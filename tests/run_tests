@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+ROOTDIR=$(dirname $0)
+ROOTDIR=$(readlink -f "$ROOTDIR")
+
+export PYTHONPATH="$ROOTDIR/..:$PYTHONPATH"
+SAVERESULTS=0
+if [ "$1" == "--save" ]; then
+    SAVERESULTS=1
+fi
+
+export DATADIR="$ROOT/data/"
+
+TMPDIRROOT=$(mktemp -d)
+for T in $ROOTDIR/tests/*; do
+    if [ -e "$T/test.py" ]; then
+        TEST=$(basename "$T")
+        TMPDIR="$TMPDIRROOT/$TEST"
+        mkdir -p $TMPDIR
+        MD5FILE=$(mktemp)
+        cd $TMPDIR
+        python $T/test.py > log-stdout.txt  2> log-stderr.txt
+        md5sum *  > $MD5FILE
+    
+        if [ ! -e "$T/reference/results.txt" ]; then
+            echo "Running test $TEST for the first time. Storing results"
+            cp $MD5FILE "$T/reference/results.txt"
+            git add "$T/reference/results.txt"
+        fi
+
+        NEW=$(cat $MD5FILE | md5sum -)
+        REF=$(cat "$T/reference/results.txt" | md5sum -)
+        RESULT="PASS"
+        if [ "$NEW" != "$REF" ]; then
+            RESULT="FAIL"
+        fi
+        echo "$TEST     $RESULT"
+        rm $MD5FILE
+    fi
+done
+
+if [ "$SAVERESULTS" == "1" ]; then
+    echo "Saved results to $TMPDIRROOT"
+else
+    rm -rf "$TMPDIRROOT"
+fi

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+if [ ! -d "$VMD_PATH" ]; then
+	if [ -e /Applications ]; then
+		SUFFIX=MACOSXX86
+		for F in /Applications/VMD*.app/Contents/vmd; do
+			VMD_PATH=$F
+		done
+	
+	else
+		SUFFIX=LINUXAMD64
+		VMD=$(which vmd 2>/dev/null) 
+		if [ ! -x "$VMD" ]; then
+			echo "Cannot find VMD. Ensure that 'vmd' is in the PATH"
+			exit 1
+		fi
+
+		VMD_PATH=$(grep defaultvmddir $VMD | head -1 | sed 's/.*=//g' | sed 's/"//g' )
+	fi
+fi
+
+
+if [ ! -d "$VMD_PATH" ]; then
+	echo "Cannot find VMD. Set VMD_PATH to point to the directory containing vmd_XXX"
+	exit 1
+fi
+
+
+#echo "[$VMD_PATH]"
+
+if ! [ -x "$VMD_PATH/vmd_$SUFFIX" ]; then
+	echo "Cannot find vmd_$SUFFIX. Ensure that 'vmd' is in the PATH"
+	exit 1
+fi
+
+export LD_LIBRARY_PATH="$VMD_PATH:$LD_LIBRARY_PATH"
+export VMDDIR="$VMD_PATH"
+export MASTERVMDDIR="$VMD_PATH"
+export VMDDISPLAYDEVICE=win
+export VMDTITLE=off
+export TCL_LIBRARY="$VMD_PATH/scripts/tcl"
+export PYTHONPATH="$VMD_PATH/scripts/python"
+export STRIDE_BIN="$VMD_PATH/stride_$SUFFIX"
+export SURF_BIN="$VMD_PATH/surf_$SUFFIX"
+export TACHYON_BIN="$VMD_PATH/tachyon_$SUFFIX"
+
+exec "$MASTERVMDDIR/vmd_$SUFFIX" -eofexit -nt $*
+
+
