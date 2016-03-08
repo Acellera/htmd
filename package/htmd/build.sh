@@ -1,16 +1,8 @@
 echo "building"
-#cd C
-#make
 
 export PATH=$PATH:/usr/bin/:/bin/
 printenv
 
-if [ "$?" != "0" ]; then
-	echo "Error: Build failed"
-	exit 1
-fi
-
-cd ..
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
