@@ -66,8 +66,12 @@ def check_registration(product=None):
 
     if not os.path.exists(prefix):
         if not check_approval(product, prefix):
-            accept_license(product=product)
-            do_register(product=product)
+            if( os.getenv("LICENCE_ACCEPTED") == "YES" ):
+                print("Licence accepted automatically. License terms apply")
+                return 
+            else:
+                accept_license(product=product)
+                do_register(product=product)
 
 
 def accept_license(product=None):
