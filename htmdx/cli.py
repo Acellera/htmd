@@ -84,7 +84,7 @@ def show_license(product=None):
     if (product):
         path = os.path.join(path, product)
 
-    path = os.path.join(path, "ACADEMIC_LICENCE.txt")
+    path = os.path.join(path, "LICENCE.txt")
     if not os.path.exists(path):
         print("Could not find license file. Aborting")
         os._exit(1)
