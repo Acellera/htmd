@@ -13,7 +13,12 @@ from htmd.molecule.support import *
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
     import inspect
-    libdir = (os.path.dirname(inspect.getfile(vmdselection))) + "/../lib"
+    import platform
+    p = platform.system()
+    libdir = (os.path.dirname(inspect.getfile(vmdselection)))
+    libdir = os.path.join( libdir, ".." )
+    libdir = os.path.join( libdir, "lib" )
+    libdir = os.path.join( libdir, p )
 
     if coordinates.ndim == 2:
         coordinates = numpy.atleast_3d(coordinates)
@@ -54,7 +59,7 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     if occupancy is not None and len(occupancy) != natoms:
         raise NameError("'occupancy' not natoms in length")
 
-    parser = cdll.LoadLibrary(libdir + "/libvmdparser.so")
+    parser = cdll.LoadLibrary( os.path.join( libdir , "libvmdparser.so") )
 
     c_selection = create_string_buffer(selection.encode('ascii'), len(selection) + 1)
     c_natoms = c_int(natoms)
@@ -166,7 +171,7 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
     if len(resid) != natoms:
         raise NameError("'resid' not natoms in length")
 
-    parser = cdll.LoadLibrary(libdir + "/libvmdparser.so")
+    parser = cdll.LoadLibrary( os.path.join( libdir , "libvmdparser.so" ) )
 
     c_natoms = c_int(natoms)
     c_atomname = pack_string_buffer(atomname)

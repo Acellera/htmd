@@ -27,7 +27,15 @@ def wrap( coordinates, bonds, box ):
 
     import inspect
 
-    libdir = (os.path.dirname(inspect.getfile(wrap))) + "/../lib"
+    libdir = (os.path.dirname(inspect.getfile(wrap))) 
+
+    import platform
+    p = platform.system()
+    libdir = (os.path.dirname(inspect.getfile(wrap))) 
+    libdir = os.path.join( libdir, ".." )
+    libdir = os.path.join( libdir, "lib" )
+    libdir = os.path.join( libdir, p )
+
 
     if coordinates.ndim == 2:
         c = coordinates.shape
@@ -48,7 +56,7 @@ def wrap( coordinates, bonds, box ):
         raise NameError("'box' not nframes x 3 in length")
 
 
-    lib = cdll.LoadLibrary(libdir + "/libvmdparser.so")
+    lib = cdll.LoadLibrary( os.path.join( libdir , "libvmdparser.so") )
 
     nbonds = bonds.shape[0]
     ll = 3 * nbonds
