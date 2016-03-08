@@ -1,6 +1,6 @@
 echo "building"
-cd C
-make
+#cd C
+#make
 
 export PATH=$PATH:/usr/bin/:/bin/
 printenv
