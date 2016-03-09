@@ -2,6 +2,7 @@ language: python
 python:
  - "3.4"
  - "3.5"
+
 install:
  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
  - bash miniconda.sh -b -p $HOME/miniconda
@@ -11,12 +12,15 @@ install:
  - conda config --add channels omnia
  - conda config --add channels acellera
  - conda install conda-build -y
- - conda build package/htmd-data
+ - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-data
  - conda install htmd-data --use-local
- - conda build package/htmd
+ - export BUILD_VERSION=$(date +%y.%m.%d)
+ - export BUILD_NUMBER=0
+ - conda build --python $TRAVIS_PYTHON_VERSION package/htmd
  - conda install htmd      --use-local
 
 script:
  - htmd --help
+# - anaconda upload /home/travis/miniconda3/conda-bld/linux-64/htmd-[0123]*.tar.bz2 -u acellera
 
 

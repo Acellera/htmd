@@ -39,14 +39,14 @@ cd "$SP_DIR/../../"
 chmod -R a+rX "$PREFIX"
 
 
-for T in 3.4 3.5; do
-	if [ "$T" != "$PY_VER" ]; then
-		mkdir -p python${T}/site-packages
-		cd python${T}/site-packages
-		ln -s ../../python${PY_VER}/site-packages/htmd .
-		ln -s ../../python${PY_VER}/site-packages/htmdx .
-		cd -
-	fi
-done
+#for T in 3.4 3.5; do
+#	if [ "$T" != "$PY_VER" ]; then
+#		mkdir -p python${T}/site-packages
+#		cd python${T}/site-packages
+#		ln -s ../../python${PY_VER}/site-packages/htmd .
+#		ln -s ../../python${PY_VER}/site-packages/htmdx .
+#	cd -
+#	fi
+#done
 
 exit 0
