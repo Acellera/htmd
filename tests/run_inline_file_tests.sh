@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 RET=0
 TF=$(mktemp)
 for T in $(find htmd -name "*.py" -type f); do 
