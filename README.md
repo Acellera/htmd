@@ -6,15 +6,16 @@ HTMD (high-throughput molecular dynamics) is a programmable, extensible platform
 It provides a complete workspace for simulation-based discovery through MD while aiming to solve the data generation and analysis problem as well as increase reproducibility.
 
 HTMD is free for academia.
+
 For commerial use, Acellera provides licenses through https://www.acellera.com/contact/.
 
-## Download HTMD
+### Download HTMD
 HTMD can be downloaded from www.htmd.org.
 
-## HTMD documentation, tutorials and forums.
+### HTMD documentation, tutorials and forums.
 Documentation, tutorials and forums of HTMD can be found on www.htmd.org.
 
-## Citing HTMD
+### Citing HTMD
 If you use HTMD in your publication please cite:
 
 **HTMD: High-throughput molecular dynamics for molecular discovery**
