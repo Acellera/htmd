@@ -356,12 +356,13 @@ class Molecule:
                 self.bonds = mol.bonds
 
             for k in self._append_fields:
+                dtype = self._append_fields[k]
                 if self.__dict__[k] is None or np.size(self.__dict__[k]) == 0:
-                    self.__dict__[k] = mol.__dict__[k]
+                    self.__dict__[k] = np.array(mol.__dict__[k], dtype=dtype)
                 elif k == 'coords':
-                    self.coords = np.append(self.coords, mol.coords, 0)
+                    self.coords = np.append(self.coords, mol.coords, axis=0)
                 else:
-                    self.__dict__[k] = np.append(self.__dict__[k], mol.__dict__[k])
+                    self.__dict__[k] = np.append(self.__dict__[k], np.array(mol.__dict__[k], dtype=dtype))
             self.serial = np.arange(1, self.numAtoms+1)
         except:
             self = backup

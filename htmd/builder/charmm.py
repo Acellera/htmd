@@ -36,7 +36,7 @@ def listFiles():
 
 
 def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=True, caps=None, execute=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=None, vmd=None):
+          saltanion=None, saltcation=None, disulfide=None, patches=[], vmd=None):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -103,7 +103,9 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
     _missingSegID(mol)
     #_checkProteinGaps(mol)
 
-    # Find protonated residues and add patches for them
+    if isinstance(patches, str):
+        patches = [patches]
+	# Find protonated residues and add patches for them
     patches += _protonationPatches(mol)
 
     f = open(path.join(outdir, 'build.vmd'), 'w')
@@ -152,9 +154,7 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         f.write('\n')
 
     # Printing out extra patches
-    if patches is not None:
-        if isinstance(patches, str):
-            patches = [patches]
+    if len(patches) != 0:
         for p in patches:
             f.write(p + '\n')
         f.write('\n')
@@ -268,9 +268,14 @@ def _printAliases(f):
         'pdbalias atom ASN 2HD2 HD22\n',
 
         # Aliases for Maestro residues
+        'pdbalias residue GLH GLU\n',
+        'pdbalias residue ASH ASP\n',
+        'pdbalias residue LYN LYS\n',
         'pdbalias residue HIE HSE\n',
         'pdbalias residue HID HSD\n',
         'pdbalias residue HIP HSP\n\n',
+        'pdbalias residue CYX CYS\n\n',
+        'pdbalias residue WAT TIP3\n',
     ]
     f.writelines(lines)
 
@@ -351,7 +356,6 @@ def _removeCappedResidues(mol, seg):
 # Mapping Maestro protonated residue names to CHARMM patches
 def _protonationPatches(mol):
     protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN'}
-    renames = {'GLH': 'GLU', 'ASH': 'ASP', 'LYN': 'LYS'}
     # TODO: Do I need to rename before applying patch?
     patches = []
 
