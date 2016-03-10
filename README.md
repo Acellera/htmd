@@ -2,5 +2,25 @@
 
 
 # HTMD main repository
+HTMD (high-throughput molecular dynamics) is a programmable, extensible platform written in Python. 
+It provides a complete workspace for simulation-based discovery through MD while aiming to solve the data generation and analysis problem as well as increase reproducibility.
 
-We will be soon (early 2016) add the repository of HTMD here. Please get in touch with info@acellera.com for information.
+HTMD is free for academia.
+
+For commerial use, Acellera provides licenses through https://www.acellera.com/contact/.
+
+### Download HTMD
+HTMD can be downloaded from www.htmd.org.
+
+### HTMD documentation, tutorials and forums.
+Documentation, tutorials and forums of HTMD can be found on www.htmd.org.
+
+### Citing HTMD
+If you use HTMD in your publication please cite:
+
+**HTMD: High-throughput molecular dynamics for molecular discovery**
+Stefan Doerr, Matthew J. Harvey, Frank Noé, and Gianni De Fabritiis
+Journal of Chemical Theory and Computation
+*DOI: 10.1021/acs.jctc.6b00049*
+http://pubs.acs.org/doi/abs/10.1021/acs.jctc.6b00049
+

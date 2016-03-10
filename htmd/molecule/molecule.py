@@ -356,12 +356,13 @@ class Molecule:
                 self.bonds = mol.bonds
 
             for k in self._append_fields:
+                dtype = self._append_fields[k]
                 if self.__dict__[k] is None or np.size(self.__dict__[k]) == 0:
-                    self.__dict__[k] = mol.__dict__[k]
+                    self.__dict__[k] = np.array(mol.__dict__[k], dtype=dtype)
                 elif k == 'coords':
-                    self.coords = np.append(self.coords, mol.coords, 0)
+                    self.coords = np.append(self.coords, mol.coords, axis=0)
                 else:
-                    self.__dict__[k] = np.append(self.__dict__[k], mol.__dict__[k])
+                    self.__dict__[k] = np.append(self.__dict__[k], np.array(mol.__dict__[k], dtype=dtype))
             self.serial = np.arange(1, self.numAtoms+1)
         except:
             self = backup
@@ -1123,6 +1124,33 @@ class Molecule:
         if np.size(src.box, 1) != self.numFrames:
             src.box = np.tile(src.box, (1, self.numFrames))
         XTCwrite(src.coords, src.box, filename, self.time, self.step)
+
+    def empty(self, numAtoms):
+        """ Creates an empty molecule of N atoms.
+
+        Parameters
+        ----------
+        numAtoms : int
+            Number of atoms to create in the molecule.
+
+        Example
+        -------
+        >>> mol = Molecule()
+        >>> mol.empty(100)
+        """
+        self.record = np.array(['ATOM'] * numAtoms, dtype=self._pdb_fields['record'])
+        self.chain = np.array(['X'] * numAtoms, dtype=self._pdb_fields['chain'])
+        self.segid = np.array(['X'] * numAtoms, dtype=self._pdb_fields['segid'])
+        self.occupancy = np.array([0] * numAtoms, dtype=self._pdb_fields['occupancy'])
+        self.beta = np.array([0] * numAtoms, dtype=self._pdb_fields['beta'])
+        self.insertion = np.array([''] * numAtoms, dtype=self._pdb_fields['insertion'])
+        self.element = np.array([''] * numAtoms, dtype=self._pdb_fields['element'])
+        self.altloc = np.array([''] * numAtoms, dtype=self._pdb_fields['altloc'])
+        self.name = np.array(['UNK'] * numAtoms, dtype=self._pdb_fields['name'])
+        self.resname = np.array(['UNK'] * numAtoms, dtype=self._pdb_fields['resname'])
+        self.resid = np.array([999] * numAtoms, dtype=self._pdb_fields['resid'])
+        self.coords = np.zeros((numAtoms, 3, 1), dtype=self._pdb_fields['coords'])
+        self.serial = np.arange(1, numAtoms+1)
 
     @property
     def numFrames(self):

@@ -33,15 +33,11 @@ class __xtc(Structure):
 
 def xtc_lib():
     import platform
-    p = platform.system()
-    libdir = (os.path.dirname(inspect.getfile(XTCread))) 
-    libdir = os.path.join( libdir, ".." )
-    libdir = os.path.join( libdir, "lib" )
-    libdir = os.path.join( libdir, p )
+    libdir = os.path.join(os.path.dirname(inspect.getfile(XTCread)), "..", "lib", platform.system())
 
     lib = {}
 
-    lib['libxtc'] = cdll.LoadLibrary( os.path.join( libdir, "libxtc.so" ) )
+    lib['libxtc'] = cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
     lib['libc'] = cdll.LoadLibrary("libc.so.6")
     return lib
 
