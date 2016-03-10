@@ -26,16 +26,8 @@ def wrap( coordinates, bonds, box ):
     """
 
     import inspect
-
-    libdir = (os.path.dirname(inspect.getfile(wrap))) 
-
     import platform
-    p = platform.system()
-    libdir = (os.path.dirname(inspect.getfile(wrap))) 
-    libdir = os.path.join( libdir, ".." )
-    libdir = os.path.join( libdir, "lib" )
-    libdir = os.path.join( libdir, p )
-
+    libdir = os.path.join(os.path.dirname(inspect.getfile(wrap)), "..", "lib", platform.system())
 
     if coordinates.ndim == 2:
         c = coordinates.shape
