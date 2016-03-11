@@ -36,7 +36,7 @@ def listFiles():
 
 
 def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=True, caps=None, execute=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=[], vmd=None):
+          saltanion=None, saltcation=None, disulfide=None, patches=[], psfgen=None):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -71,8 +71,8 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         If None it will guess disulfide bonds. Otherwise provide a list of `DisulfideBridge` objects.
     patches : list of str
         Any further patches the user wants to apply
-    vmd : str
-        Path to vmd executable used to build for CHARMM with psfgen
+    psfgen : str
+        Path to psfgen executable used to build for CHARMM
 
     Returns
     -------
@@ -87,11 +87,15 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)
     """
     mol = mol.copy()
-    vmd = getVMDpath(vmd=vmd)
-    if shutil.which(vmd) is None:
-        raise NameError('Could not find executable: `' + vmd + '` in the PATH. Cannot build for CHARMM.')
+    if psfgen is None:
+        try:
+            psfgen = shutil.which('psfgen', mode=os.X_OK)
+        except:
+            raise FileNotFoundError('Could not find psfgen executable, or no execute permissions are given. '
+                                    'Run `conda install psfgen`.')
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
+    _cleanOutDir(outdir)
     if topo is None:
         topo = _defaultTopo()
     if param is None:
@@ -105,7 +109,7 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
 
     if isinstance(patches, str):
         patches = [patches]
-	# Find protonated residues and add patches for them
+    # Find protonated residues and add patches for them
     patches += _protonationPatches(mol)
 
     f = open(path.join(outdir, 'build.vmd'), 'w')
@@ -118,8 +122,9 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
     for i in range(len(topo)):
         if topo[i][0] != '.' and path.isfile(path.join(charmmdir, topo[i])):
             topo[i] = path.join(charmmdir, topo[i])
-        shutil.copy(topo[i], outdir)
-        f.write('topology ' + path.basename(topo[i]) + '\n')
+        localname = '{}.'.format(i) + path.basename(topo[i])
+        shutil.copy(topo[i], path.join(outdir, localname))
+        f.write('topology ' + localname + '\n')
     f.write('\n')
 
     _printAliases(f)
@@ -162,7 +167,7 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
     f.write('guesscoord\n')
     f.write('writepsf ' + prefix + '.psf\n')
     f.write('writepdb ' + prefix + '.pdb\n')
-    f.write('quit\n')
+    #f.write('quit\n')
     f.close()
 
     if param is not None:
@@ -175,7 +180,8 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         currdir = os.getcwd()
         os.chdir(outdir)
         f = open(logpath, 'w')
-        call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
+        #call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
+        call([psfgen, './build.vmd'], stdout=f)
         f.close()
         _logParser(logpath)
         os.chdir(currdir)
@@ -196,8 +202,18 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, topo=topo, param=param, prefix=prefix, outdir=outdir, ionize=False, caps=caps,
-                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, vmd=vmd)
+                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, psfgen=psfgen)
     return molbuilt
+
+
+def _cleanOutDir(outdir):
+    from glob import glob
+    files = glob(os.path.join(outdir, 'structure.*'))
+    files += glob(os.path.join(outdir, 'log.*'))
+    files += glob(os.path.join(outdir, '*.log'))
+    files += glob(os.path.join(outdir, 'segment*'))
+    for f in files:
+        os.remove(f)
 
 
 def _getSegments(mol):
