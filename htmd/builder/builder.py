@@ -15,7 +15,7 @@ class DisulfideBridge(object):
     def __init__(self, segid1, resid1, segid2, resid2):
         if not isinstance(segid1, str) or not isinstance(segid2, str):
             raise NameError('segment1 and segment2 options need to be strings')
-        if not (isinstance(resid1, int) or isinstance(resid1, np.int64)) or not (isinstance(resid2, int) or isinstance(resid2, np.int64)):
+        if not isinstance(resid1, (int, np.int32, np.int64)) or not isinstance(resid2, (int, np.int32, np.int64)):
             raise NameError('residue1 and residue2 options need to be integers')
         self.segid1 = segid1
         self.resid1 = resid1

@@ -12,13 +12,8 @@ from htmd.molecule.support import *
 
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
-    import inspect
     import platform
-    p = platform.system()
-    libdir = (os.path.dirname(inspect.getfile(vmdselection)))
-    libdir = os.path.join( libdir, ".." )
-    libdir = os.path.join( libdir, "lib" )
-    libdir = os.path.join( libdir, p )
+    libdir = os.path.join(os.path.dirname(inspect.getfile(vmdselection)), "..", "lib", platform.system())
 
     if coordinates.ndim == 2:
         coordinates = numpy.atleast_3d(coordinates)
@@ -59,7 +54,7 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     if occupancy is not None and len(occupancy) != natoms:
         raise NameError("'occupancy' not natoms in length")
 
-    parser = cdll.LoadLibrary( os.path.join( libdir , "libvmdparser.so") )
+    parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
     c_selection = create_string_buffer(selection.encode('ascii'), len(selection) + 1)
     c_natoms = c_int(natoms)
@@ -147,8 +142,6 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
 
 
 def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, insertion, altloc):
-    libdir = (os.path.dirname(inspect.getfile(vmdselection))) + "/../lib"
-
     # if it's a single frame, resize to be a 3d array
     if coordinates.ndim == 2:
         c = coordinates.shape
@@ -171,7 +164,9 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
     if len(resid) != natoms:
         raise NameError("'resid' not natoms in length")
 
-    parser = cdll.LoadLibrary( os.path.join( libdir , "libvmdparser.so" ) )
+    import platform
+    libdir = os.path.join(os.path.dirname(inspect.getfile(vmdselection)), "..", "lib", platform.system())
+    parser = cdll.LoadLibrary( os.path.join(libdir, "libvmdparser.so"))
 
     c_natoms = c_int(natoms)
     c_atomname = pack_string_buffer(atomname)
