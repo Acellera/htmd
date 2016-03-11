@@ -204,16 +204,18 @@ def _applyCaps(mol, caps):
         # 2. In adding NME, remove the OXT oxygen and in that place, put the N atom of NME
         # 3. reoder to put the new atoms first and last
         # 4. Give them unique resids
+        # Toni: XPLOR names for H[123] is HT[123];  OXT is OT1 . The following code assumes
+        # just one of the two is present.
         segment = mol.atomselect('segid {}'.format(seg))
         segmentfirst = np.where(segment)[0][0]
         segmentlast = np.where(segment)[0][-1]
         resids = np.unique(mol.get('resid', sel=segment))
-        ntermAtomToMod = mol.atomselect('segid {} and resid {} and name H2'.format(seg, np.min(resids)), indexes=True)
-        ctermAtomToMod = mol.atomselect('segid {} and resid {} and name OXT'.format(seg, np.max(resids)), indexes=True)
+        ntermAtomToMod = mol.atomselect('segid {} and resid {} and name H2 HT2'.format(seg, np.min(resids)), indexes=True)
+        ctermAtomToMod = mol.atomselect('segid {} and resid {} and name OXT OT1'.format(seg, np.max(resids)), indexes=True)
         if len(ntermAtomToMod) != 1:
-            raise AssertionError('Segment {} is missing atom H2 in resid {}. Cannot cap.'.format(seg, np.min(resids)))
+            raise AssertionError('Segment {}, resid {} should have either one H2 or one HT2 atom. Cannot cap.'.format(seg, np.min(resids)))
         if len(ctermAtomToMod) != 1:
-            raise AssertionError('Segment {} is missing atom OXT in resid {}. Cannot cap.'.format(seg, np.max(resids)))
+            raise AssertionError('Segment {}, resid {} should have either one OXT or one OT1 atom. Cannot cap.'.format(seg, np.max(resids)))
         mol.set('resname', caps[seg][0], sel=ntermAtomToMod)
         mol.set('name', 'C', sel=ntermAtomToMod)
         mol.set('resid', np.min(resids)-1, sel=ntermAtomToMod)
@@ -228,7 +230,10 @@ def _applyCaps(mol, caps):
         neworder[segmentlast] = ctermAtomToMod
         _reorderMol(mol, neworder)
 
-        mol.remove('segid {} and resid {} and name H1 H3'.format(seg, np.min(resids)))
+        torem = mol.atomselect('segid {} and resid {} and name H1 H3 HT1 HT3'.format(seg, np.min(resids)))
+        if np.sum(torem) != 2:
+            raise AssertionError('Segment {}, resid {} should have H[123] or HT[123] atoms. Cannot cap.'.format(seg, np.min(resids)))
+        mol.remove(torem)
 
 
 def _defaultCaps(mol):
