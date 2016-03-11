@@ -39,8 +39,8 @@ def listFiles():
         print('par/' + p)
 
 
-def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=True, caps=None, execute=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=[], psfgen=None):
+def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
+          saltanion=None, saltcation=None, disulfide=None, patches=[], psfgen=None, execute=True):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -57,14 +57,12 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         The prefix for the generated pdb and psf files
     outdir : str
         The path to the output directory
-    ionize : bool
-        Enable or disable ionization
     caps : dict
         A dictionary with keys segids and values lists of strings describing the caps of that segment.
-        e.g. caps['P'] = ['first ACE', 'last CT2']. Default: will apply ACE and CT2 caps to proteins and none caps
+        e.g. caps['P'] = ['first ACE', 'last CT3']. Default: will apply ACE and CT3 caps to proteins and none caps
         to the rest
-    execute : bool
-        Disable building. Will only write out the vmd script needed by psfgen. Does not include ionization.
+    ionize : bool
+        Enable or disable ionization
     saltconc : float
         Salt concentration (in Molar) to add to the system after neutralization.
     saltanion : {'CLA'}
@@ -77,6 +75,8 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         Any further patches the user wants to apply
     psfgen : str
         Path to psfgen executable used to build for CHARMM
+    execute : bool
+        Disable building. Will only write out the input script needed by psfgen. Does not include ionization.
 
     Returns
     -------
@@ -382,7 +382,7 @@ def _defaultCaps(mol):
 def _removeCappedResidues(mol, seg):
     # Default caps for charmm
     nter = 'ACE'
-    cter = 'CT2'
+    cter = 'CT3'
 
     # Mapping from various residue caps to charmm patches
     '''
