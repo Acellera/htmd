@@ -8,15 +8,19 @@ from __future__ import print_function
 import numpy as np
 import os.path as path
 import os
-from htmd.home import home
-import shutil
-from htmd.molecule.molecule import Molecule
-from subprocess import call
-from htmd.molecule.util import _missingChain, _missingSegID
 import re
+import shutil
+import textwrap
+
+from subprocess import call
+
+from htmd.home import home
+from htmd.molecule.molecule import Molecule
+from htmd.molecule.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -208,76 +212,129 @@ def _getSegments(mol):
 
 
 def _printAliases(f):
-    lines = [
-        '# Aliases\n',
-        'pdbalias residue G GUA\n',
-        'pdbalias residue C CYT\n',
-        'pdbalias residue A ADE\n',
-        'pdbalias residue T THY\n',
-        'pdbalias residue U URA\n',
+    lines = '''
+        # Aliases
+        pdbalias residue G GUA
+        pdbalias residue C CYT
+        pdbalias residue A ADE
+        pdbalias residue T THY
+        pdbalias residue U URA
 
-        'foreach bp { GUA CYT ADE THY URA } {\n',
-        '\tpdbalias atom $bp "O5\\*" O5\'\n',
-        '\tpdbalias atom $bp "C5\\*" C5\'\n',
-        '\tpdbalias atom $bp "O4\\*" O4\'\n',
-        '\tpdbalias atom $bp "C4\\*" C4\'\n',
-        '\tpdbalias atom $bp "C3\\*" C3\'\n',
-        '\tpdbalias atom $bp "O3\\*" O3\'\n',
-        '\tpdbalias atom $bp "C2\\*" C2\'\n',
-        '\tpdbalias atom $bp "O2\\*" O2\'\n',
-        '\tpdbalias atom $bp "C1\\*" C1\'\n',
-        '}\n',
+        foreach bp { GUA CYT ADE THY URA } {
+            pdbalias atom $bp "O5\*" O5'
+            pdbalias atom $bp "C5\*" C5'
+            pdbalias atom $bp "O4\*" O4'
+            pdbalias atom $bp "C4\*" C4'
+            pdbalias atom $bp "C3\*" C3'
+            pdbalias atom $bp "O3\*" O3'
+            pdbalias atom $bp "C2\*" C2'
+            pdbalias atom $bp "O2\*" O2'
+            pdbalias atom $bp "C1\*" C1'
+        }
 
-        'pdbalias atom ILE CD1 CD\n',
-        'pdbalias atom SER HG HG1\n',
-        'pdbalias residue HIS HSD\n',
+        pdbalias atom ILE CD1 CD
+        pdbalias atom SER HG HG1
+        pdbalias residue HIS HSD
 
-        '# Heme aliases\n',
-        'pdbalias residue HEM HEME\n',
-        'pdbalias atom HEME "N A" NA\n',
-        'pdbalias atom HEME "N B" NB\n',
-        'pdbalias atom HEME "N C" NC\n',
-        'pdbalias atom HEME "N D" ND\n',
+        # Heme aliases
+        pdbalias residue HEM HEME
+        pdbalias atom HEME "N A" NA
+        pdbalias atom HEME "N B" NB
+        pdbalias atom HEME "N C" NC
+        pdbalias atom HEME "N D" ND
 
-        '# Water aliases\n',
-        'pdbalias residue HOH TIP3\n',
-        'pdbalias atom TIP3 O OH2\n',
+        # Water aliases
+        pdbalias residue HOH TIP3
+        pdbalias atom TIP3 O OH2
 
-        '# Ion aliases\n',
-        'pdbalias residue K POT\n',
-        'pdbalias atom K K POT\n',
-        'pdbalias residue ICL CLA\n',
-        'pdbalias atom ICL CL CLA\n',
-        'pdbalias residue INA SOD\n',
-        'pdbalias atom INA NA SOD\n',
-        'pdbalias residue CA CAL\n',
-        'pdbalias atom CA CA CAL\n',
-        'pdbalias residue ZN ZN2\n',
+        # Ion aliases
+        pdbalias residue K POT
+        pdbalias atom K K POT
+        pdbalias residue ICL CLA
+        pdbalias atom ICL CL CLA
+        pdbalias residue INA SOD
+        pdbalias atom INA NA SOD
+        pdbalias residue CA CAL
+        pdbalias atom CA CA CAL
+        pdbalias residue ZN ZN2
 
-        '# Other aliases\n',
-        'pdbalias atom LYS 1HZ HZ1\n',
-        'pdbalias atom LYS 2HZ HZ2\n',
-        'pdbalias atom LYS 3HZ HZ3\n',
+        # Other aliases
+        pdbalias atom LYS 1HZ HZ1
+        pdbalias atom LYS 2HZ HZ2
+        pdbalias atom LYS 3HZ HZ3
 
-        'pdbalias atom ARG 1HH1 HH11\n',
-        'pdbalias atom ARG 2HH1 HH12\n',
-        'pdbalias atom ARG 1HH2 HH21\n',
-        'pdbalias atom ARG 2HH2 HH22\n',
+        pdbalias atom ARG 1HH1 HH11
+        pdbalias atom ARG 2HH1 HH12
+        pdbalias atom ARG 1HH2 HH21
+        pdbalias atom ARG 2HH2 HH22
 
-        'pdbalias atom ASN 1HD2 HD21\n',
-        'pdbalias atom ASN 2HD2 HD22\n',
+        pdbalias atom ASN 1HD2 HD21
+        pdbalias atom ASN 2HD2 HD22
 
         # Aliases for Maestro residues
-        'pdbalias residue GLH GLU\n',
-        'pdbalias residue ASH ASP\n',
-        'pdbalias residue LYN LYS\n',
-        'pdbalias residue HIE HSE\n',
-        'pdbalias residue HID HSD\n',
-        'pdbalias residue HIP HSP\n\n',
-        'pdbalias residue CYX CYS\n\n',
-        'pdbalias residue WAT TIP3\n',
-    ]
-    f.writelines(lines)
+        pdbalias residue GLH GLU
+        pdbalias residue ASH ASP
+        pdbalias residue LYN LYS
+        pdbalias residue HIE HSE
+        pdbalias residue HID HSD
+        pdbalias residue HIP HSP
+        pdbalias residue CYX CYS
+        pdbalias residue WAT TIP3
+
+        # Generated by gen_psfaliases.py (Toni) on 2016-03-11 10:21
+        pdbalias atom ALA H HN
+        pdbalias atom ARG H HN
+        pdbalias atom ARG HB3 HB1
+        pdbalias atom ARG HG3 HG1
+        pdbalias atom ARG HD3 HD1
+        pdbalias atom ASP H HN
+        pdbalias atom ASP HB3 HB1
+        pdbalias atom ASN H HN
+        pdbalias atom ASN HB3 HB1
+        pdbalias atom CYS H HN
+        pdbalias atom CYS HB3 HB1
+        pdbalias atom GLU H HN
+        pdbalias atom GLU HB3 HB1
+        pdbalias atom GLU HG3 HG1
+        pdbalias atom GLN H HN
+        pdbalias atom GLN HB3 HB1
+        pdbalias atom GLN HG3 HG1
+        pdbalias atom GLY H HN
+        pdbalias atom GLY HA3 HA1
+        pdbalias atom HIS H HN
+        pdbalias atom HIS HB3 HB1
+        pdbalias atom ILE H HN
+        pdbalias atom ILE HG13 HG11
+        pdbalias atom ILE HD11 HD1
+        pdbalias atom ILE HD12 HD2
+        pdbalias atom ILE HD13 HD3
+        pdbalias atom LEU H HN
+        pdbalias atom LEU HB3 HB1
+        pdbalias atom LYS H HN
+        pdbalias atom LYS HB3 HB1
+        pdbalias atom LYS HG3 HG1
+        pdbalias atom LYS HD3 HD1
+        pdbalias atom LYS HE3 HE1
+        pdbalias atom MET H HN
+        pdbalias atom MET HB3 HB1
+        pdbalias atom MET HG3 HG1
+        pdbalias atom PHE H HN
+        pdbalias atom PHE HB3 HB1
+        pdbalias atom PRO H2 HT2
+        pdbalias atom PRO H3 HT1
+        pdbalias atom PRO HB3 HB1
+        pdbalias atom PRO HG3 HG1
+        pdbalias atom PRO HD3 HD1
+        pdbalias atom SER H HN
+        pdbalias atom SER HB3 HB1
+        pdbalias atom THR H HN
+        pdbalias atom TRP H HN
+        pdbalias atom TRP HB3 HB1
+        pdbalias atom TYR H HN
+        pdbalias atom TYR HB3 HB1
+        pdbalias atom VAL H HN
+    '''
+    f.write(textwrap.dedent(lines))
 
 
 def _defaultTopo():
