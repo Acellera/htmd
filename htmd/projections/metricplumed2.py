@@ -29,12 +29,15 @@ class PlumedGroup():
     """
 
     def __init__(self, label, mol, sel):
-        self._atomlist=mol.atomselect(sel)
-        self._label=label
+        al=mol.get("serial",sel)
+        al=list(al)
+        self.label=label
+        self.mol=mol
+        self.sel=sel
+        self.code = "%s: GROUP ATOMS=%s" % (label,",".join(map(str,al)))
 
     def __repr__(self):
-        out="%s: GROUP ATOMS=%s" % (self._label,",".join(self._al))
-        return out
+        return self.code
 
 
 class MetricPlumed2(Projection):
@@ -48,7 +51,7 @@ class MetricPlumed2(Projection):
 
     def __init__(self, plumed_inp_str):
         # I am not sure at all about opening files here is good style
-        self._enginePreinitialized = False
+        self._precalculate = False
         self._plib = False
 
         self._metainp = tempfile.NamedTemporaryFile(mode="w+", suffix=".meta_inp", dir="/tmp")
@@ -64,7 +67,7 @@ class MetricPlumed2(Projection):
         logger.info("Plumed temporary files are %s (in) and %s (out)" %
                     (self._metainp.name, self._colvar_name))
 
-
+    # The object model/sequence should be better thought-out here
     def _initEngine(self, mol):
         # This may throw exception, and I'm happy to stop if it does. 
         # TODO: Fallback to Matt's prepackaged library
@@ -78,30 +81,6 @@ class MetricPlumed2(Projection):
         plumed_create.restype = c_plumed_type
         self._pmain = plumed_create()
 
-
-        # Stuff which could be needed.  http://plumed.github.io/doc-v2.1/developer-doc/html/_how_to_plumed_your_m_d.html       
-
-        #        // Calls to pass data to plumed
-        #        plumed_cmd(plumedmain,"setRealPrecision",&real_precision);     // Pass a pointer to an integer containing the size of a real number (4 or 8)
-        #        plumed_cmd(plumedmain,"setMDEnergyUnits",&energyUnits);        // Pass a pointer to the conversion factor between the energy unit used in your code and kJ mol-1
-        #        plumed_cmd(plumedmain,"setMDLengthUnits",&lengthUnits);        // Pass a pointer to the conversion factor between the length unit used in your code and nm 
-        #        plumed_cmd(plumedmain,"setMDTimeUnits",&timeUnits);            // Pass a pointer to the conversion factor between the time unit used in your code and ps
-        #        plumed_cmd(plumedmain,"setPlumedDat",&plumedInput);            // Pass the name of the plumed input file from the md code to plumed
-        #        plumed_cmd(plumedmain,"setMPIComm",&MPI_COMM_WORLD);           // Pass a pointer to the MPI communicator to plumed
-        #        // notice that from fortran the command "setMPIFComm" should be used instead
-        #        plumed_cmd(plumedmain,"setNatoms",&natoms);                    // Pass a pointer to the number of atoms in the system to plumed
-        #        plumed_cmd(plumedmain,"setMDEngine","gromacs");                // Pass the name of your md engine to plumed (now it is just a label) 
-        #        plumed_cmd(plumedmain,"setLog",fplog);                         // Pass the file on which to write out the plumed log (if the file is already open)
-        #        plumed_cmd(plumedmain,"setLogFile",fplog);                     // Pass the file  on which to write out the plumed log (to be created)
-        #        plumed_cmd(plumedmain,"setTimestep",&delta_t);                 // Pass a pointer to the molecular dynamics timestep to plumed
-        #        
-        #        plumed_cmd(plumedmain,"setKbT",&kbT);                          // Tell to PLUMED the value of kbT - ONLY VALID IF API VERSION > 1
-
-
-
-        # Calls to do the actual initialization (all the above commands must appear before this call)
-        # plumed_cmd(plumedmain,"init",NULL);                            // Do all the initialization of plumed
-
     def getApiVersion(self):
         if not self._plib:
             raise Exception("Engine not initalized yet")
@@ -114,14 +93,14 @@ class MetricPlumed2(Projection):
     def _precalculate(self, mol):
         logger.info("In _precalculate")
         self._initEngine(mol)
-        self._enginePreinitialized = True
+        self._precalculate = True
 
     def _getEngine(self, mol):
-        if not self._enginePreinitialized:
+        if not self._precalculate:
             self._initEngine(mol)
 
     def getMapping(self, mol):
-        # TODO
+        # Useful?
         return
 
     def _tempFileName(self,prefix="",suffix=""):
@@ -143,7 +122,7 @@ class MetricPlumed2(Projection):
                 cols_str=line.split()[1:]
                 cols=[float(x) for x in cols_str]
                 data.append(cols)
-        return data
+        return numpy.array(data)
 
 
 
@@ -161,6 +140,26 @@ class MetricPlumed2(Projection):
         data : np.ndarray
             An array containing the projected data.
         """
+
+        # Stuff which could be needed.  http://plumed.github.io/doc-v2.1/developer-doc/html/_how_to_plumed_your_m_d.html
+        #        // Calls to pass data to plumed
+        #        plumed_cmd(plumedmain,"setRealPrecision",&real_precision);     // Pass a pointer to an integer containing the size of a real number (4 or 8)
+        #        plumed_cmd(plumedmain,"setMDEnergyUnits",&energyUnits);        // Pass a pointer to the conversion factor between the energy unit used in your code and kJ mol-1
+        #        plumed_cmd(plumedmain,"setMDLengthUnits",&lengthUnits);        // Pass a pointer to the conversion factor between the length unit used in your code and nm
+        #        plumed_cmd(plumedmain,"setMDTimeUnits",&timeUnits);            // Pass a pointer to the conversion factor between the time unit used in your code and ps
+        #        plumed_cmd(plumedmain,"setPlumedDat",&plumedInput);            // Pass the name of the plumed input file from the md code to plumed
+        #        plumed_cmd(plumedmain,"setMPIComm",&MPI_COMM_WORLD);           // Pass a pointer to the MPI communicator to plumed
+        #        // notice that from fortran the command "setMPIFComm" should be used instead
+        #        plumed_cmd(plumedmain,"setNatoms",&natoms);                    // Pass a pointer to the number of atoms in the system to plumed
+        #        plumed_cmd(plumedmain,"setMDEngine","gromacs");                // Pass the name of your md engine to plumed (now it is just a label)
+        #        plumed_cmd(plumedmain,"setLog",fplog);                         // Pass the file on which to write out the plumed log (if the file is already open)
+        #        plumed_cmd(plumedmain,"setLogFile",fplog);                     // Pass the file  on which to write out the plumed log (to be created)
+        #        plumed_cmd(plumedmain,"setTimestep",&delta_t);                 // Pass a pointer to the molecular dynamics timestep to plumed
+        #
+        #        plumed_cmd(plumedmain,"setKbT",&kbT);                          // Tell to PLUMED the value of kbT - ONLY VALID IF API VERSION > 1
+
+        # Calls to do the actual initialization (all the above commands must appear before this call)
+        # plumed_cmd(plumedmain,"init",NULL);                            // Do all the initialization of plumed
 
         self._getEngine(mol)
         cmd = self._plib.plumed_cmd
@@ -219,6 +218,7 @@ if __name__ == "__main__":
     metric = MetricPlumed2(['d1: DISTANCE ATOMS=2,3',
                             'd2: DISTANCE ATOMS=5,6'] )
     data = metric.project(mol)
+    pass
 
     # print("Plumed API is version %d" % pl.getApiVersion())
 
