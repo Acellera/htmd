@@ -52,17 +52,17 @@ class MetricPlumed2(Projection):
         self._plib = False
 
         self._metainp = tempfile.NamedTemporaryFile(mode="w+", suffix=".meta_inp", dir="/tmp")
-        self._colvar = tempfile.NamedTemporaryFile(mode="w+", suffix=".colvar", dir="/tmp")
+        self._colvar_name = self._tempFileName(suffix=".colvar")
 
         if not isinstance(plumed_inp_str,str):
             plumed_inp_str="\n".join(plumed_inp_str)
-        plumed_inp_str += '\nPRINT ARG=* FILE=%s\n# FLUSH STRIDE=1\n' % self._colvar.name
+        plumed_inp_str += '\nPRINT ARG=* FILE=%s\n# FLUSH STRIDE=1\n' % self._colvar_name
         self._metainp.write(plumed_inp_str)
         self._metainp.flush()
 
 
         logger.info("Plumed temporary files are %s (in) and %s (out)" %
-                    (self._metainp.name, self._colvar.name))
+                    (self._metainp.name, self._colvar_name))
 
 
     def _initEngine(self, mol):
@@ -121,37 +121,29 @@ class MetricPlumed2(Projection):
             self._initEngine(mol)
 
     def getMapping(self, mol):
-        #        dih = self._getSelections(mol)
-        #        map = []
-        #        for i, d in enumerate(dih):
-        #            resids = mol.resid[d]
-        #            uqresids = np.unique(resids)
-        #            mapstr = ''
-        #            for u in uqresids:
-        #                mapstr += 'resid {} atoms: '.format(u)
-        #                residatoms = mol.name[(mol.resid == u) & d]
-        #                for a in residatoms:
-        #                    mapstr += '{} '.format(a)
-        #            if self._sincos:
-        #                map.append('Sine of angle of ' + mapstr)
-        #                map.append('Cosine of angle of ' + mapstr)
-        #            else:
-        #                map.append('Angle of ' + mapstr)
-        #        return np.array(map)
+        # TODO
         return
 
+    def _tempFileName(self,prefix="",suffix=""):
+        return os.path.join(tempfile._get_default_tempdir(),
+                            prefix+next(tempfile._get_candidate_names())+suffix)
 
+    # Assumptions: file begins with #! FIELDS time
+    # first line is time
+    # only colvars follow
     def _readColvar(self):
-        # Not sure why I need to reopen this. Reading the already opened does not work.
-        with open(self._colvar) as fp:
-            headerline=fp.readline()
-            headerlist=headerline.strip().replace('#! FIELDS time ','').split()
+        data=[]
+        with open(self._colvar_name,"r") as file:
+            headerline=file.readline()
+            cvnames=headerline.strip().replace('#! FIELDS time ','').split()
 
-            for line in fp.readline():
-                line=line.strip()
-                cols=line.split()
-
-
+            for line in file:
+                if line[0] == "#":
+                    continue
+                cols_str=line.split()[1:]
+                cols=[float(x) for x in cols_str]
+                data.append(cols)
+        return data
 
 
 
@@ -214,6 +206,7 @@ class MetricPlumed2(Projection):
         self._plib.plumed_finalize(self._pmain)
 
         data=self._readColvar()
+        return data
 
 
 if __name__ == "__main__":
@@ -226,10 +219,8 @@ if __name__ == "__main__":
     metric = MetricPlumed2(['d1: DISTANCE ATOMS=2,3',
                             'd2: DISTANCE ATOMS=5,6'] )
     data = metric.project(mol)
-    pass
 
     # print("Plumed API is version %d" % pl.getApiVersion())
-
 
 
     #    metr = MetricDihedral(protsel='protein')
