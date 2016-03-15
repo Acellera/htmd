@@ -8,6 +8,9 @@ matrix:
   include:
    - os: linux
      language: generic
+     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1
+   - os: linux
+     language: generic
      env: TRAVIS_PYTHON_VERSION=3.4
    - os: linux
      language: generic
@@ -58,5 +61,8 @@ script:
 after_success:
  - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2 -u acellera || /bin/true 
  - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2 -u acellera || /bin/true 
+ - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-[0-9]*.tar.bz2 -u acellera ; fi
+ - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-data-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-data-[0-9]*.tar.bz2 -u acellera ; fi
+
 
 
