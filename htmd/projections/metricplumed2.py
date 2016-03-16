@@ -51,7 +51,7 @@ class MetricPlumed2(Projection):
 
     def __init__(self, plumed_inp_str):
         # I am not sure at all about opening files here is good style
-        self._precalculate = False
+        self._precalculation_enabled = False
         self._plib = False
 
         self._metainp = tempfile.NamedTemporaryFile(mode="w+", suffix=".meta_inp", dir="/tmp")
@@ -93,10 +93,10 @@ class MetricPlumed2(Projection):
     def _precalculate(self, mol):
         logger.info("In _precalculate")
         self._initEngine(mol)
-        self._precalculate = True
+        self._precalculation_enabled = True
 
     def _getEngine(self, mol):
-        if not self._precalculate:
+        if not self._precalculation_enabled:
             self._initEngine(mol)
 
     def getMapping(self, mol):
@@ -211,15 +211,34 @@ class MetricPlumed2(Projection):
 if __name__ == "__main__":
     from htmd.home import home
     from os import path
+    from glob import glob
+    from htmd.simlist import simlist
+    from htmd import *
 
+    # One simulation
     mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
     mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
 
     metric = MetricPlumed2(['d1: DISTANCE ATOMS=2,3',
                             'd2: DISTANCE ATOMS=5,6'] )
     data = metric.project(mol)
-    pass
 
+
+
+    # Simlist
+    # datadirs=glob(path.join(home(), 'data', 'adaptive', 'data', '*' )
+    # fsims=simlist(glob(path.join(home(), 'data', 'adaptive', 'data', '*', '/')),
+    #              path.join(home(), 'data', 'adaptive', 'generators', '1','structure.pdb'))
+
+    fsims=simlist(['/home/toni/work/htmd/htmd/htmd/data/adaptive/data/e1s1_1/',
+             '/home/toni/work/htmd/htmd/htmd/data/adaptive/data/e1s2_1/'],
+            '/home/toni/work/htmd/htmd/htmd/data/adaptive/generators/1/structure.pdb')
+
+    metr=Metric(fsims)
+    metr.projection(MetricPlumed2(['d1: DISTANCE ATOMS=2,3',
+                                   'd2: DISTANCE ATOMS=5,6'] ))
+    data=metr.project()
+    pass
     # print("Plumed API is version %d" % pl.getApiVersion())
 
 
