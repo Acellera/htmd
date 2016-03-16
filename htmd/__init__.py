@@ -12,7 +12,7 @@ from htmd.metricdata import MetricData
 from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance
 from htmd.projections.metricrmsd import MetricRmsd
 from htmd.projections.metriccoordinate import MetricCoordinate
-from htmd.projections.metricdiherdal import MetricDihedral
+from htmd.projections.metricdihedral import MetricDihedral
 from htmd.projections.metricshell import MetricShell
 from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
 from htmd.projections.metric import Metric
