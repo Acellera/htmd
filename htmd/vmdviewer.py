@@ -158,7 +158,7 @@ def getVMDpath(vmd=None):
         if not vmd:
             if sys=="Linux" or sys=="Darwin":
               vmd = os.path.join( os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper")
-            elif sys=="Windows"
+            elif sys=="Windows":
               vmd = os.path.join( os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper.bat")
             else:
               raise OSError("Don't know how to run VMD on platform [" + sys + "]" )
