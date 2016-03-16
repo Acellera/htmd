@@ -7,6 +7,7 @@ from ctypes import *
 import numpy
 import os
 import inspect
+import platform
 from htmd.molecule.support import *
 
 
@@ -53,6 +54,9 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
         raise NameError("'beta' not natoms in length")
     if occupancy is not None and len(occupancy) != natoms:
         raise NameError("'occupancy' not natoms in length")
+
+    if platform.system() == "Windows":
+      cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
 
     parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 

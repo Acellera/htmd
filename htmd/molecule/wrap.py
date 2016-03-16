@@ -7,6 +7,7 @@ from ctypes import *
 import numpy
 import os
 import inspect
+import platform
 
 
 def wrap( coordinates, bonds, box ):
@@ -47,6 +48,9 @@ def wrap( coordinates, bonds, box ):
     if numpy.size(box, 1) != nframes:
         raise NameError("'box' not nframes x 3 in length")
 
+
+    if platform.system() == "Windows":
+      cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
 
     lib = cdll.LoadLibrary( os.path.join( libdir , "libvmdparser.so") )
 

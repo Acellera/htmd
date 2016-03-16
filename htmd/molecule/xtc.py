@@ -37,12 +37,14 @@ def xtc_lib():
 
     lib = {}
 
-    lib['libxtc'] = cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
 
     if platform.system() == "Windows":
       lib['libc'] = cdll.msvcrt
+      cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
     else:
       lib['libc'] = cdll.LoadLibrary("libc.so.6")
+
+    lib['libxtc'] = cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
     return lib
 
 
