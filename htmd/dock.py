@@ -73,7 +73,11 @@ def dock(protein, ligand, center=None, extent=None):
     ligand.write(ligand_pdb)
 
     try:
-        vinaexe = shutil.which('htmd_vina', mode=os.X_OK)
+        import platform
+        suffix=""
+        if platform.system() == "Windows":
+          suffix=".exe"
+        vinaexe = shutil.which( platform.system() + "-vina" + suffix, mode=os.X_OK )
     except:
         raise NameError('Could not find vina, or no execute permissions are given')
     try:

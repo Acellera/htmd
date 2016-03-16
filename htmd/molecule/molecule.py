@@ -1152,6 +1152,51 @@ class Molecule:
         self.coords = np.zeros((numAtoms, 3, 1), dtype=self._pdb_fields['coords'])
         self.serial = np.arange(1, numAtoms+1)
 
+    def sequence(self, oneletter=True):
+        residues = {'ARG': 'R', 'AR0': 'R',
+                    'HIS': 'H', 'HID': 'H', 'HIE': 'H',
+                    'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
+                    'ASP': 'D', 'ASH': 'D',
+                    'GLU': 'E', 'GLH': 'E',
+                    'SER': 'S',
+                    'THR': 'T',
+                    'ASN': 'N',
+                    'GLN': 'Q',
+                    'CYS': 'C', 'CYX': 'C',
+                    'SEC': 'U',
+                    'GLY': 'G',
+                    'PRO': 'P',
+                    'ALA': 'A',
+                    'VAL': 'V',
+                    'ILE': 'I',
+                    'LEU': 'L',
+                    'MET': 'M',
+                    'PHE': 'F',
+                    'TYR': 'Y',
+                    'TRP': 'W'}
+        from htmd.builder.builder import sequenceID
+        prot = self.atomselect('protein')
+        segs = np.unique(self.segid[prot])
+        increm = sequenceID((self.resid, self.chain))
+        sequence = {}
+        olsequence = {}
+        for seg in segs:
+            sequence[seg] = []
+            olsequence[seg] = ''
+            segatoms = self.atomselect('protein and segid {}'.format(seg))
+            resnames = self.resname[segatoms]
+            incremseg = increm[segatoms]
+            for i in np.unique(incremseg):
+                resname = np.unique(resnames[incremseg == i])
+                if len(resname) != 1:
+                    raise AssertionError('Something went wrong here.')
+                sequence[seg].append(resname)
+                olsequence[seg] += residues[resname[0]]
+        if oneletter:
+            return olsequence
+        else:
+            return sequence
+
     @property
     def numFrames(self):
         """ Number of coordinate frames in the molecule

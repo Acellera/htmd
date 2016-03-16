@@ -39,8 +39,8 @@ def listFiles():
         print('par/' + p)
 
 
-def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=True, caps=None, execute=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=[], vmd=None):
+def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
+          saltanion=None, saltcation=None, disulfide=None, patches=None, psfgen=None, execute=True):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -57,14 +57,12 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         The prefix for the generated pdb and psf files
     outdir : str
         The path to the output directory
-    ionize : bool
-        Enable or disable ionization
     caps : dict
         A dictionary with keys segids and values lists of strings describing the caps of that segment.
-        e.g. caps['P'] = ['first ACE', 'last CT2']. Default: will apply ACE and CT2 caps to proteins and none caps
+        e.g. caps['P'] = ['first ACE', 'last CT3']. Default: will apply ACE and CT3 caps to proteins and none caps
         to the rest
-    execute : bool
-        Disable building. Will only write out the vmd script needed by psfgen. Does not include ionization.
+    ionize : bool
+        Enable or disable ionization
     saltconc : float
         Salt concentration (in Molar) to add to the system after neutralization.
     saltanion : {'CLA'}
@@ -75,8 +73,10 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         If None it will guess disulfide bonds. Otherwise provide a list of `DisulfideBridge` objects.
     patches : list of str
         Any further patches the user wants to apply
-    vmd : str
-        Path to vmd executable used to build for CHARMM with psfgen
+    psfgen : str
+        Path to psfgen executable used to build for CHARMM
+    execute : bool
+        Disable building. Will only write out the input script needed by psfgen. Does not include ionization.
 
     Returns
     -------
@@ -91,11 +91,16 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)
     """
     mol = mol.copy()
-    vmd = getVMDpath(vmd=vmd)
-    if shutil.which(vmd) is None:
-        raise NameError('Could not find executable: `' + vmd + '` in the PATH. Cannot build for CHARMM.')
+    _missingSegID(mol)
+    if psfgen is None:
+        try:
+            psfgen = shutil.which('psfgen', mode=os.X_OK)
+        except:
+            raise FileNotFoundError('Could not find psfgen executable, or no execute permissions are given. '
+                                    'Run `conda install psfgen`.')
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
+    _cleanOutDir(outdir)
     if topo is None:
         topo = _defaultTopo()
     if param is None:
@@ -104,12 +109,12 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         caps = _defaultCaps(mol)
 
     #_missingChain(mol)
-    _missingSegID(mol)
     #_checkProteinGaps(mol)
-
+    if patches is None:
+        patches = []
     if isinstance(patches, str):
         patches = [patches]
-	# Find protonated residues and add patches for them
+    # Find protonated residues and add patches for them
     patches += _protonationPatches(mol)
 
     f = open(path.join(outdir, 'build.vmd'), 'w')
@@ -122,8 +127,9 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
     for i in range(len(topo)):
         if topo[i][0] != '.' and path.isfile(path.join(charmmdir, topo[i])):
             topo[i] = path.join(charmmdir, topo[i])
-        shutil.copy(topo[i], outdir)
-        f.write('topology ' + path.basename(topo[i]) + '\n')
+        localname = '{}.'.format(i) + path.basename(topo[i])
+        shutil.copy(topo[i], path.join(outdir, localname))
+        f.write('topology ' + localname + '\n')
     f.write('\n')
 
     _printAliases(f)
@@ -166,7 +172,7 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
     f.write('guesscoord\n')
     f.write('writepsf ' + prefix + '.psf\n')
     f.write('writepdb ' + prefix + '.pdb\n')
-    f.write('quit\n')
+    #f.write('quit\n')
     f.close()
 
     if param is not None:
@@ -179,7 +185,8 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
         currdir = os.getcwd()
         os.chdir(outdir)
         f = open(logpath, 'w')
-        call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
+        #call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
+        call([psfgen, './build.vmd'], stdout=f)
         f.close()
         _logParser(logpath)
         os.chdir(currdir)
@@ -200,8 +207,18 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', ionize=Tr
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, topo=topo, param=param, prefix=prefix, outdir=outdir, ionize=False, caps=caps,
-                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, vmd=vmd)
+                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, psfgen=psfgen)
     return molbuilt
+
+
+def _cleanOutDir(outdir):
+    from glob import glob
+    files = glob(os.path.join(outdir, 'structure.*'))
+    files += glob(os.path.join(outdir, 'log.*'))
+    files += glob(os.path.join(outdir, '*.log'))
+    files += glob(os.path.join(outdir, 'segment*'))
+    for f in files:
+        os.remove(f)
 
 
 def _getSegments(mol):
@@ -335,6 +352,7 @@ def _printAliases(f):
         pdbalias atom VAL H HN
     '''
     f.write(textwrap.dedent(lines))
+    f.write('\n\n')
 
 
 def _defaultTopo():
@@ -366,7 +384,7 @@ def _defaultCaps(mol):
 def _removeCappedResidues(mol, seg):
     # Default caps for charmm
     nter = 'ACE'
-    cter = 'CT2'
+    cter = 'CT3'
 
     # Mapping from various residue caps to charmm patches
     '''
@@ -413,6 +431,7 @@ def _removeCappedResidues(mol, seg):
 # Mapping Maestro protonated residue names to CHARMM patches
 def _protonationPatches(mol):
     protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN'}
+    aliases = {'CYM': 'CYS', 'AR0': 'ARG'}  # Some protonations don't exist in CHARMM
     # TODO: Do I need to rename before applying patch?
     patches = []
 
@@ -421,10 +440,18 @@ def _protonationPatches(mol):
         pres = mol.get('resid', sel='resname {} and name CA'.format(pro))
         if len(pseg) == 0:
             continue
-        patch = 'patch {}'.format(protonations[pro])
         for r in range(len(pseg)):
-            patch += ' {}:{}'.format(pseg[r], pres[r])
+            #from IPython.core.debugger import Tracer
+            #Tracer()()
+            patch = 'patch {} {}:{}'.format(protonations[pro], pseg[r], pres[r])
         patches.append(patch)
+
+    for pro in aliases:
+        sel = mol.atomselect('resname {}'.format(pro))
+        if np.sum(sel) != 0:
+            logger.warning('Found resname {}. This protonation state does not exist in CHARMM '
+                           'and will be reverted to {}.'.format(pro, aliases[pro]))
+            mol.set('resname', aliases[pro], sel=sel)
     return patches
 
 

@@ -100,7 +100,8 @@ def simlist(datafolders, molfiles, inputfolders=None):
     datafolders : str list
         A list of directories, each containing a single trajectory
     molfiles : str list
-        A list of pdb files corresponding to the trajectories in dataFolders
+        A list of pdb files corresponding to the trajectories in dataFolders. Can also be a single string to a single
+        structure which corresponds to all trajectories.
     inputfolders : optional, str list
         A list of directories, each containing the input files used to produce the trajectories in dataFolders
 
@@ -320,5 +321,8 @@ def _listXTCs(folder):
 
 def _simName(foldername):
     # Uses the name of the last folder as the simulation name
-    (tmp, name) = path.split(path.dirname(foldername))
+    if os.path.isdir(foldername):
+        name = os.path.basename(os.path.normpath(foldername))
+    else:
+        name = os.path.basename(os.path.dirname(foldername))
     return name

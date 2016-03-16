@@ -8,6 +8,7 @@
 import subprocess
 import inspect
 import threading
+import platform
 
 try:
 	# Python 2
@@ -153,9 +154,14 @@ class VMD:
         return None
 
 def getVMDpath(vmd=None):
+        sys=platform.system()
         if not vmd:
-            vmd = os.path.join( os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper")
-
+            if sys=="Linux" or sys=="Darwin":
+              vmd = os.path.join( os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper")
+            elif sys=="Windows":
+              vmd = os.path.join( os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper.bat")
+            else:
+              raise OSError("Don't know how to run VMD on platform [" + sys + "]" )
         if (not vmd) or (not os.access(vmd, os.X_OK)):
             raise OSError("Cannot find VMD. Specify the location with 'vmd=' argument")
         return vmd

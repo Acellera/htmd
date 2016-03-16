@@ -9,7 +9,7 @@ from subprocess import call,check_output
 from htmd import UserInterface
 import inspect
 import shutil
-import pwd
+#import pwd
 import os
 
 class LSF(UserInterface):
