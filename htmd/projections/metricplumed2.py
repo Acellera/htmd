@@ -85,8 +85,6 @@ class MetricPlumed2(Projection):
 
 
 
-
-
     # Arguments are actually self, mol
     def project(self, mol):
         """ Project molecule.
@@ -102,6 +100,8 @@ class MetricPlumed2(Projection):
             An array containing the projected data.
         """
 
+        logger.info("_precalculate was called? %d" % self._precalculation_enabled)
+
         # --standalone-executable driver --box 100000,100000,100000 --mf_dcd /var/tmp/vmdplumed.8003/temp.dcd
         # --pdb /var/tmp/vmdplumed.8003/temp.pdb --plumed /var/tmp/vmdplumed.8003/META_INP
 
@@ -116,6 +116,7 @@ class MetricPlumed2(Projection):
 
         # Colvar
         colvar = _getTempFileName(suffix=".colvar")
+        logger.info("Colvar file is "+ colvar)
 
         # Metainp
         metainp = _getTempFileName(suffix=".metainp")
@@ -125,22 +126,21 @@ class MetricPlumed2(Projection):
         metainp_fp.write('\nPRINT ARG=* FILE=%s\n# FLUSH STRIDE=1\n' % colvar)
         metainp_fp.close()
 
-        logger.info("Plumed temporary files are %s (in) and %s (out)" %
-                    (metainp, colvar))
 
-        subprocess.check_output([self._plumed_exe,
-                                 '--standalone-executable',
+        cmd=[self._plumed_exe,   '--standalone-executable',
                                  'driver',
                                  '--mf_dcd', dcd,
                                  '--pdb', pdb,
-                                 '--plumed',metainp])
+                                 '--plumed',metainp]
+        logger.info("Invoking "+" ".join(cmd))
+        subprocess.check_output(cmd)
 
         data = _readColvar(colvar)
 
-        os.remove(pdb)
-        os.remove(dcd)
-        os.remove(colvar)
-        os.remove(metainp)
+        # os.remove(pdb)
+        # os.remove(dcd)
+        # os.remove(colvar)
+        # os.remove(metainp)
         return data
 
 
@@ -160,8 +160,10 @@ if __name__ == "__main__":
     metric = MetricPlumed2(['d1: DISTANCE ATOMS=1,200',
                             'd2: DISTANCE ATOMS=5,6'] )
     data = metric.project(mol)
-
-
+    ref  = np.array([ 0.536674, 21.722393, 22.689391, 18.402114, 23.431387, 23.13392, 19.16376, 20.393544,
+                         23.665517, 22.298349, 22.659769, 22.667669, 22.484084, 20.893447, 18.791701,
+                          21.833056, 19.901318 ])
+    assert np.all(np.abs(ref - data[:,0]) < 0.001), 'Plumed demo calculation is broken'
 
     # Simlist
     # datadirs=glob(path.join(home(), 'data', 'adaptive', 'data', '*' )
@@ -175,23 +177,7 @@ if __name__ == "__main__":
     metr=Metric(fsims)
     metr.projection(MetricPlumed2(['d1: DISTANCE ATOMS=2,3',
                                    'd2: DISTANCE ATOMS=5,6'] ))
-    data=metr.project()
-    pass
-    # print("Plumed API is version %d" % pl.getApiVersion())
+    data2=metr.project()
+    print(data2.dat)
 
 
-    #    metr = MetricDihedral(protsel='protein')
-    #    data = metr.project(mol)
-    #
-    #    calcdata = np.array([ 0.91631763,  0.40045224,  0.90890707,  0.41699872, -0.99956623,
-    #                          0.02945084,  0.52407037, -0.85167496, -0.67766999, -0.73536616,
-    #                          0.53415969, -0.8453836 , -0.66133656, -0.7500893 ,  0.55669439,
-    #                         -0.83071738, -0.90348715, -0.42861517,  0.5950773 , -0.80366847,
-    #                         -0.5837572 , -0.81192828,  0.71012313, -0.70407751, -0.95668505,
-    #                         -0.29112493,  0.53835619, -0.84271739, -0.9231271 ,  0.38449493,
-    #                         -0.12417973,  0.99225974, -0.93138983,  0.36402332,  0.37667118,
-    #                         -0.92634703, -0.14376672, -0.98961161,  0.37357125, -0.92760149,
-    #                         -0.93655808,  0.35051244,  0.64918191, -0.76063319, -0.93758286,
-    #                         -0.34776195,  0.51787137, -0.8554585 , -0.96970912,  0.2442626 ])
-    #
-    #    assert np.all(np.abs(calcdata - data[147, 500:550]) < 0.001), 'Diherdals calculation is broken'
