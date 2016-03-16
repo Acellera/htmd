@@ -8,7 +8,6 @@ from htmd.molecule.util import molRMSD
 from htmd.molecule.util import sequenceID
 from htmd.projections.projection import Projection
 import numpy as np
-from mdtraj.geometry._geometry import _dssp as dssp
 import logging
 logger = logging.getLogger(__name__)
 
@@ -126,6 +125,7 @@ class MetricSecondaryStructure(Projection):
         xyz = np.swapaxes(np.swapaxes(np.atleast_3d(mol.coords), 1, 2), 0, 1)
         xyz = np.array(xyz.copy(), dtype=np.float32) / 10  # converting to nm
 
+        from mdtraj.geometry._geometry import _dssp as dssp
         data = dssp(xyz, nco_indices, ca_indices, proline_indices, chain_ids)
 
         if self.simplified:
