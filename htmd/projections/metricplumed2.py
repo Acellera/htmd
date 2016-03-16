@@ -9,9 +9,11 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-def _getTempFileName(prefix="",suffix=""):
+def _getTempDirName(prefix=""):
         return os.path.join(tempfile._get_default_tempdir(),
-                            prefix+next(tempfile._get_candidate_names())+suffix)
+                            prefix+next(tempfile._get_candidate_names()))
+
+
 
 # Assumptions: file begins with #! FIELDS time
 # first line is time
@@ -105,21 +107,24 @@ class MetricPlumed2(Projection):
         # --standalone-executable driver --box 100000,100000,100000 --mf_dcd /var/tmp/vmdplumed.8003/temp.dcd
         # --pdb /var/tmp/vmdplumed.8003/temp.pdb --plumed /var/tmp/vmdplumed.8003/META_INP
 
+        td=_getTempDirName("metricplumed2-")
+        os.mkdir(td)
+
         # PDB
-        pdb=_getTempFileName(suffix=".pdb")
+        pdb=path.join(td,"temp.pdb")
         mol.write(pdb)
 
         # DCD
-        dcd=_getTempFileName(suffix=".dcd")
+        dcd=path.join(td,"temp.dcd")
         mol.write(dcd)
         logger.info("Done writing %d frames in %s" % (mol.numFrames,dcd))
 
         # Colvar
-        colvar = _getTempFileName(suffix=".colvar")
+        colvar = path.join(td,"temp.colvar")
         logger.info("Colvar file is "+ colvar)
 
         # Metainp
-        metainp = _getTempFileName(suffix=".metainp")
+        metainp = path.join(td,"temp.metainp")
         metainp_fp= open(metainp,"w+")
         metainp_fp.write("UNITS  LENGTH=A  ENERGY=kcal/mol  TIME=ps\n")
         metainp_fp.write(self._plumed_inp)
@@ -136,11 +141,8 @@ class MetricPlumed2(Projection):
         subprocess.check_output(cmd)
 
         data = _readColvar(colvar)
+        shutil.rmtree(td)
 
-        # os.remove(pdb)
-        # os.remove(dcd)
-        # os.remove(colvar)
-        # os.remove(metainp)
         return data
 
 
@@ -163,7 +165,7 @@ if __name__ == "__main__":
     ref  = np.array([ 0.536674, 21.722393, 22.689391, 18.402114, 23.431387, 23.13392, 19.16376, 20.393544,
                          23.665517, 22.298349, 22.659769, 22.667669, 22.484084, 20.893447, 18.791701,
                           21.833056, 19.901318 ])
-    assert np.all(np.abs(ref - data[:,0]) < 0.001), 'Plumed demo calculation is broken'
+    assert np.all(np.abs(ref - data[:,0]) < 0.01), 'Plumed demo calculation is broken'
 
     # Simlist
     # datadirs=glob(path.join(home(), 'data', 'adaptive', 'data', '*' )
