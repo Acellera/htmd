@@ -75,8 +75,8 @@ def PRMTOPread(filename):
         i += 1
 
     for c in range(0, len(v), 3):
-        prmtop.bonds[idx, 0] = int(v[c + 0])
-        prmtop.bonds[idx, 1] = int(v[c + 1])
+        prmtop.bonds[idx, 0] = int(v[c + 0]) / 3
+        prmtop.bonds[idx, 1] = int(v[c + 1]) / 3
         idx += 1
 
     return prmtop

@@ -109,7 +109,7 @@ def detectDisulfideBonds(mol, thresh=3):
 
     for sg in idx:
         resid = mol.resid[sg]
-        sel = '(not resid {0}) and resname "CY.*" and name SG and index > {1} and exwithin {2} of index {3}'.format(resid, sg, thresh, sg)
+        sel = '(not resid "{0}") and resname "CY.*" and name SG and index > {1} and exwithin {2} of index {3}'.format(resid, sg, thresh, sg)
         idx2 = np.where(mol.atomselect(sel))[0]
 
         if len(idx2) == 0:
@@ -178,7 +178,7 @@ def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
         todelete = []
         for i in range(1, len(gaps)-1):
             gapidx = gaps[i]
-            coords = mol.get('coords', sel='resid {} {} and name CA'.format(mol.resid[gapidx], mol.resid[gapidx+1]))
+            coords = mol.get('coords', sel='resid "{}" "{}" and name CA'.format(mol.resid[gapidx], mol.resid[gapidx+1]))
             if np.shape(coords) == (2, 3):
                 dist = np.sqrt(np.sum((coords[0, :] - coords[1, :]) ** 2))
                 if dist < spatialgap:

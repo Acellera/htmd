@@ -40,7 +40,7 @@ def listFiles():
 
 
 def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=[], psfgen=None, execute=True):
+          saltanion=None, saltcation=None, disulfide=None, patches=None, psfgen=None, execute=True):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -91,6 +91,7 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)
     """
     mol = mol.copy()
+    _missingSegID(mol)
     if psfgen is None:
         try:
             psfgen = shutil.which('psfgen', mode=os.X_OK)
@@ -108,9 +109,9 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
         caps = _defaultCaps(mol)
 
     #_missingChain(mol)
-    _missingSegID(mol)
     #_checkProteinGaps(mol)
-
+    if patches is None:
+        patches = []
     if isinstance(patches, str):
         patches = [patches]
     # Find protonated residues and add patches for them
@@ -351,6 +352,7 @@ def _printAliases(f):
         pdbalias atom VAL H HN
     '''
     f.write(textwrap.dedent(lines))
+    f.write('\n\n')
 
 
 def _defaultTopo():
@@ -429,6 +431,7 @@ def _removeCappedResidues(mol, seg):
 # Mapping Maestro protonated residue names to CHARMM patches
 def _protonationPatches(mol):
     protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN'}
+    aliases = {'CYM': 'CYS', 'AR0': 'ARG'}  # Some protonations don't exist in CHARMM
     # TODO: Do I need to rename before applying patch?
     patches = []
 
@@ -437,10 +440,18 @@ def _protonationPatches(mol):
         pres = mol.get('resid', sel='resname {} and name CA'.format(pro))
         if len(pseg) == 0:
             continue
-        patch = 'patch {}'.format(protonations[pro])
         for r in range(len(pseg)):
-            patch += ' {}:{}'.format(pseg[r], pres[r])
+            #from IPython.core.debugger import Tracer
+            #Tracer()()
+            patch = 'patch {} {}:{}'.format(protonations[pro], pseg[r], pres[r])
         patches.append(patch)
+
+    for pro in aliases:
+        sel = mol.atomselect('resname {}'.format(pro))
+        if np.sum(sel) != 0:
+            logger.warning('Found resname {}. This protonation state does not exist in CHARMM '
+                           'and will be reverted to {}.'.format(pro, aliases[pro]))
+            mol.set('resname', aliases[pro], sel=sel)
     return patches
 
 
