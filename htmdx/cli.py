@@ -10,6 +10,7 @@ import inspect
 import htmdx
 import json
 import requests
+import platform
 
 has_connection=True
 
@@ -95,7 +96,10 @@ def show_license(product=None):
 
     print(sys.stdin)
     if sys.stdout.isatty() and sys.stdin:
-        call(["more", path])
+        if platform.system() == "Windows":
+           call(["c:\\Windows\\System32\\more.com", path])
+        else:
+           call(["more", path])
     else:
         fh = open(path, "r")
         print(fh.read())
