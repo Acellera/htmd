@@ -29,6 +29,10 @@ def wrap( coordinates, bonds, box ):
     import inspect
     import platform
     libdir = os.path.join(os.path.dirname(inspect.getfile(wrap)), "..", "lib", platform.system())
+    if os.path.exists( os.path.join( libdir, "pro" ) ):
+       libdir = os.path.join( libdir, "pro" )
+    if os.path.exists( os.path.join( libdir, "basic" ) ):
+       libdir = os.path.join( libdir, "basic" )
 
     if coordinates.ndim == 2:
         c = coordinates.shape
