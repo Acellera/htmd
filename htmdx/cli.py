@@ -186,6 +186,29 @@ def check_ipython_profile():
         f.close()
 
 
+def main_activate():
+    import sys
+    import requests
+    if len(sys.argv) != 2:
+      print("\n Acellera License Installation\n\n Syntax: activate [activation token]\n\nPlease contact support@acellera.com for licensing\n\n" )
+      sys.exit(0)
+    
+    token=sys.argv[1]
+    r = requests.get( "https://licensing.acellera.com/issue/?token=" + token )
+    if ( r.status_code != 200 ):
+       print("\n Error: " + r.text + "(" + str(r.status_code) + ")\n\n" )
+    else:
+       prefix = os.path.join(os.path.expanduser('~'), ".acellera" );
+       try: 
+         os.mkdir( prefix )
+       except:
+         pass
+       f = open(os.path.join( prefix, "license.dat"), "a" )   
+            
+       print(r.content.decode("ascii"), file=f )
+       f.close()
+       print( "\n License installed in ~/.acellera/license.dat\n\n" );
+
 def main_htmd():
     check_registration(product="htmd")
 
@@ -211,4 +234,4 @@ def main_htmd_notebook():
 
 
 if __name__ == '__main__':
-    main_htmd()
+    main_activate()
