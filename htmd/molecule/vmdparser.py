@@ -57,6 +57,10 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
 
     if platform.system() == "Windows":
       cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
+      if( os.path.exists( os.path.join( libdir, "psprolib.dll" ) ) ):
+        cdll.LoadLibrary( os.path.join( libdir, "psprolib.dll" ) )
+
+
 
     parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 

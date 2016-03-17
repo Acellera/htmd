@@ -44,7 +44,7 @@ def xtc_lib():
     if platform.system() == "Windows":
       lib['libc'] = cdll.msvcrt
       cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
-      if( os.path.exists( os.path.join( libdir, "psprolib.dll" ) ):
+      if( os.path.exists( os.path.join( libdir, "psprolib.dll" ) ) ):
         cdll.LoadLibrary( os.path.join( libdir, "psprolib.dll" ) )
 
     else:
