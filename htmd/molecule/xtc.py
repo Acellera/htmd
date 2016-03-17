@@ -34,9 +34,9 @@ class __xtc(Structure):
 def xtc_lib():
     import platform
     libdir = os.path.join(os.path.dirname(inspect.getfile(XTCread)), "..", "lib", platform.system())
-    if ( os.path.exists( os.path.join( libdir, "pro" ) ):
+    if ( os.path.exists( os.path.join( libdir, "pro" ) ) ):
        libdir = os.path.join( libdir, "pro" )
-    if ( os.path.exists( os.path.join( libdir, "basic" ) ):
+    if ( os.path.exists( os.path.join( libdir, "basic" ) ) ):
        libdir = os.path.join( libdir, "basic" )
     lib = {}
 
