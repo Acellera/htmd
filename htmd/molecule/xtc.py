@@ -34,13 +34,19 @@ class __xtc(Structure):
 def xtc_lib():
     import platform
     libdir = os.path.join(os.path.dirname(inspect.getfile(XTCread)), "..", "lib", platform.system())
-
+    if ( os.path.exists( os.path.join( libdir, "pro" ) ) ):
+       libdir = os.path.join( libdir, "pro" )
+    if ( os.path.exists( os.path.join( libdir, "basic" ) ) ):
+       libdir = os.path.join( libdir, "basic" )
     lib = {}
 
 
     if platform.system() == "Windows":
       lib['libc'] = cdll.msvcrt
       cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
+      if( os.path.exists( os.path.join( libdir, "psprolib.dll" ) ) ):
+        cdll.LoadLibrary( os.path.join( libdir, "psprolib.dll" ) )
+
     else:
       lib['libc'] = cdll.LoadLibrary("libc.so.6")
 

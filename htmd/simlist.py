@@ -3,6 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import os
 import os.path as path
 from os import makedirs
 from glob import glob as glob

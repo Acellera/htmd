@@ -24,6 +24,12 @@ echo "Installing into $PREFIX"
 	  rm -rf $DIR/htmdx/.idea
     rm -rf $DIR/htmd/.ipynb_checkpoints
     rm -rf $DIR/htmd/Untitled*
+    if [ "$TYPE" == "basic" ]; then
+      rm -rf $DIR/htmd/lib/pro
+		fi
+    if [ "$TYPE" == "pro" ]; then
+      rm -rf $DIR/htmd/lib/basic
+		fi
 
 
     echo "def version():" > $DIR/htmd/version.py

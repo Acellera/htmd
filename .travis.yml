@@ -1,32 +1,46 @@
-git:
- depth: 3
 branches:
  only:
-  - master
-
+  - master 
+ 
 matrix:
   include:
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1
+     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1 
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4
+     env: TRAVIS_PYTHON_VERSION=3.4 
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5
+     env: TRAVIS_PYTHON_VERSION=3.5 
    - os: osx
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4
+     env: TRAVIS_PYTHON_VERSION=3.4 
    - os: osx
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5
+     env: TRAVIS_PYTHON_VERSION=3.5 
+
+# No pspro for OS x yet
+#   - os: osx
+#     language: generic
+#     env: TRAVIS_PYTHON_VERSION=3.4 TYPE=pro
+#   - os: osx
+#     language: generic
+#     env: TRAVIS_PYTHON_VERSION=3.5 TYPE=pro
+
+
 
 
 install:
  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.sh -O miniconda.sh; fi
+
+ - if [ "$TRAVIS_REPO_SLUG" == "multiscalelab/htmd" ]; then export TYPE=basic; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ];      then export TYPE=pro; fi
+
+ - if [ "$TYPE" == "basic" ]; then export CHANNEL=acellera-basic; fi
+ - if [ "$TYPE" == "pro" ];   then export CHANNEL=acellera; fi
 
  - bash miniconda.sh -b -p $HOME/miniconda
  - export PATH="$HOME/miniconda/bin:$PATH"
@@ -35,7 +49,7 @@ install:
  - conda install conda-build -y
  - conda update --all -y
  - conda config --add channels omnia
- - conda config --add channels acellera
+ - conda config --add channels $CHANNEL
 
  - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
  - source activate travis-env
@@ -56,13 +70,19 @@ install:
 
 script:
  # Run the inline file tests 
+ - python -c "import htmd"
  - tests/run_inline_file_tests.sh
 
 after_success:
- - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2 -u acellera || /bin/true 
- - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2 -u acellera || /bin/true 
- - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-[0-9]*.tar.bz2 -u acellera ; fi
- - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-data-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-data-[0-9]*.tar.bz2 -u acellera ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "multiscalelab/htmd" ]; then export TYPE=basic; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ];      then export TYPE=pro; fi
+ - if [ "$TYPE" == "basic" ]; then export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC; export CHANNEL=acellera-basic; fi
+ - if [ "$TYPE" == "pro" ];   then export ANACONDA_TOKEN=$ANACONDA_TOKEN_PRO;   export CHANNEL=acellera; fi
+
+ - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2 -u $CHANNEL 
+ - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2 -u $CHANNEL
+ - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-[0-9]*.tar.bz2 -u $CHANNEL ; fi
+ - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-data-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-data-[0-9]*.tar.bz2 -u $CHANNEL ; fi
 
 
 
