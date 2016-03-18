@@ -3,10 +3,11 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import numpy as np
-from ctypes import *
 import os
-import inspect
+
+import numpy as np
+
+import htmd.lib
 from htmd.molecule.support import *
 
 
@@ -32,19 +33,18 @@ class __xtc(Structure):
 
 
 def xtc_lib():
-    import platform
-    libdir = os.path.join(os.path.dirname(inspect.getfile(XTCread)), "..", "lib", "basic", platform.system())
     lib = {}
+    libdir = htmd.lib.path()
 
-
+    import platform
     if platform.system() == "Windows":
-      lib['libc'] = cdll.msvcrt
-      cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
-      if( os.path.exists( os.path.join( libdir, "psprolib.dll" ) ) ):
-        cdll.LoadLibrary( os.path.join( libdir, "psprolib.dll" ) )
+        lib['libc'] = cdll.msvcrt
+        cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
+        if os.path.exists(os.path.join(libdir, "psprolib.dll")):
+            cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
 
     else:
-      lib['libc'] = cdll.LoadLibrary("libc.so.6")
+        lib['libc'] = cdll.LoadLibrary("libc.so.6")
 
     lib['libxtc'] = cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
     return lib
@@ -55,7 +55,7 @@ def XTCread(filename, frames=None):
     nframes = pack_ulong_buffer([0])
     natoms = pack_int_buffer([0])
     deltastep = pack_int_buffer([0])
-    deltat    = pack_double_buffer([0])
+    deltat = pack_double_buffer([0])
 
     lib['libxtc'].xtc_read.restype = POINTER(__xtc)
     lib['libxtc'].xtc_read_frame.restype = POINTER(__xtc)
@@ -65,7 +65,7 @@ def XTCread(filename, frames=None):
             c_char_p(filename.encode("ascii")),
             natoms,
             nframes, deltat, deltastep)
-        frames = range( nframes[0] )
+        frames = range(nframes[0])
         t = Trajectory()
         t.natoms = natoms[0]
         t.nframes = len(frames)
@@ -82,9 +82,9 @@ def XTCread(filename, frames=None):
             t.box[0, i] = retval[f].box[0]
             t.box[1, i] = retval[f].box[1]
             t.box[2, i] = retval[f].box[2]
-        #		print( t.coords[:,:,f].shape)
-        #		print ( t.box[:,f] )
-        #   t.step[i] = deltastep[0] * i
+            #		print( t.coords[:,:,f].shape)
+            #		print ( t.box[:,f] )
+            #   t.step[i] = deltastep[0] * i
             t.coords[:, :, i] = numpy.ctypeslib.as_array(retval[f].pos, shape=(natoms[0], 3))
 
         for f in range(len(frames)):
@@ -95,15 +95,15 @@ def XTCread(filename, frames=None):
         if not isinstance(frames, list) and not isinstance(frames, numpy.ndarray):
             frames = [frames]
         t = Trajectory()
-        t.natoms  = 0
+        t.natoms = 0
         t.nframes = len(frames)
         t.coords = None
-        t.step   = None  
-        t.time   = None
-        t.box    = None
+        t.step = None
+        t.time = None
+        t.box = None
 
         nframes = len(frames)
-        i=0
+        i = 0
         for f in frames:
             retval = lib['libxtc'].xtc_read_frame(
                 c_char_p(filename.encode("ascii")),
@@ -132,10 +132,10 @@ def XTCread(filename, frames=None):
     if np.size(t.coords, 0) == 0:
         raise NameError('Malformed XTC file. No atoms read from: {}'.format(filename))
 
-    #print( t.step )
-    #print( t.time )
+    # print( t.step )
+    # print( t.time )
     #	print( t.coords[:,:,0] )
-    #print(t.coords.shape)
+    # print(t.coords.shape)
     t.coords *= 10.  # Convert from nm to Angstrom
     t.box *= 10.  # Convert from nm to Angstrom
     return t
@@ -155,12 +155,12 @@ def XTCwrite(coords, box, filename, time=None, step=None):
     bbox = (c_float * 3)()
     natoms = c_int(coords.shape[0])
     cstep = c_int()
-    #print(coords.shape)
+    # print(coords.shape)
     for f in range(coords.shape[2]):
         cstep = c_int(step[f])
         ctime = c_float(time[f])  # TODO FIXME
-        #print ( step )
-        #print ( time )
+        # print ( step )
+        # print ( time )
         bbox[0] = box[0, f] * 0.1
         bbox[1] = box[1, f] * 0.1
         bbox[2] = box[2, f] * 0.1

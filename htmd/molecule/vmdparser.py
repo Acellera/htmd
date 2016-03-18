@@ -3,18 +3,16 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from ctypes import *
-import numpy
 import os
-import inspect
-import platform
+
+import htmd.lib
 from htmd.molecule.support import *
 
 
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
     import platform
-    libdir = os.path.join(os.path.dirname(inspect.getfile(vmdselection)), "..", "lib", "basic", platform.system())
+    libdir = htmd.lib.path()
 
     if coordinates.ndim == 2:
         coordinates = numpy.atleast_3d(coordinates)
@@ -172,8 +170,7 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
     if len(resid) != natoms:
         raise NameError("'resid' not natoms in length")
 
-    import platform
-    libdir = os.path.join(os.path.dirname(inspect.getfile(vmdselection)), "..", "lib", "basic", platform.system())
+    libdir = htmd.lib.path()
 
     parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
