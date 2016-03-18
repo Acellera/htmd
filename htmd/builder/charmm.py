@@ -50,9 +50,9 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object containing the system
     topo : list of str
-        A list of topology `rtf` files. Default: ['top/top_all22star_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+        A list of topology `rtf` files. Default: ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
     param : list of str
-        A list of parameter `prm` files. Default: ['par/par_all22star_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+        A list of parameter `prm` files. Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -86,8 +86,8 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
     Example
     -------
     >>> charmm.listFiles()
-    >>> topos  = ['top/top_all22star_prot.rtf', './benzamidine.rtf']
-    >>> params = ['par/par_all22star_prot.prm', './benzamidine.prm']
+    >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf']
+    >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm']
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)
     """
     mol = mol.copy()
@@ -356,11 +356,11 @@ def _printAliases(f):
 
 
 def _defaultTopo():
-    return ['top/top_all22star_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+    return ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
 
 
 def _defaultParam():
-    return ['par/par_all22star_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
 
 
 def _defaultCaps(mol):
@@ -431,7 +431,7 @@ def _removeCappedResidues(mol, seg):
 # Mapping Maestro protonated residue names to CHARMM patches
 def _protonationPatches(mol):
     protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN'}
-    aliases = {'CYM': 'CYS', 'AR0': 'ARG'}  # Some protonations don't exist in CHARMM
+    aliases = {'AR0': 'ARG'}  # Some protonations don't exist in CHARMM
     # TODO: Do I need to rename before applying patch?
     patches = []
 
@@ -446,12 +446,17 @@ def _protonationPatches(mol):
             patch = 'patch {} {}:{}'.format(protonations[pro], pseg[r], pres[r])
         patches.append(patch)
 
-    for pro in aliases:
+    '''for pro in aliases:
         sel = mol.atomselect('resname {}'.format(pro))
         if np.sum(sel) != 0:
             logger.warning('Found resname {}. This protonation state does not exist in CHARMM '
                            'and will be reverted to {}.'.format(pro, aliases[pro]))
-            mol.set('resname', aliases[pro], sel=sel)
+            mol.set('resname', aliases[pro], sel=sel)'''
+    for pro in aliases:
+        sel = mol.atomselect('resname {}'.format(pro))
+        if np.sum(sel) != 0:
+            raise RuntimeError('Found resname {}. This protonation state does not exist in CHARMM. Cannot build.')
+
     return patches
 
 
