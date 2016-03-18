@@ -9,9 +9,9 @@ process in the case of the protein Villin.
 
 You can download the data and analysis file from the following links:
 
--  `Datasets <http://pub.htmd.org/kcjlb6b8c7v6djhb/datasets.tar.gz>`__.
+-  `Datasets <http://pub.htmd.org/kcjlb6b8c7v6djhb/datasets.tar.gz>`_.
    Warning: 3GB filesize.
--  `Analysis script <./protein-folding.py>`__.
+-  `Analysis script <./protein-folding.py>`_.
 
 Getting started
 ---------------

@@ -8,6 +8,7 @@ Submodules
 
    htmd.protocols.equilibration_v1
    htmd.protocols.production_v1
+   htmd.protocols.protocolinterface
 
 Module contents
 ---------------

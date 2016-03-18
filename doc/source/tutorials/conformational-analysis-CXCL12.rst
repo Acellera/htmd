@@ -5,32 +5,26 @@ Conformational analysis of CXCL12
 by Gerard Martinez
 
 Download all the required files for the tutorial from this
-`link <http://pub.htmd.org/confana1036hbl2450olw/filtered.tar.gz>`__
+`link <http://pub.htmd.org/confana1036hbl2450olw/filtered.tar.gz>`_
 
 (warning: 2.6 Gb)
 
-You can watch the presentation `here <https://youtu.be/I9VISC29Gc4>`__
+You can watch the presentation `here <https://youtu.be/I9VISC29Gc4>`_
 
 .. code:: python
 
+    %pylab inline
     from htmd import *
     htmd.config(viewer='ngl')
-    %pylab inline
     os.chdir('/webdata/confana1036hbl2450olw/')  # Skip this command.
 
 
 .. parsed-literal::
 
-    HTMD. All material of HTMD2015 will be soon made available
-    
-    New HTMD version (0.1.15) is available. You are currently on (0.1.13). Use 'conda update htmd' to update to the new version.
     Populating the interactive namespace from numpy and matplotlib
-
-
-.. parsed-literal::
-
-    WARNING: pylab import has clobbered these variables: ['random']
-    `%matplotlib` prevents importing * from pylab and numpy
+    Videos from the HTMD2015 workshops are available on the Acellera youtube channel: https://www.youtube.com/user/acelleralive
+    
+    You are on the latest HTMD version (unpackaged).
 
 
 1. Introduction
@@ -50,6 +44,7 @@ We performed...
 -  we filtered out the water from our trajectories
 
 .. figure:: http://pub.htmd.org/confana1036hbl2450olw/system-protein2.png
+   :align: center
    :alt: 
 
 2. Sampling major conformational states
@@ -66,6 +61,7 @@ we will build a Markov Model to asses the major protein conformations in
 equilibrium.
 
 .. figure:: http://pub.htmd.org/confana1036hbl2450olw/conformations.png
+   :align: center
    :alt: 
 
 Calculate metrics: protein backbone dihedrals
@@ -78,9 +74,9 @@ Calculate metrics: protein backbone dihedrals
 
 .. parsed-literal::
 
-    2015-12-17 14:06:50,142 - htmd.simlist - INFO - Starting listing of simulations.
-    Creating simlist: 100% (289/289) [#################################] eta 00:00 -
-    2015-12-17 14:06:50,501 - htmd.simlist - INFO - Finished listing of simulations.
+    2016-03-14 11:31:47,709 - htmd.simlist - INFO - Starting listing of simulations.
+    Creating simlist: 100% (289/289) [#################################] eta 00:00 \
+    2016-03-14 11:31:48,226 - htmd.simlist - INFO - Finished listing of simulations.
 
 
 CXCL12 has a very flexible C-terminus loop as well as a transiently
@@ -90,38 +86,43 @@ select residues from 10 to 54.
 
 .. code:: python
 
-    data = MetricDihedral.project(fsims, protsel='protein and resid 10 to 54', 
-                                  sincos=True)
+    metr = Metric(fsims)
+    metr.projection(MetricDihedral(protsel='protein and resid 10 to 54', sincos=True))
+    data = metr.project()
     data.fstep = 0.1
 
 
 .. parsed-literal::
 
-    2015-12-17 14:06:51,427 - htmd.projections.metricdiherdal - INFO - Precalculating phi and psi angle atom selections
-    2015-12-17 14:06:52,316 - htmd.projections.metricdiherdal - INFO - Finished precalculating phi and psi.
-    2015-12-17 14:06:52,332 - htmd.projections.metric - INFO - Metric: Starting projection of trajectories.
+    2016-03-14 11:31:48,274 - htmd.projections.metricdiherdal - INFO - Precalculating phi and psi angle atom selections
+    2016-03-14 11:31:48,828 - htmd.projections.metricdiherdal - INFO - Finished precalculating phi and psi.
+    2016-03-14 11:31:48,833 - htmd.projections.metric - INFO - Metric: Starting projection of trajectories.
 
 
 .. parsed-literal::
 
-    [Parallel(n_jobs=-2)]: Done   1 out of 289 | elapsed:    0.7s remaining:  3.5min
-    [Parallel(n_jobs=-2)]: Done  21 out of 289 | elapsed:    1.7s remaining:   22.2s
-    [Parallel(n_jobs=-2)]: Done  48 out of 289 | elapsed:    3.8s remaining:   19.1s
-    [Parallel(n_jobs=-2)]: Done  75 out of 289 | elapsed:    5.7s remaining:   16.3s
-    [Parallel(n_jobs=-2)]: Done 102 out of 289 | elapsed:    7.5s remaining:   13.7s
-    [Parallel(n_jobs=-2)]: Done 129 out of 289 | elapsed:    9.3s remaining:   11.5s
-    [Parallel(n_jobs=-2)]: Done 156 out of 289 | elapsed:   11.1s remaining:    9.4s
-    [Parallel(n_jobs=-2)]: Done 183 out of 289 | elapsed:   13.2s remaining:    7.7s
-    [Parallel(n_jobs=-2)]: Done 210 out of 289 | elapsed:   15.0s remaining:    5.6s
-    [Parallel(n_jobs=-2)]: Done 237 out of 289 | elapsed:   16.9s remaining:    3.7s
-    [Parallel(n_jobs=-2)]: Done 264 out of 289 | elapsed:   18.6s remaining:    1.8s
-    [Parallel(n_jobs=-2)]: Done 289 out of 289 | elapsed:   20.5s finished
+    [Parallel(n_jobs=-2)]: Done   1 out of 289 | elapsed:    2.1s remaining:  9.9min
+    [Parallel(n_jobs=-2)]: Done  21 out of 289 | elapsed:    3.7s remaining:   46.7s
+    [Parallel(n_jobs=-2)]: Done  48 out of 289 | elapsed:    6.7s remaining:   33.8s
+    [Parallel(n_jobs=-2)]: Done  75 out of 289 | elapsed:   10.3s remaining:   29.3s
+    [Parallel(n_jobs=-2)]: Done 102 out of 289 | elapsed:   13.8s remaining:   25.3s
+    [Parallel(n_jobs=-2)]: Done 129 out of 289 | elapsed:   18.6s remaining:   23.1s
+    [Parallel(n_jobs=-2)]: Done 156 out of 289 | elapsed:   21.7s remaining:   18.5s
+    [Parallel(n_jobs=-2)]: Done 183 out of 289 | elapsed:   25.9s remaining:   15.0s
+    [Parallel(n_jobs=-2)]: Done 210 out of 289 | elapsed:   29.9s remaining:   11.2s
+    [Parallel(n_jobs=-2)]: Done 237 out of 289 | elapsed:   33.3s remaining:    7.3s
+    [Parallel(n_jobs=-2)]: Done 264 out of 289 | elapsed:   36.4s remaining:    3.5s
 
 
 .. parsed-literal::
 
-    2015-12-17 14:07:13,086 - htmd.projections.metric - INFO - Finished projecting the trajectories.
-    2015-12-17 14:07:13,088 - htmd.projections.metric - WARNING - Multiple framesteps were read from the simulations. Taking the statistical mode: 0.1ns. If it looks wrong, you can modify it by manually setting the MetricData.fstep property.
+    2016-03-14 11:32:28,183 - htmd.projections.metric - INFO - Finished projecting the trajectories.
+    2016-03-14 11:32:28,184 - htmd.projections.metric - WARNING - Multiple framesteps were read from the simulations. Taking the statistical mode: 0.1ns. If it looks wrong, you can modify it by manually setting the MetricData.fstep property.
+
+
+.. parsed-literal::
+
+    [Parallel(n_jobs=-2)]: Done 289 out of 289 | elapsed:   39.1s finished
 
 
 .. code:: python
@@ -148,6 +149,12 @@ Clustering
 
     dataTica.cluster(MiniBatchKMeans(n_clusters=200), mergesmall=5)
 
+
+.. parsed-literal::
+
+    2016-03-14 11:32:57,064 - htmd.metricdata - INFO - Mergesmall removed 0 clusters. Original ncluster 200, new ncluster 200.
+
+
 MSM analysis and visualization
 ------------------------------
 
@@ -168,14 +175,21 @@ MSM analysis and visualization
     print(eqDist)
 
 
+.. parsed-literal::
 
-.. image:: conformational-analysis-CXCL12_files/conformational-analysis-CXCL12_15_0.png
+    2016-03-14 11:33:18,149 - htmd.model - INFO - 99.7% of the data was used
+    2016-03-14 11:33:18,190 - htmd.model - INFO - Number of trajectories that visited each macrostate:
+    2016-03-14 11:33:18,190 - htmd.model - INFO - [ 31  30  28 289   5  86  11  10]
+
+
+
+.. image:: conformational-analysis-CXCL12_files/conformational-analysis-CXCL12_15_1.png
 
 
 .. parsed-literal::
 
-    [  3.62227653e-04   6.27850327e-03   9.81777963e-03   2.96818659e-02
-       3.44476993e-02   2.01180386e-01   3.78143163e-01   3.40088375e-01]
+    [  3.13484342e-04   4.31193525e-03   1.41614615e-02   2.22383619e-02
+       2.41110676e-02   1.50397854e-01   3.17462353e-01   4.67003483e-01]
 
 
 .. code:: python
@@ -187,14 +201,26 @@ MSM analysis and visualization
 
 .. parsed-literal::
 
-    [Parallel(n_jobs=-2)]: Done   1 out of   8 | elapsed:    6.5s remaining:   45.8s
-    [Parallel(n_jobs=-2)]: Done   2 out of   8 | elapsed:   10.3s remaining:   31.0s
-    [Parallel(n_jobs=-2)]: Done   3 out of   8 | elapsed:   14.2s remaining:   23.6s
-    [Parallel(n_jobs=-2)]: Done   4 out of   8 | elapsed:   18.0s remaining:   18.0s
-    [Parallel(n_jobs=-2)]: Done   5 out of   8 | elapsed:   21.8s remaining:   13.1s
-    [Parallel(n_jobs=-2)]: Done   6 out of   8 | elapsed:   24.9s remaining:    8.3s
-    [Parallel(n_jobs=-2)]: Done   7 out of   8 | elapsed:   29.3s remaining:    4.2s
-    [Parallel(n_jobs=-2)]: Done   8 out of   8 | elapsed:   32.7s finished
+    [Parallel(n_jobs=1)]: Done   1 jobs       | elapsed:    0.5s
+    [Parallel(n_jobs=1)]: Done   2 jobs       | elapsed:    1.2s
+    [Parallel(n_jobs=1)]: Done   3 jobs       | elapsed:    1.6s
+    [Parallel(n_jobs=1)]: Done   4 jobs       | elapsed:    2.4s
+    [Parallel(n_jobs=1)]: Done   5 jobs       | elapsed:    3.0s
+    [Parallel(n_jobs=1)]: Done   6 jobs       | elapsed:    3.6s
+    [Parallel(n_jobs=1)]: Done   7 jobs       | elapsed:    4.1s
+    [Parallel(n_jobs=1)]: Done   8 jobs       | elapsed:    4.7s
+    [Parallel(n_jobs=1)]: Done   8 out of   8 | elapsed:    4.7s finished
+
+
+.. parsed-literal::
+
+    2016-03-14 11:34:10,377 - htmd.molecule.pdbparser - WARNING - Field "serial" of PDB overflows. Your data will be truncated to 5 characters.
+
+
+.. parsed-literal::
+
+    /shared/sdoerr/Software/anaconda3/lib/python3.5/site-packages/IPython/html.py:14: ShimWarning: The `IPython.html` package has been deprecated. You should import from `notebook` instead. `IPython.html.widgets` has moved to `ipywidgets`.
+      "`IPython.html.widgets` has moved to `ipywidgets`.", ShimWarning)
 
 
 Statistics
@@ -252,7 +278,7 @@ Which trajectory originated the state X?
 
 .. parsed-literal::
 
-    (array([11, 12]),)
+    (array([  4, 124]),)
 
 
 
@@ -264,16 +290,16 @@ Which trajectory originated the state X?
 
 .. parsed-literal::
 
-    [array([[ 64,  81],
-           [ 88,  53],
-           [ 52, 203],
-           [270, 482],
-           [186,  97],
-           [ 25,  30],
-           [196, 115],
-           [169, 178],
-           [  4, 736],
-           [175,  53]])]
+    [array([[ 112,  760],
+           [ 204, 1704],
+           [ 241,  766],
+           [ 112,  601],
+           [ 204, 1723],
+           [ 128,  636],
+           [ 241,  809],
+           [  48, 1684],
+           [ 204, 1819],
+           [ 128, 1321]])]
 
 
 .. code:: python
@@ -314,25 +340,41 @@ studies", Andrea bernini et al., 2014 Mar;1844(3):561-6. doi:
     # The first selection corresponds to beta-sheet 2 carbons alpha, the second one to beta-sheet 3 CA.
     # We specify metric='contacts' to create contact maps instead of proper distances,
     # this means: create an interatom matrix and put 1 if the distance is below cutoff; 0 otherwise. 
-    data3 = MetricDistance.project(fsims, 'resid 38 to 42 and noh', 
-                                   'resid 22 to 28 and noh', metric='contacts')
+    metr = Metric(fsims)
+    metr.projection(MetricDistance('resid 38 to 42 and noh', 'resid 22 to 28 and noh', metric='contacts'))
+    data3 = metr.project()
     data3.fstep = 0.1
 
 
 .. parsed-literal::
 
-    [Parallel(n_jobs=-2)]: Done   1 out of 289 | elapsed:    1.7s remaining:  8.2min
-    [Parallel(n_jobs=-2)]: Done  21 out of 289 | elapsed:    3.3s remaining:   42.5s
-    [Parallel(n_jobs=-2)]: Done  48 out of 289 | elapsed:    6.6s remaining:   33.0s
-    [Parallel(n_jobs=-2)]: Done  75 out of 289 | elapsed:    8.9s remaining:   25.4s
-    [Parallel(n_jobs=-2)]: Done 102 out of 289 | elapsed:   12.2s remaining:   22.4s
-    [Parallel(n_jobs=-2)]: Done 129 out of 289 | elapsed:   15.4s remaining:   19.1s
-    [Parallel(n_jobs=-2)]: Done 156 out of 289 | elapsed:   18.3s remaining:   15.6s
-    [Parallel(n_jobs=-2)]: Done 183 out of 289 | elapsed:   21.3s remaining:   12.3s
-    [Parallel(n_jobs=-2)]: Done 210 out of 289 | elapsed:   24.5s remaining:    9.2s
-    [Parallel(n_jobs=-2)]: Done 237 out of 289 | elapsed:   27.9s remaining:    6.1s
-    [Parallel(n_jobs=-2)]: Done 264 out of 289 | elapsed:   30.8s remaining:    2.9s
-    [Parallel(n_jobs=-2)]: Done 289 out of 289 | elapsed:   33.6s finished
+    2016-03-14 11:35:56,924 - htmd.projections.metric - INFO - Metric: Starting projection of trajectories.
+
+
+.. parsed-literal::
+
+    [Parallel(n_jobs=-2)]: Done   1 out of 289 | elapsed:    1.0s remaining:  4.7min
+    [Parallel(n_jobs=-2)]: Done  21 out of 289 | elapsed:    1.9s remaining:   23.8s
+    [Parallel(n_jobs=-2)]: Done  48 out of 289 | elapsed:    4.0s remaining:   20.2s
+    [Parallel(n_jobs=-2)]: Done  75 out of 289 | elapsed:    6.2s remaining:   17.7s
+    [Parallel(n_jobs=-2)]: Done 102 out of 289 | elapsed:    8.2s remaining:   15.0s
+    [Parallel(n_jobs=-2)]: Done 129 out of 289 | elapsed:   10.3s remaining:   12.7s
+    [Parallel(n_jobs=-2)]: Done 156 out of 289 | elapsed:   12.7s remaining:   10.8s
+    [Parallel(n_jobs=-2)]: Done 183 out of 289 | elapsed:   15.2s remaining:    8.8s
+    [Parallel(n_jobs=-2)]: Done 210 out of 289 | elapsed:   16.9s remaining:    6.3s
+    [Parallel(n_jobs=-2)]: Done 237 out of 289 | elapsed:   19.3s remaining:    4.2s
+    [Parallel(n_jobs=-2)]: Done 264 out of 289 | elapsed:   21.4s remaining:    2.0s
+
+
+.. parsed-literal::
+
+    2016-03-14 11:36:20,817 - htmd.projections.metric - INFO - Finished projecting the trajectories.
+    2016-03-14 11:36:20,818 - htmd.projections.metric - WARNING - Multiple framesteps were read from the simulations. Taking the statistical mode: 0.1ns. If it looks wrong, you can modify it by manually setting the MetricData.fstep property.
+
+
+.. parsed-literal::
+
+    [Parallel(n_jobs=-2)]: Done 289 out of 289 | elapsed:   23.2s finished
 
 
 .. code:: python
@@ -345,6 +387,12 @@ studies", Andrea bernini et al., 2014 Mar;1844(3):561-6. doi:
 
     # Clustering
     dataTica3.cluster(MiniBatchKMeans(n_clusters=200), mergesmall=5)
+
+
+.. parsed-literal::
+
+    2016-03-14 11:39:21,305 - htmd.metricdata - INFO - Mergesmall removed 0 clusters. Original ncluster 200, new ncluster 200.
+
 
 .. code:: python
 
@@ -366,13 +414,36 @@ studies", Andrea bernini et al., 2014 Mar;1844(3):561-6. doi:
     print(eqDist)
 
 
+.. parsed-literal::
 
-.. image:: conformational-analysis-CXCL12_files/conformational-analysis-CXCL12_29_0.png
+    2016-03-14 11:39:24,994 - htmd.model - INFO - 100.0% of the data was used
+    2016-03-14 11:39:25,022 - htmd.model - INFO - Number of trajectories that visited each macrostate:
+    2016-03-14 11:39:25,023 - htmd.model - INFO - [  4   3  14 289]
+    2016-03-14 11:39:25,024 - htmd.model - INFO - Take care! Macro 1 has been visited only in 3 trajectories:
+    2016-03-14 11:39:25,024 - htmd.model - INFO - id = 59
+    parent = None
+    input = []
+    trajectory = ['./filtered/3x9/3x9-GERARD_VERYLONG_CXCL12_confAna-0-1-RND1251_9.filtered.xtc']
+    molfile = ./filtered/filtered.pdb
+    2016-03-14 11:39:25,025 - htmd.model - INFO - id = 277
+    parent = None
+    input = []
+    trajectory = ['./filtered/10x23/10x23-GERARD_VERYLONG_CXCL12_confAna-0-1-RND9861_9.filtered.xtc']
+    molfile = ./filtered/filtered.pdb
+    2016-03-14 11:39:25,025 - htmd.model - INFO - id = 280
+    parent = None
+    input = []
+    trajectory = ['./filtered/10x27/10x27-GERARD_VERYLONG_CXCL12_confAna-0-1-RND0101_9.filtered.xtc']
+    molfile = ./filtered/filtered.pdb
+
+
+
+.. image:: conformational-analysis-CXCL12_files/conformational-analysis-CXCL12_29_1.png
 
 
 .. parsed-literal::
 
-    [ 0.02292385  0.06099237  0.14430835  0.77177542]
+    [ 0.0061427   0.02472505  0.0253045   0.94382775]
 
 
 .. code:: python
@@ -384,13 +455,15 @@ studies", Andrea bernini et al., 2014 Mar;1844(3):561-6. doi:
 
 .. parsed-literal::
 
-    [Parallel(n_jobs=-2)]: Done   1 out of   4 | elapsed:   10.6s remaining:   31.8s
-    [Parallel(n_jobs=-2)]: Done   2 out of   4 | elapsed:   16.5s remaining:   16.5s
-    [Parallel(n_jobs=-2)]: Done   3 out of   4 | elapsed:   22.7s remaining:    7.6s
-    [Parallel(n_jobs=-2)]: Done   4 out of   4 | elapsed:   27.2s finished
+    [Parallel(n_jobs=1)]: Done   1 jobs       | elapsed:    0.5s
+    [Parallel(n_jobs=1)]: Done   2 jobs       | elapsed:    0.9s
+    [Parallel(n_jobs=1)]: Done   3 jobs       | elapsed:    1.5s
+    [Parallel(n_jobs=1)]: Done   4 jobs       | elapsed:    2.3s
+    [Parallel(n_jobs=1)]: Done   4 out of   4 | elapsed:    2.3s finished
 
 
 .. figure:: http://pub.htmd.org/confana1036hbl2450olw/conformation_open.png
+   :align: center
    :alt: 
 
 Did you see any macrostate where the pocket is open? what is the
@@ -408,7 +481,7 @@ that produced the state...
 
 .. parsed-literal::
 
-    (array([ 2,  6, 23, 46]),)
+    (array([ 3, 25]),)
 
 
 
@@ -422,11 +495,11 @@ that produced the state...
 
 .. parsed-literal::
 
-    [array([[ 228,  672],
-           [  23, 1016],
-           [ 159,  265],
-           [ 124,  739],
-           [ 124,  399]])]
+    [array([[ 260, 1881],
+           [ 165, 1591],
+           [ 193,  152],
+           [ 249, 1555],
+           [ 174,  703]])]
 
 
 .. code:: python
@@ -451,13 +524,24 @@ that produced the state...
 
 .. parsed-literal::
 
-    Creating simlist: 100% (1/1) [#####################################] eta --:-- |
+    2016-03-14 11:40:14,656 - htmd.simlist - INFO - Starting listing of simulations.
+    Creating simlist: 100% (1/1) [#####################################] eta --:-- /
+    2016-03-14 11:40:14,659 - htmd.simlist - INFO - Finished listing of simulations.
 
 
 .. code:: python
 
     refmol = Molecule('./filtered/filtered.pdb')
-    rmsd = MetricRmsd.project(simus, refmol, 'resid 38 to 42 or resid 22 to 28 and noh', trajalnstr='protein')
+    metr = Metric(simus)
+    metr.projection(MetricRmsd(refmol, 'resid 38 to 42 or resid 22 to 28 and noh', trajalnstr='protein'))
+    rmsd = metr.project()
+
+
+.. parsed-literal::
+
+    2016-03-14 11:40:14,856 - htmd.projections.metric - INFO - Metric: Starting projection of trajectories.
+    2016-03-14 11:40:17,703 - htmd.projections.metric - INFO - Finished projecting the trajectories.
+    2016-03-14 11:40:17,705 - htmd.projections.metric - INFO - Frame step 0.1ns was read from the trajectories. If it looks wrong, redefine it by manually setting the MetricData.fstep property.
 
 
 .. parsed-literal::
@@ -478,7 +562,7 @@ that produced the state...
 
 .. parsed-literal::
 
-    <matplotlib.text.Text at 0x7fffd8a0b320>
+    <matplotlib.text.Text at 0x7f284ecfa400>
 
 
 
@@ -494,4 +578,5 @@ that produced the state...
     refmol.view()
 
 .. figure:: http://pub.htmd.org/confana1036hbl2450olw/view_trajectory.png
+   :align: center
    :alt: 

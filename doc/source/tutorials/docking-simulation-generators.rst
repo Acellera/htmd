@@ -9,7 +9,7 @@ Using docking to generate starting poses for simulations
 ========================================================
 
 Download the files for this tutorial from this
-`link <http://pub.htmd.org/nc983hu3brda/bentryp.tar.gz>`__
+`link <http://pub.htmd.org/nc983hu3brda/bentryp.tar.gz>`_
 
 Dock the protein with the ligand
 --------------------------------

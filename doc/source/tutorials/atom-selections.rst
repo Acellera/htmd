@@ -4,9 +4,9 @@ Atom selections
 
 **Toni Giorgino**
 
-| Institute of Neurosciences (IN-CNR)
-| Consiglio Nazionale delle Ricerche
-| Padua, Italy
+Institute of Neurosciences (IN-CNR)
+Consiglio Nazionale delle Ricerche
+Padua, Italy
 
 A *Molecule* has...
 -------------------
@@ -27,14 +27,14 @@ in general it contains several "chemical" molecules.
 E.g. protein + solvent + ions are often **one** "VMD Molecule".
 
 (The closest analog to molecules in the chemical sense is having same
-*segment ID*\ s)
+*segment ID*s)
 
 This applies to both VMD and HTMD.
 
 Atoms
 -----
 
-A Molecule contains several *atom*\ s
+A Molecule contains several *atom*s
 
 An *atom* has several **properties**
 ------------------------------------
@@ -46,27 +46,14 @@ An *atom* has several **properties**
 -  *Variable* properties do. Eg:
 -  ``x(t)``, ``y(t)``, ``z(t)``, ``user(t)``
 
-+---------------+-------------------------------------------------------------------------+
-| Property      | Description                                                             |
-+===============+=========================================================================+
-| ``serial``    | Unique identifier from 1                                                |
-+---------------+-------------------------------------------------------------------------+
-| ``name``      | Atom name from PDB, unique in the residue                               |
-+---------------+-------------------------------------------------------------------------+
-| ``type``      | Defined by the forcefield, if any                                       |
-+---------------+-------------------------------------------------------------------------+
-| ``resname``   | 3-letter residue type, from PDB                                         |
-+---------------+-------------------------------------------------------------------------+
-| ``resid``     | The usual residue number, **possibly not unique**                       |
-+---------------+-------------------------------------------------------------------------+
-| ``residue``   | Do not confuse with ``resid``!                                          |
-+---------------+-------------------------------------------------------------------------+
-| ``chain``     | Also from PDB                                                           |
-+---------------+-------------------------------------------------------------------------+
-| ``segid``     | Must be unique *per chemical molecule*: important for system building   |
-+---------------+-------------------------------------------------------------------------+
-| ``x,y,z``     | these depend on the trajectory frame                                    |
-+---------------+-------------------------------------------------------------------------+
+\| Property \| Description \| \|-----\|-----\| \| ``serial`` \| Unique
+identifier from 1\| \| ``name`` \| Atom name from PDB, unique in the
+residue \| \| ``type`` \| Defined by the forcefield, if any \| \|
+``resname``\| 3-letter residue type, from PDB \| \| ``resid`` \| The
+usual residue number, **possibly not unique** \| \| ``residue``\| Do not
+confuse with ``resid``! \| \| ``chain`` \| Also from PDB \| \| ``segid``
+\| Must be unique *per chemical molecule*: important for system building
+\| \| ``x,y,z`` \| these depend on the trajectory frame \|
 
 What for?
 ---------
@@ -84,19 +71,11 @@ of the original set.
 We can then manipulate these subsets, e.g. to *get* and *set*
 properties.
 
-+----------------------+----------------------------------------------------------------+
-| Example              | Meaning                                                        |
-+======================+================================================================+
-| ``chain A``          | true *iff* the atom's ``chain`` property equals string ``A``   |
-+----------------------+----------------------------------------------------------------+
-| ``resid 40 to 50``   | as intended                                                    |
-+----------------------+----------------------------------------------------------------+
-| ``mass < 15``        | you guessed it                                                 |
-+----------------------+----------------------------------------------------------------+
-| ``name CA``          | atom is a Cα                                                   |
-+----------------------+----------------------------------------------------------------+
-| ``water``            | true iff the atom belongs to a water molecule                  |
-+----------------------+----------------------------------------------------------------+
+\| Example \| Meaning \| \|---------\|---------\| \| ``chain A`` \| true
+*iff* the atom's ``chain`` property equals string ``A`` \| \|
+``resid 40 to 50`` \| as intended\| \| ``mass < 15`` \| you guessed it\|
+\| ``name CA`` \| atom is a Cα \| \| ``water`` \| true iff the atom
+belongs to a water molecule \|
 
 Important: all are **boolean** expressions. Each atom in a molecule
 either matches, or it doesn't.
@@ -104,21 +83,11 @@ either matches, or it doesn't.
 Advanced expressions
 --------------------
 
-+-----------------------+---------------------------------+
-| Type                  | Example                         |
-+=======================+=================================+
-| Chemistry             | ``protein and not hydrogen``    |
-+-----------------------+---------------------------------+
-| Secondary structure   | ``helix or sheet``              |
-+-----------------------+---------------------------------+
-| Sequence              | ``sequence "N..T"``             |
-+-----------------------+---------------------------------+
-| (ex) Within           | ``water within 4 of protein``   |
-+-----------------------+---------------------------------+
-| Same                  | ``same chain as resid 15``      |
-+-----------------------+---------------------------------+
-| Maths                 | ``x^2 + y^2 < 40``              |
-+-----------------------+---------------------------------+
+\| Type \| Example \| \|---------\|---------\| \| Chemistry \|
+``protein and not hydrogen`` \| \| Secondary structure \|
+``helix or sheet`` \| \| Sequence \| ``sequence "N..T"`` \| (ex) Within
+\| ``water within 4 of protein`` \| \| Same \|
+``same chain as resid 15`` \| \| Maths \| ``x^2 + y^2 < 40`` \|
 
 Common operations
 -----------------
@@ -134,7 +103,7 @@ Common operations
 Representations
 ---------------
 
-A molecule contains several *Representation*\ s
+A molecule contains several *Representation*s
 
 A *Representation* has...
 -------------------------

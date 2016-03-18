@@ -10,6 +10,7 @@ Submodules
    htmd.builder.builder
    htmd.builder.charmm
    htmd.builder.ionize
+   htmd.builder.loopmodeler
    htmd.builder.solvate
 
 Module contents

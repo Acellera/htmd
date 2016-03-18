@@ -60,10 +60,7 @@ Simulation details
 As only the coordinates files are seeded for every new epoch,
 simulations cannot use a velocity file. E.g. using Acemd
 
-.. code:: python
-
-    acemd.binvelocities = None # remove binvelocities for respawning
-    acemd.temperature = 300 # set velocities generation automatically
+``python acemd.binvelocities = None # remove binvelocities for respawning acemd.temperature = 300 # set velocities generation automatically``
 
 Adaptive script example
 -----------------------
@@ -100,12 +97,5 @@ Setting a simple cron job
 2. Do not set updateperiod then, or set it to zero such that the program
    will execute and exit
 
-.. code:: bash
-
-    #!/bin/bash -login
-    # cron.sh file
-    # use crontab -e to add this line:
-    # 0 */4 * * * cd /pathtomydir/; ./cron.sh
-    #
-    python conf.py
+``bash #!/bin/bash -login # cron.sh file # use crontab -e to add this line: # 0 */4 * * * cd /pathtomydir/; ./cron.sh # python conf.py``
 

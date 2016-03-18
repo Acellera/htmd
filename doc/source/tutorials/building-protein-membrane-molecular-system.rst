@@ -2,7 +2,7 @@
 Building a protein-membrane molecular system (GPCR)
 ===================================================
 
-Specifically we are building the :math:`\mu` opiod receptor using the
+Specifically we are building the :math:`$\mu$` opiod receptor using the
 pdbid 4dkl from the OPM database.
 
 .. code:: python

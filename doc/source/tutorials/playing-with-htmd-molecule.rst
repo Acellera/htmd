@@ -73,31 +73,10 @@ can perform on it) and properties (data associated to the molecule).
 Properties (among others) correspond to data which is found in PDB
 files.
 
-+----------------+--------------+
-| Methods        | Properties   |
-+================+==============+
-| read()         | record       |
-+----------------+--------------+
-| write()        | serial       |
-+----------------+--------------+
-| get()          | name         |
-+----------------+--------------+
-| set()          | resid        |
-+----------------+--------------+
-| atomselect()   | chain        |
-+----------------+--------------+
-| filter()       | coords       |
-+----------------+--------------+
-| remove()       | box          |
-+----------------+--------------+
-| insert()       | reps         |
-+----------------+--------------+
-| view()         | ...          |
-+----------------+--------------+
-| wrap()         |              |
-+----------------+--------------+
-| align()        |              |
-+----------------+--------------+
+\|Methods \| Properties \| \|--------\|------------\| \|read()\|record\|
+\|write()\|serial\| \|get() \| name\| \|set() \|resid\|
+\|atomselect()\|chain\| \|filter()\|coords\| \|remove()\|box\|
+\|insert()\|reps\| \|view()\| ...\| \|wrap()\| \| \|align() \|\|
 
 Properties can be accessed either directly, or via the
 ``Molecule.get()`` method. Similarly, they can be modified directly, or
@@ -519,7 +498,7 @@ stored *in* the molecule object.
 Atom selection expressions work as in VMD
 -----------------------------------------
 
-This removes a slab 6 Å thick (-3 Å :math:`\le x \le` +3 Å).
+This removes a slab 6 Å thick (-3 Å :math:`$\le x \le$` +3 Å).
 
 .. code:: python
 

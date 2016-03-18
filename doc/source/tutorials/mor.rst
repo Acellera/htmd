@@ -1,6 +1,6 @@
 
-Preparation of the :math:`\mu` opioid receptor with ligand
-==========================================================
+Preparation of the :math:`$\mu$` opioid receptor with ligand
+============================================================
 
 This is a complex build system as it has several components, the
 protein, a sodium ion, the ligand and of course the membrane.

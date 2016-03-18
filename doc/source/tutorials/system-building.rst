@@ -6,10 +6,9 @@ by Stefan Doerr
 
 You can watch the presentation here:
 
-|image0|
+`|image0| <https://youtu.be/DF9cHKBX19A>`_
 
 .. |image0| image:: http://pub.htmd.org/73hboiwia98hdj209jq0/opioid_youtube.png
-   :target: https://youtu.be/DF9cHKBX19A
 
 Contents
 --------
@@ -33,6 +32,7 @@ Tools
 -----
 
 .. figure:: http://pub.htmd.org/73hboiwia98hdj209jq0/molbuilding.png
+   :align: center
    :alt: 
 
 Workflow
@@ -80,8 +80,8 @@ disulfide bridges, mising atoms, etc.).
    (special situations and low pH).
 
 .. figure:: http://docs.htmd.org/img/histidines.png
+   :align: center
    :alt: 
-
 The best way to determine how histidine should be protonated is to look
 at the the structure. Typically, a histidine residue is protonated if it
 is close enough to an electron donor (e.g. a glutamic acid), thus

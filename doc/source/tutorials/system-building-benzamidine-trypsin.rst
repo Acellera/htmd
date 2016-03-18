@@ -10,15 +10,15 @@ System building Benzamidine Trypsin
 
 by Stefan Doerr
 
-Download all the required files for the tutorial from this `link <http://pub.htmd.org/73hboiwia98hdj209jq0/building.tar.gz>`__
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Download all the required files for the tutorial from this
+`link <http://pub.htmd.org/73hboiwia98hdj209jq0/building.tar.gz>`_
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can watch the presentation here:
 
-|image0|
+`|image0| <https://youtu.be/DF9cHKBX19A?t=5m42s>`_
 
 .. |image0| image:: http://pub.htmd.org/73hboiwia98hdj209jq0/bentryp_youtube.png
-   :target: https://youtu.be/DF9cHKBX19A?t=5m42s
 
 Obtain structures
 ~~~~~~~~~~~~~~~~~
@@ -94,6 +94,7 @@ This took care of the ligand rotation. But now we still need to position
 it far from the protein. We need to find out the radius of the protein:
 
 .. figure:: http://pub.htmd.org/73hboiwia98hdj209jq0/maxdist.png
+   :align: center
    :alt: 
 
 .. code:: python
@@ -136,6 +137,7 @@ Solvate
     -Leonardo da Vinci
 
 .. figure:: http://pub.htmd.org/73hboiwia98hdj209jq0/waterbox.png
+   :align: center
    :alt: 
 
 .. code:: python

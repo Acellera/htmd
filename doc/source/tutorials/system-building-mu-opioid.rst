@@ -11,17 +11,17 @@ System building μ-opioid receptor
 by Stefan Doerr
 
 .. figure:: http://pub.htmd.org/73hboiwia98hdj209jq0/membrane_GPCR.jpg
+   :align: center
    :alt: 
-
-Download all the required files for the tutorial from this `link <http://pub.htmd.org/73hboiwia98hdj209jq0/building.tar.gz>`__
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Download all the required files for the tutorial from this
+`link <http://pub.htmd.org/73hboiwia98hdj209jq0/building.tar.gz>`_
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can watch the presentation here:
 
-|image0|
+`|image0| <https://youtu.be/DF9cHKBX19A?t=22m17s>`_
 
 .. |image0| image:: http://pub.htmd.org/73hboiwia98hdj209jq0/opioid_youtube.png
-   :target: https://youtu.be/DF9cHKBX19A?t=22m17s
 
 Building pure proteins
 ~~~~~~~~~~~~~~~~~~~~~~

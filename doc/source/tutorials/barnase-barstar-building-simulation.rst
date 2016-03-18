@@ -16,6 +16,7 @@ Barnase - Barstar. Building, simulation and adaptive setup.
 ===========================================================
 
 .. figure:: http://pub.htmd.org/73hboiwia98hdj209jq0/barnasebarstar.png
+   :align: center
    :alt: 
 
 Download the two molecules and view them
@@ -24,11 +25,11 @@ Download the two molecules and view them
 You can look at their PDB information here and find out their PDB IDs.
 Then download them using those IDs.
 
--  `Barnase <http://www.rcsb.org/pdb/explore.do?structureId=2f4y>`__
--  `Barstar <http://www.rcsb.org/pdb/explore/explore.do?structureId=2hxx>`__
+-  `Barnase <http://www.rcsb.org/pdb/explore.do?structureId=2f4y>`_
+-  `Barstar <http://www.rcsb.org/pdb/explore/explore.do?structureId=2hxx>`_
 
 You will need to create Molecule objects. Check the documentation on the
-`Molecule <https://www.htmd.org/docs/htmd.molecule.molecule.html>`__
+`Molecule <https://www.htmd.org/docs/htmd.molecule.molecule.html>`_
 class.
 
 .. code:: python
@@ -72,7 +73,7 @@ as they have same resids.
     barnase.set('segid', 'W1', 'water')
     barstar.set('segid', 'W2', 'water')
 
-`Barstar <http://www.rcsb.org/pdb/explore/explore.do?structureId=2hxx>`__
+`Barstar <http://www.rcsb.org/pdb/explore/explore.do?structureId=2hxx>`_
 has a modified residue for which we lack the parametrization (check
 under "small molecules"). Mutate the modified Tryptophan in Barstar
 (resname 4IN) to a normal Tryptophan (TRP)

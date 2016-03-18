@@ -17,7 +17,7 @@ parameters and coordinates (i.e. PDB file or PDB code of the protein) of
 all elements in the simulations.
 
 Download all tutorial files from the following
-`link <http://docs.htmd.org/download/building_files.zip>`__.
+`link <http://docs.htmd.org/download/building_files.zip>`_.
 
 Getting started
 ---------------

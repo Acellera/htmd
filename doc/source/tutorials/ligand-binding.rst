@@ -9,9 +9,9 @@ binding process
 
 You can download the data and analysis file from the following links:
 
--  `Datasets <http://pub.htmd.org/li198ha8nfoiw90y2/datasets.tar.gz>`__.
+-  `Datasets <http://pub.htmd.org/li198ha8nfoiw90y2/datasets.tar.gz>`_.
    Warning: 3GB filesize.
--  `Analysis script <./ligand-binding.py>`__.
+-  `Analysis script <./ligand-binding.py>`_.
 
 Getting started
 ---------------

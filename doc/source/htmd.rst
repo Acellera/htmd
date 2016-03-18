@@ -20,6 +20,7 @@ Submodules
 
 .. toctree::
 
+   htmd.commandclass
    htmd.config
    htmd.dock
    htmd.home
