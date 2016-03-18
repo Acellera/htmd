@@ -1,11 +1,11 @@
 import platform
 import os
 import inspect
+from htmd.home import home
 
 
 def path():
-    # TODO: Replace the inspect with something better
-    libdir = os.path.join(os.path.dirname(inspect.getfile(path)))
+    libdir = os.path.join(home(), "lib")
     if os.path.exists(os.path.join(libdir, "basic")):
         libdir = os.path.join(libdir, "basic", platform.system())
     elif os.path.exists(os.path.join(libdir, "pro")):
