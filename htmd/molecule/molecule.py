@@ -1098,7 +1098,7 @@ class Molecule:
 
     def _writePDB(self, filename, sel='all'):
         src = self
-        if sel is not None:
+        if sel is not None and sel != 'all':
             src = self.copy()
             src.filter(sel, _logger=False)
 
