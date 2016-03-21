@@ -50,9 +50,9 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object containing the system
     topo : list of str
-        A list of topology `rtf` files. Default: ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+        A list of topology `rtf` files. Default: ['top/top_all36_prot.rtf', 'top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
     param : list of str
-        A list of parameter `prm` files. Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+        A list of parameter `prm` files. Default: ['par/par_all36_prot_mod.prm', 'par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -356,11 +356,11 @@ def _printAliases(f):
 
 
 def _defaultTopo():
-    return ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+    return ['top/top_all36_prot.rtf', 'top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
 
 
 def _defaultParam():
-    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+    return ['par/par_all36_prot_mod.prm', 'par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
 
 
 def _defaultCaps(mol):
@@ -430,8 +430,8 @@ def _removeCappedResidues(mol, seg):
 
 # Mapping Maestro protonated residue names to CHARMM patches
 def _protonationPatches(mol):
-    protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN'}
-    aliases = {'AR0': 'ARG'}  # Some protonations don't exist in CHARMM
+    protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN', 'AR0': 'RN1'}
+    aliases = {}  # Some protonations don't exist in CHARMM
     # TODO: Do I need to rename before applying patch?
     patches = []
 
