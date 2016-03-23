@@ -1254,7 +1254,6 @@ def _resolveCollisions(mol, occ1, occ2, gap):
     mol.remove(overlaps, _logger=False)
 
 
-
 def _pp_measure_fit(P, Q):
     """
     PP_MEASURE_FIT - molecule alignment function.
