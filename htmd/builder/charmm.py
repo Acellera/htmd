@@ -50,9 +50,9 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object containing the system
     topo : list of str
-        A list of topology `rtf` files. Default: ['top/top_all36_prot.rtf', 'top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+        A list of topology `rtf` files. Default: ['top/top_all36_prot.rtf', 'top/top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
     param : list of str
-        A list of parameter `prm` files. Default: ['par/par_all36_prot_mod.prm', 'par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+        A list of parameter `prm` files. Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -208,7 +208,16 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
             # Redo the whole build but now with ions included
             return build(newmol, topo=topo, param=param, prefix=prefix, outdir=outdir, ionize=False, caps=caps,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, psfgen=psfgen)
+    _checkFailedAtoms(molbuilt)
     return molbuilt
+
+
+def _checkFailedAtoms(mol):
+    if mol is None:
+        return
+    idx = np.where(np.sum(mol.coords == 0, axis=1) == 3)[0]
+    if len(idx) != 0:
+        logger.warning('Atoms with indexes {} are positioned at [0,0,0]. This can cause simulations to crash.'.format(idx))
 
 
 def _cleanOutDir(outdir):
@@ -356,11 +365,11 @@ def _printAliases(f):
 
 
 def _defaultTopo():
-    return ['top/top_all36_prot.rtf', 'top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+    return ['top/top_all36_prot.rtf', 'top/top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
 
 
 def _defaultParam():
-    return ['par/par_all36_prot_mod.prm', 'par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+    return ['par/par_all36_prot_mod.prm', 'par/par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
 
 
 def _defaultCaps(mol):
