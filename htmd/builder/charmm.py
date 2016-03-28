@@ -297,6 +297,18 @@ def _printAliases(f):
         pdbalias atom ASN 1HD2 HD21
         pdbalias atom ASN 2HD2 HD22
 
+        # Aliases for PDB ions / elements
+        pdbalias residue LI LIT
+        pdbalias residue NA SOD
+        pdbalias residue K POT
+        pdbalias residue CA CAL
+        pdbalias residue ZN ZN2
+        pdbalias residue CL CLA
+        pdbalias residue RB RUB
+        pdbalias residue CD CD2
+        pdbalias residue CS CES
+        pdbalias residue BA BAR
+
         # Aliases for Maestro residues
         pdbalias residue GLH GLU
         pdbalias residue ASH ASP
