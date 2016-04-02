@@ -4,13 +4,17 @@
 # No redistribution in whole or part
 #
 def compareVersions():
-    from htmd.home import home
     from htmd.version import version
     from natsort import natsorted
     import os
     import time
     #t = time.time()
-    __file = os.path.join(home(), '.latestversion')
+    from os.path import expanduser
+    __home = expanduser("~")
+    __htmdconf = os.path.join(__home, '.htmd')
+    if not os.path.exists(__htmdconf):
+        os.makedirs(__htmdconf)
+    __file = os.path.join(__htmdconf, '.latestversion')
 
     if not os.path.isfile(__file) or time.time() > os.path.getmtime(__file) + 86400: #86400:  # Check if one day has passed since last version check
         _writeLatestVersionFile(__file)
