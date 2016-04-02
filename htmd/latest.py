@@ -16,7 +16,7 @@ def compareVersions():
         try:
             os.makedirs(__htmdconf)
         except error:
-            print('Unable to create ~/.htmd/ folder. Will not check for new HTMD versions.')
+            print('Unable to create {} folder. Will not check for new HTMD versions.'.format(__htmdconf))
             return
     __file = os.path.join(__htmdconf, '.latestversion')
 
@@ -26,7 +26,7 @@ def compareVersions():
     try:
         f = open(__file, 'r')
     except:
-        print('Unable to open ~/.htmd/.latestversion file for reading. Will not check for new HTMD versions.')
+        print('Unable to open {} file for reading. Will not check for new HTMD versions.'.format(__file))
         return
     latestver = f.read()
     f.close()
@@ -50,7 +50,7 @@ def _writeLatestVersionFile(fname):
     try:
         f = open(fname, 'w')
     except:
-        print('Unable to open ~/.htmd/.latestversion file for writing. Will not check for new HTMD versions.')
+        print('Unable to open {} file for writing. Will not check for new HTMD versions.'.format(fname))
         return
     f.write(ver)
     os.utime(fname, None)
