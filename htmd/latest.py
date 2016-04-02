@@ -13,13 +13,21 @@ def compareVersions():
     __home = expanduser("~")
     __htmdconf = os.path.join(__home, '.htmd')
     if not os.path.exists(__htmdconf):
-        os.makedirs(__htmdconf)
+        try:
+            os.makedirs(__htmdconf)
+        except error:
+            print('Unable to create ~/.htmd/ folder. Will not check for new HTMD versions.')
+            return
     __file = os.path.join(__htmdconf, '.latestversion')
 
     if not os.path.isfile(__file) or time.time() > os.path.getmtime(__file) + 86400: #86400:  # Check if one day has passed since last version check
         _writeLatestVersionFile(__file)
 
-    f = open(__file, 'r')
+    try:
+        f = open(__file, 'r')
+    except:
+        print('Unable to open ~/.htmd/.latestversion file for reading. Will not check for new HTMD versions.')
+        return
     latestver = f.read()
     f.close()
     currver = version()
@@ -39,7 +47,11 @@ def _writeLatestVersionFile(fname):
         print("{}".format(err))
         return
 
-    f = open(fname, 'w')
+    try:
+        f = open(fname, 'w')
+    except:
+        print('Unable to open ~/.htmd/.latestversion file for writing. Will not check for new HTMD versions.')
+        return
     f.write(ver)
     os.utime(fname, None)
     f.close()
