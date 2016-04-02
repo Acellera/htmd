@@ -42,16 +42,18 @@ def compareVersions():
 def _writeLatestVersionFile(fname):
     import os
     try:
-        ver = _release_version('acellera', 'htmd')
-    except Exception as err:
-        print("{}".format(err))
-        return
-
-    try:
         f = open(fname, 'w')
     except:
         print('Unable to open {} file for writing. Will not check for new HTMD versions.'.format(fname))
         return
+    
+    try:
+        ver = _release_version('acellera', 'htmd')
+    except Exception as err:
+        print("{}".format(err))
+        f.close()
+        return
+    
     f.write(ver)
     os.utime(fname, None)
     f.close()
