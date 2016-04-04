@@ -79,7 +79,8 @@ class TICA(object):
         >>> dataTica = tica.project(5)
         """
         if ndim is not None:
-            self.tic.set_params(dim=ndim)
+            self.tic._dim = ndim
+            # self.tic.set_params(dim=ndim) # Change to this in new pyEMMA version
 
         if isinstance(self.data, Metric):  # Doesn't project on correct number of dimensions
             proj = []
