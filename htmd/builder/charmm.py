@@ -31,15 +31,19 @@ def listFiles():
     charmmdir = path.join(home(), 'builder', 'charmmfiles')  # maybe just lookup current module?
     topos = os.listdir(path.join(charmmdir, 'top'))
     params = os.listdir(path.join(charmmdir, 'par'))
+    streams = os.listdir(path.join(charmmdir, 'str'))
     print('---- Topologies files list: ' + path.join(charmmdir, 'top', '') + ' ----')
     for t in topos:
         print('top/' + t)
     print('---- Parameters files list: ' + path.join(charmmdir, 'par', '') + ' ----')
     for p in params:
         print('par/' + p)
+    print('---- Stream files list: ' + path.join(charmmdir, 'str', '') + ' ----')
+    for s in streams:
+        print('str/' + s)
 
 
-def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
+def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, patches=None, psfgen=None, execute=True):
     """ Builds a system for CHARMM
 
@@ -53,6 +57,8 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
         A list of topology `rtf` files. Default: ['top/top_all36_prot.rtf', 'top/top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
     param : list of str
         A list of parameter `prm` files. Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+    stream : list of str
+        A list of stream `str` files containing topologies and parameters.
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -107,6 +113,12 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
         param = _defaultParam()
     if caps is None:
         caps = _defaultCaps(mol)
+
+    # Splitting the stream files and adding them to the list of parameter and topology files
+    for s in stream:
+        outrtf, outprm = _prepareStream(s)
+        topo.append(outrtf)
+        param.append(outprm)
 
     #_missingChain(mol)
     #_checkProteinGaps(mol)
@@ -611,15 +623,71 @@ def _sec_name(filename):
     return "!Following lines added from %s\n" % (filename)
 
 
-def charmmSplit(filename):
-    """ Not implemented yet! Splits a stream file into two rtf and prm files.
+def _charmmSplit(filename, outdir):
+    """ Splits a stream file into an rtf and prm file.
 
     Parameters
     ----------
-    filename
+    filename : str
+        Stream file name
     """
+    regex = re.compile('^toppar_(\w+)\.str$')
+    base = os.path.basename(os.path.normpath(filename))
+    base = regex.findall(base)[0]
+    outrtf = os.path.join(outdir, 'top_{}.rtf'.format(base))
+    outprm = os.path.join(outdir, 'par_{}.prm'.format(base))
 
-    # TODO: Implement this
+    startrtf = re.compile('^read rtf card', flags=re.IGNORECASE)
+    startprm = re.compile('^read param? card', flags=re.IGNORECASE)
+    endsection = re.compile('^end', flags=re.IGNORECASE)
+
+    rtfsection = 0
+    prmsection = 0
+    section = 'junk'
+
+    rtfstr = ''
+    prmstr = ''
+
+    f = open(filename, 'r')
+    for line in f:
+        if startrtf.match(line):
+            rtfsection += 1
+            if rtfsection > 1:
+                rtfstr += '! WARNING -- ANOTHER rtf SECTION FOUND\n'
+            section = 'rtf'
+        elif startprm.match(line):
+            prmsection += 1
+            if prmsection > 1:
+                prmstr += '! WARNING -- ANOTHER para SECTION FOUND\n'
+            section = 'prm'
+        elif endsection.match(line):
+            section = 'junk'
+        elif section == 'rtf':
+            rtfstr += line
+        elif section == 'prm':
+            prmstr += line
+    f.close()
+
+    if rtfsection > 1:
+        logger.warning('Multiple ({}) rtf topology sections found in {} stream file.'.format(rtfsection, filename))
+    if prmsection > 1:
+        logger.warning('Multiple ({}) prm parameter sections found in {} stream file.'.format(prmsection, filename))
+
+    f = open(outrtf, 'w')
+    f.write(rtfstr + 'END\n')
+    f.close()
+    f = open(outprm, 'w')
+    f.write(prmstr + 'END\n')
+    f.close()
+    return outrtf, outprm
+
+
+def _prepareStream(filename):
+    from htmd.util import tempname
+    tmpout = tempname()
+    os.makedirs(tmpout)
+    return _charmmSplit(filename, tmpout)
+
 
 def _logParser(fname):
     import re
