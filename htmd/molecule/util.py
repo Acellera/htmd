@@ -154,3 +154,50 @@ def uniformRandomRotation():
     """
     q, r = np.linalg.qr(np.random.normal(size=(3, 3)))
     return np.dot(q, np.diag(np.sign(np.diag(r))))
+
+
+def writeCube(arr, filename, vecMin, vecMax, vecRes):
+    """ writes grid free energy to cube file
+
+    Parameters
+    ----------
+    arr: np.ndarray
+            array with volumetric data
+    filename: str
+            string with the name of the cubefile
+    vecMin: np.ndarray
+            3D vector denoting the minimal corner of the grid
+    vecMax np.ndarray
+            3D vector denoting the maximal corner of the grid
+    vecRes: np.ndarray
+            3D vector denoting the resolution of the grid in each dimension
+    """
+
+    outFile = open(filename, 'w')
+
+    # conversion to gaussian units
+    L = 1/0.52917725
+    gauss_bin = vecRes[0]*vecRes[1]*vecRes[2]*L
+    minCorner = 0.5*L*(vecMin - vecMax + vecRes)
+
+    # write header
+    outFile.write("CUBE FILE\n")
+    outFile.write("OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n")
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (1, minCorner[0], minCorner[1], minCorner[2]))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (vecMax[0] - vecMin[0], gauss_bin, 0, 0))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (vecMax[1] - vecMin[1], 0, gauss_bin, 0))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (vecMax[2] - vecMin[2], 0, 0, gauss_bin))
+    outFile.write("%5d %12.6f %12.6f %12.6f %12.6f\n" % (1, 0, minCorner[0], minCorner[1], minCorner[2]))
+
+    # main loop
+    cont = 0
+
+    for i in range(vecMax[0] - vecMin[0]):
+        for j in range(vecMax[1] - vecMin[1]):
+            for k in range(vecMax[2] - vecMin[2]):
+                outFile.write("%13.5g" % arr[i][j][k])
+                if np.mod(cont, 6) == 5:
+                    outFile.write("\n")
+                cont += 1
+
+    outFile.close()
