@@ -132,12 +132,19 @@ def detectDisulfideBonds(mol, thresh=3):
     return disubonds
 
 
+# TODO: Remove in upcoming versions
 def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
+    logger.warning('segmentgaps will be deprecated in next versions of HTMD. '
+                   'It is replaced by autoSegment to reflect the usage rather than the underlying method. '
+                   'Please change all usages.')
+    return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
+
+
+def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     """ Detects resid gaps in a selection and assigns incrementing segid to each fragment
 
-    !!!WARNING!!! If you want to use selections like protein or fragment,
-    use this function on a pure protein Molecule, otherwise the protein
-    selection will fail.
+    !!!WARNING!!! If you want to use atom selections like 'protein' or 'fragment',
+    use this function on a Molecule containing only protein atoms, otherwise the protein selection can fail.
 
     Parameters
     ----------
@@ -172,7 +179,7 @@ def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
         return mol
 
     gaps = np.array([idx[0]-1] + idx[gappos].tolist() + [idx[-1]])
-    mol.set('segid', '', sel)
+    mol.set('segid', 'P', sel)
 
     if spatial:
         todelete = []
