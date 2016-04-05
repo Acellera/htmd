@@ -13,13 +13,14 @@ import shutil
 import textwrap
 
 from subprocess import call
-
 from htmd.home import home
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
+from glob import glob
+from natsort import natsorted
 
 import logging
 logger = logging.getLogger(__name__)
@@ -28,19 +29,22 @@ logger = logging.getLogger(__name__)
 def listFiles():
     """ Lists all available Charmm topologies and parameter files
     """
-    charmmdir = path.join(home(), 'builder', 'charmmfiles')  # maybe just lookup current module?
-    topos = os.listdir(path.join(charmmdir, 'top'))
-    params = os.listdir(path.join(charmmdir, 'par'))
-    streams = os.listdir(path.join(charmmdir, 'str'))
+    charmmdir = path.join(home(), 'builder', 'charmmfiles', '')  # maybe just lookup current module?
+    topos = natsorted(glob(path.join(charmmdir, 'top', '*.rtf')))
+    params = natsorted(glob(path.join(charmmdir, 'par', '*.prm')))
+    streams = natsorted(glob(path.join(charmmdir, 'str', '*', '*.str')))
     print('---- Topologies files list: ' + path.join(charmmdir, 'top', '') + ' ----')
     for t in topos:
-        print('top/' + t)
+        t = t.replace(charmmdir, '')
+        print(t)
     print('---- Parameters files list: ' + path.join(charmmdir, 'par', '') + ' ----')
     for p in params:
-        print('par/' + p)
+        p = p.replace(charmmdir, '')
+        print(p)
     print('---- Stream files list: ' + path.join(charmmdir, 'str', '') + ' ----')
     for s in streams:
-        print('str/' + s)
+        s = s.replace(charmmdir, '')
+        print(s)
 
 
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
@@ -54,11 +58,17 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object containing the system
     topo : list of str
-        A list of topology `rtf` files. Default: ['top/top_all36_prot.rtf', 'top/top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+        A list of topology `rtf` files.
+        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available topology files.
+        Default: ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
     param : list of str
-        A list of parameter `prm` files. Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+        A list of parameter `prm` files.
+        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available parameter files.
+        Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
     stream : list of str
         A list of stream `str` files containing topologies and parameters.
+        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available stream files.
+        Default: ['str/prot/toppar_all36_prot_arg0.str']
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -111,6 +121,8 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         topo = _defaultTopo()
     if param is None:
         param = _defaultParam()
+    if stream is None:
+        stream = _defaultStream()
     if caps is None:
         caps = _defaultCaps(mol)
 
@@ -389,11 +401,15 @@ def _printAliases(f):
 
 
 def _defaultTopo():
-    return ['top/top_all36_prot.rtf', 'top/top_all36_prot_arg0.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+    return ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
 
 
 def _defaultParam():
-    return ['par/par_all36_prot_mod.prm', 'par/par_all36_prot_arg0.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+
+
+def _defaultStream():
+    return ['str/prot/toppar_all36_prot_arg0.str']
 
 
 def _defaultCaps(mol):
