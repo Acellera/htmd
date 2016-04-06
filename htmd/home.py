@@ -9,6 +9,15 @@ import inspect
 
 
 def home():
+    """Return the pathname of the HTMD root directory.
+
+    Example
+    -------
+        >>> htmd.home()       # doctest: +ELLIPSIS
+        '.../htmd/htmd'
+        >>> os.path.join(htmd.home(),"dhfr","dhfr.pdb")  # doctest: +ELLIPSIS
+        '.../htmd/dhfr/dhfr.pdb'
+    """
     return os.path.dirname(inspect.getfile(htmd))
 
 #Don't know how to do this
