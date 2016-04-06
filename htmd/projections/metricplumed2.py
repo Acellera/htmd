@@ -1,12 +1,16 @@
 from htmd.projections.projection import Projection
 from htmd.molecule.molecule import Molecule
+
 import logging
 import numpy
 import subprocess
 import shutil
+import os
+import tempfile
+
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
 
 
 def _getTempDirName(prefix=""):
@@ -111,20 +115,20 @@ class MetricPlumed2(Projection):
         os.mkdir(td)
 
         # PDB
-        pdb=path.join(td,"temp.pdb")
+        pdb=os.path.join(td,"temp.pdb")
         mol.write(pdb)
 
         # DCD
-        dcd=path.join(td,"temp.dcd")
+        dcd=os.path.join(td,"temp.dcd")
         mol.write(dcd)
         logger.info("Done writing %d frames in %s" % (mol.numFrames,dcd))
 
         # Colvar
-        colvar = path.join(td,"temp.colvar")
+        colvar = os.path.join(td,"temp.colvar")
         logger.info("Colvar file is "+ colvar)
 
         # Metainp
-        metainp = path.join(td,"temp.metainp")
+        metainp = os.path.join(td,"temp.metainp")
         metainp_fp= open(metainp,"w+")
         metainp_fp.write("UNITS  LENGTH=A  ENERGY=kcal/mol  TIME=ps\n")
         metainp_fp.write(self._plumed_inp)
@@ -156,8 +160,8 @@ if __name__ == "__main__":
     from htmd import *
 
     # One simulation
-    mol = Molecule(path.join(home(), 'data', '1kdx', '1kdx_0.pdb'))
-    mol.read(path.join(home(), 'data', '1kdx', '1kdx.dcd'))
+    mol = Molecule(os.path.join(home(), 'data', '1kdx', '1kdx_0.pdb'))
+    mol.read(os.path.join(home(), 'data', '1kdx', '1kdx.dcd'))
 
     metric = MetricPlumed2(['d1: DISTANCE ATOMS=1,200',
                             'd2: DISTANCE ATOMS=5,6'] )
@@ -168,9 +172,9 @@ if __name__ == "__main__":
     assert np.all(np.abs(ref - data[:,0]) < 0.01), 'Plumed demo calculation is broken'
 
     # Simlist
-    # datadirs=glob(path.join(home(), 'data', 'adaptive', 'data', '*' )
-    # fsims=simlist(glob(path.join(home(), 'data', 'adaptive', 'data', '*', '/')),
-    #              path.join(home(), 'data', 'adaptive', 'generators', '1','structure.pdb'))
+    # datadirs=glob(os.path.join(home(), 'data', 'adaptive', 'data', '*' )
+    # fsims=simlist(glob(os.path.join(home(), 'data', 'adaptive', 'data', '*', '/')),
+    #              os.path.join(home(), 'data', 'adaptive', 'generators', '1','structure.pdb'))
 
     fsims=simlist(['/home/toni/work/htmd/htmd/htmd/data/adaptive/data/e1s1_1/',
              '/home/toni/work/htmd/htmd/htmd/data/adaptive/data/e1s2_1/'],
