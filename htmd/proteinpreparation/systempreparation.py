@@ -6,7 +6,7 @@ import random
 from htmd.molecule.molecule import Molecule
 
 # Trying the solution http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
-# instead of relative imports which fail when run as a script
+# instead of relative imports, which fail when run as a script
 import sys
 from pathlib import Path
 sys.path.append(Path(__file__).resolve().parents[1])
@@ -171,8 +171,8 @@ def systemPreparation(mol_in,
     verbose : int
         verbosity
     returnDetails: bool
-         whether to return just the prepared Molecule (False, default) or a molecule and a dictionary
-         including computed properties
+        whether to return just the prepared Molecule (False, default) or a molecule and a dictionary
+        including computed properties
     keep : bool
         TODO
 
