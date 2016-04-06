@@ -35,8 +35,9 @@ class ResiduesInfo:
 
     Examples
     --------
-    >> tryp_op = systemPreparation(tryp)
-    >> ri=tryp_op.systemPreparationData.residuesInfo
+    >> tryp = Molecule("3PTB")
+    >> tryp_op, info = systemPreparation(tryp, returnDetails=True)
+    >> ri=info.residuesInfo
     >> ri.pKa[ri.resid==189]
 
     Properties
@@ -73,12 +74,13 @@ class ResiduesInfo:
         n=len(self.resid)
         r=""
         for i in range(n):
-            r += "%4s %4d %1s : pKa=%f, state=%s, patches=%s\n" % (self.resname[i],
-                                                                 self.resid[i],
-                                                                 self.chain[i],
-                                                                 self.pKa[i],
-                                                                 self.protonation[i],
-                                                                 self.patches[i])
+            r += "%4s %4d %1s : pKa=%f, state=%s, patches=%s\n" % (
+                self.resname[i],
+                self.resid[i],
+                self.chain[i],
+                self.pKa[i],
+                self.protonation[i],
+                self.patches[i])
         return r
 
     def __repr__(self):
@@ -132,13 +134,12 @@ def systemPreparation(mol_in,
                       keep=None):
     """A system preparation wizard for HTMD. 
 
-    Roughly equivalent to mdweb and Maestro's wizard. Returns a
-    Molecule object, where residues have been renamed to follow
-    "internal conventions" on protonation. Coordinates are changed to
-    optimize the H-bonding network. This is very preliminar.
+    Returns a Molecule object, where residues have been renamed to follow
+    internal conventions on protonation (below). Coordinates are changed to
+    optimize the H-bonding network. This is very preliminar and should be
+    roughly equivalent to mdweb and Maestro's wizard.
 
-    The following residue names are used in the returned molecule, and
-    should match those used internally by Maestro:
+    The following residue names are used in the returned molecule:
 
         ASH 	Neutral ASP
         CYX 	SS-bonded CYS
@@ -151,25 +152,15 @@ def systemPreparation(mol_in,
         TYM 	Negative TYR
         AR0     Neutral ARG
 
-    FEATURES
+
+    Features
+    --------
      - assign protonation states via propKa
      - flip residues to optimize H-bonding network
      - debump collisions
      - fill-in missing atoms, e.g. hydroges
      - atom name mapping between FFs
 
-    UNSUPPORTED/TODO/TO CHECK:
-     - ligands
-     - termini
-     - force residues
-     - multiple chains
-     - nucleic acids
-     - reporting in machine-readable form
-     - coupled titrating residues
-     - ???
-
-    UNUSED FEATURES:
-     - SS detection
 
     Parameters
     ----------
@@ -186,6 +177,15 @@ def systemPreparation(mol_in,
         TODO
 
 
+    Returns
+    -------
+    Molecule
+        the molecule titrated and optimized. The molecule object contains an additional attribute,
+    SystemPreparationData, which contains these attributes:
+        - residuesInfo : a table of residues with the corresponding protonations and pKa
+        - ... other properties of lesser interest
+
+
     Examples
     --------
     >>> tryp = Molecule('3PTB')
@@ -193,13 +193,16 @@ def systemPreparation(mol_in,
     >>> tryp_op.write('3PTB-opt-ph1.pdb')
 
 
-    Returns
-    -------
-    Molecule
-        the molecule titrated and optimized. The molecule object contains an additional attribute,
-        systemPreparationData, which contains these attributes:
-           - residuesInfo : a table of residues with the corresponding protonations and pKa
-           - ... other properties of lesser interest
+    Unsupported/To Do/To Check
+    --------------------------
+     - ligands
+     - termini
+     - force residues
+     - multiple chains
+     - nucleic acids
+     - reporting in machine-readable form
+     - coupled titrating residues
+     - Disulfide bridge detection (implemented but unused)
 
     """
 
