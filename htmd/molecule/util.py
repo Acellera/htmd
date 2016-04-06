@@ -5,6 +5,8 @@
 #
 import numpy as np
 from scipy.spatial.distance import cdist
+import logging
+logger = logging.getLogger(__name__)
 
 
 def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
@@ -246,4 +248,3 @@ def drawCube(mi, ma, viewer=None):
     draw line "$maxx $maxy $maxz" "$minx $maxy $maxz"
     draw line "$maxx $maxy $maxz" "$maxx $miny $maxz"
     """
-
