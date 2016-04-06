@@ -127,7 +127,10 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         caps = _defaultCaps(mol)
 
     # Splitting the stream files and adding them to the list of parameter and topology files
+    charmmdir = path.join(home(), 'builder', 'charmmfiles')
     for s in stream:
+        if s[0] != '.' and path.isfile(path.join(charmmdir, s)):
+            s = path.join(charmmdir, s)
         outrtf, outprm = _prepareStream(s)
         topo.append(outrtf)
         param.append(outprm)
@@ -147,7 +150,6 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     f.write('psfcontext reset;\n\n')
 
     # Copying and printing out the topologies
-    charmmdir = path.join(home(), 'builder', 'charmmfiles')
     for i in range(len(topo)):
         if topo[i][0] != '.' and path.isfile(path.join(charmmdir, topo[i])):
             topo[i] = path.join(charmmdir, topo[i])
