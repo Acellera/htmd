@@ -118,11 +118,11 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         os.makedirs(outdir)
     _cleanOutDir(outdir)
     if topo is None:
-        topo = _defaultTopo()
+        topo = ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
     if param is None:
-        param = _defaultParam()
+        param = ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
     if stream is None:
-        stream = _defaultStream()
+        stream = ['str/prot/toppar_all36_prot_arg0.str']
     if caps is None:
         caps = _defaultCaps(mol)
 
@@ -400,18 +400,6 @@ def _printAliases(f):
     '''
     f.write(textwrap.dedent(lines))
     f.write('\n\n')
-
-
-def _defaultTopo():
-    return ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
-
-
-def _defaultParam():
-    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
-
-
-def _defaultStream():
-    return ['str/prot/toppar_all36_prot_arg0.str']
 
 
 def _defaultCaps(mol):
