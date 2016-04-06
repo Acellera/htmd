@@ -5,6 +5,8 @@
 #
 import numpy as np
 from scipy.spatial.distance import cdist
+import logging
+logger = logging.getLogger(__name__)
 
 
 def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
@@ -156,7 +158,7 @@ def uniformRandomRotation():
     return np.dot(q, np.diag(np.sign(np.diag(r))))
 
 
-def writeCube(arr, filename, vecMin, vecMax, vecRes):
+def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
     """ writes grid free energy to cube file
 
     Parameters
@@ -177,16 +179,19 @@ def writeCube(arr, filename, vecMin, vecMax, vecRes):
 
     # conversion to gaussian units
     L = 1/0.52917725
-    gauss_bin = vecRes[0]*vecRes[1]*vecRes[2]*L
-    minCorner = 0.5*L*(vecMin - vecMax + vecRes)
+    gauss_bin = vecRes*L
+    #minCorner = 0.5*L*(vecMin - vecMax + vecRes)
+    minCorner = L * (vecMin + 0.5 * vecRes)
+
+    ngrid = np.array(np.floor((vecMax - vecMin) / vecRes), dtype=int)
 
     # write header
     outFile.write("CUBE FILE\n")
     outFile.write("OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n")
     outFile.write("%5d %12.6f %12.6f %12.6f\n" % (1, minCorner[0], minCorner[1], minCorner[2]))
-    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (vecMax[0] - vecMin[0], gauss_bin, 0, 0))
-    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (vecMax[1] - vecMin[1], 0, gauss_bin, 0))
-    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (vecMax[2] - vecMin[2], 0, 0, gauss_bin))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[0], gauss_bin[0], 0, 0))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[1], 0, gauss_bin[1], 0))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[2], 0, 0, gauss_bin[2]))
     outFile.write("%5d %12.6f %12.6f %12.6f %12.6f\n" % (1, 0, minCorner[0], minCorner[1], minCorner[2]))
 
     # main loop
@@ -201,3 +206,45 @@ def writeCube(arr, filename, vecMin, vecMax, vecRes):
                 cont += 1
 
     outFile.close()
+
+
+def drawCube(mi, ma, viewer=None):
+    from htmd.vmdviewer import getCurrentViewer
+    if viewer is None:
+        viewer = getCurrentViewer()
+
+    viewer.send('draw materials off')
+    viewer.send('draw color red')
+    c = ''
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], ma[0], mi[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], mi[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], mi[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], mi[0], ma[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], ma[0], mi[1], ma[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], mi[0], ma[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], mi[0], ma[1], ma[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], mi[1], ma[2])
+    viewer.send(c)
+
+    """
+    draw line "$minx $miny $minz" "$maxx $miny $minz"
+    draw line "$minx $miny $minz" "$minx $maxy $minz"
+    draw line "$minx $miny $minz" "$minx $miny $maxz"
+    draw line "$maxx $miny $minz" "$maxx $maxy $minz"
+    draw line "$maxx $miny $minz" "$maxx $miny $maxz"
+    draw line "$minx $maxy $minz" "$maxx $maxy $minz"
+    draw line "$minx $maxy $minz" "$minx $maxy $maxz"
+    draw line "$minx $miny $maxz" "$maxx $miny $maxz"
+    draw line "$minx $miny $maxz" "$minx $maxy $maxz"
+    draw line "$maxx $maxy $maxz" "$maxx $maxy $minz"
+    draw line "$maxx $maxy $maxz" "$minx $maxy $maxz"
+    draw line "$maxx $maxy $maxz" "$maxx $miny $maxz"
+    """
