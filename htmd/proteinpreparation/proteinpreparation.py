@@ -74,8 +74,7 @@ def proteinPreparation(mol_in,
      - assign protonation states via propKa
      - flip residues to optimize H-bonding network
      - debump collisions
-     - fill-in missing atoms, e.g. hydroges
-     - atom name mapping between FFs
+     - fill-in missing atoms, e.g. hydrogen atoms
 
 
     Parameters
@@ -86,9 +85,9 @@ def proteinPreparation(mol_in,
         pH to decide titration
     verbose : int
         verbosity
-    returnDetails: bool
-        whether to return just the prepared Molecule (False, default) or a molecule and a dictionary
-        including computed properties
+    returnDetails : bool
+        whether to return just the prepared Molecule (False, default) or a molecule *and* a ResidueInfo
+        object including computed properties
     keep : bool
         TODO
 
