@@ -137,7 +137,13 @@ class MetricPlumed2(Projection):
                '--pdb', pdb,
                '--plumed', metainp]
         logger.info("Invoking " + " ".join(cmd))
-        subprocess.check_output(cmd)
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            logger.error("Error from PLUMED (stdout): " + e.stdout.decode("utf-8"))
+            logger.error("Error from PLUMED (stderr):" + e.stderr.decode("utf-8"))
+            logger.error("Leaving temporary data in " + td)
+            raise e
 
         data = _readColvar(colvar)
         shutil.rmtree(td)
@@ -156,6 +162,7 @@ if __name__ == "__main__":
 
     metric = MetricPlumed2(['d1: DISTANCE ATOMS=1,200',
                             'd2: DISTANCE ATOMS=5,6'])
+#    metric = MetricPlumed2([''])
     data = metric.project(mol)
     ref = np.array([0.536674, 21.722393, 22.689391, 18.402114, 23.431387, 23.13392, 19.16376, 20.393544,
                     23.665517, 22.298349, 22.659769, 22.667669, 22.484084, 20.893447, 18.791701,
