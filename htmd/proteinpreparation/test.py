@@ -12,7 +12,7 @@ import shutil
 mol = Molecule('3ptb')
 mol.filter('protein or water')
 #mol.view()
-molp = systemPreparation(mol, ffout='AMBER')
+molp = systemPreparation(mol)
 #molp.view()
 
 molp.set('segid','P','protein')

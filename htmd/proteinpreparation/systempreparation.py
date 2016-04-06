@@ -2,7 +2,6 @@ import logging
 import tempfile
 import numpy as np
 import random
-import collections
 
 from htmd.molecule.molecule import Molecule
 
@@ -10,13 +9,15 @@ from htmd.molecule.molecule import Molecule
 # instead of relative imports which fail when run as a script
 import sys
 from pathlib import Path
-
 sys.path.append(Path(__file__).resolve().parents[1])
-
 from pdb2pqr.src.pdbParser import readPDB
 from pdb2pqr.main import runPDB2PQR
 
-random.seed(10)  # does not work?
+
+# Trying to make runs reproducible, but does not work
+random.seed(2016)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,9 +35,9 @@ class ResiduesInfo:
 
     Examples
     --------
-    >>> tryp_op = systemPreparation(tryp)
-    >>> ri=tryp_op.systemPreparationData.residuesInfo
-    >>> ri.pKa[ri.resid==189]
+    >> tryp_op = systemPreparation(tryp)
+    >> ri=tryp_op.systemPreparationData.residuesInfo
+    >> ri.pKa[ri.resid==189]
 
     Properties
     ----------
@@ -126,8 +127,8 @@ class ResiduesInfo:
 
 def systemPreparation(mol_in,
                       pH=7.0,
-                      ffout="amber",
                       verbose=0,
+                      returnDetails=False,
                       keep=None):
     """A system preparation wizard for HTMD. 
 
@@ -176,14 +177,11 @@ def systemPreparation(mol_in,
         the object to be optimized
     pH : float
         pH to decide titration
-    ffout : str
-        use the naming conventions (esp. for hydrogens) of the given FF (CHARMM, AMBER).
-        The default, AMBER, is required for later steps of system building.
     verbose : int
         verbosity
-    return_details: bool
-         whether to return just the prepared Molecule (False, default) or a dictionary
-         including properties .mol (Molecule) and  .pdb2pqr_data
+    returnDetails: bool
+         whether to return just the prepared Molecule (False, default) or a molecule and a dictionary
+         including computed properties
     keep : bool
         TODO
 
@@ -232,7 +230,7 @@ def systemPreparation(mol_in,
 
     # Relying on defaults
     header, lines, missedligands, pdb2pqr_protein = runPDB2PQR(pdblist, "parse", ph=pH,
-                                                               ffout=ffout,
+                                                               ffout="amber",
                                                                verbose=verbose,
                                                                propkaOptions=propka_opts)
     tmpin.close()
@@ -289,15 +287,18 @@ def systemPreparation(mol_in,
 
     mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
-    mol_out.systemPreparationData = SystemPreparationData()
-    mol_out.systemPreparationData.pdb2pqr_protein = pdb2pqr_protein
-    mol_out.systemPreparationData.pka_protein = pdb2pqr_protein.pka_molecule
-    mol_out.systemPreparationData.pka_dict = pdb2pqr_protein.pkadic
-
-    mol_out.systemPreparationData.residuesInfo = resinfo
+    systemPreparationData = SystemPreparationData()
+    systemPreparationData.pdb2pqr_protein = pdb2pqr_protein
+    systemPreparationData.pka_protein = pdb2pqr_protein.pka_molecule
+    systemPreparationData.pka_dict = pdb2pqr_protein.pkadic
+    systemPreparationData.residuesInfo = resinfo
 
     logger.info("Returning.")
-    return mol_out
+
+    if returnDetails:
+        return mol_out, systemPreparationData
+    else:
+        return mol_out
 
 
 
@@ -320,13 +321,13 @@ def _createMolecule(name, resname, chain, resid, insertion, coords, segid, eleme
 
 # A test method
 if __name__ == "__main__":
-    tryp = Molecule('tests/3ptb.pdb')
+    tryp = Molecule('3PTB')
 
     tryp_op = systemPreparation(tryp, pH=1.0,verbose=True)
-    tryp_op.write('tests/systempreparation-test-main-ph-1.pdb')
+    tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
 
-    tryp_op = systemPreparation(tryp)
-    tryp_op.write('tests/systempreparation-test-main-ph-7.pdb')
+    tryp_op, prepData = systemPreparation(tryp,returnDetails=True)
+    tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
 
     tryp_op = systemPreparation(tryp, pH=14.0)
-    tryp_op.write('tests/systempreparation-test-main-ph-14.pdb')
+    tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
