@@ -1,4 +1,5 @@
 from htmd.projections.projection import Projection
+from htmd.projections.metric import Metric
 from htmd.molecule.molecule import Molecule
 
 import logging
@@ -31,7 +32,7 @@ def _readColvar(colvar):
             cols_str = line.split()[1:]
             cols = [float(x) for x in cols_str]
             data.append(cols)
-    return numpy.array(data)
+    return numpy.array(data, dtype=numpy.float32)
 
 
 class PlumedGroup():
@@ -67,17 +68,6 @@ class MetricPlumed2(Projection):
     ----------
     plumed_inp_str: string
         The PLUMED script defining CVs - a string or a list of strings (which are concatenated)
-
-    Example
-    -------
-    >>> dd = htmd.home(dataDir="adaptive")
-    >>> fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
-    >>>                       dd + '/generators/1/structure.pdb')
-    >>> metr = htmd.projections.metric.Metric(fsims)
-    >>> metr.projection(MetricPlumed2(
-    >>>     ['d1: DISTANCE ATOMS=2,3',
-    >>>      'd2: DISTANCE ATOMS=5,6']))
-    >>> data2 = metr.project()
 
     """
 
@@ -189,4 +179,11 @@ if __name__ == "__main__":
     # fsims=simlist(glob(os.path.join(home(), 'data', 'adaptive', 'data', '*', '/')),
     #              os.path.join(home(), 'data', 'adaptive', 'generators', '1','structure.pdb'))
 
-
+    dd = htmd.home(dataDir="adaptive")
+    fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
+                              dd + '/generators/1/structure.pdb')
+    metr = Metric(fsims)
+    metr.projection(MetricPlumed2(
+            ['d1: DISTANCE ATOMS=2,3',
+             'd2: DISTANCE ATOMS=5,6']))
+    data2 = metr.project()
