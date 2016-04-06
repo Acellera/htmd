@@ -43,11 +43,11 @@ def _createMolecule(name, resname, chain, resid, insertion, coords, segid, eleme
 
 
 
-def systemPreparation(mol_in,
-                      pH=7.0,
-                      verbose=0,
-                      returnDetails=False,
-                      keep=None):
+def proteinPreparation(mol_in,
+                       pH=7.0,
+                       verbose=0,
+                       returnDetails=False,
+                       keep=None):
     """A system preparation wizard for HTMD. 
 
     Returns a Molecule object, where residues have been renamed to follow
@@ -104,7 +104,7 @@ def systemPreparation(mol_in,
     Examples
     --------
     >>> tryp = Molecule('3PTB')
-    >>> tryp_op = systemPreparation(tryp, pH=1.0)
+    >>> tryp_op = proteinPreparation(tryp, pH=1.0)
     >>> tryp_op.write('3PTB-opt-ph1.pdb')
 
 
@@ -225,11 +225,11 @@ def systemPreparation(mol_in,
 if __name__ == "__main__":
     tryp = Molecule('3PTB')
 
-    tryp_op = systemPreparation(tryp, pH=1.0)
+    tryp_op = proteinPreparation(tryp, pH=1.0)
     tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
 
-    tryp_op, prepData = systemPreparation(tryp,returnDetails=True)
+    tryp_op, prepData = proteinPreparation(tryp, returnDetails=True)
     tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
 
-    tryp_op = systemPreparation(tryp, pH=14.0)
+    tryp_op = proteinPreparation(tryp, pH=14.0)
     tryp_op.write('proteinpreparation-test-main-ph-14.pdb')

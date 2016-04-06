@@ -15,7 +15,7 @@ class ResidueData:
     Examples
     --------
     >> tryp = Molecule("3PTB")
-    >> tryp_op, info = systemPreparation(tryp, returnDetails=True)
+    >> tryp_op, info = proteinPreparation(tryp, returnDetails=True)
     >> ri=info.residuesInfo
     >> ri.pKa[ri.resid==189]
 

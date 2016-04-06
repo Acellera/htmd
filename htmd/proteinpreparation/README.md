@@ -34,10 +34,10 @@ See the docstring for options. You need propka31 installed via conda.
 Start from a directory above sysprep.
     
     from htmd import *
-    from sysprep.systempreparation import systemPreparation
+    from sysprep.systempreparation import proteinPreparation
 
     tryp = Molecule('sysprep/tests/3ptb.pdb')
-    tryp_op = systemPreparation(tryp)
+    tryp_op = proteinPreparation(tryp)
     tryp_op.write('sysprep/tests/systempreparation-test-main-ph-7.pdb')
 
 
