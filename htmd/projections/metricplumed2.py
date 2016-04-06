@@ -90,7 +90,6 @@ class MetricPlumed2(Projection):
         return
 
 
-
     # Arguments are actually self, mol
     def project(self, mol):
         """ Project molecule.
@@ -166,9 +165,9 @@ if __name__ == "__main__":
     metric = MetricPlumed2(['d1: DISTANCE ATOMS=1,200',
                             'd2: DISTANCE ATOMS=5,6'] )
     data = metric.project(mol)
-    ref  = np.array([ 0.536674, 21.722393, 22.689391, 18.402114, 23.431387, 23.13392, 19.16376, 20.393544,
-                         23.665517, 22.298349, 22.659769, 22.667669, 22.484084, 20.893447, 18.791701,
-                          21.833056, 19.901318 ])
+    ref  = np.array([ 0.536674,  21.722393, 22.689391, 18.402114, 23.431387, 23.13392,  19.16376, 20.393544,
+                      23.665517, 22.298349, 22.659769, 22.667669, 22.484084, 20.893447, 18.791701,
+                      21.833056, 19.901318 ])
     assert np.all(np.abs(ref - data[:,0]) < 0.01), 'Plumed demo calculation is broken'
 
     # Simlist

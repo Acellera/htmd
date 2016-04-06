@@ -8,17 +8,31 @@ import os
 import inspect
 
 
-def home():
-    """Return the pathname of the HTMD root directory.
+def home(dataDir=None):
+    """Return the pathname of the HTMD root directory (or a data subdirectory).
+
+    Parameters
+    ----------
+    dataDir : str
+        If not None, return the path to a specific data directory
 
     Example
     -------
-        >>> htmd.home()       # doctest: +ELLIPSIS
+        >>> htmd.home()                                 # doctest: +ELLIPSIS
         '.../htmd/htmd'
-        >>> os.path.join(htmd.home(),"dhfr","dhfr.pdb")  # doctest: +ELLIPSIS
-        '.../htmd/dhfr/dhfr.pdb'
+        >>> htmd.home(dataDir="dhfr")                   # doctest: +ELLIPSIS
+        '.../htmd/data/dhfr'
+        >>> os.path.join(htmd.home(dataDir="dhfr"),"dhfr.pdb")  # doctest: +ELLIPSIS
+        '.../htmd/data/dhfr/dhfr.pdb'
+
     """
-    return os.path.dirname(inspect.getfile(htmd))
+
+    homeDir=os.path.dirname(inspect.getfile(htmd))
+    if dataDir:
+        return os.path.join(homeDir,"data",dataDir)
+    else:
+        return homeDir
+
 
 #Don't know how to do this
 # def modulehome(modname):
