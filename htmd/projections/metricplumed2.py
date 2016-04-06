@@ -11,9 +11,6 @@ import tempfile
 logger = logging.getLogger(__name__)
 
 
-# logger.setLevel(logging.DEBUG)
-
-
 def _getTempDirName(prefix=""):
     return os.path.join(tempfile._get_default_tempdir(),
                         prefix + next(tempfile._get_candidate_names()))
@@ -63,10 +60,25 @@ class PlumedGroup():
 class MetricPlumed2(Projection):
     """ Calculates generic collective variables through Plumed 2
 
+    The collective variables are defined in PLUMED 2's syntax. PLUMED needs be installed
+    separately; see http://www.plumed.org/.
+
     Parameters
     ----------
     plumed_inp_str: string
-        The PLUMED script defining CVs - possibly a list of strings
+        The PLUMED script defining CVs - a string or a list of strings (which are concatenated)
+
+    Example
+    -------
+    >>> dd = htmd.home(dataDir="adaptive")
+    >>> fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
+    >>>                       dd + '/generators/1/structure.pdb')
+    >>> metr = htmd.projections.metric.Metric(fsims)
+    >>> metr.projection(MetricPlumed2(
+    >>>     ['d1: DISTANCE ATOMS=2,3',
+    >>>      'd2: DISTANCE ATOMS=5,6']))
+    >>> data2 = metr.project()
+
     """
 
     def __init__(self, plumed_inp_str):
@@ -156,6 +168,9 @@ if __name__ == "__main__":
     import htmd
     from htmd.projections.metricplumed2 import MetricPlumed2
 
+    import doctest
+    doctest.testmod()
+
     # One simulation
     mol = Molecule(os.path.join(htmd.home(), 'data', '1kdx', '1kdx_0.pdb'))
     mol.read(os.path.join(htmd.home(), 'data', '1kdx', '1kdx.dcd'))
@@ -174,13 +189,4 @@ if __name__ == "__main__":
     # fsims=simlist(glob(os.path.join(home(), 'data', 'adaptive', 'data', '*', '/')),
     #              os.path.join(home(), 'data', 'adaptive', 'generators', '1','structure.pdb'))
 
-    dd = htmd.home(dataDir="adaptive")
-    fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
-                         dd + '/generators/1/structure.pdb')
 
-    metr = htmd.projections.metric.Metric(fsims)
-    metr.projection(MetricPlumed2(
-        ['d1: DISTANCE ATOMS=2,3',
-         'd2: DISTANCE ATOMS=5,6']))
-    data2 = metr.project()
-    print(data2.dat)
