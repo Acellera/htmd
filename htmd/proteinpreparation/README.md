@@ -1,7 +1,8 @@
-System optimization with HTMD
+Protein preparation with HTMD
 ===============
 
-The system preparation phase includes the following steps (from the
+The system preparation phase is based on the PDB2PQR software. It 
+includes the following steps (from the
 [PDB2PQR algorithm
 description](http://www.poissonboltzmann.org/docs/pdb2pqr-algorithm-description/)
 ):
@@ -12,16 +13,17 @@ description](http://www.poissonboltzmann.org/docs/pdb2pqr-algorithm-description/
  * Determining the best placement for the sidechain hydrogen on neutral HIS, protonated GLU, and protonated ASP;
  * Optimizing all water hydrogens.
 
-The idea is to provide an equivalent of Schrodinger Maestro's system
-preparation wizard including the preprocessing and optimization steps.
+It should be roughly equivalent of the system preparation wizard's preprocessing and optimization steps
+of Schrodinger Maestro.
 
-The corresponding calculations are performed by the
-[PDB2PQR](http://www.poissonboltzmann.org/) and [PROPKA
-3.0](https://github.com/jensengroup/propka-3.1) software packages.
-Please see the copyright and license terms distributed with each.
+The hydrogen bonding network calculations are performed by the
+[PDB2PQR](http://www.poissonboltzmann.org/) software package. The pKa
+calculations are performed by the [PROPKA
+3.1](https://github.com/jensengroup/propka-3.1) software packages.
+Please see the copyright, license  and citation terms distributed with each.
 
-Note that this version was modified in order to use an externally-supplied
-[propKa 3.1](https://github.com/jensengroup/propka-3.1/blob/master/scripts/propka31.py), whereas
+Note that this version was modified in order to use an 
+externally-supplied PROPKA **3.1**, whereas
 the original had propKa 3.0 *embedded*!
 
 
@@ -39,9 +41,6 @@ Start from a directory above sysprep.
     tryp_op.write('sysprep/tests/systempreparation-test-main-ph-7.pdb')
 
 
-Runs are not exactly reproducible. Whether this is due to the use of
-random values or to non-deterministic ordering of dictionaries is
-unknown. Setting the seed did not help.
 
 
 Testing modified pdb2pqr stand-alone
@@ -57,13 +56,15 @@ TODO
 
 * Refactor modules and streamline PYTHONPATH.
 * Every other note in the docstring.
- 
+* Runs are not exactly reproducible. Whether this is due to the use of
+random values or to non-deterministic ordering of dictionaries is
+unknown. Setting the seed did not help.
+
  
 
 
 Changes with respect to upstream
 -------------------
-
 
 The version imported is SVN r1111 from the [SourceForge
 repository](http://sourceforge.net/p/pdb2pqr/code/HEAD/tree/trunk/pdb2pqr/),
