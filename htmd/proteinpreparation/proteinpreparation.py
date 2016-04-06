@@ -121,9 +121,9 @@ def proteinPreparation(mol_in,
 
     """
 
+    oldLoggingLevel=logger.level
     if verbose:
         logger.setLevel(logging.DEBUG)
-
     logger.info("Starting.")
 
     # We could transform the molecule into an internal object, but for now I prefer to rely on the strange
@@ -211,6 +211,7 @@ def proteinPreparation(mol_in,
     resData.missedLigands=missedLigands
 
     logger.info("Returning.")
+    logger.setLevel(oldLoggingLevel)
 
     if returnDetails:
         return mol_out, resData
