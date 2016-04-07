@@ -19,19 +19,16 @@ def _getTempDirName(prefix=""):
 
 
 def _getPlumedPath():
-    """ Return path to plumed executable
+    """ Return path to plumed executable, or raise an exception if not found.
+
     Returns
     -------
 
     pr: str
-        Path to Plumed executable, or None if failed
+        Path to Plumed executable
     """
-    pr = None
-    try:
-        pr = subprocess.check_output(["plumed", "--standalone-executable", "info", "--root"])
-        pr = pr.strip().decode("utf-8")
-    except:
-        pass
+    pr = subprocess.check_output(["plumed", "--standalone-executable", "info", "--root"])
+    pr = pr.strip().decode("utf-8")
     return pr
 
 
@@ -128,7 +125,10 @@ class MetricPlumed2(Projection):
         self.colvar = None
         self.cvnames = None
 
-        if not _getPlumedPath():
+        try:
+            pp=_getPlumedPath()
+            logger.info("Plumed path is "+pp)
+        except Exception as e:
             raise Exception("To use MetricPlumed2 please ensure PLUMED 2's executable is installed and in path")
 
         if not isinstance(plumed_inp_str, str):
@@ -244,12 +244,13 @@ if __name__ == "__main__":
     import htmd
     from htmd.projections.metricplumed2 import MetricPlumed2
 
-    if not _getPlumedPath():
+    try:
+        _getPlumedPath()
+    except:
         print("Tests in %s skipped because plumed executable not found." % __file__)
         sys.exit()
 
     import doctest
-
     doctest.testmod()
 
     # One simulation
