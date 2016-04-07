@@ -3,7 +3,7 @@ import os
 from subprocess import call, check_output
 import sys
 
-excludedfolders = ('./tests', './htmd/proteinpreparation', './doc')
+excludedfolders = ('./tests',  './doc')
 excludedfiles = ('__init__.py')
 
 
