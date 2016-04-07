@@ -2593,4 +2593,6 @@ def main():
         if len(errlist) > 0:  sys.stdout.write("\tSkipped records: %s\n" % errlist)
         sys.stdout.write("\tNo skipped records.\n")
 
-if __name__ == "__main__":  main()
+if __name__ == "__main__":
+    """main()"""
+

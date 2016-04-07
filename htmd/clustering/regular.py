@@ -1,4 +1,4 @@
-from .kcenters import KCenter
+from htmd.clustering.kcenters import KCenter
 import numpy as np
 import random as rd
 from scipy.spatial.distance import cdist

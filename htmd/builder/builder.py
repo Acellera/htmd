@@ -324,18 +324,18 @@ if __name__ == "__main__":
 
     p = Molecule(path.join(home(), 'data', 'building-protein-membrane', '4dkl.pdb'))
     p.filter('(chain B and protein) or water')
-    p = segmentgaps(p, 'protein', 'P')
+    p = autoSegment(p, 'protein', 'P')
     m = Molecule(path.join(home(), 'data', 'building-protein-membrane', 'membrane.pdb'))
     a = embed(p, m)
     print(np.unique(m.get('segid')))
 
     mol = Molecule('1ITG')
     ref = Molecule(path.join(home(), 'data', 'building-protein-membrane', '1ITG.pdb'))
-    mol = segmentgaps(mol, sel='protein')
+    mol = autoSegment(mol, sel='protein')
     assert np.all(mol.segid == ref.segid)
 
     mol = Molecule('3PTB')
     ref = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB.pdb'))
-    mol = segmentgaps(mol, sel='protein')
+    mol = autoSegment(mol, sel='protein')
     assert np.all(mol.segid == ref.segid)
 
