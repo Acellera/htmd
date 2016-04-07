@@ -18,6 +18,23 @@ def _getTempDirName(prefix=""):
                         prefix + next(tempfile._get_candidate_names()))
 
 
+def _getPlumedPath():
+    """ Return path to plumed executable
+    Returns
+    -------
+
+    pr: str
+        Path to Plumed executable, or None if failed
+    """
+    pr = None
+    try:
+        pr = subprocess.check_output(["plumed", "--standalone-executable", "info", "--root"])
+        pr = pr.strip().decode("utf-8")
+    except:
+        pass
+    return pr
+
+
 class PlumedGenericGroup(ABC):
     """ Abstract class from which PLUMED groups are inherited. Do not use directly. """
 
@@ -108,8 +125,11 @@ class MetricPlumed2(Projection):
         # I am not sure at all about opening files here is good style
         self._precalculation_enabled = False
         self._plumed_exe = shutil.which("plumed")
-        self.colvar=None
+        self.colvar = None
         self.cvnames = None
+
+        if not _getPlumedPath():
+            raise Exception("To use MetricPlumed2 please ensure PLUMED 2's executable is installed and in path")
 
         if not isinstance(plumed_inp_str, str):
             plumed_inp_str = "\n".join(plumed_inp_str)
@@ -119,7 +139,7 @@ class MetricPlumed2(Projection):
         # Assumptions: file begins with #! FIELDS time
         # first line is time
         # only colvars follow
-        assert self.colvar,"colvar variable not defined"
+        assert self.colvar, "colvar variable not defined"
         data = []
         with open(self.colvar, "r") as file:
             headerline = file.readline()
@@ -187,7 +207,7 @@ class MetricPlumed2(Projection):
 
         # Colvar
         colvar = os.path.join(td, "temp.colvar")
-        self.colvar=colvar
+        self.colvar = colvar
         logger.info("Colvar file is " + colvar)
 
         # Metainp
@@ -219,11 +239,17 @@ class MetricPlumed2(Projection):
 
 
 if __name__ == "__main__":
+    import sys
     import numpy as np
     import htmd
     from htmd.projections.metricplumed2 import MetricPlumed2
 
+    if not _getPlumedPath():
+        print("Tests in %s skipped because plumed executable not found." % __file__)
+        sys.exit()
+
     import doctest
+
     doctest.testmod()
 
     # One simulation
