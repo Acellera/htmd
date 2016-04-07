@@ -3,12 +3,13 @@ import tempfile
 import numpy as np
 import random
 
-from htmd.molecule.molecule import Molecule
-
 # If necessary: http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 from htmd.proteinpreparation.residuedata import ResidueData
 from htmd.proteinpreparation.pdb2pqr.src.pdbParser import readPDB
 from htmd.proteinpreparation.pdb2pqr.main import runPDB2PQR
+
+from htmd.molecule.molecule import Molecule
+
 
 # Tried to make runs reproducible, but does not work
 random.seed(2016)

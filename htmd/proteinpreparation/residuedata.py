@@ -1,7 +1,8 @@
 import numpy as np
 import logging
-import htmd.proteinpreparation.proteinpreparation
-from htmd import Molecule
+
+# import htmd.proteinpreparation.proteinpreparation
+# from htmd.molecule.molecule import Molecule
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +16,13 @@ class ResidueData:
 
     Examples
     --------
+    >>> import htmd.proteinpreparation.proteinpreparation  # doctest: +ELLIPSIS
+    -etc-
+    >>> from htmd.molecule.molecule import Molecule
     >>> tryp = Molecule("3PTB")
     >>> tryp_op, ri = htmd.proteinpreparation.proteinpreparation.prepareProtein(tryp, returnDetails=True) # doctest: +ELLIPSIS
-    propka3.1 ...
-    >>> ri.pKa[ri.resid==189]
+    -etc-
+    >>> ri.pKa[ri.resid == 189]
     array([ 4.94907929])
 
     Properties
@@ -105,4 +109,5 @@ class ResidueData:
 
 if __name__ == "__main__":
     import doctest
+    doctest.ELLIPSIS_MARKER = '-etc-'
     doctest.testmod()
