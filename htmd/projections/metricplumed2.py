@@ -149,10 +149,8 @@ class MetricPlumed2(Projection):
         return data
 
 
-
-
 if __name__ == "__main__":
-    from htmd.home import home
+    """from htmd.home import home
     from os import path
     from glob import glob
     from htmd.simlist import simlist
@@ -183,6 +181,6 @@ if __name__ == "__main__":
     metr.projection(MetricPlumed2(['d1: DISTANCE ATOMS=2,3',
                                    'd2: DISTANCE ATOMS=5,6'] ))
     data2=metr.project()
-    print(data2.dat)
+    print(data2.dat)"""
 
 

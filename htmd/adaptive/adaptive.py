@@ -9,14 +9,173 @@ import time
 import os.path as path
 from glob import glob
 from os import makedirs
-from shutil import copytree,ignore_patterns
+from shutil import copytree, ignore_patterns
 import numpy as np
 from natsort import natsorted
 from htmd.simlist import _simName
 from htmd.molecule.molecule import Molecule
 from htmd.userinterface import uisetattr
+from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS
 import logging
 logger = logging.getLogger(__name__)
+
+
+class AdaptiveNew(ProtocolInterface):
+    def __init__(self):
+        super().__init__()
+        from htmd.apps.app import App
+        self._cmdObject('app', ':class:`App <htmd.apps.app.App>` object', 'An App class object used to retrieve and submit simulations', None, App)
+        self._cmdString('project', 'str', 'The name of the project', 'adaptive')
+        self._cmdValue('nmin', 'int', 'Minimum number of running simulations', 1, TYPE_INT, RANGE_0POS)
+        self._cmdValue('nmax', 'int', 'Maximum number of running simulations', 1, TYPE_INT, RANGE_POS)
+        self._cmdValue('nepochs', 'int', 'Maximum number of epochs', 100, TYPE_INT, RANGE_POS)
+        self._cmdString('inputpath', 'str', 'The directory used to store input folders', 'input')
+        self._cmdString('generatorspath', 'str', 'The directory containing the generators', 'generators')
+        self._cmdBoolean('dryrun', 'boolean', 'A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations', False)
+        self._cmdValue('updateperiod', 'float', 'When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds', 0, TYPE_FLOAT, RANGE_0POS)
+        self._running = None
+
+    def run(self):
+        """ Runs the adaptive
+
+        Use this command to start the adaptive.
+
+        Example
+        -------
+        >>> adapt = Adaptive()
+        >>> adapt.run()
+        """
+        while True:
+            epoch = self._getEpoch()
+            logger.info('Processing epoch ' + str(epoch))
+
+            if epoch == 0 and self.generatorspath:
+                logger.info('Epoch 0, generating first batch')
+                self._init()
+                if not self.dryrun:
+                    self.app.submit(natsorted(glob(path.join(self.inputpath, 'e1s*'))))
+            else:
+                logger.info('Retrieving simulations.')
+                self.app.retrieve()
+
+                if epoch >= self.nepochs:
+                    logger.info('Reached maximum number of epochs ' + str(self.nepochs))
+                    return
+
+                self._running = self.app.inprogress()
+                logger.info(str(self._running) + ' simulations in progress')
+
+                if self._running <= self.nmin:
+                    self._algorithm()
+                    if not self.dryrun:
+                        self.app.submit(natsorted(glob(path.join(self.inputpath, 'e' + str(epoch+1) + 's*'))))
+                        logger.info('Finished submitting simulations.')
+
+            if self.updateperiod <= 0:
+                break
+            logger.info('Sleeping for {} seconds.'.format(self.updateperiod))
+            time.sleep(self.updateperiod)
+
+    def _init(self):
+        folders = natsorted(glob(path.join(self.generatorspath, '*', ''))) # I need the extra ''  to add a finishing /
+        if len(folders) == 0:
+            logger.info('Generators folder has no subdirectories, using folder itself')
+            folders.append(self.generatorspath)
+
+        numF = len(folders)
+        numCopies = np.ones(numF, dtype=int) * int(np.floor(self.nmax / numF))
+        numExtra = np.mod(self.nmax, numF)
+        numCopies = numCopies + np.random.multinomial(numExtra, [1/numF]*numF)  # draw the extra equally from a flat distribution
+        if not path.exists(self.inputpath):
+            makedirs(self.inputpath)
+
+        # Check if epoch 1 directories already exist in the input folder
+        existing = glob(path.join(self.inputpath, 'e1s*'))
+        if len(existing) != 0:
+            raise NameError('Epoch 1 directories already exist.')
+
+        k = 1
+        for i in range(numF):
+            for j in range(numCopies[i]):
+                name = _simName(folders[i])
+                inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
+                #src = path.join(self.generatorspath, name, '*')
+                src = folders[i]
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                k += 1
+
+    def _getEpoch(self):
+        """ Compute current epoch of adaptive
+
+        Checks the input folder for the latest epoch inputs and returns the epoch number
+
+        Returns
+        -------
+        epoch : int
+            The current epoch
+        """
+        folders = glob(path.join(self.inputpath, 'e*', ''))
+        epoch = 0
+        regex = re.compile('e(\d+)')
+        for f in folders:
+            res = regex.search(f)
+            if res:
+                num = res.group(1)
+                if int(num) > epoch:
+                    epoch = int(num)
+        return epoch
+
+    def _writeInputs(self, simsframes, epoch=None):
+        if epoch is None:
+            epoch = self._getEpoch() + 1
+
+        test = glob(path.join(self.inputpath, 'e' + str(epoch) + '*'))
+        if len(test) != 0:
+            raise NameError('Input dirs of epoch ' + str(epoch) + ' already exists.')
+
+        if path.exists(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log')):
+            raise NameError('Epoch logfile already exists. Cant overwrite it.')
+
+        fid = open(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log'), 'w')
+
+        regex = re.compile('(e\d+s\d+)_')
+        for i, f in enumerate(simsframes):
+            frameNum = f.frame
+            piece = f.piece
+            #print(frameNum)
+            if f.sim.parent is None:
+                currSim = f.sim
+            else:
+                currSim = f.sim.parent
+
+            traj = currSim.trajectory[piece]
+            if currSim.input is None:
+                raise NameError('Could not find input folder in simulation lists. Cannot create new simulations.')
+
+            wuName = _simName(traj)
+            res = regex.search(wuName)
+            if res:  # If we are running on top of adaptive, use the first name part for the next sim name
+                wuName = res.group(1)
+
+            # create new job directory
+            newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
+            newDir = path.join(self.inputpath, newName, '')
+            # copy previous input directory including input files
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
+            mol = Molecule()
+            mol.read(traj)
+            mol.frame = frameNum
+            mol.write(path.join(newDir, 'input.coor'))
+
+            # write nextInput file
+            fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
+
+        fid.close()
+
+    @abc.abstractmethod
+    def _algorithm(self):
+        return
 
 
 class Adaptive(object):
@@ -327,11 +486,15 @@ class _AdaptiveTest(Adaptive):
     def _algorithm(self):
         """  Select random frames for respawning
         """
+        from htmd.projections.metric import Metric
+        from htmd.molecule.molecule import Molecule
         from htmd.projections.metriccoordinate import MetricCoordinate
         from htmd.simlist import simlist
         sims = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
                        glob(path.join(self.inputpath, '*', '')))
-        data = MetricCoordinate.project(sims, sims[0].molfile, 'protein and name CA', 'protein and name CA')
+        metr = Metric(sims)
+        metr.projection(MetricCoordinate(Molecule(sims[0].molfile), 'protein and name CA', 'protein and name CA'))
+        data = metr.project()
         simframes = data.abs2sim(np.random.randint(0, data.numFrames, self.nmax-self.running))
         self._writeInputs(simframes)
 
