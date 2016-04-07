@@ -10,14 +10,10 @@ from htmd.proteinpreparation.residuedata import ResidueData
 from htmd.proteinpreparation.pdb2pqr.src.pdbParser import readPDB
 from htmd.proteinpreparation.pdb2pqr.main import runPDB2PQR
 
-
 # Tried to make runs reproducible, but does not work
 random.seed(2016)
 
-
 logger = logging.getLogger(__name__)
-
-
 
 
 def _createMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
@@ -34,8 +30,6 @@ def _createMolecule(name, resname, chain, resid, insertion, coords, segid, eleme
     mol.segid = np.array(segid, dtype=mol._pdb_fields['segid'])
     mol.element = np.array(elements, dtype=mol._pdb_fields['element'])
     return mol
-
-
 
 
 def prepareProtein(mol_in,
@@ -115,7 +109,7 @@ def prepareProtein(mol_in,
 
     """
 
-    oldLoggingLevel=logger.level
+    oldLoggingLevel = logger.level
     if verbose:
         logger.setLevel(logging.DEBUG)
     logger.info("Starting.")
@@ -202,7 +196,7 @@ def prepareProtein(mol_in,
     res_data.pdb2pqr_protein = pdb2pqr_protein
     res_data.pka_protein = pdb2pqr_protein.pka_molecule
     res_data.pka_dict = pdb2pqr_protein.pkadic
-    res_data.missedLigands=missedLigands
+    res_data.missedLigands = missedLigands
 
     logger.info("Returning.")
     logger.setLevel(oldLoggingLevel)
@@ -211,9 +205,6 @@ def prepareProtein(mol_in,
         return mol_out, res_data
     else:
         return mol_out
-
-
-
 
 
 # A test method
@@ -229,4 +220,3 @@ if __name__ == "__main__":
     tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
     tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     print(prepData)
-
