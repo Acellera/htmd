@@ -89,10 +89,10 @@ def proteinPreparation(mol_in,
 
     Returns
     -------
-    Molecule
+    mol_out : Molecule
         the molecule titrated and optimized. The molecule object contains an additional attribute,
-    SystemPreparationData, which contains these attributes:
-        - residueData : ResidueData a table of residues with the corresponding protonations and pKa
+    res_data : ResidueData
+        a table of residues with the corresponding protonations, pKas, and other information
 
 
     Examples
@@ -165,7 +165,7 @@ def proteinPreparation(mol_in,
     segids = []
     elements = []
 
-    resData = ResidueData()
+    res_data = ResidueData()
 
     for residue in pdb2pqr_protein.residues:
         if 'ffname' in residue.__dict__:
@@ -177,11 +177,11 @@ def proteinPreparation(mol_in,
         else:
             curr_resname = residue.name
 
-        resData.setProtonation(residue, curr_resname)
+        res_data.setProtonation(residue, curr_resname)
 
         if 'patches' in residue.__dict__:
             for patch in residue.patches:
-                resData.appendPatches(residue, patch)
+                res_data.appendPatches(residue, patch)
                 if patch != "PEPTIDE":
                     logger.info("Residue %s has patch %s set" % (residue, patch))
 
@@ -195,20 +195,20 @@ def proteinPreparation(mol_in,
             segids.append(atom.segID)
             elements.append(atom.element)
 
-    resData.setPKAs(pdb2pqr_protein.pka_molecule)
+    res_data.setPKAs(pdb2pqr_protein.pka_molecule)
 
     mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
-    resData.pdb2pqr_protein = pdb2pqr_protein
-    resData.pka_protein = pdb2pqr_protein.pka_molecule
-    resData.pka_dict = pdb2pqr_protein.pkadic
-    resData.missedLigands=missedLigands
+    res_data.pdb2pqr_protein = pdb2pqr_protein
+    res_data.pka_protein = pdb2pqr_protein.pka_molecule
+    res_data.pka_dict = pdb2pqr_protein.pkadic
+    res_data.missedLigands=missedLigands
 
     logger.info("Returning.")
     logger.setLevel(oldLoggingLevel)
 
     if returnDetails:
-        return mol_out, resData
+        return mol_out, res_data
     else:
         return mol_out
 

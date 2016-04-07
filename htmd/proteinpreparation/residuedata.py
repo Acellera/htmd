@@ -34,8 +34,8 @@ class ResidueData:
         Forcefield-independent protonation code
     patches : np.ndarray
         Additional information (may change)
-
     """
+
     _residuesinfo_fields = {
         'resid': np.int,
         'resname': object,
