@@ -5,18 +5,13 @@ import random
 
 from htmd.molecule.molecule import Molecule
 
+# If necessary: http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 from htmd.proteinpreparation.residuedata import ResidueData
-
-# Trying the solution http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
-# instead of relative imports, which fail when run as a script
-import sys
-from pathlib import Path
-sys.path.append(Path(__file__).resolve().parents[1])
-from pdb2pqr.src.pdbParser import readPDB
-from pdb2pqr.main import runPDB2PQR
+from htmd.proteinpreparation.pdb2pqr.src.pdbParser import readPDB
+from htmd.proteinpreparation.pdb2pqr.main import runPDB2PQR
 
 
-# Trying to make runs reproducible, but does not work
+# Tried to make runs reproducible, but does not work
 random.seed(2016)
 
 
