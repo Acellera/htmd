@@ -19,14 +19,7 @@ def _getTempDirName(prefix=""):
 
 
 def _getPlumedPath():
-    """ Return path to plumed executable, or raise an exception if not found.
-
-    Returns
-    -------
-
-    pr: str
-        Path to Plumed executable
-    """
+    """ Return path to plumed executable, or raise an exception if not found. """
     pr = subprocess.check_output(["plumed", "--standalone-executable", "info", "--root"])
     pr = pr.strip().decode("utf-8")
     return pr

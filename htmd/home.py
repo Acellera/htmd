@@ -39,5 +39,8 @@ def home(dataDir=None):
 #    return os.path.dirname(os.path.dirname(inspect.getfile(modname)))
 
 if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+
     h = htmd.home()
     print(h)
