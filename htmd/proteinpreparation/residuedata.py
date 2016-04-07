@@ -82,17 +82,17 @@ class ResidueData:
         return pos
 
     # residue is e.g. pdb2pqr.src.aa.ILE
-    def setProtonation(self, residue, protonation):
-        logger.debug("setProtonation %s %s" % (residue, protonation))
+    def _setProtonation(self, residue, protonation):
+        logger.debug("_setProtonation %s %s" % (residue, protonation))
         pos = self._findRes(residue.resSeq, residue.name, residue.chainID)
         self.protonation[pos] = protonation
 
     # TODO this should actually append to a list
-    def appendPatches(self, residue, patch):
+    def _appendPatches(self, residue, patch):
         pos = self._findRes(residue.resSeq, residue.name, residue.chainID)
         self.patches[pos] += patch + "/"
 
-    def setPKAs(self, pka_molecule):
+    def _setPKAs(self, pka_molecule):
         for grp in pka_molecule.conformations['AVR'].groups:
             resname = grp.residue_type
             resid = grp.atom.resNumb
