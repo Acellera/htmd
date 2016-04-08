@@ -190,10 +190,10 @@ def prepareProtein(mol_in,
             segids.append(atom.segID)
             elements.append(atom.element)
 
-    resdata_out._setPKAs(pdb2pqr_protein.pka_molecule)
 
     mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
+    resdata_out._setPKAs(pdb2pqr_protein.pka_molecule)
     resdata_out.pdb2pqr_protein = pdb2pqr_protein
     resdata_out.pka_protein = pdb2pqr_protein.pka_molecule
     resdata_out.pka_dict = pdb2pqr_protein.pkadic
@@ -210,6 +210,7 @@ def prepareProtein(mol_in,
 
 # A test method
 if __name__ == "__main__":
+
     tryp = Molecule('3PTB')
 
     tryp_op = prepareProtein(tryp, pH=1.0)
@@ -221,3 +222,9 @@ if __name__ == "__main__":
     tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
     tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     print(prepData)
+
+    mol=Molecule("1r1j")
+    mo, prepData = prepareProtein(mol, returnDetails=True)
+    his = prepData.resname=="HIS"  # Has to be checked better, due to Zn++
+    list(zip(prepData.protonation[his],prepData.resid[his]))
+    pass
