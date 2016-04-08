@@ -166,7 +166,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
 
     Example
     -------
-    >>> segmentgaps(mol,'chain B','P')
+    >>> newmol = autoSegment(mol,'chain B','P')
     """
     mol = mol.copy()
 
@@ -175,11 +175,12 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     residiff = np.diff(rid)
     gappos = idx[np.where((residiff != 1) & (residiff != 0))[0]]
 
+    mol.set('segid', basename, sel)
+
     if len(gappos) == 0:
         return mol
 
     gaps = np.array([idx[0]-1] + idx[gappos].tolist() + [idx[-1]])
-    mol.set('segid', 'P', sel)
 
     if spatial:
         todelete = []
