@@ -27,7 +27,8 @@ install:
 
  - if [ "$TRAVIS_REPO_SLUG" == "multiscalelab/htmd" ]; then export TYPE=basic; fi
  - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ];      then export TYPE=pro; fi
- - if [ "$TYPE" == "basic" ]; then export CHANNEL=acellera-basic; fi
+
+ - if [ "$TYPE" == "basic" ]; then export CHANNEL=acellera; fi
  - if [ "$TYPE" == "pro" ];   then export CHANNEL=acellera; fi
  - echo $TYPE
  - echo $CHANNEL
@@ -61,12 +62,12 @@ install:
 script:
  # Run the inline file tests 
  - python -c "import htmd"
- - tests/run_inline_file_tests.sh
+ - python tests/run_inline_file_tests.py
 
 after_success:
  - if [ "$TRAVIS_REPO_SLUG" == "multiscalelab/htmd" ]; then export TYPE=basic; fi
  - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ];      then export TYPE=pro; fi
- - if [ "$TYPE" == "basic" ]; then export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC; export CHANNEL=acellera-basic; fi
+ - if [ "$TYPE" == "basic" ]; then export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC; export CHANNEL=acellera; fi
  - if [ "$TYPE" == "pro" ];   then export ANACONDA_TOKEN=$ANACONDA_TOKEN_PRO;   export CHANNEL=acellera; fi
  - echo $CHANNEL
  - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2 -u $CHANNEL 

@@ -30,7 +30,7 @@ from htmd.acemd.acemd import Acemd
 from htmd.apps.acemdlocal import AcemdLocal
 from htmd.apps.lsf import LSF
 from htmd.apps.aws import AWS
-from htmd.builder.builder import detectDisulfideBonds, segmentgaps, embed, DisulfideBridge
+from htmd.builder.builder import detectDisulfideBonds, segmentgaps, autoSegment, embed, DisulfideBridge
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
 from htmd.molecule.util import uniformRandomRotation

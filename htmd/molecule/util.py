@@ -5,6 +5,8 @@
 #
 import numpy as np
 from scipy.spatial.distance import cdist
+import logging
+logger = logging.getLogger(__name__)
 
 
 def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
@@ -154,3 +156,95 @@ def uniformRandomRotation():
     """
     q, r = np.linalg.qr(np.random.normal(size=(3, 3)))
     return np.dot(q, np.diag(np.sign(np.diag(r))))
+
+
+def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
+    """ writes grid free energy to cube file
+
+    Parameters
+    ----------
+    arr: np.ndarray
+            array with volumetric data
+    filename: str
+            string with the name of the cubefile
+    vecMin: np.ndarray
+            3D vector denoting the minimal corner of the grid
+    vecMax np.ndarray
+            3D vector denoting the maximal corner of the grid
+    vecRes: np.ndarray
+            3D vector denoting the resolution of the grid in each dimension
+    """
+
+    outFile = open(filename, 'w')
+
+    # conversion to gaussian units
+    L = 1/0.52917725
+    gauss_bin = vecRes*L
+    #minCorner = 0.5*L*(vecMin - vecMax + vecRes)
+    minCorner = L * (vecMin + 0.5 * vecRes)
+
+    ngrid = np.array(np.floor((vecMax - vecMin) / vecRes), dtype=int)
+
+    # write header
+    outFile.write("CUBE FILE\n")
+    outFile.write("OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n")
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (1, minCorner[0], minCorner[1], minCorner[2]))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[0], gauss_bin[0], 0, 0))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[1], 0, gauss_bin[1], 0))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[2], 0, 0, gauss_bin[2]))
+    outFile.write("%5d %12.6f %12.6f %12.6f %12.6f\n" % (1, 0, minCorner[0], minCorner[1], minCorner[2]))
+
+    # main loop
+    cont = 0
+
+    for i in range(vecMax[0] - vecMin[0]):
+        for j in range(vecMax[1] - vecMin[1]):
+            for k in range(vecMax[2] - vecMin[2]):
+                outFile.write("%13.5g" % arr[i][j][k])
+                if np.mod(cont, 6) == 5:
+                    outFile.write("\n")
+                cont += 1
+
+    outFile.close()
+
+
+def drawCube(mi, ma, viewer=None):
+    from htmd.vmdviewer import getCurrentViewer
+    if viewer is None:
+        viewer = getCurrentViewer()
+
+    viewer.send('draw materials off')
+    viewer.send('draw color red')
+    c = ''
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], ma[0], mi[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], mi[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], mi[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], mi[0], ma[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], ma[0], mi[1], ma[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], mi[0], ma[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], mi[0], ma[1], ma[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], mi[1], ma[2])
+    viewer.send(c)
+
+    """
+    draw line "$minx $miny $minz" "$maxx $miny $minz"
+    draw line "$minx $miny $minz" "$minx $maxy $minz"
+    draw line "$minx $miny $minz" "$minx $miny $maxz"
+    draw line "$maxx $miny $minz" "$maxx $maxy $minz"
+    draw line "$maxx $miny $minz" "$maxx $miny $maxz"
+    draw line "$minx $maxy $minz" "$maxx $maxy $minz"
+    draw line "$minx $maxy $minz" "$minx $maxy $maxz"
+    draw line "$minx $miny $maxz" "$maxx $miny $maxz"
+    draw line "$minx $miny $maxz" "$minx $maxy $maxz"
+    draw line "$maxx $maxy $maxz" "$maxx $maxy $minz"
+    draw line "$maxx $maxy $maxz" "$minx $maxy $maxz"
+    draw line "$maxx $maxy $maxz" "$maxx $miny $maxz"
+    """

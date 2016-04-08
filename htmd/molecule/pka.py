@@ -8,7 +8,8 @@ import os
 from shutil import which
 from subprocess import check_output
 
-def pka( molecule, propka=None, pH=7.0 ):
+
+def pka(molecule, propka=None, pH=7.0):
     '''PKA - Predict per-residue pKa, using propka
 
     Parameters
@@ -29,57 +30,61 @@ def pka( molecule, propka=None, pH=7.0 ):
     '''
 
     try:
-      propka = which( "propka31", mode=os.X_OK )    
+        propka = which("propka31", mode=os.X_OK)
     except:
-      raise NameError( "Cannot find 'propka31' in PATH" );
+        raise NameError("Cannot find 'propka31' in PATH");
 
-    if not os.access( propka, os.X_OK ):
-      raise NameError( "'propka' not found" );
+    if not os.access(propka, os.X_OK):
+        raise NameError("'propka' not found");
 
     try:
-      pH=float(pH)
+        pH = float(pH)
     except:
-      raise NameError("pH value invalid")
-    if(pH<=0. or pH>=14.):
-      raise NameError("pH value invalid")
+        raise NameError("pH value invalid")
+    if (pH <= 0. or pH >= 14.):
+        raise NameError("pH value invalid")
 
-    fh,fnp = mkstemp( )
-    fn = fnp + ".pdb"    
-    molecule.write( fn )
+    fh, fnp = mkstemp()
+    fn = fnp + ".pdb"
+    molecule.write(fn)
 
     dd = os.getcwd()
     try:
-       os.chdir( os.path.dirname( fn ) )
-       op = check_output( [ propka, fn, "-o" , str(pH) ] )
-       op = op.decode("ascii").split( "\n" );
+        os.chdir(os.path.dirname(fn))
+        op = check_output([propka, fn, "-o", str(pH)])
+        op = op.decode("ascii").split("\n");
     except:
-       raise NameError("Failed to execute PropKa")
+        raise NameError("Failed to execute PropKa")
     os.chdir(dd)
 
-    ret=[]
-    #print(op)
-    atpka=False
+    ret = []
+    # print(op)
+    atpka = False
     for line in op:
-       if not atpka:
-         if "model-pKa" in line:
-           atpka=True
-           continue
-         else:
-           continue
-         if "-" in line: 
-           atpka=False
-           continue
-       print(line)
-       s = line.split()
-       if len(s) >=4:
-         pka={ "resname":s[0], "resid":s[1], "chainid":s[2], "pka":float(s[3]) }
-         ret.append(pka)
-    os.unlink( fn )
-    os.unlink( fnp + ".pka" )
-    os.unlink( fnp + ".propka_input" )
+        if not atpka:
+            if "model-pKa" in line:
+                atpka = True
+                continue
+            else:
+                continue
+            if "-" in line:
+                atpka = False
+                continue
+        print(line)
+        s = line.split()
+        if len(s) >= 4:
+            pka = {"resname": s[0], "resid": s[1], "chainid": s[2], "pka": float(s[3])}
+            ret.append(pka)
+    os.unlink(fn)
+    os.unlink(fnp + ".pka")
+    os.unlink(fnp + ".propka_input")
     return ret
 
+
 if __name__ == "__main__":
-  from htmd.molecule.molecule import Molecule
-  ret=pka( Molecule('4DFR') )
-  print(ret)
+    """
+    from htmd.molecule.molecule import Molecule
+    ret=pka( Molecule('4DFR') )
+    print(ret)
+    """
+

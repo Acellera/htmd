@@ -5,39 +5,38 @@
 #
 
 from htmd.molecule.molecule import Molecule
-from htmd.userinterface import UserInterface
+from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 from htmd.acemd.acemd import Acemd
 import os
 import htmd
 
-class Production(UserInterface):
+
+class Production(ProtocolInterface):
     ''' Production protocol for globular and membrane proteins
         It also includes a possible flatbottom potential box
 
         Parameters
         ----------
-        temperature: float
+        temperature : float, default=300
             Temperature of the thermostat in Kelvin
-        k: float
+        k : float, default=0
             Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5
-        reference: str
+        reference : str, default='none'
             Reference selection to use as dynamic center of the flatbottom box.
-        selection: str
+        selection : str, default='none'
             Selection of atoms to apply the flatbottom potential
-        box: str
-            Position of the flatbottom box in term of the reference center given as
-            [xmin, xmax, ymin, ymax, zmin, zmax]
-        inputdir: str
-            Input directory where to find the simulation files
-        outputdir: str
-            Output directory to create with the simulation ready to run
-
+        box : list, default=[0, 0, 0, 0, 0, 0]
+            Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]
     '''
     def __init__(self):
-        self._commands={'acemd':None,'temperature':300,'k':0,'reference':'none',
-                        'selection':'none','box':[0,0,0,0,0,0],'inputdir':'','outputdir':''}
-        for k in self._commands:
-            self.__dict__[k] = self._commands[k]
+        super().__init__()
+        self._cmdObject('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Acemd)
+        self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
+        self._cmdValue('k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0, TYPE_FLOAT, RANGE_ANY)
+        self._cmdString('reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.', 'none')
+        self._cmdString('selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none')
+        self._cmdList('box', 'list', 'Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]', [0,0,0,0,0,0])
+
         self.acemd = Acemd()
         #self.acemd.binindex='input.idx'
         self.acemd.extendedsystem='input.xsc'
@@ -106,7 +105,7 @@ proc calcforces {} {
 proc calcforces_endstep { } { }
 '''
 
-    def write(self,inputdir=None,outputdir=None):
+    def write(self, inputdir, outputdir):
         """ Writes the production protocol and files into a folder.
 
         Parameters
@@ -116,35 +115,28 @@ proc calcforces_endstep { } { }
         outputdir : str
             Directory where to write the production setup files.
         """
-        if inputdir is not None:
-            self.inputdir = inputdir
-        if outputdir is not None:
-            self.outputdir = outputdir
         self.acemd.temperature = self.temperature
         self.acemd.langevintemp = self.temperature
         if self.k > 0: #use TCL only for flatbottom
-            mol = Molecule(os.path.join(self.inputdir,self.acemd.coordinates))
+            mol = Molecule(os.path.join(inputdir, self.acemd.coordinates))
             self.acemd.tclforces = 'on'
             TCL = self._TCL
-            TCL = TCL.replace('KCONST',str(self.k))
-            TCL = TCL.replace('REFINDEX',' '.join(map(str,mol.get('index',self.reference))))
-            TCL = TCL.replace('SELINDEX',' '.join(map(str,mol.get('index',self.selection))))
-            TCL = TCL.replace('BOX',' '.join(map(str,self.box)))
+            TCL = TCL.replace('KCONST', str(self.k))
+            TCL = TCL.replace('REFINDEX', ' '.join(map(str, mol.get('index', self.reference))))
+            TCL = TCL.replace('SELINDEX', ' '.join(map(str, mol.get('index', self.selection))))
+            TCL = TCL.replace('BOX', ' '.join(map(str, self.box)))
             self.acemd.TCL = TCL
-        self.acemd.setup(self.inputdir, self.outputdir, overwrite=True)
+        self.acemd.setup(inputdir, outputdir, overwrite=True)
 
 if __name__ == "__main__":
-    eq = Production()
-    eq.temperature = 300
-    eq.reference = 'protein and name CA'
-    eq.selection = 'segname L and noh'
-    eq.acemd.extendedsystem = None  # use different data
-    eq.acemd.binindex = None  # use different data
-    eq.box = [-20, 20, -20, 20, 43, 45]
-    eq.k = 5
-    eq.inputdir = htmd.home() +'/data/equilibrate'
-    eq.outputdir = '/tmp/prod'
-    eq.write()
-    eq.k = 0
-    eq.outputdir = '/tmp/prod0'
-    eq.write()
+    md = Production()
+    md.temperature = 300
+    md.reference = 'protein and name CA'
+    md.selection = 'segname L and noh'
+    md.acemd.extendedsystem = None  # use different data
+    md.acemd.binindex = None  # use different data
+    md.box = [-20, 20, -20, 20, 43, 45]
+    md.k = 5
+    md.write(htmd.home() +'/data/equilibrate', '/tmp/prod')
+    md.k = 0
+    md.write(htmd.home() +'/data/equilibrate', '/tmp/prod0')

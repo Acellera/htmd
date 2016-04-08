@@ -143,11 +143,12 @@ class Slurm(UserInterface):
 
 
 if __name__ == "__main__":
-
+    """
     s=Slurm( name="testy", partition="gpu")
     s.submit("test/dhfr1" )
     ret= s.inprogress( debug=False)
     print(ret)
     print(s)
     pass
+    """
 

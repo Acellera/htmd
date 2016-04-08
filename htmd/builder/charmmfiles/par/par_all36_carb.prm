@@ -65,6 +65,8 @@
 ! viv:   Igor Vorobyov
 ! pram:  E.Prabhu Raman
 ! sai:   Sairam S. Mallajosyula
+! my:    Mingjun Yang
+! xxwy:  Wenbo Yu
 ! par22: par_all22_prot.inp
 ! par27: par_all27_lipid.prm
 ! par35: par_all35_ethers.prm
@@ -128,19 +130,19 @@ MASS   218 CC3051  12.01100 ! furan ring carbon; C2 fructose
 ! pyranose derivatives
 MASS   219 CC3062  12.01100 ! C2 on NE5AC
 MASS   220 CC3261  12.01100 ! C3 on NE5AC
-!dummy atom
-!MASS    99 DUM      1.00800   H ! dummy atom
-
 !Added by sai for modelling phosphate
 MASS   221 OC312   15.99940 ! OH in PO3H (phosphate) || OHL in top_all27_lipid.rtf
 MASS   222 OC30P   15.99940 ! ester O in PO3H (phosphate) || OSL in top_all27_lipid.rtf
 MASS   223 OC2DP   15.99940 ! =0 in P03H (phosphate) || O2L in top_all27_lipid.rtf
 MASS   224 PC      30.97400 ! phosphorus || PL in top_all27_lipid.rtf
 MASS   225 SC      32.06000 ! Sulfate sulfur
-
 !pram, furanosyl linkages
 MASS   226 CC312D  12.01100 ! from CC322C; THF anomeric carbon
 MASS   227 OC303   15.99940 ! from OC301; linear ether in P1->F3 pyranose-furanose glycosidic linkage
+!o-acetyl on ABEQ and ARHM, my
+MASS   228 CC2O5   12.01100 ! carbonyl C on acetyl
+!Sulfamate nitrogen, xxwy
+MASS   229 NC311   14.00700  !N ! Sulfamate nitrogen, xxwy
 
 BONDS
 !V(bond) = Kb(b - b0)**2
@@ -346,8 +348,22 @@ CC3162  OC303    360.00  1.395   ! CC311D  OC303 - model compound 3 (raman et. a
 OC303   CC3151   360.00  1.425   ! CC312C  OC303 - model compound 3 (raman et. al.)
 OC301   CC3051   360.00  1.395   ! CC312C  OC301 - Ome-THF
 
+!!!!!!disialic acid!!!!!!, Mingjun
+OC301   CC312    400.00  1.420   ! from CC312   OC311
+OC301   CC322    400.00  1.420   ! from CC312   OC311
+!O-acetyl on ARHM and ABEQ
+CC2O5  OC301   150.00     1.3340 ! CG2O2  OG302
+CC2O5  CC331   200.00     1.5220 ! CG2O2  CG331
+CC2O5  OC2D1   750.00     1.2200 ! CG2O2  OG2D1
 
 !*******************end of pyranose-fruanose****************************
+
+! ********************************************************************************************** 
+!Sulfamate parameters by Wenbo
+SC      NC311    185.00  1.700   ! SUFMA/B, Targeting crystal survey value instead of QM, xxwy
+CC3161  NC311    270.00  1.455   ! SUFMA/B, xxwy 
+NC311   HCP1     432.00  1.030   ! SUFMA/B, xxwy
+! ********************************************************************************************** 
 
 ! Original TIP3P water parameters
 !HCTIP3  HCTIP3     0.00  1.5139  ! TIPS3P GEOMETRY (FOR SHAKE/W PARAM)
@@ -855,10 +871,43 @@ CC3153  CC321   OC301    45.00   106.00                   ! pram, model compound
 CC3152  OC301   CC321    95.00   111.00                   ! CC3152  OC301   CC331
 CC3161  OC301   CC3152   50.00   109.20                   ! CC311C  OC301   CC311D, model compound 4
 !*******************end of pyranose/furanose****************************
+
 !for xyl(1->4)xyl, transferred from hexopyranose disac, pram
 OC301   CC3161  CC3263   45.00   109.00                   ! from OC301   CC3161  CC3163
 CC3162  OC30P   SC       15.00   109.00   27.00   1.90    ! sairam 
 CC321   OC301   CC3062   95.00   109.70                   !from CC3162  OC301   CC321; mjyang
+
+!!!!!!disialic acid!!!!!!, Mingjun
+OC301   CC312   CC312    45.00   106.00  ! OC301   CC321   CC3163
+OC301   CC312   CC322    45.00   106.00  ! OC301   CC321   CC3163
+CC312   OC301   CC3062   95.00   109.70  ! from CC3162  OC301   CC321
+OC301   CC312   HCA1     60.00   109.50  ! OC301   CC321   HCA2
+OC301   CC322   HCA2     60.00   109.50  ! OC301   CC321   HCA2
+OC301   CC322   CC312    45.00   106.00  ! OC301   CC321   CC3163
+CC322   OC301   CC3062   95.00   109.70  ! from CC3162  OC301   CC321
+!ABEQ
+CC3162  CC3161  CC3261   53.35   111.00   8.00  2.561  ! from CC3162  CC3161  CC3161
+CC3161  CC3261  CC3161   53.35   111.00   8.00  2.561  ! from CC3161  CC3161  CC3161
+CC3261  CC3161  CC3163   53.35   111.00   8.00  2.561  ! from CC3161  CC3161  CC3163
+!O-acetyl on ARHM and ABEQ
+CC3261  CC3161  OC301    75.70   110.10  ! CC3261  CC3161  OC311
+CC331   CC2O5   OC301    55.00   109.00  20.00  2.3260 ! CG331  CG2O2  OG302 
+CC331   CC2O5   OC2D1    70.00   125.00  20.00  2.4420 ! CG331  CG2O2  OG2D1 
+CC2O5   CC331   HCA3     33.00   109.50  30.00  2.1630 ! CG2O2  CG331  HGA3
+OC2D1   CC2O5   OC301    90.00   125.90 160.00  2.2576 ! OG2D1  CG2O2  OG302
+CC2O5   OC301   CC3161   40.00   109.60  30.00  2.2651 ! CG2O2  OG302  CG311
+
+! ****************************************************** 
+! Sulfamate parameters by Wenbo, 09/15
+OC2DP   SC      NC311    85.00   103.00  ! SUFMA/B, xxwy
+SC      NC311   HCP1     48.00   118.00  ! SUFMA/B, xxwy
+CC3161  NC311   HCP1     48.00   111.00  ! SUFMA/B, xxwy
+SC      NC311   CC3161   50.00   113.00  ! SUFMA/B, xxwy
+CC3161  CC3161  NC311    52.00   109.00  ! SUFMA/B, xxwy
+CC3162  CC3161  NC311    52.00   109.00  ! SUFMA/B, xxwy
+NC311   CC3161  HCA1     36.00   109.50  ! SUFMA/B, xxwy
+! ****************************************************** 
+
 ! tip3p water
 !HCTIP3  OCTIP3  HCTIP3   55.00   104.52  ! TIP3P GEOMETRY
 
@@ -1194,9 +1243,6 @@ OC301   CC321   CC311C  OC3C61   1.93  1  180.0 ! og compounds 11 and 12
 OC301   CC321   CC311C  OC3C61   0.43  2    0.0 ! "  MCSA fit
 OC301   CC321   CC311C  OC3C61   0.12  3  180.0 ! "  MP2/cc-pVTZ//MP2/6-31G*
 
-!OC301   CC321   CC3163  OC3C61   1.93  1  180.0 ! og compounds 11 and 12
-!OC301   CC321   CC3163  OC3C61   0.43  2    0.0 ! "  MCSA fit
-!OC301   CC321   CC3163  OC3C61   0.12  3  180.0 ! "  MP2/cc-pVTZ//MP2/6-31G*
 OC301   CC321   CC3163  OC3C61   1.4906  1   180.00 !dpatel modified by LS fitting
 OC301   CC321   CC3163  OC3C61   0.3759  2     0.00 !    "
 OC301   CC321   CC3163  OC3C61   0.5916  3     0.00 !    "
@@ -2408,6 +2454,107 @@ CC3261  CC3062  OC301   CC321    0.89  3    0.0 ! "
 CC321   OC301   CC3062  CC2O2    0.284 3    0.0 ! from CC3161  OC301   CC3062  CC2O2
 !end sialic acid para
 
+!!!!!!disialic acid!!!!!!, Mingjun
+OC3C61  CC3062  OC301   CC312    1.3464 1   0.00 ! RMSE = 1.59697
+OC3C61  CC3062  OC301   CC312    3.0743 2   0.00 ! RMSE = 1.59697
+OC3C61  CC3062  OC301   CC312    0.8378 3 180.00 ! RMSE = 1.59697
+CC312   CC312   OC301   CC3062   3.0937 1 180.00 ! RMSE = 1.59697
+CC312   CC312   OC301   CC3062   0.7096 2 180.00 ! RMSE = 1.59697
+CC312   CC312   OC301   CC3062   0.0245 3   0.00 ! RMSE = 1.59697
+OC301   CC312   CC322   OC311    1.7749 1 180.00 ! RMSE = 1.59697
+OC301   CC312   CC322   OC311    1.5713 2   0.00 ! RMSE = 1.59697
+OC301   CC312   CC322   OC311    1.8214 3   0.00 ! RMSE = 1.59697
+CC322   CC312   OC301   CC3062   4.2905 1 180.00 ! RMSE = 1.59697
+CC322   CC312   OC301   CC3062   0.4831 2 180.00 ! RMSE = 1.59697
+CC322   CC312   OC301   CC3062   0.0488 3 180.00 ! RMSE = 1.59697
+OC301   CC312   CC312   OC311    1.7164 1 180.00 ! RMSE = 1.59697
+OC301   CC312   CC312   OC311    0.3973 2 180.00 ! RMSE = 1.59697
+OC301   CC312   CC312   OC311    1.9793 3   0.00 ! RMSE = 1.59697
+CC3163  CC312   CC312   OC301    0.2524 1 180.00 ! RMSE = 1.59697
+CC3163  CC312   CC312   OC301    0.4587 2   0.00 ! RMSE = 1.59697
+CC3163  CC312   CC312   OC301    1.1807 3 180.00 ! RMSE = 1.59697
+CC2O2   CC3062  OC301   CC312    1.1671 1 180.00 ! RMSE = 1.59697
+CC2O2   CC3062  OC301   CC312    1.5207 2   0.00 ! RMSE = 1.59697
+CC2O2   CC3062  OC301   CC312    1.0160 3 180.00 ! RMSE = 1.59697
+CC3261  CC3062  OC301   CC312    1.5334 1 180.00 ! RMSE = 1.59697
+CC3261  CC3062  OC301   CC312    1.5933 2   0.00 ! RMSE = 1.59697
+CC3261  CC3062  OC301   CC312    1.3811 3   0.00 ! RMSE = 1.59697
+OC301   CC312   CC312   HCA1     0.1400 3   0.00 ! from HCA1    CC312   CC312   OC311
+HCA1    CC312   OC301   CC3062   0.2840 3   0.00 ! from CC3162  OC301   CC321   HCA2
+OC301   CC312   CC322   HCA2     0.1400 3   0.00 ! from HCA2    CC322   CC312   OC311
+!
+OC3C61  CC3062  OC301   CC322    2.1018 1   0.00 ! RMSE = 1.5934
+OC3C61  CC3062  OC301   CC322    1.4102 2   0.00 ! RMSE = 1.5934
+OC3C61  CC3062  OC301   CC322    0.4570 3   0.00 ! RMSE = 1.5934
+CC312   CC322   OC301   CC3062   2.5455 1 180.00 ! RMSE = 1.5934
+CC312   CC322   OC301   CC3062   0.7918 2 180.00 ! RMSE = 1.5934
+CC312   CC322   OC301   CC3062   0.9628 3 180.00 ! RMSE = 1.5934
+OC311   CC312   CC322   OC301    3.3150 1 180.00 ! RMSE = 1.5934
+OC311   CC312   CC322   OC301    1.6828 2 180.00 ! RMSE = 1.5934
+OC311   CC312   CC322   OC301    2.9534 3 180.00 ! RMSE = 1.5934
+CC312   CC312   CC322   OC301    0.5927 1   0.00 ! RMSE = 1.5934
+CC312   CC312   CC322   OC301    1.2961 2 180.00 ! RMSE = 1.5934
+CC312   CC312   CC322   OC301    2.1767 3   0.00 ! RMSE = 1.5934
+CC2O2   CC3062  OC301   CC322    0.4128 1 180.00 ! RMSE = 1.5934
+CC2O2   CC3062  OC301   CC322    0.2875 2 180.00 ! RMSE = 1.5934
+CC2O2   CC3062  OC301   CC322    0.0685 3   0.00 ! RMSE = 1.5934
+CC3261  CC3062  OC301   CC322    0.3336 1 180.00 ! RMSE = 1.5934
+CC3261  CC3062  OC301   CC322    0.0342 2   0.00 ! RMSE = 1.5934
+CC3261  CC3062  OC301   CC322    0.7301 3 180.00 ! RMSE = 1.5934
+OC301   CC322   CC312   HCA1     0.1400 3    0.0 ! from HCA1    CC312   CC312   OC311
+HCA2    CC322   OC301   CC3062   0.2840 3    0.0 ! from CC3162  OC301   CC321   HCA2
+! ABEQ, my
+HCA1    CC3162  CC3161  CC3261   0.20  3    0.0 ! from HCA1    CC3162  CC3161  CC3161
+HCA2    CC3261  CC3161  CC3162   0.20  3    0.0 ! from HCA1    CC3161  CC3161  CC3162
+CC3161  CC3261  CC3161  CC3162   0.19  3  180.0 ! from CC3161  CC3161  CC3161  CC3162
+CC3261  CC3161  CC3163  CC331    0.20  3    0.0 ! from CC3161  CC3161  CC3163  CC331
+CC3161  CC3261  CC3161  CC3163   0.19  3  180.0 ! from CC3161  CC3161  CC3161  CC3163
+HCA2    CC3261  CC3161  CC3163   0.20  3    0.0 ! from HCA1    CC3161  CC3161  CC3163
+HCA1    CC3163  CC3161  CC3261   0.20  3    0.0 ! from HCA1    CC3163  CC3161  CC3161
+HCA1    CC3161  CC3261  CC3161   0.20  3    0.0 ! from HCA1    CC3161  CC3161  CC3161
+CC3161  CC3261  CC3161  OC311    0.20  3    0.0 ! from CC3161  CC3161  CC3161  OC311
+CC3261  CC3161  CC3163  OC3C61   0.31  3  180.0 ! from CC3161  CC3161  CC3163  OC3C61
+CC3261  CC3161  CC3162  OC3C61   0.31  3  180.0 ! from CC3161  CC3161  CC3162  OC3C61
+CC3261  CC3161  CC3162  OC311    0.20  3    0.0 ! from CC3161  CC3161  CC3162  OC311
+CC3261  CC3161  CC3162  OC301    0.20  3    0.0 ! from CC3161  CC3161  CC3162  OC301
+!O-acetyl on ARHM and ABEQ, my
+CC3162  CC3161  OC301   CC2O5    0.1300 1  180.0 ! CC3162  CC3161  OC301   CC3162
+CC3162  CC3161  OC301   CC2O5    0.2500 2  180.0 ! CC3162  CC3161  OC301   CC3162
+CC3162  CC3161  OC301   CC2O5    0.0600 3  180.0 ! CC3162  CC3161  OC301   CC3162
+CC3261  CC3161  OC301   CC2O5    1.0150 1  180.0 ! RMSE = 2.28686
+CC3261  CC3161  OC301   CC2O5    0.4550 2    0.0 ! RMSE = 2.28686
+CC3261  CC3161  OC301   CC2O5    1.0330 3  180.0 ! RMSE = 2.28686
+OC2D1   CC2O5   CC331   HCA3     0.0000 6  180.0 ! OG2D1  CG2O2  CG331  HGA3
+OC301   CC2O5   CC331   HCA3     0.0000 6  180.0 ! OG302  CG2O2  CG331  HGA3
+HCA2    CC3261  CC3161  OC301    0.1400 3    0.0 ! HCA2    CC3261  CC3161  OC311
+HCA1    CC3161  OC301   CC2O5    0.0000 3    0.0 ! HGA1   CG311  OG302  CG2O2
+CC3161  OC301   CC2O5   OC2D1    0.9650 1  180.0 ! OG2D1  CG2O2  OG302  CG301
+CC3161  OC301   CC2O5   OC2D1    3.8500 2  180.0 ! OG2D1  CG2O2  OG302  CG301
+CC3161  OC301   CC2O5   CC331    2.0500 2  180.0 ! CG311  CG2O2  OG302  CG331
+CC3161  CC3261  CC3161  OC301    0.2000 3    0.0 ! from CC3161  CC3161  CC3161  OC311
+CC3161  CC3161  OC301   CC2O5    0.1300 1  180.0 ! CC3161  CC3161  OC301   CC3162
+CC3161  CC3161  OC301   CC2O5    0.2500 2  180.0 ! CC3161  CC3161  OC301   CC3162
+CC3161  CC3161  OC301   CC2O5    0.0600 3  180.0 ! CC3161  CC3161  OC301   CC3162
+
+!Sulfamate parameters by Wenbo, 09/15
+SC      NC311   CC3161  HCA1     0.10  3    0.0 ! SUFMA/B, xxwy 
+HCP1    NC311   CC3161  HCA1     0.10  3    0.0 ! SUFMA/B, xxwy 
+HCP1    NC311   CC3161  CC3161   0.10  3    0.0 ! SUFMA/B, xxwy 
+HCP1    NC311   CC3161  CC3162   0.10  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3161  CC3161   0.20  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3162  OC3C61   0.20  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3161  HCA1     0.20  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3162  HCA1     0.20  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3161  OC311    0.20  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3162  OC311    0.20  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3161  OC301    0.20  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3162  OC301    0.20  3    0.0 ! SUFMA/B, xxwy
+NC311   CC3161  CC3161  OC30P    0.20  3    0.0 ! SUFMA/B, xxwy
+OC2DP   SC      NC311   HCP1     0.25  3    0.0 ! SUFMA/B, xxwy 
+CC3161  NC311   SC      OC2DP    0.153 3    0.0 ! SUFMA/B, lsfit RMSE = 1.095, xxwy
+CC3161  CC3161  NC311   SC       0.161 3    0.0 ! SUFMA/B, lsfit RMSE = 1.095, xxwy
+CC3162  CC3161  NC311   SC       0.161 3    0.0 ! SUFMA/B, lsfit RMSE = 1.095, xxwy
+
 IMPROPER
 !
 !V(improper) = Kpsi(psi - psi0)**2
@@ -2423,9 +2570,10 @@ NC2D1   CC2O1   CC3062  HCP1     20.00   0   0.00  ! par22 NH1  X    X    H
 CC2O2   CC311   OC2D2   OC2D2    96.00   0   0.00  ! par22 OC   X    X    CC
 CC2O2   CC301   OC2D2   OC2D2    96.00   0   0.00  ! par22 OC   X    X    CC
 CC2O2   CC3163  OC2D2   OC2D2    96.00   0   0.00  ! par22 OC   X    X    CC
+CC2O2   CC3062  OC2D2   OC2D2    96.00   0   0.00  ! par22 OC   X    X    CC
+CC2O2   CC321   OC2D2   OC2D2    96.00   0   0.00  ! par22 OC   X    X    CC
 NC2D1   CC2O1   CC331   HCP1     20.00   0   0.00  ! par22 NH1  X    X    H
 NC2D1   CC2O1   CC311   HCP1     20.00   0   0.00  ! par22 NH1  X    X    H
-CC2O2   CC321   OC2D2   OC2D2    96.00   0   0.00  ! par22 OC   X    X    CC
 ! aldoses, ketoses
 CC2O4   CC331   OC2D4    HCR1    50.00   0   0.00 ! acetaldehyde adm
 CC2O4   CC312   OC2D4    HCR1    50.00   0   0.00 ! acetaldehyde adm
@@ -2450,6 +2598,7 @@ CC2O1     0.0  -0.1100   2.000  ! par22, C
 CC2O2     0.0  -0.0700   2.000  ! par22, CC
 CC2O3     0.0  -0.0900   2.000  ! adm, acetone, 11/08
 CC2O4     0.0  -0.0600   1.800  ! adm, acetaldehyde, 11/08
+CC2O5     0.0  -0.0980   1.700  ! O-acetyl carbonyl C, 04/15, methyl acetate viv 12/29/06
 OC2D1     0.0  -0.1200   1.700 0.0 -0.12 1.40 ! par22, OB
 OC2D2     0.0  -0.1200   1.700  ! par22, OC
 OC2D3     0.0  -0.0500   1.700 0.0 -0.12 1.40 ! adm, acetone, 11/08
@@ -2508,7 +2657,6 @@ OC312     0.0  -0.1521   1.77
 OC30P     0.0  -0.1521   1.77
 PC        0.0  -0.585    2.15  ! ADM Jr.
 SC        0.0  -0.47     2.1   ! methylsulfate
-
 !*******************end of phosphates***********************************
 
 ! pyranose/furanose-furanose linkages, pram 
@@ -2516,11 +2664,10 @@ CC312D    0.0  -0.0320   2.000 0.0 -0.01 1.9 ! CC312C
 OC303     0.0  -0.1000   1.6500              ! OC301
 !***********************************************************************
 
-! ions from par_all22_prot.inp
-!SOD      0.0     -0.0469    1.36375   ! sodium
-!                   ! D. Beglovd and B. Roux, dA=-100.8 kcal/mol
-!CAL      0.0     -0.120     1.367     ! Calcium
-!                   ! S. Marchand and B. Roux, dA = -384.8 kcal/mol
+!***********************************************************************
+! added by xxwy for sulfamate link
+NC311     0.0  -0.0450   2.000 ! from aliphatic amines, xxwy
+!***********************************************************************
 
 END
 

@@ -49,11 +49,11 @@ class MetricDihedral(Projection):
         # -------------- DEPRECATION PATCH --------------
         if isinstance(self, np.ndarray) or isinstance(self, Molecule):
             from warnings import warn
-            warn('Static use of the project method will be deprecated after version XXX of HTMD. '
+            warn('Static use of the project method will be deprecated in the next version of HTMD. '
                  'Please change your projection code according to the tutorials on www.htmd.org')
             data = _MetricDihedralOld.project(self, *args, **kwargs)
-            logger.warning('Static use of the project method will be deprecated after version XXX of HTMD. '
-                            'Please change your projection code according to the tutorials on www.htmd.org')
+            logger.warning('Static use of the project method will be deprecated in the next version of HTMD. '
+                           'Please change your projection code according to the tutorials on www.htmd.org')
             return data
         # ------------------ CUT HERE -------------------
         mol = args[0]
@@ -86,7 +86,7 @@ class MetricDihedral(Projection):
         return np.array(map)
 
     def _dihedralPrecalc(self, mol, protsel):
-        logger.info('Precalculating phi and psi angle atom selections')
+        #logger.info('Precalculating phi and psi angle atom selections')
 
         # Phi angle: C'-N-Cα-C'
         # Psi angle: N-Cα-C'-N
@@ -109,7 +109,7 @@ class MetricDihedral(Projection):
         dih = []
         for s in selstr:
             dih.append(mol.atomselect(s))
-        logger.info('Finished precalculating phi and psi.')
+        #logger.info('Finished precalculating phi and psi.')
         return dih
 
     def _calcDihedrals(self, mol, dih, sincos=True):
@@ -142,6 +142,8 @@ class MetricDihedral(Projection):
         Ub = np.cross(A21, A32)
         #from IPython.core.debugger import Tracer
         #Tracer()()
+        if np.any(np.sum(Ua == 0, 1) == 3) or np.any(np.sum(Ub == 0, 1) == 3):
+            raise ZeroDivisionError('Two dihedral planes are exactly parallel or antiparallel. There is probably something broken in the simulation.')
         x = np.squeeze(_inner(Ua, Ub)) / (np.squeeze(np.linalg.norm(Ua, axis=1)) * np.squeeze(np.linalg.norm(Ub, axis=1)))
 
         # Fix machine precision errors (I hope at least that's what I'm doing...)

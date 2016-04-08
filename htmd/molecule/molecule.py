@@ -989,7 +989,9 @@ class Molecule:
         >>> mol.mutateResidue('resid 158', 'ARG')
         """
         s = self.atomselect(sel, strict=True)
-        removed = self.remove(sel + ' and sidechain', _logger=False)
+        # Changed the selection from "and sidechain" to "not backbone" to remove atoms like phosphates which are bonded
+        # but not part of the sidechain
+        removed = self.remove(sel + ' and not backbone', _logger=False)
         s = np.delete(s, removed)
         self.set('resname', newres, sel=s)
 
@@ -1098,7 +1100,7 @@ class Molecule:
 
     def _writePDB(self, filename, sel='all'):
         src = self
-        if sel is not None:
+        if sel is not None and sel != 'all':
             src = self.copy()
             src.filter(sel, _logger=False)
 
@@ -1250,7 +1252,6 @@ def _resolveCollisions(mol, occ1, occ2, gap):
     logger.info('Removed {} residues from appended Molecule due to collisions.'.format(len(np.unique(mol.resid[overlaps]))))
     # Remove the overlaps
     mol.remove(overlaps, _logger=False)
-
 
 
 def _pp_measure_fit(P, Q):
