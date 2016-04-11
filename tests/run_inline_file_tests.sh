@@ -2,8 +2,9 @@
 RET=0
 TF=$(mktemp)
 for T in $(find htmd -name "*.py" -type f); do 
-	python $T  > $T 2>&1
-	if [ "$?" != "0" ]; then
+	python $T 2>&1
+    echo "$?"
+	if [ "$?" == "1" ]; then
 		echo "$T   Failed"
 		cat $T
 		RET=1
@@ -13,7 +14,7 @@ for T in $(find htmd -name "*.py" -type f); do
 done
 rm $TF
 if [ "$RET" == "0" ]; then
-	echo "All inline file tests passwd"
+	echo "All inline file tests passed"
 fi
 
 exit $RET

@@ -3,11 +3,12 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from ctypes import *
-import numpy
 import os
-import inspect
-import platform
+from ctypes import *
+
+import numpy
+
+import htmd.home
 
 
 def wrap( coordinates, bonds, box ):
@@ -26,13 +27,8 @@ def wrap( coordinates, bonds, box ):
     coordinates  
     """
 
-    import inspect
     import platform
-    libdir = os.path.join(os.path.dirname(inspect.getfile(wrap)), "..", "lib", platform.system())
-    if os.path.exists( os.path.join( libdir, "pro" ) ):
-       libdir = os.path.join( libdir, "pro" )
-    if os.path.exists( os.path.join( libdir, "basic" ) ):
-       libdir = os.path.join( libdir, "basic" )
+    libdir = htmd.home(libDir=True)
 
     if coordinates.ndim == 2:
         c = coordinates.shape

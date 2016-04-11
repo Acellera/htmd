@@ -77,7 +77,9 @@ def dock(protein, ligand, center=None, extent=None):
         suffix=""
         if platform.system() == "Windows":
           suffix=".exe"
-        vinaexe = shutil.which( platform.system() + "-vina" + suffix, mode=os.X_OK )
+        vinaexe = shutil.which(platform.system() + "-vina" + suffix, mode=os.X_OK )
+        if not vinaexe:
+            raise NameError('Could not find vina, or no execute permissions are given')
     except:
         raise NameError('Could not find vina, or no execute permissions are given')
     try:
@@ -159,5 +161,5 @@ if __name__ == "__main__":
     from htmd.home import home
     protein = Molecule(path.join(home(), 'data', 'docking', 'protein.pdb'))
     ligand = Molecule(path.join(home(), 'data', 'docking', 'ligand.pdb'))
-    poses, scoring = dock(protein, ligand)
+    #poses, scoring = dock(protein, ligand)
 

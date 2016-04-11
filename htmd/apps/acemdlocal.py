@@ -181,7 +181,7 @@ def run_job(obj, ngpu, acemd, datadir):
 if __name__ == "__main__":
     from time import sleep
     # TODO: Fix this to work
-
+    """
     a = AcemdLocal(acemd="/shared/acemd/bin/acemd", ngpus=2)
     a.submit("/tmp/job/1")
     a.submit("/tmp/job/2")
@@ -197,3 +197,4 @@ if __name__ == "__main__":
     a.stop()
     sleep(10)
     print("Done")
+    """

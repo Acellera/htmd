@@ -3,18 +3,16 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from ctypes import *
-import numpy
 import os
-import inspect
-import platform
+
+import htmd.home
 from htmd.molecule.support import *
 
 
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
     import platform
-    libdir = os.path.join(os.path.dirname(inspect.getfile(vmdselection)), "..", "lib", platform.system())
+    libdir = htmd.home(libDir=True)
 
     if coordinates.ndim == 2:
         coordinates = numpy.atleast_3d(coordinates)
@@ -33,8 +31,8 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     if bonds and bonds.shape[1] != 2:
         raise NameError("'bonds' not nbonds x 2 in length")
     if len(atomname) != natoms:
-#        print(natoms)
-#        print(len(atomname))
+        #        print(natoms)
+        #        print(len(atomname))
         raise NameError("'atomname' not natoms in length")
     if len(atomtype) != natoms:
         raise NameError("'atomtype' not natoms in length")
@@ -56,11 +54,9 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
         raise NameError("'occupancy' not natoms in length")
 
     if platform.system() == "Windows":
-      cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
-      if( os.path.exists( os.path.join( libdir, "psprolib.dll" ) ) ):
-        cdll.LoadLibrary( os.path.join( libdir, "psprolib.dll" ) )
-
-
+        cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
+        if (os.path.exists(os.path.join(libdir, "psprolib.dll"))):
+            cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
 
     parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
@@ -97,25 +93,25 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
         c_occupancy = pack_double_buffer(occupancy)
 
     c_bonds = None
-    nbonds  = 0
+    nbonds = 0
 
     if bonds:  # TODO: Replace the loops for bonds with ravel
         nbonds = bonds.shape[0]
-        if nbonds>0:
-            ll = nbonds*2
+        if nbonds > 0:
+            ll = nbonds * 2
             c_bonds = (c_int * ll)()
 
     for z in range(0, nbonds):
         for y in [0, 1]:
             c_bonds[z * 2 + y] = bonds[z, y]
 
-    c_nbonds= c_int(nbonds)   
+    c_nbonds = c_int(nbonds)
 
     ll = natoms * nframes
     c_output_buffer = (c_int * ll)()
 
     lenv = natoms * 3 * nframes
-    c_coords =  coordinates.ctypes.data_as(POINTER(c_float))
+    c_coords = coordinates.ctypes.data_as(POINTER(c_float))
 
     retval = parser.atomselect(
         c_selection,
@@ -139,13 +135,15 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     if retval != 0:
         raise NameError('Could not parse selection "' + selection + '". Is the selection a valid VMD atom selection?')
 
-    retval = numpy.empty( (natoms, nframes), dtype=numpy.bool_ )
+    retval = numpy.empty((natoms, nframes), dtype=numpy.bool_)
 
-    for frame in range( nframes ):
+    for frame in range(nframes):
         for atom in range(natoms):
-            retval[atom, frame ] = c_output_buffer[ frame * natoms + atom ]
+            retval[atom, frame] = c_output_buffer[frame * natoms + atom]
 
     return numpy.squeeze(retval)
+
+
 #    return (retval.reshape(natoms, nframes))
 
 
@@ -155,13 +153,13 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
         c = coordinates.shape
         coordinates = coordinates.reshape((c[0], c[1], 1))
 
-#    print(coordinates.shape)
+    #    print(coordinates.shape)
     natoms = coordinates.shape[0]
     nframes = coordinates.shape[2]
     # Sanity check the inputs
 
-#    print(natoms)
-#    print(len(atomname))
+    #    print(natoms)
+    #    print(len(atomname))
 
     if len(atomname) != natoms:
         raise NameError("'atomname' not natoms in length")
@@ -172,25 +170,19 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
     if len(resid) != natoms:
         raise NameError("'resid' not natoms in length")
 
-    import platform
-    libdir = os.path.join(os.path.dirname(inspect.getfile(vmdselection)), "..", "lib", platform.system())
+    libdir = htmd.home(libDir=True)
 
-    if os.path.exists( os.path.join( libdir, "pro" ) ):
-      libdir = os.path.join( libdir, "pro" )
-    if os.path.exists( os.path.join( libdir, "basic" ) ):
-      libdir = os.path.join( libdir, "basic" )
-
-    parser = cdll.LoadLibrary( os.path.join(libdir, "libvmdparser.so"))
+    parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
     c_natoms = c_int(natoms)
     c_atomname = pack_string_buffer(atomname)
     c_atomtype = pack_string_buffer(atomtype)
     c_resname = pack_string_buffer(resname)
 
-    c_chain   = pack_string_buffer( chain )
-    c_segname = pack_string_buffer( segname )
-    c_insert  = pack_string_buffer( insertion )
-    c_altLoc  = pack_string_buffer( altloc )
+    c_chain = pack_string_buffer(chain)
+    c_segname = pack_string_buffer(segname)
+    c_insert = pack_string_buffer(insertion)
+    c_altLoc = pack_string_buffer(altloc)
     c_resid = pack_int_buffer(resid)
     c_nframes = c_int(nframes)
     c_coords = None
@@ -201,7 +193,7 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
 
     z = 0
 
-    c_coords =  coordinates.ctypes.data_as(POINTER(c_float))
+    c_coords = coordinates.ctypes.data_as(POINTER(c_float))
 
     retval = fn = parser.guessbonds(
         c_natoms,

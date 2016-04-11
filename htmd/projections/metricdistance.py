@@ -72,10 +72,10 @@ class MetricDistance(Projection):
         # -------------- DEPRECATION PATCH --------------
         if isinstance(self, np.ndarray) or isinstance(self, Molecule):
             from warnings import warn
-            warn('Static use of the project method will be deprecated after version XXX of HTMD. '
+            warn('Static use of the project method will be deprecated in the next version of HTMD. '
                  'Please change your projection code according to the tutorials on www.htmd.org')
             data = _MetricDistanceOld.project(self, *args, **kwargs)
-            logger.warning('Static use of the project method will be deprecated after version XXX of HTMD. '
+            logger.warning('Static use of the project method will be deprecated in the next version of HTMD. '
                             'Please change your projection code according to the tutorials on www.htmd.org')
             return data
         # ------------------ CUT HERE -------------------
