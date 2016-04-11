@@ -10,7 +10,6 @@ from htmd.proteinpreparation.pdb2pqr.main import runPDB2PQR
 
 from htmd.molecule.molecule import Molecule
 
-
 # Tried to make runs reproducible, but does not work
 random.seed(2016)
 
@@ -190,7 +189,6 @@ def prepareProtein(mol_in,
             segids.append(atom.segID)
             elements.append(atom.element)
 
-
     mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
     resdata_out._setPKAs(pdb2pqr_protein.pka_molecule)
@@ -210,7 +208,6 @@ def prepareProtein(mol_in,
 
 # A test method
 if __name__ == "__main__":
-
     tryp = Molecule('3PTB')
 
     tryp_op = prepareProtein(tryp, pH=1.0)
@@ -223,8 +220,8 @@ if __name__ == "__main__":
     tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     print(prepData)
 
-    mol=Molecule("1r1j")
+    mol = Molecule("1r1j")
     mo, prepData = prepareProtein(mol, returnDetails=True)
-    his = prepData.resname=="HIS"  # Has to be checked better, due to Zn++
-    list(zip(prepData.protonation[his],prepData.resid[his]))
+    his = prepData.resname == "HIS"  # Has to be checked better, due to Zn++
+    list(zip(prepData.protonation[his], prepData.resid[his]))
     pass

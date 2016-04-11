@@ -83,11 +83,12 @@ main roadblock to upgrading to PDB2PQR 1.9 and later.
 
 Part of the conversion involved those steps:
 
- * Amend configure.in to find python3 and numpy
+ * Removed autoconf-related files
  * Apply `2to3 -x import`
  * Resolve naming conflict for `pdb.Atom`
  * Amend `string.xx()` -> `str.xx()` and several others
- * Web-related files were deleted.
+ * Web-related files were deleted
+ * Ported to propka31
 
 
 
