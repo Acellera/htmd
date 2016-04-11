@@ -54,8 +54,8 @@ class Metric:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
                 proj._precalculate(uqMol)
-                map.append(proj.getMapping(uqMol))
-            map = np.hstack(map)
+                #map.append(np.array(proj.getMapping(uqMol), dtype=object))
+            #map = np.hstack(map)
 
         logger.info('Metric: Starting projection of trajectories.')
         metrics = np.empty(numSim, dtype=object)
@@ -102,6 +102,11 @@ class Metric:
 
         return data
 
+    def _projectSingle(self, index):
+        data, ref, fstep, _ = _processSim(self.simulations[index], self.projectionlist, None, self.skip)
+        return data, ref, fstep
+
+
 
 def _processSim(sim, projectionlist, uqmol, skip):
     pieces = sim.trajectory
@@ -112,14 +117,14 @@ def _processSim(sim, projectionlist, uqmol, skip):
             mol = Molecule(sim.molfile)
         logger.debug(pieces[0])
         mol._readTraj(pieces, skip=skip)
+
+        data = []
+        for p in projectionlist:
+            data.append(p.project(mol))
+        data = np.hstack(data)
     except Exception as e:
         logger.warning('Error in simulation with id: ' + str(sim.simid) + ' ' + e.__str__())
         return None, None, None, True
-
-    data = []
-    for p in projectionlist:
-        data.append(p.project(mol))
-    data = np.hstack(data)
 
     return data, _calcRef(pieces, mol.fileloc), mol.fstep, False
 

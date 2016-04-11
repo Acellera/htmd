@@ -43,19 +43,19 @@ class MetricData:
         Centers of clusters
     """
     
-    def __init__(self, dat=None, ref=None, map=None, simlist=None, fstep=0, file=None):
+    def __init__(self, dat=None, ref=None, map=None, simlist=None, fstep=0, parent=None, file=None):
         self.dat = dat
         self.ref = ref
         self.simlist = simlist
         self.fstep = fstep
         self.map = map
 
-        self.parent = None
+        self.parent = parent
 
-        self.St = ()
-        self.K = ()
-        self.N = ()
-        self.Centers = ()
+        self.St = None
+        self.K = None
+        self.N = None
+        self.Centers = None
 
         if file is not None:
             self.load(file)

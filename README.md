@@ -1,9 +1,12 @@
-[![Build Status](https://travis-ci.org/Acellera/htmd.svg?branch=master)](https://travis-ci.org/Acellera/htmd)
+[![Build Status](https://travis-ci.org/Acellera/htmd.svg?branch=master)](https://travis-ci.org/Acellera/htmd) Acellera repo
+
+[![Build Status](https://travis-ci.org/multiscalelab/htmd.svg?branch=master)](https://travis-ci.org/multiscalelab/htmd) Multiscalelab fork
+
 
 
 # HTMD main repository
 HTMD (high-throughput molecular dynamics) is a programmable, extensible platform written in Python. 
-It provides a complete workspace for simulation-based discovery through MD while aiming to solve the data generation and analysis problem as well as increase reproducibility.
+It provides a complete workspace for simulation-based discovery through molecular simulations while aiming to solve the data generation and analysis problem as well as increase reproducibility.
 
 HTMD is free for academia.
 
