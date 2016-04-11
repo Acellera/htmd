@@ -1154,7 +1154,26 @@ class Molecule:
         self.coords = np.zeros((numAtoms, 3, 1), dtype=self._pdb_fields['coords'])
         self.serial = np.arange(1, numAtoms+1)
 
+
     def sequence(self, oneletter=True):
+        """ Return the AA sequence of the Molecule.
+
+        Parameters
+        ----------
+        oneletter : bool
+            Whether to return one-letter or three-letter AA codes. There should be only one atom per residue.
+
+        Returns
+        -------
+        sequence : str
+            The primary sequence as a string
+
+        Examples
+        --------
+        >>> m=Molecule("3PTB"); m.filter("protein")
+        >>> m.sequence()
+        {'0': 'IVGGYTCGANTVPYQVSLNSGYHFCGGSLINSQWVVSAAHCYKSGIQVRLGEDNINVVEGNEQFISASKSIVHPSYNSNTLNNDIMLIKLKSAASLNSRVASISLPTSCASAGTQCLISGWGNTKSSGTSYPDVLKCLKAPILSDSSCKSAYPGQITSNMFCAGYLEGGKDSCQGDSGGPVVCSGKLQGIVSWGSGCAQKNKPGVYTKVCNYVSWIKQTIASN'}
+        """
         residues = {'ARG': 'R', 'AR0': 'R',
                     'HIS': 'H', 'HID': 'H', 'HIE': 'H',
                     'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
@@ -1179,7 +1198,7 @@ class Molecule:
         from htmd.builder.builder import sequenceID
         prot = self.atomselect('protein')
         segs = np.unique(self.segid[prot])
-        increm = sequenceID((self.resid, self.chain))
+        increm = sequenceID((self.resid, self.insertion, self.chain))
         sequence = {}
         olsequence = {}
         for seg in segs:
@@ -1535,6 +1554,9 @@ class _Representation:
 
 
 if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+
     mol = Molecule('3PTB')
     a = mol.get('resid', sel='resname TRP')
     a = mol.get('coords')
