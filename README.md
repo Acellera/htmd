@@ -6,7 +6,7 @@
 
 # HTMD main repository
 HTMD (high-throughput molecular dynamics) is a programmable, extensible platform written in Python. 
-It provides a complete workspace for simulation-based discovery through MD while aiming to solve the data generation and analysis problem as well as increase reproducibility.
+It provides a complete workspace for simulation-based discovery through molecular simulations while aiming to solve the data generation and analysis problem as well as increase reproducibility.
 
 HTMD is free for academia.
 
