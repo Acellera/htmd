@@ -40,7 +40,7 @@ class Molecule:
 
     Examples
     --------
-    >>> mol = Molecule( './test/data/dhfr/dhfr.pdb' )
+    >>> mol = Molecule( './test/data/dhfr/dhfr.pdb' )  # doctest: +SKIP
     >>> mol = Molecule( '3PTB', name='Trypsin' )
 
     Properties
@@ -1310,9 +1310,11 @@ class Representations:
 
     Examples
     --------
+    >>> from htmd.molecule.molecule import Molecule
     >>> mol = Molecule('3PTB')
     >>> mol.reps.add('protein', 'NewCartoon')
-    >>> print(mol.reps)
+    >>> print(mol.reps)                     # doctest: +NORMALIZE_WHITESPACE
+    rep 0: sel='protein', style='NewCartoon', color='Name'
     >>> mol.view()
     >>> mol.reps.remove()
     """
@@ -1554,8 +1556,8 @@ class _Representation:
 
 
 if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
+    from htmd.molecule.molecule import Molecule
+    from htmd.molecule.molecule import _Representation
 
     mol = Molecule('3PTB')
     a = mol.get('resid', sel='resname TRP')
@@ -1568,4 +1570,6 @@ if __name__ == "__main__":
     mol.rotate([1, 0, 0], pi / 2)
     mol.align('name CA')
 
+    import doctest
+    doctest.testmod(globs={'mol': mol})
     # test rotate
