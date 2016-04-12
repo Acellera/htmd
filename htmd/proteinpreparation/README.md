@@ -31,56 +31,10 @@ Usage
 ----------
 
 See the docstring for options. You need propka31 installed via conda.
-Start from a directory above sysprep.
     
-    from htmd import *
-    from sysprep.systempreparation import proteinPreparation
-
     tryp = Molecule('sysprep/tests/3ptb.pdb')
-    tryp_op = proteinPreparation(tryp)
+    tryp_op = prepareProtein(tryp)
     tryp_op.write('sysprep/tests/systempreparation-test-main-ph-7.pdb')
-
-
-
-
-Testing modified pdb2pqr stand-alone
----------------------------
-
-    PYTHONPATH=src python3 main.py --with-ph=7.0 --ff charmm \
-        tests/test-toni/3ptb.pdb 3ptb.pqr > 3ptb.stdout
-
-
-
-TODO
-----
-
-* Refactor modules and streamline PYTHONPATH.
-* Every other note in the docstring.
-* Runs are not exactly reproducible. Whether this is due to the use of
-random values or to non-deterministic ordering of dictionaries is
-unknown. Setting the seed did not help.
-
- 
-
-
-Changes with respect to upstream
--------------------
-
-The version imported is SVN r1111 from the [SourceForge
-repository](http://sourceforge.net/p/pdb2pqr/code/HEAD/tree/trunk/pdb2pqr/),
-heavily modified to run with Python 3.5.  I used the last version of
-PDB2PQR which does not use the scons build system, which is not
-available for Python 3 (at least the current version 2.4). This is the
-main roadblock to upgrading to PDB2PQR 1.9 and later.
-
-Part of the conversion involved those steps:
-
- * Amend configure.in to find python3 and numpy
- * Apply `2to3 -x import`
- * Resolve naming conflict for `pdb.Atom`
- * Amend `string.xx()` -> `str.xx()` and several others
- * Web-related files were deleted.
-
 
 
 
@@ -98,5 +52,44 @@ Please acknowledge your use of PROPKA by citing:
 
  *   Sondergaard, Chresten R., Mats HM Olsson, Michal Rostkowski, and Jan H. Jensen. "Improved Treatment of Ligands and Coupling Effects in Empirical Calculation and Rationalization of pKa Values." Journal of Chemical Theory and Computation 7, no. 7 (2011): 2284-2295.
  *   Olsson, Mats HM, Chresten R. Sondergaard, Michal Rostkowski, and Jan H. Jensen. "PROPKA3: consistent treatment of internal and surface residues in empirical pKa predictions." Journal of Chemical Theory and Computation 7, no. 2 (2011): 525-537.
+
+
+
+
+
+Developer notes
+===============
+
+
+Testing modified pdb2pqr stand-alone
+---------------------------
+
+    PYTHONPATH=src python3 main.py --with-ph=7.0 --ff charmm \
+        tests/test-toni/3ptb.pdb 3ptb.pqr > 3ptb.stdout
+
+
+
+ 
+
+Changes with respect to upstream
+-------------------
+
+The version imported is SVN r1111 from the [SourceForge
+repository](http://sourceforge.net/p/pdb2pqr/code/HEAD/tree/trunk/pdb2pqr/),
+heavily modified to run with Python 3.5.  I used the last version of
+PDB2PQR which does not use the scons build system, which is not
+available for Python 3 (at least the current version 2.4). This is the
+main roadblock to upgrading to PDB2PQR 1.9 and later.
+
+Part of the conversion involved those steps:
+
+ * Removed autoconf-related files
+ * Apply `2to3 -x import`
+ * Resolve naming conflict for `pdb.Atom`
+ * Amend `string.xx()` -> `str.xx()` and several others
+ * Web-related files were deleted
+ * Ported to propka31
+
+
 
 

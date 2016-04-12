@@ -21,11 +21,11 @@ def home(dataDir=None, libDir=False):
     Example
     -------
         >>> htmd.home()                                 # doctest: +ELLIPSIS
-        '.../htmd/htmd'
+        '.../htmd'
         >>> htmd.home(dataDir="dhfr")                   # doctest: +ELLIPSIS
-        '.../htmd/data/dhfr'
+        '.../data/dhfr'
         >>> os.path.join(htmd.home(dataDir="dhfr"),"dhfr.pdb")  # doctest: +ELLIPSIS
-        '.../htmd/data/dhfr/dhfr.pdb'
+        '.../data/dhfr/dhfr.pdb'
     """
 
     homeDir=os.path.dirname(inspect.getfile(htmd))
@@ -49,5 +49,8 @@ def home(dataDir=None, libDir=False):
 #    return os.path.dirname(os.path.dirname(inspect.getfile(modname)))
 
 if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+
     h = htmd.home()
     print(h)

@@ -14,10 +14,11 @@ class ResidueData:
 
     Examples
     --------
-    >> tryp = Molecule("3PTB")
-    >> tryp_op, info = proteinPreparation(tryp, returnDetails=True)
-    >> ri=info.residuesInfo
-    >> ri.pKa[ri.resid==189]
+    >>> tryp = Molecule("3PTB")
+    >>> tryp_op, ri = prepareProtein(tryp, returnDetails=True)   # doctest: +ELLIPSIS
+    Warning...
+    >>> ri.pKa[ri.resid == 189]
+    array([ 4.94907929])
 
     Properties
     ----------
@@ -81,17 +82,17 @@ class ResidueData:
         return pos
 
     # residue is e.g. pdb2pqr.src.aa.ILE
-    def setProtonation(self, residue, protonation):
-        logger.debug("setProtonation %s %s" % (residue, protonation))
+    def _setProtonation(self, residue, protonation):
+        logger.debug("_setProtonation %s %s" % (residue, protonation))
         pos = self._findRes(residue.resSeq, residue.name, residue.chainID)
         self.protonation[pos] = protonation
 
     # TODO this should actually append to a list
-    def appendPatches(self, residue, patch):
+    def _appendPatches(self, residue, patch):
         pos = self._findRes(residue.resSeq, residue.name, residue.chainID)
         self.patches[pos] += patch + "/"
 
-    def setPKAs(self, pka_molecule):
+    def _setPKAs(self, pka_molecule):
         for grp in pka_molecule.conformations['AVR'].groups:
             resname = grp.residue_type
             resid = grp.atom.resNumb
@@ -99,3 +100,11 @@ class ResidueData:
             pka = grp.pka_value
             pos = self._findRes(resid, resname, chain)
             self.pKa[pos] = pka
+
+
+if __name__ == "__main__":
+    import doctest
+    from htmd.molecule.molecule import Molecule
+    from htmd.proteinpreparation.proteinpreparation import prepareProtein
+    doctest.testmod()
+

@@ -3,21 +3,17 @@ import tempfile
 import numpy as np
 import random
 
-from htmd.molecule.molecule import Molecule
-
 # If necessary: http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 from htmd.proteinpreparation.residuedata import ResidueData
 from htmd.proteinpreparation.pdb2pqr.src.pdbParser import readPDB
 from htmd.proteinpreparation.pdb2pqr.main import runPDB2PQR
 
+from htmd.molecule.molecule import Molecule
 
 # Tried to make runs reproducible, but does not work
 random.seed(2016)
 
-
 logger = logging.getLogger(__name__)
-
-
 
 
 def _createMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
@@ -36,13 +32,11 @@ def _createMolecule(name, resname, chain, resid, insertion, coords, segid, eleme
     return mol
 
 
-
-
-def proteinPreparation(mol_in,
-                       pH=7.0,
-                       verbose=0,
-                       returnDetails=False,
-                       keep=None):
+def prepareProtein(mol_in,
+                   pH=7.0,
+                   verbose=0,
+                   returnDetails=False,
+                   keep=None):
     """A system preparation wizard for HTMD. 
 
     Returns a Molecule object, where residues have been renamed to follow
@@ -91,15 +85,15 @@ def proteinPreparation(mol_in,
     -------
     mol_out : Molecule
         the molecule titrated and optimized. The molecule object contains an additional attribute,
-    res_data : ResidueData
-        a table of residues with the corresponding protonations, pKas, and other information
+    resdata_out : ResidueData
+        a table of residues with the corresponding protonation states, pKas, and other information
 
 
     Examples
     --------
-    >>> tryp = Molecule('3PTB')
-    >>> tryp_op = proteinPreparation(tryp, pH=1.0)
-    >>> tryp_op.write('3PTB-opt-ph1.pdb')
+    >> tryp = Molecule('3PTB')
+    >> tryp_op = prepareProtein(tryp, pH=1.0)
+    >> tryp_op.write('3PTB-opt-ph1.pdb')
 
 
     Unsupported/To Do/To Check
@@ -115,7 +109,7 @@ def proteinPreparation(mol_in,
 
     """
 
-    oldLoggingLevel=logger.level
+    oldLoggingLevel = logger.level
     if verbose:
         logger.setLevel(logging.DEBUG)
     logger.info("Starting.")
@@ -165,7 +159,7 @@ def proteinPreparation(mol_in,
     segids = []
     elements = []
 
-    res_data = ResidueData()
+    resdata_out = ResidueData()
 
     for residue in pdb2pqr_protein.residues:
         if 'ffname' in residue.__dict__:
@@ -177,11 +171,11 @@ def proteinPreparation(mol_in,
         else:
             curr_resname = residue.name
 
-        res_data.setProtonation(residue, curr_resname)
+        resdata_out._setProtonation(residue, curr_resname)
 
         if 'patches' in residue.__dict__:
             for patch in residue.patches:
-                res_data.appendPatches(residue, patch)
+                resdata_out._appendPatches(residue, patch)
                 if patch != "PEPTIDE":
                     logger.info("Residue %s has patch %s set" % (residue, patch))
 
@@ -195,36 +189,39 @@ def proteinPreparation(mol_in,
             segids.append(atom.segID)
             elements.append(atom.element)
 
-    res_data.setPKAs(pdb2pqr_protein.pka_molecule)
-
     mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
-    res_data.pdb2pqr_protein = pdb2pqr_protein
-    res_data.pka_protein = pdb2pqr_protein.pka_molecule
-    res_data.pka_dict = pdb2pqr_protein.pkadic
-    res_data.missedLigands=missedLigands
+    resdata_out._setPKAs(pdb2pqr_protein.pka_molecule)
+    resdata_out.pdb2pqr_protein = pdb2pqr_protein
+    resdata_out.pka_protein = pdb2pqr_protein.pka_molecule
+    resdata_out.pka_dict = pdb2pqr_protein.pkadic
+    resdata_out.missedLigands = missedLigands
 
     logger.info("Returning.")
     logger.setLevel(oldLoggingLevel)
 
     if returnDetails:
-        return mol_out, res_data
+        return mol_out, resdata_out
     else:
         return mol_out
-
-
-
 
 
 # A test method
 if __name__ == "__main__":
     tryp = Molecule('3PTB')
 
-    tryp_op = proteinPreparation(tryp, pH=1.0)
+    tryp_op = prepareProtein(tryp, pH=1.0)
     tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
 
-    tryp_op, prepData = proteinPreparation(tryp, returnDetails=True)
-    tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
-
-    tryp_op = proteinPreparation(tryp, pH=14.0)
+    tryp_op = prepareProtein(tryp, pH=14.0)
     tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
+
+    tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
+    tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
+    print(prepData)
+
+    mol = Molecule("1r1j")
+    mo, prepData = prepareProtein(mol, returnDetails=True)
+    his = prepData.resname == "HIS"  # Has to be checked better, due to Zn++
+    list(zip(prepData.protonation[his], prepData.resid[his]))
+    pass
