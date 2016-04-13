@@ -159,7 +159,7 @@ def uniformRandomRotation():
 
 
 def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
-    """ writes grid free energy to cube file
+    """ Writes grid free energy to cube file
 
     Parameters
     ----------
@@ -248,3 +248,42 @@ def drawCube(mi, ma, viewer=None):
     draw line "$maxx $maxy $maxz" "$minx $maxy $maxz"
     draw line "$maxx $maxy $maxz" "$maxx $miny $maxz"
     """
+
+
+def exportProjectionData(data, filename):
+    """ Export results of a projection into an R-friendly data frame
+
+    The format of the written data is:
+      Trajectory Frame   CV1  CV2 ...
+      <TrajName> <Frame> <V1> <V2> ...
+      ...
+
+    Parameters
+    ----------
+    data : htmd.metricdata.MetricData
+        The results of a metric.project() operation
+    filename : str
+        The filename to be written.
+
+    """
+
+    out_file = open(filename, "w")
+
+    nTrajs=len(data.simlist)
+
+    if nTrajs==0:
+        raise Exception("MetricData does not contain any trajectory")
+
+    (junk,nVars)=data.dat[0].shape
+
+    for tr in range(nTrajs):
+        (nf, junk)=data.dat[tr].shape
+        for fr in range(nf):
+            fields = [data.simlist[tr].trajectory[0]]
+            fields.append(fr)
+            fields.extend(data.dat[tr][fr,])
+            out_file.write("\t".join(str(el) for el in fields))
+            out_file.write("\n")
+
+    out_file.close()
+

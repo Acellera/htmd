@@ -38,7 +38,7 @@ class MetricNull(Projection):
             a dummy value
         """
 
-        return "No mapping."
+        return ["Dummy"+str(i+1) for i in range(self._ndim)]
 
 
     def project(self, mol):
