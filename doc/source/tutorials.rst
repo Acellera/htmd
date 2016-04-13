@@ -7,8 +7,7 @@ Contents:
    :maxdepth: 1
 
    Python primer <tutorials/htmd-python-primer>
-   Getting started <tutorials/getting-started-htmd>
-   Playing with HTMD Molecules <tutorials/playing-with-htmd-molecule>
+   Getting started with HTMD Molecules <tutorials/getting-started-with-htmd-molecules>
    Atom selections <tutorials/atom-selections>
    System building <tutorials-building>
    Submitting simulations
