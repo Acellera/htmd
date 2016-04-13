@@ -3,7 +3,6 @@ from htmd.projections.projection import Projection
 import logging
 import numpy as np
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -22,12 +21,10 @@ class MetricNull(Projection):
         logger.info("Initialized")
         self._ndim = ndim
 
-
     # Only called if single topology
     def _precalculate(self, mol):
         logger.info("In _precalculate")
         self._precalculation_enabled = True
-
 
     def getMapping(self):
         """ Returns optional information.
@@ -38,8 +35,7 @@ class MetricNull(Projection):
             a dummy value
         """
 
-        return ["Dummy"+str(i+1) for i in range(self._ndim)]
-
+        return ["Dummy" + str(i + 1) for i in range(self._ndim)]
 
     def project(self, mol):
         """ Compute the actual metric.
@@ -62,6 +58,21 @@ class MetricNull(Projection):
 
 
 if __name__ == "__main__":
-    # TODO a test
-    pass
+    import htmd
+    import htmd.projections.metricnull
 
+    dd = htmd.home(dataDir="adaptive")
+    fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
+                         dd + '/generators/1/structure.pdb')
+
+    metr2 = htmd.Metric(fsims)
+    metr2.projection(htmd.projections.metricnull.MetricNull(2))
+    data2 = metr2.project()
+    assert data2.dat[0] == (6, 2)
+
+    metr1 = htmd.Metric(fsims)
+    metr1.projection(htmd.projections.metricnull.MetricNull(1))
+    data1 = metr1.project()
+    assert data1.dat[0] == (6, 1)
+
+    pass
