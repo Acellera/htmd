@@ -232,7 +232,10 @@ def _applyCaps(mol, caps):
 
         torem = mol.atomselect('segid {} and resid {} and name H1 H3 HT1 HT3'.format(seg, np.min(resids)))
         if np.sum(torem) != 2:
-            raise AssertionError('Segment {}, resid {} should have H[123] or HT[123] atoms. Cannot cap.'.format(seg, np.min(resids)))
+            raise RuntimeError('Segment {}, resid {} should have H[123] or HT[123] atoms. Cannot cap. '
+                                 'Capping in AMBER requires hydrogens on the residues that will be capped. '
+                                 'Consider using the proteinPreparation function to add hydrogens to your molecule'
+                                 'before building.'.format(seg, np.min(resids)))
         mol.remove(torem)
 
 

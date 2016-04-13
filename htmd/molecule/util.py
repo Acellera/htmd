@@ -197,9 +197,9 @@ def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
     # main loop
     cont = 0
 
-    for i in range(vecMax[0] - vecMin[0]):
-        for j in range(vecMax[1] - vecMin[1]):
-            for k in range(vecMax[2] - vecMin[2]):
+    for i in range(ngrid[0]):
+        for j in range(ngrid[1]):
+            for k in range(ngrid[2]):
                 outFile.write("%13.5g" % arr[i][j][k])
                 if np.mod(cont, 6) == 5:
                     outFile.write("\n")
