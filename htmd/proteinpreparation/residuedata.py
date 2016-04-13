@@ -1,7 +1,6 @@
 import numpy as np
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -82,7 +81,7 @@ class ResidueData:
             pos = len(self.resid) - 1
         else:
             pos = np.argwhere(mask)
-            assert (len(pos)==1), "More than one resid matched"
+            assert (len(pos) == 1), "More than one resid matched"
             pos = int(pos)
         return pos
 
@@ -110,5 +109,5 @@ if __name__ == "__main__":
     import doctest
     from htmd.molecule.molecule import Molecule
     from htmd.proteinpreparation.proteinpreparation import prepareProtein
-    doctest.testmod()
 
+    doctest.testmod()
