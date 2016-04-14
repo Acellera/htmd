@@ -204,7 +204,6 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     return mol
 
 
-
 def removeLipidsInProtein(prot, memb):
     """ Calculates the convex hull of the protein. If a lipid lies inside the hull it gets removed.
 
@@ -248,7 +247,7 @@ def removeHET(prot):
     return prot
 
 
-def tilemembrane(memb, xmin, ymin, xmax, ymax):
+def tileMembrane(memb, xmin, ymin, xmax, ymax):
     """ Tile the membrane in the X and Y dimensions to reach a specific size.
     Returns
     -------
@@ -291,7 +290,7 @@ def tilemembrane(memb, xmin, ymin, xmax, ymax):
     return megamemb
 
 
-def minimalrotation(prot):
+def minimalRotation(prot):
     """ Find the rotation around Z that minimizes the X and Y dimensions of the protein to best fit in a box.
 
     Essentially PCA in 2D
@@ -316,7 +315,6 @@ def minimalrotation(prot):
 
     angle, _ = cart2pol(xa, ya)
     return angle + np.radians(45)
-
 
 
 if __name__ == "__main__":

@@ -195,13 +195,12 @@ proc calcforces_endstep { } { }
         self.acemd.setup(inputdir, outputdir, overwrite=True)
 
         # Adding constraints
-        pdbfile = os.path.join(outputdir, self.acemd.coordinates)
-        mol = Molecule(pdbfile)
-        mol.set('occupancy', 0)
-        mol.set('beta', 0)
+        inmol.set('occupancy', 0)
+        inmol.set('beta', 0)
         for sel in self.constraints:
-            mol.set('beta', self.constraints[sel], sel)
-        mol.write(pdbfile)
+            inmol.set('beta', self.constraints[sel], sel)
+        outfile = os.path.join(outputdir, self.acemd.coordinates)
+        inmol.write(outfile)
 
     def addConstraint(self, atomselect, factor=1):
         """ Convenience function for adding a new constraint to existing constraints.
