@@ -5,8 +5,10 @@ Note: some style is at variance with Python PIP recommendations.
  
 * Class names start with capital letters
 * Method names start with lower-case, then camelCase
+* Same for generic function,e.g.   testMe()
 * Make the main a test case, where possible. 
 * Name methods as verbs.
+* Use namespaces instead of composite name, e.g. charmm.build() instead of charmmBuild() when possible
 
 
 
