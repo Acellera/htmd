@@ -1,7 +1,6 @@
 import numpy as np
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -19,6 +18,8 @@ class ResidueData:
     Warning...
     >>> ri.pKa[ri.resid == 189]
     array([ 4.94907929])
+    >>> ri.patches[ri.resid == 57]
+    array([['PEPTIDE', 'HIP']], dtype=object)
 
     Properties
     ----------
@@ -48,7 +49,7 @@ class ResidueData:
 
     def __init__(self):
         for k in self._residuesinfo_fields:
-            self.__dict__[k] = np.zeros(0, dtype=self._residuesinfo_fields[k])
+            self.__dict__[k] = np.empty(0, dtype=self._residuesinfo_fields[k])
 
     def __str__(self):
         n = len(self.resid)
@@ -76,9 +77,12 @@ class ResidueData:
             self.protonation = np.append(self.protonation, "UNK")
             self.pKa = np.append(self.pKa, np.NaN)
             self.patches = np.append(self.patches, "")
+            self.patches[-1] = []
             pos = len(self.resid) - 1
         else:
             pos = np.argwhere(mask)
+            assert (len(pos) == 1), "More than one resid matched"
+            pos = int(pos)
         return pos
 
     # residue is e.g. pdb2pqr.src.aa.ILE
@@ -87,10 +91,9 @@ class ResidueData:
         pos = self._findRes(residue.resSeq, residue.name, residue.chainID)
         self.protonation[pos] = protonation
 
-    # TODO this should actually append to a list
     def _appendPatches(self, residue, patch):
         pos = self._findRes(residue.resSeq, residue.name, residue.chainID)
-        self.patches[pos] += patch + "/"
+        self.patches[pos].append(patch)
 
     def _setPKAs(self, pka_molecule):
         for grp in pka_molecule.conformations['AVR'].groups:
@@ -106,5 +109,5 @@ if __name__ == "__main__":
     import doctest
     from htmd.molecule.molecule import Molecule
     from htmd.proteinpreparation.proteinpreparation import prepareProtein
-    doctest.testmod()
 
+    doctest.testmod()

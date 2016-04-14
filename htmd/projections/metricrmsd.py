@@ -223,6 +223,7 @@ if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule
     from htmd.home import home
     from os import path
+
     mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
     mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
     ref = mol.copy()
@@ -235,3 +236,19 @@ if __name__ == "__main__":
                           1.24414587,  1.34513164,  1.31932807,  1.34282494,  1.2261436 ,
                           1.36359048,  1.26243281,  1.21157813,  1.26476419,  1.29413617], dtype=np.float32)
     assert np.all(np.abs(data[-20:] - lastrmsd) < 0.001), 'Coordinates calculation is broken'
+
+
+    from htmd.simlist import simlist
+    from htmd.projections.metric import Metric
+    dd = home(dataDir="adaptive")
+    fsims = simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
+                         dd + '/generators/1/structure.pdb')
+    ref = Molecule(dd+"/generators/1/structure.pdb")
+
+    metr2 = Metric(fsims)
+    metr2.projection(MetricRmsd(ref, 'protein and name CA'))
+    data2 = metr2.project()
+
+    assert data2.dat[0].shape == (6,1)
+
+    pass

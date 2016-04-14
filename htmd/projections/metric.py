@@ -120,7 +120,10 @@ def _processSim(sim, projectionlist, uqmol, skip):
 
         data = []
         for p in projectionlist:
-            data.append(p.project(mol))
+            pj=p.project(mol)
+            if pj.ndim==1:
+                pj=np.atleast_2d(pj).T
+            data.append(pj)
         data = np.hstack(data)
     except Exception as e:
         logger.warning('Error in simulation with id: ' + str(sim.simid) + ' ' + e.__str__())
@@ -441,3 +444,5 @@ def _processSimPyemma(obj, i, updList, uniqueMol, uqMol, skip, deleteSims, metri
     #fstep[i] = mol.fstep[1] / 1E6
     (metrics[i], trajLengths) = obj._processTraj(pieces)
     ref[i] = obj._calcRef(trajLengths)
+
+
