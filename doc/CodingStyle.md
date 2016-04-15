@@ -17,9 +17,8 @@ Docstrings
 
 See this template:
 
-~~~ 
 
-
+```python
 def home(dataDir=None, libDir=False):
     """Return the pathname of the HTMD root directory (or a data subdirectory).
 
@@ -37,28 +36,40 @@ def home(dataDir=None, libDir=False):
 
     Example
     -------
-        >>> htmd.home()                                 # doctest: +ELLIPSIS
-        '.../htmd'
-        >>> htmd.home(dataDir="dhfr")                   # doctest: +ELLIPSIS
-        '.../data/dhfr'
-        >>> os.path.join(htmd.home(dataDir="dhfr"),"dhfr.pdb")  # doctest: +ELLIPSIS
-        '.../data/dhfr/dhfr.pdb'
+    >>> htmd.home()                                 # doctest: +ELLIPSIS
+    '.../htmd'
+    >>> htmd.home(dataDir="dhfr")                   # doctest: +ELLIPSIS
+    '.../data/dhfr'
+    >>> os.path.join(htmd.home(dataDir="dhfr"),"dhfr.pdb")  # doctest: +ELLIPSIS
+    '.../data/dhfr/dhfr.pdb'
     """
 
-~~~
+```
 
 
 Doctests
 --------
 
-Docstrings can be test cases (as above). The "ELLIPSIS" line indicates that 
-match with dots is flexible.   
+Docstrings can be test cases (as above). This is convenient because you have four 
+things in one place: 
+
+ 1. the test case
+ 2. the expected result
+ 3. an example
+ 4. the rest of the documentation
 
 It's sufficient to add this in the main...
  
-~~~
+```python
 if __name__ == "__main__":
     import doctest
+    # ... add any other global / import you want tests to see
     doctest.testmod()
-~~~
+```
+
+The "ELLIPSIS" line indicates that match with dots is flexible.   
+Other possibly useful directives are SKIP and NORMALIZE_WHITESPACE. You can also
+
+  * run tests placed in external files with `doctest.testfile('doctest_in_help.rst')`
+  * test a different module with `doctest.testmod(doctest_simple)`
 
