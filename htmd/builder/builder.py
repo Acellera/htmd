@@ -172,34 +172,44 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
 
     idx = mol.atomselect(sel, indexes=True)
     rid = mol.get('resid', sel)  # TODO:maybe easier without sel, rid = mol.get('resid') and then no need of idx
+    idxdiff = np.diff(idx)
     residiff = np.diff(rid)
-    gappos = idx[np.where((residiff != 1) & (residiff != 0))[0]]
+    gappos = np.where((residiff != 1) & (residiff != 0))[0]  # Points to the index before the gap!
+
+    idxstartseg = [idx[0]] + idx[gappos + 1].tolist()
+    idxendseg = idx[gappos].tolist() + [idx[-1]]
 
     mol.set('segid', basename, sel)
 
     if len(gappos) == 0:
         return mol
 
-    gaps = np.array([idx[0]-1] + idx[gappos].tolist() + [idx[-1]])
-
     if spatial:
+        residbackup = mol.get('resid')
+        mol.set('resid', sequenceID(mol.resid))  # Assigning unique resids to be able to do the distance selection
+
         todelete = []
-        for i in range(1, len(gaps)-1):
-            gapidx = gaps[i]
-            coords = mol.get('coords', sel='resid "{}" "{}" and name CA'.format(mol.resid[gapidx], mol.resid[gapidx+1]))
+        i = 0
+        for s, e in zip(idxstartseg[1:], idxendseg[:-1]):
+            coords = mol.get('coords', sel='resid "{}" "{}" and name CA'.format(mol.resid[e], mol.resid[s]))
             if np.shape(coords) == (2, 3):
                 dist = np.sqrt(np.sum((coords[0, :] - coords[1, :]) ** 2))
                 if dist < spatialgap:
                     todelete.append(i)
-        gaps = np.delete(gaps, todelete)
+            i += 1
+        idxstartseg = np.delete(idxstartseg, todelete)
+        idxendseg = np.delete(idxendseg, todelete)
 
-    start = gaps[0]+1
-    for i in range(len(gaps) - 1):
-        stop = gaps[i+1]
+        mol.set('resid', residbackup)  # Restoring the original resids
+
+    i = 0
+    for s, e in zip(idxstartseg, idxendseg):
         newsegid = basename + str(i)
-        logger.info('Created segment {} between resid {} and {}.'.format(newsegid, mol.resid[start], mol.resid[stop]))
-        mol.segid[start:stop+1] = newsegid
-        start = stop + 1
+        if np.any(mol.segid == newsegid):
+            raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(newsegid))
+        logger.info('Created segment {} between resid {} and {}.'.format(newsegid, mol.resid[s], mol.resid[e]))
+        mol.segid[s:e+1] = newsegid
+        i += 1
 
     return mol
 
@@ -212,7 +222,6 @@ def removeLipidsInProtein(prot, memb):
     """
     # TODO: Do the same with Morphological Snakes
     from scipy.spatial import ConvexHull
-    from htmd.builder.builder import sequenceID
     memb = memb.copy()
 
     # Convex hull of the protein
@@ -255,7 +264,6 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax):
         A big membrane Molecule
     """
     from htmd.progress.progress import ProgressBar
-    from htmd.builder.builder import sequenceID
     memb = memb.copy()
     memb.resid = sequenceID(memb.resid)
 
