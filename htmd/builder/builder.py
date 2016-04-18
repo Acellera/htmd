@@ -179,6 +179,9 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     idxstartseg = [idx[0]] + idx[gappos + 1].tolist()
     idxendseg = idx[gappos].tolist() + [idx[-1]]
 
+    from IPython.core.debugger import Tracer
+    Tracer()()
+
     mol.set('segid', basename, sel)
 
     if len(gappos) == 0:
@@ -197,7 +200,8 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
                 if dist < spatialgap:
                     todelete.append(i)
             i += 1
-        idxstartseg = np.delete(idxstartseg, todelete)
+        # Join the non-real gaps into segments
+        idxstartseg = np.delete(idxstartseg, np.array(todelete)+1)
         idxendseg = np.delete(idxendseg, todelete)
 
         mol.set('resid', residbackup)  # Restoring the original resids
