@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/Acellera/htmd.svg?branch=master)](https://travis-ci.org/Acellera/htmd) Acellera repo
 
-[![Build Status](https://travis-ci.org/multiscalelab/htmd.svg?branch=master)](https://travis-ci.org/multiscalelab/htmd) Multiscalelab fork
+[![Build Status](https://travis-ci.org/multiscalelab/htmd.svg?branch=master)](https://travis-ci.org/multiscalelab/htmd) Multiscalelab fork 
 
 
 
