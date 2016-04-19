@@ -179,9 +179,6 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     idxstartseg = [idx[0]] + idx[gappos + 1].tolist()
     idxendseg = idx[gappos].tolist() + [idx[-1]]
 
-    from IPython.core.debugger import Tracer
-    Tracer()()
-
     mol.set('segid', basename, sel)
 
     if len(gappos) == 0:
