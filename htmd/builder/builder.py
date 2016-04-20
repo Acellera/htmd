@@ -215,7 +215,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     return mol
 
 
-def removeLipidsInProtein(prot, memb):
+def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
     """ Calculates the convex hull of the protein. If a lipid lies inside the hull it gets removed.
 
     This does not work well for lipids crossing out of the hull. If even one atom of the lipid is outside it will
@@ -243,7 +243,7 @@ def removeLipidsInProtein(prot, memb):
             toremove[atoms] = True
             numlipsrem += 1
 
-    lipids = memb.atomselect('lipids')  # Only remove lipids, waters are ok
+    lipids = memb.atomselect(lipidsel)  # Only remove lipids, waters are ok
     memb.remove(toremove & lipids)
     return memb, numlipsrem
 
