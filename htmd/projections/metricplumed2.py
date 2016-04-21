@@ -22,11 +22,16 @@ def _getTempDirName(prefix=""):
                         prefix + next(tempfile._get_candidate_names()))
 
 
-def _getPlumedPath():
+def _getPlumedRoot():
     """ Return path to plumed executable, or raise an exception if not found. """
-    pr = subprocess.check_output(["plumed", "--standalone-executable", "info", "--root"])
-    pr = pr.strip().decode("utf-8")
-    return pr
+    return _getPlumedInfo("root")
+
+
+def _getPlumedInfo(what):
+    """ Return selected info from plumed executable, or raise an exception if not found. """
+    info = subprocess.check_output(["plumed", "--standalone-executable", "info", "--" + what])
+    info = info.strip().decode("utf-8")
+    return info
 
 
 # Plumed statement wrappers --------------------------------------------------------
@@ -38,27 +43,36 @@ class PlumedStatement(ABC):
 
 
 class PlumedCV(PlumedStatement):
-    """ Define a Plumed2 CV
+    """ Define a Plumed2 CV.
+
+    The arguments, optional and mandatory, are passed as python named parameters. The argument
+    values can be of type (see examples):
+        string or int   - passed as they are
+        bool            - the keyword is enabled, with no value (eg: PBC=True becomes PBC)
+        PlumedGroups    - passed by label, prepended to the CV definition
+        PlumedCOM       - passed by label, prepended to the CV definition
+        Molecule        - converted into a PlumedGroup
+        list containing any of the above
+                        - each element is converted as above, then they are listed separated by comma
 
     Parameters
     ----------
     cv : str
-        The CV keyword as a string (e.g.: "DISTANCE"). Case-insensitive.
+        The CV action, as a string (e.g.: "DISTANCE"). (PLUMED is Case-insensitive.)
     label : str
         The label assigned to the CV
     args :
-        Other named arguments to the CV (e.g. ATOMS=1, NOPBC=True). Objects of
-        class PlumedGroup and PlumedCOM are expanded and prepended as appropriate.
+        Named arguments and keywords to the CV (see details).
     verbatim : str, optional
         Code which will be added as-is to the CV line
 
     Examples
     --------
-    >>> PlumedCV("GYRATION", "rgyr", ATOMS="10-20", TYPE="RADIUS")
+    >>> PlumedCV("GYRATION", "rgyr", ATOMS="10-20", TYPE="RADIUS")   # As string
     rgyr: GYRATION ATOMS=10-20 TYPE=RADIUS
     >>> m=Molecule("3ptb")
     >>> grp=PlumedGroup(m,"grp","serial 10 to 20")
-    >>> PlumedCV("GYRATION", "rgyr2", ATOMS=grp, TYPE="ASPHERICITY", NOPBC=True)
+    >>> PlumedCV("GYRATION", "rgyr2", ATOMS=grp, TYPE="ASPHERICITY", NOPBC=True)  # As PlumedGroup
     grp: GROUP ATOMS=10,11,12,13,14,15,16,17,18,19,20
     rgyr2: GYRATION ATOMS=grp NOPBC TYPE=ASPHERICITY
     >>> protCA=PlumedCOM(m,"protCA","chain A and name CA")
@@ -245,7 +259,7 @@ class MetricPlumed2(Projection):
         self.cvnames = None
 
         try:
-            pp = _getPlumedPath()
+            pp = _getPlumedRoot()
             logger.info("Plumed path is " + pp)
         except Exception as e:
             raise Exception("To use MetricPlumed2 please ensure PLUMED 2's executable is installed and in path")
@@ -366,7 +380,7 @@ if __name__ == "__main__":
     from htmd.projections.metricplumed2 import MetricPlumed2
 
     try:
-        _getPlumedPath()
+        _getPlumedRoot()
     except:
         print("Tests in %s skipped because plumed executable not found." % __file__)
         sys.exit()
