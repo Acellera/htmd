@@ -30,7 +30,7 @@ class Kinetics(object):
     --------
     >>> kin = Kinetics(model, temperature=300, concentration=0.015)
     """
-    _kB = 0.0019872041  # Boltzman constant
+    _kB = 0.0019872041  # Boltzman constant kcal/(mol K)
 
     def __init__(self, model, temperature, concentration=1, source=None, sink=None):
         self.concentration = concentration
