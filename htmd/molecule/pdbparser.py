@@ -216,6 +216,8 @@ class PDBParser:
 
                 if len(charge) != 0:
                     charge = float(charge)
+                else:
+                    charge = 0
 
                 self.name.append(name)
                 self.serial.append(serial_number)
