@@ -15,6 +15,7 @@ Contents:
    System building for protein-protein binding (Barnase-Barstar) <tutorials/barnase-barstar-building-simulation>
    Using docking to initialize positions <tutorials/docking-simulation-generators>
    Submitting simulations
+   Adaptive sampling <tutorials/adaptive-sampling-example>
    Ligand binding analysis <tutorials/ligand-binding>
    Conformational analysis Villin <tutorials/protein-folding>
    Conformational analysis CXCL12 <tutorials/conformational-analysis-CXCL12>
