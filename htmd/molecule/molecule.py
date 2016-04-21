@@ -589,6 +589,8 @@ class Molecule:
             self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
+        elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
+            self._readPDB(filename, mode='pdbqt')
         elif (type is None and firstfile.endswith(".xtc")) or type == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
         elif (type is None and firstfile.endswith(".coor")) or type == "coor":
@@ -675,17 +677,17 @@ class Molecule:
             self.coords[idx, 2, nf] = float(s[3])
             self.resname[idx] = "MOL"
 
-    def _readPDB(self, filename):
+    def _readPDB(self, filename, mode='pdb'):
         mol = []
         if os.path.isfile(filename):
-            mol = PDBParser(filename)
+            mol = PDBParser(filename, mode)
         elif len(filename) == 4:
             # Try loading it from the PDB website
             r = requests.get(
                 "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
             if r.status_code == 200:
                 tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                mol = PDBParser(tempfile)
+                mol = PDBParser(tempfile, mode)
                 os.unlink(tempfile)
             else:
                 raise NameError('Invalid PDB code')
