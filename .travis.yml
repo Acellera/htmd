@@ -55,14 +55,31 @@ install:
 
 
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-data
- - conda install htmd-data --use-local
-
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd
- - conda install htmd      --use-local
+
+ # To bring in dependencies 
+ - conda install pyemma -y
+ - conda install natsort -y
+ - conda install ipython -y
+ - conda install requests -y
+ - conda install joblib -y
+ - conda install scikit-learn -y
+ - conda install jupyter_console -y
+ - conda install notebook -y
+ - conda install ipyparallel -y
+ - conda install psfgen -y
+ - conda install vina -y
+ - conda install nglview -y
+ - conda install propka -y
+ - conda install anaconda-client -y
+
+ - conda install $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2  -y
+ - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y
 
 script:
  # Run the inline file tests 
  - python -c "import htmd"
+ - activate_license "$LICENSE_TOKEN"
  - python tests/run_inline_file_tests.py
 
 after_success:
@@ -70,7 +87,7 @@ after_success:
  - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ];      then export TYPE=pro; fi
  - if [ "$TYPE" == "basic" ]; then export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC; export CHANNEL=acellera; fi
  - if [ "$TYPE" == "pro" ];   then export ANACONDA_TOKEN=$ANACONDA_TOKEN_PRO;   export CHANNEL=acellera; fi
- - echo $CHANNEL
+ - echo "Uploading to channel: $CHANNEL"
  - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2 -u $CHANNEL 
  - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2 -u $CHANNEL
  - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-[0-9]*.tar.bz2 -u $CHANNEL ; fi
