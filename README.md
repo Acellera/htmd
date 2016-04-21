@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/Acellera/htmd.svg?branch=master)](https://travis-ci.org/Acellera/htmd) Acellera repo
 
-[![Build Status](https://travis-ci.org/multiscalelab/htmd.svg?branch=master)](https://travis-ci.org/multiscalelab/htmd) Multiscalelab fork
+[![Build Status](https://travis-ci.org/multiscalelab/htmd.svg?branch=master)](https://travis-ci.org/multiscalelab/htmd) Multiscalelab fork 
 
 
 
@@ -25,5 +25,5 @@ If you use HTMD in your publication please cite:
 Stefan Doerr, Matthew J. Harvey, Frank Noé, and Gianni De Fabritiis
 Journal of Chemical Theory and Computation
 *DOI: 10.1021/acs.jctc.6b00049*
-http://pubs.acs.org/doi/abs/10.1021/acs.jctc.6b00049
+http://pubs.acs.org/doi/abs/10.1021/acs.jctc.6b00049 
 

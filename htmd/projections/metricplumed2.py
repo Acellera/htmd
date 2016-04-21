@@ -13,6 +13,8 @@ import tempfile
 logger = logging.getLogger(__name__)
 
 
+# Local utility functions --------------------------------------------------------
+
 def _getTempDirName(prefix=""):
     return os.path.join(tempfile._get_default_tempdir(),
                         prefix + next(tempfile._get_candidate_names()))
@@ -25,7 +27,93 @@ def _getPlumedPath():
     return pr
 
 
-class PlumedGenericGroup(ABC):
+# Plumed statement wrappers --------------------------------------------------------
+
+# ABC should prevent instantiation but doesn't
+class PlumedStatement(ABC):
+    """ Abstract base class for Plumed statements. Do not use directly. """
+    pass
+
+
+class PlumedCV(PlumedStatement):
+    """ Define a Plumed2 CV
+
+    Parameters
+    ----------
+    cv : str
+        The CV keyword as a string (e.g.: "DISTANCE"). Case-insensitive.
+    label : str
+        The label assigned to the CV
+    args :
+        Other named arguments to the CV (e.g. ATOMS=1, NOPBC=True). Objects of
+        class PlumedGroup and PlumedCOM are expanded and prepended as appropriate.
+    verbatim : str, optional
+        Code which will be added as-is to the CV line
+
+    Examples
+    --------
+    >>> PlumedCV("GYRATION", "rgyr", ATOMS="10-20", TYPE="RADIUS")
+    rgyr: GYRATION ATOMS=10-20 TYPE=RADIUS
+    >>> m=Molecule("3ptb")
+    >>> grp=PlumedGroup(m,"grp","serial 10 to 20")
+    >>> PlumedCV("GYRATION", "rgyr2", ATOMS=grp, TYPE="ASPHERICITY", NOPBC=True)
+    grp: GROUP ATOMS=10,11,12,13,14,15,16,17,18,19,20
+    rgyr2: GYRATION ATOMS=grp NOPBC TYPE=ASPHERICITY
+    >>> protCA=PlumedCOM(m,"protCA","chain A and name CA")
+    >>> lig=PlumedCOM(m,"lig","resname BEN and noh")
+    >>> PlumedCV("DISTANCE", "dist", ATOMS=[protCA,lig])
+    lig: COM ATOMS=1632,1633,1634,1635,1636,1637,1638,1639,1640
+    protCA: COM ATOMS=2,10,17,21,25,37,44,50,54,59,67,74,81,88,100,109,116,122,130,138,144,148,160,170,181,187,191,195,201,209,217,225,231,240,254,261,268,274,279,284,294,300,312,321,327,331,339,348,355,366,374,378,387,395,403,411,419,426,433,442,446,454,463,472,483,491,497,502,508,517,523,531,538,548,555,561,573,581,587,595,602,610,618,626,634,642,650,658,666,675,683,692,698,703,708,714,722,730,736,747,754,759,765,773,779,787,794,801,807,813,818,824,829,833,840,849,855,863,871,877,881,895,899,907,914,923,929,935,939,946,952,964,971,979,986,994,1003,1009,1017,1026,1031,1038,1046,1054,1060,1068,1074,1080,1086,1095,1101,1106,1118,1125,1129,1138,1146,1153,1159,1167,1175,1186,1192,1197,1201,1213,1221,1230,1234,1238,1247,1255,1261,1267,1276,1280,1288,1294,1298,1302,1309,1316,1323,1329,1335,1339,1348,1356,1365,1369,1377,1384,1390,1404,1408,1414,1418,1424,1429,1438,1447,1455,1464,1471,1475,1482,1494,1501,1510,1517,1523,1531,1543,1550,1556,1570,1578,1587,1596,1603,1611,1616,1622,1631
+    dist: DISTANCE ATOMS=protCA,lig
+    """
+
+    def __init__(self, cv, label, verbatim=None, **kw):
+        self.label = label
+        self.cv = cv
+        self.args = kw
+        self.verbatim = verbatim
+        self.prereq = []
+
+        for k in self.args:
+            v = self.args[k]
+            # If the arg is a Plumed group, add it to prereq and replace by label
+            if isinstance(v, PlumedGenericGroup):
+                self.prereq.append(v)
+                self.args[k] = v.label
+            # Ditto if it is a list-like object, plus expand with commas
+            elif not isinstance(v, str):
+                for l in range(len(v)):
+                    le = v[l]
+                    if isinstance(le, PlumedGenericGroup):
+                        self.prereq.append(le)
+                        v[l] = le.label
+                self.args[k] = ",".join(v)
+
+    def __repr__(self):
+        r = ""
+
+        # Prerequisites (uniquely)
+        for p in sorted(set(self.prereq)):
+            r = r + str(p) + "\n"
+
+        # Label
+        r = r + self.label + ": " + self.cv + " "
+
+        # Code
+        if self.verbatim:
+            r = r + self.verbatim + " "
+
+        # Args
+        for k, v in sorted(self.args.items()):
+            if v == True:
+                r = r + k + " "
+            else:
+                r = r + k + "=" + str(v) + " "
+
+        return r.strip()
+
+
+class PlumedGenericGroup(PlumedStatement):
     """ Abstract class from which PLUMED groups are inherited. Do not use directly. """
 
     def __init__(self, mol, label, sel, type=""):
@@ -36,11 +124,8 @@ class PlumedGenericGroup(ABC):
         self.sel = sel
         self.code = "%s: %s ATOMS=%s" % (label, type, ",".join(map(str, al)))
 
-    def __str__(self):
-        return self.code
-
     def __repr__(self):
-        return self.__str__()
+        return self.code
 
 
 class PlumedGroup(PlumedGenericGroup):
@@ -89,6 +174,8 @@ class PlumedCOM(PlumedGenericGroup):
         return super(PlumedCOM, self).__init__(mol, label, sel, "COM")
 
 
+# Plumed projector --------------------------------------------------------
+
 class MetricPlumed2(Projection):
     """ Calculates generic collective variables through Plumed 2
 
@@ -119,8 +206,8 @@ class MetricPlumed2(Projection):
         self.cvnames = None
 
         try:
-            pp=_getPlumedPath()
-            logger.info("Plumed path is "+pp)
+            pp = _getPlumedPath()
+            logger.info("Plumed path is " + pp)
         except Exception as e:
             raise Exception("To use MetricPlumed2 please ensure PLUMED 2's executable is installed and in path")
 
@@ -231,6 +318,8 @@ class MetricPlumed2(Projection):
         return data
 
 
+# Test --------------------------------------------------------
+
 if __name__ == "__main__":
     import sys
     import numpy as np
@@ -244,6 +333,7 @@ if __name__ == "__main__":
         sys.exit()
 
     import doctest
+
     doctest.testmod()
 
     # One simulation

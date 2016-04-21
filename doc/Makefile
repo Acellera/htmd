@@ -5,7 +5,7 @@
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 SPHINXAPIDOC  = sphinx-apidoc
-IPYTHON       = ipython
+IPYTHON       = jupyter
 PAPER         =
 BUILDDIR      = build
 #BUILDDIR      = /shared/sdoerr/Work/docs.htmd.org/

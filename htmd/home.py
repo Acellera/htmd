@@ -18,6 +18,12 @@ def home(dataDir=None, libDir=False):
         If not None, return the path to a specific data directory
     libDir : bool
         If True, return path to the lib directory
+
+    Returns
+    -------
+    dir : str
+        The directory
+
     Example
     -------
         >>> htmd.home()                                 # doctest: +ELLIPSIS

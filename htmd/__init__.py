@@ -34,6 +34,8 @@ from htmd.builder.builder import detectDisulfideBonds, segmentgaps, autoSegment,
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
 from htmd.molecule.util import uniformRandomRotation
+from htmd.rotationmatrix import rotationMatrix
+from htmd.proteinpreparation.proteinpreparation import prepareProtein
 from htmd.dock import dock
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
