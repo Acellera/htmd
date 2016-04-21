@@ -8,14 +8,47 @@ from __future__ import print_function
 import numpy
 import numpy as np
 import logging
+import collections
 logger = logging.getLogger(__name__)
 
 
 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
+Pair = collections.namedtuple('Atom', 'resname name')
 
 
 class PDBParser:
-    def __init__(self, filename=None):
+    # The following is taken from MDAnalysis to align atom names based on the strict PDB formatting.
+    # Some programs like AutoDock require this strict formatting to guess atom types.
+
+    # These attributes are used to deduce how to format the atom name.
+    ions = ('FE', 'AS', 'ZN', 'MG', 'MN', 'CO', 'BR',
+            'CU', 'TA', 'MO', 'AL', 'BE', 'SE', 'PT',
+            'EU', 'NI', 'IR', 'RH', 'AU', 'GD', 'RU')
+    # Mercurial can be confused for hydrogen gamma. Yet, mercurial is
+    # rather rare in the PDB. Here are all the residues that contain
+    # mercurial.
+    special_hg = ('CMH', 'EMC', 'MBO', 'MMC', 'HGB', 'BE7', 'PMB')
+    # Chloride can be confused for a carbon. Here are the residues that
+    # contain chloride.
+    special_cl = ('0QE', 'CPT', 'DCE', 'EAA', 'IMN', 'OCZ', 'OMY', 'OMZ',
+                  'UN9', '1N1', '2T8', '393', '3MY', 'BMU', 'CLM', 'CP6',
+                  'DB8', 'DIF', 'EFZ', 'LUR', 'RDC', 'UCL', 'XMM', 'HLT',
+                  'IRE', 'LCP', 'PCI', 'VGH')
+    # In these pairs, the atom name is aligned on the first column
+    # (column 13).
+    include_pairs = (Pair('OEC', 'CA1'),
+                     Pair('PLL', 'PD'),
+                     Pair('OEX', 'CA1'))
+    # In these pairs, the atom name is aligned on the second column
+    # (column 14), but other rules would align them on the first column.
+    exclude_pairs = (Pair('C14', 'C14'), Pair('C15', 'C15'),
+                     Pair('F9F', 'F9F'), Pair('OAN', 'OAN'),
+                     Pair('BLM', 'NI'), Pair('BZG', 'CO'),
+                     Pair('BZG', 'NI'), Pair('VNL', 'CO1'),
+                     Pair('VNL', 'CO2'), Pair('PF5', 'FE1'),
+                     Pair('PF5', 'FE2'), Pair('UNL', 'UNL'))
+
+    def __init__(self, filename=None, mode='pdb'):
         self.record = []
         self.serial = []
         self.name = []
@@ -39,7 +72,7 @@ class PDBParser:
                            'insertion': 1, 'segid': 4, 'element': 2}
 
         if filename:
-            self.readPDB(filename)
+            self.readPDB(filename, mode)
 
     def checkTruncations(self):
         for f in self.fieldsizes:
@@ -65,13 +98,14 @@ class PDBParser:
             # print ( len(self.record) )
             # print ( self.coords[0].shape )
             for i in range(0, len(self.record)):
-                name = self.name[i]
+                name = self._deduce_PDB_atom_name(self.name[i], self.resname[i])
+
                 if self.serial[i] < 100000:
                     ser = str(int(self.serial[i]))
                 else:
                     ser = '*****'
 
-                print("{!s:6.6}{!s:>5.5} {!s:4.4}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  ".format(
+                print("{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  ".format(
                     self.record[i],
                     ser, name, self.altloc[i],
                     self.resname[i], self.chain[i],
@@ -108,7 +142,7 @@ class PDBParser:
 
         fh.close()
 
-    def readPDB(self, filename):
+    def readPDB(self, filename, mode='pdb'):
         self.box = numpy.zeros((3, 1))
         fh = open(filename, 'r')
         global_line_counter = 0
@@ -171,8 +205,17 @@ class PDBParser:
                 except:
                     bfactor = 0.0  # The PDB use a default of zero if the data is missing
 
-                segid = line[72:76].strip()
-                element = line[76:78].strip()
+                if mode == 'pdb':
+                    segid = line[72:76].strip()
+                    element = line[76:78].strip()
+                    charge = line[78:80].strip()
+                elif mode == 'pdbqt':
+                    segid = ''
+                    charge = line[70:76].strip()
+                    element = line[77:79].strip()
+
+                if len(charge) != 0:
+                    charge = float(charge)
 
                 self.name.append(name)
                 self.serial.append(serial_number)
@@ -185,6 +228,7 @@ class PDBParser:
                 self.beta.append(bfactor)
                 self.segid.append(segid)
                 self.element.append(element)
+                self.charge.append(charge)
                 if self.coords is None:
                     self.coords = [coord]
                 else:
@@ -287,5 +331,28 @@ class PDBParser:
             return ('%6.2f' % f)[:6]
         raise NameError('coordinate "%s" could not be represented '
                         'in a width-6 field' % f)
+
+    def _deduce_PDB_atom_name(self, name, resname):
+        """Deduce how the atom name should be aligned.
+        Atom name format can be deduced from the atom type, yet atom type is
+        not always available. This function uses the atom name and residue name
+        to deduce how the atom name should be formatted. The rules in use got
+        inferred from an analysis of the PDB. See gist at
+        <https://gist.github.com/jbarnoud/37a524330f29b5b7b096> for more
+        details.
+        """
+        if len(name) >= 4:
+            return name[:4]
+        elif len(name) == 1:
+            return ' {}  '.format(name)
+        elif ((resname == name
+               or name[:2] in self.ions
+               or name == 'UNK'
+               or (resname in self.special_hg and name[:2] == 'HG')
+               or (resname in self.special_cl and name[:2] == 'CL')
+               or Pair(resname, name) in self.include_pairs)
+              and Pair(resname, name) not in self.exclude_pairs):
+            return '{:<4}'.format(name)
+        return ' {:<3}'.format(name)
 
 # readPDB('test.pdb')
