@@ -94,6 +94,8 @@ class PlumedCV(PlumedStatement):
             # String is ok
             elif isinstance(v, str):
                 pass
+            elif isinstance(v, int):
+                self.args[k]=str(v)
             # Ditto if it is a list-like object, plus expand with commas
             elif hasattr(v, '__iter__'):
                 for l in range(len(v)):
@@ -107,6 +109,8 @@ class PlumedCV(PlumedStatement):
                         v[l] = tmpGrp.label
                     elif isinstance(le, str):
                         pass # already a string
+                    elif isinstance(le, int):
+                        v[l] = str(le)
                     else:
                         raise TypeError("Unexpected type passed at argument (list): " + k)
                 self.args[k] = ",".join(v)
