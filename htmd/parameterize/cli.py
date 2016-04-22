@@ -12,7 +12,7 @@ import htmd.parameterize
 from htmd.parameterize.configuration import Configuration
 from htmd.parameterize.command import Command
 
-from parameterize.parameterisation import Parameterisation
+from htmd.parameterize.parameterisation import Parameterisation
 import logging
 
 # from htmdx.cli import *
@@ -118,7 +118,7 @@ def main_parameterize():
     except NameError as e:
         if debug: raise
         syntax()
-        sys.exit(1)
+        sys.exit(0)
 
 
     if rename_file:
@@ -153,7 +153,7 @@ def main_parameterize():
     if input_file and not os.path.isfile(input_file):
         print("Input file not found")
         syntax()
-        sys.exit(1)
+        sys.exit(0)
 
     print("\n === Parameterise 2016 ===\n")
     print("      (c) Acellera " )
