@@ -3,6 +3,21 @@ echo "building"
 export PATH=$PATH:/usr/bin/:/bin/
 printenv
 
+# Compile any C code
+
+if [ "$CC" == "" ]; then
+ CC="g++"
+fi
+if [ "$FC" == "" ]; then
+ FC="gfortran"
+fi
+
+T="$PWD"
+for S in "$PWD/C/"*; do
+	cd "$S"
+	make CC=$CC FC=$FC
+	cd "$T"
+done
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
