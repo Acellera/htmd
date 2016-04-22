@@ -5,12 +5,6 @@ printenv
 
 # Compile any C code
 
-if [ "$CC" == "" ]; then
- CC="g++"
-fi
-if [ "$FC" == "" ]; then
- FC="gfortran"
-fi
 
 T="$PWD"
 for S in "$PWD/C/"*; do
