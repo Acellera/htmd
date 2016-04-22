@@ -450,13 +450,14 @@ class Molecule:
         map = np.ones(self.numAtoms, dtype=int)
         map[idx] = -1
         map[map == 1] = np.arange(self.numAtoms - len(idx))
-        self.bonds[:, 0] = map[self.bonds[:, 0]]
-        self.bonds[:, 1] = map[self.bonds[:, 1]]
-        remA = self.bonds[:, 0] == -1
-        remB = self.bonds[:, 1] == -1
+        bonds = np.array(self.bonds, dtype=np.int32)  # Have to store in temp because bonds is uint and can't accept -1 values
+        bonds[:, 0] = map[self.bonds[:, 0]]
+        bonds[:, 1] = map[self.bonds[:, 1]]
+        remA = bonds[:, 0] == -1
+        remB = bonds[:, 1] == -1
         stays = np.invert(remA | remB)
         # Delete bonds between non-existant atoms
-        self.bonds = self.bonds[stays, :]
+        self.bonds = bonds[stays, :]
 
     def guessBonds(self):
         """ Tries to guess the bonds in the Molecule
@@ -992,7 +993,8 @@ class Molecule:
         """
         s = self.atomselect(sel, strict=True)
         # Changed the selection from "and sidechain" to "not backbone" to remove atoms like phosphates which are bonded
-        # but not part of the sidechain
+        # but not part of the sidechain. Changed again the selection to "name C CA N O" because "backbone" works for
+        # both protein and nucleic acid backbones and it confuses phosphates of modified residues for nucleic backbones.
         removed = self.remove(sel + ' and not name C CA N O', _logger=False)
         s = np.delete(s, removed)
         self.set('resname', newres, sel=s)
