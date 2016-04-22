@@ -1,8 +1,8 @@
-CC := g++ -static
-FC := gfortran -static
+CC := $(CC) -static
+FC := $(FC) -static
 
 TIMEBOMB := -DTIMEBOMB=1 -DCDATE=$(shell date +%s)
-CFLAGS := -g -Wno-format-zero-length -Wno-unused-but-set-variable -Wno-unused-variable -Wno-write-strings -Wall -fopenmp #-fsanitize=address 
+CFLAGS := -g -Wno-format-zero-length -Wno-unused-but-set-variable -Wno-unused-variable -Wno-write-strings -Wall #-fsanitize=address 
 LDFLAGS:= -Lnlopt/lib -lnlopt
 
 NLOPT  := nlopt/lib/libnlopt.a
