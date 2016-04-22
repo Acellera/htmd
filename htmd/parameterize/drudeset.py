@@ -1,5 +1,5 @@
 
-from parameterize.step import Step, ScriptStep, StepSet
+from htmd.parameterize.step import Step, ScriptStep, StepSet
 
 class DrudeSet(StepSet):
     def __init__(self):

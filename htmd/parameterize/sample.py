@@ -163,7 +163,7 @@ def sample_main():
 def testfile( filename ):
    if( not os.access( filename, os.R_OK ) ):
      print("Cannot access file ["+filename+"]" );
-     sys.exit(1)
+     sys.exit(0)
 
 if __name__ == "__main__":
   sample_main()

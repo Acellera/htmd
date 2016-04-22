@@ -8,9 +8,9 @@ import shutil
 import argparse
 import re
 import sys
-import parameterize
-from parameterize.configuration import Configuration
-from parameterize.command import Command
+import htmd.parameterize
+from htmd.parameterize.configuration import Configuration
+from htmd.parameterize.command import Command
 
 from parameterize.parameterisation import Parameterisation
 import logging

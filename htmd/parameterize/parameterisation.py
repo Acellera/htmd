@@ -10,7 +10,7 @@ from htmd.parameterize.match    import MatchSet
 from htmd.parameterize.configuration import Configuration
 import shutil
 import inspect
-import parameterize
+import htmd.parameterize
 import subprocess
 import sys
 from htmd.progress.progress import ProgressBar

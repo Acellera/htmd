@@ -1,4 +1,4 @@
-from parameterize.command import Command
+from htmd.parameterize.command import Command
 from difflib import get_close_matches
 import re
 import os
