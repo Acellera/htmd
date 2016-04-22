@@ -105,7 +105,7 @@ class PDBParser:
                 else:
                     ser = '*****'
 
-                print("{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  ".format(
+                print("{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  ".format(
                     self.record[i],
                     ser, name, self.altloc[i],
                     self.resname[i], self.chain[i],
