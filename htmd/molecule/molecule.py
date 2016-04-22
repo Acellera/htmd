@@ -993,7 +993,7 @@ class Molecule:
         s = self.atomselect(sel, strict=True)
         # Changed the selection from "and sidechain" to "not backbone" to remove atoms like phosphates which are bonded
         # but not part of the sidechain
-        removed = self.remove(sel + ' and not backbone', _logger=False)
+        removed = self.remove(sel + ' and not name C CA N O', _logger=False)
         s = np.delete(s, removed)
         self.set('resname', newres, sel=s)
 
