@@ -4,10 +4,12 @@
 # No redistribution in whole or part
 #
 import numpy as np
-from math import cos,sqrt,sin
+from math import cos, sqrt, sin
+import logging
+logger = logging.getLogger(__name__)
 
 
-def rotationmatrix(axis, theta):
+def rotationMatrix(axis, theta):
     """
     Return the rotation matrix associated with counterclockwise rotation about
     the given axis by theta radians.
@@ -24,8 +26,14 @@ def rotationmatrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
+def rotationmatrix(axis, theta):
+    logger.warning('The rotationmatrix method is deprecated. '
+                   'It has been renamed to rotationMatrix to follow the naming style. Please change all uses.')
+    return rotationMatrix(axis, theta)
+
+
 if __name__ == '__main__':
     v = [3.0, 5., 0.]
     axis = [4.0, 4., 1.]
     theta = 1.2
-    print(np.dot(rotationmatrix(axis, theta), v))
+    print(np.dot(rotationMatrix(axis, theta), v))

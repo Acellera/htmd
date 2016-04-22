@@ -5,14 +5,14 @@
 #
 import os
 
-import htmd.lib
+import htmd.home
 from htmd.molecule.support import *
 
 
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
     import platform
-    libdir = htmd.lib.path()
+    libdir = htmd.home(libDir=True)
 
     if coordinates.ndim == 2:
         coordinates = numpy.atleast_3d(coordinates)
@@ -170,7 +170,7 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
     if len(resid) != natoms:
         raise NameError("'resid' not natoms in length")
 
-    libdir = htmd.lib.path()
+    libdir = htmd.home(libDir=True)
 
     parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 

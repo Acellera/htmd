@@ -6,11 +6,12 @@
 from htmd.molecule.molecule import Molecule
 from htmd.userinterface import UserInterface
 from htmd.acemd.acemd import Acemd
+from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 import os
 import numpy as np
 
 
-class Equilibration(UserInterface):
+class Equilibration(ProtocolInterface):
     """ Equilibration protocol
 
         Equilibration protocol for globular and membrane proteins
@@ -19,26 +20,22 @@ class Equilibration(UserInterface):
 
         Parameters
         ----------
-        numsteps: int
+        numsteps : int, default=0
             Number of steps to run the simulations in units of 4fs
-        temperature: float
+        temperature : float, default=300
             Temperature of the thermostat in Kelvin
-        useconstantratio: bool
-            For membrane protein simulations set it to true so that the barostat
-            does not modify the xy aspect ratio. Default 0
-        k: float
+        k : float, default=0
             Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5
-        reference: str
+        reference : str, default='none'
             Reference selection to use as dynamic center of the flatbottom box.
-        selection: str
+        selection : str, default='none'
             Selection of atoms to apply the flatbottom potential
-        box: str
-            Position of the flatbottom box in term of the reference center given as
-            [xmin, xmax, ymin, ymax, zmin, zmax]
-        inputdir: str
-            Input directory where to find the simulation files
-        outputdir: str
-            Output directory to create with the simulation ready to run
+        box : list, default=[0, 0, 0, 0, 0, 0]
+            Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]
+        useconstantratio : bool, default=False
+            For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
+        constraints : dict, default={'protein and noh and not name CA': 0.1, 'protein and name CA': 1}
+            A dictionary containing as keys the atomselections of the constraints and as values the constraint scaling factor. 0 factor means no constraint, 1 full constraints and in between values are used for scaling. The order with which the constraints are applied is random, so make atomselects mutually exclusive to be sure you get the correct constraints.
 
         Example
         -------
@@ -55,12 +52,21 @@ class Equilibration(UserInterface):
         >>> md.write('./build','./equil')
     """
     def __init__(self):
-        self._commands = {'acemd': None, 'numsteps': 0, 'temperature': 300, 'k': 0, 'reference': 'none',
-                          'selection': 'none', 'box': [0,0,0,0,0,0], 'useconstantratio': False, 'constraints': None}
-        for k in self._commands:
-            self.__dict__[k] = self._commands[k]
-
-        self.constraints = {'protein and noh and not name CA': 0.1, 'protein and name CA': 1}
+        super().__init__()
+        self._cmdObject('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Acemd)
+        self._cmdValue('numsteps', 'int', 'Number of steps to run the simulations in units of 4fs', 0, TYPE_INT, RANGE_0POS)
+        self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
+        self._cmdValue('k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0, TYPE_FLOAT, RANGE_ANY)
+        self._cmdString('reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.', 'none')
+        self._cmdString('selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none')
+        self._cmdList('box', 'list', 'Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]', [0,0,0,0,0,0])
+        self._cmdBoolean('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False)
+        self._cmdDict('constraints', 'dict', 'A dictionary containing as keys the atomselections of the constraints '
+                                             'and as values the constraint scaling factor. 0 factor means no constraint'
+                                             ', 1 full constraints and in between values are used for scaling.'
+                                             ' The order with which the constraints are applied is random, so make '
+                                             'atomselects mutually exclusive to be sure you get the correct constraints.'
+                                             , {'protein and noh and not name CA': 0.1, 'protein and name CA': 1})
 
         self.acemd = Acemd()
         self.acemd.coordinates = 'structure.pdb'
@@ -121,7 +127,7 @@ proc calcforces_init {} {
   set sel [addgroup  $selindex]
 }
 proc calcforces {} {
-  global ref sel numsteps K box 
+  global ref sel numsteps K box
   loadcoords coords
 ##FLATBOTTOM
   if {$K>0} {
@@ -148,7 +154,7 @@ proc calcforces {} {
 proc calcforces_endstep { } { }
 '''
 
-    def write(self, inputdir=None, outputdir=None):
+    def write(self, inputdir, outputdir):
         """ Write the equilibration protocol
 
         Writes the equilibration protocol and files into a folder for execution
@@ -180,7 +186,7 @@ proc calcforces_endstep { } { }
             if coords.size == 0:  # It's a vacuum simulation
                 coords = inmol.get('coords', sel='all')
                 dim = np.max(coords, axis=0) - np.min(coords, axis=0)
-                dim = dim + 12. 
+                dim = dim + 12.
             else:
                 dim = np.max(coords, axis=0) - np.min(coords, axis=0)
             self.acemd.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
@@ -189,49 +195,15 @@ proc calcforces_endstep { } { }
         self.acemd.setup(inputdir, outputdir, overwrite=True)
 
         # Adding constraints
-        pdbfile = os.path.join(outputdir, self.acemd.coordinates)
-        mol = Molecule(pdbfile)
-        mol.set('occupancy', 0)
-        mol.set('beta', 0)
+        inmol.set('occupancy', 0)
+        inmol.set('beta', 0)
         for sel in self.constraints:
-            mol.set('beta', self.constraints[sel], sel)
-        mol.write(pdbfile)
-
-    def getConstraints(self):
-        """ Get the currently applied constraints
-
-        Returns
-        -------
-        constraints : dict
-            A dictionary containing as keys the atomselections of the constraints and as values the constraint scaling
-            factor. 0 scaling means no constraint, 1 full constraints and in between values are used for scaling.
-        """
-        return self.constraints
-
-    def setConstraints(self, constraints):
-        """ Set equilibration constraints
-
-        Overwrites all existing constraints with your own dictionary of constraints.
-
-        Parameters
-        ----------
-        constraints : dict
-            A dictionary containing as keys the atomselections of the constraints and as values the constraint scaling
-            factor. 0 scaling means no constraint, 1 full constraints and in between values are used for scaling.
-
-        Example
-        -------
-        >>> # The order with which the constraints are written is random.
-        >>> # So if you do:
-        >>> eq.setConstraints({'protein and noh': 0.1, 'protein and name CA': 1})
-        >>> # The CA's might get factor 0.1 because of the first constraint being applied after the second.
-        >>> # So make atomselects mutually exclusive to be sure you get the correct constraints:
-        >>> eq.setConstraints({'protein and noh and not name CA': 0.1, 'protein and name CA': 1})
-        """
-        self.constraints = constraints
+            inmol.set('beta', self.constraints[sel], sel)
+        outfile = os.path.join(outputdir, self.acemd.coordinates)
+        inmol.write(outfile)
 
     def addConstraint(self, atomselect, factor=1):
-        """ Add a new constraint to existing constraints
+        """ Convenience function for adding a new constraint to existing constraints.
 
         Parameters
         ----------

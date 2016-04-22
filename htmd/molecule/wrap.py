@@ -8,7 +8,7 @@ from ctypes import *
 
 import numpy
 
-import htmd.lib
+import htmd.home
 
 
 def wrap( coordinates, bonds, box ):
@@ -28,7 +28,7 @@ def wrap( coordinates, bonds, box ):
     """
 
     import platform
-    libdir = htmd.lib.path()
+    libdir = htmd.home(libDir=True)
 
     if coordinates.ndim == 2:
         c = coordinates.shape

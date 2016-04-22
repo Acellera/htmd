@@ -7,7 +7,7 @@ import os
 
 import numpy as np
 
-import htmd.lib
+import htmd.home
 from htmd.molecule.support import *
 
 
@@ -34,7 +34,7 @@ class __xtc(Structure):
 
 def xtc_lib():
     lib = {}
-    libdir = htmd.lib.path()
+    libdir = htmd.home(libDir=True)
 
     import platform
     if platform.system() == "Windows":
@@ -42,9 +42,9 @@ def xtc_lib():
         cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
         if os.path.exists(os.path.join(libdir, "psprolib.dll")):
             cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
-
     else:
-        lib['libc'] = cdll.LoadLibrary("libc.so.6")
+        # lib['libc'] = cdll.LoadLibrary("libc.so.6")
+        lib['libc'] = cdll.LoadLibrary("libc.{}".format("so.6" if platform.uname()[0] != "Darwin" else "dylib"))
 
     lib['libxtc'] = cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
     return lib

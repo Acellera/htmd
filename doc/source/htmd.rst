@@ -13,6 +13,7 @@ Subpackages
     htmd.molecule
     htmd.progress
     htmd.projections
+    htmd.proteinpreparation
     htmd.protocols
 
 Submodules
@@ -20,14 +21,12 @@ Submodules
 
 .. toctree::
 
-   htmd.commandclass
    htmd.config
    htmd.dock
    htmd.home
    htmd.kinetics
    htmd.kineticshmm
    htmd.latest
-   htmd.log
    htmd.metricdata
    htmd.model
    htmd.modelhmm

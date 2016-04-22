@@ -4,7 +4,7 @@ import numpy as np
 from htmd.molecule.molecule import Molecule
 
 
-def loopmodeller(mol, segid, seq, startresid, movstart=None, movend=None, modellerexe='/shared/sdoerr/Software/modeller-9.16/build/bin/mod9.16'):
+def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modellerexe='/shared/sdoerr/Software/modeller-9.16/build/bin/mod9.16'):
     """ Uses the Modeller software to predict missing loops in a Molecule.
 
     Parameters
@@ -31,7 +31,7 @@ def loopmodeller(mol, segid, seq, startresid, movstart=None, movend=None, modell
 
     Examples
     --------
-    >>> newmol = loopmodeller(mol, 'B', 'MLSGSK', 263)
+    >>> newmol = loopModeller(mol, 'B', 'MLSGSK', 263)
     """
     if movstart is None:
         movstart = startresid

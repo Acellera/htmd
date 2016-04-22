@@ -37,8 +37,8 @@ import time
 import datetime
 import locale
 from itertools import cycle
-from .misc import terminal_width
-from .gui import show_progressbar, hide_progressbar
+from htmd.progress.misc import terminal_width
+from htmd.progress.gui import show_progressbar, hide_progressbar
 import threading
 import time
 

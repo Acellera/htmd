@@ -132,12 +132,19 @@ def detectDisulfideBonds(mol, thresh=3):
     return disubonds
 
 
+# TODO: Remove in upcoming versions
 def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
+    logger.warning('segmentgaps will be deprecated in next versions of HTMD. '
+                   'It is replaced by autoSegment to reflect the usage rather than the underlying method. '
+                   'Please change all usages.')
+    return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
+
+
+def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     """ Detects resid gaps in a selection and assigns incrementing segid to each fragment
 
-    !!!WARNING!!! If you want to use selections like protein or fragment,
-    use this function on a pure protein Molecule, otherwise the protein
-    selection will fail.
+    !!!WARNING!!! If you want to use atom selections like 'protein' or 'fragment',
+    use this function on a Molecule containing only protein atoms, otherwise the protein selection can fail.
 
     Parameters
     ----------
@@ -159,41 +166,164 @@ def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
 
     Example
     -------
-    >>> segmentgaps(mol,'chain B','P')
+    >>> newmol = autoSegment(mol,'chain B','P')
     """
     mol = mol.copy()
 
     idx = mol.atomselect(sel, indexes=True)
     rid = mol.get('resid', sel)  # TODO:maybe easier without sel, rid = mol.get('resid') and then no need of idx
+    idxdiff = np.diff(idx)
     residiff = np.diff(rid)
-    gappos = idx[np.where((residiff != 1) & (residiff != 0))[0]]
+    gappos = np.where((residiff != 1) & (residiff != 0))[0]  # Points to the index before the gap!
+
+    idxstartseg = [idx[0]] + idx[gappos + 1].tolist()
+    idxendseg = idx[gappos].tolist() + [idx[-1]]
+
+    mol.set('segid', basename, sel)
 
     if len(gappos) == 0:
         return mol
 
-    gaps = np.array([idx[0]-1] + idx[gappos].tolist() + [idx[-1]])
-    mol.set('segid', '', sel)
-
     if spatial:
+        residbackup = mol.get('resid')
+        mol.set('resid', sequenceID(mol.resid))  # Assigning unique resids to be able to do the distance selection
+
         todelete = []
-        for i in range(1, len(gaps)-1):
-            gapidx = gaps[i]
-            coords = mol.get('coords', sel='resid "{}" "{}" and name CA'.format(mol.resid[gapidx], mol.resid[gapidx+1]))
+        i = 0
+        for s, e in zip(idxstartseg[1:], idxendseg[:-1]):
+            coords = mol.get('coords', sel='resid "{}" "{}" and name CA'.format(mol.resid[e], mol.resid[s]))
             if np.shape(coords) == (2, 3):
                 dist = np.sqrt(np.sum((coords[0, :] - coords[1, :]) ** 2))
                 if dist < spatialgap:
                     todelete.append(i)
-        gaps = np.delete(gaps, todelete)
+            i += 1
+        # Join the non-real gaps into segments
+        idxstartseg = np.delete(idxstartseg, np.array(todelete)+1)
+        idxendseg = np.delete(idxendseg, todelete)
 
-    start = gaps[0]+1
-    for i in range(len(gaps) - 1):
-        stop = gaps[i+1]
+        mol.set('resid', residbackup)  # Restoring the original resids
+
+    i = 0
+    for s, e in zip(idxstartseg, idxendseg):
         newsegid = basename + str(i)
-        logger.info('Created segment {} between resid {} and {}.'.format(newsegid, mol.resid[start], mol.resid[stop]))
-        mol.segid[start:stop+1] = newsegid
-        start = stop + 1
+        if np.any(mol.segid == newsegid):
+            raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(newsegid))
+        logger.info('Created segment {} between resid {} and {}.'.format(newsegid, mol.resid[s], mol.resid[e]))
+        mol.segid[s:e+1] = newsegid
+        i += 1
 
     return mol
+
+
+def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
+    """ Calculates the convex hull of the protein. If a lipid lies inside the hull it gets removed.
+
+    This does not work well for lipids crossing out of the hull. If even one atom of the lipid is outside it will
+    change the hull and will not get removed. I assume it will get removed by the clashes with the protein though.
+    """
+    # TODO: Do the same with Morphological Snakes
+    from scipy.spatial import ConvexHull
+    memb = memb.copy()
+
+    # Convex hull of the protein
+    cacoords = prot.get('coords', 'name CA')
+    hull = ConvexHull(cacoords)
+
+    sequence = sequenceID((memb.resid, memb.segid))
+    uqres = np.unique(sequence)
+
+    toremove = np.zeros(len(sequence), dtype=bool)
+    numlipsrem = 0
+    for res in uqres:  # For each lipid check if it's atoms lie within the convex hull
+        atoms = np.where(sequence == res)[0]
+        newhull = ConvexHull(np.append(cacoords, np.squeeze(memb.coords[atoms, :, :]), axis=0))
+
+        # If the hull didn't change by adding the lipid, it lies within convex hull. Remove it.
+        if list(hull.vertices) == list(newhull.vertices):
+            toremove[atoms] = True
+            numlipsrem += 1
+
+    lipids = memb.atomselect(lipidsel)  # Only remove lipids, waters are ok
+    memb.remove(toremove & lipids)
+    return memb, numlipsrem
+
+
+def removeHET(prot):
+    prot = prot.copy()
+    hetatoms = np.unique(prot.resname[prot.record == 'HETATM'])
+    for het in hetatoms:
+        logger.info('Found resname ''{}'' in structure. Removed assuming it is a bound ligand.'.format(het))
+        prot.remove('resname {}'.format(het))
+    return prot
+
+
+def tileMembrane(memb, xmin, ymin, xmax, ymax):
+    """ Tile the membrane in the X and Y dimensions to reach a specific size.
+    Returns
+    -------
+    megamemb :
+        A big membrane Molecule
+    """
+    from htmd.progress.progress import ProgressBar
+    memb = memb.copy()
+    memb.resid = sequenceID(memb.resid)
+
+    minmemb = np.min(memb.get('coords', 'water'), axis=0).flatten()
+
+    size = np.max(memb.get('coords', 'water'), axis=0) - np.min(memb.get('coords', 'water'), axis=0)
+    size = size.flatten()
+    xreps = int(np.ceil((xmax - xmin) / size[0]))
+    yreps = int(np.ceil((ymax - ymin) / size[1]))
+
+    logger.info('Replicating Membrane {}x{}'.format(xreps, yreps))
+
+    from htmd.molecule.molecule import Molecule
+    megamemb = Molecule()
+    bar = ProgressBar(xreps * yreps, description='Replicating Membrane')
+    k = 0
+    for x in range(xreps):
+        for y in range(yreps):
+            tmpmemb = memb.copy()
+            xpos = xmin + x * size[0]
+            ypos = ymin + y * size[1]
+
+            tmpmemb.moveBy([-float(minmemb[0]) + xpos, -float(minmemb[1]) + ypos, 0])
+            sel = 'same resid as (x > {} or y > {})'.format(xmax, ymax)
+            tmpmemb.remove(sel, _logger=False)
+            tmpmemb.set('segid', 'M{}'.format(k))
+
+            megamemb.append(tmpmemb)
+            k += 1
+            bar.progress()
+    bar.stop()
+    return megamemb
+
+
+def minimalRotation(prot):
+    """ Find the rotation around Z that minimizes the X and Y dimensions of the protein to best fit in a box.
+
+    Essentially PCA in 2D
+    """
+    from numpy.linalg import eig
+    from numpy import cov
+
+    xycoords = prot.coords[:, 0:2]
+
+    c = cov(np.transpose(np.squeeze(xycoords)))
+    values, vectors = eig(c)
+    idx = np.argsort(values)
+
+    xa = vectors[0, idx[-1]]
+    ya = vectors[1, idx[-1]]
+
+    def cart2pol(x, y):
+        # Cartesian to polar coordinates. Rho is the rotation angle
+        rho = np.sqrt(x ** 2 + y ** 2)
+        phi = np.arctan2(y, x)
+        return rho, phi
+
+    angle, _ = cart2pol(xa, ya)
+    return angle + np.radians(45)
 
 
 if __name__ == "__main__":
@@ -202,18 +332,18 @@ if __name__ == "__main__":
 
     p = Molecule(path.join(home(), 'data', 'building-protein-membrane', '4dkl.pdb'))
     p.filter('(chain B and protein) or water')
-    p = segmentgaps(p, 'protein', 'P')
+    p = autoSegment(p, 'protein', 'P')
     m = Molecule(path.join(home(), 'data', 'building-protein-membrane', 'membrane.pdb'))
     a = embed(p, m)
     print(np.unique(m.get('segid')))
 
     mol = Molecule('1ITG')
     ref = Molecule(path.join(home(), 'data', 'building-protein-membrane', '1ITG.pdb'))
-    mol = segmentgaps(mol, sel='protein')
+    mol = autoSegment(mol, sel='protein')
     assert np.all(mol.segid == ref.segid)
 
     mol = Molecule('3PTB')
     ref = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB.pdb'))
-    mol = segmentgaps(mol, sel='protein')
+    mol = autoSegment(mol, sel='protein')
     assert np.all(mol.segid == ref.segid)
 

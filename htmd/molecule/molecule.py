@@ -40,7 +40,7 @@ class Molecule:
 
     Examples
     --------
-    >>> mol = Molecule( './test/data/dhfr/dhfr.pdb' )
+    >>> mol = Molecule( './test/data/dhfr/dhfr.pdb' )  # doctest: +SKIP
     >>> mol = Molecule( '3PTB', name='Trypsin' )
 
     Properties
@@ -589,6 +589,8 @@ class Molecule:
             self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
+        elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
+            self._readPDB(filename, mode='pdbqt')
         elif (type is None and firstfile.endswith(".xtc")) or type == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
         elif (type is None and firstfile.endswith(".coor")) or type == "coor":
@@ -675,17 +677,17 @@ class Molecule:
             self.coords[idx, 2, nf] = float(s[3])
             self.resname[idx] = "MOL"
 
-    def _readPDB(self, filename):
+    def _readPDB(self, filename, mode='pdb'):
         mol = []
         if os.path.isfile(filename):
-            mol = PDBParser(filename)
+            mol = PDBParser(filename, mode)
         elif len(filename) == 4:
             # Try loading it from the PDB website
             r = requests.get(
                 "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
             if r.status_code == 200:
                 tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                mol = PDBParser(tempfile)
+                mol = PDBParser(tempfile, mode)
                 os.unlink(tempfile)
             else:
                 raise NameError('Invalid PDB code')
@@ -1154,7 +1156,26 @@ class Molecule:
         self.coords = np.zeros((numAtoms, 3, 1), dtype=self._pdb_fields['coords'])
         self.serial = np.arange(1, numAtoms+1)
 
+
     def sequence(self, oneletter=True):
+        """ Return the AA sequence of the Molecule.
+
+        Parameters
+        ----------
+        oneletter : bool
+            Whether to return one-letter or three-letter AA codes. There should be only one atom per residue.
+
+        Returns
+        -------
+        sequence : str
+            The primary sequence as a string
+
+        Examples
+        --------
+        >>> m=Molecule("3PTB"); m.filter("protein")
+        >>> m.sequence()
+        {'0': 'IVGGYTCGANTVPYQVSLNSGYHFCGGSLINSQWVVSAAHCYKSGIQVRLGEDNINVVEGNEQFISASKSIVHPSYNSNTLNNDIMLIKLKSAASLNSRVASISLPTSCASAGTQCLISGWGNTKSSGTSYPDVLKCLKAPILSDSSCKSAYPGQITSNMFCAGYLEGGKDSCQGDSGGPVVCSGKLQGIVSWGSGCAQKNKPGVYTKVCNYVSWIKQTIASN'}
+        """
         residues = {'ARG': 'R', 'AR0': 'R',
                     'HIS': 'H', 'HID': 'H', 'HIE': 'H',
                     'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
@@ -1179,7 +1200,7 @@ class Molecule:
         from htmd.builder.builder import sequenceID
         prot = self.atomselect('protein')
         segs = np.unique(self.segid[prot])
-        increm = sequenceID((self.resid, self.chain))
+        increm = sequenceID((self.resid, self.insertion, self.chain))
         sequence = {}
         olsequence = {}
         for seg in segs:
@@ -1291,9 +1312,11 @@ class Representations:
 
     Examples
     --------
+    >>> from htmd.molecule.molecule import Molecule
     >>> mol = Molecule('3PTB')
     >>> mol.reps.add('protein', 'NewCartoon')
-    >>> print(mol.reps)
+    >>> print(mol.reps)                     # doctest: +NORMALIZE_WHITESPACE
+    rep 0: sel='protein', style='NewCartoon', color='Name'
     >>> mol.view()
     >>> mol.reps.remove()
     """
@@ -1535,6 +1558,9 @@ class _Representation:
 
 
 if __name__ == "__main__":
+    from htmd.molecule.molecule import Molecule
+    from htmd.molecule.molecule import _Representation
+
     mol = Molecule('3PTB')
     a = mol.get('resid', sel='resname TRP')
     a = mol.get('coords')
@@ -1546,4 +1572,6 @@ if __name__ == "__main__":
     mol.rotate([1, 0, 0], pi / 2)
     mol.align('name CA')
 
+    import doctest
+    doctest.testmod(globs={'mol': mol})
     # test rotate
