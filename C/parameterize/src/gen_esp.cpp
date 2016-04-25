@@ -487,7 +487,7 @@ void Generate_CGrid_Input( int prepareonly )
 	char szExeCGrid[256], szCmd[256], szCGridOutput[]="pgrid.xyz";
 	char szGjf_ESP[256], szESP_Gaussian_Output[256]="qm/mol-cgrid.out", ErrorMsg[256];
 
-	mkdir( "qm", 0700 );
+	make_directory( "qm", 0700 );
 
 	fOut = fopen(szGjf_CGrid, "w");
 	fprintf(fOut, "%s", szQM_Level_ESP_Cmd);

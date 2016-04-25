@@ -18,6 +18,9 @@ if [ "$CROSS_COMPILE" == "1" ]; then
   LD=x86_64-w64-mingw32-ld
   RANLIB=x86_64-w64-mingw32-ranlib
   NM=x86_64-w64-mingw32-nm
+  CXX=x86_64-w64-mingw32-g++
+  CC=x86_64-w64-mingw32-gcc
+  FC=x86_64-w64-mingw32-gfortran
 fi
 echo "HOST=$HOST"
 

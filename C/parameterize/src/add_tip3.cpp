@@ -2,11 +2,11 @@
 /* Licensed under GPL version 2  */
 /* Modifications by Acellera Ltd */
 
+#include "ff.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "ff.h"
 #define MAX_LINE	(2048)
 #define MAX_LEN		(256)
 

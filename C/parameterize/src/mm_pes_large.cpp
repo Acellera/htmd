@@ -157,7 +157,7 @@ int main(int argc, char **argv)
 	MPI_Comm_size(MPI_COMM_WORLD, &nProc);
 */
 	if(ProgID == 0)	{
-		system("mkdir opt-pdb");
+		system("make_directory opt-pdb");
 	}
 
 	sprintf(szName, "mm-pes-id-%d.dat", ProgID);

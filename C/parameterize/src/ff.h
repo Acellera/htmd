@@ -1,4 +1,13 @@
 //#define MD_COULOMB  (332.0636)	//(in NAMD)
+
+#include "stdio.h"
+
+#ifdef __linux__
+#define make_directory(a,b) mkdir((a),(b))
+#else
+#define make_directory(a,b) mkdir((a))
+#endif
+
 #define MD_COULOMB  (332.0716)	//(in CHARMM)
 #define K_DRUDE		(500.0)
 

@@ -389,7 +389,7 @@ void Gen_QM_Rotamer_Data(void)
 		Mol.ReadXYZ(szName);
 		
 		sprintf(szNewDir, "%s/rotamer-%d", szCurDir, i+1);
-		sprintf(szCmd, "mkdir rotamer-%d", i+1);
+		sprintf(szCmd, "make_directory rotamer-%d", i+1);
 		system(szCmd);
 		chdir(szNewDir);
 		Output_Gaussian_File();

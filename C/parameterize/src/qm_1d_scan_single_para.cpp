@@ -235,7 +235,7 @@ void Output_Gaussian_File(void)
 		Mol.Edit_Dihedral(IdxDihSelect[Active_Phi], Phi_QM_Start[IdxScan]);
 
 		sprintf(dirname, "qm-1d-phi-%02d-%02d", Active_Phi+1, IdxScan+1);
-		mkdir( dirname, 0700 );
+		make_directory( dirname, 0700 );
 		sprintf(szNameGjf, "%s/qm.gjf", dirname );
 		fOut = fopen(szNameGjf, "w");
 		fprintf(fOut, "%s", szQM_Level_1D_Scan_Cmd);

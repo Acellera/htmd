@@ -349,8 +349,8 @@ void Get_E_Mol_Water_Far_QM_prepare()
 
 	unlink( szFileEnergy );
 
-	mkdir( "single-mol", 0700 );
-	mkdir( "single-wat", 0700 );
+	make_directory( "single-mol", 0700 );
+	make_directory( "single-wat", 0700 );
 
 	fOut = fopen(szName_Gaussian_Single_Mol, "w");
 	fprintf(fOut, "%s", szQM_Level_Int_E_Single_Mol_Cmd);

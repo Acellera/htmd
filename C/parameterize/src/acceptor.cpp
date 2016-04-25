@@ -361,7 +361,7 @@ int main(int argc, char *argv[])
 			x_Dummy_2_Org = x_Dummy_2;	y_Dummy_2_Org = y_Dummy_2;	z_Dummy_2_Org = z_Dummy_2;
 
 			sprintf(szWorkDir, "%s/dat-acceptor-%d-%d", szCurDir, Idx_Acceptor+1, ActiveAtom+1);
-			mkdir( szWorkDir, 0700 );
+			make_directory( szWorkDir, 0700 );
 			chdir(szWorkDir);
 
 			E_Min_MM = 1.0E100;
@@ -448,7 +448,7 @@ int main(int argc, char *argv[])
 			fflush(fOut);
 
 			sprintf(szWorkDir, "%s/dat-acceptor-%d-%d/QM", szCurDir, Idx_Acceptor+1, ActiveAtom+1);
-			mkdir( szWorkDir, 0700 );
+			make_directory( szWorkDir, 0700 );
 			chdir(szWorkDir);
 
 

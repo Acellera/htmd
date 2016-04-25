@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
 				
 				//				sprintf(szWorkDir, "%s/dat-donor-%d-%d", szCurDir, Idx_Donor+1, ActiveAtom+1);
 				sprintf(szWorkDir, "%s/dat-donor-%d-%d", szCurDir, Idx_Donor+1, ActiveHAtom+1);
-				mkdir( szWorkDir, 0700 );
+				make_directory( szWorkDir, 0700 );
 				chdir(szWorkDir);
 				
 				E_Min_MM = 1.0E100;
@@ -387,7 +387,7 @@ int main(int argc, char *argv[])
 				
 				sprintf(szWorkDir, "%s/dat-donor-%d-%d/QM", szCurDir, Idx_Donor+1, ActiveHAtom+1);
         printf("Making [%s]\n", szWorkDir );
-				mkdir( szWorkDir, 0700 );
+				make_directory( szWorkDir, 0700 );
 				chdir(szWorkDir);
 				
 				szDirList[nJob] = strdup( szWorkDir);
