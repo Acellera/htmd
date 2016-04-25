@@ -2,10 +2,14 @@
 
 #include "stdio.h"
 
-#ifdef __linux__
+#ifdef __linux__ 
 #define make_directory(a,b) mkdir((a),(b))
 #else
 #define make_directory(a,b) mkdir((a))
+#endif
+
+#ifdef __APPLE__
+#define make_directory(a,b) mkdir((a),(b))
 #endif
 
 #define MD_COULOMB  (332.0716)	//(in CHARMM)
