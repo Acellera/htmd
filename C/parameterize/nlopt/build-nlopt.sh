@@ -14,10 +14,10 @@ NM=nm
 HOST=""
 if [ "$CROSS_COMPILE" == "1" ]; then
 	HOST="--host=mingw32"
-  AR=x86_64-w64-mingw32-gcc-ar
+  AR=x86_64-w64-mingw32-ar
   LD=x86_64-w64-mingw32-ld
-  RANLIB=x86_64-w64-mingw32-gcc-ranlib
-  NM=x86_64-w64-mingw32-gcc-nm
+  RANLIB=x86_64-w64-mingw32-ranlib
+  NM=x86_64-w64-mingw32-nm
 fi
 echo "HOST=$HOST"
 
