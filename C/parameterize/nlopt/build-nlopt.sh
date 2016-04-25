@@ -25,7 +25,7 @@ rm -rf test
 mkdir test
 echo "all:" > test/Makefile.in 
 echo "" >> test/Makefile.in 
-echo "install:" > test/Makefile.in 
+echo "install:" >> test/Makefile.in 
 ./configure --prefix="$PWD/../.." $HOST CXX=$CC CC=$CC FC=$FC CFLAGS="-g" AR=$AR LD=$LD RANLIB=$RANLIB NM=$NM LDFLAGS="" || cat config.log
 
 make && make install
