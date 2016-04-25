@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 mkdir -p nlopt/build
 mkdir -p nlopt/lib
 cd nlopt/build
