@@ -7,13 +7,24 @@ cd nlopt*
 echo "CXX=$CC"
 echo "CC=$CC"
 echo "FC=$FC"
+AR=ar
+LD=ld
+RANLIB=ranlib
+NM=nm
 HOST=""
 if [ "$CROSS_COMPILE" == "1" ]; then
 	HOST="--host=mingw32"
+  AR=x86_64-w64-mingw32-gcc-ar
+  LD=x86_64-w64-mingw32-ld
+  RANLIB=x86_64-w64-mingw32-gcc-ranlib
+  NM=x86_64-w64-mingw32-gcc-nm
 fi
 echo "HOST=$HOST"
 
-./configure --prefix="$PWD/../.." $HOST CXX=$CC CC=$CC FC=$FC CFLAGS="-g" LDFLAGS="" || cat config.log
+rm -rf test
+mkdir test
+echo "all:" > test/Makefile.in 
+./configure --prefix="$PWD/../.." $HOST CXX=$CC CC=$CC FC=$FC CFLAGS="-g" AR=$AR LD=$LD RANLIB=$RANLIB NM=$NM LDFLAGS="" || cat config.log
 
 make && make install
 
