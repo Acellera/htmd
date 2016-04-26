@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+
+# A hateful little script that shims between g09 I/O and PSI4
+
+from __future__ import print_function
+import shutil
+import numpy as np
+import os
+import subprocess
+import sys
+
+
+if( len(sys.argv)!=3 ):
+	sys.exit(1)
+
+input_file = sys.argv[1]
+output_file= sys.argv[2]
+
+# Let's see if we have G09 in the PATH
+# If we go, simply run the job with Gaussian
+
+g09 = shutil.which( "g09", mode=os.X_OK )
+if g09:
+	ret = subprocess.call( g09	+ " < " + input_file + " > " + output_file + ".tmp", shell=True );
+	# The monitor may be looking for the creation of the outputfile as an indicator that the job is over
+	# so use a tempfile and move it once the g09 is done
+	shutil.copyfile( output_file + ".tmp", output_file ) 
+#	sys.exit(ret)
+	sys.exit(0)
+
+psi4= shutil.which( "psi4", mode=os.X_OK )
+if not psi4:
+	# No PSI4 found!
+	sys.exit(1)
+
+# Otherwise, read  in the g09 input file
+
+def write_psi4_input( filename, config ):
+	tmpout = filename +".xyz"
+
+	f=open( filename, "w" )
+	if "hf/6-31g*" in config['route']:
+		print( "set {\n\treference rhf\n\tbasis 6-31G*\n}", file=f );
+	elif "ram1" in config['route']:
+		# PSI4 doesn't do AM1 -- promote it to HF
+		print( "set {\n\treference rhf\n\tbasis 6-31G*\n}", file=f );
+	else:
+		raise ValueError("Couldn't find the basis set");
+
+	ncpus=1
+	if "%nproc" in config['directives']:
+		ncpus=str(config['directives']['%nproc'])
+	elif "%nprocshared" in config['directives']:
+		ncpus=str(config['directives']['%nprocshared'])
+
+	print( "memory " + str(config['directives']['%mem']).replace("gb", " gb")  ,file=f );
+	print( "set_num_threads( " + ncpus + " )",file=f );
+	print( "\nmolecule MOL {\n\t%d %d" % ( config['charge'], config['multiplicity'] ), file=f );
+
+	numdummy=0
+	aa=config['atoms'];
+	for a in aa:
+		for b in a:
+			if( b.startswith("X") ):
+				numdummy=numdummy+1
+			print("\t %s" % (b), file=f, end="");
+		print("", file=f )
+		
+
+	print("", file=f)
+	# "roh= or phi for Z-matrix=" 
+	for k in config['suffix']:
+		if( "=" in k):
+			print( "\t" + k, file=f );
+	
+	print("", file=f)
+	print("\tsymmetry c1\n}\n", file=f );
+
+	
+	if( len(config['frozen'])>0):
+		l=len(config['frozen'])
+		print("set optking {\n\tfrozen_dihedral = (\"", file=f );
+		for i in range(l):  
+			c = config['frozen'][i]
+			if(i< l-1 ):
+				bb=","
+			else:
+				bb=""  
+			print( "\t\t%s %s %s %s%s\n" % (  c[0], c[1], c[2], c[3], bb ), end="", file=f );
+		print("\t\")\n}", file=f);
+
+	opt=False
+	for k in config['route']:
+		if k.startswith("opt") and ("z-matrix" not in k):
+			print("ee = optimize('scf')\n",file=f );
+			opt=True
+	if not opt:
+		print("ee = energy('scf')\n",file=f );
+
+	if( config['espfile'] ):
+		print("oeprop('GRID_ESP')", file=f)
+		shutil.copyfile( config['espfile'], "grid.dat" ); # PSI4 has the grid filename hard-coded
+
+	print( "f=open( '%s', 'w' )" % ( tmpout ), file=f );
+	print( "f.write( \"%d  \" )" % (len(aa) - numdummy) , file=f );
+	print( "f.write( str(ee) + \"\\n\" )", file=f );
+	print( "f.write( MOL.save_string_xyz() )", file=f );
+	print( "f.close()", file=f );
+	f.close()
+	return tmpout
+
+def read_g09_input( input_file ):
+	f=open( input_file, "r" );
+	fl=f.readlines()
+	f.close()
+
+	directives={}
+	route=""
+	atoms=[]
+	blank=0
+	q=None
+	mult=1
+	suffix=[]
+
+	state="directives"
+	count=0
+
+	for l in fl:
+		l=l.strip()
+		if state=="suffix":
+			if(len(l.strip()) > 0 ):
+				suffix.append(l)
+		if state=="atom":
+			if(len(l.strip())>0 ):
+				atoms.append(l.split())
+			else:
+				state="suffix"
+		if state=="directives":
+			if l.startswith("#") or len(l)==0:
+				state="route"
+			else:
+				ll=l.split("=" );
+				directives[ll[0].lower()]=ll[1].lower()
+		if state=="route":
+			if( len(l.strip())==0 ):
+				state="name"
+			else:
+				route = route + " " + l.lower()
+		if state=="name":
+			if count==3:
+				state="q"
+			else:
+				count=count+1
+
+		if state=="q":
+			if  "," in l:
+				ll = l.split(",")
+			else:
+				ll  =l.split()
+			q   =int(ll[0])
+			mult=int(ll[1])
+			state="atom"
+		
+	route=route.replace("#", " " );
+	route=route.split()
+
+	espfile=None
+	frozen=[]
+	for x in suffix:
+		if x.startswith("@") and "prop=(read,field)" in route:
+			espfile=x.split()[0];
+			espfile=espfile.replace("@", "" );
+		else:
+			if "F" in x:
+				x=x.split()
+				frozen.append([ x[0], x[1], x[2],x[3] ])
+
+	return {
+		"directives" : directives,
+		"route": route,
+		"charge": q,
+		"multiplicity": mult,
+		"atoms": atoms,
+		"suffix": suffix,
+		"espfile": espfile,
+		"frozen": frozen
+	}
+
+
+def read_psi4_output( psi4out, psi4log ):
+	f=open( psi4out, "r" )
+	fl=f.readlines()
+	data={}
+
+	natoms=int(fl[0].split()[0]);
+	energy=float(fl[0].split()[1]);
+	atoms=[];
+	for i in range(natoms):
+		atoms.append( fl[i+2].split() )
+
+	data['energy']= energy
+	data['atoms'] = atoms
+
+	if os.path.exists( "grid.dat" ):
+		data['grid'] =np.loadtxt(  "grid.dat" )
+	if os.path.exists( "grid_esp.dat" ):
+		data['gridesp'] =np.loadtxt(  "grid_esp.dat" )
+
+	return data
+	
+
+def write_g09_output( g09out, config, data ):
+	f=open( g09out, "w" );
+
+	print(" SCF Done:  E(RHF) = %s" % ( data['energy'] ), file=f )
+	print(" Optimization completed", file=f )
+	print("                         Standard orientation:", file=f )
+	print(" ---------------------------------------------------------------------", file=f)
+	print(" Center     Atomic      Atomic             Coordinates (Angstroms)", file=f )
+	print(" Number     Number       Type             X           Y           Z", file=f )
+	print(" ---------------------------------------------------------------------", file=f )
+	atoms=data['atoms'];
+	for a in atoms:
+		print("    %d       %d           %d          %s %s %s" % (0,0,0,a[1], a[2], a[3]), file=f )
+
+	print( "", file=f )
+	print(" SCF Done:  E(RHF) = %s" % ( data['energy'] ), file=f )
+	print( "", file=f )
+
+
+
+
+	if(  'gridesp' in data and 'espfile' in config ):
+		gridesp= data['gridesp']
+		espfile= config['espfile']
+		espgrid= np.loadtxt( espfile )
+
+		print( "", file=f );
+		print(" **********************************************************************", file=f)
+		print( "", file=f )
+		print( "            Electrostatic Properties Using The SCF Density", file=f );
+		print( "", file=f );
+		print(" **********************************************************************", file=f)
+		print( "", file=f )
+		for i in range(len(atoms)):
+			print("                                %f %f %f" % (0,0,0), file=f )
+		for j in range(espgrid.shape[0]):
+			print("                                %f %f %f" % (espgrid[j,0], espgrid[j,1], espgrid[j,2]), file=f )
+
+		print(" -----------------------------------------------------------------", file=f)
+		print("", file=f)
+		print("              Electrostatic Properties (Atomic Units)", file=f)
+		print("", file=f)
+		print(" -----------------------------------------------------------------", file=f )
+		print("    Center     Electric         -------- Electric Field --------", file=f );
+		print("               Potential          X             Y             Z", file=f);
+		print(" -----------------------------------------------------------------", file=f )
+		for i in range(len(atoms)):
+				print( "               %f" % (0.) , file=f );
+		for j in range(gridesp.shape[0]):
+				print("               %f" % (gridesp[j]), file=f )
+
+		f.close()
+
+def run_psi4( psi4, psi4_input, psi4_output ):
+	subprocess.call( [ psi4, "-i", psi4_input, "-o", psi4_output ] )
+
+config = read_g09_input( input_file )
+
+psi4_input_file = input_file + ".psi4in"
+psi4_output_file= input_file + ".psi4out"
+tmpout          = write_psi4_input( psi4_input_file, config );
+
+#print(config)
+
+try:
+	run_psi4( psi4, psi4_input_file, psi4_output_file )
+
+	log = read_psi4_output( tmpout, psi4_output_file )
+
+#print(log)
+
+	write_g09_output( output_file, config, log )
+except:
+	# Leave an empty file
+	f=open(output_file, "w" )
+	f.close()
+
+#print(config)
