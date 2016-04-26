@@ -23,9 +23,10 @@ def pka(mol, pH=7.0, pka_options=None):
 
     Examples
     --------
-    >> m=Molecule("3ptb")
-    >> rd = pka(m,pH=7.0)
-
+    >>> m=Molecule("3ptb")
+    >>> rd = pka(m,pH=7.0)
+    >>> rd.pKa[rd.resid == 189]
+    array([ 4.94907929])
     """
 
     tmpmol = mol.copy()
@@ -34,8 +35,7 @@ def pka(mol, pH=7.0, pka_options=None):
     tmpmol.write(pka_pdb.name)
 
     if not pka_options:
-        pka_options, _ = propka.lib.loadOptions()
-    pka_options.pH = pH
+        pka_options, _ = propka.lib.loadOptions('--pH',pH,'--no-print')
 
     pka_molecule = propka.molecular_container.Molecular_container(pka_pdb.name, pka_options)
 
@@ -53,9 +53,5 @@ def pka(mol, pH=7.0, pka_options=None):
 if __name__ == "__main__":
     import doctest
     from htmd.molecule.molecule import Molecule
+    doctest.testmod()
 
-    # doctest.testmod()
-
-    m = Molecule("3ptb")
-    rd = pka(m, pH=7.0)
-    pass
