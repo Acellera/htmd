@@ -31,16 +31,25 @@ def pka(mol, pH=7.0):
     --------
     >>> m=Molecule("3ptb")
     >>> rd = pka(m,pH=7.0)
-    >>> rd.pKa[rd.resid == 189]
-    array([ 4.94907929])
+    >>> rd.pKa[rd.resid == 189].round(2)
+    array([ 4.95])
     """
 
+    return _pka_backend(mol, pH)
+
+
+def _pka_backend(m, pH):
+    """Internal function - may allow switching between internal and external propka if necessary """
+    return _pka_backend_internal(m, pH)
+
+
+def _pka_backend_internal(mol, pH):
     tmpmol = mol.copy()
     tmpmol.filter("noh")
     pka_pdb = tempfile.NamedTemporaryFile(mode="w+", suffix=".pdb")
     tmpmol.write(pka_pdb.name)
 
-    pka_options, _ = propka.lib.loadOptions('--pH',pH,'--no-print')
+    pka_options, _ = propka.lib.loadOptions('--pH', pH)  # add '--no-print' when released
     pka_molecule = propka.molecular_container.Molecular_container(pka_pdb.name, pka_options)
     pka_pdb.close()
 
