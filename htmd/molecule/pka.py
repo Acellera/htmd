@@ -1,90 +1,60 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
-# All Rights Reserved
-# Distributed under HTMD Software License Agreement
-# No redistribution in whole or part
-#
-from tempfile import mkstemp
-import os
-from shutil import which
-from subprocess import check_output
+import logging
+import tempfile
+import propka
+import propka.lib
+import propka.molecular_container
+
+from htmd.molecule.molecule import Molecule
+from htmd.proteinpreparation.residuedata import ResidueData
 
 
-def pka(molecule, propka=None, pH=7.0):
-    '''PKA - Predict per-residue pKa, using propka
+logger = logging.getLogger(__name__)
+
+
+def pka(mol, pH=7.0):
+    """Compute pKa values via propKa 3.1
 
     Parameters
     ----------
-    molecule : A Molecule object
-    propka   : Path of propka program. Default: find automatically
-    pH       : pH at which to perform calculation. Default: 7.0
+    mol : Molecule
+        The molecule to be analyzed
+    pH : float
+        The pH at which to do the analysis
 
-    Return
-    ------
-
-    List of dicts containin the keys 'resname', 'resid', 'chainid', 'pka'
-
-    Example
+    Returns
     -------
+    rd : ResidueData
+        An object (see), containing resid, chain, pKa arrays.
+        Properties unrelated to pKa are unset.
 
-    pkas = pka( Molecule('4DFR'), pH=6.5 )  
-    '''
+    Examples
+    --------
+    >>> m=Molecule("3ptb")
+    >>> rd = pka(m,pH=7.0)
+    >>> rd.pKa[rd.resid == 189]
+    array([ 4.94907929])
+    """
 
-    try:
-        propka = which("propka31", mode=os.X_OK)
-    except:
-        raise NameError("Cannot find 'propka31' in PATH");
+    tmpmol = mol.copy()
+    tmpmol.filter("noh")
+    pka_pdb = tempfile.NamedTemporaryFile(mode="w+", suffix=".pdb")
+    tmpmol.write(pka_pdb.name)
 
-    if not os.access(propka, os.X_OK):
-        raise NameError("'propka' not found");
+    pka_options, _ = propka.lib.loadOptions('--pH',pH,'--no-print')
+    pka_molecule = propka.molecular_container.Molecular_container(pka_pdb.name, pka_options)
+    pka_pdb.close()
 
-    try:
-        pH = float(pH)
-    except:
-        raise NameError("pH value invalid")
-    if (pH <= 0. or pH >= 14.):
-        raise NameError("pH value invalid")
+    # calculating pKa values for ionizable residues -
+    pka_molecule.calculate_pka()
 
-    fh, fnp = mkstemp()
-    fn = fnp + ".pdb"
-    molecule.write(fn)
-
-    dd = os.getcwd()
-    try:
-        os.chdir(os.path.dirname(fn))
-        op = check_output([propka, fn, "-o", str(pH)])
-        op = op.decode("ascii").split("\n");
-    except:
-        raise NameError("Failed to execute PropKa")
-    os.chdir(dd)
-
-    ret = []
-    # print(op)
-    atpka = False
-    for line in op:
-        if not atpka:
-            if "model-pKa" in line:
-                atpka = True
-                continue
-            else:
-                continue
-            if "-" in line:
-                atpka = False
-                continue
-        print(line)
-        s = line.split()
-        if len(s) >= 4:
-            pka = {"resname": s[0], "resid": s[1], "chainid": s[2], "pka": float(s[3])}
-            ret.append(pka)
-    os.unlink(fn)
-    os.unlink(fnp + ".pka")
-    os.unlink(fnp + ".propka_input")
-    return ret
+    rd = ResidueData()
+    rd._setPKAs(pka_molecule)
+    return rd
 
 
+# A test method
 if __name__ == "__main__":
-    """
+    import doctest
     from htmd.molecule.molecule import Molecule
-    ret=pka( Molecule('4DFR') )
-    print(ret)
-    """
+    doctest.testmod()
 
