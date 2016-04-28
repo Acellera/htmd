@@ -1,6 +1,8 @@
 import numpy as np
 import logging
 
+from htmd.molecule.molecule import Molecule
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,8 +16,15 @@ class ResidueData:
     Examples
     --------
     >>> tryp = Molecule("3PTB")
-    >>> tryp_op, ri = prepareProtein(tryp, returnDetails=True)   # doctest: +ELLIPSIS
-    Warning...
+    >>> tryp_op, ri = prepareProtein(tryp, returnDetails=True)  # doctest: +ELLIPSIS
+    propka3.1...
+    >>> ri                                                      # doctest: +ELLIPSIS
+     ILE   16 A : pKa=nan, state=ILE, patches=['NTERM']
+     VAL   17 A : pKa=nan, state=VAL, patches=['PEPTIDE']
+     GLY   18 A : pKa=nan, state=GLY, patches=['PEPTIDE']
+     GLY   19 A : pKa=nan, state=GLY, patches=['PEPTIDE']
+     TYR   20 A : pKa=9.590845, state=TYR, patches=['PEPTIDE']
+     ...
     >>> ri.pKa[ri.resid == 189]
     array([ 4.94907929])
     >>> ri.patches[ri.resid == 57]
@@ -69,7 +78,7 @@ class ResidueData:
 
     def _findRes(self, a_resid, a_resname, a_chain):
         mask = (self.resid == a_resid) & (self.resname == a_resname) & (self.chain == a_chain)
-        assert (sum(mask) <= 1)
+        assert (sum(mask) <= 1), "More than one resid matched"
         if sum(mask) == 0:
             self.resid = np.append(self.resid, a_resid)
             self.resname = np.append(self.resname, a_resname)
@@ -81,7 +90,6 @@ class ResidueData:
             pos = len(self.resid) - 1
         else:
             pos = np.argwhere(mask)
-            assert (len(pos) == 1), "More than one resid matched"
             pos = int(pos)
         return pos
 
@@ -95,7 +103,7 @@ class ResidueData:
         pos = self._findRes(residue.resSeq, residue.name, residue.chainID)
         self.patches[pos].append(patch)
 
-    def _setPKAs(self, pka_molecule):
+    def _importPKAs(self, pka_molecule):
         for grp in pka_molecule.conformations['AVR'].groups:
             resname = grp.residue_type
             resid = grp.atom.resNumb
@@ -106,8 +114,6 @@ class ResidueData:
 
 
 if __name__ == "__main__":
-    import doctest
-    from htmd.molecule.molecule import Molecule
     from htmd.proteinpreparation.proteinpreparation import prepareProtein
-
+    import doctest
     doctest.testmod()

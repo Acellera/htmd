@@ -35,12 +35,8 @@ def pka(mol, pH=7.0):
     array([ 4.95])
     """
 
-    return _pka_backend(mol, pH)
+    return _pka_backend_internal(mol, pH)
 
-
-def _pka_backend(m, pH):
-    """Internal function - may allow switching between internal and external propka if necessary """
-    return _pka_backend_internal(m, pH)
 
 
 def _pka_backend_internal(mol, pH):
@@ -57,7 +53,7 @@ def _pka_backend_internal(mol, pH):
     pka_molecule.calculate_pka()
 
     rd = ResidueData()
-    rd._setPKAs(pka_molecule)
+    rd._importPKAs(pka_molecule)
     return rd
 
 

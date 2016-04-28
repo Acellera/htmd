@@ -191,7 +191,7 @@ def prepareProtein(mol_in,
 
     mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
-    resdata_out._setPKAs(pdb2pqr_protein.pka_molecule)
+    resdata_out._importPKAs(pdb2pqr_protein.pka_molecule)
     resdata_out.pdb2pqr_protein = pdb2pqr_protein
     resdata_out.pka_protein = pdb2pqr_protein.pka_molecule
     resdata_out.pka_dict = pdb2pqr_protein.pkadic
