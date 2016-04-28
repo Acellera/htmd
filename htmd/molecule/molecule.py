@@ -42,6 +42,11 @@ class Molecule:
     --------
     >>> mol = Molecule( './test/data/dhfr/dhfr.pdb' )  # doctest: +SKIP
     >>> mol = Molecule( '3PTB', name='Trypsin' )
+    >>> print(mol)                                     # doctest: +ELLIPSIS
+    Molecule with 1701 atoms and 1 frames
+    PDB field - altloc shape: (1701,)
+    PDB field - beta shape: (1701,)
+    ...
 
     Properties
     ----------
@@ -205,9 +210,16 @@ class Molecule:
         selection : str
             Atomselection string selecting the atoms we want to remove
 
+        Returns
+        -------
+        removed : np.array
+            The list of atoms removed
+
         Example
         -------
-        >>> mol.remove('name CA')
+        >>> mol.remove('name CA')               # doctest: +ELLIPSIS
+        array([   1,    9,   16,   20,   24,   36,   43,   49,   53,   58,...
+
         """
         sel = np.where(self.atomselect(selection))[0]
         self._removeBonds(sel)
@@ -227,7 +239,7 @@ class Molecule:
         sel : str
             Atom selection string selecting which atoms we want to get the field from. Default all.
 
-        Return 
+        Returns
         ------
         vals : np.ndarray
             Array of values of `field` for all atoms in the selection.
@@ -235,7 +247,11 @@ class Molecule:
         Examples
         --------
         >>> mol.get('resname')
+        array(['ILE', 'ILE', 'ILE', ..., 'ASN', 'ASN', 'ASN'], dtype=object)
         >>> mol.get('resname', sel='resid 158')
+        array(['LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU',
+               'LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU'], dtype=object)
+
         """
         if field != 'index' and field not in self._pdb_fields:
             raise NameError("Invalid field '" + field + "'")
@@ -1575,10 +1591,16 @@ class _Representation:
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
-    from htmd.molecule.molecule import _Representation
 
     mol = Molecule('3PTB')
+    mol_backup = mol.copy()
+
+    import doctest
+    doctest.testmod(extraglobs={'mol': mol})
+
+    # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed.
+
+    mol = mol_backup
     a = mol.get('resid', sel='resname TRP')
     a = mol.get('coords')
     print(a.ndim)
@@ -1589,6 +1611,4 @@ if __name__ == "__main__":
     mol.rotate([1, 0, 0], pi / 2)
     mol.align('name CA')
 
-    import doctest
-    doctest.testmod(globs={'mol': mol})
     # test rotate

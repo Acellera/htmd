@@ -148,7 +148,6 @@ def prepareProtein(mol_in,
     # Here I parse the returned protein object and recreate a Molecule,
     # because I need to access the properties.
     logger.info("Building Molecule object.")
-    mol_out = Molecule()
 
     name = []
     resid = []
