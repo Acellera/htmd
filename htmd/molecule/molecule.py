@@ -1234,6 +1234,21 @@ class Molecule:
         """
         return np.size(self.coords, 0)
 
+    @property
+    def x(self):
+        """Get the x coordinates at the current frame"""
+        return self.coords[:,0,self.frame]
+
+    @property
+    def y(self):
+        """Get the y coordinates at the current frame"""
+        return self.coords[:,1,self.frame]
+
+    @property
+    def z(self):
+        """Get the z coordinates at the current frame"""
+        return self.coords[:,2,self.frame]
+
     def __str__(self):
         def formatstr(name, field):
             if isinstance(field, np.ndarray) or isinstance(field, list):
