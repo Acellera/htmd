@@ -16,7 +16,7 @@ random.seed(2016)
 logger = logging.getLogger(__name__)
 
 
-def _createMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
+def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
     numAtoms = len(name)
     mol = Molecule()
     mol.empty(numAtoms)
@@ -85,16 +85,44 @@ def prepareProtein(mol_in,
     -------
     mol_out : Molecule
         the molecule titrated and optimized. The molecule object contains an additional attribute,
-    resdata_out : ResidueData
+    resData : ResidueData
         a table of residues with the corresponding protonation states, pKas, and other information
 
 
     Examples
     --------
-    >> tryp = Molecule('3PTB')
-    >> tryp_op = prepareProtein(tryp, pH=1.0)
-    >> tryp_op.write('3PTB-opt-ph1.pdb')
+    >>> tryp = Molecule('3PTB')
 
+    >>> tryp_op = prepareProtein(tryp, pH=1.0)
+    >>> tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
+
+    >>> tryp_op = prepareProtein(tryp, pH=14.0)
+    >>> tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
+
+    >>> tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
+    >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
+    >>> prepData                                                    # doctest: +ELLIPSIS
+     ILE   16 A : pKa=nan, state=ILE, patches=['NTERM']
+     VAL   17 A : pKa=nan, state=VAL, patches=['PEPTIDE']
+     GLY   18 A : pKa=nan, state=GLY, patches=['PEPTIDE']
+     GLY   19 A : pKa=nan, state=GLY, patches=['PEPTIDE']
+     TYR   20 A : pKa=9.590845, state=TYR, patches=['PEPTIDE']
+     THR   21 A : pKa=nan, state=THR, patches=['PEPTIDE']
+     CYS   22 A : pKa=99.990000, state=CYX, patches=['PEPTIDE', 'CYX']
+    ...
+
+    >>> mol = Molecule("1r1j")
+    >>> mo, prepData = prepareProtein(mol, returnDetails=True)
+    >>> prepData.missedLigands
+    ['NAG', 'ZN', 'OIR']
+    >>> his = prepData.resname == "HIS"
+    >>> list(zip(prepData.protonation[his], prepData.resid[his]))
+    [('HID', 214), ('HID', 217), ('HID', 437), ('HID', 583), ('HIP', 587), ('HID', 637), ('HID', 681), ('HIP', 711), ('HID', 733)]
+
+
+    See Also
+    --------
+    ResidueData object.
 
     Unsupported/To Do/To Check
     --------------------------
@@ -126,8 +154,9 @@ def prepareProtein(mol_in,
 
     # We could set additional options here
     import propka.lib
-    propka_opts, dummy = propka.lib.loadOptions()
-    propka_opts.verbose = verbose
+    propka_opts, dummy = propka.lib.loadOptions('--quiet')
+    propka_opts.verbosity = verbose
+    propka_opts.verbose = verbose   # Will be removed in future propKas
 
     # Note on naming. The behavior of PDB2PQR is controlled by two parameters, ff and ffout. My understanding is
     # that the ff parameter sets which residues are SUPPORTED by the underlying FF, PLUS the charge and radii.
@@ -158,7 +187,7 @@ def prepareProtein(mol_in,
     segids = []
     elements = []
 
-    resdata_out = ResidueData()
+    resData = ResidueData()
 
     for residue in pdb2pqr_protein.residues:
         if 'ffname' in residue.__dict__:
@@ -170,11 +199,11 @@ def prepareProtein(mol_in,
         else:
             curr_resname = residue.name
 
-        resdata_out._setProtonation(residue, curr_resname)
+        resData._setProtonation(residue, curr_resname)
 
         if 'patches' in residue.__dict__:
             for patch in residue.patches:
-                resdata_out._appendPatches(residue, patch)
+                resData._appendPatches(residue, patch)
                 if patch != "PEPTIDE":
                     logger.info("Residue %s has patch %s set" % (residue, patch))
 
@@ -188,39 +217,28 @@ def prepareProtein(mol_in,
             segids.append(atom.segID)
             elements.append(atom.element)
 
-    mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
+    mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
-    resdata_out._importPKAs(pdb2pqr_protein.pka_molecule)
-    resdata_out.pdb2pqr_protein = pdb2pqr_protein
-    resdata_out.pka_protein = pdb2pqr_protein.pka_molecule
-    resdata_out.pka_dict = pdb2pqr_protein.pkadic
-    resdata_out.missedLigands = missedLigands
+    resData._importPKAs(pdb2pqr_protein.pka_molecule)
+    resData.pdb2pqr_protein = pdb2pqr_protein
+    resData.pka_protein = pdb2pqr_protein.pka_molecule
+    resData.pka_dict = pdb2pqr_protein.pkadic
+    resData.missedLigands = missedLigands
 
     logger.info("Returning.")
     logger.setLevel(oldLoggingLevel)
 
     if returnDetails:
-        return mol_out, resdata_out
+        return mol_out, resData
     else:
         return mol_out
 
 
 # A test method
 if __name__ == "__main__":
-    tryp = Molecule('3PTB')
 
-    tryp_op = prepareProtein(tryp, pH=1.0)
-    tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
+    import doctest
+    doctest.testmod()
 
-    tryp_op = prepareProtein(tryp, pH=14.0)
-    tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
 
-    tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
-    tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
-    print(prepData)
 
-    mol = Molecule("1r1j")
-    mo, prepData = prepareProtein(mol, returnDetails=True)
-    his = prepData.resname == "HIS"  # Has to be checked better, due to Zn++
-    list(zip(prepData.protonation[his], prepData.resid[his]))
-    pass
