@@ -12,7 +12,7 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 
 class Acemd(ProtocolInterface):
     _defaultfnames = {'bincoordinates': 'input.coor', 'binvelocities': 'input.vel', 'binindex': 'index.idx',
-               'structure': 'structure.psf', 'parameters': 'parameters', 'extendedsystem': 'input.xsc',
+               'structure': 'structure.*', 'parameters': 'parameters', 'extendedsystem': 'input.xsc',
                'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb'}
 
     def __init__(self):
@@ -82,7 +82,12 @@ class Acemd(ProtocolInterface):
                 data = f.read()
                 f.close()
                 self._files[cmd] = data
-                self.__dict__[cmd] = self._defaultfnames[cmd]  # use default file names
+
+                defaultname = self._defaultfnames[cmd]
+                if defaultname.endswith('*'):
+                    defaultname = '{}.{}'.format(os.path.splitext(defaultname)[0], os.path.splitext(fname)[1])
+
+                self.__dict__[cmd] = defaultname  # use default file names
 
     def save(self, path, overwrite=False):
         """ Create a directory with all necessary input to run acemd.
