@@ -2,7 +2,8 @@ CC := $(CC) -static
 FC := $(FC) -static
 
 TIMEBOMB := -DTIMEBOMB=1 -DCDATE=$(shell date +%s)
-CFLAGS := -g -Wno-format-zero-length -Wno-unused-but-set-variable -Wno-unused-variable -Wno-write-strings -Wall #-fsanitize=address 
+CFLAGS := -g -Wno-format-zero-length -Wno-unused-but-set-variable -Wno-unused-variable -Wno-write-strings -Wall  $(STATIC)
+FFLAGS := $(STATIC)
 LDFLAGS:= -Lnlopt/lib -lnlopt
 
 NLOPT  := nlopt/lib/libnlopt.a
@@ -33,19 +34,19 @@ scripts:
 	cp scripts/* $(DEST)/
 
 $(DEST)/drude_cgrid:
-	$(FC) -static -o $@ src/drude_ConnollyGrid.f src/drude_Surface.f
+	$(FC) -o $@ src/drude_ConnollyGrid.f src/drude_Surface.f $(FFLAGS)
 
 $(DEST)/cgrid:
-	$(FC) -static -o $@  src/ConnollyGrid.f src/Surface.f
+	$(FC)  -o $@  src/ConnollyGrid.f src/Surface.f $(FFLAGS)
 
 $(DEST)/drude_fitcharge: src/drude-fitcharge.cpp
-	$(CC) -static -o $@ $< $(CFLAGS) $(LDFLAGS) -Llib -ldrude-ff
+	$(CC)  -o $@ $< $(CFLAGS) $(LDFLAGS) -Llib -ldrude-ff
 
 $(DEST)/drude_fitcharge_again: src/drude-fitcharge_again.cpp
-	$(CC) -static -o $@ $< $(CFLAGS) $(LDFLAGS) -Llib -ldrude-ff
+	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS) -Llib -ldrude-ff
 
 $(DEST)/%: src/%.cpp lib/libff.a
-	$(CC) -static -o $@  $< $(CFLAGS) $(LDFLAGS) -Llib -lff -lm
+	$(CC)  -o $@  $< $(CFLAGS) $(LDFLAGS) -Llib -lff -lm
 
 
 
