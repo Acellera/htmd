@@ -33,19 +33,19 @@ scripts:
 	cp scripts/* $(DEST)/
 
 $(DEST)/drude_cgrid:
-	$(FC) -o $@ src/drude_ConnollyGrid.f src/drude_Surface.f
+	$(FC) -static -o $@ src/drude_ConnollyGrid.f src/drude_Surface.f
 
 $(DEST)/cgrid:
-	$(FC) -o $@  src/ConnollyGrid.f src/Surface.f
+	$(FC) -static -o $@  src/ConnollyGrid.f src/Surface.f
 
 $(DEST)/drude_fitcharge: src/drude-fitcharge.cpp
-	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS) -Llib -ldrude-ff
+	$(CC) -static -o $@ $< $(CFLAGS) $(LDFLAGS) -Llib -ldrude-ff
 
 $(DEST)/drude_fitcharge_again: src/drude-fitcharge_again.cpp
-	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS) -Llib -ldrude-ff
+	$(CC) -static -o $@ $< $(CFLAGS) $(LDFLAGS) -Llib -ldrude-ff
 
 $(DEST)/%: src/%.cpp lib/libff.a
-	$(CC) -o $@  $< $(CFLAGS) $(LDFLAGS) -Llib -lff
+	$(CC) -static -o $@  $< $(CFLAGS) $(LDFLAGS) -Llib -lff -lm
 
 
 

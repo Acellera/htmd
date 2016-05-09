@@ -1,5 +1,3 @@
-from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_0POS, RANGE_POS
-
 from difflib import get_close_matches
 import os
 import sys
@@ -12,40 +10,68 @@ class Command:
     setup    = False
     commands = {}
 
-    def __init__(self, config=None, pathcheck=True ):
-        super().__init__()
-        self._cmdBinary( "AsymmetricTorsion", "bool", None, False ) 
-        self._cmdList( "Model", "str",  None, "Nonpolar", [ "Nonpolar", "Drude", "Match" ] )
-        self._cmdList( "ExecutionMode", "str",  None,"Inline", [ "Inline", "PBS", "LSF" ] )
-        self._cmdValue( 'NetCharge', 'int', None, 0, TYPE_INT, RANGE_ANY )
-        self._cmdValue( "Multiplicity", "int", None, 1, TYPE_INT, RANGE_ANY )
-        self._cmdValue( "E14Fac", "float", None, 1.0, TYPE_FLOAT, RANGE_0POS )
-        self._cmdValue( "w_H_Donor_Acceptor", "float", None, 1., TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "w_charge", "float", None, 3., TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "w_water_E_min", "float", None, 0.4, TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "w_water_R_min", "float", None, 8.0, TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "w_alpha", "float", None, 0.4, TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "w_thole", "float", None, 0.2, TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "wd_charge", "float", None, 1., TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "wd_water_E_min", "float", None, 0.4, TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "wd_water_R_min", "float", None, 8.0, TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "wd_alpha", "float", None, 0.4, TYPE_FLOAT, RANGE_0POS ) 
-        self._cmdValue( "wd_thole", "float", None, 0.2, TYPE_FLOAT, RANGE_0POS ) 
+    RANGE_ANY  = 0
+    RANGE_POS  = 1
+    RANGE_NEG  = 2
+    RANGE_0POS = 3
+    RANGE_0NEG = 4
+
+    TYPE_INT   = 0
+    TYPE_FLOAT = 1
+
+
+    @staticmethod
+    def test_deprecation( key, value ):
+        if( key in Command.deprecated ):
+            newkey = Command.deprecated[key]
+            if( not newkey ):
+                print( " Command '" + key + "'\t is deprecated and is no longer required" )
+            else:
+                print( " Command '" + key + "'\t is deprecated and replaced by '" + newkey + "'" )
+                return newkey
+        else:
+            return key
+
+    @staticmethod
+    def add_commands( pathcheck=True ):
+        if Command.setup:
+            return
+        Command.deprecated = {
+        }
+
+        # Optional Args
+
+#        Command.commands[ 'Ini_Parameters'  ] = Command.List( "Match", [ "Match" ] )
+        #Command.commands[ 'TorsionFitting'  ]	= Command.Binary( True )
+        Command.commands[ 'AsymmetricTorsion'    ]	= Command.Binary( False )
+        Command.commands[ 'Model'    ]	        = Command.List( "Nonpolar", [ "Nonpolar", "Drude", "Match" ] );
+        Command.commands[ 'ExecutionMode'    ]	        = Command.List( "Inline", [ "Inline", "PBS" , "LSF" ] );
+        Command.commands[ 'NetCharge'       ]	= Command.Value( 0, Command.TYPE_INT, Command.RANGE_ANY, 1  )
+        Command.commands[ 'Multiplicity'    ]	= Command.Value( 1, Command.TYPE_INT, Command.RANGE_ANY, 1  )
+        Command.commands[ 'E14FAC'          ]	= Command.Value( 1., Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'w_H_Donor_Acceptor'          ]	= Command.Value( 1., Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'w_charge'          ]	= Command.Value( 3., Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'w_water_E_min'     ]	= Command.Value( 0.4, Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'w_water_R_min'     ]	= Command.Value( 8.0, Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'w_alpha'           ]	= Command.Value( 0.4, Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'w_thole'           ]	= Command.Value( 0.2, Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'wd_charge'         ]	= Command.Value( 1., Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'wd_water_E_min'    ]	= Command.Value( 0.4, Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'wd_water_R_min'    ]	= Command.Value( 8.0, Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'wd_alpha'          ]	= Command.Value( 0.4, Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+        Command.commands[ 'wd_thole'          ]	= Command.Value( 0.2, Command.TYPE_FLOAT, Command.RANGE_0POS, 1  )
+
+
 
         # Mandatory args
-        self._cmdFile( "Filename"  , "str", None, None, exist=True, pathcheck=pathcheck )
-        self._cmdFile( "Equivalent", "str", None, None, exist=True, pathcheck=pathcheck )
-        self._cmdFile( "Neutral"   , "str", None, None, exist=True, pathcheck=pathcheck )
-        self._cmdFile( "FixCharges", "str", None, None, exist=True, pathcheck=pathcheck )
-
-        self._cmdValue( "MaxTorsion", "int", None, 25, TYPE_INT, RANGE_POS )
-        #self._cmd[ 'FileName'   ]	= Command.File( None, exist=True, pathcheck=pathcheck )
-        self._cmd[ 'Torsions'   ]  = Command.Torsionlist( None )
-        self._cmd[ 'JobName'    ]	= Command.Stringx( None )
-        #self._cmd[ 'Equivalent' ]	= Command.File( None, exist=True, pathcheck=pathcheck )
-        #self._cmd[ 'Neutral'    ]	= Command.File( None, exist=True, pathcheck=pathcheck )
-        #self._cmd[ 'FixCharges' ]	= Command.File( None, exist=True, pathcheck=pathcheck )
-        #self._cmd[ 'MaxTorsion' ]    = Command.Value( 25, Command.TYPE_INT, Command.RANGE_POS, 1)
+        Command.commands[ 'FileName'   ]	= Command.File( None, exist=True, pathcheck=pathcheck )
+        #Command.commands[ 'FileType'   ]	= Command.List( 'mol2', [ 'mol2', 'pdb' ] )
+        Command.commands[ 'Torsions'   ]  = Command.Torsionlist( None )
+        Command.commands[ 'JobName'    ]	= Command.Stringx( None )
+        Command.commands[ 'Equivalent' ]	= Command.File( None, exist=True, pathcheck=pathcheck )
+        Command.commands[ 'Neutral'    ]	= Command.File( None, exist=True, pathcheck=pathcheck )
+        Command.commands[ 'FixCharges' ]	= Command.File( None, exist=True, pathcheck=pathcheck )
+        Command.commands[ 'MaxTorsion' ]    = Command.Value( 25, Command.TYPE_INT, Command.RANGE_POS, 1)
 
         ncpus = psutil.cpu_count()
         if 'NCPUS' in os.environ:
@@ -64,11 +90,11 @@ class Command:
            except:
               pass
 
-        self._cmd[ 'GAUSS_SCRDIR' ]= Command.File( '/tmp', exist=False )
-        self._cmd[ 'NCORES' ] = Command.Value( ncpus, Command.TYPE_INT, Command.RANGE_POS, 1)
-        self._cmd[ 'MEMORY' ] = Command.Value( mem, Command.TYPE_INT, Command.RANGE_POS, 1)
+        Command.commands[ 'GAUSS_SCRDIR' ]= Command.File( '/tmp', exist=False )
+        Command.commands[ 'NCORES' ] = Command.Value( ncpus, Command.TYPE_INT, Command.RANGE_POS, 1)
+        Command.commands[ 'MEMORY' ] = Command.Value( mem, Command.TYPE_INT, Command.RANGE_POS, 1)
 
-        self._cmd[ 'Debug'    ]	= Command.Binary( False )
+        Command.commands[ 'Debug'    ]	= Command.Binary( False )
  
 
         Command.setup = True
@@ -119,26 +145,26 @@ class Command:
         Command.add_commands()
         if( not cmd ):
             print("\n  Valid configuration file commands:\n");
-            for a in sorted( self._cmd.keys() ):
+            for a in sorted( Command.commands.keys() ):
                 print( "    " + a )
             print("\n  parameterize --command [command] for detailed help on a specific command\n\n");
             # print sections
             pass
         else:
-            match = get_close_matches( cmd, self._cmd )
+            match = get_close_matches( cmd, Command.commands )
             if not match or (len(match)<1):
                 print( "\nNo matching command for '" + cmd + "' found\n" )
                 return
             else:
                 helpstr = Command.get_help_string( match[0] )
-                print( "\n   " + match[0] + " "+ self._cmd[ match[0] ].args() + "\n" )
+                print( "\n   " + match[0] + " "+ Command.commands[ match[0] ].args() + "\n" )
 
                 Command.pretty_print( helpstr );
 
-                units = self._cmd[match[0] ].units
+                units = Command.commands[match[0] ].units
                 if not units:
                     units=""
-                print( "\n   Default: " + str(self._cmd[ match[0] ].default) +" " + units + "\n" );
+                print( "\n   Default: " + str(Command.commands[ match[0] ].default) +" " + units + "\n" );
 
 
 
@@ -147,18 +173,18 @@ class Command:
     def get_default_configuration( pathcheck=True ):
         Command.add_commands( pathcheck=pathcheck )
         ret = {}
-        for i in self._cmd.keys():
-            ret[ i ] = self._cmd[i].default
+        for i in Command.commands.keys():
+            ret[ i ] = Command.commands[i].default
         return ret
 
 
     @staticmethod
     def validate(  key, value, basedir=None ):
         try:
-            cmd =self._cmd[key]
+            cmd =Command.commands[key]
         except:
             strerror= "Command '" + key + "' not found.";
-            match = get_close_matches( key, self._cmd )
+            match = get_close_matches( key, Command.commands )
             if match:
                 strerror = strerror + " Try '" + match[0] + "'";
             raise NameError( strerror )
