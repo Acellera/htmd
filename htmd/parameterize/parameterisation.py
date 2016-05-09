@@ -37,7 +37,7 @@ class Parameterisation:
             wdir = os.path.join(Parameterisation.prefix(), name )
 
             if os.path.exists(wdir):
-                config = Configuration( os.path.join( wdir, "configuration"), pathcheck=False )
+                config = Configuration( os.path.join( wdir, "configuration"), check=False )
                 log.info("Resuming job [" + config.JobName + "]")
                 resuming = True
             else:

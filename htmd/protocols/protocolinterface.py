@@ -121,7 +121,7 @@ class Validator:
         self.datatype = datatype
         if not descr:
             desc = os.path.join( "help", "en", key )
-        if os.path.exists(descr):
+        if descr and os.path.exists(descr):
             f = open(descr, 'r')
             self.descr = f.read()
             f.close()
@@ -385,8 +385,6 @@ class FileValidator(Validator):
                     f.close()
                 except:
                     raise NameError("File '" + value + "' is not writable")
-            if self.check:
-                value = self.check(value, basedir=basedir)
             l.append(value)
 
         # Test to see if the file exists

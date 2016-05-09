@@ -1,4 +1,4 @@
-from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_0POS, RANGE_POS
+from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_0POS, RANGE_POS, RANGE_ANY
 
 from difflib import get_close_matches
 import os
@@ -8,15 +8,15 @@ import shutil
 import inspect
 import psutil
 
-class Command:
+class Command(ProtocolInterface):
     setup    = False
     commands = {}
 
-    def __init__(self, config=None, pathcheck=True ):
+    def __init__(self, config=None, check=True ):
         super().__init__()
         self._cmdBinary( "AsymmetricTorsion", "bool", None, False ) 
-        self._cmdList( "Model", "str",  None, "Nonpolar", [ "Nonpolar", "Drude", "Match" ] )
-        self._cmdList( "ExecutionMode", "str",  None,"Inline", [ "Inline", "PBS", "LSF" ] )
+        self._cmdString( "Model", "str",  None, "Nonpolar", valid_values=[ "Nonpolar", "Drude", "Match" ] )
+        self._cmdString( "ExecutionMode", "str",  None,"Inline", valid_values=[ "Inline", "PBS", "LSF" ] )
         self._cmdValue( 'NetCharge', 'int', None, 0, TYPE_INT, RANGE_ANY )
         self._cmdValue( "Multiplicity", "int", None, 1, TYPE_INT, RANGE_ANY )
         self._cmdValue( "E14Fac", "float", None, 1.0, TYPE_FLOAT, RANGE_0POS )
@@ -33,18 +33,21 @@ class Command:
         self._cmdValue( "wd_thole", "float", None, 0.2, TYPE_FLOAT, RANGE_0POS ) 
 
         # Mandatory args
-        self._cmdFile( "Filename"  , "str", None, None, exist=True, pathcheck=pathcheck )
-        self._cmdFile( "Equivalent", "str", None, None, exist=True, pathcheck=pathcheck )
-        self._cmdFile( "Neutral"   , "str", None, None, exist=True, pathcheck=pathcheck )
-        self._cmdFile( "FixCharges", "str", None, None, exist=True, pathcheck=pathcheck )
+        self._cmdFile( "FileName"  , "str", None, None, exist=True, check=check )
+        self._cmdFile( "Equivalent", "str", None, None, exist=True, check=check )
+        self._cmdFile( "Neutral"   , "str", None, None, exist=True, check=check )
+        self._cmdFile( "FixCharges", "str", None, None, exist=True, check=check )
 
         self._cmdValue( "MaxTorsion", "int", None, 25, TYPE_INT, RANGE_POS )
-        #self._cmd[ 'FileName'   ]	= Command.File( None, exist=True, pathcheck=pathcheck )
-        self._cmd[ 'Torsions'   ]  = Command.Torsionlist( None )
-        self._cmd[ 'JobName'    ]	= Command.Stringx( None )
-        #self._cmd[ 'Equivalent' ]	= Command.File( None, exist=True, pathcheck=pathcheck )
-        #self._cmd[ 'Neutral'    ]	= Command.File( None, exist=True, pathcheck=pathcheck )
-        #self._cmd[ 'FixCharges' ]	= Command.File( None, exist=True, pathcheck=pathcheck )
+        #self._cmd[ 'FileName'   ]	= Command.File( None, exist=True, check=check )
+        #self._cmd[ 'Torsions'   ]  = Command.Torsionlist( None )
+        #self._cmd[ 'JobName'    ]	= Command.Stringx( None )
+
+        self._cmdString( "JobName", "str", None, None )
+        self._cmdListList( "Torsions", "int", None, 4 )
+        #self._cmd[ 'Equivalent' ]	= Command.File( None, exist=True, check=check )
+        #self._cmd[ 'Neutral'    ]	= Command.File( None, exist=True, check=check )
+        #self._cmd[ 'FixCharges' ]	= Command.File( None, exist=True, check=check )
         #self._cmd[ 'MaxTorsion' ]    = Command.Value( 25, Command.TYPE_INT, Command.RANGE_POS, 1)
 
         ncpus = psutil.cpu_count()
@@ -64,13 +67,16 @@ class Command:
            except:
               pass
 
-        self._cmd[ 'GAUSS_SCRDIR' ]= Command.File( '/tmp', exist=False )
-        self._cmd[ 'NCORES' ] = Command.Value( ncpus, Command.TYPE_INT, Command.RANGE_POS, 1)
-        self._cmd[ 'MEMORY' ] = Command.Value( mem, Command.TYPE_INT, Command.RANGE_POS, 1)
+#        self._cmd[ 'GAUSS_SCRDIR' ]= Command.File( '/tmp', exist=False )
+#        self._cmd[ 'NCORES' ] = Command.Value( ncpus, Command.TYPE_INT, Command.RANGE_POS, 1)
+#        self._cmd[ 'MEMORY' ] = Command.Value( mem, Command.TYPE_INT, Command.RANGE_POS, 1)
 
-        self._cmd[ 'Debug'    ]	= Command.Binary( False )
+#        self._cmd[ 'Debug'    ]	= Command.Binary( False )
  
-
+        self._cmdFile( "GAUSS_SCRDIR", "str", None, "/tmp", exist=False, check=check )
+        self._cmdBinary( "Debug", "bool", None, False )
+        self._cmdValue( "NCORES", "int", None, ncpus, TYPE_INT, RANGE_POS )
+        self._cmdValue( "MEMORY", "int", None, mem,   TYPE_INT, RANGE_POS )
         Command.setup = True
 
 
@@ -116,7 +122,6 @@ class Command:
 
     @staticmethod
     def help( cmd ):
-        Command.add_commands()
         if( not cmd ):
             print("\n  Valid configuration file commands:\n");
             for a in sorted( self._cmd.keys() ):
@@ -143,22 +148,19 @@ class Command:
 
 
             # find
-    @staticmethod
-    def get_default_configuration( pathcheck=True ):
-        Command.add_commands( pathcheck=pathcheck )
-        ret = {}
-        for i in self._cmd.keys():
-            ret[ i ] = self._cmd[i].default
+    def get_default_configuration(self, check=True ):
+        ret=dict()
+        for i in self._commands.keys():
+            ret[ i ] = self._commands[i].default
         return ret
 
 
-    @staticmethod
-    def validate(  key, value, basedir=None ):
+    def validate( self,  key, value, basedir=None ):
         try:
-            cmd =self._cmd[key]
+            cmd =self._commands[key]
         except:
             strerror= "Command '" + key + "' not found.";
-            match = get_close_matches( key, self._cmd )
+            match = get_close_matches( key, self._commands )
             if match:
                 strerror = strerror + " Try '" + match[0] + "'";
             raise NameError( strerror )
@@ -320,16 +322,16 @@ class Command:
 
     class File:
 
-        def __init__( self, default, exist=False, writable=False, multiple=False, check=None, pathcheck=True ):
+        def __init__( self, default, exist=False, writable=False, multiple=False, check=None ):
             self.multiple = multiple
             self.value = default
             self.must_exist = exist
             self.writable   = writable
             self.default = default
             self.check   = check
-            self.pathcheck=pathcheck
+            self.check=check
             self.units = None
-           # print("FILE INIT : " + str(pathcheck))
+           # print("FILE INIT : " + str(check))
         def args(self):
             dd="file"
             if self.must_exist:
@@ -346,7 +348,7 @@ class Command:
 
             l = []
             for value in value_list:
-                if( self.must_exist  and self.pathcheck ):
+                if( self.must_exist  and self.check ):
                     found = False
                     if basedir and os.path.isfile( os.path.join( basedir, value ) ):
                         value = os.path.join( basedir, value )
@@ -357,7 +359,7 @@ class Command:
                         raise NameError( "File '" + value + "' does not exist" )
                     if not os.access( value, os.R_OK ):
                         raise NameError( "File '" + value + "' cannot be read" )
-                if( self.writable and self.pathcheck ):
+                if( self.writable and self.check ):
                     if basedir:
                         value = os.path.join( basedir, value )
                     try:
