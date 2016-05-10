@@ -1,0 +1,33 @@
+#!/bin/bash
+source ../routines
+
+#cp ../230-qm_1d_scan/mol.prm .
+#cp ../230-qm_1d_scan/mol.xpsf .
+#cp ../230-qm_1d_scan/tor-1D-idx-*.dat .
+#cp ../230-qm_1d_scan/soft-dih-list.txt .
+
+if [ "$AsymmetricTorsion" == "True" ]; then
+	CHECK $BIN_1D_FITTING_ASYMMETRIC
+else
+	CHECK $BIN_1D_FITTING
+fi
+
+NumTorsion=`wc -l soft-dih-list.txt | awk '{print $1}'`
+
+if [ "$NumTorsion" > 1 ]; then
+  rm -Rf saved-para.dat
+  touch saved-para.dat
+  IdxTor=1
+  while [  $IdxTor -le $NumTorsion ]; do
+    head -n 1 torsion-para-${IdxTor}.dat >> saved-para.dat
+    let IdxTor=IdxTor+1
+  done
+else
+  head -n 1 torsion-para-1.dat > saved-para.dat
+fi
+
+CHECK $BIN_1D_ORG
+
+CHECK $BIN_UPDATE_TOR_PARA
+
+exit 0

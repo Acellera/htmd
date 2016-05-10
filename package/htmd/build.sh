@@ -3,6 +3,15 @@ echo "building"
 export PATH=$PATH:/usr/bin/:/bin/
 printenv
 
+# Compile any C code
+
+
+T="$PWD"
+for S in "$PWD/C/"*; do
+	cd "$S"
+	make CC=$CC FC=$FC STATIC=$STATIC
+	cd "$T"
+done
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 

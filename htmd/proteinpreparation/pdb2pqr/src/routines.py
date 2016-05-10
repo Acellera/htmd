@@ -1600,7 +1600,7 @@ class Routines:
         """
 
         # See https://github.com/jensengroup/propka-3.1/blob/master/scripts/propka31.py
-        import propka.lib, propka.molecular_container
+        import propka.molecular_container
         import tempfile
 
         ph = pka_options.pH

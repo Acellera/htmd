@@ -41,39 +41,43 @@ class ProtocolInterface:
         self.__dict__[key] = default
 
     def _cmdFile(self, key, datatype, descr, default, exist=False, writable=False, multiple=False, check=None):
-        self._commands[key] = FileValidator(datatype, descr, default, exist, writable, multiple, check)
+        self._commands[key] = FileValidator(key, datatype, descr, default, exist, writable, multiple, check)
         self.__misc(key, default)
 
+    def _cmdListList( self, key, datatype, descr, length, default=None ):
+        self._commands[key] = ListListValidator( key, datatype, descr, default, length )
+        self.__misc( key, default )
+
     def _cmdString(self, key, datatype, descr, default, valid_values=None):
-        self._commands[key] = StringValidator(datatype, descr, default, valid_values)
+        self._commands[key] = StringValidator(key, datatype, descr, default, valid_values)
         self.__misc(key, default)
 
     def _cmdTimestep(self, key, datatype, descr, default):
-        self._commands[key] = TimestepValidator(datatype, descr, default)
+        self._commands[key] = TimestepValidator(key, datatype, descr, default)
         self.__misc(key, default)
 
     def _cmdList(self, key, datatype, descr, default, valid_values=None):
-        self._commands[key] = ListValidator(datatype, descr, default, valid_values)
+        self._commands[key] = ListValidator(key, datatype, descr, default, valid_values)
         self.__misc(key, default)
 
     def _cmdDict(self, key, datatype, descr, default, key_type=None, val_type=None):
-        self._commands[key] = DictionaryValidator(datatype, descr, default, key_type, val_type)
+        self._commands[key] = DictionaryValidator(key, datatype, descr, default, key_type, val_type)
         self.__misc(key, default)
 
     def _cmdBinary(self, key, datatype, descr, default):
-        self._commands[key] = BinaryValidator(datatype, descr, default)
+        self._commands[key] = BinaryValidator(key, datatype, descr, default)
         self.__misc(key, default)
 
     def _cmdValue(self, key, datatype, descr, default, realdatatype, valid_range, list_len=1, units=None):
-        self._commands[key] = ValueValidator(datatype, descr, default, realdatatype, valid_range, list_len, units)
+        self._commands[key] = ValueValidator(key, datatype, descr, default, realdatatype, valid_range, list_len, units)
         self.__misc(key, default)
 
     def _cmdObject(self, key, datatype, descr, default, classname):
-        self._commands[key] = ObjectValidator(datatype, descr, default, classname)
+        self._commands[key] = ObjectValidator(key, datatype, descr, default, classname)
         self.__misc(key, default)
 
     def _cmdBoolean(self, key, datatype, descr, default):
-        self._commands[key] = BooleanValidator(datatype, descr, default)
+        self._commands[key] = BooleanValidator(key, datatype, descr, default)
         self.__misc(key, default)
 
     def _cmdDeprecated(self, key, newkey=None):
@@ -113,9 +117,11 @@ class ProtocolInterface:
 
 
 class Validator:
-    def __init__(self, datatype, descr, default):
+    def __init__(self, key, datatype, descr, default):
         self.datatype = datatype
-        if os.path.exists(descr):
+        if not descr:
+            desc = os.path.join( "help", "en", key )
+        if descr and os.path.exists(descr):
             f = open(descr, 'r')
             self.descr = f.read()
             f.close()
@@ -141,8 +147,8 @@ class Validator:
 
 # TODO: Maybe better to consolidate it into ValueValidator
 class BooleanValidator(Validator):
-    def __init__(self, datatype, descr, default):
-        super().__init__(datatype, descr, default)
+    def __init__(self, key, datatype, descr, default):
+        super().__init__(key, datatype, descr, default)
 
     def args(self):
         return
@@ -152,8 +158,8 @@ class BooleanValidator(Validator):
 
 
 class ObjectValidator(Validator):
-    def __init__(self, datatype, descr, default, classname):
-        super().__init__(datatype, descr, default)
+    def __init__(self, key,  datatype, descr, default, classname):
+        super().__init__(key, datatype, descr, default)
         self.classname = classname
 
     def args(self):
@@ -165,9 +171,47 @@ class ObjectValidator(Validator):
         return object
 
 
+class ListListValidator(Validator):
+    def __init__(self, key, datatype, descr, default, length ):
+        super().__init__(key, datatype, descr, default )
+        self.length = length
+
+    def args(self):
+        return "A list of lists with length " + self.length       
+ 
+    def validate( self, value_list ):
+            vv=""
+            for t  in value_list: vv=vv + " " +t 
+            vv=vv.strip()
+            if( vv == "[]" ): 
+                  self.value=None
+                  return self.value
+
+            vv=re.sub( "\[", "", vv )
+            vv=re.sub( ",", "", vv )
+            vv=re.sub( "\]\]$", "", vv )
+            vv=re.sub( "\],", ",", vv )
+            vv=re.sub( "'", "", vv )
+            vv=vv.split(",")
+            value=[]
+            for t1 in vv:
+               phi=[]
+               for t2 in t1.strip().split():
+                 phi.append(t2.strip().upper())
+               if(len(phi) != self.length): raise ValueError( "list requires " + self.length + " elements" )
+               value.append(phi)
+
+            if(len(value)):
+	            self.value = value
+
+            return self.value
+
+
+
+
 class StringValidator(Validator):
-    def __init__(self, datatype, descr, default, valid_values=None):
-        super().__init__(datatype, descr, default)
+    def __init__(self, key, datatype, descr, default, valid_values=None):
+        super().__init__(key, datatype, descr, default)
         self.valid_values = valid_values
         self.units = None
 
@@ -196,8 +240,8 @@ class StringValidator(Validator):
 
 
 class TimestepValidator(Validator):
-    def __init__(self, datatype, descr, default):
-        super().__init__(datatype, descr, default)
+    def __init__(self, key, datatype, descr, default):
+        super().__init__(key, datatype, descr, default)
         self.units = None
 
     def args(self):
@@ -227,8 +271,8 @@ class TimestepValidator(Validator):
 
 
 class ListValidator(Validator):
-    def __init__(self, datatype, descr, default, valid_values):
-        super().__init__(datatype, descr, default)
+    def __init__(self, key, datatype, descr, default, valid_values):
+        super().__init__(key, datatype, descr, default)
         self.valid_values = valid_values
         self.units = None
 
@@ -245,8 +289,8 @@ class ListValidator(Validator):
 
 
 class DictionaryValidator(Validator):
-    def __init__(self, datatype, descr, default, key_type=None, val_type=None):
-        super().__init__(datatype, descr, default)
+    def __init__(self, key, datatype, descr, default, key_type=None, val_type=None):
+        super().__init__(key, datatype, descr, default)
         self.key_type = key_type
         self.val_type = val_type
 
@@ -265,8 +309,8 @@ class DictionaryValidator(Validator):
 
 
 class BinaryValidator(Validator):
-    def __init__(self, type, descr, default):
-        super().__init__(type, descr, default)
+    def __init__(self, key, type, descr, default):
+        super().__init__(key, type, descr, default)
         self.units = None
 
     def args(self):
@@ -299,8 +343,8 @@ class BinaryValidator(Validator):
 
 
 class FileValidator(Validator):
-    def __init__(self, datatype, descr, default, exist=False, writable=False, multiple=False, check=None):
-        super().__init__(datatype, descr, default)
+    def __init__(self, key, datatype, descr, default, exist=False, writable=False, multiple=False, check=None):
+        super().__init__(key, datatype, descr, default)
         self.multiple = multiple
         self.must_exist = exist
         self.writable = writable
@@ -341,8 +385,6 @@ class FileValidator(Validator):
                     f.close()
                 except:
                     raise NameError("File '" + value + "' is not writable")
-            if self.check:
-                value = self.check(value, basedir=basedir)
             l.append(value)
 
         # Test to see if the file exists
@@ -356,8 +398,8 @@ class FileValidator(Validator):
 
 
 class ValueValidator(Validator):
-    def __init__(self, datatype, descr, default, realdatatype, valid_range, list_len=1, units=None):
-        super().__init__(datatype, descr, default)
+    def __init__(self, key, datatype, descr, default, realdatatype, valid_range, list_len=1, units=None):
+        super().__init__(key, datatype, descr, default)
         self.valid_range = valid_range
         self.list_len = list_len
         self.units = units

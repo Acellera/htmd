@@ -1,0 +1,29 @@
+#!/bin/bash
+source ../routines
+
+# Generate fit-mol.conf, the configuration file for fitcharge
+
+cat equiv-org.txt > fit-mol.conf
+cat neutral.txt   >> fit-mol.conf
+cat fixq.txt      >> fit-mol.conf
+
+echo "E14FAC $E14FAC" >> fit-mol.conf
+echo "netcharge $NetCharge" >> fit-mol.conf
+
+echo "w_H_Donor_Acceptor $w_H_Donor_Acceptor" >> fit-mol.conf
+echo "w_charge $w_charge" >> fit-mol.conf
+echo "w_water_E_min $w_water_E_min" >> fit-mol.conf
+echo "w_water_R_min $w_water_R_min" >> fit-mol.conf
+echo "w_alpha $w_alpha" >> fit-mol.conf
+echo "w_thole $w_thole" >> fit-mol.conf
+
+echo "FILE_FORCE_FIELD    mol.prm" >> fit-mol.conf
+echo "FILE_PSF            mol.xpsf" >> fit-mol.conf
+echo "FILE_XYZ            mol-opt.xyz" >> fit-mol.conf
+echo "FILE_pot0           mol-esp.dat" >> fit-mol.conf 
+grep "    X= " cal-esp.out | head -n 1 | awk '{print "DIPOLE_QM " $2 "  "  $4 "   " $6 "   " $8}' >> fit-mol.conf
+
+CHECK $BIN_FITCHARGE fit-mol.conf
+CHECK $BIN_UPDATE_XPSF
+
+exit 0

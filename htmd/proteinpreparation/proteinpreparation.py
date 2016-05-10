@@ -148,7 +148,6 @@ def prepareProtein(mol_in,
     # Here I parse the returned protein object and recreate a Molecule,
     # because I need to access the properties.
     logger.info("Building Molecule object.")
-    mol_out = Molecule()
 
     name = []
     resid = []
@@ -191,7 +190,7 @@ def prepareProtein(mol_in,
 
     mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
-    resdata_out._setPKAs(pdb2pqr_protein.pka_molecule)
+    resdata_out._importPKAs(pdb2pqr_protein.pka_molecule)
     resdata_out.pdb2pqr_protein = pdb2pqr_protein
     resdata_out.pka_protein = pdb2pqr_protein.pka_molecule
     resdata_out.pka_dict = pdb2pqr_protein.pkadic
