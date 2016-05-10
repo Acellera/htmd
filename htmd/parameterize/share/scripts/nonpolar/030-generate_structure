@@ -1,0 +1,29 @@
+#!/bin/bash
+
+source ../routines
+
+if [ ! -s equiv-org.txt ]; then #if zero length
+  CHECK $BIN_EQUIV_ATOM mol.rtf
+fi
+
+
+cp mol.rtf org-mol.rtf
+cp mol.prm org-mol.prm
+
+CHECK $BIN_ADD_TIP3 mol.rtf mol.prm $NetCharge $E14FAC
+CHECK $BIN_GEN_XPSF mol.rtf mol.xpsf MOL
+CHECK $BIN_GEN_XPSF mol.rtf mol-wat.xpsf MOL TIP3
+#CHECK $BIN_PDB_TO_CRD
+
+if [ ! -s soft-dih-list.txt ]; then
+   # Only generate this if the user didn't
+   # explicitly specify a torsion
+   # (indicated by a non-zero length s-d-l.txt )
+
+   CHECK $BIN_GEN_SOFT_LIST
+fi
+
+cp mol.xpsf org-mol.xpsf
+
+
+exit 0

@@ -1,0 +1,210 @@
+* Topology and Parameter Stream File to add the
+* CHARMM27 aliphatic carbon and hydrogen parameters
+* to the CHARMM22 protein parameters.  Note that
+* new atom types are added rather than converting the
+* parameters.  This file is required for other toppar
+* stream files
+*
+
+!Parent files that have to be read prior to streaming this file
+!top_all22_prot.inp
+!par_all22_prot.inp
+!
+!Testcase
+!test_all22_prot_pyridines.inp
+
+!add new alkane CT, CT1x, CT2x, CT3x, HA1, HA2, HA3 atom types to allow
+!for new additions to the force field to be consistent with the new 
+!alkane VDW params
+
+! The following must be added to the top_all22_prot.inp
+! MASS list prior to running this stream file. 
+! Caution: Be sure that the atom numbers do not overlap
+! with numbers already present.
+!
+
+!The following atom types are unique to the new aliphatic atom types and
+!have been added to the protein rtf and parameter files.  In
+!future versions of charmm, if the ability to append MASSes is added
+!these atom types should be removed from the original topology and
+!the following lines uncommented.
+!MASS    13 HA1    1.00800 H ! alkane, CH, new LJ params
+!MASS    14 HA2    1.00800 H ! alkane, CH2, new LJ params
+!MASS    15 HA3    1.00800 H ! alkane, CH3, new LJ params
+!MASS    42 CT    12.01100 C ! aliphatic sp3 C, new LJ params, no hydrogens
+!MASS    43 CT1x  12.01100 C ! aliphatic sp3 C for CH, new LJ params
+!MASS    44 CT2x  12.01100 C ! aliphatic sp3 C for CH2, new LJ params
+!MASS    45 CT3x  12.01100 C ! aliphatic sp3 C for CH3, new LJ params
+
+read para card append
+
+BONDS
+!
+!V(bond) = Kb(b - b0)**2
+!
+!Kb: kcal/mole/A**2
+!b0: A
+!
+!atom type Kb          b0
+!
+OH1  CT2x  428.000     1.4200 ! ALLOW   ALI ALC ARO
+                ! methanol vib fit EMB 11/21/89
+CT3x C     250.000     1.4900 ! ALLOW   ALI PEP POL ARO
+                ! Ala Dipeptide ab initio calc's (LK) fixed from 10/90 (5/91)
+CT1x  HA1  309.00      1.111   ! alkanes, 3/92
+CT2x  HA2  309.00      1.111   ! alkanes, 4/98
+CT3x  HA3  322.00      1.111   ! alkanes, 4/98
+CT    CT2x  222.500    1.538   ! 10/98
+CT    CT3x  222.500    1.538   ! 10/98
+CT1x  CT1x  222.500    1.500   ! alkanes, 3/92
+CT1x  CT2x  222.500    1.538   ! alkanes, 3/92
+CT1x  CT3x  222.500    1.538   ! alkanes, 3/92
+CT2x  CT2x  222.500    1.530   ! alkanes, 3/92
+CT2x  CT3x  222.500    1.528   ! alkanes, 3/92
+CT3x  CT3x  222.500    1.530   ! alkanes, 3/92
+!all alkene related terms directly from lipids
+CE1   CT2x  365.000     1.502   ! butene; from propene, yin,adm jr., 12/95
+CE1   CT3x  383.000     1.504   ! butene, yin,adm jr., 12/95
+
+ANGLES
+!
+!V(angle) = Ktheta(Theta - Theta0)**2
+!
+!V(Urey-Bradley) = Kub(S - S0)**2
+!
+!Ktheta: kcal/mole/rad**2
+!Theta0: degrees
+!Kub: kcal/mole/A**2 (Urey-Bradley)
+!S0: A
+!
+!atom types     Ktheta    Theta0   Kub     S0
+!
+H    OH1  CT2x   57.500   106.0000 ! ALLOW   ALC ARO ALI
+                ! methanol vib fit EMB 11/21/89
+OH1  CT2x HA2    45.900   108.8900 ! ALLOW   ALI ALC ARO
+                ! MeOH, EMB, 10/10/89
+NH1  C    CT3x   80.000   116.5000 ! ALLOW   ALI PEP POL ARO
+                ! NMA Vib Modes (LK)
+O    C    CT3x   80.000   121.0000 ! ALLOW   ALI PEP POL ARO
+                ! Alanine Dipeptide ab initio calc's (LK)
+HA3  CT3x C     33.000    109.50   30.00   2.16300 ! ALLOW   ALI PEP POL ARO
+                ! alanine dipeptide, LK, replaced, adm jr., 5/09/91
+HA2  CT2x HA2    35.500    109.00    5.40   1.80200 ! alkane, 3/92
+HA3  CT3x HA3    35.500    108.40    5.40   1.80200 ! alkane, 3/92
+HA1  CT1x CT1x   34.500    110.10   22.53   2.179  ! alkane, 3/92
+HA1  CT1x CT2x   34.500    110.10   22.53   2.179  ! alkane, 3/92
+HA1  CT1x CT3x   34.500    110.10   22.53   2.179  ! alkane, 3/92
+HA2  CT2x CT     26.500    110.10   22.53   2.179  ! alkane, 4/98
+HA2  CT2x CT1x   26.500    110.10   22.53   2.179  ! alkane, 4/98
+HA2  CT2x CT2x   26.500    110.10   22.53   2.179  ! alkane, 4/98
+HA2  CT2x CT3x   34.600    110.10   22.53   2.179  ! alkane, 4/98
+HA3  CT3x CT     33.430    110.10   22.53   2.179  ! alkane, 4/98
+HA3  CT3x CT1x   33.430    110.10   22.53   2.179  ! alkane, 4/98
+HA3  CT3x CT2x   34.600    110.10   22.53   2.179  ! alkane, 4/98
+HA3  CT3x CT3x   37.500    110.10   22.53   2.179  ! alkane, 4/98
+CT   CT2x CT2x   58.350    113.50   11.16   2.561  ! glycerol
+CT1x CT1x CT1x   53.350    111.00    8.00   2.561  ! alkane, 3/92
+CT1x CT1x CT2x   58.350    113.50   11.16   2.561  ! glycerol
+CT1x CT1x CT3x   53.350    108.50    8.00   2.561  ! alkane, 3/92
+CT1x CT2x CT1x   58.350    113.50   11.16   2.561  ! glycerol
+CT1x CT2x CT2x   58.350    113.50   11.16   2.561  ! glycerol
+CT1x CT2x CT3x   58.350    113.50   11.16   2.561  ! glycerol
+CT2x CT1x CT2x   58.350    113.50   11.16   2.561  ! glycerol
+CT2x CT2x CT2x   58.350    113.60   11.16   2.561  ! alkane, 3/92
+CT2x CT2x CT3x   58.000    115.00    8.00   2.561  ! alkane, 3/92
+!all alkene related terms directly from lipids
+CE1  CE1  CT2x   48.00     123.50   ! from 2-butene, yin,adm jr., 12/95
+CE1  CE1  CT3x   48.00     123.50   ! 2-butene, yin,adm jr., 12/95
+CE2  CE1  CT2x   48.00     126.00   ! 1-butene; from propene, yin,adm jr., 12/95
+CE2  CE1  CT3x   47.00     125.20   ! propene, yin,adm jr., 12/95
+HE1  CE1  CT2x   40.00     116.00   ! 1-butene; from propene, yin,adm jr., 12/95
+HE1  CE1  CT3x   22.00     117.00   ! propene, yin,adm jr., 12/95
+CE1  CT2x CT2x   32.00     112.20   ! 1-butene; from propene, yin,adm jr., 12/95
+CE1  CT2x CT2    32.00     112.20   ! 1-butene; from propene, yin,adm jr., 12/95
+CE1  CT2x CT3x   32.00     112.20   ! 1-butene; from propene, yin,adm jr., 12/95
+CE1  CT2x CT3    32.00     112.20   ! 1-butene; from propene, yin,adm jr., 12/95
+HA2  CT2x CE1    45.00     111.50   ! 1-butene; from propene, yin,adm jr., 12/95
+HA3  CT3x CE1    42.00     111.50   ! 2-butene, yin,adm jr., 12/95
+
+DIHEDRALS
+!
+!V(dihedral) = Kchi(1 + cos(n(chi) - delta))
+!
+!Kchi: kcal/mole
+!n: multiplicity
+!delta: degrees
+!
+!atom types             Kchi    n   delta
+!
+H    NH1  C    CT3x     2.5000  2   180.00 !  ALLOW PEP
+                ! Gives appropriate NMA cis/trans barrier. (LK)
+NH1  C    CT3x HA3      0.0000  3     0.00 ! ALLOW PEP
+                ! LK for autogenerate dihe, sp2-methyl, no dihedral potential
+O    C    CT3x HA3      0.0000  3   180.00 ! ALLOW POL
+                ! adm jr., 8/13/90 acetamide geometry and vibrations
+X    CT2x OH1  X        0.1400  3     0.00 ! ALLOW   ALI ALC ARO
+X    CT1x CT1x X        0.200   3     0.00 ! alkane, 3/92
+X    CT1x CT2x X        0.200   3     0.00 ! alkane, 3/92
+X    CT1x CT3x X        0.200   3     0.00 ! alkane, 3/92
+X    CT2x CT2x X        0.1900  3     0.00 ! alkane, 4/98, yin and mackerell
+X    CT2x CT3x X        0.1600  3     0.00 ! alkane, 4/98, yin and mackerell
+X    CT3x CT3x X        0.1525  3     0.00 ! alkane, 4/98, yin and mackerell
+CT3x CT2x CT2x CT3x     0.10    2   180.00 ! alkane, 4/98, adm jr., lower butane gauche conformer
+CT3x CT2x CT2x CT3x     0.15    4     0.00 ! alkane, 4/98, adm jr.
+CT3x CT2x CT2x CT3x     0.10    6   180.00 ! alkane, 4/98, adm jr.
+CT2x CT2x CT2x CT3x     0.10    2   180.00 ! alkane, 4/98, adm jr.
+CT2x CT2x CT2x CT3x     0.15    4     0.00 ! alkane, 4/98, adm jr.
+CT2x CT2x CT2x CT3x     0.10    6   180.00 ! alkane, 4/98, adm jr.
+CT2x CT2x CT2x CT2x     0.10    2   180.00 ! alkane, 4/98, adm jr.
+CT2x CT2x CT2x CT2x     0.15    4     0.00 ! alkane, 4/98, adm jr.
+CT2x CT2x CT2x CT2x     0.10    6   180.00 ! alkane, 4/98, adm jr.
+!all alkene related terms directly from lipids
+CT2x CE1  CE2  HE2      5.2000  2   180.00 ! propene, yin,adm jr., 12/95
+CT3x CE1  CE2  HE2      5.2000  2   180.00 ! propene, yin,adm jr., 12/95
+CE1  CE1  CT2x HA2      0.0300  3     0.00 ! butene, yin,adm jr., 12/95
+CE1  CE1  CT3x HA3      0.0300  3     0.00 ! butene, yin,adm jr., 12/95
+CE1  CE1  CT2x CT2x     0.5000  1   180.00 ! 1-butene, adm jr., 2/00 update
+CE1  CE1  CT2x CT2x     1.3000  3   180.00 ! 1-butene, adm jr., 2/00 update
+CE2  CE1  CT2x CT2x     0.5000  1   180.00 ! 1-butene, adm jr., 2/00 update
+CE2  CE1  CT2x CT2x     1.3000  3   180.00 ! 1-butene, adm jr., 2/00 update
+CE2  CE1  CT2x CT3x     0.5000  1   180.00 ! 1-butene, adm jr., 2/00 update
+CE2  CE1  CT2x CT3x     1.3000  3   180.00 ! 1-butene, adm jr., 2/00 update
+CE2  CE1  CT2x HA2      0.1200  3     0.00 ! 1-butene, yin,adm jr., 12/95
+CE2  CE1  CT3x HA3      0.050   3   180.00 ! propene, yin,adm jr., 12/95
+HE1  CE1  CT2x CT2x     0.1200  3     0.00 ! butene, yin,adm jr., 12/95
+HE1  CE1  CT2x CT3x     0.1200  3     0.00 ! butene, yin,adm jr., 12/95
+HE1  CE1  CT2x HA2      0.0000  3     0.00 ! butene, adm jr., 2/00 update
+HE1  CE1  CT3x HA3      0.0000  3     0.00 ! butene, adm jr., 2/00 update
+
+NONBONDED nbxmod  5 atom cdiel shift vatom vdistance vswitch -
+cutnb 14.0 ctofnb 12.0 ctonnb 10.0 eps 1.0 e14fac 1.0 wmin 1.5 
+                !adm jr., 5/08/91, suggested cutoff scheme
+!
+!V(Lennard-Jones) = Eps,i,j[(Rmin,i,j/ri,j)**12 - 2(Rmin,i,j/ri,j)**6]
+!
+!epsilon: kcal/mole, Eps,i,j = sqrt(eps,i * eps,j)
+!Rmin/2: A, Rmin,i,j = Rmin/2,i + Rmin/2,j
+!
+!atom  ignored    epsilon      Rmin/2   ignored   eps,1-4       Rmin/2,1-4
+!
+
+!The following atom types are unique to the new aliphatic atom types and
+!have been added to the protein rtf and parameter files.  In
+!future versions of charmm, if the ability to append MASSes is added
+!these atom types should be removed from the original topology and
+!the following lines uncommented.
+!
+!new alkanes atoms types for conversion to new LJ parameters for c27
+!CT       0.0       -0.0200    2.275 0.0 -0.01 1.9 ! from CT1x: needs work
+!CT1x     0.0       -0.0200    2.275 0.0 -0.01 1.9 ! alkane, 3/92: needs work
+!CT2x     0.0       -0.0560    2.010 0.0 -0.01 1.9 ! alkane, 4/98, yin, adm jr.
+!CT3x     0.0       -0.0780    2.040 0.0 -0.01 1.9 ! alkane, 4/98, yin, adm jr.
+
+!new alkanes atoms types for conversion to new LJ parameters for c27
+!HA1     0.0       -0.022     1.3200 ! alkane, 3/92
+!HA2     0.0       -0.028     1.3400 ! alkane, yin and mackerell, 4/98
+!HA3     0.0       -0.024     1.3400 ! alkane, yin and mackerell, 4/98
+
+end
+
+return

@@ -4,11 +4,11 @@ from subprocess import call, check_output
 import sys
 
 excludedfolders = ('./tests', './htmd/proteinpreparation', './doc')
-excludedfiles = ('__init__.py')
+excludedfiles = ('__init__.py',)   # Trailing comma needed otherwise it's not a tuple
 
 
-def excluded(name, exlusionlist):
-    for e in exlusionlist:
+def excluded(name, exclusionlist):
+    for e in exclusionlist:
         if name.startswith(e):
             return True
     return False
@@ -20,9 +20,8 @@ for root, dirnames, filenames in os.walk('.'):
         continue
 
     for filename in fnmatch.filter(filenames, '*.py'):
-        if excluded(filename, excludedfiles):
-            continue
-        filestotest.append(os.path.join(root, filename))
+        if not excluded(filename, excludedfiles):
+            filestotest.append(os.path.join(root, filename))
 
 # Running py files
 failed = []

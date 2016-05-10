@@ -14,7 +14,7 @@ from htmd.molecule.psf import *
 from htmd.molecule.vmdparser import *
 from htmd.molecule.xtc import *
 from htmd.molecule.wrap import *
-from htmd.rotationmatrix import rotationmatrix
+from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
 from math import pi
 from copy import deepcopy
@@ -42,6 +42,11 @@ class Molecule:
     --------
     >>> mol = Molecule( './test/data/dhfr/dhfr.pdb' )  # doctest: +SKIP
     >>> mol = Molecule( '3PTB', name='Trypsin' )
+    >>> print(mol)                                     # doctest: +ELLIPSIS
+    Molecule with 1701 atoms and 1 frames
+    PDB field - altloc shape: (1701,)
+    PDB field - beta shape: (1701,)
+    ...
 
     Properties
     ----------
@@ -162,7 +167,12 @@ class Molecule:
 
         Example
         -------
-        >>> mol.insert(Molecule('3PTB'), 158)
+        >>> mol=tryp.copy()
+        >>> mol.numAtoms
+        1701
+        >>> mol.insert(tryp, 0)
+        >>> mol.numAtoms
+        3402
         """
         backup = self.copy()
         mol = mol.copy()  # Copy because I'll modify its bonds
@@ -205,9 +215,16 @@ class Molecule:
         selection : str
             Atomselection string selecting the atoms we want to remove
 
+        Returns
+        -------
+        removed : np.array
+            The list of atoms removed
+
         Example
         -------
-        >>> mol.remove('name CA')
+        >>> mol=tryp.copy()
+        >>> mol.remove('name CA')               # doctest: +ELLIPSIS
+        array([   1,    9,   16,   20,   24,   36,   43,   49,   53,   58,...
         """
         sel = np.where(self.atomselect(selection))[0]
         self._removeBonds(sel)
@@ -227,15 +244,20 @@ class Molecule:
         sel : str
             Atom selection string selecting which atoms we want to get the field from. Default all.
 
-        Return 
+        Returns
         ------
         vals : np.ndarray
             Array of values of `field` for all atoms in the selection.
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.get('resname')
+        array(['ILE', 'ILE', 'ILE', ..., 'HOH', 'HOH', 'HOH'], dtype=object)
         >>> mol.get('resname', sel='resid 158')
+        array(['LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU', 'LEU'], dtype=object)
+
+
         """
         if field != 'index' and field not in self._pdb_fields:
             raise NameError("Invalid field '" + field + "'")
@@ -262,6 +284,7 @@ class Molecule:
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.set('segid', 'P', sel='protein')
         """
         if field not in self._pdb_fields:
@@ -288,6 +311,7 @@ class Molecule:
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.align('protein')
         >>> mol.align('name CA', refmol=Molecule('3PTB'))
         """
@@ -332,7 +356,11 @@ class Molecule:
 
         Example
         -------
-        >>> mol.append(Molecule('3PTB'))
+        >>> mol=tryp.copy()
+        >>> mol.filter("not resname BEN")
+        >>> lig=tryp.copy()
+        >>> lig.filter("resname BEN")
+        >>> mol.append(lig)
         """
         if collisions:
             # Set different occupancy to separate atoms of mol1 and mol2
@@ -390,7 +418,9 @@ class Molecule:
 
         Examples
         --------
-        >>> a = mol.atomselect('resname MOL')
+        >>> mol=tryp.copy()
+        >>> mol.atomselect('resname MOL')
+        array([False, False, False, ..., False, False, False], dtype=bool)
         """
         if sel is None or (isinstance(sel, str) and sel == 'all'):
             s = np.ones(self.numAtoms, dtype=bool)
@@ -430,6 +460,7 @@ class Molecule:
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.filter('protein')
         '''
         s = self.atomselect(sel)
@@ -450,13 +481,14 @@ class Molecule:
         map = np.ones(self.numAtoms, dtype=int)
         map[idx] = -1
         map[map == 1] = np.arange(self.numAtoms - len(idx))
-        self.bonds[:, 0] = map[self.bonds[:, 0]]
-        self.bonds[:, 1] = map[self.bonds[:, 1]]
-        remA = self.bonds[:, 0] == -1
-        remB = self.bonds[:, 1] == -1
+        bonds = np.array(self.bonds, dtype=np.int32)  # Have to store in temp because bonds is uint and can't accept -1 values
+        bonds[:, 0] = map[self.bonds[:, 0]]
+        bonds[:, 1] = map[self.bonds[:, 1]]
+        remA = bonds[:, 0] == -1
+        remB = bonds[:, 1] == -1
         stays = np.invert(remA | remB)
         # Delete bonds between non-existant atoms
-        self.bonds = self.bonds[stays, :]
+        self.bonds = bonds[stays, :]
 
     def guessBonds(self):
         """ Tries to guess the bonds in the Molecule
@@ -477,6 +509,7 @@ class Molecule:
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.moveBy([3, 45 , -8])
         '''
         vector = np.array(vector)
@@ -502,9 +535,10 @@ class Molecule:
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.rotate([0, 1, 0], 1.57)
         """
-        M = rotationmatrix(axis, angle)
+        M = rotationMatrix(axis, angle)
         s = self.atomselect(sel, indexes=True)
         for a in s:
             self.coords[a, :, self.frame] = np.dot(M, self.coords[a, :, self.frame])
@@ -536,6 +570,7 @@ class Molecule:
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.center()
         >>> mol.center([10, 10, 10], 'name CA')
         """
@@ -589,6 +624,8 @@ class Molecule:
             self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
+        elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
+            self._readPDB(filename, mode='pdbqt')
         elif (type is None and firstfile.endswith(".xtc")) or type == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
         elif (type is None and firstfile.endswith(".coor")) or type == "coor":
@@ -675,17 +712,17 @@ class Molecule:
             self.coords[idx, 2, nf] = float(s[3])
             self.resname[idx] = "MOL"
 
-    def _readPDB(self, filename):
+    def _readPDB(self, filename, mode='pdb'):
         mol = []
         if os.path.isfile(filename):
-            mol = PDBParser(filename)
+            mol = PDBParser(filename, mode)
         elif len(filename) == 4:
             # Try loading it from the PDB website
             r = requests.get(
                 "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
             if r.status_code == 200:
                 tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                mol = PDBParser(tempfile)
+                mol = PDBParser(tempfile, mode)
                 os.unlink(tempfile)
             else:
                 raise NameError('Invalid PDB code')
@@ -986,12 +1023,14 @@ class Molecule:
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.mutateResidue('resid 158', 'ARG')
         """
         s = self.atomselect(sel, strict=True)
         # Changed the selection from "and sidechain" to "not backbone" to remove atoms like phosphates which are bonded
-        # but not part of the sidechain
-        removed = self.remove(sel + ' and not backbone', _logger=False)
+        # but not part of the sidechain. Changed again the selection to "name C CA N O" because "backbone" works for
+        # both protein and nucleic acid backbones and it confuses phosphates of modified residues for nucleic backbones.
+        removed = self.remove(sel + ' and not name C CA N O', _logger=False)
         s = np.delete(s, removed)
         self.set('resname', newres, sel=s)
 
@@ -1005,6 +1044,7 @@ class Molecule:
 
         Examples
         --------
+        >>> mol=tryp.copy()
         >>> mol.wrap()
         >>> mol.wrap('protein')
         """
@@ -1137,8 +1177,8 @@ class Molecule:
 
         Example
         -------
-        >>> mol = Molecule()
-        >>> mol.empty(100)
+        >>> newmol = Molecule()
+        >>> newmol.empty(100)
         """
         self.record = np.array(['ATOM'] * numAtoms, dtype=self._pdb_fields['record'])
         self.chain = np.array(['X'] * numAtoms, dtype=self._pdb_fields['chain'])
@@ -1166,15 +1206,24 @@ class Molecule:
         Returns
         -------
         sequence : str
-            The primary sequence as a string
+            The primary sequence as a dictionary segid - string (if oneletter is True) or segid - list of
+            strings (otherwise).
 
         Examples
         --------
-        >>> m=Molecule("3PTB"); m.filter("protein")
-        >>> m.sequence()
+        >>> mol=tryp.copy()
+        >>> mol.sequence()
         {'0': 'IVGGYTCGANTVPYQVSLNSGYHFCGGSLINSQWVVSAAHCYKSGIQVRLGEDNINVVEGNEQFISASKSIVHPSYNSNTLNNDIMLIKLKSAASLNSRVASISLPTSCASAGTQCLISGWGNTKSSGTSYPDVLKCLKAPILSDSSCKSAYPGQITSNMFCAGYLEGGKDSCQGDSGGPVVCSGKLQGIVSWGSGCAQKNKPGVYTKVCNYVSWIKQTIASN'}
+        >>> sh2 = Molecule("1LKK")
+        >>> pYseq = sh2.sequence(oneletter=False)
+        >>> pYseq['1']
+        ['PTR', 'GLU', 'GLU', 'ILE']
+        >>> pYseq = sh2.sequence(oneletter=True)
+        >>> pYseq['1']
+        '?EEI'
+
         """
-        residues = {'ARG': 'R', 'AR0': 'R',
+        residueTable = {'ARG': 'R', 'AR0': 'R',
                     'HIS': 'H', 'HID': 'H', 'HIE': 'H',
                     'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
                     'ASP': 'D', 'ASH': 'D',
@@ -1199,24 +1248,33 @@ class Molecule:
         prot = self.atomselect('protein')
         segs = np.unique(self.segid[prot])
         increm = sequenceID((self.resid, self.insertion, self.chain))
-        sequence = {}
-        olsequence = {}
+
+        segSequences = {}
+
+        # Iterate over segments
         for seg in segs:
-            sequence[seg] = []
-            olsequence[seg] = ''
+            segSequences[seg] = []
             segatoms = self.atomselect('protein and segid {}'.format(seg))
             resnames = self.resname[segatoms]
             incremseg = increm[segatoms]
-            for i in np.unique(incremseg):
+            for i in np.unique(incremseg):  # Iterate over residues
                 resname = np.unique(resnames[incremseg == i])
                 if len(resname) != 1:
-                    raise AssertionError('Something went wrong here.')
-                sequence[seg].append(resname)
-                olsequence[seg] += residues[resname[0]]
+                    raise AssertionError('Unexpected non-uniqueness of chain, resid, insertion in the sequence.')
+                resname = resname[0]
+                if oneletter:
+                    rescode = residueTable.get(resname, "?")
+                    if rescode == "?":
+                        logger.warning("Cannot provide one-letter code for non-standard residue %s" % resname)
+                else:
+                    rescode = resname
+                segSequences[seg].append(rescode)
+
+        # Join single letters into strings
         if oneletter:
-            return olsequence
-        else:
-            return sequence
+            segSequences = {k: "".join(segSequences[k]) for k in segSequences }
+
+        return segSequences
 
     @property
     def numFrames(self):
@@ -1229,6 +1287,21 @@ class Molecule:
         """ Number of atoms in the molecule
         """
         return np.size(self.coords, 0)
+
+    @property
+    def x(self):
+        """Get the x coordinates at the current frame"""
+        return self.coords[:,0,self.frame]
+
+    @property
+    def y(self):
+        """Get the y coordinates at the current frame"""
+        return self.coords[:,1,self.frame]
+
+    @property
+    def z(self):
+        """Get the z coordinates at the current frame"""
+        return self.coords[:,2,self.frame]
 
     def __str__(self):
         def formatstr(name, field):
@@ -1311,7 +1384,7 @@ class Representations:
     Examples
     --------
     >>> from htmd.molecule.molecule import Molecule
-    >>> mol = Molecule('3PTB')
+    >>> mol = tryp.copy()
     >>> mol.reps.add('protein', 'NewCartoon')
     >>> print(mol.reps)                     # doctest: +NORMALIZE_WHITESPACE
     rep 0: sel='protein', style='NewCartoon', color='Name'
@@ -1556,20 +1629,23 @@ class _Representation:
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
-    from htmd.molecule.molecule import _Representation
 
-    mol = Molecule('3PTB')
-    a = mol.get('resid', sel='resname TRP')
-    a = mol.get('coords')
-    print(a.ndim)
-    mol.write('/tmp/test.pdb')
-    mol.write('/tmp/test.coor')
-    mol.write('/tmp/test.xtc')
-    mol.moveBy([1, 1, 1])
-    mol.rotate([1, 0, 0], pi / 2)
-    mol.align('name CA')
-
+    # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
+    # I do a 'copy' before each.
     import doctest
-    doctest.testmod(globs={'mol': mol})
+    m = Molecule('3PTB')
+    doctest.testmod(extraglobs={'tryp': m.copy() })
+
+    # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May
+    # have to do with the vmd console?
+    a = m.get('resid', sel='resname TRP')
+    a = m.get('coords')
+    print(a.ndim)
+    m.write('/tmp/test.pdb')
+    m.write('/tmp/test.coor')
+    m.write('/tmp/test.xtc')
+    m.moveBy([1, 1, 1])
+    m.rotate([1, 0, 0], pi / 2)
+    m.align('name CA')
+
     # test rotate
