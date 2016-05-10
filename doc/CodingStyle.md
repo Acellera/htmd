@@ -9,6 +9,7 @@ Note: some style is at variance with Python PIP recommendations.
 * Make the main a test case, where possible. 
 * Name methods as verbs.
 * Use namespaces instead of composite name, e.g. charmm.build() instead of charmmBuild() when possible
+* Try to keep single names, so no need for camelCase
 
 
 Importing htmd
