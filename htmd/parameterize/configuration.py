@@ -82,7 +82,7 @@ class Configuration:
         #key = key.replace( '-', '_' )
 #        key = Command.test_deprecation( key, value )
         if key:
-            print(key)
+#            print(key)
             value = self._commands._commands[key].validate( value, self._basedir )
             self.__dict__[key] = value;
         else:
