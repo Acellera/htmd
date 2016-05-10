@@ -1,0 +1,26 @@
+#!/bin/bash
+
+source ../routines
+
+#ln -s soft-dih-list-new.txt soft-dih-list.txt
+
+NumTorsion=`wc -l soft-dih-list.txt | awk '{print $1}'`
+#BIN=$BIN_QM_1D_SCAN_LARGE_PARA
+#
+#if [ "$NumTorsion" -lt "$MaxTorsion" ]; then
+	BIN=$BIN_QM_1D_SCAN_PARA
+#fi
+
+
+if [ "$1" == "--prepare" ]; then
+	CHECK $BIN --prepare
+elif [ "$1" == "--complete" ]; then
+	CHECK $BIN --complete
+else
+	CHECK $BIN --prepare
+	$BIN_RUN_QM_JOBS
+	CHECK $BIN --complete
+fi
+
+exit 0
+

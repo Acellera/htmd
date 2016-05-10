@@ -3,8 +3,9 @@ from difflib import get_close_matches
 import re
 import os
 class Configuration:
-    def __init__(self, config=None, pathcheck=True, **kwargs ):
-        c = Command.get_default_configuration( pathcheck=pathcheck )
+    def __init__(self, config=None, check=True, **kwargs ):
+        self._commands = Command( check=check )
+        c = self._commands.get_default_configuration( check=check )
 
         inputfile=None
 
@@ -79,15 +80,16 @@ class Configuration:
             return
 
         #key = key.replace( '-', '_' )
-        key = Command.test_deprecation( key, value )
+#        key = Command.test_deprecation( key, value )
         if key:
-            value = Command.validate( key , value, basedir=self._basedir )
+            print(key)
+            value = self._commands._commands[key].validate( value, self._basedir )
             self.__dict__[key] = value;
         else:
             key = key.lower()
-            key = Command.test_deprecation( key, value )
+#            key = Command.test_deprecation( key, value )
             if key:
-                value = Command.validate( key , value, basedir=self._basedir )
+                value = self._commands._commands[key].validate( value, self._basedir )
                 self.__dict__[key] = value;
 
 
@@ -105,7 +107,7 @@ class Configuration:
         except:
 
             errstr= "Command '" + key + "' not found.";
-            match = get_close_matches( key, Command.commands )
+            match = get_close_matches( key, self._commands.commands )
             if match:
                 errstr = errstr + " Try '"+ match[0] +"'";
             raise NameError( errstr )
@@ -137,7 +139,7 @@ class Configuration:
 
     @staticmethod
     def help( command ):
-        return Command.help( command )
+        return self._commands.help( command )
 
 
 

@@ -1,0 +1,106 @@
+MATCH Version 0.01
+
+INSTALL
+
+two paths need to be set 
+
+MATCH = clonepath/MATCH/MATCH
+PerlChemistry = clonepath/MATCH/PerlChemistry
+
+in OSX this is done by
+
+export MATCH=clonepath/MATCH/MATCH
+export PerlChemistry=clonepath/MATCH/PerlChemistry
+
+in linux 
+
+setenv MATCH clonepath/MATCH/MATCH
+setenv PerlChemistry clonepath/MATCH/PerlChemistry
+
+This needs to be done to tell perl where the perl packages are
+
+Also to use any script they need to be chmod +x to execute.
+
+example for MATCH.pl
+
+chmod +x clonepath/MATCH/MATCH/scripts/MATCH.pl
+
+##############################################################
+
+BASIC INFO 
+
+in MATCH/MATCH
+
+/lib is the location of all the perl module files are located
+
+/resources contains all the default MATCH libraries for each forcefield currently implemented in MATCH, there is also a .par files for each forcefield which gives you the default parameters for a given force field when 
+
+MATCH.pl -forcefield forcefieldname 
+
+is used. Strongly recommended not to change the parameters in this file but to override them on the command line by 
+
+MATCH.pl -forcefield forcefieldname -parametername parametervalue
+
+within each force field directory, for example /resources/top_all22_prot:
+
+  top_all22_prot.inp and par_all22_prot.prm: these are the standard CHARMM topology and parameter files
+
+  top_all22_prot.types: This is the .types file that contains all of the atom-type molecular fragment declarations in super smiles string form, this is required for atom typing, see file for format
+
+  top_all22_prot.incr: The bond increment rule file, required for atom charging
+
+  top_all22_prot.trans: Refining increment rule file, used in atom charging but is not required
+
+  top_al22_prot.rm: the relation matrix file, this is required for parameter substitution, contains the calculated values of how related on atom type is to another.
+
+  top_all22_prot.impr: improper assignment rule file, required to assigning improper angles to enforce geometry.
+
+  top_all22_prot.patches: used to assign topology patches to molecules while generating type strings, bond increments, etc
+
+/scripts contains all executed scripts for MATCH
+
+/t contains all test scripts used to validate MATCH, contains many scripts discussed in publication
+
+##############################################################
+ 
+EXAMPLE USAGE 
+
+MATCH.pl
+
+MATCH.pl -forcefield top_all36_cgenff test.pdb 
+
+  Create a topology and parameter file for molecule in test.pdb using the CGENFF force field, will be names test.rtf and test.prm
+
+MATCH.pl -forcefield top_all22_prot -CreatePdb test.mol 
+
+ Generates a topology and parameter file for the molecule within test.mol, in addition it outputs CHARMM formatted pdb
+
+MATCH.pl -forcefield top_all35_carb test1.mol2 test2.mol2 test3.mol2
+
+ Generates a topology file for the molecule found in test1, test2, and test3. Only one parameter file will be generated that will contain all of the parameters for test1, test2, and test3.
+
+GenerateBondIncrementRules.pl
+
+GenerateBondIncrementRules.pl -TopologyFile test.rtf
+
+  constructs bond increment rules that best describe the given CHARMM topology file test.rtf
+
+GenerateBondIncrementRules.pl -TopologyFile test.rtf -PatchFile test.patches
+
+  constructs bond increment rules that best describe the given CHARMM topology file test.rtf using the rules described in test.patches to generate proper reside topology.
+
+
+##############################################################
+
+IMPORTANT NOTES
+
+When preparing a molecule to be processed by MATCH.pl
+
+  1. All hydrogens are required!, if you do not add hydrogens you will get the wrong result!!!!!
+  2. for pdbs make sure that the formatting is good, for those have have access to MMTSB toolset, use convpdb.pl will save you a lot of time
+  3. Make sure that there is only 1 molecule in the pdb, you may get the incorrect result if you there are multiple residue numbers
+
+
+When processing multiple molecules at once, parameters will be pooled into the parameter file with the name of the first file that was specified
+ 
+
