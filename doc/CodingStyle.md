@@ -11,6 +11,23 @@ Note: some style is at variance with Python PIP recommendations.
 * Use namespaces instead of composite name, e.g. charmm.build() instead of charmmBuild() when possible
 
 
+Importing htmd
+--------------
+
+There are two suggested ways to import htmd
+
+```python
+import htmd
+
+m = htmd.Molecule('41ny')
+```
+the second way remove the need to use htmd, all the modules are shortcutted
+
+```python
+from htmd import *
+m = Molecule('41ny')
+```
+
 
 Docstrings
 ----------
