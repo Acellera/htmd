@@ -82,7 +82,7 @@ class Configuration:
         #key = key.replace( '-', '_' )
 #        key = Command.test_deprecation( key, value )
         if key:
-            print(key)
+#            print(key)
             value = self._commands._commands[key].validate( value, self._basedir )
             self.__dict__[key] = value;
         else:
@@ -121,10 +121,11 @@ class Configuration:
         with open( filename, "w" ) as fh:
             for cmd in sorted( self.__dict__ ):
                 if( self.__dict__[cmd] is not None ):
-                    if( fmt == "pretty"):
-                        print( "%25s %s" % ( cmd, str(self.__dict__[cmd]) ), file=fh )
-                    elif( fmt == "shell"):
-                        print( "export %s=\"%s\"" % ( cmd, self.__dict__[cmd] ), file=fh )
+                    if not (cmd.startswith("_")):
+                      if( fmt == "pretty"):
+                          print( "%25s %s" % ( cmd, str(self.__dict__[cmd]) ), file=fh )
+                      elif( fmt == "shell"):
+                          print( "export %s=\"%s\"" % ( cmd, self.__dict__[cmd] ), file=fh )
 
 
     def __str__( self ):
