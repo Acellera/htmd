@@ -10,9 +10,29 @@ logger = logging.getLogger(__name__)
 
 
 def rotationMatrix(axis, theta):
-    """
+    """ Produces a rotation matrix given an axis and radians
+
     Return the rotation matrix associated with counterclockwise rotation about
     the given axis by theta radians.
+
+    Parameters
+    ----------
+    axis: list
+        The axis around which to rotate
+    theta: float
+        The rotation angle in radians
+
+    Returns
+    -------
+    M: numpy.ndarray
+        The rotation matrix.
+
+    Examples
+    --------
+    >>> M = rotationMatrix([0, 0, 1], 1.5708)
+    """
+    """
+
     """
     axis = np.asarray(axis)
     theta = np.asarray(theta)
