@@ -58,8 +58,10 @@ def prepareProtein(mol_in,
         AR0     Neutral ARG
 
     If hydrophobicThickness is set to a positive value 2*h, a warning is produced for titratable residues
-    having -h<z<h and are buried in the protein by less than 75%. The list of such residues can be accessed via the
-    resData.membraneExposed boolean array (set returnDetails=True).
+    having -h<z<h and are buried in the protein by less than 75%. The list of such residues can be accessed setting
+    returnDetails to True. Note that the heuristic for the detection of membrane-exposed residues is very crude;
+    the "buried fraction" computation (from propka) is approximate; also, in the presence of cavities,
+    residues may be solvent-exposed independently from their z location.
 
 
     Notes
@@ -114,7 +116,7 @@ def prepareProtein(mol_in,
     >>> tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     >>> prepData
-    ResidueData object about 290 residues. Please find the full info in the .data property.
+    ResidueData object about 287 residues. Please find the full info in the .data property.
       resname  resid insertion chain       pKa protonation    buried    patches
     0     ILE     16               A       NaN         ILE       NaN    [NTERM]
     1     VAL     17               A       NaN         VAL       NaN  [PEPTIDE]
@@ -122,6 +124,7 @@ def prepareProtein(mol_in,
     3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
     4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
      . . .
+    >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
 
     >>> mol = Molecule("1r1j")
     >>> mo, prepData = prepareProtein(mol, returnDetails=True)
@@ -145,15 +148,7 @@ def prepareProtein(mol_in,
     >>> mor.filter("protein and noh")
     >>> mor_opt, mor_data = prepareProtein(mor, returnDetails=True, hydrophobicThickness=32.0)
     >>> exposedRes = mor_data.data.membraneExposed
-    >>> mor_data.data[exposedRes].head()        # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
-       resname  resid insertion chain        pKa protonation  buried    patches  \\
-    26     TYR     91               A  10.084995         TYR     0.0  [PEPTIDE]
-    30     ARG     95               A  12.700008         ARG     0.0  [PEPTIDE]
-    31     TYR     96               A  11.296680         TYR     0.0  [PEPTIDE]
-    33     LYS     98               A  10.773436         LYS     0.0  [PEPTIDE]
-    35     LYS    100               A   9.920115         LYS     0.0  [PEPTIDE]
-    ...
-
+    >>> mor_data.data[exposedRes].to_excel("/tmp/mor_exposed_residues.xlsx")
 
     See Also
     --------
