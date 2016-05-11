@@ -139,7 +139,10 @@ class ResidueData:
         for i, grp in enumerate(self.propkaContainer.conformations['AVR'].groups):
             # This is the key
             # Other places for the resname: grp.type  -  grp.atom.resName  grp.residue_type
-            resname = grp.atom.resName
+            if grp.residue_type in ['N+','C-']: # Separate info about termini
+                resname = grp.residue_type
+            else:
+                resname = grp.atom.resName
             resid = grp.atom.resNumb
             chain = grp.atom.chainID
             icode = grp.atom.icode

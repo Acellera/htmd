@@ -1641,7 +1641,7 @@ class Routines:
         pkadic_copy=pkadic.copy()
 
         if len(pkadic) == 0:
-            return pka_molecule, Null, pkadic
+            return pka_molecule, None, pkadic
 
         # Now apply each pka to the appropriate residue
         for residue in self.protein.getResidues():
