@@ -10,13 +10,12 @@ from htmd.proteinpreparation.pdb2pqr.main import runPDB2PQR
 
 from htmd.molecule.molecule import Molecule
 
-# Tried to make runs reproducible, but does not work
-random.seed(2016)
-
 logger = logging.getLogger(__name__)
 
 
-def _createMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
+
+
+def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
     numAtoms = len(name)
     mol = Molecule()
     mol.empty(numAtoms)
@@ -36,13 +35,14 @@ def prepareProtein(mol_in,
                    pH=7.0,
                    verbose=0,
                    returnDetails=False,
+                   hydrophobicThickness=None,
                    keep=None):
-    """A system preparation wizard for HTMD. 
+    """A system preparation wizard for HTMD.
 
     Returns a Molecule object, where residues have been renamed to follow
     internal conventions on protonation (below). Coordinates are changed to
-    optimize the H-bonding network. This is very preliminar and should be
-    roughly equivalent to mdweb and Maestro's wizard.
+    optimize the H-bonding network. This should be roughly equivalent to mdweb and Maestro's
+    preparation wizard.
 
     The following residue names are used in the returned molecule:
 
@@ -56,6 +56,15 @@ def prepareProtein(mol_in,
         LYN 	Neutral LYS
         TYM 	Negative TYR
         AR0     Neutral ARG
+
+    If hydrophobicThickness is set to a positive value 2*h, a warning is produced for titratable residues
+    having -h<z<h and are buried in the protein by less than 75%. The list of such residues can be accessed via the
+    resData.membraneExposed boolean array (set returnDetails=True).
+
+
+    Notes
+    -----
+    In case of problems, exclude water and other dummy atoms.
 
 
     Features
@@ -77,6 +86,9 @@ def prepareProtein(mol_in,
     returnDetails : bool
         whether to return just the prepared Molecule (False, default) or a molecule *and* a ResidueInfo
         object including computed properties
+    hydrophobicThickness : float
+        the thickness of the membrane in which the protein is embedded, or None if globular protein.
+        Used to provide a warning about membrane-exposed residues.
     keep : bool
         TODO
 
@@ -85,15 +97,67 @@ def prepareProtein(mol_in,
     -------
     mol_out : Molecule
         the molecule titrated and optimized. The molecule object contains an additional attribute,
-    resdata_out : ResidueData
+    resData : ResidueData
         a table of residues with the corresponding protonation states, pKas, and other information
 
 
     Examples
     --------
-    >> tryp = Molecule('3PTB')
-    >> tryp_op = prepareProtein(tryp, pH=1.0)
-    >> tryp_op.write('3PTB-opt-ph1.pdb')
+    >>> tryp = Molecule('3PTB')
+
+    >>> tryp_op = prepareProtein(tryp, pH=1.0)
+    >>> tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
+
+    >>> tryp_op = prepareProtein(tryp, pH=14.0)
+    >>> tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
+
+    >>> tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
+    >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
+    >>> prepData
+    ResidueData object about 290 residues. Please find the full info in the .data property.
+      resname  resid insertion chain       pKa protonation    buried    patches
+    0     ILE     16               A       NaN         ILE       NaN    [NTERM]
+    1     VAL     17               A       NaN         VAL       NaN  [PEPTIDE]
+    2     GLY     18               A       NaN         GLY       NaN  [PEPTIDE]
+    3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
+    4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
+     . . .
+
+    >>> mol = Molecule("1r1j")
+    >>> mo, prepData = prepareProtein(mol, returnDetails=True)
+    >>> prepData.missedLigands
+    ['NAG', 'ZN', 'OIR']
+
+    >>> his = prepData.data.resname == "HIS"
+    >>> prepData.data[his][["resid","insertion","chain","resname","protonation"]]
+         resid insertion chain resname protonation
+    160    214               A     HIS         HID
+    163    217               A     HIS         HID
+    383    437               A     HIS         HID
+    529    583               A     HIS         HID
+    533    587               A     HIS         HIP
+    583    637               A     HIS         HID
+    627    681               A     HIS         HID
+    657    711               A     HIS         HIP
+    679    733               A     HIS         HID
+
+    >>> mor = Molecule(os.path.join(home(dataDir="mor"), "4dkl.pdb"))
+    >>> mor.filter("protein and noh")
+    >>> mor_opt, mor_data = prepareProtein(mor, returnDetails=True, hydrophobicThickness=32.0)
+    >>> exposedRes = mor_data.data.membraneExposed
+    >>> mor_data.data[exposedRes].head()        # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+       resname  resid insertion chain        pKa protonation  buried    patches  \\
+    26     TYR     91               A  10.084995         TYR     0.0  [PEPTIDE]
+    30     ARG     95               A  12.700008         ARG     0.0  [PEPTIDE]
+    31     TYR     96               A  11.296680         TYR     0.0  [PEPTIDE]
+    33     LYS     98               A  10.773436         LYS     0.0  [PEPTIDE]
+    35     LYS    100               A   9.920115         LYS     0.0  [PEPTIDE]
+    ...
+
+
+    See Also
+    --------
+    The ResidueData object.
 
 
     Unsupported/To Do/To Check
@@ -126,8 +190,9 @@ def prepareProtein(mol_in,
 
     # We could set additional options here
     import propka.lib
-    propka_opts, dummy = propka.lib.loadOptions()
-    propka_opts.verbose = verbose
+    propka_opts, dummy = propka.lib.loadOptions('--quiet')
+    propka_opts.verbosity = verbose
+    propka_opts.verbose = verbose  # Will be removed in future propKas
 
     # Note on naming. The behavior of PDB2PQR is controlled by two parameters, ff and ffout. My understanding is
     # that the ff parameter sets which residues are SUPPORTED by the underlying FF, PLUS the charge and radii.
@@ -158,7 +223,7 @@ def prepareProtein(mol_in,
     segids = []
     elements = []
 
-    resdata_out = ResidueData()
+    resData = ResidueData()
 
     for residue in pdb2pqr_protein.residues:
         if 'ffname' in residue.__dict__:
@@ -170,11 +235,11 @@ def prepareProtein(mol_in,
         else:
             curr_resname = residue.name
 
-        resdata_out._setProtonation(residue, curr_resname)
+        resData._setProtonationState(residue, curr_resname)
 
         if 'patches' in residue.__dict__:
             for patch in residue.patches:
-                resdata_out._appendPatches(residue, patch)
+                resData._appendPatches(residue, patch)
                 if patch != "PEPTIDE":
                     logger.info("Residue %s has patch %s set" % (residue, patch))
 
@@ -188,39 +253,31 @@ def prepareProtein(mol_in,
             segids.append(atom.segID)
             elements.append(atom.element)
 
-    mol_out = _createMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
+    mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
 
-    resdata_out._importPKAs(pdb2pqr_protein.pka_molecule)
-    resdata_out.pdb2pqr_protein = pdb2pqr_protein
-    resdata_out.pka_protein = pdb2pqr_protein.pka_molecule
-    resdata_out.pka_dict = pdb2pqr_protein.pkadic
-    resdata_out.missedLigands = missedLigands
+    resData._importPKAs(pdb2pqr_protein.pka_molecule)
+    resData.pdb2pqr_protein = pdb2pqr_protein
+    resData.pka_dict = pdb2pqr_protein.pkadic
+    resData.missedLigands = missedLigands
+
+    if hydrophobicThickness:
+        resData._setMembraneExposure(hydrophobicThickness)
+
 
     logger.info("Returning.")
     logger.setLevel(oldLoggingLevel)
 
     if returnDetails:
-        return mol_out, resdata_out
+        return mol_out, resData
     else:
         return mol_out
 
 
 # A test method
 if __name__ == "__main__":
-    tryp = Molecule('3PTB')
+    from htmd import home
+    import os
 
-    tryp_op = prepareProtein(tryp, pH=1.0)
-    tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
 
-    tryp_op = prepareProtein(tryp, pH=14.0)
-    tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
-
-    tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
-    tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
-    print(prepData)
-
-    mol = Molecule("1r1j")
-    mo, prepData = prepareProtein(mol, returnDetails=True)
-    his = prepData.resname == "HIS"  # Has to be checked better, due to Zn++
-    list(zip(prepData.protonation[his], prepData.resid[his]))
-    pass
+    import doctest
+    doctest.testmod()

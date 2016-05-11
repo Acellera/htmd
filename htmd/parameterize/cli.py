@@ -159,7 +159,7 @@ def main_parameterize():
     print("      (c) Acellera " )
     try:
         if input_file:
-            config = Configuration(config=input_file, pathcheck=True )
+            config = Configuration(config=input_file, check=True )
             print(config)
         else:
             config=None

@@ -9,7 +9,7 @@ printenv
 T="$PWD"
 for S in "$PWD/C/"*; do
 	cd "$S"
-	make CC=$CC FC=$FC
+	make CC=$CC FC=$FC STATIC=$STATIC
 	cd "$T"
 done
 

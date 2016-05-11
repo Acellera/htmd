@@ -23,16 +23,22 @@ def pka(mol, pH=7.0):
 
     Returns
     -------
-    rd : ResidueData
-        An object (see), containing resid, chain, pKa arrays.
+    rd : DataFrame
+        A pandas dataframe containing resid, chain, pKa arrays.
         Properties unrelated to pKa are unset.
+
+    See Also
+    --------
+    The ResidueData object.
+
 
     Examples
     --------
     >>> m=Molecule("3ptb")
-    >>> rd = pka(m,pH=7.0)
-    >>> rd.pKa[rd.resid == 189].round(2)
-    array([ 4.95])
+    >>> rd = pka(m)
+    >>> rd.pKa[rd.resid==189]
+    39    4.949079
+    Name: pKa, dtype: float64
     """
 
     return _pka_backend_internal(mol, pH)
@@ -45,7 +51,7 @@ def _pka_backend_internal(mol, pH):
     pka_pdb = tempfile.NamedTemporaryFile(mode="w+", suffix=".pdb")
     tmpmol.write(pka_pdb.name)
 
-    pka_options, _ = propka.lib.loadOptions('--pH', pH)  # add '--no-print' when released
+    pka_options, _ = propka.lib.loadOptions('--pH', pH, '--quiet')
     pka_molecule = propka.molecular_container.Molecular_container(pka_pdb.name, pka_options)
     pka_pdb.close()
 
@@ -54,7 +60,7 @@ def _pka_backend_internal(mol, pH):
 
     rd = ResidueData()
     rd._importPKAs(pka_molecule)
-    return rd
+    return rd.data
 
 
 
