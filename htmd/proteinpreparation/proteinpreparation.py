@@ -113,33 +113,45 @@ def prepareProtein(mol_in,
 
     >>> tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
-    >>> prepData                                                    # doctest: +ELLIPSIS
-    ILE    16  A : pKa   nan, buried  nan, state=ILE, patches=NTERM
-    VAL    17  A : pKa   nan, buried  nan, state=VAL, patches=PEPTIDE
-    GLY    18  A : pKa   nan, buried  nan, state=GLY, patches=PEPTIDE
-    GLY    19  A : pKa   nan, buried  nan, state=GLY, patches=PEPTIDE
-    TYR    20  A : pKa  9.59, buried 0.15, state=TYR, patches=PEPTIDE
-    THR    21  A : pKa   nan, buried  nan, state=THR, patches=PEPTIDE
-    CYS    22  A : pKa 99.99, buried 0.00, state=CYX, patches=PEPTIDE,CYX
-    ...
+    >>> prepData
+    ResidueData object about 290 residues. Please find the full info in the .data property.
+      resname  resid insertion chain       pKa protonation    buried    patches
+    0     ILE     16               A       NaN         ILE       NaN    [NTERM]
+    1     VAL     17               A       NaN         VAL       NaN  [PEPTIDE]
+    2     GLY     18               A       NaN         GLY       NaN  [PEPTIDE]
+    3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
+    4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
+     . . .
 
     >>> mol = Molecule("1r1j")
     >>> mo, prepData = prepareProtein(mol, returnDetails=True)
     >>> prepData.missedLigands
     ['NAG', 'ZN', 'OIR']
 
-    >>> his = prepData.resname == "HIS"
-    >>> list(zip(prepData.protonation[his], prepData.resid[his]))
-    [('HID', 214), ('HID', 217), ('HID', 437), ('HID', 583), ('HIP', 587), ('HID', 637), ('HID', 681), ('HIP', 711), ('HID', 733)]
+    >>> his = prepData.data.resname == "HIS"
+    >>> prepData.data[his][["resid","insertion","chain","resname","protonation"]]
+         resid insertion chain resname protonation
+    160    214               A     HIS         HID
+    163    217               A     HIS         HID
+    383    437               A     HIS         HID
+    529    583               A     HIS         HID
+    533    587               A     HIS         HIP
+    583    637               A     HIS         HID
+    627    681               A     HIS         HID
+    657    711               A     HIS         HIP
+    679    733               A     HIS         HID
 
     >>> mor = Molecule(os.path.join(home(dataDir="mor"), "4dkl.pdb"))
     >>> mor.filter("protein and noh")
     >>> mor_opt, mor_data = prepareProtein(mor, returnDetails=True, hydrophobicThickness=32.0)
-    >>> exposedRes = mor_data.listResidues(mor_data.membraneExposed==True)
-    >>> [print(r) for r in exposedRes]  # doctest: +ELLIPSIS
-    TYR    91  A
-    ARG    95  A
-    TYR    96  A
+    >>> exposedRes = mor_data.data.membraneExposed
+    >>> mor_data.data[exposedRes].head()        # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+       resname  resid insertion chain        pKa protonation  buried    patches  \\
+    26     TYR     91               A  10.084995         TYR     0.0  [PEPTIDE]
+    30     ARG     95               A  12.700008         ARG     0.0  [PEPTIDE]
+    31     TYR     96               A  11.296680         TYR     0.0  [PEPTIDE]
+    33     LYS     98               A  10.773436         LYS     0.0  [PEPTIDE]
+    35     LYS    100               A   9.920115         LYS     0.0  [PEPTIDE]
     ...
 
 
@@ -249,7 +261,7 @@ def prepareProtein(mol_in,
     resData.missedLigands = missedLigands
 
     if hydrophobicThickness:
-        resData._checkMembraneExposure(hydrophobicThickness)
+        resData._setMembraneExposure(hydrophobicThickness)
 
 
     logger.info("Returning.")
