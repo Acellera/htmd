@@ -150,6 +150,11 @@ def prepareProtein(mol_in,
     >>> exposedRes = mor_data.data.membraneExposed
     >>> mor_data.data[exposedRes].to_excel("/tmp/mor_exposed_residues.xlsx")
 
+    >>> im=Molecule("4bkj")
+    >>> imo,imd=prepareProtein(im,returnDetails=True)
+    >>> imd.data.to_excel("/tmp/imatinib_report.xlsx")
+
+
     See Also
     --------
     The ResidueData object.

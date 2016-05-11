@@ -104,23 +104,24 @@ class ResidueData:
     def __repr__(self):
         return self.__str__()
 
-    def _findRes(self, a_resname, a_resid, a_icode, a_chain):
+    def _findRes(self, a_resname, a_resid, a_icode, a_chain, forceAppend=False):
         icode_pad = "{:1.1s}".format(a_icode)  # Pad and truncate to 1 char
         chain_pad = "{:1.1s}".format(a_chain)
         # Identity check should ignore residue name (self.resname == a_resname)
         mask = (self.data.resname == a_resname) & (self.data.resid == a_resid) & \
                (self.data.insertion == icode_pad) & (self.data.chain == chain_pad)
-        assert (sum(mask) <= 1), "More than one resid matched"
-        if sum(mask) == 0:
+        if sum(mask) == 0 or forceAppend:
             self.data = self.data.append({'resname': a_resname,
                                           'resid': a_resid,
                                           'insertion': icode_pad,
                                           'chain': chain_pad,
                                           'patches': []}, ignore_index=True)
             pos = len(self.data) - 1
-        else:
+        elif sum(mask) == 1:
             pos = np.argwhere(mask)
             pos = int(pos)
+        else:
+            assert False, "More than one resid matched (internal error, please report)"
         return pos
 
     # residue is e.g. pdb2pqr.src.aa.ILE
@@ -137,16 +138,20 @@ class ResidueData:
     def _importPKAs(self, pkaCont):
         self.propkaContainer = pkaCont
         for i, grp in enumerate(self.propkaContainer.conformations['AVR'].groups):
+            forceAppend = False
             # This is the key
             # Other places for the resname: grp.type  -  grp.atom.resName  grp.residue_type
             if grp.residue_type in ['N+','C-']: # Separate info about termini
                 resname = grp.residue_type
+            elif grp.atom.sybyl_assigned:       # A ligand - a hack to allow multiple groups overriding key
+                forceAppend = True
+                resname = grp.atom.resName
             else:
                 resname = grp.atom.resName
             resid = grp.atom.resNumb
             chain = grp.atom.chainID
             icode = grp.atom.icode
-            pos = self._findRes(resname, resid, icode, chain)
+            pos = self._findRes(resname, resid, icode, chain, forceAppend)
             self.data.set_value(pos, 'pKa', grp.pka_value)
             self.data.set_value(pos, 'buried', grp.buried)
             self.data.set_value(pos, 'z', grp.atom.z)
