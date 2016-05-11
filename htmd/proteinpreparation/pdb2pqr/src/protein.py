@@ -93,7 +93,7 @@ class Protein:
 
                 if record.chainID == "" and numChains > 1 and record.resName not in ["WAT","HOH"]:
                     # Assign a chain ID
-                    record.chainID = str.ascii_uppercase[count]
+                    record.chainID = string.ascii_uppercase[count]
 
                 chainID = record.chainID
                 resSeq = record.resSeq
