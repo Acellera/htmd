@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import logging
-import textwrap
 
 from htmd.molecule.molecule import Molecule
 
@@ -23,16 +22,16 @@ class ResidueData:
     >>> tryp = Molecule("3PTB")
     >>> tryp_op, ri = prepareProtein(tryp, returnDetails=True)
     >>> ri
-    ResidueData object with 290 residues. Please find the full info in the .data property.
-      resname  resid insertion chain      pKa protonation    buried    patches
-    0     ILE     16               A      NaN         ILE       NaN    [NTERM]
-    1     VAL     17               A      NaN         VAL       NaN  [PEPTIDE]
-    2     GLY     18               A      NaN         GLY       NaN  [PEPTIDE]
-    3     GLY     19               A      NaN         GLY       NaN  [PEPTIDE]
-    4     TYR     20               A  9.59085         TYR  0.146429  [PEPTIDE]
+    ResidueData object about 287 residues. Please find the full info in the .data property.
+      resname  resid insertion chain       pKa protonation    buried    patches
+    0     ILE     16               A  7.413075         ILE  0.839286    [NTERM]
+    1     VAL     17               A       NaN         VAL       NaN  [PEPTIDE]
+    2     GLY     18               A       NaN         GLY       NaN  [PEPTIDE]
+    3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
+    4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
      . . .
-    >>> ri.data.pKa[ri.data.resid==189].iat[0]
-    4.9490792910341349
+    >>> "%.2f" % ri.data.pKa[ri.data.resid==189]
+    '4.95'
     >>> ri.data.patches[ri.data.resid==57]
     39    [PEPTIDE, HIP]
     Name: patches, dtype: object
@@ -163,12 +162,13 @@ class ResidueData:
         self.data.membraneExposed = inSlabNotBuried
         if np.any(inSlabNotBuried):
             logger.warning(
-                "Predictions for {:d} residues may be incorrect because they are exposed to the membrane ({:.1f}<z<{:.2f} and buried<{:.1f}%).".format(
+                "Predictions for {:d} residues may be incorrect because they are "+
+                "exposed to the membrane ({:.1f}<z<{:.2f} and buried<{:.1f}%).".format(
                     sum(inSlabNotBuried), -ht, ht, maxBuried * 100.0))
 
 
 if __name__ == "__main__":
     from htmd.proteinpreparation.proteinpreparation import prepareProtein
-    import doctest
 
+    import doctest
     doctest.testmod()
