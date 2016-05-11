@@ -141,13 +141,11 @@ class ResidueData:
             forceAppend = False
             # This is the key
             # Other places for the resname: grp.type  -  grp.atom.resName  grp.residue_type
+            resname = grp.atom.resName
             if grp.residue_type in ['N+','C-']: # Separate info about termini
-                resname = grp.residue_type
+                forceAppend = True
             elif grp.atom.sybyl_assigned:       # A ligand - a hack to allow multiple groups overriding key
                 forceAppend = True
-                resname = grp.atom.resName
-            else:
-                resname = grp.atom.resName
             resid = grp.atom.resNumb
             chain = grp.atom.chainID
             icode = grp.atom.icode
