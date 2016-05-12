@@ -43,7 +43,7 @@ class Model(object):
             raise NameError('You have modified the data in data.dat after clustering. Please re-cluster.')
         self._clusterid = data._clusterid
 
-    def markovModel(self, lag, macronum):
+    def markovModel(self, lag, macronum, sparse=False):
         """ Build a Markov model at a given lag time and calculate metastable states
 
         Parameters
@@ -52,6 +52,8 @@ class Model(object):
             The lag time at which to calculate the Markov state model in frames.
         macronum : int
             The number of macrostates (metastable states) to produce
+        sparse : bool
+            Make the transition matrix sparse. Useful if lots (> 4000) states are used for the MSM. Warning: untested.
 
         Examples
         --------
@@ -66,7 +68,7 @@ class Model(object):
             logger.warning('The lag given to markovModel() was not an integer. Converting to integer: {}'.format(lag))
 
         self.lag = lag
-        self.msm = msm.estimate_markov_model(self.data.St.tolist(), self.lag)
+        self.msm = msm.estimate_markov_model(self.data.St.tolist(), self.lag, sparse=sparse)
         self.P = self.msm.transition_matrix
         self.micro_ofcluster = -np.ones(self.data.K+1, dtype=int)
         self.micro_ofcluster[self.msm.active_set] = np.arange(len(self.msm.active_set))
