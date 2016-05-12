@@ -1034,7 +1034,7 @@ class Molecule:
         s = np.delete(s, removed)
         self.set('resname', newres, sel=s)
 
-    def wrap(self, wrapsel=None):
+    def wrap(self, wrapsel=None, centersel=None):
         """ Wraps coordinates of the molecule into the simulation box
 
         Parameters
@@ -1063,7 +1063,9 @@ class Molecule:
                     bonds = np.append(bonds, [[a, i]], axis=0)
                 if not np.any(np.all(bonds == [i, a], axis=1)):
                     bonds = np.append(bonds, [[i, a]], axis=0)'''
-        self.coords = wrap(self.coords, bonds, self.box)
+        if centersel:
+          centersel = self.atomselect( centersel, indexes=True )
+        self.coords = wrap(self.coords, bonds, self.box, centersel=centersel)
 
     def write(self, filename, sel=None, type=None):
         """ Writes any of the supported formats (pdb, coor, psf, xtc)
