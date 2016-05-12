@@ -386,7 +386,6 @@ if __name__ == "__main__":
         sys.exit()
 
     import doctest
-
     doctest.testmod()
 
     # One simulation
