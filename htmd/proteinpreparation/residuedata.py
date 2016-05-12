@@ -125,12 +125,12 @@ class ResidueData:
 
     # residue is e.g. pdb2pqr.src.aa.ILE
     def _setProtonationState(self, residue, state):
-        logger.debug("_setProtonationState %s %s" % (residue, state))
+        logger.info("_setProtonationState %s %s" % (residue, state))
         pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
         self.data.set_value(pos, 'protonation', state)
 
     def _appendPatches(self, residue, patch):
-        logger.debug("_appendPatches %s %s" % (residue, patch))
+        logger.info("_appendPatches %s %s" % (residue, patch))
         pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
         self.data.patches[pos].append(patch)
 
@@ -142,6 +142,7 @@ class ResidueData:
             # Other places for the resname: grp.type  -  grp.atom.resName  grp.residue_type
             resname = grp.atom.resName
             if grp.residue_type in ['N+','C-']: # Separate info about termini
+                resname = grp.residue_type
                 forceAppend = True
             elif grp.atom.sybyl_assigned:       # A ligand - a hack to allow multiple groups overriding key
                 forceAppend = True
