@@ -125,16 +125,17 @@ class ResidueData:
 
     # residue is e.g. pdb2pqr.src.aa.ILE
     def _setProtonationState(self, residue, state):
-        logger.info("_setProtonationState %s %s" % (residue, state))
+        logger.debug("_setProtonationState %s %s" % (residue, state))
         pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
         self.data.set_value(pos, 'protonation', state)
 
     def _appendPatches(self, residue, patch):
-        logger.info("_appendPatches %s %s" % (residue, patch))
+        logger.debug("_appendPatches %s %s" % (residue, patch))
         pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
         self.data.patches[pos].append(patch)
 
     def _importPKAs(self, pkaCont):
+        logger.debug("Called _importPKAs")
         self.propkaContainer = pkaCont
         for i, grp in enumerate(self.propkaContainer.conformations['AVR'].groups):
             forceAppend = False
@@ -169,8 +170,8 @@ class ResidueData:
         self.data.membraneExposed = inSlabNotBuried
         if np.any(inSlabNotBuried):
             logger.warning(
-                "Predictions for {:d} residues may be incorrect because they are "+
-                "exposed to the membrane ({:.1f}<z<{:.2f} and buried<{:.1f}%).".format(
+                ("Predictions for {:d} residues may be incorrect because they are "+
+                 "exposed to the membrane ({:.1f}<z<{:.2f} and buried<{:.1f}%).").format(
                     sum(inSlabNotBuried), -ht, ht, maxBuried * 100.0))
 
 

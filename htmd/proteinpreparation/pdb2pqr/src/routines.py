@@ -1702,6 +1702,37 @@ class Routines:
         self.write("Done.\n")
         return pka_molecule, pkadic, pkadic_copy
 
+    def holdResidues(self, hlist):
+        """Set the stateboolean dictionary to residues in hlist."""
+
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if not hlist:
+            return
+
+        hlist_copy = hlist.copy()
+        for residue in self.protein.getResidues():
+            reskey = (residue.resSeq, residue.chainID, residue.iCode)
+            if reskey in hlist:
+                hlist.remove(reskey)
+                if isinstance(residue, Amino):
+                    residue.stateboolean = { 'FIXEDSTATE': False }
+                    logger.info("Setting residue {:s} as fixed.".format(str(residue)))
+                else:
+                    logger.warning("Matched residue {:s} but not subclass of Amino".format(str(residue)))
+
+        if len(hlist)>0:
+            logger.warn("The following fixed residues were not matched (possible internal error): "+str(hlist))
+
+        """
+        optinstance = self.isOptimizeable(residue)
+        if isinstance(residue, Amino):
+            if False in list(residue.stateboolean.values()):
+                residue.fixed = 1
+        """
+
+
 
 class Cells:
     """

@@ -13,6 +13,18 @@ from htmd.molecule.molecule import Molecule
 logger = logging.getLogger(__name__)
 
 
+def _selToHoldList(mol, sel):
+    if sel:
+        tx = mol.copy()
+        tx.filter(sel)
+        tx.filter("name CA")
+        ret = list(zip(tx.resid, tx.chain, tx.insertion))
+    else:
+        ret = None
+    return ret
+
+
+
 
 
 def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
@@ -36,7 +48,7 @@ def prepareProtein(mol_in,
                    verbose=0,
                    returnDetails=False,
                    hydrophobicThickness=None,
-                   keep=None):
+                   holdSelection=None):
     """A system preparation wizard for HTMD.
 
     Returns a Molecule object, where residues have been renamed to follow
@@ -91,8 +103,9 @@ def prepareProtein(mol_in,
     hydrophobicThickness : float
         the thickness of the membrane in which the protein is embedded, or None if globular protein.
         Used to provide a warning about membrane-exposed residues.
-    keep : bool
-        TODO
+    holdSelection : str
+        Atom selection to be excluded from optimization.
+        Only the carbon-alpha atom will be considered for the corresponding residue.
 
 
     Returns
@@ -115,8 +128,9 @@ def prepareProtein(mol_in,
 
     >>> tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
+    >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
     >>> prepData
-    ResidueData object about 287 residues. Please find the full info in the .data property.
+    ResidueData object about 290 residues. Please find the full info in the .data property.
       resname  resid insertion chain       pKa protonation    buried    patches
     0     ILE     16               A       NaN         ILE       NaN    [NTERM]
     1     VAL     17               A       NaN         VAL       NaN  [PEPTIDE]
@@ -124,7 +138,6 @@ def prepareProtein(mol_in,
     3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
     4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
      . . .
-    >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
 
     >>> mol = Molecule("1r1j")
     >>> mo, prepData = prepareProtein(mol, returnDetails=True)
@@ -176,12 +189,12 @@ def prepareProtein(mol_in,
     oldLoggingLevel = logger.level
     if verbose:
         logger.setLevel(logging.DEBUG)
-    logger.info("Starting.")
+    logger.debug("Starting.")
 
     # We could transform the molecule into an internal object, but for now I prefer to rely on the strange
     # internal parser to avoid hidden quirks.
     tmpin = tempfile.NamedTemporaryFile(suffix=".pdb", mode="w+")
-    logger.info("Temporary file is " + tmpin.name)
+    logger.debug("Temporary file is " + tmpin.name)
     mol_in.write(tmpin.name)  # Not sure this is sound unix
 
     pdblist, errlist = readPDB(tmpin)
@@ -199,11 +212,16 @@ def prepareProtein(mol_in,
     # The ffout parameter sets the naming scheme. Therefore, I want ff to be as general as possible, which turns out
     # to be "parse". Then I pick a convenient ffout.
 
+    # Hold list (None -> None)
+    hlist = _selToHoldList(mol_in, holdSelection)
+
+
     # Relying on defaults
     header, lines, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
                                                                ph=pH, verbose=verbose,
                                                                ff="parse", ffout="amber",
-                                                               propkaOptions=propka_opts)
+                                                               propkaOptions=propka_opts,
+                                                               holdList=hlist)
     tmpin.close()
 
     # Diagnostics
@@ -212,7 +230,7 @@ def prepareProtein(mol_in,
 
     # Here I parse the returned protein object and recreate a Molecule,
     # because I need to access the properties.
-    logger.info("Building Molecule object.")
+    logger.debug("Building Molecule object.")
 
     name = []
     resid = []
@@ -230,7 +248,7 @@ def prepareProtein(mol_in,
             curr_resname = residue.ffname
             if len(curr_resname) >= 4:
                 curr_resname = curr_resname[-3:]
-                logger.info("Residue %s has internal name %s, replacing with %s" %
+                logger.debug("Residue %s has internal name %s, replacing with %s" %
                             (residue, residue.ffname, curr_resname))
         else:
             curr_resname = residue.name
@@ -241,7 +259,7 @@ def prepareProtein(mol_in,
             for patch in residue.patches:
                 resData._appendPatches(residue, patch)
                 if patch != "PEPTIDE":
-                    logger.info("Residue %s has patch %s set" % (residue, patch))
+                    logger.debug("Residue %s has patch %s set" % (residue, patch))
 
         for atom in residue.atoms:
             name.append(atom.name)
@@ -262,8 +280,7 @@ def prepareProtein(mol_in,
     if hydrophobicThickness:
         resData._setMembraneExposure(hydrophobicThickness)
 
-
-    logger.info("Returning.")
+    logger.debug("Returning.")
     logger.setLevel(oldLoggingLevel)
 
     if returnDetails:
@@ -277,6 +294,12 @@ if __name__ == "__main__":
     from htmd import home
     import os
 
+    # bm = Molecule("1a18.pdb")
+    # bmo, rd = prepareProtein(bm, returnDetails=True)
+
+    tryp = Molecule('3PTB')
+    tryp_op, prepData = prepareProtein(tryp, returnDetails=True, holdSelection="resid 20 and chain A")
 
     import doctest
+
     doctest.testmod()
