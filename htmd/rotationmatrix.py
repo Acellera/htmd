@@ -30,10 +30,18 @@ def rotationMatrix(axis, theta):
     Examples
     --------
     >>> M = rotationMatrix([0, 0, 1], 1.5708)
-    """
+    >>> M.round(4)
+    array([[-0., -1.,  0.],
+           [ 1., -0.,  0.],
+           [ 0.,  0.,  1.]])
+
+    >>> axis = [4.0, 4., 1.]
+    >>> theta = 1.2
+    >>> v = [3.0, 5., 0.]
+    >>> np.dot(rotationMatrix(axis, theta), v).round(2)
+    array([ 2.75,  4.77,  1.92])
     """
 
-    """
     axis = np.asarray(axis)
     theta = np.asarray(theta)
     axis = axis / sqrt(np.dot(axis, axis))
@@ -53,7 +61,6 @@ def rotationmatrix(axis, theta):
 
 
 if __name__ == '__main__':
-    v = [3.0, 5., 0.]
-    axis = [4.0, 4., 1.]
-    theta = 1.2
-    print(np.dot(rotationMatrix(axis, theta), v))
+
+    import doctest
+    doctest.testmod()

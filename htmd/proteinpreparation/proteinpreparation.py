@@ -257,7 +257,6 @@ def prepareProtein(mol_in,
 
     resData._importPKAs(pdb2pqr_protein.pka_molecule)
     resData.pdb2pqr_protein = pdb2pqr_protein
-    resData.pka_dict = pdb2pqr_protein.pkadic
     resData.missedLigands = missedLigands
 
     if hydrophobicThickness:
