@@ -1637,7 +1637,8 @@ if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
-    m = Molecule('3PTB')
+    from htmd.home import home
+    m = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
     doctest.testmod(extraglobs={'tryp': m.copy() })
 
     # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May
