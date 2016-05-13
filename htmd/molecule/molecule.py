@@ -1064,9 +1064,9 @@ class Molecule:
                 if not np.any(np.all(bonds == [i, a], axis=1)):
                     bonds = np.append(bonds, [[i, a]], axis=0)'''
         if wrapsel:
-          centersel = self.atomselect( wrapsel, indexes=True )
+            centersel = self.atomselect( wrapsel, indexes=True )
         else:
-          centersel = None
+            centersel = None
         self.coords = wrap(self.coords, bonds, self.box, centersel=centersel)
 
     def write(self, filename, sel=None, type=None):

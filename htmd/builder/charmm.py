@@ -26,6 +26,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class MixedSegmentError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class BuildError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
 def listFiles():
     """ Lists all available Charmm topologies and parameter files
     """
@@ -222,7 +238,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
             molbuilt.read(path.join(outdir, 'structure.psf'))
         else:
-            raise NameError('No structure pdb/psf file was generated. Check {} for errors in building.'.format(logpath))
+            raise BuildError('No structure pdb/psf file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
             shutil.move(path.join(outdir, 'structure.pdb'), path.join(outdir, 'structure.noions.pdb'))
@@ -409,7 +425,7 @@ def _defaultCaps(mol):
     segsNonProt = np.unique(mol.get('segid', sel='not protein'))
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
-        raise NameError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
+        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
 
     caps = dict()
     for s in segsProt:
@@ -519,7 +535,7 @@ def _charmmCombine(prmlist, outfile):
         if myfile[0] != '.' and path.isfile(path.join(charmmdir, myfile)):
             myfile = path.join(charmmdir, myfile)
         if not path.isfile(myfile):
-            raise NameError(myfile + ' file does not exist. Cannot create combined parameter file.')
+            raise FileNotFoundError(myfile + ' file does not exist. Cannot create combined parameter file.')
         fn = os.path.basename(myfile)
         fh = open(myfile, "r")
         context = 0
