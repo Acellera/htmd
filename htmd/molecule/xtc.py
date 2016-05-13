@@ -65,10 +65,8 @@ def XTCread(filename, frames=None):
             c_char_p(filename.encode("ascii")),
             natoms,
             nframes, deltat, deltastep)
-        # TODO: replace ugly patch for catching corrupt xtcs
-        try:
-            retval[0]
-        except ValueError:
+
+        if not retval:
             raise RuntimeError('XTC file {} possibly corrupt.'.format(filename))
 
         frames = range(nframes[0])
