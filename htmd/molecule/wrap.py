@@ -79,19 +79,16 @@ def wrap( coordinates, bonds, box, centersel=None ):
     c_nframes= c_int(nframes)
     lenv = natoms * 3 * nframes
 
+    if centersel is None:
+         centersel = numpy.array([-1], dtype=numpy.int32 )
+    centersel = numpy.append( centersel, numpy.array([-1], dtype=numpy.int32 ) )
+    c_centersel = centersel.ctypes.data_as(POINTER(c_int))
     c_coords = coordinates.ctypes.data_as(POINTER(c_float))
     lib.wrap(
         c_bonds,
         c_coords,
-        c_box, c_nbonds, c_natoms, c_nframes
+        c_box, c_nbonds, c_natoms, c_nframes, c_centersel
     )
 
-    if centersel is not None:
-      for frame in range(nframes):
-        center=numpy.array([0,0,0])
-        center[0]  = numpy.mean(coordinates[centersel,0,frame])
-        center[1]  = numpy.mean(coordinates[centersel,1,frame])
-        center[2]  = numpy.mean(coordinates[centersel,2,frame])
-        coordinates[:,:,frame] = coordinates[:,:,frame] - numpy.array([center[0], center[1], center[2]])   
     return coordinates
 
