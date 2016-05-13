@@ -73,6 +73,7 @@ class PDBParser:
 
         if filename:
             self.readPDB(filename, mode)
+            self._readPDBcoords(filename )
 
     def checkTruncations(self):
         for f in self.fieldsizes:
@@ -140,6 +141,45 @@ class PDBParser:
             print("ENDMDL", file=fh)
         print("END", file=fh)
 
+        fh.close()
+
+    def _readPDBcoords( self, filename ):
+        if self.coords is None:
+           raise NameError("Can't read coords until a full PDB had been read")
+        fh = open(filename, 'r')
+
+        natoms = len(self.coords)
+
+        coords=np.zeros( (natoms, 3, 1 ) )
+        first=1
+        n=0
+        for line in fh:
+           record_type = line[0:6]
+
+           if record_type=="MODEL ":
+               if first==0:
+                  coords = numpy.append( coords, np.zeros((natoms,3, 1)), axis=2  )
+               first=0
+           if record_type=="ENDMDL":
+               if( n!= natoms ): raise ValueError("Mismatch in number of atoms in PDB frame " + str(frame) )
+               n=0
+           if record_type=="ATOM  " or record_type == "HETATM":
+                try:
+                    x = float(line[30:38])
+                    y = float(line[38:46])
+                    z = float(line[46:54])
+                except:
+                    # Should we allow parsing to continue in permissive mode?
+                    # If so, what coordinates should we default to?  Easier to abort!
+                    raise NameError("Invalid or missing coordinate(s) at line %i."
+                                    % global_line_counter)
+                f = coords.shape[2]-1
+                coords[ n, 0, f ] = x
+                coords[ n, 1, f ] = y
+                coords[ n, 2, f ] = z
+                n=n+1
+
+        self.coords = coords
         fh.close()
 
     def readPDB(self, filename, mode='pdb'):
