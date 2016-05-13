@@ -108,7 +108,7 @@ class Acemd(ProtocolInterface):
 
         # Write all files using default filenames
         for f in self._files:
-            fo = open(os.path.join(path, self._defaultfnames[f]), 'wb')  # write all as binary
+            fo = open(os.path.join(path, self.__dict__[f]), 'wb')  # write all as binary
             fo.write(self._files[f])
             fo.close()
 
