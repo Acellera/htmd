@@ -76,6 +76,11 @@ from .src.errors import PDB2PQRError
 
 from .extensions import *
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def getOldHeader(pdblist):
     oldHeader = StringIO()
     headerTypes = (HEADER, TITLE, COMPND, SOURCE, KEYWDS, EXPDTA, AUTHOR, REVDAT, JRNL, REMARK, SPRSDE)
@@ -171,7 +176,8 @@ def runPDB2PQR(pdblist, ff,
                typemap = False,
                userff = None,
                usernames = None,
-               ffout = None):
+               ffout = None,
+               holdList = None):
     """
         Run the PDB2PQR Suite
 
@@ -262,7 +268,7 @@ def runPDB2PQR(pdblist, ff,
             if atom.altLoc != "":
                 multoccupancy = 1
                 txt = "Warning: multiple occupancies found: %s in %s\n" % (atom.name, residue)
-                sys.stderr.write(txt)
+                logger.warning(txt)
         if multoccupancy == 1:
             myRoutines.warnings.append("WARNING: multiple occupancies found in %s,\n" % (residue))
             myRoutines.warnings.append("         at least one of the instances is being ignored.\n")
@@ -318,6 +324,8 @@ def runPDB2PQR(pdblist, ff,
 
         if opt:
             myhydRoutines.setOptimizeableHydrogens()
+            # TONI fixing residues - myhydRoutines has a reference to myProtein, so i'm altering it in place
+            myRoutines.holdResidues(holdList)
             myhydRoutines.initializeFullOptimization()
             myhydRoutines.optimizeHydrogens()
         else:

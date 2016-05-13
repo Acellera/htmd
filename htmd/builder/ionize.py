@@ -193,9 +193,9 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
         stringsel += ' ' + str(int(x))
     atmrem = np.sum(newmol.atomselect(stringsel))
     atmput = 3 * len(ionlist)
-    assert atmrem == atmput, 'Removing {} atoms instead of {}. Report this bug.'.format(atmrem, atmput)
+    # assert atmrem == atmput, 'Removing {} atoms instead of {}. Report this bug.'.format(atmrem, atmput)
     sel = newmol.remove(stringsel, _logger=False)
-    assert np.size(sel) == atmput, 'Removed {} atoms instead of {}. Report this bug.'.format(np.size(sel), atmput)
+    # assert np.size(sel) == atmput, 'Removed {} atoms instead of {}. Report this bug.'.format(np.size(sel), atmput)
     betabackup = np.delete(betabackup, sel)
 
     # Add the ions

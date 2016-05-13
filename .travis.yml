@@ -7,19 +7,43 @@ matrix:
   include:
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1 
+     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1 CC=x86_64-w64-mingw32-g++ FC=x86_64-w64-mingw32-gfortran
+     addons:
+      apt:
+       packages:
+       - gfortran-mingw-w64-x86-64
+       - gcc-mingw-w64-x86-64
+       - g++-mingw-w64-x86-64
+       - binutils-mingw-w64-x86-64
+       - mingw-w64-dev
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4 
+     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran
+     addons:
+      apt:
+       packages:
+       - gfortran
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 
+     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran
+     addons:
+      apt:
+       packages:
+       - gfortran
    - os: osx
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4 
+     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran
    - os: osx
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 
+     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran
+
+
+# TONI Suppress fc-list warnings and speed-up - hopefully
+cache:
+    apt: true
+    directories:
+        - $HOME/.cache/matplotlib
+
 
 install:
  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
@@ -72,6 +96,7 @@ install:
  - conda install nglview -y
  - conda install propka -y
  - conda install anaconda-client -y
+ - conda install pint -y
 
  - conda install $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2  -y
  - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y
@@ -83,15 +108,5 @@ script:
  - python tests/run_inline_file_tests.py
 
 after_success:
- - if [ "$TRAVIS_REPO_SLUG" == "multiscalelab/htmd" ]; then export TYPE=basic; fi
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ];      then export TYPE=pro; fi
- - if [ "$TYPE" == "basic" ]; then export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC; export CHANNEL=acellera; fi
- - if [ "$TYPE" == "pro" ];   then export ANACONDA_TOKEN=$ANACONDA_TOKEN_PRO;   export CHANNEL=acellera; fi
- - echo "Uploading to channel: $CHANNEL"
- - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2 -u $CHANNEL 
- - anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2 -u $CHANNEL
- - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-[0-9]*.tar.bz2 -u $CHANNEL ; fi
- - if [ "$CROSS_COMPILE" == "1" ]; then conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-data-[0-9]*.tar.bz2; anaconda -t $ANACONDA_TOKEN upload win-64/htmd-data-[0-9]*.tar.bz2 -u $CHANNEL ; fi
-
-
-
+ - if [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload_data.sh ; fi
+ - if [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload.sh ; fi

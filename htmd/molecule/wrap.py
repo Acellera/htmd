@@ -11,7 +11,7 @@ import numpy
 import htmd.home
 
 
-def wrap( coordinates, bonds, box ):
+def wrap( coordinates, bonds, box, centersel=None ):
     """Wrap the coordinates back into the unit cell. Molecules will remain continuous, so may escape the bounds of the prinary unit cell.
 
     Parameters
@@ -86,5 +86,12 @@ def wrap( coordinates, bonds, box ):
         c_box, c_nbonds, c_natoms, c_nframes
     )
 
+    if centersel is not None:
+      for frame in range(nframes):
+        center=numpy.array([0,0,0])
+        center[0]  = numpy.mean(coordinates[centersel,0,frame])
+        center[1]  = numpy.mean(coordinates[centersel,1,frame])
+        center[2]  = numpy.mean(coordinates[centersel,2,frame])
+        coordinates[:,:,frame] = coordinates[:,:,frame] - numpy.array([center[0], center[1], center[2]])   
     return coordinates
 

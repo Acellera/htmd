@@ -65,6 +65,10 @@ def XTCread(filename, frames=None):
             c_char_p(filename.encode("ascii")),
             natoms,
             nframes, deltat, deltastep)
+
+        if not retval:
+            raise RuntimeError('XTC file {} possibly corrupt.'.format(filename))
+
         frames = range(nframes[0])
         t = Trajectory()
         t.natoms = natoms[0]

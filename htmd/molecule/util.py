@@ -9,6 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+
 def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
     dist = mol.coords[rmsdsel1, :, :] - refmol.coords[rmsdsel2, :, :]
     rmsd = np.sqrt(np.mean(np.sum(dist * dist, axis=1), axis=0))
@@ -34,7 +35,8 @@ def sequenceID(field, prepend=None):
     Examples
     --------
     >>> # A change in resid or segid will cause an increase in the sequence
-    >>> sequenceID((mol.resid, mol.segid))
+    >>> sequenceID((mol.resid, mol.insertion, mol.segid))
+    array([  1,   1,   1, ..., 285, 286, 287])
     """
     if isinstance(field, tuple):
         fieldlen = len(field[0])
@@ -115,6 +117,8 @@ def maxDistance(mol, sel='all', origin=[0, 0, 0]):
     Example
     -------
     >>> y = maxDistance(mol, sel='protein', origin=[0, 0, 0])
+    >>> print(round(y,2))
+    48.39
     """
     coors = mol.get('coords', sel=sel)
     dists = cdist(np.atleast_2d(coors), np.atleast_2d(origin))
@@ -138,7 +142,10 @@ def boundingBox(mol, sel='all'):
 
     Example
     -------
-    >>> bbox = boundingBox(mol, sel='chain A')
+    >>> boundingBox(mol, sel='chain A')
+    array([[-17.3390007 , -10.43700027,  -1.43900001],
+           [ 25.40600014,  27.03800011,  46.46300125]], dtype=float32)
+
     """
     coords = mol.get('coords', sel=sel)
     maxc = np.squeeze(np.max(coords, axis=0))
@@ -248,4 +255,11 @@ def drawCube(mi, ma, viewer=None):
     draw line "$maxx $maxy $maxz" "$minx $maxy $maxz"
     draw line "$maxx $maxy $maxz" "$maxx $miny $maxz"
     """
+
+
+# A test method
+if __name__ == "__main__":
+    from htmd.molecule.molecule import Molecule
+    import doctest
+    doctest.testmod(extraglobs={"mol" : Molecule("3PTB")})
 

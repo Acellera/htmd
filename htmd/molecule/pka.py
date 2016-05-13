@@ -1,15 +1,70 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
-# All Rights Reserved
-# Distributed under HTMD Software License Agreement
-# No redistribution in whole or part
-#
-from tempfile import mkstemp
-import os
-from shutil import which
-from subprocess import check_output
+import logging
+import tempfile
+import propka
+import propka.lib
+import propka.molecular_container
+
+from htmd.molecule.molecule import Molecule
+from htmd.proteinpreparation.residuedata import ResidueData
 
 
-def pka(molecule, propka=None, pH=7.0):
+logger = logging.getLogger(__name__)
+
+
+def pka(mol, pH=7.0):
+    """Compute pKa values via propKa 3.1
+
+    Parameters
+    ----------
+    mol : Molecule
+        The molecule to be analyzed
+    pH : float
+        The pH at which to do the analysis
+
+    Returns
+    -------
+    rd : DataFrame
+        A pandas dataframe containing resid, chain, pKa arrays.
+        Properties unrelated to pKa are unset.
+
+    See Also
+    --------
+    The ResidueData object.
+
+
+    Examples
+    --------
+    >>> m=Molecule("3ptb")
+    >>> rd = pka(m)
+    >>> rd.pKa[rd.resid==189]
+    39    4.949079
+    Name: pKa, dtype: float64
+    """
+
+    return _pka_backend_internal(mol, pH)
+
+
+
+def _pka_backend_internal(mol, pH):
+    tmpmol = mol.copy()
+    tmpmol.filter("noh")
+    pka_pdb = tempfile.NamedTemporaryFile(mode="w+", suffix=".pdb")
+    tmpmol.write(pka_pdb.name)
+
+    pka_options, _ = propka.lib.loadOptions('--pH', pH, '--quiet')
+    pka_molecule = propka.molecular_container.Molecular_container(pka_pdb.name, pka_options)
+    pka_pdb.close()
+
+    # calculating pKa values for ionizable residues -
+    pka_molecule.calculate_pka()
+
+    rd = ResidueData()
+    rd._importPKAs(pka_molecule)
+    return rd.data
+
+
+
+def _pka_backend_external(molecule, propka=None, pH=7.0):
     '''PKA - Predict per-residue pKa, using propka
 
     Parameters
@@ -26,8 +81,13 @@ def pka(molecule, propka=None, pH=7.0):
     Example
     -------
 
-    pkas = pka( Molecule('4DFR'), pH=6.5 )  
+    pkas = pka( Molecule('4DFR'), pH=6.5 )
     '''
+
+    from tempfile import mkstemp
+    import os
+    from shutil import which
+    from subprocess import check_output
 
     try:
         propka = which("propka31", mode=os.X_OK)
@@ -81,10 +141,11 @@ def pka(molecule, propka=None, pH=7.0):
     return ret
 
 
+
+
+# A test method
 if __name__ == "__main__":
-    """
+    import doctest
     from htmd.molecule.molecule import Molecule
-    ret=pka( Molecule('4DFR') )
-    print(ret)
-    """
+    doctest.testmod()
 
