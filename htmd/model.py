@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from htmd.projections.metric import _singleMolfile
 from htmd.molecule.molecule import Molecule
 from htmd.vmdviewer import getCurrentViewer
+from htmd.units import convert as unitconvert
 import logging
 logger = logging.getLogger(__name__)
 
@@ -43,15 +44,17 @@ class Model(object):
             raise NameError('You have modified the data in data.dat after clustering. Please re-cluster.')
         self._clusterid = data._clusterid
 
-    def markovModel(self, lag, macronum, sparse=False):
+    def markovModel(self, lag, macronum, units='frames', sparse=False):
         """ Build a Markov model at a given lag time and calculate metastable states
 
         Parameters
         ----------
         lag : int
-            The lag time at which to calculate the Markov state model in frames.
+            The lag time at which to calculate the Markov state model. The units are specified with the `units` argument.
         macronum : int
             The number of macrostates (metastable states) to produce
+        units : str
+            The units of lag. Can be 'frames' or any time unit given as a string.
         sparse : bool
             Make the transition matrix sparse. Useful if lots (> 4000) states are used for the MSM. Warning: untested.
 
@@ -63,9 +66,7 @@ class Model(object):
         import pyemma.msm as msm
         self._integrityCheck(markov=True)
 
-        if not isinstance(lag, int):
-            lag = int(lag)
-            logger.warning('The lag given to markovModel() was not an integer. Converting to integer: {}'.format(lag))
+        lag = unitconvert(units, 'frames', lag, fstep=self.data.fstep)
 
         self.lag = lag
         self.msm = msm.estimate_markov_model(self.data.St.tolist(), self.lag, sparse=sparse)
@@ -90,7 +91,7 @@ class Model(object):
 
         _macroTrajectoriesReport(self.macronum, _macroTrajSt(self.data.St, self.macro_ofcluster), self.data.simlist)
 
-    def plotTimescales(self, lags=None, errors=None, nits=None, results=False, plot=True):
+    def plotTimescales(self, lags=None, units='frames', errors=None, nits=None, results=False, plot=True):
         """ Plot the implied timescales of MSMs of various lag times
 
         Parameters
@@ -98,6 +99,8 @@ class Model(object):
         lags : list
             The lag times at which to compute the timescales. By default it spreads out 25 lag times linearly from lag
             10 until the mode length of the trajectories.
+        units : str
+            The units of lag. Can be 'frames' or any time unit given as a string.
         errors : errors
             Calculate errors using Bayes (Refer to pyEMMA documentation)
         nits : int
@@ -126,6 +129,9 @@ class Model(object):
         self._integrityCheck()
         if lags is None:
             lags = self._defaultLags()
+        else:
+            lags = unitconvert(units, 'frames', lags, fstep=self.data.fstep).tolist()
+
         if nits is None:
             nits = np.min((self.data.K, 20))
 
