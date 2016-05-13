@@ -436,7 +436,7 @@ class Molecule:
             s = sel
 
         if indexes:
-            return np.where(s)[0]
+            return np.array( np.where(s)[0], dtype=np.int32 )
         else:
             return s
 
