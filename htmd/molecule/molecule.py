@@ -717,15 +717,22 @@ class Molecule:
         if os.path.isfile(filename):
             mol = PDBParser(filename, mode)
         elif len(filename) == 4:
-            # Try loading it from the PDB website
-            r = requests.get(
-                "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
-            if r.status_code == 200:
-                tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                mol = PDBParser(tempfile, mode)
-                os.unlink(tempfile)
+            # Try loading it from the pdb data directory
+            localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower()+".pdb")
+            if os.path.isfile(localpdb):
+                logger.info("Found local copy for {:s}: {:s}".format(filename, localpdb))
+                mol = PDBParser(localpdb, mode)
             else:
-                raise NameError('Invalid PDB code')
+                # or the PDB website
+                logger.info("Attempting PDB query for {:s}".format(filename))
+                r = requests.get(
+                    "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
+                if r.status_code == 200:
+                    tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
+                    mol = PDBParser(tempfile, mode)
+                    os.unlink(tempfile)
+                else:
+                    raise NameError('Invalid PDB code')
         else:
             raise NameError('File {} not found'.format(filename))
 
