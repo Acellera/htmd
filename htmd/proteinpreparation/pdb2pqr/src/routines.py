@@ -106,12 +106,8 @@ class Routines:
         out = ""
         import logging
         logger = logging.getLogger(__name__)
-        logger.info(message)
-        if self.verbose:
-            for i in range(indent):
-                out += "\t"
-            out += message
-            sys.stdout.write(out)
+        logger.info(message.strip())
+
 
     def getWarnings(self):
         """
@@ -1620,6 +1616,7 @@ class Routines:
         # column and hydrogens. This does not seem to be necessary in propKa 3.1 .
         HFreeProteinFile = tempfile.NamedTemporaryFile(mode="w+", suffix=".pdb")
         for atom in self.protein.getAtoms():
+            if not atom.isHydrogen():
                 atomtxt = atom.getPDBString()
                 HFreeProteinFile.write(atomtxt+'\n')
         HFreeProteinFile.seek(0)

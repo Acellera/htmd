@@ -2035,6 +2035,7 @@ class hydrogenRoutines:
             Parameters
                 text:  The text to output (string)
         """
+        self.routines.write(text)
         if HDEBUG: print(text)  
 
     def switchstate(self, states, amb, stateID):

@@ -138,6 +138,12 @@ def prepareProtein(mol_in,
     3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
     4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
      . . .
+    >>> x_HIE91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
+    >>> x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
+    >>> len(x_SER93_H) == 3
+    True
+    >>> np.linalg.norm(x_HIE91_ND1-x_SER93_H) < 3
+    True
 
     >>> mol = Molecule("1r1j")
     >>> mo, prepData = prepareProtein(mol, returnDetails=True)
@@ -295,37 +301,29 @@ def prepareProtein(mol_in,
 
 
 
-"""
-Additional tests
-    >>> tryp = Molecule('3PTB')
-    >>> tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
-    >>> x_HIE91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
-    >>> x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
-    >>> len(x_SER93_H) == 3
-    True
-    >>> np.linalg.norm(x_HIE91_ND1-x_SER93_H) < 3
-    True
-"""
 
 # A test method
 if __name__ == "__main__":
     from htmd import home
     import os
+    import sys
 
-    # bm = Molecule("1a18.pdb")
-    # bmo, rd = prepareProtein(bm, returnDetails=True)
+    if len(sys.argv) > 1:
+        # Reproducibility test
+        # rm mol-test-*; for i in `seq 9`; do py ./proteinpreparation.py ./1r1j.pdb > mol-test-$i.log ; cp ./mol-test.pdb mol-test-$i.pdb; cp mol-test.csv mol-test-$i.csv ; done
+        mol = Molecule(sys.argv[1])
+        mol_op, prepData = prepareProtein(mol, returnDetails=True)
+        mol_op.write("./mol-test.pdb")
+        prepData.data.to_csv("./mol-test.csv")
 
-#    tryp = Molecule('3PTB')
-#    tryp_op, prepData = prepareProtein(tryp, returnDetails=True, holdSelection="resid 20 and chain A")
+        """
+        x_HIS91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
+        x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
+        assert len(x_SER93_H) == 3
+        assert np.linalg.norm(x_HIS91_ND1-x_SER93_H) > 2
+        assert tryp_op.get("resname","resid 91 and  name CA") == "HIE"
+        """
 
-    tryp = Molecule('./3PTB.pdb')
-    tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
-    tryp_op.write("./3PTB-test.pdb")
-    x_HIS91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
-    x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
-    assert len(x_SER93_H) == 3
-    assert np.linalg.norm(x_HIS91_ND1-x_SER93_H) > 2
-    assert tryp_op.get("resname","resid 91 and  name ND1") == "HIE"
-
-    import doctest
-    # doctest.testmod(verbose=True)
+    else:
+        import doctest
+        doctest.testmod(verbose=True)
