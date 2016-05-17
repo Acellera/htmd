@@ -50,7 +50,7 @@ class AcemdLocal(App):
             raise NameError("Could not determine which GPUs to use. "
                             "Specify the GPUs with the `ngpus=` or `devices=` parameters")
         else:
-            logger.info("Using GPU devices {}".format(','.join(devices)))
+            logger.info("Using GPU devices {}".format(','.join(map(str, devices))))
 
         if not acemd:
             try:
