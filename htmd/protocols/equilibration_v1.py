@@ -190,7 +190,7 @@ proc calcforces_endstep { } { }
         if self.acemd.parameters.endswith('structure.prmtop'):
             self.acemd.parmfile = self.acemd.parameters
             self.acemd.parameters = None
-            self.acemd.scaling14 = 0.8333333
+            self.acemd.scaling14 = '0.8333333'
             self.acemd.amber = 'on'
 
     def write(self, inputdir, outputdir):
