@@ -85,7 +85,7 @@ class Acemd(ProtocolInterface):
 
                 defaultname = self._defaultfnames[cmd]
                 if defaultname.endswith('*'):
-                    defaultname = '{}.{}'.format(os.path.splitext(defaultname)[0], os.path.splitext(fname)[1])
+                    defaultname = '{}.{}'.format(os.path.splitext(defaultname)[0], os.path.splitext(fname)[1][1:])
 
                 self.__dict__[cmd] = defaultname  # use default file names
 
