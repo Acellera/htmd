@@ -9,6 +9,7 @@ import numpy
 import numpy as np
 import logging
 import collections
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +189,8 @@ class PDBParser:
         fh.close()
 
     def readPDB(self, filename, mode='pdb'):
+        chargeregex = re.compile('\d[\+\-]')
+
         self.box = numpy.zeros((3, 1))
         fh = open(filename, 'r')
         global_line_counter = 0
@@ -249,6 +252,7 @@ class PDBParser:
                 except:
                     bfactor = 0.0  # The PDB use a default of zero if the data is missing
 
+                charge = ''
                 if mode == 'pdb':
                     segid = line[72:76].strip()
                     element = line[76:78].strip()
@@ -259,6 +263,9 @@ class PDBParser:
                     element = line[77:79].strip()
 
                 if len(charge) != 0:
+                    # PDB supports charges of style: 1+ 2- Need to swap the order to convert to float
+                    if len(charge) == 2 and chargeregex.match(charge):
+                        charge = charge[1] + charge[0]
                     try:
                         charge = float(charge)
                     except:
