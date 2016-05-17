@@ -120,12 +120,6 @@ def prepareProtein(mol_in,
     --------
     >>> tryp = Molecule('3PTB')
 
-    >>> tryp_op = prepareProtein(tryp, pH=1.0)
-    >>> tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
-
-    >>> tryp_op = prepareProtein(tryp, pH=14.0)
-    >>> tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
-
     >>> tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
@@ -144,6 +138,12 @@ def prepareProtein(mol_in,
     True
     >>> np.linalg.norm(x_HIE91_ND1-x_SER93_H) < 3
     True
+
+    >>> tryp_op = prepareProtein(tryp, pH=1.0)
+    >>> tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
+
+    >>> tryp_op = prepareProtein(tryp, pH=14.0)
+    >>> tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
 
     >>> mol = Molecule("1r1j")
     >>> mo, prepData = prepareProtein(mol, returnDetails=True)
