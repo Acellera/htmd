@@ -104,11 +104,10 @@ class Routines:
                 indent : The indent level (int, default=0)
         """
         out = ""
-        if self.verbose:
-            for i in range(indent):
-                out += "\t"
-            out += message
-            sys.stdout.write(out)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(message.strip())
+
 
     def getWarnings(self):
         """
@@ -1617,6 +1616,7 @@ class Routines:
         # column and hydrogens. This does not seem to be necessary in propKa 3.1 .
         HFreeProteinFile = tempfile.NamedTemporaryFile(mode="w+", suffix=".pdb")
         for atom in self.protein.getAtoms():
+            if not atom.isHydrogen():
                 atomtxt = atom.getPDBString()
                 HFreeProteinFile.write(atomtxt+'\n')
         HFreeProteinFile.seek(0)
@@ -1773,15 +1773,26 @@ class Cells:
                 atom:  The atom to add (atom)
         """
         size = self.cellsize
+        # TONI Originally it was e.g.
+        #   if x < 0: x = (int(x) - 1) / size * size
+        #   else: x = int(x) / size * size
+        # in python3 division operator has a different behavior, so i changed
+        # to reproduce the old behavior even though it can be rewritten in a simpler way
         x = atom.get("x")
-        if x < 0: x = (int(x) - 1) / size * size
-        else: x = int(x) / size * size
+        if x < 0:
+            x = (int(x) - 1) // size * size
+        else:
+            x = int(x) // size * size
         y = atom.get("y")
-        if y < 0: y = (int(y) - 1) / size * size
-        else: y = int(y) / size * size
+        if y < 0:
+            y = (int(y) - 1) // size * size
+        else:
+            y = int(y) // size * size
         z = atom.get("z")
-        if z < 0: z = (int(z) - 1) / size * size
-        else: z = int(z) / size * size
+        if z < 0:
+            z = (int(z) - 1) // size * size
+        else:
+            z = int(z) // size * size
         key = (x, y, z)
         try:
             self.cellmap[key].append(atom)

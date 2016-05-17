@@ -138,6 +138,12 @@ def prepareProtein(mol_in,
     3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
     4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
      . . .
+    >>> x_HIE91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
+    >>> x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
+    >>> len(x_SER93_H) == 3
+    True
+    >>> np.linalg.norm(x_HIE91_ND1-x_SER93_H) < 3
+    True
 
     >>> mol = Molecule("1r1j")
     >>> mo, prepData = prepareProtein(mol, returnDetails=True)
@@ -159,7 +165,8 @@ def prepareProtein(mol_in,
 
     >>> mor = Molecule(os.path.join(home(dataDir="mor"), "4dkl.pdb"))
     >>> mor.filter("protein and noh")
-    >>> mor_opt, mor_data = prepareProtein(mor, returnDetails=True, hydrophobicThickness=32.0)
+    >>> mor_opt, mor_data = prepareProtein(mor, returnDetails=True, 
+    ...                                    hydrophobicThickness=32.0)
     >>> exposedRes = mor_data.data.membraneExposed
     >>> mor_data.data[exposedRes].to_excel("/tmp/mor_exposed_residues.xlsx")
 
@@ -191,8 +198,9 @@ def prepareProtein(mol_in,
         logger.setLevel(logging.DEBUG)
     logger.debug("Starting.")
 
-    # We could transform the molecule into an internal object, but for now I prefer to rely on the strange
-    # internal parser to avoid hidden quirks.
+    # We could transform the molecule into an internal object, but for
+    # now I prefer to rely on the strange internal parser to avoid
+    # hidden quirks.
     tmpin = tempfile.NamedTemporaryFile(suffix=".pdb", mode="w+")
     logger.debug("Temporary file is " + tmpin.name)
     mol_in.write(tmpin.name)  # Not sure this is sound unix
@@ -207,10 +215,13 @@ def prepareProtein(mol_in,
     propka_opts.verbosity = verbose
     propka_opts.verbose = verbose  # Will be removed in future propKas
 
-    # Note on naming. The behavior of PDB2PQR is controlled by two parameters, ff and ffout. My understanding is
-    # that the ff parameter sets which residues are SUPPORTED by the underlying FF, PLUS the charge and radii.
-    # The ffout parameter sets the naming scheme. Therefore, I want ff to be as general as possible, which turns out
-    # to be "parse". Then I pick a convenient ffout.
+    # Note on naming. The behavior of PDB2PQR is controlled by two
+    # parameters, ff and ffout. My understanding is that the ff
+    # parameter sets which residues are SUPPORTED by the underlying
+    # FF, PLUS the charge and radii.  The ffout parameter sets the
+    # naming scheme. Therefore, I want ff to be as general as
+    # possible, which turns out to be "parse". Then I pick a
+    # convenient ffout.
 
     # Hold list (None -> None)
     hlist = _selToHoldList(mol_in, holdSelection)
@@ -289,17 +300,30 @@ def prepareProtein(mol_in,
         return mol_out
 
 
+
+
 # A test method
 if __name__ == "__main__":
     from htmd import home
     import os
+    import sys
 
-    # bm = Molecule("1a18.pdb")
-    # bmo, rd = prepareProtein(bm, returnDetails=True)
+    if len(sys.argv) > 1:
+        # Reproducibility test
+        # rm mol-test-*; for i in `seq 9`; do py ./proteinpreparation.py ./1r1j.pdb > mol-test-$i.log ; cp ./mol-test.pdb mol-test-$i.pdb; cp mol-test.csv mol-test-$i.csv ; done
+        mol = Molecule(sys.argv[1])
+        mol_op, prepData = prepareProtein(mol, returnDetails=True)
+        mol_op.write("./mol-test.pdb")
+        prepData.data.to_csv("./mol-test.csv")
 
-    tryp = Molecule('3PTB')
-    tryp_op, prepData = prepareProtein(tryp, returnDetails=True, holdSelection="resid 20 and chain A")
+        """
+        x_HIS91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
+        x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
+        assert len(x_SER93_H) == 3
+        assert np.linalg.norm(x_HIS91_ND1-x_SER93_H) > 2
+        assert tryp_op.get("resname","resid 91 and  name CA") == "HIE"
+        """
 
-    import doctest
-
-    doctest.testmod()
+    else:
+        import doctest
+        doctest.testmod(verbose=True)

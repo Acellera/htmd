@@ -407,7 +407,14 @@ class HIS(Amino):
             positive incarnations of HIS to neutral HIS by
             checking to see if optimization removed hacceptor or
             hdonor flags.  Otherwise HID is used as the default.
-        """ 
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("{:s}: ND1 don: {:d} acc: {:d}; NE2 don: {:d}, acc: {:d}".format(
+            str(self),
+            self.getAtom("ND1").hdonor, self.getAtom("ND1").hacceptor,
+            self.getAtom("NE2").hdonor, self.getAtom("NE2").hacceptor
+        ))
         if "HIP" not in self.patches and self.name not in ["HIP", "HSP"]:
             if self.getAtom("ND1").hdonor and not \
                    self.getAtom("ND1").hacceptor:
