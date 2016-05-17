@@ -13,7 +13,8 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 class Acemd(ProtocolInterface):
     _defaultfnames = {'bincoordinates': 'input.coor', 'binvelocities': 'input.vel', 'binindex': 'index.idx',
                'structure': 'structure.*', 'parameters': 'parameters', 'extendedsystem': 'input.xsc',
-               'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb'}
+               'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb',
+               'parmfile': 'structure.prmtop'}
 
     def __init__(self):
         super().__init__()
@@ -54,6 +55,7 @@ class Acemd(ProtocolInterface):
         self._cmdString('TCL', 'str', '', None)
         self._cmdString('celldimension', 'str', '', None)
         self._cmdString('useconstantratio', 'str', '', None)
+        self._cmdString('amber', 'str', '', None)
 
         # Files
         self._cmdString('bincoordinates', 'str', '', None)
@@ -65,6 +67,7 @@ class Acemd(ProtocolInterface):
         self._cmdString('coordinates', 'str', '', None)
         self._cmdString('velocities', 'str', '', None)
         self._cmdString('consref', 'str', '', None)
+        self._cmdString('parmfile', 'str', '', None)
 
     def load(self, path='.'):
         """ Loads all files required to run a simulation and apply eventually configured protocols to it

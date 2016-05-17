@@ -185,6 +185,14 @@ proc calcforces_endstep { } { }
         if self.acemd.consref is None:
             self.acemd.consref = self.acemd.coordinates
 
+    def _amberFixes(self):
+        # AMBER specific fixes
+        if self.acemd.parameters.endswith('structure.prmtop'):
+            self.acemd.parmfile = self.acemd.parameters
+            self.acemd.parameters = None
+            self.acemd.scaling14 = 0.8333333
+            self.acemd.amber = 'on'
+
     def write(self, inputdir, outputdir):
         """ Write the equilibration protocol
 
@@ -204,6 +212,7 @@ proc calcforces_endstep { } { }
         >>> md.write('./build','./equil')
         """
         self._findFiles(inputdir)
+        self._amberFixes()
 
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
         inmol = Molecule(pdbfile)

@@ -133,6 +133,14 @@ proc calcforces_endstep { } { }
                                    'Please set the Equilibration.acemd.{f:} property to '
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
+    def _amberFixes(self):
+        # AMBER specific fixes
+        if self.acemd.parameters.endswith('structure.prmtop'):
+            self.acemd.parmfile = self.acemd.parameters
+            self.acemd.parameters = None
+            self.acemd.scaling14 = 0.8333333
+            self.acemd.amber = 'on'
+
     def write(self, inputdir, outputdir):
         """ Writes the production protocol and files into a folder.
 
@@ -144,6 +152,7 @@ proc calcforces_endstep { } { }
             Directory where to write the production setup files.
         """
         self._findFiles(inputdir)
+        self._amberFixes()
 
         self.acemd.temperature = str(self.temperature)
         self.acemd.langevintemp = str(self.temperature)
