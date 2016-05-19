@@ -1,13 +1,12 @@
 import logging
 import tempfile
 import numpy as np
-import random
+from pdb2pqr.main import runPDB2PQR
+from pdb2pqr.src.pdb import readPDB
+
 
 # If necessary: http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 from htmd.proteinpreparation.residuedata import ResidueData
-from htmd.proteinpreparation.pdb2pqr.src.pdbParser import readPDB
-from htmd.proteinpreparation.pdb2pqr.main import runPDB2PQR
-
 from htmd.molecule.molecule import Molecule
 
 logger = logging.getLogger(__name__)
@@ -41,6 +40,18 @@ def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element
     mol.segid = np.array(segid, dtype=mol._pdb_fields['segid'])
     mol.element = np.array(elements, dtype=mol._pdb_fields['element'])
     return mol
+
+
+def _fixupWaterNames(mol):
+    """Rename WAT OW HW HW atoms as O H1 H2"""
+    mol.set("name","O",sel="resname WAT and name OW")
+    hw = mol.atomselect("resname WAT and name HW")
+    n = np.arange(len(hw))
+    hw_even = np.logical_and(hw, np.mod(n, 2) == 0)
+    hw_odd  = np.logical_and(hw, np.mod(n, 2) == 1)
+    mol.set("name", "H1",sel=hw_even)
+    mol.set("name", "H2",sel=hw_odd)
+
 
 
 def prepareProtein(mol_in,
@@ -231,7 +242,8 @@ def prepareProtein(mol_in,
     header, lines, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
                                                                ph=pH, verbose=verbose,
                                                                ff="parse", ffout="amber",
-                                                               propkaOptions=propka_opts,
+                                                               ph_calc_method="propka31",
+                                                               ph_calc_options=propka_opts,
                                                                holdList=hlist)
     tmpin.close()
 
@@ -255,7 +267,8 @@ def prepareProtein(mol_in,
     resData = ResidueData()
 
     for residue in pdb2pqr_protein.residues:
-        if 'ffname' in residue.__dict__:
+        # if 'ffname' in residue.__dict__:
+        if getattr(residue,'ffname',None):
             curr_resname = residue.ffname
             if len(curr_resname) >= 4:
                 curr_resname = curr_resname[-3:]
@@ -266,11 +279,16 @@ def prepareProtein(mol_in,
 
         resData._setProtonationState(residue, curr_resname)
 
-        if 'patches' in residue.__dict__:
+        #if 'patches' in residue.__dict__:
+        if getattr(residue, 'patches', None):
             for patch in residue.patches:
                 resData._appendPatches(residue, patch)
                 if patch != "PEPTIDE":
                     logger.debug("Residue %s has patch %s set" % (residue, patch))
+
+        if getattr(residue, 'wasFlipped', 'UNDEF') != 'UNDEF':
+            resData._setFlipped(residue, residue.wasFlipped)
+
 
         for atom in residue.atoms:
             name.append(atom.name)
@@ -283,8 +301,10 @@ def prepareProtein(mol_in,
             elements.append(atom.element)
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
+    _fixupWaterNames(mol_out)
 
-    resData._importPKAs(pdb2pqr_protein.pka_molecule)
+    # Return residue information
+    resData._importPKAs(pdb2pqr_protein.pka_protein)
     resData.pdb2pqr_protein = pdb2pqr_protein
     resData.missedLigands = missedLigands
 
@@ -314,6 +334,7 @@ if __name__ == "__main__":
         mol = Molecule(sys.argv[1])
         mol_op, prepData = prepareProtein(mol, returnDetails=True)
         mol_op.write("./mol-test.pdb")
+        prepData.data.to_excel("./mol-test.xlsx")
         prepData.data.to_csv("./mol-test.csv")
 
         """

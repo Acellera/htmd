@@ -53,6 +53,8 @@ class ResidueData:
             pKa value computed by propKa
         protonation : str
             Forcefield-independent protonation code
+        flipped : bool
+            Whether the residue was flipped during the optimization
         buried : float
             Fraction of residue which is buried
         membraneExposed: bool
@@ -74,17 +76,17 @@ class ResidueData:
     thickness = None
 
     # Important- all must be listed or "set_value" will silently ignore them
-    _columns = ['resname', 'resid', 'insertion',
-                'chain', 'pKa', 'protonation', 'buried',
-                'patches', 'z', 'membraneExposed',
+    _columns = ['resname', 'resid', 'insertion', 'chain',
+                'pKa', 'protonation', 'flipped', 'patches',
+                'buried', 'z', 'membraneExposed',
                 'pka_group_id',
                 'pka_residue_type', 'pka_type', 'pka_charge',
                 'pka_atom_name', 'pka_atom_sybyl_type']
 
     # Columns printed by the __str__ method
-    _printColumns = ['resname', 'resid', 'insertion',
-                'chain', 'pKa', 'protonation', 'buried',
-                'patches']
+    _printColumns = ['resname', 'resid', 'insertion', 'chain',
+                     'pKa', 'protonation', 'flipped', 'buried',
+                     'patches']
 
     def __init__(self):
         self.data = pd.DataFrame(columns=self._columns)
@@ -92,7 +94,9 @@ class ResidueData:
         self.data.pKa = self.data.pKa.astype(float)
         self.data.buried = self.data.buried.astype(float)
         self.data.z = self.data.z.astype(float)
-        self.data.pka_group_id = self.data.pka_group_id.astype(int)
+        self.data.pka_group_id = self.data.pka_group_id.astype(float) # should be int, but NaN not allowed
+        # self.data.flipped = self.data.flipped.astype(float)             #  should be bool, but NaN not allowed
+
 
     def __str__(self):
         r="ResidueData object about {:d} residues. Please find the full info in the .data property.\n".format(len(self.data))
@@ -128,6 +132,11 @@ class ResidueData:
         logger.debug("_setProtonationState %s %s" % (residue, state))
         pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
         self.data.set_value(pos, 'protonation', state)
+
+    def _setFlipped(self, residue, state):
+        logger.debug("_setFlipped %s %s" % (residue, state))
+        pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
+        self.data.set_value(pos, 'flipped', state)
 
     def _appendPatches(self, residue, patch):
         logger.debug("_appendPatches %s %s" % (residue, patch))
