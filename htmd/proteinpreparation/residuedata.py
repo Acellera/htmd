@@ -24,7 +24,7 @@ class ResidueData:
     >>> ri
     ResidueData object about 290 residues.
     Unparametrized residue names: CA, BEN
-    Please find the full info in the .data property, e.g.:
+    Please find the full info in the .data property, e.g.: 
       resname  resid insertion chain       pKa protonation flipped     buried
     0     ILE     16               A       NaN         ILE     NaN        NaN
     1     VAL     17               A       NaN         VAL     NaN        NaN
