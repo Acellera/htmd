@@ -751,3 +751,22 @@ def _logParser(fname):
     if warnings:
         logger.warning('Failed/poorly guessed coordinates can cause simulations to crash since failed atoms are all positioned on (0,0,0).')
         logger.warning('Please check {} for further information.'.format(fname))
+
+
+if __name__ == '__main__':
+    from htmd.molecule.molecule import Molecule
+    from htmd.proteinpreparation.proteinpreparation import prepareProtein
+    from htmd.home import home
+    import numpy as np
+    import os
+
+    mol = Molecule(os.path.join(home(), 'data', 'charmm-build-test', '1u5u.pdb'))
+    mol.filter('protein')
+    mol.set('segid', 'P')
+    pmol = prepareProtein(mol)
+    bmol = build(pmol, outdir='/tmp/build/', ionize=False)
+
+    ref = Molecule(os.path.join(home(), 'data', 'charmm-build-test', '1u5u_built_protonated.pdb'))
+
+    assert np.array_equal(bmol.name, ref.name)
+    assert np.array_equal(bmol.resname, ref.resname)
