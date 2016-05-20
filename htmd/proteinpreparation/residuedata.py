@@ -72,9 +72,6 @@ class ResidueData:
                 propkaContainer.conformations['AVR'].groups[4].atom.__dict__
     """
 
-    propkaContainer = None
-    thickness = None
-
     # Important- all must be listed or "set_value" will silently ignore them
     _columns = ['resname', 'resid', 'insertion', 'chain',
                 'pKa', 'protonation', 'flipped', 'patches',
@@ -89,7 +86,10 @@ class ResidueData:
                      'patches']
 
     def __init__(self):
+        self.propkaContainer = None
+        self.thickness = None
         self.missedLigands = []
+
         self.data = pd.DataFrame(columns=self._columns)
         self.data.resid = self.data.resid.astype(int)
         self.data.pKa = self.data.pKa.astype(float)
