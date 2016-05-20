@@ -28,7 +28,7 @@ def opm(pdb):
     Parameters
     ----------
     pdb: str
-        The 4-letter code
+        The 4-letter PDB code
 
     Returns
     -------
