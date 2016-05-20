@@ -132,13 +132,15 @@ def prepareProtein(mol_in,
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
     >>> prepData
-    ResidueData object about 290 residues. Please find the full info in the .data property.
-      resname  resid insertion chain       pKa protonation    buried    patches
-    0     ILE     16               A       NaN         ILE       NaN    [NTERM]
-    1     VAL     17               A       NaN         VAL       NaN  [PEPTIDE]
-    2     GLY     18               A       NaN         GLY       NaN  [PEPTIDE]
-    3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
-    4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
+    ResidueData object about 290 residues.
+    Unparametrized residue names: CA, BEN
+    Please find the full info in the .data property, e.g.:
+      resname  resid insertion chain       pKa protonation flipped     buried
+    0     ILE     16               A       NaN         ILE     NaN        NaN
+    1     VAL     17               A       NaN         VAL     NaN        NaN
+    2     GLY     18               A       NaN         GLY     NaN        NaN
+    3     GLY     19               A       NaN         GLY     NaN        NaN
+    4     TYR     20               A  9.590845         TYR     NaN  14.642857
      . . .
     >>> x_HIE91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
     >>> x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
@@ -219,6 +221,12 @@ def prepareProtein(mol_in,
 
     # We could set additional options here
     import propka.lib
+
+    # An ugly hack to silence non-prefixed logging messages
+    for h in propka.lib.logger.handlers:
+        if h.formatter._fmt == '%(message)s':
+            propka.lib.logger.removeHandler(h)
+
     propka_opts, dummy = propka.lib.loadOptions('--quiet')
     propka_opts.verbosity = verbose
     propka_opts.verbose = verbose  # Will be removed in future propKas
@@ -236,7 +244,7 @@ def prepareProtein(mol_in,
 
 
     # Relying on defaults
-    header, lines, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
+    header, pqr, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
                                                                ph=pH, verbose=verbose,
                                                                ff="parse", ffout="amber",
                                                                ph_calc_method="propka31",
@@ -262,6 +270,9 @@ def prepareProtein(mol_in,
     elements = []
 
     resData = ResidueData()
+
+    resData.header = header
+    resData.pqr = pqr
 
     for residue in pdb2pqr_protein.residues:
         # if 'ffname' in residue.__dict__:
@@ -346,4 +357,4 @@ if __name__ == "__main__":
 
     else:
         import doctest
-        doctest.testmod(verbose=True)
+        doctest.testmod()

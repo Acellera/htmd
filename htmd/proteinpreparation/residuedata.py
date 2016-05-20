@@ -22,13 +22,15 @@ class ResidueData:
     >>> tryp = Molecule("3PTB")
     >>> tryp_op, ri = prepareProtein(tryp, returnDetails=True)
     >>> ri
-    ResidueData object about 287 residues. Please find the full info in the .data property.
-      resname  resid insertion chain       pKa protonation    buried    patches
-    0     ILE     16               A  7.413075         ILE  0.839286    [NTERM]
-    1     VAL     17               A       NaN         VAL       NaN  [PEPTIDE]
-    2     GLY     18               A       NaN         GLY       NaN  [PEPTIDE]
-    3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
-    4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
+    ResidueData object about 290 residues.
+    Unparametrized residue names: CA, BEN
+    Please find the full info in the .data property, e.g.:
+      resname  resid insertion chain       pKa protonation flipped     buried
+    0     ILE     16               A       NaN         ILE     NaN        NaN
+    1     VAL     17               A       NaN         VAL     NaN        NaN
+    2     GLY     18               A       NaN         GLY     NaN        NaN
+    3     GLY     19               A       NaN         GLY     NaN        NaN
+    4     TYR     20               A  9.590845         TYR     NaN  14.642857
      . . .
     >>> "%.2f" % ri.data.pKa[ri.data.resid==189]
     '4.95'
@@ -66,10 +68,11 @@ class ResidueData:
      .missedLigands : str
             List of ligands residue names which were not optimized
 
+     .header : str
+            Messages and warnings from PDB2PQR
+
      .propkaContainer : propka.molecular_container.Molecular_container
-            Detailed information returned by propKa 3.1. See e.g.
-                propkaContainer.conformations['AVR'].groups[4].__dict__
-                propkaContainer.conformations['AVR'].groups[4].atom.__dict__
+            Detailed information returned by propKa 3.1.
     """
 
     # Important- all must be listed or "set_value" will silently ignore them
@@ -82,8 +85,7 @@ class ResidueData:
 
     # Columns printed by the __str__ method
     _printColumns = ['resname', 'resid', 'insertion', 'chain',
-                     'pKa', 'protonation', 'flipped', 'buried',
-                     'patches']
+                     'pKa', 'protonation', 'flipped', 'buried' ]
 
     def __init__(self):
         self.propkaContainer = None
@@ -99,7 +101,7 @@ class ResidueData:
         # self.data.flipped = self.data.flipped.astype(float)             #  should be bool, but NaN not allowed
 
     def __str__(self):
-        r = "ResidueData object about {:d} residues.\n"
+        r = "ResidueData object about {:d} residues.\n".format(len(self.data))
         if len(self.missedLigands) > 0:
             r += "Unparametrized residue names: " + ", ".join(self.missedLigands) + "\n"
         r += "Please find the full info in the .data property, e.g.: \n".format(len(self.data))
@@ -184,8 +186,8 @@ class ResidueData:
             dl = self._prettyPrintResidues(inSlabNotBuried)
             logger.warning(
                 ("Predictions for {:d} residues may be incorrect because they are " +
-                 "exposed to the membrane ({:.1f}<z<{:.2f} and buried<{:.1f}%): {:s}.").format(
-                    sum(inSlabNotBuried), -ht, ht, maxBuried, dl))
+                 "exposed to the membrane ({:.1f}<z<{:.2f} and buried<{:.1f}%).").format(
+                    sum(inSlabNotBuried), -ht, ht, maxBuried))
 
     def _warnIfpKCloseTopH(self, ph, tol=1.0):
         # Looks like NaN < 5 is False today
@@ -194,8 +196,8 @@ class ResidueData:
         if nd > 1:
             dl = self._prettyPrintResidues(dubious)
             logger.warning(
-                "Dubious protonation state: the pKa of the following {:d} residues is within {:.1f} units of pH {:.1f}: {:s}"
-                .format(nd, tol, ph, dl))
+                "Dubious protonation state: the pKa of {:d} residues is within {:.1f} units of pH {:.1f}."
+                .format(nd, tol, ph))
 
     def _prettyPrintResidues(self, sel):
         tmp = self.data[sel][['resname', 'resid', 'insertion', 'chain']].values.tolist()
