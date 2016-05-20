@@ -23,9 +23,6 @@ def _selToHoldList(mol, sel):
     return ret
 
 
-
-
-
 def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
     numAtoms = len(name)
     mol = Molecule()
@@ -174,7 +171,7 @@ def prepareProtein(mol_in,
     657    711               A     HIS         HIP
     679    733               A     HIS         HID
 
-    >>> mor = Molecule(os.path.join(home(dataDir="mor"), "4dkl.pdb"))
+    >>> mor = Molecule("4dkl")
     >>> mor.filter("protein and noh")
     >>> mor_opt, mor_data = prepareProtein(mor, returnDetails=True, 
     ...                                    hydrophobicThickness=32.0)
@@ -308,8 +305,10 @@ def prepareProtein(mol_in,
     resData.pdb2pqr_protein = pdb2pqr_protein
     resData.missedLigands = missedLigands
 
+    resData._warnIfpKCloseTopH(pH)
+
     if hydrophobicThickness:
-        resData._setMembraneExposure(hydrophobicThickness)
+        resData._setMembraneExposureAndWarn(hydrophobicThickness)
 
     logger.debug("Returning.")
     logger.setLevel(oldLoggingLevel)
