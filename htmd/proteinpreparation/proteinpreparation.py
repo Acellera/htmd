@@ -1,13 +1,12 @@
 import logging
 import tempfile
 import numpy as np
-import random
+from pdb2pqr.main import runPDB2PQR
+from pdb2pqr.src.pdb import readPDB
+
 
 # If necessary: http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 from htmd.proteinpreparation.residuedata import ResidueData
-from htmd.proteinpreparation.pdb2pqr.src.pdbParser import readPDB
-from htmd.proteinpreparation.pdb2pqr.main import runPDB2PQR
-
 from htmd.molecule.molecule import Molecule
 
 logger = logging.getLogger(__name__)
@@ -24,9 +23,6 @@ def _selToHoldList(mol, sel):
     return ret
 
 
-
-
-
 def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
     numAtoms = len(name)
     mol = Molecule()
@@ -41,6 +37,18 @@ def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element
     mol.segid = np.array(segid, dtype=mol._pdb_fields['segid'])
     mol.element = np.array(elements, dtype=mol._pdb_fields['element'])
     return mol
+
+
+def _fixupWaterNames(mol):
+    """Rename WAT OW HW HW atoms as O H1 H2"""
+    mol.set("name","O",sel="resname WAT and name OW")
+    hw = mol.atomselect("resname WAT and name HW")
+    n = np.arange(len(hw))
+    hw_even = np.logical_and(hw, np.mod(n, 2) == 0)
+    hw_odd  = np.logical_and(hw, np.mod(n, 2) == 1)
+    mol.set("name", "H1",sel=hw_even)
+    mol.set("name", "H2",sel=hw_odd)
+
 
 
 def prepareProtein(mol_in,
@@ -124,13 +132,15 @@ def prepareProtein(mol_in,
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
     >>> prepData
-    ResidueData object about 290 residues. Please find the full info in the .data property.
-      resname  resid insertion chain       pKa protonation    buried    patches
-    0     ILE     16               A       NaN         ILE       NaN    [NTERM]
-    1     VAL     17               A       NaN         VAL       NaN  [PEPTIDE]
-    2     GLY     18               A       NaN         GLY       NaN  [PEPTIDE]
-    3     GLY     19               A       NaN         GLY       NaN  [PEPTIDE]
-    4     TYR     20               A  9.590845         TYR  0.146429  [PEPTIDE]
+    ResidueData object about 290 residues.
+    Unparametrized residue names: CA, BEN
+    Please find the full info in the .data property, e.g.:
+      resname  resid insertion chain       pKa protonation flipped     buried
+    0     ILE     16               A       NaN         ILE     NaN        NaN
+    1     VAL     17               A       NaN         VAL     NaN        NaN
+    2     GLY     18               A       NaN         GLY     NaN        NaN
+    3     GLY     19               A       NaN         GLY     NaN        NaN
+    4     TYR     20               A  9.590845         TYR     NaN  14.642857
      . . .
     >>> x_HIE91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
     >>> x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
@@ -163,7 +173,7 @@ def prepareProtein(mol_in,
     657    711               A     HIS         HIP
     679    733               A     HIS         HID
 
-    >>> mor = Molecule(os.path.join(home(dataDir="mor"), "4dkl.pdb"))
+    >>> mor = Molecule("4dkl")
     >>> mor.filter("protein and noh")
     >>> mor_opt, mor_data = prepareProtein(mor, returnDetails=True, 
     ...                                    hydrophobicThickness=32.0)
@@ -211,6 +221,12 @@ def prepareProtein(mol_in,
 
     # We could set additional options here
     import propka.lib
+
+    # An ugly hack to silence non-prefixed logging messages
+    for h in propka.lib.logger.handlers:
+        if h.formatter._fmt == '%(message)s':
+            propka.lib.logger.removeHandler(h)
+
     propka_opts, dummy = propka.lib.loadOptions('--quiet')
     propka_opts.verbosity = verbose
     propka_opts.verbose = verbose  # Will be removed in future propKas
@@ -228,10 +244,11 @@ def prepareProtein(mol_in,
 
 
     # Relying on defaults
-    header, lines, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
+    header, pqr, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
                                                                ph=pH, verbose=verbose,
                                                                ff="parse", ffout="amber",
-                                                               propkaOptions=propka_opts,
+                                                               ph_calc_method="propka31",
+                                                               ph_calc_options=propka_opts,
                                                                holdList=hlist)
     tmpin.close()
 
@@ -254,8 +271,12 @@ def prepareProtein(mol_in,
 
     resData = ResidueData()
 
+    resData.header = header
+    resData.pqr = pqr
+
     for residue in pdb2pqr_protein.residues:
-        if 'ffname' in residue.__dict__:
+        # if 'ffname' in residue.__dict__:
+        if getattr(residue,'ffname',None):
             curr_resname = residue.ffname
             if len(curr_resname) >= 4:
                 curr_resname = curr_resname[-3:]
@@ -266,11 +287,16 @@ def prepareProtein(mol_in,
 
         resData._setProtonationState(residue, curr_resname)
 
-        if 'patches' in residue.__dict__:
+        #if 'patches' in residue.__dict__:
+        if getattr(residue, 'patches', None):
             for patch in residue.patches:
                 resData._appendPatches(residue, patch)
                 if patch != "PEPTIDE":
                     logger.debug("Residue %s has patch %s set" % (residue, patch))
+
+        if getattr(residue, 'wasFlipped', 'UNDEF') != 'UNDEF':
+            resData._setFlipped(residue, residue.wasFlipped)
+
 
         for atom in residue.atoms:
             name.append(atom.name)
@@ -283,13 +309,17 @@ def prepareProtein(mol_in,
             elements.append(atom.element)
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
+    _fixupWaterNames(mol_out)
 
-    resData._importPKAs(pdb2pqr_protein.pka_molecule)
+    # Return residue information
+    resData._importPKAs(pdb2pqr_protein.pka_protein)
     resData.pdb2pqr_protein = pdb2pqr_protein
     resData.missedLigands = missedLigands
 
+    resData._warnIfpKCloseTopH(pH)
+
     if hydrophobicThickness:
-        resData._setMembraneExposure(hydrophobicThickness)
+        resData._setMembraneExposureAndWarn(hydrophobicThickness)
 
     logger.debug("Returning.")
     logger.setLevel(oldLoggingLevel)
@@ -314,6 +344,7 @@ if __name__ == "__main__":
         mol = Molecule(sys.argv[1])
         mol_op, prepData = prepareProtein(mol, returnDetails=True)
         mol_op.write("./mol-test.pdb")
+        prepData.data.to_excel("./mol-test.xlsx")
         prepData.data.to_csv("./mol-test.csv")
 
         """
@@ -326,4 +357,4 @@ if __name__ == "__main__":
 
     else:
         import doctest
-        doctest.testmod(verbose=True)
+        doctest.testmod()
