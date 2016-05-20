@@ -171,8 +171,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     mol = mol.copy()
 
     idx = mol.atomselect(sel, indexes=True)
-    rid = mol.get('resid', sel)  # TODO:maybe easier without sel, rid = mol.get('resid') and then no need of idx
-    idxdiff = np.diff(idx)
+    rid = mol.get('resid', sel)
     residiff = np.diff(rid)
     gappos = np.where((residiff != 1) & (residiff != 0))[0]  # Points to the index before the gap!
 

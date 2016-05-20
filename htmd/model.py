@@ -347,7 +347,8 @@ class Model(object):
                                                   for i, rel in enumerate(relframes))
         return np.array(mols, dtype=object)
 
-    def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None, numsamples=50):
+    def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
+                   numsamples=50, wrapsel='protein', alignsel='name CA'):
         """ Visualize macro/micro/cluster states in VMD
 
         Parameters
@@ -366,6 +367,10 @@ class Model(object):
             An array of :class:`Molecule <htmd.molecule.molecule.Molecule>` objects to visualize
         numsamples : int
             Number of samples (conformations) for each state.
+        wrapsel : str, optional, default='protein'
+            A selection to use for wrapping
+        alignsel : str, optional, default='name CA'
+            A selection used for aligning all frames
 
         Examples
         --------
@@ -388,7 +393,7 @@ class Model(object):
         if isinstance(states, int):
             states = [states]
         if mols is None:
-            mols = self.getStates(states, statetype, numsamples=numsamples)
+            mols = self.getStates(states, statetype, numsamples=numsamples, wrapsel=wrapsel, alignsel=alignsel)
         colors = [0, 1, 3, 4, 5, 6, 7, 9]
         for i, s in enumerate(states):
             viewer.loadMol(mols[i], name=statetype+' '+str(states[i]))

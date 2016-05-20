@@ -352,6 +352,7 @@ def _printAliases(f):
         pdbalias residue BA BAR
 
         # Aliases for Maestro residues
+        pdbalias residue AR0 ARG
         pdbalias residue GLH GLU
         pdbalias residue ASH ASP
         pdbalias residue LYN LYS
@@ -487,7 +488,7 @@ def _removeCappedResidues(mol, seg):
 def _protonationPatches(mol):
     protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN', 'AR0': 'RN1'}
     aliases = {}  # Some protonations don't exist in CHARMM
-    # TODO: Do I need to rename before applying patch?
+    # TODO: Remember to alias all of them before applying patches
     patches = []
 
     for pro in protonations:
@@ -499,7 +500,7 @@ def _protonationPatches(mol):
             #from IPython.core.debugger import Tracer
             #Tracer()()
             patch = 'patch {} {}:{}'.format(protonations[pro], pseg[r], pres[r])
-        patches.append(patch)
+            patches.append(patch)
 
     '''for pro in aliases:
         sel = mol.atomselect('resname {}'.format(pro))
