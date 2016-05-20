@@ -23,6 +23,8 @@ def tempname(suffix='', create=False):
 def opm(pdb):
     """Download a molecule from the OPM.
 
+    Removes DUM atoms.
+
     Parameters
     ----------
     pdb: str
@@ -56,6 +58,7 @@ def opm(pdb):
 
     tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
     mol = Molecule(tempfile)
+    mol.filter("not resname DUM")
 
     # Assuming the half-thickness is the last word in the first line
     # REMARK      1/2 of bilayer thickness:   14.1

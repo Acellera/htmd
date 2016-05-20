@@ -1,4 +1,8 @@
 from htmd import *
+from htmd.util import opm
+from htmd.builder.charmm import build
+
+import sys
 
 cases="""
 1z98
@@ -18,6 +22,26 @@ cases="""
 5an8
 """.split()
 
+print(os.getcwd())
+
 for p in cases:
-    m=Molecule(p)
-    mo,rd=prepareProtein(m)
+    print("Working on --------------- "+p)
+    m,th=opm(p)
+    m.filter("not resname DUM")
+    m.write("{:s}.pdb".format(p))
+
+    try:
+        mo,rd=prepareProtein(m,returnDetails=True,verbose=True)
+        mo.write("{:s}-prep.pdb".format(p))
+        rd.data.to_excel("{:s}-data.xlsx".format(p))
+
+        mo.set('segid', 'P')
+        build(mo,outdir="build-"+p,ionize=False)
+    except:
+        print("Unexpected error:", sys.exc_info())
+
+
+
+
+
+

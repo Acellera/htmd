@@ -24,7 +24,7 @@ class ResidueData:
     >>> ri
     ResidueData object about 290 residues.
     Unparametrized residue names: CA, BEN
-    Please find the full info in the .data property, e.g.: 
+    Please find the full info in the .data property, e.g.:
       resname  resid insertion chain       pKa protonation flipped     buried
     0     ILE     16               A       NaN         ILE     NaN        NaN
     1     VAL     17               A       NaN         VAL     NaN        NaN
@@ -194,16 +194,17 @@ class ResidueData:
         dubious = abs(self.data.pKa - ph) < tol
         nd = sum(dubious)
         if nd > 1:
-            dl = self._prettyPrintResidues(dubious)
             logger.warning(
                 "Dubious protonation state: the pKa of {:d} residues is within {:.1f} units of pH {:.1f}."
                 .format(nd, tol, ph))
+            for dr in self._prettyPrintResidues(dubious):
+                logger.warning("Dubious protonation state:    "+dr)
+
 
     def _prettyPrintResidues(self, sel):
         tmp = self.data[sel][['resname', 'resid', 'insertion', 'chain']].values.tolist()
         rl = ["{:s} {:d}{:s} {:s}".format(*i) for i in tmp]
-        srl = ", ".join(rl)
-        return srl
+        return rl
 
 
 if __name__ == "__main__":
