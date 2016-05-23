@@ -25,30 +25,25 @@ from natsort import natsorted
 import logging
 logger = logging.getLogger(__name__)
 
-__test__= { 'build-opm-1u5u' : """
->>> from htmd.proteinpreparation.proteinpreparation import prepareProtein
->>> from htmd.util import diffMolecules
+__test__ = {'build-opm-1u5u': """
+    >>> from htmd.proteinpreparation.proteinpreparation import prepareProtein
+    >>> from htmd.util import diffMolecules
 
->>> pdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_opm.pdb')
->>> mol = Molecule(pdb)
->>> mol.filter('protein')
->>> mol.set('segid', 'P')
+    >>> pdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_opm.pdb')
+    >>> mol = Molecule(pdb)
+    >>> mol.filter('protein')
+    >>> mol.set('segid', 'P')
 
->>> pmol = prepareProtein(mol)
->>> bmol = build(pmol, outdir='/tmp/build/', ionize=False)
+    >>> pmol = prepareProtein(mol)
+    >>> bmol = build(pmol, outdir='/tmp/build/', ionize=False)
 
->>> refpdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_built_protonated.pdb')
->>> ref = Molecule(refpdb)
+    >>> refpdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_built_protonated.pdb')
+    >>> ref = Molecule(refpdb)
 
->>> difflist = diffMolecules(bmol, ref, sel="name CA")
->>> print(difflist)
-[]
-"""
-            }
-#for d in difflist:
-#    print("Difference found: " + d)
-#if len(difflist) > 0:
-#    assert False, "Unexpected difference"
+    >>> difflist = diffMolecules(bmol, ref, sel="name CA")
+    >>> print(difflist)
+    []
+""" }
 
 
 class MixedSegmentError(Exception):
