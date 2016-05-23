@@ -31,9 +31,11 @@ Submodules
    htmd.metricdata
    htmd.model
    htmd.modelhmm
+   htmd.pathplanning
    htmd.rotationmatrix
    htmd.session
    htmd.simlist
+   htmd.units
    htmd.userinterface
    htmd.util
    htmd.version
