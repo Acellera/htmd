@@ -30,10 +30,12 @@ from htmd.acemd.acemd import Acemd
 from htmd.apps.acemdlocal import AcemdLocal
 from htmd.apps.lsf import LSF
 from htmd.apps.aws import AWS
-from htmd.builder.builder import detectDisulfideBonds, segmentgaps, embed, DisulfideBridge
+from htmd.builder.builder import detectDisulfideBonds, segmentgaps, autoSegment, embed, DisulfideBridge
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
 from htmd.molecule.util import uniformRandomRotation
+from htmd.rotationmatrix import rotationMatrix
+from htmd.proteinpreparation.proteinpreparation import prepareProtein
 from htmd.dock import dock
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
@@ -53,8 +55,10 @@ from glob import glob
 from sklearn.cluster import MiniBatchKMeans
 from matplotlib import pylab as plt
 # ----------------------------
-
-logging.config.fileConfig(os.path.join(home(), 'logging.ini'), disable_existing_loggers=False)
+try:
+	logging.config.fileConfig(os.path.join(home(), 'logging.ini'), disable_existing_loggers=False)
+except:
+	print("HTMD: Logging setup failed")
 
 check_registration(product='htmd')
 show_news()

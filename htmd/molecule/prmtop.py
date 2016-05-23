@@ -92,8 +92,8 @@ if __name__ == "__main__":
     from os import path
     from htmd.molecule.molecule import Molecule
 
-    m = Molecule(path.join(home(), 'data', 'amber', 'amber.pdb'))
-    m.read(path.join(home(), 'data', 'amber', 'amber.prmtop') )
+    m = Molecule(path.join(home(), 'data', 'amber', 'test-prmtop.pdb'))
+    m.read(path.join(home(), 'data', 'amber', 'test-prmtop.prmtop') )
     print( m.charge )
     print( m.bonds )
 

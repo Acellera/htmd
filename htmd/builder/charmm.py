@@ -13,33 +13,77 @@ import shutil
 import textwrap
 
 from subprocess import call
-
 from htmd.home import home
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
+from glob import glob
+from natsort import natsorted
 
 import logging
 logger = logging.getLogger(__name__)
+
+__test__ = {'build-opm-1u5u': """
+    >>> from htmd.proteinpreparation.proteinpreparation import prepareProtein
+    >>> from htmd.util import diffMolecules
+
+    >>> pdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_opm.pdb')
+    >>> mol = Molecule(pdb)
+    >>> mol.filter('protein')
+    >>> mol.set('segid', 'P')
+
+    >>> pmol = prepareProtein(mol)
+    >>> bmol = build(pmol, outdir='/tmp/build/', ionize=False)
+
+    >>> refpdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_built_protonated.pdb')
+    >>> ref = Molecule(refpdb)
+
+    >>> difflist = diffMolecules(bmol, ref, sel="name CA")
+    >>> print(difflist)
+    []
+""" }
+
+
+class MixedSegmentError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class BuildError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
 
 
 def listFiles():
     """ Lists all available Charmm topologies and parameter files
     """
-    charmmdir = path.join(home(), 'builder', 'charmmfiles')  # maybe just lookup current module?
-    topos = os.listdir(path.join(charmmdir, 'top'))
-    params = os.listdir(path.join(charmmdir, 'par'))
+    charmmdir = path.join(home(), 'builder', 'charmmfiles', '')  # maybe just lookup current module?
+    topos = natsorted(glob(path.join(charmmdir, 'top', '*.rtf')))
+    params = natsorted(glob(path.join(charmmdir, 'par', '*.prm')))
+    streams = natsorted(glob(path.join(charmmdir, 'str', '*', '*.str')))
     print('---- Topologies files list: ' + path.join(charmmdir, 'top', '') + ' ----')
     for t in topos:
-        print('top/' + t)
+        t = t.replace(charmmdir, '')
+        print(t)
     print('---- Parameters files list: ' + path.join(charmmdir, 'par', '') + ' ----')
     for p in params:
-        print('par/' + p)
+        p = p.replace(charmmdir, '')
+        print(p)
+    print('---- Stream files list: ' + path.join(charmmdir, 'str', '') + ' ----')
+    for s in streams:
+        s = s.replace(charmmdir, '')
+        print(s)
 
 
-def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
+def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, patches=None, psfgen=None, execute=True):
     """ Builds a system for CHARMM
 
@@ -50,9 +94,17 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object containing the system
     topo : list of str
-        A list of topology `rtf` files. Default: ['top/top_all22star_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+        A list of topology `rtf` files.
+        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available topology files.
+        Default: ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
     param : list of str
-        A list of parameter `prm` files. Default: ['par/par_all22star_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+        A list of parameter `prm` files.
+        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available parameter files.
+        Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+    stream : list of str
+        A list of stream `str` files containing topologies and parameters.
+        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available stream files.
+        Default: ['str/prot/toppar_all36_prot_arg0.str']
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -85,11 +137,17 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
 
     Example
     -------
-    >>> charmm.listFiles()
-    >>> topos  = ['top/top_all22star_prot.rtf', './benzamidine.rtf']
-    >>> params = ['par/par_all22star_prot.prm', './benzamidine.prm']
-    >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)
+    >>> mol = Molecule("3PTB")
+    >>> charmm.listFiles()             # doctest: +ELLIPSIS
+    ---- Topologies files list...
+    top/top_all36_prot.rtf
+    top/top_water_ions.rtf
+    ...
+    >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf']
+    >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm']
+    >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)  # doctest: +SKIP
     """
+
     mol = mol.copy()
     _missingSegID(mol)
     if psfgen is None:
@@ -102,11 +160,22 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
         os.makedirs(outdir)
     _cleanOutDir(outdir)
     if topo is None:
-        topo = _defaultTopo()
+        topo = ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
     if param is None:
-        param = _defaultParam()
+        param = ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+    if stream is None:
+        stream = ['str/prot/toppar_all36_prot_arg0.str']
     if caps is None:
         caps = _defaultCaps(mol)
+
+    # Splitting the stream files and adding them to the list of parameter and topology files
+    charmmdir = path.join(home(), 'builder', 'charmmfiles')
+    for s in stream:
+        if s[0] != '.' and path.isfile(path.join(charmmdir, s)):
+            s = path.join(charmmdir, s)
+        outrtf, outprm = _prepareStream(s)
+        topo.append(outrtf)
+        param.append(outprm)
 
     #_missingChain(mol)
     #_checkProteinGaps(mol)
@@ -123,7 +192,6 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
     f.write('psfcontext reset;\n\n')
 
     # Copying and printing out the topologies
-    charmmdir = path.join(home(), 'builder', 'charmmfiles')
     for i in range(len(topo)):
         if topo[i][0] != '.' and path.isfile(path.join(charmmdir, topo[i])):
             topo[i] = path.join(charmmdir, topo[i])
@@ -196,7 +264,7 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
             molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
             molbuilt.read(path.join(outdir, 'structure.psf'))
         else:
-            raise NameError('No structure pdb/psf file was generated. Check {} for errors in building.'.format(logpath))
+            raise BuildError('No structure pdb/psf file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
             shutil.move(path.join(outdir, 'structure.pdb'), path.join(outdir, 'structure.noions.pdb'))
@@ -208,7 +276,16 @@ def build(mol, topo=None, param=None, prefix='structure', outdir='./', caps=None
             # Redo the whole build but now with ions included
             return build(newmol, topo=topo, param=param, prefix=prefix, outdir=outdir, ionize=False, caps=caps,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, psfgen=psfgen)
+    _checkFailedAtoms(molbuilt)
     return molbuilt
+
+
+def _checkFailedAtoms(mol):
+    if mol is None:
+        return
+    idx = np.where(np.sum(mol.coords == 0, axis=1) == 3)[0]
+    if len(idx) != 0:
+        logger.warning('Atoms with indexes {} are positioned at [0,0,0]. This can cause simulations to crash.'.format(idx))
 
 
 def _cleanOutDir(outdir):
@@ -288,7 +365,20 @@ def _printAliases(f):
         pdbalias atom ASN 1HD2 HD21
         pdbalias atom ASN 2HD2 HD22
 
+        # Aliases for PDB ions / elements
+        pdbalias residue LI LIT
+        pdbalias residue NA SOD
+        pdbalias residue K POT
+        pdbalias residue CA CAL
+        pdbalias residue ZN ZN2
+        pdbalias residue CL CLA
+        pdbalias residue RB RUB
+        pdbalias residue CD CD2
+        pdbalias residue CS CES
+        pdbalias residue BA BAR
+
         # Aliases for Maestro residues
+        pdbalias residue AR0 ARG
         pdbalias residue GLH GLU
         pdbalias residue ASH ASP
         pdbalias residue LYN LYS
@@ -355,14 +445,6 @@ def _printAliases(f):
     f.write('\n\n')
 
 
-def _defaultTopo():
-    return ['top/top_all22star_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
-
-
-def _defaultParam():
-    return ['par/par_all22star_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
-
-
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
@@ -370,7 +452,7 @@ def _defaultCaps(mol):
     segsNonProt = np.unique(mol.get('segid', sel='not protein'))
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
-        raise NameError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
+        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
 
     caps = dict()
     for s in segsProt:
@@ -430,9 +512,9 @@ def _removeCappedResidues(mol, seg):
 
 # Mapping Maestro protonated residue names to CHARMM patches
 def _protonationPatches(mol):
-    protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN'}
-    aliases = {'CYM': 'CYS', 'AR0': 'ARG'}  # Some protonations don't exist in CHARMM
-    # TODO: Do I need to rename before applying patch?
+    protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN', 'AR0': 'RN1'}
+    aliases = {}  # Some protonations don't exist in CHARMM
+    # TODO: Remember to alias all of them before applying patches
     patches = []
 
     for pro in protonations:
@@ -444,14 +526,19 @@ def _protonationPatches(mol):
             #from IPython.core.debugger import Tracer
             #Tracer()()
             patch = 'patch {} {}:{}'.format(protonations[pro], pseg[r], pres[r])
-        patches.append(patch)
+            patches.append(patch)
 
-    for pro in aliases:
+    '''for pro in aliases:
         sel = mol.atomselect('resname {}'.format(pro))
         if np.sum(sel) != 0:
             logger.warning('Found resname {}. This protonation state does not exist in CHARMM '
                            'and will be reverted to {}.'.format(pro, aliases[pro]))
-            mol.set('resname', aliases[pro], sel=sel)
+            mol.set('resname', aliases[pro], sel=sel)'''
+    for pro in aliases:
+        sel = mol.atomselect('resname {}'.format(pro))
+        if np.sum(sel) != 0:
+            raise RuntimeError('Found resname {}. This protonation state does not exist in CHARMM. Cannot build.')
+
     return patches
 
 
@@ -475,7 +562,7 @@ def _charmmCombine(prmlist, outfile):
         if myfile[0] != '.' and path.isfile(path.join(charmmdir, myfile)):
             myfile = path.join(charmmdir, myfile)
         if not path.isfile(myfile):
-            raise NameError(myfile + ' file does not exist. Cannot create combined parameter file.')
+            raise FileNotFoundError(myfile + ' file does not exist. Cannot create combined parameter file.')
         fn = os.path.basename(myfile)
         fh = open(myfile, "r")
         context = 0
@@ -585,15 +672,71 @@ def _sec_name(filename):
     return "!Following lines added from %s\n" % (filename)
 
 
-def charmmSplit(filename):
-    """ Not implemented yet! Splits a stream file into two rtf and prm files.
+def _charmmSplit(filename, outdir):
+    """ Splits a stream file into an rtf and prm file.
 
     Parameters
     ----------
-    filename
+    filename : str
+        Stream file name
     """
+    regex = re.compile('^toppar_(\w+)\.str$')
+    base = os.path.basename(os.path.normpath(filename))
+    base = regex.findall(base)[0]
+    outrtf = os.path.join(outdir, 'top_{}.rtf'.format(base))
+    outprm = os.path.join(outdir, 'par_{}.prm'.format(base))
 
-    # TODO: Implement this
+    startrtf = re.compile('^read rtf card', flags=re.IGNORECASE)
+    startprm = re.compile('^read param? card', flags=re.IGNORECASE)
+    endsection = re.compile('^end', flags=re.IGNORECASE)
+
+    rtfsection = 0
+    prmsection = 0
+    section = 'junk'
+
+    rtfstr = ''
+    prmstr = ''
+
+    f = open(filename, 'r')
+    for line in f:
+        if startrtf.match(line):
+            rtfsection += 1
+            if rtfsection > 1:
+                rtfstr += '! WARNING -- ANOTHER rtf SECTION FOUND\n'
+            section = 'rtf'
+        elif startprm.match(line):
+            prmsection += 1
+            if prmsection > 1:
+                prmstr += '! WARNING -- ANOTHER para SECTION FOUND\n'
+            section = 'prm'
+        elif endsection.match(line):
+            section = 'junk'
+        elif section == 'rtf':
+            rtfstr += line
+        elif section == 'prm':
+            prmstr += line
+    f.close()
+
+    if rtfsection > 1:
+        logger.warning('Multiple ({}) rtf topology sections found in {} stream file.'.format(rtfsection, filename))
+    if prmsection > 1:
+        logger.warning('Multiple ({}) prm parameter sections found in {} stream file.'.format(prmsection, filename))
+
+    f = open(outrtf, 'w')
+    f.write(rtfstr + 'END\n')
+    f.close()
+    f = open(outprm, 'w')
+    f.write(prmstr + 'END\n')
+    f.close()
+    return outrtf, outprm
+
+
+def _prepareStream(filename):
+    from htmd.util import tempname
+    tmpout = tempname()
+    os.makedirs(tmpout)
+    return _charmmSplit(filename, tmpout)
+
 
 def _logParser(fname):
     import re
@@ -634,3 +777,15 @@ def _logParser(fname):
     if warnings:
         logger.warning('Failed/poorly guessed coordinates can cause simulations to crash since failed atoms are all positioned on (0,0,0).')
         logger.warning('Please check {} for further information.'.format(fname))
+
+
+if __name__ == '__main__':
+    from htmd import *
+    from htmd.molecule.molecule import Molecule
+    from htmd.home import home
+    import numpy as np
+    import os
+
+    import doctest
+    doctest.testmod()
+

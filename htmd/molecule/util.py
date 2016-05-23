@@ -5,6 +5,9 @@
 #
 import numpy as np
 from scipy.spatial.distance import cdist
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
@@ -32,7 +35,8 @@ def sequenceID(field, prepend=None):
     Examples
     --------
     >>> # A change in resid or segid will cause an increase in the sequence
-    >>> sequenceID((mol.resid, mol.segid))
+    >>> sequenceID((mol.resid, mol.insertion, mol.segid))
+    array([  1,   1,   1, ..., 285, 286, 287])
     """
     if isinstance(field, tuple):
         fieldlen = len(field[0])
@@ -113,6 +117,8 @@ def maxDistance(mol, sel='all', origin=[0, 0, 0]):
     Example
     -------
     >>> y = maxDistance(mol, sel='protein', origin=[0, 0, 0])
+    >>> print(round(y,2))
+    48.39
     """
     coors = mol.get('coords', sel=sel)
     dists = cdist(np.atleast_2d(coors), np.atleast_2d(origin))
@@ -136,7 +142,10 @@ def boundingBox(mol, sel='all'):
 
     Example
     -------
-    >>> bbox = boundingBox(mol, sel='chain A')
+    >>> boundingBox(mol, sel='chain A')
+    array([[-17.3390007 , -10.43700027,  -1.43900001],
+           [ 25.40600014,  27.03800011,  46.46300125]], dtype=float32)
+
     """
     coords = mol.get('coords', sel=sel)
     maxc = np.squeeze(np.max(coords, axis=0))
@@ -154,3 +163,103 @@ def uniformRandomRotation():
     """
     q, r = np.linalg.qr(np.random.normal(size=(3, 3)))
     return np.dot(q, np.diag(np.sign(np.diag(r))))
+
+
+def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
+    """ Writes grid free energy to cube file
+
+    Parameters
+    ----------
+    arr: np.ndarray
+            array with volumetric data
+    filename: str
+            string with the name of the cubefile
+    vecMin: np.ndarray
+            3D vector denoting the minimal corner of the grid
+    vecMax np.ndarray
+            3D vector denoting the maximal corner of the grid
+    vecRes: np.ndarray
+            3D vector denoting the resolution of the grid in each dimension
+    """
+
+    outFile = open(filename, 'w')
+
+    # conversion to gaussian units
+    L = 1/0.52917725
+    gauss_bin = vecRes*L
+    #minCorner = 0.5*L*(vecMin - vecMax + vecRes)
+    minCorner = L * (vecMin + 0.5 * vecRes)
+
+    ngrid = np.array(np.floor((vecMax - vecMin) / vecRes), dtype=int)
+
+    # write header
+    outFile.write("CUBE FILE\n")
+    outFile.write("OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n")
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (1, minCorner[0], minCorner[1], minCorner[2]))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[0], gauss_bin[0], 0, 0))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[1], 0, gauss_bin[1], 0))
+    outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[2], 0, 0, gauss_bin[2]))
+    outFile.write("%5d %12.6f %12.6f %12.6f %12.6f\n" % (1, 0, minCorner[0], minCorner[1], minCorner[2]))
+
+    # main loop
+    cont = 0
+
+    for i in range(ngrid[0]):
+        for j in range(ngrid[1]):
+            for k in range(ngrid[2]):
+                outFile.write("%13.5g" % arr[i][j][k])
+                if np.mod(cont, 6) == 5:
+                    outFile.write("\n")
+                cont += 1
+
+    outFile.close()
+
+
+def drawCube(mi, ma, viewer=None):
+    from htmd.vmdviewer import getCurrentViewer
+    if viewer is None:
+        viewer = getCurrentViewer()
+
+    viewer.send('draw materials off')
+    viewer.send('draw color red')
+    c = ''
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], ma[0], mi[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], mi[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], mi[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], mi[0], ma[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], ma[0], mi[1], ma[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], mi[0], ma[1], ma[2])
+
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], ma[1], mi[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], mi[0], ma[1], ma[2])
+    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], mi[1], ma[2])
+    viewer.send(c)
+
+    """
+    draw line "$minx $miny $minz" "$maxx $miny $minz"
+    draw line "$minx $miny $minz" "$minx $maxy $minz"
+    draw line "$minx $miny $minz" "$minx $miny $maxz"
+    draw line "$maxx $miny $minz" "$maxx $maxy $minz"
+    draw line "$maxx $miny $minz" "$maxx $miny $maxz"
+    draw line "$minx $maxy $minz" "$maxx $maxy $minz"
+    draw line "$minx $maxy $minz" "$minx $maxy $maxz"
+    draw line "$minx $miny $maxz" "$maxx $miny $maxz"
+    draw line "$minx $miny $maxz" "$minx $maxy $maxz"
+    draw line "$maxx $maxy $maxz" "$maxx $maxy $minz"
+    draw line "$maxx $maxy $maxz" "$minx $maxy $maxz"
+    draw line "$maxx $maxy $maxz" "$maxx $miny $maxz"
+    """
+
+
+# A test method
+if __name__ == "__main__":
+    from htmd.molecule.molecule import Molecule
+    import doctest
+    doctest.testmod(extraglobs={"mol" : Molecule("3PTB")})
+

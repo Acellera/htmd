@@ -1,0 +1,16 @@
+#!/bin/sh
+
+for F in m*.crd; do
+	echo "$F"
+	NATOMS=$(head -1 $F | sed 's/ //g')
+	N=${F%.*}
+	M="$N.xyz"
+	echo $NATOMS > $M
+	echo "" >> $M
+	tail -$NATOMS $F | awk '{gsub( /[0-9]+/, "", $4 ); print $4 "  \t"$5"  \t"$6"  \t"$7}' >> $M
+
+	babel -i xyz $N.xyz -o mol2 $N.mol2 --canonical
+	antechamber -fi mol2 -i $N.mol2 -fo mol2 -o $N.mol2
+	rm $N.xyz
+	sed -i 's/UNL/MOL/g' $N.mol2
+done

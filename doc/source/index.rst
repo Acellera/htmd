@@ -20,9 +20,7 @@ The tutorials are a good place to start playing around.
 
    tutorials
    api
-   Ligand Parameterisation <parameterisation>
    acemd
-   Basic molecular dynamics <md>
 
 
 

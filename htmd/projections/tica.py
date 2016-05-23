@@ -6,6 +6,9 @@
 import warnings
 import numpy as np
 import random
+from htmd.projections.metric import Metric
+from htmd.progress.progress import ProgressBar
+from htmd.units import convert as unitconvert
 import logging
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,8 @@ class TICA(object):
         The object whose data we wish to project onto the top TICA dimensions
     lag : int
         The correlation lagtime to use for TICA
+    units : str
+        The units of lag. Can be 'frames' or any time unit given as a string.
 
     Example
     -------
@@ -31,16 +36,31 @@ class TICA(object):
 
     References
     ----------
-    Perez-Hernandez, G. and Paul, F. and Giogino, T. and de Fabritiis, G.
+    Perez-Hernandez, G. and Paul, F. and Giorgino, T. and de Fabritiis, G.
     and Noe, F. (2013) Identification of slow molecular order parameters
     for Markov model construction. J. Chem. Phys., 139 . 015102.
     """
 
-    def __init__(self, data, lag):
+    def __init__(self, data, lag, units='frames'):
         from pyemma.coordinates import tica
         # data.dat.tolist() might be better?
         self.data = data
-        self.tic = tica(data.dat.tolist(), lag=lag)
+        if isinstance(data, Metric):
+            from pyemma.coordinates.transform.tica import TICA
+            lag = unitconvert(units, 'frames', lag, data.fstep)
+            self.tic = TICA(lag)
+
+            p = ProgressBar(len(data.simulations))
+            for i in range(len(data.simulations)):
+                # Fix for pyemma bug. Remove eventually:
+                d, _, _ = data._projectSingle(i)
+                if d is None or d.shape[0] < lag:
+                    continue
+                self.tic.partial_fit(d)
+                p.progress()
+            p.stop()
+        else:
+            self.tic = tica(data.dat.tolist(), lag=lag)
 
     def project(self, ndim=None):
         """ Projects the data object given to the constructor onto the top `ndim` TICA dimensions
@@ -63,12 +83,58 @@ class TICA(object):
         >>> dataTica = tica.project(5)
         """
         if ndim is not None:
-            self.tic._dim = ndim
-        proj = self.tic.get_output()
+            # self.tic._dim = ndim  # Old way of doing it. Deprecated since pyEMMA 2.1
+            self.tic.set_params(dim=ndim)  # Change to this in 2.1 pyEMMA version
+
+        if isinstance(self.data, Metric):  # Doesn't project on correct number of dimensions
+            proj = []
+            refs = []
+            fstep = None
+
+            '''from htmd.config import _config
+            from joblib import Parallel, delayed
+            results = Parallel(n_jobs=_config['ncpus'], verbose=11)(
+                delayed(_test)(self.data, self.tic, i) for i in range(len(self.data.simulations)))
+
+            for i in range(len(results)):
+                proj.append(results[i][0])
+                refs.append(results[i][1])
+                fstep.append(results[i][2])'''
+
+            droppedsims = []
+            p = ProgressBar(len(self.data.simulations))
+            for i in range(len(self.data.simulations)):
+                d, r, f = self.data._projectSingle(i)
+                if d is None:
+                    droppedsims.append(i)
+                    continue
+                if fstep is None:
+                    fstep = f
+                refs.append(r)
+                proj.append(self.tic.transform(d))
+                p.progress()
+            p.stop()
+            simlist = self.data.simulations
+            simlist = np.delete(simlist, droppedsims)
+            ref = np.array(refs, dtype=object)
+            #fstep = 0
+            parent = None
+        else:
+            proj = self.tic.get_output()
+            simlist = self.data.simlist
+            ref = self.data.ref
+            fstep = self.data.fstep
+            parent = self.data
+
         if ndim is None:
             logger.info('Kept {} dimension(s) to cover 95% of kinetic variance.'.format(self.tic.dimension()))
         #print(np.shape(proj))
-        datatica = self.data.copy()
+
+
+        from htmd.metricdata import MetricData
+        datatica = MetricData(dat=np.array(proj, dtype=object), simlist=simlist, ref=ref, fstep=fstep, parent=parent)
+
+        '''datatica = self.data.copy()
         #datatica.dat = self.data.deconcatenate(np.squeeze(proj))
         datatica.dat = np.array(proj, dtype=object)
         datatica.parent = self.data
@@ -77,5 +143,13 @@ class TICA(object):
         datatica.N = None
         datatica.K = None
         datatica._dataid = random.random()
-        datatica._clusterid = None
+        datatica._clusterid = None'''
         return datatica
+
+
+def _test(data, tic, i):
+    d, r, f = data._projectSingle(i)
+    if d is None:
+        return
+    else:
+        return tic.transform(d), r, f

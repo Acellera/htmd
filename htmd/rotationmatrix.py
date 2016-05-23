@@ -4,14 +4,44 @@
 # No redistribution in whole or part
 #
 import numpy as np
-from math import cos,sqrt,sin
+from math import cos, sqrt, sin
+import logging
+logger = logging.getLogger(__name__)
 
 
-def rotationmatrix(axis, theta):
-    """
+def rotationMatrix(axis, theta):
+    """ Produces a rotation matrix given an axis and radians
+
     Return the rotation matrix associated with counterclockwise rotation about
     the given axis by theta radians.
+
+    Parameters
+    ----------
+    axis: list
+        The axis around which to rotate
+    theta: float
+        The rotation angle in radians
+
+    Returns
+    -------
+    M: numpy.ndarray
+        The rotation matrix.
+
+    Examples
+    --------
+    >>> M = rotationMatrix([0, 0, 1], 1.5708)
+    >>> M.round(4)
+    array([[-0., -1.,  0.],
+           [ 1., -0.,  0.],
+           [ 0.,  0.,  1.]])
+
+    >>> axis = [4.0, 4., 1.]
+    >>> theta = 1.2
+    >>> v = [3.0, 5., 0.]
+    >>> np.dot(rotationMatrix(axis, theta), v).round(2)
+    array([ 2.75,  4.77,  1.92])
     """
+
     axis = np.asarray(axis)
     theta = np.asarray(theta)
     axis = axis / sqrt(np.dot(axis, axis))
@@ -24,8 +54,13 @@ def rotationmatrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
+def rotationmatrix(axis, theta):
+    logger.warning('The rotationmatrix method is deprecated. '
+                   'It has been renamed to rotationMatrix to follow the naming style. Please change all uses.')
+    return rotationMatrix(axis, theta)
+
+
 if __name__ == '__main__':
-    v = [3.0, 5., 0.]
-    axis = [4.0, 4., 1.]
-    theta = 1.2
-    print(np.dot(rotationmatrix(axis, theta), v))
+
+    import doctest
+    doctest.testmod()

@@ -3,14 +3,15 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from ctypes import *
-import numpy
 import os
-import inspect
-import platform
+from ctypes import *
+
+import numpy
+
+import htmd.home
 
 
-def wrap( coordinates, bonds, box ):
+def wrap( coordinates, bonds, box, centersel=None ):
     """Wrap the coordinates back into the unit cell. Molecules will remain continuous, so may escape the bounds of the prinary unit cell.
 
     Parameters
@@ -26,13 +27,8 @@ def wrap( coordinates, bonds, box ):
     coordinates  
     """
 
-    import inspect
     import platform
-    libdir = os.path.join(os.path.dirname(inspect.getfile(wrap)), "..", "lib", platform.system())
-    if os.path.exists( os.path.join( libdir, "pro" ) ):
-       libdir = os.path.join( libdir, "pro" )
-    if os.path.exists( os.path.join( libdir, "basic" ) ):
-       libdir = os.path.join( libdir, "basic" )
+    libdir = htmd.home(libDir=True)
 
     if coordinates.ndim == 2:
         c = coordinates.shape
@@ -55,7 +51,7 @@ def wrap( coordinates, bonds, box ):
 
     if platform.system() == "Windows":
       cdll.LoadLibrary( os.path.join( libdir, "libgcc_s_seh-1.dll" ) )
-      if( os.path.exists( os.path.join( libdir, "psprolib.dll" ) ):
+      if( os.path.exists( os.path.join( libdir, "psprolib.dll" ) ) ):
         cdll.LoadLibrary( os.path.join( libdir, "psprolib.dll" ) )
 
     lib = cdll.LoadLibrary( os.path.join( libdir , "libvmdparser.so") )
@@ -83,11 +79,15 @@ def wrap( coordinates, bonds, box ):
     c_nframes= c_int(nframes)
     lenv = natoms * 3 * nframes
 
+    if centersel is None:
+         centersel = numpy.array([-1], dtype=numpy.int32 )
+    centersel = numpy.append( centersel, numpy.array([-1], dtype=numpy.int32 ) )
+    c_centersel = centersel.ctypes.data_as(POINTER(c_int))
     c_coords = coordinates.ctypes.data_as(POINTER(c_float))
     lib.wrap(
         c_bonds,
         c_coords,
-        c_box, c_nbonds, c_natoms, c_nframes
+        c_box, c_nbonds, c_natoms, c_nframes, c_centersel
     )
 
     return coordinates

@@ -16,21 +16,41 @@ logger = logging.getLogger(__name__)
 
 
 class AcemdLocal(App):
-    def __init__(self, acemd=None, ngpus=None, datadir=None):
+    """
+    Parameters
+    ----------
+    acemd : str
+        Path to ACEMD executable. If None, will try to detect it.
+    ngpus : int
+        Number of GPU devices that AcemdLocal will use. Each simulation will be run on a different GPU. AcemdLocal will
+        use the first `ngpus` devices of the machine.
+    devices : list
+        A list of GPU device indexes on which AcemdLocal is allowed to run simulations. Mutually exclusive with `ngpus`
+    datadir : str
+        A folder to which completed simulations will be moved. If None they will be written in the input directory.
+    """
+    def __init__(self, acemd=None, ngpus=None, devices=None, datadir=None):
         self.states = dict()
         self.queue = queue.Queue()
         self.threads = []
         self.shutdown = False
 
-        if not ngpus:
+        if ngpus is not None and devices is not None:
+            raise ValueError('Parameters `ngpus` and `devices` are mutually exclusive.')
+
+        if ngpus is None and devices is None:
             try:
-                ngpus = int(check_output("nvidia-smi -L | wc -l", shell=True).decode("ascii"))
-                logger.info("Found " + str(ngpus) + " GPUs")
+                devices = range(int(check_output("nvidia-smi -L | wc -l", shell=True).decode("ascii")))
             except:
                 raise
+        elif ngpus is not None:
+            devices = range(ngpus)
 
-        if not ngpus:
-            raise NameError("Could not determine the number of GPUs. Specify it with the 'ngpus=' named argument")
+        if devices is None:
+            raise NameError("Could not determine which GPUs to use. "
+                            "Specify the GPUs with the `ngpus=` or `devices=` parameters")
+        else:
+            logger.info("Using GPU devices {}".format(','.join(map(str, devices))))
 
         if not acemd:
             try:
@@ -50,8 +70,8 @@ class AcemdLocal(App):
        # logger.info("Executing ACEMD")
 
         self.threads = []
-        for i in range(ngpus):
-            t = threading.Thread(target=run_job, args=(self, i, acemd, datadir))
+        for d in devices:
+            t = threading.Thread(target=run_job, args=(self, d, acemd, datadir))
             t.daemon = True
             t.start()
             self.threads.append(t)
@@ -145,7 +165,7 @@ def run_job(obj, ngpu, acemd, datadir):
 
         if path:
             try:
-                logger.info("Running " + path + " on GPU " + str(ngpu))
+                logger.info("Running " + path + " on GPU device " + str(ngpu))
                 obj.running(path)
                 cmd = 'cd {}; {} --device {} input > log.txt 2>&1'.format(os.path.normpath(path), acemd, ngpu)
                 try:
@@ -181,7 +201,7 @@ def run_job(obj, ngpu, acemd, datadir):
 if __name__ == "__main__":
     from time import sleep
     # TODO: Fix this to work
-
+    """
     a = AcemdLocal(acemd="/shared/acemd/bin/acemd", ngpus=2)
     a.submit("/tmp/job/1")
     a.submit("/tmp/job/2")
@@ -197,3 +217,4 @@ if __name__ == "__main__":
     a.stop()
     sleep(10)
     print("Done")
+    """

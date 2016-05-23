@@ -138,11 +138,12 @@ class LSF(UserInterface):
 
 
 if __name__ == "__main__":
-
+    """
     s=LSF( name="adaptivetest" )
 #    s.submit( "test/dhfr", debug=True )
 #    s.submit( "test/dhfr", debug=True )
     ret= s.inprogress( debug=False )
     print(ret)
     pass
+    """
 

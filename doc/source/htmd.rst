@@ -11,8 +11,10 @@ Subpackages
     htmd.apps
     htmd.builder
     htmd.molecule
+    htmd.parameterize
     htmd.progress
     htmd.projections
+    htmd.proteinpreparation
     htmd.protocols
 
 Submodules
@@ -26,13 +28,14 @@ Submodules
    htmd.kinetics
    htmd.kineticshmm
    htmd.latest
-   htmd.log
    htmd.metricdata
    htmd.model
    htmd.modelhmm
+   htmd.pathplanning
    htmd.rotationmatrix
    htmd.session
    htmd.simlist
+   htmd.units
    htmd.userinterface
    htmd.util
    htmd.version

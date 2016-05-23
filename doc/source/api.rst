@@ -6,8 +6,9 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   building
    Molecule <htmd.molecule.molecule>
+   building
+   Ligand Parameterisation <parameterisation>
    simlists
    projections
    clustering

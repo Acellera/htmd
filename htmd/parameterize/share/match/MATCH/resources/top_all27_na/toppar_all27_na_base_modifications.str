@@ -1,0 +1,1052 @@
+* CHARMM27 All-Hydrogen Nucleic Acid Force Toppar Stream File
+* Collection of residues and patches for base modifications
+* A.D. MacKerell, Jr., July 2001
+*
+
+!Parent files that have to be read prior to streaming this file
+!top_all27_na.rtf
+!par_all27_na.prm
+!
+!Testcase
+!test_all27_na_base_modifications.inp
+
+!References
+!
+!These residues and the associated parameters are not yet published
+!though they all were carefully parameterized.  Please reference
+!the Foloppe and MacKerell 2000 Charmm27 nucleic acid paper.
+!
+
+read rtf card append
+* residues and patches associated with base modifications
+*
+31  1
+
+PRES 5MC1          0.03 ! Patch to generate 5-methylcytosine (base only)
+                        ! use in generate statement
+                        ! checked for consistency with new NA params, adm jr., 9/98
+! DELETE PHOSPHATE AND RIBOSE ATOMS   
+DELE ATOM P
+DELE ATOM O1P
+DELE ATOM O2P
+DELE ATOM O5'
+DELE ATOM C5'
+DELE ATOM H5'
+DELE ATOM H5''
+DELE ATOM C4'
+DELE ATOM H4'
+DELE ATOM O4'
+DELE ATOM C1'
+DELE ATOM H1'
+DELE ATOM C2'
+DELE ATOM H2''
+DELE ATOM O2'
+DELE ATOM H2'
+DELE ATOM C3'
+DELE ATOM O3'
+DELE ATOM H3'
+DELE ATOM H5
+ATOM N1   NN2    -0.50
+ATOM H1   HN2     0.37
+ATOM C6   CN3     0.05
+ATOM H6   HN3     0.17
+ATOM C5   CN3D   -0.11
+ATOM C5M  CN9    -0.22
+ATOM H5M1 HN9     0.09
+ATOM H5M2 HN9     0.09
+ATOM H5M3 HN9     0.09
+BOND N1   H1
+BOND C5   C5M   C5M  H5M1  C5M H5M2  C5M  H5M3
+IMPR N1   C6   C2   H1
+BILD C5   C6   N1   H1     0.0       0.0   180.0     0.0    0.0  
+BILD C6   C4   *C5  C5M    0.0       0.0   180.0     0.0    0.0
+BILD C4   C5   C5M  H5M1   0.0       0.0   180.0     0.0    0.0
+BILD C5   H5M1 *C5M H5M2   0.0       0.0  -115.0     0.0    0.0
+BILD H5M1 H5M2 *C5M H5M3   0.0       0.0   115.0     0.0    0.0
+
+PRES 5MC2         -0.06 ! Patch to convert cytosine in DNA to 5-methylcytosine
+                        ! use in PATCH statement followed by AUTOgenerate ANGLes DIHE
+DELE ATOM H5
+GROUP
+ATOM C5   CN3D   -0.11
+ATOM C5M  CN9    -0.22
+ATOM H5M1 HN9     0.09
+ATOM H5M2 HN9     0.09
+ATOM H5M3 HN9     0.09
+BOND C5   C5M  C5M  H5M1  C5M H5M2  C5M  H5M3
+BILD C6   C4   *C5  C5M    0.0       0.0   180.0     0.0    0.0
+BILD C4   C5   C5M  H5M1   0.0       0.0   180.0     0.0    0.0
+BILD C5   H5M1 *C5M H5M2   0.0       0.0  -115.0     0.0    0.0
+BILD H5M1 H5M2 *C5M H5M3   0.0       0.0   115.0     0.0    0.0
+
+PRES INO1        -0.08 ! patch to convert guanine to inosine
+                       ! use in patch statement followed by AUTOgenerate ANGLes DIHE
+
+!reference: Pastor, N., MacKerell, A.D., Jr., and Weinstein, H. "TIT
+!for TAT: The Properties of Inosine and Adenosine in TATA Box DNA"
+!Journal of Biomolecular Structure & Design, 1999, 16: 787-810.
+
+DELE ATOM N2
+DELE ATOM H21
+DELE ATOM H22
+! charges updated to be consistent with new NA set, adm jr., 9/98
+ATOM N3   NN3I   -0.61
+ATOM C2   CN4     0.50
+ATOM H2   HN3     0.08
+ATOM N1   NN2G   -0.32
+ATOM H1   HN2     0.27
+BOND C2 H2
+IMPR C2 N1 N3 H2
+BILD N1   N3   *C2  H2     1.375   124.0   180.0   119.7    1.341
+
+PRES GUT1         0.00     ! guanine tautomer patch to convert guanine
+                           ! in DNA or RNA
+                           ! adm jr. w/Daniel Barsky
+                           !
+                           ! use patch statement, followed by AUTOgenerate
+                           ! angles dihedrals in c25 and later versions
+                           ! not MMFF compatible
+! Delete guanine H1 atom   !
+DELE ATOM H1               !        -->  H6
+GROUP                      !        |     \
+ATOM C6   CN1     0.58     !     proton    O6
+ATOM O6   ON5    -0.58     !    shifted    |
+ATOM H6   HN5     0.48     !        |      C6
+ATOM C5   CN5G    0.08     !        |     // \
+ATOM N3   NN3G   -0.69     !        -<   N1   C5--N7\\
+ATOM C2   CN2     0.78     !             |    ||     C8-H8
+ATOM N1   NN3G   -0.72     !             C2   C4--N9/
+ATOM N2   NN1    -0.65     !            / \\ /      \
+ATOM H21  HN1     0.30     !      H21-N2   N3        \
+ATOM H22  HN1     0.31     !          |               \
+ATOM N9   NN2B    0.00     !         H22               R
+ATOM C4   CN5     0.32     !
+ATOM N7   NN4    -0.62     ! atom order consistent with 9-m-gua
+ATOM C8   CN4     0.26     !
+ATOM H8   HN3     0.15     !
+
+BOND O6  H6
+
+BILD N1   C6   O6   H6     0.0       0.0     0.0     0.0    0.0
+
+PRES CYT1         0.00     ! cytosine tautomer patch to convert cytosine
+                           ! in DNA or RNA
+                           ! adm jr. w/Daniel Barsky
+                           !
+                           ! use in patch statement, followed by AUTOgenerate
+                           ! angles dihedrals in c25 and later versions
+                           ! not MMFF compatible
+                           !     ____________
+                           !    |            |
+! Delete cytosine H41 atom !    |          proton
+DELE ATOM H42              !    |          shifted          
+GROUP                      !    |            |
+ATOM N1   NN2    -0.14     !    |    H41     |
+ATOM H3   HN2     0.31     !    |      \   >-
+ATOM C6   CN3     0.15     !    |       N4
+ATOM H6   HN3     0.13     !    |       ||
+ATOM C2   CN1     0.52     !    |       C4
+ATOM O2   ON1C   -0.46     !    |      /  \
+ATOM N3   NN2C   -0.35     !    -->H3-N3  C5-H5
+ATOM C4   CN2     0.30     !          |   ||
+ATOM N4   NN1C   -0.76     !          C2  C6
+ATOM H41  HN1     0.35     !         //\  / \
+ATOM C5   CN3    -0.22     !        O2  N1   H6
+ATOM H5   HN3     0.17     !            |
+                           !            H1
+BOND N3  H3
+
+BILD N4   C4   N3   H3    0.0       0.0     0.0     0.0    0.0
+
+PRES 1EG          0.00     ! 1-Ethyl guanine patch
+                           ! adm jr. w/Daniel Barsky
+                           !
+                           ! use in patch statement, followed by AUTOgenerate
+                           ! angles dihedrals in c25 and later versions
+! Delete guanine H1 atom   !
+DELE ATOM H1               !         
+GROUP                      !      H1B1  H1A1  O6
+ATOM C6   CN1     0.54     !        \    |    ||
+ATOM O6   ON1    -0.51     !  H1B2--C1B-C1A   C6          
+ATOM C5   CN5G    0.00     !        /    | \ /  \
+ATOM N3   NN3G   -0.74     !      H1B3 H1A2 N1   C5--N7\\
+ATOM C2   CN2     0.75     !                |    ||     C8-H8
+ATOM N1   NN2G   -0.08     !                C2   C4--N9/
+ATOM N2   NN1    -0.68     !               / \\ /      \
+ATOM H21  HN1     0.32     !         H21-N2   N3        \
+ATOM H22  HN1     0.35     !             |               \
+ATOM C4   CN5     0.26     !            H22               R
+ATOM N9   NN2B   -0.02     !
+!ATOM N9   NN2B   -0.38     ! use these charges for the base alone
+!ATOM H9   HN2     0.36     ! 
+ATOM N7   NN4    -0.60     !
+ATOM C8   CN4     0.25     !
+ATOM H8   HN3     0.16     !
+ATOM C1A  CN8    -0.18     !
+ATOM H1A1 HN8     0.09     !
+ATOM H1A2 HN8     0.09     !
+ATOM C1B  CN9    -0.27     !
+ATOM H1B1 HN9     0.09     !
+ATOM H1B2 HN9     0.09     !
+ATOM H1B3 HN9     0.09     !
+
+BOND N1  C1A  C1A C1B  C1A H1A1  C1A H1A2  C1B H1B1  C1B H1B2  C1B H1B3
+
+BILD N3   C2   N1   C1A    0.0       0.0   180.0     0.0    0.0
+BILD C2   N1   C1A  C1B    0.0       0.0    90.0     0.0    0.0
+BILD C1B  N1   *C1A H1A1   0.0       0.0   120.0     0.0    0.0
+BILD C1B  N1   *C1A H1A2   0.0       0.0   240.0     0.0    0.0
+BILD N1   C1A  C1B  H1B1   0.0       0.0   180.0     0.0    0.0
+BILD C1A  H1B1 *C1B H1B2   0.0       0.0   120.0     0.0    0.0
+BILD C1A  H1B1 *C1B H1B3   0.0       0.0   240.0     0.0    0.0
+
+PRES 3EC          1.00     ! 3-Ethyl cytosine patch
+                           ! adm jr. w/Daniel Barsky
+                           !
+                           ! use in patch statement, followed by AUTOgenerate
+                           ! angles dihedrals in c25 and later versions
+                           ! not MMFF compatible 
+                           !
+GROUP                      !   
+ATOM N1   NN2    -0.12     ! comment this line and uncomment the following 2 atoms for the base alone
+!ATOM N1   NN2    -0.50    !               H41   H42
+!ATOM H1   HN2     0.38    !                 \  /
+ATOM C6   CN3     0.14     !      H3B1 H3A1   N4
+ATOM H6   HN3     0.20     !        \    |    |
+ATOM C2   CN1     0.38     !  H3B2--C3B--C3A  C4
+ATOM O2   ON1C   -0.20     !        /    | \ /  \
+ATOM N3   NN3    -0.16     !      H3B3 H3A2 N3  C5-H5
+ATOM C4   CN2     0.64     !                |   ||
+ATOM N4   NN1    -0.78     !                C2  C6
+ATOM H41  HN1     0.48     !               //\  / \
+ATOM H42  HN1     0.37     !              O2  N1   H6
+ATOM C5   CN3    -0.02     !                  |
+ATOM H5   HN3     0.07     !                  H1
+ATOM C3A  CN8    -0.18     !
+ATOM H3A1 HN8     0.09     !
+ATOM H3A2 HN8     0.09     !
+ATOM C3B  CN9    -0.27     !
+ATOM H3B1 HN9     0.09     !
+ATOM H3B2 HN9     0.09     !
+ATOM H3B3 HN9     0.09     !
+
+BOND N3  C3A  C3A H3A1  C3A H3A2  C3A C3B  C3B H3B1  C3B H3B2  C3B H3B3
+BILD N1   C2   N3   C3A   0.0       0.0   180.0     0.0    0.0
+BILD C2   N3   C3A  C3B   0.0       0.0    90.0     0.0    0.0
+BILD N3   C3B  *C3A H3A1  0.0       0.0   120.0     0.0    0.0
+BILD N3   C3B  *C3A H3A2  0.0       0.0   240.0     0.0    0.0
+BILD N3   C3A  C3B  H3B1  0.0       0.0   180.0     0.0    0.0
+BILD C3A  H3B1 *C3B H3B2  0.0       0.0   120.0     0.0    0.0
+BILD C3A  H3B1 *C3B H3B3  0.0       0.0   240.0     0.0    0.0
+
+PRES CetG         0.92     ! Create ethyl link between CYT N3 and GUA N1
+                           ! adm jr. w/Daniel Barsky
+                           !
+                           ! residue 1: cyt, residue 2 gua
+                           ! PATCh CETG dna1 1 dna2 1 setup warn
+                           ! use in patch statement, followed by AUTOgenerate
+                           ! angles dihedrals in c25 and later versions
+! Delete guanine H1 atom   !
+DELE ATOM  2H1             !
+!  
+GROUP                      !               H41   H42   
+ATOM 1N1   NN2    -0.12    !                 \  /
+ATOM 1C6   CN3     0.14    !      H3B1 H3A1   N4
+ATOM 1H6   HN3     0.20    !        \    |    |
+ATOM 1C2   CN1     0.38    !  H3B2--C3B--C3A  C4
+ATOM 1O2   ON1C   -0.20    !        /    | \ /  \
+ATOM 1N3   NN3    -0.16    !      H3B3 H3A2 N3  C5-H5
+ATOM 1C4   CN2     0.64    !                |   ||
+ATOM 1N4   NN1    -0.78    !                C2  C6
+ATOM 1H41  HN1     0.48    !               //\  / \
+ATOM 1H42  HN1     0.37    !              O2  N1   H6
+ATOM 1C5   CN3    -0.02    !                  |
+ATOM 1H5   HN3     0.07    !                  H1
+GROUP
+ATOM 1C3A  CN8    -0.18    !
+ATOM 1H3A1 HN8     0.09    !
+ATOM 1H3A2 HN8     0.09    !
+ATOM 1C3B  CN8    -0.18    !
+ATOM 1H3B1 HN8     0.09    !
+ATOM 1H3B2 HN8     0.09    !
+GROUP
+ATOM 2N1   NN2G   -0.08
+
+BOND 1N3  1C3A   1C3A 1C3B  1C3B 2N1
+BOND 1C3A 1H3A1  1C3A 1H3A2 1C3B 1H3B1  1C3B 1H3B2
+
+!ic build from the cytosine
+BILD 1N1   1C2   1N3   1C3A   0.0       0.0   180.0     0.0    0.0
+BILD 1C2   1N3   1C3A  1C3B   0.0       0.0    90.0     0.0    0.0
+BILD 1N3   1C3B  *1C3A 1H3A1  0.0       0.0   120.0     0.0    0.0
+BILD 1N3   1C3B  *1C3A 1H3A2  0.0       0.0   240.0     0.0    0.0
+BILD 1N3   1C3A  1C3B  1H3B1  0.0       0.0   180.0     0.0    0.0
+BILD 1C3A  1H3B1 *1C3B 1H3B2  0.0       0.0   120.0     0.0    0.0
+
+RESI CYTP         1.00  ! To Protonate C5-Me CYT at N3, edarian 2009-03
+GROUP
+ATOM N1   NN2    -0.13  !         H42  H41
+ATOM C6   CN3     0.10  !           \  /
+ATOM H6   HN3     0.24  !    HM51    N4
+ATOM C2   CN1     0.64  !      \     |
+ATOM O2   ON1C   -0.34  !HM52--C5M   C4   H3
+ATOM N3   NN2G   -0.72  !      /  \ /  \\ /
+ATOM H3   HN2     0.42  !    HM53  C5   N3  (Change NN3 to NN3C to adjust C2-N3 bond)?
+ATOM C4   CN2     0.90  !          ||   |
+ATOM N4   NN1    -0.75  !       H6-C6   C2    
+ATOM H41  HN1     0.37  !           \  / \\
+ATOM H42  HN1     0.33  !            N1   O2
+ATOM C5   CN3D   -0.11  !            |
+ATOM C5M  CN9    -0.22  !           CM1
+ATOM HM51 HN9     0.09  !         /  |  \
+ATOM HM52 HN9     0.09  !      HM11 HM12 HM13
+ATOM HM53 HN9     0.09 
+GROUP
+ATOM CM1  CN9    -0.27
+ATOM HM11 HN9     0.09
+ATOM HM12 HN9     0.09
+ATOM HM13 HN9     0.09
+BOND N1   C2        N1   C6       C2   N3       N3   C4       C4   C5
+BOND C5   C6        N1   CM1      C2   O2       C4   N4       C5   C5M
+BOND CM1  HM11      CM1  HM12     CM1  HM13
+BOND N3   H3
+BOND N4   H41       N4   H42
+BOND C5M  HM51      C5M  HM52     C5M  HM53
+BOND C6   H6
+IMPR C2   N1   N3   O2        C4   N3   C5   N4
+IMPR N4   C4   H41  H42
+BILD C2   N1   C6   C5     1.399   120.6     0.0   121.0    1.337
+BILD C6   N1   C2   N3     1.364   120.6     0.0   118.9    1.356
+BILD N1   N3   *C2  O2     1.399   118.9   180.0   121.9    1.237
+BILD N1   C2   N3   C4     1.399   118.9     0.0   120.0    1.334
+BILD C4   C2   *N3  H3      0.0       0.0   180.0     0.0    0.0
+BILD C5   N3   *C4  N4     1.426   121.8   180.00  118.9    1.337
+BILD N3   C4   N4   H41    1.337   117.9     0.00  118.9    1.01
+BILD H41  C4   *N4  H42    1.01    118.9   180.00  120.7    1.01
+BILD C6   C4   *C5  C5M     0.0       0.0   180.0     0.0    0.0
+BILD C4   C5   C5M  HM51    0.0       0.0   180.0     0.0    0.0
+BILD C5   HM51 *C5M HM52    0.0       0.0   115.0     0.0    0.0
+BILD HM51 HM52 *C5M HM53    0.0       0.0  -115.0     0.0    0.0
+BILD N1   C5   *C6  H6      0.0       0.0   180.0     0.0    0.0
+BILD C6   C2   *N1  C1M     0.0       0.0   180.0     0.0    0.0
+BILD C6   N1   C1M  HM11    0.0       0.0   180.0     0.0    0.0
+BILD N1   HM11 *C1M HM12    0.0       0.0   115.0     0.0    0.0
+BILD HM11 HM12 *C1M HM13    0.0       0.0  -115.0     0.0    0.0
+
+PRES CNH3         1.24  ! Patch to convert methylated cytosine CYTP to protonated
+                        ! cytosine at N3. Need to change some atom types and charges
+GROUP
+ATOM C6   CN3     0.10  ! change charge
+ATOM H6   HN3     0.24  ! change charge
+ATOM C2   CN1     0.64  ! change charge
+ATOM O2   ON1C   -0.34  ! change charge
+ATOM N3   NN2G   -0.72  ! change charge, atom type
+ATOM H3   HN2     0.42  ! new
+ATOM C4   CN2     0.90  ! change charge
+
+BOND N3   H3
+BILD C4   C2   *N3  H3      0.0       0.0   180.0     0.0    0.0
+
+RESI CYTH         1.00  ! To Protonate CYT at N3, edarian 2009-03
+GROUP
+ATOM N1   NN2    -0.08  !         H42  H41
+ATOM C6   CN3     0.03  !           \  /
+ATOM H6   HN3     0.27  !            N4
+ATOM C5   CN3    -0.19  !            |
+ATOM H5   HN3     0.09  !            C4   H3
+ATOM C2   CN1     0.48  !           /  \\ /    
+ATOM O2   ON1C   -0.30  !      H5--C5   N3  (Change NN3 to NN3C to adjust C2-N3 bond)?
+ATOM N3   NN2G   -0.62  !          ||   |      
+ATOM H3   HN2     0.42  !      H6--C6   C2 
+ATOM C4   CN2     0.85  !           \  / \\    
+ATOM N4   NN1    -0.65  !            N1   O2   
+ATOM H41  HN1     0.37  !            |         
+ATOM H42  HN1     0.33  !           C1M        
+GROUP                   !         /  |  \      
+ATOM C1M  CN9    -0.27  !      HM11 HM12 HM13  
+ATOM H11M HN9     0.09  ! 
+ATOM H12M HN9     0.09  ! 
+ATOM H13M HN9     0.09
+BOND N1   C2        N1   C6       C2   N3       N3   C4       C4   C5
+BOND C5   C6        N1   C1M      C2   O2       C4   N4
+BOND C1M  H11M      C1M  H12M     C1M  H13M
+BOND N3   H3
+BOND N4   H41       N4   H42
+BOND C5   H5
+BOND C6   H6
+IMPR C2   N1   N3   O2        C4   N3   C5   N4
+IMPR N4   C4   H41  H42
+BILD C2   N1   C6   C5     1.399   120.6     0.0   121.0    1.337
+BILD C6   N1   C2   N3     1.364   120.6     0.0   118.9    1.356
+BILD N1   N3   *C2  O2     1.399   118.9   180.0   121.9    1.237
+BILD N1   C2   N3   C4     1.399   118.9     0.0   120.0    1.334
+BILD C4   C2   *N3  H3     0.0       0.0   180.0     0.0    0.0
+BILD C5   N3   *C4  N4     1.426   121.8   180.00  118.9    1.337
+BILD N3   C4   N4   H41    1.337   117.9     0.00  118.9    1.01
+BILD H41  C4   *N4  H42    1.01    118.9   180.00  120.7    1.01
+BILD C6   C4   *C5  H5     0.0       0.0   180.0     0.0    0.0
+BILD N1   C5   *C6  H6     0.0       0.0   180.0     0.0    0.0
+BILD C6   C2   *N1  C1M    0.0       0.0   180.0     0.0    0.0
+BILD C6   N1   C1M  H11M   0.0       0.0   180.0     0.0    0.0
+BILD N1   H11M *C1M H12M   0.0       0.0   115.0     0.0    0.0
+BILD H11M H12M *C1M H13M   0.0       0.0  -115.0     0.0    0.0
+
+RESI N4EM         0.00     ! C5-Me CYT with N4-Ethyl-Methyl, edarian 2009-06
+GROUP                      ! model compound for CYT-EtGUA
+ATOM N1   NN2    -0.13     !                                 
+ATOM C6   CN3    -0.09     !                                   
+ATOM H6   HN3     0.18     !              H411 H412              
+ATOM C2   CN1     0.77     !                 \ /                          
+ATOM O2   ON1C   -0.57     !           H42   C41    H421        
+ATOM N3   NN3    -0.65     !             \  /   \   /
+ATOM C4   CN2     0.52     !      HM51    N4     C42 -- H422
+ATOM N4   NN1    -0.52     !        \     |         \              
+ATOM H42  HN1     0.33     !  HM52--C5M   C4        H423
+ATOM C5   CN3D   -0.11     !        /  \ /  \\
+ATOM C5M  CN9    -0.22     !      HM53  C5   N3
+ATOM HM51 HN9     0.09     !            ||   |
+ATOM HM52 HN9     0.09     !         H6-C6   C2
+ATOM HM53 HN9     0.09     !             \  / \\
+GROUP                      !              N1   O2
+ATOM CM1  CN9    -0.27     !              |
+ATOM HM11 HN9     0.09     !             CM1
+ATOM HM12 HN9     0.09     !           /  |  \
+ATOM HM13 HN9     0.09     !        HM11 HM12 HM13
+GROUP
+ATOM C41  CN8     0.04
+ATOM H411 HN8     0.09
+ATOM H412 HN8     0.09
+ATOM C42  CN9    -0.27
+ATOM H421 HN9     0.09
+ATOM H422 HN9     0.09
+ATOM H423 HN9     0.09
+BOND N1   C2        N1   C6       C2   N3       N3   C4       C4   C5
+BOND C5   C6        N1   CM1      C2   O2       C4   N4       C5   C5M
+BOND N4   C41       C41  C42      
+BOND CM1  HM11      CM1  HM12     CM1  HM13
+BOND C5M  HM51      C5M  HM52     C5M  HM53
+BOND C6   H6
+BOND N4   H42
+BOND C41  H411      C41  H412
+BOND C42  H421      C42  H422     C42  H423
+!DOUBLE C5  C6       N3   C4       C2   O2
+IMPR C2   N1   N3   O2        C4   N3   C5   N4
+IMPR N4   C4   C41  H42
+BILD C2   N1   C6   C5     1.399   120.6     0.0   121.0    1.337
+BILD C6   N1   C2   N3     1.364   120.6     0.0   118.9    1.356
+BILD N1   N3   *C2  O2     1.399   118.9   180.0   121.9    1.237
+BILD N1   C2   N3   C4     1.399   118.9     0.0   120.0    1.334
+BILD C5   N3   *C4  N4     1.426   121.8   180.0   118.9    1.337
+BILD N3   C4   N4   C41    0.0       0.0     0.0     0.0    0.0
+BILD C41  C4   *N4  H42    0.0       0.0   150.0     0.0    0.0
+BILD C4   N4   C41  C42    0.0       0.0  -160.0     0.0    0.0
+BILD C42  N4   *C41 H411   0.0       0.0   120.0     0.0    0.0
+BILD C42  N4   *C41 H412   0.0       0.0  -120.0     0.0    0.0
+BILD N4   C41  C42  H423   0.0       0.0  -180.0     0.0    0.0
+BILD H423 C41  *C42 H421   0.0       0.0   120.0     0.0    0.0
+BILD H423 C41  *C42 H422   0.0       0.0  -120.0     0.0    0.0
+BILD C6   C4   *C5  C5M    0.0       0.0   180.0     0.0    0.0
+BILD C4   C5   C5M  HM51   0.0       0.0   180.0     0.0    0.0
+BILD C5   HM51 *C5M HM52   0.0       0.0   115.0     0.0    0.0
+BILD HM51 HM52 *C5M HM53   0.0       0.0  -115.0     0.0    0.0
+BILD N1   C5   *C6  H6     0.0       0.0   180.0     0.0    0.0
+BILD C6   C2   *N1  C1M    0.0       0.0   180.0     0.0    0.0
+BILD C6   N1   C1M  HM11   0.0       0.0   180.0     0.0    0.0
+BILD N1   HM11 *C1M HM12   0.0       0.0   115.0     0.0    0.0
+BILD HM11 HM12 *C1M HM13   0.0       0.0  -115.0     0.0    0.0
+
+PRES 4EG1         0.86     ! Patch to add Ethyl-Guanidinium tail to CYT at N4, edarian 2009-06
+                           ! Need to change some atom types (stream toppar_pres_4eg.str for parameters)
+                           ! Addjust charge accordingly
+DELE ATOM H41              
+GROUP                      
+ATOM C41  CN8     0.04     
+ATOM H411 HN8     0.09     
+ATOM H412 HN8     0.09     
+ATOM C42  CN8     0.20     
+ATOM H421 HN8     0.09     
+ATOM H422 HN8     0.09     
+ATOM N43  NNG    -0.70     ! NEW atom type
+ATOM H43  HN1     0.44     
+ATOM C44  CNG     0.64     ! NEW atom type
+ATOM N44  NNG    -0.80     ! NEW atom type
+ATOM H441 HN1     0.46     
+ATOM H442 HN1     0.46     
+ATOM N45  NNG    -0.80     ! NEW atom type
+ATOM H451 HN1     0.46     
+ATOM H452 HN1     0.46     
+ATOM C6   CN3    -0.09     ! change charge
+ATOM H6   HN3     0.18     ! change charge
+ATOM C2   CN1     0.77     ! change charge
+ATOM O2   ON1C   -0.57     ! change charge
+ATOM N3   NN3    -0.65     ! change charge
+ATOM C4   CN2     0.52     ! change charge
+ATOM N4   NN1    -0.52     ! change charge
+BOND N4   C41       C41  C42      C42  N43      N43  C44      C44  N44
+BOND C44  N45
+BOND C41  H411      C41  H412
+BOND C42  H421      C42  H422
+BOND N43  H43
+BOND N44  H441      N44  H442
+BOND N45  H451      N45  H452
+!DOUBLE    C44 N44
+IMPR N4   C4   C41  H42
+BILD N3   C4   N4   C41    0.0       0.0     0.0     0.0    0.0
+BILD C41  C4   *N4  H42    0.0       0.0   150.0     0.0    0.0
+BILD C4   N4   C41  C42    0.0       0.0  -160.0     0.0    0.0
+BILD C42  N4   *C41 H411   0.0       0.0   120.0     0.0    0.0
+BILD C42  N4   *C41 H412   0.0       0.0  -120.0     0.0    0.0
+BILD N4   C41  C42  N43    0.0       0.0  -180.0     0.0    0.0
+BILD N43  C41  *C42 H421   0.0       0.0   120.0     0.0    0.0
+BILD N43  C41  *C42 H422   0.0       0.0  -120.0     0.0    0.0
+BILD C41  C42  N43  C44    0.0       0.0   109.0     0.0    0.0
+BILD C44  C42  *N43 H43    0.0       0.0   140.0     0.0    0.0
+BILD C42  N43  C44  N44    0.0       0.0   180.0     0.0    0.0
+BILD N43  C44  N44  H441   0.0       0.0  -178.0     0.0    0.0
+BILD H441 C44  *N44 H442   0.0       0.0   171.0     0.0    0.0
+BILD N44  N43  *C44 N45    0.0       0.0   178.0     0.0    0.0
+BILD N44  C44  N45  H451   0.0       0.0  -174.0     0.0    0.0
+BILD H451 C44  *N45 H452   0.0       0.0   166.0     0.0    0.0
+!BILD C42  N43  C44  N45   0.0       0.0   -40.0     0.0    0.0
+!BILD N43  C44  N45  H451  0.0       0.0  -175.0     0.0    0.0
+!BILD N45  C44  N44  H441  0.0       0.0   170.0     0.0    0.0
+!BILD H441 C44  *N44 H442  0.0       0.0   180.0     0.0    0.0
+!BILD H451 C44  *N45 H452  0.0       0.0   125.0     0.0    0.0
+
+PRES G8AP         0.41   ! N-[deoxy-guanosin-8-yl]-p-AminoPhenyl
+                         ! Use 9MG patch to add Methyl group at N9 (or PURG to add H9)
+GROUP                    !                               
+ATOM C8   CN4     0.45   !charge changed by patch G8AP
+ATOM N8   NN1    -0.42   !replaces H8
+ATOM H81  HN2     0.33     !                               H14       
+ATOM C82  CN3     0.05     !                               |         
+GROUP                      !                              C14        
+ATOM C10  CN3    -0.115    !                             //  \       
+ATOM H10  HN3     0.115    !                        H12-C12   C13-H13
+GROUP                      !              O6            |     ||     
+ATOM C11  CN3    -0.115    !              ||        H10-C10   C11-H11
+ATOM H11  HN3     0.115    !              C6             \\  /       
+GROUP                      !             /  \              C82       
+ATOM C12  CN3    -0.115    !         H1-N1   C5--N7\\     /          
+ATOM H12  HN3     0.115    !            |    ||     C8--N8           
+GROUP                      !            C2   C4--N9/      \          
+ATOM C13  CN3    -0.115    !           / \\ /      \      H81        
+ATOM H13  HN3     0.115    !     H21-N2   N3        C9               
+GROUP                      !         |            / |  \             
+ATOM C14  CN3    -0.115    !        H22        H91 H92  H93          
+ATOM H14  HN3     0.115    !
+
+DELE ATOM H8
+
+BOND C8  N8   N8  C82   C82  C10  C10 C12
+BOND C12 C14  C14 C13  C13 C11  C11 C82
+BOND N8  H81   C10 H10  C11 H11  C12 H12  C13 H13  C14 H14
+
+IC N9  N7   *C8  N8    0.0000    0.00  180.00    0.00   0.0000
+IC N9  C8   N8   C82   0.0000    0.00  180.00    0.00   0.0000
+IC C82 C8   *N8  H81   0.0000    0.00  130.00    0.00   0.0000
+IC C8  N8   C82  C11   0.0000    0.00  180.00    0.00   0.0000
+IC N8  C82  C11  C13   0.0000    0.00  180.00    0.00   0.0000
+IC C82 C11  C13  C14   0.0000    0.00    0.00    0.00   0.0000
+IC N8  C11  *C82 C10   0.0000    0.00  180.00    0.00   0.0000
+IC C11 C82  C10  C12   0.0000    0.00    0.00    0.00   0.0000
+IC C13 C82  *C11 H11   0.0000    0.00  180.00    0.00   0.0000
+IC C14 C11  *C13 H13   0.0000    0.00  180.00    0.00   0.0000
+IC C10 C14  *C12 H12   0.0000    0.00  180.00    0.00   0.0000
+IC C12 C82  *C10 H10   0.0000    0.00  180.00    0.00   0.0000
+IC C12 C13  *C14 H14   0.0000    0.00  180.00    0.00   0.0000
+
+RESI DFT          0.00     ! Difluorotoluene
+                           ! adm jr. w/Daniel Barsky
+                           !
+GROUP                      !
+ATOM C1   CNA    -0.24     !             F4
+ATOM C2   CNA2    0.28     !             |
+ATOM C3   CNA    -0.24     !    H51      C4    H3
+ATOM C4   CNA2    0.22     !       \    /  \\ /
+ATOM C5   CNA     0.10     ! H52--C5M-C5    C3
+ATOM C6   CNA    -0.28     !       /  ||    |
+ATOM H1   HNP     0.21     !    H52   C6    C2
+ATOM F2   FNA    -0.21     !         /  \  // \
+ATOM H3   HN3     0.19     !       H6    C1    F2           
+ATOM F4   FNA    -0.21     !             |
+ATOM C5M  CN9    -0.24     !             H1
+ATOM H51  HN9     0.07     !
+ATOM H52  HN9     0.07     !
+ATOM H53  HN9     0.07     !
+ATOM H6   HNP     0.21     !
+
+BOND C1  C2   C2  C3   C3  C4   C4  C5   C5  C6   C6  C1
+BOND C1  H1   C2  F2   C3  H3   C4  F4   C5  C5M  C6  H6
+BOND C5M H51  C5M H52  C5M H53
+BILD C1   C2   C3   C4     0.00      0.00    0.00    0.00   0.00
+BILD C2   C3   C4   C5     0.00      0.00    0.00    0.00   0.00
+BILD C3   C4   C5   C6     0.00      0.00    0.00    0.00   0.00
+BILD C4   C5   C6   C1     0.00      0.00    0.00    0.00   0.00
+BILD C5   C6   C1   C2     0.00      0.00    0.00    0.00   0.00
+BILD C6   C1   C2   C3     0.00      0.00    0.00    0.00   0.00
+BILD C3   C2   C1   H1     0.00      0.00  180.00    0.00   0.00
+BILD C4   C3   C2   F2     0.00      0.00  180.00    0.00   0.00
+BILD C5   C4   C3   H3     0.00      0.00  180.00    0.00   0.00
+BILD C6   C5   C4   F4     0.00      0.00  180.00    0.00   0.00
+BILD C3   C4   C5   C5M    0.00      0.00  180.00    0.00   0.00
+BILD C4   C5   C6   H6     0.00      0.00  180.00    0.00   0.00
+BILD C4   C5   C5M  H51    0.00      0.00  180.00    0.00   0.00
+BILD H51  C5   *C5M H52    0.00      0.00   60.00    0.00   0.00
+BILD H51  C5   *C5M H53    0.00      0.00  240.00    0.00   0.00
+
+PRES DFTO         0.00     ! patch to convert THY to Difluorotoluene
+                           ! adm jr. w/Daniel Barsky
+                           !
+                           ! use in patch statement, followed by AUTOgenerate
+                           ! angles dihedrals in c25 and later versions
+                           ! atom ordering to match ab initio
+                           ! not MMFF compatible
+                           !
+! prior to invoking this patch the following atom RENAME 
+! must be performed where segid and residue are changed
+! to the name and number corresponding to the THY being
+! converted
+!rename atom f2 sele atom segid residue o2 end
+!rename atom f4 sele atom segid residue o4 end
+!rename atom c1 sele atom segid residue n1 end
+!rename atom c3 sele atom segid residue n3 end
+! The next RENAME command can be used to change
+! the residue name from THY to DFT
+!rename resn DFT sele segid "segid" .and. resi "residue" end
+!
+GROUP                      !
+ATOM C1   CNA    -0.03     !             F4
+ATOM C2   CNA2    0.28     !             |
+ATOM C3   CNA    -0.24     !    H51      C4    H3
+ATOM C4   CNA2    0.22     !       \    /  \\ /
+ATOM C5   CNA     0.10     ! H52--C5M-C5    C3
+ATOM C6   CNA    -0.28     !       /  ||    |
+ATOM F2   FNA    -0.21     !    H52   C6    C2
+ATOM H3   HN3     0.19     !         /  \  // \
+ATOM F4   FNA    -0.21     !       H6    C1    F2           
+ATOM C5M  CN9    -0.24     !             |
+ATOM H51  HN9     0.07     !             R
+ATOM H52  HN9     0.07     !
+ATOM H53  HN9     0.07     !
+ATOM H6   HNP     0.21     !
+! delete impropers leftover from THY due to use of rename atom
+DELE IMPR C5 C4 C6 C5M
+DELE IMPR C4 C3 C5 F4
+DELE IMPR C2 C1 C3 F2
+
+RESI DFB          0.00     ! Difluorobenzene
+                           ! adm jr. w/Daniel Barsky
+                           !
+                           ! atom numbering based in difluorotoluene 
+                           ! not MMFF compatible
+GROUP                      !
+ATOM C1   CNA    -0.26     !             F4
+ATOM H1   HNP     0.23     !             |
+ATOM C2   CNA2    0.27     !       H5    C4    H3
+ATOM F2   FNA    -0.19     !         \  /  \\ /
+ATOM C3   CNA    -0.23     !          C5    C3
+ATOM H3   HN3     0.19     !          ||    |
+ATOM C4   CNA2    0.27     !          C6    C2
+ATOM F4   FNA    -0.19     !         /  \  // \
+ATOM C5   CNA    -0.26     !       H6    C1    F2           
+ATOM H5   HNP     0.23     !             |
+ATOM C6   CNA    -0.32     !             H1
+ATOM H6   HNP     0.26     !
+
+BOND C1  C2   C2  C3   C3  C4   C4  C5   C5  C6   C6  C1
+BOND C1  H1   C2  F2   C3  H3   C4  F4   C5  H5   C6  H6
+
+BILD C1   C2   C3   C4     0.00      0.00    0.00    0.00   0.00
+BILD C2   C3   C4   C5     0.00      0.00    0.00    0.00   0.00
+BILD C3   C4   C5   C6     0.00      0.00    0.00    0.00   0.00
+BILD C4   C5   C6   C1     0.00      0.00    0.00    0.00   0.00
+BILD C5   C6   C1   C2     0.00      0.00    0.00    0.00   0.00
+BILD C6   C1   C2   C3     0.00      0.00    0.00    0.00   0.00
+BILD C3   C2   C1   H1     0.00      0.00  180.00    0.00   0.00
+BILD C4   C3   C2   F2     0.00      0.00  180.00    0.00   0.00
+BILD C5   C4   C3   H3     0.00      0.00  180.00    0.00   0.00
+BILD C6   C5   C4   F4     0.00      0.00  180.00    0.00   0.00
+BILD C3   C4   C5   H5     0.00      0.00  180.00    0.00   0.00
+BILD C4   C5   C6   H6     0.00      0.00  180.00    0.00   0.00
+
+! modified thymine patches for DNA strand separation calculations
+
+PRES THYM         0.00     ! Modified thymine with ethylene on C5
+                           ! adm jr. 
+                           !
+                           ! patch to create the isolated base
+                           ! use in patch statement, followed by AUTOgenerate
+                           ! angles dihedrals in c25 and later versions
+                           !   
+! Delete thymine C5M, H51, H52, H53 atoms
+DELE ATOM C5M              !
+DELE ATOM H51              !
+DELE ATOM H52              !
+DELE ATOM H53              !  
+GROUP                      !   
+ATOM N1   NN2B   -0.80     !   
+ATOM C6   CN3     0.17     !   
+ATOM C5   CN3T   -0.10     !            O4
+ATOM C4   CN1     0.50     !            ||
+ATOM N3   NN2U   -0.46     !            C4     H5A1   H5B1
+ATOM C2   CN1T    0.51     !           /  \    /     /
+ATOM O2   ON1    -0.41     !       H3-N3  C5-C5A==C5B
+ATOM H3   HN2     0.36     !          |   ||         \
+ATOM O4   ON1    -0.45     !          C2  C6          H5B2
+ATOM H6   HN3     0.17     !         //\  / \
+ATOM H1   HN2     0.46     !        O2  N1   H6
+ATOM C5A  CNE1   -0.06     !            |
+ATOM C5B  CNE2   -0.32     !            H1
+ATOM H5A1 HNE1    0.14     !
+ATOM H5B1 HNE2    0.16     !
+ATOM H5B2 HNE2    0.13     !
+
+BOND C5  C5A  C5A H5A1 C5B H5B1  C5B H5B2
+DOUBLE C5A C5B
+
+BILD N3   C4   C5   C5A    0.0       0.0   180.0     0.0    0.0
+BILD C6   C5   C5A  C5B    0.0       0.0     0.0     0.0    0.0
+BILD C5B  C5   *C5A H5A1   0.0       0.0   180.0     0.0    0.0
+BILD C5   C5A  C5B  H5B1   0.0       0.0   180.0     0.0    0.0
+BILD H5B1 C5A  *C5B H5B2   0.0       0.0   180.0     0.0    0.0
+
+PRES THYE         0.00     ! patch to convert thymine to c5-ethylene
+                           ! thymine in DNA
+                           ! adm jr.
+                           !
+                           ! use in patch statement, followed by AUTOgenerate
+                           ! angles dihedrals in c25 and later versions
+                           !   
+! Delete thymine C5M, H51, H52, H53 atoms
+DELE ATOM C5M              !
+DELE ATOM H51              !
+DELE ATOM H52              !
+DELE ATOM H53              !  
+GROUP                      !   
+ATOM N1   NN2B   -0.34     !   
+ATOM C6   CN3     0.17     !   
+ATOM C5   CN3T   -0.10     !            O4
+ATOM C4   CN1     0.50     !            ||
+ATOM N3   NN2U   -0.46     !            C4     H5A1   H5B1
+ATOM C2   CN1T    0.51     !           /  \    /     /
+ATOM O2   ON1    -0.41     !       H3-N3  C5-C5A==C5B
+ATOM H3   HN2     0.36     !          |   ||         \
+ATOM O4   ON1    -0.45     !          C2  C6          H5B2
+ATOM H6   HN3     0.17     !         //\  / \
+ATOM C5A  CNE1   -0.06     !        O2  N1   H6
+ATOM C5B  CNE2   -0.32     !            |
+ATOM H5A1 HNE1    0.14     !            R
+ATOM H5B1 HNE2    0.16     !
+ATOM H5B2 HNE2    0.13     !
+
+BOND C5  C5A  C5A H5A1  C5B H5B1  C5B H5B2
+DOUBLE C5A C5B
+
+BILD N3   C4   C5   C5A    0.0       0.0   180.0     0.0    0.0
+BILD C6   C5   C5A  C5B    0.0       0.0     0.0     0.0    0.0
+BILD C5B  C5   *C5A H5A1   0.0       0.0   180.0     0.0    0.0
+BILD C5   C5A  C5B  H5B1   0.0       0.0   180.0     0.0    0.0
+BILD H5B1 C5A  *C5B H5B2   0.0       0.0   180.0     0.0    0.0
+
+END
+
+read param card append
+* parameters developed in collaboration with Daniel Barsky
+*
+
+BONDS
+!
+!atom types  Kb          b0
+!
+!guanine tautomer terms
+CN1  NN3G   480.0       1.310   !from CN1 NN3 (of cyt), db 6/97
+CN1  ON5    450.0       1.330   !from CN6 ON5 (RIBOSE), db 6/97
+!cytosine tautomer terms
+CN1  NN2C   400.0       1.383   !c2-n3
+CN2  NN2C   400.0       1.389   !c4-n3
+CN2  NN1C   555.0       1.343   !c4-n4
+NN1C HN1    488.0       1.00
+NN2C HN2    474.0       1.01
+!1-Ethyl Guanine
+NN2G CN8    400.0       1.340   ! (Sasha)
+!3-Ethyl Cytosine
+NN3  CN8    400.0       1.340   ! (Sasha)
+!difluorotoluene, adm jr.
+CNA  CNA    305.000     1.3750  !benzene, JES 8/25/89
+CN9  CNA    230.000     1.4900  !phe,tyr, JES 8/25/89
+CN8  CNA    230.000     1.4900  !phe,tyr, JES 8/25/89
+CN7B CNA    230.000     1.4900  !phe,tyr, JES 8/25/89
+HNP  CNA    340.000     1.0800  !phe,tyr JES 8/25/89
+CNA2 CNA    305.000     1.3700  !benzene, JES 8/25/89
+HN3  CNA    340.000     1.0800  !dft, adm jr.
+CNA2 FNA    400.0       1.3580  !dft, adm jr.
+!5-ethylene-thymine
+CN3T CNE1   365.0       1.475   ! (modified thy, Sasha)
+CNE2 HNE2   365.0       1.100   ! (modified thy, Sasha)
+CNE2 CNE1   500.0       1.342   ! (modified thy, Sasha)
+CNE1 HNE1   360.5       1.100   ! (modified thy, Sasha)
+!C5-Me CYT with N4-Ethyl-Methyl, N4EM, edarian 2009-06
+NN1  CN8    430.00      1.450   ! 
+!C8-Amino-Phenyl-Guanine, G8AP, edarian, 2009-11
+CN4  NN1    300.0       1.378   !G, adm jr. 11/97   CN4  NN2B
+NN1  HN2    474.0       1.010   !G, adm jr. 11/97   HN2  NN2B
+NN1  CN3    305.00      1.414   ! RETINOL PACP ! CG2R61 NG2S1
+!params for GUANIDINIUM tail patch at N4 of CYT, 4EG1, edarian, 2009-11
+NNG  CN8    261.000     1.490 !NC2  CT2   261.000     1.4900 ! ALLOW   ALI POL
+NNG  CNG    463.000     1.365 !NC2  C     463.000     1.3650 ! ALLOW   PEP POL ARO, NA param  360.0   1.366
+NNG  HN1    455.000     1.000 !NC2  HC    455.000     1.0000 ! ALLOW   POL        , NA param  488.0   1.00
+
+ANGLES
+!
+!atom types     Ktheta    Theta0   Kub     S0
+!
+!guanine tautomer terms
+CN1  NN3G CN2     125.0     122.3 !n1, Sasha
+NN3G CN2  NN3G     70.0     115.2 !c2, Sasha
+NN3G CN1  CN5G     67.0     123.6 !c6, Sasah
+NN3G CN1  ON5      75.7     121.6 !o6
+ON5  CN1  CN5G     75.7     114.8 !o6
+CN1  ON5  HN5      60.0     114.7 !h5
+!cytosine tautomer terms
+NN2C CN1   NN2     35.0     115.5 !c2, ring
+CN2  NN2C  CN1     35.0     130.2 !n3, ring
+NN2C CN2   CN3     35.0     109.5 !c4, ring
+CN2  NN2C  HN2     40.5     116.1 !h3
+CN1  NN2C  HN2     40.5     113.7 !h3
+NN2C CN1   ON1C    70.0     125.1 !o2
+NN2C CN2   NN1C    90.0     126.8 !n4
+CN3  CN2   NN1C    90.0     123.7 !n4
+CN2  NN1C  HN1     51.0     113.0 !h4
+!1-Ethyl Guanine
+CN2  NN2G CN8      70.0      117.3    !c2-n1-c1a
+CN1  NN2G CN8      70.0      111.6    !c6-n1-c1a
+NN2G CN8  CN9      70.0      119.9    !n1-c1a-c1b
+NN2G CN8  HN8      33.43     110.10  22.53 2.179 !from alkanes
+!3-Ethyl Cytosine, Sasha
+CN1  NN3  CN8      70.0      116.0    !c2-n3-c3a
+CN2  NN3  CN8      70.0      124.9    !c4-n3-c3a
+CN9  CN8  NN3      70.0      114.5    !n3-c3a-c3b
+NN3  CN8  HN8      33.43     110.10  22.53 2.179 !from alkanes
+!CetG patch; from 1-ethyl-G and 2-ethyl-C
+CN8  CN8  NN3      70.0      114.5    !n3-c3a-c3b
+NN2G CN8  CN8      70.0      119.9    !n1-c1a-c1b
+!difluorotoluene, adm jr.
+CNA  CNA  CNA      40.0      120.00   35.00   2.41620 ! JES 8/25/89
+CNA  CNA2 CNA      40.0      122.50   35.00   2.41620 !dft, adm jr.
+CNA2 CNA  CNA      40.0      119.00   35.00   2.41620 !dft, adm jr.
+CNA2 CNA  CNA2     40.0      117.00   35.00   2.41620 !dft, adm jr.
+CN7B CNA  CNA      45.8      121.00   !dft, adm jr., changed from toluene
+CN7B CNA  CNA2     45.8      120.00   !dft, adm jr.
+CN9  CNA  CNA      45.8      121.00   !dft, adm jr., changed from toluene
+CN9  CNA  CNA2     45.8      120.00   !dft, adm jr.
+CN8  CN7B CNA      51.8      107.50   !ethylbenzene, adm jr., 3/7/92
+ON6  CN7B CNA      51.8      107.50   !ethylbenzene, adm jr., 3/7/92
+HN7  CN7B CNA      43.0      111.00   !From HN7  CN7B NN2
+HN9  CN9  CNA      49.3      107.50   ! toluene, adm jr. 3/7/92
+HNP  CNA  CNA      30.0      120.00   22.00   2.15250 !JES 8/25/89 benzene
+HNP  CNA  CNA2     30.0      121.00   22.00   2.15250 !dft, adm jr.
+HN3  CNA  CNA2     30.0      121.50   22.00   2.15250 !dft, adm jr.
+FNA  CNA2 CNA      60.0      118.75   !dft, adm jr.
+!5-ethylene-thymine terms
+CN1  CN3T  CNE1    38.0      117.0    !c4-c5-c5a
+CN3  CN3T  CNE1    38.0      126.3    !c6-c5-c5a
+CN3T CNE1  CNE2    48.0      122.4    !c5-c5a-c5b
+CN3T CNE1  HNE1    40.0      119.6    !c5-c5a-h5a1
+CNE2 CNE1  HNE1    42.0      118.0    !fixed, alkene
+HNE2 CNE2  CNE1    45.0      120.5    !fixed, alkene
+HNE2 CNE2  HNE2    19.0      119.0    !fixed, alkene
+!N3-protonated CYT(CYTH) and 5Me-CYT(CYTP), edarian 2009-03
+NN2G CN1   NN2     70.0      107.8 ! CYTH
+NN2G CN1   ON1C    50.0      125.5 ! CYTH
+NN2G CN2   CN3     70.0      122.2 ! CYTH
+NN2G CN2   CN3D    70.0      122.2 ! for CYTP
+!C5-Me CYT with N4-Ethyl-Methyl, N4EM, edarian 2009-06
+NN1  CN8   HN8     48.0      108.0
+NN1  CN8   CN9     70.0      113.5
+CN8  NN1   HN1     35.0      117.0  
+CN2  NN1   CN8     40.0      121.5
+!C8-Amino-Phenyl-Guanine, G8AP, edarian, 2009-11
+CN1  NN3   HN2     37.0      121.2  !C, h1 cn1 nn2  hn2
+CN2  NN3   HN2     40.5      115.4  !U     cn1 nn2u hn2
+NN2B CN4   NN1     70.0      113.0  !NG321  CG2N1  NG321 ! MGU1, methylguanidine kevo:
+NN4  CN4   NN1     70.0      125.0  !NG2D1  CG2N1  NG321 ! MGU1, methylguanidine;
+CN4  NN1   CN3     50.0      120.0  !CG2O1  NG2S1  CG2R61  ! RETINOL TMCH/MECH
+NN1  CN3   CN3     40.0      120.0   35.00   2.4162 !CG2R61 CG2R61 NG2S1 ! RETINOL TMCH/MECH
+CN3  CN3   CN3     40.0      120.0   35.00   2.4162 !CG2R61 CG2R61 CG2R61 ! PROT JES 8/25/89
+CN4  NN1   HN2     34.0      117.0  !CG2R61 NG2S1  HGP1 ! RETINOL TMCH/MECH
+HN2  NN1   CN3     34.0      117.0  !CG2R61 NG2S1  HGP1 ! RETINOL TMCH/MECH
+!params for GUANIDINIUM tail patch at N4 of CYT, 4EG1, edarian, 2009-11
+CN8  NNG   CNG     62.30     120.0  !CT2  NC2  C      62.300   120.0000 ! ALLOW   ALI POL PEP ARO guanid
+NNG  CNG   NNG     52.00     120.0    90.00   2.36420 !NG2P1  CG2N1  NG2P1 (NC2  C    NC2   aa param) guanid
+HN1  NNG   HN1     25.00     120.0  ! ALLOW   POL      ! NA param   HN1  NN1  HN1     31.0     117.0  !C,A,G
+NNG  CN8   HN8     51.50     107.5  !NC2  CT2  HA     51.500   107.5000 ! ALLOW   ALI POL guanid
+NNG  CN8   CN8     67.70     107.5  !NC2  CT2  CT2    67.700   107.5000 ! ALLOW   ALI POL guanid
+CNG  NNG   HN1     49.00     120.0  ! ALLOW   POL PEP ARO ! NA param   CN2  NN1  HN1     40.0     121.5
+NN1  CN8   CN8     70.00     113.5  !NH1  CT2  CT2    70.000   113.5000 ! ALLOW   ALI PEP POL ARO
+CN8  NNG   HN1     40.40     120.0  !HC   NC2  CT2    40.400   120.0000 ! ALLOW   POL ALI
+
+DIHEDRALS
+!
+!atom types             Kchi    n   delta
+!
+!guanine tautomer terms
+ON5  CN1  NN3G CN2      1.0     2   180.0  !to o6
+CN5G CN1  NN3G CN2      2.0     2   180.0  !ring
+CN1  NN3G CN2  NN3G     2.0     2   180.0  !ring
+NN3G CN1  CN5G CN5      8.0     2   180.0  !ring
+NN3G CN2  NN3G CN5      2.0     2   180.0  !ring
+NN3G CN1  CN5G NN4      5.0     2   180.0  !bfly
+NN3G CN1  ON5  HN5      1.5     2   180.0  !to h6
+CN5G CN1  ON5  HN5      1.8     2   180.0  !to h6
+!cytosine tautomer terms
+HN1  NN1C CN2   CN3     8.0     2   180.0
+HN1  NN1C CN2   NN2C    0.7     1     0.0
+HN1  NN1C CN2   NN2C    6.0     2   180.0
+NN1C CN2  NN2C  CN1     1.0     2   180.0 !to N4
+CN3  CN2  NN2C  CN1     0.5     2   180.0 !ring
+NN2  CN1  NN2C  CN2     0.5     2   180.0 !ring
+NN2  CN1  NN2C  HN2     3.3     2   180.0 !h3
+HN2  NN2C CN1   ON1C    0.0     2   180.0 !h3
+HN2  NN2C CN2   NN1C    0.0     2   180.0 !h3
+HN2  NN2C CN2   CN3     3.3     2   180.0 !h3
+ON1C CN1  NN2C  CN2     1.6     2   180.0 !to O2
+!1-Ethyl Guanine, sasha
+CN5G  CN1   NN2G  CN8   2.0     2   180.0 !to C1A
+ON1   CN1   NN2G  CN8   2.0     2   180.0 !to C1A
+CN2   NN2G  CN8   CN9   1.5     1     0.0 !to C1B
+CN2   NN2G  CN8   CN9   1.0     2     0.0 !to C1B
+CN2   NN2G  CN8   CN9   0.2     3   180.0 !to C1B
+CN1   NN2G  CN8   CN9   1.0     2     0.0 !to C1B
+CN2   NN2G  CN8   HN8   0.15    3     0.0 !alkanes
+CN1   NN2G  CN8   HN8   0.15    3     0.0 !alkanes
+NN2G  CN8   CN9   HN9   0.15    3     0.0 !alkanes
+!3-Ethyl Cytosine, sasha
+NN2   CN1   NN3   CN8   2.0     2   180.0 !to C3A
+CN8   NN3   CN1   ON1C  2.0     2   180.0 !to C3A
+CN8   NN3   CN2   NN1   2.0     2   180.0 !to C3A
+CN8   NN3   CN2   CN3   2.0     2   180.0 !to C3A
+CN2   NN3   CN8   CN9   2.0     1     0.0 !to C3B
+CN2   NN3   CN8   CN9   0.30    3     0.0 !to C3B
+CN1   NN3   CN8   CN9   0.50    3   180.0 !to C3B
+CN2   NN3   CN8   HN8   0.15    3     0.0 !alkanes
+CN1   NN3   CN8   HN8   0.15    3     0.0 !alkanes
+NN3   CN8   CN9   HN9   0.15    3     0.0 !alkanes
+!CetG patch; from 1-ethyl-G and 2-ethyl-C
+CN2   NN2G  CN8   CN8   1.0     2     0.0 !to C1B
+CN2   NN2G  CN8   CN8   0.2     3   180.0 !to C1B
+CN1   NN2G  CN8   CN8   1.0     2     0.0 !to C1B
+CN2   NN3   CN8   CN8   2.0     1     0.0 !to C3B
+CN2   NN3   CN8   CN8   0.30    3     0.0 !to C3B
+CN1   NN3   CN8   CN8   0.50    3   180.0 !to C3B
+NN2G  CN8   CN8   NN3   0.15    3     0.0 !alkanes
+NN2G  CN8   CN8   HN8   0.15    3     0.0 !alkanes
+NN3   CN8   CN8   HN8   0.15    3     0.0 !alkanes
+!difluorotoluene, adm jr.
+CNA  CNA  CNA  CNA      3.10    2   180.0 ! JES 8/25/89
+CNA2 CNA  CNA  CNA      3.10    2   180.0 ! dft, adm jr.
+CNA2 CNA  CNA2 CNA      3.10    2   180.0 ! dft, adm jr.
+CNA  CNA2 CNA  CNA      3.10    2   180.0 ! dft, adm jr.
+CNA  CN7B CN7  CN7      0.04    3     0.0 ! 2.7 kcal/mole CH3 rot in ethylbenzene, adm jr, 3/7/92
+HN7  CN7B CNA  CNA      0.10    6   180.0 ! 2.7 kcal/mole CH3 rot in ethylbenzene, adm jr, 3/7/92
+HN8  CN8  CN7B CNA      0.00    3     0.0 ! from HN8 CN8 CN7B NN2
+HN7  CN7B CNA  CNA2     0.10    6   180.0 ! dft, adm jr.
+HN9  CN9  CNA  CNA      0.10    6   180.0 ! 2.7 kcal/mole CH3 rot in ethylbenzene, adm jr, 3/7/92
+HN9  CN9  CNA  CNA2     0.10    6   180.0 ! dft, adm jr.
+CN7  CN7B CNA  CNA      0.23    2   180.0 ! ethylbenzene ethyl rotation, adm jr. 3/7/92
+CN8  CN7B CNA  CNA      0.23    2   180.0 ! ethylbenzene ethyl rotation, adm jr. 3/7/92
+CN8  CN7B CNA  CNA2     0.23    2   180.0 ! ethylbenzene ethyl rotation, adm jr. 3/7/92
+CN7B CNA  CNA2 CNA      3.10    2   180.0 ! JES 8/25/89 toluene and ethylbenzene
+CN7B CNA  CNA  CNA      3.10    2   180.0 ! JES 8/25/89 toluene and ethylbenzene
+CN9  CNA  CNA  CNA      3.10    2   180.0 ! JES 8/25/89 toluene and ethylbenzene
+CN9  CNA  CNA2 CNA      3.10    2   180.0 ! dft, adm jr.
+HN7  CN7  CN7B CNA      0.04    3     0.0 ! ethylbenzene ethyl rotation, adm jr. 3/7/92
+HNP  CNA  CNA  CNA      4.20    2   180.0 ! JES 8/25/89 benzene
+HNP  CNA  CNA2 CNA      4.20    2   180.0 ! dft, adm jr.
+HN3  CNA  CNA2 CNA      4.20    2   180.0 ! dft, adm jr.
+HNP  CNA  CNA  CNA2     4.20    2   180.0 ! dft, adm jr.
+HNP  CNA  CNA  CN9      4.20    2   180.0 ! JES 8/25/89 toluene and ethylbenzene
+HNP  CNA  CNA  CN7B     4.20    2   180.0 ! JES 8/25/89 toluene and ethylbenzene
+HNP  CNA  CNA  HNP      2.40    2   180.0 ! JES 8/25/89 benzene
+HNP  CNA  CNA2 FNA      2.40    2   180.0 ! dft, adm jr.
+HN3  CNA  CNA2 FNA      2.40    2   180.0 ! dft, adm jr.
+FNA  CNA2 CNA  CNA      4.50    2   180.0 ! dft, adm jr.
+FNA  CNA2 CNA  CNA2     4.50    2   180.0 ! dft, adm jr.
+FNA  CNA2 CNA  CN9      4.50    2   180.0 ! dft, adm jr.
+FNA  CNA2 CNA  CN7B     4.50    2   180.0 ! dft, adm jr.
+ON6  CN7B CNA  CNA      0.00    3     0.0 ! from ON6 CN7B NN2 CN3C
+ON6  CN7B CNA  CNA2     0.00    3     0.0 ! from ON6 CN7B NN2 CN3C
+CN7  ON6  CN7B CNA      0.0     3     0.0 ! from CN7 ON6  CN7B NN2
+CN7  CN8  CN7B CNA      0.0     3     0.0 ! from CN8 CN8 CN7B NR1
+! 5-ethylene-thymine terms
+ON1  CN1  CN3T  CNE1    6.0     2   180.0
+HN3  CN3  CN3T  CNE1    3.0     2   180.0
+CN1  CN3T CNE1  HNE1    1.0     2   180.0
+CN3  CN3T CNE1  HNE1    1.0     2   180.0
+CNE2 CNE1 CN3T  CN3     0.85    1     0.0 !to c5a
+CNE2 CNE1 CN3T  CN3     0.5     2   180.0 !to c5a
+CNE2 CNE1 CN3T  CN1     0.5     2   180.0 !to c5a
+CNE2 CNE1 CN3T  CN1     1.1     3   180.0 !to c5a
+HNE2 CNE2 CNE1  HNE1    5.2     2   180.0
+HNE2 CNE2 CNE1  CN3T    5.2     2   180.0
+!N3-protonated CYT(CYTH) and 5Me-CYT(CYTP), edarian 2009-03
+ON1C CN1  NN2G  HN2     2.5     2   180.0  
+NN2  CN1  NN2G  HN2     3.8     2   180.0  
+CN3  CN2  NN2G  HN2     4.8     2   180.0  
+CN3  CN3D CN2   NN2G    2.0     2   180.0  
+NN2G CN2  CN3D  CN9     1.8     2   180.0  
+!C5-Me CYT with N4-Ethyl-Methyl, edarian, N4EM, 2009-06
+HN1  NN1  CN8   HN8     0.02    2   180.0 
+HN1  NN1  CN8   CN9     0.05    1     0.0 
+CN2  NN1  CN8   HN8     0.09    3     0.0 
+CN2  NN1  CN8   CN9     0.53    1   180.0 
+CN2  NN1  CN8    CN9     0.80    2     0.0 
+CN2  NN1  CN8    CN9     0.09    3     0.0 
+NN3  CN2  NN1   CN8     1.45    2   180.0  !NN3  CN2  NN1  HN1
+CN3  CN2  NN1   CN8     2.25    2   180.0  !CN3  CN2  NN1  HN1
+CN3  CN2  NN1   CN8     1.30    3     0.0  !CN3  CN2  NN1  HN1
+CN3D CN2  NN1   CN8     2.25    2   180.0  !CN3  CN2  NN1  HN1
+CN3D CN2  NN1   CN8     1.30    3     0.0  !CN3  CN2  NN1  HN1
+NN1  CN8  CN9   HN9     1.00    1     0.0 
+!C8-Amino-Phenyl-Guanine, G8AP, edarian, 2009-11
+NN4  CN4  NN1   CN3     0.23    1     0.0 ! RETINOL PACP ! OG2D1  CG2O1  NG2S1  CG2R61
+NN4  CN4  NN1   CN3     0.70    2   180.0 ! RETINOL PACP ! OG2D1  CG2O1  NG2S1  CG2R61
+NN2B CN4  NN1   CN3     0.50    1     0.0                                           
+NN2B CN4  NN1   CN3     0.70    2   180.0 ! RETINOL PACP ! CG331  CG2O1  NG2S1  CG2R61
+NN2B CN4  NN1   CN3     0.45    3     0.0 ! RETINOL PACP ! CG331  CG2O1  NG2S1  CG2R61
+NN2B CN4  NN1   HN2     0.40    2   180.0                                           
+NN4  CN4  NN1   HN2     0.41    3     0.0                                           
+CN4  NN1  CN3   CN3     0.90    2   180.0 ! RETINOL PACP ! CG2R61 CG2R61 NG2S1  CG2O1
+CN4  NN1  CN3   CN3     0.75    3     0.0 ! RETINOL PACP ! CG2R61 CG2R61 NG2S1  CG2O1
+HN2  NN1  CN3   CN3     0.25    2   180.0 ! RETINOL PACP ! CG2R61 CG2R61 NG2S1  HGP1
+HN2  NN1  CN3   CN3     0.05    3     0.0 ! RETINOL PACP ! CG2R61 CG2R61 NG2S1  HGP1 
+!params for GUANIDINIUM tail patch at N4 of CYT, 4EG1, edarian, 2009-11
+HN1  NN1  CN8   CN8     0.05    1     0.0  !H    NH1  CT2  CT2      0.0000  1     0.00 ! ALLOW PEP
+CN2  NN1  CN8   CN8     0.53    1   180.0
+CN2  NN1  CN8   CN8     0.80    2     0.0
+CN2  NN1  CN8   CN8     0.07    3     0.0
+NN1  CN8  CN8   HN8     1.00    2   180.0
+! guanidinium tail parameters
+CN8  CN8  NNG   CNG     0.10    3     0.0  !CG321  CG321  NG2D1  CG2D1
+CN8  CN8  NNG   HN1     0.00    6   180.0  !X    CT2  NC2  X        0.0000  6   180.00 ! ALLOW   ALI POL
+HN8  CN8  NNG   CNG     0.00    6   180.0  !X    CT2  NC2  X        0.0000  6   180.00 ! ALLOW   ALI POL
+CN8  NNG  CNG   NNG     2.25    2   180.0  !NG2P1  CG2N1  NG2P1  CG334/CG324 MGUA
+HN8  CN8  NNG   HN1     0.19    3     0.0  !CN1  NN2  CN9  HN9 ??
+NNG  CNG  NNG   HN1     2.25    2   180.0  !NG2P1  CG2N1  NG2P1  HGP2    MGUA
+
+IMPROPER
+!
+!atom types           Kpsi                   psi0
+!
+!guanine tautomer terms
+CN1  NN3G CN5G ON5     55.0     0     0.0     !sasha, 2/98
+!cytosine tautomer terms
+CN2  NN2C CN3  NN1C    90.0     0     0.0     !sasha, 2/98
+!N3-protonated CYT(CYTH) and 5Me-CYT(CYTP), edarian 2009-03
+NN2G CN1  CN2  HN2      0.0     1   180.0
+!params for GUANIDINIUM tail patch at N4 of CYT, 4EG1, edarian, 2009-11
+NNG  X    X    CNG     40.0     0     0.0     ! NC2  X    X    C   ALLOW   PEP POL ARO
+
+end
+
+return
