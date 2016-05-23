@@ -3,7 +3,7 @@ import tempfile
 import numpy as np
 from pdb2pqr.main import runPDB2PQR
 from pdb2pqr.src.pdb import readPDB
-
+import propka.lib
 
 # If necessary: http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 from htmd.proteinpreparation.residuedata import ResidueData
@@ -48,6 +48,11 @@ def _fixupWaterNames(mol):
     hw_odd  = np.logical_and(hw, np.mod(n, 2) == 1)
     mol.set("name", "H1",sel=hw_even)
     mol.set("name", "H2",sel=hw_odd)
+
+def _warnIfContainsDUM(mol):
+    """Warn if any DUM atom is there"""
+    if any(mol.atomselect("resname DUM")):
+        logger.warning("OPM's DUM residues must be filtered out before preparation. Continuing, but crash likely.")
 
 
 
@@ -197,7 +202,6 @@ def prepareProtein(mol_in,
      - force residues
      - multiple chains
      - nucleic acids
-     - reporting in machine-readable form
      - coupled titrating residues
      - Disulfide bridge detection (implemented but unused)
 
@@ -207,6 +211,8 @@ def prepareProtein(mol_in,
     if verbose:
         logger.setLevel(logging.DEBUG)
     logger.debug("Starting.")
+
+    _warnIfContainsDUM(mol_in)
 
     # We could transform the molecule into an internal object, but for
     # now I prefer to rely on the strange internal parser to avoid
@@ -218,9 +224,6 @@ def prepareProtein(mol_in,
     pdblist, errlist = readPDB(tmpin)
     if len(pdblist) == 0 and len(errlist) == 0:
         raise Exception('Internal error in preparing input to pdb2pqr')
-
-    # We could set additional options here
-    import propka.lib
 
     # An ugly hack to silence non-prefixed logging messages
     for h in propka.lib.logger.handlers:
