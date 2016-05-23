@@ -2,7 +2,7 @@
 
 R=0
 
-for T in tests/*/run.sh; do
+for T in tests/tests/*/run.sh; do
 	S="$PWD"
 	DD=$(dirname $T)
 	cd $DD
@@ -12,6 +12,7 @@ for T in tests/*/run.sh; do
 	if [ $RET != "0" ]; then
 		R=1
 	fi	
+	cd "$S"
 done
 
 exit $R
