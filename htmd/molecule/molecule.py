@@ -720,7 +720,7 @@ class Molecule:
             # Try loading it from the pdb data directory
             localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower()+".pdb")
             if os.path.isfile(localpdb):
-                logger.info("Found local copy for {:s}: {:s}".format(filename, localpdb))
+                logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
                 mol = PDBParser(localpdb, mode)
             else:
                 # or the PDB website

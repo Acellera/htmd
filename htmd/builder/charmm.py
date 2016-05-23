@@ -25,6 +25,31 @@ from natsort import natsorted
 import logging
 logger = logging.getLogger(__name__)
 
+__test__= { 'build-opm-1u5u' : """
+>>> from htmd.proteinpreparation.proteinpreparation import prepareProtein
+>>> from htmd.util import diffMolecules
+
+>>> pdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_opm.pdb')
+>>> mol = Molecule(pdb)
+>>> mol.filter('protein')
+>>> mol.set('segid', 'P')
+
+>>> pmol = prepareProtein(mol)
+>>> bmol = build(pmol, outdir='/tmp/build/', ionize=False)
+
+>>> refpdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_built_protonated.pdb')
+>>> ref = Molecule(refpdb)
+
+>>> difflist = diffMolecules(bmol, ref, sel="name CA")
+>>> print(difflist)
+[]
+"""
+            }
+#for d in difflist:
+#    print("Difference found: " + d)
+#if len(difflist) > 0:
+#    assert False, "Unexpected difference"
+
 
 class MixedSegmentError(Exception):
     def __init__(self, value):
@@ -117,11 +142,17 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     Example
     -------
-    >>> charmm.listFiles()
+    >>> mol = Molecule("3PTB")
+    >>> charmm.listFiles()             # doctest: +ELLIPSIS
+    ---- Topologies files list...
+    top/top_all36_prot.rtf
+    top/top_water_ions.rtf
+    ...
     >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf']
     >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm']
-    >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)
+    >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)  # doctest: +SKIP
     """
+
     mol = mol.copy()
     _missingSegID(mol)
     if psfgen is None:
@@ -754,19 +785,12 @@ def _logParser(fname):
 
 
 if __name__ == '__main__':
+    from htmd import *
     from htmd.molecule.molecule import Molecule
-    from htmd.proteinpreparation.proteinpreparation import prepareProtein
     from htmd.home import home
     import numpy as np
     import os
 
-    mol = Molecule(os.path.join(home(), 'data', 'charmm-build-test', '1u5u.pdb'))
-    mol.filter('protein')
-    mol.set('segid', 'P')
-    pmol = prepareProtein(mol)
-    bmol = build(pmol, outdir='/tmp/build/', ionize=False)
+    import doctest
+    doctest.testmod()
 
-    ref = Molecule(os.path.join(home(), 'data', 'charmm-build-test', '1u5u_built_protonated.pdb'))
-
-    assert np.array_equal(bmol.name, ref.name)
-    assert np.array_equal(bmol.resname, ref.resname)

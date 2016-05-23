@@ -342,6 +342,7 @@ if __name__ == "__main__":
         # Reproducibility test
         # rm mol-test-*; for i in `seq 9`; do py ./proteinpreparation.py ./1r1j.pdb > mol-test-$i.log ; cp ./mol-test.pdb mol-test-$i.pdb; cp mol-test.csv mol-test-$i.csv ; done
         mol = Molecule(sys.argv[1])
+        mol.filter("protein")
         mol_op, prepData = prepareProtein(mol, returnDetails=True)
         mol_op.write("./mol-test.pdb")
         prepData.data.to_excel("./mol-test.xlsx")
