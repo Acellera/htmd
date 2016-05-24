@@ -224,6 +224,8 @@ class StringValidator(Validator):
     def validate(self, value_list, basedir=None):
         import re
         if type(value_list) is not list and type(value_list) is not tuple:
+            if value_list is None:
+                value_list = 'None'
             value_list = [value_list]
         for v in value_list:
             if self.valid_values and v not in self.valid_values:
