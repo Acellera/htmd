@@ -1,7 +1,7 @@
-branches:
- only:
-  - master
-  - toni-devel
+#branches:
+# only:
+#  - master
+#  - toni-devel 
  
 matrix:
   include:
@@ -18,14 +18,14 @@ matrix:
        - mingw-w64-dev
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran
+     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran STATIC="-static"
      addons:
       apt:
        packages:
        - gfortran
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran
+     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran STATIC="-static"
      addons:
       apt:
        packages:
@@ -107,6 +107,7 @@ script:
  - python -c "import htmd"
  - activate_license "$LICENSE_TOKEN"
  - python tests/run_inline_file_tests.py
+ - tests/run_other_tests.sh
 
 after_success:
  - if [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload_data.sh ; fi
