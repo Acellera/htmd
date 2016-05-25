@@ -9,6 +9,8 @@ from htmd.acemd.acemd import Acemd
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 import os
 import numpy as np
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Equilibration(ProtocolInterface):
@@ -69,9 +71,9 @@ class Equilibration(ProtocolInterface):
                                              , {'protein and noh and not name CA': 0.1, 'protein and name CA': 1})
 
         self.acemd = Acemd()
-        self.acemd.coordinates = 'structure.pdb'
-        self.acemd.structure = 'structure.psf'
-        self.acemd.parameters = 'parameters'
+        self.acemd.coordinates = None
+        self.acemd.structure = None
+        self.acemd.parameters = None
         self.acemd.temperature = '$temperature'
         self.acemd.restart = 'on'
         self.acemd.restartfreq = '5000'
@@ -94,7 +96,7 @@ class Equilibration(ProtocolInterface):
         self.acemd.fullelectfrequency = '2'
         self.acemd.energyfreq = '1000'
         self.acemd.constraints = 'on'
-        self.acemd.consref = 'structure.pdb'
+        self.acemd.consref = None
         self.acemd.constraintscaling = '1.0'
         self.acemd.berendsenpressure = 'on'
         self.acemd.berendsenpressuretarget = '1.01325'
@@ -154,6 +156,43 @@ proc calcforces {} {
 proc calcforces_endstep { } { }
 '''
 
+    def _findFiles(self, inputdir):
+        # Tries to find default files if the given don't exist
+        defaults = {'coordinates': ('structure.pdb', ),
+                    'structure': ('structure.psf', 'structure.prmtop'),
+                    'parameters': ('parameters', 'structure.prmtop')}
+
+        for field in defaults:
+            userval = self.acemd.__dict__[field]
+            if userval is not None and not os.path.exists(os.path.join(inputdir, userval)):
+                self.acemd.__dict__[field] = None
+
+            if self.acemd.__dict__[field] is None:
+                for val in defaults[field]:
+                    if os.path.exists(os.path.join(inputdir, val)):
+                        self.acemd.__dict__[field] = val
+                        break
+
+            if userval is not None and self.acemd.__dict__[field] is not None and self.acemd.__dict__[field] != userval:
+                logger.warning('Could not locate structure file {}. Using {} instead.'.format(
+                    os.path.join(inputdir, userval), os.path.join(inputdir, self.acemd.__dict__[field])
+                ))
+            elif self.acemd.__dict__[field] is None:
+                raise RuntimeError('Could not locate any {f:} file in {i:}. '
+                                   'Please set the Equilibration.acemd.{f:} property to '
+                                   'point to the {f:} file'.format(f=field, i=inputdir))
+
+        if self.acemd.consref is None:
+            self.acemd.consref = self.acemd.coordinates
+
+    def _amberFixes(self):
+        # AMBER specific fixes
+        if self.acemd.parameters.endswith('structure.prmtop'):
+            self.acemd.parmfile = self.acemd.parameters
+            self.acemd.parameters = None
+            self.acemd.scaling14 = '0.8333333'
+            self.acemd.amber = 'on'
+
     def write(self, inputdir, outputdir):
         """ Write the equilibration protocol
 
@@ -172,6 +211,9 @@ proc calcforces_endstep { } { }
         >>> md = Equilibration()
         >>> md.write('./build','./equil')
         """
+        self._findFiles(inputdir)
+        self._amberFixes()
+
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
         inmol = Molecule(pdbfile)
 
@@ -181,7 +223,7 @@ proc calcforces_endstep { } { }
         self.acemd.TCL = self.acemd.TCL.replace('REFINDEX', ' '.join(map(str, inmol.get('index', self.reference))))
         self.acemd.TCL = self.acemd.TCL.replace('SELINDEX', ' '.join(map(str, inmol.get('index', self.selection))))
         self.acemd.TCL = self.acemd.TCL.replace('BOX', ' '.join(map(str, self.box)))
-        if 'celldimension' not in self.acemd.__dict__ and 'extendedsystem' not in self.acemd.__dict__:
+        if self.acemd.celldimension is None and self.acemd.extendedsystem is None:
             coords = inmol.get('coords', sel='water')
             if coords.size == 0:  # It's a vacuum simulation
                 coords = inmol.get('coords', sel='all')

@@ -7,49 +7,90 @@ import os
 import htmd
 import shutil
 import numpy as np
-from htmd.userinterface import UserInterface
+from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 
 
-class Acemd(UserInterface):
-    _cmdfile = {'bincoordinates': 'input.coor', 'binvelocities': 'input.vel', 'binindex': 'index.idx',
-               'structure': 'structure.psf', 'parameters': 'parameters', 'extendedsystem': 'input.xsc',
-               'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb'}
-
-    _cmdopt =  {'temperature':None,'restart':'on','restartfreq':'5000','outputname':'output',
-               'xtcfile':'output.xtc','xtcfreq':'25000','timestep':'4','rigidbonds':'all',
-               'hydrogenscale':'4','switching':'on','switchdist':'7.5','cutoff':'9','exclude':'scaled1-4',
-               'scaling14':'1.0','langevin':'on','langevintemp':'300','langevindamping':'1','pme':'on',
-               'pmegridspacing':'1.0','fullelectfrequency':'2','energyfreq':'1000','constraints':'off',
-               'consref':None,'constraintscaling':'1.0','berendsenpressure':'off','berendsenpressuretarget':'1.01325',
-               'berendsenpressurerelaxationtime':'800','tclforces':'off','minimize':None,'run':None,'TCL':'',
-                'celldimension':None,'useconstantratio':None}
+class Acemd(ProtocolInterface):
+    _defaultfnames = {'bincoordinates': 'input.coor', 'binvelocities': 'input.vel', 'binindex': 'index.idx',
+               'structure': 'structure.*', 'parameters': 'parameters', 'extendedsystem': 'input.xsc',
+               'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb',
+               'parmfile': 'structure.prmtop'}
 
     def __init__(self):
-        self._commands = Acemd._cmdfile.copy()  # needs to act on dictionary to avoid going via__setattr__
-        self._commands.update(Acemd._cmdopt) # merging
+        super().__init__()
+
+        self._files = {}
+
+        # Options
+        self._cmdString('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None)
+        self._cmdString('restart', 'str', 'Restart simulation.', None)
+        self._cmdString('restartfreq', 'str', 'Restart file frequency.', None)
+        self._cmdString('outputname', 'str', 'Output file name.', None)
+        self._cmdString('xtcfile', 'str', 'Output XTC file name.', None)
+        self._cmdString('xtcfreq', 'str', 'XTC sampling frequency in steps.', None)
+        self._cmdString('timestep', 'str', 'Simulation timestep.', None)
+        self._cmdString('rigidbonds', 'str', '', None)
+        self._cmdString('hydrogenscale', 'str', '', None)
+        self._cmdString('switching', 'str', '', None)
+        self._cmdString('switchdist', 'str', '', None)
+        self._cmdString('cutoff', 'str', '', None)
+        self._cmdString('exclude', 'str', '', None)
+        self._cmdString('scaling14', 'str', '', None)
+        self._cmdString('langevin', 'str', '', None)
+        self._cmdString('langevintemp', 'str', '', None)
+        self._cmdString('langevindamping', 'str', '', None)
+        self._cmdString('pme', 'str', '', None)
+        self._cmdString('pmegridspacing', 'str', '', None)
+        self._cmdString('fullelectfrequency', 'str', '', None)
+        self._cmdString('energyfreq', 'str', '', None)
+        self._cmdString('constraints', 'str', '', None)
+        self._cmdString('consref', 'str', '', None)
+        self._cmdString('constraintscaling', 'str', '', None)
+        self._cmdString('berendsenpressure', 'str', '', None)
+        self._cmdString('berendsenpressuretarget', 'str', '', None)
+        self._cmdString('berendsenpressurerelaxationtime', 'str', '', None)
+        self._cmdString('tclforces', 'str', '', None)
+        self._cmdString('minimize', 'str', '', None)
+        self._cmdString('run', 'str', '', None)
+        self._cmdString('TCL', 'str', '', None)
+        self._cmdString('celldimension', 'str', '', None)
+        self._cmdString('useconstantratio', 'str', '', None)
+        self._cmdString('amber', 'str', '', None)
+
+        # Files
+        self._cmdString('bincoordinates', 'str', '', None)
+        self._cmdString('binvelocities', 'str', '', None)
+        self._cmdString('binindex', 'str', '', None)
+        self._cmdString('structure', 'str', '', None)
+        self._cmdString('parameters', 'str', '', None)
+        self._cmdString('extendedsystem', 'str', '', None)
+        self._cmdString('coordinates', 'str', '', None)
+        self._cmdString('velocities', 'str', '', None)
+        self._cmdString('consref', 'str', '', None)
+        self._cmdString('parmfile', 'str', '', None)
 
     def load(self, path='.'):
         """ Loads all files required to run a simulation and apply eventually configured protocols to it
-
-        Files content are stored in _FILE attributes. Filenames are not needed and set to default names,
-        e.g. FILE_bincoordinates will be present containing the input coordinate file, if bincoordinates was present.
-        bincoordinates is reset to the canonical value of 'input.coor'.
 
         Parameters
         ----------
         path : str
             Working directory relative to which the configuration file is read
         """
-        #load files and reset filenames
-        for cmd in self._cmdfile.keys():
-            if cmd in self.__dict__.keys():
-                if self.__dict__[cmd]:
-                    absfname = os.path.join(path, self.__dict__[cmd])
-                    fo = open(absfname, 'rb')  #read all as binary
-                    a = fo.read()
-                    fo.close()
-                    self.__dict__['_FILE' + cmd] = a
-                    self.__dict__[cmd] = self._cmdfile[cmd]  # use default file names
+        # load files and reset filenames
+        for cmd in self._defaultfnames.keys():
+            if cmd in self.__dict__ and self.__dict__[cmd] is not None:
+                fname = os.path.join(path, self.__dict__[cmd])
+                f = open(fname, 'rb')  #read all as binary
+                data = f.read()
+                f.close()
+                self._files[cmd] = data
+
+                defaultname = self._defaultfnames[cmd]
+                if defaultname.endswith('*'):
+                    defaultname = '{}.{}'.format(os.path.splitext(defaultname)[0], os.path.splitext(fname)[1][1:])
+
+                self.__dict__[cmd] = defaultname  # use default file names
 
     def save(self, path, overwrite=False):
         """ Create a directory with all necessary input to run acemd.
@@ -67,16 +108,14 @@ class Acemd(UserInterface):
             else:
                 raise NameError('Directory exists, use overwrite=True or remove directory')
         os.makedirs(path)
-    
-        commands = self.__dict__
-        for cmdorg in list(commands.keys()):  #make copy to delete while iterating for py3
-            if cmdorg.startswith('_FILE'):
-                cmd = cmdorg[5:]  # _FILE is long 5
-                fname = commands[cmd]
-                fo = open(os.path.join(path, fname), 'wb')   #write all as binary
-                fo.write(commands[cmdorg])
-                fo.close()
-                del(commands[cmdorg])
+
+        # Write all files using default filenames
+        for f in self._files:
+            fo = open(os.path.join(path, self.__dict__[f]), 'wb')  # write all as binary
+            fo.write(self._files[f])
+            fo.close()
+
+        self._files = {}  # empty file dictionary after writing
     
         self.writeConf(os.path.join(path, 'input'))
 
@@ -109,20 +148,21 @@ class Acemd(UserInterface):
             The string of the configuration file
         """
         text = ''
-        if 'TCL' in self.__dict__.keys():
+        if self.__dict__['TCL'] is not None:
             text = self.__dict__['TCL']
 
         text += '#\n'
 
-        keys = list(self._commands.keys())
+        maxwidth = np.max([len(k) for k in self.__dict__.keys()])
+
+        keys = sorted(list(self.__dict__.keys()))
         keys = keys + [keys.pop(keys.index('run'))]  # Move the run command to the end
         for cmd in keys:
-            if cmd in self.__dict__.keys():
-                if cmd[0] != '_':
-                    if cmd == 'scaling14':  # 1-4 is not accetable field
-                        text += '1-4scaling\t' + str(self.__dict__[cmd]) + '\n'
-                    elif cmd[0:5] != '_FILE' and cmd != 'TCL':
-                        text += cmd + '\t' + str(self.__dict__[cmd]) + '\n'
+            if not cmd.startswith('_') and self.__dict__[cmd] is not None and cmd != 'TCL':
+                name = cmd
+                if cmd == 'scaling14':  # variables cannot start with numbers. We need to rename it here for acemd
+                    name = '1-4scaling'
+                text += '{name: <{maxwidth}}\t{val:}\n'.format(name=name, val=str(self.__dict__[cmd]), maxwidth=maxwidth)
 
         if not quiet:
             print(text)
@@ -148,8 +188,6 @@ if __name__ == "__main__":
     #l=Acemd.protocols(quiet=True)
     acemd = Acemd()
     acemd.structure = '5dhfr_cube.psf'
-    acemd.consref = None
-    acemd.constraintscaling = None
     acemd.parameters = 'par_all22_prot.inp'
     homedir = htmd.home()
     acemd.coordinates = '5dhfr_cube.pdb'

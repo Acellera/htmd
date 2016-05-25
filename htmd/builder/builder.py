@@ -171,8 +171,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     mol = mol.copy()
 
     idx = mol.atomselect(sel, indexes=True)
-    rid = mol.get('resid', sel)  # TODO:maybe easier without sel, rid = mol.get('resid') and then no need of idx
-    idxdiff = np.diff(idx)
+    rid = mol.get('resid', sel)
     residiff = np.diff(rid)
     gappos = np.where((residiff != 1) & (residiff != 0))[0]  # Points to the index before the gap!
 
@@ -337,12 +336,12 @@ if __name__ == "__main__":
     a = embed(p, m)
     print(np.unique(m.get('segid')))
 
-    mol = Molecule('1ITG')
+    mol = Molecule(path.join(home(), 'data', 'building-protein-membrane', '1ITG_clean.pdb'))
     ref = Molecule(path.join(home(), 'data', 'building-protein-membrane', '1ITG.pdb'))
     mol = autoSegment(mol, sel='protein')
     assert np.all(mol.segid == ref.segid)
 
-    mol = Molecule('3PTB')
+    mol = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
     ref = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB.pdb'))
     mol = autoSegment(mol, sel='protein')
     assert np.all(mol.segid == ref.segid)

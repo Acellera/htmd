@@ -8,6 +8,7 @@ import numpy as np
 import random
 from htmd.projections.metric import Metric
 from htmd.progress.progress import ProgressBar
+from htmd.units import convert as unitconvert
 import logging
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,8 @@ class TICA(object):
         The object whose data we wish to project onto the top TICA dimensions
     lag : int
         The correlation lagtime to use for TICA
+    units : str
+        The units of lag. Can be 'frames' or any time unit given as a string.
 
     Example
     -------
@@ -38,12 +41,13 @@ class TICA(object):
     for Markov model construction. J. Chem. Phys., 139 . 015102.
     """
 
-    def __init__(self, data, lag):
+    def __init__(self, data, lag, units='frames'):
         from pyemma.coordinates import tica
         # data.dat.tolist() might be better?
         self.data = data
         if isinstance(data, Metric):
             from pyemma.coordinates.transform.tica import TICA
+            lag = unitconvert(units, 'frames', lag, data.fstep)
             self.tic = TICA(lag)
 
             p = ProgressBar(len(data.simulations))

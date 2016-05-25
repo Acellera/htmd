@@ -13,6 +13,7 @@ import inspect
 import htmd.parameterize
 import subprocess
 import sys
+import os
 from htmd.progress.progress import ProgressBar
 from htmd import Molecule
 
@@ -20,11 +21,15 @@ log = log.getLogger("parameterize")
 
 
 class Parameterisation:
-    def __init__(self, config=None, name=None, run=True ):
+    _prefix = None
+    def __init__(self, config=None, name=None, run=True ,prefix=None ):
         self.completed=False
         resuming = False
+      
+        if prefix is not None:
+           if not os.path.exists( prefix ):  os.mkdir(prefix)
 
-
+        Parameterisation._prefix = prefix;
 
         if config and config.JobName:
             name =os.path.basename( config.JobName ) #sanitise
@@ -158,9 +163,16 @@ class Parameterisation:
         shutil.copyfile( d, os.path.join( rootdir, "QM-para.txt"))
 
     @staticmethod
+    def set_prefix( prefix ):
+        if not os.path.exists(prefix):
+           os.mkdir(prefix)
+        Parameterisation._prefix = prefix
 
+    @staticmethod
     def prefix():
-        import os
+        if Parameterisation._prefix:
+            return Parameterisation._prefix
+		
         dir = os.path.join(os.path.expanduser("~"), ".htmd")
         try:
             os.mkdir(dir)

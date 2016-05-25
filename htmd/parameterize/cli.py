@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+# Suppress the unhelpful warning  that matplotlib emits
+import warnings
+warnings.filterwarnings("ignore")
+
 import matplotlib as mpl
 mpl.use('Agg')
 
@@ -30,6 +34,7 @@ def syntax():
     print("    --delete [job]           : Delete a named job")
     print("    --license                : Show the software license")
     print("    --verbose                : Verbose logging")
+    print("    --cache                  : Cache directory [~/.htmd/gaamp/]" )
     print("    --help")
     print("");
     print(" No re-distribution in whole or part")
@@ -49,6 +54,7 @@ def main_parameterize():
     rename_file = None
     job_to_delete = False
     resume = None
+    cache_prefix = None
     #	check_registration( product="parameterize" )
 
     a = 1
@@ -60,6 +66,14 @@ def main_parameterize():
                     a = a + 1
                 else:
                     raise NameError()
+            elif (sys.argv[a] == "--cache" ):
+                if a < len(sys.argv) - 1:
+                    cache_prefix= sys.argv[a+1]
+                    Parameterisation.set_prefix( cache_prefix )
+                    a = a + 1
+                else:
+                    raise NameError()
+
             elif (sys.argv[a] == "--torsions" ):
                 if a < len(sys.argv) - 1:
                     try:

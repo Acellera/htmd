@@ -123,7 +123,7 @@ class Molecule:
         'charge': numpy.float32
     }
 
-    def __init__(self, filename=None, name=None):
+    def __init__(self, filename=None, name=None, guessbonds=True, filebonds=True):
         self.bonds = []
         self.ssbonds = []
         self.box = None
@@ -152,8 +152,18 @@ class Molecule:
                     self.viewname = filename
                     if path.isfile(filename):
                         self.viewname = path.basename(filename)
-        #if( self.bonds is None ) or (not len(self.bonds)):
-        #    self.guessBonds()
+
+        # Deal with the bonds. 
+        if not filebonds:
+          # throw away any bond information obtained from the file
+          self.bonds = numpy.array([], dtype=numpy.uint32)
+        if guessbonds:
+          fb = numpy.array( self.bonds, dtype=numpy.uint32 )
+          self.guessBonds()
+          if filebonds:
+             # make the union of the filebonds and guessed bonds
+             # For now don't dedupe it. 
+             self.bonds = numpy.vstack( ( fb, self.bonds ) )
 
     def insert(self, mol, index):
         """Insert the contents of one molecule into another at a specific index.
@@ -226,13 +236,12 @@ class Molecule:
         >>> mol.remove('name CA')               # doctest: +ELLIPSIS
         array([   1,    9,   16,   20,   24,   36,   43,   49,   53,   58,...
         """
-        sel = np.where(self.atomselect(selection))[0]
+        sel = self.atomselect(selection, indexes=True)
         self._removeBonds(sel)
         for k in self._append_fields:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
         if _logger:
             logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
-        return sel
 
     def get(self, field, sel=None):
         """Retrieve a specific PDB field based on the selection
@@ -429,14 +438,14 @@ class Molecule:
             s = vmdselection(sel, selc, self.element, self.name, self.resname, self.resid,
                                chain=self.chain,
                                segname=self.segid, insert=self.insertion, altloc=self.altloc, beta=self.beta,
-                               occupancy=self.occupancy)
+                               occupancy=self.occupancy, bonds = self.bonds)
             if np.sum(s) == 0 and strict:
                 raise NameError('No atoms were selected with atom selection "{}".'.format(sel))
         else:
             s = sel
 
-        if indexes:
-            return np.where(s)[0]
+        if indexes and s.dtype == bool:
+            return np.array(np.where(s)[0], dtype=np.int32)
         else:
             return s
 
@@ -651,7 +660,7 @@ class Molecule:
 
     def _readXYZ(self, filename):
         f = open(filename, "r")
-        natoms = int(f.readline())
+        natoms = int(split(f.readline())[0])
         for k in self._pdb_fields:
             self.__dict__[k] = numpy.zeros(natoms, dtype=self._pdb_fields[k])
         self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
@@ -717,15 +726,22 @@ class Molecule:
         if os.path.isfile(filename):
             mol = PDBParser(filename, mode)
         elif len(filename) == 4:
-            # Try loading it from the PDB website
-            r = requests.get(
-                "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
-            if r.status_code == 200:
-                tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                mol = PDBParser(tempfile, mode)
-                os.unlink(tempfile)
+            # Try loading it from the pdb data directory
+            localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower()+".pdb")
+            if os.path.isfile(localpdb):
+                logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
+                mol = PDBParser(localpdb, mode)
             else:
-                raise NameError('Invalid PDB code')
+                # or the PDB website
+                logger.info("Attempting PDB query for {:s}".format(filename))
+                r = requests.get(
+                    "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
+                if r.status_code == 200:
+                    tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
+                    mol = PDBParser(tempfile, mode)
+                    os.unlink(tempfile)
+                else:
+                    raise NameError('Invalid PDB code')
         else:
             raise NameError('File {} not found'.format(filename))
 
@@ -738,8 +754,8 @@ class Molecule:
                     self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
 
         self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
-        self.bonds = np.array(mol.bonds)
-        self.ssbonds = np.array(mol.ssbonds)
+        self.bonds = np.array(mol.bonds, dtype=np.uint32)
+        self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
         self.box = np.array(mol.box)
 
         if self.masses is None or len(self.masses) == 0:
@@ -1030,8 +1046,9 @@ class Molecule:
         # Changed the selection from "and sidechain" to "not backbone" to remove atoms like phosphates which are bonded
         # but not part of the sidechain. Changed again the selection to "name C CA N O" because "backbone" works for
         # both protein and nucleic acid backbones and it confuses phosphates of modified residues for nucleic backbones.
-        removed = self.remove(sel + ' and not name C CA N O', _logger=False)
-        s = np.delete(s, removed)
+        remidx = self.atomselect(sel + ' and not name C CA N O', indexes=True)
+        self.remove(remidx, _logger=False)
+        s = np.delete(s, remidx)
         self.set('resname', newres, sel=s)
 
     def wrap(self, wrapsel=None ):
@@ -1064,9 +1081,9 @@ class Molecule:
                 if not np.any(np.all(bonds == [i, a], axis=1)):
                     bonds = np.append(bonds, [[i, a]], axis=0)'''
         if wrapsel:
-          centersel = self.atomselect( wrapsel, indexes=True )
+            centersel = self.atomselect( wrapsel, indexes=True )
         else:
-          centersel = None
+            centersel = None
         self.coords = wrap(self.coords, bonds, self.box, centersel=centersel)
 
     def write(self, filename, sel=None, type=None):
@@ -1637,7 +1654,8 @@ if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
-    m = Molecule('3PTB')
+    from htmd.home import home
+    m = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
     doctest.testmod(extraglobs={'tryp': m.copy() })
 
     # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May
