@@ -1,4 +1,4 @@
-ACEMD docs
+ACEMD molecular dynamics
 ==========
 
 .. toctree::
