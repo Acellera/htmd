@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+# Suppress the unhelpful warning  that matplotlib emits
+import warnings
+warnings.filterwarnings("ignore")
+
 import matplotlib as mpl
 mpl.use('Agg')
 
