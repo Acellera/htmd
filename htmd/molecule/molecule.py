@@ -650,7 +650,7 @@ class Molecule:
 
     def _readXYZ(self, filename):
         f = open(filename, "r")
-        natoms = int(f.readline())
+        natoms = int(split(f.readline())[0])
         for k in self._pdb_fields:
             self.__dict__[k] = numpy.zeros(natoms, dtype=self._pdb_fields[k])
         self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
