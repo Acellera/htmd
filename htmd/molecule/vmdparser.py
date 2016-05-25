@@ -188,11 +188,12 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
     c_coords = None
 
     c_nbonds = (c_int * 1)()
-    lenv = natoms * 8  # some dumb guess about the max # of bonds likely to be created -- natoms*4
+    lenv = natoms * 10  # some dumb guess about the max # of bonds likely to be created -- natoms*5
     c_bonds = (c_int * lenv)()
 
     z = 0
 
+    c_nbonds[0] = 0
     c_coords = coordinates.ctypes.data_as(POINTER(c_float))
 
     retval = fn = parser.guessbonds(
@@ -210,6 +211,10 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
         c_nbonds,
         c_bonds
     )
+
+    if(retval):
+       raise ValueError("Guessed bonding is bad")
+    print(retval)
     nbonds = c_nbonds[0]
     bonds = numpy.empty((nbonds, 2), dtype=numpy.uint32)
     for y in range(0, nbonds):
