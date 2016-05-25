@@ -226,13 +226,12 @@ class Molecule:
         >>> mol.remove('name CA')               # doctest: +ELLIPSIS
         array([   1,    9,   16,   20,   24,   36,   43,   49,   53,   58,...
         """
-        sel = np.where(self.atomselect(selection))[0]
+        sel = self.atomselect(selection, indexes=True)
         self._removeBonds(sel)
         for k in self._append_fields:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
         if _logger:
             logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
-        return sel
 
     def get(self, field, sel=None):
         """Retrieve a specific PDB field based on the selection
@@ -435,8 +434,8 @@ class Molecule:
         else:
             s = sel
 
-        if indexes:
-            return np.array( np.where(s)[0], dtype=np.int32 )
+        if indexes and s.dtype == bool:
+            return np.array(np.where(s)[0], dtype=np.int32)
         else:
             return s
 
@@ -1037,8 +1036,9 @@ class Molecule:
         # Changed the selection from "and sidechain" to "not backbone" to remove atoms like phosphates which are bonded
         # but not part of the sidechain. Changed again the selection to "name C CA N O" because "backbone" works for
         # both protein and nucleic acid backbones and it confuses phosphates of modified residues for nucleic backbones.
-        removed = self.remove(sel + ' and not name C CA N O', _logger=False)
-        s = np.delete(s, removed)
+        remidx = self.atomselect(sel + ' and not name C CA N O', indexes=True)
+        self.remove(remidx, _logger=False)
+        s = np.delete(s, remidx)
         self.set('resname', newres, sel=s)
 
     def wrap(self, wrapsel=None ):

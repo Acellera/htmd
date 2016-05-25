@@ -9,6 +9,8 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 from htmd.acemd.acemd import Acemd
 import os
 import htmd
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Production(ProtocolInterface):
@@ -40,30 +42,30 @@ class Production(ProtocolInterface):
         self.acemd = Acemd()
         #self.acemd.binindex='input.idx'
         self.acemd.extendedsystem='input.xsc'
-        self.acemd.coordinates = 'structure.pdb'
-        self.acemd.structure = 'structure.psf'
-        self.acemd.parameters = 'parameters'
-        self.acemd.temperature = 300
+        self.acemd.coordinates = None
+        self.acemd.structure = None
+        self.acemd.parameters = None
+        self.acemd.temperature = '300'
         self.acemd.restart = 'on'
-        self.acemd.restartfreq = 5000
+        self.acemd.restartfreq = '5000'
         self.acemd.outputname = 'output'
         self.acemd.xtcfile = 'output.xtc'
-        self.acemd.xtcfreq = 25000
-        self.acemd.timestep = 4
+        self.acemd.xtcfreq = '25000'
+        self.acemd.timestep = '4'
         self.acemd.rigidbonds = 'all'
-        self.acemd.hydrogenscale = 4
+        self.acemd.hydrogenscale = '4'
         self.acemd.switching = 'on'
-        self.acemd.switchdist = 7.5
-        self.acemd.cutoff = 9
+        self.acemd.switchdist = '7.5'
+        self.acemd.cutoff = '9'
         self.acemd.exclude = 'scaled1-4'
-        self.acemd.scaling14 = 1.0
+        self.acemd.scaling14 = '1.0'
         self.acemd.langevin = 'on'
-        self.acemd.langevintemp = 300
-        self.acemd.langevindamping = 0.1
+        self.acemd.langevintemp = '300'
+        self.acemd.langevindamping = '0.1'
         self.acemd.pme = 'on'
-        self.acemd.pmegridspacing = 1.0
-        self.acemd.fullelectfrequency = 2
-        self.acemd.energyfreq = 5000
+        self.acemd.pmegridspacing = '1.0'
+        self.acemd.fullelectfrequency = '2'
+        self.acemd.energyfreq = '5000'
         self.acemd.run = '10ns'
         self._TCL='''
 set refindex { REFINDEX }
@@ -105,6 +107,40 @@ proc calcforces {} {
 proc calcforces_endstep { } { }
 '''
 
+    def _findFiles(self, inputdir):
+        # Tries to find default files if the given don't exist
+        defaults = {'coordinates': ('structure.pdb',),
+                    'structure': ('structure.psf', 'structure.prmtop'),
+                    'parameters': ('parameters', 'structure.prmtop')}
+
+        for field in defaults:
+            userval = self.acemd.__dict__[field]
+            if userval is not None and not os.path.exists(os.path.join(inputdir, userval)):
+                self.acemd.__dict__[field] = None
+
+            if self.acemd.__dict__[field] is None:
+                for val in defaults[field]:
+                    if os.path.exists(os.path.join(inputdir, val)):
+                        self.acemd.__dict__[field] = val
+                        break
+
+            if userval is not None and self.acemd.__dict__[field] is not None and self.acemd.__dict__[field] != userval:
+                logger.warning('Could not locate structure file {}. Using {} instead.'.format(
+                    os.path.join(inputdir, userval), os.path.join(inputdir, self.acemd.__dict__[field])
+                ))
+            elif self.acemd.__dict__[field] is None:
+                raise RuntimeError('Could not locate any {f:} file in {i:}. '
+                                   'Please set the Equilibration.acemd.{f:} property to '
+                                   'point to the {f:} file'.format(f=field, i=inputdir))
+
+    def _amberFixes(self):
+        # AMBER specific fixes
+        if self.acemd.parameters.endswith('structure.prmtop'):
+            self.acemd.parmfile = self.acemd.parameters
+            self.acemd.parameters = None
+            self.acemd.scaling14 = '0.8333333'
+            self.acemd.amber = 'on'
+
     def write(self, inputdir, outputdir):
         """ Writes the production protocol and files into a folder.
 
@@ -115,8 +151,11 @@ proc calcforces_endstep { } { }
         outputdir : str
             Directory where to write the production setup files.
         """
-        self.acemd.temperature = self.temperature
-        self.acemd.langevintemp = self.temperature
+        self._findFiles(inputdir)
+        self._amberFixes()
+
+        self.acemd.temperature = str(self.temperature)
+        self.acemd.langevintemp = str(self.temperature)
         if self.k > 0: #use TCL only for flatbottom
             mol = Molecule(os.path.join(inputdir, self.acemd.coordinates))
             self.acemd.tclforces = 'on'
@@ -126,6 +165,8 @@ proc calcforces_endstep { } { }
             TCL = TCL.replace('SELINDEX', ' '.join(map(str, mol.get('index', self.selection))))
             TCL = TCL.replace('BOX', ' '.join(map(str, self.box)))
             self.acemd.TCL = TCL
+        else:
+            self.acemd.TCL = ''
         self.acemd.setup(inputdir, outputdir, overwrite=True)
 
 if __name__ == "__main__":

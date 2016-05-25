@@ -61,28 +61,86 @@
 		
 		<a href='/docs/index.html' class='get_started'>Get started here</a>
 		
-		<h2 class='intro_check_out'>Build</h2>
+		<h2 class='intro_check_out'>Examples</h2>
 		<div id='features_wrapper'>
 		
 		<ul>
 		
 		<li><span>1</span><strong>Molecule manipulation</strong> via powerful atom selection language and integrated visualization with WebGL and VMD
 		<br>
-		<div class='code-chunk' style="background: #272822; overflow:auto;width:auto;padding:.8em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #f8f8f2">rotateBy(ligand,</span> <span style="color: #f8f8f2">uniformRandomRotation(),</span> <span style="color: #f8f8f2">ligcenter);</span>
-<span style="color: #f8f8f2">moveBy(ligand,[D</span> <span style="color: #ae81ff">0</span> <span style="color: #ae81ff">0</span><span style="color: #f8f8f2">]</span><span style="color: #f92672">-</span><span style="color: #f8f8f2">ligcenter);</span>
-<span style="color: #f8f8f2">ligand.set(</span><span style="color: #e6db74">&#39;all&#39;</span><span style="color: #f8f8f2">,</span><span style="color: #e6db74">&#39;resname&#39;</span><span style="color: #f8f8f2">,</span><span style="color: #e6db74">&#39;MOL&#39;</span><span style="color: #f8f8f2">);</span>
+
+		<div class='code-chunk' style="background: #272822; overflow:auto;width:auto;padding:.8em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #f8f8f2">m</span> <span style="color: #f92672">=</span> <span style="color: #f8f8f2">Molecule(</span><span style="color: #e6db74">&#39;2HBA&#39;</span><span style="color: #f8f8f2">)</span>
+<span style="color: #f8f8f2">m</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">filter(</span><span style="color: #e6db74">&#39;(protein and chain A) or waters within 5 of (protein and chain A)&#39;</span><span style="color: #f8f8f2">)</span>
+<span style="color: #f8f8f2">m</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">view(viewer</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;ngl&#39;</span><span style="color: #f8f8f2">)</span>
 </pre></div>
+
+                <br>
+
+		<script src="ngl.embedded.min.js"></script>
+
+		<script>
+
+		  NGL.mainScriptFilePath = "./ngl.embedded.min.js";
+		  
+		  document.addEventListener( "DOMContentLoaded", function() {
+		  var stage = new NGL.Stage( "viewport" );
+                  stage.setTheme( "dark" );
+		  stage.viewer.setBackground( 0x272822 );
+		  stage.loadFile( "./pdb/2HBA_filtered_sstruc.pdb" ).then(function (o){o.addRepresentation( "cartoon", { sele: "polymer", color: "sstruc"} ); o.addRepresentation( "ball+stick", { sele: "hetero OR mol"} ); o.centerView()});
+		  } );
+		  
+		</script>
+		<div style="margin-left:30px">
+		<div id="viewport" style="overflow:auto; width:auto; height:350px;"></div>
+		</div>
+
+		<br>
+
+		Use your mouse to interact with the molecule!
 		</li>
 		
-		<li><span>2</span><strong>Automated system building</strong> from PDB to solvated ionized system in both Charmm and Amber forcefields. Automatic <strong>ligand parametrization from QM</strong>, disulfide, protonation, hydrogen optimization, membrane embeding, solvation, ionization, 
+		<li><span>2</span><strong>Automated system building</strong> from PDB to solvated ionized system in both Charmm and Amber forcefields. Advanced features include <strong>automatic ligand parametrization from QM</strong>, protonation and side-chain optimization, and membrane embeding
 		<br>
-		<div class='code-chunk' style="background: #272822; overflow:auto;width:auto;padding:.8em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #f8f8f2">solvate(all,</span><span style="color: #e6db74">&#39;minmax&#39;</span><span style="color: #f8f8f2">,</span> <span style="color: #f8f8f2">[</span><span style="color: #f92672">-</span><span style="color: #ae81ff">30</span> <span style="color: #f92672">-</span><span style="color: #ae81ff">30</span> <span style="color: #f92672">-</span><span style="color: #ae81ff">30</span><span style="color: #f8f8f2">;</span> <span style="color: #ae81ff">30</span> <span style="color: #ae81ff">30</span> <span style="color: #ae81ff">30</span><span style="color: #f8f8f2">]);</span>
+
+		<div class='code-chunk' style="background: #272822; overflow:auto;width:auto;padding:.8em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #f8f8f2">pm</span> <span style="color: #f92672">=</span> <span style="color: #f8f8f2">prepareProtein(m)</span>      <span style="color: #75715e"># protonation, side chain optimization</span>
+<span style="color: #f8f8f2">pm</span> <span style="color: #f92672">=</span> <span style="color: #f8f8f2">autoSegment(pm)</span>        <span style="color: #75715e"># set protein segments</span>
+<span style="color: #f8f8f2">pmsol</span> <span style="color: #f92672">=</span> <span style="color: #f8f8f2">solvate(pm,</span> <span style="color: #f8f8f2">pad</span><span style="color: #f92672">=</span><span style="color: #ae81ff">12</span><span style="color: #f8f8f2">)</span> <span style="color: #75715e"># solvate</span>
+<span style="color: #f8f8f2">bm</span> <span style="color: #f92672">=</span> <span style="color: #f8f8f2">charmm</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">build(pmsol,</span> <span style="color: #f8f8f2">outdir</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;./build&#39;</span><span style="color: #f8f8f2">,</span> <span style="color: #f8f8f2">saltconc</span><span style="color: #f92672">=</span><span style="color: #ae81ff">0.15</span><span style="color: #f8f8f2">)</span> <span style="color: #75715e"># build topology</span>
 </pre></div>
+
+		<br>
+		With only 4 lines of code, the system is built! Visualize all its components:
+		<br>
+
+		<div class='code-chunk' style="background: #272822; overflow:auto;width:auto;padding:.8em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #f8f8f2">bm</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">reps</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">add(sel</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;protein&#39;</span><span style="color: #f8f8f2">,style</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;NewCartoon&#39;</span><span style="color: #f8f8f2">,color</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;sstruc&#39;</span><span style="color: #f8f8f2">)</span>
+<span style="color: #f8f8f2">bm</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">reps</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">add(sel</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;waters&#39;</span><span style="color: #f8f8f2">,style</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;lines&#39;</span><span style="color: #f8f8f2">)</span>
+<span style="color: #f8f8f2">bm</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">reps</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">add(sel</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;ions&#39;</span><span style="color: #f8f8f2">,style</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;VDW&#39;</span><span style="color: #f8f8f2">)</span>
+<span style="color: #f8f8f2">bm</span><span style="color: #f92672">.</span><span style="color: #f8f8f2">view(viewer</span><span style="color: #f92672">=</span><span style="color: #e6db74">&#39;ngl&#39;</span><span style="color: #f8f8f2">)</span>
+</pre></div>
+
+		<br>
+
+		<script>
+
+		  NGL.mainScriptFilePath = "./ngl.embedded.min.js";
+		  
+		  document.addEventListener( "DOMContentLoaded", function() {
+		  var stage = new NGL.Stage( "viewport2" );
+		  stage.viewer.setBackground( 0x272822 );
+		  stage.loadFile( "./pdb/2HBA_built_sstruc_noconect.pdb.gz" ).then(function (o){o.addRepresentation( "cartoon", { sele: "polymer", color: "sstruc"} ); o.addRepresentation( "line", { sele: "TIP3"} ); o.addRepresentation( "spacefill", { sele: "SOD OR CLA"} ); o.centerView()});
+		  } );
+		  
+		</script>
+		<div style="margin-left:30px">
+		<div id="viewport2" style="overflow:auto; width:auto; height:350px;"></div>
+		</div>
+
 		</li>
 		
 		</ul>
 </div>
 		
+<!--
 		<div style='box-shadow: 0 0 10px 4px rgba(0, 0, 0, 0.1);background-color:rgba(255,255,255,0.1);padding-top:40px; padding-bottom:20px;'>
 		<div id='features_wrapper'>
 		<h2 class='intro_check_out'>Run</h2>
@@ -90,7 +148,8 @@
 		<ul>
 		
 		
-		<li><span>3</span>Integrated molecular dynamics with equilibration and production generation, Amazon cloud, queuing systems<br>
+		<li><span>3</span><strong>Integrated molecular dynamics</strong> with equilibration and production protocols. Amazon cloud, queuing systems<br>
+
 		<div class='code-chunk' style="background: #272822; overflow:auto;width:auto;padding:.8em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #f8f8f2">sim=AcemdLocal()</span>
 <span style="color: #f8f8f2">sim.submit(</span><span style="color: #e6db74">&#39;/wrkdir/e1/&#39;</span><span style="color: #f8f8f2">)</span>
 </pre></div>
@@ -106,9 +165,28 @@
 		</div>
 		</div>
 
+		<div style='box-shadow: 0 0 10px 4px rgba(0, 0, 0, 0.1);padding-top:40px; padding-bottom:20px;'>
+		<div id='features_wrapper'>
+		<h2 class='intro_check_out'>Analyze</h2>
+		
+		<ul>
+		
+		
+		<li><span>5</span>Text<br>
+		<div class='code-chunk' style="background: #272822; overflow:auto;width:auto;padding:.8em .6em;"><pre style="margin: 0; line-height: 125%"><span style="color: #f8f8f2">sim=AcemdLocal()</span>
+<span style="color: #f8f8f2">sim.submit(</span><span style="color: #e6db74">&#39;/wrkdir/e1/&#39;</span><span style="color: #f8f8f2">)</span>
+</pre></div>
+
+
+		</li>
+			
+		</ul>
+		</div>
+		</div> -->
+
 	
 			
-    		<footer>
+    		<footer style='box-sizing: border-box; background-color:rgba(255,255,255,0.1); padding-left: 17.5%; padding-right: 17.5%; width: 100%;'>
 		All rights reserved 2016 &#169;
 
 		<div class='acellera-logo'>Supported by <img src='/img/acellera-logo.png'></div>
