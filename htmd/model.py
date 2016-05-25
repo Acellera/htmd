@@ -427,7 +427,6 @@ class Model(object):
                 mol.reps.add(sel='segid ST{}'.format(s), style='Licorice', color=colors[np.mod(i, len(colors))])
                 mols[i].filter(ligand, _logger=False)
 
-            mols[i].guessBonds()
             mols[i].set('segid', 'ST{}'.format(s))
             tmpcoo = mols[i].coords
             for j in range(mols[i].numFrames):
