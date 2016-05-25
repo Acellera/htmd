@@ -8,7 +8,7 @@ SPHINXAPIDOC  = sphinx-apidoc
 IPYTHON       = jupyter
 PAPER         =
 BUILDDIR      = build
-#BUILDDIR      = /shared/sdoerr/Work/docs.htmd.org/
+TUTORIALSDIR  = source/tutorials
 IPYNB_FILES   = $(shell ls ../tutorials/*.ipynb)
 
 # User-friendly check for sphinx-build
@@ -23,7 +23,7 @@ ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) sou
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 
-RST_FILES := $(addprefix source/tutorials/,$(notdir $(IPYNB_FILES:.ipynb=.rst)))
+RST_FILES := $(addprefix $(TUTORIALSDIR)/,$(notdir $(IPYNB_FILES:.ipynb=.rst)))
 
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
 
@@ -55,6 +55,7 @@ help:
 	@echo "  coverage   to run coverage check of the documentation (if enabled)"
 
 clean:
+	rm -rf $(TUTORIALSDIR)
 	rm -rf $(BUILDDIR)/
 
 publish:
@@ -63,9 +64,9 @@ publish:
 	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
 
 # Rule for building .rst from .ipynb
-source/tutorials/%.rst: ../tutorials/%.ipynb
+$(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
 	# Since ipython does not to accept a --outdir, cd explicitly
-	mkdir -p source/tutorials
+	mkdir -p $(TUTORIALSDIR)
 	cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to rst 
 	#cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to python
 
