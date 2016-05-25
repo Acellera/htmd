@@ -415,6 +415,8 @@ class Molecule:
         """
         bonds = np.empty((0, 2), dtype=numpy.uint32)
         if fileBonds:
+            if len(self.bonds) == 0:  # This is a patch for the other readers not returning correct empty dimensions
+                self.bonds = np.empty((0, 2), dtype=numpy.uint32)
             bonds = numpy.vstack((bonds, self.bonds))
         if guessBonds:
             bonds = numpy.vstack((bonds, self._guessBonds()))
