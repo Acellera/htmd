@@ -28,7 +28,7 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     #	print(natoms)
     #	print (len(atomname))
 
-    if bonds and bonds.shape[1] != 2:
+    if bonds is not None and bonds.shape[1] != 2:
         raise NameError("'bonds' not nbonds x 2 in length")
     if len(atomname) != natoms:
         #        print(natoms)
@@ -95,7 +95,7 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     c_bonds = None
     nbonds = 0
 
-    if bonds:  # TODO: Replace the loops for bonds with ravel
+    if bonds is not None:  # TODO: Replace the loops for bonds with ravel
         nbonds = bonds.shape[0]
         if nbonds > 0:
             ll = nbonds * 2

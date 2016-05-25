@@ -123,7 +123,7 @@ class Molecule:
         'charge': numpy.float32
     }
 
-    def __init__(self, filename=None, name=None):
+    def __init__(self, filename=None, name=None, guessbonds=True, filebonds=True):
         self.bonds = []
         self.ssbonds = []
         self.box = None
@@ -152,8 +152,18 @@ class Molecule:
                     self.viewname = filename
                     if path.isfile(filename):
                         self.viewname = path.basename(filename)
-        #if( self.bonds is None ) or (not len(self.bonds)):
-        #    self.guessBonds()
+
+        # Deal with the bonds. 
+        if not filebonds:
+          # throw away any bond information obtained from the file
+          self.bonds = numpy.array([], dtype=numpy.uint32)
+        if guessbonds:
+          fb = numpy.array( self.bonds, dtype=numpy.uint32 )
+          self.guessBonds()
+          if filebonds:
+             # make the union of the filebonds and guessed bonds
+             # For now don't dedupe it. 
+             self.bonds = numpy.vstack( ( fb, self.bonds ) )
 
     def insert(self, mol, index):
         """Insert the contents of one molecule into another at a specific index.
@@ -428,7 +438,7 @@ class Molecule:
             s = vmdselection(sel, selc, self.element, self.name, self.resname, self.resid,
                                chain=self.chain,
                                segname=self.segid, insert=self.insertion, altloc=self.altloc, beta=self.beta,
-                               occupancy=self.occupancy)
+                               occupancy=self.occupancy, bonds = self.bonds)
             if np.sum(s) == 0 and strict:
                 raise NameError('No atoms were selected with atom selection "{}".'.format(sel))
         else:
