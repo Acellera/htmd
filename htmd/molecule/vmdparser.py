@@ -214,7 +214,7 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
 
     if(retval):
        raise ValueError("Guessed bonding is bad")
-    print(retval)
+    #print(retval)
     nbonds = c_nbonds[0]
     bonds = numpy.empty((nbonds, 2), dtype=numpy.uint32)
     for y in range(0, nbonds):
