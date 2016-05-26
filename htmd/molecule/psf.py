@@ -15,8 +15,13 @@ class PSF:
     charges = None
     bonds = None
     masses = None
-
-
+    resid   = None
+    resname = None   
+    atomname = None
+    atomtype = None
+    serial = None
+    segid = None
+ 
 def PSFread(filename):
     psf = PSF
     f = open(filename, 'r')
@@ -29,6 +34,12 @@ def PSFread(filename):
 
         if mode == 'atom':
             l = line.split()
+            psf.serial[c]   = l[0]
+            psf.segid[c]    = l[1]
+            psf.resid[c]    = int(l[2])
+            psf.resname[c]  = l[3]
+            psf.atomname[c] = l[4]
+            psf.atomtype[c] = l[5]
             psf.charges[c] = float(l[6])
             psf.masses[c] = float(l[7])
             c += 1
@@ -44,8 +55,15 @@ def PSFread(filename):
         if '!NATOM' in line:
             mode = 'atom'
             l = line.split()
-            psf.charges = numpy.zeros([int(l[0])])
-            psf.masses = numpy.zeros([int(l[0])])
+            psf.segid    = numpy.empty([(int(l[0]))], dtype=object )
+            psf.serial   = numpy.zeros([int(l[0])], dtype=numpy.uint32)
+            psf.resid    = numpy.zeros([int(l[0])], dtype=numpy.uint32)
+            psf.resname  = numpy.empty([(int(l[0]))], dtype=object )
+            psf.atomname = numpy.empty([(int(l[0]))], dtype=object )
+            psf.atomtype = numpy.empty([(int(l[0]))], dtype=object )
+            psf.charges = numpy.zeros([int(l[0])], dtype=numpy.float32)
+            psf.masses = numpy.zeros([int(l[0])], dtype=numpy.float32)
+            
             c = 0
         elif '!NBOND' in line:
             mode = 'bond'

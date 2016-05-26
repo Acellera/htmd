@@ -643,6 +643,11 @@ class Molecule:
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
             con = PSFread(filename)
+            self.serial = con.serial
+            self.name   = con.atomname
+            self.resname= con.resname
+            self.resid  = con.resid
+            self.segid  = con.segid
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             self.masses = numpy.asarray(con.masses, dtype=np.float32)
             self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
