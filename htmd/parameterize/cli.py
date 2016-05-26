@@ -184,6 +184,8 @@ def main_parameterize():
 
     if verbose:
         logging.basicConfig( level=logging.INFO )
+    else:
+        logging.basicConfig( level=logging.WARNING )
 
     if debug:
         logging.basicConfig( level=logging.DEBUG )
