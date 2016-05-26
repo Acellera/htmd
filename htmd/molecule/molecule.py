@@ -1186,7 +1186,8 @@ class Molecule:
 
         pdb.bonds = src.bonds
         pdb.ssbonds = src.ssbonds  # TODO: Is there such a thing in pdb format?
-        pdb.box = self.box
+        pdb.box = np.atleast_2d( np.atleast_2d(self.box)[:,self.frame] )
+        print( pdb.box.shape)
 
         pdb.serial = np.arange(1, np.size(pdb.coords, 0) + 1)
         pdb.writePDB(filename)
