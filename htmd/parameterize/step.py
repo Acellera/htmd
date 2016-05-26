@@ -5,7 +5,7 @@ import shutil
 import sys
 import subprocess
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("htmd.parameterize")
 
 
 
