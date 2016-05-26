@@ -42,10 +42,11 @@ def wrap( coordinates, bonds, box, centersel=None ):
     #    print(coordinates.shape)
         raise NameError("Coordinates needs to be natoms x 3 x nframes")
 
-    if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
+    z = coordinates.shape[2]
+    if(coordinates.strides[0] != 12*z  or coordinates.strides[1] != 4*z ):
         # It's a view -- need to make a copy to ensure contiguity of memory
        coordinates = numpy.array( coordinates, dtype=numpy.float32 )
-    if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
+    if(coordinates.strides[0] != 12*z  or coordinates.strides[1] != 4*z ):
        raise ValueError("Coordinates is a view with unsupported strides" )
 
     natoms = coordinates.shape[0]
