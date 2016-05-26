@@ -235,7 +235,7 @@ def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
     numlipsrem = 0
     for res in uqres:  # For each lipid check if it's atoms lie within the convex hull
         atoms = np.where(sequence == res)[0]
-        newhull = ConvexHull(np.append(cacoords, np.squeeze(memb.coords[atoms, :, :]), axis=0))
+        newhull = ConvexHull(np.vstack((cacoords, memb.get('coords', sel=atoms))))
 
         # If the hull didn't change by adding the lipid, it lies within convex hull. Remove it.
         if list(hull.vertices) == list(newhull.vertices):
