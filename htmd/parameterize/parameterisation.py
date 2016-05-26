@@ -17,7 +17,7 @@ import os
 from htmd.progress.progress import ProgressBar
 from htmd import Molecule
 
-log = log.getLogger("parameterize")
+log = log.getLogger("htmd.parameterize")
 
 
 class Parameterisation:
