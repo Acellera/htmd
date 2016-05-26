@@ -629,11 +629,11 @@ class Molecule:
         """
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
-                if not os.path.exists(f):
+                if len(f) != 4 and not os.path.exists(f):
                     raise FileNotFoundError('File {} was not found.'.format(f))
             firstfile = filename[0]
         else:
-            if not os.path.exists(filename):
+            if len(filename) != 4 and not os.path.exists(filename):
                 raise FileNotFoundError('File {} was not found.'.format(filename))
             firstfile = filename
 
@@ -1196,8 +1196,8 @@ class Molecule:
 
         pdb.bonds = src.bonds
         pdb.ssbonds = src.ssbonds  # TODO: Is there such a thing in pdb format?
-        pdb.box = np.atleast_2d( np.atleast_2d(self.box)[:,self.frame] )
-        print( pdb.box.shape)
+        if pdb.box is not None:
+            pdb.box = np.atleast_2d(np.atleast_2d(self.box)[:, self.frame])
 
         pdb.serial = np.arange(1, np.size(pdb.coords, 0) + 1)
         pdb.writePDB(filename)
@@ -1237,7 +1237,12 @@ class Molecule:
         self.resname = np.array(['UNK'] * numAtoms, dtype=self._pdb_fields['resname'])
         self.resid = np.array([999] * numAtoms, dtype=self._pdb_fields['resid'])
         self.coords = np.zeros((numAtoms, 3, 1), dtype=self._pdb_fields['coords'])
+        self.charge = np.array([0] * numAtoms, dtype=self._pdb_fields['charge'])
         self.serial = np.arange(1, numAtoms + 1)
+
+        self.masses = np.array([0] * numAtoms, dtype=self._append_fields['masses'])
+        self.box = None
+
 
     def sequence(self, oneletter=True):
         """ Return the AA sequence of the Molecule.
