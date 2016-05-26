@@ -523,7 +523,8 @@ class Molecule:
 
         Can fail badly when non-bonded atoms are very close together. Use with extreme caution.
         """
-        return guessbonds(self.coords, self.element, self.name, self.resname, self.resid, self.chain, self.segid,
+        framecoords = self.coords[:, :, self.frame].copy()
+        return guessbonds(framecoords, self.element, self.name, self.resname, self.resid, self.chain, self.segid,
                                 self.insertion, self.altloc)
 
     def moveBy(self, vector, sel=None):
