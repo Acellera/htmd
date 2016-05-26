@@ -7,6 +7,7 @@ import os
 from ctypes import *
 
 import numpy
+import numpy as np
 
 import htmd.home
 
@@ -30,6 +31,9 @@ def wrap( coordinates, bonds, box, centersel=None ):
     import platform
     libdir = htmd.home(libDir=True)
 
+    if coordinates.dtype != np.float32:
+        raise ValueError("Coordinates is not float32")
+
     if coordinates.ndim == 2:
         c = coordinates.shape
         coordinates = coordinates.reshape((c[0], c[1], 1))
@@ -37,6 +41,12 @@ def wrap( coordinates, bonds, box, centersel=None ):
     if coordinates.shape[1] != 3:
     #    print(coordinates.shape)
         raise NameError("Coordinates needs to be natoms x 3 x nframes")
+
+    if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
+        # It's a view -- need to make a copy to ensure contiguity of memory
+       coordinates = numpy.array( coordinates, dtype=numpy.float32 )
+    if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
+       raise ValueError("Coordinates is a view with unsupported strides" )
 
     natoms = coordinates.shape[0]
     nframes = coordinates.shape[2]
