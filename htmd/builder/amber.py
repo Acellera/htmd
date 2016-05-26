@@ -12,6 +12,7 @@ import os.path as path
 from htmd.molecule.util import _missingSegID, sequenceID
 import shutil
 from htmd.builder.builder import detectDisulfideBonds
+from htmd.builder.builder import _checkMixedSegment
 from subprocess import call
 from htmd.molecule.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
@@ -242,12 +243,10 @@ def _applyCaps(mol, caps):
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
+    _checkMixedSegment(mol)
+
     segsProt = np.unique(mol.get('segid', sel='protein'))
     segsNonProt = np.unique(mol.get('segid', sel='not protein'))
-    intersection = np.intersect1d(segsProt, segsNonProt)
-    if len(intersection) != 0:
-        raise AssertionError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
-
     caps = dict()
     for s in segsProt:
         caps[s] = ['ACE', 'NME']
