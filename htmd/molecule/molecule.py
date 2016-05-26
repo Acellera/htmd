@@ -628,8 +628,13 @@ class Molecule:
             If the file is a trajectory, append the coordinates to the previous coordinates
         """
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
+            for f in filename:
+                if not os.path.exists(f):
+                    raise FileNotFoundError('File {} was not found.'.format(f))
             firstfile = filename[0]
         else:
+            if not os.path.exists(filename):
+                raise FileNotFoundError('File {} was not found.'.format(filename))
             firstfile = filename
 
         from htmd.simlist import Sim
