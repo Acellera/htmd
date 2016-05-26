@@ -163,6 +163,9 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
         c = coordinates.shape
         coordinates = coordinates.reshape((c[0], c[1], 1))
 
+    if coordinates.shape[2] > 1:
+       raise ValueError("Coordinates must be a single frame")
+
     if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
         # It's a view -- need to make a copy to ensure contiguity of memory
        coordinates = numpy.array( coordinates, dtype=numpy.float32 )
