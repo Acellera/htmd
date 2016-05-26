@@ -183,12 +183,12 @@ def main_parameterize():
         sys.exit(2)
 
     if verbose:
-        logging.basicConfig( level=logging.INFO )
+        logging.getLogger("htmd.parameterize").setLevel( logging.INFO )
     else:
-        logging.basicConfig( level=logging.NONE )
+        logging.getLogger("htmd.parameterize").setLevel( logging.WARNING )
 
     if debug:
-        logging.basicConfig( level=logging.DEBUG )
+        logging.getLogger("htmd.parameterize").setLevel( logging.DEBUG )
         if config:
             config.Debug = True
 
