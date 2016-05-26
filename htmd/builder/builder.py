@@ -10,6 +10,13 @@ import numpy as np
 import logging
 logger = logging.getLogger(__name__)
 
+class MixedSegmentError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
 
 class DisulfideBridge(object):
     def __init__(self, segid1, resid1, segid2, resid2):
@@ -212,6 +219,14 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
         i += 1
 
     return mol
+
+
+def _checkMixedSegment(mol):
+    segsProt = np.unique(mol.get('segid', sel='protein'))
+    segsNonProt = np.unique(mol.get('segid', sel='not protein'))
+    intersection = np.intersect1d(segsProt, segsNonProt)
+    if len(intersection) != 0:
+        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
 
 
 def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
