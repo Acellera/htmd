@@ -246,7 +246,6 @@ def _defaultCaps(mol):
     _checkMixedSegment(mol)
 
     segsProt = np.unique(mol.get('segid', sel='protein'))
-    segsNonProt = np.unique(mol.get('segid', sel='not protein'))
     caps = dict()
     for s in segsProt:
         caps[s] = ['ACE', 'NME']
