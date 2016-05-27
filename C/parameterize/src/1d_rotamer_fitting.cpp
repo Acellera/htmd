@@ -616,6 +616,12 @@ int main(int argc, char **argv)
 	Mol_ESP.E_CMap_On = 0;
 
 	Read_QM_Rotamer_Data();
+
+  if( nRotamer == 0 ) {
+    printf("No rotamers found. The should be at least one in all-rotamer.dat. Something has gone wrong in the previous step\n" );
+		exit(1);
+  }
+
 	Read_Tor_Para_1D_Fitting();
 	Assign_Torsion_Parameters();
 
