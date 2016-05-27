@@ -142,6 +142,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     mol = mol.copy()
     _missingSegID(mol)
+    _checkMixedSegment(mol)
     if psfgen is None:
         try:
             psfgen = shutil.which('psfgen', mode=os.X_OK)
@@ -440,7 +441,6 @@ def _printAliases(f):
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
-    _checkMixedSegment(mol)
 
     segsProt = np.unique(mol.get('segid', sel='protein'))
     segsNonProt = np.unique(mol.get('segid', sel='not protein'))
@@ -778,4 +778,5 @@ if __name__ == '__main__':
 
     import doctest
     doctest.testmod()
+
 

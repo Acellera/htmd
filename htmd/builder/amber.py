@@ -102,6 +102,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         caps = _defaultCaps(mol)
 
     _missingSegID(mol)
+    _checkMixedSegment(mol)
 
     logger.info('Converting CHARMM membranes to AMBER.')
     mol = _charmmLipid2Amber(mol)
@@ -200,6 +201,11 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
 
 def _applyCaps(mol, caps):
     for seg in caps:
+        aceatm = mol.atomselect('segid {} and resname ACE'.format(seg))
+        nmeatm = mol.atomselect('segid {} and resname NME'.format(seg))
+        if np.sum(aceatm) != 0 and np.sum(nmeatm) != 0:
+            logger.warning('ACE and NME caps detected on segid {}.'.format(seg))
+            continue
         # This is the (horrible) way of adding caps in tleap:
         # 1. To add ACE remove two hydrogens bound to N eg:- H1,H3 then change the H2 atom to the ACE C atom
         # 2. In adding NME, remove the OXT oxygen and in that place, put the N atom of NME
@@ -243,7 +249,6 @@ def _applyCaps(mol, caps):
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
-    _checkMixedSegment(mol)
 
     segsProt = np.unique(mol.get('segid', sel='protein'))
     caps = dict()
