@@ -204,7 +204,7 @@ def _applyCaps(mol, caps):
         aceatm = mol.atomselect('segid {} and resname ACE'.format(seg))
         nmeatm = mol.atomselect('segid {} and resname NME'.format(seg))
         if np.sum(aceatm) != 0 and np.sum(nmeatm) != 0:
-            logger.warning('ACE and NME caps detected on segid {}.'.format(seg))
+            logger.warning('ACE and NME caps already exist on segid {}. Did not re-apply them.'.format(seg))
             continue
         # This is the (horrible) way of adding caps in tleap:
         # 1. To add ACE remove two hydrogens bound to N eg:- H1,H3 then change the H2 atom to the ACE C atom
