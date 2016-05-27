@@ -21,8 +21,12 @@ class PSF:
     atomtype = None
     serial = None
     segid = None
+    insertion = None
+
  
 def PSFread(filename):
+    import re
+    residinsertion = re.compile('(\d+)([a-zA-Z])')
     psf = PSF
     f = open(filename, 'r')
     mode = None
@@ -36,7 +40,15 @@ def PSFread(filename):
             l = line.split()
             psf.serial[c]   = l[0]
             psf.segid[c]    = l[1]
-            psf.resid[c]    = int(l[2])
+            match = residinsertion.findall(l[2])
+            if match:
+                resid = int(match[0][0])
+                insertion = match[0][1]
+            else:
+                resid = int(l[2])
+                insertion = ''
+            psf.resid[c]    = resid
+            psf.insertion[c] = insertion
             psf.resname[c]  = l[3]
             psf.atomname[c] = l[4]
             psf.atomtype[c] = l[5]
@@ -63,6 +75,7 @@ def PSFread(filename):
             psf.atomtype = numpy.empty([(int(l[0]))], dtype=object )
             psf.charges = numpy.zeros([int(l[0])], dtype=numpy.float32)
             psf.masses = numpy.zeros([int(l[0])], dtype=numpy.float32)
+            psf.insertion = numpy.empty([(int(l[0]))], dtype=object)
             
             c = 0
         elif '!NBOND' in line:

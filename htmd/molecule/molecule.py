@@ -653,6 +653,7 @@ class Molecule:
             self.resname= con.resname
             self.resid  = con.resid
             self.segid  = con.segid
+            self.insertion = con.insertion
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             self.masses = numpy.asarray(con.masses, dtype=np.float32)
             self.bonds = numpy.asarray(con.bonds, dtype=np.int32)

@@ -133,7 +133,7 @@ proc calcforces_init {} {
   set sel [addgroup  $selindex]
 }
 proc calcforces {} {
-  global ref sel numsteps K box
+  global ref sel numsteps K box nvtsteps constraintsteps
   loadcoords coords
 ##FLATBOTTOM
   if {$K>0} {
