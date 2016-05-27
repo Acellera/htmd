@@ -102,6 +102,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         caps = _defaultCaps(mol)
 
     _missingSegID(mol)
+    _checkMixedSegment(mol)
 
     logger.info('Converting CHARMM membranes to AMBER.')
     mol = _charmmLipid2Amber(mol)
@@ -243,10 +244,8 @@ def _applyCaps(mol, caps):
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
-    _checkMixedSegment(mol)
 
     segsProt = np.unique(mol.get('segid', sel='protein'))
-    segsNonProt = np.unique(mol.get('segid', sel='not protein'))
     caps = dict()
     for s in segsProt:
         caps[s] = ['ACE', 'NME']

@@ -222,11 +222,12 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
 
 
 def _checkMixedSegment(mol):
-    segsProt = np.unique(mol.get('segid', sel='protein'))
-    segsNonProt = np.unique(mol.get('segid', sel='not protein'))
+    segsProt = np.unique(mol.get('segid', sel='protein or resname ACE NME'))
+    segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
-        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
+        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. '
+                                'Please assign separate segments to them.'.format(intersection))
 
 
 def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
