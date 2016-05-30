@@ -125,7 +125,7 @@ class Molecule:
     }
 
     def __init__(self, filename=None, name=None):
-        self.bonds = []
+        self.bonds = np.empty((0, 2), dtype=np.uint32)
         self.ssbonds = []
         self.box = None
         self.charge = []
@@ -784,7 +784,7 @@ class Molecule:
                     self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
 
         self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
-        self.bonds = np.array(mol.bonds, dtype=np.uint32)
+        self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
         self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
         self.box = np.array(mol.box)
 

@@ -64,7 +64,7 @@ class PDBParser:
         self.segid = []
         self.element = []
         self.charge = []
-        self.bonds = []
+        self.bonds = np.empty((0, 2), dtype=np.uint32)
         self.ssbonds = []
 
         self.box = None
@@ -378,8 +378,8 @@ class PDBParser:
                 break
 
         fh.close()
-        if( self.bonds ):
-          self.bonds = numpy.array( self.bonds, dtype=numpy.uint32 )
+        if self.bonds:
+            self.bonds = numpy.array(self.bonds, dtype=numpy.uint32)
         # If no segids were read I can use TER groups to set segids
         if all(x == '' for x in self.segid) and currter != 0:
             self.segid = tergroups
