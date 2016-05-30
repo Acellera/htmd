@@ -196,6 +196,7 @@ class PDBParser:
         global_line_counter = 0
         currter = 0
         tergroups = []
+        bonds = []
         for line in fh:
             global_line_counter += 1
             record_type = line[0:6]
@@ -313,23 +314,23 @@ class PDBParser:
                     if a2:
                         t = a1
                 #        if(a2<a1) : t,a2 = a2,t
-                #        if not ([t,a2] in self.bonds ):
-                        self.bonds.append([t, a2])
+                #        if not ([t,a2] in bonds ):
+                        bonds.append([t, a2])
                     if a3:
                         t = a1
                 #        if(a3<a1) : t,a3 = a3,t
-                #        if not ([t,a3] in self.bonds ):
-                        self.bonds.append([t, a3])
+                #        if not ([t,a3] in bonds ):
+                        bonds.append([t, a3])
                     if a4:
                         t = a1
                 #        if(a4<t) : a1,a4 = a4,t
-                #        if not ([t,a4] in self.bonds ):
-                        self.bonds.append([t, a4])
+                #        if not ([t,a4] in bonds ):
+                        bonds.append([t, a4])
                     if a5:
                         t = a1
                 #        if(a5<t) : t,a5 = t,a1
-                #        if not ([t,a5] in self.bonds ):
-                        self.bonds.append([t, a5])
+                #        if not ([t,a5] in bonds ):
+                        bonds.append([t, a5])
             elif record_type == "SSBOND":
                 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
                 a1 = a2 = a3 = a4 = a5 = None
@@ -378,8 +379,8 @@ class PDBParser:
                 break
 
         fh.close()
-        if self.bonds:
-            self.bonds = numpy.array(self.bonds, dtype=numpy.uint32)
+        if bonds:
+            self.bonds = numpy.array(bonds, dtype=numpy.uint32)
         # If no segids were read I can use TER groups to set segids
         if all(x == '' for x in self.segid) and currter != 0:
             self.segid = tergroups

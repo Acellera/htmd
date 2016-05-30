@@ -656,13 +656,13 @@ class Molecule:
             self.insertion = con.insertion
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             self.masses = numpy.asarray(con.masses, dtype=np.float32)
-            self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
+            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
         elif (type is None and (
             firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
             con = PRMTOPread(filename)
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             # self.masses = numpy.asarray(con.masses, dtype=np.float32)  # No masses in PRMTOP
-            self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
+            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":

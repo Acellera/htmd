@@ -81,7 +81,7 @@ def PSFread(filename):
         elif '!NBOND' in line:
             mode = 'bond'
             l = line.split()
-            psf.bonds = numpy.zeros([int(l[0]), 2], dtype=int)
+            psf.bonds = numpy.zeros([int(l[0]), 2], dtype=numpy.uint32)
             c = 0
     f.close()
     return psf
