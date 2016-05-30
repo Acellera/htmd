@@ -648,6 +648,7 @@ class Molecule:
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
             con = PSFread(filename)
+            self.empty(len(con.serial))  # initialize all arrays as empty
             self.serial = con.serial
             self.name   = con.atomname
             self.resname= con.resname
