@@ -7,7 +7,8 @@ Note: some style is at variance with Python PIP recommendations.
 * Method names start with lower-case, then camelCase
 * Same for generic function,e.g.   testMe()
 * Make the main a test case, where possible. 
-* Name methods as verbs.
+* Name methods as verbs
+* Modules should be nouns (singular)
 * Use namespaces instead of composite name, e.g. charmm.build() instead of charmmBuild() when possible
 * Try to keep single names, so no need for camelCase
 
@@ -28,7 +29,9 @@ the second way remove the need to use htmd, all the modules are shortcutted
 from htmd import *
 m = Molecule('41ny')
 ```
+We should avoid importing modules at different depths from htmd. So from XXX import * only removes the namespace XXX. Keep a simple htmd.modulename.submodulename structure. So file names  if they are not meant to be modules (e.g. util.py) should be imported in the upper module namespace.
 
+Do not pollute the module and submodule names. Adding something there requires a vote and proper documentation is required.
 
 Docstrings
 ----------
