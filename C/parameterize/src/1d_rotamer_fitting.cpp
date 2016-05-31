@@ -619,7 +619,7 @@ int main(int argc, char **argv)
 
   if( nRotamer == 0 ) {
     printf("No rotamers found. The should be at least one in all-rotamer.dat. Something has gone wrong in the previous step\n" );
-		exit(1);
+		exit(0);
   }
 
 	Read_Tor_Para_1D_Fitting();
