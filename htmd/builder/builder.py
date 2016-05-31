@@ -10,6 +10,13 @@ import numpy as np
 import logging
 logger = logging.getLogger(__name__)
 
+class MixedSegmentError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
 
 class DisulfideBridge(object):
     def __init__(self, segid1, resid1, segid2, resid2):
@@ -171,8 +178,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     mol = mol.copy()
 
     idx = mol.atomselect(sel, indexes=True)
-    rid = mol.get('resid', sel)  # TODO:maybe easier without sel, rid = mol.get('resid') and then no need of idx
-    idxdiff = np.diff(idx)
+    rid = mol.get('resid', sel)
     residiff = np.diff(rid)
     gappos = np.where((residiff != 1) & (residiff != 0))[0]  # Points to the index before the gap!
 
@@ -215,6 +221,15 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     return mol
 
 
+def _checkMixedSegment(mol):
+    segsProt = np.unique(mol.get('segid', sel='protein or resname ACE NME'))
+    segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))
+    intersection = np.intersect1d(segsProt, segsNonProt)
+    if len(intersection) != 0:
+        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. '
+                                'Please assign separate segments to them.'.format(intersection))
+
+
 def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
     """ Calculates the convex hull of the protein. If a lipid lies inside the hull it gets removed.
 
@@ -236,7 +251,7 @@ def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
     numlipsrem = 0
     for res in uqres:  # For each lipid check if it's atoms lie within the convex hull
         atoms = np.where(sequence == res)[0]
-        newhull = ConvexHull(np.append(cacoords, np.squeeze(memb.coords[atoms, :, :]), axis=0))
+        newhull = ConvexHull(np.vstack((cacoords, memb.get('coords', sel=atoms))))
 
         # If the hull didn't change by adding the lipid, it lies within convex hull. Remove it.
         if list(hull.vertices) == list(newhull.vertices):
@@ -337,12 +352,12 @@ if __name__ == "__main__":
     a = embed(p, m)
     print(np.unique(m.get('segid')))
 
-    mol = Molecule('1ITG')
+    mol = Molecule(path.join(home(), 'data', 'building-protein-membrane', '1ITG_clean.pdb'))
     ref = Molecule(path.join(home(), 'data', 'building-protein-membrane', '1ITG.pdb'))
     mol = autoSegment(mol, sel='protein')
     assert np.all(mol.segid == ref.segid)
 
-    mol = Molecule('3PTB')
+    mol = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
     ref = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB.pdb'))
     mol = autoSegment(mol, sel='protein')
     assert np.all(mol.segid == ref.segid)

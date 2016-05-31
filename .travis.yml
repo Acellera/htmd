@@ -1,7 +1,8 @@
-branches:
- only:
-  - master
-  - toni-devel
+#branches: 
+# only:
+#  - master
+#  - toni-devel 
+
  
 matrix:
   include:
@@ -18,14 +19,14 @@ matrix:
        - mingw-w64-dev
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran
+     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran STATIC="-static"
      addons:
       apt:
        packages:
        - gfortran
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran
+     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran STATIC="-static"
      addons:
       apt:
        packages:
@@ -43,6 +44,7 @@ cache:
     apt: true
     directories:
         - $HOME/.cache/matplotlib
+        - $HOME/.matplotlib
 
 
 install:
@@ -96,6 +98,11 @@ install:
  - conda install nglview -y
  - conda install propka -y
  - conda install anaconda-client -y
+ - conda install pint -y
+ - conda install htmd-pdb2pqr -y
+ - conda install psi4 -y
+ - conda install htmdbabel -y
+ - conda install acemd -y
 
  - conda install $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2  -y
  - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y
@@ -105,7 +112,9 @@ script:
  - python -c "import htmd"
  - activate_license "$LICENSE_TOKEN"
  - python tests/run_inline_file_tests.py
+ - tests/run_other_tests.sh
 
 after_success:
+ - if [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload_data.sh ; fi
  - if [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload.sh ; fi
  - if [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload_data.sh ; fi

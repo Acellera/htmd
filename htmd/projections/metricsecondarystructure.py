@@ -72,6 +72,8 @@ class MetricSecondaryStructure(Projection):
             else:
                 return -1
 
+        mol.resid = sequenceID((mol.resid, mol.chain, mol.insertion))
+
         ca_indices = mol.atomselect('name CA', indexes=True)
         chainids = mol.get('chain', sel=ca_indices)
         resnames = mol.get('resname', sel=ca_indices)
@@ -126,6 +128,9 @@ class MetricSecondaryStructure(Projection):
         xyz = np.array(xyz.copy(), dtype=np.float32) / 10  # converting to nm
 
         from mdtraj.geometry._geometry import _dssp as dssp
+        natoms = np.unique((nco_indices.shape[0], ca_indices.shape[0], proline_indices.shape[0], chain_ids.shape[0]))
+        if len(natoms) != 1:
+            raise AssertionError('Wrong dimensions in SS data arrays. Report this bug on the issue tracker.')
         data = dssp(xyz, nco_indices, ca_indices, proline_indices, chain_ids)
 
         if self.simplified:

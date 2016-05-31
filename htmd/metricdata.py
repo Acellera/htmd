@@ -6,7 +6,6 @@
 import numpy as np
 from scipy import stats
 import random
-import matplotlib.pyplot as plt
 from copy import deepcopy
 from scipy.spatial import distance
 import logging
@@ -297,6 +296,7 @@ class MetricData:
         >>> data.plotTrajSizes()
         """
         trajLengths = self.trajLengths
+        import matplotlib.pyplot as plt
         plt.ion()
         plt.bar(range(len(trajLengths)), np.sort(trajLengths), color='b', edgecolor='b')
         plt.ylabel('Length of trajectories (in frames)')
