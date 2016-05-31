@@ -53,10 +53,17 @@ import tempfile
 import random
 from glob import glob
 from sklearn.cluster import MiniBatchKMeans
-from matplotlib import pylab as plt
-# ----------------------------
 
-logging.config.fileConfig(os.path.join(home(), 'logging.ini'), disable_existing_loggers=False)
+# No longer impoty matplotlib here, as it breaks
+# Parameterise's import and attmept to set alternate
+# render back-end
+
+#from matplotlib import pylab as plt
+# ----------------------------
+try:
+	logging.config.fileConfig(os.path.join(home(), 'logging.ini'), disable_existing_loggers=False)
+except:
+	print("HTMD: Logging setup failed")
 
 check_registration(product='htmd')
 show_news()

@@ -5,7 +5,6 @@
 #
 import numpy as np
 import warnings
-import matplotlib.pyplot as plt
 import logging
 logger = logging.getLogger(__name__)
 
@@ -192,6 +191,7 @@ class Kinetics(object):
             koff[m] = r.koff
             kdeq[m] = r.kdeq
 
+        import matplotlib.pyplot as plt
         plt.ion()  # Interactive figure mode on
         if 'mfptoff' in rates:
             self._plotRate(mfptoff, 'MFPT off (ns)', log=True, lim1=True)
@@ -207,16 +207,17 @@ class Kinetics(object):
             self._plotRate(kdeq, 'Kd (M)')
 
     def _plotRate(self, rate, ylabel, log=False, lim1=False):
-            plt.figure()
-            plt.bar(range(self.model.macronum), rate)
-            plt.ylabel(ylabel)
-            plt.xlabel('Macrostates')
-            plt.xticks(np.arange(0.4, self.model.macronum+0.4, 1), range(self.model.macronum))
-            if log:
-                plt.yscale('log')
-            if lim1:
-                plt.ylim(ymin=1)
-            plt.show()
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.bar(range(self.model.macronum), rate)
+        plt.ylabel(ylabel)
+        plt.xlabel('Macrostates')
+        plt.xticks(np.arange(0.4, self.model.macronum+0.4, 1), range(self.model.macronum))
+        if log:
+            plt.yscale('log')
+        if lim1:
+            plt.ylim(ymin=1)
+        plt.show()
 
     def mfptGraph(self):
         """ Not yet implemented

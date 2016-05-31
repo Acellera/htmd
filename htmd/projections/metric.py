@@ -13,8 +13,72 @@ from joblib import Parallel, delayed
 import joblib.parallel
 from collections import defaultdict
 from htmd.progress.progress import ProgressBar
+import time
 import logging
 logger = logging.getLogger(__name__)
+
+
+# Horribly disgusting monkey-patch to add my progress bar to joblib.Parallel
+class BatchCompletionCallBack(object):
+    """Callback used by joblib.Parallel's multiprocessing backend.
+
+    This callable is executed by the parent process whenever a worker process
+    has returned the results of a batch of tasks.
+
+    It is used for progress reporting, to update estimate of the batch
+    processing duration and to schedule the next batch of tasks to be
+    processed.
+
+    """
+    bars = defaultdict(int)
+    def __init__(self, dispatch_timestamp, batch_size, parallel):
+        self.bar = None
+        self.dispatch_timestamp = dispatch_timestamp
+        self.batch_size = batch_size
+        self.parallel = parallel
+
+    def __call__(self, out):
+        self.parallel.n_completed_tasks += self.batch_size
+        this_batch_duration = time.time() - self.dispatch_timestamp
+
+        if (self.parallel.batch_size == 'auto'
+                and self.batch_size == self.parallel._effective_batch_size):
+            # Update the smoothed streaming estimate of the duration of a batch
+            # from dispatch to completion
+            old_duration = self.parallel._smoothed_batch_duration
+            if old_duration == 0:
+                # First record of duration for this batch size after the last
+                # reset.
+                new_duration = this_batch_duration
+            else:
+                # Update the exponentially weighted average of the duration of
+                # batch for the current effective size.
+                new_duration = 0.8 * old_duration + 0.2 * this_batch_duration
+            self.parallel._smoothed_batch_duration = new_duration
+
+        #if BatchCompletionCallBack.bars[self.parallel] == 0:  # Oh man, the race conditions possible here... kill me
+        #    BatchCompletionCallBack.bars[self.parallel] = ProgressBar(self.parallel.n_dispatched_tasks, description='Projecting trajectories')
+        #    BatchCompletionCallBack.bars[self.parallel].progress()
+
+        self.parallel.print_progress()
+        if self.parallel._original_iterator is not None:
+            self.parallel.dispatch_next()
+
+class CallBack(object):
+    bars = defaultdict(int)
+
+    def __init__(self, index, parallel):
+        self.bar = None
+        self.index = index
+        self.parallel = parallel
+
+    def __call__(self, index):
+        if CallBack.bars[self.parallel] == 0:  # Oh man, the race conditions possible here... kill me
+            CallBack.bars[self.parallel] = ProgressBar(self.parallel.n_dispatched, description='Projecting trajectories')
+        CallBack.bars[self.parallel].progress()
+
+        if self.parallel._original_iterable:
+            self.parallel.dispatch_next()
 
 
 class Metric:
@@ -63,6 +127,14 @@ class Metric:
         deletesims = np.zeros(numSim, dtype=bool)
         fstep = np.zeros(numSim)
 
+        # # Monkey-patching callback class
+        # oldcallback = joblib.parallel.BatchCompletionCallBack
+        # joblib.parallel.BatchCompletionCallBack = BatchCompletionCallBack
+        # from htmd.config import _config
+        # results = Parallel(n_jobs=_config['ncpus'], verbose=11)(
+        #     delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
+        # joblib.parallel.BatchCompletionCallBack = oldcallback
+
         from htmd.config import _config
         results = Parallel(n_jobs=_config['ncpus'], verbose=11)(
                 delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
@@ -105,7 +177,6 @@ class Metric:
     def _projectSingle(self, index):
         data, ref, fstep, _ = _processSim(self.simulations[index], self.projectionlist, None, self.skip)
         return data, ref, fstep
-
 
 
 def _processSim(sim, projectionlist, uqmol, skip):
@@ -151,24 +222,6 @@ def _singleMolfile(sims):
         single = True
         molfile = sims[0].molfile
     return single, molfile
-
-
-# Horribly disgusting monkey-patch to add my progress bar to joblib.Parallel
-class CallBack(object):
-    bars = defaultdict(int)
-
-    def __init__(self, index, parallel):
-        self.bar = None
-        self.index = index
-        self.parallel = parallel
-
-    def __call__(self, index):
-        if CallBack.bars[self.parallel] == 0:  # Oh man, the race conditions possible here... kill me
-            CallBack.bars[self.parallel] = ProgressBar(self.parallel.n_dispatched, description='Projecting trajectories')
-        CallBack.bars[self.parallel].progress()
-
-        if self.parallel._original_iterable:
-            self.parallel.dispatch_next()
 
 
 class _OldMetric(metaclass=ABCMeta):

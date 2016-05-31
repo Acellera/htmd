@@ -7,7 +7,7 @@ import os
 
 import htmd.home
 from htmd.molecule.support import *
-
+import numpy as np
 
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
@@ -21,6 +21,16 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
         print(coordinates.shape)
         raise NameError("Coordinates needs to be natoms x 3 x nframes")
 
+    if coordinates.dtype != np.float32:
+        raise ValueError("Coordinates is not float32")
+
+    if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
+        # It's a view -- need to make a copy to ensure contiguity of memory
+       coordinates = numpy.array( coordinates, dtype=numpy.float32 )
+    if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
+       raise ValueError("Coordinates is a view with unsupported strides" )
+
+
     natoms = coordinates.shape[0]
     nframes = coordinates.shape[2]
     # Sanity check the inputs
@@ -28,7 +38,7 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     #	print(natoms)
     #	print (len(atomname))
 
-    if bonds and bonds.shape[1] != 2:
+    if bonds is not None and bonds.shape[1] != 2:
         raise NameError("'bonds' not nbonds x 2 in length")
     if len(atomname) != natoms:
         #        print(natoms)
@@ -95,7 +105,7 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     c_bonds = None
     nbonds = 0
 
-    if bonds:  # TODO: Replace the loops for bonds with ravel
+    if bonds is not None:  # TODO: Replace the loops for bonds with ravel
         nbonds = bonds.shape[0]
         if nbonds > 0:
             ll = nbonds * 2
@@ -153,6 +163,18 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
         c = coordinates.shape
         coordinates = coordinates.reshape((c[0], c[1], 1))
 
+    if coordinates.shape[2] > 1:
+       raise ValueError("Coordinates must be a single frame")
+
+    if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
+        # It's a view -- need to make a copy to ensure contiguity of memory
+       coordinates = numpy.array( coordinates, dtype=numpy.float32 )
+    if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
+       raise ValueError("Coordinates is a view with unsupported strides" )
+
+
+    if coordinates.dtype != np.float32:
+        raise ValueError("Coordinates is not float32")
     #    print(coordinates.shape)
     natoms = coordinates.shape[0]
     nframes = coordinates.shape[2]
@@ -188,11 +210,12 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
     c_coords = None
 
     c_nbonds = (c_int * 1)()
-    lenv = natoms * 8  # some dumb guess about the max # of bonds likely to be created -- natoms*4
+    lenv = natoms * 10  # some dumb guess about the max # of bonds likely to be created -- natoms*5
     c_bonds = (c_int * lenv)()
 
     z = 0
 
+    c_nbonds[0] = 0
     c_coords = coordinates.ctypes.data_as(POINTER(c_float))
 
     retval = fn = parser.guessbonds(
@@ -210,6 +233,10 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
         c_nbonds,
         c_bonds
     )
+
+    if(retval):
+       raise ValueError("Guessed bonding is bad")
+    #print(retval)
     nbonds = c_nbonds[0]
     bonds = numpy.empty((nbonds, 2), dtype=numpy.uint32)
     for y in range(0, nbonds):

@@ -17,6 +17,7 @@ from htmd.home import home
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds
+from htmd.builder.builder import _checkMixedSegment
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
 from glob import glob
@@ -44,15 +45,6 @@ __test__ = {'build-opm-1u5u': """
     >>> print(difflist)
     []
 """ }
-
-
-class MixedSegmentError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
-
 
 class BuildError(Exception):
     def __init__(self, value):
@@ -150,6 +142,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     mol = mol.copy()
     _missingSegID(mol)
+    _checkMixedSegment(mol)
     if psfgen is None:
         try:
             psfgen = shutil.which('psfgen', mode=os.X_OK)
@@ -448,12 +441,9 @@ def _printAliases(f):
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
+
     segsProt = np.unique(mol.get('segid', sel='protein'))
     segsNonProt = np.unique(mol.get('segid', sel='not protein'))
-    intersection = np.intersect1d(segsProt, segsNonProt)
-    if len(intersection) != 0:
-        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
-
     caps = dict()
     for s in segsProt:
         nter, cter = _removeCappedResidues(mol, s)
@@ -788,4 +778,5 @@ if __name__ == '__main__':
 
     import doctest
     doctest.testmod()
+
 

@@ -64,7 +64,7 @@ class PDBParser:
         self.segid = []
         self.element = []
         self.charge = []
-        self.bonds = []
+        self.bonds = np.empty((0, 2), dtype=np.uint32)
         self.ssbonds = []
 
         self.box = None
@@ -95,7 +95,7 @@ class PDBParser:
         box = self.box
         if box is not None:
             print(
-                "CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[1, 0], box[2, 0], 90, 90, 90),
+                "CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90),
                 file=fh)
 
         for frame in range(0, self.coords.shape[2]):
@@ -196,6 +196,7 @@ class PDBParser:
         global_line_counter = 0
         currter = 0
         tergroups = []
+        bonds = []
         for line in fh:
             global_line_counter += 1
             record_type = line[0:6]
@@ -295,23 +296,41 @@ class PDBParser:
             elif record_type == "CONECT":
                 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
                 a1 = a2 = a3 = a4 = a5 = None
+                v1 = v2 = v3 = v4 = v5 = None
                 try:
-                    a1 = self.serial.index(int(line[6:11]))
-                    a2 = self.serial.index(int(line[11:16]))
-                    a3 = self.serial.index(int(line[16:21]))
-                    a4 = self.serial.index(int(line[21:26]))
-                    a5 = self.serial.index(int(line[26:31]))
+                    v1 = int(line[6:11])
+                    a1 = self.serial.index(v1)
+                    v2 = int(line[11:16])
+                    a2 = self.serial.index(v2)
+                    v3 = int(line[16:21])
+                    a3 = self.serial.index(v3)
+                    v4 = int(line[21:26])
+                    a4 = self.serial.index(v4)
+                    v5 = int(line[26:31])
+                    a5 = self.serial.index(v5)
                 except:
                     pass
                 if a1:
                     if a2:
-                        self.bonds.append([a1, a2])
+                        t = a1
+                #        if(a2<a1) : t,a2 = a2,t
+                #        if not ([t,a2] in bonds ):
+                        bonds.append([t, a2])
                     if a3:
-                        self.bonds.append([a1, a3])
+                        t = a1
+                #        if(a3<a1) : t,a3 = a3,t
+                #        if not ([t,a3] in bonds ):
+                        bonds.append([t, a3])
                     if a4:
-                        self.bonds.append([a1, a4])
+                        t = a1
+                #        if(a4<t) : a1,a4 = a4,t
+                #        if not ([t,a4] in bonds ):
+                        bonds.append([t, a4])
                     if a5:
-                        self.bonds.append([a1, a5])
+                        t = a1
+                #        if(a5<t) : t,a5 = t,a1
+                #        if not ([t,a5] in bonds ):
+                        bonds.append([t, a5])
             elif record_type == "SSBOND":
                 # If PDB spec says "COLUMNS 18-20" this means line[17:20]
                 a1 = a2 = a3 = a4 = a5 = None
@@ -360,7 +379,8 @@ class PDBParser:
                 break
 
         fh.close()
-
+        if bonds:
+            self.bonds = numpy.array(bonds, dtype=numpy.uint32)
         # If no segids were read I can use TER groups to set segids
         if all(x == '' for x in self.segid) and currter != 0:
             self.segid = tergroups
