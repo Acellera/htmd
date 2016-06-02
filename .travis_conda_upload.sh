@@ -3,25 +3,17 @@ set -ev
 
 # TG set command above is to fail immediately, https://docs.travis-ci.com/user/customizing-the-build/#Implementing-Complex-Build-Steps
 
-if [ "$TRAVIS_REPO_SLUG" == "multiscalelab/htmd" ]; then
-    export TYPE=basic
-    export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC
-elif [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ]; then
-    export TYPE=pro
-    export ANACONDA_TOKEN=$ANACONDA_TOKEN_PRO
-else
-    echo "Unexpected TRAVIS_REPO_SLUG = $TRAVIS_REPO_SLUG"
-    exit 0
-fi
+export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC
+
 
 export CHANNEL=acellera
-echo "Uploading to channel: $CHANNEL"
+echo "Uploading to channel: $CHANNEL : PACKAGE $PACKAGE_NAME"
 
 if [ "$CROSS_COMPILE" == "1" ]; then
-    conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/htmd-[0-9]*.tar.bz2
-    anaconda -t $ANACONDA_TOKEN upload win-64/htmd-[0-9]*.tar.bz2 -u $CHANNEL
+    conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2
+    anaconda -t $ANACONDA_TOKEN upload win-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
 else
-		anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2 -u $CHANNEL
+		anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
 fi
 
 
