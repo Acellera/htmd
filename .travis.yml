@@ -52,13 +52,10 @@ install:
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.sh -O miniconda.sh; fi
 
- - if [ "$TRAVIS_REPO_SLUG" == "multiscalelab/htmd" ]; then export TYPE=basic; fi
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ];      then export TYPE=pro; fi
+ - if [ "$TRAVIS_BRANCH" == "master" ]; then export PACKAGE_NAME=htmd; fi
+ - if [ "$TRAVIS_BRANCH" == "pro" ];      then export PACKAGE_NAME=htmd-pro; fi
 
- - if [ "$TYPE" == "basic" ]; then export CHANNEL=acellera; fi
- - if [ "$TYPE" == "pro" ];   then export CHANNEL=acellera; fi
- - echo $TYPE
- - echo $CHANNEL
+ - echo $PACKAGE_NAME
 
  - bash miniconda.sh -b -p $HOME/miniconda
  - export PATH="$HOME/miniconda/bin:$PATH"
@@ -67,7 +64,7 @@ install:
  - conda install conda-build -y
  - conda update --all -y
  - conda config --add channels omnia
- - conda config --add channels $CHANNEL
+ - conda config --add channels acellera
 
  - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
  - source activate travis-env
@@ -105,7 +102,7 @@ install:
  - conda install acemd -y
 
  - conda install $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2  -y
- - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y
+ - conda install $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2  -y
 
 script:
  # Run the inline file tests 
@@ -115,5 +112,5 @@ script:
  - tests/run_other_tests.sh
 
 after_success:
- - if [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload_data.sh ; fi
- - if [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload_data.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload.sh ; fi
