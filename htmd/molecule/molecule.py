@@ -994,6 +994,8 @@ class Molecule:
             self._viewVMD(pdb, xtc, viewerhandle, name, guessBonds)
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
             return self._viewNGL(pdb, xtc, guessBonds)
+        else:
+            raise ValueError('Unknown viewer.')
 
         # Remove temporary files
         if xtc:
