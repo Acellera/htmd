@@ -1,6 +1,7 @@
 import abc
 from difflib import get_close_matches
 import os
+import re
 
 
 RANGE_ANY = 0
@@ -179,7 +180,7 @@ class ListListValidator(Validator):
     def args(self):
         return "A list of lists with length " + self.length       
  
-    def validate( self, value_list ):
+    def validate( self, value_list, basedir=None):
             vv=""
             for t  in value_list: vv=vv + " " +t 
             vv=vv.strip()
@@ -198,7 +199,7 @@ class ListListValidator(Validator):
                phi=[]
                for t2 in t1.strip().split():
                  phi.append(t2.strip().upper())
-               if(len(phi) != self.length): raise ValueError( "list requires " + self.length + " elements" )
+               if(len(phi) != self.length): raise ValueError( "list requires " + str(self.length) + " elements" )
                value.append(phi)
 
             if(len(value)):
