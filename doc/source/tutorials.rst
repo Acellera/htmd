@@ -7,8 +7,8 @@ Contents:
    :maxdepth: 1
 
    Python primer <tutorials/python-primer>
+   Introduction to Atom selections <tutorials/introd-atom-selections>
    Getting started with HTMD Molecules <tutorials/getting-started-with-htmd-molecules>
-   Atom selections <tutorials/atom-selections>
    System building basics <tutorials/system-building-basics>
    System building for Benzamide-Trypsin <tutorials/system-building-benzamidine-trypsin>
    System building for mu opioid GPCR <tutorials/system-building-mu-opioid-gpcr>
