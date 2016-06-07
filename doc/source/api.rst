@@ -8,7 +8,7 @@ Contents:
 
    Molecule <htmd.molecule.molecule>
    building
-   Ligand Parameterisation <parameterisation>
+   Ligand Parameterization <parameterization>
    simlists
    projections
    clustering

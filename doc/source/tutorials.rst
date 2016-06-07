@@ -10,6 +10,7 @@ Contents:
    Introduction to Atom selections <tutorials/introd-atom-selections>
    Getting Started with HTMD Molecules <tutorials/getting-started-with-htmd-molecules>
    System Building Basics <tutorials/system-building-basics>
+   Ligand Parameterization <tutorials/ligand-parameterization>
    System Building Protein-Ligand <tutorials/system-building-protein-ligand>
    System building for mu opioid GPCR <tutorials/system-building-mu-opioid-gpcr>
    System building for protein-protein binding (Barnase-Barstar) <tutorials/system-building-barnase-barstar>
