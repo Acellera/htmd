@@ -104,6 +104,8 @@ class MetricDihedral(Projection):
             # Only phi angle for the last residue
             selstr.append('backbone and (resid ' + str(residues[len(residues)-2]) + ' and name C) or (resid ' + str(residues[len(residues)-1]) + ' and name N CA C)')
         else:
+            if isinstance(self._dih, str):
+                self._dih = [self._dih]
             selstr = self._dih
 
         dih = []

@@ -959,7 +959,7 @@ class Molecule:
             Coloring mode or color ID.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
-        viewer : str ('vmd','notebook')
+        viewer : str ('vmd', 'webgl')
             Choose viewer backend. Default is taken from htmd.config
         hold : bool
             If set to True, it will not visualize the molecule but instead collect representations until set back to False.
@@ -992,8 +992,10 @@ class Molecule:
             return self._viewMDTraj(pdb, xtc)
         elif viewer.lower() == 'vmd':
             self._viewVMD(pdb, xtc, viewerhandle, name, guessBonds)
-        elif viewer.lower() == 'ngl':
+        elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
             return self._viewNGL(pdb, xtc, guessBonds)
+        else:
+            raise ValueError('Unknown viewer.')
 
         # Remove temporary files
         if xtc:
