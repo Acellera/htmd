@@ -1,6 +1,7 @@
+import logging
+
 import numpy as np
 import pandas as pd
-import logging
 
 from htmd.molecule.molecule import Molecule
 
@@ -20,7 +21,7 @@ class ResidueData:
     Examples
     --------
     >>> tryp = Molecule("3PTB")
-    >>> tryp_op, ri = prepareProtein(tryp, returnDetails=True)
+    >>> tryp_op, ri = proteinPrepare(tryp, returnDetails=True)
     >>> ri
     ResidueData object about 290 residues.
     Unparametrized residue names: CA, BEN
@@ -208,7 +209,7 @@ class ResidueData:
 
 
 if __name__ == "__main__":
-    from htmd.proteinpreparation.proteinpreparation import prepareProtein
+    from builder.proteinpreparation import proteinPrepare
 
     import doctest
 
