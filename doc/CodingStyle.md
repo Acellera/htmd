@@ -103,6 +103,7 @@ if __name__ == "__main__":
 The "ELLIPSIS" line indicates that match with dots is flexible.   
 Other possibly useful directives are SKIP and NORMALIZE_WHITESPACE. You can also
 
+  * run tests placed in strings (not in documentation) as in `builder/charmm.py`
   * run tests placed in external files with `doctest.testfile('doctest_in_help.rst')`
   * test a different module with `doctest.testmod(doctest_simple)`
 

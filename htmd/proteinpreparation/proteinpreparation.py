@@ -3,7 +3,7 @@ import tempfile
 import numpy as np
 from pdb2pqr.main import runPDB2PQR
 from pdb2pqr.src.pdb import readPDB
-
+import propka.lib
 
 # If necessary: http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
 from htmd.proteinpreparation.residuedata import ResidueData
@@ -23,7 +23,8 @@ def _selToHoldList(mol, sel):
     return ret
 
 
-def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, elements):
+def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
+                  occupancy, beta, charge, record):
     numAtoms = len(name)
     mol = Molecule()
     mol.empty(numAtoms)
@@ -35,19 +36,24 @@ def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element
     mol.insertion = np.array(insertion, dtype=mol._pdb_fields['insertion'])
     mol.coords = np.array(np.atleast_3d(np.vstack(coords)), dtype=mol._pdb_fields['coords'])
     mol.segid = np.array(segid, dtype=mol._pdb_fields['segid'])
-    mol.element = np.array(elements, dtype=mol._pdb_fields['element'])
+    mol.element = np.array(element, dtype=mol._pdb_fields['element'])
+    mol.occupancy = np.array(occupancy, dtype=mol._pdb_fields['occupancy'])
+    mol.beta = np.array(beta, dtype=mol._pdb_fields['beta'])
+    # mol.charge = np.array(charge, dtype=mol._pdb_fields['charge'])
+    # mol.record = np.array(record, dtype=mol._pdb_fields['record'])
     return mol
 
 
 def _fixupWaterNames(mol):
     """Rename WAT OW HW HW atoms as O H1 H2"""
-    mol.set("name","O",sel="resname WAT and name OW")
-    hw = mol.atomselect("resname WAT and name HW")
-    n = np.arange(len(hw))
-    hw_even = np.logical_and(hw, np.mod(n, 2) == 0)
-    hw_odd  = np.logical_and(hw, np.mod(n, 2) == 1)
-    mol.set("name", "H1",sel=hw_even)
-    mol.set("name", "H2",sel=hw_odd)
+    mol.set("name", "O",sel="resname WAT and name OW")
+    mol.set("name", "H1", sel="resname WAT and name HW and serial % 2 == 0")
+    mol.set("name", "H2", sel="resname WAT and name HW and serial % 2 == 1")
+
+def _warnIfContainsDUM(mol):
+    """Warn if any DUM atom is there"""
+    if any(mol.atomselect("resname DUM")):
+        logger.warning("OPM's DUM residues must be filtered out before preparation. Continuing, but crash likely.")
 
 
 
@@ -197,7 +203,6 @@ def prepareProtein(mol_in,
      - force residues
      - multiple chains
      - nucleic acids
-     - reporting in machine-readable form
      - coupled titrating residues
      - Disulfide bridge detection (implemented but unused)
 
@@ -207,6 +212,8 @@ def prepareProtein(mol_in,
     if verbose:
         logger.setLevel(logging.DEBUG)
     logger.debug("Starting.")
+
+    _warnIfContainsDUM(mol_in)
 
     # We could transform the molecule into an internal object, but for
     # now I prefer to rely on the strange internal parser to avoid
@@ -218,9 +225,6 @@ def prepareProtein(mol_in,
     pdblist, errlist = readPDB(tmpin)
     if len(pdblist) == 0 and len(errlist) == 0:
         raise Exception('Internal error in preparing input to pdb2pqr')
-
-    # We could set additional options here
-    import propka.lib
 
     # An ugly hack to silence non-prefixed logging messages
     for h in propka.lib.logger.handlers:
@@ -266,8 +270,13 @@ def prepareProtein(mol_in,
     insertion = []
     coords = []
     resname = []
-    segids = []
-    elements = []
+    segid = []
+    element = []
+    occupancy = []
+    beta = []
+    record = []
+    charge = []
+
 
     resData = ResidueData()
 
@@ -305,10 +314,16 @@ def prepareProtein(mol_in,
             insertion.append(residue.iCode)
             coords.append([atom.x, atom.y, atom.z])
             resname.append(curr_resname)
-            segids.append(atom.segID)
-            elements.append(atom.element)
+            segid.append(atom.segID)
+            element.append(atom.element)
+            occupancy.append(atom.occupancy)
+            beta.append(atom.tempFactor)
+            charge.append(atom.charge)
+            record.append(atom.type)
 
-    mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segids, elements)
+
+    mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
+                            occupancy, beta, charge, record)
     _fixupWaterNames(mol_out)
 
     # Return residue information

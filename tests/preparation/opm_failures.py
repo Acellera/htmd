@@ -4,7 +4,7 @@ from htmd.builder.charmm import build
 
 import sys
 
-cases="""
+cases = """
 1z98
 2w2e
 2z73
@@ -22,24 +22,23 @@ cases="""
 5an8
 """.split()
 
+# Disable this as a test
+sys.exit(0)
+
 print(os.getcwd())
 
 for p in cases:
-    print("Working on --------------- "+p)
-    m,th=opm(p)
+    print("Working on --------------- " + p)
+    m, th = opm(p)
     m.filter("not resname DUM")
     m.write("{:s}.pdb".format(p))
 
     try:
-        mo,rd=prepareProtein(m,returnDetails=True,verbose=True)
+        mo, rd = prepareProtein(m, returnDetails=True, verbose=True)
         mo.write("{:s}-prep.pdb".format(p))
         rd.data.to_excel("{:s}-data.xlsx".format(p))
 
         mo.set('segid', 'P')
-        build(mo,outdir="build-"+p,ionize=False)
+        build(mo, outdir="build-" + p, ionize=False)
     except:
         print("Unexpected error:", sys.exc_info())
-
-
-
-
