@@ -36,18 +36,28 @@ Usage
 ----------
 
 See the docstring for options. You need propka31 installed via conda.
-    
-    tryp = Molecule('sysprep/tests/3ptb.pdb')
+
+    tryp = Molecule('3PTB')
     tryp_op = proteinPrepare(tryp)
-    tryp_op.write('sysprep/tests/systempreparation-test-main-ph-7.pdb')
+    tryp_op.write('systempreparation-test-main-ph-7.pdb')
+
+A table of useful information is also available:
+
+    tryp_op, prepData = proteinPrepare(tryp, returnDetails=True)
+    prepData.data.to_excel("/tmp/tryp-report.xlsx")
+
+
 
 
 
 Modified residue names
 ----------------------
 
-The molecule produced has residue names modified according to their protonation.
-Later system-building functions assume these residue names.
+The molecule produced by the preparation step has residue names modified
+according to their protonation.
+Later system-building functions assume these residue names. Forcefields,
+however, support alternative charge states to varying degrees.
+
 
 
 Charge +1    |  Neutral   | Charge -1
@@ -61,7 +71,6 @@ LYS          |  LYN       |  -
 ARG          |  AR0       |  -
 
 
-Forcefields vary in their coverage of alternative charge states.
 
 
 
