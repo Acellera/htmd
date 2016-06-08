@@ -13,7 +13,7 @@ HTMD is free for academia.
 For commerial use, Acellera provides licenses through https://www.acellera.com/contact/.
 
 ### Download HTMD
-HTMD can be downloaded from www.htmd.org.
+HTMD can be downloaded from www.htmd.org. If you want to use this git repository, still download it using conda first to have all dependencies and then set PYTHONPATH to the git directory.
 
 ### HTMD documentation, tutorials and forums.
 Documentation, tutorials and forums of HTMD can be found on www.htmd.org.
