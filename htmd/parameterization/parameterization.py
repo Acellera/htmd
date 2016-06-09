@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import time
 
-from htmd import Molecule
+from htmd.molecule.molecule import Molecule
 from htmd.parameterization.configuration import ParameterizationConfig
 from htmd.parameterization.drudeset import DrudeSet
 from htmd.parameterization.match import MatchSet
@@ -34,7 +34,6 @@ class Parameterization:
             wdir = os.path.join(Parameterization.prefix(), name)
             if os.path.exists(wdir):
                 raise ValueError("Job [" + config.JobName + "] already exists")
-
         elif name:
             name = os.path.basename(name)  # sanitise
             wdir = os.path.join(Parameterization.prefix(), name)
@@ -45,7 +44,6 @@ class Parameterization:
                 resuming = True
             else:
                 raise ValueError("Invalid job name [" + name + "] no such directory [" + wdir + "]")
-
         else:
             raise ValueError("Must specify a config (with name) or a name to resume")
 
@@ -57,6 +55,7 @@ class Parameterization:
             self.stepset = MatchSet()
         else:
             raise ValueError("Invalid Model setting")
+
         try:
             env = self._preflight_test(config)
         except ValueError as e:
@@ -65,7 +64,7 @@ class Parameterization:
         except:
             log.info("Preflight test failed")
             raise ValueError(
-                "The prerequisites for running a parameterisation could not be found. Use --verbose to see")
+                "The prerequisites for running a parameterization could not be found. Use --verbose to see")
 
         if not config.JobName:
             # No job name specified -- assume this is going to be a new job
@@ -87,7 +86,7 @@ class Parameterization:
 
         self.copy_qm_file(wdir)
 
-        if (not resuming):
+        if not resuming:
             self.copy_in_configuration_files(config, wdir)
         if run:
             self.run()
@@ -98,7 +97,6 @@ class Parameterization:
 
     def copy_in_configuration_files(self, config, wdir):
         # Copy in the files that form part of the job configuration into the working directory
-
 
         # Stage in the various input file
         # 1. The input structure -- mol2 or pdb
@@ -163,19 +161,19 @@ class Parameterization:
         if Parameterization._prefix:
             return Parameterization._prefix
 
-        dir = os.path.join(os.path.expanduser("~"), ".htmd")
+        d = os.path.join(os.path.expanduser("~"), ".htmd")
         try:
-            os.mkdir(dir)
+            os.mkdir(d)
         except:
             pass
 
-        dir = os.path.join(dir, "gaamp")
+        d = os.path.join(d, "gaamp")
         try:
-            os.mkdir(dir)
+            os.mkdir(d)
         except:
             pass
 
-        return dir
+        return d
 
     @staticmethod
     def make_job_name():
@@ -185,8 +183,9 @@ class Parameterization:
         prefix = Parameterization.prefix()
         name = "%s-%05d" % (d, suffix)
         while not os.path.exists(os.path.join(prefix, name)):
-            suffix = suffix + 1
+            suffix += 1
             name = "%s-%05d" % (d, suffix)
+        return name
 
     @staticmethod
     def listJobs():
@@ -200,15 +199,14 @@ class Parameterization:
         import shutil
         import os
         jobb = os.path.basename(job)
-        dir = os.path.join(Parameterization.prefix(), jobb)
-        if not os.path.exists(dir):
-            raise ValueError("[" + job + "] [" + dir + "] not found")
-        shutil.rmtree(dir)
-
+        d = os.path.join(Parameterization.prefix(), jobb)
+        if not os.path.exists(d):
+            raise ValueError("[" + job + "] [" + d + "] not found")
+        shutil.rmtree(d)
         return True
 
     @staticmethod
-    def find_binary(bin, path=None, fatal=True):
+    def find_binary(binary, path=None, fatal=True):
         import shutil
 
         # print( os.environ['PATH'].split(os.pathsep)  )
@@ -225,11 +223,12 @@ class Parameterization:
         # print(bin)
         # print(pp)
 
-        r = shutil.which(bin, mode=os.X_OK, path=pp)
+        r = shutil.which(binary, mode=os.X_OK, path=pp)
         # print(r)
-        if r: return r
+        if r:
+            return r
         if fatal:
-            raise ValueError("Could not find binary [" + bin + "] in PATH ")
+            raise ValueError("Could not find binary [" + binary + "] in PATH ")
         else:
             return None
 
@@ -242,7 +241,7 @@ class Parameterization:
 
         print("""
 
-# Diagnostic calling function. Generated from parameterisation.py
+# Diagnostic calling function. Generated from parameterization.py
 
 CHECK() {
     if [ ! -x $1 ]; then
@@ -316,7 +315,7 @@ CHECK() {
 
         env['BIN_BABEL'] = Parameterization.find_binary("htmd_babel", path=gaamp_bin)
         env['BIN_MATCH'] = Parameterization.find_binary("match", path=gaamp_bin)
-        # env['BIN_ANTECHAMBER']= Parameterisation.find_binary( "antechamber", path=gaamp_bin )
+        # env['BIN_ANTECHAMBER']= Parameterization.find_binary( "antechamber", path=gaamp_bin )
         has_g09 = False
         has_psi4 = False
         try:
@@ -333,13 +332,13 @@ CHECK() {
         if not has_g09 and not has_psi4:
             raise ValueError("Neither G09 nor PSI4 found. At least one QM code is required")
         env['BIN_G09'] = Parameterization.find_binary("g09_wrapper", path=gaamp_bin)
-        # env['BIN_GNUPLOT']     = Parameterisation.find_binary( "gnuplot", path=gaamp_bin )
+        # env['BIN_GNUPLOT']     = Parameterization.find_binary( "gnuplot", path=gaamp_bin )
 
         env['BIN_CGRID'] = Parameterization.find_binary("cgrid", path=gaamp_bin)
-        #        env['BIN_CGRID_DRUDE'] = Parameterisation.find_binary( "drude_cgrid", path=gaamp_bin )
+        #        env['BIN_CGRID_DRUDE'] = Parameterization.find_binary( "drude_cgrid", path=gaamp_bin )
         env['BIN_ADD_TIP3'] = Parameterization.find_binary("add_tip3", path=gaamp_bin)
         env['BIN_GEN_XPSF'] = Parameterization.find_binary("gen_xpsf", path=gaamp_bin)
-        #        env['BIN_PDB_TO_CRD']  = Parameterisation.find_binary( "pdb_to_crd", path=gaamp_bin )
+        #        env['BIN_PDB_TO_CRD']  = Parameterization.find_binary( "pdb_to_crd", path=gaamp_bin )
         env['BIN_EQUIV_ATOM'] = Parameterization.find_binary("equiv_atom", path=gaamp_bin)
         env['BIN_GEN_ESP'] = Parameterization.find_binary("gen_esp", path=gaamp_bin)
         env['BIN_CHECK_B0_THETA0'] = Parameterization.find_binary("check_b0_theta0", path=gaamp_bin)
@@ -371,18 +370,17 @@ CHECK() {
         env['BIN_BSUB'] = Parameterization.find_binary("bsub", path=gaamp_bin, fatal=False)
         env['BIN_BJOBS'] = Parameterization.find_binary("bjobs", path=gaamp_bin, fatal=False)
 
-        #        print(env)
+        # print(env)
         if config:
-            if (config.ExecutionMode == "PBS" and (env['BIN_QSUB'] is None or env['BIN_QSTAT'] is None)):
-                raise ValueError("Dependencies for PBS execution not found. Ensure QSUB and QSTAT are available");
-            if (config.ExecutionMode == "LSF" and (env['BIN_BSUB'] is None or env['BIN_BJOBS'] is None)):
-                raise ValueError("Dependencies for LSF execution not found. Ensure BSUB and BJOBS are available");
-
+            if config.ExecutionMode == "PBS" and (env['BIN_QSUB'] is None or env['BIN_QSTAT'] is None):
+                raise ValueError("Dependencies for PBS execution not found. Ensure QSUB and QSTAT are available")
+            if config.ExecutionMode == "LSF" and (env['BIN_BSUB'] is None or env['BIN_BJOBS'] is None):
+                raise ValueError("Dependencies for LSF execution not found. Ensure BSUB and BJOBS are available")
         return env
 
     def showMolecule(self):
         m = self.getMolecule()
-        return m.view(viewer="ngl", sel="all", style="cpk")
+        return m.view(viewer="webgl", sel="all", style="cpk")
 
     @staticmethod
     def listDihedrals(filename):
@@ -392,7 +390,7 @@ CHECK() {
         ll1 = []
         ll2 = []
         env = Parameterization._preflight_test(None)
-        mol = Molecule(filename);
+        mol = Molecule(filename)
         mol = Parameterization._rename_mol(mol)
         mol.bonds = mol._guessBonds()
         # make a tempdir
@@ -407,12 +405,12 @@ CHECK() {
             mol.write("mol-opt.xyz")
             mol.write("mol.xpsf", type="psf")
             for charge in range(-1, 2):
-                ret = subprocess.check_output(
+                subprocess.check_output(
                     [env['BIN_MATCH'], "-charge", str(charge), "-forcefield", "top_all36_cgenff_new", "mol.pdb"],
                     stderr=subprocess.STDOUT, shell=False, stdin=None)
-            ret = subprocess.check_output([env['BIN_GEN_XPSF'], "mol.rtf", "mol.xpsf", "MOL"], stderr=subprocess.STDOUT,
-                                          shell=False, stdin=None)
-            ret = subprocess.check_output([env['BIN_GEN_SOFT_LIST']], stderr=subprocess.STDOUT, shell=False, stdin=None)
+            subprocess.check_output([env['BIN_GEN_XPSF'], "mol.rtf", "mol.xpsf", "MOL"], stderr=subprocess.STDOUT,
+                                    shell=False, stdin=None)
+            subprocess.check_output([env['BIN_GEN_SOFT_LIST']], stderr=subprocess.STDOUT, shell=False, stdin=None)
 
             f = open("soft-dih-list.txt", "r")
             ff = f.readlines()
@@ -428,7 +426,7 @@ CHECK() {
             f.close()
             os.chdir(pwd)
 
-        return (ll1, ll2)
+        return ll1, ll2
 
     @staticmethod
     def renameStructure(filename):
@@ -448,32 +446,31 @@ CHECK() {
             t = re.sub('[1234567890]*', "", mol.name[i]).upper()
             idx = 0
 
-            if not t in hh:
+            if t not in hh:
                 hh[t] = idx
 
-            idx = hh[t] + 1;
+            idx = hh[t] + 1
             hh[t] = idx
 
-            t = t + str(idx)
+            t += str(idx)
             mol.name[i] = t
             mol.resname[i] = "MOL"
         return mol
 
     def getMolecule(self):
-        import htmd
         if not self.completed:
-            raise ValueError("Parameterisation is not complete")
+            raise ValueError("Parameterization is not complete")
 
         # look for the right files  in the output directory
-        dir = os.path.join(self.directory, "999-results")
-        dir = os.path.join(dir, "mol.xyz")
-        if not os.path.exists(dir):
-            raise ValueError("Parameterisation did not produced a minimised structure")
-        mol = htmd.Molecule(dir)
-        Parameterization._rename_mol(mol)
+        d = os.path.join(self.directory, "999-results")
+        d = os.path.join(d, "mol.xyz")
+        if not os.path.exists(d):
+            raise ValueError("Parameterization did not produced a minimised structure")
+        mol = Molecule(d)
+        mol = Parameterization._rename_mol(mol)
         return mol
 
-    def showDihedral(self, index, viewer="ngl"):
+    def showDihedral(self, index, viewer="webgl"):
         dih = self.getDihedralIndexes()
         if index < 0 or index >= len(dih):
             raise ValueError("Dihedral index out of range")
@@ -491,14 +488,14 @@ CHECK() {
 
     def getDihedralIndexes(self, byname=False):
         if not self.completed:
-            raise ValueError("Parameterisation is not complete")
+            raise ValueError("Parameterization is not complete")
 
-        dir = os.path.join(self.directory, "999-results")
+        d = os.path.join(self.directory, "999-results")
 
-        sdl = os.path.join(dir, "soft-dih-list.txt")
+        sdl = os.path.join(d, "soft-dih-list.txt")
 
         if not os.path.exists(sdl):
-            raise ValueError("Parameterisation did not produce any graphs " + sdl)
+            raise ValueError("Parameterization did not produce any graphs " + sdl)
 
         if byname:
             m = self.getMolecule()
@@ -519,58 +516,54 @@ CHECK() {
 
         return sdl
 
-    def getParameters(self):
-        import tempfile
+    def getParameters(self, outdir="./", outname="mol"):
         if not self.completed:
-            raise ValueError("Parameterisation is not complete")
+            raise ValueError("Parameterization is not complete")
         # look for the right files  in the output directory
 
-        dir = os.path.join(self.directory, "999-results")
-        rtf = os.path.join(dir, "mol.rtf")
-        prm = os.path.join(dir, "mol.prm")
-        xyz = os.path.join(dir, "mol.xyz")
-        pdb = os.path.join(dir, "mol.pdb")
+        d = os.path.join(self.directory, "999-results")
+        rtf = os.path.join(d, "mol.rtf")
+        prm = os.path.join(d, "mol.prm")
+        xyz = os.path.join(d, "mol.xyz")
+        # pdb = os.path.join(d, "mol.pdb")
 
-        rtf_tmp = tempfile.mkstemp(suffix=".rtf")
-        prm_tmp = tempfile.mkstemp(suffix=".prm")
-        pdb_tmp = tempfile.mkstemp(suffix=".pdb")
-        xyz_tmp = tempfile.mkstemp(suffix=".xyz")
-        os.close(rtf_tmp[0])
-        os.close(prm_tmp[0])
-        os.close(pdb_tmp[0])
-        os.close(xyz_tmp[0])
+        rtf_tmp = outdir + outname + ".rtf"
+        prm_tmp = outdir + outname + ".prm"
+        pdb_tmp = outdir + outname + ".pdb"
+        # xyz_tmp = tempfile.mkstemp(suffix=".xyz")
+        # os.close(rtf_tmp[0])
+        # os.close(prm_tmp[0])
+        # os.close(pdb_tmp[0])
+        # os.close(xyz_tmp[0])
 
-        shutil.copyfile(rtf, rtf_tmp[1])
-        shutil.copyfile(prm, prm_tmp[1])
-        shutil.copyfile(xyz, xyz_tmp[1])
+        shutil.copyfile(rtf, rtf_tmp)
+        shutil.copyfile(prm, prm_tmp)
+        # shutil.copyfile(xyz, xyz_tmp[1])
 
         # The Output minimised structure is in XYZ format
         # Need to turn it into a PDB with correct atom naming
         mol = Molecule(xyz)
         Parameterization._rename_mol(mol)  # Canonicalise atom and reside naming
-        mol.write(pdb_tmp[1])
+        mol.write(pdb_tmp)
 
-        return {
-            "RTF": rtf_tmp[1],
-            "PRM": prm_tmp[1],
-            "PDB": pdb_tmp[1]
-        }
+        return
 
-    def plotDihedrals(self, show=True):
+    def plotDihedrals(self, show=True, outdir="./"):
         import matplotlib as mpl
-        import matplotlib.pyplot as plt
+        from matplotlib import pylab as plt
         import numpy as np
+        import re
 
-        fn = []
+        # fn = []
         names = []
         if not self.completed:
-            raise ValueError("Parameterisation is not complete")
+            raise ValueError("Parameterization is not complete")
         if not show:
             mpl.use('Agg')
 
             # look for the right files  in the output directory
 
-        dir = os.path.join(self.directory, "999-results")
+        d = os.path.join(self.directory, "999-results")
 
         sdl = self.getDihedralIndexes()
 
@@ -597,18 +590,18 @@ CHECK() {
             ax1.set_title(title)
             names.append(title)
             #            qm =np.loadtxt( os.path.join( dir, "fitting-1d-" + str(i+1) + ".dat" ) )
-            qm = np.loadtxt(os.path.join(dir, "1d-qm-mm-" + str(i + 1) + ".dat"))
-            org = np.loadtxt(os.path.join(dir, "org-1d-" + str(i + 1) + ".dat"))
+            qm = np.loadtxt(os.path.join(d, "1d-qm-mm-" + str(i + 1) + ".dat"))
+            org = np.loadtxt(os.path.join(d, "org-1d-" + str(i + 1) + ".dat"))
 
             # Remove any values which are > 20kcal/mol from the minimum
             # and so would have been excluded from the fit
-            min = np.amin(qm[:, 1])
+            minimum = np.amin(qm[:, 1])
             qmx = []
             qmy = []
-            for i in range(qm[:, 1].shape[0]):
-                if qm[i, 1] <= (min + 20):
-                    qmx.append(qm[i, 0])
-                    qmy.append(qm[i, 1])
+            for j in range(qm[:, 1].shape[0]):
+                if qm[j, 1] <= (minimum + 20):
+                    qmx.append(qm[j, 0])
+                    qmy.append(qm[j, 1])
 
             ax1.plot(qmx, qmy, label="QM", color="r", marker="o")
             ax1.plot(qm[:, 0], qm[:, 2], label="MM Fitted", color="g", marker="o")
@@ -618,11 +611,12 @@ CHECK() {
             #        plt.tight_layout()
             if show:
                 plt.show()
-            tf = tempfile.mkstemp(suffix=".svg")
-            os.close(tf[0])
-            plt.savefig(tf[1], format="svg")
-            fn.append(tf[1])
-        return (fn, names)
+            # tf = tempfile.mkstemp(suffix=".svg")
+            tf = outdir + "torsion-potential-" + re.sub(" ", "-", title) + ".png"
+            # os.close(tf[0])
+            plt.savefig(tf, format="png")
+            # fn.append(tf[1])
+        return
 
     def run_qm_jobs(self, directory):
         if self._config.ExecutionMode == "Inline":
@@ -642,13 +636,13 @@ CHECK() {
         fno = []
         for root, dirs, files in os.walk(directory):
             for f in files:
-                if (f.endswith(".gjf")):
+                if f.endswith(".gjf"):
                     op = f.replace(".gjf", ".out")
                     if not os.path.exists(os.path.join(root, op)):
                         fni.append(os.path.join(root, f))
                         fno.append(os.path.join(root, op))
 
-        if (len(fni)):
+        if len(fni):
             bar = ProgressBar(len(fni), description="Running QM Calculations")
             for i in range(len(fni)):
                 subprocess.check_output([cmd, fni[i], fno[i]])
@@ -663,7 +657,7 @@ CHECK() {
             try:
                 ii = torsions[1].index(t)
             except:
-                raise ValueError("Torsion [" + str(t) + "] doesn't exist");
+                raise ValueError("Torsion [" + str(t) + "] doesn't exist")
             index = torsions[0][ii]
             print("%d %d %d %d" % (index[0], index[1], index[2], index[3]), file=fh)
 
@@ -677,13 +671,13 @@ CHECK() {
         fno = []
         for root, dirs, files in os.walk(directory):
             for f in files:
-                if (f.endswith(".gjf")):
+                if f.endswith(".gjf"):
                     op = f.replace(".gjf", ".out")
                     if not os.path.exists(op):
                         fni.append(os.path.join(root, f))
                         fno.append(os.path.join(root, op))
 
-        if (len(fni)):
+        if len(fni):
             # Make a PBS script
             for i in range(len(fni)):
                 fpbs = fni[i] + ".pbs"
@@ -691,7 +685,7 @@ CHECK() {
                     f = open(fpbs, "w")
                     print("#PBS -lselect=1:ncpus=%d:mem=%dgb" % (self._config.NCORES, self._config.MEMORY), file=f)
                     print("#PBS -lwalltime=24:0:0\n", file=f)
-                    print("cd \"%s\"" % (directory), file=f)
+                    print("cd \"%s\"" % directory, file=f)
                     print("\"%s\" %s %s" % (cmd, fni[i], fno[i]), file=f)
                     f.close()
 
@@ -721,15 +715,15 @@ CHECK() {
                         pass
                     if os.access(i, os.R_OK):
                         # print("FOUND")
-                        count = count + 1
+                        count += 1
                     else:
                         complete = False
 
                 # print( str(count) + " completed of " + str(len(fno)) )
-                while (lastcount < count):
+                while lastcount < count:
                     bar.progress()
-                    lastcount = lastcount + 1;
-                time.sleep(10);
+                    lastcount += 1
+                time.sleep(10)
             bar.stop()
             time.sleep(5)  # A bit of time for any outputfile to complete writing
 
@@ -754,16 +748,16 @@ CHECK() {
                 if not os.path.exists(fpbs):
                     f = open(fpbs, "w")
 
-                    print("#BSUB -n %d" % (self._config.NCORES), file=f)
-                    print("#BSUB -R \"span[ptile=%d]\"" % (self._config.NCORES), file=f)
+                    print("#BSUB -n %d" % self._config.NCORES, file=f)
+                    print("#BSUB -R \"span[ptile=%d]\"" % self._config.NCORES, file=f)
                     print("#BSUB -W 24:00", file=f)
                     print("#BSUB -J gaussian", file=f)
                     print("#BSUB -app gaussian", file=f)
                     print("#BSUB -o /dev/null", file=f)
-                    print("#BSUB -M %d000" % (self._config.MEMORY), file=f)
+                    print("#BSUB -M %d000" % self._config.MEMORY, file=f)
                     print("\nmodule load gaussian\n", file=f)
 
-                    print("cd \"%s\"" % (directory), file=f)
+                    print("cd \"%s\"" % directory, file=f)
                     print("\"%s\" %s %s" % (cmd, fni[i], fno[i]), file=f)
                     f.close()
 
@@ -793,15 +787,15 @@ CHECK() {
                         pass
                     if os.access(i, os.R_OK):
                         # print("FOUND")
-                        count = count + 1
+                        count += 1
                     else:
                         complete = False
 
                 # print( str(count) + " completed of " + str(len(fno)) )
-                while (lastcount < count):
+                while lastcount < count:
                     bar.progress()
-                    lastcount = lastcount + 1;
-                time.sleep(10);
+                    lastcount += 1
+                time.sleep(10)
             bar.stop()
             time.sleep(5)  # A bit of time for any outputfile to complete writing
 
