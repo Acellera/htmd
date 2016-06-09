@@ -1,11 +1,5 @@
-import inspect
 import os
-import re
-import shutil
-from difflib import get_close_matches
-
 import psutil
-
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_0POS, RANGE_POS, RANGE_ANY
 
 
@@ -15,6 +9,7 @@ class Command(ProtocolInterface):
 
     def __init__(self, check=True):
         super().__init__()
+
         self._cmdString("Model", "str", None, "Nonpolar", valid_values=["Nonpolar", "Drude", "Match"])
         self._cmdBinary("AsymmetricTorsion", "bool", None, False)
         self._cmdString("ExecutionMode", "str", None, "Inline", valid_values=["Inline", "PBS", "LSF"])
@@ -79,6 +74,12 @@ class Command(ProtocolInterface):
         self._cmdBinary("Debug", "bool", None, False)
         self._cmdValue("NCORES", "int", None, ncpus, TYPE_INT, RANGE_POS)
         self._cmdValue("MEMORY", "int", None, mem, TYPE_INT, RANGE_POS)
+
+    def get_default_configuration(self):
+        ret = dict()
+        for i in self._commands.keys():
+            ret[i] = self._commands[i].default
+        return ret
 
 '''
     @staticmethod
@@ -146,12 +147,6 @@ class Command(ProtocolInterface):
                 print("\n   Default: " + str(self._cmd[match[0]].default) + " " + units + "\n")
 '''
 # find
-
-    def get_default_configuration(self):
-        ret = dict()
-        for i in self._commands.keys():
-            ret[i] = self._commands[i].default
-        return ret
 
 # def validate( self,  key, value, basedir=None ):
 #
