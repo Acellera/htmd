@@ -206,8 +206,8 @@ int main(int argc, char **argv)
 		}
 		
 		sprintf(szNewDir, "%s/rotamer-%d", szCurDir, n_Rotamer+1);
-		sprintf(szCmd, "make_directory rotamer-%d", n_Rotamer+1);
-		system(szCmd);
+		sprintf(szCmd, "rotamer-%d", n_Rotamer+1);
+		make_directory( szCmd, 0700 );
 		chdir(szNewDir);
 
 		Output_Gaussian_File();

@@ -37,6 +37,8 @@ from htmd.molecule.util import uniformRandomRotation
 from htmd.rotationmatrix import rotationMatrix
 from htmd.proteinpreparation.proteinpreparation import prepareProtein
 from htmd.dock import dock
+from htmd.parameterization.parameterization import Parameterization
+from htmd.parameterization.configuration import ParameterizationConfig
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.util import tempname
@@ -53,7 +55,12 @@ import tempfile
 import random
 from glob import glob
 from sklearn.cluster import MiniBatchKMeans
-from matplotlib import pylab as plt
+
+# No longer impoty matplotlib here, as it breaks
+# Parameterise's import and attmept to set alternate
+# render back-end
+
+#from matplotlib import pylab as plt
 # ----------------------------
 try:
 	logging.config.fileConfig(os.path.join(home(), 'logging.ini'), disable_existing_loggers=False)

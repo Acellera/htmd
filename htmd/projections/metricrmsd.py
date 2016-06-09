@@ -222,6 +222,7 @@ class _MetricRmsdOld(_OldMetric):
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule
     from htmd.home import home
+    import numpy as np
     from os import path
 
     mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))

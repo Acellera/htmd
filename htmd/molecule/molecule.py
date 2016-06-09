@@ -21,6 +21,7 @@ from copy import deepcopy
 from os import path
 import logging
 import re
+
 logger = logging.getLogger(__name__)
 
 
@@ -124,7 +125,7 @@ class Molecule:
     }
 
     def __init__(self, filename=None, name=None):
-        self.bonds = []
+        self.bonds = np.empty((0, 2), dtype=np.uint32)
         self.ssbonds = []
         self.box = None
         self.charge = []
@@ -152,8 +153,6 @@ class Molecule:
                     self.viewname = filename
                     if path.isfile(filename):
                         self.viewname = path.basename(filename)
-        #if( self.bonds is None ) or (not len(self.bonds)):
-        #    self.guessBonds()
 
     def insert(self, mol, index):
         """Insert the contents of one molecule into another at a specific index.
@@ -196,16 +195,17 @@ class Molecule:
                 if k == 'serial':
                     continue
                 if mol.__dict__[k] is None or np.size(mol.__dict__[k]) == 0:
-                    self.__dict__[k] = np.insert(self.__dict__[k], index, np.zeros(numatoms, dtype=self.__dict__[k].dtype), axis=0)
+                    self.__dict__[k] = np.insert(self.__dict__[k], index,
+                                                 np.zeros(numatoms, dtype=self.__dict__[k].dtype), axis=0)
                 elif k == 'coords':
                     self.coords = np.insert(self.coords, index, np.atleast_3d(mol.coords), axis=0)
                 else:
                     self.__dict__[k] = np.insert(self.__dict__[k], index, mol.__dict__[k], axis=0)
-            self.serial = np.arange(1, self.numAtoms+1)
+            self.serial = np.arange(1, self.numAtoms + 1)
         except:
             self = backup
             raise NameError('Failed to insert molecule.')
-        # TODO: Don't allow user to insert atoms inside a residue, only between (?)
+            # TODO: Don't allow user to insert atoms inside a residue, only between (?)
 
     def remove(self, selection, _logger=True):
         """ Remove atoms from the Molecule
@@ -390,7 +390,7 @@ class Molecule:
                     self.coords = np.append(self.coords, mol.coords, axis=0)
                 else:
                     self.__dict__[k] = np.append(self.__dict__[k], np.array(mol.__dict__[k], dtype=dtype))
-            self.serial = np.arange(1, self.numAtoms+1)
+            self.serial = np.arange(1, self.numAtoms + 1)
         except:
             self = backup
             raise NameError('Failed to append molecule.')
@@ -398,7 +398,31 @@ class Molecule:
         if collisions:
             _resolveCollisions(self, occ1, occ2, coldist)
 
-    def atomselect(self, sel, indexes=False, strict=False):
+    def _getBonds(self, fileBonds=True, guessBonds=True):
+        """ Returns an array of all bonds.
+
+        Parameters
+        ----------
+        fileBonds : bool
+            If True will use bonds read from files.
+        guessBonds : bool
+            If True will use guessed bonds.
+
+        Returns
+        -------
+        bonds : np.ndarray
+            An array of bonds
+        """
+        bonds = np.empty((0, 2), dtype=numpy.uint32)
+        if fileBonds:
+            if len(self.bonds) == 0:  # This is a patch for the other readers not returning correct empty dimensions
+                self.bonds = np.empty((0, 2), dtype=numpy.uint32)
+            bonds = numpy.vstack((bonds, self.bonds))
+        if guessBonds:
+            bonds = numpy.vstack((bonds, self._guessBonds()))
+        return bonds
+
+    def atomselect(self, sel, indexes=False, strict=False, fileBonds=True, guessBonds=True):
         """ Select a set of atoms based on a selection text
 
         Parameters
@@ -409,6 +433,10 @@ class Molecule:
             If True returns the indexes instead of a bitmap
         strict: bool
             If True it will raise an error if no atoms were selected.
+        fileBonds : bool
+            If True will use bonds read from files.
+        guessBonds : bool
+            If True will use guessed bonds.
 
         Return
         ------
@@ -426,9 +454,9 @@ class Molecule:
         elif isinstance(sel, str):
             selc = self.coords[:, :, self.frame].copy()
             s = vmdselection(sel, selc, self.element, self.name, self.resname, self.resid,
-                               chain=self.chain,
-                               segname=self.segid, insert=self.insertion, altloc=self.altloc, beta=self.beta,
-                               occupancy=self.occupancy)
+                             chain=self.chain,
+                             segname=self.segid, insert=self.insertion, altloc=self.altloc, beta=self.beta,
+                             occupancy=self.occupancy, bonds=self._getBonds(fileBonds, guessBonds))
             if np.sum(s) == 0 and strict:
                 raise NameError('No atoms were selected with atom selection "{}".'.format(sel))
         else:
@@ -480,7 +508,8 @@ class Molecule:
         map = np.ones(self.numAtoms, dtype=int)
         map[idx] = -1
         map[map == 1] = np.arange(self.numAtoms - len(idx))
-        bonds = np.array(self.bonds, dtype=np.int32)  # Have to store in temp because bonds is uint and can't accept -1 values
+        bonds = np.array(self.bonds,
+                         dtype=np.int32)  # Have to store in temp because bonds is uint and can't accept -1 values
         bonds[:, 0] = map[self.bonds[:, 0]]
         bonds[:, 1] = map[self.bonds[:, 1]]
         remA = bonds[:, 0] == -1
@@ -489,12 +518,14 @@ class Molecule:
         # Delete bonds between non-existant atoms
         self.bonds = bonds[stays, :]
 
-    def guessBonds(self):
+    def _guessBonds(self):
         """ Tries to guess the bonds in the Molecule
 
         Can fail badly when non-bonded atoms are very close together. Use with extreme caution.
         """
-        self.bonds = guessbonds(self.coords, self.element, self.name, self.resname, self.resid, self.chain, self.segid, self.insertion, self.altloc)
+        framecoords = self.coords[:, :, self.frame].copy()
+        return guessbonds(framecoords, self.element, self.name, self.resname, self.resid, self.chain, self.segid,
+                                self.insertion, self.altloc)
 
     def moveBy(self, vector, sel=None):
         '''Move a selection of molecule atoms by a given vector
@@ -542,7 +573,7 @@ class Molecule:
         for a in s:
             self.coords[a, :, self.frame] = np.dot(M, self.coords[a, :, self.frame])
 
-    def rotateBy(self, M, center=[0, 0, 0], sel='all'):
+    def rotateBy(self, M, center=(0, 0, 0), sel='all'):
         """ Rotate a selection of atoms by a given rotation around a center
 
         Parameters
@@ -557,7 +588,7 @@ class Molecule:
         newcoords = np.dot(newcoords, np.transpose(M)) + center
         self.set('coords', newcoords, sel=sel)
 
-    def center(self, loc=[0, 0, 0], sel='all'):
+    def center(self, loc=(0, 0, 0), sel='all'):
         """ Moves the geometric center of the Molecule to a given location
 
         Parameters
@@ -576,8 +607,9 @@ class Molecule:
         coords = self.get('coords', sel=sel)
         com = np.mean(coords, 0)
         self.moveBy(-com)
+        self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False, bond=False):
+    def read(self, filename, type=None, skip=None, frames=None, append=False):
         """ Read any supported file (pdb, psf, prmtop, prm, xtc, mol2, gjf, mae)
 
         Detects from the extension the file type and loads it into Molecule
@@ -594,12 +626,15 @@ class Molecule:
             If the file is a trajectory, read only the given frames
         append : bool, optional
             If the file is a trajectory, append the coordinates to the previous coordinates
-        bond : bool, optional
-            Guess the connectivity of the atoms
         """
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
+            for f in filename:
+                if len(f) != 4 and not os.path.exists(f):
+                    raise FileNotFoundError('File {} was not found.'.format(f))
             firstfile = filename[0]
         else:
+            if len(filename) != 4 and not os.path.exists(filename):
+                raise FileNotFoundError('File {} was not found.'.format(filename))
             firstfile = filename
 
         from htmd.simlist import Sim
@@ -612,15 +647,29 @@ class Molecule:
             type = type.lower()
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
+            # TODO: Check for validity when loading a PSF after a PDB and vice versa
             con = PSFread(filename)
+            oldcoords = []
+            if len(self.coords) != 0:
+                oldcoords = self.coords
+            self.empty(len(con.serial))  # initialize all arrays as empty
+            self.serial = con.serial
+            self.name   = con.atomname
+            self.resname= con.resname
+            self.resid  = con.resid
+            self.segid  = con.segid
+            self.insertion = con.insertion
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             self.masses = numpy.asarray(con.masses, dtype=np.float32)
-            self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
-        elif (type is None and (firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
+            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
+            if len(oldcoords) != 0:
+                self.coords = oldcoords
+        elif (type is None and (
+            firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
             con = PRMTOPread(filename)
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             # self.masses = numpy.asarray(con.masses, dtype=np.float32)  # No masses in PRMTOP
-            self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
+            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
@@ -645,21 +694,18 @@ class Molecule:
             except:
                 raise ValueError("Unknown file type")
 
-        if bond:
-            self.guessBonds()
-
     def _readXYZ(self, filename):
         f = open(filename, "r")
-        natoms = int(f.readline())
+        natoms = int(f.readline().split()[0])
         for k in self._pdb_fields:
             self.__dict__[k] = numpy.zeros(natoms, dtype=self._pdb_fields[k])
         self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
 
         f.readline()
         for i in range(natoms):
-            s=f.readline().split()
+            s = f.readline().split()
             self.record[i] = "HETATM"
-            self.serial[i] = i+1
+            self.serial[i] = i + 1
             self.element[i] = s[0]
             self.name[i] = s[0]
             self.coords[i, 0, 0] = float(s[1])
@@ -674,16 +720,17 @@ class Molecule:
         end = -1
         c = 0
         for i in range(len(l)):
-            if len(l[i].strip()) == 0 and c == 0: c = 1
+            if len(l[i].strip()) == 0 and c == 0:
+                c = 1
             elif len(l[i].strip()) == 0 and c == 1:
                 c = 2
-                start = i+2
+                start = i + 2
             elif len(l[i].strip()) == 0 and c == 2:
                 c = 3
                 end = i
 
-        natoms = end-start
-        if start == -1 or end == -1 or natoms == 0: raise ValueError( "Invalid GJF file" )
+        natoms = end - start
+        if start == -1 or end == -1 or natoms == 0: raise ValueError("Invalid GJF file")
 
         nn = 0
         nf = self.numFrames
@@ -701,9 +748,9 @@ class Molecule:
             self.box = numpy.zeros((3, 1), dtype=numpy.float32)
 
         for idx in range(natoms):
-            s = l[idx+start].split()
+            s = l[idx + start].split()
             self.record[idx] = "HETATM"
-            self.serial[idx] = i+1
+            self.serial[idx] = i + 1
             self.element[idx] = s[0]
             self.name[idx] = s[0]
             self.coords[idx, 0, nf] = float(s[1])
@@ -717,7 +764,7 @@ class Molecule:
             mol = PDBParser(filename, mode)
         elif len(filename) == 4:
             # Try loading it from the pdb data directory
-            localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower()+".pdb")
+            localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
             if os.path.isfile(localpdb):
                 logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
                 mol = PDBParser(localpdb, mode)
@@ -744,8 +791,8 @@ class Molecule:
                     self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
 
         self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
-        self.bonds = np.array(mol.bonds)
-        self.ssbonds = np.array(mol.ssbonds)
+        self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
+        self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
         self.box = np.array(mol.box)
 
         if self.masses is None or len(self.masses) == 0:
@@ -764,8 +811,8 @@ class Molecule:
         start = None
         end = None
         for i in range(len(l)):
-            if l[i].startswith("@<TRIPOS>ATOM"): start = i+1
-            if l[i].startswith("@<TRIPOS>BOND"): end = i-1
+            if l[i].startswith("@<TRIPOS>ATOM"): start = i + 1
+            if l[i].startswith("@<TRIPOS>BOND"): end = i - 1
 
         if not start or not end:
             raise ValueError("File cannot be read")
@@ -777,7 +824,7 @@ class Molecule:
         self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
 
         for i in range(natoms):
-            s=l[i+start].strip().split()
+            s = l[i + start].strip().split()
             self.record[i] = "HETATM"
             self.serial[i] = int(s[0])
             self.element[i] = re.sub("[0123456789]*", "", s[1])
@@ -797,7 +844,8 @@ class Molecule:
                 if len(self.__dict__[k]) != natoms:
                     self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
 
-        self.segid = self.segid.astype('str').astype('object')  # Making sure the segids are strings because np.zeros gives int objects
+        self.segid = self.segid.astype('str').astype(
+            'object')  # Making sure the segids are strings because np.zeros gives int objects
         self.coords = np.atleast_3d(self.coords)
         for h in datadict['het']:
             self.set('record', 'HETATM', sel='resname {}'.format(h))
@@ -819,6 +867,7 @@ class Molecule:
         class Struct:
             def __init__(self):
                 return
+
         import mdtraj as md
         traj = md.load(filename, top=self.topoloc)
         s = Struct()
@@ -846,13 +895,15 @@ class Molecule:
             filename = np.array(filename)
         # print(len(filename), len(frames), type(frames))
 
-        #from IPython.core.debugger import Tracer
-        #Tracer()()
+        # from IPython.core.debugger import Tracer
+        # Tracer()()
         if frames is not None:
             if not isinstance(frames, list) and not isinstance(frames, np.ndarray):
                 frames = [frames]
             if len(filename) != len(frames):
-                raise NameError('Number of trajectories (' + str(len(filename)) + ') does not match number of frames (' + str(len(frames)) + ') given as arguments')
+                raise NameError(
+                    'Number of trajectories (' + str(len(filename)) + ') does not match number of frames (' + str(
+                        len(frames)) + ') given as arguments')
 
         self.fileloc = []
         for i, f in enumerate(filename):
@@ -872,7 +923,8 @@ class Molecule:
                 self.fileloc.append([f, int(frames[i])])
 
             if self.numAtoms != 0 and np.size(traj.coords, 0) != self.numAtoms:
-                raise ValueError('Trajectory # of atoms ' + str(np.size(self.coords, 0)) + ' mismatch with # of already loaded atoms ' + str(self.numAtoms))
+                raise ValueError('Trajectory # of atoms ' + str(
+                    np.size(self.coords, 0)) + ' mismatch with # of already loaded atoms ' + str(self.numAtoms))
 
             if len(self.coords) > 0 and self.coords.shape[0] > 0 and (self.coords.shape[0] != traj.coords.shape[0]):
                 raise ValueError("Trajectory # of atoms mismatch with already loaded coordinates")
@@ -894,12 +946,13 @@ class Molecule:
         self.step = traj.step
         self.time = traj.time
         if len(traj.time) < 2:
-            #logger.info('Trajectory has broken framestep. Cannot read correctly, setting to 0.1ns.')
+            # logger.info('Trajectory has broken framestep. Cannot read correctly, setting to 0.1ns.')
             self.fstep = 0.1
         else:
             self.fstep = (traj.time[1] - traj.time[0]) / 1E6  # convert femtoseconds to nanoseconds
 
-    def view(self, sel=None, style=None, color=None, guessbonds=True, viewer=None, hold=False, name=None, viewerhandle=None):
+    def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
+             viewerhandle=None):
         """ Visualizes the molecule in a molecular viewer
 
         Parameters
@@ -910,9 +963,9 @@ class Molecule:
             Representation style.
         color : str
             Coloring mode or color ID.
-        guessbonds : bool
+        guessBonds : bool
             Allow VMD to guess bonds for the molecule
-        viewer : str ('vmd','notebook')
+        viewer : str ('vmd', 'webgl')
             Choose viewer backend. Default is taken from htmd.config
         hold : bool
             If set to True, it will not visualize the molecule but instead collect representations until set back to False.
@@ -944,9 +997,11 @@ class Molecule:
         if viewer.lower() == 'notebook':
             return self._viewMDTraj(pdb, xtc)
         elif viewer.lower() == 'vmd':
-            self._viewVMD(pdb, xtc, viewerhandle, name, guessbonds)
-        elif viewer.lower() == 'ngl':
-            return self._viewNGL(pdb, xtc, guessbonds)
+            self._viewVMD(pdb, xtc, viewerhandle, name, guessBonds)
+        elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
+            return self._viewNGL(pdb, xtc, guessBonds)
+        else:
+            raise ValueError('Unknown viewer.')
 
         # Remove temporary files
         if xtc:
@@ -999,8 +1054,10 @@ class Molecule:
         class TrajectoryStreamer(Trajectory):
             def __init__(self, coords):
                 self.coords = coords
+
             def get_coordinates_list(self, index):
                 return self.coords[:, :, index].flatten().tolist()
+
             def get_frame_count(self):
                 return np.size(self.coords, 2)
 
@@ -1041,7 +1098,7 @@ class Molecule:
         s = np.delete(s, remidx)
         self.set('resname', newres, sel=s)
 
-    def wrap(self, wrapsel=None ):
+    def wrap(self, wrapsel=None, fileBonds=True, guessBonds=True):
         """ Wraps coordinates of the molecule into the simulation box
 
         Parameters
@@ -1056,25 +1113,11 @@ class Molecule:
         >>> mol.wrap('protein')
         """
         # TODO: selection is not used. WHY?
-        if len(self.bonds) == 0:
-            bonds = guessbonds(self.coords, self.element, self.name, self.resname, self.resid, self.chain, self.segid, self.insertion, self.altloc)
-        else:
-            bonds = np.append(self.bonds, guessbonds(self.coords, self.element, self.name, self.resname, self.resid, self.chain, self.segid, self.insertion, self.altloc), axis=0)
-        '''# Duplicating bonds in reverse to see if it helps
-        uqatms = np.unique(bonds)
-        for a in uqatms:
-            idx = bonds[bonds[:, 0] == a, 1]
-            idx = np.unique(np.append(idx, bonds[bonds[:, 1] == a, 0]))
-            for i in idx:
-                if not np.any(np.all(bonds == [a, i], axis=1)):
-                    bonds = np.append(bonds, [[a, i]], axis=0)
-                if not np.any(np.all(bonds == [i, a], axis=1)):
-                    bonds = np.append(bonds, [[i, a]], axis=0)'''
         if wrapsel:
-            centersel = self.atomselect( wrapsel, indexes=True )
+            centersel = self.atomselect(wrapsel, indexes=True)
         else:
             centersel = None
-        self.coords = wrap(self.coords, bonds, self.box, centersel=centersel)
+        self.coords = wrap(self.coords, self._getBonds(fileBonds, guessBonds), self.box, centersel=centersel)
 
     def write(self, filename, sel=None, type=None):
         """ Writes any of the supported formats (pdb, coor, psf, xtc)
@@ -1110,26 +1153,26 @@ class Molecule:
                 self.write(tmppdb)
                 self.write(tmpxtc)
                 traj = md.load(tmpxtc, top=tmppdb)
-                #traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
-                #traj.time = self.time
-                #traj.unitcell_lengths = self.box.T / 10
+                # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
+                # traj.time = self.time
+                # traj.unitcell_lengths = self.box.T / 10
                 traj.save(filename)
             except:
                 raise ValueError("Unknown file type")
 
-    def _writeXYZ( self, filename, sel="all" ):
+    def _writeXYZ(self, filename, sel="all"):
         src = self
-        if sel is not None: 
-          src = sel.copy()
-          src.filter(sel, _logger=False)
-        fh = open( filename, "w" )
+        if sel is not None:
+            src = sel.copy()
+            src.filter(sel, _logger=False)
+        fh = open(filename, "w")
         natoms = len(src.record)
-        print( "%d\n" % (natoms), file=fh )
+        print("%d\n" % (natoms), file=fh)
         for i in range(natoms):
-          e = src.element[i].strip()
-          if( not len(e) ):
-             e = re.sub( "[1234567890]*", "", src.name[i] )
-          print("%s   %f   %f    %f" % ( e, src.coords[i,0,0], src.coords[i,1,0], src.coords[i,2,0] ), file=fh )
+            e = src.element[i].strip()
+            if (not len(e)):
+                e = re.sub("[1234567890]*", "", src.name[i])
+            print("%s   %f   %f    %f" % (e, src.coords[i, 0, 0], src.coords[i, 1, 0], src.coords[i, 2, 0]), file=fh)
         fh.close()
 
     def _writeBinCoordinates(self, filename, sel):
@@ -1159,13 +1202,14 @@ class Molecule:
         for k in self._pdb_fields:
             pdb.__dict__[k] = src.__dict__[k].copy()
 
-        pdb.coords = np.atleast_3d(pdb.coords[:, :, self.frame]) # Writing out only current frame
+        pdb.coords = np.atleast_3d(pdb.coords[:, :, self.frame])  # Writing out only current frame
 
         pdb.bonds = src.bonds
         pdb.ssbonds = src.ssbonds  # TODO: Is there such a thing in pdb format?
-        pdb.box = self.box
+        if pdb.box is not None:
+            pdb.box = np.atleast_2d(np.atleast_2d(self.box)[:, self.frame])
 
-        pdb.serial = np.arange(1, np.size(pdb.coords, 0)+1)
+        pdb.serial = np.arange(1, np.size(pdb.coords, 0) + 1)
         pdb.writePDB(filename)
 
     def _writeTraj(self, filename, sel):
@@ -1203,7 +1247,11 @@ class Molecule:
         self.resname = np.array(['UNK'] * numAtoms, dtype=self._pdb_fields['resname'])
         self.resid = np.array([999] * numAtoms, dtype=self._pdb_fields['resid'])
         self.coords = np.zeros((numAtoms, 3, 1), dtype=self._pdb_fields['coords'])
-        self.serial = np.arange(1, numAtoms+1)
+        self.charge = np.array([0] * numAtoms, dtype=self._pdb_fields['charge'])
+        self.serial = np.arange(1, numAtoms + 1)
+
+        self.masses = np.array([0] * numAtoms, dtype=self._append_fields['masses'])
+        self.box = None
 
 
     def sequence(self, oneletter=True):
@@ -1235,26 +1283,26 @@ class Molecule:
 
         """
         residueTable = {'ARG': 'R', 'AR0': 'R',
-                    'HIS': 'H', 'HID': 'H', 'HIE': 'H',
-                    'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
-                    'ASP': 'D', 'ASH': 'D',
-                    'GLU': 'E', 'GLH': 'E',
-                    'SER': 'S',
-                    'THR': 'T',
-                    'ASN': 'N',
-                    'GLN': 'Q',
-                    'CYS': 'C', 'CYX': 'C',
-                    'SEC': 'U',
-                    'GLY': 'G',
-                    'PRO': 'P',
-                    'ALA': 'A',
-                    'VAL': 'V',
-                    'ILE': 'I',
-                    'LEU': 'L',
-                    'MET': 'M',
-                    'PHE': 'F',
-                    'TYR': 'Y',
-                    'TRP': 'W'}
+                        'HIS': 'H', 'HID': 'H', 'HIE': 'H',
+                        'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
+                        'ASP': 'D', 'ASH': 'D',
+                        'GLU': 'E', 'GLH': 'E',
+                        'SER': 'S',
+                        'THR': 'T',
+                        'ASN': 'N',
+                        'GLN': 'Q',
+                        'CYS': 'C', 'CYX': 'C',
+                        'SEC': 'U',
+                        'GLY': 'G',
+                        'PRO': 'P',
+                        'ALA': 'A',
+                        'VAL': 'V',
+                        'ILE': 'I',
+                        'LEU': 'L',
+                        'MET': 'M',
+                        'PHE': 'F',
+                        'TYR': 'Y',
+                        'TRP': 'W'}
         from htmd.builder.builder import sequenceID
         prot = self.atomselect('protein')
         segs = np.unique(self.segid[prot])
@@ -1283,7 +1331,7 @@ class Molecule:
 
         # Join single letters into strings
         if oneletter:
-            segSequences = {k: "".join(segSequences[k]) for k in segSequences }
+            segSequences = {k: "".join(segSequences[k]) for k in segSequences}
 
         return segSequences
 
@@ -1302,17 +1350,17 @@ class Molecule:
     @property
     def x(self):
         """Get the x coordinates at the current frame"""
-        return self.coords[:,0,self.frame]
+        return self.coords[:, 0, self.frame]
 
     @property
     def y(self):
         """Get the y coordinates at the current frame"""
-        return self.coords[:,1,self.frame]
+        return self.coords[:, 1, self.frame]
 
     @property
     def z(self):
         """Get the z coordinates at the current frame"""
-        return self.coords[:,2,self.frame]
+        return self.coords[:, 2, self.frame]
 
     def __str__(self):
         def formatstr(name, field):
@@ -1352,7 +1400,8 @@ def _resolveCollisions(mol, occ1, occ2, gap):
     mol.set('occupancy', occ1, s1)
     mol.set('occupancy', occ2, s2)
 
-    logger.info('Removed {} residues from appended Molecule due to collisions.'.format(len(np.unique(mol.resid[overlaps]))))
+    logger.info(
+        'Removed {} residues from appended Molecule due to collisions.'.format(len(np.unique(mol.resid[overlaps]))))
     # Remove the overlaps
     mol.remove(overlaps, _logger=False)
 
@@ -1402,6 +1451,7 @@ class Representations:
     >>> mol.view()
     >>> mol.reps.remove()
     """
+
     def __init__(self, mol):
         self.replist = []
         self._mol = mol
@@ -1451,9 +1501,12 @@ class Representations:
         return s
 
     def _translateNGL(self, rep):
-        styletrans = {'newcartoon': 'cartoon', 'licorice': 'hyperball', 'lines': 'line', 'vdw': 'spacefill', 'cpk': 'ball+stick'}
-        colortrans = {'name': 'element', 'index': 'atomindex', 'chain': 'chainindex', 'secondary structure': 'sstruc', 'colorid': 'color'}
-        hexcolors = {0: '#0000ff', 1: '#ff0000', 2: '#333333', 3: '#ff6600', 4: '#ffff00', 5: '#4c4d00', 6: '#b2b2cc', 7: '#33cc33', 8: '#ffffff', 9: '#ff3399', 10: '#33ccff'}
+        styletrans = {'newcartoon': 'cartoon', 'licorice': 'hyperball', 'lines': 'line', 'vdw': 'spacefill',
+                      'cpk': 'ball+stick'}
+        colortrans = {'name': 'element', 'index': 'atomindex', 'chain': 'chainindex', 'secondary structure': 'sstruc',
+                      'colorid': 'color'}
+        hexcolors = {0: '#0000ff', 1: '#ff0000', 2: '#333333', 3: '#ff6600', 4: '#ffff00', 5: '#4c4d00', 6: '#b2b2cc',
+                     7: '#33cc33', 8: '#ffffff', 9: '#ff3399', 10: '#33ccff'}
         try:
             selidx = '@' + ','.join(map(str, self._mol.atomselect(rep.sel, indexes=True)))
         except:
@@ -1591,7 +1644,9 @@ def _maestroparser(fname):
                     if '' in section_dict:
                         data['altloc'].append('')  # TODO: Read altloc. Quite complex actually. Won't bother.
                     if 'r_m_x_coord' in section_dict:
-                        data['coords'].append([float(row[section_dict['r_m_x_coord']]), float(row[section_dict['r_m_y_coord']]), float(row[section_dict['r_m_z_coord']])])
+                        data['coords'].append(
+                            [float(row[section_dict['r_m_x_coord']]), float(row[section_dict['r_m_y_coord']]),
+                             float(row[section_dict['r_m_z_coord']])])
                     data['masses'].append(0)
 
                 # Reading the data of the bonds section
@@ -1624,6 +1679,7 @@ class _Representation:
     >>> r = _Representation(sel='resname MOL', style='Licorice')
     >>> r = _Representation(sel='ions', style='VDW', color=1)
     """
+
     def __init__(self, sel=None, style=None, color=None):
         if sel is not None:
             self.sel = sel
@@ -1640,13 +1696,13 @@ class _Representation:
 
 
 if __name__ == "__main__":
-
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
     from htmd.home import home
+
     m = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
-    doctest.testmod(extraglobs={'tryp': m.copy() })
+    doctest.testmod(extraglobs={'tryp': m.copy()})
 
     # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May
     # have to do with the vmd console?

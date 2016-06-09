@@ -7,7 +7,6 @@ import numpy as np
 from scipy import stats
 import warnings
 import random
-import matplotlib.pyplot as plt
 from htmd.projections.metric import _singleMolfile
 from htmd.molecule.molecule import Molecule
 from htmd.vmdviewer import getCurrentViewer
@@ -138,6 +137,7 @@ class Model(object):
         from htmd.config import _config
         its = msm.its(self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=_config['ncpus'])
         if plot:
+            from matplotlib import pylab as plt
             plt.ion()
             plt.figure()
             mplt.plot_implied_timescales(its, dt=self.data.fstep, units='ns')
@@ -274,6 +274,7 @@ class Model(object):
             macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
 
         if plot:
+            from matplotlib import pylab as plt
             plt.ion()
             plt.figure()
             plt.bar(range(self.macronum), macroeq)
@@ -427,7 +428,6 @@ class Model(object):
                 mol.reps.add(sel='segid ST{}'.format(s), style='Licorice', color=colors[np.mod(i, len(colors))])
                 mols[i].filter(ligand, _logger=False)
 
-            mols[i].guessBonds()
             mols[i].set('segid', 'ST{}'.format(s))
             tmpcoo = mols[i].coords
             for j in range(mols[i].numFrames):
