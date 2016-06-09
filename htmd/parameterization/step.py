@@ -180,11 +180,9 @@ class ScriptStep(Step):
         os.chmod(dest, stat.S_IEXEC | stat.S_IREAD | stat.S_IWRITE)
         pwd = os.getcwd()
         os.chdir(directory)
-        ret = ""
         err = None
         try:
-            ret = subprocess.check_output([dest], stderr=subprocess.STDOUT, shell=False, stdin=None)
-
+            subprocess.check_output([dest], stderr=subprocess.STDOUT, shell=False, stdin=None)
         except subprocess.CalledProcessError as e:
 
             err = ""
@@ -223,7 +221,7 @@ class QMScriptStep(Step):
 
     def _exec(self, cmd):
         try:
-            ret = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=False, stdin=None)
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=False, stdin=None)
         except subprocess.CalledProcessError as e:
 
             err = ""
@@ -247,8 +245,8 @@ class QMScriptStep(Step):
         os.chmod(dest, stat.S_IEXEC | stat.S_IREAD | stat.S_IWRITE)
         pwd = os.getcwd()
         os.chdir(directory)
-        ret = ""
-        err = None
+        # ret = ""
+        # err = None
 
         self._exec([dest, "--prepare"])
         param.run_qm_jobs(directory)
