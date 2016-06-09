@@ -237,7 +237,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     f.close()
 
     if param is not None:
-        _charmmCombine(param, path.join(outdir, 'parameters'))
+        combine(param, path.join(outdir, 'parameters'))
 
     molbuilt = None
     if execute:
@@ -524,16 +524,16 @@ def _protonationPatches(mol):
     return patches
 
 
-def _charmmCombine(prmlist, outfile):
-    """ Combines CHARMM parameter files.
+def combine(prmlist, outfile):
+    """ Combines CHARMM parameter files
+    Take a list of parameters files and combine them into a single file (useful for acemd)
 
     Parameters
     ----------
-    prmlist
-    outfile
-
-    Returns
-    -------
+    prmlist: list
+        List of parameter files to combine
+    outfile: str
+        Output filename of combined parameter files
 
     """
     # Process parameter files
@@ -654,7 +654,7 @@ def _sec_name(filename):
     return "!Following lines added from %s\n" % (filename)
 
 
-def _charmmSplit(filename, outdir):
+def split(filename, outdir):
     """ Splits a stream file into an rtf and prm file.
 
     Parameters
@@ -717,7 +717,7 @@ def _prepareStream(filename):
     from htmd.util import tempname
     tmpout = tempname()
     os.makedirs(tmpout)
-    return _charmmSplit(filename, tmpout)
+    return split(filename, tmpout)
 
 
 def _logParser(fname):
