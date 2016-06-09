@@ -1,7 +1,6 @@
 import os
 from htmd.molecule.molecule import Molecule
 import htmd.builder.charmm as charmm
-
 import numpy.linalg as npla
 import numpy as np
 from optparse import OptionParser
@@ -23,9 +22,9 @@ class Sample:
             self._prep_and_run(mol, rtf, prm, outdir, solvated)
 
         print("Analysing trajectory")
-        self._analyse(mol, pdb, traj, outdir)
+        self._analyse(mol, pdb, traj)
 
-    def _analyse(self, mol, pdb, traj, outdir):
+    def _analyse(self, mol, pdb, traj):
         m = Molecule(pdb)
         m.read(traj)
         torsions = Parameterization.listDihedrals(mol)
@@ -37,12 +36,12 @@ class Sample:
             title = title + "-" + torsions[1][i][2]
             title = title + "-" + torsions[1][i][3]
 
-            (r, theta) = self._measure_torsion(torsions[0][i], m.coords, m.time)
+            (r, theta) = self._measure_torsion(torsions[0][i], m.coords)
 
             self._plot_scatter(r, theta, title)
-            self._plot_hist(r, theta, title)
+            self._plot_hist(theta, title)
 
-    def _measure_torsion(self, aidx, coords, time):
+    def _measure_torsion(self, aidx, coords):
         r = []
         theta = []
         # nprint(aidx)
@@ -53,7 +52,7 @@ class Sample:
             #  print(coords.shape)
             #  print(r)
         #      print(theta)
-        return (r, theta)
+        return r, theta
 
     def _measure_phi(self, aidx, coords, frame):
         pos1 = coords[aidx[0] - 1, :, frame]
@@ -65,21 +64,21 @@ class Sample:
         r23 = pos2 - pos3
         r34 = pos3 - pos4
 
-        A = np.cross(r12, r23)
-        B = np.cross(r23, r34)
-        C = np.cross(r23, A)
+        a = np.cross(r12, r23)
+        b = np.cross(r23, r34)
+        c = np.cross(r23, a)
 
-        rA = 1. / npla.norm(A)
-        rB = 1. / npla.norm(B)
-        rC = 1. / npla.norm(C)
+        ra = 1. / npla.norm(a)
+        rb = 1. / npla.norm(b)
+        rc = 1. / npla.norm(c)
 
-        B = B * rB
+        b = b * rb
 
-        cos_phi = (np.dot(A, B)) * rA
-        sin_phi = (np.dot(C, B)) * rC
+        cos_phi = (np.dot(a, b)) * ra
+        sin_phi = (np.dot(c, b)) * rc
 
         phi = - np.arctan2(sin_phi, cos_phi)
-        return (phi)
+        return phi
         # phi = phi * 180./ np.pi;
         # print(phi)
         # return phi
@@ -90,21 +89,20 @@ class Sample:
         area = np.ones(len(r)) * 10
         colors = theta
         ax = plt.subplot(111, polar=True)
-        c = plt.scatter(theta, r, c=colors, s=area, cmap=plt.cm.hsv)
+        c = plt.scatter(theta, r, c=colors, s=area, cmap=plt.cm.get_cmap('hsv'))
         c.set_alpha(0.75)
         ax.set_title(title)
         plt.savefig("torsion-polar-" + title + ".svg")
 
-    def _plot_hist(self, r, theta, title):
+    def _plot_hist(self, theta, title):
         import matplotlib as mpl
         mpl.use('Agg')
         for i in range(len(theta)):
-            theta[i] = theta[i] * (180 / np.pi)
+            theta[i] *= 180 / np.pi
 
-        area = np.ones(len(r)) * 10
-        colors = theta
+        # area = np.ones(len(r)) * 10
         ax = plt.subplot(111)
-        c = plt.hist(theta, (90), normed=1, alpha=0.75, range=[-180, 180])
+        # c = plt.hist(theta, (90), normed=1, alpha=0.75, range=[-180, 180])
         plt.xlim(-180, 180)
         plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
         ax.set_title(title)
@@ -119,10 +117,10 @@ class Sample:
         mol = Molecule(mol)
         mol.center()
         mol.set("segid", "L")
-        D = maxDistance(mol, 'all') + 6
+        d = maxDistance(mol, 'all') + 6
 
         if solvated:
-            mol = solvate(mol, minmax=[[-D, -D, -D], [D, D, D]])
+            mol = solvate(mol, minmax=[[-d, -d, -d], [d, d, d]])
 
         if not solvated:
             ionize = False
@@ -134,10 +132,10 @@ class Sample:
 
         rtfs = ['top/top_water_ions.rtf', rtf]
         prms = ['par/par_water_ions.prm', prm]
-        mol = charmm.build(mol, topo=rtfs, param=prms, outdir=build_dir, ionize=ionize)
+        charmm.build(mol, topo=rtfs, param=prms, outdir=build_dir, ionize=ionize)
         md = Equilibration()
         md.numsteps = 50 * 1000000 / 4  # 50ns simulation
-        md.box = [-D, -D, -D, D, D, D]
+        md.box = [-d, -d, -d, d, d, d]
         md.temperature = 300
         md.write(build_dir, equil_dir)
         mdx = AcemdLocal()
@@ -163,9 +161,9 @@ def sample_main():
 
 
 def testfile(filename):
-    if (not os.access(filename, os.R_OK)):
-        print("Cannot access file [" + filename + "]");
-        sys.exit(0)
+    if not os.access(filename, os.R_OK):
+        print("Cannot access file [" + filename + "]")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
