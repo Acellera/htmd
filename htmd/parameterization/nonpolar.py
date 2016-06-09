@@ -1,5 +1,5 @@
 
-from htmd.parameterize.step import Step, ScriptStep, StepSet, QMScriptStep
+from htmd.parameterization.step import Step, ScriptStep, StepSet, QMScriptStep
 
 class NonpolarSet(StepSet):
     def __init__(self):

@@ -1,26 +1,22 @@
 import datetime
-import time
-import os
 import logging as log
-import tempfile
-from htmd.parameterize.step import Step
-from htmd.parameterize.nonpolar import NonpolarSet
-from htmd.parameterize.drudeset import DrudeSet
-from htmd.parameterize.match import MatchSet
-from htmd.parameterize.configuration import Configuration
-import shutil
-import inspect
-import htmd.parameterize
-import subprocess
-import sys
 import os
-from htmd.progress.progress import ProgressBar
+import shutil
+import subprocess
+import tempfile
+import time
+
 from htmd import Molecule
+from htmd.parameterization.configuration import ParameterizationConfig
+from htmd.parameterization.drudeset import DrudeSet
+from htmd.parameterization.match import MatchSet
+from htmd.parameterization.nonpolar import NonpolarSet
+from htmd.progress.progress import ProgressBar
 
-log = log.getLogger("htmd.parameterize")
+log = log.getLogger("htmd.parameterization")
 
 
-class Parameterisation:
+class Parameterization:
     _prefix = None
 
     def __init__(self, config=None, name=None, run=True, prefix=None):
@@ -28,22 +24,23 @@ class Parameterisation:
         resuming = False
 
         if prefix is not None:
-            if not os.path.exists(prefix):  os.mkdir(prefix)
+            if not os.path.exists(prefix):
+                os.mkdir(prefix)
 
-        Parameterisation._prefix = prefix;
+        Parameterization._prefix = prefix
 
         if config and config.JobName:
             name = os.path.basename(config.JobName)  # sanitise
-            wdir = os.path.join(Parameterisation.prefix(), name)
+            wdir = os.path.join(Parameterization.prefix(), name)
             if os.path.exists(wdir):
                 raise ValueError("Job [" + config.JobName + "] already exists")
 
         elif name:
             name = os.path.basename(name)  # sanitise
-            wdir = os.path.join(Parameterisation.prefix(), name)
+            wdir = os.path.join(Parameterization.prefix(), name)
 
             if os.path.exists(wdir):
-                config = Configuration(os.path.join(wdir, "configuration"), check=False)
+                config = ParameterizationConfig(os.path.join(wdir, "configuration"), check=False)
                 log.info("Resuming job [" + config.JobName + "]")
                 resuming = True
             else:
@@ -73,10 +70,10 @@ class Parameterisation:
         if not config.JobName:
             # No job name specified -- assume this is going to be a new job
             # and create a new unique ID
-            config.JobName = Parameterisation.make_job_name()
+            config.JobName = Parameterization.make_job_name()
             log.info("Created new identifier [" + config.JobName + "]")
 
-        wdir = os.path.join(Parameterisation.prefix(), config.JobName)
+        wdir = os.path.join(Parameterization.prefix(), config.JobName)
         if not os.path.exists(wdir):
             os.mkdir(wdir)
 
@@ -147,7 +144,7 @@ class Parameterisation:
     def copy_qm_file(self, rootdir):
         import shutil
         import inspect
-        d = os.path.dirname(inspect.getfile(Parameterisation))
+        d = os.path.dirname(inspect.getfile(Parameterization))
         d = os.path.join(d, "share")
         d = os.path.join(d, "scripts")
         d = os.path.join(d, "QM-para.txt")
@@ -159,12 +156,12 @@ class Parameterisation:
     def set_prefix(prefix):
         if not os.path.exists(prefix):
             os.mkdir(prefix)
-        Parameterisation._prefix = prefix
+        Parameterization._prefix = prefix
 
     @staticmethod
     def prefix():
-        if Parameterisation._prefix:
-            return Parameterisation._prefix
+        if Parameterization._prefix:
+            return Parameterization._prefix
 
         dir = os.path.join(os.path.expanduser("~"), ".htmd")
         try:
@@ -185,7 +182,7 @@ class Parameterisation:
         d = datetime.date.today()
         d = d.isoformat()
         suffix = 0
-        prefix = Parameterisation.prefix()
+        prefix = Parameterization.prefix()
         name = "%s-%05d" % (d, suffix)
         while not os.path.exists(os.path.join(prefix, name)):
             suffix = suffix + 1
@@ -194,7 +191,7 @@ class Parameterisation:
     @staticmethod
     def listJobs():
         import os
-        for i in os.listdir(Parameterisation.prefix()):
+        for i in os.listdir(Parameterization.prefix()):
             print("\t" + i)
         pass
 
@@ -203,7 +200,7 @@ class Parameterisation:
         import shutil
         import os
         jobb = os.path.basename(job)
-        dir = os.path.join(Parameterisation.prefix(), jobb)
+        dir = os.path.join(Parameterization.prefix(), jobb)
         if not os.path.exists(dir):
             raise ValueError("[" + job + "] [" + dir + "] not found")
         shutil.rmtree(dir)
@@ -306,11 +303,10 @@ CHECK() {
     @staticmethod
     def _preflight_test(config):
         import inspect
-        import psutil
 
         env = {}
         gaamp_bin = []
-        p = os.path.dirname(inspect.getfile(Parameterisation))
+        p = os.path.dirname(inspect.getfile(Parameterization))
         p = os.path.join(p, "share")
         gaamp_bin.append(os.path.join(p, "bin"))
         p = os.path.join(p, "match")
@@ -318,62 +314,62 @@ CHECK() {
 
         # Locate all of  the third-party binary programs needed
 
-        env['BIN_BABEL'] = Parameterisation.find_binary("htmd_babel", path=gaamp_bin)
-        env['BIN_MATCH'] = Parameterisation.find_binary("match", path=gaamp_bin)
+        env['BIN_BABEL'] = Parameterization.find_binary("htmd_babel", path=gaamp_bin)
+        env['BIN_MATCH'] = Parameterization.find_binary("match", path=gaamp_bin)
         # env['BIN_ANTECHAMBER']= Parameterisation.find_binary( "antechamber", path=gaamp_bin )
         has_g09 = False
         has_psi4 = False
         try:
-            Parameterisation.find_binary("g09", path=gaamp_bin)
+            Parameterization.find_binary("g09", path=gaamp_bin)
             has_g09 = True
         except:
             pass
         try:
-            Parameterisation.find_binary("psi4", path=gaamp_bin)
+            Parameterization.find_binary("psi4", path=gaamp_bin)
             has_psi4 = True
         except:
             pass
 
         if not has_g09 and not has_psi4:
             raise ValueError("Neither G09 nor PSI4 found. At least one QM code is required")
-        env['BIN_G09'] = Parameterisation.find_binary("g09_wrapper", path=gaamp_bin)
+        env['BIN_G09'] = Parameterization.find_binary("g09_wrapper", path=gaamp_bin)
         # env['BIN_GNUPLOT']     = Parameterisation.find_binary( "gnuplot", path=gaamp_bin )
 
-        env['BIN_CGRID'] = Parameterisation.find_binary("cgrid", path=gaamp_bin)
+        env['BIN_CGRID'] = Parameterization.find_binary("cgrid", path=gaamp_bin)
         #        env['BIN_CGRID_DRUDE'] = Parameterisation.find_binary( "drude_cgrid", path=gaamp_bin )
-        env['BIN_ADD_TIP3'] = Parameterisation.find_binary("add_tip3", path=gaamp_bin)
-        env['BIN_GEN_XPSF'] = Parameterisation.find_binary("gen_xpsf", path=gaamp_bin)
+        env['BIN_ADD_TIP3'] = Parameterization.find_binary("add_tip3", path=gaamp_bin)
+        env['BIN_GEN_XPSF'] = Parameterization.find_binary("gen_xpsf", path=gaamp_bin)
         #        env['BIN_PDB_TO_CRD']  = Parameterisation.find_binary( "pdb_to_crd", path=gaamp_bin )
-        env['BIN_EQUIV_ATOM'] = Parameterisation.find_binary("equiv_atom", path=gaamp_bin)
-        env['BIN_GEN_ESP'] = Parameterisation.find_binary("gen_esp", path=gaamp_bin)
-        env['BIN_CHECK_B0_THETA0'] = Parameterisation.find_binary("check_b0_theta0", path=gaamp_bin)
-        env['BIN_FITCHARGE'] = Parameterisation.find_binary("fitcharge", path=gaamp_bin)
-        env['BIN_UPDATE_XPSF'] = Parameterisation.find_binary("update_xpsf", path=gaamp_bin)
-        env['BIN_UPDATE_TOR_PARA'] = Parameterisation.find_binary("update_tor_para", path=gaamp_bin)
-        env['BIN_ACCEPTOR'] = Parameterisation.find_binary("acceptor", path=gaamp_bin)
-        env['BIN_DONOR'] = Parameterisation.find_binary("donor", path=gaamp_bin)
-        env['BIN_DON_ACC_SEPARATE'] = Parameterisation.find_binary("don_acc_separate", path=gaamp_bin)
-        env['BIN_EXTRACT_QM_MOL_WATER'] = Parameterisation.find_binary("extract_qm_mol_water.py", path=gaamp_bin)
-        env['BIN_EXTRACT_QM_ROTAMER'] = Parameterisation.find_binary("extract_qm_rotamer.py", path=gaamp_bin)
-        env['BIN_GEN_SOFT_LIST'] = Parameterisation.find_binary("gen_soft_list", path=gaamp_bin)
-        env['BIN_FITCHARGE_AGAIN'] = Parameterisation.find_binary("fitcharge_again", path=gaamp_bin)
-        env['BIN_MM_PES'] = Parameterisation.find_binary("mm_pes", path=gaamp_bin)
-        env['BIN_MM_PES_LARGE'] = Parameterisation.find_binary("mm_pes_large", path=gaamp_bin)
-        env['BIN_CLUSTERING_PHI'] = Parameterisation.find_binary("clustering_phi", path=gaamp_bin)
-        env['BIN_QM_1D_SCAN_PARA'] = Parameterisation.find_binary("qm_1d_scan_para", path=gaamp_bin)
-        env['BIN_QM_1D_SCAN_LARGE_PARA'] = Parameterisation.find_binary("qm_1d_scan_large_para", path=gaamp_bin)
-        env['BIN_RUN_QM_JOBS'] = Parameterisation.find_binary("run_qm_jobs", path=gaamp_bin)
-        env['BIN_QM_ROTAMER_SCAN_LARGE'] = Parameterisation.find_binary("qm_rotamer_scan_large", path=gaamp_bin)
-        env['BIN_QM_ROTAMER_SCAN'] = Parameterisation.find_binary("qm_rotamer_scan", path=gaamp_bin)
-        env['BIN_1D_FITTING'] = Parameterisation.find_binary("1d_fitting", path=gaamp_bin)
-        env['BIN_1D_FITTING_ASYMMETRIC'] = Parameterisation.find_binary("1d_fitting_asymmetric", path=gaamp_bin)
-        env['BIN_1D_ORG'] = Parameterisation.find_binary("1d_org", path=gaamp_bin)
-        env['BIN_1D_ROTAMER_FITTING'] = Parameterisation.find_binary("1d_rotamer_fitting", path=gaamp_bin)
-        env['BIN_PLOT_1D_RESULT_AND_ORG'] = Parameterisation.find_binary("plot_1d_result_and_org", path=gaamp_bin)
-        env['BIN_QSUB'] = Parameterisation.find_binary("qsub", path=gaamp_bin, fatal=False)
-        env['BIN_QSTAT'] = Parameterisation.find_binary("qstat", path=gaamp_bin, fatal=False)
-        env['BIN_BSUB'] = Parameterisation.find_binary("bsub", path=gaamp_bin, fatal=False)
-        env['BIN_BJOBS'] = Parameterisation.find_binary("bjobs", path=gaamp_bin, fatal=False)
+        env['BIN_EQUIV_ATOM'] = Parameterization.find_binary("equiv_atom", path=gaamp_bin)
+        env['BIN_GEN_ESP'] = Parameterization.find_binary("gen_esp", path=gaamp_bin)
+        env['BIN_CHECK_B0_THETA0'] = Parameterization.find_binary("check_b0_theta0", path=gaamp_bin)
+        env['BIN_FITCHARGE'] = Parameterization.find_binary("fitcharge", path=gaamp_bin)
+        env['BIN_UPDATE_XPSF'] = Parameterization.find_binary("update_xpsf", path=gaamp_bin)
+        env['BIN_UPDATE_TOR_PARA'] = Parameterization.find_binary("update_tor_para", path=gaamp_bin)
+        env['BIN_ACCEPTOR'] = Parameterization.find_binary("acceptor", path=gaamp_bin)
+        env['BIN_DONOR'] = Parameterization.find_binary("donor", path=gaamp_bin)
+        env['BIN_DON_ACC_SEPARATE'] = Parameterization.find_binary("don_acc_separate", path=gaamp_bin)
+        env['BIN_EXTRACT_QM_MOL_WATER'] = Parameterization.find_binary("extract_qm_mol_water.py", path=gaamp_bin)
+        env['BIN_EXTRACT_QM_ROTAMER'] = Parameterization.find_binary("extract_qm_rotamer.py", path=gaamp_bin)
+        env['BIN_GEN_SOFT_LIST'] = Parameterization.find_binary("gen_soft_list", path=gaamp_bin)
+        env['BIN_FITCHARGE_AGAIN'] = Parameterization.find_binary("fitcharge_again", path=gaamp_bin)
+        env['BIN_MM_PES'] = Parameterization.find_binary("mm_pes", path=gaamp_bin)
+        env['BIN_MM_PES_LARGE'] = Parameterization.find_binary("mm_pes_large", path=gaamp_bin)
+        env['BIN_CLUSTERING_PHI'] = Parameterization.find_binary("clustering_phi", path=gaamp_bin)
+        env['BIN_QM_1D_SCAN_PARA'] = Parameterization.find_binary("qm_1d_scan_para", path=gaamp_bin)
+        env['BIN_QM_1D_SCAN_LARGE_PARA'] = Parameterization.find_binary("qm_1d_scan_large_para", path=gaamp_bin)
+        env['BIN_RUN_QM_JOBS'] = Parameterization.find_binary("run_qm_jobs", path=gaamp_bin)
+        env['BIN_QM_ROTAMER_SCAN_LARGE'] = Parameterization.find_binary("qm_rotamer_scan_large", path=gaamp_bin)
+        env['BIN_QM_ROTAMER_SCAN'] = Parameterization.find_binary("qm_rotamer_scan", path=gaamp_bin)
+        env['BIN_1D_FITTING'] = Parameterization.find_binary("1d_fitting", path=gaamp_bin)
+        env['BIN_1D_FITTING_ASYMMETRIC'] = Parameterization.find_binary("1d_fitting_asymmetric", path=gaamp_bin)
+        env['BIN_1D_ORG'] = Parameterization.find_binary("1d_org", path=gaamp_bin)
+        env['BIN_1D_ROTAMER_FITTING'] = Parameterization.find_binary("1d_rotamer_fitting", path=gaamp_bin)
+        env['BIN_PLOT_1D_RESULT_AND_ORG'] = Parameterization.find_binary("plot_1d_result_and_org", path=gaamp_bin)
+        env['BIN_QSUB'] = Parameterization.find_binary("qsub", path=gaamp_bin, fatal=False)
+        env['BIN_QSTAT'] = Parameterization.find_binary("qstat", path=gaamp_bin, fatal=False)
+        env['BIN_BSUB'] = Parameterization.find_binary("bsub", path=gaamp_bin, fatal=False)
+        env['BIN_BJOBS'] = Parameterization.find_binary("bjobs", path=gaamp_bin, fatal=False)
 
         #        print(env)
         if config:
@@ -395,9 +391,9 @@ CHECK() {
         # set up the input for gen_soft_list
         ll1 = []
         ll2 = []
-        env = Parameterisation._preflight_test(None)
+        env = Parameterization._preflight_test(None)
         mol = Molecule(filename);
-        mol = Parameterisation._rename_mol(mol)
+        mol = Parameterization._rename_mol(mol)
         mol.bonds = mol._guessBonds()
         # make a tempdir
         with tempfile.TemporaryDirectory() as td:
@@ -437,7 +433,7 @@ CHECK() {
     @staticmethod
     def renameStructure(filename):
         m = Molecule(filename)
-        m = Parameterisation._rename_mol(m)
+        m = Parameterization._rename_mol(m)
         m.write(filename)
 
     def _rename_mol(mol):
@@ -474,7 +470,7 @@ CHECK() {
         if not os.path.exists(dir):
             raise ValueError("Parameterisation did not produced a minimised structure")
         mol = htmd.Molecule(dir)
-        Parameterisation._rename_mol(mol)
+        Parameterization._rename_mol(mol)
         return mol
 
     def showDihedral(self, index, viewer="ngl"):
@@ -551,7 +547,7 @@ CHECK() {
         # The Output minimised structure is in XYZ format
         # Need to turn it into a PDB with correct atom naming
         mol = Molecule(xyz)
-        Parameterisation._rename_mol(mol)  # Canonicalise atom and reside naming
+        Parameterization._rename_mol(mol)  # Canonicalise atom and reside naming
         mol.write(pdb_tmp[1])
 
         return {
@@ -661,7 +657,7 @@ CHECK() {
 
     def _map_requested_torsions(self, ligand, torsionlist, outputfile):
         # config.FileName, config.Torsions, os.path.join( indir, "soft-dih-list.txt" )
-        torsions = Parameterisation.listDihedrals(ligand)
+        torsions = Parameterization.listDihedrals(ligand)
         fh = open(outputfile, "w")
         for t in torsionlist:
             try:
@@ -813,7 +809,7 @@ CHECK() {
 def installExamples():
     import shutil
     import inspect
-    d = os.path.dirname(inspect.getfile(Parameterisation))
+    d = os.path.dirname(inspect.getfile(Parameterization))
     d = os.path.join(d, "share")
     d = os.path.join(d, "examples")
     if not os.path.exists(d):
