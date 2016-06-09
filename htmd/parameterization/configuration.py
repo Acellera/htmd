@@ -1,14 +1,12 @@
-from htmd.parameterization.command import Command
-from difflib import get_close_matches
-import re
 import os
-from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_0POS, RANGE_POS, RANGE_ANY
+import re
+from htmd.parameterization.command import Command
 
 
-class ParameterizationConfig(ProtocolInterface):
+class ParameterizationConfig:
     def __init__(self, config=None, check=True, **kwargs):
         self._commands = Command(check=check)
-        c = self._commands.get_default_configuration(check=check)
+        c = self._commands.get_default_configuration()
 
         inputfile = None
 
@@ -77,46 +75,6 @@ class ParameterizationConfig(ProtocolInterface):
 
         return True
 
-"""
-    def __setattr__(self, key, value):
-        if key.startswith("_"):
-            self.__dict__[key] = value
-            return
-
-            # key = key.replace( '-', '_' )
-        #        key = Command.test_deprecation( key, value )
-        if key:
-            #            print(key)
-            value = self._commands._commands[key].validate(value, self._basedir)
-            self.__dict__[key] = value
-        else:
-            key = key.lower()
-            #            key = Command.test_deprecation( key, value )
-            if key:
-                value = self._commands._commands[key].validate(value, self._basedir)
-                self.__dict__[key] = value
-
-    def __getattr__(self, key):
-        if key.startswith("_"):
-            return self.__dict__[key]
-
-        try:
-            # key = key.replace( '_', '-' );
-            if key in self.__dict__:
-                return self.__dict__[key]
-            keyx = key.lower()
-            return self.__dict__[keyx]
-        except:
-
-            errstr = "Command '" + key + "' not found."
-            match = get_close_matches(key, self._commands.commands)
-            if match:
-                errstr = errstr + " Try '" + match[0] + "'"
-            raise NameError(errstr)
-
-    def __repr__(self):
-        return self.__str__()
-"""
     # TODO: moves to PI
     def save(self, filename, fmt="pretty"):
         with open(filename, "w") as fh:
@@ -145,3 +103,45 @@ class ParameterizationConfig(ProtocolInterface):
         directory = os.path.abspath(directory)
         os.makedirs(directory)
         self.save(os.path.join(directory, "input"))
+
+
+    def __setattr__(self, key, value):
+        if key.startswith("_"):
+            self.__dict__[key] = value
+            return
+
+            # key = key.replace( '-', '_' )
+        #        key = Command.test_deprecation( key, value )
+        if key:
+            #            print(key)
+            value = self._commands._commands[key].validate(value, self._basedir)
+            self.__dict__[key] = value
+        else:
+            key = key.lower()
+            #            key = Command.test_deprecation( key, value )
+            if key:
+                value = self._commands._commands[key].validate(value, self._basedir)
+                self.__dict__[key] = value
+
+"""
+    def __getattr__(self, key):
+        if key.startswith("_"):
+            return self.__dict__[key]
+
+        try:
+            # key = key.replace( '_', '-' );
+            if key in self.__dict__:
+                return self.__dict__[key]
+            keyx = key.lower()
+            return self.__dict__[keyx]
+        except:
+
+            errstr = "Command '" + key + "' not found."
+            match = get_close_matches(key, self._commands.commands)
+            if match:
+                errstr = errstr + " Try '" + match[0] + "'"
+            raise NameError(errstr)
+
+    def __repr__(self):
+        return self.__str__()
+"""
