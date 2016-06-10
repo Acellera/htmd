@@ -1715,5 +1715,7 @@ if __name__ == "__main__":
     m.moveBy([1, 1, 1])
     m.rotate([1, 0, 0], pi / 2)
     m.align('name CA')
-
+    m = Molecule('2OV5')
+    m.filter('protein or water')
+ 
     # test rotate
