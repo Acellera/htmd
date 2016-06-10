@@ -223,7 +223,7 @@ class Model(object):
         self._integrityCheck(postmsm=(statetype != 'cluster'))
         if statetype != 'macro' and samplemode != 'random':
             samplemode = 'random'
-            logger.warning('''micro'' and ''cluster'' states incompatible with ''mode'' other than ''random''.Defaulting to ''random''')
+            logger.warning('''micro'' and ''cluster'' states incompatible with ''samplemode'' other than ''random''. Defaulting to ''random''')
 
         stConcat = np.concatenate(self.data.St)
         absFrames = []
@@ -332,7 +332,12 @@ class Model(object):
         if alignmol is None:
             alignmol = molfile
         if states is None:
-            states = range(self.macronum)
+            if statetype == 'macro':
+                states = range(self.macronum)
+            elif statetype == 'micro':
+                states = range(self.micronum)
+            else:
+                raise NameError('Provide a list of ''states'' for the selected ''statetype''')
         if len(states) == 0:
             raise NameError('No ' + statetype + ' states exist in the model')
         if len(alignsel) > 0 and len(alignmol) > 0:
