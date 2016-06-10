@@ -12,7 +12,7 @@ Contents:
    System Building Basics <tutorials/system-building-basics>
    System Building Protein-Ligand <tutorials/system-building-protein-ligand>
    System Building Protein in Membrane <tutorials/system-building-protein-in-membrane>
-   System building for protein-protein binding (Barnase-Barstar) <tutorials/system-building-barnase-barstar>
+   System Building Protein-Protein <tutorials/system-building-protein-protein>
    Using docking to initialize positions <tutorials/docking-simulation-generators>
    Adaptive sampling <tutorials/adaptive-sampling-example>
    Ligand binding analysis <tutorials/ligand-binding-analysis>
