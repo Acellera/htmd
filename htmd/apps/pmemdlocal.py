@@ -1,7 +1,8 @@
 from htmd.apps.app import App
 from htmd.apps.acemdlocal import AcemdLocal
+from subprocess import check_output, CalledProcessError
+from glob import glob as glob
 from shutil import which, move
-from subprocess import call, check_output, CalledProcessError
 import threading
 import logging
 import os
@@ -16,11 +17,11 @@ class PmemdLocal(App):
         Path to any executable pmemd binary. If None, it will try to detect
         the pmemd.cuda_SPFP binary
     ngpus : int
-        Number of GPU devices that AcemdLocal will use. Each simulation will be
-        run on a different GPU. AcemdLocal will use the first `ngpus` devices
+        Number of GPU devices that PmemdLocal will use. Each simulation will be
+        run on a different GPU. PmemdLocal will use the first `ngpus` devices
         of the machine.
     devices : list
-        A list of GPU device indexes on which AcemdLocal is allowed to run
+        A list of GPU device indexes on which PmemdLocal is allowed to run
         simulations. Mutually exclusive with `ngpus`
     datadir : str
         A folder to which completed simulations will be moved. If None they
@@ -45,8 +46,9 @@ class PmemdLocal(App):
             devices = range(ngpus)
 
         if devices is None:
-            raise NameError("Could not determine which GPUs to use. "
-                            "Specify the GPUs with the `ngpus=` or `devices=` parameters")
+            raise NameError("""Could not determine which GPUs to use.
+                            Specify the GPUs with the `ngpus=`
+                            or `devices=` parameters""")
         else:
             logger.info("Using GPU devices {}".format(','.join(map(str, devices))))
 
@@ -74,3 +76,48 @@ class PmemdLocal(App):
     retrieve = AcemdLocal.retrieve
     submit = AcemdLocal.submit
     inprogress = AcemdLocal.inprogress
+
+
+def run_job(obj, ngpu, pmemd_cuda, datadir):
+    queue = obj.queue
+    while not obj.shutdown:
+        path = None
+        try:
+            path = queue.get(timeout=1)
+        except:
+            pass
+
+        if path:
+            try:
+                logger.info("Running " + path + " on GPU device " + str(ngpu))
+                obj.running(path)
+                cmd = 'cd {}; {} --device {} input > log.txt 2>&1'.format(os.path.normpath(path), pmemd_cuda, ngpu)
+                try:
+                    check_output(cmd, shell=True)
+                except CalledProcessError:
+                    logger.error('Error in pmemd.cuda for path: {}. Check the {} file.'.format(path, os.path.join(path, 'log.txt')))
+                    obj.completed(path)
+                    queue.task_done()
+                    continue
+
+                # If a datadir is provided, copy finished trajectories there.
+                # Only works for nc files.
+                if datadir is not None:
+                    if not os.path.isdir(datadir):
+                        os.mkdir(datadir)
+                    simname = os.path.basename(os.path.normpath(path))
+                    odir = os.path.join(datadir, simname)
+                    os.mkdir(odir)
+                    finishedtraj = glob(os.path.join(path, '*.nc'))
+                    logger.info("Moving simulation {} to {}.".format(finishedtraj[0], odir))
+                    move(finishedtraj[0], odir)
+
+                logger.info("Completed " + path)
+                obj.completed(path)
+                queue.task_done()
+            except:
+                logger.error("Error running job")
+                obj.completed(path)
+                queue.task_done()
+                continue
+    logger.info("Shutting down worker thread")
