@@ -331,13 +331,15 @@ class Model(object):
             raise NameError('Visualizer does not support yet visualization of systems with different number of atoms')
         if alignmol is None:
             alignmol = molfile
+        if statetype != 'macro' and statetype != 'micro' and statetype != 'cluster':
+            raise NameError('''statetype'' must be either ''macro'', ''micro'' or ''cluster''')
         if states is None:
             if statetype == 'macro':
                 states = range(self.macronum)
             elif statetype == 'micro':
                 states = range(self.micronum)
-            else:
-                raise NameError('Provide a list of ''states'' for the selected ''statetype''')
+            elif statetype == 'cluster':
+                states = range(self.data.K)
         if len(states) == 0:
             raise NameError('No ' + statetype + ' states exist in the model')
         if len(alignsel) > 0 and len(alignmol) > 0:
