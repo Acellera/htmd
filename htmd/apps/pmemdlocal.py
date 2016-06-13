@@ -1,4 +1,5 @@
 from htmd.apps.app import App
+from htmd.apps.acemdlocal import AcemdLocal
 from shutil import which, move
 from subprocess import call, check_output, CalledProcessError
 import threading
@@ -8,7 +9,23 @@ logger = logging.getLogger(__name__)
 
 
 class PmemdLocal(App):
-
+    """
+    Parameters
+    ----------
+    pmemd_cuda: str
+        Path to any executable pmemd binary. If None, it will try to detect
+        the pmemd.cuda_SPFP binary
+    ngpus : int
+        Number of GPU devices that AcemdLocal will use. Each simulation will be
+        run on a different GPU. AcemdLocal will use the first `ngpus` devices
+        of the machine.
+    devices : list
+        A list of GPU device indexes on which AcemdLocal is allowed to run
+        simulations. Mutually exclusive with `ngpus`
+    datadir : str
+        A folder to which completed simulations will be moved. If None they
+        will be written in the input directory.
+    """
     def __init__(self, pmemd_cuda=None, ngpus=None, devices=None, datadir=None):
         self.states = dict()
         self.queue = queue.Queue()
@@ -40,7 +57,9 @@ class PmemdLocal(App):
                 if pmemd_cuda:
                     logger.info("Found pmemd.cuda_SPFP at '" + pmemd_cuda + "'")
             except:
-                raise NameError("Cannot find 'pmemd.cuda_SPFP' in the PATH. Set its location with the 'pmemd_cuda=' named argument")
+                raise NameError("""Cannot find 'pmemd.cuda_SPFP' in the PATH
+                                Set its location with the 'pmemd_cuda=' named
+                                argument""")
 
         if not os.access(pmemd_cuda, os.X_OK):
             raise NameError("pmemd_cuda file '" + pmemd_cuda + "' not executable")
@@ -52,11 +71,6 @@ class PmemdLocal(App):
             t.start()
             self.threads.append(t)
 
-    def retrieve(self):
-        pass
-
-    def submit(self, dirs):
-        pass
-
-    def inprogress(self):
-        pass
+    retrieve = AcemdLocal.retrieve
+    submit = AcemdLocal.submit
+    inprogress = AcemdLocal.inprogress
