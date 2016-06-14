@@ -20,7 +20,7 @@ from htmd.projections.tica import TICA
 from htmd.projections.kmeanstri import KMeansTri
 from htmd.userinterface import UserInterface
 from htmd.molecule.molecule import Molecule
-from htmd.adaptive.adaptiverun import AdaptiveRun
+from htmd.adaptive.adaptiverun import AdaptiveRun, AdaptiveRunNew
 from htmd.adaptive.adaptive import reconstructAdaptiveTraj
 from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
