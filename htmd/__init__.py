@@ -35,7 +35,7 @@ import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
 from htmd.molecule.util import uniformRandomRotation
 from htmd.rotationmatrix import rotationMatrix
-from htmd.proteinpreparation.proteinpreparation import prepareProtein
+from htmd.builder.preparation import proteinPrepare
 from htmd.dock import dock
 from htmd.parameterization.parameterization import Parameterization
 from htmd.parameterization.configuration import ParameterizationConfig
