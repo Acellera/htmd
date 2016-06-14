@@ -101,7 +101,7 @@ class AdaptiveNew(ProtocolInterface):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc', '*.nc'))
                 k += 1
 
     def _getEpoch(self):
@@ -161,7 +161,7 @@ class AdaptiveNew(ProtocolInterface):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor', '*.nc'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
@@ -288,7 +288,7 @@ class Adaptive(object):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc', '*.nc'))
                 k += 1
 
     def _getEpoch(self):
@@ -348,7 +348,7 @@ class Adaptive(object):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor', '*.nc'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
