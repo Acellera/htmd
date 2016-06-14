@@ -1,20 +1,19 @@
 Protein preparation with HTMD
 ===============
 
+*Toni Giorgino*
+
+
 The system preparation phase is based on the PDB2PQR software. It 
 includes the following steps (from the
 [PDB2PQR algorithm
-description](http://www.poissonboltzmann.org/docs/pdb2pqr-algorithm-description/)
-):
+description](http://www.poissonboltzmann.org/docs/pdb2pqr-algorithm-description/)):
 
  * Assign titration states at the user-chosen pH;
  * Flipping the side chains of HIS (including user defined HIS states), ASN, and GLN residues;
  * Rotating the sidechain hydrogen on SER, THR, TYR, and CYS (if available);
  * Determining the best placement for the sidechain hydrogen on neutral HIS, protonated GLU, and protonated ASP;
  * Optimizing all water hydrogens.
-
-It should be roughly equivalent of the system preparation wizard's preprocessing and optimization steps
-of Schrodinger Maestro.
 
 The hydrogen bonding network calculations are performed by the
 [PDB2PQR](http://www.poissonboltzmann.org/) software package. The pKa
@@ -26,15 +25,52 @@ Note that this version was modified in order to use an
 externally-supplied PROPKA **3.1**, whereas
 the original had propKa 3.0 *embedded*!
 
+The results of the function should be roughly equivalent of the system
+preparation wizard's preprocessing and optimization steps
+of Schrodinger's Maestro software.
+
+
+
 
 Usage
 ----------
 
 See the docstring for options. You need propka31 installed via conda.
-    
-    tryp = Molecule('sysprep/tests/3ptb.pdb')
-    tryp_op = prepareProtein(tryp)
-    tryp_op.write('sysprep/tests/systempreparation-test-main-ph-7.pdb')
+
+    tryp = Molecule('3PTB')
+    tryp_op = proteinPrepare(tryp)
+    tryp_op.write('systempreparation-test-main-ph-7.pdb')
+
+A table of useful information is also available:
+
+    tryp_op, prepData = proteinPrepare(tryp, returnDetails=True)
+    prepData.data.to_excel("/tmp/tryp-report.xlsx")
+
+
+
+
+
+Modified residue names
+----------------------
+
+The molecule produced by the preparation step has residue names modified
+according to their protonation.
+Later system-building functions assume these residue names. Forcefields,
+however, support alternative charge states to varying degrees.
+
+
+
+Charge +1    |  Neutral   | Charge -1
+-------------|------------|----------
+ -           |  ASH       | ASP
+ -           |  CYS       | CYM
+ -           |  GLH       | GLU
+HIP          |  HID/HIE   |  -
+LYS          |  LYN       |  -
+ -           |  TYR       | TYM
+ARG          |  AR0       |  -
+
+
 
 
 
@@ -61,35 +97,18 @@ Developer notes
 ===============
 
 
-Testing modified pdb2pqr stand-alone
----------------------------
 
-    PYTHONPATH=src python3 main.py --with-ph=7.0 --ff charmm \
-        tests/test-toni/3ptb.pdb 3ptb.pqr > 3ptb.stdout
-
-
-
- 
-
-Changes with respect to upstream
--------------------
-
-The version imported is SVN r1111 from the [SourceForge
-repository](http://sourceforge.net/p/pdb2pqr/code/HEAD/tree/trunk/pdb2pqr/),
-heavily modified to run with Python 3.5.  I used the last version of
-PDB2PQR which does not use the scons build system, which is not
-available for Python 3 (at least the current version 2.4). This is the
-main roadblock to upgrading to PDB2PQR 1.9 and later.
+The version imported is based on a modification of the
+[apbs-pdb2pqr](https://github.com/Electrostatics/apbs-pdb2pqr)
+code hosted on GitHub.
 
 Part of the conversion involved those steps:
 
  * Removed autoconf-related files
- * Apply `2to3 -x import`
- * Resolve naming conflict for `pdb.Atom`
+ * Apply `2to3`
  * Amend `string.xx()` -> `str.xx()` and several others
- * Web-related files were deleted
  * Ported to propka31
 
-
+and is available at this [forked repository](https://github.com/tonigi/apbs-pdb2pqr).
 
 
