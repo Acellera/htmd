@@ -78,8 +78,6 @@ class PmemdLocal(App):
             self.threads.append(t)
 
     retrieve = AcemdLocal.retrieve
-    print(retrieve)
-    sys.stdout.flush()
     submit = AcemdLocal.submit
     inprogress = AcemdLocal.inprogress
     running = AcemdLocal.running
@@ -112,12 +110,14 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                                                            system_name,
                                                            system_name,
                                                            system_name)
-                         
+
                 print("JUST ASSIGNED COMMAND LINE INPUT TO VARIABLE")
-                print("Command line input: {}".format(cmd))
+                
                 
 
                 try:
+                	print("TRYING TO CALL BASH")
+                	print("Command line input: {}".format(cmd))
                     check_output(cmd, shell=True)
                 except CalledProcessError:
                     logger.error('Error in pmemd.cuda for path: {}. Check the {} file.'.format(path, os.path.join(path, 'log.txt')))
