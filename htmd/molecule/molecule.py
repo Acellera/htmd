@@ -125,7 +125,7 @@ class Molecule:
     }
 
     def __init__(self, filename=None, name=None):
-        self.bonds = []
+        self.bonds = np.empty((0, 2), dtype=np.uint32)
         self.ssbonds = []
         self.box = None
         self.charge = []
@@ -647,7 +647,12 @@ class Molecule:
             type = type.lower()
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
+            # TODO: Check for validity when loading a PSF after a PDB and vice versa
             con = PSFread(filename)
+            oldcoords = []
+            if len(self.coords) != 0:
+                oldcoords = self.coords
+            self.empty(len(con.serial))  # initialize all arrays as empty
             self.serial = con.serial
             self.name   = con.atomname
             self.resname= con.resname
@@ -656,13 +661,15 @@ class Molecule:
             self.insertion = con.insertion
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             self.masses = numpy.asarray(con.masses, dtype=np.float32)
-            self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
+            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
+            if len(oldcoords) != 0:
+                self.coords = oldcoords
         elif (type is None and (
             firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
             con = PRMTOPread(filename)
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             # self.masses = numpy.asarray(con.masses, dtype=np.float32)  # No masses in PRMTOP
-            self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
+            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
@@ -784,7 +791,7 @@ class Molecule:
                     self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
 
         self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
-        self.bonds = np.array(mol.bonds, dtype=np.uint32)
+        self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
         self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
         self.box = np.array(mol.box)
 
@@ -958,7 +965,7 @@ class Molecule:
             Coloring mode or color ID.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
-        viewer : str ('vmd','notebook')
+        viewer : str ('vmd', 'webgl')
             Choose viewer backend. Default is taken from htmd.config
         hold : bool
             If set to True, it will not visualize the molecule but instead collect representations until set back to False.
@@ -991,8 +998,10 @@ class Molecule:
             return self._viewMDTraj(pdb, xtc)
         elif viewer.lower() == 'vmd':
             self._viewVMD(pdb, xtc, viewerhandle, name, guessBonds)
-        elif viewer.lower() == 'ngl':
+        elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
             return self._viewNGL(pdb, xtc, guessBonds)
+        else:
+            raise ValueError('Unknown viewer.')
 
         # Remove temporary files
         if xtc:
@@ -1706,5 +1715,7 @@ if __name__ == "__main__":
     m.moveBy([1, 1, 1])
     m.rotate([1, 0, 0], pi / 2)
     m.align('name CA')
-
+    m = Molecule('2OV5')
+    m.filter('protein or water')
+ 
     # test rotate

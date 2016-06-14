@@ -34,6 +34,8 @@ class AcemdLocal(App):
         self.queue = queue.Queue()
         self.threads = []
         self.shutdown = False
+        self.inputfile = 'input'
+        self.timeout = None
 
         if ngpus is not None and devices is not None:
             raise ValueError('Parameters `ngpus` and `devices` are mutually exclusive.')
@@ -58,6 +60,10 @@ class AcemdLocal(App):
                 acemd = which("acemd", mode=os.X_OK)
                 if acemd:
                     logger.info("Found ACEMD at '" + acemd + "'")
+                else:
+                    acemd = which("acemdhtmd", mode=os.X_OK)
+                    if acemd:
+                        logger.info("Found ACEMD at '" + acemd + "'")
             except:
                 pass
 
@@ -154,7 +160,10 @@ class AcemdLocal(App):
 
 
 def run_job(obj, ngpu, acemd, datadir):
-    import sys
+    from subprocess import PIPE, Popen, TimeoutExpired
+    import os
+    import signal
+
     queue = obj.queue
     while not obj.shutdown:
         path = None
@@ -165,15 +174,24 @@ def run_job(obj, ngpu, acemd, datadir):
 
         if path:
             try:
+                timeoutstr = ''
+                if obj.timeout:
+                    timeoutstr = 'timeout {}'.format(obj.timeout)
                 logger.info("Running " + path + " on GPU device " + str(ngpu))
                 obj.running(path)
-                cmd = 'cd {}; {} --device {} input > log.txt 2>&1'.format(os.path.normpath(path), acemd, ngpu)
+                cmd = 'cd {}; {} {} --device {} {} > log.txt 2>&1'.format(os.path.normpath(path), timeoutstr, acemd, ngpu, obj.inputfile)
                 try:
-                    check_output(cmd, shell=True)
+                    #check_output(cmd, shell=True, timeout=obj.timeout)
+                    proc = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+                    proc.communicate()
                 except CalledProcessError:
                     logger.error('Error in ACEMD for path: {}. Check the {} file.'.format(path, os.path.join(path, 'log.txt')))
                     obj.completed(path)
                     queue.task_done()
+                    proc.kill()
+                    continue
+                except TimeoutExpired:
+                    proc.kill()
                     continue
 
                 # If a datadir is provided, copy finished trajectories there. Only works for xtc files.

@@ -37,7 +37,7 @@ int	ProgID=0, nProc=1;
 double w_rotamer_List[MAX_ROTAMER], w_rotamer_Sum;
 double x_Rotamer[MAX_ROTAMER][MAX_NUM_ATOM], y_Rotamer[MAX_ROTAMER][MAX_NUM_ATOM], z_Rotamer[MAX_ROTAMER][MAX_NUM_ATOM];
 double x_Rotamer_Opt[MAX_ROTAMER][MAX_NUM_ATOM], y_Rotamer_Opt[MAX_ROTAMER][MAX_NUM_ATOM], z_Rotamer_Opt[MAX_ROTAMER][MAX_NUM_ATOM];
-double E_Rotamer_QM[MAX_ROTAMER], E_Min_Rotamer, E_Rotamer_MM[MAX_ROTAMER], rmsd_Rotamer[MAX_ROTAMER];
+double E_Rotamer_QM[MAX_ROTAMER], E_Min_Rotamer=1.e100, E_Rotamer_MM[MAX_ROTAMER], rmsd_Rotamer[MAX_ROTAMER];
 int nRotamer=-1;
 void Read_QM_Rotamer_Data(void);
 void Cal_E_MM_Rotamer(void);
@@ -167,8 +167,8 @@ void Output_1D_QM_MM(void)
 		}
 		E_Min_1D_QM_MM_Shift = (E_Min_1D_QM_Mean - E_Min_1D_MM_Mean)/Weight_Sum;
 
-
 		for(j=0; j<nScan_List[i]; j++)	{
+//printf("i=%d j=%d phi-%f qmscan=%e qmmin=%e mmscan=%e\n", i,  j, Phi_Scan_List[i][j], E_Scan_QM[i][j], E_Min_1D_QM, E_Scan_MM[i][j] );
 			fprintf(fOut, "%.1lf %.5lf %.5lf\n", Phi_Scan_List[i][j], E_Scan_QM[i][j]-E_Min_1D_QM, E_Scan_MM[i][j]+E_Min_1D_QM_MM_Shift-E_Min_1D_QM);	// the relative 1D energy
 		}
 
@@ -617,15 +617,18 @@ int main(int argc, char **argv)
 
 	Read_QM_Rotamer_Data();
 
-  if( nRotamer == 0 ) {
-    printf("No rotamers found. The should be at least one in all-rotamer.dat. Something has gone wrong in the previous step\n" );
-		exit(1);
-  }
-
 	Read_Tor_Para_1D_Fitting();
 	Assign_Torsion_Parameters();
 
 	Read_1D_Scan_QM_Data();
+
+
+	Output_1D_QM_MM();
+
+  	if( nRotamer == 0 ) {
+	    printf("No rotamers found. The should be at least one in all-rotamer.dat. Something has gone wrong in the previous step\n" );
+	    exit(0);
+	}
 
 //	Cal_E_MM_Scaned();
 //	Cal_E_MM_Rotamer();
@@ -1072,6 +1075,7 @@ void Read_QM_Rotamer_Data(void)
 	}
 	fclose(fIn);
 
+	if( E_Min_Rotamer == 1.0E100 ) { E_Min_Rotamer = 0.; } 
 	for(i=0; i<nRotamer; i++)	{
 		E_Rotamer_QM[i] = (E_Rotamer_QM[i] - E_Min_Rotamer)*HARTREE_To_KCAL;
 	}
@@ -1107,7 +1111,8 @@ void Read_1D_Scan_QM_Data(void)
 				break;
 			}
 			if(strncmp(szLine, "E_Scan", 6) == 0)	{
-				ReadItem = sscanf(szLine, "%s %lf %lf %s %lf", szTmp, &(E_Scan_QM[i][nScan_List[i]]), &fTmp, szTmp, &(Phi_Scan_List[i][nScan_List[i]]));
+				ReadItem = sscanf(szLine, "%s %le %le %s %le", szTmp, &(E_Scan_QM[i][nScan_List[i]]), &fTmp, szTmp, &(Phi_Scan_List[i][nScan_List[i]]));
+//printf("READ %d %d  %f %f \n",  i, nScan_List[i], E_Scan_QM[i][nScan_List[i]] );
 				if(ReadItem == 5)	{
 					ReadLine = fgets(szLine, 256, fIn);
 					if(strncmp(szLine, "Coordinate", 10)==0)	{
@@ -1410,7 +1415,7 @@ void jacobi (int n, int np, double a[5][5], double d[5], double v[5][5], double 
 void Cal_E_MM_Scaned(void)
 {
 	int i, j, nAtom, Count=0;
-	double E_Min_Local_QM;
+	double E_Min_Local_QM=0;
 
 	E_Scan_MM_Mean = 0.0;
 	E_Scan_QM_Mean = 0.0;

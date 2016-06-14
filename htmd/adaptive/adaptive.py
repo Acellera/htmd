@@ -417,7 +417,7 @@ def reconstructAdaptiveTraj(simlist, trajID):
     mol.box = np.zeros((3, 0))
     for i, c in enumerate(chain):
         tmpmol = Molecule(sim.molfile)
-        tmpmol.read(c[0])
+        tmpmol.read(c[0].trajectory)
         endpiece = c[1]
         fileloc = np.vstack(tmpmol.fileloc)
         filenames = fileloc[:, 0]
