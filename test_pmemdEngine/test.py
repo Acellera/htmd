@@ -1,10 +1,11 @@
 import htmd
 import sys
 import shutil
+import os
 
 # delete previous test
-if os.path.exists('./test_pmemdEngine'):
-	shutil.rmtree('./test_pmemdEngine')
+if os.path.exists('./test_pmemdEngine/test_pmemdEngine/'):
+	shutil.rmtree('./test_pmemdEngine/test_pmemdEngine/')
 
 adapt = htmd.AdaptiveRun(inputpath='./test_pmemdEngine')
 adapt.nmin = 2
