@@ -82,6 +82,7 @@ class PmemdLocal(App):
     sys.stdout.flush()
     submit = AcemdLocal.submit
     inprogress = AcemdLocal.inprogress
+    running = AcemdLocal.running
 
 
 def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
@@ -98,6 +99,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 logger.info("Running " + path + " on GPU device " + str(ngpu))
                 print("Binary location: {}".format(pmemd_cuda))
                 print("System Name: {}".format(system_name))
+                sys.stdout.flush()
                 
                 obj.running(path)
                 # TODO: Pre-production steps
@@ -110,9 +112,10 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                                                            system_name,
                                                            system_name,
                                                            system_name)
+                         
                 print("JUST ASSIGNED COMMAND LINE INPUT TO VARIABLE")
                 print("Command line input: {}".format(cmd))
-                sys.stdout.flush()
+                
 
                 try:
                     check_output(cmd, shell=True)
