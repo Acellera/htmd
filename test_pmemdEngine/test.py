@@ -6,7 +6,7 @@ from glob import glob
 
 # delete previous test
 for file in glob('./test_pmemdEngine/*_test_pmemdEngine'):
-	os.remove('./test_pmemdEngine/' + file)
+	os.remove(file)
 
 adapt = htmd.AdaptiveRun(inputpath='./test_pmemdEngine')
 adapt.nmin = 2
