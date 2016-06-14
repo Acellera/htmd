@@ -7,6 +7,7 @@ import threading
 import logging
 import os
 import queue
+import sys
 logger = logging.getLogger(__name__)
 
 
@@ -97,7 +98,6 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 logger.info("Running " + path + " on GPU device " + str(ngpu))
                 logger.info("Binary location: {}".format(pmemd_cuda))
                 print("System Name: {}".format(system_name))
-                import sys
                 sys.stdout.flush()
                 obj.running(path)
                 # TODO: Pre-production steps
