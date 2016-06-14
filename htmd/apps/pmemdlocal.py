@@ -116,9 +116,9 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 
 
                 try:
-                	print("TRYING TO CALL BASH")
-					print("Command line input: {}".format(cmd))
-					check_output(cmd, shell=True)
+                    print("TRYING TO CALL BASH")
+                    print("Command line input: {}".format(cmd))
+                    check_output(cmd, shell=True)
                 except CalledProcessError:
                     logger.error('Error in pmemd.cuda for path: {}. Check the {} file.'.format(path, os.path.join(path, 'log.txt')))
                     obj.completed(path)
