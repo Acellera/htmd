@@ -110,6 +110,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                                                            system_name,
                                                            system_name,
                                                            system_name)
+                print("JUST ASSIGNED COMMAND LINE INPUT TO VARIABLE")
                 print("Command line input: {}".format(cmd))
                 sys.stdout.flush()
 
