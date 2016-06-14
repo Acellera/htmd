@@ -5,7 +5,7 @@ import propka
 import propka.lib
 import propka.molecular_container
 
-from builder.residuedata import ResidueData
+from htmd.builder.preparation import ResidueData
 
 logger = logging.getLogger(__name__)
 

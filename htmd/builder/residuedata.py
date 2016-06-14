@@ -209,7 +209,7 @@ class ResidueData:
 
 
 if __name__ == "__main__":
-    from builder.proteinpreparation import proteinPrepare
+    from htmd.builder.preparation import proteinPrepare
 
     import doctest
 

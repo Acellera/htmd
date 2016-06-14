@@ -6,7 +6,7 @@ import propka.lib
 from pdb2pqr.main import runPDB2PQR
 from pdb2pqr.src.pdb import readPDB
 
-from builder.residuedata import ResidueData
+from htmd.builder.residuedata import ResidueData
 from htmd.molecule.molecule import Molecule
 
 logger = logging.getLogger(__name__)
