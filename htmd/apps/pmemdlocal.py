@@ -93,6 +93,8 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
         if path:
             try:
                 logger.info("Running " + path + " on GPU device " + str(ngpu))
+                logger.info("Binary location: {}".format(pmemd_cuda))
+                logger.info("System Name: {}".format(system_name))
                 obj.running(path)
                 # TODO: Pre-production steps
                 cmd = """cd {} && {} -O -i 05_Prod.in -o {}.out \\

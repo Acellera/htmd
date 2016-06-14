@@ -115,6 +115,7 @@ class AdaptiveNew(ProtocolInterface):
             The current epoch
         """
         folders = glob(path.join(self.inputpath, 'e*', ''))
+
         epoch = 0
         regex = re.compile('e(\d+)')
         for f in folders:

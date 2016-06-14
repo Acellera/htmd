@@ -276,11 +276,13 @@ class AdaptiveRun(Adaptive):
         uisetattr(self, key, value, all)
 
     def _algorithm(self):
+
         logger.info('Postprocessing new data')
         datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
                            glob(path.join(self.inputpath, '*', '')))
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
+        # calculate metrics for tica projection            
         if hasattr(self, 'metricsel2') and self.metricsel2 is not None:
             proj = MetricDistance(self.metricsel1, self.metricsel2, metric=self.metrictype)
         else:
@@ -292,6 +294,7 @@ class AdaptiveRun(Adaptive):
         #if self.contactsym is not None:
         #    contactSymmetry(data, self.contactsym)
 
+        # projecting data with tICA
         data.dropTraj()
         if self.ticadim > 0:
             tica = TICA(data, int(max(2, np.ceil(20/self.skip))))
@@ -299,6 +302,7 @@ class AdaptiveRun(Adaptive):
         else:
             datadr = data
 
+        # what is this K definition???
         K = int(max(np.round(0.6 * np.log10(datadr.numFrames/1000)*1000+50), 100))  # heuristic
         if K > datadr.numFrames / 3: # Freaking ugly patches ...
             K = int(datadr.numFrames / 3)
