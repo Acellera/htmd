@@ -27,7 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 __test__ = {'build-opm-1u5u': """
-    >>> from htmd.proteinpreparation.proteinpreparation import prepareProtein
+    >>> from htmd.proteinpreparation.proteinpreparation import proteinPrepare
     >>> from htmd.util import diffMolecules
 
     >>> pdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_opm.pdb')
@@ -35,7 +35,7 @@ __test__ = {'build-opm-1u5u': """
     >>> mol.filter('protein')
     >>> mol.set('segid', 'P')
 
-    >>> pmol = prepareProtein(mol)
+    >>> pmol = proteinPrepare(mol)
     >>> bmol = build(pmol, outdir='/tmp/build/', ionize=False)
 
     >>> refpdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_built_protonated.pdb')
