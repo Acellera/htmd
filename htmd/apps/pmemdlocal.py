@@ -32,6 +32,7 @@ class PmemdLocal(App):
         self.queue = queue.Queue()
         self.threads = []
         self.shutdown = False
+        self.system_name = 'Test'
 
         if ngpus is not None and devices is not None:
             raise ValueError('Parameters `ngpus` and `devices` are mutually exclusive.')
@@ -68,7 +69,8 @@ class PmemdLocal(App):
 
         self.threads = []
         for d in devices:
-            t = threading.Thread(target=run_job, args=(self, d, pmemd_cuda, datadir))
+            t = threading.Thread(target=run_job, args=(self, d, pmemd_cuda,
+                                                       datadir, self.system_name))
             t.daemon = True
             t.start()
             self.threads.append(t)
@@ -78,7 +80,7 @@ class PmemdLocal(App):
     inprogress = AcemdLocal.inprogress
 
 
-def run_job(obj, ngpu, pmemd_cuda, datadir):
+def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
     queue = obj.queue
     while not obj.shutdown:
         path = None
@@ -91,7 +93,16 @@ def run_job(obj, ngpu, pmemd_cuda, datadir):
             try:
                 logger.info("Running " + path + " on GPU device " + str(ngpu))
                 obj.running(path)
-                cmd = 'cd {}; {} --device {} input > log.txt 2>&1'.format(os.path.normpath(path), pmemd_cuda, ngpu)
+                # TODO: Pre-production steps
+                cmd = """cd {} && {} -O -i 05_Prod.in -o {}.out \\
+                         -c {} -p {}.prmtop -r {}.rst \\
+                         -x {}.nc > log.txt 2>&1""".format(os.path.normpath(path),
+                                                           pmemd_cuda,
+                                                           system_name,
+                                                           system_name,
+                                                           system_name,
+                                                           system_name,
+                                                           system_name)
                 try:
                     check_output(cmd, shell=True)
                 except CalledProcessError:
