@@ -20,7 +20,7 @@ CPROGS := 1d_fitting 1d_org 1d_rotamer_fitting org_rotamer_E acceptor  \
 #         drude_gen_esp drude_gen_xpsf drude_modify_lj drude_ff drude_scale_alpha \
 #         drude_scale_vdw_r6 drude_update_torsion_para
 
-DEST=../../htmd/parameterize/share/bin
+DEST=../../htmd/parameterization/share/bin
 CBIN := $(patsubst %,$(DEST)/%, $(CPROGS))
 FBIN := $(DEST)/cgrid # $(DEST)/drude_cgrid
 

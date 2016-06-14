@@ -647,7 +647,11 @@ class Molecule:
             type = type.lower()
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
+            # TODO: Check for validity when loading a PSF after a PDB and vice versa
             con = PSFread(filename)
+            oldcoords = []
+            if len(self.coords) != 0:
+                oldcoords = self.coords
             self.empty(len(con.serial))  # initialize all arrays as empty
             self.serial = con.serial
             self.name   = con.atomname
@@ -658,6 +662,8 @@ class Molecule:
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             self.masses = numpy.asarray(con.masses, dtype=np.float32)
             self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
+            if len(oldcoords) != 0:
+                self.coords = oldcoords
         elif (type is None and (
             firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
             con = PRMTOPread(filename)
@@ -1709,5 +1715,7 @@ if __name__ == "__main__":
     m.moveBy([1, 1, 1])
     m.rotate([1, 0, 0], pi / 2)
     m.align('name CA')
-
+    m = Molecule('2OV5')
+    m.filter('protein or water')
+ 
     # test rotate

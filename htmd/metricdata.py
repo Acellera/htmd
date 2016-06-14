@@ -365,6 +365,10 @@ class MetricData:
         >>> simframes = data.rel2sim([100, 56])  # 100th simulation frame 56
         """
         from htmd.simlist import Frame
+        relFrames = np.array(relFrames)
+        if relFrames.ndim == 1:
+            relFrames = relFrames[np.newaxis, :]
+
         sims = []
         frames = []
         for i in range(np.size(relFrames, 0)):

@@ -147,7 +147,7 @@ class Command:
             print("\n  Valid configuration file commands:\n");
             for a in sorted( Command.commands.keys() ):
                 print( "    " + a )
-            print("\n  parameterize --command [command] for detailed help on a specific command\n\n");
+            print("\n  parameterization --command [command] for detailed help on a specific command\n\n");
             # print sections
             pass
         else:

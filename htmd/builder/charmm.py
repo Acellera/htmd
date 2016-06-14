@@ -237,7 +237,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     f.close()
 
     if param is not None:
-        _charmmCombine(param, path.join(outdir, 'parameters'))
+        combine(param, path.join(outdir, 'parameters'))
 
     molbuilt = None
     if execute:
@@ -271,14 +271,6 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
                          execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, psfgen=psfgen)
     _checkFailedAtoms(molbuilt)
     return molbuilt
-
-
-def _checkFailedAtoms(mol):
-    if mol is None:
-        return
-    idx = np.where(np.sum(mol.coords == 0, axis=1) == 3)[0]
-    if len(idx) != 0:
-        logger.warning('Atoms with indexes {} are positioned at [0,0,0]. This can cause simulations to crash.'.format(idx))
 
 
 def _cleanOutDir(outdir):
@@ -532,16 +524,16 @@ def _protonationPatches(mol):
     return patches
 
 
-def _charmmCombine(prmlist, outfile):
-    """ Combines CHARMM parameter files.
+def combine(prmlist, outfile):
+    """ Combines CHARMM parameter files
+    Take a list of parameters files and combine them into a single file (useful for acemd)
 
     Parameters
     ----------
-    prmlist
-    outfile
-
-    Returns
-    -------
+    prmlist: list
+        List of parameter files to combine
+    outfile: str
+        Output filename of combined parameter files
 
     """
     # Process parameter files
@@ -662,7 +654,7 @@ def _sec_name(filename):
     return "!Following lines added from %s\n" % (filename)
 
 
-def _charmmSplit(filename, outdir):
+def split(filename, outdir):
     """ Splits a stream file into an rtf and prm file.
 
     Parameters
@@ -725,7 +717,7 @@ def _prepareStream(filename):
     from htmd.util import tempname
     tmpout = tempname()
     os.makedirs(tmpout)
-    return _charmmSplit(filename, tmpout)
+    return split(filename, tmpout)
 
 
 def _logParser(fname):
@@ -765,8 +757,16 @@ def _logParser(fname):
         warnings = True
         logger.warning('{} undefined warnings were produced during building.'.format(otherwarncount))
     if warnings:
-        logger.warning('Failed/poorly guessed coordinates can cause simulations to crash since failed atoms are all positioned on (0,0,0).')
         logger.warning('Please check {} for further information.'.format(fname))
+
+
+def _checkFailedAtoms(mol):
+    if mol is None:
+        return
+    idx = np.where(np.sum(mol.coords == 0, axis=1) == 3)[0]
+    if len(idx) != 0:
+        logger.critical('Atoms with indexes {} are positioned at [0,0,0]. This can cause simulations to crash. '
+                        'Check log file for more details.'.format(idx))
 
 
 if __name__ == '__main__':
