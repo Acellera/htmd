@@ -45,16 +45,16 @@ def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element
 
 
 def _fixupWaterNames(mol):
-    """Rename WAT OW HW HW atoms as O H1 H2"""
-    mol.set("name", "O",sel="resname WAT and name OW")
+    """Rename WAT / OW HW HW atoms as O H1 H2"""
+    mol.set("name", "O", sel="resname WAT and name OW")
     mol.set("name", "H1", sel="resname WAT and name HW and serial % 2 == 0")
     mol.set("name", "H2", sel="resname WAT and name HW and serial % 2 == 1")
+
 
 def _warnIfContainsDUM(mol):
     """Warn if any DUM atom is there"""
     if any(mol.atomselect("resname DUM")):
         logger.warning("OPM's DUM residues must be filtered out before preparation. Continuing, but crash likely.")
-
 
 
 def proteinPrepare(mol_in,
@@ -83,10 +83,13 @@ def proteinPrepare(mol_in,
         TYM 	Negative TYR
         AR0     Neutral ARG
 
+    A detailed table about the residues modified is returned (as a second return value) when
+    returnDetails is True (see ResidueData object).
+
     If hydrophobicThickness is set to a positive value 2*h, a warning is produced for titratable residues
-    having -h<z<h and are buried in the protein by less than 75%. The list of such residues can be accessed setting
-    returnDetails to True. Note that the heuristic for the detection of membrane-exposed residues is very crude;
-    the "buried fraction" computation (from propka) is approximate; also, in the presence of cavities,
+    having -h<z<h and are buried in the protein by less than 75%. Note that the heuristic for the
+    detection of membrane-exposed residues is very crude; the "buried fraction" computation
+    (from propKa) is approximate; also, in the presence of cavities,
     residues may be solvent-exposed independently from their z location.
 
 
@@ -246,14 +249,13 @@ def proteinPrepare(mol_in,
     # Hold list (None -> None)
     hlist = _selToHoldList(mol_in, holdSelection)
 
-
     # Relying on defaults
     header, pqr, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
-                                                               ph=pH, verbose=verbose,
-                                                               ff="parse", ffout="amber",
-                                                               ph_calc_method="propka31",
-                                                               ph_calc_options=propka_opts,
-                                                               holdList=hlist)
+                                                             ph=pH, verbose=verbose,
+                                                             ff="parse", ffout="amber",
+                                                             ph_calc_method="propka31",
+                                                             ph_calc_options=propka_opts,
+                                                             holdList=hlist)
     tmpin.close()
 
     # Diagnostics
@@ -277,7 +279,6 @@ def proteinPrepare(mol_in,
     record = []
     charge = []
 
-
     resData = ResidueData()
 
     resData.header = header
@@ -285,18 +286,18 @@ def proteinPrepare(mol_in,
 
     for residue in pdb2pqr_protein.residues:
         # if 'ffname' in residue.__dict__:
-        if getattr(residue,'ffname',None):
+        if getattr(residue, 'ffname', None):
             curr_resname = residue.ffname
             if len(curr_resname) >= 4:
                 curr_resname = curr_resname[-3:]
                 logger.debug("Residue %s has internal name %s, replacing with %s" %
-                            (residue, residue.ffname, curr_resname))
+                             (residue, residue.ffname, curr_resname))
         else:
             curr_resname = residue.name
 
         resData._setProtonationState(residue, curr_resname)
 
-        #if 'patches' in residue.__dict__:
+        # if 'patches' in residue.__dict__:
         if getattr(residue, 'patches', None):
             for patch in residue.patches:
                 resData._appendPatches(residue, patch)
@@ -305,7 +306,6 @@ def proteinPrepare(mol_in,
 
         if getattr(residue, 'wasFlipped', 'UNDEF') != 'UNDEF':
             resData._setFlipped(residue, residue.wasFlipped)
-
 
         for atom in residue.atoms:
             name.append(atom.name)
@@ -320,7 +320,6 @@ def proteinPrepare(mol_in,
             beta.append(atom.tempFactor)
             charge.append(atom.charge)
             record.append(atom.type)
-
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
@@ -343,8 +342,6 @@ def proteinPrepare(mol_in,
         return mol_out, resData
     else:
         return mol_out
-
-
 
 
 # A test method
@@ -371,4 +368,5 @@ if __name__ == "__main__":
 
     else:
         import doctest
+
         doctest.testmod()
