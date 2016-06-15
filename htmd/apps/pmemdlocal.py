@@ -113,8 +113,8 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                                                            system_name)
 
                 print("JUST ASSIGNED COMMAND LINE INPUT TO VARIABLE")
-                
-                
+
+
 
                 try:
                     print("TRYING TO CALL BASH")
