@@ -14,9 +14,9 @@ adapt.project = 'Test'
 adapt.nmin = 4
 adapt.nmax = 4
 adapt.nepochs = 10
-adapt.inputpath = 'test_htmd'
-adapt.generatorspath = 'test_htmd'
+adapt.inputpath = 'test_pmemdEngine'
+adapt.generatorspath = 'test_pmemdEngine'
 adapt.metricsel1 = 'name CA'
-adapt.datapath = 'test_htmd'
+adapt.datapath = 'test_pmemdEngine'
 adapt.ticadim = 0
 adapt.run()
