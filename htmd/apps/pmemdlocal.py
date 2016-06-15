@@ -77,6 +77,7 @@ class PmemdLocal(App):
             t.start()
             self.threads.append(t)
 
+    # Use the methods from the AcemdLocal class
     retrieve = AcemdLocal.retrieve
     submit = AcemdLocal.submit
     inprogress = AcemdLocal.inprogress
