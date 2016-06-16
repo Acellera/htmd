@@ -92,14 +92,9 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
             path = queue.get(timeout=1)
         except:
             pass
-
         if path:
             try:
                 logger.info("Running " + path + " on GPU device " + str(ngpu))
-                print("Binary location: {}".format(pmemd_cuda))
-                print("System Name: {}".format(system_name))
-                sys.stdout.flush()
-                
                 obj.running(path)
                 # TODO: Pre-production steps
                 cmd = """cd {} && {} -O -i 05_Prod.in -o {}.out \\
@@ -111,21 +106,13 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                                                            system_name,
                                                            system_name,
                                                            system_name)
-
-                print("JUST ASSIGNED COMMAND LINE INPUT TO VARIABLE")
-
-
-
                 try:
-                    print("TRYING TO CALL BASH")
-                    print("Command line input: {}".format(cmd))
                     check_output(cmd, shell=True)
                 except CalledProcessError:
                     logger.error('Error in pmemd.cuda for path: {}. Check the {} file.'.format(path, os.path.join(path, 'log.txt')))
                     obj.completed(path)
                     queue.task_done()
                     continue
-
                 # If a datadir is provided, copy finished trajectories there.
                 # Only works for nc files.
                 if datadir is not None:
@@ -137,7 +124,6 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                     finishedtraj = glob(os.path.join(path, '*.nc'))
                     logger.info("Moving simulation {} to {}.".format(finishedtraj[0], odir))
                     move(finishedtraj[0], odir)
-
                 logger.info("Completed " + path)
                 obj.completed(path)
                 queue.task_done()
