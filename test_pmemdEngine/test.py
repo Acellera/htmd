@@ -21,4 +21,5 @@ adapt.metricsel1 = 'name CA'
 adapt.datapath = 'test_pmemdEngine'
 adapt.ticadim = 0
 adapt.updateperiod=1
+adap.inputpath='test_InputPath'
 adapt.run()
