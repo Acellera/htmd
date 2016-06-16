@@ -277,16 +277,16 @@ class AdaptiveRun(Adaptive):
 
     def _algorithm(self):
 
-        logger.info(self.app.get_class())
-
         logger.info('Postprocessing new data')
 
         # need to change datalist to accept .rst files, as these are used to store the first frame coordinates
-        
+        if self.app.get_class() == 'PmemdLocal':
+            logger.info('SUCCESS')
 
-        datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
-                           glob(path.join(self.inputpath, '*', '')))
-        filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
+        else:        
+            datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
+                               glob(path.join(self.inputpath, '*', '')))
+            filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
         # calculate metrics for tica projection            
         if hasattr(self, 'metricsel2') and self.metricsel2 is not None:
