@@ -279,13 +279,7 @@ class AdaptiveRun(Adaptive):
 
         logger.info('Postprocessing new data')
 
-        # need to change datalist to accept .prmtop files, as these are used to store the first frame coordinates
         if self.app.get_class() == 'PmemdLocal':
-            logger.info("DEBUG MESSAGES")
-            logger.info("Data path: " + str(glob(path.join(self.datapath, '*', ''))))
-            logger.info("Input path:" + str(glob(path.join(self.inputpath, '*', '.prmtop'))))
-
-            datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '.prmtop')),
             datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.prmtop')),
                                glob(path.join(self.inputpath, '*', '')))
         else:
@@ -293,7 +287,7 @@ class AdaptiveRun(Adaptive):
                                glob(path.join(self.inputpath, '*', '')))
             filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
-        # calculate metrics for tica projection            
+        # calculate metrics for tica projection
         if hasattr(self, 'metricsel2') and self.metricsel2 is not None:
             proj = MetricDistance(self.metricsel1, self.metricsel2, metric=self.metrictype)
         else:
