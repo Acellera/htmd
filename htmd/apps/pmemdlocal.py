@@ -125,7 +125,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
             pass
         if path:
             try:
-                logger.info("Running " + path + " on GPU device " + str(ngpu))
+                logger.info('Running {} on GPU device {}'.format((path, str(ngpu))))
                 obj.running(path)
                 # TODO: Pre-production steps
 
@@ -161,14 +161,14 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                     odir = os.path.join(datadir, simname)
                     os.mkdir(odir)
                     finishedtraj = glob(os.path.join(path, '*.nc'))
-                    logger.info("Moving simulation {} to {}.".format(finishedtraj[0], odir))
+                    logger.info('Moving simulation {} to {}.'.format(finishedtraj[0], odir))
                     move(finishedtraj[0], odir)
-                logger.info("Completed " + path)
+                logger.info('Completed {}'.format(path))
                 obj.completed(path)
                 queue.task_done()
             except:
-                logger.error("Error running job")
+                logger.error('Error running job')
                 obj.completed(path)
                 queue.task_done()
                 continue
-    logger.info("Shutting down worker thread")
+    logger.info('Shutting down worker thread')
