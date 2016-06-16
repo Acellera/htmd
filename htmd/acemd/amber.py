@@ -136,6 +136,5 @@ class Amber(ProtocolInterface):
         fname : output file name
         """
         text = self.show(quiet=True)
-        fo = open(fname, 'w')
-        fo.write(text)
-        fo.close()
+        with open(fname, 'w') as f:
+            f.write(text)
