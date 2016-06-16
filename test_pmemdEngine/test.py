@@ -18,10 +18,7 @@ adapt.nmin = 4
 adapt.nmax = 4
 adapt.nepochs = 10
 adapt.inputpath = 'test_pmemdEngine'
-adapt.generatorspath = ['test_pmemdEngine/generator1',
-						'test_pmemdEngine/generator2',
-						'test_pmemdEngine/generator3',
-						'test_pmemdEngine/generator4']
+adapt.generatorspath = ['test_pmemdEngine/generator']
 adapt.metricsel1 = 'name CA'
 adapt.datapath = 'test_pmemdEngine'
 adapt.ticadim = 0
