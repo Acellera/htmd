@@ -3,6 +3,7 @@ from htmd.apps.acemdlocal import AcemdLocal
 from subprocess import check_output, CalledProcessError
 from glob import glob as glob
 from shutil import which, move, copy
+from os.path import expanduser
 import threading
 import logging
 import os
@@ -109,7 +110,9 @@ class PmemdLocal(App):
             logger.info('Queueing ' + dirname)
 
             # FIXME copying files to queued directory
-            copy('/home/je714/htmd/htmd/protocols/Amber_protocols/Production.in', dirname)
+            # FIXME find more felxible way of finding home directory
+            home=expanduser("~")
+            copy(home+'htmd/htmd/protocols/Amber_protocols/Production.in', dirname)
 
             self.states[dirname] = 'Q'
             self.queue.put(dirname)
@@ -157,6 +160,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                     if not os.path.isdir(datadir):
                         os.mkdir(datadir)
                     simname = os.path.basename(os.path.normpath(path))
+                    # create directory for new file
                     odir = os.path.join(datadir, simname)
                     os.mkdir(odir)
                     finishedtraj = glob(os.path.join(path, '*.nc'))
