@@ -288,8 +288,7 @@ class AdaptiveRun(Adaptive):
             datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '.prmtop')),
             datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.prmtop')),
                                glob(path.join(self.inputpath, '*', '')))
-
-        else:        
+        else:
             datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
                                glob(path.join(self.inputpath, '*', '')))
             filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
@@ -299,6 +298,7 @@ class AdaptiveRun(Adaptive):
             proj = MetricDistance(self.metricsel1, self.metricsel2, metric=self.metrictype)
         else:
             proj = MetricSelfDistance(self.metricsel1, metric=self.metrictype)
+
         metr = Metric(filtlist, skip=self.skip)
         metr.projection(proj)
         data = metr.project()
