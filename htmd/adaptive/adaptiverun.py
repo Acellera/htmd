@@ -285,7 +285,7 @@ class AdaptiveRun(Adaptive):
         else:
             datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
                                glob(path.join(self.inputpath, '*', '')))
-            filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
+        filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
         # calculate metrics for tica projection
         if hasattr(self, 'metricsel2') and self.metricsel2 is not None:
