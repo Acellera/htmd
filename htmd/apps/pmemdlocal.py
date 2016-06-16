@@ -113,6 +113,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                                                            system_name,
                                                            system_name,
                                                            system_name)
+                logger.info('Using the following bash command: {}'.format(cmd))
                 try:
                     check_output(cmd, shell=True)
                 except CalledProcessError:
