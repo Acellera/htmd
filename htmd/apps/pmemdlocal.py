@@ -97,7 +97,14 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 logger.info("Running " + path + " on GPU device " + str(ngpu))
                 obj.running(path)
                 # TODO: Pre-production steps
-                cmd = """cd {} && {} -O -i 05_Prod.in -o {}.out \\
+
+                # AMBER automatically runs the calculation on the GPU with the
+                # most memory even if that GPU is already in use
+                # See: http://ambermd.org/gpus/#Running
+                # We assume the machine doesn't have the exhaustive mode
+
+                cmd = 'export CUDA_VISIBLE_DEVICES="{}"\n'.format(str(ngpu))
+                cmd += """cd {} && {} -O -i 05_Prod.in -o {}.out \\
                          -c {} -p {}.prmtop -r {}.rst \\
                          -x {}.nc > log.txt 2>&1""".format(os.path.normpath(path),
                                                            pmemd_cuda,
