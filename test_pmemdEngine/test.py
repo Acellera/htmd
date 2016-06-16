@@ -7,6 +7,7 @@ from glob import glob
 for directory_i in glob('./test_pmemdEngine/*_test_pmemdEngine'):
     shutil.rmtree(directory_i)
 
+# run adaptive sampling with MSM
 adapt = htmd.AdaptiveRun()
 adapt.app = htmd.apps.pmemdlocal.PmemdLocal(
     pmemd_cuda='/usr/local/amber/bin/pmemd.cuda_SPFP')
