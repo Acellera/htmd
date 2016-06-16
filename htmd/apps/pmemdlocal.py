@@ -125,7 +125,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
             pass
         if path:
             try:
-                logger.info('Running {} on GPU device {}'.format((path, str(ngpu))))
+                logger.info('Running {} on GPU device {}'.format(path, str(ngpu)))
                 obj.running(path)
                 # TODO: Pre-production steps
 
