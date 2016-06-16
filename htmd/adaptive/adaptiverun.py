@@ -283,7 +283,7 @@ class AdaptiveRun(Adaptive):
         if self.app.get_class() == 'PmemdLocal':
             logger.info("DEBUG MESSAGES")
             logger.info("Data path: " + str(glob(path.join(self.datapath, '*', ''))))
-            logger.info(glob("Input path:" + path.join(self.inputpath, '*', '.rst')))
+            logger.info("Input path:" + str(glob(path.join(self.inputpath, '*', '.rst'))))
 
             datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '.rst')),
                                glob(path.join(self.inputpath, '*', '')))
