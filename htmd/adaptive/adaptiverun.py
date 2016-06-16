@@ -286,6 +286,7 @@ class AdaptiveRun(Adaptive):
             logger.info("Input path:" + str(glob(path.join(self.inputpath, '*', '.prmtop'))))
 
             datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '.prmtop')),
+            datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.prmtop')),
                                glob(path.join(self.inputpath, '*', '')))
 
         else:        
