@@ -279,13 +279,13 @@ class AdaptiveRun(Adaptive):
 
         logger.info('Postprocessing new data')
 
-        # need to change datalist to accept .rst files, as these are used to store the first frame coordinates
+        # need to change datalist to accept .prmtop files, as these are used to store the first frame coordinates
         if self.app.get_class() == 'PmemdLocal':
             logger.info("DEBUG MESSAGES")
             logger.info("Data path: " + str(glob(path.join(self.datapath, '*', ''))))
-            logger.info("Input path:" + str(glob(path.join(self.inputpath, '*', '.rst'))))
+            logger.info("Input path:" + str(glob(path.join(self.inputpath, '*', '.prmtop'))))
 
-            datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '.rst')),
+            datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '.prmtop')),
                                glob(path.join(self.inputpath, '*', '')))
 
         else:        
