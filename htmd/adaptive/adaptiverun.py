@@ -277,7 +277,13 @@ class AdaptiveRun(Adaptive):
 
     def _algorithm(self):
 
+        logger.info(self.app)
+
         logger.info('Postprocessing new data')
+
+        # need to change datalist to accept .rst files, as these are used to store the first frame coordinates
+        
+
         datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
                            glob(path.join(self.inputpath, '*', '')))
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
