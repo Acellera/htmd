@@ -83,6 +83,11 @@ class PmemdLocal(App):
     inprogress = AcemdLocal.inprogress
     running = AcemdLocal.running
 
+    # get_class will be called to check if we are using PmemdLocal
+    # in AdaptiveRun
+    def get_class(self):
+        return self.__class__
+
     def submit(self, mydirs):
         """ Queue for execution all of the jobs in the passed list of directories
 
