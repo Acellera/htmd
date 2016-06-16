@@ -82,6 +82,7 @@ class PmemdLocal(App):
     retrieve = AcemdLocal.retrieve
     inprogress = AcemdLocal.inprogress
     running = AcemdLocal.running
+    completed = AcemdLocal.completed
 
     # get_class will be called to check if we are using PmemdLocal
     # in AdaptiveRun
