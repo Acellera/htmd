@@ -109,7 +109,7 @@ class PmemdLocal(App):
             logger.info('Queueing ' + dirname)
 
             # FIXME copying files to queued directory
-            copy('~/htmd/htmd/protocols/Amber_protocols/Production.in', dirname)
+            copy('/home/je714/htmd/htmd/protocols/Amber_protocols/Production.in', dirname)
 
             self.states[dirname] = 'Q'
             self.queue.put(dirname)
