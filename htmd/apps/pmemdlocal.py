@@ -2,7 +2,7 @@ from htmd.apps.app import App
 from htmd.apps.acemdlocal import AcemdLocal
 from subprocess import check_output, CalledProcessError
 from glob import glob as glob
-from shutil import which, move, copyfile
+from shutil import which, move, copy
 import threading
 import logging
 import os
@@ -109,7 +109,7 @@ class PmemdLocal(App):
             logger.info('Queueing ' + dirname)
 
             # FIXME copying files to queued directory
-            copyfile('~/htmd/htmd/protocols/Amber_protocols/Production.in', dirname)
+            copy('~/htmd/htmd/protocols/Amber_protocols/Production.in', dirname)
 
             self.states[dirname] = 'Q'
             self.queue.put(dirname)
