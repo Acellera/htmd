@@ -277,7 +277,7 @@ class AdaptiveRun(Adaptive):
 
     def _algorithm(self):
 
-        logger.info(self.app)
+        logger.info(self.app.get_class())
 
         logger.info('Postprocessing new data')
 
