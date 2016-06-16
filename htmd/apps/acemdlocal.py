@@ -7,7 +7,7 @@ import htmd
 from htmd.apps.app import App
 import queue
 import threading
-from shutil import which, move
+from shutil import which, move, copyfile
 from subprocess import call, check_output, CalledProcessError
 import os
 from glob import glob as glob
@@ -121,7 +121,12 @@ class AcemdLocal(App):
         # if all folders exist, submit
         for d in mydirs:
             dirname = os.path.abspath(d)
+
             logger.info('Queueing ' + dirname)
+
+            # FIXME copying files to queued directory
+            copyfile('./protocols/Amber_protocols/Production.in', dirname)
+
             self.states[dirname] = 'Q'
             self.queue.put(dirname)
 
