@@ -2,7 +2,7 @@ from htmd.apps.app import App
 from htmd.apps.acemdlocal import AcemdLocal
 from subprocess import check_output, CalledProcessError
 from glob import glob as glob
-from shutil import which, move
+from shutil import which, move, copyfile
 import threading
 import logging
 import os
@@ -79,9 +79,40 @@ class PmemdLocal(App):
 
     # Use the methods from the AcemdLocal class
     retrieve = AcemdLocal.retrieve
-    submit = AcemdLocal.submit
     inprogress = AcemdLocal.inprogress
     running = AcemdLocal.running
+
+    def submit(self, mydirs):
+        """ Queue for execution all of the jobs in the passed list of directories
+
+        Queues all work units in a given directory list with the options given in the constructor opt.
+
+        Parameters
+        ----------
+        mydirs : list of str
+            A list or ndarray of directory paths
+
+        Examples
+        --------
+        >>> grid.submit(glob('input/e2*/'));
+        """
+        if isinstance(mydirs, str): mydirs = [mydirs]
+
+        for d in mydirs:
+            if not os.path.isdir(d):
+                raise NameError('Submit: directory ' + d + ' does not exist.')
+
+        # if all folders exist, submit
+        for d in mydirs:
+            dirname = os.path.abspath(d)
+
+            logger.info('Queueing ' + dirname)
+
+            # FIXME copying files to queued directory
+            copyfile('~/htmd/htmd/protocols/Amber_protocols/Production.in', dirname)
+
+            self.states[dirname] = 'Q'
+            self.queue.put(dirname)
 
 
 def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
