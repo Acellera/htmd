@@ -1,13 +1,10 @@
 import htmd
-import sys
 import shutil
 from glob import glob
 
 # delete previous test
 for directory_i in glob('./test_pmemdEngine/*_test_pmemdEngine'):
     shutil.rmtree(directory_i)
-#for directory_i in glob('./test_pmemdEngine/generator*'):
-#	shutil.rmtree(directory_i)
 
 # run adaptive sampling with MSM
 adapt = htmd.AdaptiveRun()
@@ -22,5 +19,5 @@ adapt.generatorspath = 'test_pmemdEngine/generator'
 adapt.metricsel1 = 'name CA'
 adapt.datapath = 'test_pmemdEngine'
 adapt.ticadim = 0
-adapt.updateperiod=1
+adapt.updateperiod = 1
 adapt.run()
