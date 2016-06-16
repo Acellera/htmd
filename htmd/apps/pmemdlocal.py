@@ -135,7 +135,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 # We assume the machine doesn't have the exhaustive mode
 
                 cmd = 'export CUDA_VISIBLE_DEVICES="{}"\n'.format(str(ngpu))
-                cmd += """cd {} && {} -O -i 05_Prod.in -o {}.out \\
+                cmd += """cd {} && {} -O -i Production.in -o {}.out \\
                          -c {} -p {}.prmtop -r {}.rst \\
                          -x {}.nc > log.txt 2>&1""".format(os.path.normpath(path),
                                                            pmemd_cuda,
