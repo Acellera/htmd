@@ -282,6 +282,8 @@ class AdaptiveRun(Adaptive):
         # need to change datalist to accept .rst files, as these are used to store the first frame coordinates
         if self.app.get_class() == 'PmemdLocal':
             logger.info('SUCCESS')
+            datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '.rst')),
+                               glob(path.join(self.inputpath, '*', '')))
 
         else:        
             datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
