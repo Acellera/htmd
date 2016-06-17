@@ -156,9 +156,16 @@ class Amber(ProtocolInterface):
                              frequently.""", default=None)
 
         #  Temperature regulation (Manual section 18.6.7)
-
-
-
+        self._cmdList(key='ntt', datatype='int',
+                      descr='Switch for temperature scaling.', default=None,
+                      valid_values=[0, 1, 2, 3, 9, 10])
+        self._cmdValue(key='temp0', datatype='int',
+                       descr="""Reference temperature at which the system is to
+                             be kept, if ntt > 0.""", default=300)
+        self._cmdValue(key='temp0les', datatype='int',
+                       descr="""This is the target temperature for all LES
+                       particles (see Chapter 6 in the Amber Manual).""",
+                       default=-1)
 
 
 
