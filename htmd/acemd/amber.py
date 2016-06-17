@@ -130,6 +130,25 @@ class Amber(ProtocolInterface):
                         ibelly=1.""",
                         default=None)
 
+        #  Energy minimization (Manual section 18.6.5)
+        self._cmdValue(key='maxcyc', datatype='int',
+                       descr='The maximum number of cycles of minimization.',
+                       default=1)
+        self._cmdValue(key='ncyc', datatype='int',
+                       descr="""If NTMIN is 1 then the method of minimization
+                             will be switched from steepest descent to conjugate
+                             gradient after NCYC cycles.""",
+                       default=10)
+        self._cmdList(key='ntmin', datatype='int',
+                      descr='Flag for the method of minimization.',
+                      default=1, valid_values=[0, 1, 2, 3, 4])
+        self._cmdValue(key='dx0', datatype='float', descr='The initial step length.',
+                       default=0.01)
+        self._cmdValue(key='drms', datatype='float',
+                       descr="""The convergence criterion for the energy
+                             gradient: minimization will halt when the RMS of
+                             the Cartesian elements of the gradient is < DRMS.""",
+                       default=1e-4)
 
 
         self._cmdString('maxcycle', 'int', 'Maximum number of cycles of minimisation to perform', None)
