@@ -28,6 +28,14 @@ class Amber(ProtocolInterface):
         self._cmdList(key='nmropt', datatype='int',
                       descr='Flag to apply NMR restraints',
                       default=0, valid_values=[0, 1, 2])
+        #  Nature and format of the input (Manual section 18.6.2)
+        self._cmdList(key='ntx', datatype='int',
+                      descr="""Option to read the initial coordinates,
+                            velocities and box size from the inpcrd file.""",
+                      default=1, valid_values=[1, 5])
+        self._cmdList(key='irest', datatype='int',
+                      descr='Flag to restart a simulation.',
+                      default=0, valid_values=[0, 1])
         self._cmdString('maxcycle', 'int', 'Maximum number of cycles of minimisation to perform', None)
         self._cmdString('ncyc', 'int', 'Cycle at which to switch from steepest to conjugate descent')
         self._cmdString('cutoff', 'float', '', None)
