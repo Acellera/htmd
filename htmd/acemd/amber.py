@@ -182,49 +182,6 @@ class Amber(ProtocolInterface):
                        particles (see Chapter 6 in the Amber Manual).""",
                        default=-1, valid_range=RANGE_ANY)
 
-
-
-
-
-
-
-        self._cmdString('maxcycle', 'int', 'Maximum number of cycles of minimisation to perform', None)
-        self._cmdString('ncyc', 'int', 'Cycle at which to switch from steepest to conjugate descent')
-        self._cmdString('cutoff', 'float', '', None)
-        self._cmdString('constraints', 'str', '', None)
-        self._cmdString('printoutnsteps', 'int','Number of steps between to mdout and mdinfo print out', None)
-        self._cmdString('initcoordread', 'int', 'Option to read the initial coordinates, velocities and box size from the inpcrd file', None)
-        self._cmdString('finalcoordwrite', 'int', 'Format of the final coordinates, velocities, and box size', None)
-        self._cmdString('restart', 'int', 'Flag to restart a simulation.', None)
-        self._cmdString('ncfreq', 'int', 'NetCFD sampling frequency in steps.', None)
-        self._cmdString('coorfiletype', 'int', 'The format of coordinate and velocity trajectory files', None)
-
-        self._cmdString('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None)
-        self._cmdString('restartfreq', 'str', 'Restart file frequency.', None)
-        self._cmdString('outputname', 'str', 'Output file name.', None)
-        self._cmdString('ncfile', 'str', 'Output NetCFD file name.', None)
-        self._cmdString('timestep', 'str', 'Simulation timestep.', None)
-        self._cmdString('rigidbonds', 'str', '', None)
-        self._cmdString('hydrogenscale', 'str', '', None)
-        self._cmdString('switching', 'str', '', None)
-        self._cmdString('switchdist', 'str', '', None)
-        self._cmdString('exclude', 'str', '', None)
-        self._cmdString('langevin', 'str', '', None)
-        self._cmdString('langevintemp', 'str', '', None)
-        self._cmdString('langevindamping', 'str', '', None)
-        self._cmdString('pme', 'str', '', None)
-        self._cmdString('pmegridspacing', 'str', '', None)
-        self._cmdString('fullelectfrequency', 'str', '', None)
-        self._cmdString('energyfreq', 'str', '', None)
-        self._cmdString('consref', 'str', '', None)
-        self._cmdString('constraintscaling', 'str', '', None)
-        self._cmdString('berendsenpressure', 'str', '', None)
-        self._cmdString('berendsenpressuretarget', 'str', '', None)
-        self._cmdString('berendsenpressurerelaxationtime', 'str', '', None)
-        self._cmdString('run', 'str', '', None)
-        self._cmdString('celldimension', 'str', '', None)
-        self._cmdString('useconstantratio', 'str', '', None)
-
         # Files
         self._cmdString('bincoordinates', 'str', '', None)
         self._cmdString('structure', 'str', '', None)
