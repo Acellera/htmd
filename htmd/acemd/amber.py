@@ -181,6 +181,9 @@ class Amber(ProtocolInterface):
                        descr="""This is the target temperature for all LES
                        particles (see Chapter 6 in the Amber Manual).""",
                        default=-1, valid_range=RANGE_ANY)
+        self._cmdString('FORTRAN', 'str', '', None)
+        self._cmdString('run', 'str', '', None)
+
 
         # Files
         self._cmdString('bincoordinates', 'str', '', None)
@@ -227,8 +230,8 @@ class Amber(ProtocolInterface):
             The string of the configuration file
         """
         text = ''
-        if self.__dict__['TCL'] is not None:
-            text = self.__dict__['TCL']
+        if self.__dict__['FORTRAN'] is not None:
+            text = self.__dict__['FORTRAN']
 
         text += '#\n'
 
@@ -261,3 +264,4 @@ class Amber(ProtocolInterface):
         text = self.show(quiet=True)
         with open(fname, 'w') as f:
             f.write(text)
+
