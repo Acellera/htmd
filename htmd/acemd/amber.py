@@ -28,6 +28,7 @@ class Amber(ProtocolInterface):
         self._cmdList(key='nmropt', datatype='int',
                       descr='Flag to apply NMR restraints',
                       default=0, valid_values=[0, 1, 2])
+
         #  Nature and format of the input (Manual section 18.6.2)
         self._cmdList(key='ntx', datatype='int',
                       descr="""Option to read the initial coordinates,
@@ -36,14 +37,76 @@ class Amber(ProtocolInterface):
         self._cmdList(key='irest', datatype='int',
                       descr='Flag to restart a simulation.',
                       default=0, valid_values=[0, 1])
+
         #  Nature and format of the output (Manual section 18.6.3)
         self._cmdList(key='ntxo', datatype='int',
                       descr="""Format of the final coordinates, velocities,
-                               and box size (if constant volume or pressure
-                               run) written to file "restrt".""",
+                            and box size (if constant volume or pressure run)
+                            written to file "restrt".""",
                       default=2, valid_values=[1, 2])
-        self._cmd
-        
+        self._cmdValue(key='ntpr', datatype='int',
+                       descr="""Every ntpr steps, energy information will be
+                             printed in human-readable form to files "mdout"
+                             and "mdinfo".""",
+                       default=50)
+        self._cmdValue(key='ntave', datatype='int',
+                       descr="""Every ntave steps of dynamics, running averages
+                             of average energies and fluctuations over the last
+                             ntave steps will be printed out.""",
+                       default=0)
+        self._cmdValue(key='ntwr', datatype='int',
+                       descr="""Every ntwr steps during dynamics, the “restrt”
+                             file will be written.""",
+                       default=None)
+        self._cmdList(key='iwrap', datatype='int',
+                      descr="""If iwrap = 1, the coordinates written to the
+                            restart and trajectory files will be "wrapped"
+                            into a primary box. If iwrap = 0, no wrapping will
+                            be performed.""",
+                      default=0, valid_values=[0, 1])
+        self._cmdValue(key='ntwx', datatype='int',
+                       descr="""Every ntwx steps, the coordinates will be
+                             written to the mdcrd file. If ntwx = 0, no
+                             coordinate trajectory file will be written.""",
+                       default=0)
+        self._cmdValue(key='ntwv', datatype='int',
+                       descr="""Every ntwv steps, the velocities will be written
+                             to the mdvel file. If ntwv = 0, no velocity
+                             trajectory file will be written. If ntwv = -1,
+                             velocities will be written to mdcrd, which then
+                             becomes a combined coordinate/velocity trajectory
+                             file, at the interval defined by ntwx.""",
+                       default=0)
+        self._cmdValue(key='ntwf', datatype='int',
+                       descr="""Every ntwf steps, the forces will be written to
+                             the mdfrc file. If ntwf = 0, no force trajectory
+                             file will be written. If ntwf = -1, forces will be
+                             written to the mdcrd, which then becomes a combined
+                             coordinate/force trajectory file, at the interval
+                             defined by ntwx.""",
+                       default=0)
+        self._cmdValue(key='ntwe', datatype='int',
+                       descr="""Every ntwe steps, the energies and temperatures
+                             will be written to file "mden" in a compact form.
+                             If ntwe = 0 then no mden file will be written.""",
+                       default=0)
+        self._cmdList(key='ioutfm', datatype='int',
+                      descr="""The format of coordinate and velocity trajectory
+                            files (mdcrd, mdvel and inptraj). 0 is ASCII and 1
+                            is Binary NetCDF""",
+                      default=1, valid_values=[0, 1])
+        self._cmdValue(key='ntwprt', datatype='int',
+                       descr="""The number of atoms to include in trajectory
+                             files (mdcrd and mdvel). If ntwprt = 0, all atoms
+                             will be included.""",
+                       default=0)
+        self._cmdList(key='idecomp', datatype='int',
+                      descr="""Perform energy decomposition according to a
+                            chosen scheme.""",
+                      default=0, valid_values=[0, 1, 2, 3, 4])
+
+
+
 
         self._cmdString('maxcycle', 'int', 'Maximum number of cycles of minimisation to perform', None)
         self._cmdString('ncyc', 'int', 'Cycle at which to switch from steepest to conjugate descent')
