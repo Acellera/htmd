@@ -2,7 +2,7 @@
 
 from htmd.molecule.molecule import Molecule
 from htmd.userinterface import UserInterface
-from htmd.acemd.acemd import Amber
+from htmd.acemd.amber import Amber
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 import os
 import numpy as np
