@@ -8,7 +8,7 @@ import os
 import htmd
 import shutil
 import numpy as np
-from htmd.protocols.protocolinterface import ProtocolInterface #TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
+from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 
 
 class Amber(ProtocolInterface):
@@ -44,55 +44,60 @@ class Amber(ProtocolInterface):
                             and box size (if constant volume or pressure run)
                             written to file "restrt".""", default=2,
                             valid_values=[1, 2])
-        self._cmdValue(key='ntpr', datatype='int',
+        self._cmdValue(key='ntpr', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntpr steps, energy information will be
                              printed in human-readable form to files "mdout"
-                             and "mdinfo".""", default=50)
-        self._cmdValue(key='ntave', datatype='int',
+                             and "mdinfo".""", default=50,
+                       valid_range=RANGE_POS)
+        self._cmdValue(key='ntave', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntave steps of dynamics, running averages
                              of average energies and fluctuations over the last
-                             ntave steps will be printed out.""", default=0)
-        self._cmdValue(key='ntwr', datatype='int',
+                             ntave steps will be printed out.""", default=0,
+                       valid_range=RANGE_POS)
+        self._cmdValue(key='ntwr', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwr steps during dynamics, the “restrt”
-                             file will be written.""", default=None)
+                             file will be written.""", default=None,
+                       valid_range=RANGE_POS)
         self._cmdList(key='iwrap', datatype='int',
                       descr="""If iwrap = 1, the coordinates written to the
                             restart and trajectory files will be "wrapped"
                             into a primary box. If iwrap = 0, no wrapping will
                             be performed.""", default=0, valid_values=[0, 1])
-        self._cmdValue(key='ntwx', datatype='int',
+        self._cmdValue(key='ntwx', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwx steps, the coordinates will be
                              written to the mdcrd file. If ntwx = 0, no
                              coordinate trajectory file will be written.""",
-                       default=0)
-        self._cmdValue(key='ntwv', datatype='int',
+                       default=0, valid_range=RANGE_POS)
+        self._cmdValue(key='ntwv', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwv steps, the velocities will be written
                              to the mdvel file. If ntwv = 0, no velocity
                              trajectory file will be written. If ntwv = -1,
                              velocities will be written to mdcrd, which then
                              becomes a combined coordinate/velocity trajectory
                              file, at the interval defined by ntwx.""",
-                       default=0)
-        self._cmdValue(key='ntwf', datatype='int',
+                       default=0, valid_range=RANGE_ANY)
+        self._cmdValue(key='ntwf', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwf steps, the forces will be written to
                              the mdfrc file. If ntwf = 0, no force trajectory
                              file will be written. If ntwf = -1, forces will be
                              written to the mdcrd, which then becomes a combined
                              coordinate/force trajectory file, at the interval
-                             defined by ntwx.""", default=0)
-        self._cmdValue(key='ntwe', datatype='int',
+                             defined by ntwx.""", default=0,
+                       valid_range=RANGE_ANY)
+        self._cmdValue(key='ntwe', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwe steps, the energies and temperatures
                              will be written to file "mden" in a compact form.
                              If ntwe = 0 then no mden file will be written.""",
-                       default=0)
+                       default=0, valid_range=RANGE_0POS)
         self._cmdList(key='ioutfm', datatype='int',
                       descr="""The format of coordinate and velocity trajectory
                             files (mdcrd, mdvel and inptraj). 0 is ASCII and 1
                             is Binary NetCDF""", default=1, valid_values=[0, 1])
-        self._cmdValue(key='ntwprt', datatype='int',
+        self._cmdValue(key='ntwprt', datatype='int', realdatatype=TYPE_INT,
                        descr="""The number of atoms to include in trajectory
                              files (mdcrd and mdvel). If ntwprt = 0, all atoms
-                             will be included.""", default=0)
+                             will be included.""", default=0,
+                       valid_range=RANGE_0POS)
         self._cmdList(key='idecomp', datatype='int',
                       descr="""Perform energy decomposition according to a
                             chosen scheme.""", default=0,
@@ -104,13 +109,15 @@ class Amber(ProtocolInterface):
                             subset of the atoms in the system will be allowed
                             to move, and the coordinates of the rest will be
                             frozen.""", default=0, valid_values=[0, 1])
-        self._cmdValue(key='ntr', datatype='int',
+        self._cmdValue(key='ntr', datatype='int', realdatatype=TYPE_INT,
                        descr="""Flag for restraining specified atoms in
                              Cartesian space using a harmonic potential,
-                             if ntr > 0.""", default=0)
+                             if ntr > 0.""", default=0, valid_range=RANGE_0POS)
         self._cmdValue(key='restraint_wt', datatype='int',
+                       realdatatype=TYPE_INT,
                        descr="""The weight (in kcal/mol−A^̊2) for the positional
-                             restraints.""", default=None)
+                             restraints.""", default=None,
+                       valid_range=RANGE_0POS)
         self._cmdString(key='restraintmask', datatype='str',
                         descr="""String that specifies the restrained atoms
                               when ntr=1.""", default=None)
@@ -119,53 +126,61 @@ class Amber(ProtocolInterface):
                         ibelly=1.""", default=None)
 
         #  Energy minimization (Manual section 18.6.5)
-        self._cmdValue(key='maxcyc', datatype='int',
+        self._cmdValue(key='maxcyc', datatype='int', realdatatype=TYPE_INT,
                        descr='The maximum number of cycles of minimization.',
-                       default=1)
-        self._cmdValue(key='ncyc', datatype='int',
+                       default=1, valid_range=RANGE_POS)
+        self._cmdValue(key='ncyc', datatype='int', realdatatype=TYPE_INT,
                        descr="""If NTMIN is 1 then the method of minimization
                              will be switched from steepest descent to
                              conjugate gradient after NCYC cycles.""",
-                       default=10)
+                       default=10, valid_range=RANGE_POS)
         self._cmdList(key='ntmin', datatype='int',
                       descr='Flag for the method of minimization.',
                       default=1, valid_values=[0, 1, 2, 3, 4])
-        self._cmdValue(key='dx0', datatype='float',
-                       descr='The initial step length.', default=0.01)
-        self._cmdValue(key='drms', datatype='float',
+        self._cmdValue(key='dx0', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr='The initial step length.', default=0.01,
+                       valid_range=RANGE_POS)
+        self._cmdValue(key='drms', datatype='float', realdatatype=TYPE_FLOAT,
                        descr="""The convergence criterion for the energy
                              gradient: minimization will halt when the RMS of
                              the Cartesian elements of the gradient
-                             is < DRMS.""", default=1e-4)
+                             is < DRMS.""", default=1e-4,
+                       valid_range=RANGE_POS)
 
         #  Molecular dynamics (Manual section 18.6.6)
-        self._cmdValue(key='nstlim', datatype='int',
-                       descr='Number of MD-steps to be performed.', default=1)
-        self._cmdValue(key='nscm', datatype='int',
+        self._cmdValue(key='nstlim', datatype='int', realdatatype=TYPE_INT,
+                       descr='Number of MD-steps to be performed.', default=1,
+                       valid_range=RANGE_POS)
+        self._cmdValue(key='nscm', datatype='int', realdatatype=TYPE_INT,
                        descr="""Flag for the removal of translational and
                              rotational center-of-mass (COM) motion at regular
-                             intervals.""", default=1000)
-        self._cmdValue(key='t', datatype='float',
+                             intervals.""", default=1000,
+                       valid_range=RANGE_POS)
+        self._cmdValue(key='t', datatype='float', realdatatype=TYPE_FLOAT,
                        descr="""The time at the start (ps) this is for your own
-                             reference and is not critical.""", default=0.0)
-        self._cmdValue(key='dt', datatype='float',
-                       descr="""The time step (ps).""", default=0.001)
-        self._cmdValue(key='nrespa', datatype='int',
+                             reference and is not critical.""", default=0.0,
+                       valid_range=RANGE_0POS)
+        self._cmdValue(key='dt', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr="""The time step (ps).""", default=0.001,
+                       valid_range=RANGE_POS)
+        self._cmdValue(key='nrespa', datatype='int', realdatatype=TYPE_INT,
                        descr="""This variable allows the user to evaluate
                              slowly-varying terms in the force field less
-                             frequently.""", default=None)
+                             frequently.""", default=None,
+                       valid_range=RANGE_POS)
 
         #  Temperature regulation (Manual section 18.6.7)
         self._cmdList(key='ntt', datatype='int',
                       descr='Switch for temperature scaling.', default=None,
                       valid_values=[0, 1, 2, 3, 9, 10])
-        self._cmdValue(key='temp0', datatype='int',
+        self._cmdValue(key='temp0', datatype='int', realdatatype=TYPE_INT,
                        descr="""Reference temperature at which the system is to
-                             be kept, if ntt > 0.""", default=300)
-        self._cmdValue(key='temp0les', datatype='int',
+                             be kept, if ntt > 0.""", default=300,
+                       valid_range=RANGE_POS)
+        self._cmdValue(key='temp0les', datatype='int', realdatatype=TYPE_INT,
                        descr="""This is the target temperature for all LES
                        particles (see Chapter 6 in the Amber Manual).""",
-                       default=-1)
+                       default=-1, valid_range=RANGE_ANY)
 
 
 
