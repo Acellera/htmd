@@ -76,6 +76,34 @@ class Equilibration(ProtocolInterface):
         self.amber.ntx = 1
         self.amber.irest = 0
         self.amber.ntxo = 2
+        self.amber.ntpr = 50
+        self.amber.ntave = 0
+        self.amber.ntwr = #TODO: WHAT GOES HERE
+        self.amber.iwrap = 0
+        self.amber.ntwx = 0
+        self.amber.ntwc = 0
+        self.amber.ntwv = 0
+        self.amber.ntwf = 0
+        self.amber.ntwe = 0
+        self.amber.ioutfm = 1
+        self.amber.ntwprt = 0
+        self.amber.idecomp = 0
+        #  Frozen or restrained atoms (Manual section 18.6.4)
+        self.amber.ibelly = 0
+        self.amber.ntr = 0
+        # These values need conditionals
+        # Check Amber class in htmd.acemd.amber
+        self.amber.restraint_wt = #TODO: WHAT GOES HERE
+        self.amber.restraintmask = #TODO: WHAT GOES HERE
+        self.amber.bellymask = #TODO: WHAT GOES HERE
+        #  Energy minimization (Manual section 18.6.5)
+        self.amber.maxcyc = 1
+        self.amber.ncyc = 10
+        self.amber.ntmin = 1
+        self.amber.dx0 = 0.01
+        self.amber.drms = 1e-4
+        #  Molecular dynamics (Manual section 18.6.6)
+        
         self.amber.FORTRAN = ''' HEATING
  &cntrl
 '''
@@ -92,19 +120,19 @@ class Equilibration(ProtocolInterface):
         for field in defaults:
             userval = self.amber.__dict__[field]
             if userval is not None and not os.path.exists(os.path.join(inputdir, userval)):
-                self.acemd.__dict__[field] = None
+                self.amber.__dict__[field] = None
 
-            if self.acemd.__dict__[field] is None:
+            if self.amber.__dict__[field] is None:
                 for val in defaults[field]:
                     if os.path.exists(os.path.join(inputdir, val)):
-                        self.acemd.__dict__[field] = val
+                        self.amber.__dict__[field] = val
                         break
 
-            if userval is not None and self.acemd.__dict__[field] is not None and self.acemd.__dict__[field] != userval:
+            if userval is not None and self.amber.__dict__[field] is not None and self.amber.__dict__[field] != userval:
                 logger.warning('Could not locate structure file {}. Using {} instead.'.format(
-                    os.path.join(inputdir, userval), os.path.join(inputdir, self.acemd.__dict__[field])
+                    os.path.join(inputdir, userval), os.path.join(inputdir, self.amber.__dict__[field])
                 ))
-            elif self.acemd.__dict__[field] is None:
+            elif self.amber.__dict__[field] is None:
                 raise RuntimeError('Could not locate any {f:} file in {i:}. '
                                    'Please set the Equilibration.acemd.{f:} property to '
                                    'point to the {f:} file'.format(f=field, i=inputdir))
@@ -128,7 +156,7 @@ class Equilibration(ProtocolInterface):
         >>> md.write('./build','./equil')
         """
         # this code automatically loops through the amber attributes and assigns the given value to
-        # the parameter
+        # the parameter.
 
         for key, value in self.amber.__dict__.items():
 

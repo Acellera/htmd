@@ -53,7 +53,7 @@ class Amber(ProtocolInterface):
                        descr="""Every ntave steps of dynamics, running averages
                              of average energies and fluctuations over the last
                              ntave steps will be printed out.""", default=0,
-                       valid_range=RANGE_POS)
+                       valid_range=RANGE_0POS)
         self._cmdValue(key='ntwr', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwr steps during dynamics, the “restrt”
                              file will be written.""", default=None,
