@@ -116,7 +116,12 @@ class Equilibration(ProtocolInterface):
                                    'Please set the Equilibration.acemd.{f:} property to '
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
-    def write(self, inputdir, outputdir):
+    # FIXME: add inputdir and outputdir to write method
+    # need to decide how to organize MD engine input files
+    # Probably will create a bash script (as opposed to a TCL script)
+    # pmemd.cuda_SPFP -O -i Equil.in -o Equil.out -c structure.rst -p structure \
+    # -r EquilRestart.rst -x EquilRestart.nc (-ref Min.rst)
+    def write(self):
         """ Write the equilibration protocol
 
         Writes the equilibration protocol and files into a folder for execution
