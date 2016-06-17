@@ -117,10 +117,11 @@ class Equilibration(ProtocolInterface):
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
     # FIXME: add inputdir and outputdir to write method
-    # need to decide how to organize MD engine input files
-    # Probably will create a bash script (as opposed to a TCL script)
+    # need to decide how to organize MD engine input files!!!
+    # Probably will create a bash script here with all the information needed to run pmemd, e.g.:
     # pmemd.cuda_SPFP -O -i Equil.in -o Equil.out -c structure.rst -p structure \
     # -r EquilRestart.rst -x EquilRestart.nc (-ref Min.rst)
+
     def write(self):
         """ Write the equilibration protocol
 
