@@ -105,6 +105,30 @@ class Amber(ProtocolInterface):
                             chosen scheme.""",
                       default=0, valid_values=[0, 1, 2, 3, 4])
 
+        #  Frozen or restrained atoms (Manual section 18.6.4)
+        self._cmdList(key='ibelly', datatype='int',
+                      descr="""Flag for belly type dynamics. If set to 1, a
+                            subset of the atoms in the system will be allowed
+                            to move, and the coordinates of the rest will be
+                            frozen.""",
+                      default=0, valid_values=[0, 1])
+        self._cmdValue(key='ntr', datatype='int',
+                       descr="""Flag for restraining specified atoms in
+                             Cartesian space using a harmonic potential,
+                             if ntr > 0.""",
+                       default=0)
+        self._cmdValue(key='restraint_wt', datatype='int',
+                       descr="""The weight (in kcal/mol−A^̊2) for the positional
+                             restraints.""",
+                       default=None)
+        self._cmdString(key='restraintmask', datatype='str',
+                        descr="""String that specifies the restrained atoms
+                              when ntr=1.""",
+                        default=None)
+        self._cmdString(key='bellymask', datatype='str',
+                        descr="""String that specifies the moving atoms when
+                        ibelly=1.""",
+                        default=None)
 
 
 
