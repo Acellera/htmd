@@ -47,8 +47,7 @@ class Amber(ProtocolInterface):
         self._cmdValue(key='ntpr', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntpr steps, energy information will be
                              printed in human-readable form to files "mdout"
-                             and "mdinfo".""", default=50,
-                       valid_range=RANGE_POS)
+                             and "mdinfo".""", default=50, valid_range=RANGE_POS)
         self._cmdValue(key='ntave', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntave steps of dynamics, running averages
                              of average energies and fluctuations over the last
@@ -56,8 +55,7 @@ class Amber(ProtocolInterface):
                        valid_range=RANGE_0POS)
         self._cmdValue(key='ntwr', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwr steps during dynamics, the “restrt”
-                             file will be written.""", default=None,
-                       valid_range=RANGE_POS)
+                             file will be written.""", default=None, valid_range=RANGE_POS)
         self._cmdList(key='iwrap', datatype='int',
                       descr="""If iwrap = 1, the coordinates written to the
                             restart and trajectory files will be "wrapped"
@@ -82,8 +80,7 @@ class Amber(ProtocolInterface):
                              file will be written. If ntwf = -1, forces will be
                              written to the mdcrd, which then becomes a combined
                              coordinate/force trajectory file, at the interval
-                             defined by ntwx.""", default=0,
-                       valid_range=RANGE_ANY)
+                             defined by ntwx.""", default=0, valid_range=RANGE_ANY)
         self._cmdValue(key='ntwe', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwe steps, the energies and temperatures
                              will be written to file "mden" in a compact form.
@@ -96,12 +93,10 @@ class Amber(ProtocolInterface):
         self._cmdValue(key='ntwprt', datatype='int', realdatatype=TYPE_INT,
                        descr="""The number of atoms to include in trajectory
                              files (mdcrd and mdvel). If ntwprt = 0, all atoms
-                             will be included.""", default=0,
-                       valid_range=RANGE_0POS)
+                             will be included.""", default=0, valid_range=RANGE_0POS)
         self._cmdList(key='idecomp', datatype='int',
                       descr="""Perform energy decomposition according to a
-                            chosen scheme.""", default=0,
-                      valid_values=[0, 1, 2, 3, 4])
+                            chosen scheme.""", default=0, valid_values=[0, 1, 2, 3, 4])
 
         #  Frozen or restrained atoms (Manual section 18.6.4)
         self._cmdList(key='ibelly', datatype='int',
@@ -113,11 +108,9 @@ class Amber(ProtocolInterface):
                        descr="""Flag for restraining specified atoms in
                              Cartesian space using a harmonic potential,
                              if ntr > 0.""", default=0, valid_range=RANGE_0POS)
-        self._cmdValue(key='restraint_wt', datatype='int',
-                       realdatatype=TYPE_INT,
+        self._cmdValue(key='restraint_wt', datatype='int', realdatatype=TYPE_INT,
                        descr="""The weight (in kcal/mol−A^̊2) for the positional
-                             restraints.""", default=None,
-                       valid_range=RANGE_0POS)
+                             restraints.""", default=None, valid_range=RANGE_0POS)
         self._cmdString(key='restraintmask', datatype='str',
                         descr="""String that specifies the restrained atoms
                               when ntr=1.""", default=None)
@@ -144,8 +137,7 @@ class Amber(ProtocolInterface):
                        descr="""The convergence criterion for the energy
                              gradient: minimization will halt when the RMS of
                              the Cartesian elements of the gradient
-                             is < DRMS.""", default=1e-4,
-                       valid_range=RANGE_POS)
+                             is < DRMS.""", default=1e-4, valid_range=RANGE_POS)
 
         #  Molecular dynamics (Manual section 18.6.6)
         self._cmdValue(key='nstlim', datatype='int', realdatatype=TYPE_INT,
@@ -154,8 +146,7 @@ class Amber(ProtocolInterface):
         self._cmdValue(key='nscm', datatype='int', realdatatype=TYPE_INT,
                        descr="""Flag for the removal of translational and
                              rotational center-of-mass (COM) motion at regular
-                             intervals.""", default=1000,
-                       valid_range=RANGE_POS)
+                             intervals.""", default=1000, valid_range=RANGE_POS)
         self._cmdValue(key='t', datatype='float', realdatatype=TYPE_FLOAT,
                        descr="""The time at the start (ps) this is for your own
                              reference and is not critical.""", default=0.0,
@@ -166,8 +157,7 @@ class Amber(ProtocolInterface):
         self._cmdValue(key='nrespa', datatype='int', realdatatype=TYPE_INT,
                        descr="""This variable allows the user to evaluate
                              slowly-varying terms in the force field less
-                             frequently.""", default=None,
-                       valid_range=RANGE_POS)
+                             frequently.""", default=None, valid_range=RANGE_POS)
 
         #  Temperature regulation (Manual section 18.6.7)
         self._cmdList(key='ntt', datatype='int',
@@ -175,8 +165,7 @@ class Amber(ProtocolInterface):
                       valid_values=[0, 1, 2, 3, 9, 10])
         self._cmdValue(key='temp0', datatype='int', realdatatype=TYPE_INT,
                        descr="""Reference temperature at which the system is to
-                             be kept, if ntt > 0.""", default=300,
-                       valid_range=RANGE_POS)
+                             be kept, if ntt > 0.""", default=300, valid_range=RANGE_POS)
         self._cmdValue(key='temp0les', datatype='int', realdatatype=TYPE_INT,
                        descr="""This is the target temperature for all LES
                        particles (see Chapter 6 in the Amber Manual).""",
@@ -269,8 +258,7 @@ class Amber(ProtocolInterface):
                              resetting in shake.""", default=0.00001,
                        valid_range=RANGE_0POS)
         self._cmdList(key='jfastw', datatype='int',
-                      descr='Fast water definition flag.', default=0,
-                      valid_values=[0, 4])
+                      descr='Fast water definition flag.', default=0, valid_values=[0, 4])
         self._cmdString(key='noshakemask', datatype='str',
                         descr="""String that specifies atoms that are not to be
                               shaken (assuming that ntc>1).""", default='')
@@ -283,8 +271,7 @@ class Amber(ProtocolInterface):
                             potential. For the best physical realism, this
                             option should be combined with igb=10, in order to
                             include the reaction field of waters that are beyond
-                            the cap radius.""",
-                      default=0, valid_values=[0, 1, 2, 5])
+                            the cap radius.""", default=0, valid_values=[0, 1, 2, 5])
         self._cmdValue(key='fcap', datatype='float', realdatatype=TYPE_FLOAT,
                        descr='The force constant for the cap restraint potential.',
                        default=None, valid_range=RANGE_POS)
@@ -294,6 +281,8 @@ class Amber(ProtocolInterface):
         self._cmdValue(key='xcap', datatype='float', realdatatype=TYPE_FLOAT,
                        descr='Location of the cap center, if ivcap=1 is used.',
                        default=None, valid_range=RANGE_ANY)
+
+        # NMR refinement options (Manual section 18.6.11)
 
 
         # Assign everything to a single variable
