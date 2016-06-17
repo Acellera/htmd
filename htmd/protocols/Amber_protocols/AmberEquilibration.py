@@ -2,7 +2,7 @@
 
 from htmd.molecule.molecule import Molecule
 from htmd.userinterface import UserInterface
-from htmd.acemd.acemd import Acemd
+from htmd.acemd.acemd import Amber
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 import os
 import numpy as np
@@ -116,7 +116,7 @@ class Equilibration(ProtocolInterface):
                                    'Please set the Equilibration.acemd.{f:} property to '
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
-    def write(self):
+    def write(self, inputdir, outputdir):
         """ Write the equilibration protocol
 
         Writes the equilibration protocol and files into a folder for execution
