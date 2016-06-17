@@ -226,6 +226,41 @@ class Amber(ProtocolInterface):
                              velocity variables v1 and v2 (e.g. thermostat
                              velocities)""", default=1.0, valid_range=RANGE_0POS)
 
+        # Pressure regulation (Manual section 18.6.8)
+        self._cmdList(key='ntp', datatype='int',
+                      descr='Flag for constant pressure dynamics.',
+                      default=0, valid_values=[0, 1, 2, 3])
+        self._cmdList(key='barostat', datatype='int',
+                      descr="""Flag used to control which barostat to use in
+                            order to control the pressure.""", default=1,
+                      valid_values=[1, 2])
+        self._cmdValue(key='mcbarint', datatype='int', realdatatype=TYPE_INT,
+                       descr="""Number of steps between volume change attempts
+                             performed as part of the Monte Carlo barostat.""",
+                       default=100, valid_range=RANGE_POS)
+        self._cmdValue(key='pres0', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr="""Reference pressure (in units of bars) at which
+                             the system is maintained (when NTP > 0).""",
+                       default=1.0, valid_range=RANGE_POS)
+        self._cmdValue(key='comp', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr="""compressibility of the system when NTP > 0. The
+                             units are in 1.0 × 10-6 bar-1""", default=44.6,
+                       valid_range=RANGE_0POS)
+        self._cmdValue(key='taup', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr='Pressure relaxation time (in ps), when NTP > 0.',
+                       default=1.0, valid_range=RANGE_POS)
+        self._cmdList(key='csurften', datatype='int',
+                      descr='Flag for constant surface tension dynamics.',
+                      default=0, valid_values=[0, 1, 2, 3])
+        self._cmdValue(key='gamma_ten', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr='Surface tension value in units of dyne/cm.',
+                       default=0.0, valid_range=RANGE_0POS)
+        self._cmdValue(key='ninterface', datatype='int', realdatatype=TYPE_INT,
+                       descr="""Number of interfaces in the periodic box. There
+                             must be at least two interfaces in the periodic box.""",
+                       default=2, valid_range=RANGE_0POS)
+
+
 
         # Assign everything to a single variable
         self._cmdString('FORTRAN', 'str', '', None)
