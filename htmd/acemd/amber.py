@@ -42,28 +42,24 @@ class Amber(ProtocolInterface):
         self._cmdList(key='ntxo', datatype='int',
                       descr="""Format of the final coordinates, velocities,
                             and box size (if constant volume or pressure run)
-                            written to file "restrt".""",
-                      default=2, valid_values=[1, 2])
+                            written to file "restrt".""", default=2,
+                            valid_values=[1, 2])
         self._cmdValue(key='ntpr', datatype='int',
                        descr="""Every ntpr steps, energy information will be
                              printed in human-readable form to files "mdout"
-                             and "mdinfo".""",
-                       default=50)
+                             and "mdinfo".""", default=50)
         self._cmdValue(key='ntave', datatype='int',
                        descr="""Every ntave steps of dynamics, running averages
                              of average energies and fluctuations over the last
-                             ntave steps will be printed out.""",
-                       default=0)
+                             ntave steps will be printed out.""", default=0)
         self._cmdValue(key='ntwr', datatype='int',
                        descr="""Every ntwr steps during dynamics, the “restrt”
-                             file will be written.""",
-                       default=None)
+                             file will be written.""", default=None)
         self._cmdList(key='iwrap', datatype='int',
                       descr="""If iwrap = 1, the coordinates written to the
                             restart and trajectory files will be "wrapped"
                             into a primary box. If iwrap = 0, no wrapping will
-                            be performed.""",
-                      default=0, valid_values=[0, 1])
+                            be performed.""", default=0, valid_values=[0, 1])
         self._cmdValue(key='ntwx', datatype='int',
                        descr="""Every ntwx steps, the coordinates will be
                              written to the mdcrd file. If ntwx = 0, no
@@ -83,8 +79,7 @@ class Amber(ProtocolInterface):
                              file will be written. If ntwf = -1, forces will be
                              written to the mdcrd, which then becomes a combined
                              coordinate/force trajectory file, at the interval
-                             defined by ntwx.""",
-                       default=0)
+                             defined by ntwx.""", default=0)
         self._cmdValue(key='ntwe', datatype='int',
                        descr="""Every ntwe steps, the energies and temperatures
                              will be written to file "mden" in a compact form.
@@ -93,42 +88,35 @@ class Amber(ProtocolInterface):
         self._cmdList(key='ioutfm', datatype='int',
                       descr="""The format of coordinate and velocity trajectory
                             files (mdcrd, mdvel and inptraj). 0 is ASCII and 1
-                            is Binary NetCDF""",
-                      default=1, valid_values=[0, 1])
+                            is Binary NetCDF""", default=1, valid_values=[0, 1])
         self._cmdValue(key='ntwprt', datatype='int',
                        descr="""The number of atoms to include in trajectory
                              files (mdcrd and mdvel). If ntwprt = 0, all atoms
-                             will be included.""",
-                       default=0)
+                             will be included.""", default=0)
         self._cmdList(key='idecomp', datatype='int',
                       descr="""Perform energy decomposition according to a
-                            chosen scheme.""",
-                      default=0, valid_values=[0, 1, 2, 3, 4])
+                            chosen scheme.""", default=0,
+                      valid_values=[0, 1, 2, 3, 4])
 
         #  Frozen or restrained atoms (Manual section 18.6.4)
         self._cmdList(key='ibelly', datatype='int',
                       descr="""Flag for belly type dynamics. If set to 1, a
                             subset of the atoms in the system will be allowed
                             to move, and the coordinates of the rest will be
-                            frozen.""",
-                      default=0, valid_values=[0, 1])
+                            frozen.""", default=0, valid_values=[0, 1])
         self._cmdValue(key='ntr', datatype='int',
                        descr="""Flag for restraining specified atoms in
                              Cartesian space using a harmonic potential,
-                             if ntr > 0.""",
-                       default=0)
+                             if ntr > 0.""", default=0)
         self._cmdValue(key='restraint_wt', datatype='int',
                        descr="""The weight (in kcal/mol−A^̊2) for the positional
-                             restraints.""",
-                       default=None)
+                             restraints.""", default=None)
         self._cmdString(key='restraintmask', datatype='str',
                         descr="""String that specifies the restrained atoms
-                              when ntr=1.""",
-                        default=None)
+                              when ntr=1.""", default=None)
         self._cmdString(key='bellymask', datatype='str',
                         descr="""String that specifies the moving atoms when
-                        ibelly=1.""",
-                        default=None)
+                        ibelly=1.""", default=None)
 
         #  Energy minimization (Manual section 18.6.5)
         self._cmdValue(key='maxcyc', datatype='int',
@@ -136,19 +124,46 @@ class Amber(ProtocolInterface):
                        default=1)
         self._cmdValue(key='ncyc', datatype='int',
                        descr="""If NTMIN is 1 then the method of minimization
-                             will be switched from steepest descent to conjugate
-                             gradient after NCYC cycles.""",
+                             will be switched from steepest descent to
+                             conjugate gradient after NCYC cycles.""",
                        default=10)
         self._cmdList(key='ntmin', datatype='int',
                       descr='Flag for the method of minimization.',
                       default=1, valid_values=[0, 1, 2, 3, 4])
-        self._cmdValue(key='dx0', datatype='float', descr='The initial step length.',
-                       default=0.01)
+        self._cmdValue(key='dx0', datatype='float',
+                       descr='The initial step length.', default=0.01)
         self._cmdValue(key='drms', datatype='float',
                        descr="""The convergence criterion for the energy
                              gradient: minimization will halt when the RMS of
-                             the Cartesian elements of the gradient is < DRMS.""",
-                       default=1e-4)
+                             the Cartesian elements of the gradient
+                             is < DRMS.""", default=1e-4)
+
+        #  Molecular dynamics (Manual section 18.6.6)
+        self._cmdValue(key='nstlim', datatype='int',
+                       descr='Number of MD-steps to be performed.', default=1)
+        self._cmdValue(key='nscm', datatype='int',
+                       descr="""Flag for the removal of translational and
+                             rotational center-of-mass (COM) motion at regular
+                             intervals.""", default=1000)
+        self._cmdValue(key='t', datatype='float',
+                       descr="""The time at the start (ps) this is for your own
+                             reference and is not critical.""", default=0.0)
+        self._cmdValue(key='dt', datatype='float',
+                       descr="""The time step (ps).""", default=0.001)
+        self._cmdValue(key='nrespa', datatype='int',
+                       descr="""This variable allows the user to evaluate
+                             slowly-varying terms in the force field less
+                             frequently.""", default=None)
+
+        #  Temperature regulation (Manual section 18.6.7)
+
+
+
+
+
+
+
+
 
 
         self._cmdString('maxcycle', 'int', 'Maximum number of cycles of minimisation to perform', None)
