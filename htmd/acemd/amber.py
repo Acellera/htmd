@@ -36,6 +36,15 @@ class Amber(ProtocolInterface):
         self._cmdList(key='irest', datatype='int',
                       descr='Flag to restart a simulation.',
                       default=0, valid_values=[0, 1])
+        #  Nature and format of the output (Manual section 18.6.3)
+        self._cmdList(key='ntxo', datatype='int',
+                      descr="""Format of the final coordinates, velocities,
+                               and box size (if constant volume or pressure
+                               run) written to file "restrt".""",
+                      default=2, valid_values=[1, 2])
+        self._cmd
+        
+
         self._cmdString('maxcycle', 'int', 'Maximum number of cycles of minimisation to perform', None)
         self._cmdString('ncyc', 'int', 'Cycle at which to switch from steepest to conjugate descent')
         self._cmdString('cutoff', 'float', '', None)
