@@ -12,7 +12,7 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 
 
 class Amber(ProtocolInterface):
-    _defaultfnames = {'bincoordinates': 'input.nc', 'structure': 'structure.*',
+    _defaultfnames = {'bincoordinates': 'input.nc',
                       'parameters': 'parameters', 'coordinates': 'structure.rst',
                       'parmfile': 'structure.prmtop'}
 
@@ -291,12 +291,11 @@ class Amber(ProtocolInterface):
 
 
         # Files
-        self._cmdString('bincoordinates', 'str', '', None)
-        self._cmdString('structure', 'str', '', None)
-        self._cmdString('parameters', 'str', '', None)
-        self._cmdString('coordinates', 'str', '', None)
-        self._cmdString('consref', 'str', '', None)
-        self._cmdString('parmfile', 'str', '', None)
+        self._cmdString('bincoordinates', 'str', '', None) # coordinate binary file .nc 
+        self._cmdString('parameters', 'str', '', None) # parameters to run simulation .in
+        self._cmdString('coordinates', 'str', '', None) # frame coordinates .rst
+        self._cmdString('consref', 'str', '', None) # TODO think of easy way to write constraints
+        self._cmdString('parmfile', 'str', '', None) # topology file .prmtop
 
     def load(self, path='.'):
         """ Loads all files required to run a simulation and apply eventually configured protocols to it
@@ -307,6 +306,7 @@ class Amber(ProtocolInterface):
             Working directory relative to which the configuration file is read
         """
         # load files and reset filenames
+        
         for cmd in self._defaultfnames.keys():
             if cmd in self.__dict__ and self.__dict__[cmd] is not None:
                 fname = os.path.join(path, self.__dict__[cmd])
@@ -320,6 +320,49 @@ class Amber(ProtocolInterface):
                     defaultname = '{}.{}'.format(os.path.splitext(defaultname)[0], os.path.splitext(fname)[1][1:])
 
                 self.__dict__[cmd] = defaultname  # use default file names
+
+    def save(self, path, overwrite=False):
+        """ Create a directory with all necessary input to run acemd.
+    
+        Parameters
+        ----------
+        path : str
+            New execution directory to create
+        overwrite : bool
+            Overwrite output directory if it exists.
+        """
+        if os.path.exists(path):
+            if overwrite:
+                shutil.rmtree(path)
+            else:
+                raise NameError('Directory exists, use overwrite=True or remove directory')
+        os.makedirs(path)
+
+        # Write all files using default filenames
+        for f in self._files:
+            fo = open(os.path.join(path, self.__dict__[f]), 'wb')  # write all as binary
+            fo.write(self._files[f])
+            fo.close()
+
+        self._files = {}  # empty file dictionary after writing
+    
+        self.writeConf(os.path.join(path, 'input'))
+
+
+    def setup(self, cwd='./', outdir='./run', overwrite=False):
+        """ Convenience method performing load and save.
+
+        Parameters
+        ----------
+        cwd : str
+            The directory to load from.
+        outdir : str
+            The directory to save to.
+        overwrite : bool
+            Overwrite output directory if it exists.
+        """
+        self.load(cwd)
+        self.save(outdir, overwrite)
 
     def show(self, quiet=False):
         """ Returns the Acemd configuration file string
