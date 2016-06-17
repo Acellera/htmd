@@ -289,6 +289,31 @@ class Amber(ProtocolInterface):
         # I already have written). Still, users can use sander or the CPU version
         # of pmemd if they like
 
+        # POTENTIAL FUNCTION PARAMETERS (MANUAL SECTION 18.7)
+        # Only implementing the bold ones in the Manual (most important ones) for
+        # the moment
+
+        # Generic parameters (Manual Section 18.7.1)
+        self._cmdList(key='ntf', datatype='int', descr='Force evaluation',
+                      default=1, valid_values=[1, 2, 3, 4, 5, 6, 7, 8])
+        self._cmdList(key='ntb', datatype='int',
+                      descr="""Whether or not periodic boundaries are imposed
+                            on the system during the calcu- lation of non-bonded
+                            interactions.""", default=None, valid_values=[0, 1, 2])
+        self._cmdValue(key='cut', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr='Nonbonded cutoff, in Å',
+                       default=None, valid_range=RANGE_POS)
+        self._cmdList(key='ipol', datatype='int',
+                      descr="""When set to 1, use a polarizable force field.
+                            See Section 18.7.5 for more information.""",
+                      default=0, valid_values=[0, 1])
+
+
+
+
+
+
+
 
         # Assign everything to a single variable
         self._cmdString('FORTRAN', 'str', '', None)
