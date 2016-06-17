@@ -21,6 +21,7 @@ class Amber(ProtocolInterface):
 
         self._files = {}
 
+        # GENERAL MINIMIZATION AND DYNAMICS PARAMETERS (MANUAL SECTION 18.6)
         #  General flags describing the calculation (Manual section 18.6.1)
         self._cmdList(key='imin', datatype='int',
                       descr='Flag to run minimization.',
@@ -282,7 +283,11 @@ class Amber(ProtocolInterface):
                        descr='Location of the cap center, if ivcap=1 is used.',
                        default=None, valid_range=RANGE_ANY)
 
-        # NMR refinement options (Manual section 18.6.11)
+        # TODO: NMR refinement options (Manual section 18.6.11)
+        # TODO: EMAP restraints (Manual section 18.6.12)
+        # The pmemd cuda engine does not support these (and many other options that
+        # I already have written). Still, users can use sander or the CPU version
+        # of pmemd if they like
 
 
         # Assign everything to a single variable
