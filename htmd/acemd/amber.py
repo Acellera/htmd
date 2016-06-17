@@ -275,6 +275,26 @@ class Amber(ProtocolInterface):
                         descr="""String that specifies atoms that are not to be
                               shaken (assuming that ntc>1).""", default='')
 
+        # Water cap (Manual section 18.6.10)
+        self._cmdList(key='ivcap', datatype='int',
+                      descr="""Flag to control cap option. The "cap" refers to
+                            a spherical portion of water centered on a point in
+                            the solute and restrained by a soft half-harmonic
+                            potential. For the best physical realism, this
+                            option should be combined with igb=10, in order to
+                            include the reaction field of waters that are beyond
+                            the cap radius.""",
+                      default=0, valid_values=[0, 1, 2, 5])
+        self._cmdValue(key='fcap', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr='The force constant for the cap restraint potential.',
+                       default=None, valid_range=RANGE_POS)
+        self._cmdValue(key='cutcap', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr='Radius of the cap, if ivcap=1 is used.',
+                       default=None, valid_range=RANGE_POS)
+        self._cmdValue(key='xcap', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr='Location of the cap center, if ivcap=1 is used.',
+                       default=None, valid_range=RANGE_ANY)
+
 
         # Assign everything to a single variable
         self._cmdString('FORTRAN', 'str', '', None)
