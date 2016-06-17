@@ -21,6 +21,13 @@ class Amber(ProtocolInterface):
 
         self._files = {}
 
+        #  General flags describing the calculation (Manual section 18.6.1)
+        self._cmdList(key='imin', datatype='int',
+                      descr='Flag to run minimization.',
+                      default=0, valid_values=[0, 1, 5])
+        self._cmdList(key='nmropt', datatype='int',
+                      descr='Flag to apply NMR restraints',
+                      default=0, valid_values=[0, 1, 2])
         self._cmdString('maxcycle', 'int', 'Maximum number of cycles of minimisation to perform', None)
         self._cmdString('ncyc', 'int', 'Cycle at which to switch from steepest to conjugate descent')
         self._cmdString('cutoff', 'float', '', None)
