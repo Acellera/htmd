@@ -1,7 +1,7 @@
 # Code to setup simulations with Amber
 # Description of parameters is mainly being copied from the AMBER 15 manual
 # http://ambermd.org/doc12/Amber15.pdf
-# However, some parameter options have different names from Amber to 
+# However, some parameter options have different names from Amber to
 # to keep protocol creation as consistent as possible with acemd
 
 import os
@@ -9,6 +9,7 @@ import htmd
 import shutil
 import numpy as np
 from htmd.protocols.protocolinterface import ProtocolInterface #TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
+
 
 class Amber(ProtocolInterface):
     _defaultfnames = {'bincoordinates': 'input.nc', 'structure': 'structure.*', 
@@ -20,8 +21,6 @@ class Amber(ProtocolInterface):
 
         self._files = {}
 
-        # Options
-        self._cmdString('minimisation', 'int', 'Whether to perform energy minimisation', None)
         self._cmdString('maxcycle', 'int', 'Maximum number of cycles of minimisation to perform', None)
         self._cmdString('ncyc', 'int', 'Cycle at which to switch from steepest to conjugate descent')
         self._cmdString('cutoff', 'float', '', None)
