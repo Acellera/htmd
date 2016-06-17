@@ -88,12 +88,7 @@ class Equilibration(ProtocolInterface):
         self.amber.drms = 1e-4
         #  Molecular dynamics (Manual section 18.6.6)
         
-        self.amber.FORTRAN = ''' HEATING
- &cntrl
-'''
-        # initialize list to write out to self.amber.FORTRAN
-    
-
+        self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
 
     def _findFiles(self, inputdir):
         # Tries to find default files if the given don't exist
