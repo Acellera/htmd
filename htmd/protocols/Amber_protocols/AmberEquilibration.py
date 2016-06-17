@@ -141,13 +141,15 @@ class Equilibration(ProtocolInterface):
         """
         # this code automatically loops through the amber attributes and assigns the given value to
         # the parameter.
+        self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
+
         protocol=[]
         i=0
         for key, value in self.amber.__dict__.items():
             
             if key != 'FORTRAN' and key[0] != '_':
                 # cleans up the input file a bit
-                if i % 3 == 0:
+                if i % 3 == 0 and i>0:
                     protocol.append('\n   {}={}'.format(key,value))
                 else:
                     protocol.append('{}={}'.format(key,value))
