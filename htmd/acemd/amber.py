@@ -260,6 +260,20 @@ class Amber(ProtocolInterface):
                              must be at least two interfaces in the periodic box.""",
                        default=2, valid_range=RANGE_0POS)
 
+        # SHAKE bond length constraints (Manual section 18.6.9)
+        self._cmdList(key='ntc', datatype='int',
+                      descr='Flag for SHAKE to perform bond length constraints.',
+                      default=1, valid_values=[1, 2, 3])
+        self._cmdValue(key='tol', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr="""Relative geometrical tolerance for coordinate
+                             resetting in shake.""", default=0.00001,
+                       valid_range=RANGE_0POS)
+        self._cmdList(key='jfastw', datatype='int',
+                      descr='Fast water definition flag.', default=0,
+                      valid_values=[0, 4])
+        self._cmdString(key='noshakemask', datatype='str',
+                        descr="""String that specifies atoms that are not to be
+                              shaken (assuming that ntc>1).""", default='')
 
 
         # Assign everything to a single variable
