@@ -12,7 +12,7 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 
 
 class Amber(ProtocolInterface):
-    _defaultfnames = {'bincoordinates': 'input.nc', 'structure': 'structure.*', 
+    _defaultfnames = {'bincoordinates': 'input.nc', 'structure': 'structure.*',
                       'parameters': 'parameters', 'coordinates': 'structure.rst',
                       'parmfile': 'structure.prmtop'}
 
@@ -181,6 +181,53 @@ class Amber(ProtocolInterface):
                        descr="""This is the target temperature for all LES
                        particles (see Chapter 6 in the Amber Manual).""",
                        default=-1, valid_range=RANGE_ANY)
+        self._cmdValue(key='tempi', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr="""Initial temperature. For the initial dynamics
+                             run, (NTX < 3) the velocities are assigned from
+                             a Maxwellian distribution at TEMPI K. If
+                             TEMPI = 0.0, the velocities will be calculated
+                             from the forces instead. TEMPI has no effect if
+                             NTX > 3.""", default=0.0, valid_range=RANGE_0POS)
+        self._cmdValue(key='ig', datatype='int', realdatatype=TYPE_INT,
+                       descr='The seed for the pseudo-random numbergenerator.',
+                       default=-1, valid_range=RANGE_ANY)
+        self._cmdValue(key='tautp', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr="""Time constant (ps) for heat bath coupling for
+                             the system, if ntt = 1.""", default=1.0,
+                       valid_range=RANGE_0POS)
+        self._cmdValue(key='gamma_ln', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr='The collision frequency γ, in ps−1, when ntt = 3.',
+                       default=0.0, valid_range=RANGE_0POS)
+        self._cmdValue(key='vrand', datatype='int', realdatatype=TYPE_INT,
+                       descr="""If vrand>0 and ntt=2, the velocities will be
+                             randomized to temperature TEMP0 every vrand steps.""",
+                       default=1000, valid_range=RANGE_0POS)
+        self._cmdValue(key='vlimit', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr="""If not equal to 0.0, then any component of the
+                             velocity that is greater than abs(VLIMIT) will be
+                             reduced to VLIMIT (preserving the sign).""",
+                       default=20.0, valid_range=RANGE_0POS)
+        self._cmdValue(key='nkija', datatype='int', realdatatype=TYPE_INT,
+                       descr="""For use with ntt=9 and ntt=10., For ntt=9, this
+                             is the number of substeps of dt when integrating
+                             the thermostat equations of motion, for greater
+                             accuracy. For ntt=10, this specifies the number of
+                             additional auxiliary velocity variables v1 and v2,
+                             which will total nkija×v1 +nkija×v2""",
+                       default=1, valid_range=RANGE_0POS)
+        self._cmdValue(key='idistr', datatype='int', realdatatype=TYPE_INT,
+                       descr="""For use with ntt=9, this is the frequency at
+                             which the thermostat velocity distribution
+                             functions are accumulated.""",
+                       default=None, valid_range=RANGE_0POS)
+        self._cmdValue(key='sinrtau', datatype='float', realdatatype=TYPE_FLOAT,
+                       descr="""this specifies the time scale for determining
+                             the masses associated with the two auxiliary
+                             velocity variables v1 and v2 (e.g. thermostat
+                             velocities)""", default=1.0, valid_range=RANGE_0POS)
+
+
+        # Assign everything to a single variable
         self._cmdString('FORTRAN', 'str', '', None)
         self._cmdString('run', 'str', '', None)
 
