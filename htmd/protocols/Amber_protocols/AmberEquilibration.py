@@ -53,22 +53,7 @@ class Equilibration(ProtocolInterface):
 
     def __init__(self):
         super().__init__()
-        self._cmdObject('pmemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Amber)
-        self._cmdValue('numsteps', 'int', 'Number of steps to run the simulations in units of 4fs', 0, TYPE_INT, RANGE_0POS)
-        self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
-        self._cmdValue('k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0, TYPE_FLOAT, RANGE_ANY)
-        self._cmdString('reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.', 'none')
-        self._cmdString('selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none')
-        self._cmdList('box', 'list', 'Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]', [0,0,0,0,0,0])
-        self._cmdBoolean('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False)
-        self._cmdDict('constraints', 'dict', 'A dictionary containing as keys the atomselections of the constraints '
-                                             'and as values the constraint scaling factor. 0 factor means no constraint'
-                                             ', 1 full constraints and in between values are used for scaling.'
-                                             ' The order with which the constraints are applied is random, so make '
-                                             'atomselects mutually exclusive to be sure you get the correct constraints.'
-                                             , {'protein and noh and not name CA': 0.1, 'protein and name CA': 1})
-        self._cmdValue('nvtsteps', 'int', 'Number of initial steps to apply NVT in units of 4fs. Defaults to 500.', None, TYPE_INT, RANGE_0POS)
-        self._cmdValue('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the numsteps.', None, TYPE_INT, RANGE_0POS)
+        self._cmdObject('amber', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Amber)
 
         self.amber = Amber()
         self.amber.imin = 0
@@ -78,10 +63,9 @@ class Equilibration(ProtocolInterface):
         self.amber.ntxo = 2
         self.amber.ntpr = 50
         self.amber.ntave = 0
-        self.amber.ntwr = #TODO: WHAT GOES HERE
+#        self.amber.ntwr = #TODO: WHAT GOES HERE
         self.amber.iwrap = 0
         self.amber.ntwx = 0
-        self.amber.ntwc = 0
         self.amber.ntwv = 0
         self.amber.ntwf = 0
         self.amber.ntwe = 0
@@ -93,9 +77,9 @@ class Equilibration(ProtocolInterface):
         self.amber.ntr = 0
         # These values need conditionals
         # Check Amber class in htmd.acemd.amber
-        self.amber.restraint_wt = #TODO: WHAT GOES HERE
-        self.amber.restraintmask = #TODO: WHAT GOES HERE
-        self.amber.bellymask = #TODO: WHAT GOES HERE
+#        self.amber.restraint_wt = #TODO: WHAT GOES HERE
+#        self.amber.restraintmask = #TODO: WHAT GOES HERE
+#        self.amber.bellymask = #TODO: WHAT GOES HERE
         #  Energy minimization (Manual section 18.6.5)
         self.amber.maxcyc = 1
         self.amber.ncyc = 10
@@ -108,7 +92,7 @@ class Equilibration(ProtocolInterface):
  &cntrl
 '''
         # initialize list to write out to self.amber.FORTRAN
-        self.protocol =  []
+    
 
 
     def _findFiles(self, inputdir):
@@ -137,7 +121,7 @@ class Equilibration(ProtocolInterface):
                                    'Please set the Equilibration.acemd.{f:} property to '
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
-    def write(self, inputdir, outputdir):
+    def write(self):
         """ Write the equilibration protocol
 
         Writes the equilibration protocol and files into a folder for execution
@@ -157,17 +141,16 @@ class Equilibration(ProtocolInterface):
         """
         # this code automatically loops through the amber attributes and assigns the given value to
         # the parameter.
-
+        protocol=[]
+        i=0
         for key, value in self.amber.__dict__.items():
+            
+            if key != 'FORTRAN' and key[0] != '_':
+                # cleans up the input file a bit
+                if i % 3 == 0:
+                    protocol.append('\n   {}={}'.format(key,value))
+                else:
+                    protocol.append('{}={}'.format(key,value))
+            i+=1
 
-            if key != 'FORTRAN' and key != 'protocol':
-                self.protocol.append('{}={}'.format(key,value))
-
-        self.FORTRAN = self.amber.FORTRAN+'   '+(', '.join(self.protocol))
-
-
-
-
-
-
-
+        self.amber.FORTRAN = self.amber.FORTRAN+'   '+(', '.join(protocol)) + "\n /"

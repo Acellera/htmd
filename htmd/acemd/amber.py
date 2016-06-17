@@ -67,7 +67,7 @@ class Amber(ProtocolInterface):
                        descr="""Every ntwx steps, the coordinates will be
                              written to the mdcrd file. If ntwx = 0, no
                              coordinate trajectory file will be written.""",
-                       default=0, valid_range=RANGE_POS)
+                       default=0, valid_range=RANGE_0POS)
         self._cmdValue(key='ntwv', datatype='int', realdatatype=TYPE_INT,
                        descr="""Every ntwv steps, the velocities will be written
                              to the mdvel file. If ntwv = 0, no velocity
