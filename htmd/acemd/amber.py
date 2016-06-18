@@ -317,8 +317,8 @@ class Amber(ProtocolInterface):
         self._cmdString('outputnc', 'str', 'Name of output NetCDF file', None)
 
         # Assign everything to a single string
-        self._cmdString('FORTRAN', 'str', '', None)
-
+        self._cmdString('FORTRAN', 'str', 'Protocol in FORTRAN', None)
+        self.amber.bash('bash', 'str', '',  None)
         # Files
         self._cmdString('bincoordinates', 'str', '', None) # coordinate binary file .nc (-x)
         self._cmdString('coordinates', 'str', '', None) # frame coordinates .rst (-r)
