@@ -314,18 +314,16 @@ class Amber(ProtocolInterface):
 
 
 
+        self._cmdString('outputnc', 'str', 'Name of output NetCDF file', None)
 
-        # Assign everything to a single variable
+        # Assign everything to a single string
         self._cmdString('FORTRAN', 'str', '', None)
-        self._cmdString('run', 'str', '', None)
-
 
         # Files
-        self._cmdString('bincoordinates', 'str', '', None) # coordinate binary file .nc 
-        self._cmdString('parameters', 'str', '', None) # parameters to run simulation .in
-        self._cmdString('coordinates', 'str', '', None) # frame coordinates .rst
-        self._cmdString('consref', 'str', '', None) # TODO think of easy way to write constraints
-        self._cmdString('parmfile', 'str', '', None) # topology file .prmtop
+        self._cmdString('bincoordinates', 'str', '', None) # coordinate binary file .nc (-x)
+        self._cmdString('coordinates', 'str', '', None) # frame coordinates .rst (-r)
+        self._cmdString('consref', 'str', '', None) # constraints reference (-ref)
+        self._cmdString('parmfile', 'str', '', None) # topology file .prmtop (-p)
 
     def load(self, path='.'):
         """ Loads all files required to run a simulation and apply eventually configured protocols to it

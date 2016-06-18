@@ -88,13 +88,18 @@ class Equilibration(ProtocolInterface):
         self.amber.drms = 1e-4
         #  Molecular dynamics (Manual section 18.6.6)
         
+        self.amber.outputnc = 'Equilibration.nc'
         self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
+        self.amber.bash 'ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -r RESTART \
+        -x OUTPUTNC -ref REFERENCE'
+
+
 
     def _findFiles(self, inputdir):
         # Tries to find default files if the given don't exist
-        defaults = {'coordinates': ('structure.rst', ),
+        defaults = {'coordinates': ('structure.rst', 'structure.inpcrd', 'structure.mdcrd'),
                     'structure': ('structure.psf', 'structure.prmtop'),
-                    'parameters': ('parameters', 'structure.prmtop')}
+                    'parameters': ('parameters.in')}
 
         for field in defaults:
             userval = self.amber.__dict__[field]
@@ -122,7 +127,7 @@ class Equilibration(ProtocolInterface):
     # pmemd.cuda_SPFP -O -i Equil.in -o Equil.out -c structure.rst -p structure \
     # -r EquilRestart.rst -x EquilRestart.nc (-ref Min.rst)
 
-    def write(self):
+    def write(self, inputdir, outputdir):
         """ Write the equilibration protocol
 
         Writes the equilibration protocol and files into a folder for execution
@@ -144,16 +149,44 @@ class Equilibration(ProtocolInterface):
         # the parameter.
         self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
 
+        restartfile = os.path.join(inputdir, self.amber.coordinates)
+        topology= os.path.join(inputdir, self.amber.structure)
+
+        if self.amber.consref is not None:
+            reference = os.path.join(inputdir, self.amber.consref) 
+
         protocol=[]
         i=0
         for key, value in self.amber.__dict__.items():
             
-            if key != 'FORTRAN' and key[0] != '_':
-                # cleans up the input file a bit
+            elif key != 'FORTRAN' and key[0] != '_' and key not in ['bincoordinates', 'coordinates', 'consref', 'parmfile']:
+                
+                # cleans up the .in file a bit
                 if i % 3 == 0 and i>0:
                     protocol.append('\n   {}={}'.format(key,value))
                 else:
                     protocol.append('{}={}'.format(key,value))
-            i+=1
+                
+                i+=1
 
+        # format the FORTRAN file with MD parameters
         self.amber.FORTRAN = self.amber.FORTRAN+'   '+(', '.join(protocol)) + "\n /"
+
+        # write out the FORTRAN file
+        with open(os.path.join(outputdir+'Equilibration.in'), 'w') as text_file:
+            text_file.write(self.amber.FORTRAN)
+
+        # prepare the bash file
+        self.amber.bash = self.amber.bash.replace('INPUT', self.amber.parameters)
+        self.amber.bash = self.amber.bash.replace('OUTPUT', 'Equilibration.out')
+        self.amber.bash = self.amber.bash.replace('TOPOLOGY', self.amber.parmfile)
+        self.amber.bash = self.amber.bash.replace('RESTART', self.amber.coordinates)
+        self.amber.bash = self.amber.bash.replace('OUTPUTNC', self.amber.outputnc)
+        self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
+
+        with open(os.path.join(outputdir+'Equilibration.sh'), 'w') as text_file:
+            text_file.write(self.amber.bash)
+
+        shutil.copy(restartfile, outputdir)
+        shutil.copy(topology, outputdir)
+        shutil.copy(consref, outputdir)
