@@ -182,13 +182,13 @@ class Equilibration(ProtocolInterface):
         self.amber.bash = self.amber.bash.replace('TOPOLOGY', self.amber.parmfile)
         self.amber.bash = self.amber.bash.replace('RESTART', self.amber.coordinates)
         self.amber.bash = self.amber.bash.replace('OUTPUTNC', self.amber.outputnc)
-        FIXME: add ref
-        self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
+        #FIXME: add ref
+        #self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
 
         with open(os.path.join(outputdir,'Equilibration.sh'), 'w') as text_file:
             text_file.write(self.amber.bash)
 
         shutil.copy(restartfile, outputdir)
         shutil.copy(topology, outputdir)
-        FIXME: add ref
+        #FIXME: add ref
         #shutil.copy(consref, outputdir)
