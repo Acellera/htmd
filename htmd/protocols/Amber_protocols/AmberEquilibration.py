@@ -150,7 +150,7 @@ class Equilibration(ProtocolInterface):
         self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
 
         restartfile = os.path.join(inputdir, self.amber.coordinates)
-        topology= os.path.join(inputdir, self.amber.structure)
+        topology= os.path.join(inputdir, self.amber.parmfile)
 
         if self.amber.consref is not None:
             reference = os.path.join(inputdir, self.amber.consref) 
