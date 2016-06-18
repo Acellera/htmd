@@ -91,7 +91,7 @@ class Equilibration(ProtocolInterface):
         self.amber.outputnc = 'Equilibration.nc'
         self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
         self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -r RESTART \\
-        -x OUTPUTNC -ref REFERENCE'''
+        -x OUTPUTNC''' #FIXME: add -ref REFERENCE
 
 
 
@@ -173,20 +173,22 @@ class Equilibration(ProtocolInterface):
         self.amber.FORTRAN = self.amber.FORTRAN+'   '+(', '.join(protocol)) + "\n /"
 
         # write out the FORTRAN file
-        with open(os.path.join(outputdir+'Equilibration.in'), 'w') as text_file:
+        with open(os.path.join(outputdir,'Equilibration.in'), 'w') as text_file:
             text_file.write(self.amber.FORTRAN)
 
         # prepare the bash file
-        self.amber.bash = self.amber.bash.replace('INPUT', self.amber.parameters)
+        self.amber.bash = self.amber.bash.replace('INPUT', 'Equilibration.in') # putting these strings as placeholders for now
         self.amber.bash = self.amber.bash.replace('OUTPUT', 'Equilibration.out')
         self.amber.bash = self.amber.bash.replace('TOPOLOGY', self.amber.parmfile)
         self.amber.bash = self.amber.bash.replace('RESTART', self.amber.coordinates)
         self.amber.bash = self.amber.bash.replace('OUTPUTNC', self.amber.outputnc)
+        FIXME: add ref
         self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
 
-        with open(os.path.join(outputdir+'Equilibration.sh'), 'w') as text_file:
+        with open(os.path.join(outputdir,'Equilibration.sh'), 'w') as text_file:
             text_file.write(self.amber.bash)
 
         shutil.copy(restartfile, outputdir)
         shutil.copy(topology, outputdir)
-        shutil.copy(consref, outputdir)
+        FIXME: add ref
+        #shutil.copy(consref, outputdir)
