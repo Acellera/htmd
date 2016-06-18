@@ -159,7 +159,7 @@ class Equilibration(ProtocolInterface):
         i=0
         for key, value in self.amber.__dict__.items():
             
-            elif key != 'FORTRAN' and key[0] != '_' and key not in ['bincoordinates', 'coordinates', 'consref', 'parmfile']:
+            if key != 'FORTRAN' and key[0] != '_' and key not in ['bincoordinates', 'coordinates', 'consref', 'parmfile']:
                 
                 # cleans up the .in file a bit
                 if i % 3 == 0 and i>0:
