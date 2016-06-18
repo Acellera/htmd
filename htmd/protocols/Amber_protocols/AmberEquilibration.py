@@ -90,8 +90,8 @@ class Equilibration(ProtocolInterface):
         
         self.amber.outputnc = 'Equilibration.nc'
         self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
-        self.amber.bash 'ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -r RESTART \
-        -x OUTPUTNC -ref REFERENCE'
+        self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -r RESTART \\
+        -x OUTPUTNC -ref REFERENCE'''
 
 
 
