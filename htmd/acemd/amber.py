@@ -5,7 +5,6 @@
 # to keep protocol creation as consistent as possible with acemd
 
 import os
-import htmd
 import shutil
 import numpy as np
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
@@ -285,13 +284,13 @@ class Amber(ProtocolInterface):
 
         # TODO: NMR refinement options (Manual section 18.6.11)
         # TODO: EMAP restraints (Manual section 18.6.12)
-        # The pmemd cuda engine does not support these (and many other options that
-        # I already have written). Still, users can use sander or the CPU version
-        # of pmemd if they like
+        # The pmemd cuda engine does not support these (and many other options
+        # that I already have written). Still, users can use sander or the CPU
+        # version of pmemd if they like
 
         # POTENTIAL FUNCTION PARAMETERS (MANUAL SECTION 18.7)
-        # Only implementing the bold ones in the Manual (most important ones) for
-        # the moment
+        # Only implementing the bold ones in the Manual (most important ones)
+        # for the moment
 
         # Generic parameters (Manual Section 18.7.1)
         self._cmdList(key='ntf', datatype='int', descr='Force evaluation',
@@ -331,12 +330,12 @@ class Amber(ProtocolInterface):
 
         # Assign everything to a single string
         self._cmdString('FORTRAN', 'str', 'Protocol in FORTRAN', None)
-        self._cmdString('bash', 'str', '',  None)
+        self._cmdString('bash', 'str', '', None)
         # Files
-        self._cmdString('bincoordinates', 'str', '', None) # coordinate binary file .nc (-x)
-        self._cmdString('coordinates', 'str', '', None) # frame coordinates .rst (-r)
-        self._cmdString('consref', 'str', '', None) # constraints reference (-ref)
-        self._cmdString('parmfile', 'str', '', None) # topology file .prmtop (-p)
+        self._cmdString('bincoordinates', 'str', '', None)  # coordinate binary file .nc (-x)
+        self._cmdString('coordinates', 'str', '', None)  # frame coordinates .rst (-r)
+        self._cmdString('consref', 'str', '', None)  # constraints reference (-ref)
+        self._cmdString('parmfile', 'str', '', None)  # topology file .prmtop (-p)
 
     def load(self, path='.'):
         """ Loads all files required to run a simulation and apply eventually configured protocols to it
@@ -347,11 +346,11 @@ class Amber(ProtocolInterface):
             Working directory relative to which the configuration file is read
         """
         # load files and reset filenames
-        
+
         for cmd in self._defaultfnames.keys():
             if cmd in self.__dict__ and self.__dict__[cmd] is not None:
                 fname = os.path.join(path, self.__dict__[cmd])
-                f = open(fname, 'rb')  #read all as binary
+                f = open(fname, 'rb')  # read all as binary
                 data = f.read()
                 f.close()
                 self._files[cmd] = data
@@ -364,7 +363,7 @@ class Amber(ProtocolInterface):
 
     def save(self, path, overwrite=False):
         """ Create a directory with all necessary input to run acemd.
-    
+
         Parameters
         ----------
         path : str
@@ -386,9 +385,8 @@ class Amber(ProtocolInterface):
             fo.close()
 
         self._files = {}  # empty file dictionary after writing
-    
-        self.writeConf(os.path.join(path, 'input'))
 
+        self.writeConf(os.path.join(path, 'input'))
 
     def setup(self, cwd='./', outdir='./run', overwrite=False):
         """ Convenience method performing load and save.
@@ -427,7 +425,7 @@ class Amber(ProtocolInterface):
         maxwidth = np.max([len(k) for k in self.__dict__.keys()])
 
         keys = sorted(list(self.__dict__.keys()))
-        #keys = keys + [keys.pop(keys.index('run'))]  # Move the run command to the end
+        # keys = keys + [keys.pop(keys.index('run'))]  # Move the run command to the end
         for cmd in keys:
             if not cmd.startswith('_') and self.__dict__[cmd] is not None and cmd != 'TCL':
                 name = cmd
@@ -453,4 +451,3 @@ class Amber(ProtocolInterface):
         text = self.show(quiet=True)
         with open(fname, 'w') as f:
             f.write(text)
-
