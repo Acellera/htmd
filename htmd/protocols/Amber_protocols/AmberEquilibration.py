@@ -58,35 +58,25 @@ class Equilibration(ProtocolInterface):
 
         self.amber = Amber()
         self.amber.imin = 0
-        self.amber.nmropt = 0
         self.amber.ntx = 1
         self.amber.irest = 0
-        self.amber.ntxo = 2
-        self.amber.ntpr = 50
-        self.amber.ntave = 0
-#        self.amber.ntwr = #TODO: WHAT GOES HERE
-        self.amber.iwrap = 0
-        self.amber.ntwx = 0
-        self.amber.ntwv = 0
-        self.amber.ntwf = 0
-        self.amber.ntwe = 0
+        self.amber.ntc = 2
+        self.amber.ntf = 2
+        self.amber.tol = 0.0000001
+        self.amber.nstlim = 25000
+        self.amber.ntt = 3
+        self.amber.gamma_ln = 1.0 
+        self.amber.ntr = 1
+        self.amber.ig = -1
+        self.amber.ntpr = 1000
+        self.amber.ntwr = 10000
+        self.amber.ntwx = 1000
+        self.amber.dt = 0.004
+        self.amber.nmropt = 1
+        self.amber.ntb = 1
+        self.amber.ntp = 0
+        self.amber.cut = 8.0
         self.amber.ioutfm = 1
-        self.amber.ntwprt = 0
-        self.amber.idecomp = 0
-        #  Frozen or restrained atoms (Manual section 18.6.4)
-        self.amber.ibelly = 0
-        self.amber.ntr = 0
-        # These values need conditionals
-        # Check Amber class in htmd.acemd.amber
-#        self.amber.restraint_wt = #TODO: WHAT GOES HERE
-#        self.amber.restraintmask = #TODO: WHAT GOES HERE
-#        self.amber.bellymask = #TODO: WHAT GOES HERE
-        #  Energy minimization (Manual section 18.6.5)
-        self.amber.maxcyc = 1
-        self.amber.ncyc = 10
-        self.amber.ntmin = 1
-        self.amber.dx0 = 0.01
-        self.amber.drms = 1e-4
         #  Molecular dynamics (Manual section 18.6.6)
         
         self.amber.outputnc = 'Equilibration.nc'
