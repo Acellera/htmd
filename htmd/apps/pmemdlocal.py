@@ -145,13 +145,15 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
 
                 # need to tell the shell script what engine we are using
 
-                with open('MD.sh', 'r') as bash:
+                with open(os.path.join(path, 'MD.sh'), 'r') as bash:
                     bash = test.read()
 
                 bash.replace('ENGINE', pmemd_cuda)
+                logger.info('BASH script: {}'.format(bash))
 
-                with open('MD.sh', 'w') as equil:
+                with open(os.path.join(path, 'MD.sh') 'w') as equil:
                     equil.write(bash)
+
 
                 cmd = 'export CUDA_VISIBLE_DEVICES="{}"\n'.format(str(ngpu))
                 cmd += """cd {} && bash {}""".format(os.path.normpath(path),
