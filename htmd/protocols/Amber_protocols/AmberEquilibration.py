@@ -10,6 +10,7 @@ import logging
 import shutil
 logger = logging.getLogger(__name__)
 
+
 class Equilibration(ProtocolInterface):
 
     """ Equilibration protocol
@@ -54,7 +55,8 @@ class Equilibration(ProtocolInterface):
 
     def __init__(self):
         super().__init__()
-        self._cmdObject('amber', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Amber)
+        self._cmdObject(
+            'amber', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Amber)
 
         self.amber = Amber()
         self.amber.imin = 0
@@ -65,7 +67,7 @@ class Equilibration(ProtocolInterface):
         self.amber.tol = 0.0000001
         self.amber.nstlim = 25000
         self.amber.ntt = 3
-        self.amber.gamma_ln = 1.0 
+        self.amber.gamma_ln = 1.0
         self.amber.ntr = 1
         self.amber.ig = -1
         self.amber.ntpr = 1000
@@ -78,7 +80,7 @@ class Equilibration(ProtocolInterface):
         self.amber.cut = 8.0
         self.amber.ioutfm = 1
         #  Molecular dynamics (Manual section 18.6.6)
-        
+
         self.amber.outputnc = 'Equilibration.nc'
         self.amber.FORTRAN = """ heating 100K
  &cntrl
@@ -91,9 +93,7 @@ class Equilibration(ProtocolInterface):
    ntb=NTB, ntp=NTP, cut=CUT, ioutfm=IOUTFM,
  / \n"""
         #self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
-        self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -c RESTART -x TRAJOUT -r RESTOUT''' #FIXME: add -ref REFERENCE
-
-
+        self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -c RESTART -x TRAJOUT -r RESTOUT'''  # FIXME: add -ref REFERENCE
 
     def _findFiles(self, inputdir):
         # Tries to find default files if the given don't exist
@@ -113,7 +113,8 @@ class Equilibration(ProtocolInterface):
 
             if userval is not None and self.amber.__dict__[field] is not None and self.amber.__dict__[field] != userval:
                 logger.warning('Could not locate structure file {}. Using {} instead.'.format(
-                    os.path.join(inputdir, userval), os.path.join(inputdir, self.amber.__dict__[field])
+                    os.path.join(inputdir, userval), os.path.join(
+                        inputdir, self.amber.__dict__[field])
                 ))
             elif self.amber.__dict__[field] is None:
                 raise RuntimeError('Could not locate any {f:} file in {i:}. '
@@ -150,11 +151,10 @@ class Equilibration(ProtocolInterface):
         self._findFiles(inputdir)
 
         restartfile = os.path.join(inputdir, self.amber.coordinates)
-        topology= os.path.join(inputdir, self.amber.parmfile)
+        topology = os.path.join(inputdir, self.amber.parmfile)
 
         if self.amber.consref is not None:
-            reference = os.path.join(inputdir, self.amber.consref) 
-
+            reference = os.path.join(inputdir, self.amber.consref)
 
         # FOR NOW WE WILL HAVE A FIXED STRING LIKE IN THE ACEMD PROTOCOL
         # THIS WAY WE CAN CONTROL BETTER WHAT PARAMETERS CAN BE SPECIFIED
@@ -163,62 +163,88 @@ class Equilibration(ProtocolInterface):
         # protocol=[]
         # i=0
         # for key, value in self.amber.__dict__.items():
-            
-        #     if not key.startswith('_') and key not in ['bincoordinates', 'coordinates', 
+
+        #     if not key.startswith('_') and key not in ['bincoordinates', 'coordinates',
         #                                                'consref', 'parmfile','FORTRAN',
         #                                                'bash', 'outputnc']:
-                
+
         #         # cleans up the .in file a bit
         #         if i % 3 == 0 and i>0:
         #             protocol.append('\n   {}={}'.format(key,value))
         #         else:
         #             protocol.append('{}={}'.format(key,value))
-                
+
         #         i+=1
 
         # # format the FORTRAN file with MD parameters
         # self.amber.FORTRAN = self.amber.FORTRAN+'   '+(', '.join(protocol)) + "\n /"
 
         # preparing the FORTRAN file
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('IMIN', str(self.amber.imin))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTX', str(self.amber.ntx))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('IREST', str(self.amber.irest))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTC', str(self.amber.ntc))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTF', str(self.amber.ntf))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('TOL', '{:.10f}'.format(self.amber.tol))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NSTLIM', str(self.amber.nstlim))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTT', str(self.amber.ntt))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('GAMMA_LN', str(self.amber.gamma_ln))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTR', str(self.amber.ntr))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('IG', str(self.amber.ig))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTPR', str(self.amber.ntpr))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTWR', str(self.amber.ntwr))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTWX', str(self.amber.ntwx))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('DT', str(self.amber.dt))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NMROPT', str(self.amber.nmropt))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTB', str(self.amber.ntb))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTP', str(self.amber.ntp))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('CUT', str(self.amber.cut))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('IOUTFM', str(self.amber.ioutfm))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'IMIN', str(self.amber.imin))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTX', str(self.amber.ntx))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'IREST', str(self.amber.irest))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTC', str(self.amber.ntc))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTF', str(self.amber.ntf))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'TOL', '{:.10f}'.format(self.amber.tol))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NSTLIM', str(self.amber.nstlim))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTT', str(self.amber.ntt))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'GAMMA_LN', str(self.amber.gamma_ln))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTR', str(self.amber.ntr))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'IG', str(self.amber.ig))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTPR', str(self.amber.ntpr))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTWR', str(self.amber.ntwr))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTWX', str(self.amber.ntwx))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'DT', str(self.amber.dt))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NMROPT', str(self.amber.nmropt))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTB', str(self.amber.ntb))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTP', str(self.amber.ntp))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'CUT', str(self.amber.cut))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'IOUTFM', str(self.amber.ioutfm))
 
         # write out the FORTRAN file, for now let's call it Equilibration.in
-        with open(os.path.join(outputdir,'Equilibration.in'), 'w') as text_file:
+        with open(os.path.join(outputdir, 'Equilibration.in'), 'w') as text_file:
             text_file.write(self.amber.FORTRAN)
 
         # prepare the bash file
-        self.amber.bash = self.amber.bash.replace('INPUT', 'Equilibration.in') # putting these strings as placeholders for now
-        self.amber.bash = self.amber.bash.replace('OUTPUT', 'Equilibration.out')
-        self.amber.bash = self.amber.bash.replace('TOPOLOGY', self.amber.parmfile)
-        self.amber.bash = self.amber.bash.replace('RESTART', self.amber.coordinates)
-        self.amber.bash = self.amber.bash.replace('TRAJOUT', self.amber.outputnc)
-        self.amber.bash = self.amber.bash.replace('RESTOUT', 'Equilibration_new.rst')
-        #FIXME: add ref
+        # putting these strings as placeholders for now
+        self.amber.bash = self.amber.bash.replace('INPUT', 'Equilibration.in')
+        self.amber.bash = self.amber.bash.replace(
+            'OUTPUT', 'Equilibration.out')
+        self.amber.bash = self.amber.bash.replace(
+            'TOPOLOGY', self.amber.parmfile)
+        self.amber.bash = self.amber.bash.replace(
+            'RESTART', self.amber.coordinates)
+        self.amber.bash = self.amber.bash.replace(
+            'TRAJOUT', self.amber.outputnc)
+        self.amber.bash = self.amber.bash.replace(
+            'RESTOUT', 'Equilibration_new.rst')
+        # FIXME: add ref
         #self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
 
-        with open(os.path.join(outputdir,'MD.sh'), 'w') as text_file:
+        with open(os.path.join(outputdir, 'MD.sh'), 'w') as text_file:
             text_file.write(self.amber.bash)
 
         shutil.copy(restartfile, outputdir)
         shutil.copy(topology, outputdir)
-        #FIXME: add ref
+        # FIXME: add ref
         #shutil.copy(consref, outputdir)
