@@ -56,12 +56,13 @@ class Equilibration(ProtocolInterface):
     def __init__(self):
         super().__init__()
         self._cmdObject('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Acemd)
-        self._cmdValue('numsteps', 'int', 'Number of steps to run the simulations in units of 4fs', 0, TYPE_INT, RANGE_0POS)
+        self._cmdValue('runtime', 'float', 'Running time of the simulation.', 0, TYPE_FLOAT, RANGE_0POS)
+        self._cmdString('timeunits', 'str', 'Units for time arguments. Can be \'steps\', \'ns\' etc.', 'steps')
         self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
-        self._cmdValue('k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0, TYPE_FLOAT, RANGE_ANY)
-        self._cmdString('reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.', 'none')
-        self._cmdString('selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none')
-        self._cmdList('box', 'list', 'Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]', [0,0,0,0,0,0])
+        self._cmdValue('fb_k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0, TYPE_FLOAT, RANGE_ANY)
+        self._cmdString('fb_reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.', 'none')
+        self._cmdString('fb_selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none')
+        self._cmdList('fb_box', 'list', 'Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]', [0,0,0,0,0,0])
         self._cmdBoolean('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False)
         self._cmdDict('constraints', 'dict', 'A dictionary containing as keys the atomselections of the constraints '
                                              'and as values the constraint scaling factor. 0 factor means no constraint'
@@ -69,8 +70,8 @@ class Equilibration(ProtocolInterface):
                                              ' The order with which the constraints are applied is random, so make '
                                              'atomselects mutually exclusive to be sure you get the correct constraints.'
                                              , {'protein and noh and not name CA': 0.1, 'protein and name CA': 1})
-        self._cmdValue('nvtsteps', 'int', 'Number of initial steps to apply NVT in units of 4fs. Defaults to 500.', None, TYPE_INT, RANGE_ANY)
-        self._cmdValue('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the numsteps.', None, TYPE_INT, RANGE_ANY)
+        self._cmdValue('nvtsteps', 'int', 'Number of initial steps to apply NVT in units of 4fs.', 500, TYPE_INT, RANGE_ANY)
+        self._cmdValue('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the simulation time.', None, TYPE_INT, RANGE_ANY)
 
         self.acemd = Acemd()
         self.acemd.coordinates = None
@@ -106,43 +107,45 @@ class Equilibration(ProtocolInterface):
         self.acemd.tclforces = 'on'
         self.acemd.minimize = '500'
         self.acemd.run = '$numsteps'
-        self.acemd.TCL='''
-set numsteps NUMSTEPS
-set temperature TEMPERATURE
-set nvtsteps NVTSTEPS
-set constraintsteps CONSTRAINTSTEPS
-set refindex { REFINDEX }
-set selindex { SELINDEX }
-set box { BOX }
-set K KCONST
+        self.acemd.TCL=('''
+set numsteps {NUMSTEPS}
+set temperature {TEMPERATURE}
+set nvtsteps {NVTSTEPS}
+set constraintsteps {CONSTRAINTSTEPS}
+set fb_refindex {{ {REFINDEX} }}
+set fb_selindex {{ {SELINDEX} }}
+set fb_box {{ {BOX} }}
+set fb_K {KCONST}
 #
-proc flatbot1d {x xm xM K} {
+''',
+'''
+proc flatbot1d {x xm xM fb_K} {
   set f 0
   if {$x < $xm} {
-    set f [expr $K*[expr $xm-$x]]
+    set f [expr $fb_K*[expr $xm-$x]]
   }
   if {$x > $xM} {
-    set f [expr $K*[expr $xM-$x]]
+    set f [expr $fb_K*[expr $xM-$x]]
   }
   return $f
 }
 proc calcforces_init {} {
-  global ref sel refindex selindex
+  global ref sel fb_refindex fb_selindex
   berendsenpressure  off
-  set ref [addgroup  $refindex]
-  set sel [addgroup  $selindex]
+  set ref [addgroup  $fb_refindex]
+  set sel [addgroup  $fb_selindex]
 }
 proc calcforces {} {
-  global ref sel numsteps K box nvtsteps constraintsteps
+  global ref sel numsteps fb_K fb_box nvtsteps constraintsteps
   loadcoords coords
 ##FLATBOTTOM
-  if {$K>0} {
+  if {$fb_K>0} {
     set r0 $coords($ref)
     set r1 $coords($sel)
     set dr  [vecsub $r1 $r0]
-    set fx [flatbot1d [lindex $dr 0] [lindex $box 0] [lindex $box 1] $K]
-    set fy [flatbot1d [lindex $dr 1] [lindex $box 2] [lindex $box 3] $K]
-    set fz [flatbot1d [lindex $dr 2] [lindex $box 4] [lindex $box 5] $K]
+    set fx [flatbot1d [lindex $dr 0] [lindex $fb_box 0] [lindex $fb_box 1] $fb_K]
+    set fy [flatbot1d [lindex $dr 1] [lindex $fb_box 2] [lindex $fb_box 3] $fb_K]
+    set fz [flatbot1d [lindex $dr 2] [lindex $fb_box 4] [lindex $fb_box 5] $fb_K]
     #print "dr: $dr  fx: $fx fy: $fy fz: $fz"
     addforce $sel [list $fx $fy $fz]
   }
@@ -160,7 +163,7 @@ proc calcforces {} {
   }
 }
 proc calcforces_endstep { } { }
-'''
+''')
 
     def _findFiles(self, inputdir):
         # Tries to find default files if the given don't exist
@@ -220,23 +223,22 @@ proc calcforces_endstep { } { }
         self._findFiles(inputdir)
         self._amberFixes()
 
+        from htmd.units import convert
+        numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
+
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
         inmol = Molecule(pdbfile)
 
-        self.acemd.TCL = self.acemd.TCL.replace('NUMSTEPS', str(self.numsteps))
-        self.acemd.TCL = self.acemd.TCL.replace('TEMPERATURE', str(self.temperature))
-        self.acemd.TCL = self.acemd.TCL.replace('KCONST', str(self.k))
-        self.acemd.TCL = self.acemd.TCL.replace('REFINDEX', ' '.join(map(str, inmol.get('index', self.reference))))
-        self.acemd.TCL = self.acemd.TCL.replace('SELINDEX', ' '.join(map(str, inmol.get('index', self.selection))))
-        self.acemd.TCL = self.acemd.TCL.replace('BOX', ' '.join(map(str, self.box)))
-        if self.nvtsteps is None:
-            self.acemd.TCL = self.acemd.TCL.replace('NVTSTEPS', str(500))
-        else:
-            self.acemd.TCL = self.acemd.TCL.replace('NVTSTEPS', str(self.nvtsteps))
         if self.constraintsteps is None:
-            self.acemd.TCL = self.acemd.TCL.replace('CONSTRAINTSTEPS', str(self.numsteps / 2))
+            constrsteps = numsteps / 2
         else:
-            self.acemd.TCL = self.acemd.TCL.replace('CONSTRAINTSTEPS', str(self.constraintsteps))
+            constrsteps = self.constraintsteps
+
+        tcl = list(self._TCL)
+        tcl[0] = tcl[0].format(NUMSTEPS=numsteps, KCONST=self.fb_k, REFINDEX=inmol.get('index', self.fb_reference),
+                               SELINDEX=inmol.get('index', self.fb_selection), BOX=self.fb_box, NVTSTEPS=self.nvtsteps,
+                               CONSTRAINTSTEPS=constrsteps)
+        self.acemd.TCL = tcl
 
         if self.acemd.celldimension is None and self.acemd.extendedsystem is None:
             coords = inmol.get('coords', sel='water')
@@ -278,10 +280,10 @@ proc calcforces_endstep { } { }
 if __name__ == "__main__":
     import htmd
     eq = Equilibration()
-    eq.numsteps = 1000000
+    eq.runtime = 1000000
     eq.temperature = 300
-    eq.reference = 'protein and name CA'
-    eq.selection = 'segname L and noh'
-    eq.box = [-20, 20, -20, 20, 43, 45]
-    eq.k = 5
+    eq.fb_reference = 'protein and name CA'
+    eq.fb_selection = 'segname L and noh'
+    eq.fb_box = [-20, 20, -20, 20, 43, 45]
+    eq.fb_k = 5
     eq.write(htmd.home() + '/data/equilibrate', '/tmp/equil1')
