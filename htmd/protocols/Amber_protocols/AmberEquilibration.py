@@ -91,7 +91,7 @@ class Equilibration(ProtocolInterface):
         
         self.amber.outputnc = 'Equilibration.nc'
         self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
-        self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -r RESTART -x TRAJOUT''' #FIXME: add -ref REFERENCE
+        self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -c RESTART -x TRAJOUT -r NEWRESTART''' #FIXME: add -ref REFERENCE
 
 
 
@@ -185,6 +185,7 @@ class Equilibration(ProtocolInterface):
         self.amber.bash = self.amber.bash.replace('TOPOLOGY', self.amber.parmfile)
         self.amber.bash = self.amber.bash.replace('RESTART', self.amber.coordinates)
         self.amber.bash = self.amber.bash.replace('TRAJOUT', self.amber.outputnc)
+        self.amber.bash = self.amber.bash.replace('NEWRESTART', 'Equilibration_new.rst')
         #FIXME: add ref
         #self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
 
