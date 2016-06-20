@@ -98,7 +98,7 @@ class Equilibration(ProtocolInterface):
     def _findFiles(self, inputdir):
         # Tries to find default files if the given don't exist
         defaults = {'coordinates': ('structure.rst', 'structure.inpcrd', 'structure.mdcrd'),
-                    'structure': ('structure.psf', 'structure.prmtop')}
+                    'parmfile': ('structure.prmtop',)}
 
         for field in defaults:
             userval = self.amber.__dict__[field]
