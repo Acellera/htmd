@@ -11,33 +11,9 @@ import shutil
 logger = logging.getLogger(__name__)
 
 
-class Equilibration(ProtocolInterface):
+class Production(ProtocolInterface):
 
-    """ Equilibration protocol
-
-        Equilibration protocol for globular and membrane proteins
-        It includes a flatbottom potential box to retrain a ligand
-        for example within this box.
-
-        Parameters
-        ----------
-        numsteps : int, default=0
-            Number of steps to run the simulations in units of 4fs
-        temperature : float, default=300
-            Temperature of the thermostat in Kelvin
-        k : float, default=0
-            Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5
-        reference : str, default='none'
-            Reference selection to use as dynamic center of the flatbottom box.
-        selection : str, default='none'
-            Selection of atoms to apply the flatbottom potential
-        box : list, default=[0, 0, 0, 0, 0, 0]
-            Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]
-        useconstantratio : bool, default=False
-            For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
-        constraints : dict, default={'protein and noh and not name CA': 0.1, 'protein and name CA': 1}
-            A dictionary containing as keys the atomselections of the constraints and as values the constraint scaling factor. 0 factor means no constraint, 1 full constraints and in between values are used for scaling. The order with which the constraints are applied is random, so make atomselects mutually exclusive to be sure you get the correct constraints.
-
+    """ Production protocol for globular and membrane proteins
         Example
         -------
         >>> from htmd.protocols.equilibration_v1 import Equilibration
@@ -177,7 +153,7 @@ class Equilibration(ProtocolInterface):
 
         # # format the FORTRAN file with MD parameters
         # self.amber.FORTRAN = self.amber.FORTRAN+'   '+(', '.join(protocol)) + "\n /"
-        
+
         # preparing the FORTRAN file
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
             'IMIN', str(self.amber.imin))
