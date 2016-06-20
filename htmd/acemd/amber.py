@@ -414,7 +414,7 @@ class Amber(ProtocolInterface):
         maxwidth = np.max([len(k) for k in self.__dict__.keys()])
 
         keys = sorted(list(self.__dict__.keys()))
-        keys = keys + [keys.pop(keys.index('run'))]  # Move the run command to the end
+        #keys = keys + [keys.pop(keys.index('run'))]  # Move the run command to the end
         for cmd in keys:
             if not cmd.startswith('_') and self.__dict__[cmd] is not None and cmd != 'TCL':
                 name = cmd

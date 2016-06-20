@@ -98,8 +98,7 @@ class Equilibration(ProtocolInterface):
     def _findFiles(self, inputdir):
         # Tries to find default files if the given don't exist
         defaults = {'coordinates': ('structure.rst', 'structure.inpcrd', 'structure.mdcrd'),
-                    'structure': ('structure.psf', 'structure.prmtop'),
-                    'parameters': ('parameters.in')}
+                    'structure': ('structure.psf', 'structure.prmtop')}
 
         for field in defaults:
             userval = self.amber.__dict__[field]
@@ -147,6 +146,8 @@ class Equilibration(ProtocolInterface):
         """
         # this code automatically loops through the amber attributes and assigns the given value to
         # the parameter.
+
+        self._findFiles(inputdir)
         self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
 
         restartfile = os.path.join(inputdir, self.amber.coordinates)
@@ -159,7 +160,9 @@ class Equilibration(ProtocolInterface):
         i=0
         for key, value in self.amber.__dict__.items():
             
-            if key != 'FORTRAN' and key[0] != '_' and key not in ['bincoordinates', 'coordinates', 'consref', 'parmfile']:
+            if and key.startswith('_') and key not in ['bincoordinates', 'coordinates', 
+                                                       'consref', 'parmfile','FORTRAN',
+                                                       'bash']:
                 
                 # cleans up the .in file a bit
                 if i % 3 == 0 and i>0:
