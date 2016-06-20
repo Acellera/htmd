@@ -148,7 +148,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 with open(os.path.join(path, 'MD.sh'), 'r') as bash:
                     bash_file = bash.read()
 
-                bash_file.replace('ENGINE', pmemd_cuda)
+                bash_file = bash_file.replace('ENGINE', pmemd_cuda)
                 logger.info('BASH script: {}'.format(bash))
 
                 with open(os.path.join(path, 'MD.sh'), 'w') as equil:
