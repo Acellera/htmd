@@ -158,7 +158,6 @@ class Equilibration(ProtocolInterface):
         # the parameter.
 
         self._findFiles(inputdir)
-        self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
 
         restartfile = os.path.join(inputdir, self.amber.coordinates)
         topology= os.path.join(inputdir, self.amber.parmfile)
