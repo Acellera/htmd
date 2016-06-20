@@ -88,8 +88,8 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
         raise NameError('Rotation not implemented yet')
 
     # Calculate min max coordinates from molecule
-    minmol = np.min(mol.coords, axis=0)
-    maxmol = np.max(mol.coords, axis=0)
+    minmol = np.min(mol.get('coords'), axis=0)
+    maxmol = np.max(mol.get('coords'), axis=0)
 
     if minmax is None:
         minc = minmol
