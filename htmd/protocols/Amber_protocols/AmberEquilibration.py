@@ -160,7 +160,7 @@ class Equilibration(ProtocolInterface):
         i=0
         for key, value in self.amber.__dict__.items():
             
-            if and key.startswith('_') and key not in ['bincoordinates', 'coordinates', 
+            if not key.startswith('_') and key not in ['bincoordinates', 'coordinates', 
                                                        'consref', 'parmfile','FORTRAN',
                                                        'bash']:
                 
