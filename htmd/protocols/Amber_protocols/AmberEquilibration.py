@@ -185,7 +185,7 @@ class Equilibration(ProtocolInterface):
         self.amber.FORTRAN = self.amber.FORTRAN.replace('IREST', str(self.amber.irest))
         self.amber.FORTRAN = self.amber.FORTRAN.replace('NTC', str(self.amber.ntc))
         self.amber.FORTRAN = self.amber.FORTRAN.replace('NTF', str(self.amber.ntf))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace('TOL', str(self.amber.tol))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('TOL', '{:.10f}'.format(self.amber.tol))
         self.amber.FORTRAN = self.amber.FORTRAN.replace('NSTLIM', str(self.amber.nstlim))
         self.amber.FORTRAN = self.amber.FORTRAN.replace('NTT', str(self.amber.ntt))
         self.amber.FORTRAN = self.amber.FORTRAN.replace('GAMMA_LN', str(self.amber.gamma_ln))
