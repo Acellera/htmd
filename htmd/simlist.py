@@ -156,7 +156,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
     i = 0
     bar = ProgressBar(len(keys), description='Creating simlist')
     for k in keys:
-        trajectories = _listXTCs(datanames[k])
+        trajectories = _listTraj(datanames[k])
 
         if not trajectories:
             bar.progress()
@@ -265,7 +265,7 @@ def _filtSim(i, sims, outFolder, filterSel):
     fmolfile = path.join(outFolder, 'filtered.pdb')
     (traj, outtraj) = _renameSims(sims[i].trajectory, name, outFolder)
     if not traj:
-        ftrajectory = _listXTCs(path.join(outFolder, name))
+        ftrajectory = _listTraj(path.join(outFolder, name))
         return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
 
     try:
@@ -285,7 +285,7 @@ def _filtSim(i, sims, outFolder, filterSel):
 
         mol.write(outtraj[j], sel)
 
-    ftrajectory = _listXTCs(path.join(outFolder, name))
+    ftrajectory = _listTraj(path.join(outFolder, name))
     #bar.progress()
     return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
 
@@ -316,8 +316,9 @@ def _filterPDBPSF(sim, outfolder, filtsel):
         mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
 
 
-def _listXTCs(folder):
-    return natsort.natsorted(glob(path.join(folder, '*.xtc')))
+def _listTrajs(folder):
+    # changed function to sort .nc files too
+    return natsort.natsorted(glob(path.join(folder, '*.xtc'))+glob(path.join(folder, '*.nc')))
 
 
 def _simName(foldername):
