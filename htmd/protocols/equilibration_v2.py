@@ -69,8 +69,8 @@ class Equilibration(ProtocolInterface):
                                              ' The order with which the constraints are applied is random, so make '
                                              'atomselects mutually exclusive to be sure you get the correct constraints.'
                                              , {'protein and noh and not name CA': 0.1, 'protein and name CA': 1})
-        self._cmdValue('nvtsteps', 'int', 'Number of initial steps to apply NVT in units of 4fs. Defaults to 500.', None, TYPE_INT, RANGE_0POS)
-        self._cmdValue('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the numsteps.', None, TYPE_INT, RANGE_0POS)
+        self._cmdValue('nvtsteps', 'int', 'Number of initial steps to apply NVT in units of 4fs. Defaults to 500.', None, TYPE_INT, RANGE_ANY)
+        self._cmdValue('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the numsteps.', None, TYPE_INT, RANGE_ANY)
 
         self.acemd = Acemd()
         self.acemd.coordinates = None
