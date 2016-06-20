@@ -307,9 +307,22 @@ class Amber(ProtocolInterface):
                       descr="""When set to 1, use a polarizable force field.
                             See Section 18.7.5 for more information.""",
                       default=0, valid_values=[0, 1])
-
-
-
+        self._cmdList(key='ifqnt', datatype='int',
+                      descr="""Flag for QM/MM run; if set to 1, you must also
+                            include a &qmmm namelist.""", default=0, valid_values=[0, 1])
+        self._cmdList(key='igb', datatype='int',
+                      descr="""Flag for using the generalized Born or Poisson-Boltzmann
+                            implicit solvent models.""",
+                      default=0, valid_values=[0, 1, 2, 3, 4, 5, 6, 7, 8, 10])
+        self._cmdList(key='irism', datatype='int',
+                      descr="""Flag for 3D-reference interaction site model
+                            molecular solvation method.""", default=0, valid_values=[0, 1])
+        self._cmdList(key='ievb', datatype='int',
+                      descr="""If set to 1, use the empirical valence bond method
+                            to compute energies and forces.""", default=0, valid_values=[0, 1])
+        self._cmdList(key='iamoeba', datatype='int',
+                      descr="""Flag for using the amoeba polarizable potentials
+                            of Ren and Ponder.""", default=0, valid_values=[0, 1])
 
 
 
