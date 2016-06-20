@@ -86,9 +86,9 @@ class Equilibration(ProtocolInterface):
    ntc=NTC, ntf=NTF, tol=TOL,
    nstlim=NSTLIM, ntt=NTT, gamma_ln=GAMMA_LN,
    ntr=NTR, ig=IG,
-   ntpr=NTPR, ntwr=NTWR,ntwx=NTWX,
-   dt=DT,nmropt=NMROPT,
-   ntb=NTB,ntp=NTP,cut=CUT,ioutfm=IOUTFM,
+   ntpr=NTPR, ntwr=NTWR, ntwx=NTWX,
+   dt=DT, nmropt=NMROPT,
+   ntb=NTB, ntp=NTP, cut=CUT, ioutfm=IOUTFM,
  /"""
         #self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
         self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -c RESTART -x TRAJOUT -r RESTOUT''' #FIXME: add -ref REFERENCE
