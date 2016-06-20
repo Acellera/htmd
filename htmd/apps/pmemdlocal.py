@@ -149,14 +149,14 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                     bash_file = bash.read()
 
                 bash_file = bash_file.replace('ENGINE', pmemd_cuda)
-                logger.info('BASH script: {}'.format(bash))
+                #logger.info('BASH script: {}'.format(bash))
 
                 with open(os.path.join(path, 'MD.sh'), 'w') as equil:
                     equil.write(bash_file)
 
 
                 cmd = 'export CUDA_VISIBLE_DEVICES="{}"\n'.format(str(ngpu))
-                cmd += """cd {} && bash {}""".format(os.path.normpath(path),
+                cmd += """cd {} && bash {} > log.txt 2>&1""".format(os.path.normpath(path),
                                                      'MD.sh')
 
                 # cmd += """cd {} && {} -O -i Production.in -o {}.out \\
