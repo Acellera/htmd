@@ -72,6 +72,10 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
     >>> smol = solvate(mol, minmax=[[-20, -20, -20],[20, 20, 20]])
     """
     mol = mol.copy()
+    if mol.numFrames > 0:
+        logger.warning('Multiple frames in Molecule. Solvate keeps only frame 0 and discards the rest.')
+        mol.coords = np.atleast_3d(mol.coords[:, :, 0])
+
     if spdb is None:
         spdb = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'wat.pdb')
 
