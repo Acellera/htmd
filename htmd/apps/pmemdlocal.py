@@ -143,16 +143,29 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 # See: http://ambermd.org/gpus/#Running
                 # We assume the machine doesn't have the exhaustive mode
 
+                # need to tell the shell script what engine we are using
+
+                with open('MD.sh', 'r') as bash:
+                    bash = test.read()
+
+                bash.replace('ENGINE', pmemd_cuda)
+
+                with open('MD.sh', 'w') as equil:
+                    equil.write(bash)
+
                 cmd = 'export CUDA_VISIBLE_DEVICES="{}"\n'.format(str(ngpu))
-                cmd += """cd {} && {} -O -i Production.in -o {}.out \\
-                         -c {} -p {}.prmtop -r {}.rst \\
-                         -x {}.nc > log.txt 2>&1""".format(os.path.normpath(path),
-                                                           pmemd_cuda,
-                                                           system_name,
-                                                           system_name,
-                                                           system_name,
-                                                           system_name,
-                                                           system_name)
+                cmd += """cd {} && bash {}""".format(os.path.normpath(path),
+                                                     'MD.sh')
+
+                # cmd += """cd {} && {} -O -i Production.in -o {}.out \\
+                #          -c {} -p {}.prmtop -r {}.rst \\
+                #          -x {}.nc > log.txt 2>&1""".format(os.path.normpath(path),
+                #                                            pmemd_cuda,
+                #                                            system_name,
+                #                                            system_name,
+                #                                            system_name,
+                #                                            system_name,
+                #                                            system_name)
                 try:
                     check_output(cmd, shell=True)
                 except CalledProcessError:

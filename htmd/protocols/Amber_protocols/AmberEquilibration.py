@@ -162,7 +162,7 @@ class Equilibration(ProtocolInterface):
             
             if not key.startswith('_') and key not in ['bincoordinates', 'coordinates', 
                                                        'consref', 'parmfile','FORTRAN',
-                                                       'bash']:
+                                                       'bash', 'outputnc']:
                 
                 # cleans up the .in file a bit
                 if i % 3 == 0 and i>0:
@@ -188,7 +188,7 @@ class Equilibration(ProtocolInterface):
         #FIXME: add ref
         #self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
 
-        with open(os.path.join(outputdir,'Equilibration.sh'), 'w') as text_file:
+        with open(os.path.join(outputdir,'MD.sh'), 'w') as text_file:
             text_file.write(self.amber.bash)
 
         shutil.copy(restartfile, outputdir)

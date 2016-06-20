@@ -105,7 +105,7 @@ class AdaptiveRunNew(AdaptiveNew):
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
-        datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
+        datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb'))+glob(path.join(self.inputpath, '*', 'structure.nc')),
                            glob(path.join(self.inputpath, '*', '')))
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
