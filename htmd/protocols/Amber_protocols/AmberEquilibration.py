@@ -90,7 +90,17 @@ class Equilibration(ProtocolInterface):
         #  Molecular dynamics (Manual section 18.6.6)
         
         self.amber.outputnc = 'Equilibration.nc'
-        self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
+        self.amber.FORTRAN = """ heating 100K
+ &cntrl
+   imin=IMIN, ntx=NTX, irest=IREST,
+   ntc=NTC, ntf=NTF, tol=TOL,
+   nstlim=NSTLIM, ntt=NTT, gamma_ln=GAMMA_LN,
+   ntr=NTR, ig=IG,
+   ntpr=NTPR, ntwr=NTWR,ntwx=NTWX,
+   dt=DT,nmropt=NMROPT,
+   ntb=NTB,ntp=NTP,cut=CUT,ioutfm=IOUTFM,
+ /"""
+        #self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
         self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -c RESTART -x TRAJOUT -r RESTOUT''' #FIXME: add -ref REFERENCE
 
 
@@ -156,26 +166,53 @@ class Equilibration(ProtocolInterface):
         if self.amber.consref is not None:
             reference = os.path.join(inputdir, self.amber.consref) 
 
-        protocol=[]
-        i=0
-        for key, value in self.amber.__dict__.items():
+
+        # FOR NOW WE WILL HAVE A FIXED STRING LIKE IN THE ACEMD PROTOCOL
+        # THIS WAY WE CAN CONTROL BETTER WHAT PARAMETERS CAN BE SPECIFIED
+        # IN THE PROTOCOL
+
+        # protocol=[]
+        # i=0
+        # for key, value in self.amber.__dict__.items():
             
-            if not key.startswith('_') and key not in ['bincoordinates', 'coordinates', 
-                                                       'consref', 'parmfile','FORTRAN',
-                                                       'bash', 'outputnc']:
+        #     if not key.startswith('_') and key not in ['bincoordinates', 'coordinates', 
+        #                                                'consref', 'parmfile','FORTRAN',
+        #                                                'bash', 'outputnc']:
                 
-                # cleans up the .in file a bit
-                if i % 3 == 0 and i>0:
-                    protocol.append('\n   {}={}'.format(key,value))
-                else:
-                    protocol.append('{}={}'.format(key,value))
+        #         # cleans up the .in file a bit
+        #         if i % 3 == 0 and i>0:
+        #             protocol.append('\n   {}={}'.format(key,value))
+        #         else:
+        #             protocol.append('{}={}'.format(key,value))
                 
-                i+=1
+        #         i+=1
 
-        # format the FORTRAN file with MD parameters
-        self.amber.FORTRAN = self.amber.FORTRAN+'   '+(', '.join(protocol)) + "\n /"
+        # # format the FORTRAN file with MD parameters
+        # self.amber.FORTRAN = self.amber.FORTRAN+'   '+(', '.join(protocol)) + "\n /"
 
-        # write out the FORTRAN file
+        # preparing the FORTRAN file
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('IMIN', self.amber.imin)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTX', self.amber.ntx)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('IREST', self.amber.irest)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTC', self.amber.ntc)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTF', self.amber.ntf)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('TOL', self.amber.tol)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NSTLIM', self.amber.nstlim)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTT', self.amber.ntt)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('GAMMA_LN', self.amber.gamma_ln)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTR', self.amber.ntr)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('IG', self.amber.ig)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTPR', self.amber.ntpr)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTWR', self.amber.ntwr)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTWX', self.amber.ntwx)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('DT', self.amber.dt)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NMROPT', self.amber.nmropt)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTB', self.amber.ntb)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('NTP', self.amber.ntp)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('CUT', self.amber.cut)
+        self.amber.FORTRAN = self.amber.FORTRAN.replace('IOUTFM', self.amber.ioutfm)
+
+        # write out the FORTRAN file, for now let's call it Equilibration.in
         with open(os.path.join(outputdir,'Equilibration.in'), 'w') as text_file:
             text_file.write(self.amber.FORTRAN)
 
