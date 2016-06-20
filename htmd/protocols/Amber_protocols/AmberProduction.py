@@ -64,7 +64,7 @@ class Production(ProtocolInterface):
    nstlim=NSTLIM, ntt=NTT, gamma_ln=GAMMA_LN,
    ntr=NTR, ig=IG, temp0=TEMP0,
    ntpr=NTPR, ntwr=NTWR, ntwx=NTWX,
-   dt=DT, ntxo=NTXO, barostat=BAROSTAT
+   dt=DT, ntxo=NTXO, barostat=BAROSTAT,
    ntb=NTB, ntp=NTP, cut=CUT, ioutfm=IOUTFM,
  / \n"""
         #self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
