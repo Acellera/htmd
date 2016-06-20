@@ -337,6 +337,12 @@ class Amber(ProtocolInterface):
         self._cmdString('consref', 'str', '', None)  # constraints reference (-ref)
         self._cmdString('parmfile', 'str', '', None)  # topology file .prmtop (-p)
 
+    def printDescr():
+      """
+      Prints the description of the MD settings
+      """
+      print(self.__dict__['descr'])
+
     def load(self, path='.'):
         """ Loads all files required to run a simulation and apply eventually configured protocols to it
 
