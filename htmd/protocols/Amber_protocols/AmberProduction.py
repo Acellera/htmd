@@ -157,8 +157,8 @@ class Production(ProtocolInterface):
         # preparing the FORTRAN file
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
             'IMIN', str(self.amber.imin))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace(
-            'NTX', str(self.amber.ntx))
+        self.amber.FORTRAN = re.sub(r'\bNTX\b', str(
+            self.amber.ntx), self.amber.FORTRAN)
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
             'IREST', str(self.amber.irest))
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
@@ -195,8 +195,8 @@ class Production(ProtocolInterface):
             'IOUTFM', str(self.amber.ioutfm))
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
             'BAROSTAT', str(self.amber.barostat))
-        self.amber.FORTRAN = re.sub(r'\bNTXO\b', str(
-            self.amber.ntxo), self.amber.FORTRAN) 
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTXO', str(self.amber.ntxo))
 
         # write out the FORTRAN file, for now let's call it Production.in
         with open(os.path.join(outputdir, 'Production.in'), 'w') as text_file:
