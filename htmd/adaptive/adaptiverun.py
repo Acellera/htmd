@@ -280,7 +280,7 @@ class AdaptiveRun(Adaptive):
         logger.info('Postprocessing new data')
 
         datalist = simlist(glob(path.join(self.datapath, '*', '')),
-                           glob(path.join(self.inputpath, '*', '.prmtop')),
+                           glob(path.join(self.inputpath, '*', '*.prmtop'))[0],
                            glob(path.join(self.inputpath, '*', '')))
 
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)

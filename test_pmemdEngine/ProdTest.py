@@ -6,6 +6,7 @@ import os
 # delete previous test
 for directory_i in glob(os.path.join(htmd.home(), 'test_pmemdEngine/*_Test_Protocol_out')):
      shutil.rmtree(directory_i)
+
 for directory_i in glob(os.path.join(htmd.home(), 'TrajData')):
      shutil.rmtree(directory_i)
 
