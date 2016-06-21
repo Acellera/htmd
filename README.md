@@ -8,9 +8,9 @@
 HTMD (high-throughput molecular dynamics) is a programmable, extensible platform written in Python.
 It provides a complete workspace for simulation-based discovery through molecular simulations while aiming to solve the data generation and analysis problem as well as increase reproducibility.
 
-HTMD is free for academia.
+HTMD basic is free for no-profit organization like universities.
 
-For commerial use, Acellera provides licenses through https://www.acellera.com/contact/.
+HTMD pro requires a license. Acellera provides licenses through https://www.acellera.com/contact/.
 
 ### Download HTMD
 HTMD can be downloaded from www.htmd.org. If you want to use this git repository, still download it using conda first to have all dependencies and then set PYTHONPATH to the git directory.
