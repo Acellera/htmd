@@ -4,8 +4,8 @@ from glob import glob
 import os
 
 # delete previous test
-for directory_i in glob(os.path.join(htmd.home(), 'test_pmemdEngine/*_Test_Protocol_out')):
-    shutil.rmtree(directory_i)
+ for directory_i in glob(os.path.join(htmd.home(), 'test_pmemdEngine/*_Test_Protocol_out')):
+     shutil.rmtree(directory_i)
 
 # Create Equilibration Protocol
 from htmd.protocols.Amber_protocols.AmberProduction import Production
@@ -20,7 +20,9 @@ ProdTest.write(os.path.join(htmd.home(), 'Test_Protocol'),
 # run adaptive sampling with MSM
 adapt = htmd.AdaptiveRun()
 adapt.app = htmd.apps.pmemdlocal.PmemdLocal(
-    pmemd_cuda='/usr/local/amber/bin/pmemd.cuda_SPFP')
+    pmemd_cuda='/usr/local/amber/bin/pmemd.cuda_SPFP',
+    datadir=os.path.join(htmd.home(), 'data'))
+adapt.datapath= os.path.join(htmd.home(), 'data')
 #adapt.project = 'Test'
 adapt.nmin = 2
 adapt.nmax = 4
@@ -30,5 +32,5 @@ adapt.generatorspath = os.path.join(htmd.home(), 'Test_Protocol_out')
 adapt.metricsel1 = 'name CA'
 #adapt.datapath = 'test_pmemdEngine'
 #adapt.ticadim = 0
-adapt.updateperiod = 3600
+adapt.updateperiod = 60
 adapt.run()
