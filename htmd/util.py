@@ -3,9 +3,12 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+
 import tempfile
 import logging
 import requests
+import io
+
 import os
 import numpy as np
 
@@ -117,6 +120,66 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
     return rl
 
 
+def view3DHull(m, style="", preamble=None, solid=False):
+    """Display the convex hull of the given molecule.
+
+    For style and color, see http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.1/ug/node128.html
+
+    The function returns an ID. To delete the objects, send the "htmd_delete_graphics <ID>"
+    command to VMD (uninmplemented).
+
+    Parameters
+    ----------
+    m: Molecule
+        The object of which to show the hull (only 1 frame)
+    style: str
+        Style for lines
+    preamble: str
+        Commands (material, color) to be prefixed to the output
+    solid: bool
+        Solid or wireframe
+
+    Examples
+    --------
+    >> m=Molecule("3PTB")
+    >> m.view()
+    >> m.filter("protein and name CA")
+    >> view3DHull(m)
+
+    """
+    from scipy.spatial import ConvexHull
+    from htmd.vmdviewer import getCurrentViewer
+
+    if m.coords.shape[2] != 1:
+        raise Exception("Only one frame is supported")
+
+    r = io.StringIO()
+    if preamble:
+        r.write(preamble + "\n")
+
+    cc = m.coords[:, :, 0]
+    hull = ConvexHull(cc)
+    for i in range(hull.nsimplex):
+        v1, v2, v3 = hull.simplices[i,]
+        c1 = cc[v1, :]
+        c1s = str(c1).strip('[]')
+        c2 = cc[v2, :]
+        c2s = str(c2).strip('[]')
+        c3 = cc[v3, :]
+        c3s = str(c3).strip('[]')
+        if solid:
+            r.write("draw triangle {{ {:s} }} {{ {:s} }} {{ {:s} }}\n".format(c1s, c2s, c3s))
+        else:
+            r.write("draw line {{ {:s} }} {{ {:s} }} {:s} \n".format(c1s, c2s, style))
+            r.write("draw line {{ {:s} }} {{ {:s} }} {:s} \n".format(c1s, c3s, style))
+            r.write("draw line {{ {:s} }} {{ {:s} }} {:s} \n".format(c2s, c3s, style))
+        r.write("\n")
+
+    vmdcmd = r.getvalue()
+
+    vmd = getCurrentViewer()
+    vmd.send(vmdcmd)
+
 
 def opm(pdb):
     """Download a molecule from the OPM.
@@ -204,5 +267,5 @@ if __name__ == "__main__":
     _testDeprecation()
 
     import doctest
-    doctest.testmod()
 
+    doctest.testmod()
