@@ -1113,7 +1113,7 @@ class Molecule:
         >>> mol.wrap('protein')
         """
         # TODO: selection is not used. WHY?
-        if wrapsel:
+        if wrapsel is not None:
             centersel = self.atomselect(wrapsel, indexes=True)
         else:
             centersel = None
