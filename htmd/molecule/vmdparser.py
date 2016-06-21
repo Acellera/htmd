@@ -156,6 +156,70 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
 
 #    return (retval.reshape(natoms, nframes))
 
+def guessAnglesAndDihedrals( bonds ):
+ # Generate a guess of angle and dihedral N-body terms
+ # based on a list of bond index pairs
+ # O(n^2) so SLOW for large N 
+
+    import gc
+
+    angles=[]
+    dihedrals=[]
+    for i in range( bonds.shape[0] ):
+      a1 = bonds[i,0]
+      a2 = bonds[i,1]
+
+      for j in range( i+1, bonds.shape[0]  ):
+        b1 = bonds[j,0]
+        b2 = bonds[j,1]
+
+#a1-a2
+#b1-b2
+
+#a1-a2-b1
+#a1-a2-b2
+#a2-a1-b1
+#a2-a1-b2
+        if( a2 == b2 ) : angles.append( [ a1, a2, b1 ] )
+        elif( a2 == b1 ) : angles.append( [ a1, a2, b2 ] )
+        elif( a1 == b2 ) : angles.append( [ a2, a1, b1 ] )
+        elif( a1 == b1 ) : angles.append( [ a2, a1, b2 ] )
+
+    angles = np.asarray( angles, dtype=np.integer )
+
+
+    for i in range( angles.shape[0] ):
+      a1 = angles[i,0]
+      a2 = angles[i,1]
+      a3 = angles[i,2]
+      for j in range( i+1, angles.shape[0]  ):
+        b1 = angles[j,0]
+        b2 = angles[j,1]
+        b3 = angles[j,2]
+#a1-a2-a3-b3
+#a1-a2-a3-b1
+#b1-b2-b3-a3
+#b1-b2-b3-a1
+
+#a3-a2-a1-b3
+#a3-a2-a1-b1
+#b3-b2-b1-a3
+#b3-b2-b1-a1
+
+        if (a2 == b1) and (a3 == b2): dihedrals.append( [ a1, a2, a3, b3 ] )
+        elif (a2 == b3) and (a3 == b1): dihedrals.append( [ a1, a2, a3, b1 ] )
+        elif (b2 == a1) and (b3 == a2): dihedrals.append( [ b1, b2, b3, a3 ] )
+        elif (b2 == a3) and (b3 == a2): dihedrals.append( [ b1, b2, b3, a1 ] )
+
+        elif (a2 == b1) and (a1 == b2): dihedrals.append( [ a3, a2, a1, b3 ] )
+        elif (a2 == b3) and (a1 == b2): dihedrals.append( [ a3, a2, a1, b1 ] )
+        elif (b2 == a1) and (b1 == a2): dihedrals.append( [ b3, b2, b1, a3 ] )
+        elif (b2 == a3) and (b1 == a2): dihedrals.append( [ b3, b2, b1, a1 ] )
+
+
+    dihedrals = np.asarray( dihedrals, dtype=np.integer )
+
+    return( angles, dihedrals )
 
 def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, insertion, altloc):
     # if it's a single frame, resize to be a 3d array
