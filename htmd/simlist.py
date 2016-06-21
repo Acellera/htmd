@@ -342,7 +342,7 @@ def _filterMDtraj(sim, outfolder, filtsel):
 
 def _listTrajs(folder):
     # changed function to sort .nc files too and prmtop, since prmtop are required for any .nc modifications (i.e. filter atoms)
-    return natsort.natsorted(glob(path.join(folder, '*.xtc'))+glob(path.join(folder, '*.nc'))+glob(path.join(folder, '*.prmtop'))
+    return natsort.natsorted(glob(path.join(folder, '*.xtc'))+glob(path.join(folder, '*.nc'))+glob(path.join(folder, '*.prmtop')))
 
 
 def _simName(foldername):
