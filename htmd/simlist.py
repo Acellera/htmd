@@ -214,9 +214,10 @@ def simfilter(sims, outfolder, filtersel):
 
     if len(sims) > 0:
 
-        for func in [_filterPDBPSF(sims[0], outfolder, filtersel), _filterMDtraj(sims[0], outfolder, filtersel)]
+        # not the most elegant python ever...
+        for func in [_filterPDBPSF, _filterMDtraj]:
             try:
-                func()
+                func(sims[0], outfolder, filtersel)
             except:
                 pass
             else:
