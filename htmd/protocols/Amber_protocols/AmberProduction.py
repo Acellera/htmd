@@ -194,6 +194,8 @@ class Production(ProtocolInterface):
             'IOUTFM', str(self.amber.ioutfm))
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
             'BAROSTAT', str(self.amber.barostat))
+        self.amber.FORTRAN = self.amber.FORTRAN.replace(
+            'NTB', str(self.amber.ntb))
 
         # write out the FORTRAN file, for now let's call it Production.in
         with open(os.path.join(outputdir, 'Production.in'), 'w') as text_file:
