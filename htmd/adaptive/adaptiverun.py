@@ -279,14 +279,10 @@ class AdaptiveRun(Adaptive):
 
         logger.info('Postprocessing new data')
 
-        if self.app.get_class() == 'PmemdLocal':
-            datalist = simlist(glob(path.join(self.datapath, '*', '')),
-                               glob(path.join(self.inputpath, '*', 'structure.prmtop')),
-                               glob(path.join(self.inputpath, '*', '')))
-        else:
-            datalist = simlist(glob(path.join(self.datapath, '*', '')),
-                               glob(path.join(self.inputpath, '*', 'structure.pdb')),
-                               glob(path.join(self.inputpath, '*', '')))
+        datalist = simlist(glob(path.join(self.datapath, '*', '')),
+                           glob(path.join(self.inputpath, '*', 'structure.prmtop')),
+                           glob(path.join(self.inputpath, '*', '')))
+
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
         # calculate metrics for tica projection

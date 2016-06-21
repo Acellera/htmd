@@ -82,12 +82,7 @@ class PmemdLocal(App):
     retrieve = AcemdLocal.retrieve
     inprogress = AcemdLocal.inprogress
     running = AcemdLocal.running
-    completed = AcemdLocal.completed
-
-    # get_class will be called to check if we are using PmemdLocal
-    # in AdaptiveRun
-    def get_class(self):
-        return self.__class__.__name__
+    completed = AcemdLocal.completed 
 
     def submit(self, mydirs):
         """ Queue for execution all of the jobs in the passed list of directories
@@ -136,7 +131,6 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
             try:
                 logger.info('Running {} on GPU device {}'.format(path, str(ngpu)))
                 obj.running(path)
-                # TODO: Pre-production steps
 
                 # AMBER automatically runs the calculation on the GPU with the
                 # most memory even if that GPU is already in use
