@@ -120,10 +120,10 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
     return rl
 
 
-def view3DHull(m, style="", preamble=None, solid=False):
+def view3DHull(m, style="", preamble="", solid=False):
     """Display the convex hull of the given molecule.
 
-    For style and color, see http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.1/ug/node128.html
+    For preamble and color, see http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.1/ug/node128.html
 
     The function returns an ID. To delete the objects, send the "htmd_delete_graphics <ID>"
     command to VMD (uninmplemented).
@@ -133,9 +133,11 @@ def view3DHull(m, style="", preamble=None, solid=False):
     m: Molecule
         The object of which to show the hull (only 1 frame)
     style: str
-        Style for lines
+        Style for wireframe lines
     preamble: str
-        Commands (material, color) to be prefixed to the output
+        Commands (material, color) to be prefixed to the output.
+        E.g.: "draw color red; graphics top materials on; graphics top material Transparent".
+        Note that this affects later preamble-less commands. See
     solid: bool
         Solid or wireframe
 
@@ -143,7 +145,7 @@ def view3DHull(m, style="", preamble=None, solid=False):
     --------
     >> m=Molecule("3PTB")
     >> m.view()
-    >> m.filter("protein and name CA")
+    >> m.filter("protein ")
     >> view3DHull(m)
 
     """
@@ -154,8 +156,7 @@ def view3DHull(m, style="", preamble=None, solid=False):
         raise Exception("Only one frame is supported")
 
     r = io.StringIO()
-    if preamble:
-        r.write(preamble + "\n")
+    r.write(preamble + "\n")
 
     cc = m.coords[:, :, 0]
     hull = ConvexHull(cc)
@@ -173,7 +174,7 @@ def view3DHull(m, style="", preamble=None, solid=False):
             r.write("draw line {{ {:s} }} {{ {:s} }} {:s} \n".format(c1s, c2s, style))
             r.write("draw line {{ {:s} }} {{ {:s} }} {:s} \n".format(c1s, c3s, style))
             r.write("draw line {{ {:s} }} {{ {:s} }} {:s} \n".format(c2s, c3s, style))
-        r.write("\n")
+            r.write("\n")
 
     vmdcmd = r.getvalue()
 
