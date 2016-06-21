@@ -106,6 +106,15 @@ class Molecule:
         A list of representations that is used when visualizing the molecule
     viewname : str
         The name used for the molecule in the viewer
+    angles : np.ndarray
+        Angle terms, valid only if PSF read and molecule unmodified
+    dihedrals : np.ndarray
+        Dihedral terms, valid only if PSF read and molecule unmodified
+    impropers : np.ndarray
+        Improper terms, valid only if PSF read and molecule unmodified
+    atomtype : np.ndarray
+        Atom types, valid only if PSF read and molecule unmodified
+
     """
     _pdb_fields = {
         'record': object,
@@ -125,9 +134,13 @@ class Molecule:
     }
 
     def __init__(self, filename=None, name=None):
-        self.bonds = np.empty((0, 2), dtype=np.uint32)
+        self.bonds     = np.empty((0, 2), dtype=np.uint32)
+        self.angles    = np.empty((0, 3), dtype=np.uint32)
+        self.dihedrals = np.empty((0, 4), dtype=np.uint32)
+        self.impropers = np.empty((0, 4), dtype=np.uint32)
+        self.atomtype  = np.empty((0, 1), dtype=np.object)
         self.ssbonds = []
-        self.box = None
+        self.box = np.zeros((3,1), dtype=np.float32)
         self.charge = []
         self.masses = None
         self.frame = 0
@@ -647,7 +660,6 @@ class Molecule:
             type = type.lower()
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
-            # TODO: Check for validity when loading a PSF after a PDB and vice versa
             con = PSFread(filename)
             oldcoords = []
             if len(self.coords) != 0:
@@ -661,7 +673,12 @@ class Molecule:
             self.insertion = con.insertion
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             self.masses = numpy.asarray(con.masses, dtype=np.float32)
-            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
+            self.bonds     = numpy.asarray(con.bonds, dtype=np.uint32)
+            self.angles    = numpy.asarray(con.angles, dtype=np.uint32)
+            self.dihedrals = numpy.asarray(con.dihedrals, dtype=np.uint32)
+            self.impropers = numpy.asarray(con.impropers, dtype=np.uint32)
+            self.atomtype  = numpy.asarray(con.atomtype, dtype=np.object )
+
             if len(oldcoords) != 0:
                 self.coords = oldcoords
         elif (type is None and (
@@ -810,9 +827,12 @@ class Molecule:
         f.close()
         start = None
         end = None
+        bond = None
         for i in range(len(l)):
             if l[i].startswith("@<TRIPOS>ATOM"): start = i + 1
-            if l[i].startswith("@<TRIPOS>BOND"): end = i - 1
+            if l[i].startswith("@<TRIPOS>BOND"): 
+               end = i - 1
+               bond= i + 1
 
         if not start or not end:
             raise ValueError("File cannot be read")
@@ -823,6 +843,7 @@ class Molecule:
             self.__dict__[k] = numpy.zeros((natoms), dtype=self._pdb_fields[k])
         self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
 
+        self.atomtype  = numpy.empty( (natoms), dtype=np.object )
         for i in range(natoms):
             s = l[i + start].strip().split()
             self.record[i] = "HETATM"
@@ -832,7 +853,16 @@ class Molecule:
             self.coords[i, 0, 0] = float(s[2])
             self.coords[i, 1, 0] = float(s[3])
             self.coords[i, 2, 0] = float(s[4])
-            self.resname[i] = "MOL"
+            self.charge[i]  = float(s[8])
+            self.atomtype[i]= s[5]
+            self.resname[i] = s[6]
+        if bond:
+           bb=[]
+           for i in range(bond, len(l) ):
+              b=l[i].split()
+              if(len(b)!=4): break
+              bb.append( [ int(b[1])-1, int(b[2])-1 ] )
+        self.bonds = np.asarray( bb, dtype=np.int )
 
     def _readMae(self, filename):
         datadict = _maestroparser(filename)
@@ -1717,5 +1747,5 @@ if __name__ == "__main__":
     m.align('name CA')
     m = Molecule('2OV5')
     m.filter('protein or water')
- 
+
     # test rotate
