@@ -1113,7 +1113,7 @@ class Molecule:
         >>> mol.wrap('protein')
         """
         # TODO: selection is not used. WHY?
-        if wrapsel:
+        if wrapsel is not None:
             centersel = self.atomselect(wrapsel, indexes=True)
         else:
             centersel = None
@@ -1715,5 +1715,7 @@ if __name__ == "__main__":
     m.moveBy([1, 1, 1])
     m.rotate([1, 0, 0], pi / 2)
     m.align('name CA')
-
+    m = Molecule('2OV5')
+    m.filter('protein or water')
+ 
     # test rotate

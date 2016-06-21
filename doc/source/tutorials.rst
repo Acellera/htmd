@@ -6,18 +6,17 @@ Contents:
 .. toctree::
    :maxdepth: 1
 
-   Python primer <tutorials/htmd-python-primer>
-   Getting started with HTMD Molecules <tutorials/getting-started-with-htmd-molecules>
-   Atom selections <tutorials/atom-selections>
-   System building basics <tutorials/system-building>
-   System building for Benzamide-Trypsin <tutorials/system-building-benzamidine-trypsin>
-   System building for mu opioid GPCR <tutorials/system-building-mu-opioid>
-   System building for protein-protein binding (Barnase-Barstar) <tutorials/barnase-barstar-building-simulation>
+   Python primer <tutorials/python-primer>
+   Introduction to Atom selections <tutorials/introd-atom-selections>
+   Getting Started with HTMD Molecules <tutorials/getting-started-with-htmd-molecules>
+   System Building Basics <tutorials/system-building-basics>
+   System Building Protein-Ligand <tutorials/system-building-protein-ligand>
+   System Building Protein in Membrane <tutorials/system-building-protein-in-membrane>
+   System Building Protein-Protein <tutorials/system-building-protein-protein>
    Using docking to initialize positions <tutorials/docking-simulation-generators>
-   Submitting simulations
    Adaptive sampling <tutorials/adaptive-sampling-example>
-   Ligand binding analysis <tutorials/ligand-binding>
-   Conformational analysis Villin <tutorials/protein-folding>
-   Conformational analysis CXCL12 <tutorials/conformational-analysis-CXCL12>
+   Ligand binding analysis <tutorials/ligand-binding-analysis>
+   Protein folding analysis <tutorials/protein-folding-analysis>
+   CXCL12 conformational analysis <tutorials/cxcl12-conformational-analysis>
    Equilibration protocol for the mu opioid GPCR <tutorials/mu-opioid-receptor-gpcr-equilibration>
 
