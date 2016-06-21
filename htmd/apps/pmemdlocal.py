@@ -112,8 +112,6 @@ class PmemdLocal(App):
 
             # FIXME copying files to queued directory
             # FIXME find more felxible way of finding home directory
-            home=expanduser("~")
-            copy(home+'/htmd/htmd/protocols/Amber_protocols/Production.in', dirname)
 
             self.states[dirname] = 'Q'
             self.queue.put(dirname)
