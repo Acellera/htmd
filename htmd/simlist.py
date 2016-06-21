@@ -12,6 +12,7 @@ import numpy as np
 from htmd.molecule.molecule import Molecule
 from joblib import Parallel, delayed
 from htmd.progress.progress import ProgressBar
+import mdtraj as md
 import logging
 logger = logging.getLogger(__name__)
 
@@ -212,7 +213,14 @@ def simfilter(sims, outfolder, filtersel):
         makedirs(outfolder)
 
     if len(sims) > 0:
-        _filterPDBPSF(sims[0], outfolder, filtersel)
+
+        for func in [_filterPDBPSF(sims[0], outfolder, filtersel), _filterMDtraj(sims[0], outfolder, filtersel)]
+            try:
+                func()
+            except:
+                pass
+            else:
+                logger.info('Could not load trajectories.')
 
     logger.info('Starting filtering of simulations.')
 
@@ -315,10 +323,25 @@ def _filterPDBPSF(sim, outfolder, filtsel):
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
         mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
 
+def _filterMDtraj(sim, outfolder, filtsel):
+
+    # get one prmtop file
+    top = md.load_prmtop(sim[np.core.defchararray.find(sim, '.prmtop') > 0][0])
+    # Now we can load in all trajectory information
+    traj = md.load_netcdf(filename = sim[np.core.defchararray.find(sim, '.nc') > 0],
+                              top=top, stride=1, atom_indices=top.select(self.filtersel),
+                              frame=None)
+    # write out the new trajectories
+    if not path.isfile(path.join(outfolder, 'filtered.nc')):
+        filteredTraj = mdtraj.formats.NetCDFTrajectoryFile(filename = path.join(outfolder, 'filtered.nc', filtsel),
+                                                           mode='w', force_overwrite=True)
+        filteredTraj.write(coordinates = traj.xyz, time=None, cell_lengths=None, cell_angles=None)
+
+
 
 def _listTrajs(folder):
     # changed function to sort .nc files too
-    return natsort.natsorted(glob(path.join(folder, '*.xtc'))+glob(path.join(folder, '*.nc')))
+    return natsort.natsorted(glob(path.join(folder, '*.xtc'))+glob(path.join(folder, '*.nc'))++glob(path.join(folder, '*.prmtop')))
 
 
 def _simName(foldername):
