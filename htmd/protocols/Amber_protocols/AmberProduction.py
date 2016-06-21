@@ -8,6 +8,7 @@ import os
 import numpy as np
 import logging
 import shutil
+import re
 logger = logging.getLogger(__name__)
 
 
@@ -194,8 +195,8 @@ class Production(ProtocolInterface):
             'IOUTFM', str(self.amber.ioutfm))
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
             'BAROSTAT', str(self.amber.barostat))
-        self.amber.FORTRAN = self.amber.FORTRAN.replace(
-            'NTB', str(self.amber.ntb))
+        self.amber.FORTRAN = re.sub(r'\bNTXO\b', str(
+            self.amber.ntxo), self.amber.FORTRAN) 
 
         # write out the FORTRAN file, for now let's call it Production.in
         with open(os.path.join(outputdir, 'Production.in'), 'w') as text_file:
