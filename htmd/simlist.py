@@ -214,6 +214,8 @@ def simfilter(sims, outfolder, filtersel):
 
     if len(sims) > 0:
 
+
+
         # not the most elegant python ever...
         for func in [_filterPDBPSF, _filterMDtraj]:
             try:
@@ -223,16 +225,17 @@ def simfilter(sims, outfolder, filtersel):
             else:
                 logger.info('Could not load trajectories.')
 
-    logger.info('Starting filtering of simulations.')
+    
 
     filtsims = []
 
     #bar = ProgressBar(len(sims), description='Filtering simlist')
-    from htmd.config import _config
-    filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
-    #bar.stop()
+    # from htmd.config import _config
+    # filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
+    # #bar.stop()
 
     logger.info('Finished filtering of simulations')
+    
     return np.array(filtsims)
 
 
