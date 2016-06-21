@@ -43,18 +43,17 @@ class Production(ProtocolInterface):
         self.amber.nstlim = 12500000
         self.amber.ntt = 3
         self.amber.gamma_ln = 1.0
-        self.amber.temp0 = 300.0
-        self.amber.ig = -1
+        self.amber.temp0 = 300.0        
         self.amber.ntpr = 5000
         self.amber.ntwr = 50000
         self.amber.ntwx = 5000
         self.amber.dt = 0.004
-        self.amber.nmropt = 1
+        self.amber.ig = -1
         self.amber.ntb = 2
         self.amber.ntp = 1
         self.amber.cut = 8.0
-        self.amber.ioutfm = 1
         self.amber.barostat = 2
+        self.amber.ioutfm = 1
         self.amber.ntxo = 2
         self.amber.outputnc = 'Production.nc'
         self.amber.FORTRAN = """ Production
@@ -62,10 +61,10 @@ class Production(ProtocolInterface):
    imin=IMIN, ntx=NTX, irest=IREST,
    ntc=NTC, ntf=NTF,
    nstlim=NSTLIM, ntt=NTT, gamma_ln=GAMMA_LN,
-   ntr=NTR, ig=IG, temp0=TEMP0,
+   temp0=TEMP0,
    ntpr=NTPR, ntwr=NTWR, ntwx=NTWX,
-   dt=DT, ntxo=NTXO, barostat=BAROSTAT,
-   ntb=NTB, ntp=NTP, cut=CUT, ioutfm=IOUTFM,
+   dt=DT, ig=IG,
+   ntb=NTB, ntp=NTP, cut=CUT, barostat=BAROSTAT, ioutfm=IOUTFM, ntxo=NTXO,
  / \n"""
         #self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
         self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -c RESTART -x TRAJOUT -r RESTOUT'''  # FIXME: add -ref REFERENCE
