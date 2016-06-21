@@ -1,11 +1,11 @@
-Ligand Parameterisation
+Ligand Parameterization
 =======================
 
 
 Introduction
 ------------
 
-The parameterise package produces optimised force field parameters for small modules according to the `GAAMP <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3819940/>`__ method.
+The parameterize package produces optimised force field parameters for small modules according to the `GAAMP <https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3819940/>`__ method.
 
 Starting from an initial geometry it will optimise with respect to quantum mechanical calculations:
 
@@ -13,39 +13,25 @@ Starting from an initial geometry it will optimise with respect to quantum mecha
  - bond and angle reference lengths
  - torsional (rotameric) potentials
 
-Installation
-------------
+Parameterize will perform all QC calculations with Gaussian if the command g09 is found at runtime. If Gaussian isn't available, Parameterise will fall back to using its internal copy of the QC code Psi4.
 
-The ligand parameterisation tool is installed using the command:
-
-.. parsed-literal::
-  
-    conda install parameterisation -y
-
-Parameterise will perform all QC calculations with Gaussian if the command g09 is found at runtime. If Gaussian isn't available, Parameterise will fall back to using its internal copy of the QC code Psi4.
-
-Parameterisation
+Parameterization
 ----------------
 
-The Parameterise tool requires two input files: Firstly, a ligand starting geometry in mol2 or PDB format. Secondly, an input file containing, at a minimum:
+The Parameterize tool requires two input files: Firstly, a ligand starting geometry in mol2 or PDB format. Secondly, an input file containing, at a minimum:
 
 .. parsed-literal::
     JobName    [some-name]
     FileName   [ligand.pdb|mol2]
     NetCharge  [charge]
 
-Where "some-name" is a unique identifier for referencing the parameterisation.
-Additional input file commands are available, and can be seen with "parameterise --command", but are generally won't need to be changed from their default values.
+where "some-name" is a unique identifier for referencing the parameterization.
+Additional input file commands are available, and can be seen with "parameterize --command", but are generally won't need to be changed from their default values.
 
-Run the parameterisation with the command:
-
-.. parsed-literal::
-    parameterise --input [input-file-name]
-
-The output will look like this:
+Run the parameterization with the command:
 
 .. parsed-literal::
-some stuff
+    parameterize --input [input-file-name]
 
 Controlling QC execution
 ------------------------
@@ -57,7 +43,7 @@ The amount of memory and CPUs used by the QC calculations will be automatically 
     MEMORY   [memory-in-GB]
 
 
-The default behaviour when running the QC calculations is to run them sequentially directly on the machine on which "parameterise" was invoked. Instead, the jobs can be submitted to a batch system using the command:
+The default behaviour when running the QC calculations is to run them sequentially directly on the machine on which "parameterize" was invoked. Instead, the jobs can be submitted to a batch system using the command:
 
 .. parsed-literal::
     ExectionMode  Inline|PBS|LSF
@@ -77,42 +63,7 @@ A successful parameterisation will produce the following output files:
  * mol.rtf, mol.prm -- CHARMM format force-field parameters 
  * mol-dihedral-N.svg -- A plot of the potentials of each fitted torsion including orginal MM potential, QC potential and fitted MM potential
 
-Parameterise from Python
+Parameterize from Python
 ------------------------
 
-It's also possible to invoke a parameterisation directly from Python code:
-
-.. parsed-literal::
- from parameterise import Configuration, Parameterisation
-
-.. parsed-literal::
- # Set up a Configuration object.
- # The fields match the commands available in the input file
-
- config = Configuration()
- config.FileName = "ligand.pdb"
- config.JobName  = "parameterise-test"
- config.NCORES   = 4
- config.MEMORY   = 4
-
-
-.. parsed-literal::
- # Start a parameterisation
-
- param = Parameterisation( config = config )
-
-
-.. parsed-literal::
- # Plot each of the dihedral fits
- param.plotDihedrals()
-
-.. parsed-literal::
- # Plot dihedrals to files
- fileset = param.plotDihedrals( show=False)
-
-.. parsed-literal::
- # Returns a dictionary of temporary files 
- # with keys 'RTF', 'PRM' and 'PDB'
-
- fileset=param.getParameters()
-
+It's also possible to invoke a parameterisation directly from Python code. Please see the tutorial for Ligand Parameterization.

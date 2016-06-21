@@ -1,12 +1,12 @@
 import logging
 import tempfile
+
 import numpy as np
+import propka.lib
 from pdb2pqr.main import runPDB2PQR
 from pdb2pqr.src.pdb import readPDB
-import propka.lib
 
-# If necessary: http://stackoverflow.com/questions/16981921/relative-imports-in-python-3
-from htmd.proteinpreparation.residuedata import ResidueData
+from htmd.builder.residuedata import ResidueData
 from htmd.molecule.molecule import Molecule
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def _warnIfContainsDUM(mol):
 
 
 
-def prepareProtein(mol_in,
+def proteinPrepare(mol_in,
                    pH=7.0,
                    verbose=0,
                    returnDetails=False,
@@ -134,7 +134,7 @@ def prepareProtein(mol_in,
     --------
     >>> tryp = Molecule('3PTB')
 
-    >>> tryp_op, prepData = prepareProtein(tryp, returnDetails=True)
+    >>> tryp_op, prepData = proteinPrepare(tryp, returnDetails=True)
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
     >>> prepData
@@ -155,14 +155,14 @@ def prepareProtein(mol_in,
     >>> np.linalg.norm(x_HIE91_ND1-x_SER93_H) < 3
     True
 
-    >>> tryp_op = prepareProtein(tryp, pH=1.0)
+    >>> tryp_op = proteinPrepare(tryp, pH=1.0)
     >>> tryp_op.write('proteinpreparation-test-main-ph-1.pdb')
 
-    >>> tryp_op = prepareProtein(tryp, pH=14.0)
+    >>> tryp_op = proteinPrepare(tryp, pH=14.0)
     >>> tryp_op.write('proteinpreparation-test-main-ph-14.pdb')
 
     >>> mol = Molecule("1r1j")
-    >>> mo, prepData = prepareProtein(mol, returnDetails=True)
+    >>> mo, prepData = proteinPrepare(mol, returnDetails=True)
     >>> prepData.missedLigands
     ['NAG', 'ZN', 'OIR']
 
@@ -181,13 +181,13 @@ def prepareProtein(mol_in,
 
     >>> mor = Molecule("4dkl")
     >>> mor.filter("protein and noh")
-    >>> mor_opt, mor_data = prepareProtein(mor, returnDetails=True, 
+    >>> mor_opt, mor_data = proteinPrepare(mor, returnDetails=True,
     ...                                    hydrophobicThickness=32.0)
     >>> exposedRes = mor_data.data.membraneExposed
     >>> mor_data.data[exposedRes].to_excel("/tmp/mor_exposed_residues.xlsx")
 
     >>> im=Molecule("4bkj")
-    >>> imo,imd=prepareProtein(im,returnDetails=True)
+    >>> imo,imd=proteinPrepare(im,returnDetails=True)
     >>> imd.data.to_excel("/tmp/imatinib_report.xlsx")
 
 
@@ -349,8 +349,6 @@ def prepareProtein(mol_in,
 
 # A test method
 if __name__ == "__main__":
-    from htmd import home
-    import os
     import sys
 
     if len(sys.argv) > 1:
@@ -358,7 +356,7 @@ if __name__ == "__main__":
         # rm mol-test-*; for i in `seq 9`; do py ./proteinpreparation.py ./1r1j.pdb > mol-test-$i.log ; cp ./mol-test.pdb mol-test-$i.pdb; cp mol-test.csv mol-test-$i.csv ; done
         mol = Molecule(sys.argv[1])
         mol.filter("protein")
-        mol_op, prepData = prepareProtein(mol, returnDetails=True)
+        mol_op, prepData = proteinPrepare(mol, returnDetails=True)
         mol_op.write("./mol-test.pdb")
         prepData.data.to_excel("./mol-test.xlsx")
         prepData.data.to_csv("./mol-test.csv")

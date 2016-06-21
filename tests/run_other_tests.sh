@@ -2,7 +2,7 @@
 
 R=0
 
-for T in tests/tests/*/run.sh; do
+for T in tests/other_tests/*/run.sh; do
 	S="$PWD"
 	DD=$(dirname $T)
 	cd $DD
