@@ -186,7 +186,7 @@ class Production(ProtocolInterface):
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
             'DT', str(self.amber.dt))
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
-            'NTXO', str(self.amber.ntxo))
+            'NTB', str(self.amber.ntb))
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
             'NTP', str(self.amber.ntp))
         self.amber.FORTRAN = self.amber.FORTRAN.replace(
