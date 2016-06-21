@@ -156,7 +156,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
     i = 0
     bar = ProgressBar(len(keys), description='Creating simlist')
     for k in keys:
-        trajectories = _listTraj(datanames[k])
+        trajectories = _listTrajs(datanames[k])
 
         if not trajectories:
             bar.progress()
@@ -265,7 +265,7 @@ def _filtSim(i, sims, outFolder, filterSel):
     fmolfile = path.join(outFolder, 'filtered.pdb')
     (traj, outtraj) = _renameSims(sims[i].trajectory, name, outFolder)
     if not traj:
-        ftrajectory = _listTraj(path.join(outFolder, name))
+        ftrajectory = _listTrajs(path.join(outFolder, name))
         return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
 
     try:
@@ -285,7 +285,7 @@ def _filtSim(i, sims, outFolder, filterSel):
 
         mol.write(outtraj[j], sel)
 
-    ftrajectory = _listTraj(path.join(outFolder, name))
+    ftrajectory = _listTrajs(path.join(outFolder, name))
     #bar.progress()
     return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
 
