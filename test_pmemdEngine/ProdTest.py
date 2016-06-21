@@ -21,8 +21,8 @@ ProdTest.write(os.path.join(htmd.home(), 'Test_Protocol'),
 adapt = htmd.AdaptiveRun()
 adapt.app = htmd.apps.pmemdlocal.PmemdLocal(
     pmemd_cuda='/usr/local/amber/bin/pmemd.cuda_SPFP',
-    datadir=os.path.join(htmd.home(), 'data'))
-adapt.datapath= os.path.join(htmd.home(), 'data')
+    datadir=os.path.join(htmd.home(), 'TrajData'))
+adapt.datapath= os.path.join(htmd.home(), 'TrajData')
 #adapt.project = 'Test'
 adapt.nmin = 2
 adapt.nmax = 4
