@@ -105,7 +105,7 @@ class AdaptiveRunNew(AdaptiveNew):
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
-        datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb'))+glob(path.join(self.inputpath, '*', 'structure.nc')),
+        datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
                            glob(path.join(self.inputpath, '*', '')))
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
@@ -280,7 +280,7 @@ class AdaptiveRun(Adaptive):
         logger.info('Postprocessing new data')
 
         datalist = simlist(glob(path.join(self.datapath, '*', '')),
-                           glob(path.join(self.inputpath, '*', 'structure.prmtop')),
+                           glob(path.join(self.inputpath, '*', '.nc'))+glob(path.join(self.inputpath, '*', '.prmtop')),
                            glob(path.join(self.inputpath, '*', '')))
 
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
