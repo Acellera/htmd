@@ -265,7 +265,7 @@ class Adaptive(object):
             time.sleep(self.updateperiod)
 
     def _init(self):
-        # Creates all the directories for this epoch
+        # Creates all the directories for this epoch in a parent directory -> inputpath
         # Get's all the files from the generators required for the next epoch
         # in case of Amber it would be .in, .prmtop and .rst 
 
