@@ -297,7 +297,7 @@ class Amber(ProtocolInterface):
                       default=1, valid_values=[1, 2, 3, 4, 5, 6, 7, 8])
         self._cmdList(key='ntb', datatype='int',
                       descr="""Whether or not periodic boundaries are imposed
-                            on the system during the calcu- lation of non-bonded
+                            on the system during the calculation of non-bonded
                             interactions.""", default=None, valid_values=[0, 1, 2])
         self._cmdValue(key='cut', datatype='float', realdatatype=TYPE_FLOAT,
                        descr='Nonbonded cutoff, in Å',
@@ -322,9 +322,6 @@ class Amber(ProtocolInterface):
         self._cmdList(key='iamoeba', datatype='int',
                       descr="""Flag for using the amoeba polarizable potentials
                             of Ren and Ponder.""", default=0, valid_values=[0, 1])
-
-
-
 
         self._cmdString('outputnc', 'str', 'Name of output NetCDF file', None)
 
