@@ -340,8 +340,8 @@ def _filtSimMDtraj(i, sims, outFolder, filterSel):
 
         trajout_j = md.formats.NetCDFTrajectoryFile(filename=outtraj[j],mode='w', force_overwrite=True)
 
-        trajout_j.write(coordinates = trajin.xyz, time=traj.time, cell_lengths=traj.unitcell_lengths, 
-                        cell_angles=traj.unitcell_angles)
+        trajout_j.write(coordinates = trajin.xyz, time=trajin.time, cell_lengths=trajin.unitcell_lengths, 
+                        cell_angles=trajin.unitcell_angles)
 
         trajout_j.close()
 
