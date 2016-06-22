@@ -340,7 +340,9 @@ def _filtSimMDtraj(i, sims, outFolder, filterSel):
 
         trajout_j = md.formats.NetCDFTrajectoryFile(filename=outtraj[j],mode='w', force_overwrite=True)
 
-        trajout_j.write(trajin.xyz, time=None, cell_lengths=None, cell_angles=None)
+        trajout_j.write(coordinates = trajin.xyz, time=None, cell_lengths=None, cell_angles=None)
+
+        trajout_j.close()
 
     ftrajectory = _listTrajs(path.join(outFolder, name))
     #bar.progress()
@@ -358,6 +360,7 @@ def _renameSims(trajectory, simname, outfolder):
             outname = path.join(outfolder, simname, fname + '.filtered.xtc')
         elif '.nc' in trajectory[0]:
             outname = path.join(outfolder, simname, fname + '.filtered.nc')
+            logger.info(outname)
 
         if not path.isfile(outname) or (path.getmtime(outname) < path.getmtime(trajectory[t])):
             traj.append(trajectory[t])
@@ -377,6 +380,7 @@ def _filterPDBPSF(sim, outfolder, filtsel):
 
 def _filterPrmtop(sim, outfolder, filtsel, firstFrame):
 
+    # currently mdtraj cannot write prmtop files, so can use pdbs for now for topologies
     try:
         mol = md.load_prmtop(filename = sim.molfile)
         mol = mol.subset(mol.select(filtsel))
@@ -387,7 +391,7 @@ def _filterPrmtop(sim, outfolder, filtsel, firstFrame):
                                                        force_overwrite = True, standard_names = True)
         filteredPDB.write(positions = firstFrame.xyz.reshape(firstFrame.n_atoms,3), topology = mol, 
                           modelIndex=None, unitcell_lengths=None, unitcell_angles=None, bfactors=None)
-
+        filteredPDB.close()
 
 def _listTrajs(folder):
     # changed function to sort .nc files too and prmtop, since prmtop are required for any .nc modifications (i.e. filter atoms)
