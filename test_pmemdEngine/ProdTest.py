@@ -7,8 +7,11 @@ import os
 for directory_i in glob(os.path.join(htmd.home(), 'test_pmemdEngine/*_Test_Protocol_out')):
      shutil.rmtree(directory_i)
 
-for directory_i in glob(os.path.join(htmd.home(), 'TrajData')):
-     shutil.rmtree(directory_i)
+if os.path.isdir(os.path.join(htmd.home(), 'TrajData')):
+	for directory_i in glob(os.path.join(htmd.home(), 'TrajData')):
+	     shutil.rmtree(directory_i)
+else:
+	os.makedirs(os.path.join(htmd.home(), 'TrajData'))
 
 # Create Equilibration Protocol
 from htmd.protocols.Amber_protocols.AmberProduction import Production
@@ -33,7 +36,6 @@ adapt.nepochs = 2
 adapt.inputpath = os.path.join(htmd.home(), 'test_pmemdEngine')
 adapt.generatorspath = os.path.join(htmd.home(), 'Test_Protocol_out')
 adapt.metricsel1 = 'name CA'
-#adapt.datapath = 'test_pmemdEngine'
 #adapt.ticadim = 0
 adapt.updateperiod = 60
 adapt.run()
