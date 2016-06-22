@@ -449,11 +449,11 @@ class QMCalculation:
     pass
 
 
-if __name__ == "__main__":
-  from htmd import *
-  m = Molecule('ethanol.mol2')
-  p = QMCalculation( m, directory="test/" , esp=True, code=Code.PSI4 )
-  p = p.results()[0]
-  print(p.energy)
-  print(p.coords)
-  print(p.esp_scalar)
+#if __name__ == "__main__":
+#  from htmd import *
+#  m = Molecule('ethanol.mol2')
+#  p = QMCalculation( m, directory="test/" , esp=True, code=Code.PSI4 )
+#  p = p.results()[0]
+#  print(p.energy)
+#  print(p.coords)
+#  print(p.esp_scalar)
