@@ -316,13 +316,15 @@ def _filtSimMDtraj(i, sims, outFolder, filterSel):
 
     fmolfile = path.join(outFolder, 'filtered.pdb')
     (traj, outtraj) = _renameSims(sims[i].trajectory, name, outFolder)
-    # TODO: verify this condition
+    # TODO: read better this condition and see what to change
     if not traj:
         ftrajectory = _listTrajs(path.join(outFolder, name))
         return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
 
+    #logger.info(sims[i].molfile)
+
     try:
-        mol = Molecule(sims[i].molfile)
+        mol = md.load_prmtop(sims[i].molfile)
     except:
         logger.warning('Error! Skipping simulation ' + name)
         return
@@ -332,7 +334,7 @@ def _filtSimMDtraj(i, sims, outFolder, filterSel):
     for j in range(0, len(traj)):
         try:
             trajin = md.load_netcdf(filename=traj[j], top=mol, stride=1,
-                                    atom_indices=mol.select(filtSel), frame=None)
+                                    atom_indices=mol.select(filterSel), frame=None)
         except IOError as e:
             logger.warning(e.strerror + ', skipping trajectory')
             break
