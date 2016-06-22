@@ -214,28 +214,32 @@ def simfilter(sims, outfolder, filtersel):
 
     if len(sims) > 0:
 
+        from htmd.config import _config
 
 
-        # not the most elegant python ever...
-        for func in [_filterPDBPSF, _filterMDtraj]:
-            try:
-                func(sims[0], outfolder, filtersel)
-            except:
-                pass
-            else:
-                logger.info('Could not load trajectories.')
 
-    
+        if '.xtc' in sims[0].trajectory[0]:
 
-    filtsims = []
+            _filterPDBPSF(sims[0], outfolder, filtersel)
+            filtsims = []
+            #bar = ProgressBar(len(sims), description='Filtering simlist')
+            filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
+            #bar.stop()
+            
+        elif '.nc' in sims[0].trajectory[0]:
 
-    #bar = ProgressBar(len(sims), description='Filtering simlist')
-    # from htmd.config import _config
-    # filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
-    # #bar.stop()
+            top = md.load_prmtop(sims[0].molfile)
+            firstFrame = md.load_netcdf(filename = sims[0].trajectory[0], top = top, 
+                                        atom_indices = top.select(filtersel), frame = 0)
+            _filterPrmtop(sims[0], outfolder, filtersel, firstFrame)
+            filtsims = []
+            filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSimMDtraj)(i, sims, outfolder, filtersel) for i in range(len(sims)))
+
+        else:
+            logger.warning('Could not recognize trajectory file.')
 
     logger.info('Finished filtering of simulations')
-    
+
     return np.array(filtsims)
 
 
@@ -301,6 +305,46 @@ def _filtSim(i, sims, outFolder, filterSel):
     #bar.progress()
     return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
 
+def _filtSimMDtraj(i, sims, outFolder, filterSel):
+    # gets name of traj (list, therefore need a [0])
+    name = _simName(sims[i].trajectory[0])
+    directory = path.join(outFolder, name)
+    if not path.exists(directory):
+        makedirs(directory)
+
+    logger.debug('Processing trajectory ' + name)
+
+    fmolfile = path.join(outFolder, 'filtered.pdb')
+    (traj, outtraj) = _renameSims(sims[i].trajectory, name, outFolder)
+    # TODO: verify this condition
+    if not traj:
+        ftrajectory = _listTrajs(path.join(outFolder, name))
+        return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
+
+    try:
+        mol = Molecule(sims[i].molfile)
+    except:
+        logger.warning('Error! Skipping simulation ' + name)
+        return
+
+    #sel = mol.select(filterSel)
+
+    for j in range(0, len(traj)):
+        try:
+            trajin = md.load_netcdf(filename=traj[j], top=mol, stride=1,
+                                    atom_indices=mol.select(filtSel), frame=None)
+        except IOError as e:
+            logger.warning(e.strerror + ', skipping trajectory')
+            break
+
+        trajout_j = md.formats.NetCDFTrajectoryFile(filename=outtraj[j],mode='w', force_overwrite=True)
+
+        trajout_j.write(trajin.xyz, time=None, cell_lengths=None, cell_angles=None)
+
+    ftrajectory = _listTrajs(path.join(outFolder, name))
+    #bar.progress()
+    return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
+
 
 def _renameSims(trajectory, simname, outfolder):
     traj = list()
@@ -309,7 +353,10 @@ def _renameSims(trajectory, simname, outfolder):
     for t in range(0, len(trajectory)):
         (tmp, fname) = path.split(trajectory[t])
         (fname, ext) = path.splitext(fname)
-        outname = path.join(outfolder, simname, fname + '.filtered.xtc')
+        if '.xtc' in trajectory[0]:
+            outname = path.join(outfolder, simname, fname + '.filtered.xtc')
+        elif '.nc' in trajectory[0]:
+            outname = path.join(outfolder, simname, fname + '.filtered.nc')
 
         if not path.isfile(outname) or (path.getmtime(outname) < path.getmtime(trajectory[t])):
             traj.append(trajectory[t])
@@ -327,20 +374,18 @@ def _filterPDBPSF(sim, outfolder, filtsel):
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
         mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
 
-def _filterMDtraj(sim, outfolder, filtsel):
+def _filterPrmtop(sim, outfolder, filtsel, firstFrame):
 
-    # get one prmtop file
-    top = md.load_prmtop(sim[np.core.defchararray.find(sim, '.prmtop') > 0][0])
-    # Now we can load in all trajectory information
-    traj = md.load_netcdf(filename = sim[np.core.defchararray.find(sim, '.nc') > 0],
-                              top=top, stride=1, atom_indices=top.select(self.filtersel),
-                              frame=None)
-    # write out the new trajectories
-    if not path.isfile(path.join(outfolder, 'filtered.nc')):
-        filteredTraj = mdtraj.formats.NetCDFTrajectoryFile(filename = path.join(outfolder, 'filtered.nc', filtsel),
-                                                           mode='w', force_overwrite=True)
-        filteredTraj.write(coordinates = traj.xyz, time=None, cell_lengths=None, cell_angles=None)
-
+    # TODO: need to figure out if this is necessary for mdtraj processing...
+    try:
+        mol = md.load_prmtop(filename = sim.molfile)
+    except IOError as e:
+        raise NameError('simFilter: ' + e.strerror + ' Cannot create filtered.prmtop due to problematic parmfile: ' + sim.molfile)
+    if not path.isfile(path.join(outfolder, 'filtered.pdb')):
+        filteredPDB = md.formats.PDBTrajectoryFile(filename = path.join(outfolder, 'filtered.pdb'), mode = 'w',
+                                                       force_overwrite = True, standard_names = True)
+        filteredPDB.write(positions = firstFrame.xyz, topology = mol,  modelIndex=None, 
+                          unitcell_lengths=None, unitcell_angles=None, bfactors=None)
 
 
 def _listTrajs(folder):
