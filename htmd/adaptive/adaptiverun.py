@@ -280,7 +280,7 @@ class AdaptiveRun(Adaptive):
         logger.info('Postprocessing new data')
 
         datalist = simlist(glob(path.join(self.datapath, '*', '')),
-                           glob(path.join(self.inputpath, '*', '*.prmtop'))[0],
+                           glob(path.join(self.inputpath, '*', '*.prmtop')),
                            glob(path.join(self.inputpath, '*', '')))
 
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
@@ -305,8 +305,7 @@ class AdaptiveRun(Adaptive):
             datadr = tica.project(self.ticadim)
         else:
             datadr = data
-
-        # what is this K definition???
+            
         K = int(max(np.round(0.6 * np.log10(datadr.numFrames/1000)*1000+50), 100))  # heuristic
         if K > datadr.numFrames / 3: # Freaking ugly patches ...
             K = int(datadr.numFrames / 3)
