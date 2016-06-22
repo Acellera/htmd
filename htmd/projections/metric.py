@@ -187,8 +187,10 @@ def _processSim(sim, projectionlist, uqmol, skip):
         else:
             mol = Molecule(sim.molfile)
         logger.debug(pieces[0])
-        mol._readTraj(pieces, skip=skip)
-
+        if pieces[0].endswith('.nc'):
+            mol._readTraj(pieces, skip=skip, mdtraj = True)
+        else:
+            mol._readTraj(pieces, skip=skip)
         data = []
         for p in projectionlist:
             pj=p.project(mol)
@@ -200,8 +202,8 @@ def _processSim(sim, projectionlist, uqmol, skip):
         logger.warning('Error in simulation with id: ' + str(sim.simid) + ' ' + e.__str__())
         return None, None, None, True
 
-    return data, _calcRef(pieces, mol.fileloc), mol.fstep, False
 
+    return data, _calcRef(pieces, mol.fileloc), mol.fstep, False
 
 def _calcRef(pieces, fileloc):
     locs = np.array(list([x[0] for x in fileloc]))
