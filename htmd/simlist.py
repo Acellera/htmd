@@ -231,6 +231,7 @@ def simfilter(sims, outfolder, filtersel):
             top = md.load_prmtop(sims[0].molfile)
             firstFrame = md.load_netcdf(filename = sims[0].trajectory[0], top = top, 
                                         atom_indices = top.select(filtersel), frame = 0)
+
             _filterPrmtop(sims[0], outfolder, filtersel, firstFrame)
             filtsims = []
             filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSimMDtraj)(i, sims, outfolder, filtersel) for i in range(len(sims)))
@@ -378,16 +379,19 @@ def _filterPDBPSF(sim, outfolder, filtsel):
 
 def _filterPrmtop(sim, outfolder, filtsel, firstFrame):
 
-    # TODO: need to figure out if this is necessary for mdtraj processing...
     try:
         mol = md.load_prmtop(filename = sim.molfile)
+        mol = mol.subset(mol.select(filtsel))
+        logger.info(mol)
+        logger.info(firstFrame)
+        logger.info(firstFrame.xyz.shape)
     except IOError as e:
         raise NameError('simFilter: ' + e.strerror + ' Cannot create filtered.prmtop due to problematic parmfile: ' + sim.molfile)
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
         filteredPDB = md.formats.PDBTrajectoryFile(filename = path.join(outfolder, 'filtered.pdb'), mode = 'w',
                                                        force_overwrite = True, standard_names = True)
-        filteredPDB.write(positions = firstFrame.xyz, topology = mol,  modelIndex=None, 
-                          unitcell_lengths=None, unitcell_angles=None, bfactors=None)
+        filteredPDB.write(positions = firstFrame.xyz.reshape(firstFrame.n_atoms,3), topology = mol, 
+                          modelIndex=None, unitcell_lengths=None, unitcell_angles=None, bfactors=None)
 
 
 def _listTrajs(folder):
