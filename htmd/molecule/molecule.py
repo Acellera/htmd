@@ -830,7 +830,7 @@ class Molecule:
         bond = None
         for i in range(len(l)):
             if l[i].startswith("@<TRIPOS>ATOM"): start = i + 1
-            if l[i].startswith("@<TRIPOS>BOND"): 
+            if l[i].startswith("@<TRIPOS>BOND"):
                end = i - 1
                bond= i + 1
 
@@ -1013,71 +1013,63 @@ class Molecule:
             return
 
         # Write out PDB and XTC files
-        pdb = tempname(suffix=".pdb")
-        self.write(pdb)
-        xtc = None
-        if self.numFrames > 1:
-            xtc = tempname(suffix=".xtc")
-            self.write(xtc)
+        psf = tempname(suffix=".psf")
+        self.write(psf)
+        xtc = tempname(suffix=".xtc")
+        self.write(xtc)
 
         # Call the specified backend
         if viewer is None:
             from htmd.config import _config
             viewer = _config['viewer']
         if viewer.lower() == 'notebook':
-            return self._viewMDTraj(pdb, xtc)
+            return self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
-            self._viewVMD(pdb, xtc, viewerhandle, name, guessBonds)
+            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
-            return self._viewNGL(pdb, xtc, guessBonds)
+            return self._viewNGL(psf, self.coords, guessBonds)
         else:
             raise ValueError('Unknown viewer.')
 
         # Remove temporary files
-        if xtc:
-            os.remove(xtc)
-        os.remove(pdb)
+        os.remove(xtc)
+        os.remove(psf)
 
-    def _viewVMD(self, pdb, xtc, vhandle, name, guessbonds):
+    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
         if name is None:
             name = self.viewname
         if vhandle is None:
             vhandle = getCurrentViewer()
 
         if guessbonds:
-            vhandle.send("mol new " + pdb)
+            vhandle.send("mol new " + psf)
         else:
-            vhandle.send("mol new " + pdb + " autobonds off")
+            vhandle.send("mol new " + psf + " autobonds off")
+        vhandle.send('animate delete all')
+        vhandle.send('mol addfile ' + xtc + ' type xtc waitfor all')
 
         if name is not None:
             vhandle.send('mol rename top "' + name + '"')
         else:
-            vhandle.send('mol rename top "Mol [molinfo top]: pdb"')
-
-        if xtc:
-            vhandle.send('animate delete all')
-            vhandle.send('mol addfile ' + xtc + ' type xtc waitfor all')
-            if name is None:
-                vhandle.send('mol rename top "Mol [molinfo top]: pdb+xtc"')
+            vhandle.send('mol rename top "Mol [molinfo top]: psf+xtc"')
 
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
         self._tempreps.remove()
 
-    def _viewMDTraj(self, pdb, xtc):
+    def _viewMDTraj(self, psf, xtc):
         from mdtraj.html import TrajectoryView, TrajectorySliderView, enable_notebook
         import mdtraj
         enable_notebook()
 
-        if xtc:
-            t = mdtraj.load(xtc, top=pdb)
+        t = mdtraj.load(xtc, top=psf)
+        if self.numFrames > 1:
             widget = TrajectorySliderView(t)
         else:
-            t = mdtraj.load(pdb)
             widget = TrajectoryView(t)
         return widget
 
-    def _viewNGL(self, pdb, xtc, guessb):
+    def _viewNGL(self, psf, coords, guessb):
         from nglview import Trajectory
         import nglview
 
@@ -1091,13 +1083,13 @@ class Molecule:
             def get_frame_count(self):
                 return np.size(self.coords, 2)
 
-        struc = nglview.FileStructure(pdb)
+        struc = nglview.FileStructure(psf)
         struc.params['dontAutoBond'] = not guessb
-        if xtc:
-            traj = TrajectoryStreamer(self.coords)
-            w = nglview.NGLWidget(struc, traj)
-        else:
-            w = nglview.NGLWidget(struc)
+
+        traj = TrajectoryStreamer(coords)
+        w = nglview.NGLWidget(struc, traj)
+        #else:
+        #    w = nglview.NGLWidget(struc)
 
         self._tempreps.append(self.reps)
         self._tempreps._repsNGL(w)
