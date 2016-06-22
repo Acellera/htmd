@@ -216,8 +216,6 @@ def simfilter(sims, outfolder, filtersel):
 
         from htmd.config import _config
 
-
-
         if '.xtc' in sims[0].trajectory[0]:
 
             _filterPDBPSF(sims[0], outfolder, filtersel)
@@ -382,9 +380,6 @@ def _filterPrmtop(sim, outfolder, filtsel, firstFrame):
     try:
         mol = md.load_prmtop(filename = sim.molfile)
         mol = mol.subset(mol.select(filtsel))
-        logger.info(mol)
-        logger.info(firstFrame)
-        logger.info(firstFrame.xyz.shape)
     except IOError as e:
         raise NameError('simFilter: ' + e.strerror + ' Cannot create filtered.prmtop due to problematic parmfile: ' + sim.molfile)
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
