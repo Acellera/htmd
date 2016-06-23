@@ -3,11 +3,15 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+
 import tempfile
 import logging
 import requests
+import io
+
 import os
 import numpy as np
+
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +121,83 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
     return rl
 
 
+_view3DHull_id = 1
+
+def view3DHull(m, style="", preamble="", solid=False):
+    """Display the convex hull of the given molecule.
+
+    For preamble and color, see http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node129.html
+
+    The function returns an ID. To delete the objects, use the delete3DGraphics(<ID>) function.
+
+    Parameters
+    ----------
+    m: Molecule
+        The object of which to show the hull (only 1 frame)
+    style: str
+        Style for wireframe lines
+    preamble: str
+        Commands (material, color) to be prefixed to the output.
+        E.g.: "draw color red; graphics top materials on; graphics top material Transparent".
+        Note that this affects later preamble-less commands.
+    solid: bool
+        Solid or wireframe
+
+    Examples
+    --------
+    >> m=Molecule("3PTB")
+    >> m.view()
+    >> mf=m.copy()
+    >> mf.filter("protein ")
+    >> htmd.util.view3DHull(mf)
+
+    """
+    from scipy.spatial import ConvexHull
+    from htmd.vmdviewer import getCurrentViewer
+    global _view3DHull_id
+
+    if m.coords.shape[2] != 1:
+        raise Exception("Only one frame is supported")
+
+    r = io.StringIO()
+    r.write(preamble + "\n")
+
+    def remember(s):
+        r.write("lappend htmd_graphics({:d}) [{:s}]\n".format(_view3DHull_id, s))
+
+    cc = m.coords[:, :, 0]
+    hull = ConvexHull(cc)
+    for i in range(hull.nsimplex):
+        v1, v2, v3 = hull.simplices[i, :]
+        c1 = cc[v1, :]
+        c1s = '{ ' + str(c1).strip('[]') + ' }'
+        c2 = cc[v2, :]
+        c2s = '{ ' + str(c2).strip('[]') + ' }'
+        c3 = cc[v3, :]
+        c3s = '{ ' + str(c3).strip('[]') + ' }'
+        if solid:
+            remember("draw triangle {:s} {:s} {:s}".format(c1s, c2s, c3s))
+        else:
+            remember("draw line {:s} {:s} {:s}".format(c1s, c2s, style))
+            remember("draw line {:s} {:s} {:s}".format(c1s, c3s, style))
+            remember("draw line {:s} {:s} {:s}".format(c2s, c3s, style))
+            r.write("\n")
+
+    _view3DHull_id += 1
+    cmd = r.getvalue()
+    vmd = getCurrentViewer()
+    vmd.send(cmd)
+    return _view3DHull_id - 1
+
+
+def delete3DGraphics(id):
+    import htmd.vmdviewer
+    vmd = htmd.vmdviewer.getCurrentViewer()
+    cmd = "foreach i $htmd_graphics({:d}) {{ graphics top delete $i }}".format(id)
+    vmd.send(cmd)
+    cmd = "unset htmd_graphics({:d})".format(id)
+    vmd.send(cmd)
+
 
 def opm(pdb):
     """Download a molecule from the OPM.
@@ -204,5 +285,5 @@ if __name__ == "__main__":
     _testDeprecation()
 
     import doctest
-    doctest.testmod()
 
+    doctest.testmod()
