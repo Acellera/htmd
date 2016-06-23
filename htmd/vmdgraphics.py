@@ -9,8 +9,8 @@ class VMDGraphicObject(object):
 
     def __init__(self, data):
         """Generic creation method. Not useful for the user."""
-        self.data = data
         self.n = self.counter
+        self.data = data
         self.script = io.StringIO()
         self.valid = True
         VMDGraphicObject.counter += 1
@@ -20,17 +20,27 @@ class VMDGraphicObject(object):
         if not self.valid:
             raise Exception("The object has been deleted already.")
 
-        id = self.n
+        n = self.n
         vmd = htmd.vmdviewer.getCurrentViewer()
-        cmd = "foreach i $htmd_graphics({:d}) {{ graphics top delete $i }}".format(id)
+        cmd = "set htmd_tmp $htmd_graphics_mol({:d})".format(n)
         vmd.send(cmd)
-        cmd = "unset htmd_graphics({:d})".format(id)
+        cmd = "foreach i $htmd_graphics({:d}) {{ graphics $htmd_tmp delete $i }}".format(n)
+        vmd.send(cmd)
+        cmd = "unset htmd_graphics({:d})".format(n)
+        vmd.send(cmd)
+        cmd = "unset htmd_graphics_mol({:d})".format(n)
         vmd.send(cmd)
         self.valid = False
 
     def _remember(self, s):
+        # We can't get data back from VMD, so let it remember what's to be deleted
         n = self.n
         self.script.write("lappend htmd_graphics({:d}) [{:s}]\n".format(n, s))
+
+    @staticmethod
+    def tq(v):
+        """Quote a numpy 3-vector to a TCL list."""
+        return '{ ' + str(v).strip('[]') + ' }'
 
 
 class VMDConvexHull(VMDGraphicObject):
@@ -77,12 +87,9 @@ class VMDConvexHull(VMDGraphicObject):
 
         for i in range(hull.nsimplex):
             v1, v2, v3 = hull.simplices[i, :]
-            c1 = cc[v1, :]
-            c1s = '{ ' + str(c1).strip('[]') + ' }'
-            c2 = cc[v2, :]
-            c2s = '{ ' + str(c2).strip('[]') + ' }'
-            c3 = cc[v3, :]
-            c3s = '{ ' + str(c3).strip('[]') + ' }'
+            c1s = VMDGraphicObject.tq(cc[v1, :])
+            c2s = VMDGraphicObject.tq(cc[v2, :])
+            c3s = VMDGraphicObject.tq(cc[v3, :])
             if solid:
                 self._remember("draw triangle {:s} {:s} {:s}".format(c1s, c2s, c3s))
             else:
@@ -91,6 +98,7 @@ class VMDConvexHull(VMDGraphicObject):
                 self._remember("draw line {:s} {:s} {:s}".format(c2s, c3s, style))
                 self.script.write("\n")
 
+        self.script.write("set htmd_graphics_mol({:d}) [molinfo top]".format(self.n))
         cmd = self.script.getvalue()
         vmd = getCurrentViewer()
         vmd.send(cmd)
