@@ -1012,9 +1012,18 @@ class Molecule:
         if hold:
             return
 
+        oldbonds = None
+        if guessBonds:
+            oldbonds = self.bonds
+            self.bonds = self._getBonds()
+
         # Write out PDB and XTC files
         psf = tempname(suffix=".psf")
         self.write(psf)
+
+        if guessBonds:
+            self.bonds = oldbonds
+
         xtc = tempname(suffix=".xtc")
         self.write(xtc)
 
