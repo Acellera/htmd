@@ -157,10 +157,10 @@ def PSFwrite(molecule, filename):
             charge = m.charge[i]
         if( m.atomtype is not None ) and ( i<len(m.atomtype)):
             atomtype   = m.atomtype[i]
-        print("%8d %-4s %-5d%-4s %-4s %-6s %-2s %10.6f  %8.6f  %10d" %
+        print("%8d %-4s %-5s%-4s %-4s %-6s %-2s %10.6f  %8.6f  %10d" %
               (int(m.serial[i]),
                m.segid[i],
-               int(m.resid[i]),
+               str(m.resid[i])+m.insertion[i],
                (m.resname[i]),
                m.name[i],
                atomtype,
