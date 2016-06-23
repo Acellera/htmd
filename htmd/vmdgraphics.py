@@ -22,13 +22,12 @@ class VMDGraphicObject(object):
 
         n = self.n
         vmd = htmd.vmdviewer.getCurrentViewer()
-        cmd = "set htmd_tmp $htmd_graphics_mol({:d})".format(n)
-        vmd.send(cmd)
-        cmd = "foreach i $htmd_graphics({:d}) {{ graphics $htmd_tmp delete $i }}".format(n)
-        vmd.send(cmd)
-        cmd = "unset htmd_graphics({:d})".format(n)
-        vmd.send(cmd)
-        cmd = "unset htmd_graphics_mol({:d})".format(n)
+        cmd = """
+            set htmd_tmp $htmd_graphics_mol({0:d})
+            foreach i $htmd_graphics({0:d}) {{ graphics $htmd_tmp delete $i }}
+            unset htmd_graphics({0:d})
+            unset htmd_graphics_mol({0:d})
+        """.format(n)
         vmd.send(cmd)
         self.valid = False
 
@@ -109,12 +108,20 @@ if __name__ == "__main__":
     from htmd import vmdgraphics
 
     """
+    from htmd import *
+    import htmd.vmdgraphics
+
     m=Molecule("3PTB")
     m.view()
     mf=m.copy()
-    mf.filter("protein ")
-    gh0=htmd.vmdgraphics.VMDConvexHull(mf)
-    gh1=htmd.vmdgraphics.VMDConvexHull(mf,solid=True)
+    mf.filter("protein")
+    mgh=htmd.vmdgraphics.VMDConvexHull(mf)
+
+    n=Molecule("1JNO")
+    n.view()
+    nf=n.copy()
+    nf.filter("protein")
+    ngh=htmd.vmdgraphics.VMDConvexHull(nf,solid=True)
 
     """
 
