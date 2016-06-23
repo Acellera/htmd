@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.bincoor import *
 from htmd.molecule.pdbparser import *
-from htmd.molecule.prmtop import *
+from htmd.molecule.prmtop import PRMTOPread
 from htmd.molecule.psf import *
 from htmd.molecule.vmdparser import *
 from htmd.molecule.xtc import *
@@ -640,17 +640,17 @@ class Molecule:
         append : bool, optional
             If the file is a trajectory, append the coordinates to the previous coordinates
         """
+        from htmd.simlist import Sim
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
                 if len(f) != 4 and not os.path.exists(f):
                     raise FileNotFoundError('File {} was not found.'.format(f))
             firstfile = filename[0]
         else:
-            if len(filename) != 4 and not os.path.exists(filename):
+            if not isinstance(filename, Sim) and len(filename) != 4 and not os.path.exists(filename):
                 raise FileNotFoundError('File {} was not found.'.format(filename))
             firstfile = filename
 
-        from htmd.simlist import Sim
         if isinstance(filename, Sim):
             self._readPDB(filename.molfile)
             self._readTraj(filename.trajectory)
@@ -683,10 +683,16 @@ class Molecule:
                 self.coords = oldcoords
         elif (type is None and (
             firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
-            con = PRMTOPread(filename)
-            self.charge = numpy.asarray(con.charges, dtype=np.float32)
-            # self.masses = numpy.asarray(con.masses, dtype=np.float32)  # No masses in PRMTOP
-            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
+
+            name, charges, masses, resname, resid, bonds = PRMTOPread(filename)
+            self.empty(len(name))
+            self.serial = np.array(list(range(len(name))), dtype=self._append_fields['serial'])
+            self.name = np.array(name, dtype=self._append_fields['name'])
+            self.resname = np.array(resname, dtype=self._append_fields['resname'])
+            self.resid = np.array(resid, dtype=self._append_fields['resid'])
+            self.bonds = np.array(bonds, dtype=np.uint32)
+            self.masses = np.array(masses, dtype=self._append_fields['masses'])
+            self.charge = np.array(charges, dtype=self._append_fields['charge'])
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
