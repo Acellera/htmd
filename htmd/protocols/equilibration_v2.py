@@ -37,7 +37,8 @@ class Equilibration(ProtocolInterface):
         useconstantratio : bool, default=False
             For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
         constraints : dict, default={'protein and noh and not name CA': 0.1, 'protein and name CA': 1}
-            A dictionary containing as keys the atomselections of the constraints and as values the constraint scaling factor. 0 factor means no constraint, 1 full constraints and in between values are used for scaling. The order with which the constraints are applied is random, so make atomselects mutually exclusive to be sure you get the correct constraints.
+            A dictionary containing atomselections and values of the constraint to be applied
+            (in kcal/mol/A^2). Atomselects must be mutually exclusive.
 
         Example
         -------
@@ -63,11 +64,8 @@ class Equilibration(ProtocolInterface):
         self._cmdString('selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none')
         self._cmdList('box', 'list', 'Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]', [0,0,0,0,0,0])
         self._cmdBoolean('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False)
-        self._cmdDict('constraints', 'dict', 'A dictionary containing as keys the atomselections of the constraints '
-                                             'and as values the constraint scaling factor. 0 factor means no constraint'
-                                             ', 1 full constraints and in between values are used for scaling.'
-                                             ' The order with which the constraints are applied is random, so make '
-                                             'atomselects mutually exclusive to be sure you get the correct constraints.'
+        self._cmdDict('constraints', 'dict', 'A dictionary of atomselections and values of the constraint to be applied '
+                                             '(in kcal/mol/A^2). Atomselects must be mutually exclusive.'
                                              , {'protein and noh and not name CA': 0.1, 'protein and name CA': 1})
         self._cmdValue('nvtsteps', 'int', 'Number of initial steps to apply NVT in units of 4fs. Defaults to 500.', None, TYPE_INT, RANGE_0POS)
         self._cmdValue('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the numsteps.', None, TYPE_INT, RANGE_0POS)
@@ -107,59 +105,59 @@ class Equilibration(ProtocolInterface):
         self.acemd.minimize = '500'
         self.acemd.run = '$numsteps'
         self.acemd.TCL='''
-set numsteps NUMSTEPS
-set temperature TEMPERATURE
-set nvtsteps NVTSTEPS
-set constraintsteps CONSTRAINTSTEPS
-set refindex { REFINDEX }
-set selindex { SELINDEX }
-set box { BOX }
-set K KCONST
-#
-proc flatbot1d {x xm xM K} {
-  set f 0
-  if {$x < $xm} {
-    set f [expr $K*[expr $xm-$x]]
-  }
-  if {$x > $xM} {
-    set f [expr $K*[expr $xM-$x]]
-  }
-  return $f
-}
-proc calcforces_init {} {
-  global ref sel refindex selindex
-  berendsenpressure  off
-  set ref [addgroup  $refindex]
-  set sel [addgroup  $selindex]
-}
-proc calcforces {} {
-  global ref sel numsteps K box nvtsteps constraintsteps
-  loadcoords coords
-##FLATBOTTOM
-  if {$K>0} {
-    set r0 $coords($ref)
-    set r1 $coords($sel)
-    set dr  [vecsub $r1 $r0]
-    set fx [flatbot1d [lindex $dr 0] [lindex $box 0] [lindex $box 1] $K]
-    set fy [flatbot1d [lindex $dr 1] [lindex $box 2] [lindex $box 3] $K]
-    set fz [flatbot1d [lindex $dr 2] [lindex $box 4] [lindex $box 5] $K]
-    #print "dr: $dr  fx: $fx fy: $fy fz: $fz"
-    addforce $sel [list $fx $fy $fz]
-  }
-##EQUIL
-  set step [ getstep ]
-  if { $step > $nvtsteps } {
-    berendsenpressure  on
-  } else {
-    berendsenpressure  off
-  }
-  if { $step > $constraintsteps } {
-    constraintscaling 0
-  } else {
-    constraintscaling [expr 1 - 0.95*$step/$constraintsteps]
-  }
-}
-proc calcforces_endstep { } { }
+            set numsteps NUMSTEPS
+            set temperature TEMPERATURE
+            set nvtsteps NVTSTEPS
+            set constraintsteps CONSTRAINTSTEPS
+            set refindex { REFINDEX }
+            set selindex { SELINDEX }
+            set box { BOX }
+            set K KCONST
+            #
+            proc flatbot1d {x xm xM K} {
+              set f 0
+              if {$x < $xm} {
+                set f [expr $K*[expr $xm-$x]]
+              }
+              if {$x > $xM} {
+                set f [expr $K*[expr $xM-$x]]
+              }
+              return $f
+            }
+            proc calcforces_init {} {
+              global ref sel refindex selindex
+              berendsenpressure  off
+              set ref [addgroup  $refindex]
+              set sel [addgroup  $selindex]
+            }
+            proc calcforces {} {
+              global ref sel numsteps K box nvtsteps constraintsteps
+              loadcoords coords
+            ##FLATBOTTOM
+              if {$K>0} {
+                set r0 $coords($ref)
+                set r1 $coords($sel)
+                set dr  [vecsub $r1 $r0]
+                set fx [flatbot1d [lindex $dr 0] [lindex $box 0] [lindex $box 1] $K]
+                set fy [flatbot1d [lindex $dr 1] [lindex $box 2] [lindex $box 3] $K]
+                set fz [flatbot1d [lindex $dr 2] [lindex $box 4] [lindex $box 5] $K]
+                #print "dr: $dr  fx: $fx fy: $fy fz: $fz"
+                addforce $sel [list $fx $fy $fz]
+              }
+            ##EQUIL
+              set step [ getstep ]
+              if { $step > $nvtsteps } {
+                berendsenpressure  on
+              } else {
+                berendsenpressure  off
+              }
+              if { $step > $constraintsteps } {
+                constraintscaling 0
+              } else {
+                constraintscaling [expr 1 - 0.95*$step/$constraintsteps]
+              }
+            }
+            proc calcforces_endstep { } { }
 '''
 
     def _findFiles(self, inputdir):
