@@ -361,12 +361,12 @@ class Adaptive(object):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor', '*.nc'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor', '*.rst', '*.out'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
-            mol = Molecule()
+            mol = Molecule(glob(path.join(currSim.input, '*.prmtop'))[0])
             mol.read(traj)
             mol.frame = frameNum
-            mol.write(path.join(newDir, 'input.coor'))
+            mol.write(path.join(newDir, 'structure.rst'))
 
             # write nextInput file
             fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
