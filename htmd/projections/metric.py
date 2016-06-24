@@ -187,10 +187,7 @@ def _processSim(sim, projectionlist, uqmol, skip):
         else:
             mol = Molecule(sim.molfile)
         logger.debug(pieces[0])
-        if pieces[0].endswith('.nc'):
-            mol._readTraj(pieces, skip=skip, mdtraj = True)
-        else:
-            mol._readTraj(pieces, skip=skip)
+        mol.read(pieces, skip=skip)
         data = []
         for p in projectionlist:
             pj=p.project(mol)
