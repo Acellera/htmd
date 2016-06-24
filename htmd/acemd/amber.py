@@ -33,7 +33,7 @@ class Amber(ProtocolInterface):
         self._cmdList(key='ntx', datatype='int',
                       descr="""Option to read the initial coordinates,
                             velocities and box size from the inpcrd file.""",
-                      default=1, valid_values=[1, 5])
+                      default=1, valid_values=[1, 2, 4, 5, 6])
         self._cmdList(key='irest', datatype='int',
                       descr='Flag to restart a simulation.',
                       default=0, valid_values=[0, 1])
