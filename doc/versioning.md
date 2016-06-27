@@ -83,9 +83,11 @@ Imagine one wants to do a minor release (bug-fix) on release 1.0.0.
 
 1. Make sure you are working on `Acellera/htmd:rel-1.0.x` (https://github.com/Acellera/htmd.git):
 
-   `git remote -v`
-   `git fetch`
-   `git checkout rel-1.0.x`
+   ```
+   git remote -v
+   git fetch
+   git checkout rel-1.0.x
+   ```
 
 1. Make sure the `rel-1.0.x` branch is up-to-date:
 
