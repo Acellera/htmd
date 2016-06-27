@@ -305,11 +305,13 @@ def _filterPDBPSF(sim, outfolder, filtsel):
 
 
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
-
         if mol.topoloc.endswith('prmtop'):
             # need to load one frame, since pdbs require coords, and I do not have prmtop editor
             # this code is only temporarily until there is a prmtop write option
-            mol._prmtopPDB(path.join(outfolder, 'filtered.pdb'), filtsel, sim)
+            mol = Molecule('structure.prmtop')
+            mol.read(sim[0])
+            mol.filter(filtsel)
+            mol.write('structure.pdb')
         else:
             mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
 
