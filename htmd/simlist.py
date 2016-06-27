@@ -311,7 +311,7 @@ def _filterPDBPSF(sim, outfolder, filtsel):
             mol = Molecule('structure.prmtop')
             mol.read(sim[0])
             mol.filter(filtsel)
-            mol.write('structure.pdb')
+            mol.write(path.join(outfolder, 'filtered.pdb'))
         else:
             mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
 
