@@ -9,6 +9,7 @@ import random
 from htmd.projections.metric import Metric
 from htmd.progress.progress import ProgressBar
 from htmd.units import convert as unitconvert
+from joblib import Parallel, delayed
 import logging
 logger = logging.getLogger(__name__)
 
@@ -46,20 +47,21 @@ class TICA(object):
         # data.dat.tolist() might be better?
         self.data = data
         if isinstance(data, Metric):
+            if units != 'frames':
+                raise RuntimeError('Cannot use delayed projection TICA with units other than frames for now. Report this to HTMD issues.')
+            metr = data
             from pyemma.coordinates.transform.tica import TICA
-            lag = unitconvert(units, 'frames', lag, data.fstep)
             self.tic = TICA(lag)
 
-            p = ProgressBar(len(data.simulations))
-            for i in range(len(data.simulations)):
-                # Fix for pyemma bug. Remove eventually:
-                d, _, _ = data._projectSingle(i)
-                if d is None or d.shape[0] < lag:
-                    continue
-                self.tic.partial_fit(d)
-                p.progress()
+            p = ProgressBar(len(metr.simulations))
+            gen = _projectionGenerator(metr, _getNcpus())
+            for proj in gen:
+                for pro in proj:
+                    self.tic.partial_fit(pro[0])
+                p.progress(len(proj))
             p.stop()
         else:
+            lag = unitconvert(units, 'frames', lag, data.fstep)
             self.tic = tica(data.dat.tolist(), lag=lag)
 
     def project(self, ndim=None):
@@ -91,29 +93,24 @@ class TICA(object):
             refs = []
             fstep = None
 
-            '''from htmd.config import _config
-            from joblib import Parallel, delayed
-            results = Parallel(n_jobs=_config['ncpus'], verbose=11)(
-                delayed(_test)(self.data, self.tic, i) for i in range(len(self.data.simulations)))
-
-            for i in range(len(results)):
-                proj.append(results[i][0])
-                refs.append(results[i][1])
-                fstep.append(results[i][2])'''
-
+            metr = self.data
+            p = ProgressBar(len(metr.simulations))
+            k = -1
             droppedsims = []
-            p = ProgressBar(len(self.data.simulations))
-            for i in range(len(self.data.simulations)):
-                d, r, f = self.data._projectSingle(i)
-                if d is None:
-                    droppedsims.append(i)
-                    continue
-                if fstep is None:
-                    fstep = f
-                refs.append(r)
-                proj.append(self.tic.transform(d))
-                p.progress()
+            gen = _projectionGenerator(metr, _getNcpus())
+            for projecteddata in gen:
+                for pro in projecteddata:
+                    k += 1
+                    if pro is None:
+                        droppedsims.append(k)
+                        continue
+                    proj.append(self.tic.transform(pro[0]))
+                    refs.append(pro[1])
+                    if fstep is None:
+                        fstep = pro[2]
+                p.progress(len(projecteddata))
             p.stop()
+
             simlist = self.data.simulations
             simlist = np.delete(simlist, droppedsims)
             ref = np.array(refs, dtype=object)
@@ -128,28 +125,28 @@ class TICA(object):
 
         if ndim is None:
             logger.info('Kept {} dimension(s) to cover 95% of kinetic variance.'.format(self.tic.dimension()))
-        #print(np.shape(proj))
-
 
         from htmd.metricdata import MetricData
         datatica = MetricData(dat=np.array(proj, dtype=object), simlist=simlist, ref=ref, fstep=fstep, parent=parent)
 
-        '''datatica = self.data.copy()
-        #datatica.dat = self.data.deconcatenate(np.squeeze(proj))
-        datatica.dat = np.array(proj, dtype=object)
-        datatica.parent = self.data
-        datatica.St = None
-        datatica.Centers = None
-        datatica.N = None
-        datatica.K = None
-        datatica._dataid = random.random()
-        datatica._clusterid = None'''
         return datatica
 
 
-def _test(data, tic, i):
-    d, r, f = data._projectSingle(i)
-    if d is None:
-        return
-    else:
-        return tic.transform(d), r, f
+def _projectionGenerator(metric, ncpus):
+    for i in range(0, len(metric.simulations), ncpus):
+        simrange = range(i, np.min((i+ncpus, len(metric.simulations))))
+        results = Parallel(n_jobs=ncpus, verbose=0)(delayed(_projector)(metric, i) for i in simrange)
+        yield results
+
+
+def _projector(metric, i):
+    return metric._projectSingle(i)
+
+
+def _getNcpus():
+    from htmd.config import _config
+    ncpus = _config['ncpus']
+    if ncpus < 0:
+        import multiprocessing
+        ncpus = multiprocessing.cpu_count() + ncpus + 1
+    return ncpus
