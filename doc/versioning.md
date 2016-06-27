@@ -47,22 +47,32 @@ These are examples of how to release HTMD versions.
 Imagine one wants to do a big/major release (in this case, let's assume it's the first major release of big release 1).
 
 1. Make sure you are working on `Acellera/htmd:master` (https://github.com/Acellera/htmd.git):
+
    `git remote -v`
    `git checkout master`
+
 1. Make sure the `master` branch is up-to-date:
+
    `git fetch`
    `git pull`
+
 1. On `master`, create the new stable branch, check it out, and tag it:
+
    `git branch rel-1.0.x`
    `git checkout rel-1.0.x`
    `git tag -a 1.0.0 -m "new stable release"`
+
 1. Push the new branch and tag to the remote (`origin`):
+
    `git push --tags origin rel-1.0.x`
+
    This will trigger two Travis builds: one due to the branch and another due to the tag. A conda release will be made.
 1. Check out `master`, tag the development version, and push the tag:
+
    `git checkout master`
    `git tag -a 1.1.0 -m "new development release"`
    `git push --tags`
+
    This will trigger another Travis build. A conda release will be made.
 
 These two tags will point to the same commit (in sync).
@@ -72,17 +82,25 @@ These two tags will point to the same commit (in sync).
 Imagine one wants to do a minor release (bug-fix) on release 1.0.0.
 
 1. Make sure you are working on `Acellera/htmd:rel-1.0.x` (https://github.com/Acellera/htmd.git):
+
    `git remote -v`
    `git fetch`
    `git checkout rel-1.0.x`
+
 1. Make sure the `rel-1.0.x` branch is up-to-date:
+
    `git fetch`
    `git pull`
+
 1. Do the fix, add the files, and commit it.
 1. Tag the new bug-fix:
+
    `git tag -a 1.0.1 -m "new bug-fix"`
+
 1. Push the fix and the tag to the remote (`origin`):
+
    `git push --tags`
+
    This will trigger a new Travis build. A conda release will be made.
 
 In alternative, push the commit but do not tag it, if it is not critical to release right now.
@@ -92,13 +110,21 @@ In alternative, push the commit but do not tag it, if it is not critical to rele
 Imagine one wants to do a minor release on release 1.1.0.
 
 1. Make sure you are working on `Acellera/htmd:master` (https://github.com/Acellera/htmd.git):
+
    `git remote -v`
    `git checkout master`
+
 1. Make sure the `master` branch is up-to-date:
+
    `git fetch`
    `git pull`
+
 1. Tag the new minor release:
+
    `git tag -a 1.1.1 -m "new minor release"`
+
 1. Push the tag to the remote (`origin`):
+
    `git push --tags`
+
    This will trigger a new Travis build. A conda release will be made.
