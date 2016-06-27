@@ -1172,6 +1172,16 @@ class Molecule:
             except:
                 raise ValueError("Unknown file type")
 
+    def _prmtopPDB(self, filename, sel, sim):
+        import mdtraj as md
+        top = md.load_prmtop(self.topoloc)
+        self.coords = md.load_frame(sim.trajectory[0], index=0, top=top, atom_indices=top.select(sel)).xyz
+        top = top.subset(top.select(sel))
+        newPDB = md.formats.PDBTrajectoryFile(filename, mode='w',force_overwrite=True, standard_names=True)
+        newPDB.write(positions=self.coords.reshape(self.coords.size/3, 3),topology=top, modelIndex=None, unitcell_lengths=None, 
+                     unitcell_angles=None, bfactors=None)
+        newPDB.close()
+
     def _writeRST(self, filename, sel="all"):
         import mdtraj as md
         logger.info(self.box_angles.shape)
