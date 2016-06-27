@@ -48,19 +48,25 @@ Imagine one wants to do a big/major release (in this case, let's assume it's the
 
 1. Make sure you are working on `Acellera/htmd:master` (https://github.com/Acellera/htmd.git):
 
-   `git remote -v`
-   `git checkout master`
+   ```
+   git remote -v
+   git checkout master
+   ```
 
 1. Make sure the `master` branch is up-to-date:
 
-   `git fetch`
-   `git pull`
+   ```
+   git fetch
+   git pull
+   ```
 
 1. On `master`, create the new stable branch, check it out, and tag it:
 
-   `git branch rel-1.0.x`
-   `git checkout rel-1.0.x`
-   `git tag -a 1.0.0 -m "new stable release"`
+   ```
+   git branch rel-1.0.x
+   git checkout rel-1.0.x
+   git tag -a 1.0.0 -m "new stable release"
+   ```
 
 1. Push the new branch and tag to the remote (`origin`):
 
@@ -69,9 +75,11 @@ Imagine one wants to do a big/major release (in this case, let's assume it's the
    This will trigger two Travis builds: one due to the branch and another due to the tag. A conda release will be made.
 1. Check out `master`, tag the development version, and push the tag:
 
-   `git checkout master`
-   `git tag -a 1.1.0 -m "new development release"`
-   `git push --tags`
+   ```
+   git checkout master
+   git tag -a 1.1.0 -m "new development release"
+   git push --tags
+   ```
 
    This will trigger another Travis build. A conda release will be made.
 
@@ -91,8 +99,10 @@ Imagine one wants to do a minor release (bug-fix) on release 1.0.0.
 
 1. Make sure the `rel-1.0.x` branch is up-to-date:
 
-   `git fetch`
-   `git pull`
+   ```
+   git fetch
+   git pull
+   ```
 
 1. Do the fix, add the files, and commit it.
 1. Tag the new bug-fix:
@@ -113,13 +123,17 @@ Imagine one wants to do a minor release on release 1.1.0.
 
 1. Make sure you are working on `Acellera/htmd:master` (https://github.com/Acellera/htmd.git):
 
-   `git remote -v`
-   `git checkout master`
+   ```
+   git remote -v
+   git checkout master
+   ```
 
 1. Make sure the `master` branch is up-to-date:
 
-   `git fetch`
-   `git pull`
+   ```
+   git fetch
+   git pull
+   ```
 
 1. Tag the new minor release:
 
