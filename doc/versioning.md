@@ -30,7 +30,7 @@ When this number is different from 0 (zero), nothing should be assumed in the re
 
 ### GitHub Tagging
 
-Stable releases are tagged on a specific branch created for each of these (named rel-<big release>.<major release>.X). Development releases are tagged on the master branch.
+Stable releases are tagged on a specific branch created for each of these (named `rel-<big release>.<major release>.x`). Development releases are tagged on the master branch.
 
 Useful tag listing commands:
 ```
@@ -53,11 +53,11 @@ Imagine one wants to do a big/major release (in this case, let's assume it's the
    `git fetch`
    `git pull`
 1. On `master`, create the new stable branch, check it out, and tag it:
-   `git branch rel-1.0.X`
-   `git checkout rel-1.0.X`
+   `git branch rel-1.0.x`
+   `git checkout rel-1.0.x`
    `git tag -a 1.0.0 -m "new stable release"`
 1. Push the new branch and tag to the remote (`origin`):
-   `git push --tags origin rel-1.0.X`
+   `git push --tags origin rel-1.0.x`
    This will trigger two Travis builds: one due to the branch and another due to the tag. A conda release will be made.
 1. Check out `master`, tag the development version, and push the tag:
    `git checkout master`
@@ -71,11 +71,11 @@ These two tags will point to the same commit (in sync).
 
 Imagine one wants to do a minor release (bug-fix) on release 1.0.0.
 
-1. Make sure you are working on `Acellera/htmd:rel-1.0.X` (https://github.com/Acellera/htmd.git):
+1. Make sure you are working on `Acellera/htmd:rel-1.0.x` (https://github.com/Acellera/htmd.git):
    `git remote -v`
    `git fetch`
-   `git checkout rel-1.0.X`
-1. Make sure the `rel-1.0.X` branch is up-to-date:
+   `git checkout rel-1.0.x`
+1. Make sure the `rel-1.0.x` branch is up-to-date:
    `git fetch`
    `git pull`
 1. Do the fix, add the files, and commit it.
