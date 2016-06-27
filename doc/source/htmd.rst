@@ -14,7 +14,6 @@ Subpackages
     htmd.parameterization
     htmd.progress
     htmd.projections
-    htmd.proteinpreparation
     htmd.protocols
 
 Submodules
