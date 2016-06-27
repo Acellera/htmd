@@ -1188,10 +1188,13 @@ class Molecule:
     def _writeNC(self, filename, sel="all"):
         import mdtraj as md
         newNC = md.formats.NetCDFTrajectoryFile(filename, mode='w', force_overwrite=True)
+        if isinstance(sel, str):
+            top = md.load_prmtop(self.topoloc)
+            sel = top.select(sel)
         if len(self.box_angles) == 0:
             logger.info('Assuming orthrombic box')
             self.box_angles = np.tile(np.array([90,90,90]), (self.numFrames,1)) 
-        newNC.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0), time=self.time, 
+        newNC.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0)[:,sel,:], time=self.time, 
                     cell_lengths=np.swapaxes(self.box, 0, 1), cell_angles=self.box_angles)
         newNC.close() 
 
