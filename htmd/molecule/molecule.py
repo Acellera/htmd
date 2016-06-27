@@ -683,8 +683,10 @@ class Molecule:
                 self.coords = oldcoords
         elif (type is None and (
             firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
-
             name, charges, masses, resname, resid, bonds = PRMTOPread(filename)
+            oldcoords = []
+            if len(self.coords) != 0:
+                oldcoords = self.coords
             self.empty(len(name))
             self.serial = np.array(list(range(len(name))), dtype=self._append_fields['serial'])
             self.name = np.array(name, dtype=self._append_fields['name'])
@@ -693,6 +695,9 @@ class Molecule:
             self.bonds = np.array(bonds, dtype=np.uint32)
             self.masses = np.array(masses, dtype=self._append_fields['masses'])
             self.charge = np.array(charges, dtype=self._append_fields['charge'])
+
+            if len(oldcoords) != 0:
+                self.coords = oldcoords
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
