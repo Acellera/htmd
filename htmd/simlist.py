@@ -262,7 +262,10 @@ def _filtSim(i, sims, outFolder, filterSel):
         logger.warning('Error! Skipping simulation ' + name)
         return
 
-    sel = mol.atomselect(filterSel)
+    if mol.topoloc.endswith(".prmtop"):
+        sel = filterSel
+    else:    
+        sel = mol.atomselect(filterSel)
 
     for j in range(0, len(traj)):
         try:
