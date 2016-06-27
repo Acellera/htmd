@@ -9,78 +9,83 @@ import os
 from htmd.molecule.support import *
 
 
-class PRMTOP:
-    charges = None
-    bonds = None
-
-
 def PRMTOPread(filename):
-    psf = PRMTOP
     f = open(filename, 'r')
-    mode = None
-    c = 0
+    names = []
+    charges = []
+    masses = []
+    uqresnames = []
+    residx = []
+    bondsidx = []
 
-    lines = []
+    section = None
     for line in f:
-        lines.append(line)
+        if line.startswith('%FLAG POINTERS'):
+            section = 'pointers'
+        elif line.startswith('%FLAG ATOM_NAME'):
+            section = 'names'
+        elif line.startswith('%FLAG CHARGE'):
+            section = 'charges'
+        elif line.startswith('%FLAG MASS'):
+            section = 'masses'
+        elif line.startswith('%FLAG ATOM_TYPE_INDEX'):
+            section = 'type'
+        elif line.startswith('%FLAG RESIDUE_LABEL'):
+            section = 'resname'
+        elif line.startswith('%FLAG RESIDUE_POINTER'):
+            section = 'resstart'
+        elif line.startswith('%FLAG BONDS_INC_HYDROGEN') or line.startswith('%FLAG BONDS_WITHOUT_HYDROGEN'):
+            section = 'bonds'
+        elif line.startswith('%FLAG BOX_DIMENSIONS'):
+            section = 'box'
+        elif line.startswith('%FLAG'):
+            section = None
 
-    p_idx = -1
-    c_idx = -1
-    b1_idx = -1
-    b2_idx = -1
-    for i in range(0, len(lines)):
-        #		print(lines[i])
-        if lines[i].startswith("%FLAG POINTERS"):
-            p_idx = i
-        if lines[i].startswith("%FLAG CHARGE"):
-            c_idx = i
-        if lines[i].startswith("%FLAG BONDS_INC_HYDROGEN"):
-            b1_idx = i
-        if lines[i].startswith("%FLAG BONDS_WITHOUT_HYDROGEN"):
-            b2_idx = i
+        if line.startswith('%'):
+            continue
 
-    if (p_idx == -1 or c_idx == -1 or b1_idx == -1 or b2_idx == -1):
-        raise NameError("Syntax error in PRMTOP file")
+        if section == 'pointers':
+            pass
+        elif section == 'names':
+            fieldlen = 4
+            names += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
+                      if len(line[i:i + fieldlen].strip()) != 0]
+        elif section == 'charges':
+            fieldlen = 16
+            charges += [float(line[i:i + fieldlen].strip()) / 18.2223 for i in range(0, len(line), fieldlen)
+                        if len(line[i:i + fieldlen].strip()) != 0]  # 18.2223 = Scaling factor for charges
+        elif section == 'masses':
+            fieldlen = 16
+            masses += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                       if len(line[i:i + fieldlen].strip()) != 0]  # 18.2223 = Scaling factor for charges
+        elif section == 'resname':
+            fieldlen = 4
+            uqresnames += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
+                           if len(line[i:i + fieldlen].strip()) != 0]
+        elif section == 'resstart':
+            fieldlen = 8
+            residx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                       if len(line[i:i + fieldlen].strip()) != 0]
+        elif section == 'bonds':
+            fieldlen = 8
+            bondsidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                         if len(line[i:i + fieldlen].strip()) != 0]
 
-    l = lines[p_idx + 2].split()
-    natoms = int(l[0])
-    nb1 = int(l[2])
-    nb2 = int(l[3])
-    nc = natoms
+    # Replicating unique resnames according to their start and end indeces
+    residx.append(len(names)+1)
+    resnames = []
+    resid = []
+    for i in range(len(residx) - 1):
+        numresatoms = residx[i+1] - residx[i]
+        resnames += [uqresnames[i]] * numresatoms
+        resid += [i] * numresatoms
 
-    prmtop = PRMTOP()
+    # Processing bond triplets
+    bonds = []
+    for i in range(0, len(bondsidx), 3):
+        bonds.append([int(bondsidx[i] / 3), int(bondsidx[i+1] / 3)])
 
-    prmtop.charges = numpy.zeros((natoms))
-    prmtop.bonds = numpy.zeros((nb1 + nb2, 2), dtype=int)
-
-    i = c_idx + 2
-    idx = 0
-    while not lines[i].startswith('%'):
-        v = lines[i].split()
-        for c in v:
-            prmtop.charges[idx] = float(c) / 18.2223  # Scaling factor for charges
-            idx += 1
-        i += 1
-
-    idx = 0
-    v = []
-
-    i = b1_idx + 2
-    while not lines[i].startswith('%'):
-        v.extend(lines[i].split())
-        i += 1
-    i = b2_idx + 2
-    while not lines[i].startswith('%'):
-        v.extend(lines[i].split())
-        i += 1
-
-    for c in range(0, len(v), 3):
-        prmtop.bonds[idx, 0] = int(v[c + 0]) / 3
-        prmtop.bonds[idx, 1] = int(v[c + 1]) / 3
-        idx += 1
-
-    return prmtop
-    pass
+    return names, charges, masses, resnames, resid, bonds
 
 
 def PRMTOPwrite(filename):
@@ -96,4 +101,3 @@ if __name__ == "__main__":
     m.read(path.join(home(), 'data', 'amber', 'test-prmtop.prmtop') )
     print( m.charge )
     print( m.bonds )
-
