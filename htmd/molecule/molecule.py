@@ -25,6 +25,12 @@ import re
 logger = logging.getLogger(__name__)
 
 
+class TopologyInconsistencyError(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+
 class Molecule:
     """ Class to manipulate molecular structures.
 
@@ -722,6 +728,23 @@ class Molecule:
             except:
                 raise ValueError("Unknown file type")
 
+    def _readTopology(self, filename, overwrite=None):
+        if isinstance(overwrite, str):
+            overwrite = (overwrite)
+
+        newdata = toporeader(filename)
+
+        for field in self._pdb_fields:
+            newdatafield = np.array(newdata[field], dtype=self._pdb_fields[field])
+            if field in overwrite or self.__dict__[field] is None:
+                self.__dict__[field] = newdatafield
+            else:
+                if np.shape(self.__dict__[field]) != newdatafield:
+                    raise TopologyInconsistencyError('Different number of atoms read from topology file for field {}'.format(field))
+                if not np.array_equal(self.__dict__[field], newdatafield):
+                    raise TopologyInconsistencyError('Different atom information read from topology file for field {}'.format(field))
+
+
     def _readXYZ(self, filename):
         f = open(filename, "r")
         natoms = int(f.readline().split()[0])
@@ -1387,7 +1410,7 @@ class Molecule:
     def numAtoms(self):
         """ Number of atoms in the molecule
         """
-        return np.size(self.coords, 0)
+        return len(self.serial)
 
     @property
     def x(self):
