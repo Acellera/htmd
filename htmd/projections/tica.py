@@ -54,8 +54,7 @@ class TICA(object):
             self.tic = TICA(lag)
 
             p = ProgressBar(len(metr.simulations))
-            gen = _projectionGenerator(metr, _getNcpus())
-            for proj in gen:
+            for proj in _projectionGenerator(metr, _getNcpus()):
                 for pro in proj:
                     self.tic.partial_fit(pro[0])
                 p.progress(len(proj))
@@ -97,8 +96,7 @@ class TICA(object):
             p = ProgressBar(len(metr.simulations))
             k = -1
             droppedsims = []
-            gen = _projectionGenerator(metr, _getNcpus())
-            for projecteddata in gen:
+            for projecteddata in _projectionGenerator(metr, _getNcpus()):
                 for pro in projecteddata:
                     k += 1
                     if pro is None:
