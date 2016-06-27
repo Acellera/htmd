@@ -285,7 +285,10 @@ def _renameSims(trajectory, simname, outfolder):
     for t in range(0, len(trajectory)):
         (tmp, fname) = path.split(trajectory[t])
         (fname, ext) = path.splitext(fname)
-        outname = path.join(outfolder, simname, fname + '.filtered.xtc')
+
+        # get the file extension (i.e. .xtc or .nc)
+        filename, file_extension = os.path.splitext(trajectory[0])
+        outname = path.join(outfolder, simname, fname + '.filtered{}'.format(file_extension))
 
         if not path.isfile(outname) or (path.getmtime(outname) < path.getmtime(trajectory[t])):
             traj.append(trajectory[t])
@@ -300,8 +303,15 @@ def _filterPDBPSF(sim, outfolder, filtsel):
     except IOError as e:
         raise NameError('simFilter: ' + e.strerror + ' Cannot create filtered.pdb due to problematic pdb: ' + sim.molfile)
 
+
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
-        mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
+
+        if mol.topoloc.endswith('prmtop'):
+            # need to load one frame, since pdbs require coords, and I do not have prmtop editor
+            # this code is only temporarily until there is a prmtop write option
+            mol._prmtopPDB(path.join(outfolder, 'filtered.pdb'), filtsel, sim)
+        else:
+            mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
 
 
 def _listTrajectories(folder):
