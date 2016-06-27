@@ -1156,6 +1156,8 @@ class Molecule:
             self._writeTraj(filename, sel)
         elif type == ".rst" or filename.endswith(".rst"):
             self._writeRST(filename, sel)
+        elif type == ".nc" or filename.endswith(".nc"):
+            self._writeNC(filename, sel)
         else:
             try:
                 import mdtraj as md
@@ -1183,12 +1185,15 @@ class Molecule:
                      cell_angles=self.box_angles[self.frame, :])
         newRST.close()
 
-    def _writeNC(self, filename, sel):
+    def _writeNC(self, filename, sel="all"):
         import mdtraj as md
         newNC = md.formats.NetCDFTrajectoryFile(filename, mode='w', force_overwrite=True)
-        # did not add box yet, since it would through back an error if someone would read in .xtc and write out .nc
-        newNC.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0))
-        newNC.close()
+        if len(self.box_angles) == 0:
+            logger.info('Assuming orthrombic box')
+            self.box_angles = np.tile(np.array([90,90,90]), (self.numFrames,1)) 
+        newNC.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0), time=self.time, 
+                    cell_lengths=np.swapaxes(self.box, 0, 1), cell_angles=self.box_angles)
+        newNC.close() 
 
     def _writeXYZ(self, filename, sel="all"):
         src = self
