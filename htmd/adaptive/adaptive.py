@@ -101,7 +101,7 @@ class AdaptiveNew(ProtocolInterface):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc', '*.nc'))
                 k += 1
 
     def _getEpoch(self):
@@ -115,6 +115,7 @@ class AdaptiveNew(ProtocolInterface):
             The current epoch
         """
         folders = glob(path.join(self.inputpath, 'e*', ''))
+
         epoch = 0
         regex = re.compile('e(\d+)')
         for f in folders:
@@ -161,7 +162,7 @@ class AdaptiveNew(ProtocolInterface):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor', '*.nc'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
@@ -264,12 +265,21 @@ class Adaptive(object):
             time.sleep(self.updateperiod)
 
     def _init(self):
+        # Creates all the directories for this epoch in a parent directory -> inputpath
+        # Get's all the files from the generators required for the next epoch
+        # in case of Amber it would be .in, .prmtop and .rst 
+
         folders = natsorted(glob(path.join(self.generatorspath, '*', ''))) # I need the extra ''  to add a finishing /
         if len(folders) == 0:
             logger.info('Generators folder has no subdirectories, using folder itself')
             folders.append(self.generatorspath)
 
         numF = len(folders)
+        # Depends on number of simulations that are going to run?
+        # so if nmax = 4 (max 4 GPUs running at a time), there will be 4 copies, assuming only 1 generator
+        # if there were 2 generators -> 2 folders with two simulations each
+        # with 2 generators, but only 3 GPUs at max there will be a random (multinomial) sampling
+        # that will assign 2 and 1 folders for MD inputs
         numCopies = np.ones(numF, dtype=int) * int(np.floor(self.nmax / numF))
         numExtra = np.mod(self.nmax, numF)
         numCopies = numCopies + np.random.multinomial(numExtra, [1/numF]*numF)  # draw the extra equally from a flat distribution
@@ -281,6 +291,9 @@ class Adaptive(object):
         if len(existing) != 0:
             raise NameError('Epoch 1 directories already exist.')
 
+        # generates all the folders. The distribution of subfolders for each generator is stored as an array in numCopies
+        # with the examples above numCopies would be respectively [4], [2,2], [2,1] (or [1,2])
+
         k = 1
         for i in range(numF):
             for j in range(numCopies[i]):
@@ -288,7 +301,7 @@ class Adaptive(object):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc', '*.nc'))
                 k += 1
 
     def _getEpoch(self):
@@ -348,12 +361,12 @@ class Adaptive(object):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor', '*.rst', '*.out'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
-            mol = Molecule()
+            mol = Molecule(glob(path.join(currSim.input, '*.prmtop'))[0])
             mol.read(traj)
             mol.frame = frameNum
-            mol.write(path.join(newDir, 'input.coor'))
+            mol.write(path.join(newDir, 'structure.rst'))
 
             # write nextInput file
             fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))

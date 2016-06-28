@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.bincoor import *
 from htmd.molecule.pdbparser import *
-from htmd.molecule.prmtop import *
+from htmd.molecule.prmtop import PRMTOPread
 from htmd.molecule.psf import *
 from htmd.molecule.vmdparser import *
 from htmd.molecule.xtc import *
@@ -627,13 +627,14 @@ class Molecule:
         append : bool, optional
             If the file is a trajectory, append the coordinates to the previous coordinates
         """
+        from htmd.simlist import Sim
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
                 if len(f) != 4 and not os.path.exists(f):
                     raise FileNotFoundError('File {} was not found.'.format(f))
             firstfile = filename[0]
         else:
-            if len(filename) != 4 and not os.path.exists(filename):
+            if not isinstance(filename, Sim) and len(filename) != 4 and not os.path.exists(filename):
                 raise FileNotFoundError('File {} was not found.'.format(filename))
             firstfile = filename
 
@@ -664,12 +665,16 @@ class Molecule:
             self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
             if len(oldcoords) != 0:
                 self.coords = oldcoords
-        elif (type is None and (
-            firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
-            con = PRMTOPread(filename)
-            self.charge = numpy.asarray(con.charges, dtype=np.float32)
-            # self.masses = numpy.asarray(con.masses, dtype=np.float32)  # No masses in PRMTOP
-            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
+        elif (type is None and (firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
+            name, charges, masses, resname, resid, bonds = PRMTOPread(filename)
+            self.empty(len(name))
+            self.serial = np.array(list(range(len(name))), dtype=self._append_fields['serial'])
+            self.name = np.array(name, dtype=self._append_fields['name'])
+            self.resname = np.array(resname, dtype=self._append_fields['resname'])
+            self.resid = np.array(resid, dtype=self._append_fields['resid'])
+            self.bonds = np.array(bonds, dtype=np.uint32)
+            self.masses = np.array(masses, dtype=self._append_fields['masses'])
+            self.charge = np.array(charges, dtype=self._append_fields['charge'])
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
@@ -879,12 +884,14 @@ class Molecule:
             s.time = traj.time
             s.step = s.time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
         s.box = traj.unitcell_lengths.T * 10
+        s.box_angles = traj.unitcell_angles
         return s
 
     def _readTraj(self, filename, skip=None, frames=None, append=False, mdtraj=False):
         if not append:
             self.coords = []
             self.box = []
+            self.box_angles = []
         else:
             logger.warning('Appending trajectories not well tested yet')
 
@@ -933,14 +940,17 @@ class Molecule:
             if len(self.coords) == 0:
                 self.coords = traj.coords
                 self.box = traj.box
+                self.box_angles = traj.box_angles
             else:
                 self.coords = np.append(self.coords, traj.coords, 2)
                 self.box = np.append(self.box, traj.box, 1)
+                self.box_angles = np.append(self.box_angles, traj.unitcell_angles,1)
 
         if skip is not None:
             self.coords = self.coords[:, :, ::skip]  # Might actually not free memory! Check numpy views
             self.box = self.box[:, ::skip]
             self.fileloc = self.fileloc[::skip]
+            self.box_angles = self.box_angles[:, ::skip]
 
         self.coords = np.atleast_3d(self.coords)
         self.step = traj.step
@@ -1144,6 +1154,10 @@ class Molecule:
             self._writeConnectivity(filename, sel)
         elif type == "xtc" or filename.endswith(".xtc"):
             self._writeTraj(filename, sel)
+        elif type == ".rst" or filename.endswith(".rst"):
+            self._writeRST(filename, sel)
+        elif type == ".nc" or filename.endswith(".nc"):
+            self._writeNC(filename, sel)
         else:
             try:
                 import mdtraj as md
@@ -1159,6 +1173,29 @@ class Molecule:
                 traj.save(filename)
             except:
                 raise ValueError("Unknown file type")
+
+    def _writeRST(self, filename, sel="all"):
+        import mdtraj as md
+        newRST = md.formats.AmberNetCDFRestartFile(filename= filename, mode='w', force_overwrite=True)
+        # need to swap the coordinates back
+        # do not need to worry about the box here, since there is only one dimension
+        newRST.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0)[self.frame,:,:], 
+                     cell_lengths=self.box[:, self.frame], 
+                     cell_angles=self.box_angles[self.frame, :])
+        newRST.close()
+
+    def _writeNC(self, filename, sel="all"):
+        import mdtraj as md
+        if isinstance(sel, str):
+            top = md.load_prmtop(self.topoloc)
+            sel = top.select(sel)
+        if len(self.box_angles) == 0:
+            logger.info('Assuming orthorhombic box!')
+            self.box_angles = np.tile(np.array([90,90,90]), (self.numFrames,1))
+        newNC = md.formats.NetCDFTrajectoryFile(filename, mode='w', force_overwrite=True) 
+        newNC.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0)[:,sel,:], time=self.time, 
+                    cell_lengths=np.swapaxes(self.box, 0, 1), cell_angles=self.box_angles)
+        newNC.close() 
 
     def _writeXYZ(self, filename, sel="all"):
         src = self
