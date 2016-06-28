@@ -42,6 +42,8 @@ git describe --tags
 
 These are examples of how to release HTMD versions.
 
+DO NOT ONLY do `git push --tags`, as it will push the tag but not the commit!
+
 ### Big and/or major releases
 
 Imagine one wants to do a big/major release (in this case, let's assume it's the first major release of big release 1).
@@ -111,7 +113,7 @@ Imagine one wants to do a minor release (bug-fix) on release 1.0.0.
 
 1. Push the fix and the tag to the remote (`origin`):
 
-   `git push --tags`
+   `git push --tags origin rel-1.0.x`
 
    This will trigger a new Travis build. A conda release will be made.
 
@@ -141,6 +143,6 @@ Imagine one wants to do a minor release on release 1.1.0.
 
 1. Push the tag to the remote (`origin`):
 
-   `git push --tags`
+   `git push --tags origin master`
 
    This will trigger a new Travis build. A conda release will be made.
