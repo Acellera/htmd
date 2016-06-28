@@ -265,6 +265,11 @@ def _filtSim(i, sims, outFolder, filterSel):
     if mol.topoloc.endswith(".prmtop"):
         sel = filterSel
     else:    
+    if sims[i].molfile.endswith('prmtop'):
+        import mdtraj as md
+        top = md.load_prmtop(sims[i].molfile)
+        sel = top.select(filterSel)
+    else:
         sel = mol.atomselect(filterSel)
 
     for j in range(0, len(traj)):

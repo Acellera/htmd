@@ -1176,17 +1176,19 @@ class Molecule:
 
     def _writeRST(self, filename, sel="all"):
         import mdtraj as md
-        logger.info(self.box_angles.shape)
         newRST = md.formats.AmberNetCDFRestartFile(filename= filename, mode='w', force_overwrite=True)
         # need to swap the coordinates back
         # do not need to worry about the box here, since there is only one dimension
-        newRST.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0)[:,:,self.frame], 
+        newRST.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0)[self.frame,:,:], 
                      cell_lengths=self.box[:, self.frame], 
                      cell_angles=self.box_angles[self.frame, :])
         newRST.close()
 
     def _writeNC(self, filename, sel="all"):
         import mdtraj as md
+        if isinstance(sel, str):
+            top = md.load_prmtop(self.topoloc)
+            sel = top.select(sel)
         newNC = md.formats.NetCDFTrajectoryFile(filename, mode='w', force_overwrite=True)
         if isinstance(sel, str):
             top = md.load_prmtop(self.topoloc)
