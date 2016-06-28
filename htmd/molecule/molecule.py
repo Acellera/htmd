@@ -1189,13 +1189,10 @@ class Molecule:
         if isinstance(sel, str):
             top = md.load_prmtop(self.topoloc)
             sel = top.select(sel)
-        newNC = md.formats.NetCDFTrajectoryFile(filename, mode='w', force_overwrite=True)
-        if isinstance(sel, str):
-            top = md.load_prmtop(self.topoloc)
-            sel = top.select(sel)
         if len(self.box_angles) == 0:
-            logger.info('Assuming orthrombic box')
-            self.box_angles = np.tile(np.array([90,90,90]), (self.numFrames,1)) 
+            logger.info('Assuming orthorhombic box!')
+            self.box_angles = np.tile(np.array([90,90,90]), (self.numFrames,1))
+        md.formats.NetCDFTrajectoryFile(filename, mode='w', force_overwrite=True) 
         newNC.write(np.swapaxes(np.swapaxes(self.coords, 2, 1), 1, 0)[:,sel,:], time=self.time, 
                     cell_lengths=np.swapaxes(self.box, 0, 1), cell_angles=self.box_angles)
         newNC.close() 
