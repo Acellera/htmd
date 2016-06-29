@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.bincoor import *
 from htmd.molecule.pdbparser import *
-from htmd.molecule.prmtop import *
+from htmd.molecule.prmtop import PRMTOPread
 from htmd.molecule.psf import *
 from htmd.molecule.vmdparser import *
 from htmd.molecule.xtc import *
@@ -106,6 +106,15 @@ class Molecule:
         A list of representations that is used when visualizing the molecule
     viewname : str
         The name used for the molecule in the viewer
+    angles : np.ndarray
+        Angle terms, valid only if PSF read and molecule unmodified
+    dihedrals : np.ndarray
+        Dihedral terms, valid only if PSF read and molecule unmodified
+    impropers : np.ndarray
+        Improper terms, valid only if PSF read and molecule unmodified
+    atomtype : np.ndarray
+        Atom types, valid only if PSF read and molecule unmodified
+
     """
     _pdb_fields = {
         'record': object,
@@ -125,9 +134,13 @@ class Molecule:
     }
 
     def __init__(self, filename=None, name=None):
-        self.bonds = np.empty((0, 2), dtype=np.uint32)
+        self.bonds     = np.empty((0, 2), dtype=np.uint32)
+        self.angles    = np.empty((0, 3), dtype=np.uint32)
+        self.dihedrals = np.empty((0, 4), dtype=np.uint32)
+        self.impropers = np.empty((0, 4), dtype=np.uint32)
+        self.atomtype  = np.empty((0, 1), dtype=np.object)
         self.ssbonds = []
-        self.box = None
+        self.box = np.zeros((3,1), dtype=np.float32)
         self.charge = []
         self.masses = None
         self.frame = 0
@@ -627,17 +640,17 @@ class Molecule:
         append : bool, optional
             If the file is a trajectory, append the coordinates to the previous coordinates
         """
+        from htmd.simlist import Sim
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
                 if len(f) != 4 and not os.path.exists(f):
                     raise FileNotFoundError('File {} was not found.'.format(f))
             firstfile = filename[0]
         else:
-            if len(filename) != 4 and not os.path.exists(filename):
+            if not isinstance(filename, Sim) and len(filename) != 4 and not os.path.exists(filename):
                 raise FileNotFoundError('File {} was not found.'.format(filename))
             firstfile = filename
 
-        from htmd.simlist import Sim
         if isinstance(filename, Sim):
             self._readPDB(filename.molfile)
             self._readTraj(filename.trajectory)
@@ -647,7 +660,6 @@ class Molecule:
             type = type.lower()
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
-            # TODO: Check for validity when loading a PSF after a PDB and vice versa
             con = PSFread(filename)
             oldcoords = []
             if len(self.coords) != 0:
@@ -661,15 +673,31 @@ class Molecule:
             self.insertion = con.insertion
             self.charge = numpy.asarray(con.charges, dtype=np.float32)
             self.masses = numpy.asarray(con.masses, dtype=np.float32)
-            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
+            self.bonds     = numpy.asarray(con.bonds, dtype=np.uint32)
+            self.angles    = numpy.asarray(con.angles, dtype=np.uint32)
+            self.dihedrals = numpy.asarray(con.dihedrals, dtype=np.uint32)
+            self.impropers = numpy.asarray(con.impropers, dtype=np.uint32)
+            self.atomtype  = numpy.asarray(con.atomtype, dtype=np.object )
+
             if len(oldcoords) != 0:
                 self.coords = oldcoords
         elif (type is None and (
             firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
-            con = PRMTOPread(filename)
-            self.charge = numpy.asarray(con.charges, dtype=np.float32)
-            # self.masses = numpy.asarray(con.masses, dtype=np.float32)  # No masses in PRMTOP
-            self.bonds = numpy.asarray(con.bonds, dtype=np.uint32)
+            name, charges, masses, resname, resid, bonds = PRMTOPread(filename)
+            oldcoords = []
+            if len(self.coords) != 0:
+                oldcoords = self.coords
+            self.empty(len(name))
+            self.serial = np.array(list(range(len(name))), dtype=self._append_fields['serial'])
+            self.name = np.array(name, dtype=self._append_fields['name'])
+            self.resname = np.array(resname, dtype=self._append_fields['resname'])
+            self.resid = np.array(resid, dtype=self._append_fields['resid'])
+            self.bonds = np.array(bonds, dtype=np.uint32)
+            self.masses = np.array(masses, dtype=self._append_fields['masses'])
+            self.charge = np.array(charges, dtype=self._append_fields['charge'])
+
+            if len(oldcoords) != 0:
+                self.coords = oldcoords
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
@@ -810,9 +838,12 @@ class Molecule:
         f.close()
         start = None
         end = None
+        bond = None
         for i in range(len(l)):
             if l[i].startswith("@<TRIPOS>ATOM"): start = i + 1
-            if l[i].startswith("@<TRIPOS>BOND"): end = i - 1
+            if l[i].startswith("@<TRIPOS>BOND"):
+               end = i - 1
+               bond= i + 1
 
         if not start or not end:
             raise ValueError("File cannot be read")
@@ -823,6 +854,7 @@ class Molecule:
             self.__dict__[k] = numpy.zeros((natoms), dtype=self._pdb_fields[k])
         self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
 
+        self.atomtype  = numpy.empty( (natoms), dtype=np.object )
         for i in range(natoms):
             s = l[i + start].strip().split()
             self.record[i] = "HETATM"
@@ -832,7 +864,16 @@ class Molecule:
             self.coords[i, 0, 0] = float(s[2])
             self.coords[i, 1, 0] = float(s[3])
             self.coords[i, 2, 0] = float(s[4])
-            self.resname[i] = "MOL"
+            self.charge[i]  = float(s[8])
+            self.atomtype[i]= s[5]
+            self.resname[i] = s[6]
+        if bond:
+           bb=[]
+           for i in range(bond, len(l) ):
+              b=l[i].split()
+              if(len(b)!=4): break
+              bb.append( [ int(b[1])-1, int(b[2])-1 ] )
+        self.bonds = np.asarray( bb, dtype=np.int )
 
     def _readMae(self, filename):
         datadict = _maestroparser(filename)
@@ -982,72 +1023,73 @@ class Molecule:
         if hold:
             return
 
+        oldbonds = None
+        if guessBonds:
+            oldbonds = self.bonds
+            self.bonds = self._getBonds()
+
         # Write out PDB and XTC files
-        pdb = tempname(suffix=".pdb")
-        self.write(pdb)
-        xtc = None
-        if self.numFrames > 1:
-            xtc = tempname(suffix=".xtc")
-            self.write(xtc)
+        psf = tempname(suffix=".psf")
+        self.write(psf)
+
+        if guessBonds:
+            self.bonds = oldbonds
+
+        xtc = tempname(suffix=".xtc")
+        self.write(xtc)
 
         # Call the specified backend
         if viewer is None:
             from htmd.config import _config
             viewer = _config['viewer']
         if viewer.lower() == 'notebook':
-            return self._viewMDTraj(pdb, xtc)
+            return self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
-            self._viewVMD(pdb, xtc, viewerhandle, name, guessBonds)
+            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
-            return self._viewNGL(pdb, xtc, guessBonds)
+            return self._viewNGL(psf, self.coords, guessBonds)
         else:
             raise ValueError('Unknown viewer.')
 
         # Remove temporary files
-        if xtc:
-            os.remove(xtc)
-        os.remove(pdb)
+        os.remove(xtc)
+        os.remove(psf)
 
-    def _viewVMD(self, pdb, xtc, vhandle, name, guessbonds):
+    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
         if name is None:
             name = self.viewname
         if vhandle is None:
             vhandle = getCurrentViewer()
 
         if guessbonds:
-            vhandle.send("mol new " + pdb)
+            vhandle.send("mol new " + psf)
         else:
-            vhandle.send("mol new " + pdb + " autobonds off")
+            vhandle.send("mol new " + psf + " autobonds off")
+        vhandle.send('animate delete all')
+        vhandle.send('mol addfile ' + xtc + ' type xtc waitfor all')
 
         if name is not None:
             vhandle.send('mol rename top "' + name + '"')
         else:
-            vhandle.send('mol rename top "Mol [molinfo top]: pdb"')
-
-        if xtc:
-            vhandle.send('animate delete all')
-            vhandle.send('mol addfile ' + xtc + ' type xtc waitfor all')
-            if name is None:
-                vhandle.send('mol rename top "Mol [molinfo top]: pdb+xtc"')
+            vhandle.send('mol rename top "Mol [molinfo top]: psf+xtc"')
 
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
         self._tempreps.remove()
 
-    def _viewMDTraj(self, pdb, xtc):
+    def _viewMDTraj(self, psf, xtc):
         from mdtraj.html import TrajectoryView, TrajectorySliderView, enable_notebook
         import mdtraj
         enable_notebook()
 
-        if xtc:
-            t = mdtraj.load(xtc, top=pdb)
+        t = mdtraj.load(xtc, top=psf)
+        if self.numFrames > 1:
             widget = TrajectorySliderView(t)
         else:
-            t = mdtraj.load(pdb)
             widget = TrajectoryView(t)
         return widget
 
-    def _viewNGL(self, pdb, xtc, guessb):
+    def _viewNGL(self, psf, coords, guessb):
         from nglview import Trajectory
         import nglview
 
@@ -1061,13 +1103,13 @@ class Molecule:
             def get_frame_count(self):
                 return np.size(self.coords, 2)
 
-        struc = nglview.FileStructure(pdb)
+        struc = nglview.FileStructure(psf)
         struc.params['dontAutoBond'] = not guessb
-        if xtc:
-            traj = TrajectoryStreamer(self.coords)
-            w = nglview.NGLWidget(struc, traj)
-        else:
-            w = nglview.NGLWidget(struc)
+
+        traj = TrajectoryStreamer(coords)
+        w = nglview.NGLWidget(struc, traj)
+        #else:
+        #    w = nglview.NGLWidget(struc)
 
         self._tempreps.append(self.reps)
         self._tempreps._repsNGL(w)
@@ -1717,5 +1759,5 @@ if __name__ == "__main__":
     m.align('name CA')
     m = Molecule('2OV5')
     m.filter('protein or water')
- 
+
     # test rotate
