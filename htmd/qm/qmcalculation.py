@@ -430,15 +430,15 @@ class QMCalculation:
     print("\nMol\n\n%d %d" %(self.charge, self.multiplicity), file=f )
     for i in range(coords.shape[0] ):
       print("%s\t %f\t %f\t %f" % ( self.molecule.element[i], coords[i,0], coords[i,1], coords[i,2] ), file=f )
+    print("", file=f )
     if self.frozen:
-      print( "", file=f )
       for i in range(len(self.frozen)):
          print("%s %s %s %s F\n" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2],  self.frozen[i][3]), file=f )
 
 
 
     if self.points is not None:
-      print("\n@grid.dat /N", file=f )
+      print("@grid.dat /N", file=f )
       self._write_points( os.path.join( dirname, "grid.dat" ), self.points[frame] )
 
     f.close()
