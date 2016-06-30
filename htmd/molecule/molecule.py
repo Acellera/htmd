@@ -1293,7 +1293,7 @@ class Molecule:
         self.serial = np.arange(1, numAtoms + 1)
 
         self.masses = np.array([0] * numAtoms, dtype=self._append_fields['masses'])
-        self.box = None
+        self.box = np.zeros((3,1), dtype=np.float32)
 
 
     def sequence(self, oneletter=True):

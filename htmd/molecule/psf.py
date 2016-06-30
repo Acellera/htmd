@@ -160,7 +160,7 @@ def PSFwrite(molecule, filename):
         print("%8d %-4s %-5s%-4s %-4s %-6s %-2s %10.6f  %8.6f  %10d" %
               (int(m.serial[i]),
                m.segid[i],
-               str(m.resid[i])+m.insertion[i],
+               str(m.resid[i])+str(m.insertion[i]),
                (m.resname[i]),
                m.name[i],
                atomtype,
@@ -178,14 +178,15 @@ def PSFwrite(molecule, filename):
         print("%10d%10d" % (m.bonds[i, 0] + 1, m.bonds[i, 1] + 1), file=f, end="")
 
     print("\n\n", file=f)
-    print("%10d !NTHETA: angles\n" % (m.angles.shape[0]), file=f)
+    print("%10d !NTHETA: angles" % (m.angles.shape[0]), file=f)
     for i in range(m.angles.shape[0]):
         if (i and not (i % 3)):
             print("", file=f)
         print("%10d%10d%10d" % (m.angles[i, 0] + 1, m.angles[i, 1] + 1, m.angles[i,2]+1), file=f, end="")
 
 
-    print("%10d !NPHI: dihedrals\n" % (m.dihedrals.shape[0]), file=f)
+    print("\n\n", file=f)
+    print("%10d !NPHI: dihedrals" % (m.dihedrals.shape[0]), file=f)
     for i in range(m.dihedrals.shape[0]):
         if (i and not (i % 3)):
             print("", file=f)
@@ -193,7 +194,8 @@ def PSFwrite(molecule, filename):
 
 
 
-    print("%10d !NIMPHI: impropers\n" % (m.impropers.shape[0]), file=f)
+    print("\n\n", file=f)
+    print("%10d !NIMPHI: impropers" % (m.impropers.shape[0]), file=f)
     for i in range(m.impropers.shape[0]):
         if (i and not (i % 3)):
             print("", file=f)
@@ -201,6 +203,7 @@ def PSFwrite(molecule, filename):
 
 
 
+    print("\n\n", file=f)
     print("%10d !NDON: donors\n" % (0), file=f)
     print("%10d !NACC: acceptors\n" % (0), file=f)
     print("%10d !NNB: acceptors\n" % (0), file=f)
