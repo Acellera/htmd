@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.bincoor import *
 from htmd.molecule.pdbparser import *
-from htmd.molecule.prmtop import PRMTOPread
+from htmd.molecule.prmtop import PRMTOPread, CRDread
 from htmd.molecule.psf import *
 from htmd.molecule.vmdparser import *
 from htmd.molecule.xtc import *
@@ -716,6 +716,8 @@ class Molecule:
             self._readMae(filename)
         elif (type is None and firstfile.endswith(".mol2")) or type == "mol2":
             self._readMOL2(filename)
+        elif (type is None and firstfile.endswith(".crd")) or type == "crd":
+            self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
         else:
             try:
                 self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)

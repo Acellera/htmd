@@ -158,7 +158,6 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         f.write('\n')'''
 
     f.write('# Writing out the results\n')
-    f.write('savepdb mol ' + prefix + '.pdb\n')
     f.write('saveamberparm mol ' + prefix + '.prmtop ' + prefix + '.crd\n')
     f.write('quit')
     f.close()
@@ -178,21 +177,20 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         os.chdir(currdir)
         logger.info('Finished building.')
 
-        if path.getsize(path.join(outdir, 'structure.pdb')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
-            molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
-            molbuilt.read(path.join(outdir, 'structure.prmtop'))
+        if path.getsize(path.join(outdir, 'structure.crd')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
+            molbuilt = Molecule(path.join(outdir, 'structure.prmtop'))
+            molbuilt.read(path.join(outdir, 'structure.crd'))
             molbuilt.bonds = []  # Causes problems in ionization mol.remove and mol._removeBonds
         else:
             raise NameError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
-            shutil.move(path.join(outdir, 'structure.pdb'), path.join(outdir, 'structure.noions.pdb'))
             shutil.move(path.join(outdir, 'structure.crd'), path.join(outdir, 'structure.noions.crd'))
             shutil.move(path.join(outdir, 'structure.prmtop'), path.join(outdir, 'structure.noions.prmtop'))
             totalcharge = np.sum(molbuilt.charge)
             nwater = np.sum(molbuilt.atomselect('water and noh'))
             anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc, ff='amber', anion=saltanion, cation=saltcation)
-            newmol = ionizePlace(molbuilt, anion, cation, anionatom, cationatom, nanion, ncation)
+            newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap)
