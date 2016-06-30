@@ -1189,9 +1189,6 @@ class Molecule:
         src = self
         if sel is not None:
             src.filter(sel, _logger=False)
-        if isinstance(sel, str):
-            top = md.load_prmtop(src.topoloc)
-            sel = top.select(sel)
         try:
             box_angles = src.box_angles
         except:
