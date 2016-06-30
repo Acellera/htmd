@@ -223,7 +223,7 @@ def proteinPrepare(mol_in,
     # hidden quirks.
     tmpin = tempfile.NamedTemporaryFile(suffix=".pdb", mode="w+")
     logger.debug("Temporary file is " + tmpin.name)
-    mol_in.write(tmpin.name)  # Not sure this is sound unix
+    mol_in.write(tmpin.name)  # Not sure this is good unix
 
     pdblist, errlist = readPDB(tmpin)
     if len(pdblist) == 0 and len(errlist) == 0:
@@ -323,6 +323,7 @@ def proteinPrepare(mol_in,
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
+    mol_out.box = mol_in.box
     _fixupWaterNames(mol_out)
 
     # Return residue information
