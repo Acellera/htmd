@@ -305,9 +305,8 @@ def _filterPDBPSF(sim, outfolder, filtsel):
         raise NameError('simFilter: ' + e.strerror + ' Cannot create filtered.pdb due to problematic pdb: ' + sim.molfile)
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
         if mol.topoloc.endswith('prmtop'):
-            # need to load one frame, since pdbs require coords, and I do not have prmtop editor
-            # this code is only temporarily until there is a prmtop write option
-            mol = Molecule(mol.topoloc)
+            # prmtop files do not have coordinates, therefore we need to load some
+            # to create a pdb
             mol.read(sim.trajectory[0])
             mol.filter(filtsel)
             mol.write(path.join(outfolder, 'filtered.pdb'))
