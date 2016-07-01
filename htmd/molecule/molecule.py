@@ -453,7 +453,7 @@ class Molecule:
         bonds : np.ndarray
             An array of bonds
         """
-        bonds = np.empty((0, 2), dtype=numpy.uint32)
+        bonds = np.empty((0, 2), dtype=np.uint32)
         if fileBonds:
             if len(self.bonds) == 0:  # This is a patch for the other readers not returning correct empty dimensions
                 self.bonds = np.empty((0, 2), dtype=numpy.uint32)

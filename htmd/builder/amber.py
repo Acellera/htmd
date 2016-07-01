@@ -86,7 +86,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     """
     # Remove pdb bonds!
     mol = mol.copy()
-    mol.bonds = []
+    mol.bonds = np.empty((0, 2), dtype=np.uint32)
     if shutil.which(tleap) is None:
         raise NameError('Could not find executable: `' + tleap + '` in the PATH. Cannot build for AMBER.')
     if not os.path.isdir(outdir):
@@ -180,7 +180,6 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         if path.getsize(path.join(outdir, 'structure.crd')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
             molbuilt = Molecule(path.join(outdir, 'structure.prmtop'))
             molbuilt.read(path.join(outdir, 'structure.crd'))
-            molbuilt.bonds = []  # Causes problems in ionization mol.remove and mol._removeBonds
         else:
             raise NameError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
 
