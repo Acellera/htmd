@@ -194,6 +194,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap)
+    molbuilt.write(path.join(outdir, 'structure.pdb'))
     return molbuilt
 
 
