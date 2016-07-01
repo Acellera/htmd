@@ -7,13 +7,11 @@ from __future__ import print_function
 
 import requests
 import numpy as np
-from htmd.molecule.bincoor import *
-from htmd.molecule.pdbparser import *
-from htmd.molecule.prmtop import PRMTOPread
-from htmd.molecule.psf import *
-from htmd.molecule.vmdparser import *
-from htmd.molecule.readers import XTCread, CRDread
-from htmd.molecule.writers import XTCwrite
+from htmd.molecule.pdbparser import PDBParser
+from htmd.molecule.vmdparser import guessbonds, vmdselection
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread
+from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite
+from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer

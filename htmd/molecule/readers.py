@@ -17,6 +17,15 @@ class Topology:
         self.occupancy = []
         self.beta = []
         self.segid = []
+        self.bonds = []
+        self.charge = []
+        self.masses = []
+        self.angles = []
+        self.dihedrals = []
+        self.impropers = []
+        self.atomname = []
+        self.atomtype = []
+
 
 
 class Trajectory:  # TODO: Remove this class
@@ -244,12 +253,12 @@ def MOL2read(self, filename):
     if bond:
         for i in range(bond, len(l)):
             b = l[i].split()
-            if len(b) != 4: break
+            if len(b) != 4:
+                break
             topo.bonds.append([int(b[1]) - 1, int(b[2]) - 1])
     return topo, coords
 
 
-# TODO: Needs rewriting
 def MAEread(fname):
     """ Reads maestro files.
 
@@ -260,31 +269,16 @@ def MAEread(fname):
 
     Returns
     -------
-    mol : Molecule
-
+    topo : Topology
+    coords : list of lists
     """
     section = None
     section_desc = False
     section_data = False
 
-    data = {}
-    data['serial'] = []
-    data['record'] = []
-    data['name'] = []
-    data['resname'] = []
-    data['resid'] = []
-    data['chain'] = []
-    data['segid'] = []
-    data['occupancy'] = []
-    data['beta'] = []
-    data['insertion'] = []
-    data['element'] = []
-    data['altloc'] = []
-    data['coords'] = []
-    data['bonds'] = []
-    data['charge'] = []
-    data['masses'] = []
-    data['het'] = []
+    topo = Topology()
+    coords = []
+    heteros = []
 
     import csv
     with open(fname, newline='') as fp:
@@ -317,42 +311,186 @@ def MAEread(fname):
 
                 # Reading the data of the atoms section
                 if section == 'atoms' and section_data:
-                    data['record'].append('ATOM')
+                    topo.record.append('ATOM')
                     row = np.array(row)
                     row[row == '<>'] = 0
                     if 'i_pdb_PDB_serial' in section_dict:
-                        data['serial'].append(row[section_dict['i_pdb_PDB_serial']])
+                        topo.serial.append(row[section_dict['i_pdb_PDB_serial']])
                     if 's_m_pdb_atom_name' in section_dict:
-                        data['name'].append(row[section_dict['s_m_pdb_atom_name']].strip())
+                        topo.name.append(row[section_dict['s_m_pdb_atom_name']].strip())
                     if 's_m_pdb_residue_name' in section_dict:
-                        data['resname'].append(row[section_dict['s_m_pdb_residue_name']].strip())
+                        topo.resname.append(row[section_dict['s_m_pdb_residue_name']].strip())
                     if 'i_m_residue_number' in section_dict:
-                        data['resid'].append(int(row[section_dict['i_m_residue_number']]))
+                        topo.resid.append(int(row[section_dict['i_m_residue_number']]))
                     if 's_m_chain_name' in section_dict:
-                        data['chain'].append(row[section_dict['s_m_chain_name']])
+                        topo.chain.append(row[section_dict['s_m_chain_name']])
                     if 's_pdb_segment_id' in section_dict:
-                        data['segid'].append(row[section_dict['s_pdb_segment_id']])
+                        topo.segid.append(row[section_dict['s_pdb_segment_id']])
                     if 'r_m_pdb_occupancy' in section_dict:
-                        data['occupancy'].append(float(row[section_dict['r_m_pdb_occupancy']]))
+                        topo.occupancy.append(float(row[section_dict['r_m_pdb_occupancy']]))
                     if 'r_m_pdb_tfactor' in section_dict:
-                        data['beta'].append(float(row[section_dict['r_m_pdb_tfactor']]))
+                        topo.beta.append(float(row[section_dict['r_m_pdb_tfactor']]))
                     if 's_m_insertion_code' in section_dict:
-                        data['insertion'].append(row[section_dict['s_m_insertion_code']].strip())
+                        topo.insertion.append(row[section_dict['s_m_insertion_code']].strip())
                     if '' in section_dict:
-                        data['element'].append('')  # TODO: Read element
+                        topo.element.append('')  # TODO: Read element
                     if '' in section_dict:
-                        data['altloc'].append('')  # TODO: Read altloc. Quite complex actually. Won't bother.
+                        topo.altloc.append('')  # TODO: Read altloc. Quite complex actually. Won't bother.
                     if 'r_m_x_coord' in section_dict:
-                        data['coords'].append(
+                        coords.append(
                             [float(row[section_dict['r_m_x_coord']]), float(row[section_dict['r_m_y_coord']]),
                              float(row[section_dict['r_m_z_coord']])])
-                    data['masses'].append(0)
+                    topo.masses.append(0)
 
                 # Reading the data of the bonds section
                 if section == 'bonds' and section_data:
-                    data['bonds'].append([int(row[section_dict['i_m_from']]), int(row[section_dict['i_m_to']])])
+                    topo.bonds.append([int(row[section_dict['i_m_from']]) - 1, int(row[section_dict['i_m_to']]) - 1])  # -1 to conver to 0 indexing
 
                 # Reading the data of the hetero residue section
                 if section == 'hetresidues' and section_data:
-                    data['het'].append(row[section_dict['s_pdb_het_name']].strip())
-    return data
+                    heteros.append(row[section_dict['s_pdb_het_name']].strip())
+
+    for h in heteros:
+        topo.record[topo.resname == h] = 'HETATM'
+    return topo, coords
+
+
+def BINCOORread(filename):
+    import struct
+    f = open(filename, 'rb')
+    dat = f.read(4)
+    fmt = 'i'
+    natoms = struct.unpack(fmt, dat)[0]
+    dat = f.read(natoms * 3 * 8)
+    fmt = 'd' * (natoms * 3)
+    coords = struct.unpack(fmt, dat)
+    coords = np.array(coords).reshape((natoms, 3, 1))
+    f.close()
+    return coords
+
+
+def PRMTOPread(filename):
+    f = open(filename, 'r')
+    topo = Topology()
+    uqresnames = []
+    residx = []
+    bondsidx = []
+
+    section = None
+    for line in f:
+        if line.startswith('%FLAG POINTERS'):
+            section = 'pointers'
+        elif line.startswith('%FLAG ATOM_NAME'):
+            section = 'names'
+        elif line.startswith('%FLAG CHARGE'):
+            section = 'charges'
+        elif line.startswith('%FLAG MASS'):
+            section = 'masses'
+        elif line.startswith('%FLAG ATOM_TYPE_INDEX'):
+            section = 'type'
+        elif line.startswith('%FLAG RESIDUE_LABEL'):
+            section = 'resname'
+        elif line.startswith('%FLAG RESIDUE_POINTER'):
+            section = 'resstart'
+        elif line.startswith('%FLAG BONDS_INC_HYDROGEN') or line.startswith('%FLAG BONDS_WITHOUT_HYDROGEN'):
+            section = 'bonds'
+        elif line.startswith('%FLAG BOX_DIMENSIONS'):
+            section = 'box'
+        elif line.startswith('%FLAG'):
+            section = None
+
+        if line.startswith('%'):
+            continue
+
+        if section == 'pointers':
+            pass
+        elif section == 'names':
+            fieldlen = 4
+            topo.name += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
+                      if len(line[i:i + fieldlen].strip()) != 0]
+        elif section == 'charges':
+            fieldlen = 16
+            topo.charge += [float(line[i:i + fieldlen].strip()) / 18.2223 for i in range(0, len(line), fieldlen)
+                        if len(line[i:i + fieldlen].strip()) != 0]  # 18.2223 = Scaling factor for charges
+        elif section == 'masses':
+            fieldlen = 16
+            topo.masses += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                       if len(line[i:i + fieldlen].strip()) != 0]  # 18.2223 = Scaling factor for charges
+        elif section == 'resname':
+            fieldlen = 4
+            uqresnames += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
+                           if len(line[i:i + fieldlen].strip()) != 0]
+        elif section == 'resstart':
+            fieldlen = 8
+            residx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                       if len(line[i:i + fieldlen].strip()) != 0]
+        elif section == 'bonds':
+            fieldlen = 8
+            bondsidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                         if len(line[i:i + fieldlen].strip()) != 0]
+
+    # Replicating unique resnames according to their start and end indeces
+    residx.append(len(topo.name)+1)
+
+    for i in range(len(residx) - 1):
+        numresatoms = residx[i+1] - residx[i]
+        topo.resname += [uqresnames[i]] * numresatoms
+        topo.resid += [i+1] * numresatoms
+
+    # Processing bond triplets
+    for i in range(0, len(bondsidx), 3):
+        topo.bonds.append([int(bondsidx[i] / 3), int(bondsidx[i+1] / 3)])
+
+    return topo
+
+
+def PSFread(filename):
+    import re
+    residinsertion = re.compile('(\d+)([a-zA-Z])')
+
+    topo = Topology()
+
+    f = open(filename, 'r')
+    mode = None
+    c = 0
+
+    for line in f:
+        if line.strip() == "":
+            mode = None
+
+        if mode == 'atom':
+            l = line.split()
+            topo.serial.append(l[0])
+            topo.segid.append(l[1])
+            match = residinsertion.findall(l[2])
+            if match:
+                resid = int(match[0][0])
+                insertion = match[0][1]
+            else:
+                resid = int(l[2])
+                insertion = ''
+            topo.resid.append(resid)
+            topo.insertion.append(insertion)
+            topo.resname.append(l[3])
+            topo.atomname.append(l[4])
+            topo.atomtype.append(l[5])
+            topo.charge.append(float(l[6]))
+            topo.masses.append(float(l[7]))
+        elif mode == 'bond':
+            l = line.split()
+            for x in range(0, len(l), 2):
+                topo.bonds.append([int(l[x]) - 1, int(l[x + 1]) - 1])
+        elif mode == 'angle':
+            l = line.split()
+            for x in range(0, len(l), 3):
+                topo.angles.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1])
+        elif mode == 'dihedral':
+            l = line.split()
+            for x in range(0, len(l), 4):
+                topo.dihedrals.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1, int(l[x + 3]) - 1])
+        elif mode == 'improper':
+            l = line.split()
+            for x in range(0, len(l), 4):
+                topo.impropers.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1, int(l[x + 3]) - 1])
+    f.close()
+    return topo
