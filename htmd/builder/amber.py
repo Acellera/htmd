@@ -158,7 +158,6 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         f.write('\n')'''
 
     f.write('# Writing out the results\n')
-    f.write('savepdb mol ' + prefix + '.pdb\n')
     f.write('saveamberparm mol ' + prefix + '.prmtop ' + prefix + '.crd\n')
     f.write('quit')
     f.close()
@@ -178,24 +177,24 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         os.chdir(currdir)
         logger.info('Finished building.')
 
-        if path.getsize(path.join(outdir, 'structure.pdb')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
-            molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
-            molbuilt.read(path.join(outdir, 'structure.prmtop'))
+        if path.getsize(path.join(outdir, 'structure.crd')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
+            molbuilt = Molecule(path.join(outdir, 'structure.prmtop'))
+            molbuilt.read(path.join(outdir, 'structure.crd'))
             molbuilt.bonds = []  # Causes problems in ionization mol.remove and mol._removeBonds
         else:
             raise NameError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
-            shutil.move(path.join(outdir, 'structure.pdb'), path.join(outdir, 'structure.noions.pdb'))
             shutil.move(path.join(outdir, 'structure.crd'), path.join(outdir, 'structure.noions.crd'))
             shutil.move(path.join(outdir, 'structure.prmtop'), path.join(outdir, 'structure.noions.prmtop'))
             totalcharge = np.sum(molbuilt.charge)
             nwater = np.sum(molbuilt.atomselect('water and noh'))
             anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc, ff='amber', anion=saltanion, cation=saltcation)
-            newmol = ionizePlace(molbuilt, anion, cation, anionatom, cationatom, nanion, ncation)
+            newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap)
+    molbuilt.write(path.join(outdir, 'structure.pdb'))
     return molbuilt
 
 
@@ -381,3 +380,60 @@ def _readcsvdict(filename):
     csvfile.close()
 
     return resdict
+
+
+if __name__ == '__main__':
+    from htmd.molecule.molecule import Molecule
+    from htmd.builder.solvate import solvate
+    from htmd.builder.preparation import proteinPrepare
+    from htmd.home import home
+    from htmd.util import tempname
+    import filecmp
+    import os
+    from glob import glob
+    import numpy as np
+    from htmd.util import diffMolecules
+
+    np.random.seed(1)
+    mol = Molecule('3PTB')
+    mol.filter('protein')
+    mol = proteinPrepare(mol)
+    smol = solvate(mol)
+    ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+    tmpdir = tempname()
+    bmol = build(smol, ff=ffs, outdir=tmpdir)
+
+    compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
+    mol = Molecule(os.path.join(compare, 'structure.prmtop'))
+
+    assert len(diffMolecules(mol, bmol)) == 0
+
+    #
+    # compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
+    # files = glob(os.path.join(compare, '*'))
+    # for compfile in files:
+    #     tmpfile = os.path.join(tmpdir, os.path.basename(compfile))
+    #     if compfile.endswith('leap.log'):
+    #         continue
+    #     # Remove first line for prmtop because it contains the time
+    #     if compfile.endswith('.prmtop'):
+    #         # do my thing
+    #         f1 = open(compfile, 'r')
+    #         lines1 = f1.readlines()
+    #         f1.close()
+    #         f2 = open(tmpfile, 'r')
+    #         lines2 = f2.readlines()
+    #         f2.close()
+    #         if len(lines1) == len(lines2):
+    #             i = 0
+    #             for l1, l2 in zip(lines1, lines2):
+    #                 if i == 0:  # Skip the first time
+    #                     i += 1
+    #                     continue
+    #                 if l1 != l2:
+    #                     raise RuntimeError('Different results produced by amber.build for test 3PTB in file {}'.format(tmpfile))
+    #         else:
+    #             raise RuntimeError('Different results produced by amber.build for test 3PTB in file {}'.format(tmpfile))
+    #     elif not filecmp.cmp(tmpfile, compfile, shallow=False):
+    #         raise RuntimeError('Different results produced by amber.build for test 3PTB in file {}'.format(tmpfile))
+    # shutil.rmtree(tmpdir)

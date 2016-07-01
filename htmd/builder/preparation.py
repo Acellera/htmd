@@ -83,6 +83,16 @@ def proteinPrepare(mol_in,
         TYM 	Negative TYR
         AR0     Neutral ARG
 
+    Charge +1    |  Neutral   | Charge -1
+    -------------|------------|----------
+     -           |  ASH       | ASP
+     -           |  CYS       | CYM
+     -           |  GLH       | GLU
+    HIP          |  HID/HIE   |  -
+    LYS          |  LYN       |  -
+     -           |  TYR       | TYM
+    ARG          |  AR0       |  -
+
     A detailed table about the residues modified is returned (as a second return value) when
     returnDetails is True (see ResidueData object).
 
@@ -223,7 +233,7 @@ def proteinPrepare(mol_in,
     # hidden quirks.
     tmpin = tempfile.NamedTemporaryFile(suffix=".pdb", mode="w+")
     logger.debug("Temporary file is " + tmpin.name)
-    mol_in.write(tmpin.name)  # Not sure this is sound unix
+    mol_in.write(tmpin.name)  # Not sure this is good unix
 
     pdblist, errlist = readPDB(tmpin)
     if len(pdblist) == 0 and len(errlist) == 0:
@@ -323,6 +333,7 @@ def proteinPrepare(mol_in,
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
+    mol_out.box = mol_in.box
     _fixupWaterNames(mol_out)
 
     # Return residue information
@@ -330,6 +341,7 @@ def proteinPrepare(mol_in,
     resData.pdb2pqr_protein = pdb2pqr_protein
     resData.missedLigands = missedLigands
 
+    resData._listNonStandardResidues()
     resData._warnIfpKCloseTopH(pH)
 
     if hydrophobicThickness:
