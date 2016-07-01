@@ -688,44 +688,12 @@ class Molecule:
             type = type.lower()
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
-            con = PSFread(filename)
-            oldcoords = []
-            if len(self.coords) != 0:
-                oldcoords = self.coords
-            self.empty(len(con.serial))  # initialize all arrays as empty
-            self.serial = con.serial
-            self.name   = con.atomname
-            self.resname= con.resname
-            self.resid  = con.resid
-            self.segid  = con.segid
-            self.insertion = con.insertion
-            self.charge = numpy.asarray(con.charges, dtype=np.float32)
-            self.masses = numpy.asarray(con.masses, dtype=np.float32)
-            self.bonds     = numpy.asarray(con.bonds, dtype=np.uint32)
-            self.angles    = numpy.asarray(con.angles, dtype=np.uint32)
-            self.dihedrals = numpy.asarray(con.dihedrals, dtype=np.uint32)
-            self.impropers = numpy.asarray(con.impropers, dtype=np.uint32)
-            self.atomtype  = numpy.asarray(con.atomtype, dtype=np.object )
-
-            if len(oldcoords) != 0:
-                self.coords = oldcoords
+            topo, coords = PSFread(filename)
+            self._readTopology(topo, filename)
         elif (type is None and (
             firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
-            name, charges, masses, resname, resid, bonds = PRMTOPread(filename)
-            oldcoords = []
-            if len(self.coords) != 0:
-                oldcoords = self.coords
-            self.empty(len(name))
-            self.serial = np.array(list(range(len(name))), dtype=self._append_fields['serial'])
-            self.name = np.array(name, dtype=self._append_fields['name'])
-            self.resname = np.array(resname, dtype=self._append_fields['resname'])
-            self.resid = np.array(resid, dtype=self._append_fields['resid'])
-            self.bonds = np.array(bonds, dtype=np.uint32)
-            self.masses = np.array(masses, dtype=self._append_fields['masses'])
-            self.charge = np.array(charges, dtype=self._append_fields['charge'])
-
-            if len(oldcoords) != 0:
-                self.coords = oldcoords
+            topo = PRMTOPread(filename)
+            self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
@@ -761,7 +729,6 @@ class Molecule:
                 raise ValueError("Unknown file type")
 
     def _readPDB(self, filename, mode='pdb'):
-        mol = []
         if os.path.isfile(filename):
             mol = PDBParser(filename, mode)
         elif len(filename) == 4:
