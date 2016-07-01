@@ -4,8 +4,28 @@
 # No redistribution in whole or part
 #
 from tempfile import NamedTemporaryFile
-from ctypes import *
+import htmd
 import numpy
+import os
+from ctypes import cdll
+
+
+def xtc_lib():
+    lib = {}
+    libdir = htmd.home(libDir=True)
+
+    import platform
+    if platform.system() == "Windows":
+        lib['libc'] = cdll.msvcrt
+        cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
+        if os.path.exists(os.path.join(libdir, "psprolib.dll")):
+            cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
+    else:
+        # lib['libc'] = cdll.LoadLibrary("libc.so.6")
+        lib['libc'] = cdll.LoadLibrary("libc.{}".format("so.6" if platform.uname()[0] != "Darwin" else "dylib"))
+
+    lib['libxtc'] = cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
+    return lib
 
 
 def string_to_tempfile(content, ext):

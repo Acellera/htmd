@@ -12,7 +12,8 @@ from htmd.molecule.pdbparser import *
 from htmd.molecule.prmtop import PRMTOPread, CRDread
 from htmd.molecule.psf import *
 from htmd.molecule.vmdparser import *
-from htmd.molecule.xtc import *
+from htmd.molecule.coordreaders import XTCread
+from htmd.molecule.coordwriters import XTCwrite
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer

@@ -92,22 +92,6 @@ def PRMTOPwrite(filename):
     pass
 
 
-def CRDread(filename):
-    f = open(filename, 'r')
-    coords = []
-
-    fieldlen = 12
-    k = 0
-    for line in f:
-        k += 1
-        if k < 3:
-            continue
-
-        coords += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
-                   if len(line[i:i + fieldlen].strip()) != 0]
-
-    return [coords[i:i+3] for i in range(0, len(coords), 3)]
-
 if __name__ == "__main__":
     from htmd.home import home
     from os import path
