@@ -8,6 +8,11 @@ from htmd.molecule.molecule import Molecule
 logger = logging.getLogger(__name__)
 
 
+def prettyPrintResidue(r):
+    rs = "{:4s} {:4d}{:1s} {:1s}".format(r.resname, r.resid, r.insertion, r.chain)
+    return rs
+
+
 # Define a type for holding information on residues decisions
 class ResidueData:
     """Results of the system preparation and optimization steps.
@@ -190,6 +195,15 @@ class ResidueData:
                  "exposed to the membrane ({:.1f}<z<{:.2f} and buried<{:.1f}%).").format(
                     sum(inSlabNotBuried), -ht, ht, maxBuried))
 
+    def _listNonStandardResidues(self):
+        changed = self.data.resname != self.data.protonation
+        cl = []
+        for i, cr in self.data[changed].iterrows():
+            if cr.resname not in ['N+', 'C-']:
+                cl.append("{:s} ({:s})".format(prettyPrintResidue(cr),cr.protonation))
+        if len(cl)>0:
+            logger.info("The following residues are in a non-standard state: "+", ".join(cl))
+
     def _warnIfpKCloseTopH(self, ph, tol=1.0):
         # Looks like NaN < 5 is False today
         dubious = abs(self.data.pKa - ph) < tol
@@ -202,10 +216,6 @@ class ResidueData:
                 drs=prettyPrintResidue(dr)
                 logger.warning("Dubious protonation state:    {:s} (pKa={:5.2f})".format(drs, dr.pKa))
 
-
-def prettyPrintResidue(r):
-    rs = "{:4s} {:4d}{:1s} {:1s}".format(r.resname, r.resid, r.insertion, r.chain)
-    return rs
 
 
 if __name__ == "__main__":
