@@ -8,7 +8,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.molecule.coordreaders import XTCread
+from htmd.molecule.readers import XTCread
 import os
 import sys
 import numpy as np

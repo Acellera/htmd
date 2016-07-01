@@ -9,11 +9,11 @@ import requests
 import numpy as np
 from htmd.molecule.bincoor import *
 from htmd.molecule.pdbparser import *
-from htmd.molecule.prmtop import PRMTOPread, CRDread
+from htmd.molecule.prmtop import PRMTOPread
 from htmd.molecule.psf import *
 from htmd.molecule.vmdparser import *
-from htmd.molecule.coordreaders import XTCread
-from htmd.molecule.coordwriters import XTCwrite
+from htmd.molecule.readers import XTCread, CRDread
+from htmd.molecule.writers import XTCwrite
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
@@ -748,70 +748,6 @@ class Molecule:
                     raise TopologyInconsistencyError('Different atom information read from topology file for field {}'.format(field))
 
 
-    def _readXYZ(self, filename):
-        f = open(filename, "r")
-        natoms = int(f.readline().split()[0])
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.zeros(natoms, dtype=self._pdb_fields[k])
-        self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
-
-        f.readline()
-        for i in range(natoms):
-            s = f.readline().split()
-            self.record[i] = "HETATM"
-            self.serial[i] = i + 1
-            self.element[i] = s[0]
-            self.name[i] = s[0]
-            self.coords[i, 0, 0] = float(s[1])
-            self.coords[i, 1, 0] = float(s[2])
-            self.coords[i, 2, 0] = float(s[3])
-            self.resname[i] = "MOL"
-
-    def _readGJF(self, filename):
-        f = open(filename, "r")
-        l = f.readlines()
-        start = -1
-        end = -1
-        c = 0
-        for i in range(len(l)):
-            if len(l[i].strip()) == 0 and c == 0:
-                c = 1
-            elif len(l[i].strip()) == 0 and c == 1:
-                c = 2
-                start = i + 2
-            elif len(l[i].strip()) == 0 and c == 2:
-                c = 3
-                end = i
-
-        natoms = end - start
-        if start == -1 or end == -1 or natoms == 0: raise ValueError("Invalid GJF file")
-
-        nn = 0
-        nf = self.numFrames
-        if len(self.coords):
-            # resize
-            nn = self.numAtoms
-            nf = self.numFrames
-            if nn != natoms: raise ValueError("Mismatch in teh number of atoms")
-            self.coords = numpy.append(self.coords, numpy.zeros((natoms, 3, 1), dtype=numpy.float32), axis=2)
-            self.box = numpy.append(self.box, numpy.zeros((3, 1), dtype=numpy.float32), axis=1)
-        else:
-            for k in self._pdb_fields:
-                self.__dict__[k] = numpy.zeros((natoms), dtype=self._pdb_fields[k])
-            self.coords = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
-            self.box = numpy.zeros((3, 1), dtype=numpy.float32)
-
-        for idx in range(natoms):
-            s = l[idx + start].split()
-            self.record[idx] = "HETATM"
-            self.serial[idx] = i + 1
-            self.element[idx] = s[0]
-            self.name[idx] = s[0]
-            self.coords[idx, 0, nf] = float(s[1])
-            self.coords[idx, 1, nf] = float(s[2])
-            self.coords[idx, 2, nf] = float(s[3])
-            self.resname[idx] = "MOL"
-
     def _readPDB(self, filename, mode='pdb'):
         mol = []
         if os.path.isfile(filename):
@@ -858,51 +794,8 @@ class Molecule:
 
         self.fileloc.append([filename, 0])
 
-    def _readMOL2(self, filename):
-        f = open(filename, "r")
-        l = f.readlines()
-        f.close()
-        start = None
-        end = None
-        bond = None
-        for i in range(len(l)):
-            if l[i].startswith("@<TRIPOS>ATOM"): start = i + 1
-            if l[i].startswith("@<TRIPOS>BOND"):
-               end = i - 1
-               bond= i + 1
-
-        if not start or not end:
-            raise ValueError("File cannot be read")
-
-        natoms = end - start + 1
-
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.zeros((natoms), dtype=self._pdb_fields[k])
-        self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
-
-        self.atomtype  = numpy.empty( (natoms), dtype=np.object )
-        for i in range(natoms):
-            s = l[i + start].strip().split()
-            self.record[i] = "HETATM"
-            self.serial[i] = int(s[0])
-            self.element[i] = re.sub("[0123456789]*", "", s[1])
-            self.name[i] = s[1]
-            self.coords[i, 0, 0] = float(s[2])
-            self.coords[i, 1, 0] = float(s[3])
-            self.coords[i, 2, 0] = float(s[4])
-            self.charge[i]  = float(s[8])
-            self.atomtype[i]= s[5]
-            self.resname[i] = s[6]
-        if bond:
-           bb=[]
-           for i in range(bond, len(l) ):
-              b=l[i].split()
-              if(len(b)!=4): break
-              bb.append( [ int(b[1])-1, int(b[2])-1 ] )
-        self.bonds = np.asarray( bb, dtype=np.int )
-
     def _readMae(self, filename):
-        datadict = _maestroparser(filename)
+        datadict = MAEread(filename)
         natoms = len(datadict['record'])
         for k in self._pdb_fields:
             self.__dict__[k] = numpy.asarray(datadict[k], dtype=self._pdb_fields[k])
@@ -926,6 +819,7 @@ class Molecule:
         self.fileloc = [[fnamestr, 0]]
 
         self.box = np.max(self.coords, axis=0) - np.min(self.coords, axis=0)
+
 
     def _readBinCoordinates(self, filename):
         self.coords = BINCOORread(filename)
@@ -1617,114 +1511,6 @@ class Representations:
                     reps.append({"type": r2.style, "params": {"sele": r2.sel, "color": r2.color}})
             if reps != []:
                 viewer.representations = reps
-
-
-def _maestroparser(fname):
-    """ Reads maestro files.
-
-    Parameters
-    ----------
-    fname : str
-        .mae file
-
-    Returns
-    -------
-    mol : Molecule
-
-    """
-    section = None
-    section_desc = False
-    section_data = False
-
-    data = {}
-    data['serial'] = []
-    data['record'] = []
-    data['name'] = []
-    data['resname'] = []
-    data['resid'] = []
-    data['chain'] = []
-    data['segid'] = []
-    data['occupancy'] = []
-    data['beta'] = []
-    data['insertion'] = []
-    data['element'] = []
-    data['altloc'] = []
-    data['coords'] = []
-    data['bonds'] = []
-    data['charge'] = []
-    data['masses'] = []
-    data['het'] = []
-
-    import csv
-    with open(fname, newline='') as fp:
-        reader = csv.reader(fp, delimiter=' ', quotechar='"', skipinitialspace=True)
-        for row in reader:
-            if len(row) == 0:
-                continue
-
-            if row[0][0:6] == 'm_atom':
-                section = 'atoms'
-                section_desc = True
-                section_cols = []
-            elif row[0][0:6] == 'm_bond':
-                section = 'bonds'
-                section_desc = True
-                section_cols = []
-            elif row[0][0:18] == 'm_PDB_het_residues':
-                section = 'hetresidues'
-                section_desc = True
-                section_cols = []
-            elif section_desc and row[0] == ':::':
-                section_dict = dict(zip(section_cols, range(len(section_cols))))
-                section_desc = False
-                section_data = True
-            elif section_data and (row[0] == ':::' or row[0] == '}'):
-                section_data = False
-            else:  # It's actual data
-                if section_desc:
-                    section_cols.append(row[0])
-
-                # Reading the data of the atoms section
-                if section == 'atoms' and section_data:
-                    data['record'].append('ATOM')
-                    row = np.array(row)
-                    row[row == '<>'] = 0
-                    if 'i_pdb_PDB_serial' in section_dict:
-                        data['serial'].append(row[section_dict['i_pdb_PDB_serial']])
-                    if 's_m_pdb_atom_name' in section_dict:
-                        data['name'].append(row[section_dict['s_m_pdb_atom_name']].strip())
-                    if 's_m_pdb_residue_name' in section_dict:
-                        data['resname'].append(row[section_dict['s_m_pdb_residue_name']].strip())
-                    if 'i_m_residue_number' in section_dict:
-                        data['resid'].append(int(row[section_dict['i_m_residue_number']]))
-                    if 's_m_chain_name' in section_dict:
-                        data['chain'].append(row[section_dict['s_m_chain_name']])
-                    if 's_pdb_segment_id' in section_dict:
-                        data['segid'].append(row[section_dict['s_pdb_segment_id']])
-                    if 'r_m_pdb_occupancy' in section_dict:
-                        data['occupancy'].append(float(row[section_dict['r_m_pdb_occupancy']]))
-                    if 'r_m_pdb_tfactor' in section_dict:
-                        data['beta'].append(float(row[section_dict['r_m_pdb_tfactor']]))
-                    if 's_m_insertion_code' in section_dict:
-                        data['insertion'].append(row[section_dict['s_m_insertion_code']].strip())
-                    if '' in section_dict:
-                        data['element'].append('')  # TODO: Read element
-                    if '' in section_dict:
-                        data['altloc'].append('')  # TODO: Read altloc. Quite complex actually. Won't bother.
-                    if 'r_m_x_coord' in section_dict:
-                        data['coords'].append(
-                            [float(row[section_dict['r_m_x_coord']]), float(row[section_dict['r_m_y_coord']]),
-                             float(row[section_dict['r_m_z_coord']])])
-                    data['masses'].append(0)
-
-                # Reading the data of the bonds section
-                if section == 'bonds' and section_data:
-                    data['bonds'].append([int(row[section_dict['i_m_from']]), int(row[section_dict['i_m_to']])])
-
-                # Reading the data of the hetero residue section
-                if section == 'hetresidues' and section_data:
-                    data['het'].append(row[section_dict['s_pdb_het_name']].strip())
-    return data
 
 
 class _Representation:
