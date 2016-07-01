@@ -392,15 +392,22 @@ if __name__ == '__main__':
     import os
     from glob import glob
     import numpy as np
+    from htmd.util import diffMolecules
 
-    # np.random.seed(1)
-    # mol = Molecule('3PTB')
-    # mol.filter('protein')
-    # mol = proteinPrepare(mol)
-    # smol = solvate(mol)
-    # ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
-    # tmpdir = tempname()
-    # bmol = build(smol, ff=ffs, outdir=tmpdir)
+    np.random.seed(1)
+    mol = Molecule('3PTB')
+    mol.filter('protein')
+    mol = proteinPrepare(mol)
+    smol = solvate(mol)
+    ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+    tmpdir = tempname()
+    bmol = build(smol, ff=ffs, outdir=tmpdir)
+
+    compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
+    mol = Molecule(os.path.join(compare, 'structure.prmtop'))
+
+    assert len(diffMolecules(mol, bmol)) == 0
+
     #
     # compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
     # files = glob(os.path.join(compare, '*'))
