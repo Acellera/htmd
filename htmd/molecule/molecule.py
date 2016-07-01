@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
-from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
@@ -737,13 +737,21 @@ class Molecule:
         elif len(firstfile) == 4:  # Could be a PDB id. Try to load it from the PDB website
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".xyz")) or type == "xyz":
-            self._readXYZ(filename)
+            topo, coords = XYZread(filename)
+            self.coords = np.atleast_3d(coords)
+            self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".gjf")) or type == "gjf":
-            self._readGJF(filename)
+            topo, coords = GJFread(filename)
+            self.coords = np.atleast_3d(coords)
+            self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".mae")) or type == "mae":
-            self._readMae(filename)
+            topo, coords = MAEread(filename)
+            self.coords = np.atleast_3d(coords)
+            self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".mol2")) or type == "mol2":
-            self._readMOL2(filename)
+            topo, coords = MOL2read(filename)
+            self.coords = np.atleast_3d(coords)
+            self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".crd")) or type == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
         else:
@@ -751,22 +759,6 @@ class Molecule:
                 self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
             except:
                 raise ValueError("Unknown file type")
-
-    # def _readTopology(self, filename, overwrite=None):
-    #     if isinstance(overwrite, str):
-    #         overwrite = (overwrite)
-    #
-    #     newdata = toporeader(filename)
-    #
-    #     for field in self._pdb_fields:
-    #         newdatafield = np.array(newdata[field], dtype=self._pdb_fields[field])
-    #         if field in overwrite or self.__dict__[field] is None:
-    #             self.__dict__[field] = newdatafield
-    #         else:
-    #             if np.shape(self.__dict__[field]) != newdatafield:
-    #                 raise TopologyInconsistencyError('Different number of atoms read from topology file for field {}'.format(field))
-    #             if not np.array_equal(self.__dict__[field], newdatafield):
-    #                 raise TopologyInconsistencyError('Different atom information read from topology file for field {}'.format(field))
 
     def _readPDB(self, filename, mode='pdb'):
         mol = []
@@ -814,32 +806,37 @@ class Molecule:
 
         self.fileloc.append([filename, 0])
 
-    def _readMae(self, filename):
-        datadict = MAEread(filename)
-        natoms = len(datadict['record'])
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.asarray(datadict[k], dtype=self._dtypes[k])
-            # Pad any short list
-            if k is not "coords":
-                if len(self.__dict__[k]) != natoms:
-                    self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
+    def _readTopology(self, topo, filename, overwrite='all'):
+        if isinstance(overwrite, str):
+            overwrite = (overwrite)
 
-        self.segid = self.segid.astype('str').astype(
-            'object')  # Making sure the segids are strings because np.zeros gives int objects
-        self.coords = np.atleast_3d(self.coords)
-        for h in datadict['het']:
-            self.set('record', 'HETATM', sel='resname {}'.format(h))
+        # Checking number of atoms that were read in the topology file
+        natoms = []
+        for field in topo.atominfo:
+            natoms.append(len(field))
+        natoms = np.unique(natoms)
+        if len(natoms) != 1:
+            raise TopologyInconsistencyError('Different number of atoms read from file {} for different fields: {}.'
+                                             .format(filename, natoms))
 
-        # self.serial = np.arange(1, natoms+1)
-        self.masses = np.array(datadict['masses'])
-        self.bonds = np.array(datadict['bonds']) - 1  # convert to 0 indexing
+        if self.numAtoms == 0:
+            self.empty(natoms)
+
+        for field in topo.__dict__:
+            newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
+            if overwrite[0] == 'all' or field in overwrite or len(self.__dict__[field]) == 0:
+                self.__dict__[field] = newfielddata
+            else:
+                if np.shape(self.__dict__[field]) != newfielddata:
+                    raise TopologyInconsistencyError(
+                        'Different number of atoms read from topology file for field {}'.format(field))
+                if not np.array_equal(self.__dict__[field], newfielddata):
+                    raise TopologyInconsistencyError(
+                        'Different atom information read from topology file for field {}'.format(field))
 
         fnamestr = os.path.splitext(os.path.basename(filename))[0]
         self.viewname = fnamestr
         self.fileloc = [[fnamestr, 0]]
-
-        self.box = np.max(self.coords, axis=0) - np.min(self.coords, axis=0)
-
 
     def _readBinCoordinates(self, filename):
         self.coords = BINCOORread(filename)

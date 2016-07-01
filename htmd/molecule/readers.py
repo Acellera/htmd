@@ -25,6 +25,9 @@ class Topology:
         self.impropers = []
         self.atomtype = []
 
+        self.atominfo = [self.record, self.serial, self.name, self.altloc, self.element, self.resname, self.chain,
+                         self.resid, self.insertion, self.occupancy, self.beta, self.segid, self.charge, self.masses,
+                         self.atomtype]
 
 
 class Trajectory:  # TODO: Remove this class
@@ -183,7 +186,7 @@ def XYZread(filename):
     return topo, coords
 
 
-def GJFread(self, filename):
+def GJFread(filename):
     # $rungauss
     # %chk=ts_rhf
     # %mem=2000000
@@ -216,7 +219,7 @@ def GJFread(self, filename):
     return topo, coords
 
 
-def MOL2read(self, filename):
+def MOL2read(filename):
     import re
 
     topo = Topology()
@@ -238,7 +241,6 @@ def MOL2read(self, filename):
         raise ValueError("File cannot be read")
 
     natoms = end - start + 1
-    self.atomtype = np.empty((natoms), dtype=np.object)
     for i in range(natoms):
         s = l[i + start].strip().split()
         topo.record.append("HETATM")
@@ -246,8 +248,8 @@ def MOL2read(self, filename):
         topo.element.append(re.sub("[0123456789]*", "", s[1]))
         topo.name.append(s[1])
         coords.append([float(x) for x in s[2:5]])
-        self.charge.append(float(s[8]))
-        self.atomtype.append(s[5])
+        topo.charge.append(float(s[8]))
+        topo.atomtype.append(s[5])
         topo.resname.append(s[6])
     if bond:
         for i in range(bond, len(l)):
