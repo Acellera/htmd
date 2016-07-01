@@ -881,7 +881,7 @@ class Molecule:
             s.time = np.zeros(traj.time.shape, dtype=traj.time.dtype)
             s.step = np.zeros(traj.time.shape, dtype=traj.time.dtype)
         else:
-            s.time = traj.time
+            s.time = traj.time * 1000 # need to go from picoseconds to femtoseconds
             s.step = s.time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
         s.box = traj.unitcell_lengths.T * 10
         s.box_angles = traj.unitcell_angles
