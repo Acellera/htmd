@@ -1294,7 +1294,7 @@ class Molecule:
     def numAtoms(self):
         """ Number of atoms in the molecule
         """
-        return len(self.serial)
+        return len(self.record)
 
     @property
     def x(self):
