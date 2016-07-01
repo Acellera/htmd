@@ -424,17 +424,16 @@ class Molecule:
                 self.bonds = mol.bonds
 
             for k in self._append_fields:
-                dtype = self._append_fields[k]
                 if self.__dict__[k] is None or np.size(self.__dict__[k]) == 0:
-                    self.__dict__[k] = np.array(mol.__dict__[k], dtype=dtype)
+                    self.__dict__[k] = np.array(mol.__dict__[k], dtype=self._dtypes[k])
                 elif k == 'coords':
                     self.coords = np.append(self.coords, mol.coords, axis=0)
                 else:
-                    self.__dict__[k] = np.append(self.__dict__[k], np.array(mol.__dict__[k], dtype=dtype))
+                    self.__dict__[k] = np.append(self.__dict__[k], np.array(mol.__dict__[k], dtype=self._dtypes[k]))
             self.serial = np.arange(1, self.numAtoms + 1)
-        except:
+        except Exception as err:
             self = backup
-            raise NameError('Failed to append molecule.')
+            raise NameError('Failed to append molecule. "{}"'.format(err))
 
         if collisions:
             _resolveCollisions(self, occ1, occ2, coldist)
