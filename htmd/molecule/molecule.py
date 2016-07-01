@@ -144,7 +144,7 @@ class Molecule:
         'angles': np.uint32,
         'dihedrals': np.uint32,
         'impropers': np.uint32,
-        'atomtype': np.uint32,
+        'atomtype': object,
         'masses': np.float32,
         'box': np.float32
     }
@@ -688,7 +688,7 @@ class Molecule:
             type = type.lower()
 
         if (type is None and firstfile.endswith(".psf")) or type == "psf":
-            topo, coords = PSFread(filename)
+            topo = PSFread(filename)
             self._readTopology(topo, filename)
         elif (type is None and (
             firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
@@ -775,26 +775,30 @@ class Molecule:
 
     def _readTopology(self, topo, filename, overwrite='all'):
         if isinstance(overwrite, str):
-            overwrite = (overwrite)
+            overwrite = (overwrite, )
 
         # Checking number of atoms that were read in the topology file
         natoms = []
         for field in topo.atominfo:
-            natoms.append(len(field))
+            if len(topo.__dict__[field]) != 0:
+                natoms.append(len(topo.__dict__[field]))
         natoms = np.unique(natoms)
         if len(natoms) != 1:
             raise TopologyInconsistencyError('Different number of atoms read from file {} for different fields: {}.'
                                              .format(filename, natoms))
+        natoms = natoms[0]
 
         if self.numAtoms == 0:
             self.empty(natoms)
 
         for field in topo.__dict__:
             newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
+            if len(newfielddata) == 0:
+                continue
             if overwrite[0] == 'all' or field in overwrite or len(self.__dict__[field]) == 0:
                 self.__dict__[field] = newfielddata
             else:
-                if np.shape(self.__dict__[field]) != newfielddata:
+                if np.shape(self.__dict__[field]) != np.shape(newfielddata):
                     raise TopologyInconsistencyError(
                         'Different number of atoms read from topology file for field {}'.format(field))
                 if not np.array_equal(self.__dict__[field], newfielddata):

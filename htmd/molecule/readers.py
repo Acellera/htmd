@@ -25,9 +25,10 @@ class Topology:
         self.impropers = []
         self.atomtype = []
 
-        self.atominfo = [self.record, self.serial, self.name, self.altloc, self.element, self.resname, self.chain,
-                         self.resid, self.insertion, self.occupancy, self.beta, self.segid, self.charge, self.masses,
-                         self.atomtype]
+    @property
+    def atominfo(self):
+        return ['record', 'serial', 'name', 'altloc', 'element', 'resname', 'chain', 'resid', 'insertion',
+                     'occupancy', 'beta', 'segid', 'charge', 'masses', 'atomtype']
 
 
 class Trajectory:  # TODO: Remove this class
@@ -453,7 +454,6 @@ def PSFread(filename):
 
     f = open(filename, 'r')
     mode = None
-    c = 0
 
     for line in f:
         if line.strip() == "":
@@ -493,5 +493,16 @@ def PSFread(filename):
             l = line.split()
             for x in range(0, len(l), 4):
                 topo.impropers.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1, int(l[x + 3]) - 1])
+
+        if '!NATOM' in line:
+            mode = 'atom'
+        elif '!NBOND' in line:
+            mode = 'bond'
+        elif '!NTHETA' in line:
+            mode = 'angle'
+        elif '!NPHI' in line:
+            mode = 'dihedral'
+        elif '!NIMPHI' in line:
+            mode = 'improper'
     f.close()
     return topo
