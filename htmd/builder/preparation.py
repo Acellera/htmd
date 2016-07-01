@@ -83,6 +83,16 @@ def proteinPrepare(mol_in,
         TYM 	Negative TYR
         AR0     Neutral ARG
 
+    Charge +1    |  Neutral   | Charge -1
+    -------------|------------|----------
+     -           |  ASH       | ASP
+     -           |  CYS       | CYM
+     -           |  GLH       | GLU
+    HIP          |  HID/HIE   |  -
+    LYS          |  LYN       |  -
+     -           |  TYR       | TYM
+    ARG          |  AR0       |  -
+
     A detailed table about the residues modified is returned (as a second return value) when
     returnDetails is True (see ResidueData object).
 
@@ -331,6 +341,7 @@ def proteinPrepare(mol_in,
     resData.pdb2pqr_protein = pdb2pqr_protein
     resData.missedLigands = missedLigands
 
+    resData._listNonStandardResidues()
     resData._warnIfpKCloseTopH(pH)
 
     if hydrophobicThickness:
