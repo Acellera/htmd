@@ -27,7 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 __test__ = {'build-opm-1u5u': """
-    >>> from htmd.proteinpreparation.proteinpreparation import proteinPrepare
+    >>> from htmd.builder.preparation import proteinPrepare
     >>> from htmd.util import diffMolecules
 
     >>> pdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_opm.pdb')
@@ -129,14 +129,15 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     Example
     -------
+    >>> from htmd import *
     >>> mol = Molecule("3PTB")
     >>> charmm.listFiles()             # doctest: +ELLIPSIS
     ---- Topologies files list...
     top/top_all36_prot.rtf
     top/top_water_ions.rtf
     ...
-    >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf']
-    >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm']
+    >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf', 'top/top_water_ions.rtf']
+    >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm', 'par/par_water_ions.prm']
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)  # doctest: +SKIP
     """
 
@@ -773,13 +774,37 @@ def _checkFailedAtoms(mol):
 
 
 if __name__ == '__main__':
-    from htmd import *
     from htmd.molecule.molecule import Molecule
+    from htmd.builder.solvate import solvate
     from htmd.home import home
-    import numpy as np
+    from htmd.util import tempname
+    import filecmp
     import os
+    from glob import glob
+    import numpy as np
 
     import doctest
     doctest.testmod()
+
+    np.random.seed(1)
+    mol = Molecule('3PTB')
+    mol.filter('protein')
+    smol = solvate(mol)
+    topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
+    params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+    tmpdir = tempname()
+    bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
+
+    compare = home(dataDir=os.path.join('test-charmm-build', '3PTB'))
+    files = []
+    filestmp = glob(os.path.join(compare, '*'))
+    for f in filestmp:
+        files.append(os.path.basename(f))
+
+    match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
+    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+        raise RuntimeError('Different results produced by charmm.build for test 3PTB')
+
+    shutil.rmtree(tmpdir)
 
 
