@@ -506,3 +506,19 @@ def PSFread(filename):
             mode = 'improper'
     f.close()
     return topo
+
+
+if __name__ == '__main__':
+    from htmd.home import home
+    from htmd.molecule.molecule import Molecule
+    import os
+    testfolder = home(dataDir='molecule-readers/4RWS/')
+    mol = Molecule(os.path.join(testfolder, 'structure.psf'))
+    print('Can read PSF files.')
+    mol.read(os.path.join(testfolder, 'traj.xtc'))
+    print('Can read XTC files.')
+    testfolder = home(dataDir='molecule-readers/3AM6/')
+    mol = Molecule(os.path.join(testfolder, 'structure.prmtop'))
+    print('Can read PRMTOP files.')
+    mol.read(os.path.join(testfolder, 'structure.crd'))
+    print('Can read CRD files.')
