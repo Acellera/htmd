@@ -121,48 +121,71 @@ class Molecule:
         Atom types, valid only if PSF read and molecule unmodified
 
     """
-    _pdb_fields = {
+    _pdb_fields = ['record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion', 'coords',
+                   'occupancy', 'beta', 'segid', 'element', 'charge']
+    _append_fields = _pdb_fields + ['masses']
+
+    _dtypes = {
         'record': object,
-        'serial': numpy.int,
+        'serial': np.int,
         'name': object,
         'altloc': object,
         'resname': object,
         'chain': object,
-        'resid': numpy.int,
+        'resid': np.int,
         'insertion': object,
-        'coords': numpy.float32,
-        'occupancy': numpy.float32,
-        'beta': numpy.float32,
+        'coords': np.float32,
+        'occupancy': np.float32,
+        'beta': np.float32,
         'segid': object,
         'element': object,
-        'charge': numpy.float32
+        'charge': np.float32,
+        'bonds': np.uint32,
+        'angles': np.uint32,
+        'dihedrals': np.uint32,
+        'impropers': np.uint32,
+        'atomtype': np.uint32,
+        'masses': np.float32,
+        'box': np.float32
+    }
+
+    _dims = {
+        'record': 0,
+        'serial': 0,
+        'name': 0,
+        'altloc': 0,
+        'resname': 0,
+        'chain': 0,
+        'resid': 0,
+        'insertion': 0,
+        'coords': (0, 3, 0),
+        'occupancy': 0,
+        'beta': 0,
+        'segid': 0,
+        'element': 0,
+        'charge': 0,
+        'bonds': (0, 2),
+        'angles': (0, 3),
+        'dihedrals': (0, 4),
+        'impropers': (0, 4),
+        'atomtype': 0,
+        'masses': 0,
+        'box': (3, 1)
     }
 
     def __init__(self, filename=None, name=None):
-        self.bonds     = np.empty((0, 2), dtype=np.uint32)
-        self.angles    = np.empty((0, 3), dtype=np.uint32)
-        self.dihedrals = np.empty((0, 4), dtype=np.uint32)
-        self.impropers = np.empty((0, 4), dtype=np.uint32)
-        self.atomtype  = np.empty((0, 1), dtype=np.object)
+        for field in self._dtypes:
+            self.__dict__[field] = np.empty(self._dims[field], dtype=self._dtypes[field])
         self.ssbonds = []
-        self.box = np.zeros((3,1), dtype=np.float32)
-        self.charge = []
-        self.masses = None
         self.frame = 0
         self.fileloc = []
-        self._append_fields = self._pdb_fields.copy()
-        self._append_fields['masses'] = numpy.float32
         self.time = []
         self.step = []
+
         self.reps = Representations(self)
         self._tempreps = Representations(self)
         self.viewname = name
 
-        for k in self._pdb_fields:
-            if k == 'coords':
-                self.__dict__[k] = np.zeros((0, 0, 0), dtype=self._pdb_fields[k])
-            else:
-                self.__dict__[k] = np.zeros(0, dtype=self._pdb_fields[k])
         if filename:
             self.read(filename)
             if isinstance(filename, str):
@@ -729,22 +752,21 @@ class Molecule:
             except:
                 raise ValueError("Unknown file type")
 
-    def _readTopology(self, filename, overwrite=None):
-        if isinstance(overwrite, str):
-            overwrite = (overwrite)
-
-        newdata = toporeader(filename)
-
-        for field in self._pdb_fields:
-            newdatafield = np.array(newdata[field], dtype=self._pdb_fields[field])
-            if field in overwrite or self.__dict__[field] is None:
-                self.__dict__[field] = newdatafield
-            else:
-                if np.shape(self.__dict__[field]) != newdatafield:
-                    raise TopologyInconsistencyError('Different number of atoms read from topology file for field {}'.format(field))
-                if not np.array_equal(self.__dict__[field], newdatafield):
-                    raise TopologyInconsistencyError('Different atom information read from topology file for field {}'.format(field))
-
+    # def _readTopology(self, filename, overwrite=None):
+    #     if isinstance(overwrite, str):
+    #         overwrite = (overwrite)
+    #
+    #     newdata = toporeader(filename)
+    #
+    #     for field in self._pdb_fields:
+    #         newdatafield = np.array(newdata[field], dtype=self._pdb_fields[field])
+    #         if field in overwrite or self.__dict__[field] is None:
+    #             self.__dict__[field] = newdatafield
+    #         else:
+    #             if np.shape(self.__dict__[field]) != newdatafield:
+    #                 raise TopologyInconsistencyError('Different number of atoms read from topology file for field {}'.format(field))
+    #             if not np.array_equal(self.__dict__[field], newdatafield):
+    #                 raise TopologyInconsistencyError('Different atom information read from topology file for field {}'.format(field))
 
     def _readPDB(self, filename, mode='pdb'):
         mol = []
@@ -772,7 +794,7 @@ class Molecule:
 
         natoms = len(mol.record)
         for k in self._pdb_fields:
-            self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._pdb_fields[k])
+            self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._dtypes[k])
             # Pad any short list
             if k is not "coords":
                 if len(self.__dict__[k]) != natoms:
@@ -796,7 +818,7 @@ class Molecule:
         datadict = MAEread(filename)
         natoms = len(datadict['record'])
         for k in self._pdb_fields:
-            self.__dict__[k] = numpy.asarray(datadict[k], dtype=self._pdb_fields[k])
+            self.__dict__[k] = numpy.asarray(datadict[k], dtype=self._dtypes[k])
             # Pad any short list
             if k is not "coords":
                 if len(self.__dict__[k]) != natoms:
@@ -1195,22 +1217,22 @@ class Molecule:
         >>> newmol = Molecule()
         >>> newmol.empty(100)
         """
-        self.record = np.array(['ATOM'] * numAtoms, dtype=self._pdb_fields['record'])
-        self.chain = np.array(['X'] * numAtoms, dtype=self._pdb_fields['chain'])
-        self.segid = np.array(['X'] * numAtoms, dtype=self._pdb_fields['segid'])
-        self.occupancy = np.array([0] * numAtoms, dtype=self._pdb_fields['occupancy'])
-        self.beta = np.array([0] * numAtoms, dtype=self._pdb_fields['beta'])
-        self.insertion = np.array([''] * numAtoms, dtype=self._pdb_fields['insertion'])
-        self.element = np.array([''] * numAtoms, dtype=self._pdb_fields['element'])
-        self.altloc = np.array([''] * numAtoms, dtype=self._pdb_fields['altloc'])
-        self.name = np.array(['UNK'] * numAtoms, dtype=self._pdb_fields['name'])
-        self.resname = np.array(['UNK'] * numAtoms, dtype=self._pdb_fields['resname'])
-        self.resid = np.array([999] * numAtoms, dtype=self._pdb_fields['resid'])
-        self.coords = np.zeros((numAtoms, 3, 1), dtype=self._pdb_fields['coords'])
-        self.charge = np.array([0] * numAtoms, dtype=self._pdb_fields['charge'])
+        self.record = np.array(['ATOM'] * numAtoms, dtype=self._dtypes['record'])
+        self.chain = np.array(['X'] * numAtoms, dtype=self._dtypes['chain'])
+        self.segid = np.array(['X'] * numAtoms, dtype=self._dtypes['segid'])
+        self.occupancy = np.array([0] * numAtoms, dtype=self._dtypes['occupancy'])
+        self.beta = np.array([0] * numAtoms, dtype=self._dtypes['beta'])
+        self.insertion = np.array([''] * numAtoms, dtype=self._dtypes['insertion'])
+        self.element = np.array([''] * numAtoms, dtype=self._dtypes['element'])
+        self.altloc = np.array([''] * numAtoms, dtype=self._dtypes['altloc'])
+        self.name = np.array(['UNK'] * numAtoms, dtype=self._dtypes['name'])
+        self.resname = np.array(['UNK'] * numAtoms, dtype=self._dtypes['resname'])
+        self.resid = np.array([999] * numAtoms, dtype=self._dtypes['resid'])
+        self.coords = np.zeros((numAtoms, 3, 1), dtype=self._dtypes['coords'])
+        self.charge = np.array([0] * numAtoms, dtype=self._dtypes['charge'])
         self.serial = np.arange(1, numAtoms + 1)
 
-        self.masses = np.array([0] * numAtoms, dtype=self._append_fields['masses'])
+        self.masses = np.array([0] * numAtoms, dtype=self._dtypes['masses'])
         self.box = np.zeros((3,1), dtype=np.float32)
 
 
@@ -1336,7 +1358,7 @@ class Molecule:
         for p in sorted(self._pdb_fields):
             rep += '\n'
             rep += 'PDB field - ' + formatstr(p, self.__dict__[p])
-        for j in sorted(self.__dict__.keys() - self._pdb_fields.keys()):
+        for j in sorted(self.__dict__.keys() - self._pdb_fields):
             if j[0] == '_':
                 continue
             rep += '\n'

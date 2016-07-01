@@ -23,7 +23,6 @@ class Topology:
         self.angles = []
         self.dihedrals = []
         self.impropers = []
-        self.atomname = []
         self.atomtype = []
 
 
@@ -472,7 +471,7 @@ def PSFread(filename):
             topo.resid.append(resid)
             topo.insertion.append(insertion)
             topo.resname.append(l[3])
-            topo.atomname.append(l[4])
+            topo.name.append(l[4])
             topo.atomtype.append(l[5])
             topo.charge.append(float(l[6]))
             topo.masses.append(float(l[7]))
