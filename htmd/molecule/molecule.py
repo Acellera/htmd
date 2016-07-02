@@ -1199,7 +1199,9 @@ class Molecule:
             logger.info('Assuming orthogonal box!')
             box_angles = np.tile(np.array([90,90,90]), (self.numFrames,1))
         newNC = md.formats.NetCDFTrajectoryFile(filename, mode='w', force_overwrite=True) 
-        newNC.write(np.swapaxes(np.swapaxes(src.coords, 2, 1), 1, 0),
+        # coordinates are swapped back [frame, atoms, 3], time is in picoseconds, same is done with box dimensions
+        # angles default to [90,90,90] for each frame, unless otherwise specified
+        newNC.write(np.swapaxes(np.swapaxes(src.coords, 2, 1), 1, 0), time = src.time / 1000
                     cell_lengths=np.swapaxes(src.box, 0, 1), cell_angles=box_angles)
         newNC.close() 
 
