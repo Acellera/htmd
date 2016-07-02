@@ -1187,8 +1187,12 @@ class Molecule:
     def _writeNC(self, filename, sel="all"):
         import mdtraj as md
         src = self
-        if sel is not None:
+        # checks if sel is a string or list (assumes that the list will only have booleans)
+        if sel is not None and isinstance(sel, (str, list)):
             src.filter(sel, _logger=False)
+        # allows user to specify atom selection with a numpy array
+        elif sel is not None and isinstance(sel, numpy.ndarray):
+            src.coords = src.coords[sel,:,:]
         try:
             box_angles = src.box_angles
         except:
