@@ -1201,7 +1201,7 @@ class Molecule:
         newNC = md.formats.NetCDFTrajectoryFile(filename, mode='w', force_overwrite=True) 
         # coordinates are swapped back [frame, atoms, 3], time is in picoseconds, same is done with box dimensions
         # angles default to [90,90,90] for each frame, unless otherwise specified
-        newNC.write(np.swapaxes(np.swapaxes(src.coords, 2, 1), 1, 0), time = src.time / 1000
+        newNC.write(np.swapaxes(np.swapaxes(src.coords, 2, 1), 1, 0), time = src.time / 1000,
                     cell_lengths=np.swapaxes(src.box, 0, 1), cell_angles=box_angles)
         newNC.close() 
 
