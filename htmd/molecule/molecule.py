@@ -705,19 +705,19 @@ class Molecule:
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".xyz")) or type == "xyz":
             topo, coords = XYZread(filename)
-            self.coords = np.atleast_3d(coords)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".gjf")) or type == "gjf":
             topo, coords = GJFread(filename)
-            self.coords = np.atleast_3d(coords)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".mae")) or type == "mae":
             topo, coords = MAEread(filename)
-            self.coords = np.atleast_3d(coords)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".mol2")) or type == "mol2":
             topo, coords = MOL2read(filename)
-            self.coords = np.atleast_3d(coords)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".crd")) or type == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
@@ -1185,22 +1185,22 @@ class Molecule:
         >>> newmol.empty(100)
         """
         self.record = np.array(['ATOM'] * numAtoms, dtype=self._dtypes['record'])
-        self.chain = np.array(['X'] * numAtoms, dtype=self._dtypes['chain'])
-        self.segid = np.array(['X'] * numAtoms, dtype=self._dtypes['segid'])
+        self.chain = np.array([''] * numAtoms, dtype=self._dtypes['chain'])
+        self.segid = np.array([''] * numAtoms, dtype=self._dtypes['segid'])
         self.occupancy = np.array([0] * numAtoms, dtype=self._dtypes['occupancy'])
         self.beta = np.array([0] * numAtoms, dtype=self._dtypes['beta'])
         self.insertion = np.array([''] * numAtoms, dtype=self._dtypes['insertion'])
         self.element = np.array([''] * numAtoms, dtype=self._dtypes['element'])
         self.altloc = np.array([''] * numAtoms, dtype=self._dtypes['altloc'])
-        self.name = np.array(['UNK'] * numAtoms, dtype=self._dtypes['name'])
-        self.resname = np.array(['UNK'] * numAtoms, dtype=self._dtypes['resname'])
-        self.resid = np.array([999] * numAtoms, dtype=self._dtypes['resid'])
+        self.name = np.array([''] * numAtoms, dtype=self._dtypes['name'])
+        self.resname = np.array([''] * numAtoms, dtype=self._dtypes['resname'])
+        self.resid = np.array([0] * numAtoms, dtype=self._dtypes['resid'])
         self.coords = np.zeros((numAtoms, 3, 1), dtype=self._dtypes['coords'])
         self.charge = np.array([0] * numAtoms, dtype=self._dtypes['charge'])
         self.serial = np.arange(1, numAtoms + 1)
 
         self.masses = np.array([0] * numAtoms, dtype=self._dtypes['masses'])
-        self.box = np.zeros((3,1), dtype=np.float32)
+        self.box = np.zeros(self._dims['box'], dtype=np.float32)
 
 
     def sequence(self, oneletter=True):
