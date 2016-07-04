@@ -387,7 +387,6 @@ if __name__ == '__main__':
     from htmd.builder.preparation import proteinPrepare
     from htmd.home import home
     from htmd.util import tempname
-    import filecmp
     import os
     from glob import glob
     import numpy as np
@@ -408,33 +407,3 @@ if __name__ == '__main__':
     assert np.array_equal(mol.bonds, bmol.bonds)
 
     assert len(diffMolecules(mol, bmol)) == 0
-
-    #
-    # compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
-    # files = glob(os.path.join(compare, '*'))
-    # for compfile in files:
-    #     tmpfile = os.path.join(tmpdir, os.path.basename(compfile))
-    #     if compfile.endswith('leap.log'):
-    #         continue
-    #     # Remove first line for prmtop because it contains the time
-    #     if compfile.endswith('.prmtop'):
-    #         # do my thing
-    #         f1 = open(compfile, 'r')
-    #         lines1 = f1.readlines()
-    #         f1.close()
-    #         f2 = open(tmpfile, 'r')
-    #         lines2 = f2.readlines()
-    #         f2.close()
-    #         if len(lines1) == len(lines2):
-    #             i = 0
-    #             for l1, l2 in zip(lines1, lines2):
-    #                 if i == 0:  # Skip the first time
-    #                     i += 1
-    #                     continue
-    #                 if l1 != l2:
-    #                     raise RuntimeError('Different results produced by amber.build for test 3PTB in file {}'.format(tmpfile))
-    #         else:
-    #             raise RuntimeError('Different results produced by amber.build for test 3PTB in file {}'.format(tmpfile))
-    #     elif not filecmp.cmp(tmpfile, compfile, shallow=False):
-    #         raise RuntimeError('Different results produced by amber.build for test 3PTB in file {}'.format(tmpfile))
-    # shutil.rmtree(tmpdir)
