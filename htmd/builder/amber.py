@@ -140,7 +140,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     f.write('mol = loadpdb input.pdb\n\n')
 
     # Printing out patches for the disulfide bridges
-    '''if disulfide is None and not ionize:
+    if disulfide is None and not ionize:
         logger.info('Detecting disulfide bonds.')
         disulfide = detectDisulfideBonds(mol)
 
@@ -148,14 +148,14 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         f.write('# Adding disulfide bonds\n')
         for d in disulfide:
             # Convert to stupid amber residue numbering
-            uqseqid = sequenceID(mol.resid)
+            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
             uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
             uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
             # Rename the CYS to CYX if there is a disulfide bond
             mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
             mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
-        f.write('\n')'''
+        f.write('\n')
 
     f.write('# Writing out the results\n')
     f.write('saveamberparm mol ' + prefix + '.prmtop ' + prefix + '.crd\n')
