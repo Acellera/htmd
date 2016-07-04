@@ -405,6 +405,8 @@ if __name__ == '__main__':
     compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
     mol = Molecule(os.path.join(compare, 'structure.prmtop'))
 
+    assert np.array_equal(mol.bonds, bmol.bonds)
+
     assert len(diffMolecules(mol, bmol)) == 0
 
     #
