@@ -705,20 +705,20 @@ class Molecule:
             self._readPDB(filename)
         elif (type is None and firstfile.endswith(".xyz")) or type == "xyz":
             topo, coords = XYZread(filename)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif (type is None and firstfile.endswith(".gjf")) or type == "gjf":
             topo, coords = GJFread(filename)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif (type is None and firstfile.endswith(".mae")) or type == "mae":
             topo, coords = MAEread(filename)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif (type is None and firstfile.endswith(".mol2")) or type == "mol2":
             topo, coords = MOL2read(filename)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif (type is None and firstfile.endswith(".crd")) or type == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
         else:
