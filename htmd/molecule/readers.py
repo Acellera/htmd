@@ -522,3 +522,7 @@ if __name__ == '__main__':
     print('Can read PRMTOP files.')
     mol.read(os.path.join(testfolder, 'structure.crd'))
     print('Can read CRD files.')
+    testfolder = home(dataDir='molecule-readers/3L5E/')
+    mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
+    mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
+    print('Can read MOL2 files.')
