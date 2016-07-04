@@ -287,7 +287,7 @@ class QMCalculation:
          self._results[i].coords = np.atleast_3d(ret['coords'])
          if "gridesp" in ret:
             self._results[i].esp_scalar = ret['gridesp']
-            np.divide( self._results[i].esp_scalar,  0.529177249  ) # Unit conversion from bohrs to angstoms
+            self._results[i].esp_scalar = np.divide( self._results[i].esp_scalar,  0.529177249  ) # Unit conversion from bohrs to angstoms
        i=i+1      
     return self._results
 
