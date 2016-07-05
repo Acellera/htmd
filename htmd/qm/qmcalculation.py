@@ -27,6 +27,7 @@ class Theory(Enum):
 class Code(Enum):
  PSI4     = 3000
  Gaussian = 3001
+ TeraChem = 3002
 
 class Execution(Enum):
  Inline = 4000
@@ -56,7 +57,7 @@ class QMCalculation:
                 esp_density= 10.,
                 code   = None,
                 execution = Execution.Inline,
-                directory = ".", mem=1, ncpus=1
+                directory = ".", mem=2, ncpus=-1
               ):
 
     if not isinstance(basis, BasisSet ): raise ValueError( "basis must of type BasisSet" )
@@ -71,6 +72,16 @@ class QMCalculation:
     if not isinstance( optimize, bool )      : raise ValueError( "optimize must be boolean" )
     if not isinstance( esp     , bool )      : raise ValueError( "esp must be boolean" )
     if not isinstance( esp_density , float ) : raise ValueError( "esp_density must be float" )
+
+    if( ncpus == -1 ):
+      try:
+        ncpus = int( os.getenv("NCPUS") )
+      except:
+        pass
+    if( ncpus == -1 ):
+      ncpus = os.cpu_count()
+
+
 
     # TODO esp validation, etc
 
@@ -370,7 +381,7 @@ class QMCalculation:
     mulliken=None
 
     for i in range( len(fl) ):
-      if "Mulliken Charges; (a.u.)" in fl[i]:
+      if "Mulliken Charges: (a.u.)" in fl[i]:
         mulliken=[]
         for j in range(self.natoms):
            mulliken.append( fl[i+2+j].split()[5] )
