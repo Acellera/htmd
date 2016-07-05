@@ -8,7 +8,16 @@ from __future__ import print_function
 from htmd.molecule.util import sequenceID
 import numpy as np
 import logging
+import string
+
 logger = logging.getLogger(__name__)
+
+class MixedSegmentError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
 
 
 class DisulfideBridge(object):
@@ -140,7 +149,7 @@ def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
 
 
-def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
+def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, field="segid"):
     """ Detects resid gaps in a selection and assigns incrementing segid to each fragment
 
     !!!WARNING!!! If you want to use atom selections like 'protein' or 'fragment',
@@ -157,7 +166,9 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     spatial : bool
         Only considers a discontinuity in resid as a gap of the CA atoms have distance more than `spatialgap` Angstrom
     spatialgap : float
-        The size of a spatial gap which validates a discontinuity
+        The size of a spatial gap which validates a discontinuity (A)
+    field : str
+        Field to fix. Can be "segid" (default), "chain", or "both"
 
     Returns
     -------
@@ -174,6 +185,11 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     rid = mol.get('resid', sel)
     residiff = np.diff(rid)
     gappos = np.where((residiff != 1) & (residiff != 0))[0]  # Points to the index before the gap!
+
+    # Letters to be used for chains, if free: 0123456789abcd...ABCD..., minus chain symbols already used
+    used_chains = set(mol.chain)
+    chain_alphabet = list(string.digits + string.ascii_letters)
+    available_chains = [x for x in chain_alphabet if x not in used_chains]
 
     idxstartseg = [idx[0]] + idx[gappos + 1].tolist()
     idxendseg = idx[gappos].tolist() + [idx[-1]]
@@ -204,14 +220,31 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4):
 
     i = 0
     for s, e in zip(idxstartseg, idxendseg):
-        newsegid = basename + str(i)
-        if np.any(mol.segid == newsegid):
-            raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(newsegid))
-        logger.info('Created segment {} between resid {} and {}.'.format(newsegid, mol.resid[s], mol.resid[e]))
-        mol.segid[s:e+1] = newsegid
+        # Fixup segid
+        if field in ['segid', 'both']:
+            newsegid = basename + str(i)
+            if np.any(mol.segid == newsegid):
+                raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(newsegid))
+            logger.info('Created segment {} between resid {} and {}.'.format(newsegid, mol.resid[s], mol.resid[e]))
+            mol.segid[s:e+1] = newsegid
+        # Fixup chain
+        if field in ['chain', 'both']:
+            newchainid = available_chains[i]
+            logger.info('Set chain {} between resid {} and {}.'.format(newchainid, mol.resid[s], mol.resid[e]))
+            mol.chain[s:e+1] = newchainid
+
         i += 1
 
     return mol
+
+
+def _checkMixedSegment(mol):
+    segsProt = np.unique(mol.get('segid', sel='protein or resname ACE NME'))
+    segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))
+    intersection = np.intersect1d(segsProt, segsNonProt)
+    if len(intersection) != 0:
+        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. '
+                                'Please assign separate segments to them.'.format(intersection))
 
 
 def removeLipidsInProtein(prot, memb,lipidsel='lipids'):

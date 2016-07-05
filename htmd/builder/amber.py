@@ -12,6 +12,7 @@ import os.path as path
 from htmd.molecule.util import _missingSegID, sequenceID
 import shutil
 from htmd.builder.builder import detectDisulfideBonds
+from htmd.builder.builder import _checkMixedSegment
 from subprocess import call
 from htmd.molecule.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
@@ -85,7 +86,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     """
     # Remove pdb bonds!
     mol = mol.copy()
-    mol.bonds = []
+    mol.bonds = np.empty((0, 2), dtype=np.uint32)
     if shutil.which(tleap) is None:
         raise NameError('Could not find executable: `' + tleap + '` in the PATH. Cannot build for AMBER.')
     if not os.path.isdir(outdir):
@@ -101,6 +102,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         caps = _defaultCaps(mol)
 
     _missingSegID(mol)
+    _checkMixedSegment(mol)
 
     logger.info('Converting CHARMM membranes to AMBER.')
     mol = _charmmLipid2Amber(mol)
@@ -138,7 +140,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     f.write('mol = loadpdb input.pdb\n\n')
 
     # Printing out patches for the disulfide bridges
-    '''if disulfide is None and not ionize:
+    if disulfide is None and not ionize:
         logger.info('Detecting disulfide bonds.')
         disulfide = detectDisulfideBonds(mol)
 
@@ -146,17 +148,16 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         f.write('# Adding disulfide bonds\n')
         for d in disulfide:
             # Convert to stupid amber residue numbering
-            uqseqid = sequenceID(mol.resid)
+            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
             uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
             uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
             # Rename the CYS to CYX if there is a disulfide bond
             mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
             mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
-        f.write('\n')'''
+        f.write('\n')
 
     f.write('# Writing out the results\n')
-    f.write('savepdb mol ' + prefix + '.pdb\n')
     f.write('saveamberparm mol ' + prefix + '.prmtop ' + prefix + '.crd\n')
     f.write('quit')
     f.close()
@@ -176,29 +177,33 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         os.chdir(currdir)
         logger.info('Finished building.')
 
-        if path.getsize(path.join(outdir, 'structure.pdb')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
-            molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
-            molbuilt.read(path.join(outdir, 'structure.prmtop'))
-            molbuilt.bonds = []  # Causes problems in ionization mol.remove and mol._removeBonds
+        if path.getsize(path.join(outdir, 'structure.crd')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
+            molbuilt = Molecule(path.join(outdir, 'structure.prmtop'))
+            molbuilt.read(path.join(outdir, 'structure.crd'))
         else:
             raise NameError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
-            shutil.move(path.join(outdir, 'structure.pdb'), path.join(outdir, 'structure.noions.pdb'))
             shutil.move(path.join(outdir, 'structure.crd'), path.join(outdir, 'structure.noions.crd'))
             shutil.move(path.join(outdir, 'structure.prmtop'), path.join(outdir, 'structure.noions.prmtop'))
             totalcharge = np.sum(molbuilt.charge)
             nwater = np.sum(molbuilt.atomselect('water and noh'))
             anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc, ff='amber', anion=saltanion, cation=saltcation)
-            newmol = ionizePlace(molbuilt, anion, cation, anionatom, cationatom, nanion, ncation)
+            newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap)
+    molbuilt.write(path.join(outdir, 'structure.pdb'))
     return molbuilt
 
 
 def _applyCaps(mol, caps):
     for seg in caps:
+        aceatm = mol.atomselect('segid {} and resname ACE'.format(seg))
+        nmeatm = mol.atomselect('segid {} and resname NME'.format(seg))
+        if np.sum(aceatm) != 0 and np.sum(nmeatm) != 0:
+            logger.warning('ACE and NME caps detected on segid {}.'.format(seg))
+            continue
         # This is the (horrible) way of adding caps in tleap:
         # 1. To add ACE remove two hydrogens bound to N eg:- H1,H3 then change the H2 atom to the ACE C atom
         # 2. In adding NME, remove the OXT oxygen and in that place, put the N atom of NME
@@ -234,7 +239,7 @@ def _applyCaps(mol, caps):
         if np.sum(torem) != 2:
             raise RuntimeError('Segment {}, resid {} should have H[123] or HT[123] atoms. Cannot cap. '
                                  'Capping in AMBER requires hydrogens on the residues that will be capped. '
-                                 'Consider using the prepareProtein function to add hydrogens to your molecule'
+                                 'Consider using the proteinPrepare function to add hydrogens to your molecule'
                                  'before building.'.format(seg, np.min(resids)))
         mol.remove(torem)
 
@@ -242,12 +247,8 @@ def _applyCaps(mol, caps):
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
-    segsProt = np.unique(mol.get('segid', sel='protein'))
-    segsNonProt = np.unique(mol.get('segid', sel='not protein'))
-    intersection = np.intersect1d(segsProt, segsNonProt)
-    if len(intersection) != 0:
-        raise AssertionError('Segments {} contain both protein and non-protein atoms. Please assign separate segments to them.'.format(intersection))
 
+    segsProt = np.unique(mol.get('segid', sel='protein'))
     caps = dict()
     for s in segsProt:
         caps[s] = ['ACE', 'NME']
@@ -378,3 +379,31 @@ def _readcsvdict(filename):
     csvfile.close()
 
     return resdict
+
+
+if __name__ == '__main__':
+    from htmd.molecule.molecule import Molecule
+    from htmd.builder.solvate import solvate
+    from htmd.builder.preparation import proteinPrepare
+    from htmd.home import home
+    from htmd.util import tempname
+    import os
+    from glob import glob
+    import numpy as np
+    from htmd.util import diffMolecules
+
+    np.random.seed(1)
+    mol = Molecule('3PTB')
+    mol.filter('protein')
+    mol = proteinPrepare(mol)
+    smol = solvate(mol)
+    ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+    tmpdir = tempname()
+    bmol = build(smol, ff=ffs, outdir=tmpdir)
+
+    compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
+    mol = Molecule(os.path.join(compare, 'structure.prmtop'))
+
+    assert np.array_equal(mol.bonds, bmol.bonds)
+
+    assert len(diffMolecules(mol, bmol)) == 0

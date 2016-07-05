@@ -1,12 +1,11 @@
 import logging
 import tempfile
+
 import propka
 import propka.lib
 import propka.molecular_container
 
-from htmd.molecule.molecule import Molecule
-from htmd.proteinpreparation.residuedata import ResidueData
-
+from htmd.builder.preparation import ResidueData
 
 logger = logging.getLogger(__name__)
 

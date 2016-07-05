@@ -223,7 +223,7 @@ class Model(object):
         self._integrityCheck(postmsm=(statetype != 'cluster'))
         if statetype != 'macro' and samplemode != 'random':
             samplemode = 'random'
-            logger.warning('''micro'' and ''cluster'' states incompatible with ''mode'' other than ''random''.Defaulting to ''random''')
+            logger.warning('''micro'' and ''cluster'' states incompatible with ''samplemode'' other than ''random''. Defaulting to ''random''')
 
         stConcat = np.concatenate(self.data.St)
         absFrames = []
@@ -331,8 +331,15 @@ class Model(object):
             raise NameError('Visualizer does not support yet visualization of systems with different number of atoms')
         if alignmol is None:
             alignmol = molfile
+        if statetype != 'macro' and statetype != 'micro' and statetype != 'cluster':
+            raise NameError('''statetype'' must be either ''macro'', ''micro'' or ''cluster''')
         if states is None:
-            states = range(self.macronum)
+            if statetype == 'macro':
+                states = range(self.macronum)
+            elif statetype == 'micro':
+                states = range(self.micronum)
+            elif statetype == 'cluster':
+                states = range(self.data.K)
         if len(states) == 0:
             raise NameError('No ' + statetype + ' states exist in the model')
         if len(alignsel) > 0 and len(alignmol) > 0:
