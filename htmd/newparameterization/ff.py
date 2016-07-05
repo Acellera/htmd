@@ -374,10 +374,10 @@ class RTF:
        name = self.names[i]
        self.charge_by_name[ name ] = charges[i]
    
-if __name__ == "__main__":
-
-  prm=PRM("ethanol.prm")
-  prm.write("ethanol_out.prm")
-  rtf=RTF("ethanol.rtf")
-  rtf.write("ethanol_out.rtf")
+#if __name__ == "__main__":
+#
+#  prm=PRM("ethanol.prm")
+#  prm.write("ethanol_out.prm")
+#  rtf=RTF("ethanol.rtf")
+#  rtf.write("ethanol_out.rtf")
 

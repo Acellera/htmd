@@ -211,11 +211,11 @@ class FFEvaluate:
     return ee
 
 
-if __name__ == "__main__":
-  from htmd.newparameterization.ffmolecule import FFMolecule
-  ff    = FFMolecule( "benzamidine.mol2" )
-  ff._prm.write( "benzamidine.prm" )
-  ff._rtf.write( "benzamidine.rtf" )
-  ffeval=FFEvaluate( ff ) 
-  ee = ffeval.evaluate( ff.coords[:,:,0] )
-  print(ee)
+#if __name__ == "__main__":
+#  from htmd.newparameterization.ffmolecule import FFMolecule
+#  ff    = FFMolecule( "benzamidine.mol2" )
+#  ff._prm.write( "benzamidine.prm" )
+#  ff._rtf.write( "benzamidine.rtf" )
+#  ffeval=FFEvaluate( ff ) 
+#  ee = ffeval.evaluate( ff.coords[:,:,0] )
+#  print(ee)

@@ -136,12 +136,12 @@ def getPhi( coords, atoms ):
   return phi
 
 
-if __name__ == "__main__":
-  from htmd.newparameterization.ffmolecule import FFMolecule
-  m = FFMolecule( "benzamidine.mol2" )
-  
-  d = m.getSoftDihedrals() 
-  print(d)
-  m.fitSoftDihedral( d[0] )
+#if __name__ == "__main__":
+#  from htmd.newparameterization.ffmolecule import FFMolecule
+#  m = FFMolecule( "benzamidine.mol2" )
+#  
+#  d = m.getSoftDihedrals() 
+#  print(d)
+#  m.fitSoftDihedral( d[0] )
   
 

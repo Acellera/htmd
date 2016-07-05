@@ -199,15 +199,15 @@ def remove_equivalents( mol, soft, equiv ):
 
   return final_soft;
 
-if __name__ == "__main__":
-  m = Molecule( "ethanol.mol2" )
-  (angles, dihedrals) = guessAnglesAndDihedrals( m.bonds )
-  
-  m.angles   = angles
-  m.dihedrals= dihedrals
-  sd = detectSoftDihedrals(m)
-  print("Soft dihedrals to fit:")
-  for t in sd:
-    s=t[0]
-    print("%d-%d-%d-%d" % ( s[0],s[1], s[2], s[3] ) )
-    print("%s-%s-%s-%s" % ( m.name[s[0]], m.name[s[1]], m.name[s[2]], m.name[s[3]] ))
+#if __name__ == "__main__":
+#  m = Molecule( "ethanol.mol2" )
+#  (angles, dihedrals) = guessAnglesAndDihedrals( m.bonds )
+#  
+#  m.angles   = angles
+#  m.dihedrals= dihedrals
+#  sd = detectSoftDihedrals(m)
+#  print("Soft dihedrals to fit:")
+#  for t in sd:
+#    s=t[0]
+#    print("%d-%d-%d-%d" % ( s[0],s[1], s[2], s[3] ) )
+#    print("%s-%s-%s-%s" % ( m.name[s[0]], m.name[s[1]], m.name[s[2]], m.name[s[3]] ))
