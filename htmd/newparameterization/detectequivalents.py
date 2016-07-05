@@ -1,4 +1,11 @@
+# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
+
 from htmd.molecule.molecule import Molecule
+
 from htmd.molecule.vmdparser import guessAnglesAndDihedrals
 import numpy as np
 import scipy.sparse.csgraph as sp
