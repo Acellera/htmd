@@ -11,6 +11,6 @@ cd $D
 
 rm -rf minimize esp dihed* param*
 
-export PYTOHNPATH="$PWD/../../../../"
+export PYTHONPATH="$PWD/../../../../"
 python ../../../../htmd/newparameterization/cli.py input.mol2 > log.txt 2>&1
 
