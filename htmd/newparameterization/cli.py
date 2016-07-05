@@ -7,6 +7,7 @@
 from htmd.newparameterization import ffmolecule
 from htmd.newparameterization.fftype import FFTypeMethod
 import sys
+import os
 
 
 def main_parameterize():
