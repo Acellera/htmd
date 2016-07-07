@@ -29,32 +29,32 @@ def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element
     mol = Molecule()
     mol.empty(numAtoms)
 
-    mol.name = np.array(name, dtype=mol._pdb_fields['name'])
-    mol.resname = np.array(resname, dtype=mol._pdb_fields['resname'])
-    mol.chain = np.array(chain, dtype=mol._pdb_fields['chain'])
-    mol.resid = np.array(resid, dtype=mol._pdb_fields['resid'])
-    mol.insertion = np.array(insertion, dtype=mol._pdb_fields['insertion'])
-    mol.coords = np.array(np.atleast_3d(np.vstack(coords)), dtype=mol._pdb_fields['coords'])
-    mol.segid = np.array(segid, dtype=mol._pdb_fields['segid'])
-    mol.element = np.array(element, dtype=mol._pdb_fields['element'])
-    mol.occupancy = np.array(occupancy, dtype=mol._pdb_fields['occupancy'])
-    mol.beta = np.array(beta, dtype=mol._pdb_fields['beta'])
-    # mol.charge = np.array(charge, dtype=mol._pdb_fields['charge'])
-    # mol.record = np.array(record, dtype=mol._pdb_fields['record'])
+    mol.name = np.array(name, dtype=mol._dtypes['name'])
+    mol.resname = np.array(resname, dtype=mol._dtypes['resname'])
+    mol.chain = np.array(chain, dtype=mol._dtypes['chain'])
+    mol.resid = np.array(resid, dtype=mol._dtypes['resid'])
+    mol.insertion = np.array(insertion, dtype=mol._dtypes['insertion'])
+    mol.coords = np.array(np.atleast_3d(np.vstack(coords)), dtype=mol._dtypes['coords'])
+    mol.segid = np.array(segid, dtype=mol._dtypes['segid'])
+    mol.element = np.array(element, dtype=mol._dtypes['element'])
+    mol.occupancy = np.array(occupancy, dtype=mol._dtypes['occupancy'])
+    mol.beta = np.array(beta, dtype=mol._dtypes['beta'])
+    # mol.charge = np.array(charge, dtype=mol._dtypes['charge'])
+    # mol.record = np.array(record, dtype=mol._dtypes['record'])
     return mol
 
 
 def _fixupWaterNames(mol):
-    """Rename WAT OW HW HW atoms as O H1 H2"""
-    mol.set("name", "O",sel="resname WAT and name OW")
+    """Rename WAT / OW HW HW atoms as O H1 H2"""
+    mol.set("name", "O", sel="resname WAT and name OW")
     mol.set("name", "H1", sel="resname WAT and name HW and serial % 2 == 0")
     mol.set("name", "H2", sel="resname WAT and name HW and serial % 2 == 1")
+
 
 def _warnIfContainsDUM(mol):
     """Warn if any DUM atom is there"""
     if any(mol.atomselect("resname DUM")):
         logger.warning("OPM's DUM residues must be filtered out before preparation. Continuing, but crash likely.")
-
 
 
 def proteinPrepare(mol_in,
@@ -83,10 +83,23 @@ def proteinPrepare(mol_in,
         TYM 	Negative TYR
         AR0     Neutral ARG
 
+    Charge +1    |  Neutral   | Charge -1
+    -------------|------------|----------
+     -           |  ASH       | ASP
+     -           |  CYS       | CYM
+     -           |  GLH       | GLU
+    HIP          |  HID/HIE   |  -
+    LYS          |  LYN       |  -
+     -           |  TYR       | TYM
+    ARG          |  AR0       |  -
+
+    A detailed table about the residues modified is returned (as a second return value) when
+    returnDetails is True (see ResidueData object).
+
     If hydrophobicThickness is set to a positive value 2*h, a warning is produced for titratable residues
-    having -h<z<h and are buried in the protein by less than 75%. The list of such residues can be accessed setting
-    returnDetails to True. Note that the heuristic for the detection of membrane-exposed residues is very crude;
-    the "buried fraction" computation (from propka) is approximate; also, in the presence of cavities,
+    having -h<z<h and are buried in the protein by less than 75%. Note that the heuristic for the
+    detection of membrane-exposed residues is very crude; the "buried fraction" computation
+    (from propKa) is approximate; also, in the presence of cavities,
     residues may be solvent-exposed independently from their z location.
 
 
@@ -220,7 +233,7 @@ def proteinPrepare(mol_in,
     # hidden quirks.
     tmpin = tempfile.NamedTemporaryFile(suffix=".pdb", mode="w+")
     logger.debug("Temporary file is " + tmpin.name)
-    mol_in.write(tmpin.name)  # Not sure this is sound unix
+    mol_in.write(tmpin.name)  # Not sure this is good unix
 
     pdblist, errlist = readPDB(tmpin)
     if len(pdblist) == 0 and len(errlist) == 0:
@@ -246,14 +259,13 @@ def proteinPrepare(mol_in,
     # Hold list (None -> None)
     hlist = _selToHoldList(mol_in, holdSelection)
 
-
     # Relying on defaults
     header, pqr, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
-                                                               ph=pH, verbose=verbose,
-                                                               ff="parse", ffout="amber",
-                                                               ph_calc_method="propka31",
-                                                               ph_calc_options=propka_opts,
-                                                               holdList=hlist)
+                                                             ph=pH, verbose=verbose,
+                                                             ff="parse", ffout="amber",
+                                                             ph_calc_method="propka31",
+                                                             ph_calc_options=propka_opts,
+                                                             holdList=hlist)
     tmpin.close()
 
     # Diagnostics
@@ -277,7 +289,6 @@ def proteinPrepare(mol_in,
     record = []
     charge = []
 
-
     resData = ResidueData()
 
     resData.header = header
@@ -285,18 +296,18 @@ def proteinPrepare(mol_in,
 
     for residue in pdb2pqr_protein.residues:
         # if 'ffname' in residue.__dict__:
-        if getattr(residue,'ffname',None):
+        if getattr(residue, 'ffname', None):
             curr_resname = residue.ffname
             if len(curr_resname) >= 4:
                 curr_resname = curr_resname[-3:]
                 logger.debug("Residue %s has internal name %s, replacing with %s" %
-                            (residue, residue.ffname, curr_resname))
+                             (residue, residue.ffname, curr_resname))
         else:
             curr_resname = residue.name
 
         resData._setProtonationState(residue, curr_resname)
 
-        #if 'patches' in residue.__dict__:
+        # if 'patches' in residue.__dict__:
         if getattr(residue, 'patches', None):
             for patch in residue.patches:
                 resData._appendPatches(residue, patch)
@@ -305,7 +316,6 @@ def proteinPrepare(mol_in,
 
         if getattr(residue, 'wasFlipped', 'UNDEF') != 'UNDEF':
             resData._setFlipped(residue, residue.wasFlipped)
-
 
         for atom in residue.atoms:
             name.append(atom.name)
@@ -321,9 +331,9 @@ def proteinPrepare(mol_in,
             charge.append(atom.charge)
             record.append(atom.type)
 
-
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
+    mol_out.box = mol_in.box
     _fixupWaterNames(mol_out)
 
     # Return residue information
@@ -331,6 +341,7 @@ def proteinPrepare(mol_in,
     resData.pdb2pqr_protein = pdb2pqr_protein
     resData.missedLigands = missedLigands
 
+    resData._listNonStandardResidues()
     resData._warnIfpKCloseTopH(pH)
 
     if hydrophobicThickness:
@@ -343,8 +354,6 @@ def proteinPrepare(mol_in,
         return mol_out, resData
     else:
         return mol_out
-
-
 
 
 # A test method
@@ -371,4 +380,5 @@ if __name__ == "__main__":
 
     else:
         import doctest
+
         doctest.testmod()

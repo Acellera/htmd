@@ -85,7 +85,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     """
     # Remove pdb bonds!
     mol = mol.copy()
-    mol.bonds = []
+    mol.bonds = np.empty((0, 2), dtype=np.uint32)
     if shutil.which(tleap) is None:
         raise NameError('Could not find executable: `' + tleap + '` in the PATH. Cannot build for AMBER.')
     if not os.path.isdir(outdir):
@@ -139,7 +139,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     f.write('mol = loadpdb input.pdb\n\n')
 
     # Printing out patches for the disulfide bridges
-    '''if disulfide is None and not ionize:
+    if disulfide is None and not ionize:
         logger.info('Detecting disulfide bonds.')
         disulfide = detectDisulfideBonds(mol)
 
@@ -147,17 +147,16 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         f.write('# Adding disulfide bonds\n')
         for d in disulfide:
             # Convert to stupid amber residue numbering
-            uqseqid = sequenceID(mol.resid)
+            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
             uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
             uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
             # Rename the CYS to CYX if there is a disulfide bond
             mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
             mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
-        f.write('\n')'''
+        f.write('\n')
 
     f.write('# Writing out the results\n')
-    f.write('savepdb mol ' + prefix + '.pdb\n')
     f.write('saveamberparm mol ' + prefix + '.prmtop ' + prefix + '.crd\n')
     f.write('quit')
     f.close()
@@ -177,24 +176,23 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         os.chdir(currdir)
         logger.info('Finished building.')
 
-        if path.getsize(path.join(outdir, 'structure.pdb')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
-            molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
-            molbuilt.read(path.join(outdir, 'structure.prmtop'))
-            molbuilt.bonds = []  # Causes problems in ionization mol.remove and mol._removeBonds
+        if path.getsize(path.join(outdir, 'structure.crd')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
+            molbuilt = Molecule(path.join(outdir, 'structure.prmtop'))
+            molbuilt.read(path.join(outdir, 'structure.crd'))
         else:
             raise NameError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
-            shutil.move(path.join(outdir, 'structure.pdb'), path.join(outdir, 'structure.noions.pdb'))
             shutil.move(path.join(outdir, 'structure.crd'), path.join(outdir, 'structure.noions.crd'))
             shutil.move(path.join(outdir, 'structure.prmtop'), path.join(outdir, 'structure.noions.prmtop'))
             totalcharge = np.sum(molbuilt.charge)
             nwater = np.sum(molbuilt.atomselect('water and noh'))
             anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc, ff='amber', anion=saltanion, cation=saltcation)
-            newmol = ionizePlace(molbuilt, anion, cation, anionatom, cationatom, nanion, ncation)
+            newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap)
+    molbuilt.write(path.join(outdir, 'structure.pdb'))
     return molbuilt
 
 
@@ -408,3 +406,31 @@ def _readcsvdict(filename):
     csvfile.close()
 
     return resdict
+
+
+if __name__ == '__main__':
+    from htmd.molecule.molecule import Molecule
+    from htmd.builder.solvate import solvate
+    from htmd.builder.preparation import proteinPrepare
+    from htmd.home import home
+    from htmd.util import tempname
+    import os
+    from glob import glob
+    import numpy as np
+    from htmd.util import diffMolecules
+
+    np.random.seed(1)
+    mol = Molecule('3PTB')
+    mol.filter('protein')
+    mol = proteinPrepare(mol)
+    smol = solvate(mol)
+    ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+    tmpdir = tempname()
+    bmol = build(smol, ff=ffs, outdir=tmpdir)
+
+    compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
+    mol = Molecule(os.path.join(compare, 'structure.prmtop'))
+
+    assert np.array_equal(mol.bonds, bmol.bonds)
+
+    assert len(diffMolecules(mol, bmol)) == 0

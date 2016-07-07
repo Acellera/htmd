@@ -4,8 +4,28 @@
 # No redistribution in whole or part
 #
 from tempfile import NamedTemporaryFile
-from ctypes import *
+import htmd
 import numpy
+import os
+import ctypes as ct
+
+
+def xtc_lib():
+    lib = {}
+    libdir = htmd.home(libDir=True)
+
+    import platform
+    if platform.system() == "Windows":
+        lib['libc'] = ct.cdll.msvcrt
+        ct.cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
+        if os.path.exists(os.path.join(libdir, "psprolib.dll")):
+            ct.cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
+    else:
+        # lib['libc'] = cdll.LoadLibrary("libc.so.6")
+        lib['libc'] = ct.cdll.LoadLibrary("libc.{}".format("so.6" if platform.uname()[0] != "Darwin" else "dylib"))
+
+    lib['libxtc'] = ct.cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
+    return lib
 
 
 def string_to_tempfile(content, ext):
@@ -26,7 +46,7 @@ def pack_string_buffer(data):
         ptr[i] = addressof(buf[i])'''
 
     # Stefan alternative
-    ptr = (c_char_p * len(data))()
+    ptr = (ct.c_char_p * len(data))()
     ptr[:] = data.astype(dtype=numpy.string_).tolist()
     #ptr[:] = [x.encode() for x in data]
 
@@ -34,7 +54,7 @@ def pack_string_buffer(data):
 
 
 def pack_int_buffer(data):
-    ptr = (c_int * len(data))()
+    ptr = (ct.c_int * len(data))()
     ptr[:] = data
     '''i = 0
     for d in data:
@@ -44,7 +64,7 @@ def pack_int_buffer(data):
 
 
 def pack_ulong_buffer(data):
-    ptr = (c_ulong * len(data))()
+    ptr = (ct.c_ulong * len(data))()
     ptr[:] = data
     '''i = 0
     for d in data:
@@ -54,7 +74,7 @@ def pack_ulong_buffer(data):
 
 
 def pack_double_buffer(data):
-    ptr = (c_double * len(data))()
+    ptr = (ct.c_double * len(data))()
     ptr[:] = data
     '''i = 0
     for d in data:

@@ -28,7 +28,9 @@ class MetricRmsd(Projection):
     refalnstr : str, optional
         Atomselection for the reference structure from which to align to the trajectories. If None, it defaults to `trajalnstr`
     centerstr : str, optional
-        Atomselection around which to center the wrapping of the trajectories. CURRENTLY IGNORED!
+        Atomselection around which to center the wrapping of the trajectories.
+    pbc : bool, optional
+        Enable or disable simulation wrapping.
     """
     def __init__(self, refmol, trajrmsdstr, trajalnstr=None, refrmsdstr=None, refalnstr=None, centerstr='protein', pbc=True):
         if trajalnstr is None:
@@ -81,7 +83,7 @@ class MetricRmsd(Projection):
         (trajalnsel, trajrmsdsel, centersel) = self._getSelections(mol)
 
         if self._pbc:
-            mol.wrap()
+            mol.wrap(centersel)
         #mol.coords = self._wrapPositions(mol.box, mol.coords, centersel)
         mol.align(sel=trajalnsel, refmol=self._refmol, refsel=self._refalnsel)
 
