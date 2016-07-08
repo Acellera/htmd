@@ -7,7 +7,7 @@ from htmd.projections.metric import _OldMetric, _singleMolfile
 from htmd.projections.projection import Projection
 from htmd.molecule.molecule import Molecule
 import numpy as np
-from htmd.projections.util import pp_calcDistances, pp_calcMinDistances
+from htmd.projections.util import pp_calcDistances, pp_calcMinDistances, pp_calcMinDistances_C
 import logging
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class MetricDistance(Projection):
         if np.ndim(sel1) == 1 and np.ndim(sel2) == 1:  # normal distances
             metric = pp_calcDistances(mol, sel1, sel2, self.metric, self.threshold, self.pbc, truncate=self.truncate)
         else:  # minimum distances by groups
-            metric = pp_calcMinDistances(mol, sel1, sel2)
+            metric = pp_calcMinDistances_C(mol, sel1, sel2)
 
         return metric
 
