@@ -159,7 +159,7 @@ class MetricDistance(Projection):
         return newsel
 
     def _groupByResidue(self, mol, sel):
-        res = list(set(mol.get('resid', sel=sel)))
+        res = np.unique(mol.get('resid', sel=sel))
         newsel = np.empty(len(res), dtype=object)
         for i in range(len(res)):
             newsel[i] = 'resid ' + str(res[i]) + ' and noh'

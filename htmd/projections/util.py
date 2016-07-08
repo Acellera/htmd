@@ -70,6 +70,9 @@ def pp_calcMinDistances_C(mol, sel1, sel2, metric='distances', threshold=8, pbc=
         idx = np.where(sel2[i, :])[0]
         groups2[i, 0:len(idx)] = idx
 
+    from IPython.core.debugger import Tracer
+    Tracer()()
+
     # Running the actual calculations
     lib = ctypes.cdll.LoadLibrary(os.path.join(home(), 'projections', 'mindist', 'mindist_ext.so'))
     mindist = np.zeros((mol.numFrames, len(groups1) * len(groups2)))
