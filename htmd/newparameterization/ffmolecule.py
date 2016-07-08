@@ -195,11 +195,31 @@ class FFMolecule(Molecule):
       com = com / mass
       self.coords[:,:,f] = self.coords[:,:,f] - com
 
+  def _try_load_pointfile(self):
+    # Load a point file if one exists from a previous job
+    pointfile = os.path.join( "esp", "00000", "grid.dat" )
+    if( os.path.exists(pointfile)):
+      f = open(pointfile,"r" );
+      fl = f.readlines()
+      f.close()
+      ret = np.array( ( len(fl), 3 ))
+      for i in range(len(fl)):
+        s = fl[i].split()
+        ret[i,0] = float(s[0]) 
+        ret[i,1] = float(s[1]) 
+        ret[i,1] = float(s[2]) 
+
+      print("Re-using previously-generate point cloud")
+      return ret
+    return True
+ 
   def fitCharges(self):
     # Remove the COM from the coords, or PSI4 does it and then the grid is incorrectly centred
     self._removeCOM()
     # Kick off a QM calculation -- unconstrained single point with grid
-    qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=True, directory="esp/"  )
+    points = self._try_load_pointfile() 
+     
+    qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=points, directory="esp/"  )
     results = qm.results()
     if results[0].errored:
       raise RuntimeError("QM Calculation failed")
