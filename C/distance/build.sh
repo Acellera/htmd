@@ -3,7 +3,7 @@
 make clean
 
 for TYPE in pro basic; do
-for TRAVIS_OS_NAME in "linux" "windows"; do #  "windows" "osx"; do
+#for TRAVIS_OS_NAME in "linux" "windows"; do #  "windows" "osx"; do
 	if [ "$TRAVIS_OS_NAME" == "linux"   ]; then
 		PLATFORM=Linux; 
 		CC=gcc
@@ -21,5 +21,5 @@ for TRAVIS_OS_NAME in "linux" "windows"; do #  "windows" "osx"; do
 		exit 1
 	fi
 	make all CC=$CC CXX=$CXX PLATFORM=$PLATFORM  TYPE=$TYPE
-done
+#done
 done
