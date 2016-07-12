@@ -1,4 +1,7 @@
-CXX_FLAGS := 
+CC := $(CC)
+FC := $(FC)
+PLATFORM := $(PLATFORM)
+TYPE := $(TYPE)
 
 MINDIST_SRC:= mindist_ext
 
