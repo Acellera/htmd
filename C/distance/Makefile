@@ -13,9 +13,6 @@ INC_FLAGS :=
 
 .PHONY: clean 
 
-dummy:
-	./build.sh
-
 all: obj/$(TYPE)/$(PLATFORM) ../../htmd/lib/$(TYPE)/$(PLATFORM)/mindist_ext.so
 
 ../../htmd/lib/$(TYPE)/$(PLATFORM)/mindist_ext.so: $(_MINDIST_OBJ)
