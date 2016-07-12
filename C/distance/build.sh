@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Run this
 make clean
 
@@ -20,6 +21,5 @@ for TRAVIS_OS_NAME in "linux" "windows"; do #  "windows" "osx"; do
 		exit 1
 	fi
 	make all CC=$CC CXX=$CXX PLATFORM=$PLATFORM  TYPE=$TYPE
-
 done
 done
