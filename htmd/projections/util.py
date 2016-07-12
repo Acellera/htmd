@@ -120,7 +120,7 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
         groups2[i, 0:len(idx)] = idx
 
     # Running the actual calculations
-    lib = ctypes.cdll.LoadLibrary(os.path.join(home(), 'projections', 'mindist', 'mindist_ext.so'))
+    lib = ctypes.cdll.LoadLibrary(os.path.join(home(libDir=True), 'mindist_ext.so'))
     mindist = np.zeros((mol.numFrames, len(groups1) * len(groups2)), dtype=np.float32)  # Preparing the return array
     lib.mindist_trajectory(coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                            groups1.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
