@@ -49,6 +49,7 @@ class AcemdLocal(LocalGPUQueue):
 
 
 def jobfunc(acemd, datadir, inputfile, timeout, path, gpuid):
+    # path and gpuid arguments are provided by default by the localqueue class as last arguments
     from subprocess import PIPE, Popen, TimeoutExpired, CalledProcessError
     import os
 
@@ -56,16 +57,18 @@ def jobfunc(acemd, datadir, inputfile, timeout, path, gpuid):
     if timeout:
         timeoutstr = 'timeout {}'.format(timeout)
     cmd = 'cd {}; {} {} --device {} {} > log.txt 2>&1'.format(os.path.normpath(path), timeoutstr, acemd, gpuid, inputfile)
+    proc = None
     try:
-        #check_output(cmd, shell=True, timeout=obj.timeout)
         proc = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
         proc.communicate()
     except CalledProcessError:
         logger.error('Error in ACEMD for path: {}. Check the {} file.'.format(path, os.path.join(path, 'log.txt')))
-        proc.kill()
+        if proc:
+            proc.kill()
         return
     except TimeoutExpired:
-        proc.kill()
+        if proc:
+            proc.kill()
         return
 
     # If a datadir is provided, copy finished trajectories there. Only works for xtc files.

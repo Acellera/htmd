@@ -13,10 +13,10 @@ class LocalGPUQueue(App):
     Parameters
     ----------
     ngpus : int
-        Number of GPU devices that AcemdLocal will use. Each simulation will be run on a different GPU. AcemdLocal will
+        Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will
         use the first `ngpus` devices of the machine.
     devices : list
-        A list of GPU device indexes on which AcemdLocal is allowed to run simulations. Mutually exclusive with `ngpus`
+        A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpus`
     """
 
     def __init__(self, jobfunc, jobargs, ngpus=None, devices=None):
@@ -60,7 +60,7 @@ class LocalGPUQueue(App):
 
         Example
         -------
-        >>> comp = grid.retrieve()
+        >>> comp = app.retrieve()
         """
         ret = []
         xx = self.states.copy().keys()
@@ -83,7 +83,7 @@ class LocalGPUQueue(App):
 
         Examples
         --------
-        >>> grid.submit(glob('input/e2*/'));
+        >>> app.submit(glob('input/e2*/'));
         """
         if isinstance(mydirs, str): mydirs = [mydirs]
 
@@ -105,7 +105,7 @@ class LocalGPUQueue(App):
 
         Example
         -------
-        >>> grid.inprogress()
+        >>> app.inprogress()
         """
         output_run = sum(x == 'R' for x in self.states.values())
         output_queue = sum(x == 'Q' for x in self.states.values())
@@ -113,7 +113,11 @@ class LocalGPUQueue(App):
         return output_run + output_queue
 
     def wait(self):
-        """ WAIT - Block until all queued work complete
+        """ Blocks script execution until all queued work completes
+
+        Examples
+        --------
+        >>> app.wait()
         """
         from time import sleep
         import sys
