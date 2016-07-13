@@ -1284,6 +1284,25 @@ class Molecule:
 
         return segSequences
 
+    def dropFrames(self, keep='all', drop=None):
+        """ Removes trajectory frames from the Molecule
+
+        Parameters
+        ----------
+        keep : int or list of ints
+            Index of frame, or list of frame indexes which we want to keep (and drop all others).
+        drop : int or list of ints
+            Index of frame, or list of frame indexes which we want to drop (and keep all others).
+        """
+        if keep != 'all' and drop is not None:
+            raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
+        if keep != 'all':
+            self.coords = np.atleast_3d(self.coords[:, :, keep])
+            self.box = np.atleast_2d(self.box[:, keep])
+        if drop is not None:
+            self.coords = np.delete(self.coords, drop, axis=2)
+            self.box = np.delete(self.box, drop, axis=1)
+
     @property
     def numFrames(self):
         """ Number of coordinate frames in the molecule
