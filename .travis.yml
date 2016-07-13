@@ -8,7 +8,7 @@ matrix:
   include:
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1 CC=x86_64-w64-mingw32-g++ FC=x86_64-w64-mingw32-gfortran
+     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1 CC=gcc CPP=x86_64-w64-mingw32-g++ FC=x86_64-w64-mingw32-gfortran
      addons:
       apt:
        packages:
@@ -19,24 +19,24 @@ matrix:
        - mingw-w64-dev
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran STATIC="-static"
+     env: TRAVIS_PYTHON_VERSION=3.4  CC=gcc CPP=g++ FC=gfortran STATIC="-static"
      addons:
       apt:
        packages:
        - gfortran
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran STATIC="-static"
+     env: TRAVIS_PYTHON_VERSION=3.5 CC=gcc CPP=g++ FC=gfortran STATIC="-static"
      addons:
       apt:
        packages:
        - gfortran
    - os: osx
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran
+     env: TRAVIS_PYTHON_VERSION=3.4 CC=gcc CPP=g++ FC=gfortran
    - os: osx
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran
+     env: TRAVIS_PYTHON_VERSION=3.5 CC=gcc CPP=g++ FC=gfortran
 
 
 # TONI Suppress fc-list warnings and speed-up - hopefully
@@ -52,7 +52,7 @@ install:
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.sh -O miniconda.sh; fi
 
- - if [ "$TRAVIS_BRANCH" == "pro" ];      then export PACKAGE_NAME=htmd-pro; else export PACKAGE_NAME=htmd;  fi
+ - if [ "$TRAVIS_BRANCH" == "pro" ]; then export PACKAGE_NAME=htmd-pro; export TYPE=pro; else export PACKAGE_NAME=htmd; export TYPE=basic; fi
  - echo $PACKAGE_NAME
 
  - bash miniconda.sh -b -p $HOME/miniconda
@@ -75,7 +75,7 @@ install:
  - export BUILD_NUMBER=0
 
  # Building the C distance calculations for the specific platform
- - cd C/distance/; make CC=$CC FC=$FC STATIC=$STATIC PLATFORM=$TRAVIS_OS_NAME TYPE=$TRAVIS_BRANCH; cd ../../;
+ - cd C/distance/; make CC=$CC FC=$FC STATIC=$STATIC PLATFORM=$TRAVIS_OS_NAME TYPE=$TYPE; cd ../../;
 
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-data
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd
