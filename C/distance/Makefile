@@ -1,4 +1,4 @@
-CC := $(CC)
+CPURE := $(CPURE)
 FC := $(FC)
 PLATFORM := $(PLATFORM)
 TYPE := $(TYPE)
@@ -16,10 +16,10 @@ INC_FLAGS :=
 all: obj/$(TYPE)/$(PLATFORM) ../../htmd/lib/$(TYPE)/$(PLATFORM)/mindist_ext.so
 
 ../../htmd/lib/$(TYPE)/$(PLATFORM)/mindist_ext.so: $(_MINDIST_OBJ)
-	$(CC) -fPIC  --shared -o $@  $(_MINDIST_OBJ)
+	$(CPURE) -fPIC  --shared -o $@  $(_MINDIST_OBJ)
 
 obj/$(TYPE)/$(PLATFORM)/%.o: %.c
-	$(CC) -o $@ -c $< -g -fPIC -ffast-math -O3 -DDIST_$(TYPE)
+	$(CPURE) -o $@ -c $< -g -fPIC -ffast-math -O3 -DDIST_$(TYPE)
 
 ../../htmd/lib/$(TYPE)/$(PLATFORM):
 	mkdir -p ../../htmd/lib/$(TYPE)/$(PLATFORM)
