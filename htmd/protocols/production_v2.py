@@ -74,7 +74,7 @@ class Production(ProtocolInterface):
         self.acemd.fullelectfrequency = '2'
         self.acemd.energyfreq = '5000'
         self.acemd.run = '$numsteps'
-        self._TCL = ('''
+        self.acemd.TCL = ('''
 set numsteps {NUMSTEPS}
 set fb_refindex {{ {REFINDEX} }}
 set fb_selindex {{ {SELINDEX} }}
@@ -171,10 +171,12 @@ proc calcforces_endstep { } { }
         if self.fb_k > 0: #use TCL only for flatbottom
             mol = Molecule(os.path.join(inputdir, self.acemd.coordinates))
             self.acemd.tclforces = 'on'
-            tcl = list(self._TCL)
-            tcl[0] = tcl[0].format(NUMSTEPS=numsteps, KCONST=self.fb_k, REFINDEX=mol.get('index', self.fb_reference),
-                                   SELINDEX=mol.get('index', self.fb_selection), BOX=self.fb_box)
-            self.acemd.TCL = tcl
+            tcl = list(self.acemd.TCL)
+            tcl[0] = tcl[0].format(NUMSTEPS=numsteps, KCONST=self.fb_k,
+                                   REFINDEX=' '.join(map(str, mol.get('index', self.fb_reference))),
+                                   SELINDEX=' '.join(map(str, mol.get('index', self.fb_selection))),
+                                   BOX=' '.join(map(str, self.fb_box)))
+            self.acemd.TCL = tcl[0] + tcl[1]
         else:
             self.acemd.TCL = 'set numsteps {}\n'.format(numsteps)
         self.acemd.setup(inputdir, outputdir, overwrite=True)
@@ -189,5 +191,5 @@ if __name__ == "__main__":
     md.fb_box = [-20, 20, -20, 20, 43, 45]
     md.fb_k = 5
     md.write(htmd.home() +'/data/equilibrate', '/tmp/prod')
-    md.k = 0
+    md.fb_k = 0
     md.write(htmd.home() +'/data/equilibrate', '/tmp/prod0')

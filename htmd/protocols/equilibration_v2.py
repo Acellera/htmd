@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class Equilibration(ProtocolInterface):
-    """ Equilibration protocol
+    """ Equilibration protocol v2
 
         Equilibration protocol for globular and membrane proteins
         It includes a flatbottom potential box to retrain a ligand
@@ -22,36 +22,42 @@ class Equilibration(ProtocolInterface):
 
         Parameters
         ----------
-        numsteps : int, default=0
-            Number of steps to run the simulations in units of 4fs
+        runtime : float, default=0
+            Running time of the simulation.
+        timeunits : str, default='steps'
+            Units for time arguments. Can be 'steps', 'ns' etc.
         temperature : float, default=300
             Temperature of the thermostat in Kelvin
-        k : float, default=0
+        fb_k : float, default=0
             Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5
-        reference : str, default='none'
+        fb_reference : str, default='none'
             Reference selection to use as dynamic center of the flatbottom box.
-        selection : str, default='none'
+        fb_selection : str, default='none'
             Selection of atoms to apply the flatbottom potential
-        box : list, default=[0, 0, 0, 0, 0, 0]
+        fb_box : list, default=[0, 0, 0, 0, 0, 0]
             Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]
         useconstantratio : bool, default=False
             For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
-        constraints : dict, default={'protein and noh and not name CA': 0.1, 'protein and name CA': 1}
-            A dictionary containing atomselections and values of the constraint to be applied
-            (in kcal/mol/A^2). Atomselects must be mutually exclusive.
+        constraints : dict, default={'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
+            A dictionary of atomselections and values of the constraint to be applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.
+        nvtsteps : int, default=500
+            Number of initial steps to apply NVT in units of 4fs.
+        constraintsteps : int, default=None
+            Number of initial steps to apply constraints in units of 4fs. Defaults to half the simulation time.
 
         Example
         -------
-        >>> from htmd.protocols.equilibration_v1 import Equilibration
+        >>> from htmd.protocols.equilibration_v2 import Equilibration
         >>> md = Equilibration()
-        >>> md.numsteps = 10000000
+        >>> md.runtime = 4
+        >>> md.timeunits = 'ns'
         >>> md.temperature = 300
         >>> md.useconstantratio = True  # only for membrane sims
         >>> # this is only needed for setting the flatbottom potential, otherwise remove it
-        >>> md.reference = 'protein and resid 293'
-        >>> md.selection = 'segname L and noh'
-        >>> md.box = [-25, 25, -25, 25, 43, 45]
-        >>> md.k = 5
+        >>> md.fb_reference = 'protein and resid 293'
+        >>> md.fb_selection = 'segname L and noh'
+        >>> md.fb_box = [-25, 25, -25, 25, 43, 45]
+        >>> md.fb_k = 5
         >>> md.write('./build','./equil')
     """
     def __init__(self):
@@ -228,15 +234,17 @@ proc calcforces_endstep { } { }
         inmol = Molecule(pdbfile)
 
         if self.constraintsteps is None:
-            constrsteps = numsteps / 2
+            constrsteps = int(numsteps / 2)
         else:
-            constrsteps = self.constraintsteps
+            constrsteps = int(self.constraintsteps)
 
-        tcl = list(self._TCL)
-        tcl[0] = tcl[0].format(NUMSTEPS=numsteps, KCONST=self.fb_k, REFINDEX=inmol.get('index', self.fb_reference),
-                               SELINDEX=inmol.get('index', self.fb_selection), BOX=self.fb_box, NVTSTEPS=self.nvtsteps,
-                               CONSTRAINTSTEPS=constrsteps)
-        self.acemd.TCL = tcl
+        tcl = list(self.acemd.TCL)
+        tcl[0] = tcl[0].format(NUMSTEPS=numsteps, KCONST=self.fb_k,
+                               REFINDEX=' '.join(map(str, inmol.get('index', self.fb_reference))),
+                               SELINDEX=' '.join(map(str, inmol.get('index', self.fb_selection))),
+                               BOX=' '.join(map(str, self.fb_box)),
+                               NVTSTEPS=self.nvtsteps, CONSTRAINTSTEPS=constrsteps, TEMPERATURE=self.temperature)
+        self.acemd.TCL = tcl[0] + tcl[1]
 
         if self.acemd.celldimension is None and self.acemd.extendedsystem is None:
             coords = inmol.get('coords', sel='water')
@@ -278,10 +286,11 @@ proc calcforces_endstep { } { }
 if __name__ == "__main__":
     import htmd
     eq = Equilibration()
-    eq.runtime = 1000000
+    eq.runtime = 4
+    eq.timeunits = 'ns'
     eq.temperature = 300
     eq.fb_reference = 'protein and name CA'
     eq.fb_selection = 'segname L and noh'
     eq.fb_box = [-20, 20, -20, 20, 43, 45]
     eq.fb_k = 5
-    eq.write(htmd.home() + '/data/equilibrate', '/tmp/equil1')
+    eq.write(htmd.home() + '/data/equilibrate', '/tmp/equil')
