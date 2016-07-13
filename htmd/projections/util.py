@@ -22,9 +22,126 @@ def pp_calcDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=True,
     return metric
 
 
+# def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=True, gap=1, truncate=None):
+#     from scipy.spatial.distance import cdist
+#     if pbc:
+#         if mol.box is None or np.sum(mol.box) == 0:
+#             raise NameError(
+#                 'No periodic box dimensions given in the molecule/trajectory. If you want to calculate distance without wrapping, set the pbc option to False')
+#         coords = _wrapCoords(mol.coords, mol.box)
+#     else:
+#         coords = mol.coords
+#
+#     mindist = np.zeros((mol.numFrames, len(sel1) * len(sel2)))
+#     for i, s1 in enumerate(sel1):
+#         for j, s2 in enumerate(sel2):
+#             #print(i*len(sel1)+j)
+#             for f in range(mol.numFrames):
+#                 mindist[f, i*len(sel1)+j] = np.min(cdist(coords[s1, :, f], coords[s2, :, f])[:])
+#
+#     if metric == 'contacts':
+#         mindist = mindist <= threshold
+#     elif metric == 'distances':
+#         mindist = mindist.astype(dtype=np.float32)
+#     else:
+#         raise NameError('The metric you asked for is not supported. Check spelling and documentation')
+#     return mindist
+
+
+# def pp_calcMinDistances_C(mol, sel1, sel2, metric='distances', threshold=8, pbc=True, gap=1, truncate=None):
+#     import os
+#     import ctypes
+#     from htmd.home import home
+#     if pbc:
+#         if mol.box is None or np.sum(mol.box) == 0:
+#             raise NameError(
+#                 'No periodic box dimensions given in the molecule/trajectory. If you want to calculate distance without wrapping, set the pbc option to False')
+#         coords = _wrapCoords(mol.coords, mol.box)
+#     else:
+#         coords = mol.coords
+#
+#     # Converting from 2D boolean atomselect array to 2D int array where each row starts with the indexes of the boolean
+#     groups1 = np.ones((sel1.shape[0], mol.numAtoms), dtype=np.int32) * -1
+#     groups2 = np.ones((sel2.shape[0], mol.numAtoms), dtype=np.int32) * -1
+#     for i in range(sel1.shape[0]):
+#         idx = np.where(sel1[i, :])[0]
+#         groups1[i, 0:len(idx)] = idx
+#     for i in range(sel2.shape[0]):
+#         idx = np.where(sel2[i, :])[0]
+#         groups2[i, 0:len(idx)] = idx
+#
+#     # Running the actual calculations
+#     lib = ctypes.cdll.LoadLibrary(os.path.join(home(), 'projections', 'mindist', 'mindist_ext.so'))
+#     mindist = np.zeros((mol.numFrames, len(groups1) * len(groups2)))
+#
+#     for f in range(mol.numFrames):
+#         # print('Frame {}'.format(f))
+#         dist = np.zeros((len(groups1) * len(groups2),), dtype=np.float32)
+#         coordsframecopy = coords[:, :, f].astype(np.float32)  # This is critically important! Otherwise trajectory slice is not copied and indexing fails in C
+#         lib.mindist_single_frame(coordsframecopy.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+#                                  groups1.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+#                                  groups2.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+#                                  ctypes.c_int(len(groups1)),
+#                                  ctypes.c_int(len(groups2)),
+#                                  ctypes.c_int(mol.numAtoms),
+#                                  dist.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
+#         # print(dist)
+#         mindist[f, :] = dist
+#
+#     if metric == 'contacts':
+#         mindist = mindist <= threshold
+#     elif metric == 'distances':
+#         mindist = mindist.astype(dtype=np.float32)
+#     else:
+#         raise NameError('The metric you asked for is not supported. Check spelling and documentation')
+#     return mindist
+
+
 def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=True, gap=1, truncate=None):
-    raise NameError('TODO: Not implemented yet')
-    return
+    import os
+    import ctypes
+    from htmd.home import home
+    if pbc:
+        if mol.box is None or np.sum(mol.box) == 0:
+            raise NameError(
+                'No periodic box dimensions given in the molecule/trajectory. If you want to calculate distance without wrapping, set the pbc option to False')
+        coords = _wrapCoords(mol.coords, mol.box)
+    else:
+        coords = mol.coords
+
+    # Converting from 2D boolean atomselect array to 2D int array where each row starts with the indexes of the boolean
+    groups1 = np.ones((sel1.shape[0], mol.numAtoms), dtype=np.int32) * -1
+    groups2 = np.ones((sel2.shape[0], mol.numAtoms), dtype=np.int32) * -1
+    for i in range(sel1.shape[0]):
+        idx = np.where(sel1[i, :])[0]
+        groups1[i, 0:len(idx)] = idx
+    for i in range(sel2.shape[0]):
+        idx = np.where(sel2[i, :])[0]
+        groups2[i, 0:len(idx)] = idx
+
+    # Running the actual calculations
+    lib = ctypes.cdll.LoadLibrary(os.path.join(home(libDir=True), 'mindist_ext.so'))
+    mindist = np.zeros((mol.numFrames, len(groups1) * len(groups2)), dtype=np.float32)  # Preparing the return array
+    lib.mindist_trajectory(coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                           groups1.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+                           groups2.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+                           ctypes.c_int(len(groups1)),
+                           ctypes.c_int(len(groups2)),
+                           ctypes.c_int(mol.numAtoms),
+                           ctypes.c_int(mol.numFrames),
+                           mindist.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
+
+    if metric == 'contacts':
+        mindist = mindist <= threshold
+    elif metric == 'distances':
+        mindist = mindist.astype(dtype=np.float32)
+    else:
+        raise NameError('The metric you asked for is not supported. Check spelling and documentation')
+    return mindist
+
+
+def _wrapCoords(coords, box):
+    return coords - box * np.round(coords / box)
 
 
 def _postProcessDistances(distances, sel1, sel2, truncate):
@@ -103,7 +220,6 @@ def _wrapDistances(box, dist, diffchain):
         numatoms = np.size(dist, 0)
         dist = dist - box * np.round(dist / box)
     return dist
-
 
 
 def exportProjectionData(data, filename):

@@ -37,7 +37,8 @@ class Equilibration(ProtocolInterface):
         useconstantratio : bool, default=False
             For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
         constraints : dict, default={'protein and noh and not name CA': 0.1, 'protein and name CA': 1}
-            A dictionary containing as keys the atomselections of the constraints and as values the constraint scaling factor. 0 factor means no constraint, 1 full constraints and in between values are used for scaling. The order with which the constraints are applied is random, so make atomselects mutually exclusive to be sure you get the correct constraints.
+            A dictionary containing atomselections and values of the constraint to be applied
+            (in kcal/mol/A^2). Atomselects must be mutually exclusive.
 
         Example
         -------
@@ -64,11 +65,8 @@ class Equilibration(ProtocolInterface):
         self._cmdString('fb_selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none')
         self._cmdList('fb_box', 'list', 'Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]', [0,0,0,0,0,0])
         self._cmdBoolean('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False)
-        self._cmdDict('constraints', 'dict', 'A dictionary containing as keys the atomselections of the constraints '
-                                             'and as values the constraint scaling factor. 0 factor means no constraint'
-                                             ', 1 full constraints and in between values are used for scaling.'
-                                             ' The order with which the constraints are applied is random, so make '
-                                             'atomselects mutually exclusive to be sure you get the correct constraints.'
+        self._cmdDict('constraints', 'dict', 'A dictionary of atomselections and values of the constraint to be applied '
+                                             '(in kcal/mol/A^2). Atomselects must be mutually exclusive.'
                                              , {'protein and noh and not name CA': 0.1, 'protein and name CA': 1})
         self._cmdValue('nvtsteps', 'int', 'Number of initial steps to apply NVT in units of 4fs.', 500, TYPE_INT, RANGE_ANY)
         self._cmdValue('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the simulation time.', None, TYPE_INT, RANGE_ANY)

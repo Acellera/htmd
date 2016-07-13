@@ -18,20 +18,29 @@ class MetricDihedral(Projection):
     Parameters
     ----------
     dih : list of str
-        You can provide your own list of atomselect strings consisting of 4 atoms each for dihedral angles
+        You can provide your own list of 4 resid/atom pairs for dihedral angles. See example.
     sincos : bool, optional
-        To return the dihedral angles as their sine and cosine components. Makes them periodic.
+        Set to True to return the dihedral angles as their sine and cosine components. Makes them periodic.
     protsel : str, optional
-        Atomselection for the whole protein.
+        Atomselection for the protein segment for which to calculate dihedral angles. Resids should be unique within
+        that segment.
+
+    Examples
+    --------
+    >>> dih = []
+    >>> dih.append(MetricDihedral.chi2(4, 'ARG'))
+    >>> dih.append((15, 'N'), (15, 'CA'), (15, 'C'), (16, 'N'))  # psi angle
+    >>> dih.append(MetricDihedral.psi(15, 16))  # psi angle (equivalent to previous command, simple version)
+    >>> met = MetricDihedral(dih, 'protein and segid P0')
     """
     def __init__(self, dih=None, sincos=True, protsel='protein'):
         self._protsel = protsel
         self._sincos = sincos
-        self._dih = dih  # TODO: Calculate the dihedral
+        self._dihquads = dih  # TODO: Calculate the dihedral
         self._pc_dih = None
 
     def _precalculate(self, mol):
-        self._pc_dih = self._dihedralPrecalc(mol, mol.atomselect(self._protsel))
+        self._pc_dih = self._dihedralAtomsPrecalc(mol, mol.atomselect(self._protsel))
 
     def project(self, *args, **kwargs):
         """ Project molecule.
@@ -46,38 +55,23 @@ class MetricDihedral(Projection):
         data : np.ndarray
             An array containing the projected data.
         """
-        # -------------- DEPRECATION PATCH --------------
-        if isinstance(self, np.ndarray) or isinstance(self, Molecule):
-            from warnings import warn
-            warn('Static use of the project method will be deprecated in the next version of HTMD. '
-                 'Please change your projection code according to the tutorials on www.htmd.org')
-            data = _MetricDihedralOld.project(self, *args, **kwargs)
-            logger.warning('Static use of the project method will be deprecated in the next version of HTMD. '
-                           'Please change your projection code according to the tutorials on www.htmd.org')
-            return data
-        # ------------------ CUT HERE -------------------
         mol = args[0]
         dih = self._getSelections(mol)
-        return self._calcDihedrals(mol, dih, sincos=self._sincos)
+        return self._calcDihedralAngles(mol, dih, sincos=self._sincos)
 
     def _getSelections(self, mol):
         if self._pc_dih is not None:
             return self._pc_dih
         else:
-            return self._dihedralPrecalc(mol, mol.atomselect(self._protsel))
+            return self._dihedralAtomsPrecalc(mol, mol.atomselect(self._protsel))
 
     def getMapping(self, mol):
-        dih = self._getSelections(mol)
+        dihedrals = self._getSelections(mol)
         map = []
-        for i, d in enumerate(dih):
-            resids = mol.resid[d]
-            uqresids = np.unique(resids)
+        for i, dih in enumerate(dihedrals):
             mapstr = ''
-            for u in uqresids:
-                mapstr += 'resid {} atoms: '.format(u)
-                residatoms = mol.name[(mol.resid == u) & d]
-                for a in residatoms:
-                    mapstr += '{} '.format(a)
+            for d in dih:
+                mapstr += '({},{}) '.format(mol.resid[d], mol.name[d])
             if self._sincos:
                 map.append('Sine of angle of ' + mapstr)
                 map.append('Cosine of angle of ' + mapstr)
@@ -85,224 +79,257 @@ class MetricDihedral(Projection):
                 map.append('Angle of ' + mapstr)
         return np.array(map)
 
-    def _dihedralPrecalc(self, mol, protsel):
-        #logger.info('Precalculating phi and psi angle atom selections')
+    def _dihedralAtomsPrecalc(self, mol, protsel):
+        protatoms = mol.atomselect(protsel)
+        resids = np.unique(mol.get('resid', sel=protatoms))
 
-        # Phi angle: C'-N-Cα-C'
-        # Psi angle: N-Cα-C'-N
-        protmask = mol.atomselect('protein')
-        protmask = protmask & protsel
-        residues = np.unique(mol.get('resid', sel=protmask))
-
-        if self._dih is None:
-            selstr = []
-            # Only psi angle for first residue
-            selstr.append('backbone and (resid ' + str(residues[0]) + ' and name N CA C) or (resid ' + str(residues[1]) + ' and name N)')
-            for r in range(1, len(residues)-1):
-                selstr.append('backbone and (resid ' + str(residues[r]) + ' and name N CA C) or (resid ' + str(residues[r+1]) + ' and name N)')  #psi
-                selstr.append('backbone and (resid ' + str(residues[r-1]) + ' and name C) or (resid ' + str(residues[r]) + ' and name N CA C)')  #phi
-            # Only phi angle for the last residue
-            selstr.append('backbone and (resid ' + str(residues[len(residues)-2]) + ' and name C) or (resid ' + str(residues[len(residues)-1]) + ' and name N CA C)')
+        if self._dihquads is None:  # Default phi psi dihedrals
+            dihquads = self._proteinDihedrals(resids)
         else:
-            if isinstance(self._dih, str):
-                self._dih = [self._dih]
-            selstr = self._dih
+            if not isinstance(self._dihquads, list):
+                self._dihquads = [self._dihquads]
+            dihquads = self._dihquads
 
         dih = []
-        for s in selstr:
-            dih.append(mol.atomselect(s))
-        #logger.info('Finished precalculating phi and psi.')
+        for quad in dihquads:
+            dih.append(self._quadAtomIndexes(quad, protatoms, mol))
         return dih
 
-    def _calcDihedrals(self, mol, dih, sincos=True):
-        metric = np.zeros((np.size(mol.coords, 2), len(dih)))
+    def _quadAtomIndexes(self, quad, selatoms, mol):
+        sels = []
+        for p in quad:
+            # atomsel = mol.atomselect('resid {} and name {}'.format(p[0], p[1]))
+            atomsel = (mol.resid == p[0]) & (mol.name == p[1])
+            atomsel = atomsel & selatoms
+            if np.sum(atomsel) != 1:
+                raise RuntimeError('Expected one atom from atomselection. Got {} instead.'.format(np.sum(atomsel)))
+            sels.append(np.where(atomsel)[0][0])
+        return sels
 
-        for i in range(len(dih)):
-            metric[:, i] = self._angle(mol.coords[dih[i], :, :])
+    def _calcDihedralAngles(self, mol, dihedrals, sincos=True):
+        metric = np.zeros((np.size(mol.coords, 2), len(dihedrals)))
+
+        for i, dih in enumerate(dihedrals):
+            metric[:, i] = _angle(mol.coords[dih[0], :, :], mol.coords[dih[1], :, :],
+                                  mol.coords[dih[2], :, :], mol.coords[dih[3], :, :])
 
         if sincos:
             sc_metric = np.zeros((np.size(metric, 0), np.size(metric, 1) * 2))
             sc_metric[:, 0::2] = np.sin(metric * np.pi / 180.)
             sc_metric[:, 1::2] = np.cos(metric * np.pi / 180.)
             metric = sc_metric
-        return metric
+        return metric.astype(np.float32)
 
-    def _angle(self, A):
-        '''
-        http://en.wikipedia.org/wiki/Dihedral_angle#Methods_of_computation
-        https://www.cs.unc.edu/cms/publications/dissertations/hoffman_doug.pdf
-        http://www.cs.umb.edu/~nurith/cs612/hw4_2012.pdf
-
-        Ua = (A2 - A1) x (A3 - A1)
-        Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
-        angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
-        '''
-        A10 = np.transpose(A[1, :, :] - A[0, :, :])
-        A21 = np.transpose(A[2, :, :] - A[1, :, :])
-        A32 = np.transpose(A[3, :, :] - A[2, :, :])
-        Ua = np.cross(A10, A21)
-        Ub = np.cross(A21, A32)
-        #from IPython.core.debugger import Tracer
-        #Tracer()()
-        if np.any(np.sum(Ua == 0, 1) == 3) or np.any(np.sum(Ub == 0, 1) == 3):
-            raise ZeroDivisionError('Two dihedral planes are exactly parallel or antiparallel. There is probably something broken in the simulation.')
-        x = np.squeeze(_inner(Ua, Ub)) / (np.squeeze(np.linalg.norm(Ua, axis=1)) * np.squeeze(np.linalg.norm(Ub, axis=1)))
-
-        # Fix machine precision errors (I hope at least that's what I'm doing...)
-        if isinstance(x, np.ndarray):
-            x[x > 1] = 1
-            x[x < -1] = -1
-        elif x > 1:
-            x = 1
-        elif x < -1:
-            x = -1
-
-        signV = np.squeeze(np.sign(_inner(Ua, A32)))
-        signV[signV == 0] = 1  # Angle sign is 0. Maybe I should handle this better...
-
-        return (np.arccos(x) * 180. / np.pi) * signV
-
-
-class _MetricDihedralOld(_OldMetric):
     @staticmethod
-    def project(sims, dih=None, sincos=True, protsel='protein', skip=1, update=[]):
-        """ Calculates a set of dihedral angles from trajectories
+    def _proteinDihedrals(resids, resnames=None, dih=('psi', 'phi')):
+        """ Returns a list of tuples containing the four resid/atom pairs for each dihedral of the protein
 
         Parameters
         ----------
-        sims : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects or single :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-            A simulation list generated by the :func:`simlist <htmd.simlist.simlist>` function, or a :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        dih : list of str
-            You can provide your own list of atomselect strings consisting of 4 atoms each for dihedral angles
-        sincos : bool, optional
-            To return the dihedral angles as their sine and cosine components. Makes them periodic.
-        protsel : str, optional
-            Atomselection for the whole protein.
-        skip : int
-            Skip every `skip` frames of the trajectories
-        update :
-            Not functional yet
+        resids : list
+            A list of the protein resids
 
         Returns
         -------
-        data : :class:`MetricData <htmd.metricdata.MetricData>` object
-            Returns a :class:`MetricData <htmd.metricdata.MetricData>` object containing the metrics calculated
+        quads : list
+            A list of quads
         """
-        obj = _MetricDihedralOld(sims, protsel, dih, sincos)
-        return obj._metrify(sims, skip, update)
+        dihquads = []
+        for r in range(len(resids)):
+            if 'psi' in dih and r != len(resids)-1:  # No psi angle for last residue
+                dihquads.append(MetricDihedral.psi(resids[r], resids[r + 1]))
+            if 'phi' in dih and r != 0:  # No phi angle for first residue
+                dihquads.append(MetricDihedral.phi(resids[r - 1], resids[r]))
+            if 'chi1' in dih:
+                dihquads.append(MetricDihedral.chi1(resids[r], resnames[r]))
+            if 'chi2' in dih:
+                dihquads.append(MetricDihedral.chi2(resids[r], resnames[r]))
+            if 'chi3' in dih:
+                dihquads.append(MetricDihedral.chi3(resids[r], resnames[r]))
+            if 'chi4' in dih:
+                dihquads.append(MetricDihedral.chi4(resids[r], resnames[r]))
+            if 'chi5' in dih:
+                dihquads.append(MetricDihedral.chi5(resids[r], resnames[r]))
+        return [d for d in dihquads if d is not None]
 
-    def __init__(self, sims, protsel, dih=None, sincos=True):
-        self._protsel = protsel
-        self._sincos = sincos
-        self._dih = dih  # TODO: Calculate the dihedral
-        self._pc_dih = None
+    # Sidechain dihedral atoms taken from
+    # http://www.ccp14.ac.uk/ccp/web-mirrors/garlic/garlic/commands/dihedrals.html
+    @staticmethod
+    def phi(res1, res2):
+        """ Get a set of four resid/atom pairs corresponding to the phi angle of res1 and res2
 
-        (single, molfile) = _singleMolfile(sims)
-        if single:
-            mol = Molecule(molfile)
-            self._pc_dih = self._dihedralPrecalc(mol, mol.atomselect(protsel))
+        Parameters
+        ----------
+        res1 : int
+            The first residue containing the C atom
+        res2 : int
+            The second residue containing the N CA C atoms
 
-    def _processTraj(self, mol):
-        dih = self._getSelections(mol)
-        return self._calcDihedrals(mol, dih, sincos=self._sincos)
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        return (res1, 'C'), (res2, 'N'), (res2, 'CA'), (res2, 'C')
 
-    def _getSelections(self, mol):
-        if self._pc_dih is not None:
-            return self._pc_dih
-        else:
-            return self._dihedralPrecalc(mol, mol.atomselect(self._protsel))
+    @staticmethod
+    def psi(res1, res2):
+        """ Get a set of four resid/atom pairs corresponding to the psi angle of res1 and res2
 
-    def _getMapping(self, mol):
-        dih = self._getSelections(mol)
-        map = []
-        for i, d in enumerate(dih):
-            resids = mol.resid[d]
-            uqresids = np.unique(resids)
-            mapstr = ''
-            for u in uqresids:
-                mapstr += 'resid {} atoms: '.format(u)
-                residatoms = mol.name[(mol.resid == u) & d]
-                for a in residatoms:
-                    mapstr += '{} '.format(a)
-            if self._sincos:
-                map.append('Sine of angle of ' + mapstr)
-                map.append('Cosine of angle of ' + mapstr)
-            else:
-                map.append('Angle of ' + mapstr)
-        return np.array(map)
+        Parameters
+        ----------
+        res1 : int
+            The first residue containing the N CA C atoms
+        res2 : int
+            The second residue containing the N atom
 
-    def _dihedralPrecalc(self, mol, protsel):
-        logger.info('Precalculating phi and psi angle atom selections')
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        return (res1, 'N'), (res1, 'CA'), (res1, 'C'), (res2, 'N')
 
-        # Phi angle: C'-N-Cα-C'
-        # Psi angle: N-Cα-C'-N
-        protmask = mol.atomselect('protein')
-        protmask = protmask & protsel
-        residues = np.unique(mol.get('resid', sel=protmask))
+    @staticmethod
+    def chi1(res, resname):
+        """ Get a set of four resid/atom pairs corresponding to the chi1 angle of a residue
 
-        if self._dih is None:
-            selstr = []
-            # Only psi angle for first residue
-            selstr.append('backbone and (resid ' + str(residues[0]) + ' and name N CA C) or (resid ' + str(residues[1]) + ' and name N)')
-            for r in range(1, len(residues)-1):
-                selstr.append('backbone and (resid ' + str(residues[r]) + ' and name N CA C) or (resid ' + str(residues[r+1]) + ' and name N)')  #psi
-                selstr.append('backbone and (resid ' + str(residues[r-1]) + ' and name C) or (resid ' + str(residues[r]) + ' and name N CA C)')  #phi
-            # Only phi angle for the last residue
-            selstr.append('backbone and (resid ' + str(residues[len(residues)-2]) + ' and name C) or (resid ' + str(residues[len(residues)-1]) + ' and name N CA C)')
-        else:
-            selstr = self._dih
+        Parameters
+        ----------
+        res : int
+            The resid of the residue
 
-        dih = []
-        for s in selstr:
-            dih.append(mol.atomselect(s))
-        logger.info('Finished precalculating phi and psi.')
-        return dih
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        chi1std = ('N', 'CA', 'CB', 'CG')
+        chi1 = {'ARG': chi1std, 'ASN': chi1std, 'ASP': chi1std, 'CYS': ('N', 'CA', 'CB', 'SG'), 'GLN': chi1std,
+                'GLU': chi1std, 'HIS': chi1std, 'ILE': ('N', 'CA', 'CB', 'CG1'), 'LEU': chi1std, 'LYS': chi1std,
+                'MET': chi1std, 'PHE': chi1std, 'PRO': chi1std, 'SER': ('N', 'CA', 'CB', 'OG'),
+                'THR': ('N', 'CA', 'CB', 'OG1'), 'TRP': chi1std, 'TYR': chi1std, 'VAL': ('N', 'CA', 'CB', 'CG1')}
+        if resname not in chi1:
+            return None
+        return (res, chi1[resname][0]), (res, chi1[resname][1]), (res, chi1[resname][2]), (res, chi1[resname][3])
 
-    def _calcDihedrals(self, mol, dih, sincos=True):
-        metric = np.zeros((np.size(mol.coords, 2), len(dih)))
+    @staticmethod
+    def chi2(res, resname):
+        """ Get a set of four resid/atom pairs corresponding to the chi2 angle of a residue
 
-        for i in range(len(dih)):
-            metric[:, i] = self._angle(mol.coords[dih[i], :, :])
+        Parameters
+        ----------
+        res : int
+            The resid of the residue
 
-        if sincos:
-            sc_metric = np.zeros((np.size(metric, 0), np.size(metric, 1) * 2))
-            sc_metric[:, 0::2] = np.sin(metric * np.pi / 180.)
-            sc_metric[:, 1::2] = np.cos(metric * np.pi / 180.)
-            metric = sc_metric
-        return metric
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        chi2std = ('CA', 'CB', 'CG', 'CD')
+        chi2 = {'ARG': chi2std, 'ASN': ('CA', 'CB', 'CG', 'OD1'), 'ASP': ('CA', 'CB', 'CG', 'OD1'), 'GLN': chi2std,
+                'GLU': chi2std, 'HIS': ('CA', 'CB', 'CG', 'ND1'), 'ILE': ('CA', 'CB', 'CG1', 'CD'),
+                'LEU': ('CA', 'CB', 'CG', 'CD1'), 'LYS': chi2std,
+                'MET': ('CA', 'CB', 'CG', 'SD'), 'PHE': ('CA', 'CB', 'CG', 'CD1'), 'PRO': chi2std,
+                'TRP': ('CA', 'CB', 'CG', 'CD1'), 'TYR': ('CA', 'CB', 'CG', 'CD1')}
+        if resname not in chi2:
+            return None
+        return (res, chi2[resname][0]), (res, chi2[resname][1]), (res, chi2[resname][2]), (res, chi2[resname][3])
 
-    def _angle(self, A):
-        '''
-        http://en.wikipedia.org/wiki/Dihedral_angle#Methods_of_computation
-        https://www.cs.unc.edu/cms/publications/dissertations/hoffman_doug.pdf
-        http://www.cs.umb.edu/~nurith/cs612/hw4_2012.pdf
+    @staticmethod
+    def chi3(res, resname):
+        """ Get a set of four resid/atom pairs corresponding to the chi3 angle of a residue
 
-        Ua = (A2 - A1) x (A3 - A1)
-        Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
-        angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
-        '''
-        A10 = np.transpose(A[1, :, :] - A[0, :, :])
-        A21 = np.transpose(A[2, :, :] - A[1, :, :])
-        A32 = np.transpose(A[3, :, :] - A[2, :, :])
-        Ua = np.cross(A10, A21)
-        Ub = np.cross(A21, A32)
-        #from IPython.core.debugger import Tracer
-        #Tracer()()
-        x = np.squeeze(_inner(Ua, Ub)) / (np.squeeze(np.linalg.norm(Ua, axis=1)) * np.squeeze(np.linalg.norm(Ub, axis=1)))
+        Parameters
+        ----------
+        res : int
+            The resid of the residue
 
-        # Fix machine precision errors (I hope at least that's what I'm doing...)
-        if isinstance(x, np.ndarray):
-            x[x > 1] = 1
-            x[x < -1] = -1
-        elif x > 1:
-            x = 1
-        elif x < -1:
-            x = -1
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        chi3 = {'ARG': ('CB', 'CG', 'CD', 'NE'), 'GLN': ('CB', 'CG', 'CD', 'OE1'), 'GLU': ('CB', 'CG', 'CD', 'OE1'),
+                'LYS': ('CB', 'CG', 'CD', 'CE'), 'MET': ('CB', 'CG', 'SD', 'CE')}
+        if resname not in chi3:
+            return None
+        return (res, chi3[resname][0]), (res, chi3[resname][1]), (res, chi3[resname][2]), (res, chi3[resname][3])
 
-        signV = np.squeeze(np.sign(_inner(Ua, A32)))
-        signV[signV == 0] = 1  # Angle sign is 0. Maybe I should handle this better...
+    @staticmethod
+    def chi4(res, resname):
+        """ Get a set of four resid/atom pairs corresponding to the chi4 angle of a residue
 
-        return (np.arccos(x) * 180. / np.pi) * signV
+        Parameters
+        ----------
+        res : int
+            The resid of the residue
+
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        chi4 = {'ARG': ('CG', 'CD', 'NE', 'CZ'), 'LYS': ('CG', 'CD', 'CE', 'NZ')}
+        if resname not in chi4:
+            return None
+        return (res, chi4[resname][0]), (res, chi4[resname][1]), (res, chi4[resname][2]), (res, chi4[resname][3])
+
+    @staticmethod
+    def chi5(res, resname):
+        """ Get a set of four resid/atom pairs corresponding to the chi5 angle of a residue
+
+        Parameters
+        ----------
+        res : int
+            The resid of the residue
+
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        chi5 = {'ARG': ('CD', 'NE', 'CZ', 'NH1')}
+        if resname not in chi5:
+            return None
+        return (res, chi5[resname][0]), (res, chi5[resname][1]), (res, chi5[resname][2]), (res, chi5[resname][3])
+
+
+def _angle(A0, A1, A2, A3):
+    '''
+    http://en.wikipedia.org/wiki/Dihedral_angle#Methods_of_computation
+    https://www.cs.unc.edu/cms/publications/dissertations/hoffman_doug.pdf
+    http://www.cs.umb.edu/~nurith/cs612/hw4_2012.pdf
+
+    Ua = (A2 - A1) x (A3 - A1)
+    Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
+    angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
+    '''
+    A10 = np.transpose(A1 - A0)
+    A21 = np.transpose(A2 - A1)
+    A32 = np.transpose(A3 - A2)
+    Ua = np.cross(A10, A21)
+    Ub = np.cross(A21, A32)
+    #from IPython.core.debugger import Tracer
+    #Tracer()()
+    if np.any(np.sum(Ua == 0, 1) == 3) or np.any(np.sum(Ub == 0, 1) == 3):
+        raise ZeroDivisionError('Two dihedral planes are exactly parallel or antiparallel. There is probably something broken in the simulation.')
+    x = np.squeeze(_inner(Ua, Ub)) / (np.squeeze(np.linalg.norm(Ua, axis=1)) * np.squeeze(np.linalg.norm(Ub, axis=1)))
+
+    # Fix machine precision errors (I hope at least that's what I'm doing...)
+    if isinstance(x, np.ndarray):
+        x[x > 1] = 1
+        x[x < -1] = -1
+    elif x > 1:
+        x = 1
+    elif x < -1:
+        x = -1
+
+    signV = np.squeeze(np.sign(_inner(Ua, A32)))
+    signV[signV == 0] = 1  # Angle sign is 0. Maybe I should handle this better...
+
+    return (np.arccos(x) * 180. / np.pi) * signV
 
 
 def _inner(A, B):
