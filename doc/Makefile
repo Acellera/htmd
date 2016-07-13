@@ -59,7 +59,8 @@ clean:
 	rm -rf $(BUILDDIR)/
 
 publish:
-	scp -r $(BUILDDIR)/html/*  www.acellera.com:~/www.htmd.org/docs/
+	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/*'
+	scp -r $(BUILDDIR)/html/* www.acellera.com:~/www.htmd.org/docs/
 	scp -r static/*  www.acellera.com:~/www.htmd.org/
 	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
 

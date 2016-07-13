@@ -3,11 +3,15 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+
 import tempfile
 import logging
 import requests
+import io
+
 import os
 import numpy as np
+
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +78,48 @@ def diffMolecules(mol1, mol2, sel=None):
             m2.name[i], m2.resname[i], m2.resid[i], m2.insertion[i],
         ))
     return diff
+
+
+def getPdbStrings(mol, sel=None, onlyAtom=True):
+    """Return the PDB corresponding to molecule and selection, as a list of strings.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The Molecule object
+    sel : str
+        Atom selection to be output.
+    onlyAtom : bool
+        Only return ATOM/HETATM records (default True)
+
+    Examples
+    --------
+    >>> m = Molecule("3PTB")
+    >>> getPdbStrings(m, "resname BEN")         # doctest: +NORMALIZE_WHITESPACE
+    ['HETATM    1  C1  BEN A   1      -1.853  14.311  16.658  1.00 19.86      1    C  ',
+     'HETATM    2  C2  BEN A   1      -2.107  15.653  16.758  1.00 19.86      1    C  ',
+     'HETATM    3  C3  BEN A   1      -1.774  16.341  17.932  1.00 19.86      1    C  ',
+     'HETATM    4  C4  BEN A   1      -1.175  15.662  19.005  1.00 19.86      1    C  ',
+     'HETATM    5  C5  BEN A   1      -0.914  14.295  18.885  1.00 19.86      1    C  ',
+     'HETATM    6  C6  BEN A   1      -1.257  13.634  17.708  1.00 19.86      1    C  ',
+     'HETATM    7  C   BEN A   1      -2.193  13.627  15.496  1.00 19.86      1    C  ',
+     'HETATM    8  N1  BEN A   1      -2.797  14.235  14.491  1.00 19.86      1    N  ',
+     'HETATM    9  N2  BEN A   1      -1.762  12.391  15.309  1.00 19.86      1    N  ']
+    """
+
+    f = tempfile.NamedTemporaryFile(suffix=".pdb")
+    mol.write(f.name, sel)
+    f.seek(0, 0)
+    r = f.read()
+    f.close()
+
+    rl = r.decode("ascii").split("\n")
+
+    if onlyAtom:
+        rl = [x for x in rl if (x.startswith("ATOM") or x.startswith("HETATM"))]
+
+    return rl
+
 
 
 def opm(pdb):
@@ -162,5 +208,5 @@ if __name__ == "__main__":
     _testDeprecation()
 
     import doctest
-    doctest.testmod()
 
+    doctest.testmod()
