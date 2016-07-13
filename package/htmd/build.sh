@@ -10,9 +10,9 @@ T="$PWD"
 for S in "$PWD/C/"*; do
 	cd "$S"
 	make CPURE=$CPURE CC=$CC FC=$FC STATIC=$STATIC PLATFORM=$TRAVIS_OS_NAME TYPE=$TRAVIS_BRANCH
-	ls ../../htmd/parameterization/share/bin
 	cd "$T"
 done
+ls htmd/parameterization/share/bin
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
