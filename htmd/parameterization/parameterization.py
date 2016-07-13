@@ -220,8 +220,9 @@ class Parameterization:
 
         for p in path:
             pp = pp + os.pathsep + p
-        # print(bin)
-        # print(pp)
+        print("DEBUG: Searching for %s" % (binary) )
+        print(bin)
+        print(pp)
 
         r = shutil.which(binary, mode=os.X_OK, path=pp)
         # print(r)
