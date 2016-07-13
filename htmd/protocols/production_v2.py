@@ -20,8 +20,8 @@ class Production(ProtocolInterface):
         Parameters
         ----------
         runtime : float, default=0
-            Runtime of the simulation.
-        runtimeunits : str, default='steps'
+            Running time of the simulation.
+        timeunits : str, default='steps'
             Units for runtime. Can be 'steps', 'ns' etc.
         temperature : float, default=300
             Temperature of the thermostat in Kelvin
@@ -39,7 +39,7 @@ class Production(ProtocolInterface):
         super().__init__()
         self._cmdObject('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Acemd)
         self._cmdValue('runtime', 'float', 'Running time of the simulation.', 0, TYPE_FLOAT, RANGE_0POS)
-        self._cmdString('timeunits', 'str', 'Units for time arguments. Can be \'steps\', \'ns\' etc.', 'steps')
+        self._cmdString('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps')
         self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
         self._cmdValue('fb_k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0, TYPE_FLOAT, RANGE_ANY)
         self._cmdString('fb_reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.', 'none')
