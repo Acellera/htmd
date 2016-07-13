@@ -1,4 +1,4 @@
-CC := $(CPP) -static
+CC := $(CC) -static
 FC := $(FC) -static
 
 TIMEBOMB := -DTIMEBOMB=1 -DCDATE=$(shell date +%s)
