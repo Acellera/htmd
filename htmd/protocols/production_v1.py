@@ -105,6 +105,7 @@ proc calcforces {} {
   }
 }
 proc calcforces_endstep { } { }
+proc calcforces_terminate { } { }
 '''
 
     def _findFiles(self, inputdir):
