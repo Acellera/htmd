@@ -57,7 +57,7 @@ class VMD:
         self.send('menu main on')
         self.send('display depthcue off')
         self.send('axes location Off')
-        self.send('color Display Background white')
+        # self.send('color Display Background white')
         self.send('display projection Orthographic')
 
 

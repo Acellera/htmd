@@ -6,8 +6,10 @@
 import os
 
 import htmd.home
-from htmd.molecule.support import *
+import ctypes as ct
+from htmd.molecule.support import pack_string_buffer, pack_int_buffer, pack_ulong_buffer, pack_double_buffer
 import numpy as np
+
 
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
@@ -15,7 +17,7 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     libdir = htmd.home(libDir=True)
 
     if coordinates.ndim == 2:
-        coordinates = numpy.atleast_3d(coordinates)
+        coordinates = np.atleast_3d(coordinates)
 
     if coordinates.shape[1] != 3:
         print(coordinates.shape)
@@ -26,7 +28,7 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
 
     if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
         # It's a view -- need to make a copy to ensure contiguity of memory
-       coordinates = numpy.array( coordinates, dtype=numpy.float32 )
+       coordinates = np.array( coordinates, dtype=np.float32 )
     if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
        raise ValueError("Coordinates is a view with unsupported strides" )
 
@@ -64,15 +66,15 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
         raise NameError("'occupancy' not natoms in length")
 
     if platform.system() == "Windows":
-        cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
+        ct.cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
         if (os.path.exists(os.path.join(libdir, "psprolib.dll"))):
-            cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
+            ct.cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
 
-    parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
+    parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
-    c_selection = create_string_buffer(selection.encode('ascii'), len(selection) + 1)
-    c_natoms = c_int(natoms)
-    c_nframes = c_int(nframes)
+    c_selection = ct.create_string_buffer(selection.encode('ascii'), len(selection) + 1)
+    c_natoms = ct.c_int(natoms)
+    c_nframes = ct.c_int(nframes)
     c_atomname = pack_string_buffer(atomname)
     c_atomtype = pack_string_buffer(atomtype)
     c_resname = pack_string_buffer(resname)
@@ -109,19 +111,19 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
         nbonds = bonds.shape[0]
         if nbonds > 0:
             ll = nbonds * 2
-            c_bonds = (c_int * ll)()
+            c_bonds = (ct.c_int * ll)()
 
     for z in range(0, nbonds):
         for y in [0, 1]:
             c_bonds[z * 2 + y] = bonds[z, y]
 
-    c_nbonds = c_int(nbonds)
+    c_nbonds = ct.c_int(nbonds)
 
     ll = natoms * nframes
-    c_output_buffer = (c_int * ll)()
+    c_output_buffer = (ct.c_int * ll)()
 
     lenv = natoms * 3 * nframes
-    c_coords = coordinates.ctypes.data_as(POINTER(c_float))
+    c_coords = coordinates.ctypes.data_as(ct.POINTER(ct.c_float))
 
     retval = parser.atomselect(
         c_selection,
@@ -145,16 +147,80 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
     if retval != 0:
         raise NameError('Could not parse selection "' + selection + '". Is the selection a valid VMD atom selection?')
 
-    retval = numpy.empty((natoms, nframes), dtype=numpy.bool_)
+    retval = np.empty((natoms, nframes), dtype=np.bool_)
 
     for frame in range(nframes):
         for atom in range(natoms):
             retval[atom, frame] = c_output_buffer[frame * natoms + atom]
 
-    return numpy.squeeze(retval)
+    return np.squeeze(retval)
 
 
 #    return (retval.reshape(natoms, nframes))
+
+def guessAnglesAndDihedrals( bonds ):
+ # Generate a guess of angle and dihedral N-body terms
+ # based on a list of bond index pairs
+ # O(n^2) so SLOW for large N 
+
+    import gc
+
+    angles=[]
+    dihedrals=[]
+    for i in range( bonds.shape[0] ):
+      a1 = bonds[i,0]
+      a2 = bonds[i,1]
+
+      for j in range( i+1, bonds.shape[0]  ):
+        b1 = bonds[j,0]
+        b2 = bonds[j,1]
+
+        # a1-a2
+        # b1-b2
+
+        # a1-a2-b1
+        # a1-a2-b2
+        # a2-a1-b1
+        # a2-a1-b2
+        if( a2 == b2 ) : angles.append( [ a1, a2, b1 ] )
+        elif( a2 == b1 ) : angles.append( [ a1, a2, b2 ] )
+        elif( a1 == b2 ) : angles.append( [ a2, a1, b1 ] )
+        elif( a1 == b1 ) : angles.append( [ a2, a1, b2 ] )
+
+    angles = np.asarray( angles, dtype=np.integer )
+
+    for i in range( angles.shape[0] ):
+      a1 = angles[i,0]
+      a2 = angles[i,1]
+      a3 = angles[i,2]
+      for j in range( i+1, angles.shape[0]  ):
+        b1 = angles[j,0]
+        b2 = angles[j,1]
+        b3 = angles[j,2]
+        #a1-a2-a3-b3
+        #a1-a2-a3-b1
+        #b1-b2-b3-a3
+        #b1-b2-b3-a1
+
+        #a3-a2-a1-b3
+        #a3-a2-a1-b1
+        #b3-b2-b1-a3
+        #b3-b2-b1-a1
+
+        if (a2 == b1) and (a3 == b2): dihedrals.append( [ a1, a2, a3, b3 ] )
+        elif (a2 == b3) and (a3 == b1): dihedrals.append( [ a1, a2, a3, b1 ] )
+        elif (b2 == a1) and (b3 == a2): dihedrals.append( [ b1, b2, b3, a3 ] )
+        elif (b2 == a3) and (b3 == a2): dihedrals.append( [ b1, b2, b3, a1 ] )
+
+        elif (a2 == b1) and (a1 == b2): dihedrals.append( [ a3, a2, a1, b3 ] )
+        elif (a2 == b3) and (a1 == b2): dihedrals.append( [ a3, a2, a1, b1 ] )
+        elif (b2 == a1) and (b1 == a2): dihedrals.append( [ b3, b2, b1, a3 ] )
+        elif (b2 == a3) and (b1 == a2): dihedrals.append( [ b3, b2, b1, a1 ] )
+
+
+    dihedrals = np.asarray( dihedrals, dtype=np.integer )
+
+    return( angles, dihedrals )
 
 
 def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, insertion, altloc):
@@ -168,7 +234,7 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
 
     if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
         # It's a view -- need to make a copy to ensure contiguity of memory
-       coordinates = numpy.array( coordinates, dtype=numpy.float32 )
+       coordinates = np.array( coordinates, dtype=np.float32 )
     if(coordinates.strides[0] != 12  or coordinates.strides[1] != 4 ):
        raise ValueError("Coordinates is a view with unsupported strides" )
 
@@ -194,9 +260,9 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
 
     libdir = htmd.home(libDir=True)
 
-    parser = cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
+    parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
-    c_natoms = c_int(natoms)
+    c_natoms = ct.c_int(natoms)
     c_atomname = pack_string_buffer(atomname)
     c_atomtype = pack_string_buffer(atomtype)
     c_resname = pack_string_buffer(resname)
@@ -206,17 +272,17 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
     c_insert = pack_string_buffer(insertion)
     c_altLoc = pack_string_buffer(altloc)
     c_resid = pack_int_buffer(resid)
-    c_nframes = c_int(nframes)
+    c_nframes = ct.c_int(nframes)
     c_coords = None
 
-    c_nbonds = (c_int * 1)()
+    c_nbonds = (ct.c_int * 1)()
     lenv = natoms * 10  # some dumb guess about the max # of bonds likely to be created -- natoms*5
-    c_bonds = (c_int * lenv)()
+    c_bonds = (ct.c_int * lenv)()
 
     z = 0
 
     c_nbonds[0] = 0
-    c_coords = coordinates.ctypes.data_as(POINTER(c_float))
+    c_coords = coordinates.ctypes.data_as(ct.POINTER(ct.c_float))
 
     retval = fn = parser.guessbonds(
         c_natoms,
@@ -238,7 +304,7 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
        raise ValueError("Guessed bonding is bad")
     #print(retval)
     nbonds = c_nbonds[0]
-    bonds = numpy.empty((nbonds, 2), dtype=numpy.uint32)
+    bonds = np.empty((nbonds, 2), dtype=np.uint32)
     for y in range(0, nbonds):
         for x in range(0, 2):
             bonds[y, x] = int(c_bonds[y * 2 + x])
