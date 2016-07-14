@@ -1232,7 +1232,7 @@ class Molecule:
 
         """
         residueTable = {'ARG': 'R', 'AR0': 'R',
-                        'HIS': 'H', 'HID': 'H', 'HIE': 'H',
+                        'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HSE': 'H', 'HSD': 'H',
                         'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
                         'ASP': 'D', 'ASH': 'D',
                         'GLU': 'E', 'GLH': 'E',
