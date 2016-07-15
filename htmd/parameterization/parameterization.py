@@ -208,10 +208,6 @@ class Parameterization:
     @staticmethod
     def find_binary(binary, path=None, fatal=True):
         import shutil
-        import inspect
-
-        installp = os.path.dirname(inspect.getfile(Parameterization))
-
 
         # print( os.environ['PATH'].split(os.pathsep)  )
         if path:
@@ -224,9 +220,6 @@ class Parameterization:
 
         for p in path:
             pp = pp + os.pathsep + p
-        print("DEBUG: Searching for %s" % (binary) )
-        print( "From inspect: %s" %( installp ) )
-        print(pp)
 
         r = shutil.which(binary, mode=os.X_OK, path=pp)
         # print(r)
