@@ -98,11 +98,11 @@ def detectEquivalents( mol ):
   return (equiv_groups, equiv_atoms, equiv_group_by_atom)  
 
 
-if __name__ == "__main__":
-  m = Molecule( "ethanol.mol2" )
- # (angles, dihedrals) = guessAnglesAndDihedrals( m.bonds )
-  
-  (sd,sp) = detectEquivalents(m)
-  print(sd)
-  print(sp)
+#if __name__ == "__main__":
+#  m = Molecule( "ethanol.mol2" )
+# # (angles, dihedrals) = guessAnglesAndDihedrals( m.bonds )
+#  
+#  (sd,sp) = detectEquivalents(m)
+#  print(sd)
+#  print(sp)
 

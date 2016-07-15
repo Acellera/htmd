@@ -154,6 +154,7 @@ proc calcforces {} {
     constraintscaling [expr 1 + $step*(0.05-1)*2/$numsteps]}
 }
 proc calcforces_endstep { } { }
+proc calcforces_terminate { } { }
 '''
 
     def _findFiles(self, inputdir):

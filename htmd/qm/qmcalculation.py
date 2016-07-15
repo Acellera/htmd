@@ -70,7 +70,7 @@ class QMCalculation:
     if not isinstance( charge, int)          : raise ValueError( "charge must be integer" )
     if not isinstance( multiplicity, int )   : raise ValueError( "multiplicity must be integer" )
     if not isinstance( optimize, bool )      : raise ValueError( "optimize must be boolean" )
-    if not isinstance( esp     , bool )      : raise ValueError( "esp must be boolean" )
+    if not isinstance( esp     , bool ) and not isinstance( esp, np.ndarray )      : raise ValueError( "esp must be boolean or ndarray" )
     if not isinstance( esp_density , float ) : raise ValueError( "esp_density must be float" )
 
     if( ncpus == -1 ):
@@ -117,8 +117,14 @@ class QMCalculation:
 
     # Set up point cloud if esp calculation requested
    
-    if self.esp:
+    if self.esp == True:
        self.points = self._generate_points()
+    elif isinstance( self.esp, np.ndarray ):
+       self.points = [ self.esp ]
+       if self.points.shape[1]!=3: 
+          raise ValueError( "ESP point array must be npoints x 3" )
+       if self.coords.shape[2] != 1:
+          raise ValueError( "Can only specift ESP point array with a single frame of coords" )
     else:
        self.points = None
 
@@ -495,15 +501,15 @@ class QMCalculation:
     print("\nMol\n\n%d %d" %(self.charge, self.multiplicity), file=f )
     for i in range(coords.shape[0] ):
       print("%s\t %f\t %f\t %f" % ( self.molecule.element[i], coords[i,0], coords[i,1], coords[i,2] ), file=f )
+    print("", file=f )
     if self.frozen:
-      print( "", file=f )
       for i in range(len(self.frozen)):
          print("%s %s %s %s F\n" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2],  self.frozen[i][3]), file=f )
 
 
 
     if self.points is not None:
-      print("\n@grid.dat /N", file=f )
+      print("@grid.dat /N", file=f )
       self._write_points( os.path.join( dirname, "grid.dat" ), self.points[frame] )
 
     f.close()

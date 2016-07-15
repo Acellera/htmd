@@ -289,19 +289,19 @@ def MAEread(fname):
             if len(row) == 0:
                 continue
 
-            if row[0][0:6] == 'm_atom':
+            if row[0].startswith('m_atom'):
                 section = 'atoms'
                 section_desc = True
                 section_cols = []
-            elif row[0][0:6] == 'm_bond':
+            elif row[0].startswith('m_bond'):
                 section = 'bonds'
                 section_desc = True
                 section_cols = []
-            elif row[0][0:18] == 'm_PDB_het_residues':
+            elif row[0].startswith('m_PDB_het_residues'):
                 section = 'hetresidues'
                 section_desc = True
                 section_cols = []
-            elif section_desc and row[0] == ':::':
+            elif section_desc and row[0] == ':::':  # Once the section description has finished create a map from names to columns
                 section_dict = dict(zip(section_cols, range(len(section_cols))))
                 section_desc = False
                 section_data = True
@@ -315,6 +315,10 @@ def MAEread(fname):
                 if section == 'atoms' and section_data:
                     topo.record.append('ATOM')
                     row = np.array(row)
+                    if len(row) != len(section_dict) +1:  # TODO: fix the reader
+                        raise RuntimeError('{} has {} fields in the m_atom section description, but {} fields in the '
+                                           'section data. Please check for missing fields in the mae file.'
+                                           .format(fname, len(section_dict), len(row)))
                     row[row == '<>'] = 0
                     if 'i_pdb_PDB_serial' in section_dict:
                         topo.serial.append(row[section_dict['i_pdb_PDB_serial']])
@@ -355,6 +359,80 @@ def MAEread(fname):
     for h in heteros:
         topo.record[topo.resname == h] = 'HETATM'
     return topo, coords
+
+
+# def MAEreadPandas(fname):
+#     """ Reads maestro files.
+#
+#     Parameters
+#     ----------
+#     fname : str
+#         .mae file
+#
+#     Returns
+#     -------
+#     topo : Topology
+#     coords : list of lists
+#     """
+#     import io
+#     from pandas import read_csv
+#
+#     section = None
+#     section_desc = False
+#     section_data = False
+#
+#     topo = Topology()
+#     coords = []
+#     data = None
+#
+#     f = open(fname, 'r')
+#     for line in f:
+#         if len(line) == 0:
+#             continue
+#
+#         if line.strip().startswith('m_atom'):
+#             section = 'atoms'
+#             section_desc = True
+#             section_cols = []
+#         elif line.strip().startswith('m_bond'):
+#             section = 'bonds'
+#             section_desc = True
+#             section_cols = []
+#         elif line.strip().startswith('m_PDB_het_residues'):
+#             section = 'hetresidues'
+#             section_desc = True
+#             section_cols = []
+#         elif section_desc and line.strip() == ':::':  # Once the section description has finished create a map from names to columns
+#             section_desc = False
+#             section_data = True
+#         elif section_data and (line.strip() == ':::' or line.strip() == '}'):
+#             data.seek(0)
+#             if section == 'atoms':
+#                 atomdata = read_csv(data, delim_whitespace=True, skipinitialspace=True)
+#             elif section == 'bonds':
+#                 bonddata = read_csv(data, delim_whitespace=True, skipinitialspace=True)
+#             elif section == 'hetresidues':
+#                 hetdata = read_csv(data, delim_whitespace=True, skipinitialspace=True)
+#             data = None
+#             section = None
+#             section_data = False
+#         else:  # Descriptions or data
+#             # Reading the section description column names
+#             if section_desc:
+#                 section_cols.append(line.strip())
+#             # Reading the data
+#             if section_data and (section == 'atoms' or section == 'bonds' or section =='hetresidues'):
+#                 if data is None:
+#                     data = io.StringIO()
+#                     data.write(' '.join(section_cols) + '\n')
+#                 data.write(line)
+#
+#     from IPython.core.debugger import Tracer
+#     Tracer()()
+#
+#     for h in heteros:
+#         topo.record[topo.resname == h] = 'HETATM'
+#     return topo, coords
 
 
 def BINCOORread(filename):

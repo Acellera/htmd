@@ -15,11 +15,12 @@ class KMeansTri(object):
     Parameters
     ----------
     data : :class:`MetricData <htmd.metricdata.MetricData>` object
-        The object whose data we wish to project onto the top TICA dimensions
+        The object whose data we wish to project.
 
     Example
     -------
     >>> tri = KMeansTri(data)
+    >>> dataproj = tri.project(50)
     """
 
     def __init__(self, data):
