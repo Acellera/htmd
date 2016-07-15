@@ -19,6 +19,8 @@ class Production(ProtocolInterface):
 
         Parameters
         ----------
+        numsteps : int, default=0
+            Number of steps to run the simulations in units of 4fs
         temperature : float, default=300
             Temperature of the thermostat in Kelvin
         k : float, default=0
@@ -33,6 +35,7 @@ class Production(ProtocolInterface):
     def __init__(self):
         super().__init__()
         self._cmdObject('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Acemd)
+        self._cmdValue('numsteps', 'int', 'Number of steps to run the simulations in units of 4fs', 0, TYPE_INT, RANGE_0POS)
         self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
         self._cmdValue('k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0, TYPE_FLOAT, RANGE_ANY)
         self._cmdString('reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.', 'none')
@@ -66,8 +69,9 @@ class Production(ProtocolInterface):
         self.acemd.pmegridspacing = '1.0'
         self.acemd.fullelectfrequency = '2'
         self.acemd.energyfreq = '5000'
-        self.acemd.run = '10ns'
+        self.acemd.run = '$numsteps'
         self._TCL='''
+set numsteps NUMSTEPS
 set refindex { REFINDEX }
 set selindex { SELINDEX }
 set box { BOX }
@@ -161,13 +165,14 @@ proc calcforces_terminate { } { }
             mol = Molecule(os.path.join(inputdir, self.acemd.coordinates))
             self.acemd.tclforces = 'on'
             TCL = self._TCL
+            TCL = TCL.replace('NUMSTEPS', str(self.numsteps))
             TCL = TCL.replace('KCONST', str(self.k))
             TCL = TCL.replace('REFINDEX', ' '.join(map(str, mol.get('index', self.reference))))
             TCL = TCL.replace('SELINDEX', ' '.join(map(str, mol.get('index', self.selection))))
             TCL = TCL.replace('BOX', ' '.join(map(str, self.box)))
             self.acemd.TCL = TCL
         else:
-            self.acemd.TCL = ''
+            self.acemd.TCL = 'set numsteps {}\n'.format(self.numsteps)
         self.acemd.setup(inputdir, outputdir, overwrite=True)
 
 if __name__ == "__main__":

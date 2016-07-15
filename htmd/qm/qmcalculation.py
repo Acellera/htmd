@@ -27,6 +27,7 @@ class Theory(Enum):
 class Code(Enum):
  PSI4     = 3000
  Gaussian = 3001
+ TeraChem = 3002
 
 class Execution(Enum):
  Inline = 4000
@@ -38,6 +39,9 @@ class QMResult:
   esp_points = None
   esp_scalar = None
   energy     = 0.00
+  dipole     = None
+  quadrupole = None 
+  mulliken   = None
 
 class QMCalculation:
   
@@ -53,7 +57,7 @@ class QMCalculation:
                 esp_density= 10.,
                 code   = None,
                 execution = Execution.Inline,
-                directory = ".", mem=1, ncpus=1
+                directory = ".", mem=2, ncpus=-1
               ):
 
     if not isinstance(basis, BasisSet ): raise ValueError( "basis must of type BasisSet" )
@@ -66,8 +70,18 @@ class QMCalculation:
     if not isinstance( charge, int)          : raise ValueError( "charge must be integer" )
     if not isinstance( multiplicity, int )   : raise ValueError( "multiplicity must be integer" )
     if not isinstance( optimize, bool )      : raise ValueError( "optimize must be boolean" )
-    if not isinstance( esp     , bool )      : raise ValueError( "esp must be boolean" )
+    if not isinstance( esp     , bool ) and not isinstance( esp, np.ndarray )      : raise ValueError( "esp must be boolean or ndarray" )
     if not isinstance( esp_density , float ) : raise ValueError( "esp_density must be float" )
+
+    if( ncpus == -1 ):
+      try:
+        ncpus = int( os.getenv("NCPUS") )
+      except:
+        pass
+    if( ncpus == -1 ):
+      ncpus = os.cpu_count()
+
+
 
     # TODO esp validation, etc
 
@@ -103,8 +117,14 @@ class QMCalculation:
 
     # Set up point cloud if esp calculation requested
    
-    if self.esp:
+    if self.esp == True:
        self.points = self._generate_points()
+    elif isinstance( self.esp, np.ndarray ):
+       self.points = [ self.esp ]
+       if self.points.shape[1]!=3: 
+          raise ValueError( "ESP point array must be npoints x 3" )
+       if self.coords.shape[2] != 1:
+          raise ValueError( "Can only specift ESP point array with a single frame of coords" )
     else:
        self.points = None
 
@@ -287,8 +307,15 @@ class QMCalculation:
          self._results[i].coords = np.atleast_3d(ret['coords'])
          if "gridesp" in ret:
             self._results[i].esp_scalar = ret['gridesp']
-            np.divide( self._results[i].esp_scalar,  0.529177249  ) # Unit conversion from bohrs to angstoms
+            self._results[i].esp_scalar = np.divide( self._results[i].esp_scalar,  0.529177249  ) # Unit conversion from bohrs to angstoms
+         if "dipole" in ret:
+            self._results[i].dipole     = ret['dipole']
+         if "quadrupole" in ret:
+            self._results[i].quadrupole = ret['quadrupole']
+         if "mulliken" in ret:
+            self._results[i].mulliken   = ret['mulliken']
        i=i+1      
+
     return self._results
 
   def _read_gaussian( self, dirname ):
@@ -298,6 +325,19 @@ class QMCalculation:
     data={}
 
     completed = False
+
+    for i in range(len(fl)):
+      if "Dipole moment (field-independent basis, Debye):" in fl[i]:
+        s = fl[i+1].split()
+        data['dipole'] = [ float(s[1]), float(s[3]), float(s[5]), float(s[7]) ]
+      if "Traceless Quadrupole moment (field-independent basis, Debye-Ang):" in fl[i]:
+        s1 = fl[i+1].split()
+        s2 = fl[i+2].split()
+        data['quadrupole'] = [ float(s1[1]), float(s1[3]), float(s1[5]), float(s2[1]), float(s2[3]), float(s2[5]) ]
+      if "Mulliken atomic charges:" in fl[i]:
+        data['mulliken'] = []
+        for j in range(self.natoms):
+          data['mulliken'].append( float( fl[i+1+j].split()[2] ) )
 
     for l in fl:
         if "SCF Done:  E(RHF) = " in l:
@@ -337,9 +377,39 @@ class QMCalculation:
        
   def _read_psi4( self, dirname ):
    try:
+    data={}
+
+    f = open( os.path.join( dirname, "psi4.out" ), "r" )
+    fl= f.readlines()
+    f.close()
+    dipole=None
+    quadrupole=None
+    mulliken=None
+
+    for i in range( len(fl) ):
+      if "Mulliken Charges: (a.u.)" in fl[i]:
+        mulliken=[]
+        for j in range(self.natoms):
+           mulliken.append( fl[i+2+j].split()[5] )
+        data['mulliken'] = mulliken
+
+      if "Dipole Moment: (Debye)" in fl[i]:
+        dipole = fl[i+1]
+
+      if " Traceless Quadrupole Moment: (Debye Ang)" in fl[i]:
+        quadrupole = [ fl[i+1], fl[i+2] ]
+
+    if( dipole ):
+      s = dipole.split()
+      data['dipole'] = [ float(s[1]), float(s[3]), float(s[5]), float(s[7]) ]
+    if( quadrupole ):
+      s1 = quadrupole[0].split()
+      s2 = quadrupole[1].split()
+      data['quadrupole'] = [ float(s1[1]), float(s1[3]), float(s1[5]), float(s2[1]), float(s2[3]), float(s2[5]) ]
+
+
     f = open( os.path.join( dirname, "psi4out.xyz" ), "r" )
     fl=f.readlines()
-    data={}
 
     natoms=int(fl[0].split()[0]);
     energy=float(fl[0].split()[1]);
@@ -400,6 +470,7 @@ class QMCalculation:
     else:
       print("ee = energy('scf')", file = f )
 
+    print("oeprop('DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')", file=f )
     if self.points is not None:
       print("oeprop('GRID_ESP')", file = f )
       self._write_points( os.path.join( dirname, "grid.dat" ), self.points[frame] )
