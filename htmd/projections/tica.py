@@ -61,6 +61,8 @@ class TICA(object):
             p.stop()
         else:
             lag = unitconvert(units, 'frames', lag, data.fstep)
+            if lag == 0:
+                raise RuntimeError('Lag time conversion resulted in 0 frames. Please use a larger lag-time for TICA.')
             self.tic = tica(data.dat.tolist(), lag=lag)
 
     def project(self, ndim=None):

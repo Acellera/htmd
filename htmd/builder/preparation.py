@@ -29,18 +29,18 @@ def _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element
     mol = Molecule()
     mol.empty(numAtoms)
 
-    mol.name = np.array(name, dtype=mol._pdb_fields['name'])
-    mol.resname = np.array(resname, dtype=mol._pdb_fields['resname'])
-    mol.chain = np.array(chain, dtype=mol._pdb_fields['chain'])
-    mol.resid = np.array(resid, dtype=mol._pdb_fields['resid'])
-    mol.insertion = np.array(insertion, dtype=mol._pdb_fields['insertion'])
-    mol.coords = np.array(np.atleast_3d(np.vstack(coords)), dtype=mol._pdb_fields['coords'])
-    mol.segid = np.array(segid, dtype=mol._pdb_fields['segid'])
-    mol.element = np.array(element, dtype=mol._pdb_fields['element'])
-    mol.occupancy = np.array(occupancy, dtype=mol._pdb_fields['occupancy'])
-    mol.beta = np.array(beta, dtype=mol._pdb_fields['beta'])
-    # mol.charge = np.array(charge, dtype=mol._pdb_fields['charge'])
-    # mol.record = np.array(record, dtype=mol._pdb_fields['record'])
+    mol.name = np.array(name, dtype=mol._dtypes['name'])
+    mol.resname = np.array(resname, dtype=mol._dtypes['resname'])
+    mol.chain = np.array(chain, dtype=mol._dtypes['chain'])
+    mol.resid = np.array(resid, dtype=mol._dtypes['resid'])
+    mol.insertion = np.array(insertion, dtype=mol._dtypes['insertion'])
+    mol.coords = np.array(np.atleast_3d(np.vstack(coords)), dtype=mol._dtypes['coords'])
+    mol.segid = np.array(segid, dtype=mol._dtypes['segid'])
+    mol.element = np.array(element, dtype=mol._dtypes['element'])
+    mol.occupancy = np.array(occupancy, dtype=mol._dtypes['occupancy'])
+    mol.beta = np.array(beta, dtype=mol._dtypes['beta'])
+    # mol.charge = np.array(charge, dtype=mol._dtypes['charge'])
+    # mol.record = np.array(record, dtype=mol._dtypes['record'])
     return mol
 
 
@@ -82,6 +82,16 @@ def proteinPrepare(mol_in,
         LYN 	Neutral LYS
         TYM 	Negative TYR
         AR0     Neutral ARG
+
+    Charge +1    |  Neutral   | Charge -1
+    -------------|------------|----------
+     -           |  ASH       | ASP
+     -           |  CYS       | CYM
+     -           |  GLH       | GLU
+    HIP          |  HID/HIE   |  -
+    LYS          |  LYN       |  -
+     -           |  TYR       | TYM
+    ARG          |  AR0       |  -
 
     A detailed table about the residues modified is returned (as a second return value) when
     returnDetails is True (see ResidueData object).
@@ -223,7 +233,7 @@ def proteinPrepare(mol_in,
     # hidden quirks.
     tmpin = tempfile.NamedTemporaryFile(suffix=".pdb", mode="w+")
     logger.debug("Temporary file is " + tmpin.name)
-    mol_in.write(tmpin.name)  # Not sure this is sound unix
+    mol_in.write(tmpin.name)  # Not sure this is good unix
 
     pdblist, errlist = readPDB(tmpin)
     if len(pdblist) == 0 and len(errlist) == 0:
@@ -323,6 +333,7 @@ def proteinPrepare(mol_in,
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
+    mol_out.box = mol_in.box
     _fixupWaterNames(mol_out)
 
     # Return residue information
@@ -330,6 +341,7 @@ def proteinPrepare(mol_in,
     resData.pdb2pqr_protein = pdb2pqr_protein
     resData.missedLigands = missedLigands
 
+    resData._listNonStandardResidues()
     resData._warnIfpKCloseTopH(pH)
 
     if hydrophobicThickness:
