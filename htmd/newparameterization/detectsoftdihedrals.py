@@ -50,8 +50,14 @@ def detectSoftDihedrals( mol, equivalent_atoms ):
     c[a0,a1] = c[a1,a0] = False
     c[a1,a2] = c[a2,a1] = False
     c[a3,a2] = c[a2,a3] = False
-    left_1   =  sp.breadth_first_tree( c, a0, directed=False ).indices.flatten()
-    right_1  =  sp.breadth_first_tree( c, a3, directed=False ).indices.flatten()
+    left_1   = sp.breadth_first_tree( c, a0, directed=False )
+    left_1   = left_1.indices
+    left_1   = left_1.flatten()
+ 
+    right_1  =  sp.breadth_first_tree( c, a3, directed=False )
+    right_1  = right_1.indices
+    right_1  = right_1.flatten()
+
     left_1   = np.unique(left_1)
     right_1  = np.unique(right_1)
 #    print("MARK")
