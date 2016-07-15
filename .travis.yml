@@ -48,6 +48,7 @@ cache:
 
 
 install:
+# - printenv
  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.sh -O miniconda.sh; fi
@@ -117,5 +118,6 @@ script:
  - tests/run_other_tests.sh
 
 after_success:
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload_data.sh ; fi
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash .travis_conda_upload_data.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash .travis_conda_upload.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then package/htmd-meta/generate-meta-packages.sh; fi

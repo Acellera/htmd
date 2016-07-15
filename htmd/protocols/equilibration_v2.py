@@ -294,3 +294,4 @@ if __name__ == "__main__":
     eq.fb_box = [-20, 20, -20, 20, 43, 45]
     eq.fb_k = 5
     eq.write(htmd.home() + '/data/equilibrate', '/tmp/equil')
+
