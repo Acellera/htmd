@@ -66,7 +66,7 @@ void mindist_single_frame(float* coords, int* groups1, int* groups2, int gn1, in
 }
 
 
-void mindist_trajectory(float* coords, int* groups1, int* groups2, int gn1, int gn2, int na, int nf, float* dist) {
+void mindist_trajectory(float* coords, float* box, int* groups1, int* groups2, int gn1, int gn2, int na, int nf, int pbc, float* dist) {
     float mindist;
     int a,b,g1,g2,n1,n2,g1atm,g2atm,f;
     float coo1[3], coo2[3];
@@ -96,6 +96,12 @@ void mindist_trajectory(float* coords, int* groups1, int* groups2, int gn1, int 
                         d[0] = coords[Xf(g1atm,f,nf,nf3)]-coords[Xf(g2atm,f,nf,nf3)];
                         d[1] = coords[Yf(g1atm,f,nf,nf3)]-coords[Yf(g2atm,f,nf,nf3)];
                         d[2] = coords[Zf(g1atm,f,nf,nf3)]-coords[Zf(g2atm,f,nf,nf3)];
+
+                        if (pbc){
+                            d[0] = d[0] - box[0] * round(d[0] / box[0]);
+                            d[1] = d[1] - box[1] * round(d[1] / box[1]);
+                            d[2] = d[2] - box[2] * round(d[2] / box[2]);
+                        }
                         //printf("coor: %f %f %f / %f %f %f\n", coo1[0], coo1[1], coo1[2], coo2[0], coo2[1], coo2[2]);
 
                         float D = d[0]*d[0]+d[1]*d[1]+d[2]*d[2];
