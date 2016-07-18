@@ -252,10 +252,10 @@ if __name__ == "__main__":
 
     metr = MetricDistance('protein and name CA', 'resname MOL and noh', groupsel1='residue', groupsel2='all')
     data = metr.project(mol)
-    lastdists = np.array([29.86027718,  30.96251488,  33.62521744,  38.87788773,
-                          38.07615662,  41.80171967,  42.2215271 ,  39.5571022 ,
+    lastdists = np.array([28.99010277,  30.08285904,  32.75860214,  32.42934036,
+                          33.58397293,  32.05215073,  32.83199692,  31.5758419 ,
                           27.89051056,  27.47974586,  25.18564415,  21.57362175,
                           23.08990097,  22.45937729,  18.47289085,  18.41271782,
-                          20.87875175,  19.73318672,  15.16925335,  12.0577631 ], dtype=np.float32)
+                          20.87875175,  19.73318672,  15.1692543 ,  12.0577631 ], dtype=np.float32)
     assert np.all(np.abs(data[-1, -20:] - lastdists) < 0.001), 'Minimum distance calculation is broken'
 
