@@ -925,6 +925,8 @@ class Molecule:
                 if mdtraj:
                     traj = self._readMDtraj(f)
                     traj.coords = traj.coords[:, :, frames[i]]
+                    traj.box = traj.box[:, frames[i]]
+                    traj.box_angles = traj.box_angles[frames[i],:]
                 else:
                     traj = XTCread(f, frames[i])
                 self.fileloc.append([f, int(frames[i])])
@@ -937,6 +939,17 @@ class Molecule:
                 raise ValueError("Trajectory # of atoms mismatch with already loaded coordinates")
             # print(np.shape(traj.box), np.shape(self.box))
             # TODO : check step correct increment
+
+            if traj.coords.ndim == 2:
+                    traj.coords = traj.coords.reshape(traj.coords.shape[0],
+                                                      traj.coords.shape[1],
+                                                      1)
+            if traj.box.ndim == 1:
+                    traj.box = traj.box.reshape(traj.box.shape[0],1)
+
+            if traj.box_angles.ndim == 1:
+                    traj.box_angles = traj.box_angles.reshape(1,traj.box_angles.shape[0])
+
             if len(self.coords) == 0:
                 self.coords = traj.coords
                 self.box = traj.box
@@ -944,7 +957,7 @@ class Molecule:
             else:
                 self.coords = np.append(self.coords, traj.coords, 2)
                 self.box = np.append(self.box, traj.box, 1)
-                self.box_angles = np.append(self.box_angles, traj.unitcell_angles,1)
+                self.box_angles = np.append(self.box_angles, traj.box_angles,0)
 
         if skip is not None:
             self.coords = self.coords[:, :, ::skip]  # Might actually not free memory! Check numpy views
