@@ -101,9 +101,15 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
     import os
     import ctypes
     from htmd.home import home
-    if pbc and (mol.box is None or np.sum(mol.box) == 0):
-        raise NameError('No periodic box dimensions given in the molecule/trajectory. '
-                        'If you want to calculate distance without wrapping, set the pbc option to False')
+
+    box = np.array([0, 0, 0], dtype=np.float32)
+    if pbc:
+        if mol.box is None or np.sum(mol.box) == 0:
+            raise NameError('No periodic box dimensions given in the molecule/trajectory. '
+                            'If you want to calculate distance without wrapping, set the pbc option to False')
+        box = mol.box[:, 0]  # TODO: make it work for varying box size
+        if np.max(mol.box.T - mol.box[:, 0]) != 0:
+            raise NameError('Different box sizes per frame. Still unsupported by mindist. Contact Stefan Doerr.')
 
     coords = mol.coords
 
@@ -116,10 +122,6 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
     for i in range(sel2.shape[0]):
         idx = np.where(sel2[i, :])[0]
         groups2[i, 0:len(idx)] = idx
-
-    box = mol.box[:, 0]  # TODO: make it work for varying box size
-    if np.max(mol.box.T - mol.box[:, 0]) != 0:
-        raise NameError('Different box sizes per frame. Still unsupported by mindist. Contact Stefan Doerr.')
 
     # Running the actual calculations
     lib = ctypes.cdll.LoadLibrary(os.path.join(home(libDir=True), 'mindist_ext.so'))

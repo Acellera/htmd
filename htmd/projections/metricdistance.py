@@ -74,7 +74,7 @@ class MetricDistance(Projection):
         if np.ndim(sel1) == 1 and np.ndim(sel2) == 1:  # normal distances
             metric = pp_calcDistances(mol, sel1, sel2, self.metric, self.threshold, self.pbc, truncate=self.truncate)
         else:  # minimum distances by groups
-            metric = pp_calcMinDistances(mol, sel1, sel2)
+            metric = pp_calcMinDistances(mol, sel1, sel2, self.metric, self.threshold, pbc=self.pbc)
 
         return metric
 
