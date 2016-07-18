@@ -9,7 +9,7 @@ from IPython.core.debugger import Tracer
 
 
 def pp_calcDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=True, gap=1, truncate=None):
-    distances = _distanceArray(mol, sel1, sel2, mol.numFrames, pbc)
+    distances = _distanceArray(mol, sel1, sel2, pbc)
     distances = _postProcessDistances(distances, sel1, sel2, truncate)
 
     if metric == 'contacts':
