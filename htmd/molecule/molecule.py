@@ -886,8 +886,8 @@ class Molecule:
                 self.box = np.append(self.box, traj.box, 1)
 
         if skip is not None:
-            self.coords = self.coords[:, :, ::skip]  # Might actually not free memory! Check numpy views
-            self.box = self.box[:, ::skip]
+            self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
+            self.box = np.array(self.box[:, ::skip])
             self.fileloc = self.fileloc[::skip]
 
         self.coords = np.atleast_3d(self.coords)

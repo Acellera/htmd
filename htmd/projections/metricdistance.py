@@ -259,3 +259,7 @@ if __name__ == "__main__":
                           20.87875175,  19.73318672,  15.1692543 ,  12.0577631 ], dtype=np.float32)
     assert np.all(np.abs(data[-1, -20:] - lastdists) < 0.001), 'Minimum distance calculation is broken'
 
+    mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'), skip=10)
+    data2 = metr.project(mol)
+    assert np.array_equal(data2, data[::10, :]), 'Minimum distance calculation with skipping is broken'
+
