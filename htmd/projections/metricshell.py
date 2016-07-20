@@ -57,7 +57,7 @@ class MetricShell(MetricDistance):
         self.shellcenters = None
 
     def _precalculate(self, mol):
-        self.map = super().getMapping(mol).indexes
+        self.map = np.vstack(super().getMapping(mol).indexes)
         self.shellcenters = np.unique(self.map[:, 0])
 
     def project(self, *args, **kwargs):
@@ -88,7 +88,7 @@ class MetricShell(MetricDistance):
         if self.shellcenters is not None and self.map is not None:
             return self.shellcenters, self.map, sel1, sel2
         else:
-            map = super().getMapping(mol).indexes
+            map = np.vstack(super().getMapping(mol).indexes)
             return np.unique(map[:, 0]), map, sel1, sel2
 
     def getMapping(self, mol):

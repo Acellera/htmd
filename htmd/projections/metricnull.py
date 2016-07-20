@@ -26,7 +26,7 @@ class MetricNull(Projection):
         logger.info("In _precalculate")
         self._precalculation_enabled = True
 
-    def getMapping(self):
+    def getMapping(self, mol):
         """ Returns optional information.
 
         Returns
