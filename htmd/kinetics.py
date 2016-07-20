@@ -62,8 +62,7 @@ class Kinetics(object):
         dataobj = self.model.data
         distcols = []
         contcols = []
-        from IPython.core.debugger import Tracer
-        Tracer()()
+
         if not dataobj.map.empty:  # Search for distances or contacts in the data
             if dataobj.parent is None:
                 distcols = np.where(dataobj.map.type == 'distance')[0]
