@@ -64,6 +64,7 @@ class BatchCompletionCallBack(object):
         if self.parallel._original_iterator is not None:
             self.parallel.dispatch_next()
 
+
 class CallBack(object):
     bars = defaultdict(int)
 

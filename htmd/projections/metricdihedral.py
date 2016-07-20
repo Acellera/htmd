@@ -67,17 +67,25 @@ class MetricDihedral(Projection):
 
     def getMapping(self, mol):
         dihedrals = self._getSelections(mol)
-        map = []
+
+        from pandas import DataFrame
+        types = []
+        indexes = []
+        description = []
         for i, dih in enumerate(dihedrals):
+            types += ['dihedral']
+            indexes += [dih]
             mapstr = ''
             for d in dih:
-                mapstr += '({},{}) '.format(mol.resid[d], mol.name[d])
+                mapstr += '({} {} {}) '.format(mol.resname[d], mol.resid[d], mol.name[d])
             if self._sincos:
-                map.append('Sine of angle of ' + mapstr)
-                map.append('Cosine of angle of ' + mapstr)
+                description += ['Sine of angle of ' + mapstr]
+                description += ['Cosine of angle of ' + mapstr]
+                types += ['dihedral']
+                indexes += [dih]
             else:
-                map.append('Angle of ' + mapstr)
-        return np.array(map)
+                description += ['Angle of ' + mapstr]
+        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
     def _dihedralAtomsPrecalc(self, mol, protsel):
         protatoms = mol.atomselect(protsel)
@@ -102,7 +110,7 @@ class MetricDihedral(Projection):
             atomsel = (mol.resid == p[0]) & (mol.name == p[1])
             atomsel = atomsel & selatoms
             if np.sum(atomsel) != 1:
-                raise RuntimeError('Expected one atom from atomselection. Got {} instead.'.format(np.sum(atomsel)))
+                raise RuntimeError('Expected one atom from atomselection resid {} name {}. Got {} instead.'.format(p[0], p[1], np.sum(atomsel)))
             sels.append(np.where(atomsel)[0][0])
         return sels
 

@@ -97,22 +97,33 @@ class MetricDistance(Projection):
         numatoms1 = len(protatoms)
         numatoms2 = len(ligatoms)
 
+        from pandas import DataFrame
+        types = []
+        indexes = []
+        description = []
         if np.array_equal(protatoms, ligatoms):
-            map = np.zeros((numatoms1 * (numatoms1-1) / 2, 2), dtype=int)
-            start = 0
             for i in range(numatoms1):
-                finish = start + numatoms1 - i - 1
-                map[start:finish, 0] = protatoms[i]
-                map[start:finish, 1] = protatoms[i+1:]
-                start = finish
+                for j in range(i+1, numatoms1):
+                    atm1 = protatoms[i]
+                    atm2 = protatoms[j]
+                    desc = '{} between {} {} {} and {} {} {}'.format(self.metric[:-1],
+                                                                     mol.resname[atm1], mol.resid[atm1], mol.name[atm1],
+                                                                     mol.resname[atm2], mol.resid[atm2], mol.name[atm2])
+                    types += [self.metric[:-1]]
+                    indexes += [[atm1, atm2]]
+                    description += [desc]
         else:
-            map = np.zeros((numatoms1 * numatoms2, 2), dtype=int)
-            for i in range(numatoms2):
-                start = i * numatoms1
-                finish = (i+1) * numatoms1
-                map[start:finish, 0] = protatoms
-                map[start:finish, 1] = ligatoms[i]
-        return map
+            for j in range(numatoms2):
+                for i in range(numatoms1):
+                    atm1 = protatoms[i]
+                    atm2 = ligatoms[j]
+                    desc = '{} between {} {} {} and {} {} {}'.format(self.metric[:-1],
+                                                                     mol.resname[atm1], mol.resid[atm1], mol.name[atm1],
+                                                                     mol.resname[atm2], mol.resid[atm2], mol.name[atm2])
+                    types += [self.metric[:-1]]
+                    indexes += [[atm1, atm2]]
+                    description += [desc]
+        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
     def _getSelections(self, mol):
         # If they have been pre-calculated return them.
