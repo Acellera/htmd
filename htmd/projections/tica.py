@@ -128,6 +128,15 @@ class TICA(object):
 
         from htmd.metricdata import MetricData
         datatica = MetricData(dat=np.array(proj, dtype=object), simlist=simlist, ref=ref, fstep=fstep, parent=parent)
+        from pandas import DataFrame
+        types = []
+        indexes = []
+        description = []
+        for i in range(ndim):
+            types += ['tica']
+            indexes += [-1]
+            description += ['TICA dimension {}'.format(i+1)]
+        datatica.map = DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
         return datatica
 
