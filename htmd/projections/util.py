@@ -102,6 +102,16 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
     import ctypes
     from htmd.home import home
 
+    # Converting non-grouped boolean atomselection to group-style atomselections
+    if np.ndim(sel1) != 2:
+        sel1idx = tuple(np.where(sel1)[0])
+        sel1 = np.zeros((len(sel1idx), len(sel1)), dtype=bool)
+        sel1[range(sel1.shape[0]), sel1idx] = True
+    if np.ndim(sel2) != 2:
+        sel2idx = tuple(np.where(sel2)[0])
+        sel2 = np.zeros((len(sel2idx), len(sel2)), dtype=bool)
+        sel2[range(sel2.shape[0]), sel2idx] = True
+
     box = np.array([0, 0, 0], dtype=np.float32)
     if pbc:
         if mol.box is None or np.sum(mol.box) == 0:
