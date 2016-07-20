@@ -82,15 +82,15 @@ class MetricDistance(Projection):
         (sel1, sel2) = self._getSelections(mol)
 
         if np.ndim(sel1) == 2:
-            protatoms = np.ones(len(sel1)) * -1
-            for i in range(np.size(sel1, 1)):
-                protatoms[i] = np.where(sel1[i] == True)[0][0]
+            protatoms = []
+            for i in range(sel1.shape[0]):
+                protatoms.append(np.where(sel1[i, :] == True)[0])
         else:
             protatoms = np.where(sel1)[0]
         if np.ndim(sel2) == 2:
-            ligatoms = np.ones(len(sel1)) * -1
-            for i in range(np.size(sel2, 1)):
-                ligatoms[i] = np.where(sel2[i] == True)[0][0]
+            ligatoms = []
+            for i in range(sel2.shape[0]):
+                ligatoms.append(np.where(sel2[i, :] == True)[0])
         else:
             ligatoms = np.where(sel2)[0]
 
