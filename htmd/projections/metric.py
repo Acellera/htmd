@@ -120,7 +120,7 @@ class Metric:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
                 proj._precalculate(uqMol)
-                map = map.append(proj.getMapping(uqMol))
+                map = map.append(proj.getMapping(uqMol), ignore_index=True)
 
         logger.info('Metric: Starting projection of trajectories.')
         metrics = np.empty(numSim, dtype=object)
