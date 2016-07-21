@@ -3,6 +3,8 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+
+
 def compareVersions():
     from htmd.version import version
     from natsort import natsorted
@@ -15,12 +17,13 @@ def compareVersions():
     if not os.path.exists(__htmdconf):
         try:
             os.makedirs(__htmdconf)
-        except error:
+        except:
             print('Unable to create {} folder. Will not check for new HTMD versions.'.format(__htmdconf))
             return
     __file = os.path.join(__htmdconf, '.latestversion')
 
-    if not os.path.isfile(__file) or time.time() > os.path.getmtime(__file) + 86400: #86400:  # Check if one day has passed since last version check
+    # Check if one day has passed since last version check. If yes, get new version and write to file
+    if not os.path.isfile(__file) or time.time() > os.path.getmtime(__file) + 86400:
         _writeLatestVersionFile(__file)
 
     try:
@@ -28,15 +31,25 @@ def compareVersions():
     except:
         print('Unable to open {} file for reading. Will not check for new HTMD versions.'.format(__file))
         return
-    latestver = f.read()
+    latestversions = f.readlines()
     f.close()
+
     currver = version()
-    if currver != 'unpackaged' and natsorted((latestver, currver))[1] != currver:
-        print('New HTMD version ({}) is available. You are currently on ({}). Use \'conda update htmd\' to update to the new version.'.format(latestver, currver))
+    if currver != 'unpackaged' and len(latestversions) == 2:  # Supporting users which still haven't passed the one day limit. Can remove in next
+        if _is_stable(currver):
+            latest = latestversions[0].strip()
+            verstring = 'stable'
+        else:
+            latest = latestversions[1].strip()
+            verstring = 'devel'
+    else:  # Supporting users which still haven't passed the one day limit. Can remove in next version
+        latest = latestversions[0].strip()
+        verstring = ''
+    if currver != 'unpackaged' and natsorted((latest, currver))[1] != currver:
+        print('New {} HTMD version ({}) is available. You are currently on ({}). Use \'conda update htmd\' to '
+              'update to the new version.'.format(verstring, latest, currver))
     else:
         print('You are on the latest HTMD version ({}).'.format(currver))
-    #elapse = time.time() - t
-    #print(elapse)
 
 
 def _writeLatestVersionFile(fname):
@@ -48,27 +61,48 @@ def _writeLatestVersionFile(fname):
         return
     
     try:
-        ver = _release_version('acellera', 'htmd')
+        stable, dev = _release_version('acellera', 'htmd')
     except Exception as err:
         print("{}".format(err))
         f.close()
         return
     
-    f.write(ver)
+    f.write('{}\n{}'.format(stable, dev))
     os.utime(fname, None)
     f.close()
 
 
 def _release_version(user, package):
     import requests
-    from binstar_client.utils import get_binstar
+
+    from binstar_client.utils import get_server_api
     try:
         requests.get('http://conda.anaconda.org', timeout=1.)
         # Do conda version check
     except requests.Timeout:
         raise NameError('Failed connecting to http://conda.anaconda.org. Cannot check for new HTMD versions.')
 
-    binstar = get_binstar()
-    package = binstar.package(user, package)
-    return package['versions'][-1]
+    api = get_server_api()
+    package = api.package(user, package)
+
+    versionlist = package['versions']
+    laststable = None
+    lastdev = None
+    for ver in versionlist[::-1]:  # Iterate in reverse due to sorting of conda versions
+        if _is_stable(ver):
+            laststable = ver
+        else:
+            lastdev = ver
+        if laststable and lastdev:
+            break
+
+    return laststable, lastdev
+
+
+def _is_stable(ver):
+    import numpy as np
+    if np.mod(int(ver.split('.')[1]), 2) == 0:  # Even versions are stable (i.e. 1.2.x 3.4.x etc)
+        return True
+    else:
+        return False
 

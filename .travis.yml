@@ -8,7 +8,7 @@ matrix:
   include:
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1 CC=x86_64-w64-mingw32-g++ FC=x86_64-w64-mingw32-gfortran
+     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1 CPURE=gcc CC=x86_64-w64-mingw32-g++ FC=x86_64-w64-mingw32-gfortran OSNAME=Linux
      addons:
       apt:
        packages:
@@ -19,24 +19,24 @@ matrix:
        - mingw-w64-dev
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran STATIC="-static"
+     env: TRAVIS_PYTHON_VERSION=3.4 CPURE=gcc CC=g++ FC=gfortran STATIC="-static" OSNAME=Linux
      addons:
       apt:
        packages:
        - gfortran
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran STATIC="-static"
+     env: TRAVIS_PYTHON_VERSION=3.5 CPURE=gcc CC=g++ FC=gfortran STATIC="-static" OSNAME=Linux
      addons:
       apt:
        packages:
        - gfortran
    - os: osx
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4  CC=g++ FC=gfortran
+     env: TRAVIS_PYTHON_VERSION=3.4 CPURE=gcc CC=g++ FC=gfortran OSNAME=Darwin
    - os: osx
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CC=g++ FC=gfortran
+     env: TRAVIS_PYTHON_VERSION=3.5 CPURE=gcc CC=g++ FC=gfortran OSNAME=Darwin
 
 
 # TONI Suppress fc-list warnings and speed-up - hopefully
@@ -48,11 +48,12 @@ cache:
 
 
 install:
+# - printenv
  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.sh -O miniconda.sh; fi
 
- - if [ "$TRAVIS_BRANCH" == "pro" ];      then export PACKAGE_NAME=htmd-pro; else export PACKAGE_NAME=htmd;  fi
+ - if [ "$TRAVIS_BRANCH" == "pro" ]; then export PACKAGE_NAME=htmd-pro; export TYPE=pro; else export PACKAGE_NAME=htmd; export TYPE=basic; fi
  - echo $PACKAGE_NAME
 
  - bash miniconda.sh -b -p $HOME/miniconda
@@ -73,7 +74,6 @@ install:
  - export BUILD_NUMBER=$(git describe --tags | sed 's/-/ /g' | awk '{print $2}')
  # Always set it to 0 so we don't get a new release at every successful commit
  - export BUILD_NUMBER=0
-
 
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-data
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd
@@ -106,11 +106,18 @@ install:
 
 script:
  # Run the inline file tests 
+# - echo "HTMD TEST BEGIN"
+#
+# - pwd
+# - echo $PYTHON_PATH
+# - conda env list
+# - find $HOME -name g09_wrapper
  - python -c "import htmd"
  - activate_license "$LICENSE_TOKEN"
  - python tests/run_inline_file_tests.py
  - tests/run_other_tests.sh
 
 after_success:
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload_data.sh ; fi
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "master" ]; then bash .travis_conda_upload.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash .travis_conda_upload_data.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash .travis_conda_upload.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then package/htmd-meta/generate-meta-packages.sh; fi

@@ -30,48 +30,50 @@ class AdaptiveRunNew(AdaptiveNew):
 
     Parameters
     ----------
-    app : :class:`App <htmd.apps.app.App>` object
+    app : :class:`App <htmd.apps.app.App>` object, default=None
         An App class object used to retrieve and submit simulations
-    project : str
+    project : str, default='adaptive'
         The name of the project
-    nmin : int
+    nmin : int, default=1
         Minimum number of running simulations
-    nmax : int
+    nmax : int, default=1
         Maximum number of running simulations
-    nepochs : int
+    nepochs : int, default=100
         Maximum number of epochs
-    inputpath : str, optional
+    inputpath : str, default='input'
         The directory used to store input folders
-    generatorspath : str, optional
+    generatorspath : str, default='generators'
         The directory containing the generators
-    dryrun : bool, optional
+    dryrun : boolean, default=False
         A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations
-    updateperiod : float, optional
+    updateperiod : float, default=0
         When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
-    metricsel1 : str
-        The atomselection to be used for projecting coordinates to atom distances
-    metricsel2 : str, optional
-        Second atomselection for projecting coordinates to distances between the two selections
-    metrictype : {'contacts', 'distances'}, optional, default='contacts'
-        Metric type to user. Choose between contacts or distances
-    datapath : str, optional
+    datapath : str, default='data'
         The directory in which the completed simulations are stored
-    filteredpath : str, optional
+    filteredpath : str, default='filtered'
         The directory in which the filtered simulations will be stored
-    macronum : int, optional
+    metricsel1 : str, default=None
+        The atomselection to be used for projecting coordinates to atom distances
+    metricsel2 : str, default=None
+        Second atomselection for projecting coordinates to distances between the two selections
+    metrictype : ['contacts', 'distances'], str, default='contacts'
+        Metric type to user. Choose between contacts or distances
+    macronum : int, default=8
         The number of macrostates to produce
-    skip : int, optional
+    skip : int, default=1
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
-    lag : int, optional
+    lag : int, default=1
         The lagtime used to create the Markov model
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, optional
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
         Clustering algorithm used to cluster the contacts or distances
-    method : str, optional
+    method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
-    ticadim : int, optional
+    ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
-    filtersel : str, optional
+    filtersel : str, default='not water'
         Filtering atom selection
+    contactsym : str, default=None
+        Contact symmetry
 
     Example
     -------
@@ -79,7 +81,7 @@ class AdaptiveRunNew(AdaptiveNew):
     >>> adapt.nmin = 2
     >>> adapt.nmax = 3
     >>> adapt.nepochs = 2
-    >>> adapt.ticadim = 0
+    >>> adapt.ticadim = 3
     >>> adapt.metricsel1 = 'name CA'
     >>> adapt.generatorspath = htmd.home()+'/data/dhfr'
     >>> adapt.app = AcemdLocal()
@@ -99,7 +101,7 @@ class AdaptiveRunNew(AdaptiveNew):
         self._cmdValue('lag', 'int', 'The lagtime used to create the Markov model', 1, TYPE_INT, RANGE_POS)
         self._cmdObject('clustmethod', ':class:`ClusterMixin <sklearn.base.ClusterMixin>` object', 'Clustering algorithm used to cluster the contacts or distances', MiniBatchKMeans, ClusterMixin)
         self._cmdString('method', 'str', 'Criteria used for choosing from which state to respawn from', '1/Mc')
-        self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 0, TYPE_INT, RANGE_0POS)
+        self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3, TYPE_INT, RANGE_0POS)
         self._cmdString('filtersel', 'str', 'Filtering atom selection', 'not water')
         self._cmdString('contactsym', 'str', 'Contact symmetry', None)
 

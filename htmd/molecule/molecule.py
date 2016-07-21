@@ -886,8 +886,8 @@ class Molecule:
                 self.box = np.append(self.box, traj.box, 1)
 
         if skip is not None:
-            self.coords = self.coords[:, :, ::skip]  # Might actually not free memory! Check numpy views
-            self.box = self.box[:, ::skip]
+            self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
+            self.box = np.array(self.box[:, ::skip])
             self.fileloc = self.fileloc[::skip]
 
         self.coords = np.atleast_3d(self.coords)
@@ -1232,7 +1232,7 @@ class Molecule:
 
         """
         residueTable = {'ARG': 'R', 'AR0': 'R',
-                        'HIS': 'H', 'HID': 'H', 'HIE': 'H',
+                        'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HSE': 'H', 'HSD': 'H',
                         'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
                         'ASP': 'D', 'ASH': 'D',
                         'GLU': 'E', 'GLH': 'E',
@@ -1283,6 +1283,25 @@ class Molecule:
             segSequences = {k: "".join(segSequences[k]) for k in segSequences}
 
         return segSequences
+
+    def dropFrames(self, keep='all', drop=None):
+        """ Removes trajectory frames from the Molecule
+
+        Parameters
+        ----------
+        keep : int or list of ints
+            Index of frame, or list of frame indexes which we want to keep (and drop all others).
+        drop : int or list of ints
+            Index of frame, or list of frame indexes which we want to drop (and keep all others).
+        """
+        if keep != 'all' and drop is not None:
+            raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
+        if keep != 'all':
+            self.coords = np.array(np.atleast_3d(self.coords[:, :, keep]))  # Copy array. Slices are dangerous with C
+            self.box = np.array(np.atleast_2d(self.box[:, keep]))
+        if drop is not None:
+            self.coords = np.delete(self.coords, drop, axis=2)
+            self.box = np.delete(self.box, drop, axis=1)
 
     @property
     def numFrames(self):

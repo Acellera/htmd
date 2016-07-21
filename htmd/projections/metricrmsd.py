@@ -108,7 +108,11 @@ class MetricRmsd(Projection):
 
     def getMapping(self, mol):
         (xxx, trajrmsdsel, yyy) = self._getSelections(mol)
-        return np.where(trajrmsdsel)[0]
+        from pandas import DataFrame
+        types = ['rmsd']
+        indexes = [np.where(trajrmsdsel)[0]]
+        description = ['RMSD to reference structure.']
+        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
     def _wrapPositions(self, box, pos, centersel):
         if box is None or np.sum(box) == 0:

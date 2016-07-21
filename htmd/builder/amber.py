@@ -121,8 +121,14 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     f.write('# Loading ions and TIP3P water parameters\n')
     f.write('loadamberparams frcmod.ionsjc_tip3p\n\n')
 
+    # Loading user parameters
+    f.write('# Loading parameter files\n')
+    for p in param:
+        shutil.copy(p, outdir)
+        f.write('loadamberparams ' + path.basename(p) + '\n')
+    f.write('\n')
+
     # Printing out topologies
-    logger.info('Writing prepi files.')
     f.write('# Loading prepi topologies\n')
     for t in topo:
         shutil.copy(t, outdir)

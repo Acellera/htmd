@@ -99,11 +99,17 @@ class MetricCoordinate(Projection):
 
     def getMapping(self, mol):
         (xxx, atomsel, yyy) = self._getSelections(mol)
-        premap = np.where(atomsel)[0]
-        map = np.zeros(len(premap) * 3, dtype=int)
-        map[0*len(premap):1*len(premap)] = premap
-        map[1*len(premap):2*len(premap)] = premap
-        map[2*len(premap):3*len(premap)] = premap
+        atomidx = np.where(atomsel)[0]
+        from pandas import DataFrame
+        types = []
+        indexes = []
+        description = []
+        for xyz in ('X', 'Y', 'Z'):
+            for i in atomidx:
+                types += ['coordinate']
+                indexes += [i]
+                description += ['{} coordinate of {} {} {}'.format(xyz, mol.resname[i], mol.resid[i], mol.name[i])]
+        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
 
 class _MetricCoordinateOld(_OldMetric):

@@ -64,6 +64,7 @@ class BatchCompletionCallBack(object):
         if self.parallel._original_iterator is not None:
             self.parallel.dispatch_next()
 
+
 class CallBack(object):
     bars = defaultdict(int)
 
@@ -112,14 +113,14 @@ class Metric:
 
         # Find out if there is a unique molfile. If there is, initialize a single Molecule to speed up calculations
         uqMol = None
-        map = []
+        import pandas as pd
+        map = pd.DataFrame(columns=('type', 'indexes', 'description'))
         (single, molfile) = _singleMolfile(self.simulations)
         if single:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
                 proj._precalculate(uqMol)
-                #map.append(np.array(proj.getMapping(uqMol), dtype=object))
-            #map = np.hstack(map)
+                map = map.append(proj.getMapping(uqMol))
 
         logger.info('Metric: Starting projection of trajectories.')
         metrics = np.empty(numSim, dtype=object)

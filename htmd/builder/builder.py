@@ -238,6 +238,56 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
+def autoSegment2(mol, sel='protein and backbone', basename='P', fields=('segid')):
+    """ Detects backbone gaps in a selection and assigns incrementing segid to each fragment
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The Molecule object
+    sel : str
+        Atom selection on which to check for gaps.
+    basename : str
+        The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
+    field : tuple of strings
+        Field to fix. Can be "segid" (default) or any other Molecule field or combinations thereof.
+
+    Returns
+    -------
+    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        A new Molecule object with modified segids
+
+    Example
+    -------
+    >>> newmol = autoSegment(mol,'chain B','P')
+    """
+    from scipy.sparse import csr_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    if isinstance(fields, str):
+        fields = (fields,)
+
+    submol = mol.copy()
+    idx = mol.atomselect(sel, indexes=True)
+    submol.filter(sel, _logger=False)
+    bonds = submol._getBonds()
+
+    sparsemat = csr_matrix((np.ones(bonds.shape[0] * 2),  # Values
+                            (np.hstack((bonds[:, 0], bonds[:, 1])),  # Rows
+                             np.hstack((bonds[:, 1], bonds[:, 0])))), shape=[submol.numAtoms,submol.numAtoms])  # Columns
+    numcomp, compidx = connected_components(sparsemat, directed=False)
+
+    mol = mol.copy()
+    for i in range(numcomp):
+        for f in fields:
+            mol.__dict__[f][idx[compidx == i]] = basename + str(i)
+    if numcomp == 1:
+        logger.info('Created 1 segment.')
+    else:
+        logger.info('Created {} segments.'.format(numcomp))
+    return mol
+
+
 def _checkMixedSegment(mol):
     segsProt = np.unique(mol.get('segid', sel='protein or resname ACE NME'))
     segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))

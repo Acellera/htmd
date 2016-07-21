@@ -43,7 +43,7 @@ class Kinetics(object):
             self.sinkmicro = np.where(model.macro_ofmicro == self.sink)[0]
 
         if model._modelid is None:
-            raise NameError('You need to call model.markovModel() before calculating kinetics')
+            raise RuntimeError('You need to call model.markovModel() before calculating kinetics')
 
         self._modelid = model._modelid
 
@@ -56,10 +56,29 @@ class Kinetics(object):
             self._detectSink()
             logger.info('Sink macro = ' + str(self.sink))
         if model.data.fstep is None:
-            raise NameError('Please define a framestep (fstep) for the data object')
+            raise RuntimeError('Please define a framestep (fstep) for the data object')
 
     def _detectSource(self):
         dataobj = self.model.data
+        distcols = []
+        contcols = []
+
+        if not dataobj.map.empty:  # Search for distances or contacts in the data
+            if dataobj.parent is None:
+                distcols = np.where(dataobj.map.type == 'distance')[0]
+                contcols = np.where(dataobj.map.type == 'contact')[0]
+            else:
+                distcols = np.where(dataobj.parent.map.type == 'distance')[0]
+                contcols = np.where(dataobj.parent.map.type == 'contact')[0]
+
+        if len(distcols) == 0 and len(contcols) == 0:
+            raise RuntimeError('Could not detect source state. Please specify it in the Kinetics constructor.')
+
+        if len(distcols) != 0:
+            cols = distcols
+        else:
+            cols = contcols
+
         if dataobj.parent is None:
             data = dataobj.dat
         else:
@@ -68,19 +87,19 @@ class Kinetics(object):
         averages = np.zeros(dataobj.K)
         for i in range(len(dataobj.St)):
             if data[i].ndim == 2:
-                rowsums = np.sum(data[i], axis=1)
+                rowsums = np.sum(data[i][:, cols], axis=1)
             else:
-                rowsums = data[i]
+                rowsums = data[i][:, cols]
             totalsums = np.bincount(dataobj.St[i], weights=rowsums)
             idx = list(set(dataobj.St[i]))
             averages[idx] += totalsums[idx]
         avg = averages / dataobj.N
         avg = avg[self.model.cluster_ofmicro]
 
-        if data[0].dtype == bool:
+        if len(contcols) != 0:
             logger.info('Guessing the source state as the state with minimum contacts.')
             sourcemicro = np.argmin(avg)
-        else:
+        elif len(distcols) != 0:
             logger.info('Guessing the source state as the state with maximum distances.')
             sourcemicro = np.argmax(avg)
         self.source = self.model.macro_ofmicro[sourcemicro]
