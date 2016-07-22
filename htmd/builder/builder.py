@@ -267,6 +267,11 @@ def autoSegment2(mol, sel='protein and backbone', basename='P', fields=('segid')
     if isinstance(fields, str):
         fields = (fields,)
 
+    # Letters to be used for chains, if free: 0123456789abcd...ABCD..., minus chain symbols already used
+    used_chains = set(mol.chain)
+    chain_alphabet = list(string.digits + string.ascii_letters)
+    available_chains = [x for x in chain_alphabet if x not in used_chains]
+
     submol = mol.copy()
     idx = mol.atomselect(sel, indexes=True)
     submol.filter(sel, _logger=False)
@@ -280,7 +285,11 @@ def autoSegment2(mol, sel='protein and backbone', basename='P', fields=('segid')
     mol = mol.copy()
     for i in range(numcomp):
         for f in fields:
-            mol.__dict__[f][idx[compidx == i]] = basename + str(i)
+            # chain only has 1 char available
+            if f == 'chain':
+                 mol.__dict__[f][idx[compidx == i]] = available_chains[i]
+            else:
+                mol.__dict__[f][idx[compidx == i]] = basename + str(i)
     if numcomp == 1:
         logger.info('Created 1 segment.')
     else:
