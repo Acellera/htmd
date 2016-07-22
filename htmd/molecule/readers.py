@@ -559,7 +559,8 @@ def PDBread(filename, mode='pdb'):
     parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames)
     parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames)
     parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames)
-    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+    if not np.all(parsedtopo.chargesign.isnull()):
+        parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
 
     if len(parsedtopo) > 99999:
         logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
