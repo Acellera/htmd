@@ -540,7 +540,7 @@ def PDBread(filename, mode='pdb'):
             coorddata.write(line)
         if (line.startswith('ATOM') or line.startswith('HETATM')) and not topoend:
             topodata.write(line)
-            teridx.append(currter)
+            teridx.append(str(currter))
         if line.startswith('TER'):
             currter += 1
         if line.startswith('END'):
