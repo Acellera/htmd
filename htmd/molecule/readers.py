@@ -1,10 +1,12 @@
 import ctypes as ct
 import numpy as np
 from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_string_buffer, pack_ulong_buffer, xtc_lib
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Topology:
-    def __init__(self):
+    def __init__(self, pandasdata=None):
         self.record = []
         self.serial = []
         self.name = []
@@ -24,6 +26,16 @@ class Topology:
         self.dihedrals = []
         self.impropers = []
         self.atomtype = []
+
+        if pandasdata is not None:
+            for field in self.__dict__:
+                fielddat = pandasdata.get(field)
+                if fielddat is not None and not np.all(fielddat.isnull()):
+                    if fielddat.dtype == object:  # If not all are NaN replace NaNs with default values
+                        pandasdata.loc[fielddat.isnull(), field] = ''
+                    else:
+                        pandasdata.loc[fielddat.isnull(), field] = 0
+                    self.__dict__[field] = fielddat.tolist()
 
     @property
     def atominfo(self):
@@ -433,6 +445,142 @@ def MAEread(fname):
 #     for h in heteros:
 #         topo.record[topo.resname == h] = 'HETATM'
 #     return topo, coords
+
+def PDBread(filename, mode='pdb'):
+    from pandas import read_fwf
+    import io
+
+    """
+    COLUMNS        DATA  TYPE    FIELD        DEFINITION
+    -------------------------------------------------------------------------------------
+     1 -  6        Record name   "ATOM  "
+     7 - 11        Integer       serial       Atom  serial number.
+    13 - 16        Atom          name         Atom name.
+    17             Character     altLoc       Alternate location indicator.
+    18 - 20        Residue name  resName      Residue name.
+    22             Character     chainID      Chain identifier.
+    23 - 26        Integer       resSeq       Residue sequence number.
+    27             AChar         iCode        Code for insertion of residues.
+    31 - 38        Real(8.3)     x            Orthogonal coordinates for X in Angstroms.
+    39 - 46        Real(8.3)     y            Orthogonal coordinates for Y in Angstroms.
+    47 - 54        Real(8.3)     z            Orthogonal coordinates for Z in Angstroms.
+    55 - 60        Real(6.2)     occupancy    Occupancy.
+    61 - 66        Real(6.2)     tempFactor   Temperature  factor.
+    77 - 78        LString(2)    element      Element symbol, right-justified.
+    79 - 80        LString(2)    charge       Charge  on the atom.
+    """
+    if mode == 'pdb':
+        topocolspecs = [(0, 6), (6, 11), (12, 16), (16, 17), (17, 21), (21, 22), (22, 26), (26, 27),
+                        (54, 60), (60, 66), (72, 76), (76, 78), (78, 79), (79, 80)]
+        toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
+                     'occupancy', 'beta', 'segid', 'element', 'charge', 'chargesign')
+    elif mode == 'pdbqt':
+        topocolspecs = [(0, 6), (6, 11), (12, 16), (16, 17), (17, 21), (21, 22), (22, 26), (26, 27),
+                        (54, 60), (60, 66), (70, 76), (77, 79)]
+        toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
+                     'occupancy', 'beta', 'charge', 'element')
+    coordcolspecs = [(30, 38), (38, 46), (46, 54)]
+    coordnames = ('x', 'y', 'z')
+
+    """
+    COLUMNS       DATA  TYPE      FIELD        DEFINITION
+    -------------------------------------------------------------------------
+     1 -  6        Record name    "CONECT"
+     7 - 11        Integer        serial       Atom  serial number
+    12 - 16        Integer        serial       Serial number of bonded atom
+    17 - 21        Integer        serial       Serial  number of bonded atom
+    22 - 26        Integer        serial       Serial number of bonded atom
+    27 - 31        Integer        serial       Serial number of bonded atom
+    """
+    bondcolspecs = [(6, 11), (11, 16), (16, 21), (21, 26), (26, 31)]
+    bondnames = ('serial1', 'serial2', 'serial3', 'serial4', 'serial5')
+
+    """
+    COLUMNS       DATA  TYPE    FIELD          DEFINITION
+    -------------------------------------------------------------
+     1 -  6       Record name   "CRYST1"
+     7 - 15       Real(9.3)     a              a (Angstroms).
+    16 - 24       Real(9.3)     b              b (Angstroms).
+    25 - 33       Real(9.3)     c              c (Angstroms).
+    34 - 40       Real(7.2)     alpha          alpha (degrees).
+    41 - 47       Real(7.2)     beta           beta (degrees).
+    48 - 54       Real(7.2)     gamma          gamma (degrees).
+    56 - 66       LString       sGroup         Space  group.
+    67 - 70       Integer       z              Z value.
+    """
+    boxcolspecs = [(6, 15), (15, 24), (24, 33)]
+    boxnames = ('a', 'b', 'c')
+
+    def concatCoords(coords, coorddata):
+        if coorddata.tell() != 0:  # Not empty
+            coorddata.seek(0)
+            parsedcoor = read_fwf(coorddata, colspecs=coordcolspecs, names=coordnames)
+            if coords is None:
+                coords = np.zeros((len(parsedcoor), 3, 0), dtype=np.float32)
+            currcoords = np.vstack((parsedcoor.x, parsedcoor.y, parsedcoor.z)).T
+            coords = np.append(coords, currcoords[:, :, np.newaxis], axis=2)
+        return coords
+
+    teridx = []
+    currter = 0
+    topoend = False
+
+    crystdata = io.StringIO()
+    topodata = io.StringIO()
+    conectdata = io.StringIO()
+    coorddata = io.StringIO()
+
+    coords = None
+
+    f = open(filename, 'r')
+    for line in f:
+        if line.startswith('CRYST1'):
+            crystdata.write(line)
+        if line.startswith('ATOM') or line.startswith('HETATM'):
+            coorddata.write(line)
+        if (line.startswith('ATOM') or line.startswith('HETATM')) and not topoend:
+            topodata.write(line)
+            teridx.append(currter)
+        if line.startswith('TER'):
+            currter += 1
+        if line.startswith('END'):
+            topoend = True
+        if line.startswith('CONECT'):
+            conectdata.write(line)
+        if line.startswith('MODEL'):
+            coords = concatCoords(coords, coorddata)
+            coorddata = io.StringIO()
+    crystdata.seek(0)
+    topodata.seek(0)
+    conectdata.seek(0)
+
+    coords = concatCoords(coords, coorddata)
+
+    parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames)
+    parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames)
+    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames)
+    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+
+    if len(parsedtopo) > 99999:
+        logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
+
+    topo = Topology(parsedtopo)
+
+    # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
+    serials = parsedtopo.serial.as_matrix()
+    mapserials = np.ones(np.max(serials)+1) * -1
+    mapserials[serials] = list(range(np.max(serials)))
+    for i in range(len(parsedbonds)):
+        row = parsedbonds.loc[i].tolist()
+        for b in range(1, 5):
+            if not np.isnan(row[b]):
+                topo.bonds.append([int(row[0]), int(row[b])])
+    topo.bonds = np.array(topo.bonds, dtype=np.uint32)
+    topo.bonds[:] = mapserials[topo.bonds[:]]
+
+    if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
+        topo.segid = teridx
+    return topo, coords
 
 
 def BINCOORread(filename):

@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
-from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
@@ -679,7 +679,10 @@ class Molecule:
             firstfile = filename
 
         if isinstance(filename, Sim):
-            self._readPDB(filename.molfile)
+            topo, coords = PDBread(filename)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            # self._readPDB(filename.molfile)
             self._readTraj(filename.trajectory)
             return
 
@@ -694,15 +697,24 @@ class Molecule:
             topo = PRMTOPread(filename)
             self._readTopology(topo, filename)
         elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
-            self._readPDB(filename)
+            topo, coords = PDBread(filename)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            # self._readPDB(filename)
         elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
-            self._readPDB(filename, mode='pdbqt')
+            topo, coords = PDBread(filename, mode='pdbqt')
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            # self._readPDB(filename, mode='pdbqt')
         elif (type is None and firstfile.endswith(".xtc")) or type == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
         elif (type is None and firstfile.endswith(".coor")) or type == "coor":
             self._readBinCoordinates(filename)
         elif len(firstfile) == 4:  # Could be a PDB id. Try to load it from the PDB website
-            self._readPDB(filename)
+            topo, coords = PDBread(filename)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            # self._readPDB(filename)
         elif (type is None and firstfile.endswith(".xyz")) or type == "xyz":
             topo, coords = XYZread(filename)
             self._readTopology(topo, filename)
