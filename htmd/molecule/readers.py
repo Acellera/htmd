@@ -479,6 +479,22 @@ def PDBread(filename, mode='pdb'):
                         (54, 60), (60, 66), (70, 76), (77, 79)]
         toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
                      'occupancy', 'beta', 'charge', 'element')
+    topodtypes = {
+        'record': str,
+        'serial': np.int,
+        'name': str,
+        'altloc': str,
+        'resname': str,
+        'chain': str,
+        'resid': np.int,
+        'insertion': str,
+        'occupancy': np.float32,
+        'beta': np.float32,
+        'segid': str,
+        'element': str,
+        'charge': np.float32,
+        'chargesign': str,
+    }
     coordcolspecs = [(30, 38), (38, 46), (46, 54)]
     coordnames = ('x', 'y', 'z')
 
@@ -558,7 +574,7 @@ def PDBread(filename, mode='pdb'):
 
     parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames)
     parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames)
-    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames)
+    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames) #, dtype=topodtypes)
     if not np.all(parsedtopo.chargesign.isnull()):
         parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
 

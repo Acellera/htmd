@@ -763,6 +763,11 @@ class Molecule:
         if self.charge is None or len(self.charge) == 0:
             self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
 
+        for pf in self._pdb_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
+            if self._dtypes[pf] == object:
+                for i in range(self.numAtoms):
+                    self.__dict__[pf][i] = str(self.__dict__[pf][i])
+
         self.fileloc.append([filename, 0])
 
     def _readTopology(self, topo, filename, overwrite='all'):
