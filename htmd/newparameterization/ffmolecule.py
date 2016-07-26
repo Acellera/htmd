@@ -202,14 +202,14 @@ class FFMolecule(Molecule):
       f = open(pointfile,"r" );
       fl = f.readlines()
       f.close()
-      ret = np.array( ( len(fl), 3 ))
+      ret = np.zeros( ( len(fl), 3 ))
       for i in range(len(fl)):
         s = fl[i].split()
         ret[i,0] = float(s[0]) 
         ret[i,1] = float(s[1]) 
-        ret[i,1] = float(s[2]) 
+        ret[i,2] = float(s[2]) 
 
-      print("Re-using previously-generate point cloud")
+      print("Reusing previously-generated point cloud")
       return ret
     return True
  
@@ -300,6 +300,46 @@ class FFMolecule(Molecule):
     for d in self._soft_dihedrals:
       dd.append( d.atoms.copy() )
     return dd
+
+  def scanSoftDihedral(self, phi, directory="dihedral", step=10):
+    found=False
+    phi_to_fit = None
+    frozens=[]
+    dih_index=0
+    i=0
+    for d in self._soft_dihedrals:
+      if (d.atoms == phi).all():  
+         phi_to_fit = d
+         dih_index=i
+      else:
+         frozens.append(d.atoms)
+      i=i+1
+    if not phi_to_fit: raise ValueError( "specified phi is not a recognised soft dihedral" )
+
+    atoms = phi_to_fit.atoms 
+    left  = phi_to_fit.left 
+    right = phi_to_fit.right 
+    equivs= phi_to_fit.equivalents
+ 
+#    step  = 10 # degrees
+    nstep = (int)(360/step)
+    cset  = np.zeros( ( self.natoms, 3, nstep ) )
+
+    i=0
+    for phi in range( -180, 180, step ):
+      cset[:,:,i] = setPhi( self.coords[:,:,0], atoms, left, right, phi )
+      i=i+1
+
+    mol        = self.copy()
+    mol.coords = cset
+    try:
+      os.mkdir( directory )
+    except:
+      pass
+    dih_name = "%s-%s-%s-%s" % ( self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]] )
+    qmset   = QMCalculation( mol, charge=self.netcharge, directory="%s/%s" % (directory, dih_name), frozen=frozens )
+    return qmset
+
 
   def fitSoftDihedral( self, phi ):
     found=False
