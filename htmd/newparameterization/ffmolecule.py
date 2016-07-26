@@ -338,8 +338,15 @@ class FFMolecule(Molecule):
       pass
     dih_name = "%s-%s-%s-%s" % ( self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]] )
     qmset   = QMCalculation( mol, charge=self.netcharge, directory="%s/%s" % (directory, dih_name), frozen=frozens )
-    return qmset
-
+    r = qmset.results()
+    x=0
+    ret=[]
+    for phi in range( -180, 180, step ):
+      r[x].phi = phi
+      if r[x].errored == False:
+        ret.append(r[x])
+      x=x+1
+    return ret
 
   def fitSoftDihedral( self, phi ):
     found=False
