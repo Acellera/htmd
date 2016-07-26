@@ -1,0 +1,40 @@
+set {
+	reference rhf
+	basis 6-31G*
+}
+
+
+set_num_threads( 1 )
+memory 2 gb
+
+molecule MOL {
+0 1
+
+H	 -0.000158	 1.970498	 0.756846
+O	 -0.000074	 1.880206	 -0.189275
+C	 -0.000015	 0.544847	 -0.545111
+C	 -1.146713	 -0.178430	 0.153418
+C	 1.372058	 -0.064025	 -0.275501
+H	 -0.178470	 0.486751	 -1.608540
+F	 -0.662300	 -1.036396	 1.025647
+F	 -1.941828	 0.650663	 0.795879
+F	 -1.875487	 -0.856902	 -0.718454
+F	 2.283717	 0.570380	 -0.981153
+F	 1.423530	 -1.339565	 -0.596012
+F	 1.696156	 0.053849	 1.002248
+
+	symmetry c1
+}
+set optking {
+	frozen_dihedral = ("
+		6 3 2 1
+	")
+}
+
+ee = energy('scf')
+oeprop('DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
+f=open( 'psi4out.xyz', 'w' )
+f.write( "12  " )
+f.write( str(ee) + "\n" )
+f.write( MOL.save_string_xyz() )
+f.close()

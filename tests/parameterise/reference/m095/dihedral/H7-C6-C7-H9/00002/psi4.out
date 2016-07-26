@@ -1,0 +1,208 @@
+    -----------------------------------------------------------------------
+          Psi4: An Open-Source Ab Initio Electronic Structure Package
+                              Psi4 (no tag) Driver
+
+                          Git: Rev {detached?}  
+
+    J. M. Turney, A. C. Simmonett, R. M. Parrish, E. G. Hohenstein,
+    F. A. Evangelista, J. T. Fermann, B. J. Mintz, L. A. Burns, J. J. Wilke,
+    M. L. Abrams, N. J. Russ, M. L. Leininger, C. L. Janssen, E. T. Seidl,
+    W. D. Allen, H. F. Schaefer, R. A. King, E. F. Valeev, C. D. Sherrill,
+    and T. D. Crawford, WIREs Comput. Mol. Sci. 2, 556-565 (2012)
+    (doi: 10.1002/wcms.93)
+
+                         Additional Contributions by
+    A. E. DePrince, M. Saitow, U. Bozkaya, A. Yu. Sokolov
+    -----------------------------------------------------------------------
+
+
+    Psi4 started on: Tue Jul  5 17:21:32 2016
+
+    Process ID:  11748
+    PSI4DATADIR: /export131/home/mjharvey/miniconda3/share
+    Memory level set to 256.000 MB
+
+  ==> Input File <==
+
+--------------------------------------------------------------------------
+set {
+	reference rhf
+	basis 6-31G*
+}
+
+
+set_num_threads( 1 )
+memory 2 gb
+
+molecule MOL {
+0 1
+
+O	 -6.378629	 3.075924	 0.969795
+C	 -5.392057	 3.555009	 0.500850
+C	 -4.042649	 2.863098	 0.573629
+C	 -5.423978	 4.896128	 -0.203095
+C	 -4.071439	 1.518440	 1.294254
+H	 -3.672665	 2.746562	 -0.444172
+H	 -3.344409	 3.544542	 1.057878
+C	 -2.695584	 0.852130	 1.347325
+H	 -4.779947	 0.863496	 0.797069
+H	 -4.451091	 1.662339	 2.300884
+C	 -2.259874	 0.272531	 0.000494
+H	 -1.954000	 1.575645	 1.682924
+H	 -2.704505	 0.058494	 2.093065
+C	 -2.299309	 1.292585	 -1.138781
+H	 -2.899189	 -0.571838	 -0.251175
+H	 -1.251106	 -0.126593	 0.090406
+C	 -3.566352	 2.147124	 -1.131721
+H	 -1.427462	 1.940154	 -1.072741
+H	 -2.220829	 0.772174	 -2.091079
+H	 -3.656394	 2.706940	 -0.205088
+H	 -3.564796	 2.860504	 -1.950126
+H	 -4.455333	 1.530813	 -1.231810
+H	 -5.083981	 4.793603	 -1.229500
+H	 -6.431142	 5.289032	 -0.194009
+H	 -4.756707	 5.597910	 0.288724
+
+	symmetry c1
+}
+set optking {
+	frozen_dihedral = ("
+		9 5 8 12,
+		15 11 8 12,
+		1 2 3 6,
+		9 5 3 6
+	")
+}
+
+ee = energy('scf')
+oeprop('DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
+f=open( 'psi4out.xyz', 'w' )
+f.write( "25  " )
+f.write( str(ee) + "\n" )
+f.write( MOL.save_string_xyz() )
+f.close()
+--------------------------------------------------------------------------
+
+  Memory set to   2.000 GiB by Python script.
+
+*** tstart() called on cx1-1-2-1.cx1.hpc.ic.ac.uk
+*** at Tue Jul  5 17:21:32 2016
+
+
+         ---------------------------------------------------------
+                                   SCF
+            by Justin Turney, Rob Parrish, and Andy Simmonett
+                              RHF Reference
+                        1 Threads,   2000 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c1
+    Full point group: C1
+
+    Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+           O         -2.350085928501     0.785235749075     0.735127001442    15.994914619560
+           C         -1.363513928501     1.264320749075     0.266182001442    12.000000000000
+           C         -0.014105928501     0.572409749075     0.338961001442    12.000000000000
+           C         -1.395434928501     2.605439749075    -0.437762998558    12.000000000000
+           C         -0.042895928501    -0.772248250925     1.059586001442    12.000000000000
+           H          0.355878071499     0.455873749075    -0.678839998558     1.007825032070
+           H          0.684134071499     1.253853749075     0.823210001442     1.007825032070
+           C          1.332959071499    -1.438558250925     1.112657001442    12.000000000000
+           H         -0.751403928501    -1.427192250925     0.562401001442     1.007825032070
+           H         -0.422547928501    -0.628349250925     2.066216001442     1.007825032070
+           C          1.768669071499    -2.018157250925    -0.234173998558    12.000000000000
+           H          2.074543071499    -0.715043250925     1.448256001442     1.007825032070
+           H          1.324038071499    -2.232194250925     1.858397001442     1.007825032070
+           C          1.729234071499    -0.998103250925    -1.373448998558    12.000000000000
+           H          1.129354071499    -2.862526250925    -0.485842998558     1.007825032070
+           H          2.777437071499    -2.417281250925    -0.144261998558     1.007825032070
+           C          0.462191071499    -0.143564250925    -1.366388998558    12.000000000000
+           H          2.601081071499    -0.350534250925    -1.307408998558     1.007825032070
+           H          1.807714071499    -1.518514250925    -2.325746998558     1.007825032070
+           H          0.372149071499     0.416251749075    -0.439755998558     1.007825032070
+           H          0.463747071499     0.569815749075    -2.184793998558     1.007825032070
+           H         -0.426789928501    -0.759875250925    -1.466477998558     1.007825032070
+           H         -1.055437928501     2.502914749075    -1.464167998558     1.007825032070
+           H         -2.402598928501     2.998343749075    -0.428676998558     1.007825032070
+           H         -0.728163928501     3.307221749075     0.054056001442     1.007825032070
+
+  Running in c1 symmetry.
+
+  Rotational constants: A =      0.10013  B =      0.03318  C =      0.02767 [cm^-1]
+  Rotational constants: A =   3001.73968  B =    994.64567  C =    829.48896 [MHz]
+  Nuclear repulsion =  501.532026477625152
+
+  Charge       = 0
+  Multiplicity = 1
+  Electrons    = 72
+  Nalpha       = 36
+  Nbeta        = 36
+
+  ==> Algorithm <==
+
+  SCF Algorithm Type is DF.
+  DIIS enabled.
+  MOM disabled.
+  Fractional occupation disabled.
+  Guess Type is CORE.
+  Energy threshold   = 1.00e-06
+  Density threshold  = 1.00e-06
+  Integral threshold = 0.00e+00
+
+  ==> Primary Basis <==
+
+  Basis Set: 6-31G*
+    Number of shells: 86
+    Number of basis function: 167
+    Number of Cartesian functions: 167
+    Spherical Harmonics?: false
+    Max angular momentum: 2
+
+  ==> Pre-Iterations <==
+
+   -------------------------------------------------------
+    Irrep   Nso     Nmo     Nalpha   Nbeta   Ndocc  Nsocc
+   -------------------------------------------------------
+     A        167     167       0       0       0       0
+   -------------------------------------------------------
+    Total     167     167      36      36      36       0
+   -------------------------------------------------------
+
+ OEINTS: Overlap, kinetic, potential, dipole, and quadrupole integrals
+         stored in file 35.
+
+  ==> Integral Setup <==
+
+  ==> DFJK: Density-Fitted J/K Matrices <==
+
+    J tasked:                  Yes
+    K tasked:                  Yes
+    wK tasked:                  No
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              1430
+    Algorithm:                Core
+    Integral Cache:           NONE
+    Schwarz Cutoff:          1E-12
+    Fitting Condition:       1E-12
+
+   => Auxiliary Basis Set <=
+
+  Basis Set: 
+    Number of shells: 360
+    Number of basis function: 1129
+    Number of Cartesian functions: 1129
+    Spherical Harmonics?: false
+    Max angular momentum: 3
+
+  Minimum eigenvalue in the overlap matrix is            NAN.
+  Using Canonical Orthogonalization with cutoff of 1.0000000000E-07.
+  Overall, 167 of 167 possible MOs eliminated.
+
+  SCF Guess: Core (One-Electron) Hamiltonian.
+
