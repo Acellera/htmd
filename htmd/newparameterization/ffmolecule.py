@@ -497,7 +497,7 @@ class FFMolecule(Molecule):
     completed = 0
     for q in results:
       if( q.completed and not q.errored ):
-        if ( q.energy - qmin ) < 40. : # Only fit against QM points < 40kcal above the minimum 
+        if ( q.energy - qmin ) < 20. : # Only fit against QM points < 20kcal above the minimum 
           completed = completed + 1
           ret.phi.append( getPhi( q.coords, atoms ) )
           
