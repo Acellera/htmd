@@ -15,8 +15,6 @@ done
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
-ls htmd/parameterization/share/bin
-
 echo "Installing into $PREFIX"
 
 	DIR="$SP_DIR"
