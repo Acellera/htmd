@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 
-from htmd.newparameterization import ffmolecule
+from htmd.newparameterization.ffmolecule import FFMolecule
 from htmd.newparameterization.fftype import FFTypeMethod
 import sys
 import os

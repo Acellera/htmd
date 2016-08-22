@@ -1,0 +1,306 @@
+    -----------------------------------------------------------------------
+          Psi4: An Open-Source Ab Initio Electronic Structure Package
+                              Psi4 (no tag) Driver
+
+                          Git: Rev {detached?}  
+
+    J. M. Turney, A. C. Simmonett, R. M. Parrish, E. G. Hohenstein,
+    F. A. Evangelista, J. T. Fermann, B. J. Mintz, L. A. Burns, J. J. Wilke,
+    M. L. Abrams, N. J. Russ, M. L. Leininger, C. L. Janssen, E. T. Seidl,
+    W. D. Allen, H. F. Schaefer, R. A. King, E. F. Valeev, C. D. Sherrill,
+    and T. D. Crawford, WIREs Comput. Mol. Sci. 2, 556-565 (2012)
+    (doi: 10.1002/wcms.93)
+
+                         Additional Contributions by
+    A. E. DePrince, M. Saitow, U. Bozkaya, A. Yu. Sokolov
+    -----------------------------------------------------------------------
+
+
+    Psi4 started on: Tue Jul  5 16:34:10 2016
+
+    Process ID:  24207
+    PSI4DATADIR: /export131/home/mjharvey/miniconda3/share
+    Memory level set to 256.000 MB
+
+  ==> Input File <==
+
+--------------------------------------------------------------------------
+set {
+	reference rhf
+	basis 6-31G*
+}
+
+
+set_num_threads( 1 )
+memory 2 gb
+
+molecule MOL {
+0 1
+
+H	 3.729471	 -0.928294	 -0.070608
+O	 2.826016	 -1.159218	 0.122261
+C	 2.077727	 -0.067559	 -0.035091
+C	 0.624473	 -0.343591	 0.253101
+O	 2.542965	 0.974826	 -0.363729
+C	 -0.265902	 0.883932	 0.072916
+H	 0.324016	 -1.163849	 -0.390541
+H	 0.565024	 -0.726111	 1.268924
+C	 -1.728698	 0.646073	 0.462102
+H	 -0.209144	 1.219470	 -0.958188
+H	 0.135059	 1.692851	 0.673903
+C	 -2.482460	 -0.343073	 -0.431425
+H	 -2.245265	 1.602650	 0.432430
+H	 -1.779332	 0.308348	 1.496285
+C	 -1.973297	 -1.776403	 -0.280439
+H	 -3.542556	 -0.309142	 -0.188341
+H	 -2.397688	 -0.047338	 -1.473891
+H	 -2.520848	 -2.457948	 -0.923865
+H	 -2.083410	 -2.125707	 0.742151
+H	 -0.921278	 -1.848072	 -0.541889
+
+	symmetry c1
+}
+set optking {
+	frozen_dihedral = ("
+		7 4 6 10,
+		12 9 6 10,
+		5 3 4 7,
+		1 2 3 5
+	")
+}
+
+ee = energy('scf')
+oeprop('DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
+f=open( 'psi4out.xyz', 'w' )
+f.write( "20  " )
+f.write( str(ee) + "\n" )
+f.write( MOL.save_string_xyz() )
+f.close()
+--------------------------------------------------------------------------
+
+  Memory set to   2.000 GiB by Python script.
+
+*** tstart() called on cx1-1-1-2.cx1.hpc.ic.ac.uk
+*** at Tue Jul  5 16:34:11 2016
+
+
+         ---------------------------------------------------------
+                                   SCF
+            by Justin Turney, Rob Parrish, and Andy Simmonett
+                              RHF Reference
+                        1 Threads,   2000 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c1
+    Full point group: C1
+
+    Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+           H          3.472183390719    -0.757922522445    -0.042168160010     1.007825032070
+           O          2.568728390719    -0.988846522445     0.150700839990    15.994914619560
+           C          1.820439390719     0.102812477555    -0.006651160010    12.000000000000
+           C          0.367185390719    -0.173219522445     0.281540839990    12.000000000000
+           O          2.285677390719     1.145197477555    -0.335289160010    15.994914619560
+           C         -0.523189609281     1.054303477555     0.101355839990    12.000000000000
+           H          0.066728390719    -0.993477522445    -0.362101160010     1.007825032070
+           H          0.307736390719    -0.555739522445     1.297363839990     1.007825032070
+           C         -1.985985609281     0.816444477555     0.490541839990    12.000000000000
+           H         -0.466431609281     1.389841477555    -0.929748160010     1.007825032070
+           H         -0.122228609281     1.863222477555     0.702342839990     1.007825032070
+           C         -2.739747609281    -0.172701522445    -0.402985160010    12.000000000000
+           H         -2.502552609281     1.773021477555     0.460869839990     1.007825032070
+           H         -2.036619609281     0.478719477555     1.524724839990     1.007825032070
+           C         -2.230584609281    -1.606031522445    -0.251999160010    12.000000000000
+           H         -3.799843609281    -0.138770522445    -0.159901160010     1.007825032070
+           H         -2.654975609281     0.123033477555    -1.445451160010     1.007825032070
+           H         -2.778135609281    -2.287576522445    -0.895425160010     1.007825032070
+           H         -2.340697609281    -1.955335522445     0.770590839990     1.007825032070
+           H         -1.178565609281    -1.677700522445    -0.513449160010     1.007825032070
+
+  Running in c1 symmetry.
+
+  Rotational constants: A =      0.13113  B =      0.03301  C =      0.02796 [cm^-1]
+  Rotational constants: A =   3931.09351  B =    989.73405  C =    838.10754 [MHz]
+  Nuclear repulsion =  387.553612672094971
+
+  Charge       = 0
+  Multiplicity = 1
+  Electrons    = 64
+  Nalpha       = 32
+  Nbeta        = 32
+
+  ==> Algorithm <==
+
+  SCF Algorithm Type is DF.
+  DIIS enabled.
+  MOM disabled.
+  Fractional occupation disabled.
+  Guess Type is CORE.
+  Energy threshold   = 1.00e-06
+  Density threshold  = 1.00e-06
+  Integral threshold = 0.00e+00
+
+  ==> Primary Basis <==
+
+  Basis Set: 6-31G*
+    Number of shells: 72
+    Number of basis function: 144
+    Number of Cartesian functions: 144
+    Spherical Harmonics?: false
+    Max angular momentum: 2
+
+  ==> Pre-Iterations <==
+
+   -------------------------------------------------------
+    Irrep   Nso     Nmo     Nalpha   Nbeta   Ndocc  Nsocc
+   -------------------------------------------------------
+     A        144     144       0       0       0       0
+   -------------------------------------------------------
+    Total     144     144      32      32      32       0
+   -------------------------------------------------------
+
+ OEINTS: Overlap, kinetic, potential, dipole, and quadrupole integrals
+         stored in file 35.
+
+  ==> Integral Setup <==
+
+  ==> DFJK: Density-Fitted J/K Matrices <==
+
+    J tasked:                  Yes
+    K tasked:                  Yes
+    wK tasked:                  No
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              1430
+    Algorithm:                Core
+    Integral Cache:           NONE
+    Schwarz Cutoff:          1E-12
+    Fitting Condition:       1E-12
+
+   => Auxiliary Basis Set <=
+
+  Basis Set: 
+    Number of shells: 300
+    Number of basis function: 948
+    Number of Cartesian functions: 948
+    Spherical Harmonics?: false
+    Max angular momentum: 3
+
+  Minimum eigenvalue in the overlap matrix is 2.8955056458E-03.
+  Using Symmetric Orthogonalization.
+  SCF Guess: Core (One-Electron) Hamiltonian.
+
+  ==> Iterations <==
+
+                           Total Energy        Delta E     RMS |[F,P]|
+
+   @DF-RHF iter   1:  -296.05200439269419   -2.96052e+02   6.33991e-02 
+   @DF-RHF iter   2:  -141.02528129411377    1.55027e+02   7.92381e-02 DIIS
+   @DF-RHF iter   3:  -343.99458520865500   -2.02969e+02   3.10314e-02 DIIS
+   @DF-RHF iter   4:  -202.95181138871095    1.41043e+02   7.79283e-02 DIIS
+   @DF-RHF iter   5:  -247.66848177272999   -4.47167e+01   7.83292e-02 DIIS
+   @DF-RHF iter   6:  -254.98598462263470   -7.31750e+00   7.48629e-02 DIIS
+   @DF-RHF iter   7:  -265.74463130635633   -1.07586e+01   7.80271e-02 DIIS
+   @DF-RHF iter   8:  -265.45296033802146    2.91671e-01   7.79774e-02 DIIS
+   @DF-RHF iter   9:  -265.99474570182480   -5.41785e-01   7.84873e-02 DIIS
+   @DF-RHF iter  10:  -267.40785454961150   -1.41311e+00   7.86649e-02 DIIS
+   @DF-RHF iter  11:  -270.25632206393590   -2.84847e+00   7.83171e-02 DIIS
+   @DF-RHF iter  12:  -237.30468483629130    3.29516e+01   7.84709e-02 DIIS
+   @DF-RHF iter  13:  -237.33859864285040   -3.39138e-02   7.87593e-02 DIIS
+   @DF-RHF iter  14:  -213.89369540219690    2.34449e+01   8.39163e-02 DIIS
+   @DF-RHF iter  15:  -213.50388935523546    3.89806e-01   8.31446e-02 DIIS
+   @DF-RHF iter  16:  -213.56139314380295   -5.75038e-02   8.32760e-02 DIIS
+   @DF-RHF iter  17:  -213.54974408979632    1.16491e-02   8.32484e-02 DIIS
+   @DF-RHF iter  18:  -213.55173563590660   -1.99155e-03   8.32533e-02 DIIS
+   @DF-RHF iter  19:  -213.55140569124859    3.29945e-04   8.32525e-02 DIIS
+   @DF-RHF iter  20:  -213.55145843341217   -5.27422e-05   8.32526e-02 DIIS
+   @DF-RHF iter  21:  -213.55145020714843    8.22626e-06   8.32526e-02 DIIS
+   @DF-RHF iter  22:  -213.55145146458193   -1.25743e-06   8.32526e-02 DIIS
+   @DF-RHF iter  23:  -213.55145127555346    1.89028e-07   8.32526e-02 DIIS
+   @DF-RHF iter  24:  -213.55145130358738   -2.80339e-08   8.32526e-02 DIIS
+   @DF-RHF iter  25:  -213.55145129940644    4.18095e-09   8.32526e-02 DIIS
+   @DF-RHF iter  26:  -213.55145130001910   -6.12658e-10   8.32526e-02 DIIS
+   @DF-RHF iter  27:  -213.55145130001046    8.64020e-12   8.32526e-02 DIIS
+   @DF-RHF iter  28:  -213.55145129995168    5.87761e-11   8.32526e-02 DIIS
+   @DF-RHF iter  29:  -213.55145129995134    3.41061e-13   8.32526e-02 DIIS
+   @DF-RHF iter  30:  -213.55145129990143    4.99085e-11   8.32526e-02 DIIS
+   @DF-RHF iter  31:  -213.55145129990984   -8.41283e-12   8.32526e-02 DIIS
+   @DF-RHF iter  32:  -213.55145129993633   -2.64890e-11   8.32526e-02 DIIS
+   @DF-RHF iter  33:  -213.55145129993565    6.82121e-13   8.32526e-02 DIIS
+   @DF-RHF iter  34:  -213.55145129994372   -8.07177e-12   8.32526e-02 DIIS
+   @DF-RHF iter  35:  -213.55145129996998   -2.62617e-11   8.32526e-02 DIIS
+   @DF-RHF iter  36:  -213.55145129992144    4.85443e-11   8.32526e-02 DIIS
+   @DF-RHF iter  37:  -213.55145129996805   -4.66116e-11   8.32526e-02 DIIS
+   @DF-RHF iter  38:  -213.55145129996112    6.93490e-12   8.32526e-02 DIIS
+   @DF-RHF iter  39:  -213.55145129992883    3.22871e-11   8.32526e-02 DIIS
+   @DF-RHF iter  40:  -213.55145129996941   -4.05862e-11   8.32526e-02 DIIS
+   @DF-RHF iter  41:  -213.55145129991246    5.69571e-11   8.32526e-02 DIIS
+   @DF-RHF iter  42:  -213.55145129996021   -4.77485e-11   8.32526e-02 DIIS
+   @DF-RHF iter  43:  -213.55145129990257    5.76392e-11   8.32526e-02 DIIS
+   @DF-RHF iter  44:  -213.55145129995793   -5.53655e-11   8.32526e-02 DIIS
+   @DF-RHF iter  45:  -213.55145129993497    2.29647e-11   8.32526e-02 DIIS
+   @DF-RHF iter  46:  -213.55145129999511   -6.01403e-11   8.32526e-02 DIIS
+   @DF-RHF iter  47:  -213.55145129991507    8.00355e-11   8.32526e-02 DIIS
+   @DF-RHF iter  48:  -213.55145129993883   -2.37605e-11   8.32526e-02 DIIS
+   @DF-RHF iter  49:  -213.55145129987960    5.92308e-11   8.32526e-02 DIIS
+   @DF-RHF iter  50:  -213.55145129999568   -1.16074e-10   8.32526e-02 DIIS
+   @DF-RHF iter  51:  -213.55145129991485    8.08313e-11   8.32526e-02 DIIS
+   @DF-RHF iter  52:  -213.55145129992337   -8.52651e-12   8.32526e-02 DIIS
+   @DF-RHF iter  53:  -213.55145129992724   -3.86535e-12   8.32526e-02 DIIS
+   @DF-RHF iter  54:  -213.55145129993156   -4.32010e-12   8.32526e-02 DIIS
+   @DF-RHF iter  55:  -213.55145130004308   -1.11527e-10   8.32526e-02 DIIS
+   @DF-RHF iter  56:  -213.55145129994020    1.02887e-10   8.32526e-02 DIIS
+   @DF-RHF iter  57:  -213.55145129997180   -3.16049e-11   8.32526e-02 DIIS
+   @DF-RHF iter  58:  -213.55145129991666    5.51381e-11   8.32526e-02 DIIS
+   @DF-RHF iter  59:  -213.55145129989143    2.52385e-11   8.32526e-02 DIIS
+   @DF-RHF iter  60:  -213.55145129996157   -7.01448e-11   8.32526e-02 DIIS
+   @DF-RHF iter  61:  -213.55145129997032   -8.75389e-12   8.32526e-02 DIIS
+   @DF-RHF iter  62:  -213.55145129996703    3.29692e-12   8.32526e-02 DIIS
+   @DF-RHF iter  63:  -213.55145129999318   -2.61480e-11   8.32526e-02 DIIS
+   @DF-RHF iter  64:  -213.55145129998567    7.50333e-12   8.32526e-02 DIIS
+   @DF-RHF iter  65:  -213.55145130000295   -1.72804e-11   8.32526e-02 DIIS
+   @DF-RHF iter  66:  -213.55145129993952    6.34373e-11   8.32526e-02 DIIS
+   @DF-RHF iter  67:  -213.55145129992815    1.13687e-11   8.32526e-02 DIIS
+   @DF-RHF iter  68:  -213.55145130000273   -7.45786e-11   8.32526e-02 DIIS
+   @DF-RHF iter  69:  -213.55145129992019    8.25366e-11   8.32526e-02 DIIS
+   @DF-RHF iter  70:  -213.55145129997953   -5.93445e-11   8.32526e-02 DIIS
+   @DF-RHF iter  71:  -213.55145129992428    5.52518e-11   8.32526e-02 DIIS
+   @DF-RHF iter  72:  -213.55145129997885   -5.45697e-11   8.32526e-02 DIIS
+   @DF-RHF iter  73:  -213.55145129996339    1.54614e-11   8.32526e-02 DIIS
+   @DF-RHF iter  74:  -213.55145129992030    4.30873e-11   8.32526e-02 DIIS
+   @DF-RHF iter  75:  -213.55145129998510   -6.48015e-11   8.32526e-02 DIIS
+   @DF-RHF iter  76:  -213.55145129987358    1.11527e-10   8.32526e-02 DIIS
+   @DF-RHF iter  77:  -213.55145129991405   -4.04725e-11   8.32526e-02 DIIS
+   @DF-RHF iter  78:  -213.55145129987403    4.00178e-11   8.32526e-02 DIIS
+   @DF-RHF iter  79:  -213.55145129995998   -8.59472e-11   8.32526e-02 DIIS
+   @DF-RHF iter  80:  -213.55145129996157   -1.59162e-12   8.32526e-02 DIIS
+   @DF-RHF iter  81:  -213.55145129997635   -1.47793e-11   8.32526e-02 DIIS
+   @DF-RHF iter  82:  -213.55145129995441    2.19416e-11   8.32526e-02 DIIS
+   @DF-RHF iter  83:  -213.55145129987937    7.50333e-11   8.32526e-02 DIIS
+   @DF-RHF iter  84:  -213.55145129995907   -7.96945e-11   8.32526e-02 DIIS
+   @DF-RHF iter  85:  -213.55145129999352   -3.44471e-11   8.32526e-02 DIIS
+   @DF-RHF iter  86:  -213.55145129997157    2.19416e-11   8.32526e-02 DIIS
+   @DF-RHF iter  87:  -213.55145129996794    3.63798e-12   8.32526e-02 DIIS
+   @DF-RHF iter  88:  -213.55145129997419   -6.25278e-12   8.32526e-02 DIIS
+   @DF-RHF iter  89:  -213.55145129991405    6.01403e-11   8.32526e-02 DIIS
+   @DF-RHF iter  90:  -213.55145129999477   -8.07177e-11   8.32526e-02 DIIS
+   @DF-RHF iter  91:  -213.55145129991769    7.70797e-11   8.32526e-02 DIIS
+   @DF-RHF iter  92:  -213.55145129992837   -1.06866e-11   8.32526e-02 DIIS
+   @DF-RHF iter  93:  -213.55145130000307   -7.46923e-11   8.32526e-02 DIIS
+   @DF-RHF iter  94:  -213.55145129994338    5.96856e-11   8.32526e-02 DIIS
+   @DF-RHF iter  95:  -213.55145129997840   -3.50155e-11   8.32526e-02 DIIS
+   @DF-RHF iter  96:  -213.55145129995157    2.68301e-11   8.32526e-02 DIIS
+   @DF-RHF iter  97:  -213.55145129991109    4.04725e-11   8.32526e-02 DIIS
+   @DF-RHF iter  98:  -213.55145129998283   -7.17364e-11   8.32526e-02 DIIS
+   @DF-RHF iter  99:  -213.55145129994634    3.64935e-11   8.32526e-02 DIIS
+   @DF-RHF iter 100:  -213.55145129984106    1.05274e-10   8.32526e-02 DIIS
+
+  ==> Post-Iterations <==
+
+  Failed to converged.
+    NOTE: MO Coefficients will not be saved to Checkpoint.
+Iterations did not converge.

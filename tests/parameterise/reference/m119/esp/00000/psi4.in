@@ -1,0 +1,28 @@
+set {
+	reference rhf
+	basis 6-31G*
+}
+
+
+set_num_threads( 1 )
+memory 2 gb
+
+molecule MOL {
+0 1
+
+H	 0.704845	 1.200016	 0.892000
+C	 0.591444	 0.609902	 -0.000000
+Cl	 -1.043510	 -0.071779	 0.000000
+F	 1.498454	 -0.378997	 0.000000
+H	 0.704845	 1.200016	 -0.892000
+
+	symmetry c1
+}
+ee = energy('scf')
+oeprop('DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
+oeprop('GRID_ESP')
+f=open( 'psi4out.xyz', 'w' )
+f.write( "5  " )
+f.write( str(ee) + "\n" )
+f.write( MOL.save_string_xyz() )
+f.close()

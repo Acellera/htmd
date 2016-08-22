@@ -1,7 +1,8 @@
 #!/bin/bash
-#PBS -lselect=1:ncpous=1:mem=2gb
+#PBS -lselect=1:ncpus=1:mem=2gb
 #PBS -lwalltime=72:0:0
 #PBS -J 1-119
+#PBS -N param
 if [ "$PBS_O_WORKDIR" != "" ]; then
  cd "$PBS_O_WORKDIR"
 fi
