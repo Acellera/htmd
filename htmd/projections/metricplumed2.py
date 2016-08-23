@@ -291,7 +291,7 @@ class MetricPlumed2(Projection):
         logger.info("In _precalculate")
         self._precalculation_enabled = True
 
-    def getMapping(self):
+    def getMapping(self, mol):
         """ Return the labels of the colvars used in this projection.
 
         Can only be used after the projection has been executed.
@@ -304,7 +304,8 @@ class MetricPlumed2(Projection):
         if self.cvnames:
             return self.cvnames
         else:
-            raise Exception("MetricPlumed's getMapping can only be called after the projection")
+            logger.warning("MetricPlumed's getMapping can only be called after the projection")
+            # raise Exception("MetricPlumed's getMapping can only be called after the projection")
 
     # Arguments are actually self, mol
     def project(self, mol):
