@@ -273,6 +273,7 @@ class Molecule:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
         if _logger:
             logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
+        return sel
 
     def get(self, field, sel=None):
         """Retrieve a specific PDB field based on the selection
@@ -1559,7 +1560,7 @@ if __name__ == "__main__":
     import doctest
     from htmd.home import home
 
-    m = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
+    m = Molecule('3PTB')
     doctest.testmod(extraglobs={'tryp': m.copy()})
 
     # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May
