@@ -27,7 +27,7 @@ class ResidueData:
     --------
     >>> tryp = Molecule("3PTB")
     >>> tryp_op, ri = proteinPrepare(tryp, returnDetails=True)
-    >>> ri
+    >>> ri                                  # doctest: +NORMALIZE_WHITESPACE
     ResidueData object about 290 residues.
     Unparametrized residue names: CA, BEN
     Please find the full info in the .data property, e.g.:
@@ -199,9 +199,10 @@ class ResidueData:
         changed = self.data.resname != self.data.protonation
         cl = []
         for i, cr in self.data[changed].iterrows():
-            if cr.resname not in ['N+', 'C-']:
-                cl.append("{:s} ({:s})".format(prettyPrintResidue(cr),cr.protonation))
-        if len(cl)>0:
+            if cr.resname in ['N+', 'C-'] or cr.protonation in ['WAT'] or type(cr.protonation) == float:
+                continue
+            cl.append("{:s} ({:s})".format(prettyPrintResidue(cr),cr.protonation))
+        if cl:
             logger.info("The following residues are in a non-standard state: "+", ".join(cl))
 
     def _warnIfpKCloseTopH(self, ph, tol=1.0):

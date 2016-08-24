@@ -9,7 +9,7 @@ from IPython.core.debugger import Tracer
 
 
 def pp_calcDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=True, gap=1, truncate=None):
-    distances = _distanceArray(mol, sel1, sel2, mol.numFrames, pbc)
+    distances = _distanceArray(mol, sel1, sel2, pbc)
     distances = _postProcessDistances(distances, sel1, sel2, truncate)
 
     if metric == 'contacts':
@@ -101,13 +101,27 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
     import os
     import ctypes
     from htmd.home import home
+
+    # Converting non-grouped boolean atomselection to group-style atomselections
+    if np.ndim(sel1) != 2:
+        sel1idx = tuple(np.where(sel1)[0])
+        sel1 = np.zeros((len(sel1idx), len(sel1)), dtype=bool)
+        sel1[range(sel1.shape[0]), sel1idx] = True
+    if np.ndim(sel2) != 2:
+        sel2idx = tuple(np.where(sel2)[0])
+        sel2 = np.zeros((len(sel2idx), len(sel2)), dtype=bool)
+        sel2[range(sel2.shape[0]), sel2idx] = True
+
+    box = np.array([0, 0, 0], dtype=np.float32)
     if pbc:
         if mol.box is None or np.sum(mol.box) == 0:
-            raise NameError(
-                'No periodic box dimensions given in the molecule/trajectory. If you want to calculate distance without wrapping, set the pbc option to False')
-        coords = _wrapCoords(mol.coords, mol.box)
-    else:
-        coords = mol.coords
+            raise NameError('No periodic box dimensions given in the molecule/trajectory. '
+                            'If you want to calculate distance without wrapping, set the pbc option to False')
+        box = mol.box[:, 0]  # TODO: make it work for varying box size
+        if np.max(mol.box.T - mol.box[:, 0]) != 0:
+            raise NameError('Different box sizes per frame. Still unsupported by mindist. Contact Stefan Doerr.')
+
+    coords = mol.coords
 
     # Converting from 2D boolean atomselect array to 2D int array where each row starts with the indexes of the boolean
     groups1 = np.ones((sel1.shape[0], mol.numAtoms), dtype=np.int32) * -1
@@ -123,12 +137,14 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
     lib = ctypes.cdll.LoadLibrary(os.path.join(home(libDir=True), 'mindist_ext.so'))
     mindist = np.zeros((mol.numFrames, len(groups1) * len(groups2)), dtype=np.float32)  # Preparing the return array
     lib.mindist_trajectory(coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                           box.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                            groups1.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
                            groups2.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
                            ctypes.c_int(len(groups1)),
                            ctypes.c_int(len(groups2)),
                            ctypes.c_int(mol.numAtoms),
                            ctypes.c_int(mol.numFrames),
+                           ctypes.c_int(int(pbc)),
                            mindist.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
 
     if metric == 'contacts':
@@ -163,7 +179,7 @@ def _postProcessDistances(distances, sel1, sel2, truncate):
     return np.atleast_1d(np.squeeze(distances))
 
 
-def _distanceArray(mol, sel1, sel2, numframes, pbc):
+def _distanceArray(mol, sel1, sel2, pbc):
     numsel1 = np.sum(sel1)
     numsel2 = np.sum(sel2)
     coords1 = mol.coords[sel1, :, :]
@@ -181,27 +197,6 @@ def _distanceArray(mol, sel1, sel2, numframes, pbc):
         distances.append(dists)
     return distances
 
-'''
-def _minDistanceArray(mol, sel1, sel2, group1, group2, numframes, pbc):
-    distances = _distanceArray(mol, sel1, sel2, numframes, pbc)
-    if np.ndim(distances[0]) > 1:  # 2D data
-        distances = np.concatenate(distances, axis=1)
-    else: # 1D data
-        distances = np.vstack(distances).transpose()
-
-    numsel1 = np.sum(sel1)
-    numsel2 = np.sum(sel2)
-    combo = []
-    for s1 in group1:
-        s1x = [s1 + (numsel1 * n2) for n2 in range(numsel2)]
-        for s2 in group2:
-            combo.append()
-
-    newdistances = np.zeros((distances.shape[0], len(combo)))
-    for c in combo:
-        newdistances[:, c] = np.min(distances[:, c], axis=1)
-'''
-
 
 def _findDiffChain(mol, sel1, sel2, i, others):
     if np.array_equal(sel1, sel2) and len(mol.chain) > 0:
@@ -214,10 +209,8 @@ def _findDiffChain(mol, sel1, sel2, i, others):
 
 def _wrapDistances(box, dist, diffchain):
     if diffchain is not None:
-        numatoms = np.sum(diffchain)
         dist[diffchain, :, :] -= box * np.round(dist[diffchain, :, :] / box)
     else:
-        numatoms = np.size(dist, 0)
         dist = dist - box * np.round(dist / box)
     return dist
 

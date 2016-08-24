@@ -26,7 +26,7 @@ class MetricNull(Projection):
         logger.info("In _precalculate")
         self._precalculation_enabled = True
 
-    def getMapping(self):
+    def getMapping(self, mol):
         """ Returns optional information.
 
         Returns
@@ -34,8 +34,15 @@ class MetricNull(Projection):
         map :
             a dummy value
         """
-
-        return ["Dummy" + str(i + 1) for i in range(self._ndim)]
+        from pandas import DataFrame
+        types = []
+        indexes = []
+        description = []
+        for i in range(self._ndim):
+            types += ['dummy']
+            indexes += [i]
+            description += ['Dummy metric.']
+        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
     def project(self, mol):
         """ Compute the actual metric.

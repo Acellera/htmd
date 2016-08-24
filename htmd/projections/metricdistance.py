@@ -74,7 +74,7 @@ class MetricDistance(Projection):
         if np.ndim(sel1) == 1 and np.ndim(sel2) == 1:  # normal distances
             metric = pp_calcDistances(mol, sel1, sel2, self.metric, self.threshold, self.pbc, truncate=self.truncate)
         else:  # minimum distances by groups
-            metric = pp_calcMinDistances(mol, sel1, sel2)
+            metric = pp_calcMinDistances(mol, sel1, sel2, self.metric, self.threshold, pbc=self.pbc)
 
         return metric
 
@@ -82,37 +82,48 @@ class MetricDistance(Projection):
         (sel1, sel2) = self._getSelections(mol)
 
         if np.ndim(sel1) == 2:
-            protatoms = np.ones(len(sel1)) * -1
-            for i in range(np.size(sel1, 1)):
-                protatoms[i] = np.where(sel1[i] == True)[0][0]
+            protatoms = []
+            for i in range(sel1.shape[0]):
+                protatoms.append(np.where(sel1[i, :] == True)[0])
         else:
             protatoms = np.where(sel1)[0]
         if np.ndim(sel2) == 2:
-            ligatoms = np.ones(len(sel1)) * -1
-            for i in range(np.size(sel2, 1)):
-                ligatoms[i] = np.where(sel2[i] == True)[0][0]
+            ligatoms = []
+            for i in range(sel2.shape[0]):
+                ligatoms.append(np.where(sel2[i, :] == True)[0])
         else:
             ligatoms = np.where(sel2)[0]
 
         numatoms1 = len(protatoms)
         numatoms2 = len(ligatoms)
 
+        from pandas import DataFrame
+        types = []
+        indexes = []
+        description = []
         if np.array_equal(protatoms, ligatoms):
-            map = np.zeros((numatoms1 * (numatoms1-1) / 2, 2), dtype=int)
-            start = 0
             for i in range(numatoms1):
-                finish = start + numatoms1 - i - 1
-                map[start:finish, 0] = protatoms[i]
-                map[start:finish, 1] = protatoms[i+1:]
-                start = finish
+                for j in range(i+1, numatoms1):
+                    atm1 = protatoms[i]
+                    atm2 = protatoms[j]
+                    desc = '{} between {} {} {} and {} {} {}'.format(self.metric[:-1],
+                                                                     mol.resname[atm1], mol.resid[atm1], mol.name[atm1],
+                                                                     mol.resname[atm2], mol.resid[atm2], mol.name[atm2])
+                    types += [self.metric[:-1]]
+                    indexes += [[atm1, atm2]]
+                    description += [desc]
         else:
-            map = np.zeros((numatoms1 * numatoms2, 2), dtype=int)
-            for i in range(numatoms2):
-                start = i * numatoms1
-                finish = (i+1) * numatoms1
-                map[start:finish, 0] = protatoms
-                map[start:finish, 1] = ligatoms[i]
-        return map
+            for j in range(numatoms2):
+                for i in range(numatoms1):
+                    atm1 = protatoms[i]
+                    atm2 = ligatoms[j]
+                    desc = '{} between {} {} {} and {} {} {}'.format(self.metric[:-1],
+                                                                     mol.resname[atm1], mol.resid[atm1], mol.name[atm1],
+                                                                     mol.resname[atm2], mol.resid[atm2], mol.name[atm2])
+                    types += [self.metric[:-1]]
+                    indexes += [[atm1, atm2]]
+                    description += [desc]
+        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
     def _getSelections(self, mol):
         # If they have been pre-calculated return them.
@@ -252,10 +263,14 @@ if __name__ == "__main__":
 
     metr = MetricDistance('protein and name CA', 'resname MOL and noh', groupsel1='residue', groupsel2='all')
     data = metr.project(mol)
-    lastdists = np.array([29.86027718,  30.96251488,  33.62521744,  38.87788773,
-                          38.07615662,  41.80171967,  42.2215271 ,  39.5571022 ,
+    lastdists = np.array([28.99010277,  30.08285904,  32.75860214,  32.42934036,
+                          33.58397293,  32.05215073,  32.83199692,  31.5758419 ,
                           27.89051056,  27.47974586,  25.18564415,  21.57362175,
                           23.08990097,  22.45937729,  18.47289085,  18.41271782,
-                          20.87875175,  19.73318672,  15.16925335,  12.0577631 ], dtype=np.float32)
+                          20.87875175,  19.73318672,  15.1692543 ,  12.0577631 ], dtype=np.float32)
     assert np.all(np.abs(data[-1, -20:] - lastdists) < 0.001), 'Minimum distance calculation is broken'
+
+    mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'), skip=10)
+    data2 = metr.project(mol)
+    assert np.array_equal(data2, data[::10, :]), 'Minimum distance calculation with skipping is broken'
 

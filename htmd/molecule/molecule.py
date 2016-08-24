@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
-from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
@@ -273,6 +273,7 @@ class Molecule:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
         if _logger:
             logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
+        return sel
 
     def get(self, field, sel=None):
         """Retrieve a specific PDB field based on the selection
@@ -729,13 +730,17 @@ class Molecule:
 
     def _readPDB(self, filename, mode='pdb'):
         if os.path.isfile(filename):
-            mol = PDBParser(filename, mode)
+            topo, coords = PDBread(filename, mode=mode)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif len(filename) == 4:
             # Try loading it from the pdb data directory
             localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
             if os.path.isfile(localpdb):
                 logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
-                mol = PDBParser(localpdb, mode)
+                topo, coords = PDBread(localpdb, mode=mode)
+                self._readTopology(topo, localpdb)
+                self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             else:
                 # or the PDB website
                 logger.info("Attempting PDB query for {:s}".format(filename))
@@ -743,32 +748,26 @@ class Molecule:
                     "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
                 if r.status_code == 200:
                     tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                    mol = PDBParser(tempfile, mode)
+                    topo, coords = PDBread(tempfile, mode=mode)
+                    self._readTopology(topo, tempfile)
+                    self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
                     os.unlink(tempfile)
                 else:
                     raise NameError('Invalid PDB code')
         else:
             raise NameError('File {} not found'.format(filename))
 
-        natoms = len(mol.record)
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._dtypes[k])
-            # Pad any short list
-            if k is not "coords":
-                if len(self.__dict__[k]) != natoms:
-                    self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
-
-        self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
-        self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
-        self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
-        self.box = np.array(mol.box)
-
         if self.masses is None or len(self.masses) == 0:
-            self.masses = numpy.zeros(natoms, dtype=numpy.float32)
+            self.masses = numpy.zeros(self.numAtoms, dtype=numpy.float32)
         if self.charge is None or len(self.charge) == 0:
             self.charge = mol.charge.copy()
         if self.charge is None or len(self.charge) == 0:
-            self.charge = numpy.zeros(natoms, dtype=numpy.float32)
+            self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
+
+        for pf in self._pdb_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
+            if self._dtypes[pf] == object:
+                for i in range(self.numAtoms):
+                    self.__dict__[pf][i] = str(self.__dict__[pf][i])
 
         self.fileloc.append([filename, 0])
 
@@ -886,8 +885,8 @@ class Molecule:
                 self.box = np.append(self.box, traj.box, 1)
 
         if skip is not None:
-            self.coords = self.coords[:, :, ::skip]  # Might actually not free memory! Check numpy views
-            self.box = self.box[:, ::skip]
+            self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
+            self.box = np.array(self.box[:, ::skip])
             self.fileloc = self.fileloc[::skip]
 
         self.coords = np.atleast_3d(self.coords)
@@ -1297,8 +1296,8 @@ class Molecule:
         if keep != 'all' and drop is not None:
             raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
         if keep != 'all':
-            self.coords = np.atleast_3d(self.coords[:, :, keep])
-            self.box = np.atleast_2d(self.box[:, keep])
+            self.coords = np.array(np.atleast_3d(self.coords[:, :, keep]))  # Copy array. Slices are dangerous with C
+            self.box = np.array(np.atleast_2d(self.box[:, keep]))
         if drop is not None:
             self.coords = np.delete(self.coords, drop, axis=2)
             self.box = np.delete(self.box, drop, axis=1)
@@ -1559,9 +1558,8 @@ if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
-    from htmd.home import home
 
-    m = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
+    m = Molecule('3PTB')
     doctest.testmod(extraglobs={'tryp': m.copy()})
 
     # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May

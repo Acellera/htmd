@@ -7,7 +7,7 @@ if [ "$?" == "1" ]; then
 fi
 
 RET=0
-for T in  $(dirname $(which parameterize))/../lib/*/*/htmd/parameterization/share/bin/* ; do
+for T in  $(find $(dirname $(which parameterize))/../lib/*/*/htmd/parameterization/share/bin/ -type f); do
 	ldd $T | grep -q "not a dynamic executable"
 	if [ "$?" == "1" ]; then
 		RET=1

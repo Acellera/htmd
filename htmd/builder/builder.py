@@ -238,6 +238,77 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
+def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
+    """ Detects bonded segments in a selection and assigns incrementing segid to each segment
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The Molecule object
+    sel : str
+        Atom selection on which to check for gaps.
+    basename : str
+        The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
+    field : tuple of strings
+        Field to fix. Can be "segid" (default) or any other Molecule field or combinations thereof.
+
+    Returns
+    -------
+    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        A new Molecule object with modified segids
+
+    Example
+    -------
+    >>> newmol = autoSegment(mol, 'chain B', 'P')
+    """
+    from scipy.sparse import csr_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    if isinstance(fields, str):
+        fields = (fields,)
+
+    sel += ' and backbone'  # Looking for bonds only over the backbone of the protein
+    idx = mol.atomselect(sel, indexes=True)  # Keep the original atom indexes to map from submol to mol
+    submol = mol.copy()  # We filter out everything not on the backbone to calculate only those bonds
+    submol.filter(sel, _logger=False)
+    bonds = submol._getBonds()  # Calculate both file and guessed bonds
+
+    sparsemat = csr_matrix((np.ones(bonds.shape[0] * 2),  # Values
+                            (np.hstack((bonds[:, 0], bonds[:, 1])),  # Rows
+                             np.hstack((bonds[:, 1], bonds[:, 0])))), shape=[submol.numAtoms,submol.numAtoms])  # Columns
+    numcomp, compidx = connected_components(sparsemat, directed=False)
+
+    # Warning about bonds bonding non-continuous resids
+    bondresiddiff = np.abs(submol.resid[bonds[:, 0]] - submol.resid[bonds[:, 1]])
+    if np.any(bondresiddiff > 1):
+        for i in np.where(bondresiddiff > 1)[0]:
+            logger.warning('Bonds found between resid gaps: resid {} and {}'.format(submol.resid[bonds[i, 0]], submol.resid[bonds[i, 1]]))
+
+    mol = mol.copy()
+    prevsegres = None
+    for i in range(numcomp):  # For each connected component / segment
+        segid = basename + str(i)
+        backboneSegIdx = idx[compidx == i]  # The backbone atoms of the segment
+        segres = mol.atomselect('same residue as index {}'.format(' '.join(map(str, backboneSegIdx)))) # Get whole residues
+
+        # Warning about separating segments with continuous resids
+        if i > 0 and (np.min(mol.resid[segres]) - np.max(mol.resid[prevsegres])) == 1:
+            logger.warning('Separated segments {} and {}, despite continuous resids, due to lack of bonding.'.format(
+                            basename + str(i-1), segid))
+
+        # Add the new segment ID to all fields the user specified
+        for f in fields:
+            if np.any(mol.__dict__[f] == segid):
+                raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
+            mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
+
+        logger.info('Created segment {} between resid {} and {}.'.format(segid, np.min(mol.resid[segres]),
+                                                                         np.max(mol.resid[segres])))
+        prevsegres = segres  # Store old segment atom indexes for the warning about continuous resids
+
+    return mol
+
+
 def _checkMixedSegment(mol):
     segsProt = np.unique(mol.get('segid', sel='protein or resname ACE NME'))
     segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))
