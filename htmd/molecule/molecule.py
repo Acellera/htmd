@@ -897,8 +897,8 @@ class Molecule:
             self.fstep = 0.1
         else:
             self.fstep = (traj.time[1] - traj.time[0]) / 1E6  # convert femtoseconds to nanoseconds
-            if skip is not None:
-                self.fstep *= skip
+        if skip is not None:
+            self.fstep *= skip
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
              viewerhandle=None):
