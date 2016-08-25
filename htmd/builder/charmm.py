@@ -234,6 +234,11 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             f.write(p + '\n')
         f.write('\n')
 
+    # Print regenerate angles and dihedrals
+    # necessary for some patches
+
+    f.write('regenerate angles dihedrals\n')
+
     f.write('guesscoord\n')
     f.write('writepsf ' + prefix + '.psf\n')
     f.write('writepdb ' + prefix + '.pdb\n')
