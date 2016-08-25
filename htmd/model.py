@@ -72,12 +72,12 @@ class Model(object):
         self.msm = msm.estimate_markov_model(self.data.St.tolist(), self.lag, sparse=sparse)
         self.coarsemsm = self.msm.pcca(macronum)
 
+        self._modelid = random.random()
+
         if hmm:  # Still in development
             self.hmm = self.msm.coarse_grain(self.macronum)
 
         logger.info('{:.1f}% of the data was used'.format(self.msm.active_count_fraction * 100))
-
-        self._modelid = random.random()
 
         _macroTrajectoriesReport(self.macronum, _macroTrajSt(self.data.St, self.macro_ofcluster), self.data.simlist)
 
