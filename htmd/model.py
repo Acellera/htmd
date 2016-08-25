@@ -36,6 +36,7 @@ class Model(object):
         if data is None:
             return
         self.data = data
+        self.hmm = None
         self._modelid = None
         if data._clusterid is None:
             raise NameError('You need to cluster your data before making a Markov model')
@@ -43,7 +44,7 @@ class Model(object):
             raise NameError('You have modified the data in data.dat after clustering. Please re-cluster.')
         self._clusterid = data._clusterid
 
-    def markovModel(self, lag, macronum, units='frames', sparse=False):
+    def markovModel(self, lag, macronum, units='frames', sparse=False, hmm=False):
         """ Build a Markov model at a given lag time and calculate metastable states
 
         Parameters
@@ -69,26 +70,57 @@ class Model(object):
 
         self.lag = lag
         self.msm = msm.estimate_markov_model(self.data.St.tolist(), self.lag, sparse=sparse)
-        self.P = self.msm.transition_matrix
-        self.micro_ofcluster = -np.ones(self.data.K+1, dtype=int)
-        self.micro_ofcluster[self.msm.active_set] = np.arange(len(self.msm.active_set))
-        self.cluster_ofmicro = self.msm.active_set
-        self.micronum = len(self.msm.active_set)
         self.coarsemsm = self.msm.pcca(macronum)
 
-        # Fixing pyemma macrostates
-        self.macronum = len(set(self.msm.metastable_assignments))
-        mask = np.ones(macronum, dtype=int) * -1
-        mask[list(set(self.msm.metastable_assignments))] = range(self.macronum)
+        if hmm:  # Still in development
+            self.hmm = self.msm.coarse_grain(self.macronum)
 
-        self.macro_ofmicro = mask[self.msm.metastable_assignments]
-        self.macro_ofcluster = -np.ones(self.data.K+1, dtype=int)
-        self.macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
         logger.info('{:.1f}% of the data was used'.format(self.msm.active_count_fraction * 100))
 
         self._modelid = random.random()
 
         _macroTrajectoriesReport(self.macronum, _macroTrajSt(self.data.St, self.macro_ofcluster), self.data.simlist)
+
+    @property
+    def P(self):
+        return self.msm.transition_matrix
+
+    @property
+    def micro_ofcluster(self):
+        self._integrityCheck(postmsm=True)
+        micro_ofcluster = -np.ones(self.data.K+1, dtype=int)
+        micro_ofcluster[self.msm.active_set] = np.arange(len(self.msm.active_set))
+        return micro_ofcluster
+
+    @property
+    def cluster_ofmicro(self):
+        self._integrityCheck(postmsm=True)
+        return self.msm.active_set
+
+    @property
+    def micronum(self):
+        self._integrityCheck(postmsm=True)
+        return len(self.msm.active_set)
+
+    @property
+    def macronum(self):
+        self._integrityCheck(postmsm=True)
+        return len(set(self.msm.metastable_assignments))
+
+    @property
+    def macro_ofmicro(self):
+        self._integrityCheck(postmsm=True)
+        # Fixing pyemma macrostate numbering
+        mask = np.ones(np.max(self.msm.metastable_assignments) + 1, dtype=int) * -1
+        mask[list(set(self.msm.metastable_assignments))] = range(self.macronum)
+        return mask[self.msm.metastable_assignments]
+
+    @property
+    def macro_ofcluster(self):
+        self._integrityCheck(postmsm=True)
+        macro_ofcluster = -np.ones(self.data.K+1, dtype=int)
+        macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
+        return macro_ofcluster
 
     def plotTimescales(self, lags=None, units='frames', errors=None, nits=None, results=False, plot=True):
         """ Plot the implied timescales of MSMs of various lag times
@@ -223,7 +255,7 @@ class Model(object):
         self._integrityCheck(postmsm=(statetype != 'cluster'))
         if statetype != 'macro' and samplemode != 'random':
             samplemode = 'random'
-            logger.warning('''micro'' and ''cluster'' states incompatible with ''samplemode'' other than ''random''. Defaulting to ''random''')
+            logger.warning("'micro' and 'cluster' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'")
 
         stConcat = np.concatenate(self.data.St)
         absFrames = []
@@ -332,7 +364,7 @@ class Model(object):
         if alignmol is None:
             alignmol = molfile
         if statetype != 'macro' and statetype != 'micro' and statetype != 'cluster':
-            raise NameError('''statetype'' must be either ''macro'', ''micro'' or ''cluster''')
+            raise NameError("'statetype' must be either 'macro', 'micro' or ''cluster'")
         if states is None:
             if statetype == 'macro':
                 states = range(self.macronum)
