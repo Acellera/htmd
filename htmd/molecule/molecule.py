@@ -1024,6 +1024,8 @@ class Molecule:
         self._tempreps.append(self.reps)
         self._tempreps._repsNGL(w)
         self._tempreps.remove()
+
+        os.remove(pdb)
         return w
 
     def mutateResidue(self, sel, newres):
