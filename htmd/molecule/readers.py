@@ -80,7 +80,7 @@ def XTCread(filename, frames=None):
             nframes, deltat, deltastep)
 
         if not retval:
-            raise RuntimeError('XTC file {} possibly corrupt.'.format(filename))
+            raise IOError('XTC file {} possibly corrupt.'.format(filename))
 
         frames = range(nframes[0])
         t = Trajectory()
@@ -93,7 +93,7 @@ def XTCread(filename, frames=None):
 
         for i, f in enumerate(frames):
             if f >= nframes[0] or f < 0:
-                raise NameError('Frame index out of range in XTCread with given frames')
+                raise RuntimeError('Frame index out of range in XTCread with given frames')
             t.step[i] = retval[f].step
             t.time[i] = retval[f].time
             t.box[0, i] = retval[f].box[0]
