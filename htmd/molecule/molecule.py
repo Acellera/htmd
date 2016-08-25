@@ -997,6 +997,7 @@ class Molecule:
 
     def _viewNGL(self, psf, coords, guessb):
         from nglview import Trajectory
+        from htmd.util import tempname
         import nglview
 
         class TrajectoryStreamer(Trajectory):
@@ -1009,7 +1010,10 @@ class Molecule:
             def get_frame_count(self):
                 return np.size(self.coords, 2)
 
-        struc = nglview.FileStructure(psf)
+        pdb = tempname(suffix=".pdb")
+        self.write(pdb)
+
+        struc = nglview.FileStructure(pdb)
         struc.params['dontAutoBond'] = not guessb
 
         traj = TrajectoryStreamer(coords)
