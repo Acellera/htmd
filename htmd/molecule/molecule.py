@@ -1335,6 +1335,10 @@ class Molecule:
         """Get the z coordinates at the current frame"""
         return self.coords[:, 2, self.frame]
 
+    def __repr__(self):
+        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
+               + self.__str__()
+
     def __str__(self):
         def formatstr(name, field):
             if isinstance(field, np.ndarray) or isinstance(field, list):
@@ -1356,6 +1360,8 @@ class Molecule:
             rep += formatstr(j, self.__dict__[j])
 
         return rep
+
+
 
 
 def _resolveCollisions(mol, occ1, occ2, gap):
