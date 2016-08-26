@@ -1,11 +1,11 @@
 Simulation lists
 ================
 
-HTMD can handle a large amount of simulations. Therefore it is necessary to create a list of them before calculating any projections.
+HTMD can handle a large amount of simulations. Simulation lists allow to create a simple list containting all relevant information about the simulations to later perform any type of analysis. 
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
 
-   htmd.simlist
+   Simulation lists <htmd.simlist>
