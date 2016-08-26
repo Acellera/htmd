@@ -2,10 +2,14 @@ Simulations
 ==============================
 
 HTMD allows to prepare molecular simulations and run them with minimal knowledge of the technical details 
-required to do so, thanks to prepared protocols. Some of these functionalities are general, some are 
+required to do so, thanks to prepared protocols. 
+
+Some of these functionalities are general, some are 
 specific to the acemd molecular simulation package, however the MD engine should not matter. In particular,
 there are functions to setup the configuration of a simulation into a specific directory and way to perform adaptive sampling
 methods which is the primary method of sampling in HTMD.
+
+ACEMD a powerful and simple MD engine which pioneered  GPU computing since 2009 is distributed together with HTMD in a standard version. A profesional version is available by writing at info@acellera.com (http://www.acellera.com/acemd).
 
 References
 
