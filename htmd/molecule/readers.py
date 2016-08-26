@@ -598,15 +598,18 @@ def PDBread(filename, mode='pdb'):
 
     # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
     serials = parsedtopo.serial.as_matrix()
-    mapserials = np.ones(np.max(serials)+1) * -1
-    mapserials[serials] = list(range(np.max(serials)))
-    for i in range(len(parsedbonds)):
-        row = parsedbonds.loc[i].tolist()
-        for b in range(1, 5):
-            if not np.isnan(row[b]):
-                topo.bonds.append([int(row[0]), int(row[b])])
-    topo.bonds = np.array(topo.bonds, dtype=np.uint32)
-    topo.bonds[:] = mapserials[topo.bonds[:]]
+    if np.max(parsedbonds.max()) > np.max(serials):
+        logger.info('Bond indexes in PDB file exceed atom indexes. For safety we will discard all bond information.')
+    else:
+        mapserials = np.ones(np.max(serials)+1) * -1
+        mapserials[serials] = list(range(np.max(serials)))
+        for i in range(len(parsedbonds)):
+            row = parsedbonds.loc[i].tolist()
+            for b in range(1, 5):
+                if not np.isnan(row[b]):
+                    topo.bonds.append([int(row[0]), int(row[b])])
+        topo.bonds = np.array(topo.bonds, dtype=np.uint32)
+        topo.bonds[:] = mapserials[topo.bonds[:]]
 
     if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx

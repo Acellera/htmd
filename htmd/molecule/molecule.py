@@ -769,6 +769,49 @@ class Molecule:
 
         self.fileloc.append([filename, 0])
 
+    # def _readPDB_old(self, filename, mode='pdb'):
+    #     if os.path.isfile(filename):
+    #         mol = PDBParser(filename, mode)
+    #     elif len(filename) == 4:
+    #         # Try loading it from the pdb data directory
+    #         localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
+    #         if os.path.isfile(localpdb):
+    #             logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
+    #             mol = PDBParser(localpdb, mode)
+    #         else:
+    #             # or the PDB website
+    #             logger.info("Attempting PDB query for {:s}".format(filename))
+    #             r = requests.get(
+    #                 "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
+    #             if r.status_code == 200:
+    #                 tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
+    #                 mol = PDBParser(tempfile, mode)
+    #                 os.unlink(tempfile)
+    #             else:
+    #                 raise NameError('Invalid PDB code')
+    #     else:
+    #         raise NameError('File {} not found'.format(filename))
+    #
+    #     natoms = len(mol.record)
+    #     for k in self._pdb_fields:
+    #         self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._dtypes[k])
+    #         # Pad any short list
+    #         if k is not "coords":
+    #             if len(self.__dict__[k]) != natoms:
+    #                 self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
+    #
+    #     self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
+    #     self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
+    #     self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
+    #     self.box = np.array(mol.box)
+    #
+    #     if self.masses is None or len(self.masses) == 0:
+    #         self.masses = numpy.zeros(natoms, dtype=numpy.float32)
+    #     if self.charge is None or len(self.charge) == 0:
+    #         self.charge = numpy.zeros(natoms, dtype=numpy.float32)
+    #
+    #     self.fileloc.append([filename, 0])
+
     def _readTopology(self, topo, filename, overwrite='all'):
         if isinstance(overwrite, str):
             overwrite = (overwrite, )
