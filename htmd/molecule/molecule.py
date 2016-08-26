@@ -1362,6 +1362,16 @@ class Molecule:
         return rep
 
 
+def mol_equal(mol1, mol2):
+    difffields = []
+    for field in Molecule._append_fields:
+        if not np.array_equal(mol1.__dict__[field], mol2.__dict__[field]):
+            difffields += [field]
+
+    if len(difffields) > 0:
+        print('Differences detected in mol1 and mol2 in field(s) {}.'.format(difffields))
+        return False
+    return True
 
 
 def _resolveCollisions(mol, occ1, occ2, gap):

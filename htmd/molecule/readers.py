@@ -4,6 +4,13 @@ from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_stri
 import logging
 logger = logging.getLogger(__name__)
 
+# Pandas NA values taken from https://github.com/pydata/pandas/blob/6645b2b11a82343e5f07b15a25a250f411067819/pandas/io/common.py
+# Removed NA because it's natrium!
+_NA_VALUES = set([
+    '-1.#IND', '1.#QNAN', '1.#IND', '-1.#QNAN', '#N/A N/A', '#N/A',
+    'N/A', '#NA', 'NULL', 'NaN', '-NaN', 'nan', '-nan', ''
+])
+
 
 class Topology:
     def __init__(self, pandasdata=None):
@@ -536,7 +543,7 @@ def PDBread(filename, mode='pdb'):
     def concatCoords(coords, coorddata):
         if coorddata.tell() != 0:  # Not empty
             coorddata.seek(0)
-            parsedcoor = read_fwf(coorddata, colspecs=coordcolspecs, names=coordnames)
+            parsedcoor = read_fwf(coorddata, colspecs=coordcolspecs, names=coordnames, na_values=_NA_VALUES, keep_default_na=False)
             if coords is None:
                 coords = np.zeros((len(parsedcoor), 3, 0), dtype=np.float32)
             currcoords = np.vstack((parsedcoor.x, parsedcoor.y, parsedcoor.z)).T
@@ -578,9 +585,9 @@ def PDBread(filename, mode='pdb'):
 
     coords = concatCoords(coords, coorddata)
 
-    parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames)
-    parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames)
-    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames) #, dtype=topodtypes)
+    parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
+    parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames, na_values=_NA_VALUES, keep_default_na=False)
+    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
     if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
         parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
 
