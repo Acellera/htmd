@@ -760,8 +760,6 @@ class Molecule:
         if self.masses is None or len(self.masses) == 0:
             self.masses = numpy.zeros(self.numAtoms, dtype=numpy.float32)
         if self.charge is None or len(self.charge) == 0:
-            self.charge = mol.charge.copy()
-        if self.charge is None or len(self.charge) == 0:
             self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
 
         for pf in self._pdb_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf

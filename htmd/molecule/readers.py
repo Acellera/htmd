@@ -475,6 +475,12 @@ def PDBread(filename, mode='pdb'):
         toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
                      'occupancy', 'beta', 'segid', 'element', 'charge', 'chargesign')
     elif mode == 'pdbqt':
+        # http://autodock.scripps.edu/faqs-help/faq/what-is-the-format-of-a-pdbqt-file
+        # The rigid root contains one or more PDBQT-style ATOM or HETATM records. These records resemble their
+        # traditional PDB counterparts, but diverge in columns 71-79 inclusive (where the first character in the line
+        # corresponds to column 1). The partial charge is stored in columns 71-76 inclusive (in %6.3f format, i.e.
+        # right-justified, 6 characters wide, with 3 decimal places). The AutoDock atom-type is stored in columns 78-79
+        # inclusive (in %-2.2s format, i.e. left-justified and 2 characters wide..
         topocolspecs = [(0, 6), (6, 11), (12, 16), (16, 17), (17, 21), (21, 22), (22, 26), (26, 27),
                         (54, 60), (60, 66), (70, 76), (77, 79)]
         toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
@@ -575,7 +581,7 @@ def PDBread(filename, mode='pdb'):
     parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames)
     parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames)
     parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames) #, dtype=topodtypes)
-    if not np.all(parsedtopo.chargesign.isnull()):
+    if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
         parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
 
     if len(parsedtopo) > 99999:
