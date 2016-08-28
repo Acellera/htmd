@@ -66,9 +66,8 @@ publish:
 
 # Rule for building .rst from .ipynb
 $(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
-	# Since ipython does not to accept a --outdir, cd explicitly
 	mkdir -p $(TUTORIALSDIR)
-	cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to rst 
+	$(IPYTHON) nbconvert $< --to rst --stdout > $@
 	#cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to python
 
 tutorials: $(RST_FILES)
