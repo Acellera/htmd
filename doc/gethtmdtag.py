@@ -9,6 +9,6 @@ if sys.argv[1] == 'tag':
 if sys.argv[1] == 'branch':
     output = subprocess.check_output("git rev-parse --abbrev-ref HEAD", shell=True).decode('utf8')
     if output.startswith('master'):
-        print('devel')
+        print('latest')
     elif output.startswith('rel-'):
         print('stable')
