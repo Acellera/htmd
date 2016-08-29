@@ -4,6 +4,13 @@ from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_stri
 import logging
 logger = logging.getLogger(__name__)
 
+# Pandas NA values taken from https://github.com/pydata/pandas/blob/6645b2b11a82343e5f07b15a25a250f411067819/pandas/io/common.py
+# Removed NA because it's natrium!
+_NA_VALUES = set([
+    '-1.#IND', '1.#QNAN', '1.#IND', '-1.#QNAN', '#N/A N/A', '#N/A',
+    'N/A', '#NA', 'NULL', 'NaN', '-NaN', 'nan', '-nan', ''
+])
+
 
 class Topology:
     def __init__(self, pandasdata=None):
@@ -475,6 +482,12 @@ def PDBread(filename, mode='pdb'):
         toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
                      'occupancy', 'beta', 'segid', 'element', 'charge', 'chargesign')
     elif mode == 'pdbqt':
+        # http://autodock.scripps.edu/faqs-help/faq/what-is-the-format-of-a-pdbqt-file
+        # The rigid root contains one or more PDBQT-style ATOM or HETATM records. These records resemble their
+        # traditional PDB counterparts, but diverge in columns 71-79 inclusive (where the first character in the line
+        # corresponds to column 1). The partial charge is stored in columns 71-76 inclusive (in %6.3f format, i.e.
+        # right-justified, 6 characters wide, with 3 decimal places). The AutoDock atom-type is stored in columns 78-79
+        # inclusive (in %-2.2s format, i.e. left-justified and 2 characters wide..
         topocolspecs = [(0, 6), (6, 11), (12, 16), (16, 17), (17, 21), (21, 22), (22, 26), (26, 27),
                         (54, 60), (60, 66), (70, 76), (77, 79)]
         toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
@@ -530,7 +543,7 @@ def PDBread(filename, mode='pdb'):
     def concatCoords(coords, coorddata):
         if coorddata.tell() != 0:  # Not empty
             coorddata.seek(0)
-            parsedcoor = read_fwf(coorddata, colspecs=coordcolspecs, names=coordnames)
+            parsedcoor = read_fwf(coorddata, colspecs=coordcolspecs, names=coordnames, na_values=_NA_VALUES, keep_default_na=False)
             if coords is None:
                 coords = np.zeros((len(parsedcoor), 3, 0), dtype=np.float32)
             currcoords = np.vstack((parsedcoor.x, parsedcoor.y, parsedcoor.z)).T
@@ -572,10 +585,10 @@ def PDBread(filename, mode='pdb'):
 
     coords = concatCoords(coords, coorddata)
 
-    parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames)
-    parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames)
-    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames) #, dtype=topodtypes)
-    if not np.all(parsedtopo.chargesign.isnull()):
+    parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
+    parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames, na_values=_NA_VALUES, keep_default_na=False)
+    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
+    if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
         parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
 
     if len(parsedtopo) > 99999:
@@ -585,15 +598,18 @@ def PDBread(filename, mode='pdb'):
 
     # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
     serials = parsedtopo.serial.as_matrix()
-    mapserials = np.ones(np.max(serials)+1) * -1
-    mapserials[serials] = list(range(np.max(serials)))
-    for i in range(len(parsedbonds)):
-        row = parsedbonds.loc[i].tolist()
-        for b in range(1, 5):
-            if not np.isnan(row[b]):
-                topo.bonds.append([int(row[0]), int(row[b])])
-    topo.bonds = np.array(topo.bonds, dtype=np.uint32)
-    topo.bonds[:] = mapserials[topo.bonds[:]]
+    if np.max(parsedbonds.max()) > np.max(serials):
+        logger.info('Bond indexes in PDB file exceed atom indexes. For safety we will discard all bond information.')
+    else:
+        mapserials = np.ones(np.max(serials)+1) * -1
+        mapserials[serials] = list(range(np.max(serials)))
+        for i in range(len(parsedbonds)):
+            row = parsedbonds.loc[i].tolist()
+            for b in range(1, 5):
+                if not np.isnan(row[b]):
+                    topo.bonds.append([int(row[0]), int(row[b])])
+        topo.bonds = np.array(topo.bonds, dtype=np.uint32)
+        topo.bonds[:] = mapserials[topo.bonds[:]]
 
     if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx
