@@ -112,7 +112,7 @@ class AdaptiveRun2(AdaptiveNew):
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
         metr = Metric(filtlist, skip=self.skip)
-        metr.projection(self.projection)
+        metr.set(self.projection)
 
         #if self.contactsym is not None:
         #    contactSymmetry(data, self.contactsym)

@@ -36,6 +36,7 @@ Submodules
    htmd.userinterface
    htmd.util
    htmd.version
+   htmd.vmdgraphics
    htmd.vmdviewer
 
 Module contents

@@ -89,7 +89,19 @@ class Metric:
         self.projectionlist = []
 
     def projection(self, metric):
+        """ Deprecated
+        """
         self.projectionlist.append(metric)
+
+    def set(self, projection):
+        """ Sets the projection to be applied to the simulations.
+
+        Parameters
+        ----------
+        projection : :class:`Projection <htmd.projections.projection.Projection>` object or list of objects
+            A projection or a list of projections which to use on the simulations
+        """
+        self.projectionlist = projection
 
     def project(self):
         """
