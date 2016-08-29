@@ -593,7 +593,7 @@ class Molecule:
             self.coords[s, :, f] += vector
 
     def rotate(self, axis, angle, sel=None):
-        """ Rotate molecule atoms around a given axis
+        """ DEPRECATED. Use rotateBy instead
 
         Parameters
         ----------
@@ -609,6 +609,7 @@ class Molecule:
         >>> mol=tryp.copy()
         >>> mol.rotate([0, 1, 0], 1.57)
         """
+        logger.warning('Molecule.rotate is deprecated and will be removed. Use Molecule.rotateBy instead.')
         M = rotationMatrix(axis, angle)
         s = self.atomselect(sel, indexes=True)
         for a in s:
@@ -623,6 +624,11 @@ class Molecule:
             The rotation matrix
         center : list
             The rotation center
+
+        Examples
+        --------
+        >>> mol.rotateBy(rotationMatrix([0, 1, 0], 1.57))
+        >>> mol.rorateBy(uniformRandomRotation())
         """
         coords = self.get('coords', sel=sel)
         newcoords = coords - center
@@ -1636,7 +1642,6 @@ if __name__ == "__main__":
     m.write('/tmp/test.coor')
     m.write('/tmp/test.xtc')
     m.moveBy([1, 1, 1])
-    m.rotate([1, 0, 0], pi / 2)
     m.align('name CA')
     m = Molecule('2OV5')
     m.filter('protein or water')
