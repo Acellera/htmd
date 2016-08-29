@@ -45,6 +45,9 @@ class AdaptiveNew(ProtocolInterface):
         >>> adapt = Adaptive()
         >>> adapt.run()
         """
+        if self.nmax <= self.nmin:
+            raise RuntimeError('nmax option should be larger than nmin.')
+
         while True:
             epoch = self._getEpoch()
             logger.info('Processing epoch ' + str(epoch))
