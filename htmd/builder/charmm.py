@@ -78,6 +78,13 @@ def listFiles():
 def search(key, name):
     """ Searches for CHARMM files containing a given definition.
 
+    Parameters
+    ----------
+    key : str
+        A key
+    name : str
+        The corresponding name
+        
     Examples
     --------
     >>> charmm.search(key='RESI', name = 'CHL1')
