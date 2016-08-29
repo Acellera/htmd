@@ -172,7 +172,12 @@ class Model(object):
             from matplotlib import pylab as plt
             plt.ion()
             plt.figure()
-            mplt.plot_implied_timescales(its, dt=self.data.fstep, units='ns')
+            try:
+                mplt.plot_implied_timescales(its, dt=self.data.fstep, units='ns')
+            except ValueError as ve:
+                plt.close()
+                raise ValueError('{} This is probably caused by badly set fstep in the data ({}). '.format(ve, self.data.fstep) +
+                                 'Please correct the model.data.fstep to correspond to the simulation frame step in nanoseconds.')
             plt.show()
         if results:
             return its.get_timescales(), its.lags
