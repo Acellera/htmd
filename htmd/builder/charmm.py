@@ -278,7 +278,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc, ff='charmm', anion=saltanion, cation=saltcation)
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
-            return build(newmol, topo=alltopo, param=allparam, prefix=prefix, outdir=outdir, ionize=False, caps=caps,
+            return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False, caps=caps,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, psfgen=psfgen)
     _checkFailedAtoms(molbuilt)
     return molbuilt
