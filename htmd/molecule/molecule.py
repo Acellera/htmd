@@ -593,7 +593,7 @@ class Molecule:
             self.coords[s, :, f] += vector
 
     def rotate(self, axis, angle, sel=None):
-        """ Rotate molecule atoms around a given axis
+        """ DEPRECATED. Use rotateBy instead
 
         Parameters
         ----------
@@ -609,6 +609,7 @@ class Molecule:
         >>> mol=tryp.copy()
         >>> mol.rotate([0, 1, 0], 1.57)
         """
+        logger.warning('Molecule.rotate is deprecated and will be removed. Use Molecule.rotateBy instead.')
         M = rotationMatrix(axis, angle)
         s = self.atomselect(sel, indexes=True)
         for a in s:
@@ -623,6 +624,11 @@ class Molecule:
             The rotation matrix
         center : list
             The rotation center
+
+        Examples
+        --------
+        >>> mol.rotateBy(rotationMatrix([0, 1, 0], 1.57))
+        >>> mol.rorateBy(uniformRandomRotation())
         """
         coords = self.get('coords', sel=sel)
         newcoords = coords - center
@@ -760,8 +766,6 @@ class Molecule:
         if self.masses is None or len(self.masses) == 0:
             self.masses = numpy.zeros(self.numAtoms, dtype=numpy.float32)
         if self.charge is None or len(self.charge) == 0:
-            self.charge = mol.charge.copy()
-        if self.charge is None or len(self.charge) == 0:
             self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
 
         for pf in self._pdb_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
@@ -770,6 +774,49 @@ class Molecule:
                     self.__dict__[pf][i] = str(self.__dict__[pf][i])
 
         self.fileloc.append([filename, 0])
+
+    # def _readPDB_old(self, filename, mode='pdb'):
+    #     if os.path.isfile(filename):
+    #         mol = PDBParser(filename, mode)
+    #     elif len(filename) == 4:
+    #         # Try loading it from the pdb data directory
+    #         localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
+    #         if os.path.isfile(localpdb):
+    #             logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
+    #             mol = PDBParser(localpdb, mode)
+    #         else:
+    #             # or the PDB website
+    #             logger.info("Attempting PDB query for {:s}".format(filename))
+    #             r = requests.get(
+    #                 "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
+    #             if r.status_code == 200:
+    #                 tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
+    #                 mol = PDBParser(tempfile, mode)
+    #                 os.unlink(tempfile)
+    #             else:
+    #                 raise NameError('Invalid PDB code')
+    #     else:
+    #         raise NameError('File {} not found'.format(filename))
+    #
+    #     natoms = len(mol.record)
+    #     for k in self._pdb_fields:
+    #         self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._dtypes[k])
+    #         # Pad any short list
+    #         if k is not "coords":
+    #             if len(self.__dict__[k]) != natoms:
+    #                 self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
+    #
+    #     self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
+    #     self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
+    #     self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
+    #     self.box = np.array(mol.box)
+    #
+    #     if self.masses is None or len(self.masses) == 0:
+    #         self.masses = numpy.zeros(natoms, dtype=numpy.float32)
+    #     if self.charge is None or len(self.charge) == 0:
+    #         self.charge = numpy.zeros(natoms, dtype=numpy.float32)
+    #
+    #     self.fileloc.append([filename, 0])
 
     def _readTopology(self, topo, filename, overwrite='all'):
         if isinstance(overwrite, str):
@@ -897,6 +944,8 @@ class Molecule:
             self.fstep = 0.1
         else:
             self.fstep = (traj.time[1] - traj.time[0]) / 1E6  # convert femtoseconds to nanoseconds
+        if skip is not None:
+            self.fstep *= skip
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
              viewerhandle=None):
@@ -997,6 +1046,7 @@ class Molecule:
 
     def _viewNGL(self, psf, coords, guessb):
         from nglview import Trajectory
+        from htmd.util import tempname
         import nglview
 
         class TrajectoryStreamer(Trajectory):
@@ -1009,7 +1059,10 @@ class Molecule:
             def get_frame_count(self):
                 return np.size(self.coords, 2)
 
-        struc = nglview.FileStructure(psf)
+        pdb = tempname(suffix=".pdb")
+        self.write(pdb)
+
+        struc = nglview.FileStructure(pdb)
         struc.params['dontAutoBond'] = not guessb
 
         traj = TrajectoryStreamer(coords)
@@ -1020,6 +1073,8 @@ class Molecule:
         self._tempreps.append(self.reps)
         self._tempreps._repsNGL(w)
         self._tempreps.remove()
+
+        os.remove(pdb)
         return w
 
     def mutateResidue(self, sel, newres):
@@ -1329,6 +1384,10 @@ class Molecule:
         """Get the z coordinates at the current frame"""
         return self.coords[:, 2, self.frame]
 
+    def __repr__(self):
+        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
+               + self.__str__()
+
     def __str__(self):
         def formatstr(name, field):
             if isinstance(field, np.ndarray) or isinstance(field, list):
@@ -1350,6 +1409,18 @@ class Molecule:
             rep += formatstr(j, self.__dict__[j])
 
         return rep
+
+
+def mol_equal(mol1, mol2):
+    difffields = []
+    for field in Molecule._append_fields:
+        if not np.array_equal(mol1.__dict__[field], mol2.__dict__[field]):
+            difffields += [field]
+
+    if len(difffields) > 0:
+        print('Differences detected in mol1 and mol2 in field(s) {}.'.format(difffields))
+        return False
+    return True
 
 
 def _resolveCollisions(mol, occ1, occ2, gap):
@@ -1571,7 +1642,6 @@ if __name__ == "__main__":
     m.write('/tmp/test.coor')
     m.write('/tmp/test.xtc')
     m.moveBy([1, 1, 1])
-    m.rotate([1, 0, 0], pi / 2)
     m.align('name CA')
     m = Molecule('2OV5')
     m.filter('protein or water')

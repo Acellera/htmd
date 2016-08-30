@@ -9,7 +9,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   MetricData is used to store all projected data <htmd.metricdata>
+   MetricData used to store all projected data <htmd.metricdata>
    MetricDistance distance based metrics between different atoms <htmd.projections.metricdistance>
    MetricSelfDistance distance based metrics on the same  atoms <htmd.projections.metricdistance>
    MetricRmsd RMSD based metrics <htmd.projections.metricrmsd>
