@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AdaptiveNew(ProtocolInterface):
+class AdaptiveBase(ProtocolInterface):
     def __init__(self):
         super().__init__()
         from htmd.apps.app import App
