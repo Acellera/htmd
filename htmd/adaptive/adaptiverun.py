@@ -7,7 +7,7 @@ from glob import glob
 from os import path
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
-from htmd.adaptive.adaptive import Adaptive, AdaptiveNew
+from htmd.adaptive.adaptive import Adaptive, AdaptiveBase
 from htmd.simlist import simlist, simfilter
 from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance
 from htmd.model import Model, macroAccumulate
@@ -19,7 +19,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AdaptiveRun2(AdaptiveNew):
+class AdaptiveMD(AdaptiveBase):
     """ Adaptive class which uses a Markov state model for respawning
 
     AdaptiveRun uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
@@ -65,7 +65,7 @@ class AdaptiveRun2(AdaptiveNew):
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
     ticalag : int, default=20
-        Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
     filtersel : str, default='not water'
@@ -360,7 +360,7 @@ if __name__ == "__main__":
     tmpdir = tempname()
     shutil.copytree(htmd.home()+'/data/adaptive/', tmpdir)
     os.chdir(tmpdir)
-    md = AdaptiveRun2()
+    md = AdaptiveMD()
     # md.dryrun = True
     md.nmin = 1
     md.nmax = 2
