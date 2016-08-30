@@ -25,7 +25,8 @@ def main_scan():
   for d in dihedrals:
     print("\nScanning dihedral %s-%s-%s-%s" % ( mol.name[ d[0] ], mol.name[ d[1] ], mol.name[ d[2] ], mol.name[ d[3] ]  ))
     qmset =mol.scanSoftDihedral( d, directory="scan", step=20 );
-    print(qmset)
+    for i in range(len(qmset)):
+         print("%f %f" %( qmset[i].phi, qmset[i].energy) )
 
 
 if __name__ == "__main__":
