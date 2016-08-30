@@ -694,7 +694,7 @@ class Molecule:
 
         if type is not None:
             type = type.lower()
-        ext = os.path.splitext(firstfile)[1]
+        ext = os.path.splitext(firstfile)[1][1:]
 
         if type == "psf" or ext == "psf":
             topo = PSFread(filename)
@@ -1154,7 +1154,7 @@ class Molecule:
         """
         if type:
             type = type.lower()
-        ext = os.path.splitext(filename)[1]
+        ext = os.path.splitext(filename)[1][1:]
 
         if type == "coor" or ext == "coor":
             self._writeBinCoordinates(filename, sel)
