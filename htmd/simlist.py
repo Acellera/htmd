@@ -35,7 +35,7 @@ class Frame(object):
         self.piece = piece
         self.frame = frame
 
-    def __str__(self):
+    def __repr__(self):
         return 'sim = {}\npiece = {}\nframe = {}'.format(self.sim, self.piece, self.frame)
 
 
@@ -69,7 +69,7 @@ class Sim(object):
         self.trajectory = trajectory
         self.molfile = molfile
 
-    def __str__(self):
+    def __repr__(self):
         if self.parent is None:
             return 'id = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}'.format(self.simid, self.parent, self.input, self.trajectory, self.molfile)
         else:
