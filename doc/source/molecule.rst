@@ -13,6 +13,9 @@ A very important feature is atomselection. This is identical to the VMD atomsele
 
 Contents:
 
+.. autoclass:: htmd.molecule.molecule.Molecule
+   :members:
+
 .. toctree::
    :maxdepth: 2
 

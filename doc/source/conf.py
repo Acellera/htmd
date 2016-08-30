@@ -409,14 +409,14 @@ spelling_show_suggestions = True
 
 
 # try to exclude deprecated
-def skip_deprecated(app, what, name, obj, skip, options):
-    if hasattr(obj, "func_dict") and "__deprecated__" in obj.func_dict:
-        print("skipping " + name)
-        return True
-    return skip or False
+#def skip_deprecated(app, what, name, obj, skip, options):
+#    if hasattr(obj, "func_dict") and "__deprecated__" in obj.func_dict:
+#        print("skipping " + name)
+#        return True
+#    return skip or False
 
 def setup(app):
-    app.connect('autodoc-skip-member', skip_deprecated)
+#    app.connect('autodoc-skip-member', skip_deprecated)
     try:
         from sphinx.ext.autosummary import Autosummary
         from sphinx.ext.autosummary import get_documenter
@@ -470,11 +470,11 @@ def setup(app):
 
 
 
-#
-#def skip(app, what, name, obj, skip, options):
-#    if name == "__init__":
-#        return False
-#    return skip
-#
+
+def skip(app, what, name, obj, skip, options):
+    if name == "__init__":
+        return False
+    return skip
+
 #def setup(app):
 #    app.connect("autodoc-skip-member", skip)
