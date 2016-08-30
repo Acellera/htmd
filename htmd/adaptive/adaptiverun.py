@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 class AdaptiveMD(AdaptiveBase):
     """ Adaptive class which uses a Markov state model for respawning
 
-    AdaptiveRun uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
-    currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
-    currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
+    AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
+    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
+    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
     the discretized trajectories. From the Markov model it then chooses conformations from the various states based on
     the chosen criteria which will be used for starting new simulations.
 
@@ -75,7 +75,7 @@ class AdaptiveMD(AdaptiveBase):
 
     Example
     -------
-    >>> adapt = AdaptiveRun2()
+    >>> adapt = AdaptiveRunMD()
     >>> adapt.nmin = 2
     >>> adapt.nmax = 3
     >>> adapt.nepochs = 2
