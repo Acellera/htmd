@@ -42,9 +42,11 @@ def compareVersions():
         else:
             latest = latestversions[1].strip()
             verstring = 'devel'
-    else:  # Supporting users which still haven't passed the one day limit. Can remove in next version
+    elif len(latestversions) == 1:  # Supporting users which still haven't passed the one day limit. Can remove in next version
         latest = latestversions[0].strip()
         verstring = ''
+    else:
+        return
     if currver != 'unpackaged' and natsorted((latest, currver))[1] != currver:
         print('New {} HTMD version ({}) is available. You are currently on ({}). Use \'conda update htmd\' to '
               'update to the new version.'.format(verstring, latest, currver))
@@ -63,7 +65,7 @@ def _writeLatestVersionFile(fname):
     try:
         stable, dev = _release_version('acellera', 'htmd')
     except Exception as err:
-        print("{}".format(err))
+        print("Failed at checking latest conda version. {}".format(err))
         f.close()
         return
     
@@ -74,13 +76,7 @@ def _writeLatestVersionFile(fname):
 
 def _release_version(user, package):
     import requests
-
     from binstar_client.utils import get_server_api
-    try:
-        requests.get('http://conda.anaconda.org', timeout=1.)
-        # Do conda version check
-    except requests.Timeout:
-        raise NameError('Failed connecting to http://conda.anaconda.org. Cannot check for new HTMD versions.')
 
     api = get_server_api()
     package = api.package(user, package)
