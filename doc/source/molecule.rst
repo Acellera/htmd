@@ -15,6 +15,20 @@ Contents:
 
 .. autoclass:: htmd.molecule.molecule.Molecule
    :members:
+   :undoc-members:
+
+    .. rubric:: Methods
+
+    .. autoautosummary:: htmd.molecule.molecule.Molecule
+        :methods:
+
+    .. rubric:: Attributes
+
+    .. autoautosummary:: htmd.molecule.molecule.Molecule
+        :attributes:
+
+.. autoclass:: htmd.molecule.molecule.Molecule
+   :members:
 
 .. toctree::
    :maxdepth: 2
