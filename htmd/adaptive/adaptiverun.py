@@ -7,7 +7,7 @@ from glob import glob
 from os import path
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
-from htmd.adaptive.adaptive import Adaptive, AdaptiveNew
+from htmd.adaptive.adaptive import Adaptive, AdaptiveBase
 from htmd.simlist import simlist, simfilter
 from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance
 from htmd.model import Model, macroAccumulate
@@ -19,12 +19,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AdaptiveRun2(AdaptiveNew):
+class AdaptiveMD(AdaptiveBase):
     """ Adaptive class which uses a Markov state model for respawning
 
-    AdaptiveRun uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
-    currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
-    currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
+    AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
+    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
+    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
     the discretized trajectories. From the Markov model it then chooses conformations from the various states based on
     the chosen criteria which will be used for starting new simulations.
 
@@ -65,7 +65,7 @@ class AdaptiveRun2(AdaptiveNew):
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
     ticalag : int, default=20
-        Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
     filtersel : str, default='not water'
@@ -75,7 +75,7 @@ class AdaptiveRun2(AdaptiveNew):
 
     Example
     -------
-    >>> adapt = AdaptiveRun2()
+    >>> adapt = AdaptiveRunMD()
     >>> adapt.nmin = 2
     >>> adapt.nmax = 3
     >>> adapt.nepochs = 2
@@ -113,12 +113,15 @@ class AdaptiveRun2(AdaptiveNew):
 
         metr = Metric(filtlist, skip=self.skip)
         metr.set(self.projection)
-
+        
         #if self.contactsym is not None:
         #    contactSymmetry(data, self.contactsym)
 
         if self.ticadim > 0:
-            tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))
+            #gianni: without project it was tooooo slow
+            data = metr.project()
+            #tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))
+            tica = TICA(data, int(max(2, np.ceil(self.ticalag))))
             datadr = tica.project(self.ticadim)
         else:
             datadr = metr.project()
@@ -357,7 +360,7 @@ if __name__ == "__main__":
     tmpdir = tempname()
     shutil.copytree(htmd.home()+'/data/adaptive/', tmpdir)
     os.chdir(tmpdir)
-    md = AdaptiveRun2()
+    md = AdaptiveMD()
     # md.dryrun = True
     md.nmin = 1
     md.nmax = 2
