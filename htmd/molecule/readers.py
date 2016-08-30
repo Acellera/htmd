@@ -625,7 +625,7 @@ def BINCOORread(filename):
     dat = f.read(natoms * 3 * 8)
     fmt = 'd' * (natoms * 3)
     coords = struct.unpack(fmt, dat)
-    coords = np.array(coords).reshape((natoms, 3, 1))
+    coords = np.array(coords, dtype=np.float32).reshape((natoms, 3, 1))
     f.close()
     return coords
 
