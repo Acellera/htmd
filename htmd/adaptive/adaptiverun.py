@@ -113,12 +113,15 @@ class AdaptiveMD(AdaptiveBase):
 
         metr = Metric(filtlist, skip=self.skip)
         metr.set(self.projection)
-
+        
         #if self.contactsym is not None:
         #    contactSymmetry(data, self.contactsym)
 
         if self.ticadim > 0:
-            tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))
+            #gianni: without project it was tooooo slow
+            data = metr.project()
+            #tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))
+            tica = TICA(data, int(max(2, np.ceil(self.ticalag))))
             datadr = tica.project(self.ticadim)
         else:
             datadr = metr.project()
