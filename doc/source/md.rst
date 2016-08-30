@@ -1,4 +1,4 @@
-HTMD Basic Molecular Dynamics
+MDy
 =============================
 
 

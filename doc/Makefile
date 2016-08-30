@@ -9,6 +9,8 @@ IPYTHON       = jupyter
 PAPER         =
 BUILDDIR      = build
 TUTORIALSDIR  = source/tutorials
+HTMDTAG       = $(shell python gethtmdtag.py tag)
+HTMDBRANCH    = $(shell python gethtmdtag.py branch)
 IPYNB_FILES   = $(shell ls ../tutorials/*.ipynb)
 
 # User-friendly check for sphinx-build
@@ -59,16 +61,15 @@ clean:
 	rm -rf $(BUILDDIR)/
 
 publish:
-	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/*'
-	scp -r $(BUILDDIR)/html/* www.acellera.com:~/www.htmd.org/docs/
+	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/$(HTMDBRANCH)/*'
+	scp -r $(BUILDDIR)/html/* www.acellera.com:~/www.htmd.org/docs/$(HTMDBRANCH)/
 	scp -r static/*  www.acellera.com:~/www.htmd.org/
 	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
 
 # Rule for building .rst from .ipynb
 $(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
-	# Since ipython does not to accept a --outdir, cd explicitly
 	mkdir -p $(TUTORIALSDIR)
-	cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to rst 
+	$(IPYTHON) nbconvert $< --to rst --stdout > $@
 	#cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to python
 
 tutorials: $(RST_FILES)

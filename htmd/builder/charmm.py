@@ -75,6 +75,24 @@ def listFiles():
         print(s)
 
 
+def search(key, name):
+    """ Searches for CHARMM files containing a given definition.
+
+    Parameters
+    ----------
+    key : str
+        A key
+    name : str
+        The corresponding name
+        
+    Examples
+    --------
+    >>> charmm.search(key='RESI', name = 'CHL1')
+    """
+    charmmdir = path.join(home(), 'builder', 'charmmfiles', '')
+    os.system('find {} -type f -exec grep -n "{} {}" {{}} +'.format(charmmdir, key, name))
+
+
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, patches=None, psfgen=None, execute=True):
     """ Builds a system for CHARMM
