@@ -675,6 +675,8 @@ class Molecule:
             If the file is a trajectory, append the coordinates to the previous coordinates
         """
         from htmd.simlist import Sim
+        from mdtraj.core.trajectory import _TOPOLOGY_EXTS
+
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
                 if len(f) != 4 and not os.path.exists(f):
@@ -686,53 +688,54 @@ class Molecule:
             firstfile = filename
 
         if isinstance(filename, Sim):
-            self._readPDB(filename.molfile)
-            self._readTraj(filename.trajectory)
+            self.read(filename.molfile)
+            self.read(filename.trajectory)
             return
 
         if type is not None:
             type = type.lower()
+        ext = os.path.splitext(firstfile)[1]
 
-        if (type is None and firstfile.endswith(".psf")) or type == "psf":
+        if type == "psf" or ext == "psf":
             topo = PSFread(filename)
             self._readTopology(topo, filename)
-        elif (type is None and (
-            firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
+        elif type == "prm" or ext == "prm" or type == "prmtop" or ext == "prmtop":
             topo = PRMTOPread(filename)
             self._readTopology(topo, filename)
-        elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
+        elif type == "pdb" or ext == "pdb":
             self._readPDB(filename)
-        elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
+        elif type == "pdbqt" or ext == "pdbqt":
             self._readPDB(filename, mode='pdbqt')
-        elif (type is None and firstfile.endswith(".xtc")) or type == "xtc":
+        elif type == "xtc" or ext == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
-        elif (type is None and firstfile.endswith(".coor")) or type == "coor":
-            self._readBinCoordinates(filename)
+        elif type == "coor" or ext == "coor":
+            self.coords = BINCOORread(filename)
         elif len(firstfile) == 4:  # Could be a PDB id. Try to load it from the PDB website
             self._readPDB(filename)
-        elif (type is None and firstfile.endswith(".xyz")) or type == "xyz":
+        elif type == "xyz" or ext == "xyz":
             topo, coords = XYZread(filename)
             self._readTopology(topo, filename)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif (type is None and firstfile.endswith(".gjf")) or type == "gjf":
+        elif type == "gjf" or ext == "gjf":
             topo, coords = GJFread(filename)
             self._readTopology(topo, filename)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif (type is None and firstfile.endswith(".mae")) or type == "mae":
+        elif type == "mae" or ext == "mae":
             topo, coords = MAEread(filename)
             self._readTopology(topo, filename)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif (type is None and firstfile.endswith(".mol2")) or type == "mol2":
+        elif type == "mol2" or ext == "mol2":
             topo, coords = MOL2read(filename)
             self._readTopology(topo, filename)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif (type is None and firstfile.endswith(".crd")) or type == "crd":
+        elif type == "crd" or ext == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
+        elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
+            self._readMDtrajTopology(filename)
+        elif type in ('binpos','trr','nc','h5','lh5','netcdf') or ext in ('binpos','trr','nc','h5','lh5','netcdf'):
+            self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
         else:
-            try:
-                self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
-            except:
-                raise ValueError("Unknown file type")
+            raise ValueError('Unknown file type with extension "{}".'.format(ext))
 
     def _readPDB(self, filename, mode='pdb'):
         if os.path.isfile(filename):
@@ -854,8 +857,23 @@ class Molecule:
         self.viewname = fnamestr
         self.fileloc = [[fnamestr, 0]]
 
-    def _readBinCoordinates(self, filename):
-        self.coords = BINCOORread(filename)
+    def _readMDtrajTopology(self, filename):
+        translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
+                     'chainID': 'chain', 'segmentID': 'segid'}
+        import mdtraj as md
+        from htmd.molecule.readers import Topology
+        mdstruct = md.load(filename)
+        topology = mdstruct.topology
+        table, bonds = topology.to_dataframe()
+
+        topo = Topology()
+        for k in table.keys():
+            topo.__dict__[translate[k]] = table[k].tolist()
+
+        self._readTopology(topo, filename)
+        self.bonds = bonds
+        self.coords = mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10
+        self.topoloc = os.path.abspath(filename)
 
     def _readMDtraj(self, filename):
         class Struct:
@@ -1136,16 +1154,17 @@ class Molecule:
         """
         if type:
             type = type.lower()
+        ext = os.path.splitext(filename)[1]
 
-        if type == "coor" or filename.endswith(".coor"):
+        if type == "coor" or ext == "coor":
             self._writeBinCoordinates(filename, sel)
-        elif type == "pdb" or filename.endswith(".pdb"):
+        elif type == "pdb" or ext == "pdb":
             self._writePDB(filename, sel)
-        elif type == "xyz" or filename.endswith(".xyz"):
+        elif type == "xyz" or ext == "xyz":
             self._writeXYZ(filename, sel)
-        elif type == "psf" or filename.endswith(".psf"):
+        elif type == "psf" or ext == "psf":
             self._writeConnectivity(filename, sel)
-        elif type == "xtc" or filename.endswith(".xtc"):
+        elif type == "xtc" or ext == "xtc":
             self._writeTraj(filename, sel)
         else:
             try:
