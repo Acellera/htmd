@@ -326,7 +326,7 @@ class Adaptive(object):
         if path.exists(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log')):
             raise NameError('Epoch logfile already exists. Cant overwrite it.')
 
-        fid = open(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log'), 'w')
+        #fid = open(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log'), 'w')
 
         regex = re.compile('(e\d+s\d+)_')
         for i, f in enumerate(simsframes):
@@ -359,9 +359,9 @@ class Adaptive(object):
             mol.write(path.join(newDir, 'input.coor'))
 
             # write nextInput file
-            fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
+            #fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
 
-        fid.close()
+        #fid.close()
 
     @abc.abstractmethod
     def _algorithm(self):
