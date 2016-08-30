@@ -65,7 +65,7 @@ class AdaptiveMD(AdaptiveBase):
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
     ticalag : int, default=20
-        Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
     filtersel : str, default='not water'

@@ -114,6 +114,8 @@ class Metric:
         """
         if len(self.projectionlist) == 0:
             raise NameError('You need to provide projections using the Metric.projection method.')
+        if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
+            self.projectionlist = [self.projectionlist]
 
         if isinstance(self.simulations, Molecule):
             data = []
