@@ -672,7 +672,7 @@ class Molecule:
         frames : list, optional
             If the file is a trajectory, read only the given frames
         append : bool, optional
-            If the file is a trajectory, append the coordinates to the previous coordinates
+            If the file is a trajectory or coor file, append the coordinates to the previous coordinates. Note append is slow.
         """
         from htmd.simlist import Sim
         from mdtraj.core.trajectory import _TOPOLOGY_EXTS
@@ -709,7 +709,10 @@ class Molecule:
         elif type == "xtc" or ext == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
         elif type == "coor" or ext == "coor":
-            self.coords = BINCOORread(filename)
+            if append:
+                self.coords = np.append(self.coords,BINCOORread(filename),axis=2)
+            else:
+                self.coords = BINCOORread(filename)
         elif len(firstfile) == 4:  # Could be a PDB id. Try to load it from the PDB website
             self._readPDB(filename)
         elif type == "xyz" or ext == "xyz":
