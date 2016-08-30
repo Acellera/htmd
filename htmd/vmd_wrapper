@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+
+SSH=""
+if [ "$1" == "--host" ]; then
+	SSH="/usr/bin/ssh $2 -oTCPKeepAlive=True -oSendEnv=True"
+	shift
+	shift
+	exec $SSH $(readlink -f "$0")  $* 
+	exit 0
+fi
+
+
 if [ ! -d "$VMD_PATH" ]; then
 	if [ -e /Applications ]; then
 		SUFFIX=MACOSXX86
@@ -43,7 +54,9 @@ export PYTHONPATH="$VMD_PATH/scripts/python"
 export STRIDE_BIN="$VMD_PATH/stride_$SUFFIX"
 export SURF_BIN="$VMD_PATH/surf_$SUFFIX"
 export TACHYON_BIN="$VMD_PATH/tachyon_$SUFFIX"
-
+if [ "$DISPLAY" == "" ]; then 
+	export DISPLAY=":0" 
+fi
+echo "Display: [$DISPLAY]"
 exec "$MASTERVMDDIR/vmd_$SUFFIX" -eofexit -nt $*
-
 

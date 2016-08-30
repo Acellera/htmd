@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 echo "building"
 
 export PATH=$PATH:/usr/bin/:/bin/
@@ -9,7 +11,7 @@ printenv
 T="$PWD"
 for S in "$PWD/C/"*; do
 	cd "$S"
-	make CC=$CC FC=$FC STATIC=$STATIC
+	make CPURE=$CPURE CC=$CC FC=$FC STATIC=$STATIC PLATFORM=$OSNAME TYPE=$TYPE
 	cd "$T"
 done
 
@@ -33,10 +35,10 @@ echo "Installing into $PREFIX"
 	  rm -rf $DIR/htmdx/.idea
     rm -rf $DIR/htmd/.ipynb_checkpoints
     rm -rf $DIR/htmd/Untitled*
-    if [ "$TYPE" == "basic" ]; then
+    if [ "$PKG_NAME" == "htmd" ]; then
       rm -rf $DIR/htmd/lib/pro
 		fi
-    if [ "$TYPE" == "pro" ]; then
+    if [ "$PKG_NAME" == "htmd-pro" ]; then
       rm -rf $DIR/htmd/lib/basic
 		fi
 

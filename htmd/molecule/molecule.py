@@ -7,12 +7,11 @@ from __future__ import print_function
 
 import requests
 import numpy as np
-from htmd.molecule.bincoor import *
-from htmd.molecule.pdbparser import *
-from htmd.molecule.prmtop import *
-from htmd.molecule.psf import *
-from htmd.molecule.vmdparser import *
-from htmd.molecule.xtc import *
+from htmd.molecule.pdbparser import PDBParser
+from htmd.molecule.vmdparser import guessbonds, vmdselection
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
+from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite
+from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
@@ -24,6 +23,12 @@ import re
 
 logger = logging.getLogger(__name__)
 
+
+class TopologyInconsistencyError(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
 
 class Molecule:
     """ Class to manipulate molecular structures.
@@ -106,45 +111,81 @@ class Molecule:
         A list of representations that is used when visualizing the molecule
     viewname : str
         The name used for the molecule in the viewer
+    angles : np.ndarray
+        Angle terms, valid only if PSF read and molecule unmodified
+    dihedrals : np.ndarray
+        Dihedral terms, valid only if PSF read and molecule unmodified
+    impropers : np.ndarray
+        Improper terms, valid only if PSF read and molecule unmodified
+    atomtype : np.ndarray
+        Atom types, valid only if PSF read and molecule unmodified
+
     """
-    _pdb_fields = {
+    _pdb_fields = ['record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion', 'coords',
+                   'occupancy', 'beta', 'segid', 'element', 'charge']
+    _append_fields = _pdb_fields + ['masses']
+
+    _dtypes = {
         'record': object,
-        'serial': numpy.int,
+        'serial': np.int,
         'name': object,
         'altloc': object,
         'resname': object,
         'chain': object,
-        'resid': numpy.int,
+        'resid': np.int,
         'insertion': object,
-        'coords': numpy.float32,
-        'occupancy': numpy.float32,
-        'beta': numpy.float32,
+        'coords': np.float32,
+        'occupancy': np.float32,
+        'beta': np.float32,
         'segid': object,
         'element': object,
-        'charge': numpy.float32
+        'charge': np.float32,
+        'bonds': np.uint32,
+        'angles': np.uint32,
+        'dihedrals': np.uint32,
+        'impropers': np.uint32,
+        'atomtype': object,
+        'masses': np.float32,
+        'box': np.float32
+    }
+
+    _dims = {
+        'record': 0,
+        'serial': 0,
+        'name': 0,
+        'altloc': 0,
+        'resname': 0,
+        'chain': 0,
+        'resid': 0,
+        'insertion': 0,
+        'coords': (0, 3, 0),
+        'occupancy': 0,
+        'beta': 0,
+        'segid': 0,
+        'element': 0,
+        'charge': 0,
+        'bonds': (0, 2),
+        'angles': (0, 3),
+        'dihedrals': (0, 4),
+        'impropers': (0, 4),
+        'atomtype': 0,
+        'masses': 0,
+        'box': (3, 1)
     }
 
     def __init__(self, filename=None, name=None):
-        self.bonds = []
+        for field in self._dtypes:
+            self.__dict__[field] = np.empty(self._dims[field], dtype=self._dtypes[field])
         self.ssbonds = []
-        self.box = None
-        self.charge = []
-        self.masses = None
         self.frame = 0
         self.fileloc = []
-        self._append_fields = self._pdb_fields.copy()
-        self._append_fields['masses'] = numpy.float32
         self.time = []
         self.step = []
+
         self.reps = Representations(self)
         self._tempreps = Representations(self)
         self.viewname = name
 
-        for k in self._pdb_fields:
-            if k == 'coords':
-                self.__dict__[k] = np.zeros((0, 0, 0), dtype=self._pdb_fields[k])
-            else:
-                self.__dict__[k] = np.zeros(0, dtype=self._pdb_fields[k])
         if filename:
             self.read(filename)
             if isinstance(filename, str):
@@ -232,6 +273,7 @@ class Molecule:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
         if _logger:
             logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
+        return sel
 
     def get(self, field, sel=None):
         """Retrieve a specific PDB field based on the selection
@@ -383,17 +425,16 @@ class Molecule:
                 self.bonds = mol.bonds
 
             for k in self._append_fields:
-                dtype = self._append_fields[k]
                 if self.__dict__[k] is None or np.size(self.__dict__[k]) == 0:
-                    self.__dict__[k] = np.array(mol.__dict__[k], dtype=dtype)
+                    self.__dict__[k] = np.array(mol.__dict__[k], dtype=self._dtypes[k])
                 elif k == 'coords':
                     self.coords = np.append(self.coords, mol.coords, axis=0)
                 else:
-                    self.__dict__[k] = np.append(self.__dict__[k], np.array(mol.__dict__[k], dtype=dtype))
+                    self.__dict__[k] = np.append(self.__dict__[k], np.array(mol.__dict__[k], dtype=self._dtypes[k]))
             self.serial = np.arange(1, self.numAtoms + 1)
-        except:
+        except Exception as err:
             self = backup
-            raise NameError('Failed to append molecule.')
+            raise NameError('Failed to append molecule. "{}"'.format(err))
 
         if collisions:
             _resolveCollisions(self, occ1, occ2, coldist)
@@ -413,7 +454,7 @@ class Molecule:
         bonds : np.ndarray
             An array of bonds
         """
-        bonds = np.empty((0, 2), dtype=numpy.uint32)
+        bonds = np.empty((0, 2), dtype=np.uint32)
         if fileBonds:
             if len(self.bonds) == 0:  # This is a patch for the other readers not returning correct empty dimensions
                 self.bonds = np.empty((0, 2), dtype=numpy.uint32)
@@ -523,7 +564,8 @@ class Molecule:
 
         Can fail badly when non-bonded atoms are very close together. Use with extreme caution.
         """
-        return guessbonds(self.coords, self.element, self.name, self.resname, self.resid, self.chain, self.segid,
+        framecoords = self.coords[:, :, self.frame].copy()
+        return guessbonds(framecoords, self.element, self.name, self.resname, self.resid, self.chain, self.segid,
                                 self.insertion, self.altloc)
 
     def moveBy(self, vector, sel=None):
@@ -551,7 +593,7 @@ class Molecule:
             self.coords[s, :, f] += vector
 
     def rotate(self, axis, angle, sel=None):
-        """ Rotate molecule atoms around a given axis
+        """ DEPRECATED. Use rotateBy instead
 
         Parameters
         ----------
@@ -567,6 +609,7 @@ class Molecule:
         >>> mol=tryp.copy()
         >>> mol.rotate([0, 1, 0], 1.57)
         """
+        logger.warning('Molecule.rotate is deprecated and will be removed. Use Molecule.rotateBy instead.')
         M = rotationMatrix(axis, angle)
         s = self.atomselect(sel, indexes=True)
         for a in s:
@@ -581,6 +624,11 @@ class Molecule:
             The rotation matrix
         center : list
             The rotation center
+
+        Examples
+        --------
+        >>> mol.rotateBy(rotationMatrix([0, 1, 0], 1.57))
+        >>> mol.rorateBy(uniformRandomRotation())
         """
         coords = self.get('coords', sel=sel)
         newcoords = coords - center
@@ -626,129 +674,82 @@ class Molecule:
         append : bool, optional
             If the file is a trajectory, append the coordinates to the previous coordinates
         """
+        from htmd.simlist import Sim
+        from mdtraj.core.trajectory import _TOPOLOGY_EXTS
+
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
+            for f in filename:
+                if len(f) != 4 and not os.path.exists(f):
+                    raise FileNotFoundError('File {} was not found.'.format(f))
             firstfile = filename[0]
         else:
+            if not isinstance(filename, Sim) and len(filename) != 4 and not os.path.exists(filename):
+                raise FileNotFoundError('File {} was not found.'.format(filename))
             firstfile = filename
 
-        from htmd.simlist import Sim
         if isinstance(filename, Sim):
-            self._readPDB(filename.molfile)
-            self._readTraj(filename.trajectory)
+            self.read(filename.molfile)
+            self.read(filename.trajectory)
             return
 
         if type is not None:
             type = type.lower()
+        ext = os.path.splitext(firstfile)[1][1:]
 
-        if (type is None and firstfile.endswith(".psf")) or type == "psf":
-            con = PSFread(filename)
-            self.charge = numpy.asarray(con.charges, dtype=np.float32)
-            self.masses = numpy.asarray(con.masses, dtype=np.float32)
-            self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
-        elif (type is None and (
-            firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
-            con = PRMTOPread(filename)
-            self.charge = numpy.asarray(con.charges, dtype=np.float32)
-            # self.masses = numpy.asarray(con.masses, dtype=np.float32)  # No masses in PRMTOP
-            self.bonds = numpy.asarray(con.bonds, dtype=np.int32)
-        elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
+        if type == "psf" or ext == "psf":
+            topo = PSFread(filename)
+            self._readTopology(topo, filename)
+        elif type == "prm" or ext == "prm" or type == "prmtop" or ext == "prmtop":
+            topo = PRMTOPread(filename)
+            self._readTopology(topo, filename)
+        elif type == "pdb" or ext == "pdb":
             self._readPDB(filename)
-        elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
+        elif type == "pdbqt" or ext == "pdbqt":
             self._readPDB(filename, mode='pdbqt')
-        elif (type is None and firstfile.endswith(".xtc")) or type == "xtc":
+        elif type == "xtc" or ext == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
-        elif (type is None and firstfile.endswith(".coor")) or type == "coor":
-            self._readBinCoordinates(filename)
+        elif type == "coor" or ext == "coor":
+            self.coords = BINCOORread(filename)
         elif len(firstfile) == 4:  # Could be a PDB id. Try to load it from the PDB website
             self._readPDB(filename)
-        elif (type is None and firstfile.endswith(".xyz")) or type == "xyz":
-            self._readXYZ(filename)
-        elif (type is None and firstfile.endswith(".gjf")) or type == "gjf":
-            self._readGJF(filename)
-        elif (type is None and firstfile.endswith(".mae")) or type == "mae":
-            self._readMae(filename)
-        elif (type is None and firstfile.endswith(".mol2")) or type == "mol2":
-            self._readMOL2(filename)
+        elif type == "xyz" or ext == "xyz":
+            topo, coords = XYZread(filename)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+        elif type == "gjf" or ext == "gjf":
+            topo, coords = GJFread(filename)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+        elif type == "mae" or ext == "mae":
+            topo, coords = MAEread(filename)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+        elif type == "mol2" or ext == "mol2":
+            topo, coords = MOL2read(filename)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+        elif type == "crd" or ext == "crd":
+            self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
+        elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
+            self._readMDtrajTopology(filename)
+        elif type in ('binpos','trr','nc','h5','lh5','netcdf') or ext in ('binpos','trr','nc','h5','lh5','netcdf'):
+            self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
         else:
-            try:
-                self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
-            except:
-                raise ValueError("Unknown file type")
-
-    def _readXYZ(self, filename):
-        f = open(filename, "r")
-        natoms = int(f.readline().split()[0])
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.zeros(natoms, dtype=self._pdb_fields[k])
-        self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
-
-        f.readline()
-        for i in range(natoms):
-            s = f.readline().split()
-            self.record[i] = "HETATM"
-            self.serial[i] = i + 1
-            self.element[i] = s[0]
-            self.name[i] = s[0]
-            self.coords[i, 0, 0] = float(s[1])
-            self.coords[i, 1, 0] = float(s[2])
-            self.coords[i, 2, 0] = float(s[3])
-            self.resname[i] = "MOL"
-
-    def _readGJF(self, filename):
-        f = open(filename, "r")
-        l = f.readlines()
-        start = -1
-        end = -1
-        c = 0
-        for i in range(len(l)):
-            if len(l[i].strip()) == 0 and c == 0:
-                c = 1
-            elif len(l[i].strip()) == 0 and c == 1:
-                c = 2
-                start = i + 2
-            elif len(l[i].strip()) == 0 and c == 2:
-                c = 3
-                end = i
-
-        natoms = end - start
-        if start == -1 or end == -1 or natoms == 0: raise ValueError("Invalid GJF file")
-
-        nn = 0
-        nf = self.numFrames
-        if len(self.coords):
-            # resize
-            nn = self.numAtoms
-            nf = self.numFrames
-            if nn != natoms: raise ValueError("Mismatch in teh number of atoms")
-            self.coords = numpy.append(self.coords, numpy.zeros((natoms, 3, 1), dtype=numpy.float32), axis=2)
-            self.box = numpy.append(self.box, numpy.zeros((3, 1), dtype=numpy.float32), axis=1)
-        else:
-            for k in self._pdb_fields:
-                self.__dict__[k] = numpy.zeros((natoms), dtype=self._pdb_fields[k])
-            self.coords = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
-            self.box = numpy.zeros((3, 1), dtype=numpy.float32)
-
-        for idx in range(natoms):
-            s = l[idx + start].split()
-            self.record[idx] = "HETATM"
-            self.serial[idx] = i + 1
-            self.element[idx] = s[0]
-            self.name[idx] = s[0]
-            self.coords[idx, 0, nf] = float(s[1])
-            self.coords[idx, 1, nf] = float(s[2])
-            self.coords[idx, 2, nf] = float(s[3])
-            self.resname[idx] = "MOL"
+            raise ValueError('Unknown file type with extension "{}".'.format(ext))
 
     def _readPDB(self, filename, mode='pdb'):
-        mol = []
         if os.path.isfile(filename):
-            mol = PDBParser(filename, mode)
+            topo, coords = PDBread(filename, mode=mode)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif len(filename) == 4:
             # Try loading it from the pdb data directory
             localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
             if os.path.isfile(localpdb):
                 logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
-                mol = PDBParser(localpdb, mode)
+                topo, coords = PDBread(localpdb, mode=mode)
+                self._readTopology(topo, localpdb)
+                self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             else:
                 # or the PDB website
                 logger.info("Attempting PDB query for {:s}".format(filename))
@@ -756,93 +757,123 @@ class Molecule:
                     "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
                 if r.status_code == 200:
                     tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                    mol = PDBParser(tempfile, mode)
+                    topo, coords = PDBread(tempfile, mode=mode)
+                    self._readTopology(topo, tempfile)
+                    self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
                     os.unlink(tempfile)
                 else:
                     raise NameError('Invalid PDB code')
         else:
             raise NameError('File {} not found'.format(filename))
 
-        natoms = len(mol.record)
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._pdb_fields[k])
-            # Pad any short list
-            if k is not "coords":
-                if len(self.__dict__[k]) != natoms:
-                    self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
-
-        self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
-        self.bonds = np.array(mol.bonds, dtype=np.uint32)
-        self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
-        self.box = np.array(mol.box)
-
         if self.masses is None or len(self.masses) == 0:
-            self.masses = numpy.zeros(natoms, dtype=numpy.float32)
+            self.masses = numpy.zeros(self.numAtoms, dtype=numpy.float32)
         if self.charge is None or len(self.charge) == 0:
-            self.charge = mol.charge.copy()
-        if self.charge is None or len(self.charge) == 0:
-            self.charge = numpy.zeros(natoms, dtype=numpy.float32)
+            self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
+
+        for pf in self._pdb_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
+            if self._dtypes[pf] == object:
+                for i in range(self.numAtoms):
+                    self.__dict__[pf][i] = str(self.__dict__[pf][i])
 
         self.fileloc.append([filename, 0])
 
-    def _readMOL2(self, filename):
-        f = open(filename, "r")
-        l = f.readlines()
-        f.close()
-        start = None
-        end = None
-        for i in range(len(l)):
-            if l[i].startswith("@<TRIPOS>ATOM"): start = i + 1
-            if l[i].startswith("@<TRIPOS>BOND"): end = i - 1
+    # def _readPDB_old(self, filename, mode='pdb'):
+    #     if os.path.isfile(filename):
+    #         mol = PDBParser(filename, mode)
+    #     elif len(filename) == 4:
+    #         # Try loading it from the pdb data directory
+    #         localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
+    #         if os.path.isfile(localpdb):
+    #             logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
+    #             mol = PDBParser(localpdb, mode)
+    #         else:
+    #             # or the PDB website
+    #             logger.info("Attempting PDB query for {:s}".format(filename))
+    #             r = requests.get(
+    #                 "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
+    #             if r.status_code == 200:
+    #                 tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
+    #                 mol = PDBParser(tempfile, mode)
+    #                 os.unlink(tempfile)
+    #             else:
+    #                 raise NameError('Invalid PDB code')
+    #     else:
+    #         raise NameError('File {} not found'.format(filename))
+    #
+    #     natoms = len(mol.record)
+    #     for k in self._pdb_fields:
+    #         self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._dtypes[k])
+    #         # Pad any short list
+    #         if k is not "coords":
+    #             if len(self.__dict__[k]) != natoms:
+    #                 self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
+    #
+    #     self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
+    #     self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
+    #     self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
+    #     self.box = np.array(mol.box)
+    #
+    #     if self.masses is None or len(self.masses) == 0:
+    #         self.masses = numpy.zeros(natoms, dtype=numpy.float32)
+    #     if self.charge is None or len(self.charge) == 0:
+    #         self.charge = numpy.zeros(natoms, dtype=numpy.float32)
+    #
+    #     self.fileloc.append([filename, 0])
 
-        if not start or not end:
-            raise ValueError("File cannot be read")
+    def _readTopology(self, topo, filename, overwrite='all'):
+        if isinstance(overwrite, str):
+            overwrite = (overwrite, )
 
-        natoms = end - start + 1
+        # Checking number of atoms that were read in the topology file
+        natoms = []
+        for field in topo.atominfo:
+            if len(topo.__dict__[field]) != 0:
+                natoms.append(len(topo.__dict__[field]))
+        natoms = np.unique(natoms)
+        if len(natoms) != 1:
+            raise TopologyInconsistencyError('Different number of atoms read from file {} for different fields: {}.'
+                                             .format(filename, natoms))
+        natoms = natoms[0]
 
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.zeros((natoms), dtype=self._pdb_fields[k])
-        self.__dict__["coords"] = numpy.zeros((natoms, 3, 1), dtype=numpy.float32)
+        if self.numAtoms == 0:
+            self.empty(natoms)
 
-        for i in range(natoms):
-            s = l[i + start].strip().split()
-            self.record[i] = "HETATM"
-            self.serial[i] = int(s[0])
-            self.element[i] = re.sub("[0123456789]*", "", s[1])
-            self.name[i] = s[1]
-            self.coords[i, 0, 0] = float(s[2])
-            self.coords[i, 1, 0] = float(s[3])
-            self.coords[i, 2, 0] = float(s[4])
-            self.resname[i] = "MOL"
-
-    def _readMae(self, filename):
-        datadict = _maestroparser(filename)
-        natoms = len(datadict['record'])
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.asarray(datadict[k], dtype=self._pdb_fields[k])
-            # Pad any short list
-            if k is not "coords":
-                if len(self.__dict__[k]) != natoms:
-                    self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
-
-        self.segid = self.segid.astype('str').astype(
-            'object')  # Making sure the segids are strings because np.zeros gives int objects
-        self.coords = np.atleast_3d(self.coords)
-        for h in datadict['het']:
-            self.set('record', 'HETATM', sel='resname {}'.format(h))
-
-        # self.serial = np.arange(1, natoms+1)
-        self.masses = np.array(datadict['masses'])
-        self.bonds = np.array(datadict['bonds']) - 1  # convert to 0 indexing
+        for field in topo.__dict__:
+            newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
+            if len(newfielddata) == 0:
+                continue
+            if overwrite[0] == 'all' or field in overwrite or len(self.__dict__[field]) == 0:
+                self.__dict__[field] = newfielddata
+            else:
+                if np.shape(self.__dict__[field]) != np.shape(newfielddata):
+                    raise TopologyInconsistencyError(
+                        'Different number of atoms read from topology file for field {}'.format(field))
+                if not np.array_equal(self.__dict__[field], newfielddata):
+                    raise TopologyInconsistencyError(
+                        'Different atom information read from topology file for field {}'.format(field))
 
         fnamestr = os.path.splitext(os.path.basename(filename))[0]
         self.viewname = fnamestr
         self.fileloc = [[fnamestr, 0]]
 
-        self.box = np.max(self.coords, axis=0) - np.min(self.coords, axis=0)
+    def _readMDtrajTopology(self, filename):
+        translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
+                     'chainID': 'chain', 'segmentID': 'segid'}
+        import mdtraj as md
+        from htmd.molecule.readers import Topology
+        mdstruct = md.load(filename)
+        topology = mdstruct.topology
+        table, bonds = topology.to_dataframe()
 
-    def _readBinCoordinates(self, filename):
-        self.coords = BINCOORread(filename)
+        topo = Topology()
+        for k in table.keys():
+            topo.__dict__[translate[k]] = table[k].tolist()
+
+        self._readTopology(topo, filename)
+        self.bonds = bonds
+        self.coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
+        self.topoloc = os.path.abspath(filename)
 
     def _readMDtraj(self, filename):
         class Struct:
@@ -919,8 +950,8 @@ class Molecule:
                 self.box = np.append(self.box, traj.box, 1)
 
         if skip is not None:
-            self.coords = self.coords[:, :, ::skip]  # Might actually not free memory! Check numpy views
-            self.box = self.box[:, ::skip]
+            self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
+            self.box = np.array(self.box[:, ::skip])
             self.fileloc = self.fileloc[::skip]
 
         self.coords = np.atleast_3d(self.coords)
@@ -931,6 +962,8 @@ class Molecule:
             self.fstep = 0.1
         else:
             self.fstep = (traj.time[1] - traj.time[0]) / 1E6  # convert femtoseconds to nanoseconds
+        if skip is not None:
+            self.fstep *= skip
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
              viewerhandle=None):
@@ -946,7 +979,7 @@ class Molecule:
             Coloring mode or color ID.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
-        viewer : str ('vmd','notebook')
+        viewer : str ('vmd', 'webgl')
             Choose viewer backend. Default is taken from htmd.config
         hold : bool
             If set to True, it will not visualize the molecule but instead collect representations until set back to False.
@@ -963,71 +996,75 @@ class Molecule:
         if hold:
             return
 
+        oldbonds = None
+        if guessBonds:
+            oldbonds = self.bonds
+            self.bonds = self._getBonds()
+
         # Write out PDB and XTC files
-        pdb = tempname(suffix=".pdb")
-        self.write(pdb)
-        xtc = None
-        if self.numFrames > 1:
-            xtc = tempname(suffix=".xtc")
-            self.write(xtc)
+        psf = tempname(suffix=".psf")
+        self.write(psf)
+
+        if guessBonds:
+            self.bonds = oldbonds
+
+        xtc = tempname(suffix=".xtc")
+        self.write(xtc)
 
         # Call the specified backend
         if viewer is None:
             from htmd.config import _config
             viewer = _config['viewer']
         if viewer.lower() == 'notebook':
-            return self._viewMDTraj(pdb, xtc)
+            return self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
-            self._viewVMD(pdb, xtc, viewerhandle, name, guessBonds)
-        elif viewer.lower() == 'ngl':
-            return self._viewNGL(pdb, xtc, guessBonds)
+            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
+        elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
+            return self._viewNGL(psf, self.coords, guessBonds)
+        else:
+            raise ValueError('Unknown viewer.')
 
         # Remove temporary files
-        if xtc:
-            os.remove(xtc)
-        os.remove(pdb)
+        os.remove(xtc)
+        os.remove(psf)
 
-    def _viewVMD(self, pdb, xtc, vhandle, name, guessbonds):
+    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
         if name is None:
             name = self.viewname
         if vhandle is None:
             vhandle = getCurrentViewer()
 
         if guessbonds:
-            vhandle.send("mol new " + pdb)
+            vhandle.send("mol new " + psf)
         else:
-            vhandle.send("mol new " + pdb + " autobonds off")
+            vhandle.send("mol new " + psf + " autobonds off")
+        vhandle.send('animate delete all')
+        vhandle.send('mol addfile ' + xtc + ' type xtc waitfor all')
 
         if name is not None:
             vhandle.send('mol rename top "' + name + '"')
         else:
-            vhandle.send('mol rename top "Mol [molinfo top]: pdb"')
-
-        if xtc:
-            vhandle.send('animate delete all')
-            vhandle.send('mol addfile ' + xtc + ' type xtc waitfor all')
-            if name is None:
-                vhandle.send('mol rename top "Mol [molinfo top]: pdb+xtc"')
+            vhandle.send('mol rename top "Mol [molinfo top]: psf+xtc"')
 
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
         self._tempreps.remove()
 
-    def _viewMDTraj(self, pdb, xtc):
+    def _viewMDTraj(self, psf, xtc):
         from mdtraj.html import TrajectoryView, TrajectorySliderView, enable_notebook
         import mdtraj
         enable_notebook()
 
-        if xtc:
-            t = mdtraj.load(xtc, top=pdb)
+        t = mdtraj.load(xtc, top=psf)
+        if self.numFrames > 1:
             widget = TrajectorySliderView(t)
         else:
-            t = mdtraj.load(pdb)
             widget = TrajectoryView(t)
         return widget
 
-    def _viewNGL(self, pdb, xtc, guessb):
+    def _viewNGL(self, psf, coords, guessb):
         from nglview import Trajectory
+        from htmd.util import tempname
         import nglview
 
         class TrajectoryStreamer(Trajectory):
@@ -1040,17 +1077,22 @@ class Molecule:
             def get_frame_count(self):
                 return np.size(self.coords, 2)
 
+        pdb = tempname(suffix=".pdb")
+        self.write(pdb)
+
         struc = nglview.FileStructure(pdb)
         struc.params['dontAutoBond'] = not guessb
-        if xtc:
-            traj = TrajectoryStreamer(self.coords)
-            w = nglview.NGLWidget(struc, traj)
-        else:
-            w = nglview.NGLWidget(struc)
+
+        traj = TrajectoryStreamer(coords)
+        w = nglview.NGLWidget(struc, traj)
+        #else:
+        #    w = nglview.NGLWidget(struc)
 
         self._tempreps.append(self.reps)
         self._tempreps._repsNGL(w)
         self._tempreps.remove()
+
+        os.remove(pdb)
         return w
 
     def mutateResidue(self, sel, newres):
@@ -1092,7 +1134,7 @@ class Molecule:
         >>> mol.wrap('protein')
         """
         # TODO: selection is not used. WHY?
-        if wrapsel:
+        if wrapsel is not None:
             centersel = self.atomselect(wrapsel, indexes=True)
         else:
             centersel = None
@@ -1112,16 +1154,17 @@ class Molecule:
         """
         if type:
             type = type.lower()
+        ext = os.path.splitext(filename)[1][1:]
 
-        if type == "coor" or filename.endswith(".coor"):
+        if type == "coor" or ext == "coor":
             self._writeBinCoordinates(filename, sel)
-        elif type == "pdb" or filename.endswith(".pdb"):
+        elif type == "pdb" or ext == "pdb":
             self._writePDB(filename, sel)
-        elif type == "xyz" or filename.endswith(".xyz"):
+        elif type == "xyz" or ext == "xyz":
             self._writeXYZ(filename, sel)
-        elif type == "psf" or filename.endswith(".psf"):
+        elif type == "psf" or ext == "psf":
             self._writeConnectivity(filename, sel)
-        elif type == "xtc" or filename.endswith(".xtc"):
+        elif type == "xtc" or ext == "xtc":
             self._writeTraj(filename, sel)
         else:
             try:
@@ -1185,7 +1228,8 @@ class Molecule:
 
         pdb.bonds = src.bonds
         pdb.ssbonds = src.ssbonds  # TODO: Is there such a thing in pdb format?
-        pdb.box = self.box
+        if pdb.box is not None:
+            pdb.box = np.atleast_2d(np.atleast_2d(self.box)[:, self.frame])
 
         pdb.serial = np.arange(1, np.size(pdb.coords, 0) + 1)
         pdb.writePDB(filename)
@@ -1213,19 +1257,24 @@ class Molecule:
         >>> newmol = Molecule()
         >>> newmol.empty(100)
         """
-        self.record = np.array(['ATOM'] * numAtoms, dtype=self._pdb_fields['record'])
-        self.chain = np.array(['X'] * numAtoms, dtype=self._pdb_fields['chain'])
-        self.segid = np.array(['X'] * numAtoms, dtype=self._pdb_fields['segid'])
-        self.occupancy = np.array([0] * numAtoms, dtype=self._pdb_fields['occupancy'])
-        self.beta = np.array([0] * numAtoms, dtype=self._pdb_fields['beta'])
-        self.insertion = np.array([''] * numAtoms, dtype=self._pdb_fields['insertion'])
-        self.element = np.array([''] * numAtoms, dtype=self._pdb_fields['element'])
-        self.altloc = np.array([''] * numAtoms, dtype=self._pdb_fields['altloc'])
-        self.name = np.array(['UNK'] * numAtoms, dtype=self._pdb_fields['name'])
-        self.resname = np.array(['UNK'] * numAtoms, dtype=self._pdb_fields['resname'])
-        self.resid = np.array([999] * numAtoms, dtype=self._pdb_fields['resid'])
-        self.coords = np.zeros((numAtoms, 3, 1), dtype=self._pdb_fields['coords'])
+        self.record = np.array(['ATOM'] * numAtoms, dtype=self._dtypes['record'])
+        self.chain = np.array([''] * numAtoms, dtype=self._dtypes['chain'])
+        self.segid = np.array([''] * numAtoms, dtype=self._dtypes['segid'])
+        self.occupancy = np.array([0] * numAtoms, dtype=self._dtypes['occupancy'])
+        self.beta = np.array([0] * numAtoms, dtype=self._dtypes['beta'])
+        self.insertion = np.array([''] * numAtoms, dtype=self._dtypes['insertion'])
+        self.element = np.array([''] * numAtoms, dtype=self._dtypes['element'])
+        self.altloc = np.array([''] * numAtoms, dtype=self._dtypes['altloc'])
+        self.name = np.array([''] * numAtoms, dtype=self._dtypes['name'])
+        self.resname = np.array([''] * numAtoms, dtype=self._dtypes['resname'])
+        self.resid = np.array([0] * numAtoms, dtype=self._dtypes['resid'])
+        self.coords = np.zeros((numAtoms, 3, 1), dtype=self._dtypes['coords'])
+        self.charge = np.array([0] * numAtoms, dtype=self._dtypes['charge'])
         self.serial = np.arange(1, numAtoms + 1)
+
+        self.masses = np.array([0] * numAtoms, dtype=self._dtypes['masses'])
+        self.box = np.zeros(self._dims['box'], dtype=np.float32)
+
 
     def sequence(self, oneletter=True):
         """ Return the AA sequence of the Molecule.
@@ -1256,7 +1305,7 @@ class Molecule:
 
         """
         residueTable = {'ARG': 'R', 'AR0': 'R',
-                        'HIS': 'H', 'HID': 'H', 'HIE': 'H',
+                        'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HSE': 'H', 'HSD': 'H',
                         'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
                         'ASP': 'D', 'ASH': 'D',
                         'GLU': 'E', 'GLH': 'E',
@@ -1308,6 +1357,25 @@ class Molecule:
 
         return segSequences
 
+    def dropFrames(self, keep='all', drop=None):
+        """ Removes trajectory frames from the Molecule
+
+        Parameters
+        ----------
+        keep : int or list of ints
+            Index of frame, or list of frame indexes which we want to keep (and drop all others).
+        drop : int or list of ints
+            Index of frame, or list of frame indexes which we want to drop (and keep all others).
+        """
+        if keep != 'all' and drop is not None:
+            raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
+        if keep != 'all':
+            self.coords = np.array(np.atleast_3d(self.coords[:, :, keep]))  # Copy array. Slices are dangerous with C
+            self.box = np.array(np.atleast_2d(self.box[:, keep]))
+        if drop is not None:
+            self.coords = np.delete(self.coords, drop, axis=2)
+            self.box = np.delete(self.box, drop, axis=1)
+
     @property
     def numFrames(self):
         """ Number of coordinate frames in the molecule
@@ -1318,7 +1386,7 @@ class Molecule:
     def numAtoms(self):
         """ Number of atoms in the molecule
         """
-        return np.size(self.coords, 0)
+        return len(self.record)
 
     @property
     def x(self):
@@ -1335,6 +1403,10 @@ class Molecule:
         """Get the z coordinates at the current frame"""
         return self.coords[:, 2, self.frame]
 
+    def __repr__(self):
+        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
+               + self.__str__()
+
     def __str__(self):
         def formatstr(name, field):
             if isinstance(field, np.ndarray) or isinstance(field, list):
@@ -1349,13 +1421,25 @@ class Molecule:
         for p in sorted(self._pdb_fields):
             rep += '\n'
             rep += 'PDB field - ' + formatstr(p, self.__dict__[p])
-        for j in sorted(self.__dict__.keys() - self._pdb_fields.keys()):
+        for j in sorted(self.__dict__.keys() - self._pdb_fields):
             if j[0] == '_':
                 continue
             rep += '\n'
             rep += formatstr(j, self.__dict__[j])
 
         return rep
+
+
+def mol_equal(mol1, mol2):
+    difffields = []
+    for field in Molecule._append_fields:
+        if not np.array_equal(mol1.__dict__[field], mol2.__dict__[field]):
+            difffields += [field]
+
+    if len(difffields) > 0:
+        print('Differences detected in mol1 and mol2 in field(s) {}.'.format(difffields))
+        return False
+    return True
 
 
 def _resolveCollisions(mol, occ1, occ2, gap):
@@ -1524,114 +1608,6 @@ class Representations:
                 viewer.representations = reps
 
 
-def _maestroparser(fname):
-    """ Reads maestro files.
-
-    Parameters
-    ----------
-    fname : str
-        .mae file
-
-    Returns
-    -------
-    mol : Molecule
-
-    """
-    section = None
-    section_desc = False
-    section_data = False
-
-    data = {}
-    data['serial'] = []
-    data['record'] = []
-    data['name'] = []
-    data['resname'] = []
-    data['resid'] = []
-    data['chain'] = []
-    data['segid'] = []
-    data['occupancy'] = []
-    data['beta'] = []
-    data['insertion'] = []
-    data['element'] = []
-    data['altloc'] = []
-    data['coords'] = []
-    data['bonds'] = []
-    data['charge'] = []
-    data['masses'] = []
-    data['het'] = []
-
-    import csv
-    with open(fname, newline='') as fp:
-        reader = csv.reader(fp, delimiter=' ', quotechar='"', skipinitialspace=True)
-        for row in reader:
-            if len(row) == 0:
-                continue
-
-            if row[0][0:6] == 'm_atom':
-                section = 'atoms'
-                section_desc = True
-                section_cols = []
-            elif row[0][0:6] == 'm_bond':
-                section = 'bonds'
-                section_desc = True
-                section_cols = []
-            elif row[0][0:18] == 'm_PDB_het_residues':
-                section = 'hetresidues'
-                section_desc = True
-                section_cols = []
-            elif section_desc and row[0] == ':::':
-                section_dict = dict(zip(section_cols, range(len(section_cols))))
-                section_desc = False
-                section_data = True
-            elif section_data and (row[0] == ':::' or row[0] == '}'):
-                section_data = False
-            else:  # It's actual data
-                if section_desc:
-                    section_cols.append(row[0])
-
-                # Reading the data of the atoms section
-                if section == 'atoms' and section_data:
-                    data['record'].append('ATOM')
-                    row = np.array(row)
-                    row[row == '<>'] = 0
-                    if 'i_pdb_PDB_serial' in section_dict:
-                        data['serial'].append(row[section_dict['i_pdb_PDB_serial']])
-                    if 's_m_pdb_atom_name' in section_dict:
-                        data['name'].append(row[section_dict['s_m_pdb_atom_name']].strip())
-                    if 's_m_pdb_residue_name' in section_dict:
-                        data['resname'].append(row[section_dict['s_m_pdb_residue_name']].strip())
-                    if 'i_m_residue_number' in section_dict:
-                        data['resid'].append(int(row[section_dict['i_m_residue_number']]))
-                    if 's_m_chain_name' in section_dict:
-                        data['chain'].append(row[section_dict['s_m_chain_name']])
-                    if 's_pdb_segment_id' in section_dict:
-                        data['segid'].append(row[section_dict['s_pdb_segment_id']])
-                    if 'r_m_pdb_occupancy' in section_dict:
-                        data['occupancy'].append(float(row[section_dict['r_m_pdb_occupancy']]))
-                    if 'r_m_pdb_tfactor' in section_dict:
-                        data['beta'].append(float(row[section_dict['r_m_pdb_tfactor']]))
-                    if 's_m_insertion_code' in section_dict:
-                        data['insertion'].append(row[section_dict['s_m_insertion_code']].strip())
-                    if '' in section_dict:
-                        data['element'].append('')  # TODO: Read element
-                    if '' in section_dict:
-                        data['altloc'].append('')  # TODO: Read altloc. Quite complex actually. Won't bother.
-                    if 'r_m_x_coord' in section_dict:
-                        data['coords'].append(
-                            [float(row[section_dict['r_m_x_coord']]), float(row[section_dict['r_m_y_coord']]),
-                             float(row[section_dict['r_m_z_coord']])])
-                    data['masses'].append(0)
-
-                # Reading the data of the bonds section
-                if section == 'bonds' and section_data:
-                    data['bonds'].append([int(row[section_dict['i_m_from']]), int(row[section_dict['i_m_to']])])
-
-                # Reading the data of the hetero residue section
-                if section == 'hetresidues' and section_data:
-                    data['het'].append(row[section_dict['s_pdb_het_name']].strip())
-    return data
-
-
 class _Representation:
     """ Class that stores a representation for Molecule
 
@@ -1672,9 +1648,8 @@ if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
-    from htmd.home import home
 
-    m = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
+    m = Molecule('3PTB')
     doctest.testmod(extraglobs={'tryp': m.copy()})
 
     # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May
@@ -1686,7 +1661,8 @@ if __name__ == "__main__":
     m.write('/tmp/test.coor')
     m.write('/tmp/test.xtc')
     m.moveBy([1, 1, 1])
-    m.rotate([1, 0, 0], pi / 2)
     m.align('name CA')
+    m = Molecule('2OV5')
+    m.filter('protein or water')
 
     # test rotate

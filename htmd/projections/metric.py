@@ -64,6 +64,7 @@ class BatchCompletionCallBack(object):
         if self.parallel._original_iterator is not None:
             self.parallel.dispatch_next()
 
+
 class CallBack(object):
     bars = defaultdict(int)
 
@@ -88,7 +89,19 @@ class Metric:
         self.projectionlist = []
 
     def projection(self, metric):
+        """ Deprecated
+        """
         self.projectionlist.append(metric)
+
+    def set(self, projection):
+        """ Sets the projection to be applied to the simulations.
+
+        Parameters
+        ----------
+        projection : :class:`Projection <htmd.projections.projection.Projection>` object or list of objects
+            A projection or a list of projections which to use on the simulations
+        """
+        self.projectionlist = projection
 
     def project(self):
         """
@@ -101,6 +114,8 @@ class Metric:
         """
         if len(self.projectionlist) == 0:
             raise NameError('You need to provide projections using the Metric.projection method.')
+        if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
+            self.projectionlist = [self.projectionlist]
 
         if isinstance(self.simulations, Molecule):
             data = []
@@ -112,14 +127,14 @@ class Metric:
 
         # Find out if there is a unique molfile. If there is, initialize a single Molecule to speed up calculations
         uqMol = None
-        map = []
+        import pandas as pd
+        map = pd.DataFrame(columns=('type', 'indexes', 'description'))
         (single, molfile) = _singleMolfile(self.simulations)
         if single:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
                 proj._precalculate(uqMol)
-                #map.append(np.array(proj.getMapping(uqMol), dtype=object))
-            #map = np.hstack(map)
+                map = map.append(proj.getMapping(uqMol), ignore_index=True)
 
         logger.info('Metric: Starting projection of trajectories.')
         metrics = np.empty(numSim, dtype=object)

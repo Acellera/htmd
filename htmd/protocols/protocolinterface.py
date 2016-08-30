@@ -1,7 +1,7 @@
 import abc
 from difflib import get_close_matches
 import os
-
+import re
 
 RANGE_ANY = 0
 RANGE_POS = 1
@@ -44,9 +44,9 @@ class ProtocolInterface:
         self._commands[key] = FileValidator(key, datatype, descr, default, exist, writable, multiple, check)
         self.__misc(key, default)
 
-    def _cmdListList( self, key, datatype, descr, length, default=None ):
-        self._commands[key] = ListListValidator( key, datatype, descr, default, length )
-        self.__misc( key, default )
+    def _cmdListList(self, key, datatype, descr, length, default=None):
+        self._commands[key] = ListListValidator(key, datatype, descr, default, length)
+        self.__misc(key, default)
 
     def _cmdString(self, key, datatype, descr, default, valid_values=None):
         self._commands[key] = StringValidator(key, datatype, descr, default, valid_values)
@@ -120,7 +120,7 @@ class Validator:
     def __init__(self, key, datatype, descr, default):
         self.datatype = datatype
         if not descr:
-            desc = os.path.join( "help", "en", key )
+            desc = os.path.join("help", "en", key)
         if descr and os.path.exists(descr):
             f = open(descr, 'r')
             self.descr = f.read()
@@ -134,7 +134,7 @@ class Validator:
         if hasattr(self, 'valid_values') and self.valid_values is not None:
             doc += '{}, '.format(self.valid_values)
         doc += '{}'.format(self.datatype)
-        #if self.default is not None:
+        # if self.default is not None:
         if isinstance(self.default, str):
             doc += ', default=\'{}\''.format(self.default)
         else:
@@ -158,7 +158,7 @@ class BooleanValidator(Validator):
 
 
 class ObjectValidator(Validator):
-    def __init__(self, key,  datatype, descr, default, classname):
+    def __init__(self, key, datatype, descr, default, classname):
         super().__init__(key, datatype, descr, default)
         self.classname = classname
 
@@ -166,47 +166,51 @@ class ObjectValidator(Validator):
         return
 
     def validate(self, object, basedir=None):
-        if not isinstance(object, self.classname):
-            raise ValueError('Value must be object of {}'.format(self.classname))
+        if not (isinstance(object, list) or isinstance(object, tuple)):  # Allow lists of objects
+            object = [object]
+        for obj in object:
+            if not isinstance(obj, self.classname):
+                raise ValueError('Value must be object of {}'.format(self.classname))
+
         return object
 
 
 class ListListValidator(Validator):
-    def __init__(self, key, datatype, descr, default, length ):
-        super().__init__(key, datatype, descr, default )
+    def __init__(self, key, datatype, descr, default, length):
+        super().__init__(key, datatype, descr, default)
         self.length = length
 
     def args(self):
-        return "A list of lists with length " + self.length       
- 
-    def validate( self, value_list ):
-            vv=""
-            for t  in value_list: vv=vv + " " +t 
-            vv=vv.strip()
-            if( vv == "[]" ): 
-                  self.value=None
-                  return self.value
+        return "A list of lists with length " + self.length
 
-            vv=re.sub( "\[", "", vv )
-            vv=re.sub( ",", "", vv )
-            vv=re.sub( "\]\]$", "", vv )
-            vv=re.sub( "\],", ",", vv )
-            vv=re.sub( "'", "", vv )
-            vv=vv.split(",")
-            value=[]
-            for t1 in vv:
-               phi=[]
-               for t2 in t1.strip().split():
-                 phi.append(t2.strip().upper())
-               if(len(phi) != self.length): raise ValueError( "list requires " + self.length + " elements" )
-               value.append(phi)
-
-            if(len(value)):
-	            self.value = value
-
+    def validate(self, value_list, basedir=None):
+        vv = ""
+        for t in value_list:
+            vv = vv + " " + t
+        vv = vv.strip()
+        if vv == "[]":
+            self.value = None
             return self.value
 
+        vv = re.sub("\[", "", vv)
+        vv = re.sub(",", "", vv)
+        vv = re.sub("\]\]$", "", vv)
+        vv = re.sub("\],", ",", vv)
+        vv = re.sub("'", "", vv)
+        vv = vv.split(",")
+        value = []
+        for t1 in vv:
+            phi = []
+            for t2 in t1.strip().split():
+                phi.append(t2.strip().upper())
+            if len(phi) != self.length:
+                raise ValueError("list requires " + str(self.length) + " elements")
+            value.append(phi)
 
+        if len(value):
+            self.value = value
+
+        return self.value
 
 
 class StringValidator(Validator):
@@ -433,7 +437,7 @@ class ValueValidator(Validator):
                     if self.realdatatype == TYPE_INT:
                         value = int(value)
                 except:
-                    raise ValueError("Value is not " + strfudge )
+                    raise ValueError("Value is not " + strfudge)
 
                 if valid_range == RANGE_POS and value <= 0:
                     raise ValueError("Value must be " + strfudge + " > 0")

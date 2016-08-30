@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AdaptiveNew(ProtocolInterface):
+class AdaptiveBase(ProtocolInterface):
     def __init__(self):
         super().__init__()
         from htmd.apps.app import App
@@ -45,6 +45,9 @@ class AdaptiveNew(ProtocolInterface):
         >>> adapt = Adaptive()
         >>> adapt.run()
         """
+        if self.nmax <= self.nmin:
+            raise RuntimeError('nmax option should be larger than nmin.')
+
         while True:
             epoch = self._getEpoch()
             logger.info('Processing epoch ' + str(epoch))
@@ -323,7 +326,7 @@ class Adaptive(object):
         if path.exists(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log')):
             raise NameError('Epoch logfile already exists. Cant overwrite it.')
 
-        fid = open(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log'), 'w')
+        #fid = open(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log'), 'w')
 
         regex = re.compile('(e\d+s\d+)_')
         for i, f in enumerate(simsframes):
@@ -356,9 +359,9 @@ class Adaptive(object):
             mol.write(path.join(newDir, 'input.coor'))
 
             # write nextInput file
-            fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
+            #fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
 
-        fid.close()
+        #fid.close()
 
     @abc.abstractmethod
     def _algorithm(self):
@@ -417,7 +420,7 @@ def reconstructAdaptiveTraj(simlist, trajID):
     mol.box = np.zeros((3, 0))
     for i, c in enumerate(chain):
         tmpmol = Molecule(sim.molfile)
-        tmpmol.read(c[0])
+        tmpmol.read(c[0].trajectory)
         endpiece = c[1]
         fileloc = np.vstack(tmpmol.fileloc)
         filenames = fileloc[:, 0]

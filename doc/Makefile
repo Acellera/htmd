@@ -8,12 +8,14 @@ SPHINXAPIDOC  = sphinx-apidoc
 IPYTHON       = jupyter
 PAPER         =
 BUILDDIR      = build
-#BUILDDIR      = /shared/sdoerr/Work/docs.htmd.org/
+TUTORIALSDIR  = source/tutorials
+HTMDTAG       = $(shell python gethtmdtag.py tag)
+HTMDBRANCH    = $(shell python gethtmdtag.py branch)
 IPYNB_FILES   = $(shell ls ../tutorials/*.ipynb)
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
-$(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don't have Sphinx installed, grab it from http://sphinx-doc.org/)
+$(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don\'t have Sphinx installed, grab it from http://sphinx-doc.org/)
 endif
 
 # Internal variables.
@@ -23,7 +25,7 @@ ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) sou
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 
-RST_FILES := $(addprefix source/tutorials/,$(notdir $(IPYNB_FILES:.ipynb=.rst)))
+RST_FILES := $(addprefix $(TUTORIALSDIR)/,$(notdir $(IPYNB_FILES:.ipynb=.rst)))
 
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
 
@@ -55,18 +57,19 @@ help:
 	@echo "  coverage   to run coverage check of the documentation (if enabled)"
 
 clean:
+	rm -rf $(TUTORIALSDIR)
 	rm -rf $(BUILDDIR)/
 
 publish:
-	scp -r $(BUILDDIR)/html/*  www.acellera.com:~/www.htmd.org/docs/
+	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/$(HTMDBRANCH)/*'
+	scp -r $(BUILDDIR)/html/* www.acellera.com:~/www.htmd.org/docs/$(HTMDBRANCH)/
 	scp -r static/*  www.acellera.com:~/www.htmd.org/
 	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
 
 # Rule for building .rst from .ipynb
-source/tutorials/%.rst: ../tutorials/%.ipynb
-	# Since ipython does not to accept a --outdir, cd explicitly
-	mkdir -p source/tutorials
-	cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to rst 
+$(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
+	mkdir -p $(TUTORIALSDIR)
+	$(IPYTHON) nbconvert $< --to rst --stdout > $@
 	#cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to python
 
 tutorials: $(RST_FILES)

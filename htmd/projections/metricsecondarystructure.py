@@ -151,7 +151,15 @@ class MetricSecondaryStructure(Projection):
 
     def getMapping(self, mol):
         idx = mol.atomselect('{} and name CA'.format(self.sel), indexes=True)
-        return idx
+        from pandas import DataFrame
+        types = []
+        indexes = []
+        description = []
+        for i in idx:
+            types += ['secondary structure']
+            indexes += [i]
+            description += ['Secondary structure of residue {} {}'.format(mol.resname[i], mol.resid[i])]
+        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
 
 class _MetricSecondaryStructureOld(_OldMetric):

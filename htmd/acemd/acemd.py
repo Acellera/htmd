@@ -169,7 +169,7 @@ class Acemd(ProtocolInterface):
         else:
             return text
 
-    def __str__(self):
+    def __repr__(self):
         return self.show(quiet=True)
 
     def writeConf(self, fname='input'):

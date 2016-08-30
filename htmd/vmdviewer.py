@@ -40,11 +40,13 @@ def _enqueue_output(obj, vmd, queue):
 class VMD:
     """ Please do not directly call this class constructor. Use the `viewer` or `getCurrentViewer` function instead.
     """
-    def __init__(self, vmd=None):
+    def __init__(self, vmd=None, host=None):
         self.done = 0
         vmd = getVMDpath(vmd=vmd)
 
-        self.vmd = subprocess.Popen([vmd], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, close_fds=True,
+        args=[vmd]
+        if(host): args.append(host)
+        self.vmd = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, close_fds=True,
                                     shell=False)
         self.queue = queue.Queue()
         self.thread = threading.Thread(target=_enqueue_output, args=(self, self.vmd, self.queue))
@@ -57,7 +59,7 @@ class VMD:
         self.send('menu main on')
         self.send('display depthcue off')
         self.send('axes location Off')
-        self.send('color Display Background white')
+        # self.send('color Display Background white')
         self.send('display projection Orthographic')
 
 

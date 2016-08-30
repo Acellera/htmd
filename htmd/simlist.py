@@ -35,7 +35,7 @@ class Frame(object):
         self.piece = piece
         self.frame = frame
 
-    def __str__(self):
+    def __repr__(self):
         return 'sim = {}\npiece = {}\nframe = {}'.format(self.sim, self.piece, self.frame)
 
 
@@ -69,7 +69,7 @@ class Sim(object):
         self.trajectory = trajectory
         self.molfile = molfile
 
-    def __str__(self):
+    def __repr__(self):
         if self.parent is None:
             return 'id = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}'.format(self.simid, self.parent, self.input, self.trajectory, self.molfile)
         else:
@@ -156,7 +156,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
     i = 0
     bar = ProgressBar(len(keys), description='Creating simlist')
     for k in keys:
-        trajectories = _listXTCs(datanames[k])
+        trajectories = _listTrajectories(datanames[k])
 
         if not trajectories:
             bar.progress()
@@ -265,7 +265,7 @@ def _filtSim(i, sims, outFolder, filterSel):
     fmolfile = path.join(outFolder, 'filtered.pdb')
     (traj, outtraj) = _renameSims(sims[i].trajectory, name, outFolder)
     if not traj:
-        ftrajectory = _listXTCs(path.join(outFolder, name))
+        ftrajectory = _listTrajectories(path.join(outFolder, name))
         return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
 
     try:
@@ -285,7 +285,7 @@ def _filtSim(i, sims, outFolder, filterSel):
 
         mol.write(outtraj[j], sel)
 
-    ftrajectory = _listXTCs(path.join(outFolder, name))
+    ftrajectory = _listTrajectories(path.join(outFolder, name))
     #bar.progress()
     return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
 
@@ -316,8 +316,12 @@ def _filterPDBPSF(sim, outfolder, filtsel):
         mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
 
 
-def _listXTCs(folder):
-    return natsort.natsorted(glob(path.join(folder, '*.xtc')))
+def _listTrajectories(folder):
+    trajtypes = ['xtc', 'trr', 'dcd', 'nc', 'dtr', 'crd', 'gro']
+    for tt in trajtypes:
+        trajectories = glob(path.join(folder, '*.{}'.format(tt)))
+        if len(trajectories) > 0:
+            return natsort.natsorted(trajectories)
 
 
 def _simName(foldername):
