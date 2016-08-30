@@ -872,7 +872,7 @@ class Molecule:
 
         self._readTopology(topo, filename)
         self.bonds = bonds
-        self.coords = mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10
+        self.coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
         self.topoloc = os.path.abspath(filename)
 
     def _readMDtraj(self, filename):
