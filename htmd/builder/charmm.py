@@ -254,14 +254,13 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             f.write('patch DISU {}:{} {}:{}\n'.format(d.segid1, d.resid1, d.segid2, d.resid2))
         f.write('\n')
 
+    noregenpatches = [p for p in allpatches if p.split()[1] in noregen]
+    regenpatches = [p for p in allpatches if p.split()[1] not in noregen]
+
     # Printing regenerable patches
-    printnoregen = 0
-    if len(allpatches) != 0:
-        for p in allpatches:
-            if p.split()[1] not in noregen:
-                f.write(p + '\n')
-            else:
-                printnoregen = 1
+    if len(regenpatches) != 0:
+        for p in regenpatches:
+            f.write(p + '\n')
         f.write('\n')
 
     # Regenerate angles and dihedrals
@@ -269,10 +268,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     f.write('\n')
 
     # Printing non-regenerable patches
-    if printnoregen:
-        for p in allpatches:
-            if p.split()[1] in noregen:
-                f.write(p + '\n')
+    if len(noregenpatches) != 0:
+        for p in noregenpatches:
+            f.write(p + '\n')
         f.write('\n')
 
     f.write('guesscoord\n')
