@@ -370,7 +370,7 @@ if __name__ == "__main__":
     # md.datapath = 'input'
     # md.app = AcemdLocal(inputfile='input.acemd')
 
-    md.app = AcemdLocal(datadir='data')
+    # md.app = AcemdLocal(datadir='data')
     # md.run()  # Takes too long (2 minutes on 780).
 
 
