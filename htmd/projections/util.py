@@ -257,3 +257,37 @@ def exportProjectionData(data, filename):
 
     out_file.close()
 
+
+def getProjectionDataPandas(md):
+    """ Export results of a projection into a pandas data frame
+
+    The format of the returned data is:
+      Trajectory Frame   CV1  CV2 ...
+      <TrajName> <Frame> <V1> <V2> ...
+      ...
+
+    Parameters
+    ----------
+    md : htmd.metricdata.MetricData
+        The results of a metric.project() operation
+
+    """
+
+    import pandas as pd
+
+    nTrajs=len(md.simlist)
+    if nTrajs==0:
+        raise Exception("MetricData does not contain any trajectory")
+
+    dflist = []
+
+    for tr in range(nTrajs):
+        df0 = pd.DataFrame(md.dat[tr])
+        df0.insert(0,'Trajectory', md.simlist[tr].trajectory[0])
+        df0.insert(1,'Frame',range(len(df0)))
+        dflist.append(df0)
+
+    return pd.concat(dflist)
+
+
+
