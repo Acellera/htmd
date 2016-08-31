@@ -76,7 +76,7 @@ def listFiles():
 
 
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=None, psfgen=None, execute=True):
+          saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, psfgen=None, execute=True):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -117,6 +117,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         If None it will guess disulfide bonds. Otherwise provide a list of `DisulfideBridge` objects.
     patches : list of str
         Any further patches the user wants to apply
+    noregen : list of str
+        A list of patches that must not be regenerated (angles and dihedrals)
+        Default: ['FHEM', 'PHEM', 'PLOH', 'PLO2', 'PLIG', 'PSUL']
     psfgen : str
         Path to psfgen executable used to build for CHARMM
     execute : bool
@@ -161,6 +164,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         stream = ['str/prot/toppar_all36_prot_arg0.str']
     if caps is None:
         caps = _defaultCaps(mol)
+    # patches that must _not_ be regenerated
+    if noregen is None:
+        noregen = ['FHEM', 'PHEM', 'PLOH', 'PLO2', 'PLIG', 'PSUL']
 
     alltopo = topo.copy()
     allparam = param.copy()
@@ -230,16 +236,26 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             f.write('patch DISU {}:{} {}:{}\n'.format(d.segid1, d.resid1, d.segid2, d.resid2))
         f.write('\n')
 
-    # Printing out extra patches
+    # Printing regenerable patches
+    printnoregen = 0
     if len(allpatches) != 0:
         for p in allpatches:
-            f.write(p + '\n')
+            if p.split()[1] not in noregen:
+                f.write(p + '\n')
+            else:
+                printnoregen = 1
         f.write('\n')
 
-    # Print regenerate angles and dihedrals
-    # necessary for some patches
-
+    # Regenerate angles and dihedrals
     f.write('regenerate angles dihedrals\n')
+    f.write('\n')
+
+    # Printing non-regenerable patches
+    if printnoregen:
+        for p in allpatches:
+            if p.split()[1] in noregen:
+                f.write(p + '\n')
+        f.write('\n')
 
     f.write('guesscoord\n')
     f.write('writepsf ' + prefix + '.psf\n')
@@ -279,7 +295,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False, caps=caps,
-                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, psfgen=psfgen)
+                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, noregen=noregen, psfgen=psfgen)
     _checkFailedAtoms(molbuilt)
     return molbuilt
 
