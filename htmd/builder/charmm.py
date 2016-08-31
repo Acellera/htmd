@@ -255,13 +255,13 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         f.write('\n')
 
     # Printing regenerable patches
-    printnoregen = 0
+    printnoregen = False
     if len(allpatches) != 0:
         for p in allpatches:
             if p.split()[1] not in noregen:
                 f.write(p + '\n')
             else:
-                printnoregen = 1
+                printnoregen = True
         f.write('\n')
 
     # Regenerate angles and dihedrals
