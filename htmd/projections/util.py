@@ -258,7 +258,7 @@ def exportProjectionData(data, filename):
     out_file.close()
 
 
-def getProjectionDataPandas(md):
+def convertProjectionDataToPandas(md):
     """ Export results of a projection into a pandas data frame
 
     The format of the returned data is:
