@@ -145,8 +145,8 @@ class AdaptiveMD(AdaptiveBase):
 
         from pyemma.msm import timescales_msm
         timesc = timescales_msm(datadr.St.tolist(), lags=self.lag, nits=macronum).get_timescales()
+         
         macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
-
         model.markovModel(self.lag, macronum)
         p_i = self._criteria(model, self.method)
         (spawncounts, prob) = self._spawn(p_i, self.nmax - self._running)
@@ -154,6 +154,9 @@ class AdaptiveMD(AdaptiveBase):
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=replacement)
         logger.debug('relFrames {}'.format(relFrames))
+        
+        #for revising it later
+        self.model = model
 
         self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
 
