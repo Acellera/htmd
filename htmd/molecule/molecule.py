@@ -676,6 +676,7 @@ class Molecule:
         """
         from htmd.simlist import Sim
         from mdtraj.core.trajectory import _TOPOLOGY_EXTS
+        _MDTRAJ_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
 
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
@@ -732,7 +733,7 @@ class Molecule:
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
         elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
             self._readMDtrajTopology(filename)
-        elif type in ('binpos','trr','nc','h5','lh5','netcdf') or ext in ('binpos','trr','nc','h5','lh5','netcdf'):
+        elif type in _MDTRAJ_EXTS or ext in _MDTRAJ_EXTS:
             self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
         else:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
@@ -897,8 +898,6 @@ class Molecule:
         if not append:
             self.coords = []
             self.box = []
-        else:
-            logger.warning('Appending trajectories not well tested yet')
 
         # If a single filename is specified, turn it into an array so we can iterate
         if isinstance(filename, str):
@@ -1648,6 +1647,7 @@ if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
+    from htmd import home
 
     m = Molecule('3PTB')
     doctest.testmod(extraglobs={'tryp': m.copy()})
@@ -1665,4 +1665,7 @@ if __name__ == "__main__":
     m = Molecule('2OV5')
     m.filter('protein or water')
 
-    # test rotate
+    # Testing DCD reader
+    mol = Molecule(os.path.join(home(), 'data', '1kdx', '1kdx_0.pdb'))
+    mol.read(os.path.join(home(), 'data', '1kdx', '1kdx.dcd'))
+
