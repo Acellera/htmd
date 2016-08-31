@@ -1168,12 +1168,12 @@ class Molecule:
         else:
             try:
                 import mdtraj as md
-                from htmd.util import tempname
-                tmppdb = tempname(suffix='.pdb')
-                tmpxtc = tempname(suffix='.xtc')
-                self.write(tmppdb)
-                self.write(tmpxtc)
-                traj = md.load(tmpxtc, top=tmppdb)
+                import tempfile
+                tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
+                tmpxtc = tempfile.NamedTemporaryFile(suffix='.xtc')
+                self.write(tmppdb.name)
+                self.write(tmpxtc.name)
+                traj = md.load(tmpxtc.name, top=tmppdb.name)
                 # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
                 # traj.time = self.time
                 # traj.unitcell_lengths = self.box.T / 10
