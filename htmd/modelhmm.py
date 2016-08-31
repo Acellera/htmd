@@ -24,12 +24,13 @@ class ModelHMM(object):
         its = msm.timescales_hmsm(self.hmm.discrete_trajectories_full, self.macronum, lags=maxlag)
         mplt.plot_implied_timescales(its, ylog=True, units='ns', dt=self.data.fstep, linewidth=2)
 
-    def eqDistribution(self):
-        from matplotlib import pylab as plt
-        plt.bar(range(self.macronum), self.hmm.stationary_distribution)
-        #ax = plt.gca()
-        #ax.set_xticklabels([str(a) for a in self.hmm.active_set])
-        plt.xticks(np.arange(self.macronum)+0.4, [str(a) for a in self.hmm.active_set])
+    def eqDistribution(self, plot=True):
+        if plot:
+            from matplotlib import pylab as plt
+            plt.bar(range(self.macronum), self.hmm.stationary_distribution)
+            #ax = plt.gca()
+            #ax.set_xticklabels([str(a) for a in self.hmm.active_set])
+            plt.xticks(np.arange(self.macronum)+0.4, [str(a) for a in self.hmm.active_set])
         return self.hmm.stationary_distribution
 
     def viewStates(self, protein=None, ligand=None, nsamples=20):
