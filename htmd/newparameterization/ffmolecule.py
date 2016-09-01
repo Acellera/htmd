@@ -354,6 +354,8 @@ class FFMolecule(Molecule):
     frozens=[]
     dih_index=0
     i=0
+    bkp_coords = self.coords.copy()
+
     for d in self._soft_dihedrals:
       if (d.atoms == phi).all():  
          phi_to_fit = d
@@ -500,6 +502,7 @@ class FFMolecule(Molecule):
     ret.chisq = chisq
 
 # TODO Score it
+    self.coords = bkp_coords
 
     return ret
 
