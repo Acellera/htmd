@@ -24,7 +24,6 @@ class AdaptiveMD(AdaptiveBase):
 
     AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
     currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
-    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
     the discretized trajectories. From the Markov model it then chooses conformations from the various states based on
     the chosen criteria which will be used for starting new simulations.
 
@@ -50,6 +49,10 @@ class AdaptiveMD(AdaptiveBase):
         When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
     datapath : str, default='data'
         The directory in which the completed simulations are stored
+    filter : bool, default=True
+        Enable or disable filtering of trajectories.
+    filtersel : str, default='not water'
+        Filtering atom selection
     filteredpath : str, default='filtered'
         The directory in which the filtered simulations will be stored
     projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None
@@ -65,17 +68,16 @@ class AdaptiveMD(AdaptiveBase):
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
     ticalag : int, default=20
-        Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
-    filtersel : str, default='not water'
-        Filtering atom selection
     contactsym : str, default=None
         Contact symmetry
 
+
     Example
     -------
-    >>> adapt = AdaptiveRunMD()
+    >>> adapt = AdaptiveMD()
     >>> adapt.nmin = 2
     >>> adapt.nmax = 3
     >>> adapt.nepochs = 2
@@ -91,6 +93,8 @@ class AdaptiveMD(AdaptiveBase):
         from htmd.projections.projection import Projection
         super().__init__()
         self._cmdString('datapath', 'str', 'The directory in which the completed simulations are stored', 'data')
+        self._cmdBoolean('filter', 'bool', 'Enable or disable filtering of trajectories.', True)
+        self._cmdString('filtersel', 'str', 'Filtering atom selection', 'not water')
         self._cmdString('filteredpath', 'str', 'The directory in which the filtered simulations will be stored', 'filtered')
         self._cmdObject('projection', ':class:`Projection <htmd.projections.projection.Projection>` object',
                         'A Projection class object or a list of objects which will be used to project the simulation '
@@ -102,60 +106,44 @@ class AdaptiveMD(AdaptiveBase):
         self._cmdString('method', 'str', 'Criteria used for choosing from which state to respawn from', '1/Mc')
         self._cmdValue('ticalag', 'int', 'Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.', 20, TYPE_INT, RANGE_0POS)
         self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3, TYPE_INT, RANGE_0POS)
-        self._cmdString('filtersel', 'str', 'Filtering atom selection', 'not water')
         self._cmdString('contactsym', 'str', 'Contact symmetry', None)
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
-        datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
+        sims = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
                            glob(path.join(self.inputpath, '*', '')))
-        filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
+        if self.filter:
+            sims = simfilter(sims, self.filteredpath, filtersel=self.filtersel)
 
-        metr = Metric(filtlist, skip=self.skip)
+        metr = Metric(sims, skip=self.skip)
         metr.set(self.projection)
         
         #if self.contactsym is not None:
         #    contactSymmetry(data, self.contactsym)
 
         if self.ticadim > 0:
-            #gianni: without project it was tooooo slow
-            data = metr.project()
-            #tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))
-            tica = TICA(data, int(max(2, np.ceil(self.ticalag))))
+            # tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))  # gianni: without project it was tooooo slow
+            tica = TICA(metr.project(), int(max(2, np.ceil(self.ticalag))))
             datadr = tica.project(self.ticadim)
         else:
             datadr = metr.project()
 
-        datadr.dropTraj()
-
-        K = int(max(np.round(0.6 * np.log10(datadr.numFrames/1000)*1000+50), 100))  # heuristic
-        if K > datadr.numFrames / 3:  # Ugly patch for low-data regimes ...
-            K = int(datadr.numFrames / 3)
-
-        datadr.cluster(self.clustmethod(n_clusters=K))
-        replacement = False
-        if datadr.K < 10:
-            replacement = True
-
+        datadr.dropTraj()  # Preferably we should do this before any projections. Corrupted sims can affect TICA
+        datadr.cluster(self.clustmethod(n_clusters=self._numClusters(datadr.numFrames)))
         model = Model(datadr)
-        macronum = self.macronum
-        if datadr.K < macronum:
-            macronum = np.ceil(datadr.K / 2)
-            logger.warning('Using less macrostates than requested due to lack of microstates. macronum = ' + str(macronum))
+        model.markovModel(self.lag, self._numMacrostates(datadr))
 
-        from pyemma.msm import timescales_msm
-        timesc = timescales_msm(datadr.St.tolist(), lags=self.lag, nits=macronum).get_timescales()
-        macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
+        relFrames = self._getSpawnFrames(self, model, datadr)
+        self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
 
-        model.markovModel(self.lag, macronum)
+    def _getSpawnFrames(self, model, data):
         p_i = self._criteria(model, self.method)
         (spawncounts, prob) = self._spawn(p_i, self.nmax - self._running)
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
-        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=replacement)
+        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=(data.K < 10))
         logger.debug('relFrames {}'.format(relFrames))
-
-        self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
+        return relFrames
 
     def _criteria(self, model, criteria):
         # TODO. REST OF CRITERIA!
@@ -176,6 +164,26 @@ class AdaptiveMD(AdaptiveBase):
         prob = ranking / np.sum(ranking)
         spawnmicro = np.random.multinomial(N, prob)
         return spawnmicro, prob
+
+    def _numClusters(self, numFrames):
+        """ Heuristic that calculates number of clusters from number of frames """
+        K = int(max(np.round(0.6 * np.log10(numFrames/1000)*1000+50), 100))  # heuristic
+        if K > numFrames / 3:  # Ugly patch for low-data regimes ...
+            K = int(numFrames / 3)
+        return K
+
+    def _numMacrostates(self, data):
+        """ Heuristic for calculating the number of macrostates for the Markov model """
+        macronum = self.macronum
+        if data.K < macronum:
+            macronum = np.ceil(data.K / 2)
+            logger.warning('Using less macrostates than requested due to lack of microstates. macronum = ' + str(macronum))
+
+        # Calculating how many timescales are above the lag time to limit number of macrostates
+        from pyemma.msm import timescales_msm
+        timesc = timescales_msm(data.St.tolist(), lags=self.lag, nits=macronum).get_timescales()
+        macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
+        return macronum
 
 
 class AdaptiveRun(Adaptive):
@@ -256,6 +264,7 @@ class AdaptiveRun(Adaptive):
                  clustmethod=MiniBatchKMeans, method='1/Mc', ticadim=0, filtersel='not water'):
 
         super().__init__(app, project, nmin, nmax, nepochs, inputpath, generatorspath, dryrun, updateperiod)
+        logger.warning('AdaptiveRun will be deprecated. Please use AdaptiveMD for any future adaptive runs.')
         self.metrictype = metrictype
         self.datapath = datapath
         self.filteredpath = filteredpath
