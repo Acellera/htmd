@@ -34,7 +34,10 @@ class Molecule:
     """ Class to manipulate molecular structures.
 
     Molecule contains all the fields of a PDB and it is independent of any force field. It can contain multiple
-    conformations and trajectories, however all operations are done on the current frame.
+    conformations and trajectories, however all operations are done on the current frame. The following PDB fields 
+    are accessible as attributes (record, serial, name, altloc, resname, chain, resid, insertion, coords,
+    occupancy, beta, segid, element, charge). The coordinates are accessible via the coords attribute 
+    ([number of atoms x 3 x number of frames] where [x,y,z] are the second dimension.
 
     Parameters
     ----------
@@ -54,42 +57,6 @@ class Molecule:
     PDB field - beta shape: (1701,)
     ...
 
-    Properties
-    ----------
-    PDB Fields
-
-    record : np.ndarray
-        PDB record field.
-    serial : np.ndarray
-        PDB serial field.
-    name : np.ndarray
-        PDB name field.
-    altloc : np.ndarray
-        PDB alternative location field.
-    resname : np.ndarray
-        PDB residue name field.
-    chain : np.ndarray
-        PDB chain field.
-    resid : np.ndarray
-        PDB residue ID field.
-    insertion : np.ndarray
-        PDB insertion code field.
-    occupancy : np.ndarray
-        PDB occupancy field.
-    beta : np.ndarray
-        PDB beta value field.
-    segid : np.ndarray
-        PDB segment ID field.
-    element : np.ndarray
-        PDB element field.
-    charge : np.ndarray
-        PDB charge field.
-    bonds : np.ndarray
-        PDB bonds information.
-    ssbonds : np.ndarray
-        PDB secondary structure bonds field.
-    coords : np.ndarray
-        PDB coordinates. 3D matrix. [number of atoms x 3 x number of frames] where the second dimension are the [x,y,z]
 
     Other Fields
 
@@ -676,6 +643,7 @@ class Molecule:
         """
         from htmd.simlist import Sim
         from mdtraj.core.trajectory import _TOPOLOGY_EXTS
+        _MDTRAJ_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
 
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
@@ -735,7 +703,7 @@ class Molecule:
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
         elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
             self._readMDtrajTopology(filename)
-        elif type in ('binpos','trr','nc','h5','lh5','netcdf') or ext in ('binpos','trr','nc','h5','lh5','netcdf'):
+        elif type in _MDTRAJ_EXTS or ext in _MDTRAJ_EXTS:
             self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
         else:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
@@ -900,8 +868,6 @@ class Molecule:
         if not append:
             self.coords = []
             self.box = []
-        else:
-            logger.warning('Appending trajectories not well tested yet')
 
         # If a single filename is specified, turn it into an array so we can iterate
         if isinstance(filename, str):
@@ -1172,12 +1138,12 @@ class Molecule:
         else:
             try:
                 import mdtraj as md
-                from htmd.util import tempname
-                tmppdb = tempname(suffix='.pdb')
-                tmpxtc = tempname(suffix='.xtc')
-                self.write(tmppdb)
-                self.write(tmpxtc)
-                traj = md.load(tmpxtc, top=tmppdb)
+                import tempfile
+                tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
+                tmpxtc = tempfile.NamedTemporaryFile(suffix='.xtc')
+                self.write(tmppdb.name)
+                self.write(tmpxtc.name)
+                traj = md.load(tmpxtc.name, top=tmppdb.name)
                 # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
                 # traj.time = self.time
                 # traj.unitcell_lengths = self.box.T / 10
@@ -1651,6 +1617,7 @@ if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
+    from htmd import home
 
     m = Molecule('3PTB')
     doctest.testmod(extraglobs={'tryp': m.copy()})
@@ -1668,4 +1635,7 @@ if __name__ == "__main__":
     m = Molecule('2OV5')
     m.filter('protein or water')
 
-    # test rotate
+    # Testing DCD reader
+    mol = Molecule(os.path.join(home(), 'data', '1kdx', '1kdx_0.pdb'))
+    mol.read(os.path.join(home(), 'data', '1kdx', '1kdx.dcd'))
+
