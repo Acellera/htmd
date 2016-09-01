@@ -152,9 +152,6 @@ class AdaptiveGoal(AdaptiveBase):
         if self.save:
             self._model.save('adapt_model_e' + str(self._getEpoch()) + '.dat')
 
-        from IPython.core.debugger import Tracer
-        Tracer()()
-
         # Undirected component
         uc = -model.data.N  # Lower counts should give higher score hence the -
         if self.statetype == 'micro':
@@ -175,7 +172,7 @@ class AdaptiveGoal(AdaptiveBase):
         reward = dc + self.ucscale * uc
 
         relFrames = self._getSpawnFrames(reward, self._model, datadr)
-        #self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
+        self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
 
     def _featScale(self, feat):
         return (feat - np.min(feat)) / (np.max(feat) - np.min(feat))
