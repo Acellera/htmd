@@ -86,7 +86,7 @@ class AdaptiveMD(AdaptiveBase):
     >>> adapt.run()
     """
 
-    def __init__(self):
+    def __init__(self,save=False):
         from sklearn.base import ClusterMixin
         from htmd.projections.projection import Projection
         super().__init__()
@@ -104,6 +104,8 @@ class AdaptiveMD(AdaptiveBase):
         self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3, TYPE_INT, RANGE_0POS)
         self._cmdString('filtersel', 'str', 'Filtering atom selection', 'not water')
         self._cmdString('contactsym', 'str', 'Contact symmetry', None)
+#        self._cmdBoolean('save', 'bool', 'Save the model generated', False)
+        self._save = save
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
@@ -157,17 +159,25 @@ class AdaptiveMD(AdaptiveBase):
         
         #for revising it later
         self.model = model
+        if self._save: # get epoch before write new inputs to keep previous epoch
+            self.model.save('adapt_model_e'+str(adapt._getEpoch())+'.dat')
 
         self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
 
     def _criteria(self, model, criteria):
-        # TODO. REST OF CRITERIA!
         P_I = []
         if criteria == '1/Mc':
             nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
             P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
             P_I = P_I / nMicroPerMacro
-        return P_I[model.macro_ofmicro]
+            ret = P_I[model.macro_ofmicro]
+        elif criteria == 'pi/Mc':
+            nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
+            P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
+            P_I = P_I / nMicroPerMacro
+            ret = P_I[model.macro_ofmicro]*model.msm.stationary_distribution            
+
+        return ret
 
     def _spawn(self, ranking, N, truncated=False):
         if truncated:
