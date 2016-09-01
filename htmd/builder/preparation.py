@@ -318,6 +318,8 @@ def proteinPrepare(mol_in,
             resData._setFlipped(residue, residue.wasFlipped)
 
         for atom in residue.atoms:
+            # Fixup element fields for added H (routines.addHydrogens)
+            elt = "H" if atom.added and atom.name.startswith("H") else atom.element
             name.append(atom.name)
             resid.append(residue.resSeq)
             chain.append(residue.chainID)
@@ -325,7 +327,7 @@ def proteinPrepare(mol_in,
             coords.append([atom.x, atom.y, atom.z])
             resname.append(curr_resname)
             segid.append(atom.segID)
-            element.append(atom.element)
+            element.append(elt)
             occupancy.append(atom.occupancy)
             beta.append(atom.tempFactor)
             charge.append(atom.charge)

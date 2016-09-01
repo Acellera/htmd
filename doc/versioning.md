@@ -42,8 +42,6 @@ git describe --tags
 
 These are examples of how to release HTMD versions.
 
-DO NOT ONLY do `git push --tags`, as it will push the tag but not the commit!
-
 ### Big and/or major releases
 
 Imagine one wants to do a big/major release (in this case, let's assume it's the first major release of big release 1).

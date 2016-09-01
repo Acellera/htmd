@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
-from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
@@ -34,7 +34,10 @@ class Molecule:
     """ Class to manipulate molecular structures.
 
     Molecule contains all the fields of a PDB and it is independent of any force field. It can contain multiple
-    conformations and trajectories, however all operations are done on the current frame.
+    conformations and trajectories, however all operations are done on the current frame. The following PDB fields 
+    are accessible as attributes (record, serial, name, altloc, resname, chain, resid, insertion, coords,
+    occupancy, beta, segid, element, charge). The coordinates are accessible via the coords attribute 
+    ([number of atoms x 3 x number of frames] where [x,y,z] are the second dimension.
 
     Parameters
     ----------
@@ -54,42 +57,6 @@ class Molecule:
     PDB field - beta shape: (1701,)
     ...
 
-    Properties
-    ----------
-    PDB Fields
-
-    record : np.ndarray
-        PDB record field.
-    serial : np.ndarray
-        PDB serial field.
-    name : np.ndarray
-        PDB name field.
-    altloc : np.ndarray
-        PDB alternative location field.
-    resname : np.ndarray
-        PDB residue name field.
-    chain : np.ndarray
-        PDB chain field.
-    resid : np.ndarray
-        PDB residue ID field.
-    insertion : np.ndarray
-        PDB insertion code field.
-    occupancy : np.ndarray
-        PDB occupancy field.
-    beta : np.ndarray
-        PDB beta value field.
-    segid : np.ndarray
-        PDB segment ID field.
-    element : np.ndarray
-        PDB element field.
-    charge : np.ndarray
-        PDB charge field.
-    bonds : np.ndarray
-        PDB bonds information.
-    ssbonds : np.ndarray
-        PDB secondary structure bonds field.
-    coords : np.ndarray
-        PDB coordinates. 3D matrix. [number of atoms x 3 x number of frames] where the second dimension are the [x,y,z]
 
     Other Fields
 
@@ -273,6 +240,7 @@ class Molecule:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
         if _logger:
             logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
+        return sel
 
     def get(self, field, sel=None):
         """Retrieve a specific PDB field based on the selection
@@ -592,7 +560,7 @@ class Molecule:
             self.coords[s, :, f] += vector
 
     def rotate(self, axis, angle, sel=None):
-        """ Rotate molecule atoms around a given axis
+        """ DEPRECATED. Use rotateBy instead
 
         Parameters
         ----------
@@ -608,6 +576,7 @@ class Molecule:
         >>> mol=tryp.copy()
         >>> mol.rotate([0, 1, 0], 1.57)
         """
+        logger.warning('Molecule.rotate is deprecated and will be removed. Use Molecule.rotateBy instead.')
         M = rotationMatrix(axis, angle)
         s = self.atomselect(sel, indexes=True)
         for a in s:
@@ -622,6 +591,11 @@ class Molecule:
             The rotation matrix
         center : list
             The rotation center
+
+        Examples
+        --------
+        >>> mol.rotateBy(rotationMatrix([0, 1, 0], 1.57))
+        >>> mol.rorateBy(uniformRandomRotation())
         """
         coords = self.get('coords', sel=sel)
         newcoords = coords - center
@@ -665,9 +639,12 @@ class Molecule:
         frames : list, optional
             If the file is a trajectory, read only the given frames
         append : bool, optional
-            If the file is a trajectory, append the coordinates to the previous coordinates
+            If the file is a trajectory or coor file, append the coordinates to the previous coordinates. Note append is slow.
         """
         from htmd.simlist import Sim
+        from mdtraj.core.trajectory import _TOPOLOGY_EXTS
+        _MDTRAJ_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
+
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
                 if len(f) != 4 and not os.path.exists(f):
@@ -679,63 +656,71 @@ class Molecule:
             firstfile = filename
 
         if isinstance(filename, Sim):
-            self._readPDB(filename.molfile)
-            self._readTraj(filename.trajectory)
+            self.read(filename.molfile)
+            self.read(filename.trajectory)
             return
 
         if type is not None:
             type = type.lower()
+        ext = os.path.splitext(firstfile)[1][1:]
 
-        if (type is None and firstfile.endswith(".psf")) or type == "psf":
+        if type == "psf" or ext == "psf":
             topo = PSFread(filename)
             self._readTopology(topo, filename)
-        elif (type is None and (
-            firstfile.endswith(".prm") or firstfile.endswith(".prmtop"))) or type == "prmtop" or type == "prm":
+        elif type == "prm" or ext == "prm" or type == "prmtop" or ext == "prmtop":
             topo = PRMTOPread(filename)
             self._readTopology(topo, filename)
-        elif (type is None and firstfile.endswith(".pdb")) or type == "pdb":
+        elif type == "pdb" or ext == "pdb":
             self._readPDB(filename)
-        elif (type is None and firstfile.endswith(".pdbqt")) or type == "pdbqt":
+        elif type == "pdbqt" or ext == "pdbqt":
             self._readPDB(filename, mode='pdbqt')
-        elif (type is None and firstfile.endswith(".xtc")) or type == "xtc":
+        elif type == "xtc" or ext == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
-        elif (type is None and firstfile.endswith(".coor")) or type == "coor":
-            self._readBinCoordinates(filename)
+        elif type == "coor" or ext == "coor":
+            if append:
+                self.coords = np.append(self.coords,BINCOORread(filename),axis=2)
+            else:
+                self.coords = BINCOORread(filename)
         elif len(firstfile) == 4:  # Could be a PDB id. Try to load it from the PDB website
             self._readPDB(filename)
-        elif (type is None and firstfile.endswith(".xyz")) or type == "xyz":
+        elif type == "xyz" or ext == "xyz":
             topo, coords = XYZread(filename)
             self._readTopology(topo, filename)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif (type is None and firstfile.endswith(".gjf")) or type == "gjf":
+        elif type == "gjf" or ext == "gjf":
             topo, coords = GJFread(filename)
             self._readTopology(topo, filename)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif (type is None and firstfile.endswith(".mae")) or type == "mae":
+        elif type == "mae" or ext == "mae":
             topo, coords = MAEread(filename)
             self._readTopology(topo, filename)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif (type is None and firstfile.endswith(".mol2")) or type == "mol2":
+        elif type == "mol2" or ext == "mol2":
             topo, coords = MOL2read(filename)
             self._readTopology(topo, filename)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif (type is None and firstfile.endswith(".crd")) or type == "crd":
+        elif type == "crd" or ext == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
+        elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
+            self._readMDtrajTopology(filename)
+        elif type in _MDTRAJ_EXTS or ext in _MDTRAJ_EXTS:
+            self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
         else:
-            try:
-                self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
-            except:
-                raise ValueError("Unknown file type")
+            raise ValueError('Unknown file type with extension "{}".'.format(ext))
 
     def _readPDB(self, filename, mode='pdb'):
         if os.path.isfile(filename):
-            mol = PDBParser(filename, mode)
+            topo, coords = PDBread(filename, mode=mode)
+            self._readTopology(topo, filename)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif len(filename) == 4:
             # Try loading it from the pdb data directory
             localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
             if os.path.isfile(localpdb):
                 logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
-                mol = PDBParser(localpdb, mode)
+                topo, coords = PDBread(localpdb, mode=mode)
+                self._readTopology(topo, localpdb)
+                self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             else:
                 # or the PDB website
                 logger.info("Attempting PDB query for {:s}".format(filename))
@@ -743,34 +728,69 @@ class Molecule:
                     "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
                 if r.status_code == 200:
                     tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                    mol = PDBParser(tempfile, mode)
+                    topo, coords = PDBread(tempfile, mode=mode)
+                    self._readTopology(topo, tempfile)
+                    self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
                     os.unlink(tempfile)
                 else:
                     raise NameError('Invalid PDB code')
         else:
             raise NameError('File {} not found'.format(filename))
 
-        natoms = len(mol.record)
-        for k in self._pdb_fields:
-            self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._dtypes[k])
-            # Pad any short list
-            if k is not "coords":
-                if len(self.__dict__[k]) != natoms:
-                    self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
-
-        self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
-        self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
-        self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
-        self.box = np.array(mol.box)
-
         if self.masses is None or len(self.masses) == 0:
-            self.masses = numpy.zeros(natoms, dtype=numpy.float32)
+            self.masses = numpy.zeros(self.numAtoms, dtype=numpy.float32)
         if self.charge is None or len(self.charge) == 0:
-            self.charge = mol.charge.copy()
-        if self.charge is None or len(self.charge) == 0:
-            self.charge = numpy.zeros(natoms, dtype=numpy.float32)
+            self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
+
+        for pf in self._pdb_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
+            if self._dtypes[pf] == object:
+                for i in range(self.numAtoms):
+                    self.__dict__[pf][i] = str(self.__dict__[pf][i])
 
         self.fileloc.append([filename, 0])
+
+    # def _readPDB_old(self, filename, mode='pdb'):
+    #     if os.path.isfile(filename):
+    #         mol = PDBParser(filename, mode)
+    #     elif len(filename) == 4:
+    #         # Try loading it from the pdb data directory
+    #         localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
+    #         if os.path.isfile(localpdb):
+    #             logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
+    #             mol = PDBParser(localpdb, mode)
+    #         else:
+    #             # or the PDB website
+    #             logger.info("Attempting PDB query for {:s}".format(filename))
+    #             r = requests.get(
+    #                 "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
+    #             if r.status_code == 200:
+    #                 tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
+    #                 mol = PDBParser(tempfile, mode)
+    #                 os.unlink(tempfile)
+    #             else:
+    #                 raise NameError('Invalid PDB code')
+    #     else:
+    #         raise NameError('File {} not found'.format(filename))
+    #
+    #     natoms = len(mol.record)
+    #     for k in self._pdb_fields:
+    #         self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._dtypes[k])
+    #         # Pad any short list
+    #         if k is not "coords":
+    #             if len(self.__dict__[k]) != natoms:
+    #                 self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
+    #
+    #     self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
+    #     self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
+    #     self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
+    #     self.box = np.array(mol.box)
+    #
+    #     if self.masses is None or len(self.masses) == 0:
+    #         self.masses = numpy.zeros(natoms, dtype=numpy.float32)
+    #     if self.charge is None or len(self.charge) == 0:
+    #         self.charge = numpy.zeros(natoms, dtype=numpy.float32)
+    #
+    #     self.fileloc.append([filename, 0])
 
     def _readTopology(self, topo, filename, overwrite='all'):
         if isinstance(overwrite, str):
@@ -808,8 +828,23 @@ class Molecule:
         self.viewname = fnamestr
         self.fileloc = [[fnamestr, 0]]
 
-    def _readBinCoordinates(self, filename):
-        self.coords = BINCOORread(filename)
+    def _readMDtrajTopology(self, filename):
+        translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
+                     'chainID': 'chain', 'segmentID': 'segid'}
+        import mdtraj as md
+        from htmd.molecule.readers import Topology
+        mdstruct = md.load(filename)
+        topology = mdstruct.topology
+        table, bonds = topology.to_dataframe()
+
+        topo = Topology()
+        for k in table.keys():
+            topo.__dict__[translate[k]] = table[k].tolist()
+
+        self._readTopology(topo, filename)
+        self.bonds = bonds
+        self.coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
+        self.topoloc = os.path.abspath(filename)
 
     def _readMDtraj(self, filename):
         class Struct:
@@ -833,8 +868,6 @@ class Molecule:
         if not append:
             self.coords = []
             self.box = []
-        else:
-            logger.warning('Appending trajectories not well tested yet')
 
         # If a single filename is specified, turn it into an array so we can iterate
         if isinstance(filename, str):
@@ -898,6 +931,8 @@ class Molecule:
             self.fstep = 0.1
         else:
             self.fstep = (traj.time[1] - traj.time[0]) / 1E6  # convert femtoseconds to nanoseconds
+        if skip is not None:
+            self.fstep *= skip
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
              viewerhandle=None):
@@ -998,6 +1033,7 @@ class Molecule:
 
     def _viewNGL(self, psf, coords, guessb):
         from nglview import Trajectory
+        from htmd.util import tempname
         import nglview
 
         class TrajectoryStreamer(Trajectory):
@@ -1010,7 +1046,10 @@ class Molecule:
             def get_frame_count(self):
                 return np.size(self.coords, 2)
 
-        struc = nglview.FileStructure(psf)
+        pdb = tempname(suffix=".pdb")
+        self.write(pdb)
+
+        struc = nglview.FileStructure(pdb)
         struc.params['dontAutoBond'] = not guessb
 
         traj = TrajectoryStreamer(coords)
@@ -1021,6 +1060,8 @@ class Molecule:
         self._tempreps.append(self.reps)
         self._tempreps._repsNGL(w)
         self._tempreps.remove()
+
+        os.remove(pdb)
         return w
 
     def mutateResidue(self, sel, newres):
@@ -1082,26 +1123,27 @@ class Molecule:
         """
         if type:
             type = type.lower()
+        ext = os.path.splitext(filename)[1][1:]
 
-        if type == "coor" or filename.endswith(".coor"):
+        if type == "coor" or ext == "coor":
             self._writeBinCoordinates(filename, sel)
-        elif type == "pdb" or filename.endswith(".pdb"):
+        elif type == "pdb" or ext == "pdb":
             self._writePDB(filename, sel)
-        elif type == "xyz" or filename.endswith(".xyz"):
+        elif type == "xyz" or ext == "xyz":
             self._writeXYZ(filename, sel)
-        elif type == "psf" or filename.endswith(".psf"):
+        elif type == "psf" or ext == "psf":
             self._writeConnectivity(filename, sel)
-        elif type == "xtc" or filename.endswith(".xtc"):
+        elif type == "xtc" or ext == "xtc":
             self._writeTraj(filename, sel)
         else:
             try:
                 import mdtraj as md
-                from htmd.util import tempname
-                tmppdb = tempname(suffix='.pdb')
-                tmpxtc = tempname(suffix='.xtc')
-                self.write(tmppdb)
-                self.write(tmpxtc)
-                traj = md.load(tmpxtc, top=tmppdb)
+                import tempfile
+                tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
+                tmpxtc = tempfile.NamedTemporaryFile(suffix='.xtc')
+                self.write(tmppdb.name)
+                self.write(tmpxtc.name)
+                traj = md.load(tmpxtc.name, top=tmppdb.name)
                 # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
                 # traj.time = self.time
                 # traj.unitcell_lengths = self.box.T / 10
@@ -1330,6 +1372,10 @@ class Molecule:
         """Get the z coordinates at the current frame"""
         return self.coords[:, 2, self.frame]
 
+    def __repr__(self):
+        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
+               + self.__str__()
+
     def __str__(self):
         def formatstr(name, field):
             if isinstance(field, np.ndarray) or isinstance(field, list):
@@ -1351,6 +1397,18 @@ class Molecule:
             rep += formatstr(j, self.__dict__[j])
 
         return rep
+
+
+def mol_equal(mol1, mol2):
+    difffields = []
+    for field in Molecule._append_fields:
+        if not np.array_equal(mol1.__dict__[field], mol2.__dict__[field]):
+            difffields += [field]
+
+    if len(difffields) > 0:
+        print('Differences detected in mol1 and mol2 in field(s) {}.'.format(difffields))
+        return False
+    return True
 
 
 def _resolveCollisions(mol, occ1, occ2, gap):
@@ -1559,9 +1617,9 @@ if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
-    from htmd.home import home
+    from htmd import home
 
-    m = Molecule(path.join(home(), 'data', 'building-protein-membrane', '3PTB_clean.pdb'))
+    m = Molecule('3PTB')
     doctest.testmod(extraglobs={'tryp': m.copy()})
 
     # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May
@@ -1573,9 +1631,11 @@ if __name__ == "__main__":
     m.write('/tmp/test.coor')
     m.write('/tmp/test.xtc')
     m.moveBy([1, 1, 1])
-    m.rotate([1, 0, 0], pi / 2)
     m.align('name CA')
     m = Molecule('2OV5')
     m.filter('protein or water')
 
-    # test rotate
+    # Testing DCD reader
+    mol = Molecule(os.path.join(home(), 'data', '1kdx', '1kdx_0.pdb'))
+    mol.read(os.path.join(home(), 'data', '1kdx', '1kdx.dcd'))
+

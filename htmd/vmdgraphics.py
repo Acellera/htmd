@@ -70,7 +70,7 @@ class VMDConvexHull(VMDGraphicObject):
         >>> mf=m.copy()
         >>> mf.filter("protein ")
         >>> gh=htmd.vmdgraphics.VMDConvexHull(mf)  # doctest: +ELLIPSIS
-        <htmd.vmdgraphics.VMDConvexHull object at ...
+        >>> gh.delete()
         """
 
         from scipy.spatial import ConvexHull

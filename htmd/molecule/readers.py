@@ -1,10 +1,19 @@
 import ctypes as ct
 import numpy as np
 from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_string_buffer, pack_ulong_buffer, xtc_lib
+import logging
+logger = logging.getLogger(__name__)
+
+# Pandas NA values taken from https://github.com/pydata/pandas/blob/6645b2b11a82343e5f07b15a25a250f411067819/pandas/io/common.py
+# Removed NA because it's natrium!
+_NA_VALUES = set([
+    '-1.#IND', '1.#QNAN', '1.#IND', '-1.#QNAN', '#N/A N/A', '#N/A',
+    'N/A', '#NA', 'NULL', 'NaN', '-NaN', 'nan', '-nan', ''
+])
 
 
 class Topology:
-    def __init__(self):
+    def __init__(self, pandasdata=None):
         self.record = []
         self.serial = []
         self.name = []
@@ -24,6 +33,16 @@ class Topology:
         self.dihedrals = []
         self.impropers = []
         self.atomtype = []
+
+        if pandasdata is not None:
+            for field in self.__dict__:
+                fielddat = pandasdata.get(field)
+                if fielddat is not None and not np.all(fielddat.isnull()):
+                    if fielddat.dtype == object:  # If not all are NaN replace NaNs with default values
+                        pandasdata.loc[fielddat.isnull(), field] = ''
+                    else:
+                        pandasdata.loc[fielddat.isnull(), field] = 0
+                    self.__dict__[field] = fielddat.tolist()
 
     @property
     def atominfo(self):
@@ -68,7 +87,7 @@ def XTCread(filename, frames=None):
             nframes, deltat, deltastep)
 
         if not retval:
-            raise RuntimeError('XTC file {} possibly corrupt.'.format(filename))
+            raise IOError('XTC file {} possibly corrupt.'.format(filename))
 
         frames = range(nframes[0])
         t = Trajectory()
@@ -81,7 +100,7 @@ def XTCread(filename, frames=None):
 
         for i, f in enumerate(frames):
             if f >= nframes[0] or f < 0:
-                raise NameError('Frame index out of range in XTCread with given frames')
+                raise RuntimeError('Frame index out of range in XTCread with given frames')
             t.step[i] = retval[f].step
             t.time[i] = retval[f].time
             t.box[0, i] = retval[f].box[0]
@@ -434,6 +453,168 @@ def MAEread(fname):
 #         topo.record[topo.resname == h] = 'HETATM'
 #     return topo, coords
 
+def PDBread(filename, mode='pdb'):
+    from pandas import read_fwf
+    import io
+
+    """
+    COLUMNS        DATA  TYPE    FIELD        DEFINITION
+    -------------------------------------------------------------------------------------
+     1 -  6        Record name   "ATOM  "
+     7 - 11        Integer       serial       Atom  serial number.
+    13 - 16        Atom          name         Atom name.
+    17             Character     altLoc       Alternate location indicator.
+    18 - 20        Residue name  resName      Residue name.
+    22             Character     chainID      Chain identifier.
+    23 - 26        Integer       resSeq       Residue sequence number.
+    27             AChar         iCode        Code for insertion of residues.
+    31 - 38        Real(8.3)     x            Orthogonal coordinates for X in Angstroms.
+    39 - 46        Real(8.3)     y            Orthogonal coordinates for Y in Angstroms.
+    47 - 54        Real(8.3)     z            Orthogonal coordinates for Z in Angstroms.
+    55 - 60        Real(6.2)     occupancy    Occupancy.
+    61 - 66        Real(6.2)     tempFactor   Temperature  factor.
+    77 - 78        LString(2)    element      Element symbol, right-justified.
+    79 - 80        LString(2)    charge       Charge  on the atom.
+    """
+    if mode == 'pdb':
+        topocolspecs = [(0, 6), (6, 11), (12, 16), (16, 17), (17, 21), (21, 22), (22, 26), (26, 27),
+                        (54, 60), (60, 66), (72, 76), (76, 78), (78, 79), (79, 80)]
+        toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
+                     'occupancy', 'beta', 'segid', 'element', 'charge', 'chargesign')
+    elif mode == 'pdbqt':
+        # http://autodock.scripps.edu/faqs-help/faq/what-is-the-format-of-a-pdbqt-file
+        # The rigid root contains one or more PDBQT-style ATOM or HETATM records. These records resemble their
+        # traditional PDB counterparts, but diverge in columns 71-79 inclusive (where the first character in the line
+        # corresponds to column 1). The partial charge is stored in columns 71-76 inclusive (in %6.3f format, i.e.
+        # right-justified, 6 characters wide, with 3 decimal places). The AutoDock atom-type is stored in columns 78-79
+        # inclusive (in %-2.2s format, i.e. left-justified and 2 characters wide..
+        topocolspecs = [(0, 6), (6, 11), (12, 16), (16, 17), (17, 21), (21, 22), (22, 26), (26, 27),
+                        (54, 60), (60, 66), (70, 76), (77, 79)]
+        toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
+                     'occupancy', 'beta', 'charge', 'element')
+    topodtypes = {
+        'record': str,
+        'serial': np.int,
+        'name': str,
+        'altloc': str,
+        'resname': str,
+        'chain': str,
+        'resid': np.int,
+        'insertion': str,
+        'occupancy': np.float32,
+        'beta': np.float32,
+        'segid': str,
+        'element': str,
+        'charge': np.float32,
+        'chargesign': str,
+    }
+    coordcolspecs = [(30, 38), (38, 46), (46, 54)]
+    coordnames = ('x', 'y', 'z')
+
+    """
+    COLUMNS       DATA  TYPE      FIELD        DEFINITION
+    -------------------------------------------------------------------------
+     1 -  6        Record name    "CONECT"
+     7 - 11        Integer        serial       Atom  serial number
+    12 - 16        Integer        serial       Serial number of bonded atom
+    17 - 21        Integer        serial       Serial  number of bonded atom
+    22 - 26        Integer        serial       Serial number of bonded atom
+    27 - 31        Integer        serial       Serial number of bonded atom
+    """
+    bondcolspecs = [(6, 11), (11, 16), (16, 21), (21, 26), (26, 31)]
+    bondnames = ('serial1', 'serial2', 'serial3', 'serial4', 'serial5')
+
+    """
+    COLUMNS       DATA  TYPE    FIELD          DEFINITION
+    -------------------------------------------------------------
+     1 -  6       Record name   "CRYST1"
+     7 - 15       Real(9.3)     a              a (Angstroms).
+    16 - 24       Real(9.3)     b              b (Angstroms).
+    25 - 33       Real(9.3)     c              c (Angstroms).
+    34 - 40       Real(7.2)     alpha          alpha (degrees).
+    41 - 47       Real(7.2)     beta           beta (degrees).
+    48 - 54       Real(7.2)     gamma          gamma (degrees).
+    56 - 66       LString       sGroup         Space  group.
+    67 - 70       Integer       z              Z value.
+    """
+    boxcolspecs = [(6, 15), (15, 24), (24, 33)]
+    boxnames = ('a', 'b', 'c')
+
+    def concatCoords(coords, coorddata):
+        if coorddata.tell() != 0:  # Not empty
+            coorddata.seek(0)
+            parsedcoor = read_fwf(coorddata, colspecs=coordcolspecs, names=coordnames, na_values=_NA_VALUES, keep_default_na=False)
+            if coords is None:
+                coords = np.zeros((len(parsedcoor), 3, 0), dtype=np.float32)
+            currcoords = np.vstack((parsedcoor.x, parsedcoor.y, parsedcoor.z)).T
+            coords = np.append(coords, currcoords[:, :, np.newaxis], axis=2)
+        return coords
+
+    teridx = []
+    currter = 0
+    topoend = False
+
+    crystdata = io.StringIO()
+    topodata = io.StringIO()
+    conectdata = io.StringIO()
+    coorddata = io.StringIO()
+
+    coords = None
+
+    f = open(filename, 'r')
+    for line in f:
+        if line.startswith('CRYST1'):
+            crystdata.write(line)
+        if line.startswith('ATOM') or line.startswith('HETATM'):
+            coorddata.write(line)
+        if (line.startswith('ATOM') or line.startswith('HETATM')) and not topoend:
+            topodata.write(line)
+            teridx.append(str(currter))
+        if line.startswith('TER'):
+            currter += 1
+        if line.startswith('END'):
+            topoend = True
+        if line.startswith('CONECT'):
+            conectdata.write(line)
+        if line.startswith('MODEL'):
+            coords = concatCoords(coords, coorddata)
+            coorddata = io.StringIO()
+    crystdata.seek(0)
+    topodata.seek(0)
+    conectdata.seek(0)
+
+    coords = concatCoords(coords, coorddata)
+
+    parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
+    parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames, na_values=_NA_VALUES, keep_default_na=False)
+    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
+    if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
+        parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+
+    if len(parsedtopo) > 99999:
+        logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
+
+    topo = Topology(parsedtopo)
+
+    # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
+    serials = parsedtopo.serial.as_matrix()
+    if np.max(parsedbonds.max()) > np.max(serials):
+        logger.info('Bond indexes in PDB file exceed atom indexes. For safety we will discard all bond information.')
+    else:
+        mapserials = np.ones(np.max(serials)+1) * -1
+        mapserials[serials] = list(range(np.max(serials)))
+        for i in range(len(parsedbonds)):
+            row = parsedbonds.loc[i].tolist()
+            for b in range(1, 5):
+                if not np.isnan(row[b]):
+                    topo.bonds.append([int(row[0]), int(row[b])])
+        topo.bonds = np.array(topo.bonds, dtype=np.uint32)
+        topo.bonds[:] = mapserials[topo.bonds[:]]
+
+    if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
+        topo.segid = teridx
+    return topo, coords
+
 
 def BINCOORread(filename):
     import struct
@@ -444,7 +625,7 @@ def BINCOORread(filename):
     dat = f.read(natoms * 3 * 8)
     fmt = 'd' * (natoms * 3)
     coords = struct.unpack(fmt, dat)
-    coords = np.array(coords).reshape((natoms, 3, 1))
+    coords = np.array(coords, dtype=np.float32).reshape((natoms, 3, 1))
     f.close()
     return coords
 

@@ -7,7 +7,7 @@ from glob import glob
 from os import path
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
-from htmd.adaptive.adaptive import Adaptive, AdaptiveNew
+from htmd.adaptive.adaptive import Adaptive, AdaptiveBase
 from htmd.simlist import simlist, simfilter
 from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance
 from htmd.model import Model, macroAccumulate
@@ -19,12 +19,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AdaptiveRunNew(AdaptiveNew):
+class AdaptiveMD(AdaptiveBase):
     """ Adaptive class which uses a Markov state model for respawning
 
-    AdaptiveRun uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
-    currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
-    currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
+    AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
+    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
+    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
     the discretized trajectories. From the Markov model it then chooses conformations from the various states based on
     the chosen criteria which will be used for starting new simulations.
 
@@ -52,12 +52,8 @@ class AdaptiveRunNew(AdaptiveNew):
         The directory in which the completed simulations are stored
     filteredpath : str, default='filtered'
         The directory in which the filtered simulations will be stored
-    metricsel1 : str, default=None
-        The atomselection to be used for projecting coordinates to atom distances
-    metricsel2 : str, default=None
-        Second atomselection for projecting coordinates to distances between the two selections
-    metrictype : ['contacts', 'distances'], str, default='contacts'
-        Metric type to user. Choose between contacts or distances
+    projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None
+        A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
     macronum : int, default=8
         The number of macrostates to produce
     skip : int, default=1
@@ -68,6 +64,8 @@ class AdaptiveRunNew(AdaptiveNew):
         Clustering algorithm used to cluster the contacts or distances
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
+    ticalag : int, default=20
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
     filtersel : str, default='not water'
@@ -77,33 +75,37 @@ class AdaptiveRunNew(AdaptiveNew):
 
     Example
     -------
-    >>> adapt = AdaptiveRun()
+    >>> adapt = AdaptiveRunMD()
     >>> adapt.nmin = 2
     >>> adapt.nmax = 3
     >>> adapt.nepochs = 2
     >>> adapt.ticadim = 3
-    >>> adapt.metricsel1 = 'name CA'
+    >>> adapt.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
     >>> adapt.generatorspath = htmd.home()+'/data/dhfr'
     >>> adapt.app = AcemdLocal()
     >>> adapt.run()
     """
 
-    def __init__(self):
+    def __init__(self,save=False):
         from sklearn.base import ClusterMixin
+        from htmd.projections.projection import Projection
         super().__init__()
         self._cmdString('datapath', 'str', 'The directory in which the completed simulations are stored', 'data')
         self._cmdString('filteredpath', 'str', 'The directory in which the filtered simulations will be stored', 'filtered')
-        self._cmdString('metricsel1', 'str', 'The atomselection to be used for projecting coordinates to atom distances', None)
-        self._cmdString('metricsel2', 'str', 'Second atomselection for projecting coordinates to distances between the two selections', None)
-        self._cmdString('metrictype', 'str', 'Metric type to user. Choose between contacts or distances', 'contacts', valid_values=['contacts', 'distances'])
+        self._cmdObject('projection', ':class:`Projection <htmd.projections.projection.Projection>` object',
+                        'A Projection class object or a list of objects which will be used to project the simulation '
+                        'data before constructing a Markov model', None, Projection)
         self._cmdValue('macronum', 'int', 'The number of macrostates to produce', 8, TYPE_INT, RANGE_POS)
         self._cmdValue('skip', 'int', 'Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame', 1, TYPE_INT, RANGE_POS)
         self._cmdValue('lag', 'int', 'The lagtime used to create the Markov model', 1, TYPE_INT, RANGE_POS)
         self._cmdObject('clustmethod', ':class:`ClusterMixin <sklearn.base.ClusterMixin>` object', 'Clustering algorithm used to cluster the contacts or distances', MiniBatchKMeans, ClusterMixin)
         self._cmdString('method', 'str', 'Criteria used for choosing from which state to respawn from', '1/Mc')
+        self._cmdValue('ticalag', 'int', 'Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.', 20, TYPE_INT, RANGE_0POS)
         self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3, TYPE_INT, RANGE_0POS)
         self._cmdString('filtersel', 'str', 'Filtering atom selection', 'not water')
         self._cmdString('contactsym', 'str', 'Contact symmetry', None)
+#        self._cmdBoolean('save', 'bool', 'Save the model generated', False)
+        self._save = save
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
@@ -111,32 +113,30 @@ class AdaptiveRunNew(AdaptiveNew):
                            glob(path.join(self.inputpath, '*', '')))
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
-        if hasattr(self, 'metricsel2') and self.metricsel2 is not None:
-            proj = MetricDistance(self.metricsel1, self.metricsel2, metric=self.metrictype)
-        else:
-            proj = MetricSelfDistance(self.metricsel1, metric=self.metrictype)
         metr = Metric(filtlist, skip=self.skip)
-        metr.projection(proj)
-        data = metr.project()
-
+        metr.set(self.projection)
+        
         #if self.contactsym is not None:
         #    contactSymmetry(data, self.contactsym)
 
-        data.dropTraj()
         if self.ticadim > 0:
-            tica = TICA(data, int(max(2, np.ceil(20/self.skip))))
+            #gianni: without project it was tooooo slow
+            data = metr.project()
+            #tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))
+            tica = TICA(data, int(max(2, np.ceil(self.ticalag))))
             datadr = tica.project(self.ticadim)
         else:
-            datadr = data
+            datadr = metr.project()
+
+        datadr.dropTraj()
 
         K = int(max(np.round(0.6 * np.log10(datadr.numFrames/1000)*1000+50), 100))  # heuristic
-        if K > datadr.numFrames / 3: # Freaking ugly patches ...
+        if K > datadr.numFrames / 3:  # Ugly patch for low-data regimes ...
             K = int(datadr.numFrames / 3)
 
-        datadr.cluster(self.clustmethod(n_clusters=K), mergesmall=5)
+        datadr.cluster(self.clustmethod(n_clusters=K))
         replacement = False
         if datadr.K < 10:
-            datadr.cluster(self.clustmethod(n_clusters=K))
             replacement = True
 
         model = Model(datadr)
@@ -147,8 +147,8 @@ class AdaptiveRunNew(AdaptiveNew):
 
         from pyemma.msm import timescales_msm
         timesc = timescales_msm(datadr.St.tolist(), lags=self.lag, nits=macronum).get_timescales()
+         
         macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
-
         model.markovModel(self.lag, macronum)
         p_i = self._criteria(model, self.method)
         (spawncounts, prob) = self._spawn(p_i, self.nmax - self._running)
@@ -156,17 +156,28 @@ class AdaptiveRunNew(AdaptiveNew):
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=replacement)
         logger.debug('relFrames {}'.format(relFrames))
+        
+        #for revising it later
+        self.model = model
+        if self._save: # get epoch before write new inputs to keep previous epoch
+            self.model.save('adapt_model_e'+str(adapt._getEpoch())+'.dat')
 
         self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
 
     def _criteria(self, model, criteria):
-        # TODO. REST OF CRITERIA!
         P_I = []
         if criteria == '1/Mc':
             nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
             P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
             P_I = P_I / nMicroPerMacro
-        return P_I[model.macro_ofmicro]
+            ret = P_I[model.macro_ofmicro]
+        elif criteria == 'pi/Mc':
+            nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
+            P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
+            P_I = P_I / nMicroPerMacro
+            ret = P_I[model.macro_ofmicro]*model.msm.stationary_distribution            
+
+        return ret
 
     def _spawn(self, ranking, N, truncated=False):
         if truncated:
@@ -355,18 +366,27 @@ class AdaptiveRun(Adaptive):
 if __name__ == "__main__":
     from htmd import AcemdLocal
     import htmd
-    from os import chdir
-    from tempfile import mkdtemp
+    import os
+    import shutil
+    from htmd.util import tempname
 
-    chdir(mkdtemp())
-    md = AdaptiveRun()
-    md.dryrun = True
-    md.nmin = 2
-    md.nmax = 3
-    md.nepochs = 2
-    md.ticadim = 0
-    md.metricsel1 = 'name CA'
-    md.generatorspath = htmd.home()+'/data/dhfr'
-    #md.app = AcemdLocal()
-    # md.run()  # Disabled because I can't assume acemd is installed in travis machines
+    tmpdir = tempname()
+    shutil.copytree(htmd.home()+'/data/adaptive/', tmpdir)
+    os.chdir(tmpdir)
+    md = AdaptiveMD()
+    # md.dryrun = True
+    md.nmin = 1
+    md.nmax = 2
+    md.nepochs = 3
+    md.ticalag = 2
+    md.ticadim = 3
+    md.updateperiod = 5
+    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh')
+    # md.generatorspath = htmd.home()+'/data/dhfr'
+    # md.datapath = 'input'
+    # md.app = AcemdLocal(inputfile='input.acemd')
+
+    # md.app = AcemdLocal(datadir='data')
+    # md.run()  # Takes too long (2 minutes on 780).
+
 

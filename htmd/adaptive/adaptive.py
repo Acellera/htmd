@@ -19,8 +19,10 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 import logging
 logger = logging.getLogger(__name__)
 
+_TRAJ_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf')
 
-class AdaptiveNew(ProtocolInterface):
+
+class AdaptiveBase(ProtocolInterface):
     def __init__(self):
         super().__init__()
         from htmd.apps.app import App
@@ -45,6 +47,9 @@ class AdaptiveNew(ProtocolInterface):
         >>> adapt = Adaptive()
         >>> adapt.run()
         """
+        if self.nmax <= self.nmin:
+            raise RuntimeError('nmax option should be larger than nmin.')
+
         while True:
             epoch = self._getEpoch()
             logger.info('Processing epoch ' + str(epoch))
@@ -101,7 +106,7 @@ class AdaptiveNew(ProtocolInterface):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns(*_TRAJ_EXTENSIONS))
                 k += 1
 
     def _getEpoch(self):
@@ -161,7 +166,7 @@ class AdaptiveNew(ProtocolInterface):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS, '*.coor'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
@@ -288,7 +293,7 @@ class Adaptive(object):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns(*_TRAJ_EXTENSIONS))
                 k += 1
 
     def _getEpoch(self):
@@ -323,7 +328,7 @@ class Adaptive(object):
         if path.exists(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log')):
             raise NameError('Epoch logfile already exists. Cant overwrite it.')
 
-        fid = open(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log'), 'w')
+        #fid = open(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log'), 'w')
 
         regex = re.compile('(e\d+s\d+)_')
         for i, f in enumerate(simsframes):
@@ -348,7 +353,7 @@ class Adaptive(object):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS, '*.coor'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
@@ -356,9 +361,9 @@ class Adaptive(object):
             mol.write(path.join(newDir, 'input.coor'))
 
             # write nextInput file
-            fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
+            #fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
 
-        fid.close()
+        #fid.close()
 
     @abc.abstractmethod
     def _algorithm(self):

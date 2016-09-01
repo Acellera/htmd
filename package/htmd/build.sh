@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 echo "building"
 
 export PATH=$PATH:/usr/bin/:/bin/

@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 
-from htmd.newparameterization import ffmolecule
+from htmd.newparameterization.ffmolecule import FFMolecule
 from htmd.newparameterization.fftype import FFTypeMethod
 import sys
 import os
@@ -35,11 +35,14 @@ def main_parameterize():
   dihedrals = mol.getSoftDihedrals()
   for d in dihedrals:
     print("\nFitting dihedral %s-%s-%s-%s" % ( mol.name[ d[0] ], mol.name[ d[1] ], mol.name[ d[2] ], mol.name[ d[3] ]  ))
-    ret = mol.fitSoftDihedral( d )
+    try:
+      ret = mol.fitSoftDihedral( d )
 
-    print("Chi^2 score : %f" % ( ret.chisq ) )
+      print("Chi^2 score : %f" % ( ret.chisq ) )
 
-    fn  = mol.plotDihedralFit( ret, show=False, directory="plots" )
+      fn  = mol.plotDihedralFit( ret, show=False, directory="plots" )
+    except:
+      pass
     #print(fn)
 
   try:

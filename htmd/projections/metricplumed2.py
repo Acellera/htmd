@@ -34,6 +34,31 @@ def _getPlumedInfo(what):
     return info
 
 
+# Static utility functions ---------------------------------------------------------
+def genTemplate(action, include_optional=False):
+        """ Return the template for the given action
+
+        Parameters
+        ----------
+        action : str
+            The action to be documented
+        include_optional : bool
+            Whether to include optional arguments
+
+        Examples
+        --------
+        >>> genTemplate("GYRATION")
+        'GYRATION ATOMS=<atom selection> TYPE=RADIUS'
+        """
+
+        cl = ["plumed", "--standalone-executable", "gentemplate", "--action", action]
+        if include_optional:
+            cl.append("--include-optional")
+        info = subprocess.check_output(cl)
+        info = info.strip().decode("utf-8")
+        return info
+
+
 # Plumed statement wrappers --------------------------------------------------------
 
 # ABC should prevent instantiation but doesn't
@@ -134,12 +159,8 @@ class PlumedCV(PlumedStatement):
             else:
                 raise TypeError("Unexpected type passed at argument: " + k)
 
-    def __repr__(self):
+    def __str__(self):
         r = ""
-
-        # Prerequisites (uniquely)
-        for p in sorted([str(i) for i in set(self.prereq)]):
-            r = r + p + "\n"
 
         # Label
         r = r + self.label + ": " + self.cv + " "
@@ -158,6 +179,20 @@ class PlumedCV(PlumedStatement):
         return r.strip()
 
 
+    def genTemplate(self, include_optional=False):
+        """ Return the template for the given action
+
+        Examples
+        --------
+        >>> rg=PlumedCV("GYRATION", "rgyr3", ATOMS=[1,2,3])
+        >>> rg.genTemplate()
+        'GYRATION ATOMS=<atom selection> TYPE=RADIUS'
+        """
+
+        tmpl = genTemplate(self.cv,include_optional=include_optional)
+        return tmpl
+
+
 class PlumedGenericGroup(PlumedStatement):
     """ Abstract class from which PLUMED groups are inherited. Do not use directly. """
 
@@ -174,7 +209,7 @@ class PlumedGenericGroup(PlumedStatement):
         self.sel = sel
         self.code = "%s: %s ATOMS=%s" % (self.label, type, ",".join(map(str, al)))
 
-    def __repr__(self):
+    def __str__(self):
         return self.code
 
 
@@ -235,23 +270,27 @@ class MetricPlumed2(Projection):
     The collective variables are defined in PLUMED 2's syntax. PLUMED needs be installed
     separately; see http://www.plumed.org/.
 
+    The script can be defined as
+     * a string, or a list of strings (which are concatenated), or
+     * a list of PlumedCV objects (see PlumedCV for examples)
+
     Parameters
     ----------
-    plumed_inp_str: string
-        The PLUMED script defining CVs - a string or a list of strings (which are concatenated)
+    plumed_inp :
+        The PLUMED script defining CVs - string, list of strings or list of PlumedCV objects
 
     Examples
     --------
     >>> dd = htmd.home(dataDir="adaptive")
     >>> fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'], dd + '/generators/1/structure.pdb')
     >>> metr = Metric(fsims)
-    >>> metr.projection(MetricPlumed2( ['d1: DISTANCE ATOMS=2,3', 'd2: DISTANCE ATOMS=5,6']))
+    >>> metr.projection(MetricPlumed2( ['d1: DISTANCE ATOMS=2,3', 'd2: DISTANCE ATOMS=5,6'])) # As strings
     >>> data=metr.project()
     >>> data.dat
     array([ array([[ 1.68597198,  1.09485197], ...
     """
 
-    def __init__(self, plumed_inp_str):
+    def __init__(self, plumed_inp):
         # I am not sure at all about opening files here is good style
         self._precalculation_enabled = False
         self._plumed_exe = shutil.which("plumed")
@@ -264,9 +303,23 @@ class MetricPlumed2(Projection):
         except Exception as e:
             raise Exception("To use MetricPlumed2 please ensure PLUMED 2's executable is installed and in path")
 
-        if not isinstance(plumed_inp_str, str):
-            plumed_inp_str = "\n".join(plumed_inp_str)
-        self._plumed_inp = plumed_inp_str
+        # Sanitize if single element
+        if not isinstance(plumed_inp, list):
+            plumed_inp = [plumed_inp]
+
+        prereqs = set()
+        for i in plumed_inp:
+            if hasattr(i,'prereq'):
+                prereqs=prereqs.union(i.prereq)
+
+        prereqs_s = "\n".join([str(x) for x in prereqs])
+        inp_s     = "\n".join([str(x) for x in plumed_inp])
+
+        self._plumed_inp = prereqs_s+"\n\n"+inp_s
+
+    def __str__(self):
+        return self._plumed_inp
+
 
     def _readColvar(self):
         # Assumptions: file begins with #! FIELDS time
@@ -291,7 +344,7 @@ class MetricPlumed2(Projection):
         logger.info("In _precalculate")
         self._precalculation_enabled = True
 
-    def getMapping(self):
+    def getMapping(self, mol):
         """ Return the labels of the colvars used in this projection.
 
         Can only be used after the projection has been executed.
@@ -304,7 +357,8 @@ class MetricPlumed2(Projection):
         if self.cvnames:
             return self.cvnames
         else:
-            raise Exception("MetricPlumed's getMapping can only be called after the projection")
+            logger.warning("MetricPlumed's getMapping can only be called after the projection")
+            # raise Exception("MetricPlumed's getMapping can only be called after the projection")
 
     # Arguments are actually self, mol
     def project(self, mol):
@@ -333,15 +387,15 @@ class MetricPlumed2(Projection):
         pdb = os.path.join(td, "temp.pdb")
         mol.write(pdb)
 
-        # DCD
-        dcd = os.path.join(td, "temp.dcd")
-        mol.write(dcd)
-        logger.info("Done writing %d frames in %s" % (mol.numFrames, dcd))
+        # XTC
+        xtc = os.path.join(td, "temp.xtc")
+        mol.write(xtc)
+        logger.debug("Done writing %d frames in %s" % (mol.numFrames, xtc))
 
         # Colvar
         colvar = os.path.join(td, "temp.colvar")
         self.colvar = colvar
-        logger.info("Colvar file is " + colvar)
+        logger.debug("Colvar file is " + colvar)
 
         # Metainp
         metainp = os.path.join(td, "temp.metainp")
@@ -353,10 +407,10 @@ class MetricPlumed2(Projection):
 
         cmd = [self._plumed_exe, '--standalone-executable',
                'driver',
-               '--mf_dcd', dcd,
+               '--mf_xtc', xtc,
                '--pdb', pdb,
                '--plumed', metainp]
-        logger.info("Invoking " + " ".join(cmd))
+        logger.debug("Invoking " + " ".join(cmd))
         try:
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
@@ -377,7 +431,7 @@ if __name__ == "__main__":
     import sys
     import numpy as np
     import htmd
-    from htmd.projections.metricplumed2 import MetricPlumed2
+    from htmd.projections.metricplumed2 import *
 
     try:
         _getPlumedRoot()
@@ -388,24 +442,8 @@ if __name__ == "__main__":
     import doctest
     doctest.testmod()
 
-    # One simulation
-    mol = Molecule(os.path.join(htmd.home(), 'data', '1kdx', '1kdx_0.pdb'))
-    mol.read(os.path.join(htmd.home(), 'data', '1kdx', '1kdx.dcd'))
-
-    metric = MetricPlumed2(['d1: DISTANCE ATOMS=1,200',
-                            'd2: DISTANCE ATOMS=5,6'])
-    #    metric = MetricPlumed2([''])  # to test exceptions
-    data = metric.project(mol)
-    ref = np.array([0.536674, 21.722393, 22.689391, 18.402114, 23.431387, 23.13392, 19.16376, 20.393544,
-                    23.665517, 22.298349, 22.659769, 22.667669, 22.484084, 20.893447, 18.791701,
-                    21.833056, 19.901318])
-    assert np.all(np.abs(ref - data[:, 0]) < 0.01), 'Plumed demo calculation is broken'
 
     # Simlist
-    # datadirs=glob(os.path.join(home(), 'data', 'adaptive', 'data', '*' )
-    # fsims=simlist(glob(os.path.join(home(), 'data', 'adaptive', 'data', '*', '/')),
-    #              os.path.join(home(), 'data', 'adaptive', 'generators', '1','structure.pdb'))
-
     dd = htmd.home(dataDir="adaptive")
     fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
                          dd + '/generators/1/structure.pdb')
@@ -414,4 +452,27 @@ if __name__ == "__main__":
         ['d1: DISTANCE ATOMS=2,3',
          'd2: DISTANCE ATOMS=5,6']))
     data2 = metr.project()
+
+
+    # One simulation
+    testpath=os.path.join(htmd.home(), 'data', '1kdx')
+    mol = Molecule(os.path.join(testpath, '1kdx_0.pdb'))
+    mol.read(os.path.join(htmd.home(), 'data', '1kdx', '1kdx.dcd'))
+
+    metric = MetricPlumed2(['d1: DISTANCE ATOMS=1,200',
+                            'd2: DISTANCE ATOMS=5,6'])
+    data = metric.project(mol)
+    ref = np.array([0.536674, 21.722393, 22.689391, 18.402114, 23.431387, 23.13392, 19.16376, 20.393544,
+                    23.665517, 22.298349, 22.659769, 22.667669, 22.484084, 20.893447, 18.791701,
+                    21.833056, 19.901318])
+    assert np.all(np.abs(ref - data[:, 0]) < 0.01), 'Plumed demo calculation is broken'
+
+
+    #    metric = MetricPlumed2([''])  # to test exceptions
+
+    # Simlist
+    # datadirs=glob(os.path.join(home(), 'data', 'adaptive', 'data', '*' )
+    # fsims=simlist(glob(os.path.join(home(), 'data', 'adaptive', 'data', '*', '/')),
+    #              os.path.join(home(), 'data', 'adaptive', 'generators', '1','structure.pdb'))
+
     pass

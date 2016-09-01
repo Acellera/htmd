@@ -117,14 +117,14 @@ class QMCalculation:
 
     # Set up point cloud if esp calculation requested
    
-    if self.esp == True:
-       self.points = self._generate_points()
-    elif isinstance( self.esp, np.ndarray ):
+    if isinstance( self.esp, np.ndarray ):
        self.points = [ self.esp ]
-       if self.points.shape[1]!=3: 
+       if self.points[0].shape[1]!=3: 
           raise ValueError( "ESP point array must be npoints x 3" )
-       if self.coords.shape[2] != 1:
+       if self.molecule.coords.shape[2] != 1:
           raise ValueError( "Can only specift ESP point array with a single frame of coords" )
+    elif self.esp == True:
+       self.points = self._generate_points()
     else:
        self.points = None
 

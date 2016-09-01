@@ -238,8 +238,8 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
-def autoSegment2(mol, sel='protein and backbone', basename='P', fields=('segid')):
-    """ Detects backbone gaps in a selection and assigns incrementing segid to each fragment
+def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
+    """ Detects bonded segments in a selection and assigns incrementing segid to each segment
 
     Parameters
     ----------
@@ -259,7 +259,7 @@ def autoSegment2(mol, sel='protein and backbone', basename='P', fields=('segid')
 
     Example
     -------
-    >>> newmol = autoSegment(mol,'chain B','P')
+    >>> newmol = autoSegment(mol, 'chain B', 'P')
     """
     from scipy.sparse import csr_matrix
     from scipy.sparse.csgraph import connected_components
@@ -267,33 +267,45 @@ def autoSegment2(mol, sel='protein and backbone', basename='P', fields=('segid')
     if isinstance(fields, str):
         fields = (fields,)
 
-    # Letters to be used for chains, if free: 0123456789abcd...ABCD..., minus chain symbols already used
-    used_chains = set(mol.chain)
-    chain_alphabet = list(string.digits + string.ascii_letters)
-    available_chains = [x for x in chain_alphabet if x not in used_chains]
-
-    submol = mol.copy()
-    idx = mol.atomselect(sel, indexes=True)
+    sel += ' and backbone'  # Looking for bonds only over the backbone of the protein
+    idx = mol.atomselect(sel, indexes=True)  # Keep the original atom indexes to map from submol to mol
+    submol = mol.copy()  # We filter out everything not on the backbone to calculate only those bonds
     submol.filter(sel, _logger=False)
-    bonds = submol._getBonds()
+    bonds = submol._getBonds()  # Calculate both file and guessed bonds
 
     sparsemat = csr_matrix((np.ones(bonds.shape[0] * 2),  # Values
                             (np.hstack((bonds[:, 0], bonds[:, 1])),  # Rows
                              np.hstack((bonds[:, 1], bonds[:, 0])))), shape=[submol.numAtoms,submol.numAtoms])  # Columns
     numcomp, compidx = connected_components(sparsemat, directed=False)
 
+    # Warning about bonds bonding non-continuous resids
+    bondresiddiff = np.abs(submol.resid[bonds[:, 0]] - submol.resid[bonds[:, 1]])
+    if np.any(bondresiddiff > 1):
+        for i in np.where(bondresiddiff > 1)[0]:
+            logger.warning('Bonds found between resid gaps: resid {} and {}'.format(submol.resid[bonds[i, 0]], submol.resid[bonds[i, 1]]))
+
     mol = mol.copy()
-    for i in range(numcomp):
+    prevsegres = None
+    for i in range(numcomp):  # For each connected component / segment
+        segid = basename + str(i)
+        backboneSegIdx = idx[compidx == i]  # The backbone atoms of the segment
+        segres = mol.atomselect('same residue as index {}'.format(' '.join(map(str, backboneSegIdx)))) # Get whole residues
+
+        # Warning about separating segments with continuous resids
+        if i > 0 and (np.min(mol.resid[segres]) - np.max(mol.resid[prevsegres])) == 1:
+            logger.warning('Separated segments {} and {}, despite continuous resids, due to lack of bonding.'.format(
+                            basename + str(i-1), segid))
+
+        # Add the new segment ID to all fields the user specified
         for f in fields:
-            # chain only has 1 char available
-            if f == 'chain':
-                 mol.__dict__[f][idx[compidx == i]] = available_chains[i]
-            else:
-                mol.__dict__[f][idx[compidx == i]] = basename + str(i)
-    if numcomp == 1:
-        logger.info('Created 1 segment.')
-    else:
-        logger.info('Created {} segments.'.format(numcomp))
+            if np.any(mol.__dict__[f] == segid):
+                raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
+            mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
+
+        logger.info('Created segment {} between resid {} and {}.'.format(segid, np.min(mol.resid[segres]),
+                                                                         np.max(mol.resid[segres])))
+        prevsegres = segres  # Store old segment atom indexes for the warning about continuous resids
+
     return mol
 
 
