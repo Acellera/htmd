@@ -34,7 +34,10 @@ class Molecule:
     """ Class to manipulate molecular structures.
 
     Molecule contains all the fields of a PDB and it is independent of any force field. It can contain multiple
-    conformations and trajectories, however all operations are done on the current frame.
+    conformations and trajectories, however all operations are done on the current frame. The following PDB fields 
+    are accessible as attributes (record, serial, name, altloc, resname, chain, resid, insertion, coords,
+    occupancy, beta, segid, element, charge). The coordinates are accessible via the coords attribute 
+    ([number of atoms x 3 x number of frames] where [x,y,z] are the second dimension.
 
     Parameters
     ----------
@@ -54,42 +57,6 @@ class Molecule:
     PDB field - beta shape: (1701,)
     ...
 
-    Properties
-    ----------
-    PDB Fields
-
-    record : np.ndarray
-        PDB record field.
-    serial : np.ndarray
-        PDB serial field.
-    name : np.ndarray
-        PDB name field.
-    altloc : np.ndarray
-        PDB alternative location field.
-    resname : np.ndarray
-        PDB residue name field.
-    chain : np.ndarray
-        PDB chain field.
-    resid : np.ndarray
-        PDB residue ID field.
-    insertion : np.ndarray
-        PDB insertion code field.
-    occupancy : np.ndarray
-        PDB occupancy field.
-    beta : np.ndarray
-        PDB beta value field.
-    segid : np.ndarray
-        PDB segment ID field.
-    element : np.ndarray
-        PDB element field.
-    charge : np.ndarray
-        PDB charge field.
-    bonds : np.ndarray
-        PDB bonds information.
-    ssbonds : np.ndarray
-        PDB secondary structure bonds field.
-    coords : np.ndarray
-        PDB coordinates. 3D matrix. [number of atoms x 3 x number of frames] where the second dimension are the [x,y,z]
 
     Other Fields
 
