@@ -73,7 +73,8 @@ class AdaptiveMD(AdaptiveBase):
         Number of TICA dimensions to use. When set to 0 it disables TICA
     contactsym : str, default=None
         Contact symmetry
-
+    save : bool, default=False
+        Save the model generated
 
     Example
     -------
@@ -107,6 +108,7 @@ class AdaptiveMD(AdaptiveBase):
         self._cmdValue('ticalag', 'int', 'Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.', 20, TYPE_INT, RANGE_0POS)
         self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3, TYPE_INT, RANGE_0POS)
         self._cmdString('contactsym', 'str', 'Contact symmetry', None)
+        self._cmdBoolean('save', 'bool', 'Save the model generated', False)
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
@@ -130,10 +132,12 @@ class AdaptiveMD(AdaptiveBase):
 
         datadr.dropTraj()  # Preferably we should do this before any projections. Corrupted sims can affect TICA
         datadr.cluster(self.clustmethod(n_clusters=self._numClusters(datadr.numFrames)))
-        model = Model(datadr)
-        model.markovModel(self.lag, self._numMacrostates(datadr))
+        self._model = Model(datadr)
+        self._model.markovModel(self.lag, self._numMacrostates(datadr))
+        if self.save:
+            self._model.save('adapt_model_e'+str(self._getEpoch())+'.dat')
 
-        relFrames = self._getSpawnFrames(self, model, datadr)
+        relFrames = self._getSpawnFrames(self._model, datadr)
         self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
 
     def _getSpawnFrames(self, model, data):
@@ -146,13 +150,17 @@ class AdaptiveMD(AdaptiveBase):
         return relFrames
 
     def _criteria(self, model, criteria):
-        # TODO. REST OF CRITERIA!
-        P_I = []
         if criteria == '1/Mc':
             nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
             P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
             P_I = P_I / nMicroPerMacro
-        return P_I[model.macro_ofmicro]
+            ret = P_I[model.macro_ofmicro]
+        elif criteria == 'pi/Mc':
+            nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
+            P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
+            P_I = P_I / nMicroPerMacro
+            ret = P_I[model.macro_ofmicro]*model.msm.stationary_distribution
+        return ret
 
     def _spawn(self, ranking, N, truncated=False):
         if truncated:
@@ -382,7 +390,7 @@ if __name__ == "__main__":
     # md.datapath = 'input'
     # md.app = AcemdLocal(inputfile='input.acemd')
 
-    md.app = AcemdLocal(datadir='data')
+    # md.app = AcemdLocal(datadir='data')
     # md.run()  # Takes too long (2 minutes on 780).
 
 
