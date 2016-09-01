@@ -256,5 +256,5 @@ if __name__ == '__main__':
     md.goalprojection = MetricRmsd(Molecule(htmd.home() + '/data/adaptive/generators/1/structure.pdb'),
                                    'protein and name CA')
     md.goalfunction = rmsdgoal
-    md.app = AcemdLocal()
-    md.run()
+    #md.app = AcemdLocal()
+    #md.run()
