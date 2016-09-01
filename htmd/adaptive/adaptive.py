@@ -19,6 +19,8 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 import logging
 logger = logging.getLogger(__name__)
 
+_TRAJ_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf')
+
 
 class AdaptiveBase(ProtocolInterface):
     def __init__(self):
@@ -104,7 +106,7 @@ class AdaptiveBase(ProtocolInterface):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns(*_TRAJ_EXTENSIONS))
                 k += 1
 
     def _getEpoch(self):
@@ -164,7 +166,7 @@ class AdaptiveBase(ProtocolInterface):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS, '*.coor'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
@@ -291,7 +293,7 @@ class Adaptive(object):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns('*.dcd', '*.xtc'))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns(*_TRAJ_EXTENSIONS))
                 k += 1
 
     def _getEpoch(self):
@@ -351,7 +353,7 @@ class Adaptive(object):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.dcd', '*.xtc', '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS, '*.coor'))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
