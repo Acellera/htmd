@@ -166,7 +166,7 @@ class AdaptiveBase(ProtocolInterface):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS, '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor',*_TRAJ_EXTENSIONS))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
@@ -353,7 +353,7 @@ class Adaptive(object):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS, '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor',*_TRAJ_EXTENSIONS))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
