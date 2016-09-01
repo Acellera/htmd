@@ -102,6 +102,8 @@ class Metric:
             A projection or a list of projections which to use on the simulations
         """
         self.projectionlist = projection
+        if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
+            self.projectionlist = [self.projectionlist]
 
     def project(self):
         """
@@ -114,8 +116,6 @@ class Metric:
         """
         if len(self.projectionlist) == 0:
             raise NameError('You need to provide projections using the Metric.projection method.')
-        if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
-            self.projectionlist = [self.projectionlist]
 
         if isinstance(self.simulations, Molecule):
             data = []
@@ -237,6 +237,17 @@ def _singleMolfile(sims):
         single = True
         molfile = sims[0].molfile
     return single, molfile
+
+
+def _projectionGenerator(metric, ncpus):
+    for i in range(0, len(metric.simulations), ncpus):
+        simrange = range(i, np.min((i+ncpus, len(metric.simulations))))
+        results = Parallel(n_jobs=ncpus, verbose=0)(delayed(_projector)(metric, i) for i in simrange)
+        yield results
+
+
+def _projector(metric, i):
+    return metric._projectSingle(i)
 
 
 class _OldMetric(metaclass=ABCMeta):
