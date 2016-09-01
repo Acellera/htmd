@@ -35,7 +35,6 @@ def _getPlumedInfo(what):
 
 
 # Static utility functions ---------------------------------------------------------
-@staticmethod
 def genTemplate(action, include_optional=False):
         """ Return the template for the given action
 
@@ -160,12 +159,8 @@ class PlumedCV(PlumedStatement):
             else:
                 raise TypeError("Unexpected type passed at argument: " + k)
 
-    def __repr__(self):
+    def __str__(self):
         r = ""
-
-        # Prerequisites (uniquely)
-        for p in sorted([str(i) for i in set(self.prereq)]):
-            r = r + p + "\n"
 
         # Label
         r = r + self.label + ": " + self.cv + " "
@@ -214,7 +209,7 @@ class PlumedGenericGroup(PlumedStatement):
         self.sel = sel
         self.code = "%s: %s ATOMS=%s" % (self.label, type, ",".join(map(str, al)))
 
-    def __repr__(self):
+    def __str__(self):
         return self.code
 
 
@@ -308,9 +303,23 @@ class MetricPlumed2(Projection):
         except Exception as e:
             raise Exception("To use MetricPlumed2 please ensure PLUMED 2's executable is installed and in path")
 
-        if type(plumed_inp) is list or type(plumed_inp) is tuple:
-            plumed_inp = "\n".join([str(x) for x in plumed_inp])
-        self._plumed_inp = str(plumed_inp)
+        # Sanitize if single element
+        if not isinstance(plumed_inp, list):
+            plumed_inp = [plumed_inp]
+
+        prereqs = set()
+        for i in plumed_inp:
+            if hasattr(i,'prereq'):
+                prereqs=prereqs.union(i.prereq)
+
+        prereqs_s = "\n".join([str(x) for x in prereqs])
+        inp_s     = "\n".join([str(x) for x in plumed_inp])
+
+        self._plumed_inp = prereqs_s+"\n\n"+inp_s
+
+    def __str__(self):
+        return self._plumed_inp
+
 
     def _readColvar(self):
         # Assumptions: file begins with #! FIELDS time
@@ -381,12 +390,12 @@ class MetricPlumed2(Projection):
         # XTC
         xtc = os.path.join(td, "temp.xtc")
         mol.write(xtc)
-        logger.info("Done writing %d frames in %s" % (mol.numFrames, xtc))
+        logger.debug("Done writing %d frames in %s" % (mol.numFrames, xtc))
 
         # Colvar
         colvar = os.path.join(td, "temp.colvar")
         self.colvar = colvar
-        logger.info("Colvar file is " + colvar)
+        logger.debug("Colvar file is " + colvar)
 
         # Metainp
         metainp = os.path.join(td, "temp.metainp")
@@ -401,7 +410,7 @@ class MetricPlumed2(Projection):
                '--mf_xtc', xtc,
                '--pdb', pdb,
                '--plumed', metainp]
-        logger.info("Invoking " + " ".join(cmd))
+        logger.debug("Invoking " + " ".join(cmd))
         try:
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
