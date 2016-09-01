@@ -329,7 +329,7 @@ class Rates(object):
     g0eq : float
         The free energy between source and sink, calculated from the equilibrium probability
     """
-    def __str__(self):
+    def __repr__(self):
         s = ''
         s += 'mfpton = {:.2E} (ns)\n'.format(self.mfpton)
         s += 'mfptoff = {:.2E} (ns)\n'.format(self.mfptoff)

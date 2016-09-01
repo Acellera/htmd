@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 class AdaptiveMD(AdaptiveBase):
     """ Adaptive class which uses a Markov state model for respawning
 
-    AdaptiveRun uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
-    currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
-    currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
+    AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
+    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
+    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
     the discretized trajectories. From the Markov model it then chooses conformations from the various states based on
     the chosen criteria which will be used for starting new simulations.
 
@@ -75,7 +75,7 @@ class AdaptiveMD(AdaptiveBase):
 
     Example
     -------
-    >>> adapt = AdaptiveRun2()
+    >>> adapt = AdaptiveRunMD()
     >>> adapt.nmin = 2
     >>> adapt.nmax = 3
     >>> adapt.nepochs = 2
@@ -86,7 +86,7 @@ class AdaptiveMD(AdaptiveBase):
     >>> adapt.run()
     """
 
-    def __init__(self):
+    def __init__(self,save=False):
         from sklearn.base import ClusterMixin
         from htmd.projections.projection import Projection
         super().__init__()
@@ -104,6 +104,8 @@ class AdaptiveMD(AdaptiveBase):
         self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3, TYPE_INT, RANGE_0POS)
         self._cmdString('filtersel', 'str', 'Filtering atom selection', 'not water')
         self._cmdString('contactsym', 'str', 'Contact symmetry', None)
+#        self._cmdBoolean('save', 'bool', 'Save the model generated', False)
+        self._save = save
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
@@ -113,12 +115,15 @@ class AdaptiveMD(AdaptiveBase):
 
         metr = Metric(filtlist, skip=self.skip)
         metr.set(self.projection)
-
+        
         #if self.contactsym is not None:
         #    contactSymmetry(data, self.contactsym)
 
         if self.ticadim > 0:
-            tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))
+            #gianni: without project it was tooooo slow
+            data = metr.project()
+            #tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))
+            tica = TICA(data, int(max(2, np.ceil(self.ticalag))))
             datadr = tica.project(self.ticadim)
         else:
             datadr = metr.project()
@@ -142,8 +147,8 @@ class AdaptiveMD(AdaptiveBase):
 
         from pyemma.msm import timescales_msm
         timesc = timescales_msm(datadr.St.tolist(), lags=self.lag, nits=macronum).get_timescales()
+         
         macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
-
         model.markovModel(self.lag, macronum)
         p_i = self._criteria(model, self.method)
         (spawncounts, prob) = self._spawn(p_i, self.nmax - self._running)
@@ -151,17 +156,28 @@ class AdaptiveMD(AdaptiveBase):
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=replacement)
         logger.debug('relFrames {}'.format(relFrames))
+        
+        #for revising it later
+        self.model = model
+        if self._save: # get epoch before write new inputs to keep previous epoch
+            self.model.save('adapt_model_e'+str(adapt._getEpoch())+'.dat')
 
         self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
 
     def _criteria(self, model, criteria):
-        # TODO. REST OF CRITERIA!
         P_I = []
         if criteria == '1/Mc':
             nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
             P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
             P_I = P_I / nMicroPerMacro
-        return P_I[model.macro_ofmicro]
+            ret = P_I[model.macro_ofmicro]
+        elif criteria == 'pi/Mc':
+            nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
+            P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
+            P_I = P_I / nMicroPerMacro
+            ret = P_I[model.macro_ofmicro]*model.msm.stationary_distribution            
+
+        return ret
 
     def _spawn(self, ranking, N, truncated=False):
         if truncated:
@@ -370,7 +386,7 @@ if __name__ == "__main__":
     # md.datapath = 'input'
     # md.app = AcemdLocal(inputfile='input.acemd')
 
-    md.app = AcemdLocal(datadir='data')
+    # md.app = AcemdLocal(datadir='data')
     # md.run()  # Takes too long (2 minutes on 780).
 
 
