@@ -10,7 +10,7 @@ import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
-from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite
+from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
@@ -1146,7 +1146,7 @@ class Molecule:
             coords = np.atleast_3d(src.coords[:, :, self.frame].copy())
             BINCOORwrite(coords, filename)
         elif type == "pdb" or ext == "pdb":
-            self._writePDB(filename, src)
+            PDBwrite(src, filename)
         elif type == "xyz" or ext == "xyz":
             XYZwrite(src, filename)
         elif type == "psf" or ext == "psf":
@@ -1168,21 +1168,6 @@ class Molecule:
                 traj.save(filename)
             except:
                 raise ValueError("Unknown file type")
-
-    def _writePDB(self, filename, src):
-        pdb = PDBParser()
-        for k in self._pdb_fields:
-            pdb.__dict__[k] = src.__dict__[k].copy()
-
-        pdb.coords = np.atleast_3d(pdb.coords[:, :, self.frame])  # Writing out only current frame
-
-        pdb.bonds = src.bonds
-        pdb.ssbonds = src.ssbonds  # TODO: Is there such a thing in pdb format?
-        if pdb.box is not None:
-            pdb.box = np.atleast_2d(np.atleast_2d(self.box)[:, self.frame])
-
-        pdb.serial = np.arange(1, np.size(pdb.coords, 0) + 1)
-        pdb.writePDB(filename)
 
     def empty(self, numAtoms):
         """ Creates an empty molecule of N atoms.
