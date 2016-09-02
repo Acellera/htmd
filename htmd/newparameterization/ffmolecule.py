@@ -311,8 +311,9 @@ class FFMolecule(Molecule):
       if (d.atoms == phi).all():  
          phi_to_fit = d
          dih_index=i
-      else:
          frozens.append(d.atoms)
+      else:
+         pass
       i=i+1
     if not phi_to_fit: raise ValueError( "specified phi is not a recognised soft dihedral" )
 
@@ -337,7 +338,7 @@ class FFMolecule(Molecule):
     except:
       pass
     dih_name = "%s-%s-%s-%s" % ( self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]] )
-    qmset   = QMCalculation( mol, charge=self.netcharge, directory="%s/%s" % (directory, dih_name), frozen=frozens )
+    qmset   = QMCalculation( mol, charge=self.netcharge, directory="%s/%s" % (directory, dih_name), frozen=frozens, optimized=True )
     r = qmset.results()
     x=0
     ret=[]
@@ -348,7 +349,7 @@ class FFMolecule(Molecule):
       x=x+1
     return ret
 
-  def fitSoftDihedral( self, phi ):
+  def fitSoftDihedral( self, phi, geomopt=True ):
     found=False
     phi_to_fit = None
     frozens=[]
@@ -360,8 +361,10 @@ class FFMolecule(Molecule):
       if (d.atoms == phi).all():  
          phi_to_fit = d
          dih_index=i
-      else:
          frozens.append(d.atoms)
+      else:
+         if not geomopt:
+           frozens.append(d.atoms)
       i=i+1
     if not phi_to_fit: raise ValueError( "specified phi is not a recognised soft dihedral" )
     self._makeDihedralUnique( phi_to_fit )
@@ -382,12 +385,16 @@ class FFMolecule(Molecule):
 
     mol        = self.copy()
     mol.coords = cset
+
+    dirname = "dihedral-single-point"
+    if geomopt: dirname="dihedral-opt"
+
     try:
-      os.mkdir("dihedral")
+      os.mkdir( dirname )
     except:
       pass
     dih_name = "%s-%s-%s-%s" % ( self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]] )
-    qmset   = QMCalculation( mol, charge=self.netcharge, directory="dihedral/%s" % (dih_name), frozen=frozens )
+    qmset   = QMCalculation( mol, charge=self.netcharge, directory= os.path.join( dirname, (dih_name)) , frozen=frozens, optimize=geomopt )
 
     ret = self._makeDihedralFittingSetFromQMResults( atoms, qmset.results() )
 
