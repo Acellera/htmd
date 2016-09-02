@@ -120,3 +120,16 @@ def PSFwrite(molecule, filename):
     print("%10d !NNB: acceptors\n" % (0), file=f)
     print("%10d %10d !NGRP \n" % (0, 0), file=f)
     f.close()
+
+
+def XYZwrite(src, filename):
+    import re
+    fh = open(filename, "w")
+    natoms = len(src.record)
+    print("%d\n" % (natoms), file=fh)
+    for i in range(natoms):
+        e = src.element[i].strip()
+        if not len(e):
+            e = re.sub("[1234567890]*", "", src.name[i])
+        print("%s   %f   %f    %f" % (e, src.coords[i, 0, src.frame], src.coords[i, 1, src.frame], src.coords[i, 2, src.frame]), file=fh)
+    fh.close()
