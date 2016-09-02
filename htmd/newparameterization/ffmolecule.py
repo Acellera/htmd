@@ -385,12 +385,16 @@ class FFMolecule(Molecule):
 
     mol        = self.copy()
     mol.coords = cset
+
+    dirname = "dihedral-single-point"
+    if geomopt: dirname="dihedral-opt"
+
     try:
-      os.mkdir("dihedral")
+      os.mkdir( dirname )
     except:
       pass
     dih_name = "%s-%s-%s-%s" % ( self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]] )
-    qmset   = QMCalculation( mol, charge=self.netcharge, directory="dihedral/%s" % (dih_name), frozen=frozens, optimize=geomopt )
+    qmset   = QMCalculation( mol, charge=self.netcharge, directory= os.path.join( dirname, (dih_name)) , frozen=frozens, optimize=geomopt )
 
     ret = self._makeDihedralFittingSetFromQMResults( atoms, qmset.results() )
 
