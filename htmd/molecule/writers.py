@@ -5,6 +5,10 @@ from htmd.molecule.support import xtc_lib
 
 
 def XTCwrite(coords, box, filename, time=None, step=None):
+    numFrames = coords.shape[2]
+    if np.size(box, 1) != numFrames:  # Box should have as many frames as trajectory
+        box = np.tile(box, (1, numFrames))
+
     nframes = np.size(coords, 2)
     if np.size(time) != nframes:
         time = np.zeros(nframes)

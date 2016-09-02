@@ -1143,7 +1143,8 @@ class Molecule:
             src.filter(sel, _logger=False)
 
         if type == "coor" or ext == "coor":
-            self._writeBinCoordinates(filename, src)
+            coords = np.atleast_3d(src.coords[:, :, self.frame].copy())
+            BINCOORwrite(coords, filename)
         elif type == "pdb" or ext == "pdb":
             self._writePDB(filename, src)
         elif type == "xyz" or ext == "xyz":
@@ -1151,7 +1152,7 @@ class Molecule:
         elif type == "psf" or ext == "psf":
             PSFwrite(src, filename)
         elif type == "xtc" or ext == "xtc":
-            self._writeTraj(filename, src)
+            XTCwrite(src.coords, src.box, filename, self.time, self.step)
         else:
             try:
                 import mdtraj as md
@@ -1168,10 +1169,6 @@ class Molecule:
             except:
                 raise ValueError("Unknown file type")
 
-    def _writeBinCoordinates(self, filename, src):
-        coords = np.atleast_3d(src.coords[:, :, self.frame].copy())
-        BINCOORwrite(coords, filename)
-
     def _writePDB(self, filename, src):
         pdb = PDBParser()
         for k in self._pdb_fields:
@@ -1186,12 +1183,6 @@ class Molecule:
 
         pdb.serial = np.arange(1, np.size(pdb.coords, 0) + 1)
         pdb.writePDB(filename)
-
-    def _writeTraj(self, filename, src):
-        # Write xtc
-        if np.size(src.box, 1) != self.numFrames:
-            src.box = np.tile(src.box, (1, self.numFrames))
-        XTCwrite(src.coords, src.box, filename, self.time, self.step)
 
     def empty(self, numAtoms):
         """ Creates an empty molecule of N atoms.
