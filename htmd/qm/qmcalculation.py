@@ -257,6 +257,7 @@ class QMCalculation:
           os.mkdir( dn )
       dirs.append(dn)
       # Write input files for both PSI4 and Gaussian
+      self._write_xyz( dn, c )	
       self._write_psi4( dn, c )
       self._write_gaussian( dn, c )
       i=i+1
@@ -482,6 +483,18 @@ class QMCalculation:
     print( "f.close()", file=f )
     f.close()
 
+
+  def _write_xyz( self, dirname, frame ):
+    coords = self.molecule.coords[:,:,frame]
+    f = open( os.path.join( dirname, "input.xyz"  ), "w" )
+    print( "%d\n" % ( coords.shape[0] ), file=f )
+    for i in range(coords.shape[0] ):
+      print("%s\t %f\t %f\t %f" % ( self.molecule.element[i], coords[i,0], coords[i,1], coords[i,2] ), file=f )
+    f.close()
+
+    pass
+  
+
   def _write_gaussian( self, dirname, frame ):
     coords = self.molecule.coords[:,:,frame]
     f = open( os.path.join( dirname, "input.gjf"  ), "w" )
@@ -504,7 +517,7 @@ class QMCalculation:
     print("", file=f )
     if self.frozen:
       for i in range(len(self.frozen)):
-         print("%s %s %s %s F\n" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2],  self.frozen[i][3]), file=f )
+         print("%s %s %s %s F" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2],  self.frozen[i][3]), file=f )
 
 
 
