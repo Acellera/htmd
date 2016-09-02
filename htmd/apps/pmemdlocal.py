@@ -134,10 +134,14 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 # AMBER automatically runs the calculation on the GPU with the
                 # most memory even if that GPU is already in use
                 # See: http://ambermd.org/gpus/#Running
-                # We assume the machine doesn't have the exhaustive mode
+                # We assume the machine has the exhaustive mode setup
+                # So if other GPUs are being used when we launch the adaptive
+                # runs, jobs are only run in the free GPUs
+                # You set Persistence and Compute Exclusive Modes by running the following as root:
+                # $ nvidia-smi -pm 1
+                # $ nvidia-smi -c 3
 
                 # need to tell the shell script what engine we are using
-
                 with open(os.path.join(path, 'MD.sh'), 'r') as bash:
                     bash_file = bash.read()
 
@@ -146,7 +150,7 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
 
                 with open(os.path.join(path, 'MD.sh'), 'w') as equil:
                     equil.write(bash_file)
-                cmd = 'export CUDA_VISIBLE_DEVICES="{}"\n'.format(str(ngpu))
+
                 cmd += """cd {} && bash {} > log.txt 2>&1""".format(os.path.normpath(path),
                                                                     'MD.sh')
                 try:
