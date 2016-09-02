@@ -44,7 +44,7 @@ class Production(ProtocolInterface):
         self.amber.nstlim = 12500000
         self.amber.ntt = 3
         self.amber.gamma_ln = 1.0
-        self.amber.temp0 = 300.0        
+        self.amber.temp0 = 300.0
         self.amber.ntpr = 5000
         self.amber.ntwr = 50000
         self.amber.ntwx = 5000
@@ -67,7 +67,7 @@ class Production(ProtocolInterface):
    dt=DT, ig=IG,
    ntb=NTB, ntp=NTP, cut=CUT, barostat=BAROSTAT, ioutfm=IOUTFM, ntxo=NTXO,
  / \n"""
-        #self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
+        # self.amber.FORTRAN = ''' HEATING\n &cntrl\n'''
         self.amber.bash = '''ENGINE -O -i INPUT -o OUTPUT -p TOPOLOGY -c RESTART -x TRAJOUT -r RESTOUT'''  # FIXME: add -ref REFERENCE
 
     def _findFiles(self, inputdir):
@@ -97,7 +97,7 @@ class Production(ProtocolInterface):
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
     # FIXME: add inputdir and outputdir to write method
-    # need to decide how to organize MD engine input files!!!
+    # need to decide how to organize MD engine input files!!!
     # Probably will create a bash script here with all the information needed to run pmemd, e.g.:
     # pmemd.cuda_SPFP -O -i Equil.in -o Equil.out -c structure.rst -p structure \
     # -r EquilRestart.rst -x EquilRestart.nc (-ref Min.rst)
@@ -216,7 +216,7 @@ class Production(ProtocolInterface):
         self.amber.bash = self.amber.bash.replace(
             'RESTOUT', 'Production_new.rst')
         # FIXME: add ref
-        #self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
+        # self.amber.bash = self.amber.bash.replace('REFERENCE', self.amber.reference)
 
         with open(os.path.join(outputdir, 'MD.sh'), 'w') as text_file:
             text_file.write(self.amber.bash)
@@ -224,4 +224,4 @@ class Production(ProtocolInterface):
         shutil.copy(restartfile, outputdir)
         shutil.copy(topology, outputdir)
         # FIXME: add ref
-        #shutil.copy(consref, outputdir)
+        # shutil.copy(consref, outputdir)
