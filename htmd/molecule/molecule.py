@@ -144,7 +144,7 @@ class Molecule:
         for field in self._dtypes:
             self.__dict__[field] = np.empty(self._dims[field], dtype=self._dtypes[field])
         self.ssbonds = []
-        self.frame = 0
+        self._frame = 0
         self.fileloc = []
         self.time = []
         self.step = []
@@ -161,6 +161,18 @@ class Molecule:
                     self.viewname = filename
                     if path.isfile(filename):
                         self.viewname = path.basename(filename)
+
+    @property
+    def frame(self):
+        if self._frame < 0 or self._frame >= self.numFrames:
+            raise NameError("frame out of range")
+        return self._frame
+
+    @frame.setter
+    def frame(self, value):
+        if value < 0 or value >= self.numFrames:
+            raise NameError("Frame index out of range. Molecule contains {} frame(s). Frames are 0-indexed.".format(self.numFrames))
+        self._frame = value
 
     def insert(self, mol, index):
         """Insert the contents of one molecule into another at a specific index.
@@ -1157,8 +1169,6 @@ class Molecule:
                 raise ValueError("Unknown file type")
 
     def _writeBinCoordinates(self, filename, src):
-        if self.frame < 0 or self.frame > self.numFrames:
-            raise NameError("frame out of range")
         coords = src.coords[:, :, self.frame].copy()
         coords = np.atleast_3d(coords.reshape((coords.shape[0], 3, 1)))
         BINCOORwrite(coords, filename)
