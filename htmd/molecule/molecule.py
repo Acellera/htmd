@@ -1169,8 +1169,7 @@ class Molecule:
                 raise ValueError("Unknown file type")
 
     def _writeBinCoordinates(self, filename, src):
-        coords = src.coords[:, :, self.frame].copy()
-        coords = np.atleast_3d(coords.reshape((coords.shape[0], 3, 1)))
+        coords = np.atleast_3d(src.coords[:, :, self.frame].copy())
         BINCOORwrite(coords, filename)
 
     def _writePDB(self, filename, src):
