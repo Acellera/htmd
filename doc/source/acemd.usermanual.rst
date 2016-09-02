@@ -25,6 +25,7 @@ and capabilities:
 -  Scripting TCL and C interfaces
 -  Metadynamics using PLUMED 1.3/2.0, including parallel tempering
    metadynamics and replica exchange
+-  Total integration with HTMD 
 
 Fundamental units
 -----------------
@@ -46,23 +47,17 @@ Force field parameters
 The default force-field formats used by ACEMD are CHARMM including
 cross-term support and Amber force-fields. The code can also simulate
 OPLS force-fields in CHARMM format via translated force-fields. To
-build the molecular system it is possible to use any tool that it
-suitable for these force fields. For instance, charmm or
- VMD for the Charmm forcefield and ambertools (free) for Amber.
+build the molecular system it is possible to use HTMD.
 
 CHARMM force field
 ~~~~~~~~~~~~~~~~~~
 
-ACEMD reads directly the psf and parameter files for Charmm. You can
-generate these files as usual with the Charmm suite or with VMD. The
-topology and parameters force fields for CHARMM are available at
-Mackerell's page. Please refer to this link for the complete and latest
-information. Different forcefields might give diffent results for your
-system. Also the quality of the forcefields have greatly improved in the
-last years. Use always the latest forcefield unless you have a specific
-reason not to. For Charmm we suggest two forcefields:
+ACEMD reads directly the psf and parameter files for Charmm. The
+topology and parameters force fields for CHARMM are included in the HTMD
+distribution. Also the quality of the forcefields have greatly improved in the
+last years. HTMD always provide the latest version. 
 
--  **CHARMM36** - this is the latest available forcefield for Charmm. It
+-  **CHARMM36** - this is the latest available forcefield for Charmm (Feb2016). It
    is probably the best forcefield for membrane proteins. The free (for
    academics) online website CHARMM-GUI is very good to set up a
    membrane system also changing the type of lipids. However it is still
@@ -73,23 +68,15 @@ reason not to. For Charmm we suggest two forcefields:
    better for protein folding. You can also mix Charmm22star for protein
    with Charmm36 for proteins. Note that this is different from Charmm22
    without star which should never be used. Charmm27 also widely used is
-   known to overstabilize helices and should also be avoided now that
-   there are better alternatives. Charmm22star files are available from
-   us here: `charmm22star topology
-   file <http://docs.acellera.com/acemd/pub/top_all22star_prot.inp>`__
-   and `parameter
-   file <http://docs.acellera.com/acemd/pub/par_all22star_prot.inp>`__.
-   There is no official distribution of charmm22star files, but these
-   were manually validated against Desmond implementation and we are
-   sufficiently confident that they are correct and acemd produces the
-   correct forces.
+   known to overstabilize helices and should also be avoided now. 
 
 AMBER force field
 ~~~~~~~~~~~~~~~~~
 
 AMBER input files are read by ACEMD, so it is only necessary to provide
-a PDB instead of the CRD file (load it and save it from VMD). Use the
-following commands in your ACEMD configuration files :
+a PDB instead of the CRD file (use HTMD to convert). The
+following commands in your ACEMD configuration files but they are automatically set
+by HTMD if you prepared the system with it:
 
 ::
 
@@ -102,23 +89,7 @@ We suggest that you keep switching when using AMBER force fields in
 ACEMD to avoid force discontinuities at the cutoff distance as you do
 for CHARMM.
 
-The latest forcefield from Amber is the best to use
-
--  **Amber14SB** solves several shortcomings of previous Amber
-   forcefields. Special parameters for the Amber forcefields can be
-   found at this site. To obtain the latest forcefield simply download
-   the latest version of AmberTools for free.
-
-To generate a system with tleap using ff14SB and new ions, load the
-following settings
-
-::
-
-    source leaprc.ff14SB # FF14 forcefield 
-    source leaprc.gaff   # If custom ligands: GAFF forcefield
-    # Modified ions and ion names Joung/Cheatham ion parameters for TIP3P water
-    loadamberparams frcmod.ionsjc_tip3p
-    loadoff ions08.lib
+The latest forcefield from Amber is the best to use.
 
 OPLS force field
 ~~~~~~~~~~~~~~~~
@@ -325,72 +296,6 @@ unless you really know what you are doing (for large number of atoms all
 ensembles are equivalent statistically). For molecular systems up to
 100,000 atoms in a membrane allow for an equilibration of 20 ns, for
 globular proteins 1 to 5 ns are sufficient.
-
-Full Configuration Example
---------------------------
-
-Shown below is an example of an explicit input file for an Amber force
-field simulation in the NPT ensemble using positional restraints:
-
-::
-
-    # Inputs
-        coordinates         structure.pdb
-        bincoordinates      input.coor
-        binvelocities       input.vel
-        extendedsystem      input.xsc
-    # Configure force calculation
-        pme                 on
-        pmegridspacing      1.0
-        pmefreq             2
-        cutoff              9.
-        switching           on
-        switchdist          7.5
-    # Configure integration
-        rigidbonds          all
-        hydrogenscale       4.0
-        timestep            4.0
-    # Configure output
-        energyfreq          5000
-        xtcfreq             25000
-        xtcfile             trajectory.xtc
-        outputname          output
-        restart             on
-        restartfreq         25000
-        restartname         restart      
-    # Configure thermostat
-        langevin            on
-        langevintemp        300.0
-        langevindamping     0.1
-    # Configure barostat 
-        berendsenpressure                on
-        berendsenpressuretarget          1.01325
-        berendsenpressurerelaxationtime  800
-        useflexiblecell     off
-        useconstantratio    on
-    # Configure positional restraints
-        constraints         on
-        consref             structure.pdb
-        constraintscaling   1.0
-    # Configure for Amber ff
-        amber       on
-        parmfile    structure.prmtop 
-        switching   on
-        switchdist  7.5
-        exclude     scaled1-4
-        1-4scaling  0.8333333333333333
-    # run
-        run                 100ns
-
-This is equivalent to simple write in the quick format:
-
-::
-
-    protocol ff/amber
-    protocol run/NPT
-    langevintemp        300.0
-    constraints         on
-    run 100ns
 
 Input Files
 -----------
