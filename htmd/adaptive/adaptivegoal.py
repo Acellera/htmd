@@ -243,6 +243,7 @@ if __name__ == '__main__':
     shutil.copytree(htmd.home() + '/data/adaptive/', tmpdir)
     os.chdir(tmpdir)
     md = AdaptiveGoal()
+    md.dryrun = True
     md.nmin = 1
     md.nmax = 2
     md.nepochs = 3
