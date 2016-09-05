@@ -68,7 +68,11 @@ def main_parameterize():
     print(" == Charge fitting ==\n")
     #  (score, qm_dipole, mm_dipole) = mol.fitCharges()
 
-    print("\tCharge Chi^2 score : %f" % score)
+    rating="GOOD"
+    if score > 1:  rating="CHECK"
+    if score > 10: rating="BAD"
+
+    print("\tCharge Chi^2 score : %f : %s" % ( score, rating ))
     print("\tQM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
     print("\tMM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
     print("")
@@ -80,7 +84,10 @@ def main_parameterize():
             try:
                 ret = mol.fitSoftDihedral(d)
 
-                print("\tTorsion %s Chi^2 score : %f" % (name, ret.chisq))
+                rating="GOOD"
+                if ret.chisq > 10:  rating="CHECK"
+                if ret.chisq > 100: rating="BAD"
+                print("\tTorsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
 
                 fn = mol.plotDihedralFit(ret, show=False, directory="plots")
             except:
