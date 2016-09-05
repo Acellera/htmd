@@ -151,7 +151,7 @@ class Metric:
         # joblib.parallel.BatchCompletionCallBack = oldcallback
 
         from htmd.config import _config
-        results = Parallel(n_jobs=_config['ncpus'], verbose=11)(
+        results = Parallel(n_jobs=_config['ncpus'], verbose=6)(
                 delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
 
         for i in range(len(results)):
