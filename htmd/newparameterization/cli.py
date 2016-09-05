@@ -96,6 +96,7 @@ def main_parameterize():
   mol.write( "parameters/mol.psf" )
   mol.write( "parameters/mol.xyz" )
   mol.write( "parameters/mol.pdb" )
+  mol.write( "parameters/mol.mol2" )
   
   sys.exit(0)	
 
