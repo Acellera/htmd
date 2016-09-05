@@ -313,6 +313,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False, caps=caps,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, noregen=noregen, psfgen=psfgen)
     _checkFailedAtoms(molbuilt)
+    _recoverProtonations(molbuilt)
     return molbuilt
 
 
@@ -565,6 +566,15 @@ def _protonationPatches(mol):
             raise RuntimeError('Found resname {}. This protonation state does not exist in CHARMM. Cannot build.')
 
     return patches
+
+
+# Recover protonation states of residues after building (CHARMM renames protonated residues to standard names)
+def _recoverProtonations(mol):
+    mol.set('resname', 'ASH', sel='same residue as (resname ASP and name HD2)')
+    mol.set('resname', 'GLH', sel='same residue as (resname GLU and name HE2)')
+    mol.set('resname', 'LYN', sel='resname LYS and not (same residue as (resname LYS and name HZ3))')  # The LYN patch removes the HZ3 proton
+    mol.set('resname', 'AR0', sel='resname ARG and not (same residue as (resname ARG and name HE))')   # The AR0 patch removes the HE proton
+    # Histidine protonations keep their names in CHARMM. No need to rename them
 
 
 def combine(prmlist, outfile):

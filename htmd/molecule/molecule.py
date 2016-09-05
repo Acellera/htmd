@@ -10,7 +10,7 @@ import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
-from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite
+from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
@@ -144,7 +144,7 @@ class Molecule:
         for field in self._dtypes:
             self.__dict__[field] = np.empty(self._dims[field], dtype=self._dtypes[field])
         self.ssbonds = []
-        self.frame = 0
+        self._frame = 0
         self.fileloc = []
         self.time = []
         self.step = []
@@ -161,6 +161,18 @@ class Molecule:
                     self.viewname = filename
                     if path.isfile(filename):
                         self.viewname = path.basename(filename)
+
+    @property
+    def frame(self):
+        if self._frame < 0 or self._frame >= self.numFrames:
+            raise NameError("frame out of range")
+        return self._frame
+
+    @frame.setter
+    def frame(self, value):
+        if value < 0 or value >= self.numFrames:
+            raise NameError("Frame index out of range. Molecule contains {} frame(s). Frames are 0-indexed.".format(self.numFrames))
+        self._frame = value
 
     def insert(self, mol, index):
         """Insert the contents of one molecule into another at a specific index.
@@ -1125,16 +1137,22 @@ class Molecule:
             type = type.lower()
         ext = os.path.splitext(filename)[1][1:]
 
+        src = self
+        if sel is not None and sel != 'all':
+            src = self.copy()
+            src.filter(sel, _logger=False)
+
         if type == "coor" or ext == "coor":
-            self._writeBinCoordinates(filename, sel)
+            coords = np.atleast_3d(src.coords[:, :, self.frame].copy())
+            BINCOORwrite(coords, filename)
         elif type == "pdb" or ext == "pdb":
-            self._writePDB(filename, sel)
+            PDBwrite(src, filename)
         elif type == "xyz" or ext == "xyz":
-            self._writeXYZ(filename, sel)
+            XYZwrite(src, filename)
         elif type == "psf" or ext == "psf":
-            self._writeConnectivity(filename, sel)
+            PSFwrite(src, filename)
         elif type == "xtc" or ext == "xtc":
-            self._writeTraj(filename, sel)
+            XTCwrite(src.coords, src.box, filename, self.time, self.step)
         else:
             try:
                 import mdtraj as md
@@ -1150,68 +1168,6 @@ class Molecule:
                 traj.save(filename)
             except:
                 raise ValueError("Unknown file type")
-
-    def _writeXYZ(self, filename, sel="all"):
-        src = self
-        if sel is not None:
-            src = sel.copy()
-            src.filter(sel, _logger=False)
-        fh = open(filename, "w")
-        natoms = len(src.record)
-        print("%d\n" % (natoms), file=fh)
-        for i in range(natoms):
-            e = src.element[i].strip()
-            if (not len(e)):
-                e = re.sub("[1234567890]*", "", src.name[i])
-            print("%s   %f   %f    %f" % (e, src.coords[i, 0, 0], src.coords[i, 1, 0], src.coords[i, 2, 0]), file=fh)
-        fh.close()
-
-    def _writeBinCoordinates(self, filename, sel):
-        if self.frame < 0 or self.frame > self.numFrames:
-            raise NameError("frame out of range")
-        mol = self.copy()
-        mol.coords = mol.coords[:, :, self.frame]
-        mol.coords = np.atleast_3d(mol.coords.reshape((mol.coords.shape[0], 3, 1)))
-        if sel is not None: mol.filter(sel, _logger=False)
-        # Bincoor is in angstrom
-        BINCOORwrite(mol.coords, filename)
-
-    def _writeConnectivity(self, filename, sel):
-        src = self
-        if sel is not None:
-            src = self.copy()
-            src.filter(sel, _logger=False)
-        PSFwrite(src, filename)
-
-    def _writePDB(self, filename, sel='all'):
-        src = self
-        if sel is not None and sel != 'all':
-            src = self.copy()
-            src.filter(sel, _logger=False)
-
-        pdb = PDBParser()
-        for k in self._pdb_fields:
-            pdb.__dict__[k] = src.__dict__[k].copy()
-
-        pdb.coords = np.atleast_3d(pdb.coords[:, :, self.frame])  # Writing out only current frame
-
-        pdb.bonds = src.bonds
-        pdb.ssbonds = src.ssbonds  # TODO: Is there such a thing in pdb format?
-        if pdb.box is not None:
-            pdb.box = np.atleast_2d(np.atleast_2d(self.box)[:, self.frame])
-
-        pdb.serial = np.arange(1, np.size(pdb.coords, 0) + 1)
-        pdb.writePDB(filename)
-
-    def _writeTraj(self, filename, sel):
-        # Write xtc
-        src = self
-        if sel is not None:
-            src = self.copy()
-            src.filter(sel, _logger=False)
-        if np.size(src.box, 1) != self.numFrames:
-            src.box = np.tile(src.box, (1, self.numFrames))
-        XTCwrite(src.coords, src.box, filename, self.time, self.step)
 
     def empty(self, numAtoms):
         """ Creates an empty molecule of N atoms.
