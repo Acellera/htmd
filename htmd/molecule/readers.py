@@ -598,7 +598,10 @@ def PDBread(filename, mode='pdb'):
 
     # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
     serials = parsedtopo.serial.as_matrix()
-    if np.max(parsedbonds.max()) > np.max(serials):
+    if isinstance(serials[0], str) and np.any(serials == '*****'):
+        logger.info('Non-integer serials were read. For safety we will discard all bond information and serials will be assigned automatically.')
+        topo.serial = np.arange(1, len(serials)+1, dtype=np.int)
+    elif np.max(parsedbonds.max()) > np.max(serials):
         logger.info('Bond indexes in PDB file exceed atom indexes. For safety we will discard all bond information.')
     else:
         mapserials = np.ones(np.max(serials)+1) * -1
