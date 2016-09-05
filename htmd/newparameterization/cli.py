@@ -16,16 +16,26 @@ import os
 
 
 def main_parameterize():
+  ncpus = os.cpu_count()
+  try:
+    ncpus = int( os.getenv("NCPUS") )
+  except:
+    pass
+
   parser = argparse.ArgumentParser( description="Acellera Small Molecule Parameterisation Version 2.0" )
   parser.add_argument( "-m", "--mol2", help="Molecule to parameterise, in mol2 format", type=str, default="input.mol2", action="store", dest="mol" )
   parser.add_argument( "-c", "--charge", help="Net charge on molecule", type=int, default=None, action="store", dest="charge" )
   parser.add_argument( "--rtf", help="Inital RTF parameters (req --prm)", type=str, default=None, dest="rtf" )
   parser.add_argument( "--prm", help="Inital PRM parameters (req --rtf)", type=str, default=None, dest="prm" )
-  parser.add_argument( "-o", "--output", help="Output dirctory", type=str, default="parameters" )
+  parser.add_argument( "-o", "--output", metavar="DIRECTORY", help="Output directory", type=str, default="parameters" )
   parser.add_argument( "-l", "--list",help="List parameterisable torsions", action="store_true", default=False, dest="list" )
   parser.add_argument( "-t", "--torsion", metavar="A1-A2-A3-A4",  help="Torsion to parameterise (default all)", action="append", default=None, dest="torsion" ) 
+  parser.add_argument( "-n", "--ncpus",  help="Number of CPUs to use (default %d)" % (ncpus),  default=ncpus, dest="ncpus" ) 
 
   args =parser.parse_args()
+
+  # Communicate the # of CPUs to use to the QM engine via environment variable
+  os.setenv("NCPUS", args.ncpus )
 
   filename = args.mol
 
