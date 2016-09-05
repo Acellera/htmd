@@ -30,8 +30,9 @@ class FFEvaluate:
        self.s14[ d[3], d[0] ] = 1
        self.excl[ d[0], d[3] ] = 1
        self.excl[ d[3], d[0] ] = 1
-       self.e14[ d[0], d[3] ] = d.e14
-       self.e14[ d[3], d[0] ] = d.e14
+       dd = self.prm.dihedralParam( self.rtf.type_by_index[d[0]], self.rtf.type_by_index[d[1]], self.rtf.type_by_index[d[2]], self.rtf.type_by_index[d[3]] )
+       self.e14[ d[0], d[3] ] = dd[0].e14
+       self.e14[ d[3], d[0] ] = dd[0].e14
 
     for d in ffmol.bonds:
        self.excl[ d[0], d[1] ] = 1

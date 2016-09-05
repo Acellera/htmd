@@ -9,7 +9,7 @@ import tempfile
 import shutil
 import subprocess
 import os
-from htmd.newparameterization.ff import RTF,PRM
+from htmd.newparameterization.ff import RTF,PRM,AmberRTF, AmberPRM
 from enum import Enum
 
 class FFTypeMethod(Enum):
@@ -35,7 +35,7 @@ class FFType:
        self._makeTopoFromAmber()
     elif(method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2):
       antechamber_binary = shutil.which("antechamber")
-      if( not amberchamber_binary ): raise RuntimeError("antechamber executable not found")
+      if( not antechamber_binary ): raise RuntimeError("antechamber executable not found")
       parmchk2_binary = shutil.which("parmchk2")
       if( not parmchk2_binary ): raise RuntimeError("parmchk2 executable not found")
 
@@ -47,9 +47,9 @@ class FFType:
         atomtype = "gaff"
         if method == FFTypeMethod.GAFF2: atomtype = "gaff2"
 
-        subprocess.call( [antechamber_binary, "-at", atomtype, "-nc",  str(mol.netcharge), "-fi", "mol2", "mol.mol2", "-fo", "prepi", "mol.prepi" ] )
-        subprocess.call( [parmchk2_binary, "-f", "prepi", "-i", "mol.prepi", "-o", "mol.frcmod",  "-a" ] )
-        self._rtf = AmberRTF( "mol.prepi", "mol.frcmod" )
+        subprocess.call( [antechamber_binary, "-at", atomtype, "-nc",  str(mol.netcharge), "-fi", "mol2", "-i", "mol.mol2", "-fo", "prepi",  "-o", "mol.prepi" ] )
+        subprocess.call( [parmchk2_binary, "-f", "prepi", "-i", "mol.prepi", "-o", "mol.frcmod",  "-a", "Y" ] )
+        self._rtf = AmberRTF( mol, "mol.prepi", "mol.frcmod" )
         self._prm = AmberPRM( "mol.prepi", "mol.frcmod" )
         os.chdir(cwd)
         shutil.rmtree(tmpdir)     

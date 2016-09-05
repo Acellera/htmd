@@ -18,7 +18,7 @@ import os
 def printEnergies( mol ):
   print(" == Diagnostic Energies == ")
   ffe = FFEvaluate( mol )
-  energies = ffe.evalaute()
+  energies = ffe.evaluate( mol.coords[:,:,0] )
   print( "" )
   print( " Bond     : %f" % ( energies['bond'] ) )
   print( " Angle    : %f" % ( energies['angle'] ) )
@@ -93,7 +93,8 @@ def main_parameterize():
     print("\tMM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
     print("")
 
-    for d in dihedrals:
+    if 1:
+      for d in dihedrals:
         name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
         if not args.torsion or name in args.torsion:
             print(" == Fitting torsion %s ==\n" % (name))
@@ -112,7 +113,7 @@ def main_parameterize():
 
     printEnergies( mol )
 
-    print(" == Output to %s ==\n", args.output)
+    print(" == Output to %s ==\n" % ( args.output) )
 
     try:
         os.mkdir(args.output)
@@ -129,7 +130,7 @@ def main_parameterize():
     mol.write("parameters/mol.pdb")
     mol.write("parameters/mol.mol2")
     try:
-      mol.write("parameters/mol.frcmod")
+      mol._prm.writeFrcmod( mol._rtf, "parameters/mol.frcmod")
     except ValueError as e: 
       print("Could not write Amber FRCMOD: %s" % (str(e)) )
     sys.exit(0)
