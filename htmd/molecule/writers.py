@@ -295,3 +295,25 @@ def XYZwrite(src, filename):
             e = re.sub("[1234567890]*", "", src.name[i])
         print("%s   %f   %f    %f" % (e, src.coords[i, 0, src.frame], src.coords[i, 1, src.frame], src.coords[i, 2, src.frame]), file=fh)
     fh.close()
+
+def MOL2write(mol, filename):
+    import re
+
+
+    f = open(filename, "w")
+    l = f.readlines()
+    f.close()
+
+    print( "@<TRIPOS>MOLECULE", file=f )
+    print( "Written by HTMD", file=f )
+    print( "%5d %5d %5d %5d %5d" % ( mol.coords.shape[0], mol.bonds.shape[0], 0, 0, 0 ), file=f )
+    print( "SMALL\nUSER_CHARGES\n", file=f )
+    print( "@<TRIPOS>ATOM", file=f )
+    for i in range( mol.coords.shape[0] ):
+      print( "%7d %8s %9.4f %9.4f %9.4f %8s 1 %8s %12.6f" % ( i+1, mol.name[i], mol.coords[i,0,0], mol.coords[i,1,0], mol.coords[i,2,0], mol.atomtype[i], "MOL", mol.charge[i])
+
+    print( "\n@<TRIPOS>BOND", file=f )
+    for i in range( mol.bonds.shape[0] ):
+      print( "%6d %6d %6d 1" % ( i+1, mol.bonds[i,0], mol.bonds[i,1] ), file=f )
+   print("",file=f)
+

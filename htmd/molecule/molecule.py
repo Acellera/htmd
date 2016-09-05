@@ -10,7 +10,7 @@ import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
-from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite
+from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
@@ -1147,6 +1147,8 @@ class Molecule:
             BINCOORwrite(coords, filename)
         elif type == "pdb" or ext == "pdb":
             PDBwrite(src, filename)
+        elif type == "mol2" or ext == "mol2":
+            MOL2write(src, filename)
         elif type == "xyz" or ext == "xyz":
             XYZwrite(src, filename)
         elif type == "psf" or ext == "psf":
