@@ -103,7 +103,7 @@ def PDBwrite(mol, filename):
     fh = open(filename, 'w')
     # TODO FIXME  -- should take box from traj frame
     box = mol.box
-    if box is not None:
+    if box is not None and not np.all(mol.box == 0):
         box = np.atleast_2d(np.atleast_2d(box)[:, mol.frame])
         print("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90),
             file=fh)
@@ -113,8 +113,8 @@ def PDBwrite(mol, filename):
         for i in range(0, len(mol.record)):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
-            if mol.serial[i] < 100000:
-                ser = str(int(mol.serial[i]))
+            if serial[i] < 100000:
+                ser = str(int(serial[i]))
             else:
                 ser = '*****'
 
