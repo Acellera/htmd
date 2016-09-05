@@ -1,0 +1,296 @@
+* Topology for protein related model compounds
+*
+31  1
+
+! use flexible toplogy/parameter reader
+!!atom for methylguanidine compounds
+!!atoms renamed to 4 letter code
+MASS   501 HRA3     1.00800  ! alphatic proton, CH3
+MASS   502 HRP2     1.00800  ! polar H, +ve charge
+MASS   503 HRM1     1.00800  ! polar H, dimethylamine
+MASS   504 HRM2     1.00800  ! polar H, methylamine
+MASS   505 CRN1    12.01100  ! conjugated C in Arg/guanidinium
+MASS   506 CR33    12.01100  ! aliphatic C for methyl group (-CH3)
+MASS   507 NRC4    14.00700  ! N for deprotonated Schiff's base
+MASS   508 NRN1    14.00700  ! dimethylamine nitrogen
+MASS   509 NRN2    14.00700  ! methylamine nitrogen
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!! original topology from Alex
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!methylguanidine model compounds
+RESI MGU1          0.00 ! deprotonated methyl-guanidinium
+                        ! Ne deprotonated
+GROUP  
+ATOM  C   CRN1     0.66 !      H11  H12
+ATOM  N1  NRN2    -0.60 !        \  /
+ATOM  H11 HRM2     0.29 !         N1
+ATOM  H12 HRM2     0.29 !         |
+ATOM  N2  NRN2    -0.60 !         C       H41
+ATOM  H21 HRM2     0.29 !        / \\    /
+ATOM  H22 HRM2     0.29 !  H21-N2   N3--C4-H42
+ATOM  N3  NRC4    -0.86 !       |        \
+ATOM  C4  CR33    -0.03 !     H22         H43   !extra charge on C4 to neutralize
+ATOM  H41 HRA3     0.09
+ATOM  H42 HRA3     0.09
+ATOM  H43 HRA3     0.09
+BOND   C  N1   C N2    C N3     N3 C4
+BOND   N1 H11  N1 H12  N2 H21   N2 H22  
+BOND   C4 H41  C4 H42  C4 H43
+IMPH   C  N2  N1  N3 
+IMPH   N1 H11 H12 C  N2 H21 H22 C
+
+IC C4   N3   C    N1     0.0000    0.00  180.00    0.00   0.0000
+IC N1   N3   *C   N2     0.0000    0.00  180.00    0.00   0.0000
+IC N3   C    N1   H11    0.0000    0.00  180.00    0.00   0.0000
+IC H11  C    *N1  H12    0.0000    0.00  180.00    0.00   0.0000
+IC N3   C    N2   H21    0.0000    0.00  180.00    0.00   0.0000
+IC H21  C    *N2  H22    0.0000    0.00  180.00    0.00   0.0000
+IC N1   C    N3   C4     0.0000    0.00  180.00    0.00   0.0000
+IC C    N3   C4   H41    0.0000    0.00  180.00    0.00   0.0000
+IC H41  N3   *C4  H42    0.0000    0.00  120.00    0.00   0.0000
+IC H41  N3   *C4  H43    0.0000    0.00 -120.00    0.00   0.0000
+patc firs none last none
+
+RESI MGU2          0.00 ! deprotonated methyl-guanidinium
+                        ! NH1-H12 (outer) deprotonated
+GROUP               
+ATOM  C   CRN1     0.59 !
+ATOM  N1  NRC4    -0.91 !      H11
+ATOM  H11 HRP2     0.37 !        \
+ATOM  N2  NRN2    -0.60 !         N1 
+ATOM  H21 HRM2     0.33 !         ||
+ATOM  H22 HRM2     0.33 !         C       H41
+ATOM  N3  NRN1    -0.54 !        / \     /
+ATOM  H31 HRM1     0.36 !  H21-N2   N3--C4-H42
+ATOM  C4  CR33    -0.20 !       |   |    \      !carbon charge to neutralize
+ATOM  H41 HRA3     0.09 !     H22   H31   H43
+ATOM  H42 HRA3     0.09
+ATOM  H43 HRA3     0.09
+BOND   C  N1   C  N2    C N3    N3 C4
+BOND   N1 H11  N2 H21   N2 H22  N3 H31
+BOND   C4 H41  C4 H42   C4 H43
+IMPH   C  N2  N1  N3
+IMPH   N3 C4  C   H31  N2 H21 H22 C
+
+IC C4   N3   C    N1     0.0000    0.00  180.00    0.00   0.0000
+IC N1   N3   *C   N2     0.0000    0.00  180.00    0.00   0.0000
+IC N3   C    N1   H11    0.0000    0.00  180.00    0.00   0.0000
+IC N3   C    N2   H21    0.0000    0.00  180.00    0.00   0.0000
+IC H21  C    *N2  H22    0.0000    0.00  180.00    0.00   0.0000
+IC N1   C    N3   C4     0.0000    0.00  180.00    0.00   0.0000
+IC C    C4   *N3  H31    0.0000    0.00  180.00    0.00   0.0000
+IC C    N3   C4   H41    0.0000    0.00  180.00    0.00   0.0000
+IC H41  N3   *C4  H42    0.0000    0.00  120.00    0.00   0.0000
+IC H41  N3   *C4  H43    0.0000    0.00 -120.00    0.00   0.0000
+
+patc firs none last none
+
+RESI MGU3          0.00 ! deprotonated methyl-guanidinium
+                        ! NH1-H11 (inner) deprotonated
+!
+!MGU3 parameters obtained directly from MGU2 optimization
+!charges readjust to improve interactions with water
+!Two charge models determined with and without IMPRoper
+!on H31 atom, which has a large effect on the pyramidalization
+!and the overall dipole moment
+!
+!charges with !IMPH   N3 C4  C   H31 commented out
+GROUP  
+ATOM  C   CRN1     0.59 !
+ATOM  N1  NRC4    -0.95 !           H12
+ATOM  H12 HRP2     0.33 !           /
+ATOM  N2  NRN2    -0.60 !         N1 
+ATOM  H21 HRM2     0.33 !         ||
+ATOM  H22 HRM2     0.33 !         C       H41
+ATOM  N3  NRN1    -0.54 !        / \     /
+ATOM  H31 HRM1     0.44 !  H21-N2   N3--C4-H42
+ATOM  C4  CR33    -0.20 !       |   |    \      
+ATOM  H41 HRA3     0.09 !     H22   H31   H43
+ATOM  H42 HRA3     0.09
+ATOM  H43 HRA3     0.09
+
+!charges with !IMPH   N3 C4  C   H31 included
+!GROUP
+!ATOM  C   CRN1     0.59 !
+!ATOM  N1  NRC4    -1.01 !           H12
+!ATOM  H12 HRP2     0.39 !           /
+!ATOM  N2  NRN2    -0.56 !         N1 
+!ATOM  H21 HRM2     0.33 !         ||
+!ATOM  H22 HRM2     0.33 !         C       H41
+!ATOM  N3  NRN1    -0.55 !        / \     /
+!ATOM  H31 HRM1     0.41 !  H21-N2   N3--C4-H42
+!ATOM  C4  CR33    -0.20 !       |   |    \      
+!ATOM  H41 HRA3     0.09 !     H22   H31   H43
+!ATOM  H42 HRA3     0.09
+!ATOM  H43 HRA3     0.09
+BOND   C  N1   C  N2   C  N3    N3 C4
+BOND   N1 H12  N2 H21   N2 H22  N3 H31
+BOND   C4 H41 C4 H42 C4 H43
+IMPH   C  N2  N1  N3
+!IMPH   N3 C4  C   H31 
+IMPH   N2 H21 H22 C
+
+IC C4   N3   C    N1     0.0000    0.00  180.00    0.00   0.0000
+IC N1   N3   *C   N2     0.0000    0.00  180.00    0.00   0.0000
+IC N3   C    N1   H12    0.0000    0.00    0.00    0.00   0.0000
+IC N3   C    N2   H21    0.0000    0.00  180.00    0.00   0.0000
+IC H21  C    *N2  H22    0.0000    0.00  180.00    0.00   0.0000
+IC N1   C    N3   C4     0.0000    0.00  180.00    0.00   0.0000
+IC C    C4   *N3  H31    0.0000    0.00  180.00    0.00   0.0000
+IC C    N3   C4   H41    0.0000    0.00  180.00    0.00   0.0000
+IC H41  N3   *C4  H42    0.0000    0.00  120.00    0.00   0.0000
+IC H41  N3   *C4  H43    0.0000    0.00 -120.00    0.00   0.0000
+patc firs none last none
+
+!patches to convert arginine to neutral species based on the
+!methylguanidine model compounds
+PRES RN1          0.00 !patch for neutral arginine: He delete
+DELE ATOM HE           !from RESI MGU1
+GROUP   
+ATOM CD   CT2      0.06 !-0.03
+ATOM HD1  HA2      0.09
+ATOM HD2  HA2      0.09
+ATOM NE   NRC4    -0.86
+ATOM CZ   CRN1     0.66
+ATOM NH1  NRN2    -0.60
+ATOM HH11 HRM2     0.29
+ATOM HH12 HRM2     0.29
+ATOM NH2  NRN2    -0.60
+ATOM HH21 HRM2     0.29
+ATOM HH22 HRM2     0.29
+!IMPH   C  N2  N1  N3 !present in RESI ARG
+IMPH NH1 HH11 HH12 CZ
+IMPH NH2 HH21 HH22 CZ
+
+PRES RN2          0.00 !patch for neutral arginine: HH12 deleted (proton removed from NH2)
+DELE ATOM HH12         !from RESI MGU2
+GROUP
+ATOM CD   CT2     -0.11 ! -0.20
+ATOM HD1  HA2      0.09
+ATOM HD2  HA2      0.09
+ATOM NE   NRN1    -0.54
+ATOM HE   HRM1     0.36
+ATOM CZ   CRN1     0.59
+ATOM NH1  NRC4    -0.91
+ATOM HH11 HRP2     0.37
+ATOM NH2  NRN2    -0.60
+ATOM HH21 HRM2     0.33
+ATOM HH22 HRM2     0.33
+IMPH NE  CD   CZ   HE
+IMPH NH2 HH21 HH22 CZ
+
+PRES RN3          0.00 !patch for neutral arginine: HH12 deleted (proton adjacent to NH2)
+DELE ATOM HH11         !from RESI MGU3 (see comments on MGU3 residue above)
+GROUP
+ATOM CD   CT2     -0.11 ! -0.20
+ATOM HD1  HA2      0.09
+ATOM HD2  HA2      0.09
+ATOM NE   NRN1    -0.54
+ATOM HE   HRM1     0.44
+ATOM CZ   CRN1     0.59
+ATOM NH1  NRC4    -0.95
+ATOM HH12 HRP2     0.33
+ATOM NH2  NRN2    -0.60
+ATOM HH21 HRM2     0.33
+ATOM HH22 HRM2     0.33
+!IMPH NE  CD   CZ   HE  !removed based on MGU3, see above
+IMPH NH2 HH21 HH22 CZ
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!! The topology below is from
+!!!!  the group of Toby Allen
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!! propyl guanidine
+!! based on MGU1 and RN1
+!! note different atom naming
+!! and numbering
+
+!reset default patches
+
+DEFA FIRS NONE LAST NONE
+
+!following not tested
+
+RESI PGUN          0.00
+GROUP
+ATOM CB   CT3    -0.27  !
+ATOM HB1  HA3     0.09  !
+ATOM HB2  HA3     0.09  !
+ATOM HB3  HA3     0.09
+GROUP                   !
+ATOM CG   CT2    -0.18
+ATOM HG1  HA2     0.09
+ATOM HG2  HA2     0.09
+GROUP
+ATOM CD   CT2      0.06 !-0.03
+ATOM HD1  HA2      0.09
+ATOM HD2  HA2      0.09
+ATOM NE   NRC4    -0.86
+!ATOM HE   DUM      0.00
+ATOM CZ   CRN1     0.66
+ATOM NH1  NRN2    -0.60
+ATOM HH11 HRM2     0.29
+ATOM HH12 HRM2     0.29
+ATOM NH2  NRN2    -0.60
+ATOM HH21 HRM2     0.29
+ATOM HH22 HRM2     0.29
+
+BOND CG  CB  CD CG  NE CD  CZ NE
+BOND NH2 CZ
+BOND CB  HB3  CB HB1
+BOND CB  HB2 CG  HG1 CG HG2 CD HD1 CD HD2
+BOND NH1 HH11  NH1 HH12  NH2 HH21  NH2 HH22
+DOUBLE   CZ  NH1
+IMPH CZ NH1 NH2 NE
+IMPH NH1 HH11 HH12 CZ
+IMPH NH2 HH21 HH22 CZ
+ACCEPTOR NE
+DONOR HH11 NH1
+DONOR HH12 NH1
+DONOR HH21 NH2
+DONOR HH22 NH2
+
+!! Methyl guanidine residue
+!! based on MGU1 and RN1
+!! note different atom naming
+!! and numbering
+
+RESI MGUN          0.00
+GROUP
+ATOM CD   CT2     -0.03
+ATOM HD1  HA2      0.09
+ATOM HD2  HA2      0.09
+ATOM HD3  HA2      0.09
+ATOM NE   NRC4    -0.86
+!ATOM HE   DUM      0.00
+ATOM CZ   CRN1     0.66
+ATOM NH1  NRN2    -0.60
+ATOM HH11 HRM2     0.29
+ATOM HH12 HRM2     0.29
+ATOM NH2  NRN2    -0.60
+ATOM HH21 HRM2     0.29
+ATOM HH22 HRM2     0.29
+
+BOND NE CD  CZ NE
+BOND NH2 CZ
+BOND CD HD1 CD HD2  CD HD3
+BOND NH1 HH11  NH1 HH12  NH2 HH21  NH2 HH22
+DOUBLE   CZ  NH1
+IMPH CZ NH1 NH2 NE
+IMPH NH1 HH11 HH12 CZ
+IMPH NH2 HH21 HH22 CZ
+ACCEPTOR NE
+DONOR HH11 NH1
+DONOR HH12 NH1
+DONOR HH21 NH2
+DONOR HH22 NH2
+
+
+PATCHING FIRST NONE LAST NONE
+
+END
