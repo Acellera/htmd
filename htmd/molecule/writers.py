@@ -140,15 +140,17 @@ def PDBwrite(mol, filename):
 
         if mol.bonds is not None and len(mol.bonds) != 0:
             bondedatoms = np.unique(mol.bonds)
+            bondedatoms = bondedatoms[bondedatoms < 99998]  # Don't print bonds over 99999 as it overflows the field
 
             for a in bondedatoms:
-                idx = mol.bonds[mol.bonds[:, 0] == a, 1]
-                idx = np.unique(np.append(idx, mol.bonds[mol.bonds[:, 1] == a, 0]))
+                partners = mol.bonds[mol.bonds[:, 0] == a, 1]
+                partners = np.unique(np.append(partners, mol.bonds[mol.bonds[:, 1] == a, 0]))
+                partners = partners[partners < 99998]  # Don't print bonds over 99999 as it overflows the field
                 # I need to support multi-line printing of atoms with more than 4 bonds
-                for k in range(int(np.ceil(len(idx) / 4))):
+                for k in range(int(np.ceil(len(partners) / 4))):
                     print("CONECT%5d" % (a + 1), file=fh, end="")
-                    for j in range((k * 4), np.min((len(idx), (k + 1) * 4))):
-                        print("%5d" % (idx[j] + 1), file=fh, end="")
+                    for j in range((k * 4), np.min((len(partners), (k + 1) * 4))):
+                        print("%5d" % (partners[j] + 1), file=fh, end="")
                     print("", file=fh)
 
         print("ENDMDL", file=fh)
