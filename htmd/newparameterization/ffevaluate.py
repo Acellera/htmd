@@ -22,11 +22,16 @@ class FFEvaluate:
     self.s14 = sp.sparse.lil_matrix( (ffmol.natoms, ffmol.natoms) )
     self.excl= sp.sparse.lil_matrix( (ffmol.natoms, ffmol.natoms) )
 
+    # Store 1-4 elec scaling factors (always 1.0 in CHARMM, these can be per-dihedral in Amber)
+    self.e14 = sp.sparse.lil_matrix( (ffmol.natoms, ffmol.natoms) )
+
     for d in ffmol.dihedrals:
        self.s14[ d[0], d[3] ] = 1
        self.s14[ d[3], d[0] ] = 1
        self.excl[ d[0], d[3] ] = 1
        self.excl[ d[3], d[0] ] = 1
+       self.e14[ d[0], d[3] ] = d.e14
+       self.e14[ d[3], d[0] ] = d.e14
 
     for d in ffmol.bonds:
        self.excl[ d[0], d[1] ] = 1
@@ -45,10 +50,13 @@ class FFEvaluate:
       qi = self.mol.charge[i]
       for j in range( i+1, self.natoms ):
          if not self.excl[ i, j ]:
+             e14_scaling = self.e14[i,j]
+             if e14_scaling==0. : e14_scaling = 1.; # If 0, assume it's not a 1-4 term
+
              qj = self.mol.charge[j]
 
              dr = np.linalg.norm( coords[j,:] - coords[i,:] )
-             e = qi * qj * 332.0636 / dr
+             e = e14_scaling * qi * qj * 332.0636 / dr
              ee = ee + e
 
     return ee;

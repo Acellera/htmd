@@ -36,15 +36,39 @@ class FFType:
     elif(method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2):
       antechamber_binary = shutil.which("antechamber")
       if( not amberchamber_binary ): raise RuntimeError("antechamber executable not found")
-      self._makeTopoFromAmber()
+      parmchk2_binary = shutil.which("parmchk2")
+      if( not parmchk2_binary ): raise RuntimeError("parmchk2 executable not found")
+
+      cwd = os.getcwd()
+      tmpdir = tempfile.mkdtemp()
+      try:
+        os.chdir( tmpdir )
+        mol.write( "mol.mol2" )
+        atomtype = "gaff"
+        if method == FFTypeMethod.GAFF2: atomtype = "gaff2"
+
+        subprocess.call( [antechamber_binary, "-at", atomtype, "-nc",  str(mol.netcharge), "-fi", "mol2", "mol.mol2", "-fo", "prepi", "mol.prepi" ] )
+        subprocess.call( [parmchk2_binary, "-f", "prepi", "-i", "mol.prepi", "-o", "mol.frcmod",  "-a" ] )
+        self._rtf = AmberRTF( "mol.prepi", "mol.frcmod" )
+        self._prm = AmberPRM( "mol.prepi", "mol.frcmod" )
+        os.chdir(cwd)
+        shutil.rmtree(tmpdir)     
+      except:
+        os.chdir(cwd)
+        raise RuntimeError("FFTyping failed running Antechamber and Parmchk2")
+      if not self._rtf or not self._prm: 
+        raise RuntimeError("FFTyping failed reading Antechamber/Parmchk2 output: see %s" % (tmpdir))
+
+
+
       pass
+
     elif(method == FFTypeMethod.CGenFF_2b6 ):
       match_binary = shutil.which("match")
       if( not match_binary ): raise RuntimeError("match executable not found")
 
       cwd = os.getcwd()
       tmpdir = tempfile.mkdtemp()
-      self._makeTopoFromCharmm()
       try:
         os.chdir( tmpdir )
         mol.write( "mol.pdb" )
@@ -62,8 +86,4 @@ class FFType:
     else:
       raise RuntimeError("Unknown method for FFType: %s" %(method) )
 
-  def _makeTopoFromCharmm( self ):
-    pass     
 
-  def _makeTopoFromAmber( self ):
-    pass     

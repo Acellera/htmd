@@ -23,11 +23,12 @@ class AnglePrm:
     self.kUB     = kUB
 
 class TorsPrm:
-  def __init__( self, types, n=0., k0=0., phi0=0. ):
+  def __init__( self, types, n=0., k0=0., phi0=0., e14=1. ):
     self.types  = types
     self.n    = n
     self.k0   = k0
     self.phi0 = phi0
+    self.e14  = e14
 
 class NBPrm:
   def __init__( self, types, epsilon=0., rmin2=0., epsilon_14=None, rmin2_14=None ):
@@ -296,7 +297,110 @@ class PRM:
 
 
 
+class AmberRTF:
+  def __innit__( self, prepi, frcmod ):
+   f = open(prepi, "r" )
+   lines = f.readlines()
+   f.close()
 
+   self.types=[]
+   self.mass_by_type=dict()
+   self.element_by_type=dict()
+   self.type_by_name=dict()
+   self.type_by_index=[]
+   self.index_by_name=dict()
+   self.names=[]
+   self.charge_by_name=dict()
+   self.bonds=[]
+   self.impropers=[]
+   self.typeindex_by_type=dict()
+   self.netcharge= 0.
+
+   if f[4].split()[1] != "INT": raise ValueError("Invalid prepi format line 5")
+   if f[5].trim() != "CORRECT     OMIT DU   BEG" : raise ValueError("Invalid prepi format line 6" )
+
+   # Netcharge is 3rd term on 5th line
+   cc = int(f[4].split()[2])
+
+   idx=10
+   while f[idx].trim() != "":
+     ff = f[idx].split()
+     self.names.append( ff[1] )
+     self.index_by_name( ff[1] ) = idx-10     
+     self.type_by_name( ff[1] ) = ff[2]
+     self.type_by_index.append( ff[2] )
+     self.charge_by_name( ff[1]) = float(ff[10])
+     if not ( ff[1] in self.types ):
+        self.types.append( ff[1] )
+        self.typeindex_by_type( ff[1] ) = 900 + len(self.types)-1 # add a big offset so it doesn't collide with real charm types
+     self.mass_by_type( ff[2] )    = mass
+     self.element_by_type( ff[2] ) = self.guessElement( ff[1] ) 
+
+   f = open(frcmod, "r" )
+   lines = f.readlines()
+   f.close()
+   for ff in lines:
+     ff=ff.trim()
+     if ff == "MASS": section="MASS"
+     elif ff == "BOND": section="BOND"
+     elif ff == "ANGLE": section="ANGLE"
+     elif ff == "DIHE": section="DIHE"
+     elif ff == "IMPROPER": section="IMPROPER"
+     elif ff == "NONBON": section="NONBON"
+     else:
+       if section=="MASS":
+          x = ff.split()
+          self.mass_by_type( x[0] ) float( x[1] )
+
+  def _guessElement( self, name ):
+    import re
+    name = re.sub( '[0-9]*$', '', name )
+    name=name.lower().capitalize()
+    return name
+
+class AmberPRM:
+  def __init__(self, prepi, frcmod ):
+   import math
+   f = open(frcmod, "r" )
+   lines = f.readlines()
+   f.close()
+   for ff in lines:
+     ff=ff.trim()
+     if ff == "MASS": section="MASS"
+     elif ff == "BOND": section="BOND"
+     elif ff == "ANGLE": section="ANGLE"
+     elif ff == "DIHE": section="DIHE"
+     elif ff == "IMPROPER": section="IMPROPER"
+     elif ff == "NONBON": section="NONBON"
+     else:
+       x = ff.split()
+       y = ff.split( x[0], "-" )
+       if section=="MASS":
+          self.mass_by_type( x[0] ) = float( x[1] )
+       elif section=="BOND":
+          self.bonds.append( BondPrm( y[0], y[1], r0=float(x[2]), k0=float(x[1]) ) )
+       elif section=="ANGLE":
+          self.angles.append( AnglePrm( y[0], y[1], y[2], theta0=float(x[2]), k0=float(x[1]) ) )
+          pass
+       elif section=="DIHE":
+          self.dihedrals.append( TorsPrm( y[0], y[1], y[2], y[3], n=math.abs((int)x[4]), k0= (float)x[2] / (float)x[1], phi0=(float)x[3], e14=1./1.2 ) )
+       elif section=="IMPROPER":
+          # Amber impropers have the same potential as dihedrals, except the scaling factor is different
+          self.dihedrals.append( TorsPrm( y[0], y[1], y[2], y[3], n=math.abs((int)x[4]), k0= (float)x[2], phi0=(float)x[3], e14=1./1.2 ) )
+       elif section=="NONBON":
+#          A=float(x[1])
+#          B=float(x[2])
+#          sigma   = (A / B) ** 6.
+#          epsilon = (B * B) / (4. * A)
+#          rmin    = sigma * 2 ** (1./6.)
+          rmin    = (float) x[1]
+          epsilon = (float) x[2]
+          # Amber always scales 1-4 VDW interactions by 0.5
+          self.nonbonded.append( NBPrm( y[0], epsilon=epsilon, rmin2=rmin/2., epsion_14= 0.5 * epsilon,  rmin2_14= rmin/2. ) )
+          pass
+
+
+ 
 class RTF:
   def __init__(self, filename):
    f = open(filename, "r" )
@@ -373,6 +477,7 @@ class RTF:
     for i in range(self.natoms):
        name = self.names[i]
        self.charge_by_name[ name ] = charges[i]
+
    
 #if __name__ == "__main__":
 #
