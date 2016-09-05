@@ -45,13 +45,20 @@ def compareVersions():
     elif len(latestversions) == 1:  # Supporting users which still haven't passed the one day limit. Can remove in next version
         latest = latestversions[0].strip()
         verstring = ''
+    elif currver == 'unpackaged':
+        pass
     else:
         return
+
     if currver != 'unpackaged' and natsorted((latest, currver))[1] != currver:
         print('New {} HTMD version ({}) is available. You are currently on ({}). Use \'conda update htmd\' to '
               'update to the new version.'.format(verstring, latest, currver))
     else:
-        print('You are on the latest HTMD version ({}).'.format(currver))
+        if currver != 'unpackaged':
+            print('You are on the latest HTMD version ({}).'.format(currver))
+        else:
+            from htmd import home
+            print('You are on the latest HTMD version ({} : {}).'.format(currver, home()))
 
 
 def _writeLatestVersionFile(fname):
