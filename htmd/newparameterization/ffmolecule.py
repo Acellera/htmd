@@ -420,6 +420,7 @@ class FFMolecule(Molecule):
 
     for t in param:
        t.k0 = t.phi0 = 0.
+       t.e14 = 1. # Always fit with e14 scaling of 1. per CHARMM
     self._prm.updateDihedral( param )
  
     ffe = FFEvaluate( self )
