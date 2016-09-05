@@ -47,7 +47,7 @@ def main_parameterize():
 
     if not os.path.exists(filename):
         print("file %s not found" % filename)
-        sys.exit(1)
+        sys.exit(0)
 
     print(" === Parameterizing %s ===\n" % filename)
 
@@ -105,4 +105,4 @@ def main_parameterize():
 
 
 if __name__ == "__main__":
-    # main_parameterize()
+    main_parameterize()
