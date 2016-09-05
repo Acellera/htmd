@@ -151,8 +151,8 @@ def run_job(obj, ngpu, pmemd_cuda, datadir, system_name):
                 with open(os.path.join(path, 'MD.sh'), 'w') as equil:
                     equil.write(bash_file)
 
-                cmd += """cd {} && bash {} > log.txt 2>&1""".format(os.path.normpath(path),
-                                                                    'MD.sh')
+                cmd = """cd {} && bash {} > log.txt 2>&1""".format(os.path.normpath(path),
+                                                                   'MD.sh')
                 try:
                     check_output(cmd, shell=True)
                 except CalledProcessError:
