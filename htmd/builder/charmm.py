@@ -866,7 +866,7 @@ if __name__ == '__main__':
     topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
     params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
     tmpdir = tempname()
-    bmol = charmm.build(smol, topo=topos, param=params, outdir=tmpdir)
+    bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
 
     compare = home(dataDir=os.path.join('test-charmm-build', '1A25'))
     files = []
