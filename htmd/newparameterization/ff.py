@@ -408,7 +408,7 @@ class AmberPRM(PRM):
     ret   = []
     found = False
     for i in  range(6):
-     ret.append( TorsPrm( [ n1, n2, n3, n4] , phi0=0., n=i+1, k0=0., e14=1.0  ) )
+     ret.append( TorsPrm( [ n1, n2, n3, n4] , phi0=0., n=i+1, k0=0., e14 = 1.0/1.2  ) )
 
     for b in self.dihedrals:
        #print(b.types)
