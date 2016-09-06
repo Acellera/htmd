@@ -94,7 +94,7 @@ def main_parameterize():
       print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
       print("")
 
-    if 0:
+    if 1:
       for d in dihedrals:
         name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
         if not args.torsion or name in args.torsion:
