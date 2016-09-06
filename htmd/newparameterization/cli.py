@@ -10,11 +10,24 @@ matplotlib.use('Agg')
 
 import argparse
 
-from htmd.newparameterization.ffmolecule import FFMolecule
+from htmd.newparameterization.ffmolecule import FFMolecule, FFEvaluate
 from htmd.newparameterization.fftype import FFTypeMethod
 import sys
 import os
 
+def printEnergies( mol ):
+  print(" == Diagnostic Energies == ")
+  ffe = FFEvaluate( mol )
+  energies = ffe.evaluate( mol.coords[:,:,0] )
+  print( "" )
+  print( " Bond     : %f" % ( energies['bond'] ) )
+  print( " Angle    : %f" % ( energies['angle'] ) )
+  print( " Dihedral : %f" % ( energies['dihedral'] ) )
+  print( " Improper : %f" % ( energies['improper'] ) )
+  print( " Electro  : %f" % ( energies['elec'] ) )
+  print( " VdW      : %f" % ( energies['vdw'] ) )
+  print( "" )
+ 
 
 def main_parameterize():
     ncpus = os.cpu_count()
@@ -35,8 +48,8 @@ def main_parameterize():
                         dest="list")
     parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default all)",
                         action="append", default=None, dest="torsion")
-    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default %d)" % (ncpus), default=ncpus,
-                        dest="ncpus")
+    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default %d)" % (ncpus), default=ncpus, dest="ncpus")
+    parser.add_argument( "-f", "--forcefield", help="Inital FF guess to use", choices=[ "GAFF", "GAFF2", "CGENFF"], default="CGENFF" )
 
     args = parser.parse_args()
 
@@ -51,8 +64,11 @@ def main_parameterize():
 
     print(" === Parameterizing %s ===\n" % filename)
 
-    mol = FFMolecule(filename=filename, method=FFTypeMethod.CGenFF_2b6, netcharge=args.charge, rtf=args.rtf,
-                     prm=args.prm)
+    method = FFTypeMethod.CGenFF_2b6
+    if  args.forcefield == "GAFF" : method = FFTypeMethod.GAFF
+    if  args.forcefield == "GAFF2": method = FFTypeMethod.GAFF2
+
+    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm)
 
     dihedrals = mol.getSoftDihedrals()
 
@@ -66,7 +82,7 @@ def main_parameterize():
     mol.minimize()
 
     print(" == Charge fitting ==\n")
-    #  (score, qm_dipole, mm_dipole) = mol.fitCharges()
+    (score, qm_dipole, mm_dipole) = mol.fitCharges()
 
     rating="GOOD"
     if score > 1:  rating="CHECK"
@@ -77,7 +93,8 @@ def main_parameterize():
     print("\tMM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
     print("")
 
-    for d in dihedrals:
+    if 1:
+      for d in dihedrals:
         name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
         if not args.torsion or name in args.torsion:
             print(" == Fitting torsion %s ==\n" % (name))
@@ -94,20 +111,28 @@ def main_parameterize():
                 pass
                 # print(fn)
 
-    print(" == Output to %s ==\n", args.output)
+    printEnergies( mol )
+
+    print(" == Output to %s ==\n" % ( args.output) )
 
     try:
         os.mkdir(args.output)
     except:
         pass
+    try:
+      mol._rtf.write("parameters/mol.rtf")
+      mol._prm.write("parameters/mol.prm")
+    except ValueError as e:
+      print("Could not write CHARMM PRM: %s" % ( str(e) ) )
 
-    mol._rtf.write("parameters/mol.rtf")
-    mol._prm.write("parameters/mol.prm")
     mol.write("parameters/mol.psf")
     mol.write("parameters/mol.xyz")
     mol.write("parameters/mol.pdb")
     mol.write("parameters/mol.mol2")
-
+    try:
+      mol._prm.writeFrcmod( mol._rtf, "parameters/mol.frcmod")
+    except ValueError as e: 
+      print("Could not write Amber FRCMOD: %s" % (str(e)) )
     sys.exit(0)
 
 
