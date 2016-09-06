@@ -731,39 +731,11 @@ class FFMolecule(Molecule):
       plt.savefig( tf, format="svg")
       return tf
 
-#if __name__ == "__main__":
-#  os.chdir("tests/benzamidine" )
-#
-#  mol = FFMolecule( filename="benzamidine.mol2", method=FFTypeMethod.CGenFF_2b6 )
-#
-#  print("Minimizing")
-#  mol.minimize()
-#
-#  print("Charge fitting")
-#  (score, qm_dipole, mm_dipole) = mol.fitCharges()
-#
-#  print( "Chi^2 score : %f" %( score ) )
-#  print( "QM Dipole   : %f %f %f ; %f" % ( qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3] ) )
-#  print( "MM Dipole   : %f %f %f ; %f" % ( mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3] ) )
-#
-#  dihedrals = mol.getSoftDihedrals()
-#  for d in dihedrals:
-#    print("\nFitting dihedral %s-%s-%s-%s" % ( mol.name[ d[0] ], mol.name[ d[1] ], mol.name[ d[2] ], mol.name[ d[3] ]  ))
-#    ret = mol.fitSoftDihedral( d )
-#
-#    print("Chi^2 score : %f" % ( ret.chisq ) )
-#
-#    fn  = mol.plotDihedralFit( ret, show=False, directory="plots" )
-#    #print(fn)
-#
-#  try:
-#    os.mkdir("parameters")
-#  except:
-#    pass
-#  mol._rtf.write( "parameters/mol.rtf" )
-#  mol._prm.write( "parameters/mol.prm" )
-#  mol.write( "parameters/mol.psf" )
-#  mol.write( "parameters/mol.xyz" )
-#  mol.write( "parameters/mol.pdb" )
-#  
-#
+  def write(self, filename, sel=None, type=None):
+    if hasattr( self, "_rtf" ): # Update base Molecule's attributes so write() works correctly
+      for i in range(self.charge.shape[0]):
+        self.segid[i]    = "L"
+        self.charge[i]   = self._rtf.charge_by_name[ self.name[i] ]
+        self.atomtype[i] = self._rtf.type_by_name[ self.name[i] ]
+
+    super().write( filename, sel=sel, type=type )

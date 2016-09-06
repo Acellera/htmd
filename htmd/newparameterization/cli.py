@@ -82,16 +82,17 @@ def main_parameterize():
     mol.minimize()
 
     print(" == Charge fitting ==\n")
-    (score, qm_dipole, mm_dipole) = mol.fitCharges()
+    if 1:
+      (score, qm_dipole, mm_dipole) = mol.fitCharges()
 
-    rating="GOOD"
-    if score > 1:  rating="CHECK"
-    if score > 10: rating="BAD"
+      rating="GOOD"
+      if score > 1:  rating="CHECK"
+      if score > 10: rating="BAD"
 
-    print("\tCharge Chi^2 score : %f : %s" % ( score, rating ))
-    print("\tQM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
-    print("\tMM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
-    print("")
+      print("Charge Chi^2 score : %f : %s" % ( score, rating ))
+      print("QM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
+      print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
+      print("")
 
     if 1:
       for d in dihedrals:
@@ -104,7 +105,7 @@ def main_parameterize():
                 rating="GOOD"
                 if ret.chisq > 10:  rating="CHECK"
                 if ret.chisq > 100: rating="BAD"
-                print("\tTorsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
+                print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
 
                 fn = mol.plotDihedralFit(ret, show=False, directory="plots")
             except:
@@ -129,6 +130,7 @@ def main_parameterize():
     mol.write("parameters/mol.xyz")
     mol.write("parameters/mol.pdb")
     mol.write("parameters/mol.mol2")
+    mol.write("parameters/mol.coor")
     try:
       mol._prm.writeFrcmod( mol._rtf, "parameters/mol.frcmod")
     except ValueError as e: 

@@ -31,12 +31,12 @@ class TorsPrm:
     self.e14  = e14
 
 class NBPrm:
-  def __init__( self, types, epsilon=0., rmin2=0., epsilon_14=None, rmin2_14=None ):
+  def __init__( self, types, emin=0., rmin=0., emin_14=None, rmin_14=None ):
     self.types  = types
-    self.epsilon = epsilon
-    self.rmin2    = rmin2
-    self.epsilon_14  = epsilon_14
-    self.rmin2_14    = rmin2_14
+    self.emin   = emin
+    self.rmin    = rmin
+    self.emin_14  = emin_14
+    self.rmin_14    = rmin_14
 
 
 class PRM:
@@ -89,10 +89,11 @@ class PRM:
        elif mode.startswith( "IMPROPER" ):
          self.impropers.append( TorsPrm( [ ll[0], ll[1], ll[2], ll[3] ], n=int(ll[5]), k0=float(ll[4]), phi0=float(ll[6]) ) )
        elif mode.startswith( "NONBONDED" ):
+         # Charm prm stores  rmin/2 for some pointless reason. remember to multiply by 2
          if len(ll) < 5:
-           self.nonbonded.append( NBPrm( [ ll[0] ], epsilon=float(ll[2]), rmin2=float(ll[3]) ) )
+           self.nonbonded.append( NBPrm( [ ll[0] ], emin=float(ll[2]), rmin=float(ll[3]) * 2. ) )
          else:
-           self.nonbonded.append( NBPrm( [ ll[0] ], epsilon=float(ll[2]), rmin2=float(ll[3]), epsilon_14 = float(ll[5]), rmin2_14 = float(ll[6]) ) )
+           self.nonbonded.append( NBPrm( [ ll[0] ], emin=float(ll[2]), rmin=float(ll[3]) * 2. , emin_14 = float(ll[5]), rmin_14 = float(ll[6]) ) * 2. )
   
        
   def write(self, filename ):
@@ -101,7 +102,7 @@ class PRM:
         raise ValueError( "Can't express 1-4 electrostatic scaling in Charmm file format" )
  
     f = open(filename, "w" )
-    print("* prm file build by HTMD parameterize", file=f )
+    print("* prm file built by HTMD parameterize", file=f )
     print("*\n", file=f )
     print("BONDS", file=f)
     for a in self.bonds:
@@ -121,10 +122,11 @@ class PRM:
     print("\nNONBONDED nbxmod  5 atom cdiel shift vatom vdistance vswitch -", file=f )
     print("cutnb 14.0 ctofnb 12.0 ctonnb 10.0 eps 1.0 e14fac 1.0 wmin 1.5", file=f )
     for a in self.nonbonded:
-      if( a.epsilon_14 != None ):
-        print("%-6s 0.0000 %8.4f %8.4f 0.0000 %8.4f %8.4f" % ( a.types[0], a.epsilon, a.rmin2, a.epsilon_14, a.rmin2_14 ), file=f )
+      if( a.emin_14 != None ):
+        # Charmm prm stores rmin/2
+        print("%-6s 0.0000 %8.4f %8.4f 0.0000 %8.4f %8.4f" % ( a.types[0], a.emin, a.rmin /2. , a.emin_14, a.rmin_14 / 2.), file=f )
       else:
-        print("%-6s 0.0000 %8.4f %8.4f" % ( a.types[0], a.epsilon, a.rmin2 ), file=f )
+        print("%-6s 0.0000 %8.4f %8.4f" % ( a.types[0], a.emin, a.rmin/2. ), file=f )
     f.close()
 
   def writeFrcmod(self, rtf, filename):
@@ -133,10 +135,10 @@ class PRM:
    for i in self.angles:
      if i.rUB != 0. or i.kUB != 0.: raise ValueError( "Can't express Urey-Bradley terms in Amber file format" )
    for i in self.nonbonded:
-     if not i.rmin2_14 or not i.epsilon_14:
+     if not i.rmin_14 or not i.emin_14:
         raise ValueError( "Can't express 1-4 VdW terms that aren't 0.5x scaled in Amber file format" )
-     eps = math.fabs( i.epsilon - i.epsilon_14 * 2. )
-     if i.rmin2 !=  i.rmin2_14  or eps > 1.e-6 :
+     eps = math.fabs( i.emin - i.emin_14 * 2. )
+     if i.rmin !=  i.rmin_14  or eps > 1.e-6 :
         raise ValueError( "Can't express 1-4 VdW terms that aren't 0.5x scaled in Amber file format" )
    
 
@@ -173,7 +175,7 @@ class PRM:
 
    print("\nNONBON", file=f )
    for i in self.nonbonded:
-      print( "%s %f %f" % ( i.types[0], i.rmin2 * 2., i.epsilon ), file=f )
+      print( "%s %f %f" % ( i.types[0], i.rmin * 2., i.emin ), file=f )
 
    print("", file=f )
    f.close()
@@ -213,23 +215,23 @@ class PRM:
     if (not p1) or (not p2):
       raise ValueError( "Could not find nb parameters for %s - %s" %( n1, n2 ) )
 
-    epsilon_1 = p1.epsilon
-    epsilon_2 = p2.epsilon
-    rmin2_1   = p1.rmin2
-    rmin2_2   = p2.rmin2
+    emin_1 = p1.emin
+    emin_2 = p2.emin
+    rmin_1   = p1.rmin
+    rmin_2   = p2.rmin
     
-    if s14 and (p1.epsilon_14 != None):
-      epsilon_1 = p1.epsilon_14
-      rmin2_1   = p1.rmin2_14
+    if s14 and (p1.emin_14 != None):
+      emin_1 = p1.emin_14
+      rmin_1   = p1.rmin_14
 
-    if s14 and (p2.epsilon_14 != None):
-      epsilon_2 = p2.epsilon_14
-      rmin2_2   = p2.rmin2_14
-
-    neg_emin = math.sqrt( epsilon_1 * epsilon_2 ) 
-    rmin     = ( rmin2_1 + rmin2_2 ) 
+    if s14 and (p2.emin_14 != None):
+      emin_2 = p2.emin_14
+      rmin_2   = p2.rmin_14
+    neg_emin = math.sqrt( emin_1 * emin_2 ) 
+    rmin     = 0.5 * ( rmin_1 + rmin_2 ) 
     A = neg_emin * math.pow( rmin, 12 )
     B = 2.0 * neg_emin * math.pow( rmin, 6 )
+#    print( "emin=%f,%f rmin=%f,%f A=%f B=%f" % (emin_1, emin_2, rmin_1, rmin_2, A,B ) )
 
     return(A, B)
 
@@ -396,12 +398,12 @@ class AmberPRM(PRM):
 #          A=float(x[1])
 #          B=float(x[2])
 #          sigma   = (A / B) ** 6.
-#          epsilon = (B * B) / (4. * A)
+#          emin = (B * B) / (4. * A)
 #          rmin    = sigma * 2 ** (1./6.)
           rmin    = float( x[1] )
-          epsilon = float( x[2] )
+          emin = float( x[2] )
           # Amber always scales 1-4 VDW interactions by 0.5
-          self.nonbonded.append( NBPrm( [y[0]], epsilon=epsilon, rmin2=rmin/2., epsilon_14= 0.5 * epsilon,  rmin2_14= rmin/2. ) )
+          self.nonbonded.append( NBPrm( [y[0]], emin=emin, rmin=rmin, emin_14= 0.5 * emin,  rmin_14= rmin ) )
           pass
 
   def dihedralParam( self, n1, n2, n3, n4 ):

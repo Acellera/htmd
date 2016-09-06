@@ -223,7 +223,7 @@ def PSFwrite(molecule, filename):
 
     f = open(filename, 'w')
     print("PSF\n", file=f)
-    print("%8d !TITLE\n" % (0), file=f)
+    print("%8d !NTITLE\n" % (0), file=f)
     print("%8d !NATOM" % (len(m.serial)), file=f)
     for i in range(len(m.serial)):
         charge = 0
@@ -265,14 +265,14 @@ def PSFwrite(molecule, filename):
     print("\n\n", file=f)
     print("%10d !NPHI: dihedrals" % (m.dihedrals.shape[0]), file=f)
     for i in range(m.dihedrals.shape[0]):
-        if i and not (i % 3):
+        if i and not (i % 2):
             print("", file=f)
         print("%10d%10d%10d%10d" % (m.dihedrals[i, 0] + 1, m.dihedrals[i, 1] + 1, m.dihedrals[i,2]+1, m.dihedrals[i,3]+1), file=f, end="")
 
     print("\n\n", file=f)
     print("%10d !NIMPHI: impropers" % (m.impropers.shape[0]), file=f)
     for i in range(m.impropers.shape[0]):
-        if i and not (i % 3):
+        if i and not (i % 2):
             print("", file=f)
         print("%10d%10d%10d%10d" % (m.impropers[i, 0] + 1, m.impropers[i, 1] + 1, m.impropers[i,2]+1, m.impropers[i,3]+1), file=f, end="")
 
