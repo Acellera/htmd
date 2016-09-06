@@ -104,6 +104,10 @@ def main_parameterize():
       print("Charge Chi^2 score : %f : %s" % ( score, rating ))
       print("QM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
       print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
+      d = qm_dipole[3] - mm_dipole[3]
+      d = d * d
+      rating="X"
+      print("Dipole Chi^2 score : %f : %s" % ( d, rating ) )
       print("")
 
     if 1:

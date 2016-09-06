@@ -393,28 +393,32 @@ class AmberPRM(PRM):
      elif ff == "IMPROPER": section="IMPROPER"
      elif ff == "NONBON": section="NONBON"
      else:
-       x = ff.split()
-       y = x[0].split( "-" )
        if section=="BOND":
-          self.bonds.append( BondPrm( [y[0], y[1]], r0=float(x[2]), k0=float(x[1]) ) )
+          x = ff[5:].split() 
+          y = ff[0:5].split("-")
+          self.bonds.append( BondPrm( [y[0].strip(), y[1].strip()], r0=float(x[1]), k0=float(x[0]) ) )
        elif section=="ANGLE":
-          self.angles.append( AnglePrm( [y[0], y[1], y[2]], theta0=float(x[2]), k0=float(x[1]) ) )
+          x = ff[8:].split() 
+          y = ff[0:8].split("-")
+          self.angles.append( AnglePrm( [y[0].strip(), y[1].strip(), y[2].strip()], theta0=float(x[1]), k0=float(x[0]) ) )
           pass
        elif section=="DIHE":
-          self.dihedrals.append( TorsPrm( [y[0], y[1], y[2], y[3]], n=int(math.fabs(int(float(x[4])))), k0= float(x[2]) / float(x[1]), phi0=float(x[3]), e14=1./1.2 ) )
+          x = ff[11:].split() 
+          y = ff[0:11].split("-")
+          self.dihedrals.append( TorsPrm( [y[0].strip(), y[1].strip(), y[2].strip(), y[3].strip()], n=int(math.fabs(int(float(x[3])))), k0= float(x[1]) / float(x[0]), phi0=float(x[2]), e14=1./1.2 ) )
        elif section=="IMPROPER":
+
+          x = ff[11:].split() 
+          y = ff[0:11].split("-")
           # Amber impropers have the same potential as dihedrals, except the scaling factor is different
-          self.dihedrals.append( TorsPrm( [y[0], y[1], y[2], y[3]], n=int(math.fabs(int(float(x[4])))), k0= float(x[2]), phi0=float(x[3]), e14=1./1.2 ) )
+          self.dihedrals.append( TorsPrm( [y[0].strip(), y[1].strip(), y[2].strip(), y[3].strip()], n=int(math.fabs(int(float(x[3])))), k0= float(x[1]), phi0=float(x[2]), e14=1./1.2 ) )
        elif section=="NONBON":
-#          A=float(x[1])
-#          B=float(x[2])
-#          sigma   = (A / B) ** 6.
-#          emin = (B * B) / (4. * A)
-#          rmin    = sigma * 2 ** (1./6.)
+          x = ff.split()
+          y = x[0].split( "-" )
           rmin =  float( x[1] )  * 2.
-          emin =   - float( x[2] )  
+          emin =  - float( x[2] )  
           # Amber always scales 1-4 VDW interactions by 0.5
-          self.nonbonded.append( NBPrm( [y[0]], emin=emin, rmin=rmin, emin_14= 0.5 * emin,  rmin_14= rmin ) )
+          self.nonbonded.append( NBPrm( [y[0].strip()], emin=emin, rmin=rmin, emin_14= 0.5 * emin,  rmin_14= rmin ) )
           pass
 
   def dihedralParam( self, n1, n2, n3, n4 ):
