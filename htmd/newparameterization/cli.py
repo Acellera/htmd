@@ -78,10 +78,10 @@ def main_parameterize():
             print("\t%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
         sys.exit(0)
 
-    print(" == Minimizing ==\n")
+    print("\n == Minimizing ==\n")
     mol.minimize()
 
-    print(" == Charge fitting ==\n")
+    print("\n == Charge fitting ==\n")
     if 1:
       (score, qm_dipole, mm_dipole) = mol.fitCharges()
 
@@ -94,11 +94,11 @@ def main_parameterize():
       print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
       print("")
 
-    if 1:
+    if 0:
       for d in dihedrals:
         name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
         if not args.torsion or name in args.torsion:
-            print(" == Fitting torsion %s ==\n" % (name))
+            print("\n == Fitting torsion %s ==\n" % (name))
             try:
                 ret = mol.fitSoftDihedral(d)
 
@@ -114,7 +114,7 @@ def main_parameterize():
 
     printEnergies( mol )
 
-    print(" == Output to %s ==\n" % ( args.output) )
+    print("\n == Output to %s ==\n" % ( args.output) )
 
     try:
         os.mkdir(args.output)
@@ -124,7 +124,7 @@ def main_parameterize():
       mol._rtf.write("parameters/mol.rtf")
       mol._prm.write("parameters/mol.prm")
     except ValueError as e:
-      print("Could not write CHARMM PRM: %s" % ( str(e) ) )
+      print("Not writing CHARMM PRM: %s" % ( str(e) ) )
 
     mol.write("parameters/mol.psf")
     mol.write("parameters/mol.xyz")
@@ -134,7 +134,7 @@ def main_parameterize():
     try:
       mol._prm.writeFrcmod( mol._rtf, "parameters/mol.frcmod")
     except ValueError as e: 
-      print("Could not write Amber FRCMOD: %s" % (str(e)) )
+      print("Not writing Amber FRCMOD: %s" % (str(e)) )
     sys.exit(0)
 
 

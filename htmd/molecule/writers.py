@@ -242,7 +242,7 @@ def PSFwrite(molecule, filename):
                (m.resname[i]),
                m.name[i],
                atomtype,
-               m.element[i],
+               "",  # m.element[i], # NAMD barfs if this is set
                charge,
                mass,
                0

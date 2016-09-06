@@ -152,7 +152,7 @@ class PRM:
    for i in self.bonds:
      print( "%s-%s %f %f" % ( i.types[0], i.types[1], i.k0, i.r0 ), file=f )
 
-   print("\nANGLE", file=f )
+   print("\nANGL", file=f )
    for i in self.angles:
      print( "%s-%s-%s %f %f" % ( i.types[0], i.types[1], i.types[2], i.k0, i.theta0 ), file=f )
 
@@ -171,11 +171,11 @@ class PRM:
          if pi < (len(prm)-1) : sign = -1
          print( "%s-%s-%s-%s 1 %f %f %f %f %f" % ( i.types[0], i.types[1], i.types[2], i.types[3], p.k0, p.phi0, sign * p.n, scee, scnb ), file=f )
 
-   print("\nIMPROPER", file=f )
+   print("\nIMPR", file=f )
 
-   print("\nNONBON", file=f )
+   print("\nNONB", file=f )
    for i in self.nonbonded:
-      print( "%s %f %f" % ( i.types[0], i.rmin * 2., i.emin ), file=f )
+      print( "%s %f %f" % ( i.types[0], 0.5 * i.rmin, -i.emin ), file=f )
 
    print("", file=f )
    f.close()
@@ -400,8 +400,8 @@ class AmberPRM(PRM):
 #          sigma   = (A / B) ** 6.
 #          emin = (B * B) / (4. * A)
 #          rmin    = sigma * 2 ** (1./6.)
-          rmin    = float( x[1] )
-          emin = float( x[2] )
+          rmin =  float( x[1] )  * 2.
+          emin =   - float( x[2] )  
           # Amber always scales 1-4 VDW interactions by 0.5
           self.nonbonded.append( NBPrm( [y[0]], emin=emin, rmin=rmin, emin_14= 0.5 * emin,  rmin_14= rmin ) )
           pass
