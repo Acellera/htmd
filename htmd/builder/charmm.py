@@ -827,6 +827,7 @@ if __name__ == '__main__':
     from htmd.builder.solvate import solvate
     from htmd.home import home
     from htmd.util import tempname
+    from htmd.builder.preparation import proteinPrepare
     import filecmp
     import os
     from glob import glob
@@ -835,49 +836,29 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
 
-    np.random.seed(1)
-    mol = Molecule('3PTB')
-    mol.filter('protein')
-    smol = solvate(mol)
-    topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-    params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
-    tmpdir = tempname()
-    bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
+    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+    for pid in pdbids:
+        np.random.seed(1)
+        mol = Molecule(pid)
+        mol.filter('protein')
+        mol = proteinPrepare(mol)
+        mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+        smol = solvate(mol)
+        topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
+        params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+        tmpdir = tempname()
+        bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
 
-    compare = home(dataDir=os.path.join('test-charmm-build', '3PTB'))
-    files = []
-    filestmp = glob(os.path.join(compare, '*'))
-    for f in filestmp:
-        files.append(os.path.basename(f))
+        compare = home(dataDir=os.path.join('test-charmm-build', pid))
+        files = []
+        filestmp = glob(os.path.join(compare, '*'))
+        for f in filestmp:
+            files.append(os.path.basename(f))
 
-    match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
-    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-        raise RuntimeError('Different results produced by charmm.build for test 3PTB')
+        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
+        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+            raise RuntimeError('Different results produced by charmm.build for test {}'.format(pid))
 
-    shutil.rmtree(tmpdir)
-
-    ############################################### Test that has ASH and GLH protonations
-    np.random.seed(1)
-    from htmd.builder.preparation import proteinPrepare
-    mol = Molecule('1A25')
-    mol.filter('protein')
-    mol = proteinPrepare(mol)
-    smol = solvate(mol)
-    topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-    params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
-    tmpdir = tempname()
-    bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
-
-    compare = home(dataDir=os.path.join('test-charmm-build', '1A25'))
-    files = []
-    filestmp = glob(os.path.join(compare, '*'))
-    for f in filestmp:
-        files.append(os.path.basename(f))
-
-    match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
-    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-        raise RuntimeError('Different results produced by charmm.build for test 1A25')
-
-    shutil.rmtree(tmpdir)
+        shutil.rmtree(tmpdir)
 
 
