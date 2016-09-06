@@ -731,11 +731,18 @@ class FFMolecule(Molecule):
       plt.savefig( tf, format="svg")
       return tf
 
-  def write(self, filename, sel=None, type=None):
+  def write(self, filename, sel=None, type=None, typemap=None):
     if hasattr( self, "_rtf" ): # Update base Molecule's attributes so write() works correctly
       for i in range(self.charge.shape[0]):
         self.segid[i]    = "L"
         self.charge[i]   = self._rtf.charge_by_name[ self.name[i] ]
         self.atomtype[i] = self._rtf.type_by_name[ self.name[i] ]
 
+    ref_atomtype = deepcopy(self.atomtype)
+    if typemap:
+      for i in range(self.charge.shape[0]):
+        self.atomtype[i] = typemap[ self.atomtype[i] ]
+  
     super().write( filename, sel=sel, type=type )
+
+    self.atomtype = ref_atomtype

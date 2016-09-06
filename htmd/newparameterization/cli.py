@@ -62,6 +62,18 @@ def main_parameterize():
         print("file %s not found" % filename)
         sys.exit(0)
 
+    # Make outdir directory [outdir]/[ff-name]
+    outdir = os.path.join( args.output, args.forcefield )
+    try:
+        os.mkdir(args.output)
+    except: 
+        pass
+    try:
+        os.mkdir( os.path.join( args.output, args.forcefield ) )
+    except:
+        pass
+
+
     print(" === Parameterizing %s ===\n" % filename)
 
     method = FFTypeMethod.CGenFF_2b6
@@ -107,32 +119,88 @@ def main_parameterize():
                 if ret.chisq > 100: rating="BAD"
                 print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
 
-                fn = mol.plotDihedralFit(ret, show=False, directory="plots")
+                fn = mol.plotDihedralFit(ret, show=False, directory= os.path.join( outdir, "plots") )
             except:
                 pass
                 # print(fn)
 
     printEnergies( mol )
 
-    print("\n == Output to %s ==\n" % ( args.output) )
+
+
+    print("\n == Output to %s ==\n" % (outdir) )
 
     try:
-        os.mkdir(args.output)
-    except:
-        pass
-    try:
-      mol._rtf.write("parameters/mol.rtf")
-      mol._prm.write("parameters/mol.prm")
+      if args.forcefield == "CGENFF":
+        mol._rtf.write( os.path.join( outdir, "mol.rtf" ) )
+        mol._prm.write( os.path.join( outdir, "mol.prm" ) ) 
+        mol.write( os.path.join( outdir, "mol.psf" ) )
+        mol.write( os.path.join( outdir, "mol.xyz" ) )
+        mol.write( os.path.join( outdir, "mol.coor" ) )
+        mol.write( os.path.join( outdir, "mol.mol2" ) )
+        mol.write( os.path.join( outdir, "mol.pdb" ) )
+        f = open( os.path.join(outdir, "input.namd" ), "w"  )
+        print("parameters mol.prm", file=f )
+        print("paraTypeCharmm on", file=f )
+        print("coordinates mol.pdb", file=f )
+        print("bincoordinates mol.coor", file=f )
+        print("temperature 0", file=f )
+        print("timestep 0", file=f )
+        print("1-4scaling 1.0", file=f )
+        print("exclude scaled1-4", file=f )
+ 
+        print("outputname .out", file=f )
+        print("outputenergies 1", file=f )
+        print("structure mol.psf", file=f )
+        print("cutoff 20.", file=f )
+        print("switching off", file=f )
+        print("stepsPerCycle 1", file=f )
+        print("rigidbonds none", file=f )
+ 
+        print("cellBasisVector1 50. 0. 0.", file=f )
+        print("cellBasisVector2 0. 50. 0.", file=f )
+        print("cellBasisVector3 0. 0. 50.", file=f )
+        print("run 0", file=f )
+        f.close()
     except ValueError as e:
       print("Not writing CHARMM PRM: %s" % ( str(e) ) )
 
-    mol.write("parameters/mol.psf")
-    mol.write("parameters/mol.xyz")
-    mol.write("parameters/mol.pdb")
-    mol.write("parameters/mol.mol2")
-    mol.write("parameters/mol.coor")
     try:
-      mol._prm.writeFrcmod( mol._rtf, "parameters/mol.frcmod")
+     if args.forcefield == "GAFF" or args.forcefield == "GAFF2":
+       # types need to be remapped because Amber FRCMOD format limits the type to characters
+       # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
+       typemap = mol._prm.writeFrcmod( mol._rtf, os.path.join( outdir, "mol.frcmod") )
+       mol.write( os.path.join( outdir, "mol.mol2" ), typemap = typemap )
+       mol.write( os.path.join( outdir, "mol.pdb" ), typemap = typemap )
+       mol.write( os.path.join( outdir, "mol.coor" ), typemap = typemap )
+       f = open( os.path.join( outdir, "tleap.in" ) , "w" )
+       print("loadAmberParams mol.frcmod", file=f )
+       print("A = loadMol2 mol.mol2", file=f )
+       print("saveAmberParm A structure.prmtop mol.crd", file=f )
+       print("quit", file=f )
+       f.close()
+       f = open( os.path.join(outdir, "input.namd" ), "w"  )
+       print("parmfile structure.prmtop", file=f )
+       print("amber on", file=f )
+       print("coordinates mol.pdb", file=f )
+       print("bincoordinates mol.coor", file=f )
+       print("temperature 0", file=f )
+       print("timestep 0", file=f )
+       print("1-4scaling 0.83333333", file=f )
+       print("exclude scaled1-4", file=f )
+
+       print("outputname .out", file=f )
+       print("outputenergies 1", file=f )
+       print("cutoff 20.", file=f )
+       print("switching off", file=f )
+       print("stepsPerCycle 1", file=f )
+       print("rigidbonds none", file=f )
+
+       print("cellBasisVector1 50. 0. 0.", file=f )
+       print("cellBasisVector2 0. 50. 0.", file=f )
+       print("cellBasisVector3 0. 0. 50.", file=f )
+       print("run 0", file=f )
+       f.close()
     except ValueError as e: 
       print("Not writing Amber FRCMOD: %s" % (str(e)) )
     sys.exit(0)
