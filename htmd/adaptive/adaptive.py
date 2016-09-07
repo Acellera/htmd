@@ -171,7 +171,7 @@ def _writeInputsFunction(i, f, epoch, inputpath):
     newName = 'e' + str(epoch) + 's' + str(i + 1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
     newDir = path.join(inputpath, newName, '')
     # copy previous input directory including input files
-    copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(_TRAJ_EXTENSIONS_COOR))
+    copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS_COOR))
     # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
     mol = Molecule()
     mol.read(traj)
