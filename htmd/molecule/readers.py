@@ -300,6 +300,8 @@ def MAEread(fname):
     topo = Topology()
     coords = []
     heteros = []
+    #from IPython.core.debugger import Tracer
+    #Tracer()()
 
     import csv
     with open(fname, newline='') as fp:
@@ -334,7 +336,7 @@ def MAEread(fname):
                 if section == 'atoms' and section_data:
                     topo.record.append('ATOM')
                     row = np.array(row)
-                    if len(row) != len(section_dict) +1:  # TODO: fix the reader
+                    if len(row) != len(section_dict):  # TODO: fix the reader
                         raise RuntimeError('{} has {} fields in the m_atom section description, but {} fields in the '
                                            'section data. Please check for missing fields in the mae file.'
                                            .format(fname, len(section_dict), len(row)))
@@ -596,6 +598,7 @@ def PDBread(filename, mode='pdb'):
 
     topo = Topology(parsedtopo)
 
+    # Bond formatting part
     # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
     serials = parsedtopo.serial.as_matrix()
     if isinstance(serials[0], str) and np.any(serials == '*****'):
@@ -604,7 +607,8 @@ def PDBread(filename, mode='pdb'):
     elif np.max(parsedbonds.max()) > np.max(serials):
         logger.info('Bond indexes in PDB file exceed atom indexes. For safety we will discard all bond information.')
     else:
-        mapserials = np.ones(np.max(serials)+1) * -1
+        mapserials = np.empty(np.max(serials)+1)
+        mapserials[:] = np.NAN
         mapserials[serials] = list(range(np.max(serials)))
         for i in range(len(parsedbonds)):
             row = parsedbonds.loc[i].tolist()
@@ -612,7 +616,12 @@ def PDBread(filename, mode='pdb'):
                 if not np.isnan(row[b]):
                     topo.bonds.append([int(row[0]), int(row[b])])
         topo.bonds = np.array(topo.bonds, dtype=np.uint32)
-        topo.bonds[:] = mapserials[topo.bonds[:]]
+        if topo.bonds.size != 0:
+            mappedbonds = mapserials[topo.bonds[:]]
+            wrongidx, _ = np.where(np.isnan(mappedbonds))  # Some PDBs have bonds to non-existing serials... go figure
+            logger.info('Discarding {} bonds to non-existing indexes in the PDB file.'.format(len(wrongidx)))
+            mappedbonds = np.delete(mappedbonds, wrongidx, axis=0)
+            topo.bonds = np.array(mappedbonds, dtype=np.uint32)
 
     if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx
@@ -788,3 +797,5 @@ if __name__ == '__main__':
     mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
     mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
     print('Can read MOL2 files.')
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'protein.mae'))
+    print('Can read MAE files.')

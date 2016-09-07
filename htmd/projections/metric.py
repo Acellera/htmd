@@ -213,16 +213,17 @@ def _processSim(sim, projectionlist, uqmol, skip):
         else:
             mol = Molecule(sim.molfile)
         logger.debug(pieces[0])
-        mol._readTraj(pieces, skip=skip)
        
+       
+        mol.read(pieces, skip=skip)
         #Gianni testing
         #_highfreqFilter(mol,10)
-        
+ 
         data = []
         for p in projectionlist:
-            pj=p.project(mol)
-            if pj.ndim==1:
-                pj=np.atleast_2d(pj).T
+            pj = p.project(mol)
+            if pj.ndim == 1:
+                pj = np.atleast_2d(pj).T
             data.append(pj)
         data = np.hstack(data)
     except Exception as e:
