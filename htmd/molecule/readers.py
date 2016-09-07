@@ -300,6 +300,8 @@ def MAEread(fname):
     topo = Topology()
     coords = []
     heteros = []
+    #from IPython.core.debugger import Tracer
+    #Tracer()()
 
     import csv
     with open(fname, newline='') as fp:
@@ -334,7 +336,7 @@ def MAEread(fname):
                 if section == 'atoms' and section_data:
                     topo.record.append('ATOM')
                     row = np.array(row)
-                    if len(row) != len(section_dict) +1:  # TODO: fix the reader
+                    if len(row) != len(section_dict):  # TODO: fix the reader
                         raise RuntimeError('{} has {} fields in the m_atom section description, but {} fields in the '
                                            'section data. Please check for missing fields in the mae file.'
                                            .format(fname, len(section_dict), len(row)))
@@ -788,3 +790,5 @@ if __name__ == '__main__':
     mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
     mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
     print('Can read MOL2 files.')
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'protein.mae'))
+    print('Can read MAE files.')
