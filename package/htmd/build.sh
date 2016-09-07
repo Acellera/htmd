@@ -11,7 +11,11 @@ printenv
 T="$PWD"
 for S in "$PWD/C/"*; do
 	cd "$S"
-	make CPURE=$CPURE CC=$CC FC=$FC STATIC=$STATIC PLATFORM=$OSNAME TYPE=$TYPE
+  FLAGS=""
+  if [ "$OSNAME" == "Darwin" ];
+   FLAGS=-Wl,-headerpad_max_install_names 
+  fi
+	make CPURE=$CPURE CC=$CC FC=$FC STATIC=$STATIC PLATFORM=$OSNAME TYPE=$TYPE LDFLAGS=$FLAGS
 	cd "$T"
 done
 
