@@ -194,6 +194,17 @@ class Metric:
         return data, ref, fstep
 
 
+def _highfreqFilter(mol,steps):
+    newframes = int(mol.coords.shape[2]/steps)*steps
+    mol.coords =   mol.coords[:,:,:newframes]
+    mol.box = mol.box[:,:newframes]
+    mol.box = mol.box[:,::steps]
+    mol.fstep = mol.fstep*steps
+    coo=np.reshape(mol.coords,[mol.coords.shape[0],mol.coords.shape[1],int(mol.coords.shape[2]/steps),steps])
+    X=np.mean(coo,axis=3)
+#   print("mol: ", mol.coords.shape, " X: ",X.shape)
+    mol.coords=X
+
 def _processSim(sim, projectionlist, uqmol, skip):
     pieces = sim.trajectory
     try:
@@ -202,8 +213,12 @@ def _processSim(sim, projectionlist, uqmol, skip):
         else:
             mol = Molecule(sim.molfile)
         logger.debug(pieces[0])
+       
+       
         mol.read(pieces, skip=skip)
-
+        #Gianni testing
+        #_highfreqFilter(mol,10)
+ 
         data = []
         for p in projectionlist:
             pj = p.project(mol)
