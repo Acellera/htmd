@@ -22,11 +22,11 @@ class KineticsHMM(object):
         if self.source is None:
             logger.info('Detecting source state...')
             self._detectSource()
-            logger.info('Source macro = ' + str(self.source))
+            logger.info('Source macro = ' + str(model.hmm.active_set[self.source]))
         if self.sink is None:
             logger.info('Detecting sink state...')
             self._detectSink()
-            logger.info('Sink macro = ' + str(self.sink))
+            logger.info('Sink macro = ' + str(model.hmm.active_set[self.sink]))
         if model.data.fstep is None:
             raise RuntimeError('Please define a framestep (fstep) for the data object')
 
@@ -103,11 +103,17 @@ class KineticsHMM(object):
         >>> print(r)
         >>> dg = r.g0eq
         """
+        actset = model.hmm.active_set
         if source is None:
             source = self.source
+        else:
+            source = np.where(actset == source)[0]
+
         if sink is None:
             sink = self.sink
-        logger.info('Calculating rates between source: {} and sink: {} states.'.format(source, sink))
+        else:
+            sink = np.where(actset == sink)[0]
+        logger.info('Calculating rates between source: {} and sink: {} states.'.format(actset[source], actset[sink]))
         if source == sink:
             logger.info('Calculating rates between state and itself gives 0')
             r = Rates(); r.mfpton = 0; r.mfptoff=0; r.koff=0; r.kon=0; r.g0eq=0; r.kdeq=0;
