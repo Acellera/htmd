@@ -133,7 +133,7 @@ def XTCread(filename, frames=None):
                 ct.c_char_p(filename.encode("ascii")),
                 natoms,
                 ct.c_int(f))
-            
+
             if not retval:
                 raise IOError('XTC file {} possibly corrupt.'.format(filename))
 
