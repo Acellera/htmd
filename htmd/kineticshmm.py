@@ -103,7 +103,7 @@ class KineticsHMM(object):
         >>> print(r)
         >>> dg = r.g0eq
         """
-        actset = model.hmm.active_set
+        actset = self.model.hmm.active_set
         if source is None:
             source = self.source
         else:
