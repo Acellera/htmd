@@ -411,7 +411,7 @@ class AmberPRM(PRM):
           x = ff[11:].split() 
           y = ff[0:11].split("-")
           # Amber impropers have the same potential as dihedrals, except the scaling factor is different
-          self.dihedrals.append( TorsPrm( [y[0].strip(), y[1].strip(), y[2].strip(), y[3].strip()], n=int(math.fabs(int(float(x[3])))), k0= float(x[1]), phi0=float(x[2]), e14=1./1.2 ) )
+          self.dihedrals.append( TorsPrm( [y[0].strip(), y[1].strip(), y[2].strip(), y[3].strip()], n=int(math.fabs(int(float(x[2])))), k0= float(x[0]), phi0=float(x[1]), e14=1./1.2 ) )
        elif section=="NONBON":
           x = ff.split()
           y = x[0].split( "-" )
@@ -583,6 +583,7 @@ class AmberRTF(RTF):
    while f[ctr].strip() != "":
      self.natoms = self.natoms+1
      ff = f[ctr].split()
+     ff[1] = ff[1].upper()
      idx = self.index_by_name[ ff[1] ]
      self.names.append( ff[1] )
      self.type_by_name[ ff[1] ] = ff[2]
