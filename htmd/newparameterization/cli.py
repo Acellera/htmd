@@ -82,7 +82,10 @@ def main_parameterize():
     basis = BasisSet._6_31G_star
 
     if args.basis == "6-31g-star"  : basis = BasisSet._6_31G_star
-    if args.basis == "cc_pVTZ" : basis = BasisSet._cc_pVTZ
+    if args.basis == "cc-pVTZ" : basis = BasisSet._cc_pVTZ
+    else: 
+      print("Unknown basis %s" % ( args.basis ) )
+      sys.exit(1)
 
     print(" === Parameterizing %s ===\n" % filename)
 
@@ -90,7 +93,7 @@ def main_parameterize():
     if  args.forcefield == "GAFF" : method = FFTypeMethod.GAFF
     if  args.forcefield == "GAFF2": method = FFTypeMethod.GAFF2
 
-    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm, basis = basis )
+    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm, basis=basis )
 
     dihedrals = mol.getSoftDihedrals()
     
