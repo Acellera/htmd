@@ -27,7 +27,7 @@ for root, dirnames, filenames in os.walk('.'):
 failed = []
 for f in filestotest:
     print(' ************************  Running "{}"  ************************'.format(f))
-    if f.endswith('charmm.py'):
+    if f.endswith('amber.py') or f.endswith('charmm.py'):
         out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
     else:
         out = call('python {}'.format(f), shell=True)

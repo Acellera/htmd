@@ -133,6 +133,10 @@ def XTCread(filename, frames=None):
                 ct.c_char_p(filename.encode("ascii")),
                 natoms,
                 ct.c_int(f))
+
+            if not retval:
+                raise IOError('XTC file {} possibly corrupt.'.format(filename))
+
             if t.coords is None:
                 t.natoms = natoms[0]
                 t.coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
