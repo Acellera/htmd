@@ -106,7 +106,8 @@ def main_parameterize():
       print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
       d = qm_dipole[3] - mm_dipole[3]
       d = d * d
-      rating="X"
+      rating="GOOD"
+      if score > 1:  rating="CHECK"
       print("Dipole Chi^2 score : %f : %s" % ( d, rating ) )
       print("")
 
