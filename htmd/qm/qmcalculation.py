@@ -449,6 +449,7 @@ class QMCalculation:
     basis = "unknown"
     if   self.basis == BasisSet._6_31G_star: basis = "6-31G*"
     elif self.basis == BasisSet._cc_pVTZ: basis = "cc-pvtz"
+    else: raise ValueError( "Unknown basis set %s" % (self.basis) )
     if self.theory==Theory.HF:
       print( "set {\n\treference rhf\n\tbasis %s\n}\n" % ( basis ), file=f )
 
@@ -505,9 +506,12 @@ class QMCalculation:
     print("%%mem=%dGB" % (self.mem), file=f )
     theory="unknown"
     basis="unknown"
-    if self.theory == Theory.HF       : theory = "HF"
-    if self.basis  == BasisSet._6_31G_star: basis  = "6-31G*"  
+    if self.theory  == Theory.HF       : theory = "HF"
+
+    if self.basis   == BasisSet._6_31G_star: basis  = "6-31G*"  
     elif self.basis == BasisSet._cc_pVTZ: basis = "cc-pVTZ"
+    else: raise ValueError( "Unknown basis set %s" % (self.basis) )
+
     opt=""
     if self.optimize : opt="opt=ModRedundant"
 

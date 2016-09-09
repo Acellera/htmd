@@ -47,6 +47,7 @@ class FFMolecule(Molecule):
     elif basis == BasisSet._cc_pVTZ:    self.basis_name = "cc-pVTZ"
     else: raise ValueError( "Unknown Basis Set" )
 
+
     if( not ( filename.endswith(".mol2")) ):
       raise ValueError( "Input file must be mol2 format" )
 
@@ -121,7 +122,7 @@ class FFMolecule(Molecule):
 
   def minimize(self ):
     # Kick off a QM calculation -- unconstrained geometry optimization
-    qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory= os.path.join( "minimize", self.basis_name ) )
+    qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory= os.path.join( "minimize", self.basis_name ), basis=self.basis )
     results = qm.results()
     if results[0].errored:
       raise RuntimeError("QM Optimization failed")
@@ -222,7 +223,7 @@ class FFMolecule(Molecule):
     # Kick off a QM calculation -- unconstrained single point with grid
     points = self._try_load_pointfile() 
      
-    qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=points, directory= os.path.join( "esp", self.basis_name )  )
+    qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=points, directory= os.path.join( "esp", self.basis_name ), basis=self.basis  )
     results = qm.results()
     if results[0].errored:
       raise RuntimeError("QM Calculation failed")
@@ -415,7 +416,7 @@ class FFMolecule(Molecule):
 
 
    
-    qmset   = QMCalculation( mol, charge=self.netcharge, directory= dirname , frozen=frozens, optimize=geomopt )
+    qmset   = QMCalculation( mol, charge=self.netcharge, directory= dirname , frozen=frozens, optimize=geomopt, basis=self.basis )
 
     ret = self._makeDihedralFittingSetFromQMResults( atoms, qmset.results() )
 
@@ -670,7 +671,7 @@ class FFMolecule(Molecule):
          c= c+1
          unique_uses.append(u)
       else:
-         print(" Dih %d-%d-%d-%d and %d-%d-%d-%d are equivalent " % ( aidx[0], aidx[1], aidx[2], aidx[3], u[0], u[1], u[2], u[3] ) )
+         print(" Dih %s-%s-%s-%s and %s-%s-%s-%s are equivalent " % ( self._rtf.names[aidx[0]], self._rtf.names[aidx[1]], self._rtf.names[aidx[2]], self._rtf.names[aidx[3]], self._rtf.names[u[0]], self._rtf.names[u[1]], self._rtf.names[u[2]], self._rtf.names[u[3]] ) )
          pass
  
   #  return(count, uses )
