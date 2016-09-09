@@ -19,6 +19,7 @@ from htmd.progress.progress import ProgressBar
 
 class BasisSet(Enum):
  _6_31G_star = 1000
+ _cc_pVTZ    = 1001
 
 class Theory(Enum):
  HF = 2000
@@ -300,8 +301,10 @@ class QMCalculation:
          ret = self._read_gaussian( dn )  
 
        if( ret == None ):
+         print("CASE 1")
          self._results[i].errored = True
        elif( (not ( "energy" in ret )) or (ret['energy'] == 0.) ):    
+         print("CASE 2")
          self._results[i].errored = True
        else:
          self._results[i].energy = ret['energy'] * 627.509469 # Hartree to kcal
@@ -446,7 +449,8 @@ class QMCalculation:
 
     f = open( os.path.join( dirname, "psi4.in" ), "w" )
     basis = "unknown"
-    if self.basis == BasisSet._6_31G_star: basis = "6-31G*"
+    if   self.basis == BasisSet._6_31G_star: basis = "6-31G*"
+    elif self.basis == BasisSet._cc_pVTZ: basis = "cc-pvtz"
     if self.theory==Theory.HF:
       print( "set {\n\treference rhf\n\tbasis %s\n}\n" % ( basis ), file=f )
 
@@ -505,6 +509,7 @@ class QMCalculation:
     basis="unknown"
     if self.theory == Theory.HF       : theory = "HF"
     if self.basis  == BasisSet._6_31G_star: basis  = "6-31G*"  
+    elif self.basis == BasisSet._cc_pVTZ: basis = "cc-pVTZ"
     opt=""
     if self.optimize : opt="opt=ModRedundant"
 
