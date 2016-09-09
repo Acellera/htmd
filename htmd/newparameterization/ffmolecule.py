@@ -121,6 +121,14 @@ class FFMolecule(Molecule):
             self.resname[i] = "MOL"
 
   def minimize(self ):
+    try:
+      os.mkdir( "minimize" )
+    except:
+      pass
+    try:
+      os.mkdir( os.path.join( "minimize", self.basis_name ) )
+    except:
+      pass
     # Kick off a QM calculation -- unconstrained geometry optimization
     qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory= os.path.join( "minimize", self.basis_name ), basis=self.basis )
     results = qm.results()
@@ -222,7 +230,17 @@ class FFMolecule(Molecule):
     self._removeCOM()
     # Kick off a QM calculation -- unconstrained single point with grid
     points = self._try_load_pointfile() 
-     
+    try:
+      os.mkdir( "esp" )
+    except:
+      pass  
+    try:
+      os.mkdir( os.path.join("esp", self.basis_name) )
+    except:
+      pass  
+
+
+
     qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=points, directory= os.path.join( "esp", self.basis_name ), basis=self.basis  )
     results = qm.results()
     if results[0].errored:
@@ -390,8 +408,8 @@ class FFMolecule(Molecule):
     mol        = self.copy()
     mol.coords = cset
 
-    dirname = os.path.join( "dihedral-single-point" ) #, self.basis_name )
-    if geomopt: dirname= os.path.join( "dihedral-opt" ) #, self.basis_name )
+    dirname =  "dihedral-single-point" 
+    if geomopt:  "dihedral-opt" 
 
     try:
       os.mkdir( dirname )
