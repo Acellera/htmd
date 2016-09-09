@@ -301,10 +301,8 @@ class QMCalculation:
          ret = self._read_gaussian( dn )  
 
        if( ret == None ):
-         print("CASE 1")
          self._results[i].errored = True
        elif( (not ( "energy" in ret )) or (ret['energy'] == 0.) ):    
-         print("CASE 2")
          self._results[i].errored = True
        else:
          self._results[i].energy = ret['energy'] * 627.509469 # Hartree to kcal
