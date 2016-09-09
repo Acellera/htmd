@@ -623,7 +623,8 @@ def PDBread(filename, mode='pdb'):
         if topo.bonds.size != 0:
             mappedbonds = mapserials[topo.bonds[:]]
             wrongidx, _ = np.where(np.isnan(mappedbonds))  # Some PDBs have bonds to non-existing serials... go figure
-            logger.info('Discarding {} bonds to non-existing indexes in the PDB file.'.format(len(wrongidx)))
+            if len(wrongidx):
+                logger.info('Discarding {} bonds to non-existing indexes in the PDB file.'.format(len(wrongidx)))
             mappedbonds = np.delete(mappedbonds, wrongidx, axis=0)
             topo.bonds = np.array(mappedbonds, dtype=np.uint32)
 

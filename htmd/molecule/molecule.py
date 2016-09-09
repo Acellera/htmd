@@ -635,7 +635,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False):
+    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all'):
         """ Read any supported file (pdb, psf, prmtop, prm, xtc, mol2, gjf, mae)
 
         Detects from the extension the file type and loads it into Molecule
@@ -652,6 +652,8 @@ class Molecule:
             If the file is a trajectory, read only the given frames
         append : bool, optional
             If the file is a trajectory or coor file, append the coordinates to the previous coordinates. Note append is slow.
+        overwrite : list of str
+            A list of the existing fields in Molecule that we wish to overwrite when reading this file.
         """
         from htmd.simlist import Sim
         from mdtraj.core.trajectory import _TOPOLOGY_EXTS
@@ -678,14 +680,14 @@ class Molecule:
 
         if type == "psf" or ext == "psf":
             topo = PSFread(filename)
-            self._readTopology(topo, filename)
+            self._readTopology(topo, filename, overwrite=overwrite)
         elif type == "prm" or ext == "prm" or type == "prmtop" or ext == "prmtop":
             topo = PRMTOPread(filename)
-            self._readTopology(topo, filename)
+            self._readTopology(topo, filename, overwrite=overwrite)
         elif type == "pdb" or ext == "pdb":
-            self._readPDB(filename)
+            self._readPDB(filename, overwrite=overwrite)
         elif type == "pdbqt" or ext == "pdbqt":
-            self._readPDB(filename, mode='pdbqt')
+            self._readPDB(filename, mode='pdbqt', overwrite=overwrite)
         elif type == "xtc" or ext == "xtc":
             self._readTraj(filename, skip=skip, frames=frames, append=append)
         elif type == "coor" or ext == "coor":
@@ -697,19 +699,19 @@ class Molecule:
             self._readPDB(filename)
         elif type == "xyz" or ext == "xyz":
             topo, coords = XYZread(filename)
-            self._readTopology(topo, filename)
+            self._readTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "gjf" or ext == "gjf":
             topo, coords = GJFread(filename)
-            self._readTopology(topo, filename)
+            self._readTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "mae" or ext == "mae":
             topo, coords = MAEread(filename)
-            self._readTopology(topo, filename)
+            self._readTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "mol2" or ext == "mol2":
             topo, coords = MOL2read(filename)
-            self._readTopology(topo, filename)
+            self._readTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "crd" or ext == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
@@ -720,34 +722,34 @@ class Molecule:
         else:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
 
-    def _readPDB(self, filename, mode='pdb'):
+    def _readPDB(self, filename, mode='pdb', overwrite='all'):
+        tempfile = False
         if os.path.isfile(filename):
-            topo, coords = PDBread(filename, mode=mode)
-            self._readTopology(topo, filename)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            filepath = filename
         elif len(filename) == 4:
             # Try loading it from the pdb data directory
             localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
             if os.path.isfile(localpdb):
                 logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
-                topo, coords = PDBread(localpdb, mode=mode)
-                self._readTopology(topo, localpdb)
-                self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+                filepath = localpdb
             else:
                 # or the PDB website
                 logger.info("Attempting PDB query for {:s}".format(filename))
                 r = requests.get(
                     "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
                 if r.status_code == 200:
-                    tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                    topo, coords = PDBread(tempfile, mode=mode)
-                    self._readTopology(topo, tempfile)
-                    self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-                    os.unlink(tempfile)
+                    filepath = string_to_tempfile(r.content.decode('ascii'), "pdb")
+                    tempfile = True
                 else:
                     raise NameError('Invalid PDB code')
         else:
             raise NameError('File {} not found'.format(filename))
+
+        topo, coords = PDBread(filepath, mode=mode)
+        self._readTopology(topo, filepath, overwrite=overwrite)
+        self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+        if tempfile:
+            os.unlink(filepath)
 
         if self.masses is None or len(self.masses) == 0:
             self.masses = numpy.zeros(self.numAtoms, dtype=numpy.float32)
@@ -761,54 +763,11 @@ class Molecule:
 
         self.fileloc.append([filename, 0])
 
-    # def _readPDB_old(self, filename, mode='pdb'):
-    #     if os.path.isfile(filename):
-    #         mol = PDBParser(filename, mode)
-    #     elif len(filename) == 4:
-    #         # Try loading it from the pdb data directory
-    #         localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
-    #         if os.path.isfile(localpdb):
-    #             logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
-    #             mol = PDBParser(localpdb, mode)
-    #         else:
-    #             # or the PDB website
-    #             logger.info("Attempting PDB query for {:s}".format(filename))
-    #             r = requests.get(
-    #                 "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
-    #             if r.status_code == 200:
-    #                 tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-    #                 mol = PDBParser(tempfile, mode)
-    #                 os.unlink(tempfile)
-    #             else:
-    #                 raise NameError('Invalid PDB code')
-    #     else:
-    #         raise NameError('File {} not found'.format(filename))
-    #
-    #     natoms = len(mol.record)
-    #     for k in self._pdb_fields:
-    #         self.__dict__[k] = numpy.asarray(mol.__dict__[k], dtype=self._dtypes[k])
-    #         # Pad any short list
-    #         if k is not "coords":
-    #             if len(self.__dict__[k]) != natoms:
-    #                 self.__dict__[k] = numpy.zeros(natoms, dtype=self.__dict__[k].dtype)
-    #
-    #     self.coords = np.atleast_3d(np.array(self.coords, dtype=np.float32))
-    #     self.bonds = np.array(np.vstack((self.bonds, mol.bonds)), dtype=np.uint32)
-    #     self.ssbonds = np.array(mol.ssbonds, dtype=np.uint32)
-    #     self.box = np.array(mol.box)
-    #
-    #     if self.masses is None or len(self.masses) == 0:
-    #         self.masses = numpy.zeros(natoms, dtype=numpy.float32)
-    #     if self.charge is None or len(self.charge) == 0:
-    #         self.charge = numpy.zeros(natoms, dtype=numpy.float32)
-    #
-    #     self.fileloc.append([filename, 0])
-
     def _readTopology(self, topo, filename, overwrite='all'):
         if isinstance(overwrite, str):
             overwrite = (overwrite, )
 
-        # Checking number of atoms that were read in the topology file
+        # Checking number of atoms that were read in the topology file for each field are the same
         natoms = []
         for field in topo.atominfo:
             if len(topo.__dict__[field]) != 0:
