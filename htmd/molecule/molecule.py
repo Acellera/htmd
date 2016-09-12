@@ -219,6 +219,7 @@ class Molecule:
 
         backup = self.copy()
         try:
+            mol.coords = np.atleast_3d(mol.coords)  # Ensuring 3D coords for appending
             # TODO: Why this limitation?
             if np.size(self.coords) != 0 and (np.size(self.coords, 2) != 1 or np.size(mol.coords, 2) != 1):
                 raise NameError('Cannot concatenate molecules which contain multiple frames.')
@@ -238,8 +239,6 @@ class Molecule:
                 data2 = mol.__dict__[k]
                 if mol.__dict__[k] is None or np.size(mol.__dict__[k]) == 0:
                     data2 = self._empty(mol.numAtoms, k)
-                if k == 'coords':
-                    data2 = np.atleast_3d(mol.coords)  # Ensuring 3D coords
                 self.__dict__[k] = insertappend(index, self.__dict__[k], data2)
             self.serial = np.arange(1, self.numAtoms + 1)
         except Exception as err:
