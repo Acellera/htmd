@@ -1258,16 +1258,7 @@ class Molecule:
     def numAtoms(self):
         """ Number of atoms in the molecule
         """
-        lengths = []
-        for field in self._pdb_fields:
-            if self.__dict__[field] is not None:
-                lengths.append(len(self.__dict__[field]))
-        if len(lengths) == 0:
-            return 0
-        if len(np.unique(lengths)) != 1:
-            raise RuntimeError('Inconsistency in Molecule. Different number of atoms in fields.')
-        else:
-            return np.unique(lengths)[0]
+        return len(self.record)
 
     @property
     def x(self):
