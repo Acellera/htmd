@@ -271,6 +271,8 @@ class Molecule:
         self._removeBonds(sel)
         for k in self._append_fields:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
+            if k == 'coords':
+                self.__dict__[k] = np.atleast_3d(self.__dict__[k])
         if _logger:
             logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
         return sel
