@@ -304,82 +304,85 @@ def MAEread(fname):
     topo = Topology()
     coords = []
     heteros = []
-    #from IPython.core.debugger import Tracer
-    #Tracer()()
+
+    # Stripping starting and trailing whitespaces which confuse csv reader
+    csvfile = open(fname, 'r')
+    stripped = (row.strip() for row in csvfile)
 
     import csv
-    with open(fname, newline='') as fp:
-        reader = csv.reader(fp, delimiter=' ', quotechar='"', skipinitialspace=True)
-        for row in reader:
-            if len(row) == 0:
-                continue
+    reader = csv.reader(stripped, delimiter=' ', quotechar='"', skipinitialspace=True)
+    for row in reader:
+        if len(row) == 0:
+            continue
 
-            if row[0].startswith('m_atom'):
-                section = 'atoms'
-                section_desc = True
-                section_cols = []
-            elif row[0].startswith('m_bond'):
-                section = 'bonds'
-                section_desc = True
-                section_cols = []
-            elif row[0].startswith('m_PDB_het_residues'):
-                section = 'hetresidues'
-                section_desc = True
-                section_cols = []
-            elif section_desc and row[0] == ':::':  # Once the section description has finished create a map from names to columns
-                section_dict = dict(zip(section_cols, range(len(section_cols))))
-                section_desc = False
-                section_data = True
-            elif section_data and (row[0] == ':::' or row[0] == '}'):
-                section_data = False
-            else:  # It's actual data
-                if section_desc:
-                    section_cols.append(row[0])
+        if row[0].startswith('m_atom'):
+            section = 'atoms'
+            section_desc = True
+            section_cols = []
+        elif row[0].startswith('m_bond'):
+            section = 'bonds'
+            section_desc = True
+            section_cols = []
+        elif row[0].startswith('m_PDB_het_residues'):
+            section = 'hetresidues'
+            section_desc = True
+            section_cols = []
+        elif section_desc and row[0] == ':::':  # Once the section description has finished create a map from names to columns
+            section_dict = dict(zip(section_cols, range(len(section_cols))))
+            section_desc = False
+            section_data = True
+        elif section_data and (row[0] == ':::' or row[0] == '}'):
+            section_data = False
+        else:  # It's actual data
+            if section_desc:
+                section_cols.append(row[0])
 
-                # Reading the data of the atoms section
-                if section == 'atoms' and section_data:
-                    topo.record.append('ATOM')
-                    row = np.array(row)
-                    if len(row) != len(section_dict):  # TODO: fix the reader
-                        raise RuntimeError('{} has {} fields in the m_atom section description, but {} fields in the '
-                                           'section data. Please check for missing fields in the mae file.'
-                                           .format(fname, len(section_dict), len(row)))
-                    row[row == '<>'] = 0
-                    if 'i_pdb_PDB_serial' in section_dict:
-                        topo.serial.append(row[section_dict['i_pdb_PDB_serial']])
-                    if 's_m_pdb_atom_name' in section_dict:
-                        topo.name.append(row[section_dict['s_m_pdb_atom_name']].strip())
-                    if 's_m_pdb_residue_name' in section_dict:
-                        topo.resname.append(row[section_dict['s_m_pdb_residue_name']].strip())
-                    if 'i_m_residue_number' in section_dict:
-                        topo.resid.append(int(row[section_dict['i_m_residue_number']]))
-                    if 's_m_chain_name' in section_dict:
-                        topo.chain.append(row[section_dict['s_m_chain_name']])
-                    if 's_pdb_segment_id' in section_dict:
-                        topo.segid.append(row[section_dict['s_pdb_segment_id']])
-                    if 'r_m_pdb_occupancy' in section_dict:
-                        topo.occupancy.append(float(row[section_dict['r_m_pdb_occupancy']]))
-                    if 'r_m_pdb_tfactor' in section_dict:
-                        topo.beta.append(float(row[section_dict['r_m_pdb_tfactor']]))
-                    if 's_m_insertion_code' in section_dict:
-                        topo.insertion.append(row[section_dict['s_m_insertion_code']].strip())
-                    if '' in section_dict:
-                        topo.element.append('')  # TODO: Read element
-                    if '' in section_dict:
-                        topo.altloc.append('')  # TODO: Read altloc. Quite complex actually. Won't bother.
-                    if 'r_m_x_coord' in section_dict:
-                        coords.append(
-                            [float(row[section_dict['r_m_x_coord']]), float(row[section_dict['r_m_y_coord']]),
-                             float(row[section_dict['r_m_z_coord']])])
-                    topo.masses.append(0)
+            # Reading the data of the atoms section
+            if section == 'atoms' and section_data:
+                topo.record.append('ATOM')
+                row = np.array(row)
+                if len(row) != len(section_dict):  # TODO: fix the reader
+                    raise RuntimeError('{} has {} fields in the m_atom section description, but {} fields in the '
+                                       'section data. Please check for missing fields in the mae file.'
+                                       .format(fname, len(section_dict), len(row)))
+                row[row == '<>'] = 0
+                if 'i_pdb_PDB_serial' in section_dict:
+                    topo.serial.append(row[section_dict['i_pdb_PDB_serial']])
+                if 's_m_pdb_atom_name' in section_dict:
+                    topo.name.append(row[section_dict['s_m_pdb_atom_name']].strip())
+                if 's_m_pdb_residue_name' in section_dict:
+                    topo.resname.append(row[section_dict['s_m_pdb_residue_name']].strip())
+                if 'i_m_residue_number' in section_dict:
+                    topo.resid.append(int(row[section_dict['i_m_residue_number']]))
+                if 's_m_chain_name' in section_dict:
+                    topo.chain.append(row[section_dict['s_m_chain_name']])
+                if 's_pdb_segment_id' in section_dict:
+                    topo.segid.append(row[section_dict['s_pdb_segment_id']])
+                if 'r_m_pdb_occupancy' in section_dict:
+                    topo.occupancy.append(float(row[section_dict['r_m_pdb_occupancy']]))
+                if 'r_m_pdb_tfactor' in section_dict:
+                    topo.beta.append(float(row[section_dict['r_m_pdb_tfactor']]))
+                if 's_m_insertion_code' in section_dict:
+                    topo.insertion.append(row[section_dict['s_m_insertion_code']].strip())
+                if '' in section_dict:
+                    topo.element.append('')  # TODO: Read element
+                if '' in section_dict:
+                    topo.altloc.append('')  # TODO: Read altloc. Quite complex actually. Won't bother.
+                if 'r_m_x_coord' in section_dict:
+                    coords.append(
+                        [float(row[section_dict['r_m_x_coord']]), float(row[section_dict['r_m_y_coord']]),
+                         float(row[section_dict['r_m_z_coord']])])
+                topo.masses.append(0)
 
-                # Reading the data of the bonds section
-                if section == 'bonds' and section_data:
-                    topo.bonds.append([int(row[section_dict['i_m_from']]) - 1, int(row[section_dict['i_m_to']]) - 1])  # -1 to conver to 0 indexing
+            # Reading the data of the bonds section
+            if section == 'bonds' and section_data:
+                topo.bonds.append([int(row[section_dict['i_m_from']]) - 1, int(row[section_dict['i_m_to']]) - 1])  # -1 to conver to 0 indexing
 
-                # Reading the data of the hetero residue section
-                if section == 'hetresidues' and section_data:
-                    heteros.append(row[section_dict['s_pdb_het_name']].strip())
+            # Reading the data of the hetero residue section
+            if section == 'hetresidues' and section_data:
+                heteros.append(row[section_dict['s_pdb_het_name']].strip())
+
+    csvfile.close()
 
     for h in heteros:
         topo.record[topo.resname == h] = 'HETATM'
@@ -812,4 +815,8 @@ if __name__ == '__main__':
     mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
     print('Can read MOL2 files.')
     mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'protein.mae'))
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '3pbl.mae'))
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '4mqt.mae'))
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '1e66.mae'))
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '3zkm-ph4.mae'))
     print('Can read MAE files.')
