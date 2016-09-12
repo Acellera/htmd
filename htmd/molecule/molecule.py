@@ -162,6 +162,11 @@ class Molecule:
                     if path.isfile(filename):
                         self.viewname = path.basename(filename)
 
+    def _empty(self, numAtoms, field):
+        dims = list(self._dims[field])
+        dims[0] = numAtoms
+        return np.empty(dims, dtype=self._dtypes[field])
+
     @property
     def frame(self):
         if self._frame < 0 or self._frame >= self.numFrames:
@@ -174,7 +179,7 @@ class Molecule:
             raise NameError("Frame index out of range. Molecule contains {} frame(s). Frames are 0-indexed.".format(self.numFrames))
         self._frame = value
 
-    def insert(self, mol, index):
+    def insert(self, mol, index, collisions=False, coldist=1.3):
         """Insert the contents of one molecule into another at a specific index.
 
         Parameters
@@ -183,6 +188,10 @@ class Molecule:
                 Molecule to be inserted
         index : integer
                 The atom index at which the passed molecule will be inserted
+        collisions : bool
+            If set to True it will remove residues of `mol` which collide with atoms of this Molecule object.
+        coldist : float
+            Collision distance in Angstrom between atoms of the two molecules. Anything closer will be considered a collision.
 
         Example
         -------
@@ -193,39 +202,51 @@ class Molecule:
         >>> mol.numAtoms
         3402
         """
+        # TODO: Remove this if numpy insert is as fast as append
+        def insertappend(index, data1, data2):
+            if index == self.numAtoms:
+                return np.append(data1, data2, axis=0)
+            else:
+                return np.insert(data1, index, data2, axis=0)
+
+        if collisions:
+            # Set different occupancy to separate atoms of mol1 and mol2
+            occ1 = self.get('occupancy')
+            occ2 = mol.get('occupancy')
+            self.set('occupancy', 1)
+            mol.set('occupancy', 2)
+
         backup = self.copy()
-        mol = mol.copy()  # Copy because I'll modify its bonds
-        if len(mol.bonds) > 0:
-            mol.bonds += index
-
-        for k in mol._pdb_fields:
-            if mol.__dict__[k] is not None and np.size(mol.__dict__[k]) != 0:
-                numatoms = np.size(mol.__dict__[k])
-                break
-
         try:
-            if len(self.bonds) > 0:
-                self.bonds[self.bonds >= index] += mol.numAtoms
-                if len(mol.bonds) > 0:
-                    self.bonds = np.append(self.bonds, mol.bonds, axis=0)
-            elif len(mol.bonds) > 0:
-                self.bonds = mol.bonds
+            # TODO: Why this limitation?
+            if np.size(self.coords) != 0 and (np.size(self.coords, 2) != 1 or np.size(mol.coords, 2) != 1):
+                raise NameError('Cannot concatenate molecules which contain multiple frames.')
+
+            if len(mol.bonds) > 0:
+                newbonds = mol.bonds.copy()
+                newbonds += index
+                if len(self.bonds) > 0:
+                    self.bonds[self.bonds >= index] += mol.numAtoms
+                    self.bonds = np.append(self.bonds, newbonds, axis=0)
+                else:
+                    self.bonds = newbonds
 
             for k in self._append_fields:
                 if k == 'serial':
                     continue
+                data2 = mol.__dict__[k]
                 if mol.__dict__[k] is None or np.size(mol.__dict__[k]) == 0:
-                    self.__dict__[k] = np.insert(self.__dict__[k], index,
-                                                 np.zeros(numatoms, dtype=self.__dict__[k].dtype), axis=0)
-                elif k == 'coords':
-                    self.coords = np.insert(self.coords, index, np.atleast_3d(mol.coords), axis=0)
-                else:
-                    self.__dict__[k] = np.insert(self.__dict__[k], index, mol.__dict__[k], axis=0)
+                    data2 = self._empty(mol.numAtoms, k)
+                if k == 'coords':
+                    data2 = np.atleast_3d(mol.coords)  # Ensuring 3D coords
+                self.__dict__[k] = insertappend(index, self.__dict__[k], data2)
             self.serial = np.arange(1, self.numAtoms + 1)
-        except:
+        except Exception as err:
             self = backup
-            raise NameError('Failed to insert molecule.')
-            # TODO: Don't allow user to insert atoms inside a residue, only between (?)
+            raise NameError('Failed to insert/append molecule at position {} with error: "{}"'.format(index, err))
+
+        if collisions:
+            _resolveCollisions(self, occ1, occ2, coldist)
 
     def remove(self, selection, _logger=True):
         """ Remove atoms from the Molecule
