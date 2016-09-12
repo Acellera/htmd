@@ -6,6 +6,11 @@
 from scipy.sparse import lil_matrix
 import numpy as np
 from IPython.core.debugger import Tracer
+import logging
+import htmd.molecule.molecule
+import htmd.progress.progress
+
+logger = logging.getLogger(__name__)
 
 
 def pp_calcDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=True, gap=1, truncate=None):
@@ -13,7 +18,7 @@ def pp_calcDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=True,
     distances = _postProcessDistances(distances, sel1, sel2, truncate)
 
     if metric == 'contacts':
-        #metric = lil_matrix(distances <= threshold)
+        # metric = lil_matrix(distances <= threshold)
         metric = distances <= threshold
     elif metric == 'distances':
         metric = distances.astype(dtype=np.float32)
@@ -164,11 +169,11 @@ def _postProcessDistances(distances, sel1, sel2, truncate):
     # Setting upper triangle to -1 if same selections
     if np.array_equal(sel1, sel2):
         for i in range(len(distances)):
-            distances[i][:, range(i+1)] = -1
+            distances[i][:, range(i + 1)] = -1
 
     if np.ndim(distances[0]) > 1:  # 2D data
         distances = np.concatenate(distances, axis=1)
-    else: # 1D data
+    else:  # 1D data
         distances = np.vstack(distances).transpose()
 
     if np.array_equal(sel1, sel2):
@@ -191,7 +196,8 @@ def _distanceArray(mol, sel1, sel2, pbc):
         dists = coords1 - coo2
         if pbc:
             if mol.box is None or np.sum(mol.box) == 0:
-                raise NameError('No periodic box dimensions given in the molecule/trajectory. If you want to calculate distance without wrapping, set the pbc option to False')
+                raise NameError(
+                    'No periodic box dimensions given in the molecule/trajectory. If you want to calculate distance without wrapping, set the pbc option to False')
             dists = _wrapDistances(mol.box, dists, _findDiffChain(mol, sel1, sel2, j, range(numsel1)))
         dists = np.transpose(np.sqrt(np.sum(dists * dists, 1)))
         distances.append(dists)
@@ -234,20 +240,20 @@ def exportProjectionData(data, filename):
 
     out_file = open(filename, "w")
 
-    nTrajs=len(data.simlist)
+    nTrajs = len(data.simlist)
 
-    if nTrajs==0:
+    if nTrajs == 0:
         raise Exception("MetricData does not contain any trajectory")
 
-    (junk,nVars)=data.dat[0].shape
+    (junk, nVars) = data.dat[0].shape
     # Can we recover the mapping?
     # TODO check if combined trajectories work
-    out_file.write("\t".join(["TrajName","Frame"]+
-                             ["CV"+str(i) for i in range(nVars)]))
+    out_file.write("\t".join(["TrajName", "Frame"] +
+                             ["CV" + str(i) for i in range(nVars)]))
     out_file.write("\n")
 
     for tr in range(nTrajs):
-        (nf, junk)=data.dat[tr].shape
+        (nf, junk) = data.dat[tr].shape
         for fr in range(nf):
             fields = [data.simlist[tr].trajectory[0]]
             fields.append(fr)
@@ -258,12 +264,12 @@ def exportProjectionData(data, filename):
     out_file.close()
 
 
-def convertProjectionDataToPandas(md):
+def convertProjectionToDataFrame(md):
     """ Export results of a projection into a pandas data frame
 
     The format of the returned data is:
-      Trajectory Frame   CV1  CV2 ...
-      <TrajName> <Frame> <V1> <V2> ...
+      TrajectoryID TrajectoryFile Frame   CV1  CV2 ...
+      <TID>        <TrajName>     <Frame> <V1> <V2> ...
       ...
 
     Parameters
@@ -271,23 +277,71 @@ def convertProjectionDataToPandas(md):
     md : htmd.metricdata.MetricData
         The results of a metric.project() operation
 
+    Returns
+    -------
+    df : pandas.DataFrame
+        A DataFrame containing the results of the projection
+
     """
 
     import pandas as pd
 
-    nTrajs=len(md.simlist)
-    if nTrajs==0:
+    nTrajs = len(md.simlist)
+    if nTrajs == 0:
         raise Exception("MetricData does not contain any trajectory")
 
     dflist = []
 
     for tr in range(nTrajs):
         df0 = pd.DataFrame(md.dat[tr])
-        df0.insert(0,'Trajectory', md.simlist[tr].trajectory[0])
-        df0.insert(1,'Frame',range(len(df0)))
+        df0.insert(0, 'TrajectoryID', tr)
+        df0.insert(1, 'TrajectoryFile', md.simlist[tr].trajectory[0])
+        df0.insert(2, 'Frame', range(len(df0)))
         dflist.append(df0)
 
-    return pd.concat(dflist)
+    df = pd.concat(dflist)
+    df.set_index(["TrajectoryID", "TrajectoryFile", "Frame"], drop=False, inplace=True, verify_integrity=True)
+    return df
 
 
+def readSimlistIndices(prj, selector):
+    """Convert a list of boolean values to a Molecule containing frames from the given simlist.
 
+    Limitation: all trajectories must have the same (or compatible) topology.
+
+    Parameters
+    ----------
+    prj : htmd.metricdata.MetricData
+        The results of a metric.project() operation
+    selector : list
+        List of boolean values, i.e. whether to extract that frame.
+
+    Returns
+    -------
+    mol : Molecule
+        A molecule containing the frames selected.
+
+    """
+    idx = [i for i, x in enumerate(selector) if x]
+    frs = prj.abs2sim(idx)
+    nf = len(frs)
+
+    molfile = prj.simlist[0].molfile
+    mol = htmd.Molecule(molfile)
+    mol.dropFrames([])
+
+    tset = set()
+    i = 0
+    bar = htmd.progress.progress.ProgressBar(nf, description="Reading {:d} frames".format(nf))
+
+    for i, f in enumerate(frs):
+        tn = f.sim.trajectory[f.piece]
+        tset.add(tn)
+        bar.progress()
+        # print("Read frame {:d} from trajectory {:s}, frame {:d}".format(i, tn, f.frame))
+        mol.read(filename=tn,
+                 frames=f.frame,
+                 append=True)
+
+    logger.info("Read {:d} frames from {:d} distinct trajectories".format(i + 1, len(tset)))
+    return mol
