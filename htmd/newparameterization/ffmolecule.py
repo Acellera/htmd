@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.vmdparser import guessAnglesAndDihedrals
 from htmd.newparameterization.detectsoftdihedrals import detectSoftDihedrals
@@ -39,10 +38,15 @@ class QMFittingSet:
 
 
 class FFMolecule(Molecule):
-  def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6 ):
+  def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6, basis=BasisSet._6_31G_star ):
     # filename -- a mol2 format input geometry  
     # rtf, prm -- rtf, prm files
     # method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
+    self.basis = basis
+    if   basis == BasisSet._6_31G_star: self.basis_name = "6-31g-star"
+    elif basis == BasisSet._cc_pVTZ:    self.basis_name = "cc-pVTZ"
+    else: raise ValueError( "Unknown Basis Set" )
+
 
     if( not ( filename.endswith(".mol2")) ):
       raise ValueError( "Input file must be mol2 format" )
@@ -116,9 +120,17 @@ class FFMolecule(Molecule):
             self.name[i] = t
             self.resname[i] = "MOL"
 
-  def minimize(self):
+  def minimize(self ):
+    try:
+      os.mkdir( "minimize" )
+    except:
+      pass
+    try:
+      os.mkdir( os.path.join( "minimize", self.basis_name ) )
+    except:
+      pass
     # Kick off a QM calculation -- unconstrained geometry optimization
-    qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory="minimize/" )
+    qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory= os.path.join( "minimize", self.basis_name ), basis=self.basis )
     results = qm.results()
     if results[0].errored:
       raise RuntimeError("QM Optimization failed")
@@ -142,7 +154,7 @@ class FFMolecule(Molecule):
     return charges 
 
 
-  def _fitCharges_con( self, x ):
+  def _fitCharges_con( self, x  ):
     charges = self._fitCharges_map_back_to_charges( x )
     s=np.sum(charges) -  self.netcharge;
     return s
@@ -197,7 +209,7 @@ class FFMolecule(Molecule):
 
   def _try_load_pointfile(self):
     # Load a point file if one exists from a previous job
-    pointfile = os.path.join( "esp", "00000", "grid.dat" )
+    pointfile = os.path.join( "esp", self.basis_name, "00000", "grid.dat" )
     if( os.path.exists(pointfile)):
       f = open(pointfile,"r" );
       fl = f.readlines()
@@ -218,8 +230,18 @@ class FFMolecule(Molecule):
     self._removeCOM()
     # Kick off a QM calculation -- unconstrained single point with grid
     points = self._try_load_pointfile() 
-     
-    qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=points, directory="esp/"  )
+    try:
+      os.mkdir( "esp" )
+    except:
+      pass  
+    try:
+      os.mkdir( os.path.join("esp", self.basis_name) )
+    except:
+      pass  
+
+
+
+    qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=points, directory= os.path.join( "esp", self.basis_name ), basis=self.basis  )
     results = qm.results()
     if results[0].errored:
       raise RuntimeError("QM Calculation failed")
@@ -301,53 +323,53 @@ class FFMolecule(Molecule):
       dd.append( d.atoms.copy() )
     return dd
 
-  def scanSoftDihedral(self, phi, directory="dihedral", step=10):
-    found=False
-    phi_to_fit = None
-    frozens=[]
-    dih_index=0
-    i=0
-    for d in self._soft_dihedrals:
-      if (d.atoms == phi).all():  
-         phi_to_fit = d
-         dih_index=i
-         frozens.append(d.atoms)
-      else:
-         pass
-      i=i+1
-    if not phi_to_fit: raise ValueError( "specified phi is not a recognised soft dihedral" )
-
-    atoms = phi_to_fit.atoms 
-    left  = phi_to_fit.left 
-    right = phi_to_fit.right 
-    equivs= phi_to_fit.equivalents
- 
-#    step  = 10 # degrees
-    nstep = (int)(360/step)
-    cset  = np.zeros( ( self.natoms, 3, nstep ) )
-
-    i=0
-    for phi in range( -180, 180, step ):
-      cset[:,:,i] = setPhi( self.coords[:,:,0], atoms, left, right, phi )
-      i=i+1
-
-    mol        = self.copy()
-    mol.coords = cset
-    try:
-      os.mkdir( directory )
-    except:
-      pass
-    dih_name = "%s-%s-%s-%s" % ( self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]] )
-    qmset   = QMCalculation( mol, charge=self.netcharge, directory="%s/%s" % (directory, dih_name), frozen=frozens, optimized=True )
-    r = qmset.results()
-    x=0
-    ret=[]
-    for phi in range( -180, 180, step ):
-      r[x].phi = phi
-      if r[x].errored == False:
-        ret.append(r[x])
-      x=x+1
-    return ret
+#  def scanSoftDihedral(self, phi, directory = "dihedral", step=10):
+#    found=False
+#    phi_to_fit = None
+#    frozens=[]
+#    dih_index=0
+#    i=0
+#    for d in self._soft_dihedrals:
+#      if (d.atoms == phi).all():  
+#         phi_to_fit = d
+#         dih_index=i
+#         frozens.append(d.atoms)
+#      else:
+#         pass
+#      i=i+1
+#    if not phi_to_fit: raise ValueError( "specified phi is not a recognised soft dihedral" )
+#
+#    atoms = phi_to_fit.atoms 
+#    left  = phi_to_fit.left 
+#    right = phi_to_fit.right 
+#    equivs= phi_to_fit.equivalents
+# 
+##    step  = 10 # degrees
+#    nstep = (int)(360/step)
+#    cset  = np.zeros( ( self.natoms, 3, nstep ) )
+#
+#    i=0
+#    for phi in range( -180, 180, step ):
+#      cset[:,:,i] = setPhi( self.coords[:,:,0], atoms, left, right, phi )
+#      i=i+1
+#
+#    mol        = self.copy()
+#    mol.coords = cset
+#    try:
+#      os.mkdir( directory )
+#    except:
+#      pass
+#    dih_name = "%s-%s-%s-%s" % ( self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]] )
+#    qmset   = QMCalculation( mol, charge=self.netcharge, directory="%s/%s" % (directory, dih_name), frozen=frozens, optimized=True )
+#    r = qmset.results()
+#    x=0
+#    ret=[]
+#    for phi in range( -180, 180, step ):
+#      r[x].phi = phi
+#      if r[x].errored == False:
+#        ret.append(r[x])
+#      x=x+1
+#    return ret
 
   def fitSoftDihedral( self, phi, geomopt=True ):
     found=False
@@ -386,15 +408,33 @@ class FFMolecule(Molecule):
     mol        = self.copy()
     mol.coords = cset
 
-    dirname = "dihedral-single-point"
-    if geomopt: dirname="dihedral-opt"
+    dirname =  "dihedral-single-point" 
+    if geomopt:  "dihedral-opt" 
 
     try:
       os.mkdir( dirname )
     except:
       pass
+
     dih_name = "%s-%s-%s-%s" % ( self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]] )
-    qmset   = QMCalculation( mol, charge=self.netcharge, directory= os.path.join( dirname, (dih_name)) , frozen=frozens, optimize=geomopt )
+    dirname = os.path.join( dirname, dih_name );
+
+    try:
+      os.mkdir( dirname )
+    except:
+      pass
+
+    dirname = os.path.join( dirname, self.basis_name );
+
+    try:
+      os.mkdir( dirname )
+    except:
+      pass
+
+
+
+   
+    qmset   = QMCalculation( mol, charge=self.netcharge, directory= dirname , frozen=frozens, optimize=geomopt, basis=self.basis )
 
     ret = self._makeDihedralFittingSetFromQMResults( atoms, qmset.results() )
 
@@ -649,7 +689,7 @@ class FFMolecule(Molecule):
          c= c+1
          unique_uses.append(u)
       else:
-         print(" Dih %d-%d-%d-%d and %d-%d-%d-%d are equivalent " % ( aidx[0], aidx[1], aidx[2], aidx[3], u[0], u[1], u[2], u[3] ) )
+         print(" Dih %s-%s-%s-%s and %s-%s-%s-%s are equivalent " % ( self._rtf.names[aidx[0]], self._rtf.names[aidx[1]], self._rtf.names[aidx[2]], self._rtf.names[aidx[3]], self._rtf.names[u[0]], self._rtf.names[u[1]], self._rtf.names[u[2]], self._rtf.names[u[3]] ) )
          pass
  
   #  return(count, uses )
@@ -715,12 +755,11 @@ class FFMolecule(Molecule):
     ax1.set_title( fit.name )
     ax1.plot( fit.phi , fit.qm         , label="QM", color="r", marker="o" )
     ax1.plot( fit.phi , fit.mm_original, label="MM Original", color="b", marker="o" )  
-    ax1.plot( fit.phi , fit.mm_zeroed  , label="MM With phi zeroed", color="black", marker="x" )  
-    ax1.plot( fit.phi , fit.mm_delta   , label="QM-MM target", color="magenta", marker="x" )  
+#    ax1.plot( fit.phi , fit.mm_zeroed  , label="MM With phi zeroed", color="black", marker="x" )  
+#    ax1.plot( fit.phi , fit.mm_delta   , label="QM-MM target", color="magenta", marker="x" )  
     ax1.plot( fit.phi , fit.mm_fitted  , label="MM Fitted", color="g", marker="o" )  
     ax1.legend(prop={'size': 8})
     if show:
-      print("SHOW") # TODO FIXME doesn't work for some reason; nothing shown?!
       plt.show()
     else:
       try:

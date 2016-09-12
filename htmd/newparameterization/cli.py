@@ -12,6 +12,7 @@ import argparse
 
 from htmd.newparameterization.ffmolecule import FFMolecule, FFEvaluate
 from htmd.newparameterization.fftype import FFTypeMethod
+from htmd.qm.qmcalculation import BasisSet
 import sys
 import os
 
@@ -50,6 +51,7 @@ def main_parameterize():
                         action="append", default=None, dest="torsion")
     parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default %d)" % (ncpus), default=ncpus, dest="ncpus")
     parser.add_argument( "-f", "--forcefield", help="Inital FF guess to use", choices=[ "GAFF", "GAFF2", "CGENFF"], default="CGENFF" )
+    parser.add_argument ( "-b", "--basis", help="QM Basis Set", choices=[ "6-31g-star", "cc-pVTZ" ], default="6-31g-star", dest="basis") 
 
     args = parser.parse_args()
 
@@ -63,7 +65,7 @@ def main_parameterize():
         sys.exit(0)
 
     # Make outdir directory [outdir]/[ff-name]
-    outdir = os.path.join( args.output, args.forcefield )
+    outdir = os.path.join( args.output, args.forcefield, args.basis )
     try:
         os.mkdir(args.output)
     except: 
@@ -72,7 +74,18 @@ def main_parameterize():
         os.mkdir( os.path.join( args.output, args.forcefield ) )
     except:
         pass
+    try:
+        os.mkdir( os.path.join( args.output, args.forcefield, args.basis ) )
+    except:
+        pass
 
+    basis = BasisSet._6_31G_star
+
+    if args.basis == "6-31g-star"  : basis = BasisSet._6_31G_star
+    if args.basis == "cc-pVTZ" : basis = BasisSet._cc_pVTZ
+    else: 
+      print("Unknown basis %s" % ( args.basis ) )
+      sys.exit(1)
 
     print(" === Parameterizing %s ===\n" % filename)
 
@@ -80,10 +93,10 @@ def main_parameterize():
     if  args.forcefield == "GAFF" : method = FFTypeMethod.GAFF
     if  args.forcefield == "GAFF2": method = FFTypeMethod.GAFF2
 
-    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm)
+    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm, basis=basis )
 
     dihedrals = mol.getSoftDihedrals()
-
+    
     if args.list:
         print("Detected soft torsions:")
         for d in dihedrals:
@@ -106,7 +119,8 @@ def main_parameterize():
       print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
       d = qm_dipole[3] - mm_dipole[3]
       d = d * d
-      rating="X"
+      rating="GOOD"
+      if score > 1:  rating="CHECK"
       print("Dipole Chi^2 score : %f : %s" % ( d, rating ) )
       print("")
 

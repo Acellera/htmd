@@ -19,6 +19,7 @@ from htmd.progress.progress import ProgressBar
 
 class BasisSet(Enum):
  _6_31G_star = 1000
+ _cc_pVTZ    = 1001
 
 class Theory(Enum):
  HF = 2000
@@ -446,7 +447,9 @@ class QMCalculation:
 
     f = open( os.path.join( dirname, "psi4.in" ), "w" )
     basis = "unknown"
-    if self.basis == BasisSet._6_31G_star: basis = "6-31G*"
+    if   self.basis == BasisSet._6_31G_star: basis = "6-31G*"
+    elif self.basis == BasisSet._cc_pVTZ: basis = "cc-pvtz"
+    else: raise ValueError( "Unknown basis set %s" % (self.basis) )
     if self.theory==Theory.HF:
       print( "set {\n\treference rhf\n\tbasis %s\n}\n" % ( basis ), file=f )
 
@@ -467,13 +470,13 @@ class QMCalculation:
       print("\t\")\n}\n", file=f )
 
     if self.optimize: 
-      print("ee = optimize('scf')", file = f )
+      print("ee,wfn = optimize('scf', return_wfn=True)", file = f )
     else:
-      print("ee = energy('scf')", file = f )
+      print("ee,wfn = energy('scf', return_wfn=True)", file = f )
 
-    print("oeprop('DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')", file=f )
+    print("oeprop( wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')", file=f )
     if self.points is not None:
-      print("oeprop('GRID_ESP')", file = f )
+      print("oeprop( wfn, 'GRID_ESP')", file = f )
       self._write_points( os.path.join( dirname, "grid.dat" ), self.points[frame] )
 
     print( "f=open( 'psi4out.xyz', 'w' )", file=f )
@@ -503,8 +506,12 @@ class QMCalculation:
     print("%%mem=%dGB" % (self.mem), file=f )
     theory="unknown"
     basis="unknown"
-    if self.theory == Theory.HF       : theory = "HF"
-    if self.basis  == BasisSet._6_31G_star: basis  = "6-31G*"  
+    if self.theory  == Theory.HF       : theory = "HF"
+
+    if self.basis   == BasisSet._6_31G_star: basis  = "6-31G*"  
+    elif self.basis == BasisSet._cc_pVTZ: basis = "cc-pVTZ"
+    else: raise ValueError( "Unknown basis set %s" % (self.basis) )
+
     opt=""
     if self.optimize : opt="opt=ModRedundant"
 
