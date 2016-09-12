@@ -484,9 +484,9 @@ def PDBread(filename, mode='pdb'):
     """
     if mode == 'pdb':
         topocolspecs = [(0, 6), (6, 11), (12, 16), (16, 17), (17, 21), (21, 22), (22, 26), (26, 27),
-                        (54, 60), (60, 66), (72, 76), (76, 78), (78, 79), (79, 80)]
+                        (54, 60), (60, 66), (72, 76), (76, 78), (78, 80)]
         toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
-                     'occupancy', 'beta', 'segid', 'element', 'charge', 'chargesign')
+                     'occupancy', 'beta', 'segid', 'element', 'charge')
     elif mode == 'pdbqt':
         # http://autodock.scripps.edu/faqs-help/faq/what-is-the-format-of-a-pdbqt-file
         # The rigid root contains one or more PDBQT-style ATOM or HETATM records. These records resemble their
@@ -594,8 +594,16 @@ def PDBread(filename, mode='pdb'):
     parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
     parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames, na_values=_NA_VALUES, keep_default_na=False)
     parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
-    if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
-        parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+    # if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
+    #    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+
+    # Fixing PDB format charges which can come after the number
+    minuses = np.where(parsedtopo.charge.str.match('\d\-'))[0]
+    pluses = np.where(parsedtopo.charge.str.match('\d\+'))[0]
+    for m in minuses:
+        parsedtopo.loc[m, 'charge'] = int(parsedtopo.charge[m][0]) * -1
+    for p in pluses:
+        parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
 
     if len(parsedtopo) > 99999:
         logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
