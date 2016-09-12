@@ -227,7 +227,7 @@ def _processSim(sim, projectionlist, uqmol, skip):
             data.append(pj)
         data = np.hstack(data)
     except Exception as e:
-        logger.warning('Error in simulation with id: ' + str(sim.simid) + ' ' + e.__str__())
+        logger.warning('Error in simulation with id: ' + str(sim.simid) + '. "' + e.__str__() + '"')
         return None, None, None, True
 
     return data, _calcRef(pieces, mol.fileloc), mol.fstep, False
