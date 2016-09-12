@@ -162,10 +162,11 @@ class Molecule:
                     if path.isfile(filename):
                         self.viewname = path.basename(filename)
 
-    def _empty(self, numAtoms, field):
-        dims = list(self._dims[field])
+    @staticmethod
+    def _empty(numAtoms, field):
+        dims = list(Molecule._dims[field])
         dims[0] = numAtoms
-        return np.empty(dims, dtype=self._dtypes[field])
+        return np.empty(dims, dtype=Molecule._dtypes[field])
 
     @property
     def frame(self):
@@ -403,41 +404,7 @@ class Molecule:
         >>> lig.filter("resname BEN")
         >>> mol.append(lig)
         """
-        if collisions:
-            # Set different occupancy to separate atoms of mol1 and mol2
-            occ1 = self.get('occupancy')
-            occ2 = mol.get('occupancy')
-            self.set('occupancy', 1)
-            mol.set('occupancy', 2)
-
-        backup = self.copy()
-        mol = mol.copy()  # Copy because I'll modify its bonds
-        if len(mol.bonds) > 0:
-            mol.bonds += self.numAtoms
-
-        try:
-            if np.size(self.coords) != 0 and (np.size(self.coords, 2) != 1 or np.size(mol.coords, 2) != 1):
-                raise NameError('Cannot concatenate molecules which contain multiple frames.')
-
-            if len(self.bonds) > 0 and len(mol.bonds) > 0:
-                self.bonds = np.append(self.bonds, mol.bonds, axis=0)
-            elif len(mol.bonds) > 0:
-                self.bonds = mol.bonds
-
-            for k in self._append_fields:
-                if self.__dict__[k] is None or np.size(self.__dict__[k]) == 0:
-                    self.__dict__[k] = np.array(mol.__dict__[k], dtype=self._dtypes[k])
-                elif k == 'coords':
-                    self.coords = np.append(self.coords, mol.coords, axis=0)
-                else:
-                    self.__dict__[k] = np.append(self.__dict__[k], np.array(mol.__dict__[k], dtype=self._dtypes[k]))
-            self.serial = np.arange(1, self.numAtoms + 1)
-        except Exception as err:
-            self = backup
-            raise NameError('Failed to append molecule. "{}"'.format(err))
-
-        if collisions:
-            _resolveCollisions(self, occ1, occ2, coldist)
+        self.insert(mol, self.numAtoms, collisions=collisions, coldist=coldist)
 
     def _getBonds(self, fileBonds=True, guessBonds=True):
         """ Returns an array of all bonds.
@@ -593,7 +560,7 @@ class Molecule:
             self.coords[s, :, f] += vector
 
     def rotate(self, axis, angle, sel=None):
-        """ DEPRECATED. Use rotateBy instead
+        """ Rotate atoms around an axis for a given angle in radians.
 
         Parameters
         ----------
@@ -611,9 +578,7 @@ class Molecule:
         """
         logger.warning('Molecule.rotate is deprecated and will be removed. Use Molecule.rotateBy instead.')
         M = rotationMatrix(axis, angle)
-        s = self.atomselect(sel, indexes=True)
-        for a in s:
-            self.coords[a, :, self.frame] = np.dot(M, self.coords[a, :, self.frame])
+        self.rotateBy(M, sel=sel)
 
     def rotateBy(self, M, center=(0, 0, 0), sel='all'):
         """ Rotate a selection of atoms by a given rotation around a center
@@ -713,7 +678,7 @@ class Molecule:
             self._readTraj(filename, skip=skip, frames=frames, append=append)
         elif type == "coor" or ext == "coor":
             if append:
-                self.coords = np.append(self.coords,BINCOORread(filename),axis=2)
+                self.coords = np.append(self.coords, BINCOORread(filename), axis=2)
             else:
                 self.coords = BINCOORread(filename)
         elif len(firstfile) == 4:  # Could be a PDB id. Try to load it from the PDB website
@@ -811,10 +776,10 @@ class Molecule:
             else:
                 if np.shape(self.__dict__[field]) != np.shape(newfielddata):
                     raise TopologyInconsistencyError(
-                        'Different number of atoms read from topology file for field {}'.format(field))
+                        'Different number of atoms read from topology file {} for field {}'.format(filename, field))
                 if not np.array_equal(self.__dict__[field], newfielddata):
                     raise TopologyInconsistencyError(
-                        'Different atom information read from topology file for field {}'.format(field))
+                        'Different atom information read from topology file {} for field {}'.format(filename, field))
 
         fnamestr = os.path.splitext(os.path.basename(filename))[0]
         self.viewname = fnamestr
@@ -1293,7 +1258,16 @@ class Molecule:
     def numAtoms(self):
         """ Number of atoms in the molecule
         """
-        return len(self.record)
+        lengths = []
+        for field in self._pdb_fields:
+            if self.__dict__[field] is not None:
+                lengths.append(len(self.__dict__[field]))
+        if len(lengths) == 0:
+            return 0
+        if len(np.unique(lengths)) != 1:
+            raise RuntimeError('Inconsistency in Molecule. Different number of atoms in fields.')
+        else:
+            return np.unique(lengths)[0]
 
     @property
     def x(self):
