@@ -204,11 +204,16 @@ class Molecule:
         3402
         """
         # TODO: Remove this if numpy insert is as fast as append
-        def insertappend(index, data1, data2):
-            if index == self.numAtoms:
+        def insertappend(index, data1, data2, append):
+            if data1.size == 0:
+                return data2
+            if data2.size == 0:
+                return data1
+            if append:
                 return np.append(data1, data2, axis=0)
             else:
                 return np.insert(data1, index, data2, axis=0)
+        append = index == self.numAtoms
 
         if collisions:
             # Set different occupancy to separate atoms of mol1 and mol2
@@ -239,7 +244,7 @@ class Molecule:
                 data2 = mol.__dict__[k]
                 if mol.__dict__[k] is None or np.size(mol.__dict__[k]) == 0:
                     data2 = self._empty(mol.numAtoms, k)
-                self.__dict__[k] = insertappend(index, self.__dict__[k], data2)
+                self.__dict__[k] = insertappend(index, self.__dict__[k], data2, append)
             self.serial = np.arange(1, self.numAtoms + 1)
         except Exception as err:
             self = backup
