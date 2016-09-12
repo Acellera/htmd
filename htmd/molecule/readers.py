@@ -598,12 +598,13 @@ def PDBread(filename, mode='pdb'):
     #    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
 
     # Fixing PDB format charges which can come after the number
-    minuses = np.where(parsedtopo.charge.str.match('\d\-'))[0]
-    pluses = np.where(parsedtopo.charge.str.match('\d\+'))[0]
-    for m in minuses:
-        parsedtopo.loc[m, 'charge'] = int(parsedtopo.charge[m][0]) * -1
-    for p in pluses:
-        parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
+    if parsedtopo.charge.dtype == 'object':
+        minuses = np.where(parsedtopo.charge.str.match('\d\-'))[0]
+        pluses = np.where(parsedtopo.charge.str.match('\d\+'))[0]
+        for m in minuses:
+            parsedtopo.loc[m, 'charge'] = int(parsedtopo.charge[m][0]) * -1
+        for p in pluses:
+            parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
 
     if len(parsedtopo) > 99999:
         logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
