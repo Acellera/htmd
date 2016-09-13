@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.apps.localqueue import LocalGPUQueue
+from htmd.apps.localqueue import LocalGPUQueue, _executeMDcommand
 from shutil import which, move
 import os
 from glob import glob as glob
@@ -50,37 +50,12 @@ class AcemdLocal(LocalGPUQueue):
 
 def jobfunc(acemd, datadir, inputfile, timeout, path, gpuid):
     # path and gpuid arguments are provided by default by the localqueue class as last arguments
-    from subprocess import PIPE, Popen, TimeoutExpired, CalledProcessError
     import os
-
     timeoutstr = ''
     if timeout:
         timeoutstr = 'timeout {}'.format(timeout)
     cmd = 'cd {}; {} {} --device {} {} > log.txt 2>&1'.format(os.path.normpath(path), timeoutstr, acemd, gpuid, inputfile)
-    proc = None
-    try:
-        proc = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-        proc.communicate()
-    except CalledProcessError:
-        logger.error('Error in ACEMD for path: {}. Check the {} file.'.format(path, os.path.join(path, 'log.txt')))
-        if proc:
-            proc.kill()
-        return
-    except TimeoutExpired:
-        if proc:
-            proc.kill()
-        return
-
-    # If a datadir is provided, copy finished trajectories there. Only works for xtc files.
-    if datadir is not None:
-        if not os.path.isdir(datadir):
-            os.mkdir(datadir)
-        simname = os.path.basename(os.path.normpath(path))
-        odir = os.path.join(datadir, simname)
-        os.mkdir(odir)
-        finishedtraj = glob(os.path.join(path, '*.xtc'))
-        logger.info("Moving simulation {} to {}.".format(finishedtraj[0], odir))
-        move(finishedtraj[0], odir)
+    _executeMDcommand(cmd, path, datadir, 'ACEMD', '*.xtc')
 
 
 if __name__ == "__main__":
