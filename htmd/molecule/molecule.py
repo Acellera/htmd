@@ -203,13 +203,16 @@ class Molecule:
         >>> mol.numAtoms
         3402
         """
-        # TODO: Remove this if numpy insert is as fast as append
         def insertappend(index, data1, data2, append):
+            if not isinstance(data1, np.ndarray):
+                data1 = np.array([data1])
+            if not isinstance(data2, np.ndarray):
+                data2 = np.array([data2])
             if data1.size == 0:
                 return data2
             if data2.size == 0:
                 return data1
-            if append:
+            if append:  # TODO: Remove this if numpy insert is as fast as append
                 return np.append(data1, data2, axis=0)
             else:
                 return np.insert(data1, index, data2, axis=0)
