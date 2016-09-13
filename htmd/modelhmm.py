@@ -21,7 +21,7 @@ class ModelHMM(object):
     def plotTimescales(self, maxlag):
         import pyemma.msm as msm
         import pyemma.plots as mplt
-        its = msm.timescales_hmsm(self.hmm.discrete_trajectories_full, self.macronum, lags=maxlag)
+        its = msm.timescales_hmsm(self.data.St.tolist(), self.macronum, lags=maxlag)
         mplt.plot_implied_timescales(its, ylog=True, units='ns', dt=self.data.fstep, linewidth=2)
 
     def eqDistribution(self, plot=True):
