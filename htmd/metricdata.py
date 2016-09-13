@@ -134,7 +134,10 @@ class MetricData:
             datconcat = np.concatenate(self.dat)
             if np.ndim(datconcat) == 1:
                 datconcat = np.transpose(np.atleast_2d(datconcat))
-            clusterobj.fit(datconcat)
+            import warnings  # Following 3 lines are BS because sklearn refuse to make releases more often than 1 per year...
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                clusterobj.fit(datconcat)
             labels = clusterobj.labels_
 
         uqclu = np.unique(labels)
