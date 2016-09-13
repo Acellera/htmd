@@ -26,7 +26,8 @@ from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
 from htmd.vmdviewer import viewer, getCurrentViewer
 from htmd.builder.solvate import solvate
-from htmd.acemd.acemd import Acemd
+from htmd.apps.acemd import Acemd
+from htmd.apps.pmemd import Pmemd
 from htmd.apps.acemdlocal import AcemdLocal
 from htmd.apps.lsf import LSF
 from htmd.apps.aws import AWS
