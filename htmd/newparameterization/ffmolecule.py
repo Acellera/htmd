@@ -409,7 +409,7 @@ class FFMolecule(Molecule):
     mol.coords = cset
 
     dirname =  "dihedral-single-point" 
-    if geomopt:  "dihedral-opt" 
+    if geomopt:  dirname = "dihedral-opt" 
 
     try:
       os.mkdir( dirname )
