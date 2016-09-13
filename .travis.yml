@@ -69,9 +69,7 @@ install:
  - source activate travis-env
  - pwd
  - ls -la
- - git describe --tags
- - export BUILD_VERSION=$(git describe --tags | sed 's/-/ /g' | awk '{print $1}')
- - export BUILD_NUMBER=$(git describe --tags | sed 's/-/ /g' | awk '{print $2}')
+ - if [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then export BUILD_VERSION=$TRAVIS_TAG; else export BUILD_VERSION=0.0.0; fi
  # Always set it to 0 so we don't get a new release at every successful commit
  - export BUILD_NUMBER=0
 
