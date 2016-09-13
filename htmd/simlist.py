@@ -117,9 +117,9 @@ def simlist(datafolders, molfiles, inputfolders=None):
     """
 
     if not datafolders:
-        raise NameError('No data folders were given, check your arguments.')
+        raise FileNotFoundError('No data folders were given, check your arguments.')
     if not molfiles:
-        raise NameError('No molecule files were given, check your arguments.')
+        raise FileNotFoundError('No molecule files were given, check your arguments.')
     if isinstance(molfiles, str):
         molfiles = [molfiles]
     if isinstance(datafolders, str):
@@ -138,7 +138,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
     datanames = dict()
     for folder in datafolders:
         if _simName(folder) in datanames:
-            raise NameError('Duplicate simulation name detected. Cannot name-match directories.')
+            raise RuntimeError('Duplicate simulation name detected. Cannot name-match directories.')
         datanames[_simName(folder)] = folder
 
     molnames = dict()
@@ -164,7 +164,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
 
         if len(molfiles) > 1:
             if k not in molnames:
-                raise NameError('Did not find molfile with folder name ' + k + ' in the given glob')
+                raise FileNotFoundError('Did not find molfile with folder name ' + k + ' in the given glob')
             molfile = molnames[k]
         else:
             molfile = molfiles[0]
@@ -172,7 +172,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
         inputf = []
         if inputfolders:
             if k not in inputnames:
-                raise NameError('Did not find input with folder name ' + k + ' in the given glob')
+                raise FileNotFoundError('Did not find input with folder name ' + k + ' in the given glob')
             inputf = inputnames[k]
 
         sims.append(Sim(simid=i, parent=None, input=inputf, trajectory=trajectories, molfile=molfile))
