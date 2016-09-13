@@ -48,7 +48,7 @@ class Production(ProtocolInterface):
         self.amber.ntpr = 5000
         self.amber.ntwr = 50000
         self.amber.ntwx = 5000
-        self.amber.dt = 0.004
+        self.amber.dt = 0.002
         self.amber.ig = -1
         self.amber.ntb = 2
         self.amber.ntp = 1
