@@ -1,6 +1,10 @@
-# Author: Juan Eiros Zamora (je714@ic.ac.uk) Organisation: Imperial College London
+# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
+# Author: Juan Eiros Zamora (je714@ic.ac.uk) & Gil Ferreira Hoben (gf712@ic.ac.uk) Organisation: Imperial College London
 # Modified by: Stefan Doerr
-# Copyright: Acellera Ltd
 
 # Code to setup simulations with Amber
 # Description of parameters is mainly being copied from the AMBER 15 manual
