@@ -1,3 +1,7 @@
+# Author: Juan Eiros Zamora (je714@ic.ac.uk) Organisation: Imperial College London
+# Modified by: Stefan Doerr
+# Copyright: Acellera Ltd
+
 from htmd.apps.localqueue import LocalGPUQueue, _executeMDcommand
 from shutil import which
 import logging

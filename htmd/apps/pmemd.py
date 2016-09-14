@@ -1,3 +1,7 @@
+# Author: Juan Eiros Zamora (je714@ic.ac.uk) Organisation: Imperial College London
+# Modified by: Stefan Doerr
+# Copyright: Acellera Ltd
+
 # Code to setup simulations with Amber
 # Description of parameters is mainly being copied from the AMBER 15 manual
 # http://ambermd.org/doc12/Amber15.pdf

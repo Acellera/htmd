@@ -29,6 +29,7 @@ from htmd.builder.solvate import solvate
 from htmd.apps.acemd import Acemd
 from htmd.apps.pmemd import Pmemd
 from htmd.apps.acemdlocal import AcemdLocal
+from htmd.apps.pmemdlocal import PmemdLocal
 from htmd.apps.lsf import LSF
 from htmd.apps.aws import AWS
 from htmd.builder.builder import detectDisulfideBonds, segmentgaps, autoSegment, embed, DisulfideBridge
