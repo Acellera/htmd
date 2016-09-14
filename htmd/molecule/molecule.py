@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
-from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
@@ -713,7 +713,9 @@ class Molecule:
         elif type == "crd" or ext == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
         elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
-            self._readMDtrajTopology(filename)
+            topo, coords = MDTRAJTOPOread(filename)
+            self._readTopology(topo, filename, overwrite=overwrite)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type in _MDTRAJ_EXTS or ext in _MDTRAJ_EXTS:
             self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
         else:
@@ -795,38 +797,7 @@ class Molecule:
         fnamestr = os.path.splitext(os.path.basename(filename))[0]
         self.viewname = fnamestr
         self.fileloc = [[fnamestr, 0]]
-
-    def _readMDtrajTopology(self, filename):
-        translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
-                     'chainID': 'chain', 'segmentID': 'segid'}
-        import mdtraj as md
-        from htmd.molecule.readers import Topology
-        mdstruct = md.load(filename)
-        topology = mdstruct.topology
-        table, bonds = topology.to_dataframe()
-
-        topo = Topology()
-        for k in table.keys():
-            topo.__dict__[translate[k]] = table[k].tolist()
-
-        self._readTopology(topo, filename)
-        self.bonds = bonds
-        self.coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
         self.topoloc = os.path.abspath(filename)
-
-    def _readMDtraj(self, filename):
-        import mdtraj as md
-        traj = md.load(filename, top=self.topoloc)
-        coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
-        if traj.timestep == 1:
-            time = np.zeros(traj.time.shape, dtype=traj.time.dtype)
-            step = np.zeros(traj.time.shape, dtype=traj.time.dtype)
-        else:
-            time = traj.time * 1000  # need to go from picoseconds to femtoseconds
-            step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
-        box = traj.unitcell_lengths.T * 10
-        boxangles = traj.unitcell_angles
-        return coords, box, boxangles, step, time
 
     def _readTraj(self, filename, skip=None, frames=None, append=False, mdtraj=False):
         if not append:
@@ -855,14 +826,14 @@ class Molecule:
         for i, f in enumerate(filename):
             if frames is None:
                 if mdtraj:
-                    coords, box, boxangles, step, time = self._readMDtraj(f)
+                    coords, box, boxangles, step, time = MDTRAJread(f)
                 else:
                     coords, box, boxangles, step, time = XTCread(f)
                 for j in range(np.size(coords, 2)):
                     self.fileloc.append([f, j])
             else:
                 if mdtraj:
-                    coords, box, boxangles, step, time = self._readMDtraj(f)
+                    coords, box, boxangles, step, time = MDTRAJread(f)
                     coords = coords[:, :, frames[i]]
                     box = box[:, frames[i]]
                     boxangles = boxangles[frames[i], :]

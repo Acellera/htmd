@@ -772,6 +772,39 @@ def PSFread(filename):
     return topo
 
 
+def MDTRAJread(filename):
+    import mdtraj as md
+    traj = md.load(filename, top=self.topoloc)
+    coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
+    if traj.timestep == 1:
+        time = np.zeros(traj.time.shape, dtype=traj.time.dtype)
+        step = np.zeros(traj.time.shape, dtype=traj.time.dtype)
+    else:
+        time = traj.time * 1000  # need to go from picoseconds to femtoseconds
+        step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
+    box = traj.unitcell_lengths.T * 10
+    boxangles = traj.unitcell_angles
+    return coords, box, boxangles, step, time
+
+
+def MDTRAJTOPOread(filename):
+    translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
+                 'chainID': 'chain', 'segmentID': 'segid'}
+    import mdtraj as md
+    from htmd.molecule.readers import Topology
+    mdstruct = md.load(filename)
+    topology = mdstruct.topology
+    table, bonds = topology.to_dataframe()
+
+    topo = Topology()
+    for k in table.keys():
+        topo.__dict__[translate[k]] = table[k].tolist()
+
+    coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
+    topo.bonds = bonds
+    return topo, coords
+
+
 if __name__ == '__main__':
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
