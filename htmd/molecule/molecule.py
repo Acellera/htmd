@@ -836,7 +836,7 @@ class Molecule:
                     coords, box, boxangles, step, time = MDTRAJread(f)
                     coords = coords[:, :, frames[i]]
                     box = box[:, frames[i]]
-                    boxangles = boxangles[frames[i], :]
+                    boxangles = boxangles[:, frames[i]]
                 else:
                     coords, box, boxangles, step, time = XTCread(f, frames[i])
                 self.fileloc.append([f, int(frames[i])])

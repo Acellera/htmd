@@ -280,7 +280,7 @@ def _filtSim(i, sims, outFolder, filterSel):
         try:
             mol.read(traj[j])
         except IOError as e:
-            logger.warning(e.strerror + ', skipping trajectory')
+            logger.warning('{}, skipping trajectory'.format(e))
             break
 
         mol.write(outtraj[j], sel)
@@ -310,7 +310,7 @@ def _filterPDBPSF(sim, outfolder, filtsel):
     try:
         mol = Molecule(sim.molfile)
     except IOError as e:
-        raise NameError('simFilter: ' + e.strerror + ' Cannot create filtered.pdb due to problematic pdb: ' + sim.molfile)
+        raise NameError('simFilter: {}. Cannot create filtered.pdb due to problematic pdb: {}'.format(e, sim.molfile))
 
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
         if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere

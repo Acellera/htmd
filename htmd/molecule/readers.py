@@ -783,7 +783,7 @@ def MDTRAJread(filename):
         time = traj.time * 1000  # need to go from picoseconds to femtoseconds
         step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
     box = traj.unitcell_lengths.T * 10
-    boxangles = traj.unitcell_angles
+    boxangles = traj.unitcell_angles.T
     return coords, box, boxangles, step, time
 
 
