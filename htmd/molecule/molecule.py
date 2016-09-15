@@ -603,8 +603,9 @@ class Molecule:
 
         Examples
         --------
+        >>> mol = tryp.copy()
         >>> mol.rotateBy(rotationMatrix([0, 1, 0], 1.57))
-        >>> mol.rorateBy(uniformRandomRotation())
+        >>> mol.rotateBy(uniformRandomRotation())
         """
         coords = self.get('coords', sel=sel)
         newcoords = coords - center
