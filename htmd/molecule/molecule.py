@@ -1067,7 +1067,7 @@ class Molecule:
         ext = os.path.splitext(filename)[1][1:]
 
         src = self
-        if sel is not None and sel != 'all':
+        if not (sel is None or (isinstance(sel, str) and sel == 'all')):
             src = self.copy()
             src.filter(sel, _logger=False)
 
