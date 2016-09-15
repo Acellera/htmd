@@ -772,9 +772,9 @@ def PSFread(filename):
     return topo
 
 
-def MDTRAJread(filename):
+def MDTRAJread(filename, topoloc):
     import mdtraj as md
-    traj = md.load(filename, top=self.topoloc)
+    traj = md.load(filename, top=topoloc)
     coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
     if traj.timestep == 1:
         time = np.zeros(traj.time.shape, dtype=traj.time.dtype)

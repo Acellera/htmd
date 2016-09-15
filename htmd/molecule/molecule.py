@@ -826,14 +826,14 @@ class Molecule:
         for i, f in enumerate(filename):
             if frames is None:
                 if mdtraj:
-                    coords, box, boxangles, step, time = MDTRAJread(f)
+                    coords, box, boxangles, step, time = MDTRAJread(f, self.topoloc)
                 else:
                     coords, box, boxangles, step, time = XTCread(f)
                 for j in range(np.size(coords, 2)):
                     self.fileloc.append([f, j])
             else:
                 if mdtraj:
-                    coords, box, boxangles, step, time = MDTRAJread(f)
+                    coords, box, boxangles, step, time = MDTRAJread(f, self.topoloc)
                     coords = coords[:, :, frames[i]]
                     box = box[:, frames[i]]
                     boxangles = boxangles[:, frames[i]]
