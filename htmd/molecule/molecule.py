@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
-from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
@@ -113,7 +113,8 @@ class Molecule:
         'impropers': np.uint32,
         'atomtype': object,
         'masses': np.float32,
-        'box': np.float32
+        'box': np.float32,
+        'boxangles': np.float32
     }
 
     _dims = {
@@ -137,7 +138,8 @@ class Molecule:
         'impropers': (0, 4),
         'atomtype': (0,),
         'masses': (0,),
-        'box': (3, 1)
+        'box': (3, 1),
+        'boxangles': (3, 1),
     }
 
     def __init__(self, filename=None, name=None):
@@ -711,7 +713,9 @@ class Molecule:
         elif type == "crd" or ext == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
         elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
-            self._readMDtrajTopology(filename)
+            topo, coords = MDTRAJTOPOread(filename)
+            self._readTopology(topo, filename, overwrite=overwrite)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type in _MDTRAJ_EXTS or ext in _MDTRAJ_EXTS:
             self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
         else:
@@ -793,47 +797,13 @@ class Molecule:
         fnamestr = os.path.splitext(os.path.basename(filename))[0]
         self.viewname = fnamestr
         self.fileloc = [[fnamestr, 0]]
-
-    def _readMDtrajTopology(self, filename):
-        translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
-                     'chainID': 'chain', 'segmentID': 'segid'}
-        import mdtraj as md
-        from htmd.molecule.readers import Topology
-        mdstruct = md.load(filename)
-        topology = mdstruct.topology
-        table, bonds = topology.to_dataframe()
-
-        topo = Topology()
-        for k in table.keys():
-            topo.__dict__[translate[k]] = table[k].tolist()
-
-        self._readTopology(topo, filename)
-        self.bonds = bonds
-        self.coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
         self.topoloc = os.path.abspath(filename)
-
-    def _readMDtraj(self, filename):
-        class Struct:
-            def __init__(self):
-                return
-
-        import mdtraj as md
-        traj = md.load(filename, top=self.topoloc)
-        s = Struct()
-        s.coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
-        if traj.timestep == 1:
-            s.time = np.zeros(traj.time.shape, dtype=traj.time.dtype)
-            s.step = np.zeros(traj.time.shape, dtype=traj.time.dtype)
-        else:
-            s.time = traj.time
-            s.step = s.time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
-        s.box = traj.unitcell_lengths.T * 10
-        return s
 
     def _readTraj(self, filename, skip=None, frames=None, append=False, mdtraj=False):
         if not append:
             self.coords = []
             self.box = []
+            self.boxangles = []
 
         # If a single filename is specified, turn it into an array so we can iterate
         if isinstance(filename, str):
@@ -856,47 +826,52 @@ class Molecule:
         for i, f in enumerate(filename):
             if frames is None:
                 if mdtraj:
-                    traj = self._readMDtraj(f)
+                    coords, box, boxangles, step, time = MDTRAJread(f)
                 else:
-                    traj = XTCread(f)
-                for j in range(np.size(traj.coords, 2)):
+                    coords, box, boxangles, step, time = XTCread(f)
+                for j in range(np.size(coords, 2)):
                     self.fileloc.append([f, j])
             else:
                 if mdtraj:
-                    traj = self._readMDtraj(f)
-                    traj.coords = traj.coords[:, :, frames[i]]
+                    coords, box, boxangles, step, time = MDTRAJread(f)
+                    coords = coords[:, :, frames[i]]
+                    box = box[:, frames[i]]
+                    boxangles = boxangles[frames[i], :]
                 else:
-                    traj = XTCread(f, frames[i])
+                    coords, box, boxangles, step, time = XTCread(f, frames[i])
                 self.fileloc.append([f, int(frames[i])])
 
-            if self.numAtoms != 0 and np.size(traj.coords, 0) != self.numAtoms:
+            if self.numAtoms != 0 and np.size(coords, 0) != self.numAtoms:
                 raise ValueError('Trajectory # of atoms ' + str(
                     np.size(self.coords, 0)) + ' mismatch with # of already loaded atoms ' + str(self.numAtoms))
 
-            if len(self.coords) > 0 and self.coords.shape[0] > 0 and (self.coords.shape[0] != traj.coords.shape[0]):
+            if len(self.coords) > 0 and self.coords.shape[0] > 0 and (self.coords.shape[0] != coords.shape[0]):
                 raise ValueError("Trajectory # of atoms mismatch with already loaded coordinates")
             # print(np.shape(traj.box), np.shape(self.box))
             # TODO : check step correct increment
             if len(self.coords) == 0:
-                self.coords = traj.coords
-                self.box = traj.box
+                self.coords = coords
+                self.box = box
+                self.boxangles = boxangles
             else:
-                self.coords = np.append(self.coords, traj.coords, 2)
-                self.box = np.append(self.box, traj.box, 1)
+                self.coords = np.append(self.coords, coords, 2)
+                self.box = np.append(self.box, box, 1)
+                self.boxangles = np.append(self.boxangles, boxangles, 0)
 
         if skip is not None:
             self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
             self.box = np.array(self.box[:, ::skip])
             self.fileloc = self.fileloc[::skip]
+            self.boxangles = self.boxangles[:, ::skip]
 
         self.coords = np.atleast_3d(self.coords)
-        self.step = traj.step
-        self.time = traj.time
-        if len(traj.time) < 2:
+        self.step = step
+        self.time = time
+        if len(time) < 2:
             # logger.info('Trajectory has broken framestep. Cannot read correctly, setting to 0.1ns.')
             self.fstep = 0.1
         else:
-            self.fstep = (traj.time[1] - traj.time[0]) / 1E6  # convert femtoseconds to nanoseconds
+            self.fstep = (time[1] - time[0]) / 1E6  # convert femtoseconds to nanoseconds
         if skip is not None:
             self.fstep *= skip
 

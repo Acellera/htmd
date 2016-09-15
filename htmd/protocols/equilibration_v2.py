@@ -4,8 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.molecule.molecule import Molecule
-from htmd.userinterface import UserInterface
-from htmd.acemd.acemd import Acemd
+from htmd.apps.acemd import Acemd
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 import os
 import numpy as np

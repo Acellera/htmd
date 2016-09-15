@@ -294,8 +294,10 @@ class AdaptiveRun(Adaptive):
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
-        datalist = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
-                           glob(path.join(self.inputpath, '*', '')))
+        topologies = glob(path.join(self.inputpath, '*', 'structure.pdb'))
+        if len(topologies) == 0:
+            topologies = glob(path.join(self.inputpath, '*', '*.prmtop'))
+        datalist = simlist(glob(path.join(self.datapath, '*', '')), topologies, glob(path.join(self.inputpath, '*', '')))
         filtlist = simfilter(datalist, self.filteredpath, filtersel=self.filtersel)
 
         if hasattr(self, 'metricsel2') and self.metricsel2 is not None:
