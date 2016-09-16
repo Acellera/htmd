@@ -449,12 +449,12 @@ class QMCalculation:
     basis = "unknown"
     # If the charge is < 0, need to use a diffuse basis set
     if   self.basis == BasisSet._6_31G_star: 
-      if charge < 0:
+      if self.charge < 0:
         basis = "6-31+G*"
       else:
         basis = "6-31G*"
     elif self.basis == BasisSet._cc_pVTZ: 
-      if charge < 0:
+      if self.charge < 0:
         basis = "aug-cc-pvtz"
       else:  
         basis = "cc-pvtz"
@@ -519,12 +519,12 @@ class QMCalculation:
     if self.theory  == Theory.HF       : theory = "HF"
 
     if self.basis   == BasisSet._6_31G_star: 
-     if charge < 0:
+     if self.charge < 0:
       basis  = "6-31+G*"  
      else:
       basis  = "6-31G*"  
     elif self.basis == BasisSet._cc_pVTZ: 
-      if charge < 0:
+      if self.charge < 0:
        basis = "AUG-cc-pVTZ"
       else:
        basis = "cc-pVTZ"
