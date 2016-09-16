@@ -447,8 +447,18 @@ class QMCalculation:
 
     f = open( os.path.join( dirname, "psi4.in" ), "w" )
     basis = "unknown"
-    if   self.basis == BasisSet._6_31G_star: basis = "6-31G*"
-    elif self.basis == BasisSet._cc_pVTZ: basis = "cc-pvtz"
+    # If the charge is < 0, need to use a diffuse basis set
+    if   self.basis == BasisSet._6_31G_star: 
+      if charge < 0:
+        basis = "6-31+G*"
+      else:
+        basis = "6-31G*"
+    elif self.basis == BasisSet._cc_pVTZ: 
+      if charge < 0:
+        basis = "aug-cc-pvtz"
+      else:  
+        basis = "cc-pvtz"
+
     else: raise ValueError( "Unknown basis set %s" % (self.basis) )
     if self.theory==Theory.HF:
       print( "set {\n\treference rhf\n\tbasis %s\n}\n" % ( basis ), file=f )
@@ -508,8 +518,16 @@ class QMCalculation:
     basis="unknown"
     if self.theory  == Theory.HF       : theory = "HF"
 
-    if self.basis   == BasisSet._6_31G_star: basis  = "6-31G*"  
-    elif self.basis == BasisSet._cc_pVTZ: basis = "cc-pVTZ"
+    if self.basis   == BasisSet._6_31G_star: 
+     if charge < 0:
+      basis  = "6-31+G*"  
+     else:
+      basis  = "6-31G*"  
+    elif self.basis == BasisSet._cc_pVTZ: 
+      if charge < 0:
+       basis = "AUG-cc-pVTZ"
+      else:
+       basis = "cc-pVTZ"
     else: raise ValueError( "Unknown basis set %s" % (self.basis) )
 
     opt=""
