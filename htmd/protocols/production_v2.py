@@ -6,7 +6,7 @@
 
 from htmd.molecule.molecule import Molecule
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
-from htmd.acemd.acemd import Acemd
+from htmd.apps.acemd import Acemd
 import os
 import htmd
 import logging

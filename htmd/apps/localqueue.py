@@ -162,6 +162,52 @@ def run_job(obj, gpuid, jobfun, jobargs):
     logger.info("Shutting down worker thread")
 
 
+def _executeMDcommand(cmd, path, datadir, enginename, trajext):
+    """ Executes command line MD simulation. Can move finished simulations to datadir.
+
+    Parameters
+    ----------
+    cmd : str
+        The command-line string to execute
+    path : str
+        The path containing the simulation files. Used only to report errors
+    datadir : str
+        The path in which to store completed trajectories. Default is None and doesn't move them.
+    enginename : str
+        Name of the MD engine to report nice error
+    trajext : str
+        Extension of completed trajectories to be able to move them to datadir
+    """
+    from subprocess import PIPE, Popen, TimeoutExpired, CalledProcessError
+    proc = None
+    try:
+        proc = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+        proc.communicate()
+    except CalledProcessError:
+        logger.error('Error in {} for path: {}. Check the {} file.'.format(enginename, path, os.path.join(path, 'log.txt')))
+        if proc:
+            proc.kill()
+        raise
+    except TimeoutExpired:
+        if proc:
+            proc.kill()
+        raise
+
+    import shutil
+    # If a datadir is provided, copy finished trajectories there.
+    # Only works for nc files.
+    if datadir is not None:
+        if not os.path.isdir(datadir):
+            os.mkdir(datadir)
+        simname = os.path.basename(os.path.normpath(path))
+        # create directory for new file
+        odir = os.path.join(datadir, simname)
+        os.mkdir(odir)
+        finishedtraj = glob(os.path.join(path, trajext))
+        logger.info('Moving simulation {} to {}.'.format(finishedtraj[0], odir))
+        shutil.move(finishedtraj[0], odir)
+
+
 if __name__ == "__main__":
     from time import sleep
 

@@ -92,13 +92,13 @@ def write_psi4_input( filename, config ):
 	opt=False
 	for k in config['route']:
 		if k.startswith("opt") and ("z-matrix" not in k):
-			print("ee = optimize('scf')\n",file=f );
+			print("ee,wfb = optimize('scf',return_wfn=True)\n",file=f );
 			opt=True
 	if not opt:
-		print("ee = energy('scf')\n",file=f );
+		print("ee,wfn = energy('scf', return_wfn=True)\n",file=f );
 
 	if( config['espfile'] ):
-		print("oeprop('GRID_ESP')", file=f)
+		print("oeprop(wfn, 'GRID_ESP')", file=f)
 		shutil.copyfile( config['espfile'], "grid.dat" ); # PSI4 has the grid filename hard-coded
 
 	print( "f=open( '%s', 'w' )" % ( tmpout ), file=f );

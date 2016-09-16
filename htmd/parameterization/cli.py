@@ -35,7 +35,6 @@ def syntax():
 
 
 def main_parameterize():
-    import matplotlib as mpl
     mpl.use('Agg')
 
     input_file = None

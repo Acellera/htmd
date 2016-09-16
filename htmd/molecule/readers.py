@@ -50,20 +50,24 @@ class Topology:
                      'occupancy', 'beta', 'segid', 'charge', 'masses', 'atomtype']
 
 
-class Trajectory:  # TODO: Remove this class
-    box = np.array((0, 0))
-    natoms = 0
-    nframes = 0
-    time = np.array(0)
-    step = np.array(0)
-    coords = np.array((0, 3, 0))
+def XTCread(filename, givenframes=None):
+    """ Reads XTC file
 
-    def __str__(self):
-        return "Trajectory with " + str(self.nframes) + " frames, each with " + str(
-            self.natoms) + " atoms and timestep of " + str(self.time)
+    Parameters
+    ----------
+    filename : str
+        Path of xtc file.
+    givenframes : list
+        A list of integer frames which we want to read from the file. If None will read all.
 
-
-def XTCread(filename, frames=None):
+    Returns
+    -------
+    coords : nd.array
+    box : nd.array
+    boxangles : nd.array
+    step : nd.array
+    time : nd.array
+    """
     class __xtc(ct.Structure):
         _fields_ = [("box", (ct.c_float * 3)),
                     ("natoms", ct.c_int),
@@ -80,93 +84,65 @@ def XTCread(filename, frames=None):
     lib['libxtc'].xtc_read.restype = ct.POINTER(__xtc)
     lib['libxtc'].xtc_read_frame.restype = ct.POINTER(__xtc)
 
-    if frames is None:
+    coords = None
+    if givenframes is None:  # Read the whole XTC file at once
         retval = lib['libxtc'].xtc_read(
             ct.c_char_p(filename.encode("ascii")),
             natoms,
             nframes, deltat, deltastep)
-
         if not retval:
             raise IOError('XTC file {} possibly corrupt.'.format(filename))
-
-        frames = range(nframes[0])
-        t = Trajectory()
-        t.natoms = natoms[0]
-        t.nframes = len(frames)
-        t.coords = np.zeros((natoms[0], 3, t.nframes), dtype=np.float32)
-        t.step = np.zeros(t.nframes, dtype=np.uint64)
-        t.time = np.zeros(t.nframes, dtype=np.float32)
-        t.box = np.zeros((3, t.nframes), dtype=np.float32)
-
-        for i, f in enumerate(frames):
-            if f >= nframes[0] or f < 0:
-                raise RuntimeError('Frame index out of range in XTCread with given frames')
-            t.step[i] = retval[f].step
-            t.time[i] = retval[f].time
-            t.box[0, i] = retval[f].box[0]
-            t.box[1, i] = retval[f].box[1]
-            t.box[2, i] = retval[f].box[2]
-            #		print( t.coords[:,:,f].shape)
-            #		print ( t.box[:,f] )
-            #   t.step[i] = deltastep[0] * i
-            t.coords[:, :, i] = np.ctypeslib.as_array(retval[f].pos, shape=(natoms[0], 3))
-
-        for f in range(len(frames)):
-            lib['libc'].free(retval[f].pos)
-        lib['libc'].free(retval)
-
+        nframes = nframes[0]
+        frames = range(nframes)
+        coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
     else:
-        if not isinstance(frames, list) and not isinstance(frames, np.ndarray):
-            frames = [frames]
-        t = Trajectory()
-        t.natoms = 0
-        t.nframes = len(frames)
-        t.coords = None
-        t.step = None
-        t.time = None
-        t.box = None
+        if not isinstance(givenframes, list) and not isinstance(givenframes, np.ndarray):
+            givenframes = [givenframes]
+        nframes = len(givenframes)
+        frames = givenframes
 
-        nframes = len(frames)
-        i = 0
-        for f in frames:
+
+    step = np.zeros(nframes, dtype=np.uint64)
+    time = np.zeros(nframes, dtype=np.float32)
+    box = np.zeros((3, nframes), dtype=np.float32)
+    boxangles = np.zeros((3, nframes), dtype=np.float32)
+
+    for i, f in enumerate(frames):
+        if givenframes is not None:  # If frames were given, read specific frame
             retval = lib['libxtc'].xtc_read_frame(
                 ct.c_char_p(filename.encode("ascii")),
                 natoms,
                 ct.c_int(f))
-
             if not retval:
                 raise IOError('XTC file {} possibly corrupt.'.format(filename))
+            if coords is None:
+                coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
+            fidx = 0
+        else:
+            fidx = f
 
-            if t.coords is None:
-                t.natoms = natoms[0]
-                t.coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
-                t.step = np.zeros(nframes, dtype=np.uint64)
-                t.time = np.zeros(nframes, dtype=np.float32)
-                t.box = np.zeros((3, nframes), dtype=np.float32)
+        step[i] = retval[fidx].step
+        time[i] = retval[fidx].time
+        box[:, i] = retval[fidx].box
+        coords[:, :, i] = np.ctypeslib.as_array(retval[fidx].pos, shape=(natoms[0], 3))
 
-            t.step[i] = retval[0].step
-            t.time[i] = retval[0].time
-            t.box[0, i] = retval[0].box[0]
-            t.box[1, i] = retval[0].box[1]
-            t.box[2, i] = retval[0].box[2]
-            t.coords[:, :, i] = np.ctypeslib.as_array(retval[0].pos, shape=(natoms[0], 3))
-            i += 1
-
+        if givenframes is not None:
             lib['libc'].free(retval[0].pos)
             lib['libc'].free(retval)
 
-    if np.size(t.coords, 2) == 0:
+    if givenframes is None:
+        for f in range(len(frames)):
+            lib['libc'].free(retval[f].pos)
+        lib['libc'].free(retval)
+
+    if np.size(coords, 2) == 0:
         raise NameError('Malformed XTC file. No frames read from: {}'.format(filename))
-    if np.size(t.coords, 0) == 0:
+    if np.size(coords, 0) == 0:
         raise NameError('Malformed XTC file. No atoms read from: {}'.format(filename))
 
-    # print( t.step )
-    # print( t.time )
-    #	print( t.coords[:,:,0] )
-    # print(t.coords.shape)
-    t.coords *= 10.  # Convert from nm to Angstrom
-    t.box *= 10.  # Convert from nm to Angstrom
-    return t
+    coords *= 10.  # Convert from nm to Angstrom
+    box *= 10.  # Convert from nm to Angstrom
+    return coords, box, boxangles, step, time
 
 
 def CRDread(filename):
@@ -602,8 +578,8 @@ def PDBread(filename, mode='pdb'):
 
     # Fixing PDB format charges which can come after the number
     if parsedtopo.charge.dtype == 'object':
-        minuses = np.where(parsedtopo.charge.str.match('\d\-'))[0]
-        pluses = np.where(parsedtopo.charge.str.match('\d\+'))[0]
+        minuses = np.where(parsedtopo.charge.str.match('\d\-') == True)[0]
+        pluses = np.where(parsedtopo.charge.str.match('\d\+') == True)[0]
         for m in minuses:
             parsedtopo.loc[m, 'charge'] = int(parsedtopo.charge[m][0]) * -1
         for p in pluses:
@@ -794,6 +770,39 @@ def PSFread(filename):
             mode = 'improper'
     f.close()
     return topo
+
+
+def MDTRAJread(filename, topoloc):
+    import mdtraj as md
+    traj = md.load(filename, top=topoloc)
+    coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
+    if traj.timestep == 1:
+        time = np.zeros(traj.time.shape, dtype=traj.time.dtype)
+        step = np.zeros(traj.time.shape, dtype=traj.time.dtype)
+    else:
+        time = traj.time * 1000  # need to go from picoseconds to femtoseconds
+        step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
+    box = traj.unitcell_lengths.T * 10
+    boxangles = traj.unitcell_angles.T
+    return coords, box, boxangles, step, time
+
+
+def MDTRAJTOPOread(filename):
+    translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
+                 'chainID': 'chain', 'segmentID': 'segid'}
+    import mdtraj as md
+    from htmd.molecule.readers import Topology
+    mdstruct = md.load(filename)
+    topology = mdstruct.topology
+    table, bonds = topology.to_dataframe()
+
+    topo = Topology()
+    for k in table.keys():
+        topo.__dict__[translate[k]] = table[k].tolist()
+
+    coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
+    topo.bonds = bonds
+    return topo, coords
 
 
 if __name__ == '__main__':

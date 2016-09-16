@@ -36,6 +36,7 @@ class AdaptiveBase(ProtocolInterface):
         self._cmdString('generatorspath', 'str', 'The directory containing the generators', 'generators')
         self._cmdBoolean('dryrun', 'boolean', 'A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations', False)
         self._cmdValue('updateperiod', 'float', 'When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds', 0, TYPE_FLOAT, RANGE_0POS)
+        self._cmdString('coorname', 'str', 'Name of the file containing the starting coordinates for the new simulations', 'input.coor')
         self._running = None
 
     def run(self):
@@ -141,14 +142,14 @@ class AdaptiveBase(ProtocolInterface):
 
         from htmd.config import _config
         Parallel(n_jobs=_config['ncpus'], verbose=11)(
-            delayed(_writeInputsFunction)(i, f, epoch, self.inputpath) for i, f in enumerate(simsframes))
+            delayed(_writeInputsFunction)(i, f, epoch, self.inputpath, self.coorname) for i, f in enumerate(simsframes))
 
     @abc.abstractmethod
     def _algorithm(self):
         return
 
 
-def _writeInputsFunction(i, f, epoch, inputpath):
+def _writeInputsFunction(i, f, epoch, inputpath, coorname):
     regex = re.compile('(e\d+s\d+)_')
     frameNum = f.frame
     piece = f.piece
@@ -170,12 +171,12 @@ def _writeInputsFunction(i, f, epoch, inputpath):
     newName = 'e' + str(epoch) + 's' + str(i + 1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
     newDir = path.join(inputpath, newName, '')
     # copy previous input directory including input files
-    copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor', *_IGNORE_EXTENSIONS))
+    copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor', '*.rst', '*.out', *_IGNORE_EXTENSIONS))
     # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
     mol = Molecule()
     mol.read(traj)
     mol.frame = frameNum
-    mol.write(path.join(newDir, 'input.coor'))
+    mol.write(path.join(newDir, coorname))
 
 
 class Adaptive(object):
@@ -348,7 +349,7 @@ class Adaptive(object):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor', *_IGNORE_EXTENSIONS))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor',  '*.rst', '*.out', *_IGNORE_EXTENSIONS))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)
