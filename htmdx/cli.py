@@ -208,6 +208,14 @@ def main_activate():
        print(r.content.decode("ascii"), file=f )
        f.close()
        print( "\n License installed in ~/.acellera/license.dat\n\n" );
+       try:
+         f = open(os.path.join( "/opt/acellera/license.dat"), "a" )   
+            
+         print(r.content.decode("ascii"), file=f )
+         f.close()
+         print( "\n License installed in /opt/acellera/license.dat\n\n" );
+       except:
+         pass
 
 def main_htmd():
     check_registration(product="htmd")
