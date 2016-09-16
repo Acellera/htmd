@@ -81,8 +81,10 @@ def main_parameterize():
 
     basis = BasisSet._6_31G_star
 
-    if args.basis == "6-31g-star"  : basis = BasisSet._6_31G_star
-    elif args.basis == "cc-pVTZ"   : basis = BasisSet._cc_pVTZ
+    if args.basis == "6-31g-star":
+      basis = BasisSet._6_31G_star
+    elif args.basis == "cc-pVTZ": 
+      basis = BasisSet._cc_pVTZ
     else: 
       print("Unknown basis %s" % ( args.basis ) )
       sys.exit(1)
