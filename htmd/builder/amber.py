@@ -245,9 +245,19 @@ def _applyCaps(mol, caps):
         ntermAtomToMod = mol.atomselect('segid {} and resid {} and name H2 HT2'.format(seg, np.min(resids)), indexes=True)
         ctermAtomToMod = mol.atomselect('segid {} and resid {} and name OXT OT1'.format(seg, np.max(resids)), indexes=True)
         if len(ntermAtomToMod) != 1:
-            raise AssertionError('Segment {}, resid {} should have either one H2 or one HT2 atom. Cannot cap.'.format(seg, np.min(resids)))
+            ntermAtomToMod = mol.atomselect('segid {} and resid {} and name H'.format(seg, np.min(resids)),
+                                            indexes=True)
+            if len(ntermAtomToMod) == 1:
+                logger.info("Segid {}, resid {} does not have OXT or OT1, falling back at atom H".format(seg, np.min(resids)))
+            else:
+                raise AssertionError('Segment {}, resid {} should have an H2, an HT2, or an H atom. Cannot cap.'.format(seg, np.min(resids)))
         if len(ctermAtomToMod) != 1:
-            raise AssertionError('Segment {}, resid {} should have either one OXT or one OT1 atom. Cannot cap.'.format(seg, np.max(resids)))
+            ctermAtomToMod = mol.atomselect('segid {} and resid {} and name O'.format(seg, np.max(resids)),
+                                            indexes=True)
+            if len(ctermAtomToMod) == 1:
+                logger.info("Segid {}, resid {} does not have OXT or OT1, falling back at atom O".format(seg, np.max(resids)))
+            else:
+                raise AssertionError('Segment {}, resid {} should have an OXT, an OT1, or an O atom. Cannot cap.'.format(seg, np.max(resids)))
         mol.set('resname', caps[seg][0], sel=ntermAtomToMod)
         mol.set('name', 'C', sel=ntermAtomToMod)
         mol.set('resid', np.min(resids)-1, sel=ntermAtomToMod)
@@ -264,9 +274,9 @@ def _applyCaps(mol, caps):
 
         torem = mol.atomselect('segid {} and resid {} and name H1 H3 HT1 HT3'.format(seg, np.min(resids)))
         if np.sum(torem) != 2:
-            raise RuntimeError('Segment {}, resid {} should have H[123] or HT[123] atoms. Cannot cap. '
+            logger.warning('Segment {}, resid {} should have H[123] or HT[123] atoms. Cannot cap. '
                                  'Capping in AMBER requires hydrogens on the residues that will be capped. '
-                                 'Consider using the proteinPrepare function to add hydrogens to your molecule'
+                                 'Consider using the proteinPrepare function to add hydrogens to your molecule '
                                  'before building.'.format(seg, np.min(resids)))
         mol.remove(torem)
 
