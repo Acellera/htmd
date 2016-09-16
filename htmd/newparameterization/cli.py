@@ -17,7 +17,7 @@ import sys
 import os
 
 def printEnergies( mol ):
-  print(" == Diagnostic Energies == ")
+  print("\n == Diagnostic Energies == ")
   ffe = FFEvaluate( mol )
   energies = ffe.evaluate( mol.coords[:,:,0] )
   print( "" )
