@@ -41,6 +41,7 @@ def home(dataDir=None, libDir=False):
         libdir = os.path.join(homeDir, "lib", platform.system() )
         if not os.path.exists( libdir ):
             raise FileNotFoundError('Could not find libs.')
+        return libdir
 #        if os.path.exists(os.path.join(libdir, "basic")):
 #            return os.path.join(libdir, "basic", platform.system())
 #        elif os.path.exists(os.path.join(libdir, "pro")):
