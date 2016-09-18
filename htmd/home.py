@@ -5,6 +5,7 @@
 #
 import htmd
 import os
+import sys
 import inspect
 import platform
 
@@ -35,6 +36,9 @@ def home(dataDir=None, libDir=False):
     """
 
     homeDir=os.path.dirname(inspect.getfile(htmd))
+    if sys._MEIPASS:
+       homeDir = sys._MEIPASS
+
     if dataDir:
         return os.path.join(homeDir, "data", dataDir)
     elif libDir:
