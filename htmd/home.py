@@ -36,8 +36,11 @@ def home(dataDir=None, libDir=False):
     """
 
     homeDir=os.path.dirname(inspect.getfile(htmd))
-    if sys._MEIPASS:
-       homeDir = sys._MEIPASS
+    try:
+      if sys._MEIPASS:
+         homeDir = sys._MEIPASS
+    except:
+      pass
 
     if dataDir:
         return os.path.join(homeDir, "data", dataDir)
