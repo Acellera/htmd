@@ -17,7 +17,7 @@ import sys
 import os
 
 def printEnergies( mol ):
-  print(" == Diagnostic Energies == ")
+  print("\n == Diagnostic Energies == ")
   ffe = FFEvaluate( mol )
   energies = ffe.evaluate( mol.coords[:,:,0] )
   print( "" )
@@ -119,8 +119,11 @@ def main_parameterize():
       print("Charge Chi^2 score : %f : %s" % ( score, rating ))
       print("QM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
       print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
-      d = qm_dipole[3] - mm_dipole[3]
-      d = d * d
+      d=0.
+      for i in range(3):
+        x = qm_dipole[i] - mm_dipole[i]
+        d = d + x * x
+ 
       rating="GOOD"
       if score > 1:  rating="CHECK"
       print("Dipole Chi^2 score : %f : %s" % ( d, rating ) )
