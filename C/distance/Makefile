@@ -5,7 +5,7 @@ TYPE := $(TYPE)
 
 MINDIST_SRC:= mindist_ext
 
-_MINDIST_OBJ := $(patsubst %,obj/$(TYPE)/$(PLATFORM)/%.o, $(MINDIST_SRC))
+_MINDIST_OBJ := $(patsubst %,obj/$(PLATFORM)/%.o, $(MINDIST_SRC))
 _MINDIST_SRC := $(patsubst %,src/$(PLATFORM)/%.c, $(MINDIST_SRC))
 
 LDFLAGS := 
@@ -13,19 +13,19 @@ INC_FLAGS :=
 
 .PHONY: clean 
 
-all: obj/$(TYPE)/$(PLATFORM) ../../htmd/lib/$(TYPE)/$(PLATFORM)/mindist_ext.so
+all: obj/$(PLATFORM) ../../htmd/lib/$(PLATFORM)/mindist_ext.so
 
-../../htmd/lib/$(TYPE)/$(PLATFORM)/mindist_ext.so: $(_MINDIST_OBJ)
+../../htmd/lib/$(PLATFORM)/mindist_ext.so: $(_MINDIST_OBJ)
 	$(CPURE) -fPIC  --shared -o $@  $(_MINDIST_OBJ)
 
-obj/$(TYPE)/$(PLATFORM)/%.o: %.c
-	$(CPURE) -o $@ -c $< -g -fPIC -ffast-math -O3 -DDIST_$(TYPE)
+obj/$(PLATFORM)/%.o: %.c
+	$(CPURE) -o $@ -c $< -g -fPIC -ffast-math -O3 -DDIST_
 
-../../htmd/lib/$(TYPE)/$(PLATFORM):
-	mkdir -p ../../htmd/lib/$(TYPE)/$(PLATFORM)
+../../htmd/lib/$(PLATFORM):
+	mkdir -p ../../htmd/lib/$(PLATFORM)
 
-obj/$(TYPE)/$(PLATFORM):
-	mkdir -p obj/$(TYPE)/$(PLATFORM)
+obj/$(PLATFORM):
+	mkdir -p obj/$(PLATFORM)
 
 clean:
 	rm -rf obj/* obj
