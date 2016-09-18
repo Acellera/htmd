@@ -69,8 +69,9 @@ try:
 except:
 	print("HTMD: Logging setup failed")
 
-check_registration(product='htmd')
-show_news()
-compareVersions()
+if not os.getenv("HTMD_NONINTERACTIVE"):
+  check_registration(product='htmd')
+  show_news()
+  compareVersions()
 
 config()
