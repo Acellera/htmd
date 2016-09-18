@@ -39,12 +39,6 @@ echo "Installing into $PREFIX"
 	  rm -rf $DIR/htmdx/.idea
     rm -rf $DIR/htmd/.ipynb_checkpoints
     rm -rf $DIR/htmd/Untitled*
-    if [ "$PKG_NAME" == "htmd" ]; then
-      rm -rf $DIR/htmd/lib/pro
-		fi
-    if [ "$PKG_NAME" == "htmd-pro" ]; then
-      rm -rf $DIR/htmd/lib/basic
-		fi
 
 
     echo "def version():" > $DIR/htmd/version.py
