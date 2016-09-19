@@ -6,6 +6,11 @@ import platform
 
 def licenseEntitlements():
 	libdir = home(libDir=True)
+
+	# No liblicense.so for OS X yet. Need to buy it
+	if platform.system() == "Darwin":
+		return dict()
+  
 	if platform.system() == "Windows":
 		cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
 		if os.path.exists(os.path.join(libdir, "psprolib.dll")):
