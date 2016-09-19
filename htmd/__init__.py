@@ -68,7 +68,6 @@ try:
 	logging.config.fileConfig(os.path.join(home(), 'logging.ini'), disable_existing_loggers=False)
 except:
 	print("HTMD: Logging setup failed")
-
 if not os.getenv("HTMD_NONINTERACTIVE"):
   check_registration(product='htmd')
   show_news()
