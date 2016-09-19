@@ -226,7 +226,7 @@ class Parameterization:
         if r:
             return r
         if fatal:
-            raise ValueError("Could not find binary [" + binary + "] in PATH ")
+            raise ValueError("Could not find binary [" + binary + "] in PATH %s " % ( path ) )
         else:
             return None
 
