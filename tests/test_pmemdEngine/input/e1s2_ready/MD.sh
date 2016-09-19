@@ -1,0 +1,1 @@
+/usr/local/amber/bin/pmemd.cuda_SPFP -O -i Production.in -o Production.out -p Ala2.prmtop -c Ala2.rst -x Production.nc -r Production_new.rst
