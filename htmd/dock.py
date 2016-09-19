@@ -83,7 +83,7 @@ def dock(protein, ligand, center=None, extent=None):
     except:
         raise NameError('Could not find vina, or no execute permissions are given')
     try:
-        babelexe = shutil.which('htmd_babel', mode=os.X_OK)
+        babelexe = shutil.which('babel', mode=os.X_OK)
     except:
         raise NameError('Could not find babel, or no execute permissions are given')
     #babelexe = path.join(home(), 'bin', 'htmd_babel')

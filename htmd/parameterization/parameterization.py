@@ -311,7 +311,7 @@ CHECK() {
 
         # Locate all of  the third-party binary programs needed
 
-        env['BIN_BABEL'] = Parameterization.find_binary("htmd_babel", path=gaamp_bin)
+        env['BIN_BABEL'] = Parameterization.find_binary("babel", path=gaamp_bin)
         env['BIN_MATCH'] = Parameterization.find_binary("match", path=gaamp_bin)
         # env['BIN_ANTECHAMBER']= Parameterization.find_binary( "antechamber", path=gaamp_bin )
         has_g09 = False
