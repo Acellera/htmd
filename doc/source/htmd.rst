@@ -6,7 +6,6 @@ Subpackages
 
 .. toctree::
 
-    htmd.acemd
     htmd.adaptive
     htmd.apps
     htmd.builder
@@ -25,9 +24,12 @@ Submodules
    htmd.dock
    htmd.home
    htmd.kinetics
+   htmd.kineticshmm
    htmd.latest
+   htmd.license
    htmd.metricdata
    htmd.model
+   htmd.modelhmm
    htmd.pathplanning
    htmd.rotationmatrix
    htmd.session
