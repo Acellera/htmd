@@ -809,6 +809,7 @@ def MDTRAJTOPOread(filename):
 if __name__ == '__main__':
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
+    from glob import glob
     import os
     testfolder = home(dataDir='molecule-readers/4RWS/')
     mol = Molecule(os.path.join(testfolder, 'structure.psf'))
@@ -824,9 +825,11 @@ if __name__ == '__main__':
     mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
     mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
     print('Can read MOL2 files.')
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'protein.mae'))
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '3pbl.mae'))
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '4mqt.mae'))
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '1e66.mae'))
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '3zkm-ph4.mae'))
+    for f in glob(os.path.join(home(dataDir='molecule-readers/'), '*.mae')):
+        mol = Molecule(f)
     print('Can read MAE files.')
+    for f in glob(os.path.join(home(dataDir='molecule-readers/'), '*.pdb')):
+        mol = Molecule(f)
+    for f in glob(os.path.join(home(dataDir='pdb/'), '*.pdb')):
+        mol = Molecule(f)
+    print('Can read PDB files.')
