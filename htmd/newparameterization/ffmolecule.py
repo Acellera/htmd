@@ -108,7 +108,8 @@ class FFMolecule(Molecule):
         hh = dict()
 
         for i in range(len(self.name)):
-            t = re.sub('[1234567890]*', "", self.name[i]).upper()
+            # Remove any character that isn't alpha
+            t = re.sub('[^A-Z]*', "", self.name[i].upper())
             idx = 0
 
             if not t in hh:
