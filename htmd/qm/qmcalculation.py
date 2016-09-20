@@ -270,7 +270,7 @@ class QMCalculation:
     self._start( dirs )
 
   def _start( self, directories ):
-     if self.execution == Exection.Inline:
+     if self.execution == Execution.Inline:
        self._start_inline( directories )
      elif self.exeuction == Execution.LSF:
        self._start_lsf( directories )

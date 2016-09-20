@@ -245,7 +245,7 @@ def MOL2read(filename):
         s = l[i + start].strip().split()
         topo.record.append("HETATM")
         topo.serial.append(int(s[0]))
-        topo.element.append(re.sub("[0123456789]*", "", s[1]))
+        topo.element.append(re.sub("[^A-Z]*", "", s[1]))
         topo.name.append(s[1])
         coords.append([float(x) for x in s[2:5]])
         topo.charge.append(float(s[8]))

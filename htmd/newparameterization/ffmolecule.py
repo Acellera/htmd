@@ -110,6 +110,7 @@ class FFMolecule(Molecule):
         for i in range(len(self.name)):
             # Remove any character that isn't alpha
             t = re.sub('[^A-Z]*', "", self.name[i].upper())
+           # print("RENAMED %s to %s" %(self.name[i], t ) )
             idx = 0
 
             if not t in hh:
@@ -132,7 +133,7 @@ class FFMolecule(Molecule):
     except:
       pass
     # Kick off a QM calculation -- unconstrained geometry optimization
-    qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory= os.path.join( "minimize", self.basis_name ), basis=self.basis, exection=self.execution )
+    qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory= os.path.join( "minimize", self.basis_name ), basis=self.basis, execution=self.execution )
     results = qm.results()
     if results[0].errored:
       raise RuntimeError("QM Optimization failed")
