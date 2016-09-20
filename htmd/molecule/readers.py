@@ -810,6 +810,7 @@ if __name__ == '__main__':
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
     from glob import glob
+    from natsort import natsorted
     import os
     testfolder = home(dataDir='molecule-readers/4RWS/')
     mol = Molecule(os.path.join(testfolder, 'structure.psf'))
@@ -833,3 +834,7 @@ if __name__ == '__main__':
     for f in glob(os.path.join(home(dataDir='pdb/'), '*.pdb')):
         mol = Molecule(f)
     print('Can read PDB files.')
+    testfolder = home(dataDir='molecule-readers/CMYBKIX/')
+    mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
+    mol.read(natsorted(glob(os.path.join(testfolder, '*.xtc'))))
+    print('Can read/append XTC trajectories.')
