@@ -111,7 +111,7 @@ class LSF(UserInterface):
        print("#!/bin/sh", file =f )
        print("cd \"" + dir + "\"", file=f)
        print("module load acemd", file=f )
-       print("%s > log.txt 2>&1" % (exe), file=f )
+       print("%s --device $CUDA_VISIBLE_DEVICES > log.txt 2>&1" % (exe), file=f )
        f.close()
        os.chmod( fn, 0o700 )
        return os.path.abspath(fn)
