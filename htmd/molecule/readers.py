@@ -584,6 +584,7 @@ def PDBread(filename, mode='pdb'):
             parsedtopo.loc[m, 'charge'] = int(parsedtopo.charge[m][0]) * -1
         for p in pluses:
             parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
+        parsedtopo.loc[parsedtopo.charge.isnull(), 'charge'] = 0
 
     if len(parsedtopo) > 99999:
         logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')

@@ -55,6 +55,7 @@ def jobfunc(acemd, datadir, inputfile, timeout, path, gpuid):
     if timeout:
         timeoutstr = 'timeout {}'.format(timeout)
     cmd = 'cd {}; {} {} --device {} {} > log.txt 2>&1'.format(os.path.normpath(path), timeoutstr, acemd, gpuid, inputfile)
+    logger.debug(cmd)
     _executeMDcommand(cmd, path, datadir, 'ACEMD', '*.xtc')
 
 
