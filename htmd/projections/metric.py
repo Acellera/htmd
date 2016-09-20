@@ -135,6 +135,8 @@ class Metric:
             for proj in self.projectionlist:
                 proj._precalculate(uqMol)
                 map = map.append(proj.getMapping(uqMol), ignore_index=True)
+        else:
+            logger.warning('Cannot calculate description of dimensions due to different topology files for each trajectory.')
 
         logger.info('Metric: Starting projection of trajectories.')
         metrics = np.empty(numSim, dtype=object)
