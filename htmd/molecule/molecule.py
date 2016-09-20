@@ -856,7 +856,7 @@ class Molecule:
             else:
                 self.coords = np.append(self.coords, coords, 2)
                 self.box = np.append(self.box, box, 1)
-                self.boxangles = np.append(self.boxangles, boxangles, 0)
+                self.boxangles = np.append(self.boxangles, boxangles, 1)
 
         if skip is not None:
             self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
