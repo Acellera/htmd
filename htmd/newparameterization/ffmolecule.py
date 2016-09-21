@@ -38,7 +38,7 @@ class QMFittingSet:
 
 
 class FFMolecule(Molecule):
-  def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6, basis=BasisSet._6_31G_star, execution=Execution.Inline ):
+  def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6, basis=BasisSet._6_31G_star, execution=Execution.Inline, qmcode = Code.PSI4 ):
     # filename -- a mol2 format input geometry  
     # rtf, prm -- rtf, prm files
     # method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
@@ -48,6 +48,7 @@ class FFMolecule(Molecule):
     else: raise ValueError( "Unknown Basis Set" )
 
     self.execution = execution 
+    self.qmcode    = code
 
     if( not ( filename.endswith(".mol2")) ):
       raise ValueError( "Input file must be mol2 format" )
@@ -133,7 +134,7 @@ class FFMolecule(Molecule):
     except:
       pass
     # Kick off a QM calculation -- unconstrained geometry optimization
-    qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory= os.path.join( "minimize", self.basis_name ), basis=self.basis, execution=self.execution )
+    qm = QMCalculation( self, charge=self.netcharge, optimize=True, directory= os.path.join( "minimize", self.basis_name ), basis=self.basis, execution=self.execution , code = self.qmcode )
     results = qm.results()
     if results[0].errored:
       raise RuntimeError("QM Optimization failed")
@@ -244,7 +245,7 @@ class FFMolecule(Molecule):
 
 
 
-    qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=points, directory= os.path.join( "esp", self.basis_name ), basis=self.basis, execution=self.execution  )
+    qm = QMCalculation( self, charge=self.netcharge, optimize=False, esp=points, directory= os.path.join( "esp", self.basis_name ), basis=self.basis, execution=self.execution , code = self.qmcode )
     results = qm.results()
     if results[0].errored:
       raise RuntimeError("QM Calculation failed")
@@ -437,7 +438,7 @@ class FFMolecule(Molecule):
 
 
    
-    qmset   = QMCalculation( mol, charge=self.netcharge, directory= dirname , frozen=frozens, optimize=geomopt, basis=self.basis , execution = self.execution )
+    qmset   = QMCalculation( mol, charge=self.netcharge, directory= dirname , frozen=frozens, optimize=geomopt, basis=self.basis , execution = self.execution, code = self.qmcode )
 
     ret = self._makeDihedralFittingSetFromQMResults( atoms, qmset.results() )
 
@@ -757,10 +758,10 @@ class FFMolecule(Molecule):
     ax1.set_ylabel( "kcal/mol" )
     ax1.set_title( fit.name )
     ax1.plot( fit.phi , fit.qm         , label="QM", color="r", marker="o" )
-    ax1.plot( fit.phi , fit.mm_original, label="MM Original", color="b", marker="o" )  
+    ax1.plot( fit.phi , fit.mm_original, label="MM Original", color="b", marker="d" )  
 #    ax1.plot( fit.phi , fit.mm_zeroed  , label="MM With phi zeroed", color="black", marker="x" )  
 #    ax1.plot( fit.phi , fit.mm_delta   , label="QM-MM target", color="magenta", marker="x" )  
-    ax1.plot( fit.phi , fit.mm_fitted  , label="MM Fitted", color="g", marker="o" )  
+    ax1.plot( fit.phi , fit.mm_fitted  , label="MM Fitted", color="g", marker="s" )  
     ax1.legend(prop={'size': 8})
     if show:
       plt.show()
