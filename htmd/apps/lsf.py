@@ -151,6 +151,7 @@ class LSF(UserInterface):
 
 if __name__ == "__main__":
     s=LSF( name="adaptivetest" )
+    print(s.name)
     """
 #    s.submit( "test/dhfr", debug=True )
 #    s.submit( "test/dhfr", debug=True )
