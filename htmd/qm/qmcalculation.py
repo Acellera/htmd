@@ -6,6 +6,7 @@ import subprocess
 from shutil import which 
 import shutil
 import os
+import time
 from math import pi as PI
 from math import sqrt
 from math import acos
@@ -302,6 +303,7 @@ class QMCalculation:
 
      lsf = LSF( ncpus=self.ncpus, executable = cmd, queue = "general", resources = "span[ptile=%d]" % (self.ncpus) )
      lsf.submit( to_submit )
+     time.sleep(5)
      lsf.wait()
 
 
