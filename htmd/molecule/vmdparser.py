@@ -9,12 +9,20 @@ import htmd.home
 import ctypes as ct
 from htmd.molecule.support import pack_string_buffer, pack_int_buffer, pack_ulong_buffer, pack_double_buffer
 import numpy as np
+import platform
+
+libdir = htmd.home(libDir=True)
+if platform.system() == "Windows":
+    ct.cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
+    if (os.path.exists(os.path.join(libdir, "psprolib.dll"))):
+        ct.cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
+
+parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
 
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
-    import platform
-    libdir = htmd.home(libDir=True)
+
 
     if coordinates.ndim == 2:
         coordinates = np.atleast_3d(coordinates)
@@ -64,13 +72,6 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
         raise NameError("'beta' not natoms in length")
     if occupancy is not None and len(occupancy) != natoms:
         raise NameError("'occupancy' not natoms in length")
-
-    if platform.system() == "Windows":
-        ct.cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
-        if (os.path.exists(os.path.join(libdir, "psprolib.dll"))):
-            ct.cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
-
-    parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
     c_selection = ct.create_string_buffer(selection.encode('ascii'), len(selection) + 1)
     c_natoms = ct.c_int(natoms)
@@ -257,10 +258,6 @@ def guessbonds(coordinates, atomname, atomtype, resname, resid, chain, segname, 
         raise NameError("'resname' not natoms in length")
     if len(resid) != natoms:
         raise NameError("'resid' not natoms in length")
-
-    libdir = htmd.home(libDir=True)
-
-    parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
     c_natoms = ct.c_int(natoms)
     c_atomname = pack_string_buffer(atomname)
