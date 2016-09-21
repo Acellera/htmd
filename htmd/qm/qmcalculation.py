@@ -383,10 +383,10 @@ class QMCalculation:
         s1 = fl[i+1].split()
         s2 = fl[i+2].split()
         data['quadrupole'] = [ float(s1[1]), float(s1[3]), float(s1[5]), float(s2[1]), float(s2[3]), float(s2[5]) ]
-      if "Mulliken atomic charges:" in fl[i]:
+      if "Mulliken atomic charges:" in fl[i] or "Mulliken charges:" in fl[i]:
         data['mulliken'] = []
         for j in range(self.natoms):
-          data['mulliken'].append( float( fl[i+1+j].split()[2] ) )
+          data['mulliken'].append( float( fl[i+2+j].split()[2] ) )
 
     for l in fl:
         if "SCF Done:  E(RHF) = " in l:
