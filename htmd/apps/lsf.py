@@ -27,7 +27,6 @@ class LSF(UserInterface):
 
 
     def __init__(self, **kw):
-        self.name = None
         for i in self._commands.keys():
             self.__dict__[i] = self._commands[i]
 
@@ -46,9 +45,8 @@ class LSF(UserInterface):
         except:
           self._exe = self.executable
 
-        if( not self.name ):
-          lst = [random.choice(string.ascii_letters + string.digits) for n in range(10)]
-          self.name = "".join(lst)
+        lst = [random.choice(string.ascii_letters + string.digits) for n in range(10)]
+        self.name = "".join(lst)
 
     def _find_binary(self, bin ):
         ret = shutil.which( bin, mode=os.X_OK )
