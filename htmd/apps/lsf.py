@@ -41,6 +41,7 @@ class LSF(UserInterface):
         self._bsub = self._find_binary( "bsub" )
         self._bjobs = self._find_binary( "bjobs" )
 
+        self._dirs= []
         try: 
           self._exe    = self._find_binary( self.executable )
         except:
@@ -76,7 +77,7 @@ class LSF(UserInterface):
         '''
 
         if isinstance(mydirs, str): mydirs = [mydirs]
-
+        self._dirs.extend( mydirs )
         for d in mydirs:
             if not isdir(d):
                 raise NameError('Submit: directory ' + d + ' does not exist.')
@@ -137,12 +138,20 @@ class LSF(UserInterface):
          print("%s --device $CUDA_VISIBLE_DEVICES > log.txt 2>&1" % (exe), file=f )
        else:
          print("%s" % (exe), file=f )
+       print( "touch .done", file=f )
 
        f.close()
        os.chmod( fn, 0o700 )
        return os.path.abspath(fn)
 
-    def inprogress(self, debug=False):
+    def inprogress( self, debug=False ):
+       inprogress=0
+       for i in self._dirs:
+          if not os.path.exist( os.path.join( i, ".done" ) ):
+           inprogress = inprogress + 1 
+       return inprogress
+
+    def __inprogress(self, debug=False):
         ''' INPROGRESS - Returns the sum of the number of running and queued
                       workunits of the specific group in the engine.
 
