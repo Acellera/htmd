@@ -304,7 +304,7 @@ class QMCalculation:
      time.sleep(5)
      lsf.wait()
      time.sleep(5)
-
+     os.sync()
 
   def _start_inline( self, directories ):
      bar = ProgressBar( len(directories), description="Running QM Calculations" )
