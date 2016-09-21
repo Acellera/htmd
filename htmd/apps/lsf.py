@@ -11,6 +11,8 @@ import inspect
 import shutil
 #import pwd
 import os
+import string
+import random
 
 class LSF(UserInterface):
     _commands = {
@@ -43,6 +45,10 @@ class LSF(UserInterface):
           self._exe    = self._find_binary( self.executable )
         except:
           self._exe = self.executable
+
+        if( not self.name ):
+          lst = [random.choice(string.ascii_letters + string.digits) for n in range(10)]
+          self.name = "".join(lst)
 
     def _find_binary(self, bin ):
         ret = shutil.which( bin, mode=os.X_OK )
@@ -146,8 +152,8 @@ class LSF(UserInterface):
 
 
 if __name__ == "__main__":
-    """
     s=LSF( name="adaptivetest" )
+    """
 #    s.submit( "test/dhfr", debug=True )
 #    s.submit( "test/dhfr", debug=True )
     ret= s.inprogress( debug=False )
