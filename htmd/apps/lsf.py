@@ -134,6 +134,7 @@ class LSF(UserInterface):
        print("cd \"" + dir + "\"", file=f)
        print("module load acemd", file=f )
        print("module load htmd", file=f )
+       print("module load gaussian", file=f )
        if "acemd" in exe:
          print("%s --device $CUDA_VISIBLE_DEVICES > log.txt 2>&1" % (exe), file=f )
        else:

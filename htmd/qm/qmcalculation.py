@@ -108,17 +108,22 @@ class QMCalculation:
     self._results = []
     self.natoms  = self.molecule.coords.shape[0]
 
-    self.psi4_binary = shutil.which( "psi4", mode = os.X_OK )
-    self.gaussian_binary = shutil.which( "g03", mode = os.X_OK )
-    if not self.gaussian_binary:
-       self.gaussian_binary = shutil.which( "g09", mode = os.X_OK )
-    if (not self.gaussian_binary) and ( not self.psi4_binary ):
-       raise RuntimeError("Can not find neither Gaussian nor PSI4" )
-    if self.code == None:
-       if self.gaussian_binary: self.code = Code.Gaussian
-       elif self.psi4_binary:   self.code = Code.PSI4
-    if self.code == Code.PSI4    and (not self.psi4_binary )     : raise RuntimeError( "PSI4 not found" )
-    if self.code == Code.Gaussian and (not self.gaussian_binary ): raise RuntimeError( "Gaussian not found" )
+    if self.execution == Execution.Inline:
+      self.psi4_binary = shutil.which( "psi4", mode = os.X_OK )
+      self.gaussian_binary = shutil.which( "g03", mode = os.X_OK )
+      if not self.gaussian_binary:
+         self.gaussian_binary = shutil.which( "g09", mode = os.X_OK )
+      if (not self.gaussian_binary) and ( not self.psi4_binary ):
+         raise RuntimeError("Can not find neither Gaussian nor PSI4" )
+      if self.code == None:
+         if self.gaussian_binary: self.code = Code.Gaussian
+         elif self.psi4_binary:   self.code = Code.PSI4
+      if self.code == Code.PSI4    and (not self.psi4_binary )     : raise RuntimeError( "PSI4 not found" )
+      if self.code == Code.Gaussian and (not self.gaussian_binary ): raise RuntimeError( "Gaussian not found" )
+    else:
+      self.psi4_binary = "psi4"
+      if self.code == Code.Gaussian
+        self.gaussian_binary = "g09"
 
     # Set up point cloud if esp calculation requested
    
