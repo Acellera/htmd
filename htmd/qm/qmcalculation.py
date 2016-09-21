@@ -303,6 +303,7 @@ class QMCalculation:
      lsf.submit( to_submit )
      time.sleep(5)
      lsf.wait()
+     time.sleep(5)
 
 
   def _start_inline( self, directories ):
