@@ -228,6 +228,8 @@ def _processSim(sim, projectionlist, uqmol, skip):
                 pj = np.atleast_2d(pj).T
             data.append(pj)
         data = np.hstack(data)
+        if data.dtype == np.float64:
+            data = data.astype(np.float32)
     except Exception as e:
         logger.warning('Error in simulation with id: ' + str(sim.simid) + '. "' + e.__str__() + '"')
         return None, None, None, True

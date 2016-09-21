@@ -11,11 +11,14 @@ import inspect
 import shutil
 #import pwd
 import os
+import string
+import random
 
 class LSF(UserInterface):
     _commands = {
-       'name'      : None,                           # whatever identifier you want for the job
-       'queue'     : "gpu_priority",                          # the 'queue' to run on
+       'name'      : "",                           
+       'queue'     : "gpu_priority",                
+       'ncpus'     : 1,
        'resources' : 'select[ngpus>0] rusage[ngpus_excl_p=1]',
        'memory'    : "4000",                           # MB
        'walltime'  : '23:59',                      # hh:mm:ss
@@ -33,8 +36,6 @@ class LSF(UserInterface):
             else:
                raise ValueError( "Invalid configuration option [%s]" % (key) )
 
-        if not self.name:
-             raise ValueError( "Name must be set" )
         # Find executables
         self._bsub = self._find_binary( "bsub" )
         self._bjobs = self._find_binary( "bjobs" )
@@ -43,6 +44,9 @@ class LSF(UserInterface):
           self._exe    = self._find_binary( self.executable )
         except:
           self._exe = self.executable
+
+        lst = [random.choice(string.ascii_letters + string.digits) for n in range(10)]
+        self.__dict__["name"] = "".join(lst)
 
     def _find_binary(self, bin ):
         ret = shutil.which( bin, mode=os.X_OK )
@@ -93,7 +97,7 @@ class LSF(UserInterface):
               "-W", self.walltime,
               "-q", self.queue,
               "-R", self.resources,
-              "-n", "1",
+              "-n", str(self.ncpus),
               js
             ]
             if debug:
@@ -146,8 +150,9 @@ class LSF(UserInterface):
 
 
 if __name__ == "__main__":
-    """
     s=LSF( name="adaptivetest" )
+    print(s.name)
+    """
 #    s.submit( "test/dhfr", debug=True )
 #    s.submit( "test/dhfr", debug=True )
     ret= s.inprogress( debug=False )

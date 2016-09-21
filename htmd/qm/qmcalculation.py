@@ -6,6 +6,7 @@ import subprocess
 from shutil import which 
 import shutil
 import os
+import time
 from math import pi as PI
 from math import sqrt
 from math import acos
@@ -272,7 +273,7 @@ class QMCalculation:
   def _start( self, directories ):
      if self.execution == Execution.Inline:
        self._start_inline( directories )
-     elif self.exeuction == Execution.LSF:
+     elif self.execution == Execution.LSF:
        self._start_lsf( directories )
      else:
        raise RuntimeError( "Invalid execution mode" )
@@ -287,21 +288,20 @@ class QMCalculation:
            if self.code == Code.Gaussian: 
              if not os.path.exists( os.path.join( directory, "output.gau" ) ):
                to_submit.append( directory ) 
-               subprocess.call( '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1', shell=True )
            elif self.code == Code.PSI4: 
              if not os.path.exists( os.path.join( directory, "psi4.out" ) ):
                to_submit.append( directory ) 
-               subprocess.call( [ self.psi4_binary, "-i", "psi4.in", "-o", "psi4.out" ] )
        except:
          raise
 
      if self.code == Code.Gaussian: 
-       cmd =  self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+       cmd =  '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
      elif self.code == Code.PSI4:
-       cmd =  self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
+       cmd =  '"' + self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
 
-     lsf = LSF( executable = cmd, resources = "select[ncpus=%s]" % self.ncpus )
+     lsf = LSF( ncpus=self.ncpus, executable = cmd, queue = "general", resources = "span[ptile=%d]" % (self.ncpus) )
      lsf.submit( to_submit )
+     time.sleep(5)
      lsf.wait()
 
 

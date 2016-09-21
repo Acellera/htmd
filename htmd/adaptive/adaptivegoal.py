@@ -160,7 +160,7 @@ class AdaptiveGoal(AdaptiveBase):
             uc = macroAccumulate(model, uc[model.cluster_ofmicro])
 
         # Calculating the directed component
-        dc = self._calculateDirectedComponent(sims, model.data.St, model.data.N)
+        dc = self._calculateDirectedComponent(model.data.simlist, model.data.St, model.data.N)
         if self.statetype == 'micro':
             dc = dc[model.cluster_ofmicro]
         if self.statetype == 'macro':
