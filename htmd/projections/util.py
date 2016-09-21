@@ -221,56 +221,18 @@ def _wrapDistances(box, dist, diffchain):
     return dist
 
 
-def exportProjectionData(data, filename):
-    """ Export results of a projection into an R-friendly data frame
-
-    The format of the written data is:
-      Trajectory Frame   CV1  CV2 ...
-      <TrajName> <Frame> <V1> <V2> ...
-      ...
-
-    Parameters
-    ----------
-    data : htmd.metricdata.MetricData
-        The results of a metric.project() operation
-    filename : str
-        The filename to be written.
-
-    """
-
-    out_file = open(filename, "w")
-
-    nTrajs = len(data.simlist)
-
-    if nTrajs == 0:
-        raise Exception("MetricData does not contain any trajectory")
-
-    (junk, nVars) = data.dat[0].shape
-    # Can we recover the mapping?
-    # TODO check if combined trajectories work
-    out_file.write("\t".join(["TrajName", "Frame"] +
-                             ["CV" + str(i) for i in range(nVars)]))
-    out_file.write("\n")
-
-    for tr in range(nTrajs):
-        (nf, junk) = data.dat[tr].shape
-        for fr in range(nf):
-            fields = [data.simlist[tr].trajectory[0]]
-            fields.append(fr)
-            fields.extend(data.dat[tr][fr,])
-            out_file.write("\t".join(str(el) for el in fields))
-            out_file.write("\n")
-
-    out_file.close()
 
 
 def convertProjectionToDataFrame(md):
     """ Export results of a projection into a pandas data frame
 
-    The format of the returned data is:
-      TrajectoryID TrajectoryFile Frame   CV1  CV2 ...
-      <TID>        <TrajName>     <Frame> <V1> <V2> ...
-      ...
+    The format of the returned data contains:
+      - TrajectoryID     (also index)
+      - TrajectoryFrame  (also index)
+      - Piece
+      - PieceFile
+      - PieceFrame
+      - Columns containing the values
 
     Parameters
     ----------
@@ -290,17 +252,31 @@ def convertProjectionToDataFrame(md):
     if nTrajs == 0:
         raise Exception("MetricData does not contain any trajectory")
 
+    bar = htmd.progress.progress.ProgressBar(nTrajs, description="Converting {:d} trajectories".format(nTrajs))
     dflist = []
 
+    curf=0
     for tr in range(nTrajs):
         df0 = pd.DataFrame(md.dat[tr])
+        nf = len(df0)
+        nfl = curf+np.array(range(nf))
+        nfs = md.abs2sim(nfl)
         df0.insert(0, 'TrajectoryID', tr)
-        df0.insert(1, 'TrajectoryFile', md.simlist[tr].trajectory[0])
-        df0.insert(2, 'Frame', range(len(df0)))
+        # df0.insert(1, 'TrajectoryFile', md.simlist[tr].trajectory[0])
+        df0.insert(1, 'TrajectoryFrame', range(len(df0)))
+        df0.insert(2, 'Piece', [x.piece for x in nfs])
+        df0.insert(3, 'PieceFile', [x.sim.trajectory[x.piece] for x in nfs])
+        df0.insert(4, 'PieceFrame', [x.frame for x in nfs])
         dflist.append(df0)
+        curf += nf
+        bar.progress()
 
     df = pd.concat(dflist)
-    df.set_index(["TrajectoryID", "TrajectoryFile", "Frame"], drop=False, inplace=True, verify_integrity=True)
+
+    df['PieceFile']=df['PieceFile'].astype('category')
+
+    df.set_index(["TrajectoryID", "TrajectoryFrame"],
+                 drop=False, inplace=True, verify_integrity=True)
     return df
 
 
