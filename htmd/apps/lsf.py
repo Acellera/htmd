@@ -23,6 +23,7 @@ class LSF(UserInterface):
        'memory'    : "4000",                           # MB
        'walltime'  : '23:59',                      # hh:mm:ss
        'executable': 'acemd',                        # The thing to run 
+       'app'       : "",
     }
 
 
@@ -90,16 +91,29 @@ class LSF(UserInterface):
             js = self._make_jobscript( dirname, self._exe )
 
             ret = 0
-            cmd = [
-              self._bsub,
-              "-J", self.name,
-              "-M", self.memory,
-              "-W", self.walltime,
-              "-q", self.queue,
-              "-R", self.resources,
-              "-n", str(self.ncpus),
-              js
-            ]
+            if not self.app:
+                cmd = [
+                    self._bsub,
+                    "-J", self.name,
+                    "-M", self.memory,
+                    "-W", self.walltime,
+                    "-q", self.queue,
+                    "-R", self.resources,
+                    "-n", str(self.ncpus),
+                    js
+                    ]
+            else:
+                cmd = [
+                    self._bsub,
+                    "-J", self.name,
+                    "-M", self.memory,
+                    "-W", self.walltime,
+                    "-q", self.queue,
+                    "-R", self.resources,
+                    "-n", str(self.ncpus),
+                    "-app", self.app,
+                    js
+                    ]
             if debug:
               print(cmd)
             try:
