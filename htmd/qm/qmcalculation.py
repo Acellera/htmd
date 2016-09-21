@@ -303,7 +303,7 @@ class QMCalculation:
      lsf.submit( to_submit )
      time.sleep(5)
      lsf.wait()
-     time.sleep(5)
+     time.sleep(10)
      for i in to_submit:
        os.stat( i )
      os.sync()
