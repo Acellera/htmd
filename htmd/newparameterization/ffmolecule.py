@@ -48,7 +48,7 @@ class FFMolecule(Molecule):
     else: raise ValueError( "Unknown Basis Set" )
 
     self.execution = execution 
-    self.qmcode    = code
+    self.qmcode    = qmcode
 
     if( not ( filename.endswith(".mol2")) ):
       raise ValueError( "Input file must be mol2 format" )

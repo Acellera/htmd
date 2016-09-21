@@ -115,7 +115,7 @@ def main_parameterize():
     if  args.forcefield == "GAFF" : method = FFTypeMethod.GAFF
     if  args.forcefield == "GAFF2": method = FFTypeMethod.GAFF2
 
-    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm, basis=basis, execution=execution, qmcode=qmcode )
+    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm, basis=basis, execution=execution, qmcode=code )
 
     dihedrals = mol.getSoftDihedrals()
     
