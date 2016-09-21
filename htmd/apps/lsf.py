@@ -16,8 +16,8 @@ import random
 
 class LSF(UserInterface):
     _commands = {
-       'name'      : None,                           # whatever identifier you want for the job
-       'queue'     : "gpu_priority",                          # the 'queue' to run on
+       'name'      : "",                           
+       'queue'     : "gpu_priority",                
        'ncpus'     : 1,
        'resources' : 'select[ngpus>0] rusage[ngpus_excl_p=1]',
        'memory'    : "4000",                           # MB
