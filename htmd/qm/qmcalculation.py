@@ -272,7 +272,7 @@ class QMCalculation:
   def _start( self, directories ):
      if self.execution == Execution.Inline:
        self._start_inline( directories )
-     elif self.exeuction == Execution.LSF:
+     elif self.execution == Execution.LSF:
        self._start_lsf( directories )
      else:
        raise RuntimeError( "Invalid execution mode" )
