@@ -46,7 +46,7 @@ class LSF(UserInterface):
           self._exe = self.executable
 
         lst = [random.choice(string.ascii_letters + string.digits) for n in range(10)]
-        self.name = "".join(lst)
+        self.__dict__["name"] = "".join(lst)
 
     def _find_binary(self, bin ):
         ret = shutil.which( bin, mode=os.X_OK )
