@@ -296,9 +296,9 @@ class QMCalculation:
          raise
 
      if self.code == Code.Gaussian: 
-       cmd =  self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+       cmd =  '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
      elif self.code == Code.PSI4:
-       cmd =  self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
+       cmd =  '"' + self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
 
      lsf = LSF( name="parameterize-qm", executable = cmd, queue = "general", resources = "select[ncpus=%s]" % self.ncpus )
      lsf.submit( to_submit )
