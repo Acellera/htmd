@@ -27,6 +27,7 @@ class LSF(UserInterface):
 
 
     def __init__(self, **kw):
+        self.name = None
         for i in self._commands.keys():
             self.__dict__[i] = self._commands[i]
 
