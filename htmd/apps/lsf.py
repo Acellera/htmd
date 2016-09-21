@@ -39,7 +39,10 @@ class LSF(UserInterface):
         self._bsub = self._find_binary( "bsub" )
         self._bjobs = self._find_binary( "bjobs" )
 
-        self._exe    = self._find_binary( self.executable )
+        try: 
+          self._exe    = self._find_binary( self.executable )
+        except:
+          self._exe = self.executable
 
     def _find_binary(self, bin ):
         ret = shutil.which( bin, mode=os.X_OK )
@@ -111,7 +114,12 @@ class LSF(UserInterface):
        print("#!/bin/sh", file =f )
        print("cd \"" + dir + "\"", file=f)
        print("module load acemd", file=f )
-       print("%s --device $CUDA_VISIBLE_DEVICES > log.txt 2>&1" % (exe), file=f )
+       print("module load htmd", file=f )
+       if "acemd" in exe:
+         print("%s --device $CUDA_VISIBLE_DEVICES > log.txt 2>&1" % (exe), file=f )
+       else:
+         print("%s" % (exe), file=f )
+
        f.close()
        os.chmod( fn, 0o700 )
        return os.path.abspath(fn)

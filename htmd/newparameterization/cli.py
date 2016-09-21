@@ -12,7 +12,7 @@ import argparse
 
 from htmd.newparameterization.ffmolecule import FFMolecule, FFEvaluate
 from htmd.newparameterization.fftype import FFTypeMethod
-from htmd.qm.qmcalculation import BasisSet
+from htmd.qm.qmcalculation import BasisSet, Execution
 import sys
 import os
 
@@ -52,6 +52,7 @@ def main_parameterize():
     parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default %d)" % (ncpus), default=ncpus, dest="ncpus")
     parser.add_argument( "-f", "--forcefield", help="Inital FF guess to use", choices=[ "GAFF", "GAFF2", "CGENFF"], default="CGENFF" )
     parser.add_argument ( "-b", "--basis", help="QM Basis Set", choices=[ "6-31g-star", "cc-pVTZ" ], default="6-31g-star", dest="basis") 
+    parser.add_argument ( "-e", "--exec", help="How to run the QM", choices=[ "inline", "LSF" ], default="inline", dest="exec") 
 
     args = parser.parse_args()
 
@@ -78,6 +79,15 @@ def main_parameterize():
         os.mkdir( os.path.join( args.output, args.forcefield, args.basis ) )
     except:
         pass
+
+
+    if args.exec == "inline":
+      execution = Execution.Inline
+    elif args.exec == "LSF":
+      execution = Execution.LSF
+    else:
+      print("Unknown execution mode") 
+      sys.exit(1)
 
     basis = BasisSet._6_31G_star
 

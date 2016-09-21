@@ -17,6 +17,8 @@ from htmd.molecule.vdw import VDW
 from htmd.molecule.molecule import Molecule
 from htmd.progress.progress import ProgressBar
 
+from htmd.apps.lsf import LSF
+
 class BasisSet(Enum):
  _6_31G_star = 1000
  _cc_pVTZ    = 1001
@@ -32,6 +34,7 @@ class Code(Enum):
 
 class Execution(Enum):
  Inline = 4000
+ LSF    = 4001
 
 class QMResult:
   completed  = False
@@ -267,11 +270,47 @@ class QMCalculation:
     self._start( dirs )
 
   def _start( self, directories ):
-     bar = ProgressBar( len(directories), description="Running QM Calculations" )
+     if self.execution == Execution.Inline:
+       self._start_inline( directories )
+     elif self.exeuction == Execution.LSF:
+       self._start_lsf( directories )
+     else:
+       raise RuntimeError( "Invalid execution mode" )
+
+  def _start_lsf( self, directories ):
+     print( "Running QM Calculations via LSF" )
+
+     to_submit=[]
      for directory  in directories:
        cwd=os.getcwd()
        try: 
-         if self.execution == Execution.Inline:
+           if self.code == Code.Gaussian: 
+             if not os.path.exists( os.path.join( directory, "output.gau" ) ):
+               to_submit.append( directory ) 
+               subprocess.call( '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1', shell=True )
+           elif self.code == Code.PSI4: 
+             if not os.path.exists( os.path.join( directory, "psi4.out" ) ):
+               to_submit.append( directory ) 
+               subprocess.call( [ self.psi4_binary, "-i", "psi4.in", "-o", "psi4.out" ] )
+       except:
+         raise
+
+     if self.code == Code.Gaussian: 
+       cmd =  self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+     elif self.code == Code.PSI4:
+       cmd =  self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
+
+     lsf = LSF( executable = cmd, resources = "select[ncpus=%s]" % self.ncpus )
+     lsf.submit( to_submit )
+     lsf.wait()
+
+
+  def _start_inline( self, directories ):
+     bar = ProgressBar( len(directories), description="Running QM Calculations" )
+
+     for directory  in directories:
+       cwd=os.getcwd()
+       try: 
            os.chdir( directory )
            if self.code == Code.Gaussian: 
              if not os.path.exists( "output.gau" ):
