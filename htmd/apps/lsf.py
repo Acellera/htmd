@@ -36,8 +36,6 @@ class LSF(UserInterface):
             else:
                raise ValueError( "Invalid configuration option [%s]" % (key) )
 
-        if not self.name:
-             raise ValueError( "Name must be set" )
         # Find executables
         self._bsub = self._find_binary( "bsub" )
         self._bjobs = self._find_binary( "bjobs" )
