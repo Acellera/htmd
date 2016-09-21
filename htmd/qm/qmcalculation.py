@@ -300,7 +300,7 @@ class QMCalculation:
      elif self.code == Code.PSI4:
        cmd =  self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
 
-     lsf = LSF( executable = cmd, resources = "select[ncpus=%s]" % self.ncpus )
+     lsf = LSF( executable = cmd, queue = "general", resources = "select[ncpus=%s]" % self.ncpus )
      lsf.submit( to_submit )
      lsf.wait()
 
