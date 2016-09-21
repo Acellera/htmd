@@ -122,7 +122,7 @@ class QMCalculation:
       if self.code == Code.Gaussian and (not self.gaussian_binary ): raise RuntimeError( "Gaussian not found" )
     else:
       self.psi4_binary = "psi4"
-      if self.code == Code.Gaussian
+      if self.code == Code.Gaussian:
         self.gaussian_binary = "g09"
 
     # Set up point cloud if esp calculation requested
