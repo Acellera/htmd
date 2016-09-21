@@ -18,6 +18,7 @@ class LSF(UserInterface):
     _commands = {
        'name'      : None,                           # whatever identifier you want for the job
        'queue'     : "gpu_priority",                          # the 'queue' to run on
+       'ncpus'     : 1,
        'resources' : 'select[ngpus>0] rusage[ngpus_excl_p=1]',
        'memory'    : "4000",                           # MB
        'walltime'  : '23:59',                      # hh:mm:ss
@@ -99,7 +100,7 @@ class LSF(UserInterface):
               "-W", self.walltime,
               "-q", self.queue,
               "-R", self.resources,
-              "-n", "1",
+              "-n", str(self.ncpus),
               js
             ]
             if debug:
