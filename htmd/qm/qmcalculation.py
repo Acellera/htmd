@@ -304,6 +304,8 @@ class QMCalculation:
      time.sleep(5)
      lsf.wait()
      time.sleep(5)
+     for i in to_submit:
+       os.stat( i )
      os.sync()
 
   def _start_inline( self, directories ):
