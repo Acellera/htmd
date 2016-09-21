@@ -19,13 +19,15 @@ class MetricDistance(Projection):
     sel1 : str
         Atomselection for the first set of atoms
     sel2 : str
-        Atomselection for the second set of atoms. If sel1 != sel2 it will calculate inter-set distances. If sel1 == sel2 it will calculate intra-set distances
+        Atomselection for the second set of atoms. If sel1 != sel2 it will calculate inter-set distances.
+        If sel1 == sel2, it will calculate intra-set distances
     groupsel1 : ['all','residue'], optional
-        Group all atoms in `sel1` to the single minimum distance. Alternatively can calculate the minimum distance of a residue containing the atoms in sel1.
+        Group all atoms in `sel1` to the single minimum distance. Alternatively can calculate the minimum distance of a
+        residue containing the atoms in sel1.
     groupsel2 : ['all','residue'], optional
         Same as groupsel1 but for `sel2`
     metric : ['distances','contacts'], optional
-        Set to 'concacts' to calculate contacts instead of distances
+        Set to 'contacts' to calculate contacts instead of distances
     threshold : float, optional
         The threshold under which a distance is considered in contact
     pbc : bool, optional

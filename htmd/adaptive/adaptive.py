@@ -12,6 +12,7 @@ from os import makedirs
 from shutil import copytree, ignore_patterns
 import numpy as np
 from natsort import natsorted
+from joblib import Parallel, delayed
 from htmd.simlist import _simName
 from htmd.molecule.molecule import Molecule
 from htmd.userinterface import uisetattr
@@ -19,7 +20,7 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 import logging
 logger = logging.getLogger(__name__)
 
-_TRAJ_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf')
+_IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel')
 
 
 class AdaptiveBase(ProtocolInterface):
@@ -35,6 +36,7 @@ class AdaptiveBase(ProtocolInterface):
         self._cmdString('generatorspath', 'str', 'The directory containing the generators', 'generators')
         self._cmdBoolean('dryrun', 'boolean', 'A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations', False)
         self._cmdValue('updateperiod', 'float', 'When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds', 0, TYPE_FLOAT, RANGE_0POS)
+        self._cmdString('coorname', 'str', 'Name of the file containing the starting coordinates for the new simulations', 'input.coor')
         self._running = None
 
     def run(self):
@@ -106,7 +108,7 @@ class AdaptiveBase(ProtocolInterface):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns(*_TRAJ_EXTENSIONS))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns(*_IGNORE_EXTENSIONS))
                 k += 1
 
     def _getEpoch(self):
@@ -138,49 +140,43 @@ class AdaptiveBase(ProtocolInterface):
         if len(test) != 0:
             raise NameError('Input dirs of epoch ' + str(epoch) + ' already exists.')
 
-        if path.exists(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log')):
-            raise NameError('Epoch logfile already exists. Cant overwrite it.')
-
-        fid = open(path.join(self.inputpath, 'e' + str(epoch) + '_writeinputs.log'), 'w')
-
-        regex = re.compile('(e\d+s\d+)_')
-        for i, f in enumerate(simsframes):
-            frameNum = f.frame
-            piece = f.piece
-            #print(frameNum)
-            if f.sim.parent is None:
-                currSim = f.sim
-            else:
-                currSim = f.sim.parent
-
-            traj = currSim.trajectory[piece]
-            if currSim.input is None:
-                raise NameError('Could not find input folder in simulation lists. Cannot create new simulations.')
-
-            wuName = _simName(traj)
-            res = regex.search(wuName)
-            if res:  # If we are running on top of adaptive, use the first name part for the next sim name
-                wuName = res.group(1)
-
-            # create new job directory
-            newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
-            newDir = path.join(self.inputpath, newName, '')
-            # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS, '*.coor'))
-            # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
-            mol = Molecule()
-            mol.read(traj)
-            mol.frame = frameNum
-            mol.write(path.join(newDir, 'input.coor'))
-
-            # write nextInput file
-            fid.write('# {0} \n{1} {2}\n'.format(newName, traj, frameNum))
-
-        fid.close()
+        from htmd.config import _config
+        Parallel(n_jobs=_config['ncpus'], verbose=11)(
+            delayed(_writeInputsFunction)(i, f, epoch, self.inputpath, self.coorname) for i, f in enumerate(simsframes))
 
     @abc.abstractmethod
     def _algorithm(self):
         return
+
+
+def _writeInputsFunction(i, f, epoch, inputpath, coorname):
+    regex = re.compile('(e\d+s\d+)_')
+    frameNum = f.frame
+    piece = f.piece
+    if f.sim.parent is None:
+        currSim = f.sim
+    else:
+        currSim = f.sim.parent
+
+    traj = currSim.trajectory[piece]
+    if currSim.input is None:
+        raise NameError('Could not find input folder in simulation lists. Cannot create new simulations.')
+
+    wuName = _simName(traj)
+    res = regex.search(wuName)
+    if res:  # If we are running on top of adaptive, use the first name part for the next sim name
+        wuName = res.group(1)
+
+    # create new job directory
+    newName = 'e' + str(epoch) + 's' + str(i + 1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
+    newDir = path.join(inputpath, newName, '')
+    # copy previous input directory including input files
+    copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor', '*.rst', '*.out', *_IGNORE_EXTENSIONS))
+    # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
+    mol = Molecule()
+    mol.read(traj)
+    mol.frame = frameNum
+    mol.write(path.join(newDir, coorname))
 
 
 class Adaptive(object):
@@ -293,7 +289,7 @@ class Adaptive(object):
                 inputdir = path.join(self.inputpath, 'e1s' + str(k) + '_' + name)
                 #src = path.join(self.generatorspath, name, '*')
                 src = folders[i]
-                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns(*_TRAJ_EXTENSIONS))
+                copytree(src, inputdir, symlinks=True, ignore=ignore_patterns(*_IGNORE_EXTENSIONS))
                 k += 1
 
     def _getEpoch(self):
@@ -353,7 +349,7 @@ class Adaptive(object):
             newName = 'e' + str(epoch) + 's' + str(i+1) + '_' + wuName + 'p' + str(piece) + 'f' + str(frameNum)
             newDir = path.join(self.inputpath, newName, '')
             # copy previous input directory including input files
-            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns(*_TRAJ_EXTENSIONS, '*.coor'))
+            copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor',  '*.rst', '*.out', *_IGNORE_EXTENSIONS))
             # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
             mol = Molecule()
             mol.read(traj)

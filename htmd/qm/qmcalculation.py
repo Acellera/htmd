@@ -17,8 +17,11 @@ from htmd.molecule.vdw import VDW
 from htmd.molecule.molecule import Molecule
 from htmd.progress.progress import ProgressBar
 
+from htmd.apps.lsf import LSF
+
 class BasisSet(Enum):
  _6_31G_star = 1000
+ _cc_pVTZ    = 1001
 
 class Theory(Enum):
  HF = 2000
@@ -31,6 +34,7 @@ class Code(Enum):
 
 class Execution(Enum):
  Inline = 4000
+ LSF    = 4001
 
 class QMResult:
   completed  = False
@@ -257,6 +261,7 @@ class QMCalculation:
           os.mkdir( dn )
       dirs.append(dn)
       # Write input files for both PSI4 and Gaussian
+      self._write_xyz( dn, c )	
       self._write_psi4( dn, c )
       self._write_gaussian( dn, c )
       i=i+1
@@ -265,11 +270,47 @@ class QMCalculation:
     self._start( dirs )
 
   def _start( self, directories ):
-     bar = ProgressBar( len(directories), description="Running QM Calculations" )
+     if self.execution == Execution.Inline:
+       self._start_inline( directories )
+     elif self.exeuction == Execution.LSF:
+       self._start_lsf( directories )
+     else:
+       raise RuntimeError( "Invalid execution mode" )
+
+  def _start_lsf( self, directories ):
+     print( "Running QM Calculations via LSF" )
+
+     to_submit=[]
      for directory  in directories:
        cwd=os.getcwd()
        try: 
-         if self.execution == Execution.Inline:
+           if self.code == Code.Gaussian: 
+             if not os.path.exists( os.path.join( directory, "output.gau" ) ):
+               to_submit.append( directory ) 
+               subprocess.call( '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1', shell=True )
+           elif self.code == Code.PSI4: 
+             if not os.path.exists( os.path.join( directory, "psi4.out" ) ):
+               to_submit.append( directory ) 
+               subprocess.call( [ self.psi4_binary, "-i", "psi4.in", "-o", "psi4.out" ] )
+       except:
+         raise
+
+     if self.code == Code.Gaussian: 
+       cmd =  self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+     elif self.code == Code.PSI4:
+       cmd =  self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
+
+     lsf = LSF( executable = cmd, resources = "select[ncpus=%s]" % self.ncpus )
+     lsf.submit( to_submit )
+     lsf.wait()
+
+
+  def _start_inline( self, directories ):
+     bar = ProgressBar( len(directories), description="Running QM Calculations" )
+
+     for directory  in directories:
+       cwd=os.getcwd()
+       try: 
            os.chdir( directory )
            if self.code == Code.Gaussian: 
              if not os.path.exists( "output.gau" ):
@@ -445,7 +486,19 @@ class QMCalculation:
 
     f = open( os.path.join( dirname, "psi4.in" ), "w" )
     basis = "unknown"
-    if self.basis == BasisSet._6_31G_star: basis = "6-31G*"
+    # If the charge is < 0, need to use a diffuse basis set
+    if   self.basis == BasisSet._6_31G_star: 
+      if self.charge < 0:
+        basis = "6-31+G*"
+      else:
+        basis = "6-31G*"
+    elif self.basis == BasisSet._cc_pVTZ: 
+      if self.charge < 0:
+        basis = "aug-cc-pvtz"
+      else:  
+        basis = "cc-pvtz"
+
+    else: raise ValueError( "Unknown basis set %s" % (self.basis) )
     if self.theory==Theory.HF:
       print( "set {\n\treference rhf\n\tbasis %s\n}\n" % ( basis ), file=f )
 
@@ -466,13 +519,13 @@ class QMCalculation:
       print("\t\")\n}\n", file=f )
 
     if self.optimize: 
-      print("ee = optimize('scf')", file = f )
+      print("ee,wfn = optimize('scf', return_wfn=True)", file = f )
     else:
-      print("ee = energy('scf')", file = f )
+      print("ee,wfn = energy('scf', return_wfn=True)", file = f )
 
-    print("oeprop('DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')", file=f )
+    print("oeprop( wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')", file=f )
     if self.points is not None:
-      print("oeprop('GRID_ESP')", file = f )
+      print("oeprop( wfn, 'GRID_ESP')", file = f )
       self._write_points( os.path.join( dirname, "grid.dat" ), self.points[frame] )
 
     print( "f=open( 'psi4out.xyz', 'w' )", file=f )
@@ -482,6 +535,18 @@ class QMCalculation:
     print( "f.close()", file=f )
     f.close()
 
+
+  def _write_xyz( self, dirname, frame ):
+    coords = self.molecule.coords[:,:,frame]
+    f = open( os.path.join( dirname, "input.xyz"  ), "w" )
+    print( "%d\n" % ( coords.shape[0] ), file=f )
+    for i in range(coords.shape[0] ):
+      print("%s\t %f\t %f\t %f" % ( self.molecule.element[i], coords[i,0], coords[i,1], coords[i,2] ), file=f )
+    f.close()
+
+    pass
+  
+
   def _write_gaussian( self, dirname, frame ):
     coords = self.molecule.coords[:,:,frame]
     f = open( os.path.join( dirname, "input.gjf"  ), "w" )
@@ -490,8 +555,20 @@ class QMCalculation:
     print("%%mem=%dGB" % (self.mem), file=f )
     theory="unknown"
     basis="unknown"
-    if self.theory == Theory.HF       : theory = "HF"
-    if self.basis  == BasisSet._6_31G_star: basis  = "6-31G*"  
+    if self.theory  == Theory.HF       : theory = "HF"
+
+    if self.basis   == BasisSet._6_31G_star: 
+     if self.charge < 0:
+      basis  = "6-31+G*"  
+     else:
+      basis  = "6-31G*"  
+    elif self.basis == BasisSet._cc_pVTZ: 
+      if self.charge < 0:
+       basis = "AUG-cc-pVTZ"
+      else:
+       basis = "cc-pVTZ"
+    else: raise ValueError( "Unknown basis set %s" % (self.basis) )
+
     opt=""
     if self.optimize : opt="opt=ModRedundant"
 
@@ -504,7 +581,7 @@ class QMCalculation:
     print("", file=f )
     if self.frozen:
       for i in range(len(self.frozen)):
-         print("%s %s %s %s F\n" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2],  self.frozen[i][3]), file=f )
+         print("%s %s %s %s F" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2],  self.frozen[i][3]), file=f )
 
 
 

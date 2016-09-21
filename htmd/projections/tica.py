@@ -6,7 +6,8 @@
 import warnings
 import numpy as np
 import random
-from htmd.projections.metric import Metric
+from htmd.util import _getNcpus
+from htmd.projections.metric import Metric, _projectionGenerator
 from htmd.progress.progress import ProgressBar
 from htmd.units import convert as unitconvert
 from joblib import Parallel, delayed
@@ -141,21 +142,4 @@ class TICA(object):
         return datatica
 
 
-def _projectionGenerator(metric, ncpus):
-    for i in range(0, len(metric.simulations), ncpus):
-        simrange = range(i, np.min((i+ncpus, len(metric.simulations))))
-        results = Parallel(n_jobs=ncpus, verbose=0)(delayed(_projector)(metric, i) for i in simrange)
-        yield results
 
-
-def _projector(metric, i):
-    return metric._projectSingle(i)
-
-
-def _getNcpus():
-    from htmd.config import _config
-    ncpus = _config['ncpus']
-    if ncpus < 0:
-        import multiprocessing
-        ncpus = multiprocessing.cpu_count() + ncpus + 1
-    return ncpus

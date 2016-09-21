@@ -305,10 +305,13 @@ class Model(object):
         >>> model.markovModel(100, 5)
         >>> model.eqDistribution()
         """
+        logger.warning('Equilibrium distribution calculations for macrostates are now done using membership '
+                       'probabilities and hence your results might differ from analyses done before this change.')
         self._integrityCheck(postmsm=True)
         macroeq = np.ones(self.macronum) * -1
         for i in range(self.macronum):
-            macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
+            # macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
+            macroeq[i] = np.sum(self.msm.metastable_memberships[:, i] * self.msm.stationary_distribution)
 
         if plot:
             from matplotlib import pylab as plt
