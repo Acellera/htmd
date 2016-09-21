@@ -147,7 +147,7 @@ class LSF(UserInterface):
     def inprogress( self, debug=False ):
        inprogress=0
        for i in self._dirs:
-          if not os.path.exist( os.path.join( i, ".done" ) ):
+          if not os.path.exists( os.path.join( i, ".done" ) ):
            inprogress = inprogress + 1 
        return inprogress
 
