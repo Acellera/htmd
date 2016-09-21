@@ -757,10 +757,10 @@ class FFMolecule(Molecule):
     ax1.set_ylabel( "kcal/mol" )
     ax1.set_title( fit.name )
     ax1.plot( fit.phi , fit.qm         , label="QM", color="r", marker="o" )
-    ax1.plot( fit.phi , fit.mm_original, label="MM Original", color="b", marker="o" )  
+    ax1.plot( fit.phi , fit.mm_original, label="MM Original", color="b", marker="d" )  
 #    ax1.plot( fit.phi , fit.mm_zeroed  , label="MM With phi zeroed", color="black", marker="x" )  
 #    ax1.plot( fit.phi , fit.mm_delta   , label="QM-MM target", color="magenta", marker="x" )  
-    ax1.plot( fit.phi , fit.mm_fitted  , label="MM Fitted", color="g", marker="o" )  
+    ax1.plot( fit.phi , fit.mm_fitted  , label="MM Fitted", color="g", marker="s" )  
     ax1.legend(prop={'size': 8})
     if show:
       plt.show()
