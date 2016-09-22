@@ -173,9 +173,9 @@ class LSF(UserInterface):
         return int(l[0]) + int(l[4])
 
 
-if __name__ == "__main__":
-    s=LSF( name="adaptivetest" )
-    print(s.name)
+#if __name__ == "__main__":
+#    s=LSF( name="adaptivetest" )
+#    print(s.name)
     """
 #    s.submit( "test/dhfr", debug=True )
 #    s.submit( "test/dhfr", debug=True )
