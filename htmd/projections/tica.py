@@ -43,11 +43,12 @@ class TICA(object):
     for Markov model construction. J. Chem. Phys., 139 . 015102.
     """
 
-    def __init__(self, data, lag, units='frames'):
+    def __init__(self, data, lag, units='frames', dimensions=None):
         from pyemma.coordinates import tica
-        # data.dat.tolist() might be better?
         self.data = data
-        if isinstance(data, Metric):
+        self.dimensions = dimensions
+
+        if isinstance(data, Metric):  # Memory efficient TICA projecting trajectories on the fly
             if units != 'frames':
                 raise RuntimeError('Cannot use delayed projection TICA with units other than frames for now. Report this to HTMD issues.')
             metr = data
@@ -57,14 +58,24 @@ class TICA(object):
             p = ProgressBar(len(metr.simulations))
             for proj in _projectionGenerator(metr, _getNcpus()):
                 for pro in proj:
-                    self.tic.partial_fit(pro[0])
+                    if pro is None:
+                        continue
+                    if self.dimensions is None:
+                        self.tic.partial_fit(pro[0])
+                    else:  # Sub-select dimensions for fitting
+                        self.tic.partial_fit(pro[0][:, self.dimensions])
                 p.progress(len(proj))
             p.stop()
-        else:
+        else:  # In-memory TICA
             lag = unitconvert(units, 'frames', lag, data.fstep)
             if lag == 0:
                 raise RuntimeError('Lag time conversion resulted in 0 frames. Please use a larger lag-time for TICA.')
-            self.tic = tica(data.dat.tolist(), lag=lag)
+
+            if self.dimensions is None:
+                datalist = data.dat.tolist()
+            else:  # Sub-select dimensions for fitting
+                datalist = [x[:, self.dimensions] for x in data.dat]
+            self.tic = tica(datalist, lag=lag)
 
     def project(self, ndim=None):
         """ Projects the data object given to the constructor onto the top `ndim` TICA dimensions
@@ -87,10 +98,12 @@ class TICA(object):
         >>> dataTica = tica.project(5)
         """
         if ndim is not None:
-            # self.tic._dim = ndim  # Old way of doing it. Deprecated since pyEMMA 2.1
-            self.tic.set_params(dim=ndim)  # Change to this in 2.1 pyEMMA version
+            self.tic.set_params(dim=ndim)
 
-        if isinstance(self.data, Metric):  # Doesn't project on correct number of dimensions
+        keepdata = []
+        keepdim = None
+        keepdimdesc = None
+        if isinstance(self.data, Metric):  # Memory efficient TICA projecting trajectories on the fly
             proj = []
             refs = []
             fstep = None
@@ -105,7 +118,13 @@ class TICA(object):
                     if pro is None:
                         droppedsims.append(k)
                         continue
-                    proj.append(self.tic.transform(pro[0]))
+                    if self.dimensions is not None:
+                        numDimensions = pro[0].shape[1]
+                        keepdim = np.setdiff1d(range(numDimensions), self.dimensions)
+                        keepdata.append(pro[0][:, keepdim])
+                        proj.append(self.tic.transform(pro[0][:, self.dimensions]).astype(np.float32))  # Sub-select dimensions for projecting
+                    else:
+                        proj.append(self.tic.transform(pro[0]).astype(np.float32))
                     refs.append(pro[1])
                     if fstep is None:
                         fstep = pro[2]
@@ -115,21 +134,38 @@ class TICA(object):
             simlist = self.data.simulations
             simlist = np.delete(simlist, droppedsims)
             ref = np.array(refs, dtype=object)
-            #fstep = 0
             parent = None
+            if self.dimensions is not None:
+                from htmd.projections.metric import _singleMolfile
+                from htmd.molecule.molecule import Molecule
+                (single, molfile) = _singleMolfile(metr.simulations)
+                keepdimdesc = metr.getMapping(Molecule(molfile))
+                keepdimdesc = keepdimdesc.ix[keepdim]
         else:
+            if self.dimensions is not None:
+                keepdim = np.setdiff1d(range(self.data.numDimensions), self.dimensions)
+                keepdata = [x[:, keepdim] for x in self.data.dat]
+                keepdimdesc = self.data.map.ix[keepdim]
             proj = self.tic.get_output()
             simlist = self.data.simlist
             ref = self.data.ref
             fstep = self.data.fstep
             parent = self.data
 
+        # If TICA is done on a subset of dimensions, combine non-projected data with projected data
+        if self.dimensions is not None:
+            newproj = []
+            for k, t in zip(keepdata, proj):
+                newproj.append(np.hstack((k, t)))
+            proj = newproj
+
         if ndim is None:
             logger.info('Kept {} dimension(s) to cover 95% of kinetic variance.'.format(self.tic.dimension()))
 
         from htmd.metricdata import MetricData
-        datatica = MetricData(dat=np.array(proj, dtype=object), simlist=simlist, ref=ref, fstep=fstep, parent=parent)
+        datatica = MetricData(dat=np.array(proj), simlist=simlist, ref=ref, fstep=fstep, parent=parent)
         from pandas import DataFrame
+        # TODO: Make this messy pandas creation cleaner. I'm sure I can append rows to DataFrame
         types = []
         indexes = []
         description = []
@@ -139,7 +175,62 @@ class TICA(object):
             description += ['TICA dimension {}'.format(i+1)]
         datatica.map = DataFrame({'type': types, 'indexes': indexes, 'description': description})
 
+        if self.dimensions is not None:  # If TICA is done on a subset of dims
+            datatica.map = keepdimdesc.append(datatica.map, ignore_index=True)
+
         return datatica
 
 
+if __name__ == '__main__':
+    from htmd import *
+    from htmd.home import home
+    from os.path import join
 
+    testfolder = home(dataDir='villin')
+
+    sims = simlist(glob(join(testfolder, '*', '')), join(testfolder, 'filtered.pdb'))
+    met = Metric(sims[0:2])
+    met.projection(MetricSelfDistance('protein and name CA'))
+    data = met.project()
+
+    tica = TICA(data, 2, dimensions=range(2, 10))
+    datatica = tica.project(2)
+    expected = [[ 3.69098878, -0.33862674,  0.85779184],
+                [ 3.77816105, -0.31887317,  0.87724227],
+                [ 3.83537507, -0.11878026,  0.65236956]]
+    assert np.allclose(np.abs(datatica.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.all(datatica.map.ix[[587, 588]].type == 'tica')
+    assert np.all(datatica.map.ix[range(587)].type == 'distance')
+    print('In-memory TICA with subset of dimensions passed test.')
+
+    tica2 = TICA(met, 2, dimensions=range(2, 10))
+    datatica2 = tica2.project(2)
+    expected = [[ 3.69098878, -0.33862674,  0.85779184],
+                [ 3.77816105, -0.31887317,  0.87724227],
+                [ 3.83537507, -0.11878026,  0.65236956]]
+    assert np.allclose(np.abs(datatica2.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.all(datatica2.map.ix[[587, 588]].type == 'tica')
+    assert np.all(datatica2.map.ix[range(587)].type == 'distance')
+    print('Streaming TICA with subset of dimensions passed test.')
+
+    #assert np.max(np.abs(datatica.dat[0][:, -2:]) - np.abs(datatica2.dat[0][:, -2:])) < 0.01, 'Streaming and memory subdim TICA inconsistent.'
+
+    tica3 = TICA(data, 2)
+    datatica3 = tica3.project(2)
+    expected = [[-1.36328638, -0.35354128],
+                [-1.35348749, -0.13028328],
+                [-1.43249917, -0.31004715]]
+    assert np.allclose(np.abs(datatica3.dat[0][-3:, :]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.all(datatica3.map.ix[[0, 1]].type == 'tica')
+    print('In-memory TICA passed test.')
+
+    tica4 = TICA(met, 2)
+    datatica4 = tica4.project(2)
+    expected = [[ 1.36328638, -0.35354128],
+                [ 1.35348749, -0.13028328],
+                [ 1.43249917, -0.31004715]]
+    assert np.allclose(np.abs(datatica4.dat[0][-3:, :]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.all(datatica4.map.ix[[0, 1]].type == 'tica')
+    print('Streaming TICA passed test.')
+
+    assert np.max(np.abs(datatica4.dat[0]) - np.abs(datatica3.dat[0])) < 0.01, 'Streaming and memory TICA inconsistent.'

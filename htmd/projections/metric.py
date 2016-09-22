@@ -105,6 +105,15 @@ class Metric:
         if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
             self.projectionlist = [self.projectionlist]
 
+    def getMapping(self, mol):
+        import pandas as pd
+        if mol is None:
+            return
+        pandamap = pd.DataFrame(columns=('type', 'indexes', 'description'))
+        for proj in self.projectionlist:
+            pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
+        return pandamap
+
     def project(self):
         """
         Applies all projections stored in Metric on all simulations.
@@ -134,9 +143,9 @@ class Metric:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
                 proj._precalculate(uqMol)
-                map = map.append(proj.getMapping(uqMol), ignore_index=True)
         else:
             logger.warning('Cannot calculate description of dimensions due to different topology files for each trajectory.')
+        map = self.getMapping(uqMol)
 
         logger.info('Metric: Starting projection of trajectories.')
         metrics = np.empty(numSim, dtype=object)
