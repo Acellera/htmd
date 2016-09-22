@@ -6,6 +6,7 @@ import subprocess
 from shutil import which 
 import shutil
 import os
+import time
 from math import pi as PI
 from math import sqrt
 from math import acos
@@ -107,17 +108,22 @@ class QMCalculation:
     self._results = []
     self.natoms  = self.molecule.coords.shape[0]
 
-    self.psi4_binary = shutil.which( "psi4", mode = os.X_OK )
-    self.gaussian_binary = shutil.which( "g03", mode = os.X_OK )
-    if not self.gaussian_binary:
-       self.gaussian_binary = shutil.which( "g09", mode = os.X_OK )
-    if (not self.gaussian_binary) and ( not self.psi4_binary ):
-       raise RuntimeError("Can not find neither Gaussian nor PSI4" )
-    if self.code == None:
-       if self.gaussian_binary: self.code = Code.Gaussian
-       elif self.psi4_binary:   self.code = Code.PSI4
-    if self.code == Code.PSI4    and (not self.psi4_binary )     : raise RuntimeError( "PSI4 not found" )
-    if self.code == Code.Gaussian and (not self.gaussian_binary ): raise RuntimeError( "Gaussian not found" )
+    if self.execution == Execution.Inline:
+      self.psi4_binary = shutil.which( "psi4", mode = os.X_OK )
+      self.gaussian_binary = shutil.which( "g03", mode = os.X_OK )
+      if not self.gaussian_binary:
+         self.gaussian_binary = shutil.which( "g09", mode = os.X_OK )
+      if (not self.gaussian_binary) and ( not self.psi4_binary ):
+         raise RuntimeError("Can not find neither Gaussian nor PSI4" )
+      if self.code == None:
+         if self.gaussian_binary: self.code = Code.Gaussian
+         elif self.psi4_binary:   self.code = Code.PSI4
+      if self.code == Code.PSI4    and (not self.psi4_binary )     : raise RuntimeError( "PSI4 not found" )
+      if self.code == Code.Gaussian and (not self.gaussian_binary ): raise RuntimeError( "Gaussian not found" )
+    else:
+      self.psi4_binary = "psi4"
+      if self.code == Code.Gaussian:
+        self.gaussian_binary = "g09"
 
     # Set up point cloud if esp calculation requested
    
@@ -272,7 +278,7 @@ class QMCalculation:
   def _start( self, directories ):
      if self.execution == Execution.Inline:
        self._start_inline( directories )
-     elif self.exeuction == Execution.LSF:
+     elif self.execution == Execution.LSF:
        self._start_lsf( directories )
      else:
        raise RuntimeError( "Invalid execution mode" )
@@ -287,23 +293,25 @@ class QMCalculation:
            if self.code == Code.Gaussian: 
              if not os.path.exists( os.path.join( directory, "output.gau" ) ):
                to_submit.append( directory ) 
-               subprocess.call( '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1', shell=True )
            elif self.code == Code.PSI4: 
              if not os.path.exists( os.path.join( directory, "psi4.out" ) ):
                to_submit.append( directory ) 
-               subprocess.call( [ self.psi4_binary, "-i", "psi4.in", "-o", "psi4.out" ] )
        except:
          raise
 
      if self.code == Code.Gaussian: 
-       cmd =  self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+       cmd =  '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
      elif self.code == Code.PSI4:
-       cmd =  self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
+       cmd =  '"' + self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
 
-     lsf = LSF( executable = cmd, resources = "select[ncpus=%s]" % self.ncpus )
+     lsf = LSF( ncpus=self.ncpus, executable = cmd, queue = "general", resources = "span[ptile=%d]" % (self.ncpus), app = "gaussian")
      lsf.submit( to_submit )
+     time.sleep(5)
      lsf.wait()
-
+     time.sleep(10)
+     for i in to_submit:
+       os.stat( i )
+     os.sync()
 
   def _start_inline( self, directories ):
      bar = ProgressBar( len(directories), description="Running QM Calculations" )
@@ -375,10 +383,10 @@ class QMCalculation:
         s1 = fl[i+1].split()
         s2 = fl[i+2].split()
         data['quadrupole'] = [ float(s1[1]), float(s1[3]), float(s1[5]), float(s2[1]), float(s2[3]), float(s2[5]) ]
-      if "Mulliken atomic charges:" in fl[i]:
+      if "Mulliken atomic charges:" in fl[i] or "Mulliken charges:" in fl[i]:
         data['mulliken'] = []
         for j in range(self.natoms):
-          data['mulliken'].append( float( fl[i+1+j].split()[2] ) )
+          data['mulliken'].append( float( fl[i+2+j].split()[2] ) )
 
     for l in fl:
         if "SCF Done:  E(RHF) = " in l:

@@ -11,15 +11,19 @@ import inspect
 import shutil
 #import pwd
 import os
+import string
+import random
 
 class LSF(UserInterface):
     _commands = {
-       'name'      : None,                           # whatever identifier you want for the job
-       'queue'     : "gpu_priority",                          # the 'queue' to run on
+       'name'      : "",                           
+       'queue'     : "gpu_priority",                
+       'ncpus'     : 1,
        'resources' : 'select[ngpus>0] rusage[ngpus_excl_p=1]',
        'memory'    : "4000",                           # MB
        'walltime'  : '23:59',                      # hh:mm:ss
        'executable': 'acemd',                        # The thing to run 
+       'app'       : "",
     }
 
 
@@ -33,16 +37,18 @@ class LSF(UserInterface):
             else:
                raise ValueError( "Invalid configuration option [%s]" % (key) )
 
-        if not self.name:
-             raise ValueError( "Name must be set" )
         # Find executables
         self._bsub = self._find_binary( "bsub" )
         self._bjobs = self._find_binary( "bjobs" )
 
+        self._dirs= []
         try: 
           self._exe    = self._find_binary( self.executable )
         except:
           self._exe = self.executable
+
+        lst = [random.choice(string.ascii_letters + string.digits) for n in range(10)]
+        self.__dict__["name"] = "".join(lst)
 
     def _find_binary(self, bin ):
         ret = shutil.which( bin, mode=os.X_OK )
@@ -71,7 +77,7 @@ class LSF(UserInterface):
         '''
 
         if isinstance(mydirs, str): mydirs = [mydirs]
-
+        self._dirs.extend( mydirs )
         for d in mydirs:
             if not isdir(d):
                 raise NameError('Submit: directory ' + d + ' does not exist.')
@@ -86,16 +92,29 @@ class LSF(UserInterface):
             js = self._make_jobscript( dirname, self._exe )
 
             ret = 0
-            cmd = [
-              self._bsub,
-              "-J", self.name,
-              "-M", self.memory,
-              "-W", self.walltime,
-              "-q", self.queue,
-              "-R", self.resources,
-              "-n", "1",
-              js
-            ]
+            if not self.app:
+                cmd = [
+                    self._bsub,
+                    "-J", self.name,
+                    "-M", self.memory,
+                    "-W", self.walltime,
+                    "-q", self.queue,
+                    "-R", self.resources,
+                    "-n", str(self.ncpus),
+                    js
+                    ]
+            else:
+                cmd = [
+                    self._bsub,
+                    "-J", self.name,
+                    "-M", self.memory,
+                    "-W", self.walltime,
+                    "-q", self.queue,
+                    "-R", self.resources,
+                    "-n", str(self.ncpus),
+                    "-app", self.app,
+                    js
+                    ]
             if debug:
               print(cmd)
             try:
@@ -114,17 +133,26 @@ class LSF(UserInterface):
        print("#!/bin/sh", file =f )
        print("cd \"" + dir + "\"", file=f)
        print("module load acemd", file=f )
-       print("module load htmd", file=f )
+       print("module load acellera/test", file=f )
+       print("module load gaussian", file=f)
        if "acemd" in exe:
          print("%s --device $CUDA_VISIBLE_DEVICES > log.txt 2>&1" % (exe), file=f )
        else:
          print("%s" % (exe), file=f )
+       print( "touch .done", file=f )
 
        f.close()
        os.chmod( fn, 0o700 )
        return os.path.abspath(fn)
 
-    def inprogress(self, debug=False):
+    def inprogress( self, debug=False ):
+       inprogress=0
+       for i in self._dirs:
+          if not os.path.exists( os.path.join( i, ".done" ) ):
+           inprogress = inprogress + 1 
+       return inprogress
+
+    def __inprogress(self, debug=False):
         ''' INPROGRESS - Returns the sum of the number of running and queued
                       workunits of the specific group in the engine.
 
@@ -146,8 +174,9 @@ class LSF(UserInterface):
 
 
 if __name__ == "__main__":
-    """
     s=LSF( name="adaptivetest" )
+    print(s.name)
+    """
 #    s.submit( "test/dhfr", debug=True )
 #    s.submit( "test/dhfr", debug=True )
     ret= s.inprogress( debug=False )
