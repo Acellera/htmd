@@ -92,7 +92,9 @@ class AdaptiveBase(ProtocolInterface):
         numF = len(folders)
         numCopies = np.ones(numF, dtype=int) * int(np.floor(self.nmax / numF))
         numExtra = np.mod(self.nmax, numF)
-        numCopies = numCopies + np.random.multinomial(numExtra, [1/numF]*numF)  # draw the extra equally from a flat distribution
+        extraChoices = np.random.choice(numF, numExtra, replace=False)  # draw the extra randomly without replacement
+        numCopies[extraChoices] += 1
+        # numCopies = numCopies + np.random.multinomial(numExtra, [1/numF]*numF)  # draw the extra equally from a flat distribution
         if not path.exists(self.inputpath):
             makedirs(self.inputpath)
 
