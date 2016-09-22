@@ -30,6 +30,9 @@ class TICA(object):
         The correlation lagtime to use for TICA
     units : str
         The units of lag. Can be 'frames' or any time unit given as a string.
+    dimensions : list
+        A list of dimensions of the original data on which to apply TICA. All other dimensions will stay unaltered.
+        If None is given, it will apply on all dimensions.
 
     Example
     -------
