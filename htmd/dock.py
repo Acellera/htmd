@@ -74,9 +74,9 @@ def dock(protein, ligand, center=None, extent=None):
 
     try:
         import platform
-        suffix=""
+        suffix = ''
         if platform.system() == "Windows":
-          suffix=".exe"
+          suffix = '.exe'
         vinaexe = shutil.which(platform.system() + "-vina" + suffix, mode=os.X_OK )
         if not vinaexe:
             raise NameError('Could not find vina, or no execute permissions are given')
@@ -84,6 +84,8 @@ def dock(protein, ligand, center=None, extent=None):
         raise NameError('Could not find vina, or no execute permissions are given')
     try:
         babelexe = shutil.which('babel', mode=os.X_OK)
+        if babelexe is None:
+            raise NameError('Could not find babel, or no execute permissions are given')
     except:
         raise NameError('Could not find babel, or no execute permissions are given')
     #babelexe = path.join(home(), 'bin', 'htmd_babel')
