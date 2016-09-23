@@ -14,7 +14,7 @@ import os
 import string
 import random
 
-class LSF(UserInterface):
+class PBS(UserInterface):
     _commands = {
        'name'      : "",                           
        'queue'     : "default",                
