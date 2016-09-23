@@ -47,16 +47,17 @@ class TICA(object):
     """
 
     def __init__(self, data, lag, units='frames', dimensions=None):
-        from pyemma.coordinates import tica
+        from pyemma.coordinates.transform.tica import TICA as TICApyemma
+
         self.data = data
         self.dimensions = dimensions
+
+        self.tic = TICApyemma(lag)
 
         if isinstance(data, Metric):  # Memory efficient TICA projecting trajectories on the fly
             if units != 'frames':
                 raise RuntimeError('Cannot use delayed projection TICA with units other than frames for now. Report this to HTMD issues.')
             metr = data
-            from pyemma.coordinates.transform.tica import TICA
-            self.tic = TICA(lag)
 
             p = ProgressBar(len(metr.simulations))
             for proj in _projectionGenerator(metr, _getNcpus()):
@@ -78,7 +79,7 @@ class TICA(object):
                 datalist = data.dat.tolist()
             else:  # Sub-select dimensions for fitting
                 datalist = [x[:, self.dimensions] for x in data.dat]
-            self.tic = tica(datalist, lag=lag)
+            self.tic.fit(datalist)
 
     def project(self, ndim=None):
         """ Projects the data object given to the constructor onto the top `ndim` TICA dimensions
@@ -208,9 +209,6 @@ if __name__ == '__main__':
 
     tica2 = TICA(met, 2, dimensions=range(2, 10))
     datatica2 = tica2.project(2)
-    expected = [[ 3.69098878, -0.33862674,  0.85779184],
-                [ 3.77816105, -0.31887317,  0.87724227],
-                [ 3.83537507, -0.11878026,  0.65236956]]
     assert np.allclose(np.abs(datatica2.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
     assert np.all(datatica2.map.ix[[587, 588]].type == 'tica')
     assert np.all(datatica2.map.ix[range(587)].type == 'distance')
@@ -229,9 +227,6 @@ if __name__ == '__main__':
 
     tica4 = TICA(met, 2)
     datatica4 = tica4.project(2)
-    expected = [[ 1.36328638, -0.35354128],
-                [ 1.35348749, -0.13028328],
-                [ 1.43249917, -0.31004715]]
     assert np.allclose(np.abs(datatica4.dat[0][-3:, :]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
     assert np.all(datatica4.map.ix[[0, 1]].type == 'tica')
     print('Streaming TICA passed test.')
