@@ -19,6 +19,7 @@ from htmd.molecule.molecule import Molecule
 from htmd.progress.progress import ProgressBar
 
 from htmd.apps.lsf import LSF
+from htmd.apps.pbs import PBS
 
 class BasisSet(Enum):
  _6_31G_star = 1000
@@ -36,6 +37,7 @@ class Code(Enum):
 class Execution(Enum):
  Inline = 4000
  LSF    = 4001
+ PBS    = 4002
 
 class QMResult:
   completed  = False
@@ -278,13 +280,11 @@ class QMCalculation:
   def _start( self, directories ):
      if self.execution == Execution.Inline:
        self._start_inline( directories )
-     elif self.execution == Execution.LSF:
-       self._start_lsf( directories )
      else:
-       raise RuntimeError( "Invalid execution mode" )
+       self._start_cluster( directories, self.execution )
 
-  def _start_lsf( self, directories ):
-     print( "Running QM Calculations via LSF" )
+  def _start_cluster( self, directories, execution ):
+     print( "Running QM Calculations via Cluster" )
 
      to_submit=[]
      for directory  in directories:
@@ -304,14 +304,15 @@ class QMCalculation:
      elif self.code == Code.PSI4:
        cmd =  '"' + self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
 
-     lsf = LSF( ncpus=self.ncpus, executable = cmd, queue = "general", resources = "span[ptile=%d]" % (self.ncpus), app = "gaussian")
+     if execution == Execution.LSF:
+       lsf = LSF( ncpus=self.ncpus, executable = cmd, queue = "general", resources = "span[ptile=%d]" % (self.ncpus), app = "gaussian")
+     elif execution == Execution.PBS:
+       lsf = PBS( ncpus=self.ncpus, executable = cmd, queue = "default" )
+     else:
+       raise RuntimeError( "Execution taget not recognised" );
+
      lsf.submit( to_submit )
-     time.sleep(5)
      lsf.wait()
-     time.sleep(10)
-     for i in to_submit:
-       os.stat( i )
-     os.sync()
 
   def _start_inline( self, directories ):
      bar = ProgressBar( len(directories), description="Running QM Calculations" )
