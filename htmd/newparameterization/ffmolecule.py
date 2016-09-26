@@ -63,10 +63,10 @@ class FFMolecule(Molecule):
     self._equivalent_atom_groups= ee[0] # list of groups of equivalent atoms
     self._equivalent_atoms      = ee[1] # list of equivalent atoms, indexed by atom
     self._equivalent_group_by_atom = ee[2] # mapping from atom index to equivalent atom group
-    if netcharge==None:
-      self.netcharge = int(round(np.sum( self.charge )))
+    if netcharge is None:
+      self.netcharge = int(round(np.sum(self.charge)))
     else:
-      self.netcharge = int(round(charge))
+      self.netcharge = int(round(netcharge))
 
     # Canonicalise the atom naming.
     self._rename_mol()
