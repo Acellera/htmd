@@ -135,6 +135,23 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         f.write('loadamberprep ' + path.basename(t) + '\n')
     f.write('\n')
 
+    # Detect disulfide bonds
+    if disulfide is None and not ionize:
+        logger.info('Detecting disulfide bonds.')
+        disulfide = detectDisulfideBonds(mol)
+        if len(disulfide) != 0:
+            for d in disulfide:
+                # Convert to stupid amber residue numbering
+                uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
+                uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
+                uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
+                # Rename the CYS to CYX if there is a disulfide bond
+                mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
+                mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
+                # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
+                mol.remove('name HG and segid {} and resid {}'.format(d.segid1, d.resid1))
+                mol.remove('name HG and segid {} and resid {}'.format(d.segid2, d.resid2))
+
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.info('Writing PDB file for input to tleap.')
     pdbname = path.join(outdir, 'input.pdb')
@@ -144,21 +161,10 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     f.write('# Loading the system\n')
     f.write('mol = loadpdb input.pdb\n\n')
 
-    # Printing out patches for the disulfide bridges
-    if disulfide is None and not ionize:
-        logger.info('Detecting disulfide bonds.')
-        disulfide = detectDisulfideBonds(mol)
-
-    if not ionize and len(disulfide) != 0:  # Only make disu bonds after ionizing!
+    # Write patches for disulfide bonds (only after ionizing)
+    if not ionize and len(disulfide) != 0:
         f.write('# Adding disulfide bonds\n')
         for d in disulfide:
-            # Convert to stupid amber residue numbering
-            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
-            uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
-            uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
-            # Rename the CYS to CYX if there is a disulfide bond
-            mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
-            mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
         f.write('\n')
 
@@ -245,13 +251,13 @@ def _applyProteinCaps(mol, caps):
                 raise RuntimeError(
                     'In segment {}, the {} cap is not supported. Try using {} instead.'.format(seg, cap, capresname[i]))
             # Test if cap is already applied
-            testcap = mol.atomselect('segid {} and resid {} and resname {}'.format(seg, terminalresids[i], cap),
+            testcap = mol.atomselect('segid {} and resid "{}" and resname {}'.format(seg, terminalresids[i], cap),
                                      indexes=True)
             if len(testcap) != 0:
                 logger.warning('Cap {} already exists on segment {}. Did not re-apply it.'.format(cap, seg))
                 continue
             # Test if the atom to change exists
-            termatomsids = mol.atomselect('segid {} and resid {} and name {}'.format(seg,
+            termatomsids = mol.atomselect('segid {} and resid "{}" and name {}'.format(seg,
                                                                                     terminalresids[i],
                                                                                     terminalatoms[i]),
                                           indexes=True)
@@ -275,7 +281,7 @@ def _applyProteinCaps(mol, caps):
             _reorderMol(mol, neworder)
 
         # Remove lingering hydrogens in N- terminal (i = 0)
-        mol.remove('segid {} and resid {} and name {}'.format(seg, terminalresids[0], terminalatoms[0]))
+        mol.remove('segid {} and resid "{}" and name {}'.format(seg, terminalresids[0], terminalatoms[0]))
 
 def _defaultProteinCaps(mol):
     # Defines ACE and NME (neutral terminals) as default for protein segments
