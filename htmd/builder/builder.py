@@ -376,8 +376,8 @@ def _checkMixedSegment(mol):
     segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
-        logger.warning('Segments {} may contain both protein and non-protein atoms. '
-                                'Consider assigning separate segments to them.'.format(intersection))
+        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. '
+                                'Please assign separate segments to them.'.format(intersection))
 
 
 def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
