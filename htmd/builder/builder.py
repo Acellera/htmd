@@ -383,7 +383,7 @@ def _checkMixedSegment(mol):
                                 'Please assign separate segments to them.'.format(intersection))
 
 
-def removeLipidsInProtein(prot, memb,lipidsel='lipids'):
+def removeLipidsInProtein(prot, memb, lipidsel='lipids'):
     """ Calculates the convex hull of the protein. If a lipid lies inside the hull it gets removed.
 
     This does not work well for lipids crossing out of the hull. If even one atom of the lipid is outside it will

@@ -15,6 +15,10 @@ class FFEvaluate:
     self.mol = ffmol
     self.natoms = ffmol.natoms
 
+    # Update the charge model
+    for i in range(self.natoms):
+     self.mol.charge[i] = self.rtf.charge_by_name[ self.mol.name[i] ] 
+
     # set up two sparse matrices
     # that indicate with atom pairs have 1-2,1-3 exclusions
     # and 1-4 scaling
@@ -22,11 +26,15 @@ class FFEvaluate:
     self.s14 = sp.sparse.lil_matrix( (ffmol.natoms, ffmol.natoms) )
     self.excl= sp.sparse.lil_matrix( (ffmol.natoms, ffmol.natoms) )
 
+    # Store 1-4 elec scaling factors (always 1.0 in CHARMM, these can be per-dihedral in Amber)
+    self.e14 = sp.sparse.lil_matrix( (ffmol.natoms, ffmol.natoms) )
+
     for d in ffmol.dihedrals:
        self.s14[ d[0], d[3] ] = 1
        self.s14[ d[3], d[0] ] = 1
-       self.excl[ d[0], d[3] ] = 1
-       self.excl[ d[3], d[0] ] = 1
+       dd = self.prm.dihedralParam( self.rtf.type_by_index[d[0]], self.rtf.type_by_index[d[1]], self.rtf.type_by_index[d[2]], self.rtf.type_by_index[d[3]] )
+       self.e14[ d[0], d[3] ] = dd[0].e14
+       self.e14[ d[3], d[0] ] = dd[0].e14
 
     for d in ffmol.bonds:
        self.excl[ d[0], d[1] ] = 1
@@ -45,10 +53,12 @@ class FFEvaluate:
       qi = self.mol.charge[i]
       for j in range( i+1, self.natoms ):
          if not self.excl[ i, j ]:
+             e14_scaling = self.e14[i,j]
+             if e14_scaling==0. : e14_scaling = 1.; # If 0, assume it's not a 1-4 term
+                                                    # NB - this breaks if 1-4 is intentionally scaled to 0
              qj = self.mol.charge[j]
-
              dr = np.linalg.norm( coords[j,:] - coords[i,:] )
-             e = qi * qj * 332.0636 / dr
+             e = e14_scaling * qi * qj * 332.0636 / dr
              ee = ee + e
 
     return ee;
@@ -57,11 +67,12 @@ class FFEvaluate:
     ee = 0.
     for i in range( 0, self.natoms ):
       for j in range( i+1, self.natoms ):
-         if not self.excl[i,j]:
-           (A,B) = self.prm.vdwParam( self.rtf.type_by_index[i], self.rtf.type_by_index[i], self.s14[i,j] )
+         if not self.excl[i,j]: 
+           (A,B) = self.prm.vdwParam( self.rtf.type_by_index[i], self.rtf.type_by_index[j], self.s14[i,j] )
            dr = np.linalg.norm( coords[j,:] - coords[i,:] )
            e = ( A / math.pow( dr, 12 ) ) - ( B / math.pow( dr, 6 ) )
            ee = ee + e
+#           print( "VDW %3d %3d %f %f : r=%f e=%f %s %s" % ( i,j, A, B, dr, e,  self.rtf.type_by_index[i], self.rtf.type_by_index[j] ) )
  
     return ee;
  

@@ -50,20 +50,24 @@ class Topology:
                      'occupancy', 'beta', 'segid', 'charge', 'masses', 'atomtype']
 
 
-class Trajectory:  # TODO: Remove this class
-    box = np.array((0, 0))
-    natoms = 0
-    nframes = 0
-    time = np.array(0)
-    step = np.array(0)
-    coords = np.array((0, 3, 0))
+def XTCread(filename, givenframes=None):
+    """ Reads XTC file
 
-    def __str__(self):
-        return "Trajectory with " + str(self.nframes) + " frames, each with " + str(
-            self.natoms) + " atoms and timestep of " + str(self.time)
+    Parameters
+    ----------
+    filename : str
+        Path of xtc file.
+    givenframes : list
+        A list of integer frames which we want to read from the file. If None will read all.
 
-
-def XTCread(filename, frames=None):
+    Returns
+    -------
+    coords : nd.array
+    box : nd.array
+    boxangles : nd.array
+    step : nd.array
+    time : nd.array
+    """
     class __xtc(ct.Structure):
         _fields_ = [("box", (ct.c_float * 3)),
                     ("natoms", ct.c_int),
@@ -80,89 +84,65 @@ def XTCread(filename, frames=None):
     lib['libxtc'].xtc_read.restype = ct.POINTER(__xtc)
     lib['libxtc'].xtc_read_frame.restype = ct.POINTER(__xtc)
 
-    if frames is None:
+    coords = None
+    if givenframes is None:  # Read the whole XTC file at once
         retval = lib['libxtc'].xtc_read(
             ct.c_char_p(filename.encode("ascii")),
             natoms,
             nframes, deltat, deltastep)
-
         if not retval:
             raise IOError('XTC file {} possibly corrupt.'.format(filename))
-
-        frames = range(nframes[0])
-        t = Trajectory()
-        t.natoms = natoms[0]
-        t.nframes = len(frames)
-        t.coords = np.zeros((natoms[0], 3, t.nframes), dtype=np.float32)
-        t.step = np.zeros(t.nframes, dtype=np.uint64)
-        t.time = np.zeros(t.nframes, dtype=np.float32)
-        t.box = np.zeros((3, t.nframes), dtype=np.float32)
-
-        for i, f in enumerate(frames):
-            if f >= nframes[0] or f < 0:
-                raise RuntimeError('Frame index out of range in XTCread with given frames')
-            t.step[i] = retval[f].step
-            t.time[i] = retval[f].time
-            t.box[0, i] = retval[f].box[0]
-            t.box[1, i] = retval[f].box[1]
-            t.box[2, i] = retval[f].box[2]
-            #		print( t.coords[:,:,f].shape)
-            #		print ( t.box[:,f] )
-            #   t.step[i] = deltastep[0] * i
-            t.coords[:, :, i] = np.ctypeslib.as_array(retval[f].pos, shape=(natoms[0], 3))
-
-        for f in range(len(frames)):
-            lib['libc'].free(retval[f].pos)
-        lib['libc'].free(retval)
-
+        nframes = nframes[0]
+        frames = range(nframes)
+        coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
     else:
-        if not isinstance(frames, list) and not isinstance(frames, np.ndarray):
-            frames = [frames]
-        t = Trajectory()
-        t.natoms = 0
-        t.nframes = len(frames)
-        t.coords = None
-        t.step = None
-        t.time = None
-        t.box = None
+        if not isinstance(givenframes, list) and not isinstance(givenframes, np.ndarray):
+            givenframes = [givenframes]
+        nframes = len(givenframes)
+        frames = givenframes
 
-        nframes = len(frames)
-        i = 0
-        for f in frames:
+
+    step = np.zeros(nframes, dtype=np.uint64)
+    time = np.zeros(nframes, dtype=np.float32)
+    box = np.zeros((3, nframes), dtype=np.float32)
+    boxangles = np.zeros((3, nframes), dtype=np.float32)
+
+    for i, f in enumerate(frames):
+        if givenframes is not None:  # If frames were given, read specific frame
             retval = lib['libxtc'].xtc_read_frame(
                 ct.c_char_p(filename.encode("ascii")),
                 natoms,
                 ct.c_int(f))
-            if t.coords is None:
-                t.natoms = natoms[0]
-                t.coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
-                t.step = np.zeros(nframes, dtype=np.uint64)
-                t.time = np.zeros(nframes, dtype=np.float32)
-                t.box = np.zeros((3, nframes), dtype=np.float32)
+            if not retval:
+                raise IOError('XTC file {} possibly corrupt.'.format(filename))
+            if coords is None:
+                coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
+            fidx = 0
+        else:
+            fidx = f
 
-            t.step[i] = retval[0].step
-            t.time[i] = retval[0].time
-            t.box[0, i] = retval[0].box[0]
-            t.box[1, i] = retval[0].box[1]
-            t.box[2, i] = retval[0].box[2]
-            t.coords[:, :, i] = np.ctypeslib.as_array(retval[0].pos, shape=(natoms[0], 3))
-            i += 1
+        step[i] = retval[fidx].step
+        time[i] = retval[fidx].time
+        box[:, i] = retval[fidx].box
+        coords[:, :, i] = np.ctypeslib.as_array(retval[fidx].pos, shape=(natoms[0], 3))
 
+        if givenframes is not None:
             lib['libc'].free(retval[0].pos)
             lib['libc'].free(retval)
 
-    if np.size(t.coords, 2) == 0:
+    if givenframes is None:
+        for f in range(len(frames)):
+            lib['libc'].free(retval[f].pos)
+        lib['libc'].free(retval)
+
+    if np.size(coords, 2) == 0:
         raise NameError('Malformed XTC file. No frames read from: {}'.format(filename))
-    if np.size(t.coords, 0) == 0:
+    if np.size(coords, 0) == 0:
         raise NameError('Malformed XTC file. No atoms read from: {}'.format(filename))
 
-    # print( t.step )
-    # print( t.time )
-    #	print( t.coords[:,:,0] )
-    # print(t.coords.shape)
-    t.coords *= 10.  # Convert from nm to Angstrom
-    t.box *= 10.  # Convert from nm to Angstrom
-    return t
+    coords *= 10.  # Convert from nm to Angstrom
+    box *= 10.  # Convert from nm to Angstrom
+    return coords, box, boxangles, step, time
 
 
 def CRDread(filename):
@@ -171,18 +151,18 @@ def CRDread(filename):
     #  -7.0046035  10.4479194  20.8320000  -7.3970000   9.4310000  20.8320000
     #  -7.0486898   8.9066002  21.7218220  -7.0486899   8.9065995  19.9421780
 
-    f = open(filename, 'r')
-    coords = []
+    with open(filename, 'r') as f:
+        coords = []
 
-    fieldlen = 12
-    k = 0
-    for line in f:
-        k += 1
-        if k < 3:  # skip first 2 lines
-            continue
+        fieldlen = 12
+        k = 0
+        for line in f:
+            k += 1
+            if k < 3:  # skip first 2 lines
+                continue
 
-        coords += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
-                   if len(line[i:i + fieldlen].strip()) != 0]
+            coords += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                       if len(line[i:i + fieldlen].strip()) != 0]
 
     return [coords[i:i+3] for i in range(0, len(coords), 3)]
 
@@ -191,17 +171,17 @@ def XYZread(filename):
     topo = Topology()
     coords = []
 
-    f = open(filename, 'r')
-    natoms = int(f.readline().split()[0])
-    f.readline()
-    for i in range(natoms):
-        s = f.readline().split()
-        topo.record.append('HETATM')
-        topo.serial.append(i + 1)
-        topo.element.append(s[0])
-        topo.name.append(s[0])
-        topo.resname.append('MOL')
-        coords.append(s[1:4])
+    with open(filename, 'r') as f:
+        natoms = int(f.readline().split()[0])
+        f.readline()
+        for i in range(natoms):
+            s = f.readline().split()
+            topo.record.append('HETATM')
+            topo.serial.append(i + 1)
+            topo.element.append(s[0])
+            topo.name.append(s[0])
+            topo.resname.append('MOL')
+            coords.append(s[1:4])
 
     return topo, coords
 
@@ -225,16 +205,16 @@ def GJFread(filename):
     topo = Topology()
     coords = []
 
-    f = open(filename, "r")
-    for line in f:
-        pieces = line.split(sep=',')
-        if len(pieces) == 4 and not line.startswith('$') and not line.startswith('%') and not line.startswith('#'):
-            topo.record.append('HETATM')
-            topo.element.append(pieces[0])
-            topo.name.append(pieces[0])
-            topo.resname = 'MOL'
-            coords.append([float(s) for s in pieces[1:4]])
-    topo.serial = range(len(topo.record))
+    with open(filename, "r") as f:
+        for line in f:
+            pieces = line.split(sep=',')
+            if len(pieces) == 4 and not line.startswith('$') and not line.startswith('%') and not line.startswith('#'):
+                topo.record.append('HETATM')
+                topo.element.append(pieces[0])
+                topo.name.append(pieces[0])
+                topo.resname = 'MOL'
+                coords.append([float(s) for s in pieces[1:4]])
+        topo.serial = range(len(topo.record))
 
     return topo, coords
 
@@ -245,9 +225,9 @@ def MOL2read(filename):
     topo = Topology()
     coords = []
 
-    f = open(filename, "r")
-    l = f.readlines()
-    f.close()
+    with open(filename, "r") as f:
+        l = f.readlines()
+
     start = None
     end = None
     bond = None
@@ -265,7 +245,7 @@ def MOL2read(filename):
         s = l[i + start].strip().split()
         topo.record.append("HETATM")
         topo.serial.append(int(s[0]))
-        topo.element.append(re.sub("[0123456789]*", "", s[1]))
+        topo.element.append(re.sub("[^A-Z]*", "", s[1]))
         topo.name.append(s[1])
         coords.append([float(x) for x in s[2:5]])
         topo.charge.append(float(s[8]))
@@ -301,9 +281,12 @@ def MAEread(fname):
     coords = []
     heteros = []
 
-    import csv
-    with open(fname, newline='') as fp:
-        reader = csv.reader(fp, delimiter=' ', quotechar='"', skipinitialspace=True)
+    # Stripping starting and trailing whitespaces which confuse csv reader
+    with open(fname, 'r') as csvfile:
+        stripped = (row.strip() for row in csvfile)
+
+        import csv
+        reader = csv.reader(stripped, delimiter=' ', quotechar='"', skipinitialspace=True)
         for row in reader:
             if len(row) == 0:
                 continue
@@ -334,7 +317,7 @@ def MAEread(fname):
                 if section == 'atoms' and section_data:
                     topo.record.append('ATOM')
                     row = np.array(row)
-                    if len(row) != len(section_dict) +1:  # TODO: fix the reader
+                    if len(row) != len(section_dict):  # TODO: fix the reader
                         raise RuntimeError('{} has {} fields in the m_atom section description, but {} fields in the '
                                            'section data. Please check for missing fields in the mae file.'
                                            .format(fname, len(section_dict), len(row)))
@@ -478,9 +461,9 @@ def PDBread(filename, mode='pdb'):
     """
     if mode == 'pdb':
         topocolspecs = [(0, 6), (6, 11), (12, 16), (16, 17), (17, 21), (21, 22), (22, 26), (26, 27),
-                        (54, 60), (60, 66), (72, 76), (76, 78), (78, 79), (79, 80)]
+                        (54, 60), (60, 66), (72, 76), (76, 78), (78, 80)]
         toponames = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
-                     'occupancy', 'beta', 'segid', 'element', 'charge', 'chargesign')
+                     'occupancy', 'beta', 'segid', 'element', 'charge')
     elif mode == 'pdbqt':
         # http://autodock.scripps.edu/faqs-help/faq/what-is-the-format-of-a-pdbqt-file
         # The rigid root contains one or more PDBQT-style ATOM or HETATM records. These records resemble their
@@ -561,47 +544,63 @@ def PDBread(filename, mode='pdb'):
 
     coords = None
 
-    f = open(filename, 'r')
-    for line in f:
-        if line.startswith('CRYST1'):
-            crystdata.write(line)
-        if line.startswith('ATOM') or line.startswith('HETATM'):
-            coorddata.write(line)
-        if (line.startswith('ATOM') or line.startswith('HETATM')) and not topoend:
-            topodata.write(line)
-            teridx.append(str(currter))
-        if line.startswith('TER'):
-            currter += 1
-        if line.startswith('END'):
-            topoend = True
-        if line.startswith('CONECT'):
-            conectdata.write(line)
-        if line.startswith('MODEL'):
-            coords = concatCoords(coords, coorddata)
-            coorddata = io.StringIO()
-    crystdata.seek(0)
-    topodata.seek(0)
-    conectdata.seek(0)
+    with open(filename, 'r') as f:
+        for line in f:
+            if line.startswith('CRYST1'):
+                crystdata.write(line)
+            if line.startswith('ATOM') or line.startswith('HETATM'):
+                coorddata.write(line)
+            if (line.startswith('ATOM') or line.startswith('HETATM')) and not topoend:
+                topodata.write(line)
+                teridx.append(str(currter))
+            if line.startswith('TER'):
+                currter += 1
+            if line.startswith('END'):
+                topoend = True
+            if line.startswith('CONECT'):
+                conectdata.write(line)
+            if line.startswith('MODEL'):
+                coords = concatCoords(coords, coorddata)
+                coorddata = io.StringIO()
+        crystdata.seek(0)
+        topodata.seek(0)
+        conectdata.seek(0)
 
-    coords = concatCoords(coords, coorddata)
+        coords = concatCoords(coords, coorddata)
 
-    parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
-    parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames, na_values=_NA_VALUES, keep_default_na=False)
-    parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
-    if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
-        parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+        parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
+        parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames, na_values=_NA_VALUES, keep_default_na=False)
+        parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
+
+    # if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
+    #    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+
+    # Fixing PDB format charges which can come after the number
+    if parsedtopo.charge.dtype == 'object':
+        minuses = np.where(parsedtopo.charge.str.match('\d\-') == True)[0]
+        pluses = np.where(parsedtopo.charge.str.match('\d\+') == True)[0]
+        for m in minuses:
+            parsedtopo.loc[m, 'charge'] = int(parsedtopo.charge[m][0]) * -1
+        for p in pluses:
+            parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
+        parsedtopo.loc[parsedtopo.charge.isnull(), 'charge'] = 0
 
     if len(parsedtopo) > 99999:
         logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
 
     topo = Topology(parsedtopo)
 
+    # Bond formatting part
     # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
     serials = parsedtopo.serial.as_matrix()
-    if np.max(parsedbonds.max()) > np.max(serials):
+    if isinstance(serials[0], str) and np.any(serials == '*****'):
+        logger.info('Non-integer serials were read. For safety we will discard all bond information and serials will be assigned automatically.')
+        topo.serial = np.arange(1, len(serials)+1, dtype=np.int)
+    elif np.max(parsedbonds.max()) > np.max(serials):
         logger.info('Bond indexes in PDB file exceed atom indexes. For safety we will discard all bond information.')
     else:
-        mapserials = np.ones(np.max(serials)+1) * -1
+        mapserials = np.empty(np.max(serials)+1)
+        mapserials[:] = np.NAN
         mapserials[serials] = list(range(np.max(serials)))
         for i in range(len(parsedbonds)):
             row = parsedbonds.loc[i].tolist()
@@ -609,7 +608,13 @@ def PDBread(filename, mode='pdb'):
                 if not np.isnan(row[b]):
                     topo.bonds.append([int(row[0]), int(row[b])])
         topo.bonds = np.array(topo.bonds, dtype=np.uint32)
-        topo.bonds[:] = mapserials[topo.bonds[:]]
+        if topo.bonds.size != 0:
+            mappedbonds = mapserials[topo.bonds[:]]
+            wrongidx, _ = np.where(np.isnan(mappedbonds))  # Some PDBs have bonds to non-existing serials... go figure
+            if len(wrongidx):
+                logger.info('Discarding {} bonds to non-existing indexes in the PDB file.'.format(len(wrongidx)))
+            mappedbonds = np.delete(mappedbonds, wrongidx, axis=0)
+            topo.bonds = np.array(mappedbonds, dtype=np.uint32)
 
     if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx
@@ -618,77 +623,76 @@ def PDBread(filename, mode='pdb'):
 
 def BINCOORread(filename):
     import struct
-    f = open(filename, 'rb')
-    dat = f.read(4)
-    fmt = 'i'
-    natoms = struct.unpack(fmt, dat)[0]
-    dat = f.read(natoms * 3 * 8)
-    fmt = 'd' * (natoms * 3)
-    coords = struct.unpack(fmt, dat)
-    coords = np.array(coords, dtype=np.float32).reshape((natoms, 3, 1))
-    f.close()
+    with open(filename, 'rb') as f:
+        dat = f.read(4)
+        fmt = 'i'
+        natoms = struct.unpack(fmt, dat)[0]
+        dat = f.read(natoms * 3 * 8)
+        fmt = 'd' * (natoms * 3)
+        coords = struct.unpack(fmt, dat)
+        coords = np.array(coords, dtype=np.float32).reshape((natoms, 3, 1))
     return coords
 
 
 def PRMTOPread(filename):
-    f = open(filename, 'r')
-    topo = Topology()
-    uqresnames = []
-    residx = []
-    bondsidx = []
+    with open(filename, 'r') as f:
+        topo = Topology()
+        uqresnames = []
+        residx = []
+        bondsidx = []
 
-    section = None
-    for line in f:
-        if line.startswith('%FLAG POINTERS'):
-            section = 'pointers'
-        elif line.startswith('%FLAG ATOM_NAME'):
-            section = 'names'
-        elif line.startswith('%FLAG CHARGE'):
-            section = 'charges'
-        elif line.startswith('%FLAG MASS'):
-            section = 'masses'
-        elif line.startswith('%FLAG ATOM_TYPE_INDEX'):
-            section = 'type'
-        elif line.startswith('%FLAG RESIDUE_LABEL'):
-            section = 'resname'
-        elif line.startswith('%FLAG RESIDUE_POINTER'):
-            section = 'resstart'
-        elif line.startswith('%FLAG BONDS_INC_HYDROGEN') or line.startswith('%FLAG BONDS_WITHOUT_HYDROGEN'):
-            section = 'bonds'
-        elif line.startswith('%FLAG BOX_DIMENSIONS'):
-            section = 'box'
-        elif line.startswith('%FLAG'):
-            section = None
+        section = None
+        for line in f:
+            if line.startswith('%FLAG POINTERS'):
+                section = 'pointers'
+            elif line.startswith('%FLAG ATOM_NAME'):
+                section = 'names'
+            elif line.startswith('%FLAG CHARGE'):
+                section = 'charges'
+            elif line.startswith('%FLAG MASS'):
+                section = 'masses'
+            elif line.startswith('%FLAG ATOM_TYPE_INDEX'):
+                section = 'type'
+            elif line.startswith('%FLAG RESIDUE_LABEL'):
+                section = 'resname'
+            elif line.startswith('%FLAG RESIDUE_POINTER'):
+                section = 'resstart'
+            elif line.startswith('%FLAG BONDS_INC_HYDROGEN') or line.startswith('%FLAG BONDS_WITHOUT_HYDROGEN'):
+                section = 'bonds'
+            elif line.startswith('%FLAG BOX_DIMENSIONS'):
+                section = 'box'
+            elif line.startswith('%FLAG'):
+                section = None
 
-        if line.startswith('%'):
-            continue
+            if line.startswith('%'):
+                continue
 
-        if section == 'pointers':
-            pass
-        elif section == 'names':
-            fieldlen = 4
-            topo.name += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
-                      if len(line[i:i + fieldlen].strip()) != 0]
-        elif section == 'charges':
-            fieldlen = 16
-            topo.charge += [float(line[i:i + fieldlen].strip()) / 18.2223 for i in range(0, len(line), fieldlen)
-                        if len(line[i:i + fieldlen].strip()) != 0]  # 18.2223 = Scaling factor for charges
-        elif section == 'masses':
-            fieldlen = 16
-            topo.masses += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
-                       if len(line[i:i + fieldlen].strip()) != 0]  # 18.2223 = Scaling factor for charges
-        elif section == 'resname':
-            fieldlen = 4
-            uqresnames += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
+            if section == 'pointers':
+                pass
+            elif section == 'names':
+                fieldlen = 4
+                topo.name += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
+                          if len(line[i:i + fieldlen].strip()) != 0]
+            elif section == 'charges':
+                fieldlen = 16
+                topo.charge += [float(line[i:i + fieldlen].strip()) / 18.2223 for i in range(0, len(line), fieldlen)
+                            if len(line[i:i + fieldlen].strip()) != 0]  # 18.2223 = Scaling factor for charges
+            elif section == 'masses':
+                fieldlen = 16
+                topo.masses += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                           if len(line[i:i + fieldlen].strip()) != 0]  # 18.2223 = Scaling factor for charges
+            elif section == 'resname':
+                fieldlen = 4
+                uqresnames += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
+                               if len(line[i:i + fieldlen].strip()) != 0]
+            elif section == 'resstart':
+                fieldlen = 8
+                residx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
                            if len(line[i:i + fieldlen].strip()) != 0]
-        elif section == 'resstart':
-            fieldlen = 8
-            residx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
-                       if len(line[i:i + fieldlen].strip()) != 0]
-        elif section == 'bonds':
-            fieldlen = 8
-            bondsidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
-                         if len(line[i:i + fieldlen].strip()) != 0]
+            elif section == 'bonds':
+                fieldlen = 8
+                bondsidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                             if len(line[i:i + fieldlen].strip()) != 0]
 
     # Replicating unique resnames according to their start and end indeces
     residx.append(len(topo.name)+1)
@@ -711,65 +715,99 @@ def PSFread(filename):
 
     topo = Topology()
 
-    f = open(filename, 'r')
-    mode = None
+    with open(filename, 'r') as f:
+        mode = None
 
-    for line in f:
-        if line.strip() == "":
-            mode = None
+        for line in f:
+            if line.strip() == "":
+                mode = None
 
-        if mode == 'atom':
-            l = line.split()
-            topo.serial.append(l[0])
-            topo.segid.append(l[1])
-            match = residinsertion.findall(l[2])
-            if match:
-                resid = int(match[0][0])
-                insertion = match[0][1]
-            else:
-                resid = int(l[2])
-                insertion = ''
-            topo.resid.append(resid)
-            topo.insertion.append(insertion)
-            topo.resname.append(l[3])
-            topo.name.append(l[4])
-            topo.atomtype.append(l[5])
-            topo.charge.append(float(l[6]))
-            topo.masses.append(float(l[7]))
-        elif mode == 'bond':
-            l = line.split()
-            for x in range(0, len(l), 2):
-                topo.bonds.append([int(l[x]) - 1, int(l[x + 1]) - 1])
-        elif mode == 'angle':
-            l = line.split()
-            for x in range(0, len(l), 3):
-                topo.angles.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1])
-        elif mode == 'dihedral':
-            l = line.split()
-            for x in range(0, len(l), 4):
-                topo.dihedrals.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1, int(l[x + 3]) - 1])
-        elif mode == 'improper':
-            l = line.split()
-            for x in range(0, len(l), 4):
-                topo.impropers.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1, int(l[x + 3]) - 1])
+            if mode == 'atom':
+                l = line.split()
+                topo.serial.append(l[0])
+                topo.segid.append(l[1])
+                match = residinsertion.findall(l[2])
+                if match:
+                    resid = int(match[0][0])
+                    insertion = match[0][1]
+                else:
+                    resid = int(l[2])
+                    insertion = ''
+                topo.resid.append(resid)
+                topo.insertion.append(insertion)
+                topo.resname.append(l[3])
+                topo.name.append(l[4])
+                topo.atomtype.append(l[5])
+                topo.charge.append(float(l[6]))
+                topo.masses.append(float(l[7]))
+            elif mode == 'bond':
+                l = line.split()
+                for x in range(0, len(l), 2):
+                    topo.bonds.append([int(l[x]) - 1, int(l[x + 1]) - 1])
+            elif mode == 'angle':
+                l = line.split()
+                for x in range(0, len(l), 3):
+                    topo.angles.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1])
+            elif mode == 'dihedral':
+                l = line.split()
+                for x in range(0, len(l), 4):
+                    topo.dihedrals.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1, int(l[x + 3]) - 1])
+            elif mode == 'improper':
+                l = line.split()
+                for x in range(0, len(l), 4):
+                    topo.impropers.append([int(l[x]) - 1, int(l[x + 1]) - 1, int(l[x + 2]) - 1, int(l[x + 3]) - 1])
 
-        if '!NATOM' in line:
-            mode = 'atom'
-        elif '!NBOND' in line:
-            mode = 'bond'
-        elif '!NTHETA' in line:
-            mode = 'angle'
-        elif '!NPHI' in line:
-            mode = 'dihedral'
-        elif '!NIMPHI' in line:
-            mode = 'improper'
-    f.close()
+            if '!NATOM' in line:
+                mode = 'atom'
+            elif '!NBOND' in line:
+                mode = 'bond'
+            elif '!NTHETA' in line:
+                mode = 'angle'
+            elif '!NPHI' in line:
+                mode = 'dihedral'
+            elif '!NIMPHI' in line:
+                mode = 'improper'
     return topo
+
+
+def MDTRAJread(filename, topoloc):
+    import mdtraj as md
+    traj = md.load(filename, top=topoloc)
+    coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
+    if traj.timestep == 1:
+        time = np.zeros(traj.time.shape, dtype=traj.time.dtype)
+        step = np.zeros(traj.time.shape, dtype=traj.time.dtype)
+    else:
+        time = traj.time * 1000  # need to go from picoseconds to femtoseconds
+        step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
+    box = traj.unitcell_lengths.T * 10
+    boxangles = traj.unitcell_angles.T
+    return coords, box, boxangles, step, time
+
+
+def MDTRAJTOPOread(filename):
+    translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
+                 'chainID': 'chain', 'segmentID': 'segid'}
+    import mdtraj as md
+    from htmd.molecule.readers import Topology
+    mdstruct = md.load(filename)
+    topology = mdstruct.topology
+    table, bonds = topology.to_dataframe()
+
+    topo = Topology()
+    for k in table.keys():
+        topo.__dict__[translate[k]] = table[k].tolist()
+
+    coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
+    topo.bonds = bonds
+    return topo, coords
 
 
 if __name__ == '__main__':
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
+    from glob import glob
+    from natsort import natsorted
     import os
     testfolder = home(dataDir='molecule-readers/4RWS/')
     mol = Molecule(os.path.join(testfolder, 'structure.psf'))
@@ -785,3 +823,15 @@ if __name__ == '__main__':
     mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
     mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
     print('Can read MOL2 files.')
+    for f in glob(os.path.join(home(dataDir='molecule-readers/'), '*.mae')):
+        mol = Molecule(f)
+    print('Can read MAE files.')
+    for f in glob(os.path.join(home(dataDir='molecule-readers/'), '*.pdb')):
+        mol = Molecule(f)
+    for f in glob(os.path.join(home(dataDir='pdb/'), '*.pdb')):
+        mol = Molecule(f)
+    print('Can read PDB files.')
+    testfolder = home(dataDir='molecule-readers/CMYBKIX/')
+    mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
+    mol.read(natsorted(glob(os.path.join(testfolder, '*.xtc'))))
+    print('Can read/append XTC trajectories.')

@@ -80,6 +80,10 @@ class ProtocolInterface:
         self._commands[key] = BooleanValidator(key, datatype, descr, default)
         self.__misc(key, default)
 
+    def _cmdFunction(self, key, datatype, descr, default):
+        self._commands[key] = FunctionValidator(key, datatype, descr, default)
+        self.__misc(key, default)
+
     def _cmdDeprecated(self, key, newkey=None):
         self._deprecated[key] = newkey
 
@@ -173,6 +177,17 @@ class ObjectValidator(Validator):
                 raise ValueError('Value must be object of {}'.format(self.classname))
 
         return object
+
+
+class FunctionValidator(Validator):
+    def __init__(self, key, datatype, descr, default):
+        super().__init__(key, datatype, descr, default)
+
+    def args(self):
+        return
+
+    def validate(self, object, basedir=None):
+        return hasattr(object, '__call__')
 
 
 class ListListValidator(Validator):

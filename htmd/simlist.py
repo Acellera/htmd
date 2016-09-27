@@ -117,9 +117,9 @@ def simlist(datafolders, molfiles, inputfolders=None):
     """
 
     if not datafolders:
-        raise NameError('No data folders were given, check your arguments.')
+        raise FileNotFoundError('No data folders were given, check your arguments.')
     if not molfiles:
-        raise NameError('No molecule files were given, check your arguments.')
+        raise FileNotFoundError('No molecule files were given, check your arguments.')
     if isinstance(molfiles, str):
         molfiles = [molfiles]
     if isinstance(datafolders, str):
@@ -138,7 +138,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
     datanames = dict()
     for folder in datafolders:
         if _simName(folder) in datanames:
-            raise NameError('Duplicate simulation name detected. Cannot name-match directories.')
+            raise RuntimeError('Duplicate simulation name detected. Cannot name-match directories.')
         datanames[_simName(folder)] = folder
 
     molnames = dict()
@@ -164,7 +164,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
 
         if len(molfiles) > 1:
             if k not in molnames:
-                raise NameError('Did not find molfile with folder name ' + k + ' in the given glob')
+                raise FileNotFoundError('Did not find molfile with folder name ' + k + ' in the given glob')
             molfile = molnames[k]
         else:
             molfile = molfiles[0]
@@ -172,7 +172,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
         inputf = []
         if inputfolders:
             if k not in inputnames:
-                raise NameError('Did not find input with folder name ' + k + ' in the given glob')
+                raise FileNotFoundError('Did not find input with folder name ' + k + ' in the given glob')
             inputf = inputnames[k]
 
         sims.append(Sim(simid=i, parent=None, input=inputf, trajectory=trajectories, molfile=molfile))
@@ -280,7 +280,7 @@ def _filtSim(i, sims, outFolder, filterSel):
         try:
             mol.read(traj[j])
         except IOError as e:
-            logger.warning(e.strerror + ', skipping trajectory')
+            logger.warning('{}, skipping trajectory'.format(e))
             break
 
         mol.write(outtraj[j], sel)
@@ -297,7 +297,7 @@ def _renameSims(trajectory, simname, outfolder):
     for t in range(0, len(trajectory)):
         (tmp, fname) = path.split(trajectory[t])
         (fname, ext) = path.splitext(fname)
-        outname = path.join(outfolder, simname, fname + '.filtered.xtc')
+        outname = path.join(outfolder, simname, fname + '.filtered{}'.format(ext))
 
         if not path.isfile(outname) or (path.getmtime(outname) < path.getmtime(trajectory[t])):
             traj.append(trajectory[t])
@@ -310,9 +310,11 @@ def _filterPDBPSF(sim, outfolder, filtsel):
     try:
         mol = Molecule(sim.molfile)
     except IOError as e:
-        raise NameError('simFilter: ' + e.strerror + ' Cannot create filtered.pdb due to problematic pdb: ' + sim.molfile)
+        raise NameError('simFilter: {}. Cannot create filtered.pdb due to problematic pdb: {}'.format(e, sim.molfile))
 
     if not path.isfile(path.join(outfolder, 'filtered.pdb')):
+        if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere
+            mol.coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
         mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
 
 

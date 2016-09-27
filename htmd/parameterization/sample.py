@@ -5,6 +5,10 @@ import numpy.linalg as npla
 import numpy as np
 from optparse import OptionParser
 import sys
+
+import matplotlib
+matplotlib.use('Agg')
+
 from matplotlib import pylab as plt
 from htmd.molecule.util import maxDistance
 from htmd.parameterization.parameterization import Parameterization

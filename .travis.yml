@@ -3,6 +3,7 @@
 #  - master
 #  - toni-devel 
 
+# Note on releases -- HTMD releases are now only made when a tag is pushed
  
 matrix:
   include:
@@ -17,13 +18,13 @@ matrix:
        - g++-mingw-w64-x86-64
        - binutils-mingw-w64-x86-64
        - mingw-w64-dev
-   - os: linux
-     language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4 CPURE=gcc CC=g++ FC=gfortran STATIC="-static" OSNAME=Linux
-     addons:
-      apt:
-       packages:
-       - gfortran
+#   - os: linux
+#     language: generic
+#     env: TRAVIS_PYTHON_VERSION=3.4 CPURE=gcc CC=g++ FC=gfortran STATIC="-static" OSNAME=Linux
+#     addons:
+#      apt:
+#       packages:
+#       - gfortran
    - os: linux
      language: generic
      env: TRAVIS_PYTHON_VERSION=3.5 CPURE=gcc CC=g++ FC=gfortran STATIC="-static" OSNAME=Linux
@@ -31,24 +32,15 @@ matrix:
       apt:
        packages:
        - gfortran
-   - os: osx
-     language: generic
-     env: TRAVIS_PYTHON_VERSION=3.4 CPURE=gcc CC=g++ FC=gfortran OSNAME=Darwin
+#   - os: osx
+#     language: generic
+#     env: TRAVIS_PYTHON_VERSION=3.4 CPURE=gcc CC=g++ FC=gfortran OSNAME=Darwin
    - os: osx
      language: generic
      env: TRAVIS_PYTHON_VERSION=3.5 CPURE=gcc CC=g++ FC=gfortran OSNAME=Darwin
 
-
-# TONI Suppress fc-list warnings and speed-up - hopefully
-cache:
-    apt: true
-    directories:
-        - $HOME/.cache/matplotlib
-        - $HOME/.matplotlib
-
-
 install:
-# - printenv
+ - printenv
  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.sh -O miniconda.sh; fi
@@ -69,16 +61,20 @@ install:
  - source activate travis-env
  - pwd
  - ls -la
- - git describe --tags
- - export BUILD_VERSION=$(git describe --tags | sed 's/-/ /g' | awk '{print $1}')
- - export BUILD_NUMBER=$(git describe --tags | sed 's/-/ /g' | awk '{print $2}')
+ - if [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then export BUILD_VERSION=$TRAVIS_TAG; else export BUILD_VERSION=0.0.0; fi
+ - echo "TRAVIS_BRANCH = $TRAVIS_BRANCH"
+ - echo "TRAVIS_TAG    = $TRAVIS_TAG"
  # Always set it to 0 so we don't get a new release at every successful commit
+ - echo "BUILD_VERSION = $BUILD_VERSION"
+
  - export BUILD_NUMBER=0
 
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-data
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd
 
  # To bring in dependencies 
+ - conda install qt pyqt -y
+ - conda install openbabel -y
  - conda install pyemma -y
  - conda install natsort -y
  - conda install ipython -y
@@ -96,10 +92,9 @@ install:
  - conda install pint -y
  - conda install htmd-pdb2pqr -y
  - conda install psi4 -y
- - conda install htmdbabel -y
  - conda install acemd -y
  - conda install match -y
- - conda install ambermini -y
+ - conda install ambermini=15.0.4 -y
 
  - conda install $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2  -y
  - conda install $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2  -y
@@ -112,6 +107,7 @@ script:
 # - echo $PYTHON_PATH
 # - conda env list
 # - find $HOME -name g09_wrapper
+ - which babel
  - python -c "import htmd"
  - activate_license "$LICENSE_TOKEN"
  - python tests/run_inline_file_tests.py

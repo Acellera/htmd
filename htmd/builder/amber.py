@@ -442,7 +442,7 @@ def _readcsvdict(filename):
 
 
 if __name__ == '__main__':
-    from htmd.molecule.molecule import Molecule
+    from htmd.molecule.molecule import Molecule, mol_equal
     from htmd.builder.solvate import solvate
     from htmd.builder.preparation import proteinPrepare
     from htmd.home import home
@@ -450,20 +450,48 @@ if __name__ == '__main__':
     import os
     from glob import glob
     import numpy as np
-    from htmd.util import diffMolecules
+    import filecmp
 
-    np.random.seed(1)
-    mol = Molecule('3PTB')
-    mol.filter('protein')
-    mol = proteinPrepare(mol)
-    smol = solvate(mol)
-    ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
-    tmpdir = tempname()
-    bmol = build(smol, ff=ffs, outdir=tmpdir)
+    def cutfirstline(infile, outfile):
+        # Cut out the first line of prmtop which has a build date in it
+        with open(infile, 'r') as fin:
+            data = fin.read().splitlines(True)
+        with open(outfile, 'w') as fout:
+            fout.writelines(data[1:])
 
-    compare = home(dataDir=os.path.join('test-amber-build', '3PTB'))
-    mol = Molecule(os.path.join(compare, 'structure.prmtop'))
+    pdbids = ['3PTB']  # , '1A25', '1GZM', '1U5U']
+    for pid in pdbids:
+        np.random.seed(1)
+        mol = Molecule(pid)
+        mol.filter('protein')
+        mol = proteinPrepare(mol)
+        mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+        smol = solvate(mol)
+        ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+        tmpdir = tempname()
+        bmol = build(smol, ff=ffs, outdir=tmpdir)
 
-    assert np.array_equal(mol.bonds, bmol.bonds)
+        compare = home(dataDir=os.path.join('test-amber-build', pid))
 
-    assert len(diffMolecules(mol, bmol)) == 0
+        ignore_ftypes = ('.log', '.txt')
+        files = []
+        deletefiles = []
+        for f in glob(os.path.join(compare, '*')):
+            fname = os.path.basename(f)
+            if os.path.splitext(f)[1] in ignore_ftypes:
+                continue
+            if f.endswith('prmtop'):
+                cutfirstline(f, os.path.join(compare, fname+'.mod'))
+                cutfirstline(os.path.join(tmpdir, fname), os.path.join(tmpdir, fname+'.mod'))
+                files.append(os.path.basename(f)+'.mod')
+                deletefiles.append(os.path.join(compare, fname+'.mod'))
+            else:
+                files.append(os.path.basename(f))
+
+        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
+        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+            raise RuntimeError('Different results produced by amber.build for test {} between {} and {} in files {}.'.format(pid, compare, tmpdir, mismatch))
+
+        for f in deletefiles:
+            os.remove(f)
+        shutil.rmtree(tmpdir)

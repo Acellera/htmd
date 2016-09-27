@@ -1,8 +1,8 @@
-CC := $(CC) -static
-FC := $(FC) -static
+CC := $(CC) -static $(EXTRAFLAGS)
+FC := $(FC) -static $(EXTRAFLAGS)
 
 TIMEBOMB := -DTIMEBOMB=1 -DCDATE=$(shell date +%s)
-CFLAGS := -g -Wno-format-zero-length -Wno-unused-but-set-variable -Wno-unused-variable -Wno-write-strings -Wall  $(STATIC)
+CFLAGS := -g -Wno-format-zero-length -Wno-unused-but-set-variable -Wno-unused-variable -Wno-write-strings -Wall  $(STATIC) -Wl,-headerpad_max_install_names
 FFLAGS := $(STATIC)
 LDFLAGS:= -Lnlopt/lib -lnlopt
 

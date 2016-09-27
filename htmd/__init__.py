@@ -20,14 +20,16 @@ from htmd.projections.tica import TICA
 from htmd.projections.kmeanstri import KMeansTri
 from htmd.userinterface import UserInterface
 from htmd.molecule.molecule import Molecule
-from htmd.adaptive.adaptiverun import AdaptiveRun
+from htmd.adaptive.adaptiverun import AdaptiveRun, AdaptiveMD
 from htmd.adaptive.adaptive import reconstructAdaptiveTraj
 from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
 from htmd.vmdviewer import viewer, getCurrentViewer
 from htmd.builder.solvate import solvate
-from htmd.acemd.acemd import Acemd
+from htmd.apps.acemd import Acemd
+from htmd.apps.pmemd import Pmemd
 from htmd.apps.acemdlocal import AcemdLocal
+from htmd.apps.pmemdlocal import PmemdLocal
 from htmd.apps.lsf import LSF
 from htmd.apps.aws import AWS
 from htmd.builder.builder import detectDisulfideBonds, segmentgaps, autoSegment, embed, DisulfideBridge
@@ -66,9 +68,9 @@ try:
 	logging.config.fileConfig(os.path.join(home(), 'logging.ini'), disable_existing_loggers=False)
 except:
 	print("HTMD: Logging setup failed")
-
-check_registration(product='htmd')
-show_news()
-compareVersions()
+if not os.getenv("HTMD_NONINTERACTIVE"):
+  check_registration(product='htmd')
+  show_news()
+  compareVersions()
 
 config()

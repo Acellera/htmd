@@ -313,6 +313,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False, caps=caps,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, noregen=noregen, psfgen=psfgen)
     _checkFailedAtoms(molbuilt)
+    _recoverProtonations(molbuilt)
     return molbuilt
 
 
@@ -567,6 +568,15 @@ def _protonationPatches(mol):
     return patches
 
 
+# Recover protonation states of residues after building (CHARMM renames protonated residues to standard names)
+def _recoverProtonations(mol):
+    mol.set('resname', 'ASH', sel='same residue as (resname ASP and name HD2)')
+    mol.set('resname', 'GLH', sel='same residue as (resname GLU and name HE2)')
+    mol.set('resname', 'LYN', sel='resname LYS and not (same residue as (resname LYS and name HZ3))')  # The LYN patch removes the HZ3 proton
+    mol.set('resname', 'AR0', sel='resname ARG and not (same residue as (resname ARG and name HE))')   # The AR0 patch removes the HE proton
+    # Histidine protonations keep their names in CHARMM. No need to rename them
+
+
 def combine(prmlist, outfile):
     """ Combines CHARMM parameter files
     Take a list of parameters files and combine them into a single file (useful for acemd)
@@ -817,6 +827,7 @@ if __name__ == '__main__':
     from htmd.builder.solvate import solvate
     from htmd.home import home
     from htmd.util import tempname
+    from htmd.builder.preparation import proteinPrepare
     import filecmp
     import os
     from glob import glob
@@ -825,25 +836,29 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
 
-    np.random.seed(1)
-    mol = Molecule('3PTB')
-    mol.filter('protein')
-    smol = solvate(mol)
-    topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-    params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
-    tmpdir = tempname()
-    bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
+    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+    for pid in pdbids:
+        np.random.seed(1)
+        mol = Molecule(pid)
+        mol.filter('protein')
+        mol = proteinPrepare(mol)
+        mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+        smol = solvate(mol)
+        topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
+        params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+        tmpdir = tempname()
+        bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
 
-    compare = home(dataDir=os.path.join('test-charmm-build', '3PTB'))
-    files = []
-    filestmp = glob(os.path.join(compare, '*'))
-    for f in filestmp:
-        files.append(os.path.basename(f))
+        compare = home(dataDir=os.path.join('test-charmm-build', pid))
+        files = []
+        filestmp = glob(os.path.join(compare, '*'))
+        for f in filestmp:
+            files.append(os.path.basename(f))
 
-    match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
-    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-        raise RuntimeError('Different results produced by charmm.build for test 3PTB')
+        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
+        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+            raise RuntimeError('Different results produced by charmm.build for test {}'.format(pid))
 
-    shutil.rmtree(tmpdir)
+        shutil.rmtree(tmpdir)
 
 

@@ -14,7 +14,7 @@ from htmd.util import tempname
 from htmd.molecule.molecule import Molecule
 
 
-def dock(protein, ligand, center=None, extent=None):
+def dock(protein, ligand, center=None, extent=None, babelexe='babel', vinaexe=None):
     """ Molecular docking, using Vina
 
     If centre and extent are not provided, docking will be performed over the whole protein
@@ -29,6 +29,10 @@ def dock(protein, ligand, center=None, extent=None):
         3-vec centre of of the search bounding box (optional)
     extent
         3-vec linear extent of the search bounding box (optional)
+    babelexe : str
+        Path to babel executable.
+    vinaexe : str
+        Path to AutoDock Vina executable.
 
     Returns
     -------
@@ -73,17 +77,22 @@ def dock(protein, ligand, center=None, extent=None):
     ligand.write(ligand_pdb)
 
     try:
-        import platform
-        suffix=""
-        if platform.system() == "Windows":
-          suffix=".exe"
-        vinaexe = shutil.which(platform.system() + "-vina" + suffix, mode=os.X_OK )
+        if vinaexe is None:
+            import platform
+            suffix = ''
+            if platform.system() == "Windows":
+                suffix = '.exe'
+            vinaexe = '{}-vina{}'.format(platform.system(), suffix)
+
+        vinaexe = shutil.which(vinaexe, mode=os.X_OK)
         if not vinaexe:
             raise NameError('Could not find vina, or no execute permissions are given')
     except:
         raise NameError('Could not find vina, or no execute permissions are given')
     try:
-        babelexe = shutil.which('htmd_babel', mode=os.X_OK)
+        babelexe = shutil.which(babelexe, mode=os.X_OK)
+        if babelexe is None:
+            raise NameError('Could not find babel, or no execute permissions are given')
     except:
         raise NameError('Could not find babel, or no execute permissions are given')
     #babelexe = path.join(home(), 'bin', 'htmd_babel')

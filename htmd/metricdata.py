@@ -93,6 +93,26 @@ class MetricData:
         """
         return sum(self.trajLengths)
 
+    @property
+    def numTrajectories(self):
+        """ The number of trajectories
+
+        Examples
+        --------
+        >>> data.numTrajectories
+        """
+        return len(self.dat)
+
+    @property
+    def numDimensions(self):
+        """ The number of dimensions
+
+        Examples
+        --------
+        >>> data.numDimensions
+        """
+        return self.dat[0].shape[1]
+
     def cluster(self, clusterobj, mergesmall=None, batchsize=False):
         """ Cluster the metrics
 
@@ -134,7 +154,10 @@ class MetricData:
             datconcat = np.concatenate(self.dat)
             if np.ndim(datconcat) == 1:
                 datconcat = np.transpose(np.atleast_2d(datconcat))
-            clusterobj.fit(datconcat)
+            import warnings  # Following 3 lines are BS because sklearn refuse to make releases more often than 1 per year...
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                clusterobj.fit(datconcat)
             labels = clusterobj.labels_
 
         uqclu = np.unique(labels)
@@ -173,14 +196,49 @@ class MetricData:
         """
         if not np.array_equal(self.trajLengths, otherdata.trajLengths):
             raise NameError('Trying to combine MetricData objects with different number/lengths of trajectories. Check the trajLengths property.')
-        for i in range(self.dat):
+        for i in range(self.numTrajectories):
             if self.simlist[i].simid != otherdata.simlist[i].simid:
                 raise NameError('Simulation ids do not match. Cannot combine. Please generate both data from the same simlist')
-        for i in range(self.dat):
+        for i in range(self.numTrajectories):
             self.dat[i] = np.concatenate((self.dat[i], otherdata.dat[i]), axis=1)
-        self.map = np.concatenate((self.map, otherdata.map), axis=0)
+        self.map = self.map.append(otherdata.map, ignore_index=True)
         self._dataid = random.random()
-    
+
+    def dropDimensions(self, drop=None, keep=None):
+        """ Drop some dimensions of the data given their indexes
+
+        Parameters
+        ----------
+        drop : list
+            A list of integer indexes of the dimensions to drop
+        keep : list
+            A list of integer indexes of the dimensions to keep
+
+        Examples
+        --------
+        >>> data.dropDimensions([1, 24, 3])
+        >>> data.dropDimensions(keep=[2, 10])
+        """
+        if drop is not None and not isinstance(drop, np.ndarray):
+            drop = np.array(drop)
+        if keep is not None and not isinstance(keep, np.ndarray):
+            keep = np.array(keep)
+        if drop is not None and keep is not None:
+            raise AttributeError('drop and keep arguments for dropDimensions are mutually exclusive. Pass only one.')
+        if keep is not None:
+            keepidx = keep
+            dropidx = np.arange(self.numDimensions)
+            dropidx = np.setdiff1d(dropidx, keepidx)
+        else:
+            dropidx = drop
+            keepidx = np.arange(self.numDimensions)
+            keepidx = np.setdiff1d(keepidx, dropidx)
+
+        for i, d in enumerate(self.dat):
+            self.dat[i] = self.dat[i][:, keepidx]
+        self.map = self.map.drop(self.map.index[dropidx])
+        self.map = self.map.reset_index(drop=True)
+
     def dropTraj(self, limits=None, multiple=None, partial=None, idx=None, keepsims=None):
         """ Drops trajectories based on their lengths
 
@@ -268,7 +326,7 @@ class MetricData:
         >>> data = MetricSelfDistance.project(sims, 'protein and name CA')
         >>> databoot = data.bootstrap(0.8)
         """
-        numtraj = len(self.dat)
+        numtraj = self.numTrajectories
         numtokeep = int(np.floor(numtraj * ratio))
         if replacement:
             rndtraj = np.random.randint(numtraj, size=numtokeep)
@@ -530,6 +588,44 @@ def _ismember(a, b):
     for i, elt in enumerate(list(set(b))):
         bind[elt] = i
     return np.array([bind.get(itm, -1) for itm in a])  # None can be replaced by any other "not in b" value
+
+
+if __name__ == '__main__':
+    from htmd import *
+    from htmd.util import tempname
+    from htmd.home import home
+    from os.path import join
+
+    testfolder = home(dataDir='adaptive')
+
+    sims = simlist(glob(join(testfolder, 'data', '*', '')), glob(join(testfolder, 'input', '*', 'structure.pdb')))
+    fsims = simfilter(sims, tempname(), 'not water')
+    metr = Metric(fsims)
+    metr.set(MetricDistance('protein and resid 10 and name CA', 'resname BEN and noh', metric='contacts',
+                            groupsel1='residue', threshold=4))
+    data1 = metr.project()
+    metr.set(MetricDihedral())
+    data2 = metr.project()
+
+    # Testing combining of metrics
+    data1.combine(data2)
+
+    # Testing dimensions
+    assert np.array_equal(data1.map.shape, (897, 3)), 'combine not working correct'
+    assert np.array_equal(data1.dat[0].shape, (6, 897)), 'combine not working correct'
+    assert np.array_equal(np.where(data1.map.type == 'contact')[0], [0, 1, 2, 3, 4, 5, 6, 7, 8]), 'combine not working correct'
+
+    # Testing dimension dropping / keeping
+    datatmp = data1.copy()
+    data1.dropDimensions(range(9))
+    assert np.array_equal(data1.map.shape, (888, 3)), 'dropDimensions not working correct'
+    assert np.array_equal(data1.dat[0].shape, (6, 888)), 'dropDimensions not working correct'
+    assert len(np.where(data1.map.type == 'contact')[0]) == 0, 'dropDimensions not working correct'
+    data1 = datatmp.copy()
+    data1.dropDimensions(keep=range(9))
+    assert np.array_equal(data1.map.shape, (9, 3)), 'dropDimensions not working correct'
+    assert np.array_equal(data1.dat[0].shape, (6, 9)), 'dropDimensions not working correct'
+    assert len(np.where(data1.map.type == 'dihedral')[0]) == 0, 'dropDimensions not working correct'
 
 
 
