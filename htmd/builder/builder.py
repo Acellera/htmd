@@ -314,8 +314,8 @@ def _checkMixedSegment(mol):
     segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
-        raise MixedSegmentError('Segments {} contain both protein and non-protein atoms. '
-                                'Please assign separate segments to them.'.format(intersection))
+        logger.warning('Segments {} contain both protein and non-protein atoms. '
+                       'Please assign separate segments to them or the build procedue might fail.'.format(intersection))
 
 
 def removeLipidsInProtein(prot, memb, lipidsel='lipids'):
@@ -324,31 +324,55 @@ def removeLipidsInProtein(prot, memb, lipidsel='lipids'):
     This does not work well for lipids crossing out of the hull. If even one atom of the lipid is outside it will
     change the hull and will not get removed. I assume it will get removed by the clashes with the protein though.
     """
-    # TODO: Do the same with Morphological Snakes
+    return removeAtomsInHull(prot, memb, 'name CA', lipidsel)
+
+
+def removeAtomsInHull(mol1, mol2, hullsel, removesel):
+    """ Calculates the convex hull of an atom selection in mol1 and removes atoms within that hull in mol2.
+
+    Parameters
+    ----------
+    mol1 : Molecule
+        Molecule for which to calculate the convex hull
+    mol2 : Molecule
+        Molecule which contains the atoms which we check if they are within the hull
+    hullsel : str
+        Atomselection for atoms in mol1 from which to calculate the convex hull.
+    removesel : str
+        Atomselection for atoms in mol2 from which to remove the ones which are within the hull
+
+    Returns
+    -------
+    newmol2 : Molecule
+        mol2 but without any atoms located within the convex hull
+    numrem : int
+        Number of fragments removed
+    """
+    # TODO: Look into Morphological Snakes
     from scipy.spatial import ConvexHull
-    memb = memb.copy()
 
+    mol2 = mol2.copy()
     # Convex hull of the protein
-    cacoords = prot.get('coords', 'name CA')
-    hull = ConvexHull(cacoords)
+    hullcoords = mol1.get('coords', hullsel)
+    hull = ConvexHull(hullcoords)
 
-    sequence = sequenceID((memb.resid, memb.segid))
+    sequence = sequenceID((mol2.resid, mol2.segid))
     uqres = np.unique(sequence)
 
     toremove = np.zeros(len(sequence), dtype=bool)
     numlipsrem = 0
-    for res in uqres:  # For each lipid check if it's atoms lie within the convex hull
+    for res in uqres:  # For each fragment check if it's atoms lie within the convex hull
         atoms = np.where(sequence == res)[0]
-        newhull = ConvexHull(np.vstack((cacoords, memb.get('coords', sel=atoms))))
+        newhull = ConvexHull(np.vstack((hullcoords, mol2.get('coords', sel=atoms))))
 
-        # If the hull didn't change by adding the lipid, it lies within convex hull. Remove it.
+        # If the hull didn't change by adding the fragment, it lies within convex hull. Remove it.
         if list(hull.vertices) == list(newhull.vertices):
             toremove[atoms] = True
             numlipsrem += 1
 
-    lipids = memb.atomselect(lipidsel)  # Only remove lipids, waters are ok
-    memb.remove(toremove & lipids)
-    return memb, numlipsrem
+    rematoms = mol2.atomselect(removesel)
+    mol2.remove(toremove & rematoms)
+    return mol2, numlipsrem
 
 
 def removeHET(prot):
