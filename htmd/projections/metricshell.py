@@ -92,6 +92,18 @@ class MetricShell(MetricDistance):
             return np.unique(map[:, 0]), map, sel1, sel2
 
     def getMapping(self, mol):
+        """ Returns the description of each projected dimension.
+
+        Parameters
+        ----------
+        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+            A Molecule object which will be used to calculate the descriptions of the projected dimensions.
+
+        Returns
+        -------
+        map : :class:`DataFrame <pandas.core.frame.DataFrame>` object
+            A DataFrame containing the descriptions of each dimension
+        """
         idx, _ = super()._getSelections(mol)
         from pandas import DataFrame
         types = []

@@ -27,7 +27,10 @@ for root, dirnames, filenames in os.walk('.'):
 failed = []
 for f in filestotest:
     print(' ************************  Running "{}"  ************************'.format(f))
-    out = call('python {}'.format(f), shell=True)
+    if f.endswith('amber.py') or f.endswith('charmm.py'):
+        out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
+    else:
+        out = call('python {}'.format(f), shell=True)
     print(' ************************  Result : {}  ************************'.format(out))
     if out != 0:
         failed.append(f)

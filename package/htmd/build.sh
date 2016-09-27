@@ -11,7 +11,11 @@ printenv
 T="$PWD"
 for S in "$PWD/C/"*; do
 	cd "$S"
-	make CPURE=$CPURE CC=$CC FC=$FC STATIC=$STATIC PLATFORM=$OSNAME TYPE=$TYPE
+  FLAGS=""
+  if [ "$OSNAME" == "Darwin" ]; then
+   FLAGS=-Wl,-headerpad_max_install_names 
+  fi
+	make CPURE=$CPURE CC=$CC FC=$FC STATIC=$STATIC PLATFORM=$OSNAME TYPE=$TYPE EXTRAFLAGS=$FLAGS
 	cd "$T"
 done
 
@@ -35,12 +39,6 @@ echo "Installing into $PREFIX"
 	  rm -rf $DIR/htmdx/.idea
     rm -rf $DIR/htmd/.ipynb_checkpoints
     rm -rf $DIR/htmd/Untitled*
-    if [ "$PKG_NAME" == "htmd" ]; then
-      rm -rf $DIR/htmd/lib/pro
-		fi
-    if [ "$PKG_NAME" == "htmd-pro" ]; then
-      rm -rf $DIR/htmd/lib/basic
-		fi
 
 
     echo "def version():" > $DIR/htmd/version.py

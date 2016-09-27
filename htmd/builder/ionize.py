@@ -202,25 +202,20 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
     # Add the ions
     randidx = np.random.permutation(np.size(waterpos, 0))
     atom = Molecule()
-    atom.record = 'ATOM'
-    atom.chain = 'I'
-    atom.segid = 'I'
-    atom.occupancy = 0
-    atom.beta = 0
-    atom.insertion = ''
-    atom.element = ''
-    atom.altloc = ''
+    atom.empty(1)
+    atom.set('chain', 'I')
+    atom.set('segid', 'I')
 
     for i in range(nanion):
-        atom.name = anionatom
-        atom.resname = anion
-        atom.resid = newmol.resid[-1] + 1
+        atom.set('name', anionatom)
+        atom.set('resname', anion)
+        atom.set('resid', newmol.resid[-1] + 1)
         atom.coords = waterpos[randidx[i], :]
         newmol.insert(atom, len(newmol.name))
     for i in range(ncation):
-        atom.name = cationatom
-        atom.resname = cation
-        atom.resid = newmol.resid[-1] + 1
+        atom.set('name', cationatom)
+        atom.set('resname', cation)
+        atom.set('resid', newmol.resid[-1] + 1)
         atom.coords = waterpos[randidx[i+nanion], :]
         newmol.insert(atom, len(newmol.name))
 

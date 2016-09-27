@@ -102,6 +102,29 @@ class Metric:
             A projection or a list of projections which to use on the simulations
         """
         self.projectionlist = projection
+        if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
+            self.projectionlist = [self.projectionlist]
+
+    def getMapping(self, mol):
+        """ Returns the description of each projected dimension.
+
+        Parameters
+        ----------
+        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+            A Molecule object which will be used to calculate the descriptions of the projected dimensions.
+
+        Returns
+        -------
+        map : :class:`DataFrame <pandas.core.frame.DataFrame>` object
+            A DataFrame containing the descriptions of each dimension
+        """
+        import pandas as pd
+        if mol is None:
+            return
+        pandamap = pd.DataFrame(columns=('type', 'indexes', 'description'))
+        for proj in self.projectionlist:
+            pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
+        return pandamap
 
     def project(self):
         """
@@ -114,8 +137,6 @@ class Metric:
         """
         if len(self.projectionlist) == 0:
             raise NameError('You need to provide projections using the Metric.projection method.')
-        if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
-            self.projectionlist = [self.projectionlist]
 
         if isinstance(self.simulations, Molecule):
             data = []
@@ -134,7 +155,9 @@ class Metric:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
                 proj._precalculate(uqMol)
-                map = map.append(proj.getMapping(uqMol), ignore_index=True)
+        else:
+            logger.warning('Cannot calculate description of dimensions due to different topology files for each trajectory.')
+        map = self.getMapping(uqMol)
 
         logger.info('Metric: Starting projection of trajectories.')
         metrics = np.empty(numSim, dtype=object)
@@ -151,7 +174,7 @@ class Metric:
         # joblib.parallel.BatchCompletionCallBack = oldcallback
 
         from htmd.config import _config
-        results = Parallel(n_jobs=_config['ncpus'], verbose=11)(
+        results = Parallel(n_jobs=_config['ncpus'], verbose=6)(
                 delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
 
         for i in range(len(results)):
@@ -194,6 +217,17 @@ class Metric:
         return data, ref, fstep
 
 
+def _highfreqFilter(mol,steps):
+    newframes = int(mol.coords.shape[2]/steps)*steps
+    mol.coords =   mol.coords[:,:,:newframes]
+    mol.box = mol.box[:,:newframes]
+    mol.box = mol.box[:,::steps]
+    mol.fstep = mol.fstep*steps
+    coo=np.reshape(mol.coords,[mol.coords.shape[0],mol.coords.shape[1],int(mol.coords.shape[2]/steps),steps])
+    X=np.mean(coo,axis=3)
+#   print("mol: ", mol.coords.shape, " X: ",X.shape)
+    mol.coords=X
+
 def _processSim(sim, projectionlist, uqmol, skip):
     pieces = sim.trajectory
     try:
@@ -202,17 +236,23 @@ def _processSim(sim, projectionlist, uqmol, skip):
         else:
             mol = Molecule(sim.molfile)
         logger.debug(pieces[0])
-        mol._readTraj(pieces, skip=skip)
-
+       
+       
+        mol.read(pieces, skip=skip)
+        #Gianni testing
+        #_highfreqFilter(mol,10)
+ 
         data = []
         for p in projectionlist:
-            pj=p.project(mol)
-            if pj.ndim==1:
-                pj=np.atleast_2d(pj).T
+            pj = p.project(mol)
+            if pj.ndim == 1:
+                pj = np.atleast_2d(pj).T
             data.append(pj)
         data = np.hstack(data)
+        if data.dtype == np.float64:
+            data = data.astype(np.float32)
     except Exception as e:
-        logger.warning('Error in simulation with id: ' + str(sim.simid) + ' ' + e.__str__())
+        logger.warning('Error in simulation with id: ' + str(sim.simid) + '. "' + e.__str__() + '"')
         return None, None, None, True
 
     return data, _calcRef(pieces, mol.fileloc), mol.fstep, False
@@ -237,6 +277,17 @@ def _singleMolfile(sims):
         single = True
         molfile = sims[0].molfile
     return single, molfile
+
+
+def _projectionGenerator(metric, ncpus):
+    for i in range(0, len(metric.simulations), ncpus):
+        simrange = range(i, np.min((i+ncpus, len(metric.simulations))))
+        results = Parallel(n_jobs=ncpus, verbose=0)(delayed(_projector)(metric, i) for i in simrange)
+        yield results
+
+
+def _projector(metric, i):
+    return metric._projectSingle(i)
 
 
 class _OldMetric(metaclass=ABCMeta):

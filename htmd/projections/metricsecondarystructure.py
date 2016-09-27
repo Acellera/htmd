@@ -150,6 +150,18 @@ class MetricSecondaryStructure(Projection):
         return data
 
     def getMapping(self, mol):
+        """ Returns the description of each projected dimension.
+
+        Parameters
+        ----------
+        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+            A Molecule object which will be used to calculate the descriptions of the projected dimensions.
+
+        Returns
+        -------
+        map : :class:`DataFrame <pandas.core.frame.DataFrame>` object
+            A DataFrame containing the descriptions of each dimension
+        """
         idx = mol.atomselect('{} and name CA'.format(self.sel), indexes=True)
         from pandas import DataFrame
         types = []

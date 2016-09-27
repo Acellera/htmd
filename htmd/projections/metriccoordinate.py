@@ -98,6 +98,18 @@ class MetricCoordinate(Projection):
         return trajalnsel, atomsel, centersel
 
     def getMapping(self, mol):
+        """ Returns the description of each projected dimension.
+
+        Parameters
+        ----------
+        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+            A Molecule object which will be used to calculate the descriptions of the projected dimensions.
+
+        Returns
+        -------
+        map : :class:`DataFrame <pandas.core.frame.DataFrame>` object
+            A DataFrame containing the descriptions of each dimension
+        """
         (xxx, atomsel, yyy) = self._getSelections(mol)
         atomidx = np.where(atomsel)[0]
         from pandas import DataFrame
