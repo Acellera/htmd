@@ -298,10 +298,13 @@ def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
 
         # Add the new segment ID to all fields the user specified
         for f in fields:
-            if np.any(mol.__dict__[f] == segid):
-                raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
-            mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
-
+            if f != 'chain':
+                if np.any(mol.__dict__[f] == segid):
+                    raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
+                mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
+            else:
+                base62 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+                mol.__dict__[f][segres] = base62[i % 62]
         logger.info('Created segment {} between resid {} and {}.'.format(segid, np.min(mol.resid[segres]),
                                                                          np.max(mol.resid[segres])))
         prevsegres = segres  # Store old segment atom indexes for the warning about continuous resids
