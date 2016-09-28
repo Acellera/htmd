@@ -18,6 +18,7 @@ class Production(ProtocolInterface):
 
         Production protocol for globular and membrane proteins
         It also includes a possible flatbottom potential box
+        It is also possible to define constraints for the production run
 
         Parameters
         ----------
