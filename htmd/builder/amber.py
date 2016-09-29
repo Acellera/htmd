@@ -241,8 +241,7 @@ def _applyProteinCaps(mol, caps):
     # 4. Remove the lingering hydrogens of the N terminal
 
     # Define the atoms to be replaced (0 and 1 corresponds to N- and C-terminal caps)
-    terminalatoms = ['H1 H2 H3 HT1 HT2 HT3',
-                     'OXT OT1']  # XPLOR names for H[123] and OXT are HT[123] and OT1, respectively.
+    terminalatoms = {'ACE': 'H1 H2 H3 HT1 HT2 HT3', 'NME': 'OXT OT1'}  # XPLOR names for H[123] and OXT are HT[123] and OT1, respectively.
     capresname = ['ACE', 'NME']
     capatomtype = ['C', 'N']
 
@@ -268,9 +267,9 @@ def _applyProteinCaps(mol, caps):
                     'No cap provided for resid {} on segment {}. Did not apply it.'.format(terminalresids[i], seg))
                 continue
             # If it is defined, test if supported
-            elif cap != capresname[i]:
+            elif cap not in capresname:
                 raise RuntimeError(
-                    'In segment {}, the {} cap is not supported. Try using {} instead.'.format(seg, cap, capresname[i]))
+                    'In segment {}, the {} cap is not supported. Try using {} instead.'.format(seg, cap, capresname))
             # Test if cap is already applied
             testcap = mol.atomselect('segid {} and resid "{}" and resname {}'.format(seg, terminalresids[i], cap),
                                      indexes=True)
@@ -280,14 +279,14 @@ def _applyProteinCaps(mol, caps):
             # Test if the atom to change exists
             termatomsids = mol.atomselect('segid {} and resid "{}" and name {}'.format(seg,
                                                                                     terminalresids[i],
-                                                                                    terminalatoms[i]),
+                                                                                    terminalatoms[cap]),
                                           indexes=True)
             if len(termatomsids) == 0:
                 raise RuntimeError(
                     'In segment {}, resid {} should have at least one of these atoms: {}. Cannot cap. '
                     'Capping in AMBER requires one of these atoms on the residues that will be capped. '
                     'Consider using the proteinPrepare function to prepare to your molecule before '
-                    'building.'.format(seg, terminalresids[i], terminalatoms[i]))
+                    'building.'.format(seg, terminalresids[i], terminalatoms[cap]))
 
             # Select atom to change, do changes to cap, and change resid
             atomtomod = np.min(termatomsids)
