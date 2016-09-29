@@ -149,68 +149,6 @@ def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
 
 
-def findBreaks(mol, sel='all', spatialgap=4.0):
-    """Return a list of breaks in the given sequence.
-
-     Returns a list arranged as follows [ [ res1 res2 distance nmiss ] ... ], where
-
-      * res1 and res2 are dictionaries with keys {resid, chain, insertion},
-      * distance is the gap between Cα atoms in Å
-      * nmiss is the number of missing residues.
-
-    Gaps are only reported within the same chain.
-
-    Parameters
-    ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        The Molecule object
-    sel : str
-        Atom selection on which to check for gaps.
-    spatialgap : float
-        The size of a spatial gap between CAs which validates a discontinuity (Å)
-
-    Returns
-    -------
-    breaklist : list
-        A list arranged as follows [ [ res1 res2 distance nmiss ] ... ] (see description)
-    """
-
-    selCA = np.bitwise_and(mol.atomselect(sel), mol.atomselect("name CA") )
-    xyz = mol.get('coords', selCA)
-    Dxyz = np.diff(xyz, axis=0)
-    dxyz = np.sqrt(np.sum(Dxyz*Dxyz,axis=1))
-
-    breaks = dxyz > spatialgap
-    breaks1 = np.append(breaks, False)    # So same length as selCA
-    breaks2 = np.insert(breaks, 0, False)
-
-    dxyz_ = dxyz[breaks]
-
-    nm = mol.copy()
-    nm.filter(selCA, _logger=False)
-
-    breaklist = []
-    for r1, i1, c1, rn1,  r2, i2, c2, rn2,  d in zip(
-            nm.get("resid", breaks1), nm.get("insertion", breaks1), nm.get("chain", breaks1), nm.get("resname", breaks1),
-            nm.get("resid", breaks2), nm.get("insertion", breaks2), nm.get("chain", breaks2), nm.get("resname", breaks2),
-            dxyz_ ):
-        if c1 == c2:
-            dr1 = dict(resid= r1, chain=c1, insertion=i1)
-            dr2 = dict(resid= r2, chain=c2, insertion=i2)
-            nmiss = r2 - r1 - 1
-            breaklist.append([dr1, dr2, d, nmiss])
-            logger.info("Missing {:2d} residues ({:5.2f} Å) at {:s} {:d}{:s} {:s} - {:s} {:d}{:s} {:s} ".format(
-                    nmiss, d,
-                    rn1, r1, i1, c1,
-                    rn2, r2, i2, c2
-                ))
-
-    return breaklist
-
-
-
-
-
 def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, field="segid"):
     """ Detects resid gaps in a selection and assigns incrementing segid to each fragment
 
@@ -376,8 +314,8 @@ def _checkMixedSegment(mol):
     segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
-        logger.warning('Segments {} may contain both protein and non-protein atoms. '
-                                'Consider assigning separate segments to them.'.format(intersection))
+        logger.warning('Segments {} contain both protein and non-protein atoms. '
+                       'Please assign separate segments to them or the build procedue might fail.'.format(intersection))
 
 
 def removeLipidsInProtein(prot, memb, lipidsel='lipids'):
@@ -386,31 +324,55 @@ def removeLipidsInProtein(prot, memb, lipidsel='lipids'):
     This does not work well for lipids crossing out of the hull. If even one atom of the lipid is outside it will
     change the hull and will not get removed. I assume it will get removed by the clashes with the protein though.
     """
-    # TODO: Do the same with Morphological Snakes
+    return removeAtomsInHull(prot, memb, 'name CA', lipidsel)
+
+
+def removeAtomsInHull(mol1, mol2, hullsel, removesel):
+    """ Calculates the convex hull of an atom selection in mol1 and removes atoms within that hull in mol2.
+
+    Parameters
+    ----------
+    mol1 : Molecule
+        Molecule for which to calculate the convex hull
+    mol2 : Molecule
+        Molecule which contains the atoms which we check if they are within the hull
+    hullsel : str
+        Atomselection for atoms in mol1 from which to calculate the convex hull.
+    removesel : str
+        Atomselection for atoms in mol2 from which to remove the ones which are within the hull
+
+    Returns
+    -------
+    newmol2 : Molecule
+        mol2 but without any atoms located within the convex hull
+    numrem : int
+        Number of fragments removed
+    """
+    # TODO: Look into Morphological Snakes
     from scipy.spatial import ConvexHull
-    memb = memb.copy()
 
+    mol2 = mol2.copy()
     # Convex hull of the protein
-    cacoords = prot.get('coords', 'name CA')
-    hull = ConvexHull(cacoords)
+    hullcoords = mol1.get('coords', hullsel)
+    hull = ConvexHull(hullcoords)
 
-    sequence = sequenceID((memb.resid, memb.segid))
+    sequence = sequenceID((mol2.resid, mol2.segid))
     uqres = np.unique(sequence)
 
     toremove = np.zeros(len(sequence), dtype=bool)
     numlipsrem = 0
-    for res in uqres:  # For each lipid check if it's atoms lie within the convex hull
+    for res in uqres:  # For each fragment check if it's atoms lie within the convex hull
         atoms = np.where(sequence == res)[0]
-        newhull = ConvexHull(np.vstack((cacoords, memb.get('coords', sel=atoms))))
+        newhull = ConvexHull(np.vstack((hullcoords, mol2.get('coords', sel=atoms))))
 
-        # If the hull didn't change by adding the lipid, it lies within convex hull. Remove it.
+        # If the hull didn't change by adding the fragment, it lies within convex hull. Remove it.
         if list(hull.vertices) == list(newhull.vertices):
             toremove[atoms] = True
             numlipsrem += 1
 
-    lipids = memb.atomselect(lipidsel)  # Only remove lipids, waters are ok
-    memb.remove(toremove & lipids)
-    return memb, numlipsrem
+    rematoms = mol2.atomselect(removesel)
+    mol2.remove(toremove & rematoms)
+    return mol2, numlipsrem
 
 
 def removeHET(prot):

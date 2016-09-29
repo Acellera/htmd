@@ -12,7 +12,7 @@ import argparse
 
 from htmd.newparameterization.ffmolecule import FFMolecule, FFEvaluate
 from htmd.newparameterization.fftype import FFTypeMethod
-from htmd.qm.qmcalculation import BasisSet, Execution
+from htmd.qm.qmcalculation import BasisSet, Execution, Code
 import sys
 import os
 
@@ -51,8 +51,9 @@ def main_parameterize():
                         action="append", default=None, dest="torsion")
     parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default %d)" % (ncpus), default=ncpus, dest="ncpus")
     parser.add_argument( "-f", "--forcefield", help="Inital FF guess to use", choices=[ "GAFF", "GAFF2", "CGENFF"], default="CGENFF" )
-    parser.add_argument ( "-b", "--basis", help="QM Basis Set", choices=[ "6-31g-star", "cc-pVTZ" ], default="6-31g-star", dest="basis") 
-    parser.add_argument ( "-e", "--exec", help="How to run the QM", choices=[ "inline", "LSF" ], default="inline", dest="exec") 
+    parser.add_argument ( "-b", "--basis", help="QM Basis Set", choices=[ "6-31g-star", "cc-pVTZ" ], default="cc-pVTZ", dest="basis") 
+    parser.add_argument ( "-e", "--exec", help="How to run the QM", choices=[ "inline", "LSF", "PBS" ], default="inline", dest="exec") 
+    parser.add_argument ( "--qmcode",  help="QM code to use", choices=[ "Gaussian", "PSI4" ], default="PSI4", dest="qmcode") 
 
     args = parser.parse_args()
 
@@ -80,11 +81,22 @@ def main_parameterize():
     except:
         pass
 
+    code = Code.PSI4
+    if args.qmcode == "Gaussian":
+      code = Code.Gaussian
+    elif args.qmcode == "PSI4":
+      code = Code.PSI4
+    else:
+      print("Unknown QM code") 
+      sys.exit(1)
+
 
     if args.exec == "inline":
       execution = Execution.Inline
     elif args.exec == "LSF":
       execution = Execution.LSF
+    elif args.exec == "PBS":
+      execution = Execution.PBS
     else:
       print("Unknown execution mode") 
       sys.exit(1)
@@ -105,7 +117,7 @@ def main_parameterize():
     if  args.forcefield == "GAFF" : method = FFTypeMethod.GAFF
     if  args.forcefield == "GAFF2": method = FFTypeMethod.GAFF2
 
-    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm, basis=basis, execution=execution )
+    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm, basis=basis, execution=execution, qmcode=code )
 
     dihedrals = mol.getSoftDihedrals()
     

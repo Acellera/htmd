@@ -14,12 +14,12 @@ import os
 import string
 import random
 
-class LSF(UserInterface):
+class PBS(UserInterface):
     _commands = {
        'name'      : "",                           
-       'queue'     : "gpu_priority",                
+       'queue'     : "default",                
        'ncpus'     : 1,
-       'resources' : 'select[ngpus>0] rusage[ngpus_excl_p=1]',
+       'resources' : '',
        'memory'    : "4000",                           # MB
        'walltime'  : '23:59',                      # hh:mm:ss
        'executable': 'acemd',                        # The thing to run 
@@ -38,8 +38,7 @@ class LSF(UserInterface):
                raise ValueError( "Invalid configuration option [%s]" % (key) )
 
         # Find executables
-        self._bsub = self._find_binary( "bsub" )
-        self._bjobs = self._find_binary( "bjobs" )
+        self._bsub = self._find_binary( "qsub" )
 
         self._dirs= []
         try: 
@@ -92,29 +91,15 @@ class LSF(UserInterface):
             js = self._make_jobscript( dirname, self._exe )
 
             ret = 0
-            if not self.app:
-                cmd = [
+            cmd = [
                     self._bsub,
-                    "-J", self.name,
-                    "-M", self.memory,
+                    "-M", self.name,
+                    "-l", "select=1:ncpus=%d:mem=%d" % ( self.ncpus, self.memory ),
                     "-W", self.walltime,
                     "-q", self.queue,
-                    "-R", self.resources,
-                    "-n", str(self.ncpus),
                     js
                     ]
-            else:
-                cmd = [
-                    self._bsub,
-                    "-J", self.name,
-                    "-M", self.memory,
-                    "-W", self.walltime,
-                    "-q", self.queue,
-                    "-R", self.resources,
-                    "-n", str(self.ncpus),
-                    "-app", self.app,
-                    js
-                    ]
+
             if debug:
               print(cmd)
             try:
