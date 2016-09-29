@@ -278,7 +278,7 @@ if __name__ == "__main__":
                            25.09490013,  24.58997917,  20.71271324], dtype=np.float32)
     assert np.all(np.abs(data[-1, -20:-1] - lastdists) < 0.001), 'Distance calculation is broken'
 
-    metr = MetricDistance('protein and name CA', 'resname MOL and noh', groupsel1='residue', groupsel2='all')
+    metr = MetricDistance('protein and noh', 'resname MOL and noh', groupsel1='residue', groupsel2='all')
     data = metr.project(mol)
     lastdists = np.array([28.99010277,  30.08285904,  32.75860214,  32.42934036,
                           33.58397293,  32.05215073,  32.83199692,  31.5758419 ,
