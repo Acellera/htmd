@@ -155,8 +155,7 @@ class MetricDistance(Projection):
             elif groupsel == 'all':
                 sel = self._processMultiSelections(mol, [sel])
             elif groupsel == 'residue':
-                selCell = self._groupByResidue(mol, sel)
-                sel = self._processMultiSelections(mol, selCell)
+                sel = self._groupByResidue(mol, sel)
             else:
                 raise NameError('Invalid groupsel argument')
         else:  # If user passes his own sets of groups
@@ -167,16 +166,20 @@ class MetricDistance(Projection):
         return sel
 
     def _processMultiSelections(self, mol, sel):
-        newsel = np.zeros((len(sel), mol.numAtoms), dtype=object)
+        newsel = np.zeros((len(sel), mol.numAtoms), dtype=bool)
         for s in range(len(sel)):
             newsel[s, :] = mol.atomselect(sel[s])
         return newsel
 
     def _groupByResidue(self, mol, sel):
-        res = np.unique(mol.get('resid', sel=sel))
-        newsel = np.empty(len(res), dtype=object)
-        for i in range(len(res)):
-            newsel[i] = 'resid ' + str(res[i]) + ' and noh'
+        import pandas as pd
+        idx = mol.atomselect(sel, indexes=True)
+        df = pd.DataFrame({'a': mol.resid[idx]})
+        gg = df.groupby(by=df.a).groups  # Grouping by same resids
+
+        newsel = np.zeros((len(gg), mol.numAtoms), dtype=bool)
+        for i, res in enumerate(sorted(gg)):
+            newsel[i, idx[gg[res]]] = True  # Setting the selected indexes to True which correspond to the same residue
         return newsel
 
 
