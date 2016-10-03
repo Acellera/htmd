@@ -54,7 +54,7 @@ class PRM:
    skip=0
    for l in lines:
      l = l.strip()
-     l = re.sub( "/!.*$//", "", l ) # Remove any comment
+     l = re.sub( "!.*$", "", l ) # Remove any comment
      
      if   l ==  "BONDS"    : 
        mode="BONDS"
