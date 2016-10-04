@@ -118,7 +118,8 @@ def detectDisulfideBonds(mol, thresh=3):
 
     for sg in idx:
         resid = mol.resid[sg]
-        sel = '(not resid "{0}") and resname "CY.*" and name SG and index > {1} and exwithin {2} of index {3}'.format(resid, sg, thresh, sg)
+        segid = mol.segid[sg]
+        sel = '(not resid "{0}" or not segid "{1}") and resname "CY.*" and name SG and index > {2} and exwithin {3} of index {2}'.format(resid, segid, sg, thresh)
         idx2 = np.where(mol.atomselect(sel))[0]
 
         if len(idx2) == 0:
