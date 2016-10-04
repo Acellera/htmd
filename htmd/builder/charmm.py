@@ -469,6 +469,13 @@ def _printAliases(f):
         pdbalias atom TYR H HN
         pdbalias atom TYR HB3 HB1
         pdbalias atom VAL H HN
+
+        # Aliases for carbohydrates
+        pdbalias residue NAG BGLCNA
+        pdbalias residue BMA BMAN
+        pdbalias residue GAL BGAL
+        pdbalias residue MAN AMAN
+        pdbalias residue FUC AFUC
     '''
     f.write(textwrap.dedent(lines))
     f.write('\n\n')
