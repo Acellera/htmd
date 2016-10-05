@@ -47,6 +47,7 @@ def listFiles():
     for f in extraffs:
         print(f)
 
+
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True):
     """ Builds a system for AMBER
@@ -153,11 +154,21 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.info('Writing PDB file for input to tleap.')
     pdbname = path.join(outdir, 'input.pdb')
-    mol.write(pdbname)
+    mol.write(pdbname, mol.atomtype == '')
     if not os.path.isfile(pdbname):
         raise NameError('Could not write a PDB file out of the given Molecule.')
     f.write('# Loading the system\n')
     f.write('mol = loadpdb input.pdb\n\n')
+
+    if np.sum(mol.atomtype != '') != 0:
+        logger.info('Writing mol2 file for input to tleap.')
+        mol2name = path.join(outdir, 'extra.mol2')
+        mol.write(mol2name, mol.atomtype != '')
+        if not os.path.isfile(mol2name):
+            raise NameError('Could not write a mol2 file out of the given Molecule.')
+        f.write('# Loading the rest of the system\n')
+        f.write('extra = loadmol2 extra.mol2\n\n')
+        f.write('mol = combine {mol extra}\n\n')
 
     # Printing out patches for the disulfide bridges
     if disulfide is None and not ionize:
@@ -374,7 +385,7 @@ def _charmmLipid2Amber(mol):
 
 
 def _reorderMol(mol, order):
-    for k in mol._append_fields:
+    for k in mol._atom_fields:
         if mol.__dict__[k] is not None and np.size(mol.__dict__[k]) != 0:
             if k == 'coords':
                 mol.__dict__[k] = mol.__dict__[k][order, :, :]
