@@ -161,14 +161,20 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     f.write('mol = loadpdb input.pdb\n\n')
 
     if np.sum(mol.atomtype != '') != 0:
-        logger.info('Writing mol2 file for input to tleap.')
-        mol2name = path.join(outdir, 'extra.mol2')
-        mol.write(mol2name, mol.atomtype != '')
-        if not os.path.isfile(mol2name):
-            raise NameError('Could not write a mol2 file out of the given Molecule.')
-        f.write('# Loading the rest of the system\n')
-        f.write('extra = loadmol2 extra.mol2\n\n')
-        f.write('mol = combine {mol extra}\n\n')
+        logger.info('Writing mol2 files for input to tleap.')
+        segs = np.unique(mol.segid[mol.atomtype != ''])
+        combstr = 'mol = combine {mol'
+        for s in segs:
+            name = 'segment{}'.format(s)
+            mol2name = path.join(outdir, '{}.mol2'.format(name))
+            mol.write(mol2name, (mol.atomtype != '') & (mol.segid == s))
+            if not os.path.isfile(mol2name):
+                raise NameError('Could not write a mol2 file out of the given Molecule.')
+            f.write('# Loading the rest of the system\n')
+            f.write('{} = loadmol2 {}.mol2\n\n'.format(name, name))
+            combstr += ' {}'.format(name)
+        combstr += '}\n\n'
+        f.write(combstr)
 
     # Printing out patches for the disulfide bridges
     if disulfide is None and not ionize:
@@ -423,6 +429,7 @@ if __name__ == '__main__':
     from htmd.molecule.molecule import Molecule, mol_equal
     from htmd.builder.solvate import solvate
     from htmd.builder.preparation import proteinPrepare
+    from htmd.builder.builder import autoSegment2
     from htmd.home import home
     from htmd.util import tempname
     import os
@@ -437,6 +444,31 @@ if __name__ == '__main__':
         with open(outfile, 'w') as fout:
             fout.writelines(data[1:])
 
+
+    def _compareResultFolders(compare, tmpdir, pid):
+        ignore_ftypes = ('.log', '.txt')
+        files = []
+        deletefiles = []
+        for f in glob(os.path.join(compare, '*')):
+            fname = os.path.basename(f)
+            if os.path.splitext(f)[1] in ignore_ftypes:
+                continue
+            if f.endswith('prmtop'):
+                cutfirstline(f, os.path.join(compare, fname + '.mod'))
+                cutfirstline(os.path.join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
+                files.append(os.path.basename(f) + '.mod')
+                deletefiles.append(os.path.join(compare, fname + '.mod'))
+            else:
+                files.append(os.path.basename(f))
+
+        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
+        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+            raise RuntimeError(
+                'Different results produced by amber.build for test {} between {} and {} in files {}.'.format(pid, compare, tmpdir, mismatch))
+
+        for f in deletefiles:
+            os.remove(f)
+
     pdbids = ['3PTB']  # , '1A25', '1GZM', '1U5U']
     for pid in pdbids:
         np.random.seed(1)
@@ -449,27 +481,33 @@ if __name__ == '__main__':
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 
-        compare = home(dataDir=os.path.join('test-amber-build', pid))
-
-        ignore_ftypes = ('.log', '.txt')
-        files = []
-        deletefiles = []
-        for f in glob(os.path.join(compare, '*')):
-            fname = os.path.basename(f)
-            if os.path.splitext(f)[1] in ignore_ftypes:
-                continue
-            if f.endswith('prmtop'):
-                cutfirstline(f, os.path.join(compare, fname+'.mod'))
-                cutfirstline(os.path.join(tmpdir, fname), os.path.join(tmpdir, fname+'.mod'))
-                files.append(os.path.basename(f)+'.mod')
-                deletefiles.append(os.path.join(compare, fname+'.mod'))
-            else:
-                files.append(os.path.basename(f))
-
-        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
-        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-            raise RuntimeError('Different results produced by amber.build for test {} between {} and {} in files {}.'.format(pid, compare, tmpdir, mismatch))
-
-        for f in deletefiles:
-            os.remove(f)
+        refdir = home(dataDir=os.path.join('test-amber-build', pid))
+        _compareResultFolders(refdir, tmpdir, pid)
         shutil.rmtree(tmpdir)
+
+    # Test protein-ligand building
+    folder = home(dataDir='building-protein-ligand')
+    prot = Molecule(os.path.join(folder, 'trypsin.pdb'))
+    prot.filter('protein')
+    prot = autoSegment2(prot)
+    prot = proteinPrepare(prot)
+    prot1 = prot
+    prot2 = prot.copy()
+    lig1 = Molecule(os.path.join(folder, 'benzamidine.mol2'))
+    lig1.set('segid', 'L')
+    lig2 = Molecule(os.path.join(folder, 'benzamidine.pdb'))
+    lig2.set('segid', 'L')
+    prot1.append(lig1)
+    prot2.append(lig2)
+    smol1 = solvate(prot1)
+    smol2 = solvate(prot2)
+    tmpdir1 = tempname()
+    tmpdir2 = tempname()
+    np.random.seed(1)
+    bmol1 = build(smol1, param=[os.path.join(folder, 'benzamidine.frcmod')], outdir=tmpdir1)
+    np.random.seed(1)
+    bmol2 = build(smol2, topo=[os.path.join(folder, 'benzamidine.prepi')], param=[os.path.join(folder, 'benzamidineprepi.frcmod')], outdir=tmpdir2)
+    # _compareResultFolders(tmpdir1, tmpdir2, 'ben-tryp')
+    shutil.rmtree(tmpdir1)
+    shutil.rmtree(tmpdir2)
+
