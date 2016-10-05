@@ -864,7 +864,11 @@ if __name__ == '__main__':
 
         match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
         if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-            raise RuntimeError('Different results produced by charmm.build for test {}'.format(pid))
+            raise RuntimeError(
+                'Different results produced by amber.build for test {} between {} and {} in files {}.'.format(pid,
+                                                                                                              compare,
+                                                                                                              tmpdir,
+                                                                                                              mismatch))
 
         shutil.rmtree(tmpdir)
 
