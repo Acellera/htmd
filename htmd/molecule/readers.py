@@ -789,7 +789,6 @@ def MDTRAJTOPOread(filename):
     translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
                  'chainID': 'chain', 'segmentID': 'segid'}
     import mdtraj as md
-    from htmd.molecule.readers import Topology
     mdstruct = md.load(filename)
     topology = mdstruct.topology
     table, bonds = topology.to_dataframe()
