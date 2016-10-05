@@ -4,8 +4,8 @@ import os
 from htmd.molecule.support import xtc_lib
 import collections
 import logging
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 _Pair = collections.namedtuple('Atom', 'resname name')
 # The following is taken from MDAnalysis to align atom names based on the strict PDB formatting.
@@ -13,8 +13,8 @@ _Pair = collections.namedtuple('Atom', 'resname name')
 
 # These attributes are used to deduce how to format the atom name.
 _ions = ('FE', 'AS', 'ZN', 'MG', 'MN', 'CO', 'BR',
-        'CU', 'TA', 'MO', 'AL', 'BE', 'SE', 'PT',
-        'EU', 'NI', 'IR', 'RH', 'AU', 'GD', 'RU')
+         'CU', 'TA', 'MO', 'AL', 'BE', 'SE', 'PT',
+         'EU', 'NI', 'IR', 'RH', 'AU', 'GD', 'RU')
 # Mercurial can be confused for hydrogen gamma. Yet, mercurial is
 # rather rare in the PDB. Here are all the residues that contain
 # mercurial.
@@ -22,9 +22,9 @@ _special_hg = ('CMH', 'EMC', 'MBO', 'MMC', 'HGB', 'BE7', 'PMB')
 # Chloride can be confused for a carbon. Here are the residues that
 # contain chloride.
 _special_cl = ('0QE', 'CPT', 'DCE', 'EAA', 'IMN', 'OCZ', 'OMY', 'OMZ',
-              'UN9', '1N1', '2T8', '393', '3MY', 'BMU', 'CLM', 'CP6',
-              'DB8', 'DIF', 'EFZ', 'LUR', 'RDC', 'UCL', 'XMM', 'HLT',
-              'IRE', 'LCP', 'PCI', 'VGH')
+               'UN9', '1N1', '2T8', '393', '3MY', 'BMU', 'CLM', 'CP6',
+               'DB8', 'DIF', 'EFZ', 'LUR', 'RDC', 'UCL', 'XMM', 'HLT',
+               'IRE', 'LCP', 'PCI', 'VGH')
 # In these pairs, the atom name is aligned on the first column
 # (column 13).
 _include_pairs = (_Pair('OEC', 'CA1'),
@@ -72,7 +72,9 @@ def checkTruncations(mol):
             if fieldsizes[f] == 1:
                 logger.warning('Field "{}" of PDB overflows. Your data will be truncated to 1 character.'.format(f))
             else:
-                logger.warning('Field "{}" of PDB overflows. Your data will be truncated to {} characters.'.format(f, fieldsizes[f]))
+                logger.warning('Field "{}" of PDB overflows. Your data will be truncated to {} characters.'.format(f,
+                                                                                                                   fieldsizes[
+                                                                                                                       f]))
 
 
 def PDBwrite(mol, filename):
@@ -106,7 +108,7 @@ def PDBwrite(mol, filename):
     if box is not None and not np.all(mol.box == 0):
         box = np.atleast_2d(np.atleast_2d(box)[:, mol.frame])
         print("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90),
-            file=fh)
+              file=fh)
 
     for frame in range(numFrames):
         print("MODEL    %5d" % (frame + 1), file=fh)
@@ -148,10 +150,10 @@ def PDBwrite(mol, filename):
                 partners = partners[partners < 99998] + 1  # Don't print bonds over 99999 as it overflows the field
                 # I need to support multi-line printing of atoms with more than 4 bonds
                 while len(partners) >= 3:  # Write bonds as long as they are more than 3 in fast more
-                    print("CONECT%5d%5d%5d%5d" % (a+1, partners[0], partners[1], partners[2]), file=fh)
+                    print("CONECT%5d%5d%5d%5d" % (a + 1, partners[0], partners[1], partners[2]), file=fh)
                     partners = partners[3:]
                 if len(partners) > 0:  # Write the rest of the bonds
-                    line = "CONECT%5d" % (a+1)
+                    line = "CONECT%5d" % (a + 1)
                     for p in partners:
                         line = "%s%5d" % (line, p)
                     print(line, file=fh)
@@ -233,12 +235,12 @@ def PSFwrite(molecule, filename):
             mass = m.masses[i]
         if (m.charge is not None) and (i < len(m.charge)):
             charge = m.charge[i]
-        if( m.atomtype is not None ) and ( i<len(m.atomtype)):
-            atomtype   = m.atomtype[i]
+        if (m.atomtype is not None) and (i < len(m.atomtype)):
+            atomtype = m.atomtype[i]
         print("%8d %-4s %-5s%-4s %-4s %-6s %-2s %10.6f  %8.6f  %10d" %
               (int(m.serial[i]),
                m.segid[i],
-               str(m.resid[i])+str(m.insertion[i]),
+               str(m.resid[i]) + str(m.insertion[i]),
                (m.resname[i]),
                m.name[i],
                atomtype,
@@ -260,21 +262,23 @@ def PSFwrite(molecule, filename):
     for i in range(m.angles.shape[0]):
         if i and not (i % 3):
             print("", file=f)
-        print("%10d%10d%10d" % (m.angles[i, 0] + 1, m.angles[i, 1] + 1, m.angles[i,2]+1), file=f, end="")
+        print("%10d%10d%10d" % (m.angles[i, 0] + 1, m.angles[i, 1] + 1, m.angles[i, 2] + 1), file=f, end="")
 
     print("\n\n", file=f)
     print("%10d !NPHI: dihedrals" % (m.dihedrals.shape[0]), file=f)
     for i in range(m.dihedrals.shape[0]):
         if i and not (i % 2):
             print("", file=f)
-        print("%10d%10d%10d%10d" % (m.dihedrals[i, 0] + 1, m.dihedrals[i, 1] + 1, m.dihedrals[i,2]+1, m.dihedrals[i,3]+1), file=f, end="")
+        print("%10d%10d%10d%10d" % (
+        m.dihedrals[i, 0] + 1, m.dihedrals[i, 1] + 1, m.dihedrals[i, 2] + 1, m.dihedrals[i, 3] + 1), file=f, end="")
 
     print("\n\n", file=f)
     print("%10d !NIMPHI: impropers" % (m.impropers.shape[0]), file=f)
     for i in range(m.impropers.shape[0]):
         if i and not (i % 2):
             print("", file=f)
-        print("%10d%10d%10d%10d" % (m.impropers[i, 0] + 1, m.impropers[i, 1] + 1, m.impropers[i,2]+1, m.impropers[i,3]+1), file=f, end="")
+        print("%10d%10d%10d%10d" % (
+        m.impropers[i, 0] + 1, m.impropers[i, 1] + 1, m.impropers[i, 2] + 1, m.impropers[i, 3] + 1), file=f, end="")
 
     print("\n\n", file=f)
     print("%10d !NDON: donors\n" % (0), file=f)
@@ -293,25 +297,24 @@ def XYZwrite(src, filename):
         e = src.element[i].strip()
         if not len(e):
             e = re.sub("[1234567890]*", "", src.name[i])
-        print("%s   %f   %f    %f" % (e, src.coords[i, 0, src.frame], src.coords[i, 1, src.frame], src.coords[i, 2, src.frame]), file=fh)
+        print("%s   %f   %f    %f" % (
+        e, src.coords[i, 0, src.frame], src.coords[i, 1, src.frame], src.coords[i, 2, src.frame]), file=fh)
     fh.close()
 
+
 def MOL2write(mol, filename):
-    import re
+    with open(filename, "w") as f:
+        print("@<TRIPOS>MOLECULE", file=f)
+        print("    MOL", file=f)
+        print("%5d %5d %5d %5d %5d" % (mol.numAtoms, mol.bonds.shape[0], 0, 0, 0), file=f)
+        print("SMALL\nUSER_CHARGES\n\n", file=f)
+        print("@<TRIPOS>ATOM", file=f)
+        for i in range(mol.coords.shape[0]):
+            print("%7d %-8s %9.4f %9.4f %9.4f %-8s  1 %-4s %12.6f" % (
+            i + 1, mol.name[i], mol.coords[i, 0, 0], mol.coords[i, 1, 0], mol.coords[i, 2, 0], mol.atomtype[i], "MOL",
+            mol.charge[i]), file=f)
 
-
-    f = open(filename, "w")
-
-    print( "@<TRIPOS>MOLECULE", file=f )
-    print( "Written by HTMD", file=f )
-    print( "%5d %5d %5d %5d %5d" % ( mol.coords.shape[0], mol.bonds.shape[0], 0, 0, 0 ), file=f )
-    print( "SMALL\nUSER_CHARGES\n\n", file=f )
-    print( "@<TRIPOS>ATOM", file=f )
-    for i in range( mol.coords.shape[0] ):
-      print( "%7d %-8s %9.4f %9.4f %9.4f %-8s  1 %-4s %12.6f" % ( i+1, mol.name[i], mol.coords[i,0,0], mol.coords[i,1,0], mol.coords[i,2,0], mol.atomtype[i], "MOL", mol.charge[i]), file=f )
-
-    print( "@<TRIPOS>BOND", file=f )
-    for i in range( mol.bonds.shape[0] ):
-      print( "%6d %4d %4d 1" % ( i+1, mol.bonds[i,0]+1, mol.bonds[i,1]+1 ), file=f )
-    print("",file=f)
-    f.close()
+        print("@<TRIPOS>BOND", file=f)
+        for i in range(mol.bonds.shape[0]):
+            print("%6d %4d %4d 1" % (i + 1, mol.bonds[i, 0] + 1, mol.bonds[i, 1] + 1), file=f)
+        print("", file=f)

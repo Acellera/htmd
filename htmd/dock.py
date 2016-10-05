@@ -12,23 +12,27 @@ import shutil
 from subprocess import call, check_output
 from htmd.util import tempname
 from htmd.molecule.molecule import Molecule
+from natsort import natsorted
+from glob import glob
 
 
-def dock(protein, ligand, center=None, extent=None, babelexe='babel', vinaexe=None):
+def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='babel', vinaexe=None):
     """ Molecular docking, using Vina
 
     If centre and extent are not provided, docking will be performed over the whole protein
 
     Parameters
     ----------
-    protein
+    protein : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         Molecule object representing the receptor
-    ligand
+    ligand : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         Molecule object representing the ligand to dock
-    center
+    center : list
         3-vec centre of of the search bounding box (optional)
-    extent
+    extent : list
         3-vec linear extent of the search bounding box (optional)
+    numposes : int
+        Number of poses to return. Vina cannot return more than 20 poses.
     babelexe : str
         Path to babel executable.
     vinaexe : str
@@ -43,8 +47,8 @@ def dock(protein, ligand, center=None, extent=None, babelexe='babel', vinaexe=No
 
     Examples
     --------
-    >>> poses = dock(protein, ligand)
-    >>> poses = dock(protein, ligand, center=[ 10., 5., 12. ], extent=[ 15., 15., 15. ] )
+    >>> poses, scoring = dock(protein, ligand)
+    >>> poses, scoring = dock(protein, ligand, center=[ 10., 5., 12. ], extent=[ 15., 15., 15. ] )
 
     """
     if np.size(protein.coords, 2) != 1 or np.size(ligand.coords, 2) != 1:
@@ -95,16 +99,7 @@ def dock(protein, ligand, center=None, extent=None, babelexe='babel', vinaexe=No
             raise NameError('Could not find babel, or no execute permissions are given')
     except:
         raise NameError('Could not find babel, or no execute permissions are given')
-    #babelexe = path.join(home(), 'bin', 'htmd_babel')
-    #vinaexe = path.join(home(), 'bin', 'htmd_vina')
 
-    #if not os.access(babelexe, os.X_OK):
-    #    raise NameError('Could not find ' + babelexe + ' or no execute permissions are given')
-    #if not os.access(vinaexe, os.X_OK):
-    #    raise NameError('Could not find ' + vinaexe + ' or no execute permissions are given')
-
-    #from IPython.core.debugger import Tracer
-    #Tracer()()
     call([babelexe, '-i', 'pdb', protein_pdb, '-o', 'pdbqt', protein_pdbqt, '-xr'])
     call([babelexe, '-i', 'pdb', ligand_pdb, '-o', 'pdbqt', ligand_pdbqt, '-xhn'])
 
@@ -115,39 +110,29 @@ def dock(protein, ligand, center=None, extent=None, babelexe='babel', vinaexe=No
 
     call([vinaexe, '--receptor', protein_pdbqt, '--ligand', ligand_pdbqt, '--out', output_pdbqt,
           '--center_x', str(center[0]), '--center_y', str(center[1]), '--center_z', str(center[2]),
-          '--size_x', str(extent[0]), '--size_y', str(extent[1]), '--size_z', str(extent[2])])
+          '--size_x', str(extent[0]), '--size_y', str(extent[1]), '--size_z', str(extent[2]), '--num_modes', str(numposes)])
 
     call([babelexe, '-m', '-i', 'pdbqt', output_pdbqt, '-o', 'pdb', output_pdb, '-xhn'])
 
-    scoring = np.zeros((0,3))
+    scoring = []
     coords = []
-    idx = 1
-    name = '{}{}.pdb'.format(output_prefix, idx)
-    while path.isfile(name):
+    outfiles = natsorted(glob('{}*.pdb'.format(output_prefix)))
+    for outf in outfiles:
         # First get the scoring
-        kcal = float(check_output('grep "VINA RESULT" ' + name + ' | awk \'{print $4}\'', shell=True).decode('ascii').strip())
-        rmsdlb = float(check_output('grep "VINA RESULT" ' + name + ' | awk \'{print $5}\'', shell=True).decode('ascii').strip())
-        rmsdub = float(check_output('grep "VINA RESULT" ' + name + ' | awk \'{print $6}\'', shell=True).decode('ascii').strip())
-        scoring = np.append(scoring, np.array([[float(kcal), float(rmsdlb), float(rmsdub)]]), axis=0)
-        next_pose = Molecule(name)
-        os.remove(name)
+        scoring.append(_parseScoring(outf))
+        next_pose = Molecule(outf)
+        os.remove(outf)
         c = next_pose.coords
         co = c.copy()
         natoms = len(ligand.name)
 
+        # Order atoms back to original order
         for idx_i in range(natoms):
             for idx_j in range(natoms):
                 if ligand.name[idx_i] == next_pose.name[idx_j]:
                     co[idx_i, :, :] = c[idx_j, :, :]
 
-        '''if idx == 1:
-            coords = co
-        else:
-            coords = np.append(coords, co, axis=2)'''
         coords.append(co)
-
-        idx += 1
-        name = '{}{}.pdb'.format(output_prefix, idx)
 
     poses = []
     for i, c in enumerate(coords):
@@ -162,7 +147,22 @@ def dock(protein, ligand, center=None, extent=None, babelexe='babel', vinaexe=No
     os.remove(ligand_pdbqt)
     os.remove(output_pdbqt)
 
-    return poses, scoring
+    return poses, np.array(scoring)
+
+
+def _parseScoring(outf):
+    kcal = rmsdlb = rmsdub = None
+    with open(outf, 'r') as f:
+        for line in f:
+            if line.startswith('REMARK VINA RESULT:'):
+                pieces = line.split()
+                kcal = float(pieces[3])
+                rmsdlb = float(pieces[4])
+                rmsdub = float(pieces[5])
+                break
+    if kcal is None or rmsdlb is None or rmsdub is None:
+        raise RuntimeError('Could not parse vina output correctly {}'.format(outf))
+    return kcal, rmsdlb, rmsdub
 
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule

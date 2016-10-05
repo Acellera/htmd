@@ -108,6 +108,8 @@ class AdaptiveGoal(AdaptiveBase):
                           'This function will be used to convert the goal-projected simulation data to a ranking which'
                           'can be used for the directed component of FAST.', None)
         self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component.', 1, TYPE_FLOAT, RANGE_ANY)
+        self._cmdString('truncation', 'str', 'Method for truncating the prob distribution (None, \'cumsum\', '
+                                             '\'statecut\'', None)
         self._cmdString('statetype', 'str', 'What states (cluster, micro, macro) to use for calculations.', 'micro')
         self._cmdValue('macronum', 'int', 'The number of macrostates to produce', 8, TYPE_INT, RANGE_POS)
         self._cmdValue('skip', 'int',
@@ -168,6 +170,8 @@ class AdaptiveGoal(AdaptiveBase):
 
         uc = self._featScale(uc)
         dc = self._featScale(dc)
+        logger.debug('Undirected component: {}'.format(uc))
+        logger.debug('Directed component: {}'.format(dc))
 
         reward = dc + self.ucscale * uc
 
@@ -182,17 +186,22 @@ class AdaptiveGoal(AdaptiveBase):
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=(data.K < 10))
-        logger.debug('relFrames {}'.format(relFrames))
         return relFrames
 
-    def _spawn(self, ranking, N, truncated=False):
-        if truncated:
-            idx = np.argsort(ranking)
-            idx = idx[::-1]  # decreasing sort
-            errs = ranking[idx]
-            H = (N * errs / np.cumsum(errs)) < 1
-            ranking[idx[H]] = 0
+    def _spawn(self, ranking, N):
+        if self.truncation is not None and self.truncation.lower() != 'none':
+            if self.truncation == 'cumsum':
+                idx = np.argsort(ranking)
+                idx = idx[::-1]  # decreasing sort
+                errs = ranking[idx]
+                H = (N * errs / np.cumsum(errs)) < 1
+                ranking[idx[H]] = 0
+            if self.truncation == 'statecut':
+                idx = np.argsort(ranking)
+                idx = idx[::-1]  # decreasing sort
+                ranking[idx[N:]] = 0  # Set all states ranked > N to zero.
         prob = ranking / np.sum(ranking)
+        logger.debug('Sampling probabilities {}'.format(prob))
         spawnmicro = np.random.multinomial(N, prob)
         return spawnmicro, prob
 
