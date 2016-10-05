@@ -88,9 +88,8 @@ class Molecule:
         Atom types, valid only if PSF read and molecule unmodified
 
     """
-    _pdb_fields = ['record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion', 'coords',
-                   'occupancy', 'beta', 'segid', 'element', 'charge']
-    _append_fields = _pdb_fields + ['masses']
+    _atom_fields = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion', 'coords',
+                   'occupancy', 'beta', 'segid', 'element', 'charge', 'masses', 'atomtype')
 
     _dtypes = {
         'record': object,
@@ -126,7 +125,7 @@ class Molecule:
         'chain': (0,),
         'resid': (0,),
         'insertion': (0,),
-        'coords': (0, 3, 0),
+        'coords': (0, 3, 1),
         'occupancy': (0,),
         'beta': (0,),
         'segid': (0,),
@@ -168,7 +167,14 @@ class Molecule:
     def _empty(numAtoms, field):
         dims = list(Molecule._dims[field])
         dims[0] = numAtoms
-        return np.empty(dims, dtype=Molecule._dtypes[field])
+        data = np.zeros(dims, dtype=Molecule._dtypes[field])
+        if Molecule._dtypes[field] is object:
+            data[:] = ''
+        if field == 'record':
+            data[:] = 'ATOM'
+        if field == 'serial':
+            data = np.arange(1, numAtoms + 1)
+        return data
 
     @property
     def frame(self):
@@ -243,7 +249,7 @@ class Molecule:
                 else:
                     self.bonds = newbonds
 
-            for k in self._append_fields:
+            for k in self._atom_fields:
                 if k == 'serial':
                     continue
                 data2 = mol.__dict__[k]
@@ -279,7 +285,7 @@ class Molecule:
         """
         sel = self.atomselect(selection, indexes=True)
         self._removeBonds(sel)
-        for k in self._append_fields:
+        for k in self._atom_fields:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
             if k == 'coords':
                 self.__dict__[k] = np.atleast_3d(self.__dict__[k])
@@ -312,7 +318,7 @@ class Molecule:
 
 
         """
-        if field != 'index' and field not in self._pdb_fields:
+        if field != 'index' and field not in self._atom_fields:
             raise NameError("Invalid field '" + field + "'")
         s = self.atomselect(sel)
         if field == 'coords':
@@ -340,7 +346,7 @@ class Molecule:
         >>> mol=tryp.copy()
         >>> mol.set('segid', 'P', sel='protein')
         """
-        if field not in self._pdb_fields:
+        if field not in self._atom_fields:
             raise NameError("Invalid field '" + field + "'")
         s = self.atomselect(sel)
         if field == 'coords':
@@ -677,10 +683,10 @@ class Molecule:
 
         if type == "psf" or ext == "psf":
             topo = PSFread(filename)
-            self._readTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite)
         elif type == "prm" or ext == "prm" or type == "prmtop" or ext == "prmtop":
             topo = PRMTOPread(filename)
-            self._readTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite)
         elif type == "pdb" or ext == "pdb":
             self._readPDB(filename, overwrite=overwrite)
         elif type == "pdbqt" or ext == "pdbqt":
@@ -696,25 +702,25 @@ class Molecule:
             self._readPDB(filename)
         elif type == "xyz" or ext == "xyz":
             topo, coords = XYZread(filename)
-            self._readTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "gjf" or ext == "gjf":
             topo, coords = GJFread(filename)
-            self._readTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "mae" or ext == "mae":
             topo, coords = MAEread(filename)
-            self._readTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "mol2" or ext == "mol2":
             topo, coords = MOL2read(filename)
-            self._readTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "crd" or ext == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
         elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
             topo, coords = MDTRAJTOPOread(filename)
-            self._readTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type in _MDTRAJ_EXTS or ext in _MDTRAJ_EXTS:
             self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
@@ -745,7 +751,7 @@ class Molecule:
             raise NameError('File {} not found'.format(filename))
 
         topo, coords = PDBread(filepath, mode=mode)
-        self._readTopology(topo, filepath, overwrite=overwrite)
+        self._parseTopology(topo, filepath, overwrite=overwrite)
         self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         if tempfile:
             os.unlink(filepath)
@@ -755,14 +761,14 @@ class Molecule:
         if self.charge is None or len(self.charge) == 0:
             self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
 
-        for pf in self._pdb_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
-            if self._dtypes[pf] == object:
+        for pf in self._atom_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
+            if self._dtypes[pf] == object and len(self.__dict__[pf]) != 0:
                 for i in range(self.numAtoms):
                     self.__dict__[pf][i] = str(self.__dict__[pf][i])
 
         self.fileloc.append([filename, 0])
 
-    def _readTopology(self, topo, filename, overwrite='all'):
+    def _parseTopology(self, topo, filename, overwrite='all'):
         if isinstance(overwrite, str):
             overwrite = (overwrite, )
 
@@ -783,6 +789,8 @@ class Molecule:
         for field in topo.__dict__:
             newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
             if len(newfielddata) == 0:
+                if field in Molecule._atom_fields:
+                    self.__dict__[field] = self._empty(natoms, field)
                 continue
             if overwrite[0] == 'all' or field in overwrite or len(self.__dict__[field]) == 0:
                 self.__dict__[field] = newfielddata
@@ -1113,24 +1121,9 @@ class Molecule:
         >>> newmol = Molecule()
         >>> newmol.empty(100)
         """
-        self.record = np.array(['ATOM'] * numAtoms, dtype=self._dtypes['record'])
-        self.chain = np.array([''] * numAtoms, dtype=self._dtypes['chain'])
-        self.segid = np.array([''] * numAtoms, dtype=self._dtypes['segid'])
-        self.occupancy = np.array([0] * numAtoms, dtype=self._dtypes['occupancy'])
-        self.beta = np.array([0] * numAtoms, dtype=self._dtypes['beta'])
-        self.insertion = np.array([''] * numAtoms, dtype=self._dtypes['insertion'])
-        self.element = np.array([''] * numAtoms, dtype=self._dtypes['element'])
-        self.altloc = np.array([''] * numAtoms, dtype=self._dtypes['altloc'])
-        self.name = np.array([''] * numAtoms, dtype=self._dtypes['name'])
-        self.resname = np.array([''] * numAtoms, dtype=self._dtypes['resname'])
-        self.resid = np.array([0] * numAtoms, dtype=self._dtypes['resid'])
-        self.coords = np.zeros((numAtoms, 3, 1), dtype=self._dtypes['coords'])
-        self.charge = np.array([0] * numAtoms, dtype=self._dtypes['charge'])
-        self.serial = np.arange(1, numAtoms + 1)
-
-        self.masses = np.array([0] * numAtoms, dtype=self._dtypes['masses'])
+        for field in Molecule._atom_fields:
+            self.__dict__[field] = self._empty(numAtoms, field)
         self.box = np.zeros(self._dims['box'], dtype=np.float32)
-
 
     def sequence(self, oneletter=True):
         """ Return the AA sequence of the Molecule.
@@ -1274,10 +1267,10 @@ class Molecule:
             return rep
 
         rep = 'Molecule with ' + str(self.numAtoms) + ' atoms and ' + str(self.numFrames) + ' frames'
-        for p in sorted(self._pdb_fields):
+        for p in sorted(self._atom_fields):
             rep += '\n'
-            rep += 'PDB field - ' + formatstr(p, self.__dict__[p])
-        for j in sorted(self.__dict__.keys() - self._pdb_fields):
+            rep += 'Atom field - ' + formatstr(p, self.__dict__[p])
+        for j in sorted(self.__dict__.keys() - list(Molecule._atom_fields)):
             if j[0] == '_':
                 continue
             rep += '\n'
@@ -1288,7 +1281,7 @@ class Molecule:
 
 def mol_equal(mol1, mol2):
     difffields = []
-    for field in Molecule._append_fields:
+    for field in Molecule._atom_fields:
         if not np.array_equal(mol1.__dict__[field], mol2.__dict__[field]):
             difffields += [field]
 

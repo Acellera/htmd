@@ -155,8 +155,7 @@ class MetricDistance(Projection):
             elif groupsel == 'all':
                 sel = self._processMultiSelections(mol, [sel])
             elif groupsel == 'residue':
-                selCell = self._groupByResidue(mol, sel)
-                sel = self._processMultiSelections(mol, selCell)
+                sel = self._groupByResidue(mol, sel)
             else:
                 raise NameError('Invalid groupsel argument')
         else:  # If user passes his own sets of groups
@@ -167,16 +166,20 @@ class MetricDistance(Projection):
         return sel
 
     def _processMultiSelections(self, mol, sel):
-        newsel = np.zeros((len(sel), mol.numAtoms), dtype=object)
+        newsel = np.zeros((len(sel), mol.numAtoms), dtype=bool)
         for s in range(len(sel)):
             newsel[s, :] = mol.atomselect(sel[s])
         return newsel
 
     def _groupByResidue(self, mol, sel):
-        res = np.unique(mol.get('resid', sel=sel))
-        newsel = np.empty(len(res), dtype=object)
-        for i in range(len(res)):
-            newsel[i] = 'resid ' + str(res[i]) + ' and noh'
+        import pandas as pd
+        idx = mol.atomselect(sel, indexes=True)
+        df = pd.DataFrame({'a': mol.resid[idx]})
+        gg = df.groupby(by=df.a).groups  # Grouping by same resids
+
+        newsel = np.zeros((len(gg), mol.numAtoms), dtype=bool)
+        for i, res in enumerate(sorted(gg)):
+            newsel[i, idx[gg[res]]] = True  # Setting the selected indexes to True which correspond to the same residue
         return newsel
 
 
@@ -275,7 +278,7 @@ if __name__ == "__main__":
                            25.09490013,  24.58997917,  20.71271324], dtype=np.float32)
     assert np.all(np.abs(data[-1, -20:-1] - lastdists) < 0.001), 'Distance calculation is broken'
 
-    metr = MetricDistance('protein and name CA', 'resname MOL and noh', groupsel1='residue', groupsel2='all')
+    metr = MetricDistance('protein and noh', 'resname MOL and noh', groupsel1='residue', groupsel2='all')
     data = metr.project(mol)
     lastdists = np.array([28.99010277,  30.08285904,  32.75860214,  32.42934036,
                           33.58397293,  32.05215073,  32.83199692,  31.5758419 ,

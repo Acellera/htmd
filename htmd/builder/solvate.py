@@ -148,23 +148,23 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
     for i in range(nx):
         movex = xmin + i * watsize
         movexmax = movex + watsize
-        xoverlap = 1
+        xoverlap = True
         if movex > maxx or movexmax < minx:
-            xoverlap = 0
+            xoverlap = False
 
         for j in range(ny):
             movey = ymin + j * watsize
             moveymax = movey + watsize
-            yoverlap = 1
+            yoverlap = True
             if movey > maxy or moveymax < miny:
-                yoverlap = 0
+                yoverlap = False
 
             for k in range(nz):
                 movez = zmin + k * watsize
                 movezmax = movez + watsize
-                zoverlap = 1
+                zoverlap = True
                 if movez > maxz or movezmax < minz:
-                    zoverlap = 0
+                    zoverlap = False
 
                 if writemode == 'decimal':
                     segname = '{0}{1:d}'.format(prefix, n)

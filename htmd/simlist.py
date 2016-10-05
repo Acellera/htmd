@@ -71,9 +71,9 @@ class Sim(object):
 
     def __repr__(self):
         if self.parent is None:
-            return 'id = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}'.format(self.simid, self.parent, self.input, self.trajectory, self.molfile)
+            return 'simid = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}'.format(self.simid, self.parent, self.input, self.trajectory, self.molfile)
         else:
-            return 'id = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}'.format(self.simid, self.parent.simid, self.input, self.trajectory, self.molfile)
+            return 'simid = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}'.format(self.simid, self.parent.simid, self.input, self.trajectory, self.molfile)
 
     def __eq__(self, other):
         iseq = True
