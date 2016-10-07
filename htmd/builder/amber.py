@@ -164,8 +164,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
                 mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
                 mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
                 # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
-                mol.remove('name HG and segid {} and resid {}'.format(d.segid1, d.resid1))
-                mol.remove('name HG and segid {} and resid {}'.format(d.segid2, d.resid2))
+                mol.remove('name HG and segid {} and resid {}'.format(d.segid1, d.resid1), _logger=False)
+                mol.remove('name HG and segid {} and resid {}'.format(d.segid2, d.resid2), _logger=False)
 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.info('Writing PDB file for input to tleap.')
@@ -201,6 +201,10 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     if not ionize and len(disulfide) != 0:
         f.write('# Adding disulfide bonds\n')
         for d in disulfide:
+            # Convert to stupid amber residue numbering
+            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
+            uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
+            uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
         f.write('\n')
 
@@ -258,12 +262,12 @@ def _applyProteinCaps(mol, caps):
     # This is the (horrible) way of adding caps in tleap:
     # For now, this is hardwired for ACE and NME
     # 1. Change one of the hydrogens of the N terminal (H[T]?[123]) to the ACE C atom, giving it a new resid
-    # 2. Change the OXT (or OT1) oxygen of the C terminal to the N atom of NME, giving it a new resid
+    # 2. Change one of the oxygens of the C terminal ({O,OT1,OXT}) to the NME N atom, giving it a new resid
     # 3. Reorder to put the new atoms first and last
-    # 4. Remove the lingering hydrogens of the N terminal
+    # 4. Remove the lingering hydrogens of the N terminal and oxygens of the C terminal.
 
     # Define the atoms to be replaced (0 and 1 corresponds to N- and C-terminal caps)
-    terminalatoms = {'ACE': 'H1 H2 H3 HT1 HT2 HT3', 'NME': 'OXT OT1'}  # XPLOR names for H[123] and OXT are HT[123] and OT1, respectively.
+    terminalatoms = {'ACE': 'H1 H2 H3 HT1 HT2 HT3', 'NME': 'OXT OT1 O'}  # XPLOR names for H[123] and OXT are HT[123] and OT1, respectively.
     capresname = ['ACE', 'NME']
     capatomtype = ['C', 'N']
 
@@ -311,7 +315,7 @@ def _applyProteinCaps(mol, caps):
                     'building.'.format(seg, terminalresids[i], terminalatoms[cap]))
 
             # Select atom to change, do changes to cap, and change resid
-            atomtomod = np.min(termatomsids)
+            atomtomod = np.max(termatomsids)
             mol.set('resname', cap, sel=atomtomod)
             mol.set('name', capatomtype[i], sel=atomtomod)
             mol.set('resid', terminalresids[i]-1+2*i, sel=atomtomod)  # if i=0 => resid-1; i=1 => resid+1
@@ -322,8 +326,10 @@ def _applyProteinCaps(mol, caps):
             neworder[terminalids[i]] = atomtomod
             _reorderMol(mol, neworder)
 
-        # Remove lingering hydrogens in N- terminal (i = 0)
-        mol.remove('segid {} and resid "{}" and name {}'.format(seg, terminalresids[0], terminalatoms[0]))
+        # For each cap
+        for i, cap in enumerate(caps[seg]):
+            # Remove lingering hydrogens or oxygens in terminals
+            mol.remove('segid {} and resid "{}" and name {}'.format(seg, terminalresids[i], terminalatoms[cap]), _logger=False)
 
 def _defaultProteinCaps(mol):
     # Defines ACE and NME (neutral terminals) as default for protein segments
