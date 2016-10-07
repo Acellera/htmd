@@ -301,7 +301,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
-def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
+def autoSegment2(mol, sel='protein or name ACE NME', basename='P', fields=('segid')):
     """ Detects bonded segments in a selection and assigns incrementing segid to each segment
 
     Parameters
@@ -330,7 +330,7 @@ def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
     if isinstance(fields, str):
         fields = (fields,)
 
-    sel += ' and backbone'  # Looking for bonds only over the backbone of the protein
+    sel += ' and backbone or (resname NME ACE and name N C O CH3)'  # Looking for bonds only over the backbone of the protein
     idx = mol.atomselect(sel, indexes=True)  # Keep the original atom indexes to map from submol to mol
     submol = mol.copy()  # We filter out everything not on the backbone to calculate only those bonds
     submol.filter(sel, _logger=False)
