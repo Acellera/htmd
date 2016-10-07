@@ -222,7 +222,7 @@ class Model(object):
     def _defaultLags(self):
         return self.data._defaultLags()
 
-    def sampleStates(self, states, frames, statetype='micro', replacement=False, samplemode='random', allframes=False):
+    def sampleStates(self, states, frames, statetype='macro', replacement=False, samplemode='random', allframes=False):
         """ Samples frames from a set of states
 
         Parameters

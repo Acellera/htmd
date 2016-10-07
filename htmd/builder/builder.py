@@ -385,8 +385,18 @@ def removeHET(prot):
     return prot
 
 
-def tileMembrane(memb, xmin, ymin, xmax, ymax):
-    """ Tile the membrane in the X and Y dimensions to reach a specific size.
+def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
+    """ Tile a membrane in the X and Y dimensions to reach a specific size.
+
+    Parameters
+    ----------
+    memb
+    xmin
+    ymin
+    xmax
+    ymax
+    buffer
+
     Returns
     -------
     megamemb :
@@ -412,18 +422,20 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax):
     for x in range(xreps):
         for y in range(yreps):
             tmpmemb = memb.copy()
-            xpos = xmin + x * size[0]
-            ypos = ymin + y * size[1]
+            xpos = xmin + x * (size[0] + buffer)
+            ypos = ymin + y * (size[1] + buffer)
 
             tmpmemb.moveBy([-float(minmemb[0]) + xpos, -float(minmemb[1]) + ypos, 0])
-            sel = 'same resid as (x > {} or y > {})'.format(xmax, ymax)
-            tmpmemb.remove(sel, _logger=False)
+            tmpmemb.remove('same resid as (x > {} or y > {})'.format(xmax, ymax), _logger=False)
             tmpmemb.set('segid', 'M{}'.format(k))
 
             megamemb.append(tmpmemb)
             k += 1
             bar.progress()
     bar.stop()
+    # Membranes don't tile perfectly. Need to remove waters that clash with lipids of other tiles
+    # Some clashes will still occur between periodic images however
+    megamemb.remove('same fragment as water and within 1.5 of not water', _logger=False)
     return megamemb
 
 
