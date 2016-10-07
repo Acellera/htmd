@@ -150,6 +150,68 @@ def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
 
 
+def findBreaks(mol, sel='all', spatialgap=4.0):
+    """Return a list of breaks in the given sequence.
+
+     Returns a list arranged as follows [ [ res1 res2 distance nmiss ] ... ], where
+
+      * res1 and res2 are dictionaries with keys {resid, chain, insertion},
+      * distance is the gap between Cα atoms in Å
+      * nmiss is the number of missing residues.
+
+    Gaps are only reported within the same chain.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The Molecule object
+    sel : str
+        Atom selection on which to check for gaps.
+    spatialgap : float
+        The size of a spatial gap between CAs which validates a discontinuity (Å)
+
+    Returns
+    -------
+    breaklist : list
+        A list arranged as follows [ [ res1 res2 distance nmiss ] ... ] (see description)
+    """
+
+    selCA = np.bitwise_and(mol.atomselect(sel), mol.atomselect("name CA") )
+    xyz = mol.get('coords', selCA)
+    Dxyz = np.diff(xyz, axis=0)
+    dxyz = np.sqrt(np.sum(Dxyz*Dxyz,axis=1))
+
+    breaks = dxyz > spatialgap
+    breaks1 = np.append(breaks, False)    # So same length as selCA
+    breaks2 = np.insert(breaks, 0, False)
+
+    dxyz_ = dxyz[breaks]
+
+    nm = mol.copy()
+    nm.filter(selCA, _logger=False)
+
+    breaklist = []
+    for r1, i1, c1, rn1,  r2, i2, c2, rn2,  d in zip(
+            nm.get("resid", breaks1), nm.get("insertion", breaks1), nm.get("chain", breaks1), nm.get("resname", breaks1),
+            nm.get("resid", breaks2), nm.get("insertion", breaks2), nm.get("chain", breaks2), nm.get("resname", breaks2),
+            dxyz_ ):
+        if c1 == c2:
+            dr1 = dict(resid= r1, chain=c1, insertion=i1)
+            dr2 = dict(resid= r2, chain=c2, insertion=i2)
+            nmiss = r2 - r1 - 1
+            breaklist.append([dr1, dr2, d, nmiss])
+            logger.info("Missing {:2d} residues ({:5.2f} Å) at {:s} {:d}{:s} {:s} - {:s} {:d}{:s} {:s} ".format(
+                    nmiss, d,
+                    rn1, r1, i1, c1,
+                    rn2, r2, i2, c2
+                ))
+
+    return breaklist
+
+
+
+
+
 def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, field="segid"):
     """ Detects resid gaps in a selection and assigns incrementing segid to each fragment
 
@@ -239,7 +301,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
-def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
+def autoSegment2(mol, sel='protein or name ACE NME', basename='P', fields=('segid')):
     """ Detects bonded segments in a selection and assigns incrementing segid to each segment
 
     Parameters
@@ -268,7 +330,7 @@ def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
     if isinstance(fields, str):
         fields = (fields,)
 
-    sel += ' and backbone'  # Looking for bonds only over the backbone of the protein
+    sel += ' and backbone or (resname NME ACE and name N C O CH3)'  # Looking for bonds only over the backbone of the protein
     idx = mol.atomselect(sel, indexes=True)  # Keep the original atom indexes to map from submol to mol
     submol = mol.copy()  # We filter out everything not on the backbone to calculate only those bonds
     submol.filter(sel, _logger=False)
@@ -299,10 +361,13 @@ def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
 
         # Add the new segment ID to all fields the user specified
         for f in fields:
-            if np.any(mol.__dict__[f] == segid):
-                raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
-            mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
-
+            if f != 'chain':
+                if np.any(mol.__dict__[f] == segid):
+                    raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
+                mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
+            else:
+                base62 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+                mol.__dict__[f][segres] = base62[i % 62]
         logger.info('Created segment {} between resid {} and {}.'.format(segid, np.min(mol.resid[segres]),
                                                                          np.max(mol.resid[segres])))
         prevsegres = segres  # Store old segment atom indexes for the warning about continuous resids

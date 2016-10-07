@@ -1,4 +1,3 @@
-%VERSION  VERSION_STAMP = V0001.000  DATE = 10/07/16  22:48:18                  
 %FLAG TITLE                                                                     
 %FORMAT(20a4)                                                                   
 default_name                                                                    
