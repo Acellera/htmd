@@ -70,6 +70,10 @@ class Molecule:
     PDB field - beta shape: (1701,)
     ...
 
+    .. currentmodule:: htmd.molecule.molecule.Molecule
+    .. autoautosummary:: htmd.molecule.molecule
+        :methods:
+
     .. rubric:: Methods
 
     .. autoautosummary:: htmd.molecule.molecule.Molecule
@@ -80,7 +84,8 @@ class Molecule:
     .. autoautosummary:: htmd.molecule.molecule.Molecule
         :attributes:
 
-    Other Fields
+    Other Attributes:
+    -----------------
 
     box : np.ndarray
         Box dimensions of the simulation.
