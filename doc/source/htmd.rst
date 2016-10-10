@@ -9,6 +9,7 @@ Subpackages
     htmd.adaptive
     htmd.apps
     htmd.builder
+    htmd.clustering
     htmd.molecule
     htmd.parameterization
     htmd.progress

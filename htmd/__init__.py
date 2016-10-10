@@ -45,6 +45,8 @@ from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.util import tempname
 from htmd.config import config
+from htmd.clustering.kcenters import KCenter
+from htmd.clustering.regular import RegCluster
 import logging.config
 import htmd
 

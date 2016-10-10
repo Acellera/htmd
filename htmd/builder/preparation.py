@@ -72,26 +72,30 @@ def proteinPrepare(mol_in,
 
     The following residue names are used in the returned molecule:
 
-        ASH 	Neutral ASP
-        CYX 	SS-bonded CYS
-        CYM 	Negative CYS
-        GLH 	Neutral GLU
-        HIP 	Positive HIS
-        HID 	Neutral HIS, proton HD1 present
-        HIE 	Neutral HIS, proton HE2 present
-        LYN 	Neutral LYS
-        TYM 	Negative TYR
-        AR0     Neutral ARG
+    === ===============================
+    ASH Neutral ASP
+    CYX SS-bonded CYS
+    CYM Negative CYS
+    GLH Neutral GLU
+    HIP Positive HIS
+    HID Neutral HIS, proton HD1 present
+    HIE Neutral HIS, proton HE2 present
+    LYN Neutral LYS
+    TYM Negative TYR
+    AR0 Neutral ARG
+    === ===============================
 
-    Charge +1    |  Neutral   | Charge -1
-    -------------|------------|----------
-     -           |  ASH       | ASP
-     -           |  CYS       | CYM
-     -           |  GLH       | GLU
-    HIP          |  HID/HIE   |  -
-    LYS          |  LYN       |  -
-     -           |  TYR       | TYM
-    ARG          |  AR0       |  -
+    ========= ======= =========
+    Charge +1 Neutral Charge -1
+    ========= ======= =========
+    -         ASH     ASP
+    -         CYS     CYM
+    -         GLH     GLU
+    HIP       HID/HIE -
+    LYS       LYN     -
+    -         TYR     TYM
+    ARG       AR0     -
+    ========= ======= =========
 
     A detailed table about the residues modified is returned (as a second return value) when
     returnDetails is True (see ResidueData object).
@@ -107,9 +111,7 @@ def proteinPrepare(mol_in,
     -----
     In case of problems, exclude water and other dummy atoms.
 
-
-    Features
-    --------
+    Features:
      - assign protonation states via propKa
      - flip residues to optimize H-bonding network
      - debump collisions
@@ -203,14 +205,13 @@ def proteinPrepare(mol_in,
     >>> imo,imd=proteinPrepare(im,returnDetails=True)
     >>> imd.data.to_excel("/tmp/imatinib_report.xlsx")
 
-
     See Also
     --------
-    The ResidueData object.
+    :class:`htmd.builder.residuedata.ResidueData`
 
-
-    Unsupported/To Do/To Check
-    --------------------------
+    Notes
+    -----
+    Unsupported/To Do/To Check:
      - ligands
      - termini
      - force residues
@@ -218,7 +219,6 @@ def proteinPrepare(mol_in,
      - nucleic acids
      - coupled titrating residues
      - Disulfide bridge detection (implemented but unused)
-
     """
 
     oldLoggingLevel = logger.level

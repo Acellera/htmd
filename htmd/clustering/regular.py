@@ -26,15 +26,15 @@ class RegCluster:
     >>> cluster = RegCluster(radius=5.1)
     >>> cluster.fit(data)
 
-    Properties
+    Attributes
     ----------
-    cluster_centers: list
+    cluster_centers:  list
         list with the points, which are the centers of the clusters
-    centerFrames: list
+    centerFrames : list
         list of indices of center points in data array
-    labels_: list
+    labels_ : list
         list with number of cluster of each frame
-    clusterSize_: list
+    clusterSize_ : list
         list with number of frames in each cluster
     """
     def __init__(self, radius=None, n_clusters=None):

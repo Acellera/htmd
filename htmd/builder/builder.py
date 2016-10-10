@@ -118,7 +118,8 @@ def detectDisulfideBonds(mol, thresh=3):
 
     for sg in idx:
         resid = mol.resid[sg]
-        sel = '(not resid "{0}") and resname "CY.*" and name SG and index > {1} and exwithin {2} of index {3}'.format(resid, sg, thresh, sg)
+        segid = mol.segid[sg]
+        sel = '(not resid "{0}" or not segid "{1}") and resname "CY.*" and name SG and index > {2} and exwithin {3} of index {2}'.format(resid, segid, sg, thresh)
         idx2 = np.where(mol.atomselect(sel))[0]
 
         if len(idx2) == 0:
@@ -238,7 +239,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
-def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
+def autoSegment2(mol, sel='protein or name ACE NME', basename='P', fields=('segid')):
     """ Detects bonded segments in a selection and assigns incrementing segid to each segment
 
     Parameters
@@ -267,7 +268,7 @@ def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
     if isinstance(fields, str):
         fields = (fields,)
 
-    sel += ' and backbone'  # Looking for bonds only over the backbone of the protein
+    sel += ' and backbone or (resname NME ACE and name N C O CH3)'  # Looking for bonds only over the backbone of the protein
     idx = mol.atomselect(sel, indexes=True)  # Keep the original atom indexes to map from submol to mol
     submol = mol.copy()  # We filter out everything not on the backbone to calculate only those bonds
     submol.filter(sel, _logger=False)
@@ -298,10 +299,13 @@ def autoSegment2(mol, sel='protein', basename='P', fields=('segid')):
 
         # Add the new segment ID to all fields the user specified
         for f in fields:
-            if np.any(mol.__dict__[f] == segid):
-                raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
-            mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
-
+            if f != 'chain':
+                if np.any(mol.__dict__[f] == segid):
+                    raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
+                mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
+            else:
+                base62 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+                mol.__dict__[f][segres] = base62[i % 62]
         logger.info('Created segment {} between resid {} and {}.'.format(segid, np.min(mol.resid[segres]),
                                                                          np.max(mol.resid[segres])))
         prevsegres = segres  # Store old segment atom indexes for the warning about continuous resids
@@ -384,8 +388,18 @@ def removeHET(prot):
     return prot
 
 
-def tileMembrane(memb, xmin, ymin, xmax, ymax):
-    """ Tile the membrane in the X and Y dimensions to reach a specific size.
+def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
+    """ Tile a membrane in the X and Y dimensions to reach a specific size.
+
+    Parameters
+    ----------
+    memb
+    xmin
+    ymin
+    xmax
+    ymax
+    buffer
+
     Returns
     -------
     megamemb :
@@ -411,18 +425,20 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax):
     for x in range(xreps):
         for y in range(yreps):
             tmpmemb = memb.copy()
-            xpos = xmin + x * size[0]
-            ypos = ymin + y * size[1]
+            xpos = xmin + x * (size[0] + buffer)
+            ypos = ymin + y * (size[1] + buffer)
 
             tmpmemb.moveBy([-float(minmemb[0]) + xpos, -float(minmemb[1]) + ypos, 0])
-            sel = 'same resid as (x > {} or y > {})'.format(xmax, ymax)
-            tmpmemb.remove(sel, _logger=False)
+            tmpmemb.remove('same resid as (x > {} or y > {})'.format(xmax, ymax), _logger=False)
             tmpmemb.set('segid', 'M{}'.format(k))
 
             megamemb.append(tmpmemb)
             k += 1
             bar.progress()
     bar.stop()
+    # Membranes don't tile perfectly. Need to remove waters that clash with lipids of other tiles
+    # Some clashes will still occur between periodic images however
+    megamemb.remove('same fragment as water and within 1.5 of not water', _logger=False)
     return megamemb
 
 

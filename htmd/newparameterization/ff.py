@@ -54,7 +54,7 @@ class PRM:
    skip=0
    for l in lines:
      l = l.strip()
-     l = re.sub( "/!.*$//", "", l ) # Remove any comment
+     l = re.sub( "!.*$", "", l ) # Remove any comment
      
      if   l ==  "BONDS"    : 
        mode="BONDS"
@@ -82,7 +82,7 @@ class PRM:
          if(len(ll)<=5):
            self.angles.append( AnglePrm([ ll[0], ll[1], ll[2] ], theta0=float(ll[4]), k0=float(ll[3]) ) )
          else:
-           self.angles.append( AnglePrm([ ll[0], ll[1], ll[2] ], theta0=float(ll[4]), k0=float(ll[3]), rB=float(ll[6]), kB=float(ll[5]) ) )
+           self.angles.append( AnglePrm([ ll[0], ll[1], ll[2] ], theta0=float(ll[4]), k0=float(ll[3]), rUB=float(ll[6]), kUB=float(ll[5]) ) )
 
        elif mode.startswith( "DIHEDRALS" ):
          self.dihedrals.append( TorsPrm( [ ll[0], ll[1], ll[2], ll[3] ] , n=int(ll[5]), k0=float(ll[4]),  phi0=float(ll[6]) ) ) 

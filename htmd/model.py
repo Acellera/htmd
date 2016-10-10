@@ -143,7 +143,7 @@ class Model(object):
 
         Returns
         -------
-        If given `results`=True this method will return the following data
+        If given results=True this method will return the following data
         its : np.ndarray
             The calculated implied timescales. 2D array with dimensions (len(`lags`), `nits`)
         lags : np.ndarray
@@ -222,7 +222,7 @@ class Model(object):
     def _defaultLags(self):
         return self.data._defaultLags()
 
-    def sampleStates(self, states, frames, statetype='micro', replacement=False, samplemode='random', allframes=False):
+    def sampleStates(self, states, frames, statetype='macro', replacement=False, samplemode='random', allframes=False):
         """ Samples frames from a set of states
 
         Parameters
