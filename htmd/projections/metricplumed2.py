@@ -72,13 +72,13 @@ class PlumedCV(PlumedStatement):
 
     The arguments, optional and mandatory, are passed as python named parameters. The argument
     values can be of type (see examples):
-        string or int   - passed as they are
-        bool            - the keyword is enabled, with no value (eg: PBC=True becomes PBC)
-        PlumedGroups    - passed by label, prepended to the CV definition
-        PlumedCOM       - passed by label, prepended to the CV definition
-        Molecule        - converted into a PlumedGroup
-        list containing any of the above
-                        - each element is converted as above, then they are listed separated by comma
+
+     - string or int   (passed as they are)
+     - bool            (the keyword is enabled, with no value (eg: PBC=True becomes PBC))
+     - PlumedGroups    (passed by label, prepended to the CV definition)
+     - PlumedCOM       (passed by label, prepended to the CV definition)
+     - Molecule        (converted into a PlumedGroup)
+     - list containing any of the above (each element is converted as above, then they are listed separated by comma)
 
     Parameters
     ----------

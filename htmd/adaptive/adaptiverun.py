@@ -63,7 +63,7 @@ class AdaptiveMD(AdaptiveBase):
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
         The lagtime used to create the Markov model
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.MiniBatchKMeans'>
         Clustering algorithm used to cluster the contacts or distances
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from

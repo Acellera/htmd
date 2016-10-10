@@ -143,7 +143,7 @@ class Model(object):
 
         Returns
         -------
-        If given `results`=True this method will return the following data
+        If given results=True this method will return the following data
         its : np.ndarray
             The calculated implied timescales. 2D array with dimensions (len(`lags`), `nits`)
         lags : np.ndarray

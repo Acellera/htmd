@@ -1,5 +1,5 @@
 ACEMD molecular dynamics
-==========
+========================
 
 .. toctree::
       :maxdepth: 2

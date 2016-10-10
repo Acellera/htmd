@@ -45,40 +45,20 @@ class ResidueData:
     Name: patches, dtype: object
     >>> ri.data.to_csv("/tmp/report.csv")
 
-    Properties
+    Attributes
     ----------
-    .data
-        A pandas DataFrame with these columns
-        resname : str
-            Residue name, as per the original PDB
-        resid : int
-            Residue ID
-        insertion : str
-            Insertion code (resid suffix)
-        chain : str
-            Chain
-        pKa : float
-            pKa value computed by propKa
-        protonation : str
-            Forcefield-independent protonation code
-        flipped : bool
-            Whether the residue was flipped during the optimization
-        buried : float
-            Fraction of residue which is buried
-        membraneExposed: bool
-            Whether residue is exposed to membrane
-        patches : str[]
-            Additional information (may change)
-        (etc)
-
-     .missedLigands : str
-            List of ligands residue names which were not optimized
-
-     .header : str
-            Messages and warnings from PDB2PQR
-
-     .propkaContainer : propka.molecular_container.Molecular_container
-            Detailed information returned by propKa 3.1.
+    data : :class:`DataFrame <pandas.core.frame.DataFrame>` object
+        A pandas DataFrame with these columns: resname "Residue name, as per the original PDB", resid "Residue ID",
+        insertion "Insertion code (resid suffix)", chain "Chain", pKa "pKa value computed by propKa",
+        "protonation" Forcefield-independent protonation code, flipped "Whether the residue was flipped during the
+        optimization", buried "Fraction of residue which is buried", membraneExposed "Whether residue is exposed to
+        membrane", patches "Additional information (may change)" (etc)
+    missedLigands : str
+        List of ligands residue names which were not optimized
+    header : str
+        Messages and warnings from PDB2PQR
+    propkaContainer : propka.molecular_container.Molecular_container
+        Detailed information returned by propKa 3.1.
     """
 
     # Important- all must be listed or "set_value" will silently ignore them
