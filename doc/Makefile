@@ -76,7 +76,7 @@ tutorials: $(RST_FILES)
 
 html: tutorials
 	rm -f source/htmd.*
-	$(SPHINXAPIDOC) --force --separate -o  source ../htmd/
+	$(SPHINXAPIDOC) --force --separate -o  source ../htmd/ >/dev/null
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html"

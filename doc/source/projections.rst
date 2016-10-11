@@ -9,6 +9,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   Metric used to project simulation lists <htmd.projections.metric>
    MetricData used to store all projected data <htmd.metricdata>
    MetricDistance distance based metrics between different atoms <htmd.projections.metricdistance>
    MetricSelfDistance distance based metrics on the same  atoms <htmd.projections.metricdistance>

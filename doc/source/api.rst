@@ -6,7 +6,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   htmd.molecule.molecule 
+   Molecule <htmd.molecule.molecule>
    building
    simlists
    projections

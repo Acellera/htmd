@@ -71,21 +71,15 @@ class Molecule:
     ...
 
     .. currentmodule:: htmd.molecule.molecule.Molecule
-    .. autoautosummary:: htmd.molecule.molecule
-        :methods:
-
     .. rubric:: Methods
-
     .. autoautosummary:: htmd.molecule.molecule.Molecule
         :methods:
-
     .. rubric:: Attributes
-
     .. autoautosummary:: htmd.molecule.molecule.Molecule
         :attributes:
 
-    Other Attributes:
-    -----------------
+    Attributes
+    ----------
 
     box : np.ndarray
         Box dimensions of the simulation.
