@@ -16,7 +16,6 @@ Where to start
 The tutorials are a good place to start playing around. 
 
 .. toctree::
-   :maxdepth: 2
 
    tutorials
    api
