@@ -24,5 +24,6 @@ Contents:
    :maxdepth: 1
 
    The ACEMD MD engine <htmd.acemd>
-   Adaptive sampling <htmd.adaptive> 
+   Applications <htmd.apps>
+   Adaptive sampling <adaptive> 
    State-of-the-art protocols for molecular simulations <htmd.protocols>
