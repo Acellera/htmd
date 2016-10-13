@@ -1,3 +1,6 @@
+============
+ACEMD Manual
+============
 
 Introduction
 ============
