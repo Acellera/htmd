@@ -1104,7 +1104,7 @@ class Molecule:
             coords = np.atleast_3d(src.coords[:, :, self.frame].copy())
             BINCOORwrite(coords, filename)
         elif type == "pdb" or ext == "pdb":
-            PDBwrite(src, filename)
+            PDBwrite(src, filename, self.frame)
         elif type == "mol2" or ext == "mol2":
             MOL2write(src, filename)
         elif type == "xyz" or ext == "xyz":

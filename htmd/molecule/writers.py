@@ -77,7 +77,10 @@ def checkTruncations(mol):
                                                                                                                        f]))
 
 
-def PDBwrite(mol, filename):
+def PDBwrite(mol, filename, frame):
+    if isinstance(frame, int):
+        frame = [frame, ]
+
     def format83(f):
         """Format a single float into a string of width 8, with ideally 3 decimal places of precision. If the number is
         a little too large, we can gracefully degrade the precision by lopping off some of the decimal places. If it's
@@ -98,7 +101,7 @@ def PDBwrite(mol, filename):
                         'in a width-6 field' % f)
 
     checkTruncations(mol)
-    coords = np.atleast_3d(mol.coords[:, :, mol.frame])
+    coords = np.atleast_3d(mol.coords[:, :, frame])
     numFrames = coords.shape[2]
     serial = np.arange(1, np.size(coords, 0) + 1)
 
@@ -110,8 +113,8 @@ def PDBwrite(mol, filename):
         print("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90),
               file=fh)
 
-    for frame in range(numFrames):
-        print("MODEL    %5d" % (frame + 1), file=fh)
+    for f in frame:
+        print("MODEL    %5d" % (f + 1), file=fh)
         for i in range(0, len(mol.record)):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
@@ -127,9 +130,9 @@ def PDBwrite(mol, filename):
                     mol.resname[i], mol.chain[i],
                     mol.resid[i],
                     mol.insertion[i],
-                    format83(mol.coords[i, 0, frame]),
-                    format83(mol.coords[i, 1, frame]),
-                    format83(mol.coords[i, 2, frame]),
+                    format83(mol.coords[i, 0, f]),
+                    format83(mol.coords[i, 1, f]),
+                    format83(mol.coords[i, 2, f]),
                     format62(mol.occupancy[i]),
                     format62(mol.beta[i]),
                     mol.segid[i],
