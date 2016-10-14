@@ -125,7 +125,9 @@ class AdaptiveMD(AdaptiveBase):
 
         if self.ticadim > 0:
             # tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))  # gianni: without project it was tooooo slow
-            tica = TICA(metr.project(), int(max(2, np.ceil(self.ticalag))))
+            data = metr.project()
+            ticalag = int(np.ceil(max(2, min(np.min(data.trajLengths)/2, self.ticalag))))  # 1 < ticalag < (trajLen / 2)
+            tica = TICA(data, ticalag)
             datadr = tica.project(self.ticadim)
         else:
             datadr = metr.project()
@@ -135,7 +137,7 @@ class AdaptiveMD(AdaptiveBase):
         self._model = Model(datadr)
         self._model.markovModel(self.lag, self._numMacrostates(datadr))
         if self.save:
-            self._model.save('adapt_model_e'+str(self._getEpoch())+'.dat')
+            self._model.save('adapt_model_e{}.dat'.format(self._getEpoch()))
 
         relFrames = self._getSpawnFrames(self._model, datadr)
         self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))

@@ -119,7 +119,7 @@ class AdaptiveGoal(AdaptiveBase):
         self._cmdObject('clustmethod', ':class:`ClusterMixin <sklearn.base.ClusterMixin>` object',
                         'Clustering algorithm used to cluster the contacts or distances', MiniBatchKMeans, ClusterMixin)
         self._cmdValue('ticalag', 'int',
-                       'Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.', 20,
+                       'Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.', 20,
                        TYPE_INT, RANGE_0POS)
         self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3,
                        TYPE_INT, RANGE_0POS)
@@ -141,7 +141,9 @@ class AdaptiveGoal(AdaptiveBase):
 
         if self.ticadim > 0:
             # tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))  # gianni: without project it was tooooo slow
-            tica = TICA(metr.project(), int(max(2, np.ceil(self.ticalag))))
+            data = metr.project()
+            ticalag = int(np.ceil(max(2, min(np.min(data.trajLengths)/2, self.ticalag))))  # 1 < ticalag < (trajLen / 2)
+            tica = TICA(data, ticalag)
             datadr = tica.project(self.ticadim)
         else:
             datadr = metr.project()
@@ -152,7 +154,7 @@ class AdaptiveGoal(AdaptiveBase):
         self._model = model
         self._model.markovModel(self.lag, self._numMacrostates(datadr))
         if self.save:
-            self._model.save('adapt_model_e' + str(self._getEpoch()) + '.dat')
+            self._model.save('adapt_model_e{}.dat'.format(self._getEpoch()))
 
         # Undirected component
         uc = -model.data.N  # Lower counts should give higher score hence the -
