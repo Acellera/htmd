@@ -211,6 +211,24 @@ class MetricDihedral(Projection):
         return (res1, 'N'), (res1, 'CA'), (res1, 'C'), (res2, 'N')
 
     @staticmethod
+    def omega(res1, res2):
+        """ Get a set of four resid/atom pairs corresponding to the omega angle of res1 and res2
+
+        Parameters
+        ----------
+        res1 : int
+            The first residue containing the CA C atoms
+        res2 : int
+            The second residue containing the N CA atoms
+
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        return (res1, 'CA'), (res1, 'C'), (res2, 'N'), (res2, 'CA')
+
+    @staticmethod
     def chi1(res, resname):
         """ Get a set of four resid/atom pairs corresponding to the chi1 angle of a residue
 
