@@ -299,7 +299,7 @@ class ProgressBar(BaseProgressBar):
     """Draw a progress bar showing the ETA, percentage, done/total items, and a spinner.
 
     Looks like one of these:
-      8% (  8/100) [##                                  ] eta 00:24 /
+    8% (  8/100) [##                                  ] eta 00:24 /
     100% (100/100) [####################################] eta 00:01 -
     23 [                       ?                        ] eta --:-- |
 
