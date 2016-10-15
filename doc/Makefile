@@ -69,15 +69,14 @@ publish:
 # Rule for building .rst from .ipynb
 $(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
 	mkdir -p $(TUTORIALSDIR)
-	$(IPYTHON) nbconvert $< --to rst --stdout > $@
-	#cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to python
+	$(IPYTHON) nbconvert $< --to rst --output-dir=$(TUTORIALSDIR)/
 
 tutorials: $(RST_FILES)
 
 html: tutorials
 	rm -f source/htmd.*
 	$(SPHINXAPIDOC) --force --separate -o  source ../htmd/ >/dev/null
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	$(SPHINXBUILD) -a -E -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html"
 
