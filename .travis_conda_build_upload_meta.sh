@@ -13,16 +13,18 @@ else
  export META_PACKAGE_NAME=htmd-latest
 fi
 
+export BUGFIX
+export MINOR_VERSION="${MAJOR}.${MINOR}"
+export BUGFIX_VERSION="${MAJOR}.${MINOR}.${BUGFIX}"
+
+conda build --python $TRAVIS_PYTHON_VERSION package/htmd-meta
+
 export CHANNEL=acellera
 echo "Uploading to channel: $CHANNEL ; META_PACKAGE: $META_PACKAGE_NAME (based on $PACKAGE_NAME version $MAJOR.$MINOR.$BUGFIX)"
 
 if [ "$CROSS_COMPILE" == "1" ]; then
-    conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2
-    export pkgtar=$(ls win-64/$PACKAGE_NAME-[0-9]*.tar.bz2)
-    cp -rp $pkgtar ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME}
-    anaconda -t $ANACONDA_TOKEN upload ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME} -u $CHANNEL -p $META_PACKAGE_NAME
+    conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/$META_PACKAGE_NAME-[0-9]*.tar.bz2
+    anaconda -t $ANACONDA_TOKEN upload win-64/$META_PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL -p $META_PACKAGE_NAME
 else
-    export pkgtar=$(ls $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2)
-    cp -rp $pkgtar ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME}
-	anaconda -t $ANACONDA_TOKEN upload ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME} -u $CHANNEL -p $META_PACKAGE_NAME
+	anaconda -t $ANACONDA_TOKEN upload $HOME/miniconda/conda-bld/*-64/$META_PACKAGE_NAME-*.tar.bz2 -u $CHANNEL -p $META_PACKAGE_NAME
 fi
