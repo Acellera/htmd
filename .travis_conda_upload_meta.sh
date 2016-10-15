@@ -18,7 +18,11 @@ echo "Uploading to channel: $CHANNEL ; META_PACKAGE: $META_PACKAGE_NAME (based o
 
 if [ "$CROSS_COMPILE" == "1" ]; then
     conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2
-    anaconda -t $ANACONDA_TOKEN upload win-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL -p $META_PACKAGE_NAME
+    pkgtar = $(ls win-64/$META_PACKAGE_NAME-[0-9]*.tar.bz2)
+    cp -rp $pkgtar ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME}
+    anaconda -t $ANACONDA_TOKEN upload ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME} -u $CHANNEL
 else
-	anaconda -t $ANACONDA_TOKEN upload $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL -p $META_PACKAGE_NAME
+    pkgtar = $(ls $HOME/miniconda/conda-bld/*-64/$META_PACKAGE_NAME-[0-9]*.tar.bz2)
+    cp -rp $pkgtar ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME}
+	anaconda -t $ANACONDA_TOKEN upload ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME} -u $CHANNEL
 fi
