@@ -3,5 +3,5 @@ ACEMD molecular dynamics
 
 .. toctree::
 
-      acemd.usermanual
-      acemd.commandreference
+    acemd.usermanual
+    acemd.commandreference
