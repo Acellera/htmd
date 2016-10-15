@@ -20,9 +20,9 @@ if [ "$CROSS_COMPILE" == "1" ]; then
     conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2
     export pkgtar=$(ls win-64/$PACKAGE_NAME-[0-9]*.tar.bz2)
     cp -rp $pkgtar ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME}
-    anaconda -t $ANACONDA_TOKEN upload ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME} -u $CHANNEL
+    anaconda -t $ANACONDA_TOKEN upload ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME} -u $CHANNEL -p $META_PACKAGE_NAME
 else
     export pkgtar=$(ls $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2)
     cp -rp $pkgtar ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME}
-	anaconda -t $ANACONDA_TOKEN upload ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME} -u $CHANNEL
+	anaconda -t $ANACONDA_TOKEN upload ${pkgtar/$PACKAGE_NAME/$META_PACKAGE_NAME} -u $CHANNEL -p $META_PACKAGE_NAME
 fi
