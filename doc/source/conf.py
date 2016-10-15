@@ -72,7 +72,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'HTMD'
-copyright = date.today().year
+copyright = str(date.today().year)
 author = 'Stefan Doerr'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -173,7 +173,7 @@ html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
-#html_last_updated_fmt = '%b %d, %Y'
+html_last_updated_fmt = '%b %d, %Y'
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
@@ -228,6 +228,9 @@ html_show_sourcelink = False
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'HTMDdoc'
+
+# Suppress "WARNING: nonlocal image URI found" - https://github.com/sphinx-doc/sphinx/issues/2466
+suppress_warnings = ['image.nonlocal_uri']
 
 # -- Options for LaTeX output ---------------------------------------------
 
