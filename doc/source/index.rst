@@ -16,10 +16,11 @@ Where to start
 The tutorials are a good place to start playing around. 
 
 .. toctree::
+    :maxdepth: 3
 
-   tutorials
-   api
-   acemd
+    tutorials
+    api
+    acemd
 
 
 

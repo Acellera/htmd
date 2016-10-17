@@ -66,18 +66,25 @@ publish:
 	scp -r static/*  www.acellera.com:~/www.htmd.org/
 	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
 
+publish-mk-test:
+	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/test/*; mkdir -p ~/www.htmd.org/docs/test'
+	scp -r $(BUILDDIR)/html/* www.acellera.com:~/www.htmd.org/docs/test/
+	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
+
+publish-rm-test:
+	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/test'
+
 # Rule for building .rst from .ipynb
 $(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
 	mkdir -p $(TUTORIALSDIR)
-	$(IPYTHON) nbconvert $< --to rst --stdout > $@
-	#cd source/tutorials && $(IPYTHON) nbconvert ../../$< --to python
+	$(IPYTHON) nbconvert $< --to rst --output-dir=$(TUTORIALSDIR)/
 
 tutorials: $(RST_FILES)
 
 html: tutorials
 	rm -f source/htmd.*
 	$(SPHINXAPIDOC) --force --separate -o  source ../htmd/ >/dev/null
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	$(SPHINXBUILD) -a -E -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html"
 
