@@ -187,7 +187,13 @@ class FunctionValidator(Validator):
         return
 
     def validate(self, object, basedir=None):
-        return hasattr(object, '__call__')
+        if hasattr(object, '__call__'):
+            return
+        elif isinstance(object, tuple) and hasattr(object[0], '__call__'):
+            # Supporting delayed functions which are passed as function/arguments tuples
+            return
+        else:
+            raise ValueError('Value must be a function')
 
 
 class ListListValidator(Validator):
