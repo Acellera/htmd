@@ -66,6 +66,14 @@ publish:
 	scp -r static/*  www.acellera.com:~/www.htmd.org/
 	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
 
+publish-mk-test:
+	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/test/*; mkdir -p ~/www.htmd.org/docs/test'
+	scp -r $(BUILDDIR)/html/* www.acellera.com:~/www.htmd.org/docs/test/
+	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
+
+publish-rm-test:
+	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/test'
+
 # Rule for building .rst from .ipynb
 $(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
 	mkdir -p $(TUTORIALSDIR)
