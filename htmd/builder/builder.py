@@ -301,7 +301,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
-def autoSegment2(mol, sel='protein or name ACE NME', basename='P', fields=('segid')):
+def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('segid')):
     """ Detects bonded segments in a selection and assigns incrementing segid to each segment
 
     Parameters
