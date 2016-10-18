@@ -6,13 +6,10 @@
 import shutil
 from os.path import isdir
 from subprocess import check_output
-
-from htmd import UserInterface
-# import pwd
 import os
 import string
 import random
-
+from htmd import UserInterface
 
 class LSF(UserInterface):
     _commands = {
