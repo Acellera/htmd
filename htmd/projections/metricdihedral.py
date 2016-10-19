@@ -29,7 +29,7 @@ class MetricDihedral(Projection):
     --------
     >>> dih = []
     >>> dih.append(MetricDihedral.chi2(4, 'ARG'))
-    >>> dih.append((15, 'N'), (15, 'CA'), (15, 'C'), (16, 'N'))  # psi angle
+    >>> dih.append(((15, 'N'), (15, 'CA'), (15, 'C'), (16, 'N')))  # psi angle
     >>> dih.append(MetricDihedral.psi(15, 16))  # psi angle (equivalent to previous command, simple version)
     >>> met = MetricDihedral(dih, 'protein and segid P0')
     """
