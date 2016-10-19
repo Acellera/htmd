@@ -15,6 +15,7 @@ from htmd.projections.metriccoordinate import MetricCoordinate
 from htmd.projections.metricdihedral import MetricDihedral
 from htmd.projections.metricshell import MetricShell
 from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
+from htmd.projections.metricsasa import MetricSasa
 from htmd.projections.metric import Metric
 from htmd.projections.tica import TICA
 from htmd.projections.kmeanstri import KMeansTri

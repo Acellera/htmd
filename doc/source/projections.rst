@@ -20,3 +20,4 @@ Contents:
     MetricShell - occupancy of an atom selection (e.g. water) around another selection <htmd.projections.metricshell>
     MetricSecondaryStructure - secondary structure-based metric <htmd.projections.metricsecondarystructure>
     MetricPlumed2 - access all Plumed2 metrics (CVs) <htmd.projections.metricplumed2>
+    MetricSasa - Solvent accessible surface area <htmd.projections.metricsasa>
