@@ -47,6 +47,8 @@ class AdaptiveGoal(AdaptiveBase):
         A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations
     updateperiod : float, default=0
         When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
+    coorname : str, default='input.coor'
+        Name of the file containing the starting coordinates for the new simulations
     datapath : str, default='data'
         The directory in which the completed simulations are stored
     filter : bool, default=True
@@ -57,18 +59,24 @@ class AdaptiveGoal(AdaptiveBase):
         The directory in which the filtered simulations will be stored
     projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None
         A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
+    goalfunction : function, default=None
+        This function will be used to convert the goal-projected simulation data to a ranking whichcan be used for the directed component of FAST.
+    ucscale : float, default=1
+        Scaling factor for undirected component.
+    truncation : str, default=None
+        Method for truncating the prob distribution (None, 'cumsum', 'statecut'
+    statetype : str, default='micro'
+        What states (cluster, micro, macro) to use for calculations.
     macronum : int, default=8
         The number of macrostates to produce
     skip : int, default=1
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
         The lagtime used to create the Markov model
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.MiniBatchKMeans'>
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
         Clustering algorithm used to cluster the contacts or distances
-    method : str, default='1/Mc'
-        Criteria used for choosing from which state to respawn from
     ticalag : int, default=20
-        Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
     contactsym : str, default=None
@@ -78,15 +86,32 @@ class AdaptiveGoal(AdaptiveBase):
 
     Example
     -------
-    >>> adapt = AdaptiveGoal()
-    >>> adapt.nmin = 2
-    >>> adapt.nmax = 3
-    >>> adapt.nepochs = 2
-    >>> adapt.ticadim = 3
-    >>> adapt.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
-    >>> adapt.generatorspath = htmd.home()+'/data/dhfr'
-    >>> adapt.app = AcemdLocal()
-    >>> adapt.run()
+    >>> crystalSS = MetricSecondaryStructure().project(Molecule('crystal.pdb'))[0]
+    >>>
+    >>> # First argument of a goal function always has to be a Molecule object
+    >>> def ssGoal(mol):
+    >>>     proj = MetricSecondaryStructure().project(mol)
+    >>>     ss_score = np.sum(proj == crystalSS, axis=1) / proj.shape[1]  # How many predicted SS match
+    >>>     return ss_score
+    >>>
+    >>> ag = AdaptiveGoal()
+    >>> ag.generatorspath = '../generators/'
+    >>> ag.nmin = 2
+    >>> ag.nmax = 3
+    >>> ag.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
+    >>> ag.goalfunction = ssGoal
+    >>> ag.app = AcemdLocal()
+    >>> ag.run()
+    >>>
+    >>> # Or alternatively if we have a multi-argument goal function
+    >>> def ssGoalAlt(mol, ss):
+    >>>     proj = MetricSecondaryStructure().project(mol)
+    >>>     ss_score = np.sum(proj == ss, axis=1) / proj.shape[1]
+    >>>     return ss_score
+    >>> from joblib import delayed
+    >>> ag.goalfunction = delayed(ssGoalAlt)(crystalSS)
+    >>> ag.app = AcemdLocal()
+    >>> ag.run()
     """
 
     def __init__(self):
@@ -101,9 +126,6 @@ class AdaptiveGoal(AdaptiveBase):
         self._cmdObject('projection', ':class:`Projection <htmd.projections.projection.Projection>` object',
                         'A Projection class object or a list of objects which will be used to project the simulation '
                         'data before constructing a Markov model', None, Projection)
-        self._cmdObject('goalprojection', ':class:`Projection <htmd.projections.projection.Projection>` object',
-                        'A Projection class object or a list of objects which will be used to project the simulation '
-                        'data. This data will be used for the directed component of FAST.', None, Projection)
         self._cmdFunction('goalfunction', 'function',
                           'This function will be used to convert the goal-projected simulation data to a ranking which'
                           'can be used for the directed component of FAST.', None)
@@ -229,6 +251,30 @@ class AdaptiveGoal(AdaptiveBase):
         return macronum
 
     def _calculateDirectedComponent(self, sims, St, N):
+        from joblib import Parallel, delayed
+        from htmd.util import _getNcpus
+        from htmd.molecule.molecule import Molecule
+
+        if hasattr(self.goalfunction, '__call__'):
+            results = Parallel(n_jobs=_getNcpus(), verbose=0)(delayed(self.goalfunction)(Molecule(s)) for s in sims)
+        elif isinstance(self.goalfunction, tuple) and hasattr(self.goalfunction[0], '__call__'):
+            results = Parallel(n_jobs=_getNcpus(), verbose=0)(delayed(self.goalfunction[0])(Molecule(s), *self.goalfunction[1]) for s in sims)
+
+        goalconcat = np.concatenate(results)
+        stconcat = np.concatenate(St)
+        clustermeans = np.bincount(stconcat, goalconcat.flatten())
+        return clustermeans / N
+
+
+class _AdaptiveGoalOld(AdaptiveGoal):
+    def __init__(self):
+        from htmd.projections.projection import Projection
+        super().__init__()
+        self._cmdObject('goalprojection', ':class:`Projection <htmd.projections.projection.Projection>` object',
+                        'A Projection class object or a list of objects which will be used to project the simulation '
+                        'data. This data will be used for the directed component of FAST.', None, Projection)
+
+    def _calculateDirectedComponent(self, sims, St, N):
         metr = Metric(sims, skip=self.skip)
         metr.set(self.goalprojection)
         clustermeans = np.zeros(len(N))
@@ -262,8 +308,8 @@ if __name__ == '__main__':
     md.ticadim = 3
     md.updateperiod = 5
     md.projection = MetricDistance('protein and name CA', 'resname BEN and noh')
-    md.goalprojection = MetricRmsd(Molecule(htmd.home() + '/data/adaptive/generators/1/structure.pdb'),
-                                   'protein and name CA')
+    # md.goalprojection = MetricRmsd(Molecule(htmd.home() + '/data/adaptive/generators/1/structure.pdb'),
+    #                               'protein and name CA')
     md.goalfunction = rmsdgoal
-    #md.app = AcemdLocal()
-    #md.run()
+    # md.app = AcemdLocal()
+    # md.run()
