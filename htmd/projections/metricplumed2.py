@@ -1,5 +1,4 @@
 from htmd.projections.projection import Projection
-from htmd.projections.metric import Metric
 from htmd.molecule.molecule import Molecule
 
 from abc import ABC

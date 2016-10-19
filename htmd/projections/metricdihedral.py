@@ -3,10 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.projections.metric import _OldMetric, _singleMolfile
 from htmd.projections.projection import Projection
-from htmd.molecule.molecule import Molecule
-from htmd.molecule.util import molRMSD
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -42,7 +39,7 @@ class MetricDihedral(Projection):
     def _precalculate(self, mol):
         self._pc_dih = self._dihedralAtomsPrecalc(mol, mol.atomselect(self._protsel))
 
-    def project(self, *args, **kwargs):
+    def project(self, mol):
         """ Project molecule.
 
         Parameters
@@ -55,7 +52,6 @@ class MetricDihedral(Projection):
         data : np.ndarray
             An array containing the projected data.
         """
-        mol = args[0]
         dih = self._getSelections(mol)
         return self._calcDihedralAngles(mol, dih, sincos=self._sincos)
 

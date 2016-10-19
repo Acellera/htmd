@@ -12,7 +12,7 @@ class Projection:
     """
 
     @abc.abstractmethod
-    def project(self, *args, **kwargs):
+    def project(self, mol):
         """ Subclasses need to implement and overload this method """
         return
 

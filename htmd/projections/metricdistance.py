@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.projections.metric import _OldMetric, _singleMolfile
 from htmd.projections.projection import Projection
 import numpy as np
 from htmd.projections.util import pp_calcDistances, pp_calcMinDistances
@@ -57,7 +56,7 @@ class MetricDistance(Projection):
         self.precalcsel1 = self._processSelection(mol, self.sel1, self.groupsel1)
         self.precalcsel2 = self._processSelection(mol, self.sel2, self.groupsel2)
 
-    def project(self, *args, **kwargs):
+    def project(self, mol):
         """ Project molecule.
 
         Parameters
@@ -70,7 +69,6 @@ class MetricDistance(Projection):
         data : np.ndarray
             An array containing the projected data.
         """
-        mol = args[0]
         (sel1, sel2) = self._getSelections(mol)
 
         if np.ndim(sel1) == 1 and np.ndim(sel2) == 1:  # normal distances
