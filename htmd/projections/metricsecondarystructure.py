@@ -5,6 +5,7 @@
 #
 from htmd.molecule.util import sequenceID
 from htmd.projections.projection import Projection
+import numpy as np
 import logging
 logger = logging.getLogger(__name__)
 
