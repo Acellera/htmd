@@ -260,6 +260,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     mol.set('segid', basename, sel)
 
     if len(gappos) == 0:
+        mol.set('segid', basename+'0', sel)
         return mol
 
     if spatial:
@@ -301,7 +302,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
-def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('segid')):
+def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('segid'), residgaps=False, residgaptol=1, chaingaps=True):
     """ Detects bonded segments in a selection and assigns incrementing segid to each segment
 
     Parameters
@@ -314,6 +315,13 @@ def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('se
         The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
     field : tuple of strings
         Field to fix. Can be "segid" (default) or any other Molecule field or combinations thereof.
+    residgaps : bool
+        Set to True to consider gaps in resids as structural gaps. Set to False to ignore resids
+    residgaptol : int
+        Above what resid difference is considered a gap. I.e. with residgaptol 1, 235-233 = 2 > 1 hence is a gap. We set
+        default to 2 because in many PDBs single residues are missing in the proteins without any gaps.
+    chaingaps : bool
+        Set to True to consider changes in chains as structural gaps. Set to False to ignore chains
 
     Returns
     -------
@@ -322,7 +330,7 @@ def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('se
 
     Example
     -------
-    >>> newmol = autoSegment(mol, 'chain B', 'P')
+    >>> newmol = autoSegment2(mol)
     """
     from scipy.sparse import csr_matrix
     from scipy.sparse.csgraph import connected_components
@@ -336,16 +344,42 @@ def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('se
     submol.filter(sel, _logger=False)
     bonds = submol._getBonds()  # Calculate both file and guessed bonds
 
+    if residgaps:
+        # Remove bonds between residues without continuous resids
+        bondresiddiff = np.abs(submol.resid[bonds[:, 0]] - submol.resid[bonds[:, 1]])
+        bonds = bonds[bondresiddiff <= residgaptol, :]
+    else:
+        # Warning about bonds bonding non-continuous resids
+        bondresiddiff = np.abs(submol.resid[bonds[:, 0]] - submol.resid[bonds[:, 1]])
+        if np.any(bondresiddiff > 1):
+            for i in np.where(bondresiddiff > residgaptol)[0]:
+                logger.warning('Bonds found between resid gaps: resid {} and {}'.format(submol.resid[bonds[i, 0]],
+                                                                                        submol.resid[bonds[i, 1]]))
+    if chaingaps:
+        # Remove bonds between residues without same chain
+        bondsamechain = submol.chain[bonds[:, 0]] == submol.chain[bonds[:, 1]]
+        bonds = bonds[bondsamechain, :]
+    else:
+        # Warning about bonds bonding different chains
+        bondsamechain = submol.chain[bonds[:, 0]] == submol.chain[bonds[:, 1]]
+        if np.any(bondsamechain == False):
+            for i in np.where(bondsamechain == False)[0]:
+                logger.warning('Bonds found between chain gaps: resid {}/{} and {}/{}'.format(submol.resid[bonds[i, 0]],
+                                                                                              submol.chain[bonds[i, 0]],
+                                                                                              submol.resid[bonds[i, 1]],
+                                                                                              submol.chain[bonds[i, 1]]
+                                                                                              ))
+
+    # Calculate connected components using the bonds
     sparsemat = csr_matrix((np.ones(bonds.shape[0] * 2),  # Values
                             (np.hstack((bonds[:, 0], bonds[:, 1])),  # Rows
-                             np.hstack((bonds[:, 1], bonds[:, 0])))), shape=[submol.numAtoms,submol.numAtoms])  # Columns
+                             np.hstack((bonds[:, 1], bonds[:, 0])))), shape=[submol.numAtoms, submol.numAtoms])  # Columns
     numcomp, compidx = connected_components(sparsemat, directed=False)
 
-    # Warning about bonds bonding non-continuous resids
-    bondresiddiff = np.abs(submol.resid[bonds[:, 0]] - submol.resid[bonds[:, 1]])
-    if np.any(bondresiddiff > 1):
-        for i in np.where(bondresiddiff > 1)[0]:
-            logger.warning('Bonds found between resid gaps: resid {} and {}'.format(submol.resid[bonds[i, 0]], submol.resid[bonds[i, 1]]))
+    # Letters to be used for chains, if free: 0123456789abcd...ABCD..., minus chain symbols already used
+    used_chains = set(mol.chain)
+    chain_alphabet = list(string.digits + string.ascii_letters)
+    available_chains = [x for x in chain_alphabet if x not in used_chains]
 
     mol = mol.copy()
     prevsegres = None
@@ -366,8 +400,7 @@ def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('se
                     raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
                 mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
             else:
-                base62 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-                mol.__dict__[f][segres] = base62[i % 62]
+                mol.__dict__[f][segres] = available_chains[i % len(available_chains)]
         logger.info('Created segment {} between resid {} and {}.'.format(segid, np.min(mol.resid[segres]),
                                                                          np.max(mol.resid[segres])))
         prevsegres = segres  # Store old segment atom indexes for the warning about continuous resids
