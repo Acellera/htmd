@@ -5,6 +5,7 @@
 #
 from htmd.projections.projection import Projection
 from htmd.molecule.util import molRMSD
+import numpy as np
 import logging
 logger = logging.getLogger(__name__)
 
