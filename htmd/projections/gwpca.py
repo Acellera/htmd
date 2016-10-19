@@ -12,6 +12,15 @@ logger = logging.getLogger(__name__)
 class GWPCA(object):
     """ Class for calculating the globally-weighted PCA projections of a MetricData  object
 
+    References
+    ----------
+
+    * N. Blöchliger, A. Caflisch, and A. Vitalis. Weighted Distance Functions Improve Analysis of High-Dimensional
+      Data: Application to Molecular Dynamics Simulations, J. Chem. Theory Comput., 2015, 11 (11), pp 5481–5492. doi:
+      `10.1021/acs.jctc.5b00618`_
+
+    .. _10.1021/acs.jctc.5b00618: http://dx.doi.org/10.1021/acs.jctc.5b00618
+
     Parameters
     ----------
     data : :class:`MetricData <htmd.metricdata.MetricData>` object
