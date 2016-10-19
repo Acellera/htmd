@@ -4,7 +4,6 @@
 # No redistribution in whole or part
 #
 from __future__ import print_function
-#from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
 from htmd.home import home
 from htmd.session import htmdsave, htmdload
 from htmd.simlist import simlist, simfilter, simmerge
@@ -19,6 +18,7 @@ from htmd.projections.metricsasa import MetricSasa
 from htmd.projections.metric import Metric
 from htmd.projections.tica import TICA
 from htmd.projections.kmeanstri import KMeansTri
+from htmd.projections.gwpca import GWPCA
 from htmd.userinterface import UserInterface
 from htmd.molecule.molecule import Molecule
 from htmd.adaptive.adaptiverun import AdaptiveRun, AdaptiveMD
