@@ -94,16 +94,14 @@ class AdaptiveGoal(AdaptiveBase):
     >>>     ss_score = np.sum(proj == crystalSS, axis=1) / proj.shape[1]  # How many predicted SS match
     >>>     return ss_score
     >>>
-    >>> adapt = AdaptiveGoal()
-    >>> adapt.generatorspath = '../generators/'
-    >>> adapt.nmin = 2
-    >>> adapt.nmax = 3
-    >>> adapt.nepochs = 2
-    >>> adapt.ticadim = 3
-    >>> adapt.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
-    >>> adapt.goalfunction = ssGoal
-    >>> adapt.app = AcemdLocal()
-    >>> adapt.run()
+    >>> ag = AdaptiveGoal()
+    >>> ag.generatorspath = '../generators/'
+    >>> ag.nmin = 2
+    >>> ag.nmax = 3
+    >>> ag.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
+    >>> ag.goalfunction = ssGoal
+    >>> ag.app = AcemdLocal()
+    >>> ag.run()
     >>>
     >>> # Or alternatively if we have a multi-argument goal function
     >>> def ssGoalAlt(mol, ss):
@@ -111,9 +109,9 @@ class AdaptiveGoal(AdaptiveBase):
     >>>     ss_score = np.sum(proj == ss, axis=1) / proj.shape[1]
     >>>     return ss_score
     >>> from joblib import delayed
-    >>> adapt.goalfunction = delayed(ssGoalAlt)(crystalSS)
-    >>> adapt.app = AcemdLocal()
-    >>> adapt.run()
+    >>> ag.goalfunction = delayed(ssGoalAlt)(crystalSS)
+    >>> ag.app = AcemdLocal()
+    >>> ag.run()
     """
 
     def __init__(self):
