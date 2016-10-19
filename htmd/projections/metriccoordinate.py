@@ -27,7 +27,7 @@ class MetricCoordinate(Projection):
 
     Returns
     -------
-    proj : MetricCoordinate object
+    metr : MetricCoordinate object
     """
     def __init__(self, refmol, atomsel, trajalnstr='protein and name CA', refalnstr=None, centerstr='protein'):
         if refalnstr is None:

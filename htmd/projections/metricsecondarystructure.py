@@ -44,7 +44,7 @@ class MetricSecondaryStructure(Projection):
 
     Returns
     -------
-    data : :class:`MetricData <htmd.metricdata.MetricData>` object
+    metr : :class:`MetricData <htmd.metricdata.MetricData>` object
         Returns a :class:`MetricData <htmd.metricdata.MetricData>` object containing the metrics calculated
     """
     def __init__(self, sel='protein', simplified=True, integer=True):
