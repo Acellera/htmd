@@ -110,12 +110,10 @@ class SlurmQueue(Queue, ProtocolInterface):
         total : int
             Total running and queued workunits
         """
-        if self.name is None:
-            raise ValueError('Project name needs to be defined.')
-        if self.queue is None:
-            raise ValueError('Project queue needs to be defined.')
+        if self.partition is None:
+            raise ValueError('The partition needs to be defined.')
         user = pwd.getpwuid(os.getuid()).pw_name
-        cmd = [self._squeue, "-n", self.name, "-u", user, "-p", self.queue]
+        cmd = [self._squeue, "-u", user, "-p", self.partition]
         logger.debug(cmd)
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))
