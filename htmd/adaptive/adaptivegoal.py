@@ -147,6 +147,7 @@ class AdaptiveGoal(AdaptiveBase):
                        TYPE_INT, RANGE_0POS)
         self._cmdString('contactsym', 'str', 'Contact symmetry', None)
         self._cmdBoolean('save', 'bool', 'Save the model generated', False)
+        self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
 
     def _algorithm(self):
         logger.info('Postprocessing new data')
@@ -186,7 +187,7 @@ class AdaptiveGoal(AdaptiveBase):
             uc = macroAccumulate(model, uc[model.cluster_ofmicro])
 
         # Calculating the directed component
-        dc = self._calculateDirectedComponent(model.data.simlist, model.data.St, model.data.N)
+        dc, dc_conf = self._calculateDirectedComponent(model.data.simlist, model.data.St, model.data.N)
         if self.statetype == 'micro':
             dc = dc[model.cluster_ofmicro]
         if self.statetype == 'macro':
@@ -199,8 +200,13 @@ class AdaptiveGoal(AdaptiveBase):
 
         reward = dc + self.ucscale * uc
 
-        relFrames = self._getSpawnFrames(reward, self._model, datadr)
-        self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
+        if not self.nosampledc:
+            relFrames = self._getSpawnFrames(reward, self._model, datadr)
+            self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
+        else:
+            print('Spawning only from top DC conformations without sampling')
+            sortedabs = np.argsort(dc_conf)[::-1]
+            self._writeInputs(datadr.abs2sim(sortedabs[:self.nmax - self._running]))
 
     def _featScale(self, feat):
         return (feat - np.min(feat)) / (np.max(feat) - np.min(feat))
@@ -263,7 +269,7 @@ class AdaptiveGoal(AdaptiveBase):
         goalconcat = np.concatenate(results)
         stconcat = np.concatenate(St)
         clustermeans = np.bincount(stconcat, goalconcat.flatten())
-        return clustermeans / N
+        return clustermeans / N, goalconcat
 
 
 class _AdaptiveGoalOld(AdaptiveGoal):
@@ -283,7 +289,7 @@ class _AdaptiveGoalOld(AdaptiveGoal):
             for pro in proj:
                 clustermeans[:np.max(St[k])+1] += np.bincount(St[k], self.goalfunction(pro[0]).flatten())
                 k += 1
-        return clustermeans / N
+        return clustermeans / N, None
 
 
 if __name__ == '__main__':
