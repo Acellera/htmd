@@ -128,7 +128,7 @@ class SlurmQueue(Queue, ProtocolInterface):
         return l
 
 
-class AcemdSlurm(Slurm):
+class AcemdSlurm(SlurmQueue):
     def __init__(self):
         super().__init__()
         self._cmdString('acemd', 'str', 'Path to acemd executable', None)
