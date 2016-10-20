@@ -78,7 +78,7 @@ def checkTruncations(mol):
 
 
 def PDBwrite(mol, filename, frame):
-    if isinstance(frame, int):
+    if not isinstance(frame, list) and not isinstance(frame, tuple):
         frame = [frame, ]
 
     def format83(f):
