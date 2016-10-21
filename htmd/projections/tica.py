@@ -52,11 +52,11 @@ class TICA(object):
         self.data = data
         self.dimensions = dimensions
 
-        self.tic = TICApyemma(lag)
 
         if isinstance(data, Metric):  # Memory efficient TICA projecting trajectories on the fly
             if units != 'frames':
                 raise RuntimeError('Cannot use delayed projection TICA with units other than frames for now. Report this to HTMD issues.')
+            self.tic = TICApyemma(lag)
             metr = data
 
             p = ProgressBar(len(metr.simulations))
@@ -75,6 +75,7 @@ class TICA(object):
             if lag == 0:
                 raise RuntimeError('Lag time conversion resulted in 0 frames. Please use a larger lag-time for TICA.')
 
+            self.tic = TICApyemma(lag)
             if self.dimensions is None:
                 datalist = data.dat.tolist()
             else:  # Sub-select dimensions for fitting
