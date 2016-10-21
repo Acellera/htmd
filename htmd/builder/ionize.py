@@ -161,7 +161,7 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
         watsize = len(watindex)
 
         if watsize == 0:
-            raise NameError('No waters could be found further than ' + str(dfrom) + ' from other molecules to be replaced by ions. You might need to solvate with a bigger box.')
+            raise NameError('No waters could be found further than ' + str(dfrom) + ' from other molecules to be replaced by ions. You might need to solvate with a bigger box or disable the ionize property when building.')
 
         while len(ionlist) < nions:
             if len(watindex) == 0:
