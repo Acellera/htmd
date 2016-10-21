@@ -15,12 +15,12 @@ from os.path import isdir
 from subprocess import check_output
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
 from htmd import UserInterface
-from htmd.queues.queue import Queue
+from htmd.queues.queue import _Queue
 import logging
 logger = logging.getLogger(__name__)
 
 
-class SlurmQueue(Queue, ProtocolInterface):
+class SlurmQueue(_Queue, ProtocolInterface):
     def __init__(self):
         super().__init__()
         self._cmdString('jobname', 'str', 'Job name (identifier)', None)

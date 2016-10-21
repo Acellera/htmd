@@ -7,7 +7,7 @@ import abc
 from abc import ABCMeta
 
 
-class Queue(metaclass=ABCMeta):
+class _Queue(metaclass=ABCMeta):
 
     @abc.abstractmethod
     def retrieve(self):
