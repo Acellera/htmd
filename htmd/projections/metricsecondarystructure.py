@@ -115,10 +115,8 @@ class MetricSecondaryStructure(Projection):
             An array containing the projected data.
         """
         ca_indices, nco_indices, proline_indices, chain_ids = self._getSelections(mol)
-        #print(nco_indices)
-        #print(ca_indices)
-        #print(proline_indices)
-        #print(chain_ids)
+        mol = mol.copy()
+        mol.filter(self.sel, _logger=False)
 
         xyz = np.swapaxes(np.swapaxes(np.atleast_3d(mol.coords), 1, 2), 0, 1)
         xyz = np.array(xyz.copy(), dtype=np.float32) / 10  # converting to nm
@@ -199,10 +197,20 @@ if __name__ == "__main__":
     from htmd.home import home
     from os import path
     import numpy as np
-    mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
-    #mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
+    mol = Molecule('2HBB')  #NTL9
+    mol.filter('protein')
     metr = MetricSecondaryStructure()
     data = metr.project(mol)
+    # ref = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0,
+    #     2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 2, 2,
+    #     2, 2, 2, 2, 2, 2, 0])
+    # assert np.array_equal(data, ref), 'MetricSecondaryStructure assertion failed'
+    # metr = MetricSecondaryStructure()
+    # data = metr.project(mol)
+    # ref = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0,
+    #     2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 2, 2,
+    #     2, 2, 2, 2, 2, 2, 0])
+
     """x = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 2, 2, 2, 2,
         2, 2, 2, 2, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
         1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1,
