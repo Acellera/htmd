@@ -197,6 +197,7 @@ if __name__ == '__main__':
     met = Metric(sims[0:2])
     met.projection(MetricSelfDistance('protein and name CA'))
     data = met.project()
+    data.fstep = 0.1
 
     tica = TICA(data, 2, dimensions=range(2, 10))
     datatica = tica.project(2)
