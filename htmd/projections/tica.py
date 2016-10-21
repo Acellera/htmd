@@ -199,10 +199,13 @@ if __name__ == '__main__':
 
     tica = TICA(data, 2, dimensions=range(2, 10))
     datatica = tica.project(2)
+    tica5 = TICA(data, 0.2, units='ns', dimensions=range(2, 10))
+    datatica5 = tica5.project(2)
     expected = [[ 3.69098878, -0.33862674,  0.85779184],
                 [ 3.77816105, -0.31887317,  0.87724227],
                 [ 3.83537507, -0.11878026,  0.65236956]]
     assert np.allclose(np.abs(datatica.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.allclose(np.abs(datatica5.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
     assert np.all(datatica.map.ix[[587, 588]].type == 'tica')
     assert np.all(datatica.map.ix[range(587)].type == 'distance')
     print('In-memory TICA with subset of dimensions passed test.')
