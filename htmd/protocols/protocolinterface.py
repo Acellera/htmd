@@ -170,10 +170,19 @@ class ObjectValidator(Validator):
         return
 
     def validate(self, object, basedir=None):
+        classname = self.classname
         if not (isinstance(object, list) or isinstance(object, tuple)):  # Allow lists of objects
-            object = [object]
+            object = [object,]
+        if not (isinstance(classname, list) or isinstance(classname, tuple)):  # Allow lists of classes
+            classname = [classname,]
+
         for obj in object:
-            if not isinstance(obj, self.classname):
+            valid = False
+            for cl in classname:
+                if isinstance(obj, self.classname):
+                    valid = True
+                    break
+            if not valid:
                 raise ValueError('Value must be object of {}'.format(self.classname))
 
         return object

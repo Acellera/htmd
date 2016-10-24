@@ -21,6 +21,40 @@ logger = logging.getLogger(__name__)
 
 
 class SlurmQueue(SimQueue, ProtocolInterface):
+    """ Queue system for SLURM
+
+    Parameters
+    ----------
+    jobname : str, default=None
+        Job name (identifier)
+    partition : str, default=None
+        The queue (partition) to run on
+    priority : str, default='gpu_priority'
+        Job priority
+    ngpu : int, default=1
+        Number of GPUs to use for a single job
+    memory : int, default=4000
+        Amount of memory per job (MB)
+    walltime : int, default=None
+        Job timeout (s)
+    environment : str, default='ACEMD_HOME,HTMD_LICENSE_FILE'
+        Envvars to propagate to the job.
+    mailtype : str, default=None
+        When to send emails. Separate options with commas like 'END,FAIL'.
+    mailuser : str, default=None
+        User email address.
+    outputstream : str, default='slurm.%N.%j.out'
+        Output stream.
+    errorstream : str, default='slurm.%N.%j.err'
+        Error stream.
+
+    Examples
+    --------
+    >>> from htmd import *
+    >>> s = SlurmQueue()
+    >>> s.partition = 'multiscale'
+    >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
+    """
     def __init__(self):
         super().__init__()
         self._cmdString('jobname', 'str', 'Job name (identifier)', None)
@@ -66,7 +100,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             if self.mailtype is not None and self.mailuser is not None:
                 f.write('#SBATCH --mail-type={}\n'.format(self.mailtype))
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
-            f.write('\ncd {}\n'.format(workdir))
+            f.write('\ncd {}\n'.format(os.path.abspath(workdir)))
             f.write('{}'.format(runsh))
         os.chmod(fname, 0o700)
 
@@ -83,18 +117,20 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             A list of executable directories.
         """
         import time
+        if isinstance(dirs, str):
+            dirs = [dirs,]
 
         # if all folders exist, submit
         for d in dirs:
             logger.info('Queueing ' + d)
 
-            runscript = os.path.join(d, 'run.sh')
+            runscript = os.path.abspath(os.path.join(d, 'run.sh'))
             if not os.path.exists(runscript):
                 raise FileExistsError('File {} does not exist.'.format(runscript))
             if not os.access(runscript, os.X_OK):
                 raise PermissionError('File {} does not have execution permissions.'.format(runscript))
 
-            jobscript = os.path.join(d, 'job.sh')
+            jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)
             try:
                 ret = check_output([self._sbatch, jobscript])
@@ -113,7 +149,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
         user = pwd.getpwuid(os.getuid()).pw_name
-        cmd = [self._squeue, "-u", user, "-p", self.partition]
+        cmd = [self._squeue, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))
@@ -124,72 +160,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         if l < 0:
             l = 0  # something odd happened
         return l
-
-
-class AcemdSlurm(SlurmQueue):
-    def __init__(self):
-        super().__init__()
-        self._cmdString('acemd', 'str', 'Path to acemd executable', None)
-        self._cmdString('inputfile', 'str', 'Name of input files', 'input')
-        self._cmdValue('gpuid', 'int', 'GPU id', 0)
-
-    def _findAcemd(self):
-        from shutil import which
-        if not self.acemd:
-            try:
-                # Try to find acemd in the path
-                acemd = which("acemd", mode=os.X_OK)
-                if acemd:
-                    logger.info("Found ACEMD at '" + acemd + "'")
-                else:
-                    acemd = which("acemdhtmd", mode=os.X_OK)
-                    if acemd:
-                        logger.info("Found ACEMD at '" + acemd + "'")
-            except:
-                pass
-        else:
-            acemd = self.acemd
-
-        if not acemd:
-            raise NameError("Cannot find 'acemd' in the PATH. Set its location with the 'acemd=' named argument")
-
-        if not os.access(acemd, os.X_OK):
-            raise NameError("ACEMD file '" + acemd + "' not executable")
-
-    def retrieve(self):
-        # TODO: Make it move the completed trajectories
-        pass
-
-    def submit(self, mydirs):
-        """ Submits all work units in a given directory list to the engine.
-
-        Parameters
-        ----------
-        mydirs : list
-            A list of job directories
-        """
-        if isinstance(mydirs, str): mydirs = [mydirs]
-
-        for d in mydirs:
-            if not os.path.isdir(d):
-                raise NameError('Submit: directory ' + d + ' does not exist.')
-
-        acemd = SlurmQueue._find_binary(self.acemd)
-
-        for d in mydirs:
-            logger.info('Queueing ' + dirname)
-            dirname = os.path.abspath(d)
-            self._make_jobscript(dirname, self.gpuid)
-
-        super().submit(mydirs)
-
-    def _make_jobscript(self, path, gpuid, acemd, inputfile):
-        fn = os.path.join(path, "run.sh")
-        with open(fn, 'w') as f:
-            f.write('#!/bin/sh')
-            f.write('{} --device {} {} > log.txt 2>&1'.format(acemd, gpuid, inputfile))
-        os.chmod(fn, 0o700)
-        return os.path.abspath(fn)
 
 
 if __name__ == "__main__":

@@ -52,7 +52,6 @@ class TICA(object):
         self.data = data
         self.dimensions = dimensions
 
-
         if isinstance(data, Metric):  # Memory efficient TICA projecting trajectories on the fly
             if units != 'frames':
                 raise RuntimeError('Cannot use delayed projection TICA with units other than frames for now. Report this to HTMD issues.')
