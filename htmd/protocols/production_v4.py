@@ -219,16 +219,7 @@ proc calcforces_endstep { } { }
 
 if __name__ == "__main__":
     md = Production()
-    md.temperature = 300
-    md.fb_reference = 'protein and name CA'
-    md.fb_selection = 'segname L and noh'
-    md.acemd.extendedsystem = None  # use different data
-    md.acemd.binindex = None  # use different data
-    md.fb_box = [-20, 20, -20, 20, 43, 45]
-    md.fb_k = 5
-    md.write(htmd.home() +'/data/equilibrate', '/tmp/prod')
-    md.fb_k = 0
-    md.write(htmd.home() +'/data/equilibrate', '/tmp/prod0')
-    md.useconstraints = True
-    md.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
-    md.write(htmd.home() +'/data/equilibrate', '/tmp/prod0cons')
+    md.runtime = 10000
+    md.timeunits = 'ns'
+    md.temperature = 350
+    # md.write(g, outdir)
