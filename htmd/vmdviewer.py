@@ -45,7 +45,9 @@ class VMD:
         vmd = getVMDpath(vmd=vmd)
 
         args=[vmd]
-        if(host): args.append(host)
+        if(host): 
+           args.append("--host")
+           args.append(host)
         self.vmd = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, close_fds=True,
                                     shell=False)
         self.queue = queue.Queue()
