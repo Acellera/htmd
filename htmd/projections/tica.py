@@ -73,6 +73,8 @@ class TICA(object):
             lag = unitconvert(units, 'frames', lag, data.fstep)
             if lag == 0:
                 raise RuntimeError('Lag time conversion resulted in 0 frames. Please use a larger lag-time for TICA.')
+            print(lag)
+            print(type(lag))
 
             self.tic = TICApyemma(lag)
             if self.dimensions is None:
