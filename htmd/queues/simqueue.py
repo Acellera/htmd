@@ -23,3 +23,13 @@ class SimQueue(metaclass=ABCMeta):
     def inprogress(self):
         """ Subclasses need to implement this method """
         pass
+
+    @abc.abstractmethod
+    def wait(self):
+        """ Subclasses need to implement this method """
+        pass
+
+    @abc.abstractmethod
+    def stop(self):
+        """ Subclasses need to implement this method """
+        pass

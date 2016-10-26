@@ -68,6 +68,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('mailuser', 'str', 'User email address.', None)
         self._cmdString('outputstream', 'str', 'Output stream.', 'slurm.%N.%j.out')
         self._cmdString('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err')  # Maybe change these to job name
+        self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
+        self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
 
         # Find executables
         self._sbatch = SlurmQueue._find_binary('sbatch')
@@ -82,6 +84,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         return ret
 
     def _createJobScript(self, fname, workdir, runsh):
+        workdir = os.path.abspath(workdir)
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n')
             f.write('#\n')
@@ -100,8 +103,19 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             if self.mailtype is not None and self.mailuser is not None:
                 f.write('#SBATCH --mail-type={}\n'.format(self.mailtype))
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
-            f.write('\ncd {}\n'.format(os.path.abspath(workdir)))
+            f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
+
+            # Move completed trajectories
+            if self.datadir is not None:
+                datadir = os.path.abspath(self.datadir)
+                if not os.path.isdir(datadir):
+                    os.mkdir(datadir)
+                simname = os.path.basename(os.path.normpath(workdir))
+                # create directory for new file
+                odir = os.path.join(datadir, simname)
+                os.mkdir(odir)
+                f.write('\nmv *.{} {}'.format(self.trajext, odir))
         os.chmod(fname, 0o700)
 
     def retrieve(self):
@@ -160,6 +174,14 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         if l < 0:
             l = 0  # something odd happened
         return l
+
+    def stop(self):
+        # Nothing to do
+        pass
+
+    def wait(self):
+        # Nothing to do
+        pass
 
 
 if __name__ == "__main__":
