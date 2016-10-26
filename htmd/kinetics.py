@@ -28,6 +28,14 @@ class Kinetics(object):
     Examples
     --------
     >>> kin = Kinetics(model, temperature=300, concentration=0.015)
+
+    .. currentmodule:: htmd.kinetics.Kinetics
+    .. rubric:: Methods
+    .. autoautosummary:: htmd.kinetics.Kinetics
+        :methods:
+    .. rubric:: Attributes
+    .. autoautosummary:: htmd.kinetics.Kinetics
+        :attributes:
     """
     _kB = 0.0019872041  # Boltzman constant kcal/(mol K)
 

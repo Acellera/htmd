@@ -52,11 +52,10 @@ class TICA(object):
         self.data = data
         self.dimensions = dimensions
 
-        self.tic = TICApyemma(lag)
-
         if isinstance(data, Metric):  # Memory efficient TICA projecting trajectories on the fly
             if units != 'frames':
                 raise RuntimeError('Cannot use delayed projection TICA with units other than frames for now. Report this to HTMD issues.')
+            self.tic = TICApyemma(lag)
             metr = data
 
             p = ProgressBar(len(metr.simulations))
@@ -75,6 +74,7 @@ class TICA(object):
             if lag == 0:
                 raise RuntimeError('Lag time conversion resulted in 0 frames. Please use a larger lag-time for TICA.')
 
+            self.tic = TICApyemma(lag)
             if self.dimensions is None:
                 datalist = data.dat.tolist()
             else:  # Sub-select dimensions for fitting
@@ -196,13 +196,17 @@ if __name__ == '__main__':
     met = Metric(sims[0:2])
     met.projection(MetricSelfDistance('protein and name CA'))
     data = met.project()
+    data.fstep = 0.1
 
     tica = TICA(data, 2, dimensions=range(2, 10))
     datatica = tica.project(2)
+    tica5 = TICA(data, 0.2, units='ns', dimensions=range(2, 10))
+    datatica5 = tica5.project(2)
     expected = [[ 3.69098878, -0.33862674,  0.85779184],
                 [ 3.77816105, -0.31887317,  0.87724227],
                 [ 3.83537507, -0.11878026,  0.65236956]]
     assert np.allclose(np.abs(datatica.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.allclose(np.abs(datatica5.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
     assert np.all(datatica.map.ix[[587, 588]].type == 'tica')
     assert np.all(datatica.map.ix[range(587)].type == 'distance')
     print('In-memory TICA with subset of dimensions passed test.')

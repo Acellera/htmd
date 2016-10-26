@@ -631,7 +631,7 @@ class FFMolecule(Molecule):
     # Duplicate the dihedrals types so this modified term is unique
     print( "Duplicating types.." )
     for i in range(4):
-         if not ( "_" in self._rtf.type_by_index[phi_to_fit.atoms[i]]):
+         if not ( "x" in self._rtf.type_by_index[phi_to_fit.atoms[i]]):
            self._duplicateTypeOfAtom( phi_to_fit.atoms[i] )
 
     (number_of_uses, uses) = self._countUsesOfDihedral( phi_to_fit.atoms )
@@ -710,12 +710,12 @@ class FFMolecule(Molecule):
 
     # perhaps the type is already a duplicate? if so
     # remove the duplicated suffix
-    atype = re.sub( "_[0123456789]+$", "", atype )
+    atype = re.sub( "x[0123456789]+$", "", atype )
     i=0
     # make the new type name
-    while ("%s_%d" % ( atype, i )) in self._rtf.types: i=i+1
+    while ("%sx%d" % ( atype, i )) in self._rtf.types: i=i+1
 
-    newtype = "%s_%d" % (atype, i)
+    newtype = "%sx%d" % (atype, i)
     print("Creating new type %s from %s for atom %s" %( newtype, atype, self._rtf.names[ aidx ] ) )
 
     # duplicate the type in the fields RTF -- todo: move to a method in the RTF
@@ -730,7 +730,7 @@ class FFMolecule(Molecule):
 #    # Now also reset the type of  any atoms that share equivalency
     for bidx in  self._equivalent_atoms[aidx]:
       if aidx != bidx:
-         if "_" in self._rtf.type_by_index[ bidx ]:
+         if "x" in self._rtf.type_by_index[ bidx ]:
             raise RuntimeError("Equivalent atom already has a duplicated type: %d %d" % ( bidx, self._rtf.type_by_index[ bidx ] ) )
          self._rtf.type_by_index[ bidx ] = newtype
          self._rtf.type_by_name[ self._rtf.names[ bidx ] ] = newtype

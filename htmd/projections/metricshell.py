@@ -60,7 +60,7 @@ class MetricShell(MetricDistance):
         self.map = np.vstack(super().getMapping(mol).indexes)
         self.shellcenters = np.unique(self.map[:, 0])
 
-    def project(self, *args, **kwargs):
+    def project(self, mol):
         """ Project molecule.
 
         Parameters
@@ -75,7 +75,6 @@ class MetricShell(MetricDistance):
         data : np.ndarray
             An array containing the projected data.
         """
-        mol = args[0]
         (shellcenters, map, sel1, sel2) = self._getPrecalc(mol)
         distances = super().project(mol)
         return _shells(distances, map[:, 0], shellcenters, self.numshells, self.shellwidth)

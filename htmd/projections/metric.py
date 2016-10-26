@@ -1,3 +1,4 @@
+""""""
 # (c) 2015-2016 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
@@ -83,6 +84,29 @@ class CallBack(object):
 
 
 class Metric:
+    """ Class for calculating projections of a simlist.
+
+    Parameters
+    ----------
+    simulations : list
+        A list of simulations produced by :func:`simlist <htmd.simlist.simlist>`
+    skip : int
+        Frame skipping. Setting i.e. to 3 will keep only every third frame of each simulation.
+
+    Examples
+    --------
+    >>> metr = Metric(sims)  # doctest: +SKIP
+    >>> metr.projection(MetricSelfDistance('protein and name CA', metric='contacts'))  # doctest: +SKIP
+    >>> data = metr.project()  # doctest: +SKIP
+
+    .. currentmodule:: htmd.projections.metric.Metric
+    .. rubric:: Methods
+    .. autoautosummary:: htmd.projections.metric.Metric
+        :methods:
+    .. rubric:: Attributes
+    .. autoautosummary:: htmd.projections.metric.Metric
+        :attributes:
+    """
     def __init__(self, simulations, skip=1):
         self.simulations = simulations
         self.skip = skip

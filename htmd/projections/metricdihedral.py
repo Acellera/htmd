@@ -3,10 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.projections.metric import _OldMetric, _singleMolfile
 from htmd.projections.projection import Projection
-from htmd.molecule.molecule import Molecule
-from htmd.molecule.util import molRMSD
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -29,7 +26,7 @@ class MetricDihedral(Projection):
     --------
     >>> dih = []
     >>> dih.append(MetricDihedral.chi2(4, 'ARG'))
-    >>> dih.append((15, 'N'), (15, 'CA'), (15, 'C'), (16, 'N'))  # psi angle
+    >>> dih.append(((15, 'N'), (15, 'CA'), (15, 'C'), (16, 'N')))  # psi angle
     >>> dih.append(MetricDihedral.psi(15, 16))  # psi angle (equivalent to previous command, simple version)
     >>> met = MetricDihedral(dih, 'protein and segid P0')
     """
@@ -42,7 +39,7 @@ class MetricDihedral(Projection):
     def _precalculate(self, mol):
         self._pc_dih = self._dihedralAtomsPrecalc(mol, mol.atomselect(self._protsel))
 
-    def project(self, *args, **kwargs):
+    def project(self, mol):
         """ Project molecule.
 
         Parameters
@@ -55,7 +52,6 @@ class MetricDihedral(Projection):
         data : np.ndarray
             An array containing the projected data.
         """
-        mol = args[0]
         dih = self._getSelections(mol)
         return self._calcDihedralAngles(mol, dih, sincos=self._sincos)
 
@@ -209,6 +205,24 @@ class MetricDihedral(Projection):
             A touple containing four resid/atom pairs
         """
         return (res1, 'N'), (res1, 'CA'), (res1, 'C'), (res2, 'N')
+
+    @staticmethod
+    def omega(res1, res2):
+        """ Get a set of four resid/atom pairs corresponding to the omega angle of res1 and res2
+
+        Parameters
+        ----------
+        res1 : int
+            The first residue containing the CA C atoms
+        res2 : int
+            The second residue containing the N CA atoms
+
+        Returns
+        -------
+        quad : tuple
+            A touple containing four resid/atom pairs
+        """
+        return (res1, 'CA'), (res1, 'C'), (res2, 'N'), (res2, 'CA')
 
     @staticmethod
     def chi1(res, resname):

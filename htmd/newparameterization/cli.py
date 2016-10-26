@@ -58,7 +58,7 @@ def main_parameterize():
     args = parser.parse_args()
 
     # Communicate the # of CPUs to use to the QM engine via environment variable
-    os.putenv("NCPUS", str(args.ncpus))
+    os.environ['NCPUS'] = str(args.ncpus)
 
     filename = args.mol
 

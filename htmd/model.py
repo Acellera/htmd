@@ -27,6 +27,14 @@ class Model(object):
     -------
     >>> model = Model(data)
 
+    .. currentmodule:: htmd.model.Model
+    .. rubric:: Methods
+    .. autoautosummary:: htmd.model.Model
+        :methods:
+    .. rubric:: Attributes
+    .. autoautosummary:: htmd.model.Model
+        :attributes:
+
     References
     ----------
     .. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
@@ -513,7 +521,7 @@ class Model(object):
         display(hb)
 
     def save(self, filename):
-        """ Save a :class:`Model` object to disk
+        """ Save a :class:`Model <htmd.model.Model>` object to disk
 
         Parameters
         ----------
@@ -532,7 +540,7 @@ class Model(object):
         f.close()
 
     def load(self, filename):
-        """ Load a :class:`MetricData` object from disk
+        """ Load a :class:`MetricData <htmd.metricdata.MetricData>` object from disk
 
         Parameters
         ----------

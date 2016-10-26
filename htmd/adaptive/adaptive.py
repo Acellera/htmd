@@ -27,7 +27,8 @@ class AdaptiveBase(ProtocolInterface):
     def __init__(self):
         super().__init__()
         from htmd.apps.app import App
-        self._cmdObject('app', ':class:`App <htmd.apps.app.App>` object', 'An App class object used to retrieve and submit simulations', None, App)
+        from htmd.queues.simqueue import SimQueue
+        self._cmdObject('app', ':class:`App <htmd.apps.app.App>` object', 'An App class object used to retrieve and submit simulations', None, (App, SimQueue))
         self._cmdString('project', 'str', 'The name of the project', 'adaptive')
         self._cmdValue('nmin', 'int', 'Minimum number of running simulations', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('nmax', 'int', 'Maximum number of running simulations', 1, TYPE_INT, RANGE_POS)

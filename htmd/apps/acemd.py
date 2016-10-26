@@ -56,6 +56,7 @@ class Acemd(ProtocolInterface):
         self._cmdString('celldimension', 'str', '', None)
         self._cmdString('useconstantratio', 'str', '', None)
         self._cmdString('amber', 'str', '', None)
+        self._cmdString('dielectric', 'str', '', None)
 
         # Files
         self._cmdString('bincoordinates', 'str', '', None)

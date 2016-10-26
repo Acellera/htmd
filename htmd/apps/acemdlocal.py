@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class AcemdLocal(LocalGPUQueue):
-    """
+    """ Class for running local ACEMD simulations on GPUs. Uses a queuing system.
+
     Parameters
     ----------
     acemd : str
@@ -24,6 +25,19 @@ class AcemdLocal(LocalGPUQueue):
         A list of GPU device indexes on which AcemdLocal is allowed to run simulations. Mutually exclusive with `ngpus`
     datadir : str
         A folder to which completed simulations will be moved. If None they will be written in the input directory.
+    inputfile : str
+        The name of the input file for the simulation.
+    timeout : float
+        Timeout for simulations. Can be used to run simulations only for X amounts of minutes before exiting.
+
+    .. currentmodule:: htmd.apps.acemdlocal.AcemdLocal
+    .. rubric:: Methods
+    .. autoautosummary:: htmd.apps.acemdlocal.AcemdLocal
+        :methods:
+        :inherited-members:
+    .. rubric:: Attributes
+    .. autoautosummary:: htmd.apps.acemdlocal.AcemdLocal
+        :attributes:
     """
     def __init__(self, acemd=None, ngpus=None, devices=None, datadir=None, inputfile='input', timeout=None):
         if not acemd:

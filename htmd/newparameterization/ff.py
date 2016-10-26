@@ -200,8 +200,8 @@ class PRM:
       if b.types[0] == n2: p2 = b 
 
     # not found, maybe it's a duplicate that needs new params
-    if( not p1 ) and ( "_" in n1 ): 
-       xn1 = re.sub("_[0123456789]$", "", n1 )
+    if( not p1 ) and ( "x" in n1 ):
+       xn1 = re.sub("x[0123456789]$", "", n1 )
        for b in self.nonbonded:
           if b.types[0] == xn1:
             p1 = b
@@ -211,8 +211,8 @@ class PRM:
        if n1==n2:
             p2 = b
 
-    if( not p2 ) and ( "_" in n2 ): 
-       xn2 = re.sub("_[0123456789]$", "", n2 )
+    if( not p2 ) and ( "x" in n2 ):
+       xn2 = re.sub("x[0123456789]$", "", n2 )
        for b in self.nonbonded:
           if b.types[0] == xn2:
             p2 = b
@@ -254,9 +254,9 @@ class PRM:
        if b.types[1] == n1 and b.types[0] == n2: return b
 
     # not found, maybe it's a duplicate that needs new params
-    if( "_" in n1 ) or ( "_" in n2 ):
-       xn1 = re.sub("_[0123456789]$", "", n1 )
-       xn2 = re.sub("_[0123456789]$", "", n2 )
+    if( "x" in n1 ) or ( "x" in n2 ):
+       xn1 = re.sub("x[0123456789]$", "", n1 )
+       xn2 = re.sub("x[0123456789]$", "", n2 )
        b = self.bondParam( xn1, xn2 )
        c = BondPrm( [n1, n2], r0=b.r0, k0=b.k0 )
        self.bonds.append(c)
@@ -270,10 +270,10 @@ class PRM:
        if b.types[2] == n1 and b.types[1] == n2 and b.types[0] == n3: return b;
 
     # not found, maybe it's a duplicate that needs new params
-    if( "_" in n1 ) or ( "_" in n2 ) or ( "_" in n3 ):
-       xn1 = re.sub("_[0123456789]$", "", n1 )
-       xn2 = re.sub("_[0123456789]$", "", n2 )
-       xn3 = re.sub("_[0123456789]$", "", n3 )
+    if( "x" in n1 ) or ( "x" in n2 ) or ( "x" in n3 ):
+       xn1 = re.sub("x[0123456789]$", "", n1 )
+       xn2 = re.sub("x[0123456789]$", "", n2 )
+       xn3 = re.sub("x[0123456789]$", "", n3 )
        b = self.angleParam( xn1, xn2, xn3 )
        c = AnglePrm( [ n1, n2, n3 ], theta0=b.theta0, k0=b.k0, rUB=b.rUB, kUB=b.kUB )
        self.angles.append(c)
@@ -299,11 +299,11 @@ class PRM:
 
     # not found, maybe it's a duplicate that needs new params
     if not found:
-      if( "_" in n1 ) or ( "_" in n2 ) or ( "_" in n3 ) or ( "_" in n4 ):
-       xn1 = re.sub("_[0123456789]$", "", n1 )
-       xn2 = re.sub("_[0123456789]$", "", n2 )
-       xn3 = re.sub("_[0123456789]$", "", n3 )
-       xn4 = re.sub("_[0123456789]$", "", n4 )
+      if( "x" in n1 ) or ( "x" in n2 ) or ( "x" in n3 ) or ( "x" in n4 ):
+       xn1 = re.sub("x[0123456789]$", "", n1 )
+       xn2 = re.sub("x[0123456789]$", "", n2 )
+       xn3 = re.sub("x[0123456789]$", "", n3 )
+       xn4 = re.sub("x[0123456789]$", "", n4 )
        b = self.dihedralParam( xn1, xn2, xn3, xn4 )
        r=[]
       # print(b)
@@ -332,11 +332,11 @@ class PRM:
 
     # not found, maybe it's a duplicate that needs new params
     if len(ret) == 0:
-      if( "_" in n1 ) or ( "_" in n2 ) or ( "_" in n3 ) or ( "_" in n4 ):
-       xn1 = re.sub("_[0123456789]$", "", n1 )
-       xn2 = re.sub("_[0123456789]$", "", n2 )
-       xn3 = re.sub("_[0123456789]$", "", n3 )
-       xn4 = re.sub("_[0123456789]$", "", n4 )
+      if( "x" in n1 ) or ( "x" in n2 ) or ( "x" in n3 ) or ( "x" in n4 ):
+       xn1 = re.sub("x[0123456789]$", "", n1 )
+       xn2 = re.sub("x[0123456789]$", "", n2 )
+       xn3 = re.sub("x[0123456789]$", "", n3 )
+       xn4 = re.sub("x[0123456789]$", "", n4 )
        b = self.improperParam( xn1, xn2, xn3, xn4 )
        r = []
        for c in b:
@@ -439,11 +439,11 @@ class AmberPRM(PRM):
 
     # not found, maybe it's a duplicate that needs new params
     if not found:
-      if( "_" in n1 ) or ( "_" in n2 ) or ( "_" in n3 ) or ( "_" in n4 ):
-       xn1 = re.sub("_[0123456789]$", "", n1 )
-       xn2 = re.sub("_[0123456789]$", "", n2 )
-       xn3 = re.sub("_[0123456789]$", "", n3 )
-       xn4 = re.sub("_[0123456789]$", "", n4 )
+      if( "x" in n1 ) or ( "x" in n2 ) or ( "x" in n3 ) or ( "x" in n4 ):
+       xn1 = re.sub("x[0123456789]$", "", n1 )
+       xn2 = re.sub("x[0123456789]$", "", n2 )
+       xn3 = re.sub("x[0123456789]$", "", n3 )
+       xn4 = re.sub("x[0123456789]$", "", n4 )
        b = self.dihedralParam( xn1, xn2, xn3, xn4 )
        r=[]
       # print(b)

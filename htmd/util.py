@@ -15,6 +15,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
 def _getNcpus():
     from htmd.config import _config
     ncpus = _config['ncpus']

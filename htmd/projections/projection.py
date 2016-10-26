@@ -12,7 +12,7 @@ class Projection:
     """
 
     @abc.abstractmethod
-    def project(self, *args, **kwargs):
+    def project(self, mol):
         """ Subclasses need to implement and overload this method """
         return
 
@@ -23,3 +23,9 @@ class Projection:
     @abc.abstractmethod
     def _precalculate(self, mol):
         return
+
+    def copy(self):
+        """ Produces a deep copy of the object
+        """
+        from copy import deepcopy
+        return deepcopy(self)
