@@ -38,6 +38,7 @@ class AdaptiveBase(ProtocolInterface):
         self._cmdBoolean('dryrun', 'boolean', 'A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations', False)
         self._cmdValue('updateperiod', 'float', 'When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds', 0, TYPE_FLOAT, RANGE_0POS)
         self._cmdString('coorname', 'str', 'Name of the file containing the starting coordinates for the new simulations', 'input.coor')
+        self._cmdBoolean('lock', 'bool', 'Lock the folder while adaptive is ongoing', False)
         self._running = None
 
     def run(self):
@@ -53,6 +54,7 @@ class AdaptiveBase(ProtocolInterface):
         if self.nmax <= self.nmin:
             raise RuntimeError('nmax option should be larger than nmin.')
 
+        self._setLock()
         while True:
             epoch = self._getEpoch()
             logger.info('Processing epoch ' + str(epoch))
@@ -68,6 +70,7 @@ class AdaptiveBase(ProtocolInterface):
 
                 if epoch >= self.nepochs:
                     logger.info('Reached maximum number of epochs ' + str(self.nepochs))
+                    self._unsetLock()
                     return
 
                 self._running = self.app.inprogress()
@@ -83,6 +86,27 @@ class AdaptiveBase(ProtocolInterface):
                 break
             logger.info('Sleeping for {} seconds.'.format(self.updateperiod))
             time.sleep(self.updateperiod)
+        self._unsetLock()
+
+    def _setLock(self):
+        import datetime
+        import os
+
+        if self.lock:
+            lockfile = os.path.abspath('./adaptivelock')
+            if os.path.exists(lockfile):
+                raise FileExistsError('This adaptive folder is locked by a running adaptive application. If this is not'
+                                      'the case, delete the {} file and run adaptive again.'.format(lockfile))
+
+            with open(lockfile, 'w') as f:
+                f.write(datetime.datetime.now())
+
+    def _unsetLock(self):
+        import os
+        if self.lock:
+            lockfile = os.path.abspath('./adaptivelock')
+            if os.path.exists(lockfile):
+                os.remove(lockfile)
 
     def _init(self):
         folders = natsorted(glob(path.join(self.generatorspath, '*', ''))) # I need the extra ''  to add a finishing /
