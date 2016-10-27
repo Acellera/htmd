@@ -96,10 +96,10 @@ class AdaptiveBase(ProtocolInterface):
             lockfile = os.path.abspath('./adaptivelock')
             if os.path.exists(lockfile):
                 raise FileExistsError('This adaptive folder is locked by a running adaptive application. If this is not'
-                                      'the case, delete the {} file and run adaptive again.'.format(lockfile))
+                                      ' the case, delete the {} file and run adaptive again.'.format(lockfile))
 
             with open(lockfile, 'w') as f:
-                f.write(datetime.datetime.now())
+                f.write('{}'.format(datetime.datetime.now()))
 
     def _unsetLock(self):
         import os
