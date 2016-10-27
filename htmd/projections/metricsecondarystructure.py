@@ -64,34 +64,25 @@ class MetricSecondaryStructure(Projection):
         mol = mol.copy()
         mol.filter(self.sel, _logger=False)
 
-        def get_or_minus1(idx):
-            if len(idx) != 0:
-                return idx[0]
-            else:
-                return -1
+        residues = sequenceID((mol.resid, mol.chain, mol.insertion)) - 1  # Start at 0
 
-        mol.resid = sequenceID((mol.resid, mol.chain, mol.insertion))
-
-        ca_indices = mol.atomselect('name CA', indexes=True)
-        chainids = mol.get('chain', sel=ca_indices)
-        resnames = mol.get('resname', sel=ca_indices)
-
-        uqchains = np.unique(chainids)
-        chain_ids = np.zeros(len(chainids), dtype=np.int32)
-        for i, uqc in enumerate(uqchains):
-            idx = chainids == uqc
-            chain_ids[idx] = i
-
-        nco_indices = []
-        uqresid = np.unique(mol.resid)
-        for res in uqresid:
-            nco_indices.append([get_or_minus1(mol.atomselect('resid {} and backbone and name "N.*"'.format(res), indexes=True)),
-                                get_or_minus1(mol.atomselect('resid {} and backbone and name C'.format(res), indexes=True)),
-                                get_or_minus1(mol.atomselect('resid {} and backbone and name "O.*"'.format(res), indexes=True))])
-        nco_indices = np.array(nco_indices, np.int32)
+        backbone = mol.atomselect('backbone')
+        ca_indices = np.where(mol.name == 'CA')[0].astype(np.int32)
+        chainids = mol.chain[ca_indices]
+        resnames = mol.resname[ca_indices]
         proline_indices = np.array(resnames == 'PRO', dtype=np.int32)
-        ca_indices = np.array(ca_indices, dtype=np.int32)
-        return ca_indices, nco_indices, proline_indices, chain_ids
+
+        _, chain_ids = np.unique(chainids, return_inverse=True)
+
+        nco_indices = np.ones((residues.max()+1, 3), dtype=np.int32) * -1
+        natriums = np.where((mol.name == 'N') & backbone)[0]
+        carbons = np.where((mol.name == 'C') & backbone)[0]
+        oxygens = np.where((mol.name == 'O') & backbone)[0]
+        nco_indices[residues[natriums], 0] = natriums
+        nco_indices[residues[carbons], 1] = carbons
+        nco_indices[residues[oxygens], 2] = oxygens
+
+        return ca_indices, nco_indices, proline_indices, chain_ids.astype(np.int32)
 
     def _getSelections(self, mol):
         # If they have been pre-calculated return them.
