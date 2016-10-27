@@ -60,6 +60,8 @@ def compareVersions():
             from htmd import home
             print('You are on the latest HTMD version ({} : {}).'.format(currver, home()))
 
+    print("")
+
 
 def _writeLatestVersionFile(fname):
     import os
