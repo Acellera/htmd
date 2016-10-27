@@ -67,7 +67,7 @@ def check_registration(product=None):
 
     if not os.path.exists(prefix):
         if not check_approval(product, prefix):
-            if( os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG") ):
+            if os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG"):
                 print("Licence accepted automatically. License terms apply")
                 return 
             else:
