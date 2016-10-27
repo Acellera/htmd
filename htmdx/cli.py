@@ -204,8 +204,10 @@ def main_activate():
        except:
          pass
        f = open(os.path.join( prefix, "license.dat"), "a" )   
-            
-       print(r.content.decode("ascii"), file=f )
+       try:      
+         print(r.content.decode("ascii"), file=f )
+       except:
+         print(r.content, file=f )
        f.close()
        print( "\n License installed in ~/.acellera/license.dat\n\n" );
        try:
