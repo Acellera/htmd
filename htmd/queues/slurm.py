@@ -74,6 +74,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         # Find executables
         self._sbatch = SlurmQueue._find_binary('sbatch')
         self._squeue = SlurmQueue._find_binary('squeue')
+        self._scancel = SlurmQueue._find_binary('scancel')
 
     @staticmethod
     def _find_binary(binary):
@@ -176,12 +177,16 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         return l
 
     def stop(self):
-        # Nothing to do
-        pass
+        """ Cancels all currently running and queued jobs
+        """
+        if self.partition is None:
+            raise ValueError('The partition needs to be defined.')
+        user = pwd.getpwuid(os.getuid()).pw_name
+        cmd = [self._scancel, '-n', self.jobname, '-u', user, '-p', self.partition]
+        logger.debug(cmd)
+        ret = check_output(cmd)
+        logger.debug(ret.decode("ascii"))
 
-    def wait(self):
-        # Nothing to do
-        pass
 
 
 if __name__ == "__main__":

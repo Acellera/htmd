@@ -112,20 +112,6 @@ class LocalGPUQueue(App):
 
         return output_run + output_queue
 
-    def wait(self):
-        """ Blocks script execution until all queued work completes
-
-        Examples
-        --------
-        >>> app.wait()
-        """
-        from time import sleep
-        import sys
-        while self.inprogress() != 0:
-            sys.stdout.flush()
-            sleep(1)
-            # self.queue.join()
-
     def stop(self):
         self.shutdown = True
 
