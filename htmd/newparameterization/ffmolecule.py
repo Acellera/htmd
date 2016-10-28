@@ -35,7 +35,7 @@ class QMFittingSet:
 
 class FFMolecule(Molecule):
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 basis=BasisSet._6_31G_star, execution=Execution.Inline, qmcode=Code.PSI4):
+                 basis=BasisSet._6_31G_star, execution=Execution.Inline, qmcode=Code.PSI4, outdir="./"):
         # filename -- a mol2 format input geometry
         # rtf, prm -- rtf, prm files
         # method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
@@ -49,6 +49,8 @@ class FFMolecule(Molecule):
 
         self.execution = execution
         self.qmcode = qmcode
+        self.method = method
+        self.outdir = outdir
 
         if not (filename.endswith(".mol2")):
             raise ValueError("Input file must be mol2 format")
@@ -78,7 +80,7 @@ class FFMolecule(Molecule):
         else:
             # Otherwise make atom types using the specified method
             # (Right now only MATCH)
-            fftype = FFType(self, method=method)
+            fftype = FFType(self, method=self.method)
             self._rtf = fftype._rtf
             self._prm = fftype._prm
         if not self._rtf or not self._prm:
@@ -125,17 +127,15 @@ class FFMolecule(Molecule):
             self.resname[i] = "MOL"
 
     def minimize(self):
+        mindir = os.path.join(self.outdir, "minimize", self.basis_name)
         try:
-            os.mkdir("minimize")
+            os.makedirs(mindir, exist_ok=True)
         except:
-            pass
-        try:
-            os.mkdir(os.path.join("minimize", self.basis_name))
-        except:
-            pass
+            raise OSError('Directory {} could not be created. Check if you have permissions.'.format(mindir))
+
         # Kick off a QM calculation -- unconstrained geometry optimization
         qm = QMCalculation(self, charge=self.netcharge, optimize=True,
-                           directory=os.path.join("minimize", self.basis_name), basis=self.basis,
+                           directory=mindir, basis=self.basis,
                            execution=self.execution, code=self.qmcode)
         results = qm.results()
         if results[0].errored:
@@ -208,7 +208,7 @@ class FFMolecule(Molecule):
 
     def _try_load_pointfile(self):
         # Load a point file if one exists from a previous job
-        pointfile = os.path.join("esp", self.basis_name, "00000", "grid.dat")
+        pointfile = os.path.join(self.outdir, "esp", self.basis_name, "00000", "grid.dat")
         if os.path.exists(pointfile):
             f = open(pointfile, "r")
             fl = f.readlines()
@@ -228,17 +228,14 @@ class FFMolecule(Molecule):
         self._removeCOM()
         # Kick off a QM calculation -- unconstrained single point with grid
         points = self._try_load_pointfile()
+        espdir = os.path.join(self.outdir, "esp", self.basis_name)
         try:
-            os.mkdir("esp")
+            os.makedirs(espdir, exist_ok=True)
         except:
-            pass
-        try:
-            os.mkdir(os.path.join("esp", self.basis_name))
-        except:
-            pass
+            raise OSError('Directory {} could not be created. Check if you have permissions.'.format(espdir))
 
         qm = QMCalculation(self, charge=self.netcharge, optimize=False, esp=points,
-                           directory=os.path.join("esp", self.basis_name), basis=self.basis, execution=self.execution,
+                           directory=espdir, basis=self.basis, execution=self.execution,
                            code=self.qmcode)
         results = qm.results()
         if results[0].errored:
@@ -405,27 +402,16 @@ class FFMolecule(Molecule):
         if geomopt:
             dirname = "dihedral-opt"
 
-        try:
-            os.mkdir(dirname)
-        except:
-            pass
-
         dih_name = "%s-%s-%s-%s" % (self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]])
-        dirname = os.path.join(dirname, dih_name)
+
+        fitdir = os.path.join(self.outdir, dirname, dih_name, self.basis_name)
 
         try:
-            os.mkdir(dirname)
+            os.makedirs(fitdir, exist_ok=True)
         except:
-            pass
+            raise OSError('Directory {} could not be created. Check if you have permissions.'.format(fitdir))
 
-        dirname = os.path.join(dirname, self.basis_name)
-
-        try:
-            os.mkdir(dirname)
-        except:
-            pass
-
-        qmset = QMCalculation(mol, charge=self.netcharge, directory=dirname, frozen=frozens, optimize=geomopt,
+        qmset = QMCalculation(mol, charge=self.netcharge, directory=fitdir, frozen=frozens, optimize=geomopt,
                               basis=self.basis, execution=self.execution, code=self.qmcode)
 
         ret = self._makeDihedralFittingSetFromQMResults(atoms, qmset.results())
@@ -728,7 +714,7 @@ class FFMolecule(Molecule):
         ffe = FFEvaluate(self)
         ffe.evaluate(self.coords)
 
-    def plotDihedralFit(self, fit, show=True, directory="."):
+    def plotDihedralFit(self, fit, show=True):
         import matplotlib as mpl
         if not show:
             mpl.use('Agg')
@@ -750,11 +736,12 @@ class FFMolecule(Molecule):
         if show:
             plt.show()
         else:
+            plotdir = os.path.join(self.outdir, "parameters", self.method.name, self.basis_name, "plots")
             try:
-                os.mkdir(directory)
+                os.makedirs(plotdir, exist_ok=True)
             except:
-                pass
-            tf = os.path.join(directory, fit.name) + ".svg"
+                raise OSError('Directory {} could not be created. Check if you have permissions.'.format(plotdir))
+            tf = os.path.join(plotdir, fit.name) + ".svg"
             plt.savefig(tf, format="svg")
             return tf
 
