@@ -90,15 +90,21 @@ class Model(object):
         _macroTrajectoriesReport(self.macronum, _macroTrajSt(self.data.St, self.macro_ofcluster), self.data.simlist)
 
     def createState(self, microstates=None, indexpairs=None):
-        """ Splits microstates out of macrostates to create a new macrostate.
+        """ Creates a new state. Works both for new clusters and macrostates.
+
+        If creating a new cluster, it just reassigns the given frames to the new cluster.
+        If creating a new macrostate, it removes the given microstates from their previous macrostate, creates a new one
+        and assigns them to it.
 
         Parameters
         ----------
         microstates : list
             The microstates to split out into a new macrostate.
         indexpairs : list
-            Currently unsupported. To be written.
+            List of lists. Each row is a simulation index - frame pair which should be added to a new cluster.
         """
+        if microstates is not None and indexpairs is not None:
+            raise AttributeError('microstates and indexpairs arguments are mutually exclusive')
         if microstates is not None:
             newmacro = self.macronum
 
@@ -118,6 +124,12 @@ class Model(object):
             # Fixing distributions
             self.msm._metastable_distributions = np.pad(self.msm.metastable_distributions, ((0, 1), (0, 0)), mode='constant', constant_values=(0))
             self.msm._metastable_distributions[-1, microstates] = 1 / len(microstates)
+        if indexpairs is not None:
+            newcluster = self.data.K
+            for ip in indexpairs:
+                self.data.St[ip[0]][ip[1]] = newcluster
+            self.data.K += 1
+            self.data.N = np.bincount(np.concatenate(self.data.St))
 
     @property
     def P(self):
