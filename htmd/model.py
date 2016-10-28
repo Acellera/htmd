@@ -89,6 +89,36 @@ class Model(object):
 
         _macroTrajectoriesReport(self.macronum, _macroTrajSt(self.data.St, self.macro_ofcluster), self.data.simlist)
 
+    def createState(self, microstates=None, indexpairs=None):
+        """ Splits microstates out of macrostates to create a new macrostate.
+
+        Parameters
+        ----------
+        microstates : list
+            The microstates to split out into a new macrostate.
+        indexpairs : list
+            Currently unsupported. To be written.
+        """
+        if microstates is not None:
+            newmacro = self.macronum
+
+            # Fixing sets. Remove microstates from previous macrostates and add new set
+            for i, metset in enumerate(self.msm.metastable_sets):
+                self.msm.metastable_sets[i] = np.array(np.sort(list(set(metset) - set(microstates))))
+            self.msm.metastable_sets.append(np.array(microstates, dtype=np.int64))
+
+            # Fixing hard assignments
+            self.msm.metastable_assignments[microstates] = newmacro
+
+            # Fixing memberships. Padding the array with 0s for the new macrostate
+            self.msm._metastable_memberships = np.pad(self.msm.metastable_memberships, ((0, 0), (0, 1)), mode='constant', constant_values=(0))
+            self.msm._metastable_memberships[microstates, :] = 0
+            self.msm._metastable_memberships[microstates, -1] = 1
+
+            # Fixing distributions
+            self.msm._metastable_distributions = np.pad(self.msm.metastable_distributions, ((0, 1), (0, 0)), mode='constant', constant_values=(0))
+            self.msm._metastable_distributions[-1, microstates] = 1 / len(microstates)
+
     @property
     def P(self):
         return self.msm.transition_matrix
@@ -558,6 +588,21 @@ class Model(object):
         f.close()
         for k in z:
             self.__dict__[k] = z[k]
+
+    def copy(self):
+        """ Produces a deep copy of the object
+
+        Returns
+        -------
+        data : :class:`Model` object
+            A copy of the current object
+
+        Examples
+        --------
+        >>> model2 = model.copy()
+        """
+        from copy import deepcopy
+        return deepcopy(self)
 
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:
