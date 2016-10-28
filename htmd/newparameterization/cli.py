@@ -246,5 +246,5 @@ run 0'''
     sys.exit(0)
 
 
-if __name__ == "__main__":
-    main_parameterize()
+# if __name__ == "__main__":
+#     main_parameterize()  #TODO: separate argparse from the main_parameterize, so it can be called here with arguments (-m and -l)
