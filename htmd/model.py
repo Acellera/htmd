@@ -616,6 +616,78 @@ class Model(object):
         from copy import deepcopy
         return deepcopy(self)
 
+    def createCoreSetModel(self, divisor=2):
+        """ Given an MSM this function detects the states belonging to a core set and returns a new model consisting
+        only of these states.
+
+        Parameters
+        ----------
+        divisor : float
+            Heuristic hyperparameter for modifying the amoung of core state.
+
+        Returns
+        -------
+        newmodel :
+            A new model object
+        """
+        def calcCoreSet(distr, assign, divisor=2):
+            coreset = []
+            for i, md in enumerate(distr):
+                microofmacro = np.where(assign == i)[0]
+                prob = md[microofmacro]
+                coreset.append(microofmacro[np.where(prob > (prob.max() - prob.min()) / divisor)[0]])
+            return coreset
+
+        def coreDtraj(St, micro_ofcluster, coreset):
+            discretetraj = [st.copy() for st in St]
+            newdiscretetraj = []
+            for t, st in enumerate(discretetraj):
+                oldmicro = None
+                newtraj = []
+                for f, cl in enumerate(st):
+                    newmicro = None
+                    micro = micro_ofcluster[cl]
+                    if micro == -1:
+                        newmicro = oldmicro
+                    else:
+                        for co in coreset:
+                            if micro in co:
+                                newmicro = micro
+                                oldmicro = micro
+                                break
+                    if newmicro is None and oldmicro is not None:
+                        newtraj.append(oldmicro)
+                    elif newmicro is not None:
+                        newtraj.append(newmicro)
+                newdiscretetraj.append(np.array(newtraj, dtype=int))
+            kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
+            newdiscretetraj = np.array([x for x in newdiscretetraj if len(x) != 0], dtype=object)
+            return newdiscretetraj, kept
+
+        coreset = calcCoreSet(self.msm.metastable_distributions, self.msm.metastable_assignments, divisor)
+        newdata = self.data.copy()
+        newdata.St, kept = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
+
+        logger.info('Kept {} core microstates from each macrostate.'.format([len(x) for x in coreset]))
+
+        dataobjects = [newdata]
+        if newdata.parent is not None:
+            dataobjects.append(newdata.parent)
+        for data in dataobjects:
+            dat = []
+            ref = []
+            simstmp = []
+            for i, k in enumerate(kept):
+                s = newdata.St[i]
+                dat.append(data.dat[k][-len(s):, :])
+                ref.append(data.ref[k][-len(s):, :])
+                simstmp.append(data.simlist[k])
+            data.dat = np.array(dat, dtype=object)
+            data.ref = np.array(ref, dtype=object)
+            data.simlist = np.array(simstmp)
+
+        return Model(newdata)
+
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:
             raise NameError('You need to call markovModel before calling this command')
