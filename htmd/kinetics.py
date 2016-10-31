@@ -147,28 +147,41 @@ class Kinetics(object):
         >>> print(r)
         >>> dg = r.g0eq
         """
+        import numbers
         self._intergrityCheck()
         if source is None:
             source = self.source
         if sink is None:
             sink = self.sink
+        if isinstance(source, numbers.Integral):
+            source = [source, ]
+        if isinstance(sink, numbers.Integral):
+            sink = [sink, ]
         logger.info('Calculating rates between source: {} and sink: {} states.'.format(source, sink))
-        if source == sink:
+
+        if len(np.intersect1d(source, sink)) != 0:
             logger.info('Calculating rates between state and itself gives 0')
-            r = Rates(); r.mfpton = 0; r.mfptoff=0; r.koff=0; r.kon=0; r.g0eq=0; r.kdeq=0;
+            r = Rates()
             return r
 
-        if source == self.source:  # Apply concentration only on the bulk state
+        if self.source in source:  # Apply concentration only on the bulk state
             conc = self.concentration
-        elif sink == self.source:
+        elif self.source in sink:  # Invert concentration is bulk state is in sink
+            logger.info('Bulk state detected in sink. Applying concentration correction to sink instead of source.')
             conc = 1 / self.concentration
         else:
             conc = 1
 
         model = self.model
-        if states == 'macro':
-            source = np.where(model.macro_ofmicro == source)[0]
-            sink = np.where(model.macro_ofmicro == sink)[0]
+        if states == 'macro':  # Finding the microstates of the macrostates
+            micros = []
+            for s in source:
+                micros += list(np.where(model.macro_ofmicro == s)[0])
+            source = micros
+            micros = []
+            for s in sink:
+                micros += list(np.where(model.macro_ofmicro == s)[0])
+            sink = micros
 
         from msmtools.analysis import mfpt
         r = Rates()
@@ -309,7 +322,6 @@ class Kinetics(object):
         # transition rates
         # plot_markov_model(P)
 
-
     @property
     def _kBT(self):
         return self._kB * self.temperature
@@ -337,13 +349,28 @@ class Rates(object):
     g0eq : float
         The free energy between source and sink, calculated from the equilibrium probability
     """
+    def __init__(self, mfpton=None, mfptoff=None, kon=None, koff=None, kdeq=None, g0eq=None):
+        if mfpton is None:
+            self.mfpton = 0
+        if mfptoff is None:
+            self.mfptoff = 0
+        if kon is None:
+            self.kon = 0
+        if koff is None:
+            self.koff = 0
+        if kdeq is None:
+            self.kdeq = 0
+        if g0eq is None:
+            self.g0eq = 0
+
     def __repr__(self):
         s = ''
         s += 'mfpton = {:.2E} (ns)\n'.format(self.mfpton)
         s += 'mfptoff = {:.2E} (ns)\n'.format(self.mfptoff)
         s += 'kon = {:.2E} (1/M 1/s)\n'.format(self.kon)
         s += 'koff = {:.2E} (1/s)\n'.format(self.koff)
-        s += 'koff/kon = {:.2E} (M)\n'.format(self.koff/self.kon)
+        if self.kon != 0:
+            s += 'koff/kon = {:.2E} (M)\n'.format(self.koff/self.kon)
         s += 'kdeq = {:.2E} (M)\n'.format(self.kdeq)
         s += 'g0eq = {:.2f} (kcal/mol)\n'.format(self.g0eq)
         return s
