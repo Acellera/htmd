@@ -79,7 +79,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
             f.write('#!/bin/bash\n')
             f.write('#\n')
             f.write('#BSUB -J {}\n'.format(self.jobname))
-            f.write('#BSUB -q {}\n'.format(self.partition))
+            f.write('#BSUB -q {}\n'.format(self.queue))
             f.write('#BSUB -n {}\n'.format(self.ngpu))
             f.write('#BSUB -M {}\n'.format(self.memory))
             f.write('#BSUB {}\n'.format(workdir))
@@ -135,7 +135,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)
             try:
-                ret = check_output([self._qsubmit, jobscript])
+                ret = check_output(self._qsubmit + " < " + jobscript, shell=True)
                 logger.debug(ret)
             except:
                 raise
@@ -148,8 +148,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
         total : int
             Total running and queued workunits
         """
-        if self.partition is None:
-            raise ValueError('The partition needs to be defined.')
+        if self.queue is None:
+            raise ValueError('The queue needs to be defined.')
         user = pwd.getpwuid(os.getuid()).pw_name
         cmd = [self._qlist, '-J', self.jobname, '-u', user, '-q', self.queue]
         logger.debug(cmd)
@@ -166,8 +166,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
     def stop(self):
         """ Cancels all currently running and queued jobs
         """
-        if self.partition is None:
-            raise ValueError('The partition needs to be defined.')
+        if self.queue is None:
+            raise ValueError('The queue needs to be defined.')
         user = pwd.getpwuid(os.getuid()).pw_name
         cmd = [self._qcancel, '-J', self.jobname, '-u', user, '-q', self.queue]
         logger.debug(cmd)
