@@ -116,6 +116,8 @@ class Acemd(ProtocolInterface):
             fo.write(self._files[f])
             fo.close()
 
+        self._writeBashRun(os.path.join(path, 'run.sh'))
+
         self._files = {}  # empty file dictionary after writing
     
         self.writeConf(os.path.join(path, 'input'))
@@ -169,6 +171,11 @@ class Acemd(ProtocolInterface):
             print(text)
         else:
             return text
+
+    def _writeBashRun(self, fname):
+        with open(fname, 'w') as f:
+            f.write('#!/bin/bash\nacemd >log.txt 2>&1')
+        os.chmod(fname, 0o700)
 
     def __repr__(self):
         return self.show(quiet=True)

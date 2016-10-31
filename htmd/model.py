@@ -138,7 +138,7 @@ class Model(object):
     @property
     def micro_ofcluster(self):
         self._integrityCheck(postmsm=True)
-        micro_ofcluster = -np.ones(self.data.K+1, dtype=int)
+        micro_ofcluster = -np.ones(self.data.K, dtype=int)
         micro_ofcluster[self.msm.active_set] = np.arange(len(self.msm.active_set))
         return micro_ofcluster
 
@@ -639,15 +639,21 @@ class Model(object):
             return coreset
 
         def coreDtraj(St, micro_ofcluster, coreset):
+            corestates = np.concatenate(coreset)
+            newmapping = np.ones(corestates.max()+1, dtype=int) * -1
+            newmapping[corestates] = np.arange(len(corestates))
             discretetraj = [st.copy() for st in St]
+            frames = []
             newdiscretetraj = []
+            newcounts = np.zeros(len(corestates))
             for t, st in enumerate(discretetraj):
                 oldmicro = None
                 newtraj = []
+                tframes = []
                 for f, cl in enumerate(st):
                     newmicro = None
                     micro = micro_ofcluster[cl]
-                    if micro == -1:
+                    if micro == -1:  # If we are in an dropped cluster, keep old index
                         newmicro = oldmicro
                     else:
                         for co in coreset:
@@ -657,18 +663,24 @@ class Model(object):
                                 break
                     if newmicro is None and oldmicro is not None:
                         newtraj.append(oldmicro)
+                        tframes.append(f)
                     elif newmicro is not None:
                         newtraj.append(newmicro)
-                newdiscretetraj.append(np.array(newtraj, dtype=int))
-            kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
+                        tframes.append(f)
+                mappedtraj = newmapping[np.array(newtraj, dtype=int)]
+                newdiscretetraj.append(mappedtraj)
+                if len(mappedtraj):
+                    newcounts[:mappedtraj.max()+1] += np.bincount(mappedtraj)
+                frames.append(np.array(tframes))
+            #kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
             newdiscretetraj = np.array([x for x in newdiscretetraj if len(x) != 0], dtype=object)
-            return newdiscretetraj, kept
+            return newdiscretetraj, len(corestates), newcounts, frames
 
         coreset = calcCoreSet(self.msm.metastable_distributions, self.msm.metastable_assignments, divisor)
         newdata = self.data.copy()
-        newdata.St, kept = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
+        newdata.St, newdata.K, newdata.N, frames = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
 
-        logger.info('Kept {} core microstates from each macrostate.'.format([len(x) for x in coreset]))
+        logger.info('Kept {} microstates from each macrostate.'.format([len(x) for x in coreset]))
 
         dataobjects = [newdata]
         if newdata.parent is not None:
@@ -677,11 +689,11 @@ class Model(object):
             dat = []
             ref = []
             simstmp = []
-            for i, k in enumerate(kept):
-                s = newdata.St[i]
-                dat.append(data.dat[k][-len(s):, :])
-                ref.append(data.ref[k][-len(s):, :])
-                simstmp.append(data.simlist[k])
+            for i, fr in enumerate(frames):
+                if len(fr):
+                    dat.append(data.dat[i][fr, :])
+                    ref.append(data.ref[i][fr, :])
+                    simstmp.append(data.simlist[i])
             data.dat = np.array(dat, dtype=object)
             data.ref = np.array(ref, dtype=object)
             data.simlist = np.array(simstmp)
