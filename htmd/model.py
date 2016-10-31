@@ -692,7 +692,7 @@ class Model(object):
             for i, fr in enumerate(frames):
                 if len(fr):
                     dat.append(data.dat[i][fr, :])
-                    ref.append(data.dat[i][fr, :])
+                    ref.append(data.ref[i][fr, :])
                     simstmp.append(data.simlist[i])
             data.dat = np.array(dat, dtype=object)
             data.ref = np.array(ref, dtype=object)
