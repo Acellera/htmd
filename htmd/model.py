@@ -639,6 +639,9 @@ class Model(object):
             return coreset
 
         def coreDtraj(St, micro_ofcluster, coreset):
+            corestates = np.concatenate(coreset)
+            newmapping = np.ones(corestates.max()+1, dtype=int) * -1
+            newmapping[corestates] = np.arange(len(corestates))
             discretetraj = [st.copy() for st in St]
             newdiscretetraj = []
             for t, st in enumerate(discretetraj):
@@ -659,7 +662,7 @@ class Model(object):
                         newtraj.append(oldmicro)
                     elif newmicro is not None:
                         newtraj.append(newmicro)
-                newdiscretetraj.append(np.array(newtraj, dtype=int))
+                newdiscretetraj.append(newmapping[np.array(newtraj, dtype=int)])
             kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
             newdiscretetraj = np.array([x for x in newdiscretetraj if len(x) != 0], dtype=object)
             return newdiscretetraj, kept
@@ -668,7 +671,7 @@ class Model(object):
         newdata = self.data.copy()
         newdata.St, kept = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
 
-        logger.info('Kept {} core microstates from each macrostate.'.format([len(x) for x in coreset]))
+        logger.info('Kept microstates {} as core microstates from each macrostate.'.format([len(x) for x in coreset]))
 
         dataobjects = [newdata]
         if newdata.parent is not None:
