@@ -146,6 +146,7 @@ class Kinetics(object):
         >>> r = kin.getRates()
         >>> print(r)
         >>> dg = r.g0eq
+        >>> r = kin.getRates(source=4, sink=[0,1,2,3])
         """
         import numbers
         self._intergrityCheck()
