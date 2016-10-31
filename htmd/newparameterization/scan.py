@@ -7,27 +7,26 @@
 from htmd.newparameterization.ffmolecule import FFMolecule
 from htmd.newparameterization.fftype import FFTypeMethod
 import sys
-import os
 
 
 def main_scan():
-  if(len(sys.argv)!=2):
-    print("Syntax: %s input.mol" % ( sys.argv[0] ) )
-    sys.exit(0)
- 
-  filename = sys.argv[1]
+    if len(sys.argv) != 2:
+        print("Syntax: %s input.mol" % (sys.argv[0]))
+        sys.exit(0)
 
-  print("Scan %s" % ( filename )) 
+    filename = sys.argv[1]
 
-  mol = FFMolecule( filename=filename, method=FFTypeMethod.CGenFF_2b6 )
+    print("Scan {}".format(filename))
 
-  dihedrals = mol.getSoftDihedrals()
-  for d in dihedrals:
-    print("\nScanning dihedral %s-%s-%s-%s" % ( mol.name[ d[0] ], mol.name[ d[1] ], mol.name[ d[2] ], mol.name[ d[3] ]  ))
-    qmset =mol.scanSoftDihedral( d, directory="scan", step=20 );
-    for i in range(len(qmset)):
-         print("%f %f" %( qmset[i].phi, qmset[i].energy) )
+    mol = FFMolecule(filename=filename, method=FFTypeMethod.CGenFF_2b6)
+
+    dihedrals = mol.getSoftDihedrals()
+    for d in dihedrals:
+        print("\nScanning dihedral %s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
+        qmset = mol.scanSoftDihedral(d, directory="scan", step=20)
+        for i in range(len(qmset)):
+            print("%f %f" % (qmset[i].phi, qmset[i].energy))
 
 
 if __name__ == "__main__":
-  main_scan()
+    main_scan()

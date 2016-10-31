@@ -260,17 +260,35 @@ class AdaptiveGoal(AdaptiveBase):
     def _calculateDirectedComponent(self, sims, St, N):
         from joblib import Parallel, delayed
         from htmd.util import _getNcpus
+        from htmd.projections.metric import _singleMolfile
         from htmd.molecule.molecule import Molecule
+        from htmd.config import _config
 
-        if hasattr(self.goalfunction, '__call__'):
-            results = Parallel(n_jobs=_getNcpus(), verbose=0)(delayed(self.goalfunction)(Molecule(s)) for s in sims)
-        elif isinstance(self.goalfunction, tuple) and hasattr(self.goalfunction[0], '__call__'):
-            results = Parallel(n_jobs=_getNcpus(), verbose=0)(delayed(self.goalfunction[0])(Molecule(s), *self.goalfunction[1]) for s in sims)
+        logger.debug('Calculating directed component')
+        single, molfile = _singleMolfile(sims)
+        singlemol = None
+        if single:
+            singlemol = Molecule(molfile)
+        logger.debug('Starting parallel')
+        results = Parallel(n_jobs=_config['ncpus'], verbose=6)(delayed(parallelFunction)(s, self.goalfunction, singlemol) for s in sims)
+        logger.debug('Finished calculating directed component')
 
         goalconcat = np.concatenate(results)
         stconcat = np.concatenate(St)
         clustermeans = np.bincount(stconcat, goalconcat.flatten())
         return clustermeans / N, goalconcat
+
+
+def parallelFunction(sim, goalfunction, singlemol):
+    if singlemol is not None:  # Speeds up by avoiding reading the PDB file multiple times
+        mol = singlemol.copy()
+        mol.read(sim.trajectory)
+    else:
+        mol = Molecule(sim)
+    if hasattr(goalfunction, '__call__'):
+        return goalfunction(mol)
+    elif isinstance(goalfunction, tuple) and hasattr(goalfunction[0], '__call__'):
+        return goalfunction[0](mol, *goalfunction[1])
 
 
 class _AdaptiveGoalOld(AdaptiveGoal):

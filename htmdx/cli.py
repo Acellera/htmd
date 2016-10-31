@@ -67,7 +67,7 @@ def check_registration(product=None):
 
     if not os.path.exists(prefix):
         if not check_approval(product, prefix):
-            if( os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG") ):
+            if os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG"):
                 print("Licence accepted automatically. License terms apply")
                 return 
             else:
@@ -204,8 +204,10 @@ def main_activate():
        except:
          pass
        f = open(os.path.join( prefix, "license.dat"), "a" )   
-            
-       print(r.content.decode("ascii"), file=f )
+       try:      
+         print(r.content.decode("ascii"), file=f )
+       except:
+         print(r.content, file=f )
        f.close()
        print( "\n License installed in ~/.acellera/license.dat\n\n" );
        try:

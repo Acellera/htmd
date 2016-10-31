@@ -89,6 +89,48 @@ class Model(object):
 
         _macroTrajectoriesReport(self.macronum, _macroTrajSt(self.data.St, self.macro_ofcluster), self.data.simlist)
 
+    def createState(self, microstates=None, indexpairs=None):
+        """ Creates a new state. Works both for new clusters and macrostates.
+
+        If creating a new cluster, it just reassigns the given frames to the new cluster.
+        If creating a new macrostate, it removes the given microstates from their previous macrostate, creates a new one
+        and assigns them to it.
+
+        Parameters
+        ----------
+        microstates : list
+            The microstates to split out into a new macrostate.
+        indexpairs : list
+            List of lists. Each row is a simulation index - frame pair which should be added to a new cluster.
+        """
+        if microstates is not None and indexpairs is not None:
+            raise AttributeError('microstates and indexpairs arguments are mutually exclusive')
+        if microstates is not None:
+            newmacro = self.macronum
+
+            # Fixing sets. Remove microstates from previous macrostates and add new set
+            for i, metset in enumerate(self.msm.metastable_sets):
+                self.msm.metastable_sets[i] = np.array(np.sort(list(set(metset) - set(microstates))))
+            self.msm.metastable_sets.append(np.array(microstates, dtype=np.int64))
+
+            # Fixing hard assignments
+            self.msm.metastable_assignments[microstates] = newmacro
+
+            # Fixing memberships. Padding the array with 0s for the new macrostate
+            self.msm._metastable_memberships = np.pad(self.msm.metastable_memberships, ((0, 0), (0, 1)), mode='constant', constant_values=(0))
+            self.msm._metastable_memberships[microstates, :] = 0
+            self.msm._metastable_memberships[microstates, -1] = 1
+
+            # Fixing distributions
+            self.msm._metastable_distributions = np.pad(self.msm.metastable_distributions, ((0, 1), (0, 0)), mode='constant', constant_values=(0))
+            self.msm._metastable_distributions[-1, microstates] = 1 / len(microstates)
+        if indexpairs is not None:
+            newcluster = self.data.K
+            for ip in indexpairs:
+                self.data.St[ip[0]][ip[1]] = newcluster
+            self.data.K += 1
+            self.data.N = np.bincount(np.concatenate(self.data.St))
+
     @property
     def P(self):
         return self.msm.transition_matrix
@@ -96,7 +138,7 @@ class Model(object):
     @property
     def micro_ofcluster(self):
         self._integrityCheck(postmsm=True)
-        micro_ofcluster = -np.ones(self.data.K+1, dtype=int)
+        micro_ofcluster = -np.ones(self.data.K, dtype=int)
         micro_ofcluster[self.msm.active_set] = np.arange(len(self.msm.active_set))
         return micro_ofcluster
 
@@ -558,6 +600,105 @@ class Model(object):
         f.close()
         for k in z:
             self.__dict__[k] = z[k]
+
+    def copy(self):
+        """ Produces a deep copy of the object
+
+        Returns
+        -------
+        data : :class:`Model` object
+            A copy of the current object
+
+        Examples
+        --------
+        >>> model2 = model.copy()
+        """
+        from copy import deepcopy
+        return deepcopy(self)
+
+    def createCoreSetModel(self, divisor=2):
+        """ Given an MSM this function detects the states belonging to a core set and returns a new model consisting
+        only of these states.
+
+        Parameters
+        ----------
+        divisor : float
+            Heuristic hyperparameter for modifying the amoung of core state.
+
+        Returns
+        -------
+        newmodel :
+            A new model object
+        """
+        def calcCoreSet(distr, assign, divisor=2):
+            coreset = []
+            for i, md in enumerate(distr):
+                microofmacro = np.where(assign == i)[0]
+                prob = md[microofmacro]
+                coreset.append(microofmacro[np.where(prob > (prob.max() - prob.min()) / divisor)[0]])
+            return coreset
+
+        def coreDtraj(St, micro_ofcluster, coreset):
+            corestates = np.concatenate(coreset)
+            newmapping = np.ones(corestates.max()+1, dtype=int) * -1
+            newmapping[corestates] = np.arange(len(corestates))
+            discretetraj = [st.copy() for st in St]
+            frames = []
+            newdiscretetraj = []
+            newcounts = np.zeros(len(corestates))
+            for t, st in enumerate(discretetraj):
+                oldmicro = None
+                newtraj = []
+                tframes = []
+                for f, cl in enumerate(st):
+                    newmicro = None
+                    micro = micro_ofcluster[cl]
+                    if micro == -1:  # If we are in an dropped cluster, keep old index
+                        newmicro = oldmicro
+                    else:
+                        for co in coreset:
+                            if micro in co:
+                                newmicro = micro
+                                oldmicro = micro
+                                break
+                    if newmicro is None and oldmicro is not None:
+                        newtraj.append(oldmicro)
+                        tframes.append(f)
+                    elif newmicro is not None:
+                        newtraj.append(newmicro)
+                        tframes.append(f)
+                mappedtraj = newmapping[np.array(newtraj, dtype=int)]
+                newdiscretetraj.append(mappedtraj)
+                if len(mappedtraj):
+                    newcounts[:mappedtraj.max()+1] += np.bincount(mappedtraj)
+                frames.append(np.array(tframes))
+            #kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
+            newdiscretetraj = np.array([x for x in newdiscretetraj if len(x) != 0], dtype=object)
+            return newdiscretetraj, len(corestates), newcounts, frames
+
+        coreset = calcCoreSet(self.msm.metastable_distributions, self.msm.metastable_assignments, divisor)
+        newdata = self.data.copy()
+        newdata.St, newdata.K, newdata.N, frames = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
+
+        logger.info('Kept {} microstates from each macrostate.'.format([len(x) for x in coreset]))
+
+        dataobjects = [newdata]
+        if newdata.parent is not None:
+            dataobjects.append(newdata.parent)
+        for data in dataobjects:
+            dat = []
+            ref = []
+            simstmp = []
+            for i, fr in enumerate(frames):
+                if len(fr):
+                    dat.append(data.dat[i][fr, :])
+                    ref.append(data.dat[i][fr, :])
+                    simstmp.append(data.simlist[i])
+            data.dat = np.array(dat, dtype=object)
+            data.ref = np.array(ref, dtype=object)
+            data.simlist = np.array(simstmp)
+
+        return Model(newdata)
 
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:

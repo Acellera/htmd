@@ -24,10 +24,18 @@ class SimQueue(metaclass=ABCMeta):
         """ Subclasses need to implement this method """
         pass
 
-    @abc.abstractmethod
     def wait(self):
-        """ Subclasses need to implement this method """
-        pass
+        """ Blocks script execution until all queued work completes
+
+        Examples
+        --------
+        >>> queue.wait()
+        """
+        from time import sleep
+        import sys
+        while self.inprogress() != 0:
+            sys.stdout.flush()
+            sleep(1)
 
     @abc.abstractmethod
     def stop(self):
