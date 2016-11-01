@@ -1,13 +1,36 @@
 #!/bin/sh
 
-anaconda copy --to-owner acellera --to-label omnia omnia/ambermini/15.0.4
-anaconda copy --to-owner acellera --to-label omnia omnia/bhmm/0.6.1
-anaconda copy --to-owner acellera --to-label omnia omnia/funcsigs/1.0.0
-anaconda copy --to-owner acellera --to-label omnia omnia/mdtraj/1.7.2
-anaconda copy --to-owner acellera --to-label omnia omnia/msmtools/1.1.4
-anaconda copy --to-owner acellera --to-label omnia omnia/openbabel/2015.09
-anaconda copy --to-owner acellera --to-label omnia omnia/pint/0.7.2
-anaconda copy --to-owner acellera --to-label omnia omnia/progress_reporter/1.2
-anaconda copy --to-owner acellera --to-label omnia omnia/pyemma/2.2.6
-anaconda copy --to-owner acellera --to-label omnia omnia/thermotools/0.2.3
+PACKAGES="
+ambermini
+bhmm
+funcsigs
+mdtraj
+msmtools
+openbabel
+pint
+progress_reporter
+pyemma
+thermotools
+"
+
+DIR=$(mktemp -d)
+cd $DIR
+echo "Using TMPDIR $DIR"
+
+mkdir win-64 win-32 osx-32 osx-64 linux-32 linux-64 noarch
+
+for T in $PACKAGES; do
+	echo "Downloading [$T]"
+	anaconda download omnia/$T
+done	
+
+for F in */*; do
+	echo "Uploading [$F]"
+	anaconda upload */* -u acellera 
+done
+
+cd /
+rm -rf $DIR
+
+exit 0 
 
