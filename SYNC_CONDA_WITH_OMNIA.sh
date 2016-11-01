@@ -1,9 +1,16 @@
 #!/bin/sh
 
 PACKAGES="
+ambermini
+bhmm
+funcsigs
 mdtraj
+msmtools
 openbabel
+pint
 progress_reporter
+pyemma
+thermotools
 "
 
 DIR=$(mktemp -d)
