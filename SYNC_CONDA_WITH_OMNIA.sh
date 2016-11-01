@@ -1,16 +1,9 @@
 #!/bin/sh
 
 PACKAGES="
-ambermini
-bhmm
-funcsigs
 mdtraj
-msmtools
 openbabel
-pint
 progress_reporter
-pyemma
-thermotools
 "
 
 DIR=$(mktemp -d)
@@ -25,7 +18,7 @@ for T in $PACKAGES; do
 done	
 wait
 
-for F in */*; do
+for F in noarch/* */*py35*; do
 	echo "Uploading [$F]"
 	anaconda upload $F -u acellera 
 done
