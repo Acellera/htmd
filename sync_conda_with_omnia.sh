@@ -23,6 +23,7 @@ except:
 # Add packages to sync in this list here
 
 for p in [ 
+	"fftw3f",
 	"openmm",
 	"ambermini",
 	"bhmm",
