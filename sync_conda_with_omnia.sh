@@ -55,7 +55,7 @@ for p in [
 				call([ "curl", "-L", "-s",  url, "-o", f["basename"] ])
 				print("Uploading.."  )
 				try:
-        	os.getenv("ANACONDA_TOKEN_BASIC") 
+					os.getenv("ANACONDA_TOKEN_BASIC") 
 					call([ "anaconda", "upload", "-t", os.getenv("ANACONDA_TOKEN_BASIC"),"-u",  "acellera", f["basename"] ])
 				except:
 					call([ "anaconda", "upload", "-u",  "acellera", f["basename"] ])
