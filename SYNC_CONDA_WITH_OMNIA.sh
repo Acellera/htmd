@@ -26,7 +26,7 @@ done
 
 for F in */*; do
 	echo "Uploading [$F]"
-	anaconda upload */* -u acellera 
+	anaconda upload $F -u acellera 
 done
 
 cd /
