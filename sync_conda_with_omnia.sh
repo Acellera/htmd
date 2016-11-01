@@ -54,6 +54,6 @@ for p in [
 					pass
 				call([ "curl", "-L", "-s",  url, "-o", f["basename"] ])
 				print("Uploading.."  )
-				call([ "anaconda", "upload", "-t", os.getenv("ANACONDA_TOKEN"),"-u",  "acellera", f["basename"] ])
+				call([ "anaconda", "upload", "-t", os.getenv("ANACONDA_TOKEN_BASIC"),"-u",  "acellera", f["basename"] ])
 	else:
 		print("Package %s up to date at version %s" % ( p, omnia["latest_version"] ) )
