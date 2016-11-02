@@ -34,7 +34,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
     walltime : int, default=None
         Job timeout (hour:min or min)
     environment : list of strings, default=None
-        Envvars to propagate to the job.
+        Things to run before the job (sourcing envs).
     outputstream : str, default='slurm.%N.%j.out'
         Output stream.
     errorstream : str, default='slurm.%N.%j.err'
@@ -55,6 +55,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 4000, TYPE_INT, RANGE_0POS)
         self._cmdValue('walltime', 'int', 'Job timeout (hour:min or min)', None, TYPE_INT, RANGE_POS)
+        self._cmdList('environment', 'list', 'Things to run before the job (sourcing envs).', None)
         self._cmdString('outputstream', 'str', 'Output stream.', 'lsf.%J.out')
         self._cmdString('errorstream', 'str', 'Error stream.', 'lsf.%J.err')
         self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
