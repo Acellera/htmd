@@ -10,7 +10,7 @@ rm -rf $(find htmd -type d -name __pycache__)
 
 echo "Installing into $PREFIX"
 
-	DIR="$SP_DIR"
+	DIR="$PREFIX"
 
 	if [ "$DIR" != "" ]; then
 		mkdir -p "$DIR"
@@ -23,7 +23,7 @@ echo "Installing into $PREFIX"
     rm -rf $(find "$DIR/htmd" -name .git -type d) 
 
  	else
-		echo "Error: SP_DIR not defined"
+		echo "Error: PREFIX not defined"
 		exit 1
 	fi
 
