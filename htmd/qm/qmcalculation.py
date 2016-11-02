@@ -456,6 +456,10 @@ class QMCalculation:
                     ff = l.split()
                     data['energy'] = float(ff[4])
                     completed = True
+                if "SCF Done:  E(RB3LYP) = " in l:
+                    ff = l.split()
+                    data['energy'] = float(ff[4])
+                    completed = True
             i = 0
             while i < len(fl):
                 if "Number     Number       Type             X           Y           Z" in fl[i]:

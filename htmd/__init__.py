@@ -46,7 +46,7 @@ from htmd.util import tempname
 from htmd.config import config
 from htmd.clustering.kcenters import KCenter
 from htmd.clustering.regular import RegCluster
-from htmd.queues.slurm import SlurmQueue
+import htmd.queues
 import logging.config
 import htmd
 
