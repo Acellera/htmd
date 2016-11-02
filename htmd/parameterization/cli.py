@@ -1,208 +1,251 @@
-import os
-import shutil
-import re
+# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
+
+import argparse
+from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
+from htmd.parameterization.fftype import FFTypeMethod
+from htmd.qm.qmcalculation import BasisSet, Execution, Code
 import sys
-from htmd.parameterization.configuration import ParameterizationConfig
-from htmd.parameterization.command import Command
-from htmd.parameterization.parameterization import Parameterization
-import logging
-import warnings
-import matplotlib as mpl
-
-# Suppress the unhelpful warning  that matplotlib emits
-warnings.filterwarnings("ignore")
-mpl.use('Agg')
+import os
 
 
-def syntax():
+def printEnergies(mol):
+    print("\n == Diagnostic Energies == ")
+    ffe = FFEvaluate(mol)
+    energies = ffe.evaluate(mol.coords[:, :, 0])
     print("")
-    print(" Acellera Small Molecule Parameterization 2016 (c) \n")
-    print("  Syntax: parameterize [args]:\n")
-    print("    --input [inputfile]      : Specify the input file. Default value 'input'")
-    print("    --resume [job]           : Specify name of a job to resume")
-    print("    --command ([command])    : Show help for an input-file command")
-    print("    --list                   : Show jobs")
-    print("    --rename [molfile]       : Rename the atoms in specified file")
-    print("    --torsions [molfile]     : List the soft torsions")
-    print("    --delete [job]           : Delete a named job")
-    print("    --license                : Show the software license")
-    print("    --verbose                : Verbose logging")
-    print("    --cache                  : Cache directory [~/.htmd/gaamp/]")
-    print("    --help")
-    print("")
-    print(" No re-distribution in whole or part")
+    print(" Bond     : %f" % (energies['bond']))
+    print(" Angle    : %f" % (energies['angle']))
+    print(" Dihedral : %f" % (energies['dihedral']))
+    print(" Improper : %f" % (energies['improper']))
+    print(" Electro  : %f" % (energies['elec']))
+    print(" VdW      : %f" % (energies['vdw']))
     print("")
 
 
 def main_parameterize():
-    mpl.use('Agg')
-
-    input_file = None
-    # device = None
-    verbose = False
-    # platform = None
-    debug = False
-    list_jobs = False
-    rename_file = None
-    job_to_delete = False
-    resume = None
-    # cache_prefix = None
-    # check_registration( product="parameterization" )
-
-    a = 1
+    ncpus = os.cpu_count()
     try:
-        while a < len(sys.argv):
-            if sys.argv[a] == "--rename":
-                if a < len(sys.argv) - 1:
-                    rename_file = sys.argv[a + 1]
-                    a += 1
-                else:
-                    raise NameError()
-            elif sys.argv[a] == "--cache":
-                if a < len(sys.argv) - 1:
-                    cache_prefix = sys.argv[a + 1]
-                    Parameterization.set_prefix(cache_prefix)
-                    a += 1
-                else:
-                    raise NameError()
-            elif sys.argv[a] == "--torsions":
-                if a < len(sys.argv) - 1:
-                    try:
-                        tt = (Parameterization.listDihedrals(sys.argv[a + 1]))
-                        tt = tt[1]
-                        for x in tt:
-                            for y in x:
-                                print("%5s" % y, end="")
-                            print("")
-                    except NameError as e:
-                        print(str(e))
-                    sys.exit(0)
-                else:
-                    raise NameError()
-            elif sys.argv[a] == "--input":
-                if a < len(sys.argv) - 1:
-                    input_file = sys.argv[a + 1]
-                    a += 1
-                else:
-                    raise NameError()
-            elif sys.argv[a] == "--resume":
-                if a < len(sys.argv) - 1:
-                    resume = sys.argv[a + 1]
-                    a += 1
-                else:
-                    raise NameError()
-            elif sys.argv[a] == "--license":
-                # show_license( product="parameterization" )
-                sys.exit(0)
-            elif sys.argv[a] == "--debug":
-                debug = True
-            elif sys.argv[a] == "--list":
-                list_jobs = True
-            elif (sys.argv[a] == "--delete") and (a < len(sys.argv) - 1):
-                job_to_delete = sys.argv[a + 1]
-                a += 1
-            elif sys.argv[a] == "--verbose":
-                verbose = True
-            elif sys.argv[a] == "--command":
-                if a < len(sys.argv) - 1:
-                    Command.help(sys.argv[a + 1])
-                    sys.exit(1)
-                    a += 1
-                else:
-                    Command.help(None)
-                    sys.exit(1)
+        ncpus = int(os.getenv("NCPUS"))
+    except:
+        pass
 
-            elif sys.argv[a] == "--help" or sys.argv[a] == "-h":
-                syntax()
-                sys.exit(0)
-            else:
-                print("Unparsed : " + sys.argv[a])
-            a += 1
-    except NameError as e:
-        if debug:
-            raise e
-        syntax()
+    parser = argparse.ArgumentParser(description="Acellera Small Molecule Parameterisation Version 2.0")
+    parser.add_argument("-m", "--mol2", help="Molecule to parameterise, in mol2 format", required=True, type=str,
+                        default=None, metavar="<input.mol2>", action="store", dest="mol")
+    parser.add_argument("-l", "--list", help="List parameterisable torsions", action="store_true", default=False,
+                        dest="list")
+    parser.add_argument("-c", "--charge", help="Net charge on molecule (default: sum of the partial charges on the "
+                        ".mol2 file)", type=int, default=None, action="store", dest="charge")
+    parser.add_argument("--rtf", help="Inital RTF parameters (req --prm)", type=str, default=None, dest="rtf")
+    parser.add_argument("--prm", help="Inital PRM parameters (req --rtf)", type=str, default=None, dest="prm")
+    parser.add_argument("-o", "--outdir", help="Output directory (default: %(default)s)", type=str, default="./",
+                        dest="outdir")
+    parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default all)",
+                        action="append", default=None, dest="torsion")
+    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=ncpus,
+                        dest="ncpus")
+    parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
+                        choices=["GAFF", "GAFF2", "CGENFF"], default="CGENFF")
+    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVTZ"],
+                        default="cc-pVTZ", dest="basis")
+    parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
+                        choices=["inline", "LSF", "PBS"], default="inline", dest="exec")
+    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4"], default="PSI4",
+                        dest="qmcode")
+
+    args = parser.parse_args()
+
+    # Communicate the # of CPUs to use to the QM engine via environment variable
+    os.environ['NCPUS'] = str(args.ncpus)
+
+    filename = args.mol
+    if not os.path.exists(filename):
+        print("File {} not found. Please check that the file exists and that the path is correct.".format(filename))
         sys.exit(0)
 
-    if rename_file:
-        try:
-            Parameterization.renameStructure(rename_file)
-            print("Atoms renamed and file over-written")
-            sys.exit(0)
-        except (NameError, ValueError) as e:
-            print("Renaming of atoms failed " + str(e))
-            sys.exit(1)
-
-    if input_file and resume:
-        print("--input and --resume are mutually exclusive")
+    if args.qmcode == "Gaussian":
+        code = Code.Gaussian
+    elif args.qmcode == "PSI4":
+        code = Code.PSI4
+    else:
+        print("Unknown QM code: {}".format(args.qmcode))
         sys.exit(1)
 
-    if list_jobs:
-        Parameterization.listJobs()
-        sys.exit(0)
-    if job_to_delete:
-        try:
-            Parameterization.deleteJob(job_to_delete)
-            sys.exit(0)
-        except (ValueError, NameError) as e:
-            print("Unable to remove job: " + str(e))
-            sys.exit(1)
-
-    if not resume and (not input_file):
-        input_file = "input"
-
-    if input_file and not os.path.isfile(input_file):
-        print("Input file not found")
-        syntax()
-        sys.exit(0)
-
-    print("\n === Acellera Small Molecule Parameterization 2016 (c) === \n")
-    try:
-        if input_file:
-            config = ParameterizationConfig(config=input_file, check=True)
-            print(config)
-        else:
-            config = None
-    except NameError as e:
-        print("\n Failed to parse input file : \n\n  " + str(e) + "\n\n")
-        if debug:
-            raise e
-        sys.exit(2)
-
-    if verbose:
-        logging.getLogger("htmd.parameterization").setLevel(logging.INFO)
+    if args.exec == "inline":
+        execution = Execution.Inline
+    elif args.exec == "LSF":
+        execution = Execution.LSF
+    elif args.exec == "PBS":
+        execution = Execution.PBS
     else:
-        logging.getLogger("htmd.parameterization").setLevel(logging.WARNING)
+        print("Unknown execution mode: {}".format(args.exec))
+        sys.exit(1)
 
-    if debug:
-        logging.getLogger("htmd.parameterization").setLevel(logging.DEBUG)
-        if config:
-            config.Debug = True
+    if args.forcefield == "CGENFF":
+        method = FFTypeMethod.CGenFF_2b6
+    elif args.forcefield == "GAFF":
+        method = FFTypeMethod.GAFF
+    elif args.forcefield == "GAFF2":
+        method = FFTypeMethod.GAFF2
+    else:
+        print("Unknown initial guess force-field: {}".format(args.forcefield))
+        sys.exit(1)
 
-    try:
-        p = Parameterization(config=config, name=resume)
-        p.plotDihedrals(show=False)
-        # for i in range(len(fp)):
-        #     shutil.copyfile(fp[i], "torsion-potential-" + re.sub(" ", "-", names[i]) + ".svg")
-        p.getParameters()
-        # shutil.copyfile(pp['RTF'], "mol.rtf")
-        # shutil.copyfile(pp['PRM'], "mol.prm")
-        # shutil.copyfile(pp['PDB'], "mol.pdb")
+    if args.basis == "6-31g-star":
+        basis = BasisSet._6_31G_star
+    elif args.basis == "cc-pVTZ":
+        basis = BasisSet._cc_pVTZ
+    else:
+        print("Unknown basis {}".format(args.basis))
+        sys.exit(1)
 
-    except (NameError, ValueError) as e:
-        print("\n Failed to run parameterization : " + str(e) + "\n")
-        if debug:
-            raise e
-        sys.exit(3)
+    # Just list or parameterize?
+    if args.list:
+        print(" === Listing soft torsions of {} ===\n".format(filename))
+    else:
+        print(" === Parameterizing {} ===\n".format(filename))
 
-    except KeyboardInterrupt as e:
-        print("\n Terminating at user request before parameterization started\n")
-        if debug:
-            raise e
-        sys.exit(5)
+    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
+                     basis=basis, execution=execution, qmcode=code, outdir=args.outdir)
+    dihedrals = mol.getSoftDihedrals()
 
+    if args.list:
+        print("Detected soft torsions:")
+        for d in dihedrals:
+            print("\t{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
+        sys.exit(0)
+
+    if not args.list:  # Parameterize
+
+        print("\n == Minimizing ==\n")
+        mol.minimize()
+
+        print("\n == Charge fitting ==\n")
+        if True:
+            (score, qm_dipole, mm_dipole) = mol.fitCharges()
+
+            rating = "GOOD"
+            if score > 1:
+                rating = "CHECK"
+            if score > 10:
+                rating = "BAD"
+
+            print("Charge Chi^2 score : %f : %s" % (score, rating))
+            print("QM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
+            print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
+            d = 0.
+            for i in range(3):
+                x = qm_dipole[i] - mm_dipole[i]
+                d = d + x * x
+
+            rating = "GOOD"
+            if score > 1:
+                rating = "CHECK"
+            print("Dipole Chi^2 score : %f : %s" % (d, rating))
+            print("")
+
+        for d in dihedrals:
+            name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
+            if not args.torsion or name in args.torsion:
+                print("\n == Fitting torsion {} ==\n".format(name))
+                try:
+                    ret = mol.fitSoftDihedral(d)
+
+                    rating = "GOOD"
+                    if ret.chisq > 10:
+                        rating = "CHECK"
+                    if ret.chisq > 100:
+                        rating = "BAD"
+                    print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
+
+                    fn = mol.plotDihedralFit(ret, show=False)
+                except:
+                    pass
+                    # print(fn)
+
+        printEnergies(mol)
+
+        paramdir = os.path.join(args.outdir, "parameters", method.name, args.basis)
+        print("\n == Output to {} ==\n".format(paramdir))
+        try:
+            os.makedirs(paramdir, exist_ok=True)
+        except:
+            raise OSError('Directory {} could not be created. Check if you have permissions.'.format(paramdir))
+
+        if args.forcefield == "CGENFF":
+            try:
+                mol._rtf.write(os.path.join(paramdir, "mol.rtf"))
+                mol._prm.write(os.path.join(paramdir, "mol.prm"))
+                for ext in ['psf', 'xyz', 'coor', 'mol2', 'pdb']:
+                    mol.write(os.path.join(paramdir, "mol." + ext))
+                f = open(os.path.join(paramdir, "input.namd"), "w")
+                tmp = '''parameters mol.prm
+paraTypeCharmm on
+coordinates mol.pdb
+bincoordinates mol.coor
+temperature 0
+timestep 0
+1-4scaling 1.0
+exclude scaled1-4
+outputname .out
+outputenergies 1
+structure mol.psf
+cutoff 20.
+switching off
+stepsPerCycle 1
+rigidbonds none
+cellBasisVector1 50. 0. 0.
+cellBasisVector2 0. 50. 0.
+cellBasisVector3 0. 0. 50.
+run 0'''
+                print(tmp, file=f)
+                f.close()
+            except ValueError as e:
+                print("Not writing CHARMM PRM: {}".format(str(e)))
+        elif args.forcefield == "GAFF" or args.forcefield == "GAFF2":
+            try:
+                # types need to be remapped because Amber FRCMOD format limits the type to characters
+                # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
+                typemap = mol._prm.writeFrcmod(mol._rtf, os.path.join(paramdir, "mol.frcmod"))
+                for ext in ['coor', 'mol2', 'pdb']:
+                    mol.write(os.path.join(paramdir, "mol." + ext))
+                f = open(os.path.join(paramdir, "tleap.in"), "w")
+                tmp = '''loadAmberParams mol.frcmod
+A = loadMol2 mol.mol2
+saveAmberParm A structure.prmtop mol.crd
+quit'''
+                print(tmp, file=f)
+                f.close()
+                f = open(os.path.join(paramdir, "input.namd"), "w")
+                tmp = '''parmfile structure.prmtop
+amber on
+coordinates mol.pdb
+bincoordinates mol.coor
+temperature 0
+timestep 0
+1-4scaling 0.83333333
+exclude scaled1-4
+outputname .out
+outputenergies 1
+cutoff 20.
+switching off
+stepsPerCycle 1
+rigidbonds none
+cellBasisVector1 50. 0. 0.
+cellBasisVector2 0. 50. 0.
+cellBasisVector3 0. 0. 50.
+run 0'''
+                print(tmp, file=f)
+                f.close()
+            except ValueError as e:
+                print("Not writing Amber FRCMOD: {}".format(str(e)))
     sys.exit(0)
 
 
 if __name__ == "__main__":
-    main_parameterize()
+    # main_parameterize()  #TODO: separate argparse from the main_parameterize, so it can be called here with arguments (-m and -l)
+    sys.exit(0)

@@ -136,7 +136,7 @@ def getPhi(coords, atoms):
     return phi
 
 # if __name__ == "__main__":
-#  from htmd.newparameterization.ffmolecule import FFMolecule
+#  from htmd.parameterization.ffmolecule import FFMolecule
 #  m = FFMolecule( "benzamidine.mol2" )
 #  
 #  d = m.getSoftDihedrals() 

@@ -245,7 +245,7 @@ def MOL2read(filename):
         s = l[i + start].strip().split()
         topo.record.append("HETATM")
         topo.serial.append(int(s[0]))
-        topo.element.append(re.sub("[^A-Z]*", "", s[1]))
+        topo.element.append(re.sub("[^A-Za-z]*", "", s[1]))
         topo.name.append(s[1])
         coords.append([float(x) for x in s[2:5]])
         topo.charge.append(float(s[8]))
@@ -254,7 +254,7 @@ def MOL2read(filename):
     if bond:
         for i in range(bond, len(l)):
             b = l[i].split()
-            if len(b) != 4:
+            if len(b) < 4:
                 break
             topo.bonds.append([int(b[1]) - 1, int(b[2]) - 1])
     return topo, coords

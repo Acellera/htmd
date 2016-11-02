@@ -51,7 +51,7 @@ def compareVersions():
         return
 
     if currver != 'unpackaged' and natsorted((latest, currver))[1] != currver:
-        print('New {} HTMD version ({}) is available. You are currently on ({}). Use \'conda update -c acellera -c omnia htmd\' to '
+        print('New {} HTMD version ({}) is available. You are currently on ({}). Use \'conda update -c acellera htmd\' to '
               'update to the new version.'.format(verstring, latest, currver))
     else:
         if currver != 'unpackaged':
