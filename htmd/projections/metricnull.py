@@ -42,7 +42,7 @@ class MetricNull(Projection):
             types += ['dummy']
             indexes += [i]
             description += ['Dummy metric.']
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
     def project(self, mol):
         """ Compute the actual metric.

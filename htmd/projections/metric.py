@@ -145,7 +145,7 @@ class Metric:
         import pandas as pd
         if mol is None:
             return
-        pandamap = pd.DataFrame(columns=('type', 'indexes', 'description'))
+        pandamap = pd.DataFrame(columns=('type', 'atomIndexes', 'description'))
         for proj in self.projectionlist:
             pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
         return pandamap
@@ -173,7 +173,7 @@ class Metric:
         # Find out if there is a unique molfile. If there is, initialize a single Molecule to speed up calculations
         uqMol = None
         import pandas as pd
-        map = pd.DataFrame(columns=('type', 'indexes', 'description'))
+        map = pd.DataFrame(columns=('type', 'atomIndexes', 'description'))
         (single, molfile) = _singleMolfile(self.simulations)
         if single:
             uqMol = Molecule(molfile)

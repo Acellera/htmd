@@ -93,7 +93,7 @@ class MetricDihedral(Projection):
                 indexes += [dih]
             else:
                 description += ['Angle of ' + mapstr]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
     def _dihedralAtomsPrecalc(self, mol, protsel):
         protatoms = mol.atomselect(protsel)

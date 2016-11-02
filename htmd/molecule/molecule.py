@@ -1004,35 +1004,38 @@ class Molecule:
 
     def _viewNGL(self, psf, coords, guessb):
         from nglview import Trajectory
-        from htmd.util import tempname
         import nglview
 
-        class TrajectoryStreamer(Trajectory):
-            def __init__(self, coords):
-                self.coords = coords
+        # Subclassing http://arose.github.io/nglview/latest/_modules/nglview.html#FileStructure
+        # If issues occur check the class definition. Method names might have changed
+        class HTMDTrajectory(Trajectory):
+            def __init__(self, mol):
+                super().__init__()
+                self.mol = mol
+                self.ext = "pdb"
+                self.params = {}
 
-            def get_coordinates_list(self, index):
-                return self.coords[:, :, index].flatten().tolist()
+            def get_coordinates(self, index):
+                return self.mol.coords[:, :, index].flatten().tolist()
 
-            def get_frame_count(self):
-                return np.size(self.coords, 2)
+            @property
+            def n_frames(self):
+                return self.mol.numFrames
 
-        pdb = tempname(suffix=".pdb")
-        self.write(pdb)
+            def get_structure_string(self):
+                import tempfile
+                fd, fname = tempfile.mkstemp(suffix='.pdb')
+                self.mol.write(fname)
+                pdb_string = os.fdopen(fd).read()
+                # os.close( fd )
+                return pdb_string
 
-        struc = nglview.FileStructure(pdb)
-        struc.params['dontAutoBond'] = not guessb
+        traj = HTMDTrajectory(self)
+        w = nglview.NGLWidget(traj)
 
-        traj = TrajectoryStreamer(coords)
-        w = nglview.NGLWidget(struc, traj)
-        #else:
-        #    w = nglview.NGLWidget(struc)
-
-        self._tempreps.append(self.reps)
-        self._tempreps._repsNGL(w)
-        self._tempreps.remove()
-
-        os.remove(pdb)
+        #self._tempreps.append(self.reps)
+        #self._tempreps._repsNGL(w)
+        #self._tempreps.remove()
         return w
 
     def mutateResidue(self, sel, newres):
