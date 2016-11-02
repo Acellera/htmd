@@ -114,7 +114,7 @@ class MetricShell(MetricDistance):
                 indexes += [i]
                 description += ['Density of sel2 atoms in shell {}-{} A centered on atom {} {} {}'
                                 .format(n*self.shellwidth, (n+1)*self.shellwidth, mol.resname[i], mol.resid[i], mol.name[i])]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
 
 def _shells(distances, map, shellcenters, numshells, shellwidth):

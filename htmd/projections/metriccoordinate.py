@@ -108,7 +108,7 @@ class MetricCoordinate(Projection):
                 types += ['coordinate']
                 indexes += [i]
                 description += ['{} coordinate of {} {} {}'.format(xyz, mol.resname[i], mol.resid[i], mol.name[i])]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
 
 if __name__ == "__main__":
