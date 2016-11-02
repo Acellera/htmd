@@ -266,6 +266,8 @@ proc calcforces_endstep { } { }
         outfile = os.path.join(outputdir, self.acemd.coordinates)
         inmol.write(outfile)
 
+        self._writeBashRun(os.path.join(outputdir, 'run.sh'))
+
     def addConstraint(self, atomselect, factor=1):
         """ Convenience function for adding a new constraint to existing constraints.
 
@@ -281,6 +283,12 @@ proc calcforces_endstep { } { }
         >>> eq.addConstraint('chain X', 0.3)
         """
         self.constraints[atomselect] = factor
+
+    def _writeBashRun(self, fname):
+        with open(fname, 'w') as f:
+            f.write('#!/bin/bash\nacemd >log.txt 2>&1')
+        os.chmod(fname, 0o700)
+
 
 if __name__ == "__main__":
     import htmd
