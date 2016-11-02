@@ -549,10 +549,10 @@ class QMCalculation:
         except:
             return None
 
-    def _write_terachem( self, dirname, frame);
+    def _write_terachem( self, dirname, frame):
         coords = self.molecule.coords[:, :, frame]
         nrealatoms = coords.shape[0]  # TODO: compensate for dummy atoms
-        f = open(os.path.join(dirname, "psi4.in"), "w")
+        f = open(os.path.join(dirname, "terachem.in"), "w")
 
         if self.basis == BasisSet._6_31G_star:
 #           if self.charge < 0:
@@ -569,15 +569,15 @@ class QMCalculation:
 
         if self.theory == Theory.DFT:
           print( "method      b3lyp", file=f )
-        elif self.theor == Theory.RHF:
+        elif self.theory == Theory.HF:
           print( "method      rhf", file=f )
-        else raise ValueError( "TeraChem is DFT only" )
+        else: raise ValueError( "TeraChem is DFT only" )
 
         print( "basis       %s" % ( basis ), file=f )
         print( "coordinates input.xyz", file=f )
         print( "charge      %d" % (self.charge), file=f )
         print( "spinmult    %d" % (self.multiplicity), file=f )
-        if self.theory = Theory.DFT:
+        if self.theory == Theory.DFT:
            print( "dftd        d3", file=f )
         else:
            print( "dftd        no", file=f )
@@ -594,7 +594,7 @@ class QMCalculation:
 
         if( self.frozen ):
            print( "$constraints", file=f )
-           for i in range(len(self.frozen));
+           for i in range(len(self.frozen)):
                print( "dihedral  %d %d %d %d" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3] ), file=f ) 
            print( "$end", file=f )
         f.close()
@@ -645,7 +645,7 @@ class QMCalculation:
                     self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3], bb), file=f)
             print("\t\")\n}\n", file=f)
 
-        if   self.theory == Theory.RHF: energy="scf"
+        if   self.theory == Theory.HF: energy="scf"
         elif self.theory == Theory.DFT: energy="b3lyp-d3"
          
         if self.optimize:
