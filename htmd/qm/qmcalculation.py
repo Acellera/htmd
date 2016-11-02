@@ -63,6 +63,7 @@ class QMCalculation:
                  charge=0,
                  multiplicity=1,
                  frozen=None,
+                 solvent=True,
                  optimize=False,
                  esp=False,
                  esp_vdw_radii=[1.4, 1.6, 1.8, 2.0, 2.2],
@@ -121,6 +122,7 @@ class QMCalculation:
         self.charge = charge
         self.multiplicity = multiplicity
         self.frozen = None
+        self.solvent  = solvent
         self.esp = esp
         self.esp_vdw_radii = esp_vdw_radii
         self.esp_density = esp_density
@@ -136,11 +138,12 @@ class QMCalculation:
 
         if self.execution == Execution.Inline:
             self.psi4_binary = shutil.which("psi4", mode=os.X_OK)
+            self.terachem_binary = shutil.which("terachem", mode=os.X_OK)
             self.gaussian_binary = shutil.which("g03", mode=os.X_OK)
             if not self.gaussian_binary:
                 self.gaussian_binary = shutil.which("g09", mode=os.X_OK)
-            if (not self.gaussian_binary) and (not self.psi4_binary):
-                raise RuntimeError("Can not find neither Gaussian nor PSI4")
+            if (not self.gaussian_binary) and (not self.psi4_binary) and (not self.terachem_binary):
+                raise RuntimeError("Can not find any QM code")
             if self.code is None:
                 if self.gaussian_binary:
                     self.code = Code.Gaussian
@@ -150,6 +153,8 @@ class QMCalculation:
                 raise RuntimeError("PSI4 not found")
             if self.code == Code.Gaussian and (not self.gaussian_binary):
                 raise RuntimeError("Gaussian not found")
+            if self.code == Code.TeraChem and (not self.terachem_binary):
+                raise RuntimeError("Terachem not found")
         else:
             self.psi4_binary = "psi4"
             if self.code == Code.Gaussian:
@@ -297,6 +302,7 @@ class QMCalculation:
             self._write_xyz(dn, c)
             self._write_psi4(dn, c)
             self._write_gaussian(dn, c)
+            self._write_terachem(dn,c)
             i += 1
             self._job_dirs = dirs
         pass
@@ -399,6 +405,8 @@ class QMCalculation:
                 ret = self._read_psi4(dn)
             elif self.code == Code.Gaussian:
                 ret = self._read_gaussian(dn)
+            elif self.code == Code.TeraChem:
+                ret = self._read_terachem(dn)
 
             if ret is None:
                 self._results[i].errored = True
@@ -541,6 +549,56 @@ class QMCalculation:
         except:
             return None
 
+    def _write_terachem( self, dirname, frame);
+        coords = self.molecule.coords[:, :, frame]
+        nrealatoms = coords.shape[0]  # TODO: compensate for dummy atoms
+        f = open(os.path.join(dirname, "psi4.in"), "w")
+
+        if self.basis == BasisSet._6_31G_star:
+#           if self.charge < 0:
+#              basis = "6-31+g*"
+#           else:
+              basis = "6-31g*"
+        elif self.basis == BasisSet._cc_pVTZ:
+#           if self.charge < 0:
+#              basis = "aug-cc-pvtz"
+#           else:
+              basis = "cc-pvtz"
+        else:
+            raise ValueError("Unknown basis set {}".format(self.basis))
+
+        if self.theory == Theory.DFT:
+          print( "method      b3lyp", file=f )
+        elif self.theor == Theory.RHF:
+          print( "method      rhf", file=f )
+        else raise ValueError( "TeraChem is DFT only" )
+
+        print( "basis       %s" % ( basis ), file=f )
+        print( "coordinates input.xyz", file=f )
+        print( "charge      %d" % (self.charge), file=f )
+        print( "spinmult    %d" % (self.multiplicity), file=f )
+        if self.theory = Theory.DFT:
+           print( "dftd        d3", file=f )
+        else:
+           print( "dftd        no", file=f )
+
+        if( self.solvent ):
+           print( "pcm         cosmo", file=f )
+           print( "epsilon     78.39", file=f )
+        
+        if( self.optimize ):
+           print( "run          minimize", file=f )
+        else: 
+           print( "run          energy", file=f )
+        print( "end", file=f )
+
+        if( self.frozen ):
+           print( "$constraints", file=f )
+           for i in range(len(self.frozen));
+               print( "dihedral  %d %d %d %d" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3] ), file=f ) 
+           print( "$end", file=f )
+        f.close()
+
     def _write_psi4(self, dirname, frame):
         coords = self.molecule.coords[:, :, frame]
 
@@ -563,6 +621,8 @@ class QMCalculation:
 
         if self.theory == Theory.HF:
             print("set {{\n\treference rhf\n\tbasis {}\n}}\n".format(basis), file=f)
+        elif self.theory == Theory.DFT:
+            print("set {{\n\treference rks\n\tbasis {}\n}}\n".format(basis), file=f)
 
         print("\nset_num_threads( {} )".format(self.ncpus), file=f)
         print("memory {} gb".format(self.mem), file=f)
@@ -571,6 +631,9 @@ class QMCalculation:
         for i in range(coords.shape[0]):
             print("%s\t %f\t %f\t %f" % (self.molecule.element[i], coords[i, 0], coords[i, 1], coords[i, 2]), file=f)
         print("\n\tsymmetry c1\n}", file=f)
+
+        if self.solvent:
+           print( "set {\n  pcm true\n  pcm_scf_type total\n}", file=f )
 
         if self.frozen:
             print("set optking {\n\tfrozen_dihedral = (\"", file=f)
@@ -582,10 +645,13 @@ class QMCalculation:
                     self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3], bb), file=f)
             print("\t\")\n}\n", file=f)
 
+        if   self.theory == Theory.RHF: energy="scf"
+        elif self.theory == Theory.DFT: energy="b3lyp-d3"
+         
         if self.optimize:
-            print("ee,wfn = optimize('scf', return_wfn=True)", file=f)
+            print("ee,wfn = optimize('%s', return_wfn=True)" % ( energy ), file=f)
         else:
-            print("ee,wfn = energy('scf', return_wfn=True)", file=f)
+            print("ee,wfn = energy('%s', return_wfn=True)" % ( energy ), file=f)
 
         print("oeprop( wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')", file=f)
         if self.points is not None:
@@ -618,16 +684,20 @@ class QMCalculation:
 
         if self.theory == Theory.HF:
             theory = "HF"
+            dispersion=""
+        elif self.theory == Theory.DFT:
+            theory = "B3LYP"
+            dispersion="EmpiricalDispersion=GD3"
 
         if self.basis == BasisSet._6_31G_star:
-            if self.charge < 0:
-                basis = "6-31+G*"
-            else:
+#            if self.charge < 0:
+#                basis = "6-31+G*"
+#            else:
                 basis = "6-31G*"
         elif self.basis == BasisSet._cc_pVTZ:
-            if self.charge < 0:
-                basis = "AUG-cc-pVTZ"
-            else:
+#            if self.charge < 0:
+#                basis = "AUG-cc-pVTZ"
+#            else:
                 basis = "cc-pVTZ"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
@@ -635,8 +705,14 @@ class QMCalculation:
         opt = ""
         if self.optimize:
             opt = "opt=ModRedundant"
+ 
+        if self.solvent:
+            solvent = "SCRFgaussian dispersion=PCM"
+        else:
+            solvent = ""
 
-        print("#%s/%s nosymm scf=tight %s" % (theory, basis, opt), file=f)
+       
+        print("#%s/%s nosymm scf=tight %s %s %s" % (theory, basis, opt, solvent, dispersion), file=f)
         if self.points is not None:
             print("prop=(read,field)", file=f)
         print("\nMol\n\n%d %d" % (self.charge, self.multiplicity), file=f)
