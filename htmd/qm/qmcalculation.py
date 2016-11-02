@@ -15,8 +15,9 @@ from numpy.random import uniform as rand
 from htmd.molecule.vdw import VDW
 from htmd.progress.progress import ProgressBar
 
-from htmd.apps.lsf import LSF
-from htmd.apps.pbs import PBS
+from htmd.queues import *
+#from htmd.apps.lsf import LSF
+#from htmd.apps.pbs import PBS
 
 
 class BasisSet(Enum):
@@ -36,9 +37,11 @@ class Code(Enum):
 
 
 class Execution(Enum):
-    Inline = 4000
-    LSF = 4001
-    PBS = 4002
+    Inline   = 4000
+    LSF      = 4001
+    PBS      = 4002
+    Slurm    = 4003
+    AceCloud = 4004
 
 
 class QMResult:
@@ -77,7 +80,8 @@ class QMCalculation:
             raise ValueError("theory must of type Theory")
         if code and (not isinstance(code, Code)):
             raise ValueError("code must be of type Code")
-        if not isinstance(execution, Execution):
+        if not (isinstance(execution, Execution) or  isinstance( execution, SimQueue )):
+            print(execution)
             raise ValueError("execution must be of type Execution")
 
         if not isinstance(mem, int):
@@ -95,6 +99,7 @@ class QMCalculation:
         if not isinstance(esp_density, float):
             raise ValueError("esp_density must be float")
 
+        ngpus = 0
         if ncpus == -1:
             try:
                 ncpus = int(os.getenv('NCPUS'))
@@ -104,6 +109,11 @@ class QMCalculation:
             ncpus = os.cpu_count()
 
         # TODO esp validation, etc
+
+        # AceCloud
+        if( execution == Execution.AceCloud ): 
+           ncpus = 4
+           ngpus = 0
 
         self.molecule = molecule.copy()
         self.basis = basis
@@ -117,6 +127,7 @@ class QMCalculation:
         self.optimize = optimize
         self.directory = directory
         self.ncpus = ncpus
+        self.ngpus = ngpus
         self.mem = mem
         self.execution = execution
         self.code = code
@@ -315,23 +326,48 @@ class QMCalculation:
 
         cmd = ''
         if self.code == Code.Gaussian:
-            cmd = '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+            cmd = self.gaussian_binary + " < input.gjf > output.gau 2>&1"
         elif self.code == Code.PSI4:
-            cmd = '"' + self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
+            cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
 
-        if execution == Execution.LSF:
-            lsf = LSF(ncpus=self.ncpus, executable=cmd, queue="general", resources="span[ptile={}]".format(self.ncpus),
-                      app="gaussian")
+        for d in to_submit:
+         f = open( os.path.join( d, "run.sh" ), "w" )
+         print( "#!/bin/sh\n%s\n" % ( cmd ), file=f )
+         f.close() 
+         os.chmod(  os.path.join( d, "run.sh" ), 0o700 )
+
+        if isinstance( execution, SimQueue ): 
+            lsf = execution
+        elif execution == Execution.LSF:
+            lsf = LSFQueue(ncpus=self.ncpus, executable=cmd, queue="general", resources="span[ptile={}]".format(self.ncpus), app="gaussian")
         elif execution == Execution.PBS:
-            lsf = PBS(ncpus=self.ncpus, executable=cmd, queue="default")
+            lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        elif execution == Execution.Slurm:
+            lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        elif execution == Execution.AceCloud:
+            lsf = AceCloudQueue()
         else:
-            raise RuntimeError("Execution taget not recognised")
+            raise RuntimeError("Execution target not recognised")
 
         lsf.submit(to_submit)
         lsf.wait()
+        lsf.retrieve()
 
     def _start_inline(self, directories):
         bar = ProgressBar(len(directories), description="Running QM Calculations")
+
+        if self.code == Code.Gaussian:
+            cmd = self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+        elif self.code == Code.PSI4:
+            cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
+
+
+        for d in directories:
+           f = open( os.path.join( d, "run.sh" ), "w" )
+           print( "#!/bin/sh\n%s\n" % ( cmd ), file=f )
+           f.close() 
+           os.chmod(  os.path.join( d, "run.sh" ), 0o700 )
+
 
         for directory in directories:
             cwd = os.getcwd()
@@ -339,10 +375,10 @@ class QMCalculation:
                 os.chdir(directory)
                 if self.code == Code.Gaussian:
                     if not os.path.exists("output.gau"):
-                        subprocess.call('"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1', shell=True)
+                        subprocess.call( cmd , shell=True)
                 elif self.code == Code.PSI4:
                     if not os.path.exists("psi4.out"):
-                        subprocess.call([self.psi4_binary, "-i", "psi4.in", "-o", "psi4.out"])
+                        subprocess.call( cmd, shell=True)
             except:
                 os.chdir(cwd)
                 raise

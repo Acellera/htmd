@@ -53,7 +53,7 @@ def main_parameterize():
     parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVTZ"],
                         default="cc-pVTZ", dest="basis")
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
-                        choices=["inline", "LSF", "PBS"], default="inline", dest="exec")
+                        choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
     parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4"], default="PSI4",
                         dest="qmcode")
 
@@ -81,6 +81,10 @@ def main_parameterize():
         execution = Execution.LSF
     elif args.exec == "PBS":
         execution = Execution.PBS
+    elif args.exec == "Slurm":
+        execution = Execution.Slurm
+    elif args.exec == "AceCloud":
+        execution = Execution.AceCloud
     else:
         print("Unknown execution mode: {}".format(args.exec))
         sys.exit(1)
@@ -247,5 +251,5 @@ run 0'''
 
 
 if __name__ == "__main__":
-    # main_parameterize()  #TODO: separate argparse from the main_parameterize, so it can be called here with arguments (-m and -l)
+    main_parameterize()  
     sys.exit(0)
