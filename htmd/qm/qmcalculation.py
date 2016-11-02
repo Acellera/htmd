@@ -63,7 +63,7 @@ class QMCalculation:
                  charge=0,
                  multiplicity=1,
                  frozen=None,
-                 solvent=True,
+                 solvent=False,
                  optimize=False,
                  esp=False,
                  esp_vdw_radii=[1.4, 1.6, 1.8, 2.0, 2.2],
@@ -555,14 +555,14 @@ class QMCalculation:
         f = open(os.path.join(dirname, "terachem.in"), "w")
 
         if self.basis == BasisSet._6_31G_star:
-#           if self.charge < 0:
-#              basis = "6-31+g*"
-#           else:
+           if self.charge < 0 and ( not self.solvent ):
+              basis = "6-31+g*"
+           else:
               basis = "6-31g*"
         elif self.basis == BasisSet._cc_pVDZ:
-#           if self.charge < 0:
-#              basis = "aug-cc-pvdz"
-#           else:
+           if self.charge < 0 and ( not self.solvent ):
+              basis = "aug-cc-pvdz"
+           else:
               basis = "cc-pvdz"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
@@ -571,7 +571,6 @@ class QMCalculation:
           print( "method      b3lyp", file=f )
         elif self.theory == Theory.HF:
           print( "method      rhf", file=f )
-        else: raise ValueError( "TeraChem is DFT only" )
 
         print( "basis       %s" % ( basis ), file=f )
         print( "coordinates input.xyz", file=f )
@@ -607,12 +606,12 @@ class QMCalculation:
         f = open(os.path.join(dirname, "psi4.in"), "w")
         # If the charge is < 0, need to use a diffuse basis set
         if self.basis == BasisSet._6_31G_star:
-            if self.charge < 0:
+            if self.charge < 0 and not (self.solvent):
                 basis = "6-31+G*"
             else:
                 basis = "6-31G*"
         elif self.basis == BasisSet._cc_pVDZ:
-            if self.charge < 0:
+            if self.charge < 0 and not (self.solvent):
                 basis = "aug-cc-pvdz"
             else:
                 basis = "cc-pvdz"
