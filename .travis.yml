@@ -1,4 +1,5 @@
 #branches: 
+
 # only:
 #  - master
 #  - toni-devel 
@@ -54,11 +55,14 @@ install:
  - bash miniconda.sh -b -p $HOME/miniconda
  - export PATH="$HOME/miniconda/bin:$PATH"
  - hash -r
+ - conda install conda-build -y 
+#=1.21.14 -y
+ - conda install anaconda -y
+ # Update acellera channel with any updates of the omnia packages that we track
+ - ./sync_conda_with_omnia.sh
  - conda config --set always_yes yes 
  - conda update --all -y
- - conda config --add channels omnia
  - conda config --add channels acellera
- - conda install conda-build=1.21.14 -y
 
  - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
  - source activate travis-env
@@ -98,6 +102,7 @@ install:
  - conda install match -y
  - conda install ambermini=15.0.4 -y
  - conda install openpyxl -y
+ - conda install acecloud-client -y
 
  - conda install $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2  -y
  - conda install $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2  -y

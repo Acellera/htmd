@@ -5,13 +5,13 @@
 #
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.vmdparser import guessAnglesAndDihedrals
-from htmd.newparameterization.detectsoftdihedrals import detectSoftDihedrals
-from htmd.newparameterization.detectequivalents import detectEquivalents
-from htmd.newparameterization.fftype import FFTypeMethod, FFType
-from htmd.newparameterization.ff import RTF, PRM
-from htmd.newparameterization.ffevaluate import FFEvaluate
+from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
+from htmd.parameterization.detectequivalents import detectEquivalents
+from htmd.parameterization.fftype import FFTypeMethod, FFType
+from htmd.parameterization.ff import RTF, PRM
+from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.qm.qmcalculation import *
-from htmd.newparameterization.phi import setPhi, getPhi
+from htmd.parameterization.phi import setPhi, getPhi
 from htmd.progress.progress import ProgressBar
 import re
 import math

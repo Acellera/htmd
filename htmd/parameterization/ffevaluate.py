@@ -216,7 +216,7 @@ class FFEvaluate:
         return ee
 
 # if __name__ == "__main__":
-#  from htmd.newparameterization.ffmolecule import FFMolecule
+#  from htmd.parameterization.ffmolecule import FFMolecule
 #  ff    = FFMolecule( "benzamidine.mol2" )
 #  ff._prm.write( "benzamidine.prm" )
 #  ff._rtf.write( "benzamidine.rtf" )
