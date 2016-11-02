@@ -23,7 +23,7 @@ find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
 echo "Installing into $PREFIX"
 
-	DIR="$PREFIX"
+	DIR="$SP_DIR"
 
 	if [ "$DIR" != "" ]; then
 		mkdir -p "$DIR"
@@ -45,7 +45,7 @@ echo "Installing into $PREFIX"
     echo "    return \"$PKG_VERSION\"" >> $DIR/htmd/version.py
 
 	else
-		echo "Error: SP_DIR not defined"
+		echo "Error: PREFIX not defined"
 		exit 1
 	fi
 
