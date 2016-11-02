@@ -23,7 +23,7 @@ find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
 echo "Installing into $PREFIX"
 
-	DIR="$PREFIX""
+	DIR="$PREFIX"
 
 	if [ "$DIR" != "" ]; then
 		mkdir -p "$DIR"
@@ -49,7 +49,7 @@ echo "Installing into $PREFIX"
 		exit 1
 	fi
 
-cd "$SP_DIR/../../"
+cd "$DIR/../../"
 
 chmod -R a+rX "$PREFIX"
 
