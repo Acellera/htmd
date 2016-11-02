@@ -45,11 +45,11 @@ echo "Installing into $PREFIX"
     echo "    return \"$PKG_VERSION\"" >> $DIR/htmd/version.py
 
 	else
-		echo "Error: SP_DIR not defined"
+		echo "Error: PREFIX not defined"
 		exit 1
 	fi
 
-cd "$SP_DIR/../../"
+cd "$DIR/../../"
 
 chmod -R a+rX "$PREFIX"
 

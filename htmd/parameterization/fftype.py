@@ -8,7 +8,7 @@ import tempfile
 import shutil
 import subprocess
 import os
-from htmd.newparameterization.ff import RTF, PRM, AmberRTF, AmberPRM
+from htmd.parameterization.ff import RTF, PRM, AmberRTF, AmberPRM
 from enum import Enum
 
 

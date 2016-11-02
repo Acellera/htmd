@@ -11,9 +11,10 @@ matplotlib.use('Agg')
 
 from matplotlib import pylab as plt
 from htmd.molecule.util import maxDistance
-from htmd.parameterization.parameterization import Parameterization
+#from htmd.parameterization.parameterization import Parameterization
 from htmd.protocols.equilibration_v1 import Equilibration
 
+# TODO: This needs to be completely refactored to match the new parameterization
 
 class Sample:
     def __init__(self, mol, rtf, prm, outdir, solvated):
