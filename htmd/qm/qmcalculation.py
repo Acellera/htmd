@@ -22,7 +22,7 @@ from htmd.queues import *
 
 class BasisSet(Enum):
     _6_31G_star = 1000
-    _cc_pVTZ = 1001
+    _cc_pVDZ = 1001
 
 
 class Theory(Enum):
@@ -58,8 +58,8 @@ class QMResult:
 
 class QMCalculation:
     def __init__(self, molecule,
-                 basis=BasisSet._6_31G_star,
-                 theory=Theory.HF,
+                 basis=BasisSet._cc_pVDZ,
+                 theory=Theory.DFT,
                  charge=0,
                  multiplicity=1,
                  frozen=None,
@@ -559,11 +559,11 @@ class QMCalculation:
 #              basis = "6-31+g*"
 #           else:
               basis = "6-31g*"
-        elif self.basis == BasisSet._cc_pVTZ:
+        elif self.basis == BasisSet._cc_pVDZ:
 #           if self.charge < 0:
-#              basis = "aug-cc-pvtz"
+#              basis = "aug-cc-pvdz"
 #           else:
-              basis = "cc-pvtz"
+              basis = "cc-pvdz"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
@@ -611,11 +611,11 @@ class QMCalculation:
                 basis = "6-31+G*"
             else:
                 basis = "6-31G*"
-        elif self.basis == BasisSet._cc_pVTZ:
+        elif self.basis == BasisSet._cc_pVDZ:
             if self.charge < 0:
-                basis = "aug-cc-pvtz"
+                basis = "aug-cc-pvdz"
             else:
-                basis = "cc-pvtz"
+                basis = "cc-pvdz"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
@@ -678,8 +678,8 @@ class QMCalculation:
         coords = self.molecule.coords[:, :, frame]
         f = open(os.path.join(dirname, "input.gjf"), "w")
 
-        print("%%nprocshared={}".format(self.ncpus), file=f)
-        print("%%mem={}GB".format(self.mem), file=f)
+        print("%nprocshared={}".format(self.ncpus), file=f)
+        print("%mem={}GB".format(self.mem), file=f)
         theory = "unknown"
 
         if self.theory == Theory.HF:
@@ -694,11 +694,11 @@ class QMCalculation:
 #                basis = "6-31+G*"
 #            else:
                 basis = "6-31G*"
-        elif self.basis == BasisSet._cc_pVTZ:
+        elif self.basis == BasisSet._cc_pVDZ:
 #            if self.charge < 0:
-#                basis = "AUG-cc-pVTZ"
+#                basis = "AUG-cc-pVDZ"
 #            else:
-                basis = "cc-pVTZ"
+                basis = "cc-pVDZ"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
@@ -707,12 +707,12 @@ class QMCalculation:
             opt = "opt=ModRedundant"
  
         if self.solvent:
-            solvent = "SCRFgaussian dispersion=PCM"
+            solvent = "SCRF=PCM"
         else:
             solvent = ""
 
        
-        print("#%s/%s nosymm scf=tight %s %s %s" % (theory, basis, opt, solvent, dispersion), file=f)
+        print("#%s/%s nosymm scf=tight\n# %s %s %s" % (theory, basis, opt, solvent, dispersion), file=f)
         if self.points is not None:
             print("prop=(read,field)", file=f)
         print("\nMol\n\n%d %d" % (self.charge, self.multiplicity), file=f)
