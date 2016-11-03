@@ -14,6 +14,9 @@ import platform
 
 has_connection=True
 
+def main_do_nothing():
+    import htmd
+
 def show_news():
     try:
         r = requests.get("https://www.htmd.org/news/content", timeout=(3.05, 3.05))
