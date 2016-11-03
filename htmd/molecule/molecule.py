@@ -1006,6 +1006,14 @@ class Molecule:
         from nglview import Trajectory
         import nglview
 
+        from notebook.nbextensions import check_nbextension, enable_nbextension_python
+        if not check_nbextension('nglview'):
+            logger.info('Enabled nglview')
+            enable_nbextension_python('nglview')
+        if not check_nbextension('widgetsnbextension'):
+            logger.info('Enabled widgetsnbextension')
+            enable_nbextension_python('widgetsnbextension')
+
         # Subclassing http://arose.github.io/nglview/latest/_modules/nglview.html#FileStructure
         # If issues occur check the class definition. Method names might have changed
         class HTMDTrajectory(Trajectory):
