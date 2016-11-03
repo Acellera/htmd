@@ -31,6 +31,6 @@ def convert(fromunit, tounit, value, fstep=1, timestep=4):
     q = ureg.Quantity(value, fromunit)
     convval = q.to(tounit)
     if convval.units == 'frame' or convval.units == 'step':
-        return int(np.round(convval.magnitude))
+        return np.round(convval.magnitude).astype(int)
     else:
         return convval.magnitude
