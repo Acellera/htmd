@@ -78,7 +78,7 @@ class TICA(object):
             if self.dimensions is None:
                 datalist = data.dat.tolist()
             else:  # Sub-select dimensions for fitting
-                datalist = [x[:, self.dimensions] for x in data.dat]
+                datalist = [x[:, self.dimensions].copy() for x in data.dat]
             self.tic.fit(datalist)
 
     def project(self, ndim=None):

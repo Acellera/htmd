@@ -906,7 +906,7 @@ class Molecule:
             self.fstep *= skip
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
-             viewerhandle=None):
+             viewerhandle=None, gui=False):
         """ Visualizes the molecule in a molecular viewer
 
         Parameters
@@ -960,7 +960,7 @@ class Molecule:
         elif viewer.lower() == 'vmd':
             self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
-            return self._viewNGL(psf, self.coords, guessBonds)
+            return self._viewNGL(gui=gui)
         else:
             raise ValueError('Unknown viewer.')
 
@@ -1002,7 +1002,7 @@ class Molecule:
             widget = TrajectoryView(t)
         return widget
 
-    def _viewNGL(self, psf, coords, guessb):
+    def _viewNGL(self, gui=False):
         from nglview import Trajectory
         import nglview
 
@@ -1016,7 +1016,7 @@ class Molecule:
                 self.params = {}
 
             def get_coordinates(self, index):
-                return self.mol.coords[:, :, index].flatten().tolist()
+                return np.squeeze(self.mol.coords[:, :, index])
 
             @property
             def n_frames(self):
@@ -1031,11 +1031,11 @@ class Molecule:
                 return pdb_string
 
         traj = HTMDTrajectory(self)
-        w = nglview.NGLWidget(traj)
+        w = nglview.NGLWidget(traj, gui=gui)
 
-        #self._tempreps.append(self.reps)
-        #self._tempreps._repsNGL(w)
-        #self._tempreps.remove()
+        self._tempreps.append(self.reps)
+        self._tempreps._repsNGL(w)
+        self._tempreps.remove()
         return w
 
     def mutateResidue(self, sel, newres):
