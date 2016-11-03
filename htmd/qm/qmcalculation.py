@@ -63,7 +63,7 @@ class QMCalculation:
                  charge=0,
                  multiplicity=1,
                  frozen=None,
-                 solvent=True,
+                 solvent=False,
                  optimize=False,
                  esp=False,
                  esp_vdw_radii=[1.4, 1.6, 1.8, 2.0, 2.2],
@@ -553,35 +553,34 @@ class QMCalculation:
         except:
             return None
 
-    def _write_terachem( self, dirname, frame);
+    def _write_terachem( self, dirname, frame):
         coords = self.molecule.coords[:, :, frame]
         nrealatoms = coords.shape[0]  # TODO: compensate for dummy atoms
-        f = open(os.path.join(dirname, "psi4.in"), "w")
+        f = open(os.path.join(dirname, "terachem.in"), "w")
 
         if self.basis == BasisSet._6_31G_star:
-#           if self.charge < 0:
-#              basis = "6-31+g*"
-#           else:
+           if self.charge < 0 and ( not self.solvent ):
+              basis = "6-31+g*"
+           else:
               basis = "6-31g*"
         elif self.basis == BasisSet._cc_pVDZ:
-#           if self.charge < 0:
-#              basis = "aug-cc-pvdz"
-#           else:
+           if self.charge < 0 and ( not self.solvent ):
+              basis = "aug-cc-pvdz"
+           else:
               basis = "cc-pvdz"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
         if self.theory == Theory.DFT:
           print( "method      b3lyp", file=f )
-        elif self.theor == Theory.RHF:
+        elif self.theory == Theory.HF:
           print( "method      rhf", file=f )
-        else raise ValueError( "TeraChem is DFT only" )
 
         print( "basis       %s" % ( basis ), file=f )
         print( "coordinates input.xyz", file=f )
         print( "charge      %d" % (self.charge), file=f )
         print( "spinmult    %d" % (self.multiplicity), file=f )
-        if self.theory = Theory.DFT:
+        if self.theory == Theory.DFT:
            print( "dftd        d3", file=f )
         else:
            print( "dftd        no", file=f )
@@ -598,7 +597,7 @@ class QMCalculation:
 
         if( self.frozen ):
            print( "$constraints", file=f )
-           for i in range(len(self.frozen));
+           for i in range(len(self.frozen)):
                print( "dihedral  %d %d %d %d" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3] ), file=f ) 
            print( "$end", file=f )
         f.close()
@@ -611,12 +610,12 @@ class QMCalculation:
         f = open(os.path.join(dirname, "psi4.in"), "w")
         # If the charge is < 0, need to use a diffuse basis set
         if self.basis == BasisSet._6_31G_star:
-            if self.charge < 0:
+            if self.charge < 0 and not (self.solvent):
                 basis = "6-31+G*"
             else:
                 basis = "6-31G*"
         elif self.basis == BasisSet._cc_pVDZ:
-            if self.charge < 0:
+            if self.charge < 0 and not (self.solvent):
                 basis = "aug-cc-pvdz"
             else:
                 basis = "cc-pvdz"
@@ -665,7 +664,7 @@ class QMCalculation:
                     self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3], bb), file=f)
             print("\t\")\n}\n", file=f)
 
-        if   self.theory == Theory.RHF: energy="scf"
+        if   self.theory == Theory.HF: energy="scf"
         elif self.theory == Theory.DFT: energy="b3lyp-d3"
          
         if self.optimize:
