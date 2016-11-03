@@ -26,8 +26,8 @@ class BasisSet(Enum):
 
 
 class Theory(Enum):
-    HF = 2000
-    DFT = 2001
+    RHF = 2000
+    B3LYP = 2001
 
 
 class Code(Enum):
@@ -59,7 +59,7 @@ class QMResult:
 class QMCalculation:
     def __init__(self, molecule,
                  basis=BasisSet._cc_pVDZ,
-                 theory=Theory.DFT,
+                 theory=Theory.B3LYP,
                  charge=0,
                  multiplicity=1,
                  frozen=None,
@@ -571,16 +571,16 @@ class QMCalculation:
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
-        if self.theory == Theory.DFT:
+        if self.theory == Theory.B3LYP:
           print( "method      b3lyp", file=f )
-        elif self.theory == Theory.HF:
+        elif self.theory == Theory.RHF:
           print( "method      rhf", file=f )
 
         print( "basis       %s" % ( basis ), file=f )
         print( "coordinates input.xyz", file=f )
         print( "charge      %d" % (self.charge), file=f )
         print( "spinmult    %d" % (self.multiplicity), file=f )
-        if self.theory == Theory.DFT:
+        if self.theory == Theory.B3LYP:
            print( "dftd        d3", file=f )
         else:
            print( "dftd        no", file=f )
@@ -622,9 +622,9 @@ class QMCalculation:
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
-        if self.theory == Theory.HF:
+        if self.theory == Theory.RHF:
             print("set {{\n\treference rhf\n\tbasis {}\n}}\n".format(basis), file=f)
-        elif self.theory == Theory.DFT:
+        elif self.theory == Theory.B3LYP:
             print("set {{\n\treference rks\n\tbasis {}\n}}\n".format(basis), file=f)
 
         print("\nset_num_threads( {} )".format(self.ncpus), file=f)
@@ -664,8 +664,8 @@ class QMCalculation:
                     self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3], bb), file=f)
             print("\t\")\n}\n", file=f)
 
-        if   self.theory == Theory.HF: energy="scf"
-        elif self.theory == Theory.DFT: energy="b3lyp-d3"
+        if   self.theory == Theory.RHF: energy="scf"
+        elif self.theory == Theory.B3LYP: energy="b3lyp-d3"
          
         if self.optimize:
             print("ee,wfn = optimize('%s', return_wfn=True)" % ( energy ), file=f)
@@ -701,10 +701,10 @@ class QMCalculation:
         print("%mem={}GB".format(self.mem), file=f)
         theory = "unknown"
 
-        if self.theory == Theory.HF:
+        if self.theory == Theory.RHF:
             theory = "HF"
             dispersion=""
-        elif self.theory == Theory.DFT:
+        elif self.theory == Theory.B3LYP:
             theory = "B3LYP"
             dispersion="EmpiricalDispersion=GD3"
 

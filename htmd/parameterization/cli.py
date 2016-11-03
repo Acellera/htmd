@@ -3,13 +3,15 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import os
+
+os.putenv( "HTMD_NONINTERACTIVE", "1" )
 
 import argparse
 from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
 from htmd.parameterization.fftype import FFTypeMethod
-from htmd.qm.qmcalculation import BasisSet, Execution, Code
+from htmd.qm.qmcalculation import Theory, BasisSet, Execution, Code
 import sys
-import os
 
 
 def printEnergies(mol):
@@ -54,6 +56,8 @@ def main_parameterize():
                         default="cc-pVDZ", dest="basis")
     parser.add_argument("--theory",  help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
                         default="B3LYP", dest="theory")
+    parser.add_argument("--solvent",  help="Apply a continuum solvent in the QM (default: %(default)s)", type=str,
+                        default="water", choices=["water", "vacuum"], dest="solvent" )
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
                         choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
     parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4"], default="PSI4",
@@ -109,6 +113,19 @@ def main_parameterize():
         print("Unknown basis {}".format(args.basis))
         sys.exit(1)
 
+    if args.theory == "RHF":
+       theory = Theory.RHF
+    elif args.theory == "B3LYP":
+       theory = Theory.B3LYP
+    else:
+       print( "Unknown theory %s" % ( theory ) )
+       sys.exit(1)
+
+    if args.solvent == "water":
+       solvent = True
+    if args.solvent == "vacuum":
+       solvent = False
+
     # Just list or parameterize?
     if args.list:
         print(" === Listing soft torsions of {} ===\n".format(filename))
@@ -116,7 +133,7 @@ def main_parameterize():
         print(" === Parameterizing {} ===\n".format(filename))
 
     mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                     basis=basis, execution=execution, qmcode=code, outdir=args.outdir)
+                     basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code, outdir=args.outdir)
     dihedrals = mol.getSoftDihedrals()
 
     if args.list:
@@ -253,5 +270,7 @@ run 0'''
 
 
 if __name__ == "__main__":
-#    main_parameterize()  
+    if "TRAVIS_OS_NAME" in os.environ: sys.exit(0)
+
+    main_parameterize()  
     sys.exit(0)

@@ -11,7 +11,9 @@ from os.path import isdir
 from subprocess import check_output
 from htmd.protocols.protocolinterface import ProtocolInterface
 from htmd.queues.simqueue import SimQueue
-from acecloud import *
+from acecloud.cloud  import Cloud
+from acecloud.job    import Job
+from acecloud.status import Status
 import logging
 import random
 import string
