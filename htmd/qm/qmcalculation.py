@@ -637,21 +637,21 @@ class QMCalculation:
 
         if self.solvent:
            print( "set {\n  pcm true\n  pcm_scf_type total\n}", file=f )
-           print( "pcm = {
-   Units = Angstrom
-   Medium {
-   SolverType = IEFPCM
-   Solvent = Water
-   }
-
-   Cavity {
-   RadiiSet = UFF
-   Type = GePol
-   Scaling = False
-   Area = 0.3
-   Mode = Implicit
-   }
-}", file=f )
+           print( "pcm = {", file=f ) 
+           print("  Units = Angstrom", file=f )
+           print("  Medium {", file=f )
+           print("   SolverType = IEFPCM", file=f )
+           print("   Solvent = Water", file=f )
+           print("  }", file=f )
+           print("", file=f )
+           print("  Cavity {", file=f )
+           print("   RadiiSet = UFF", file=f )
+           print("   Type = GePol", file=f )
+           print("   Scaling = False", file=f )
+           print("   Area = 0.3", file=f )
+           print("   Mode = Implicit", file=f )
+           print("  }", file=f )
+           print("}", file=f )
 
 
         if self.frozen:
