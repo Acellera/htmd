@@ -57,7 +57,7 @@ class MetricShell(MetricDistance):
         self.shellcenters = None
 
     def _precalculate(self, mol):
-        self.map = np.vstack(super().getMapping(mol).indexes)
+        self.map = np.vstack(super().getMapping(mol).atomIndexes)
         self.shellcenters = np.unique(self.map[:, 0])
 
     def project(self, mol):
@@ -87,7 +87,7 @@ class MetricShell(MetricDistance):
         if self.shellcenters is not None and self.map is not None:
             return self.shellcenters, self.map, sel1, sel2
         else:
-            map = np.vstack(super().getMapping(mol).indexes)
+            map = np.vstack(super().getMapping(mol).atomIndexes)
             return np.unique(map[:, 0]), map, sel1, sel2
 
     def getMapping(self, mol):
@@ -114,7 +114,7 @@ class MetricShell(MetricDistance):
                 indexes += [i]
                 description += ['Density of sel2 atoms in shell {}-{} A centered on atom {} {} {}'
                                 .format(n*self.shellwidth, (n+1)*self.shellwidth, mol.resname[i], mol.resid[i], mol.name[i])]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
 
 def _shells(distances, map, shellcenters, numshells, shellwidth):

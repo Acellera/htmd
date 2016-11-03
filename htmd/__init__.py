@@ -46,6 +46,7 @@ from htmd.util import tempname
 from htmd.config import config
 from htmd.clustering.kcenters import KCenter
 from htmd.clustering.regular import RegCluster
+from htmd.queues.local import LocalGPUQueue
 from htmd.queues.slurm import SlurmQueue
 import logging.config
 import htmd
@@ -71,7 +72,7 @@ try:
 except:
     print("HTMD: Logging setup failed")
 
-if not os.getenv("HTMD_NONINTERACTIVE"):
+if not (os.getenv("HTMD_NONINTERACTIVE")):
     check_registration(product='htmd')
     show_news()
     compareVersions()

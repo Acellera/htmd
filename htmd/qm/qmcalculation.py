@@ -15,18 +15,19 @@ from numpy.random import uniform as rand
 from htmd.molecule.vdw import VDW
 from htmd.progress.progress import ProgressBar
 
-from htmd.apps.lsf import LSF
-from htmd.apps.pbs import PBS
+from htmd.queues import *
+#from htmd.apps.lsf import LSF
+#from htmd.apps.pbs import PBS
 
 
 class BasisSet(Enum):
     _6_31G_star = 1000
-    _cc_pVTZ = 1001
+    _cc_pVDZ = 1001
 
 
 class Theory(Enum):
-    HF = 2000
-    DFT = 2001
+    RHF = 2000
+    B3LYP = 2001
 
 
 class Code(Enum):
@@ -36,9 +37,11 @@ class Code(Enum):
 
 
 class Execution(Enum):
-    Inline = 4000
-    LSF = 4001
-    PBS = 4002
+    Inline   = 4000
+    LSF      = 4001
+    PBS      = 4002
+    Slurm    = 4003
+    AceCloud = 4004
 
 
 class QMResult:
@@ -55,11 +58,12 @@ class QMResult:
 
 class QMCalculation:
     def __init__(self, molecule,
-                 basis=BasisSet._6_31G_star,
-                 theory=Theory.HF,
+                 basis=BasisSet._cc_pVDZ,
+                 theory=Theory.B3LYP,
                  charge=0,
                  multiplicity=1,
                  frozen=None,
+                 solvent=True,
                  optimize=False,
                  esp=False,
                  esp_vdw_radii=[1.4, 1.6, 1.8, 2.0, 2.2],
@@ -77,7 +81,8 @@ class QMCalculation:
             raise ValueError("theory must of type Theory")
         if code and (not isinstance(code, Code)):
             raise ValueError("code must be of type Code")
-        if not isinstance(execution, Execution):
+        if not (isinstance(execution, Execution) or  isinstance( execution, SimQueue )):
+            print(execution)
             raise ValueError("execution must be of type Execution")
 
         if not isinstance(mem, int):
@@ -95,6 +100,7 @@ class QMCalculation:
         if not isinstance(esp_density, float):
             raise ValueError("esp_density must be float")
 
+        ngpus = 0
         if ncpus == -1:
             try:
                 ncpus = int(os.getenv('NCPUS'))
@@ -105,18 +111,25 @@ class QMCalculation:
 
         # TODO esp validation, etc
 
+        # AceCloud
+        if( execution == Execution.AceCloud ): 
+           ncpus = 4
+           ngpus = 0
+
         self.molecule = molecule.copy()
         self.basis = basis
         self.theory = theory
         self.charge = charge
         self.multiplicity = multiplicity
         self.frozen = None
+        self.solvent  = solvent
         self.esp = esp
         self.esp_vdw_radii = esp_vdw_radii
         self.esp_density = esp_density
         self.optimize = optimize
         self.directory = directory
         self.ncpus = ncpus
+        self.ngpus = ngpus
         self.mem = mem
         self.execution = execution
         self.code = code
@@ -125,11 +138,12 @@ class QMCalculation:
 
         if self.execution == Execution.Inline:
             self.psi4_binary = shutil.which("psi4", mode=os.X_OK)
+            self.terachem_binary = shutil.which("terachem", mode=os.X_OK)
             self.gaussian_binary = shutil.which("g03", mode=os.X_OK)
             if not self.gaussian_binary:
                 self.gaussian_binary = shutil.which("g09", mode=os.X_OK)
-            if (not self.gaussian_binary) and (not self.psi4_binary):
-                raise RuntimeError("Can not find neither Gaussian nor PSI4")
+            if (not self.gaussian_binary) and (not self.psi4_binary) and (not self.terachem_binary):
+                raise RuntimeError("Can not find any QM code")
             if self.code is None:
                 if self.gaussian_binary:
                     self.code = Code.Gaussian
@@ -139,6 +153,8 @@ class QMCalculation:
                 raise RuntimeError("PSI4 not found")
             if self.code == Code.Gaussian and (not self.gaussian_binary):
                 raise RuntimeError("Gaussian not found")
+            if self.code == Code.TeraChem and (not self.terachem_binary):
+                raise RuntimeError("Terachem not found")
         else:
             self.psi4_binary = "psi4"
             if self.code == Code.Gaussian:
@@ -286,6 +302,7 @@ class QMCalculation:
             self._write_xyz(dn, c)
             self._write_psi4(dn, c)
             self._write_gaussian(dn, c)
+            self._write_terachem(dn,c)
             i += 1
             self._job_dirs = dirs
         pass
@@ -315,23 +332,48 @@ class QMCalculation:
 
         cmd = ''
         if self.code == Code.Gaussian:
-            cmd = '"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+            cmd = self.gaussian_binary + " < input.gjf > output.gau 2>&1"
         elif self.code == Code.PSI4:
-            cmd = '"' + self.psi4_binary + '" -i psi4.in -o psi4.out 2>&1'
+            cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
 
-        if execution == Execution.LSF:
-            lsf = LSF(ncpus=self.ncpus, executable=cmd, queue="general", resources="span[ptile={}]".format(self.ncpus),
-                      app="gaussian")
+        for d in to_submit:
+         f = open( os.path.join( d, "run.sh" ), "w" )
+         print( "#!/bin/sh\n%s\n" % ( cmd ), file=f )
+         f.close() 
+         os.chmod(  os.path.join( d, "run.sh" ), 0o700 )
+
+        if isinstance( execution, SimQueue ): 
+            lsf = execution
+        elif execution == Execution.LSF:
+            lsf = LSFQueue(ncpus=self.ncpus, executable=cmd, queue="general", resources="span[ptile={}]".format(self.ncpus), app="gaussian")
         elif execution == Execution.PBS:
-            lsf = PBS(ncpus=self.ncpus, executable=cmd, queue="default")
+            lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        elif execution == Execution.Slurm:
+            lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        elif execution == Execution.AceCloud:
+            lsf = AceCloudQueue()
         else:
-            raise RuntimeError("Execution taget not recognised")
+            raise RuntimeError("Execution target not recognised")
 
         lsf.submit(to_submit)
         lsf.wait()
+        lsf.retrieve()
 
     def _start_inline(self, directories):
         bar = ProgressBar(len(directories), description="Running QM Calculations")
+
+        if self.code == Code.Gaussian:
+            cmd = self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+        elif self.code == Code.PSI4:
+            cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
+
+
+        for d in directories:
+           f = open( os.path.join( d, "run.sh" ), "w" )
+           print( "#!/bin/sh\n%s\n" % ( cmd ), file=f )
+           f.close() 
+           os.chmod(  os.path.join( d, "run.sh" ), 0o700 )
+
 
         for directory in directories:
             cwd = os.getcwd()
@@ -339,10 +381,10 @@ class QMCalculation:
                 os.chdir(directory)
                 if self.code == Code.Gaussian:
                     if not os.path.exists("output.gau"):
-                        subprocess.call('"' + self.gaussian_binary + '" < input.gjf > output.gau 2>&1', shell=True)
+                        subprocess.call( cmd , shell=True)
                 elif self.code == Code.PSI4:
                     if not os.path.exists("psi4.out"):
-                        subprocess.call([self.psi4_binary, "-i", "psi4.in", "-o", "psi4.out"])
+                        subprocess.call( cmd, shell=True)
             except:
                 os.chdir(cwd)
                 raise
@@ -363,6 +405,8 @@ class QMCalculation:
                 ret = self._read_psi4(dn)
             elif self.code == Code.Gaussian:
                 ret = self._read_gaussian(dn)
+            elif self.code == Code.TeraChem:
+                ret = self._read_terachem(dn)
 
             if ret is None:
                 self._results[i].errored = True
@@ -409,6 +453,10 @@ class QMCalculation:
 
             for l in fl:
                 if "SCF Done:  E(RHF) = " in l:
+                    ff = l.split()
+                    data['energy'] = float(ff[4])
+                    completed = True
+                if "SCF Done:  E(RB3LYP) = " in l:
                     ff = l.split()
                     data['energy'] = float(ff[4])
                     completed = True
@@ -505,6 +553,55 @@ class QMCalculation:
         except:
             return None
 
+    def _write_terachem( self, dirname, frame):
+        coords = self.molecule.coords[:, :, frame]
+        nrealatoms = coords.shape[0]  # TODO: compensate for dummy atoms
+        f = open(os.path.join(dirname, "terachem.in"), "w")
+
+        if self.basis == BasisSet._6_31G_star:
+           if self.charge < 0 and ( not self.solvent ):
+              basis = "6-31+g*"
+           else:
+              basis = "6-31g*"
+        elif self.basis == BasisSet._cc_pVDZ:
+           if self.charge < 0 and ( not self.solvent ):
+              basis = "aug-cc-pvdz"
+           else:
+              basis = "cc-pvdz"
+        else:
+            raise ValueError("Unknown basis set {}".format(self.basis))
+
+        if self.theory == Theory.B3LYP:
+          print( "method      b3lyp", file=f )
+        elif self.theory == Theory.RHF:
+          print( "method      rhf", file=f )
+
+        print( "basis       %s" % ( basis ), file=f )
+        print( "coordinates input.xyz", file=f )
+        print( "charge      %d" % (self.charge), file=f )
+        print( "spinmult    %d" % (self.multiplicity), file=f )
+        if self.theory == Theory.B3LYP:
+           print( "dftd        d3", file=f )
+        else:
+           print( "dftd        no", file=f )
+
+        if( self.solvent ):
+           print( "pcm         cosmo", file=f )
+           print( "epsilon     78.39", file=f )
+        
+        if( self.optimize ):
+           print( "run          minimize", file=f )
+        else: 
+           print( "run          energy", file=f )
+        print( "end", file=f )
+
+        if( self.frozen ):
+           print( "$constraints", file=f )
+           for i in range(len(self.frozen)):
+               print( "dihedral  %d %d %d %d" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3] ), file=f ) 
+           print( "$end", file=f )
+        f.close()
+
     def _write_psi4(self, dirname, frame):
         coords = self.molecule.coords[:, :, frame]
 
@@ -513,20 +610,22 @@ class QMCalculation:
         f = open(os.path.join(dirname, "psi4.in"), "w")
         # If the charge is < 0, need to use a diffuse basis set
         if self.basis == BasisSet._6_31G_star:
-            if self.charge < 0:
+            if self.charge < 0 and not (self.solvent):
                 basis = "6-31+G*"
             else:
                 basis = "6-31G*"
-        elif self.basis == BasisSet._cc_pVTZ:
-            if self.charge < 0:
-                basis = "aug-cc-pvtz"
+        elif self.basis == BasisSet._cc_pVDZ:
+            if self.charge < 0 and not (self.solvent):
+                basis = "aug-cc-pvdz"
             else:
-                basis = "cc-pvtz"
+                basis = "cc-pvdz"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
-        if self.theory == Theory.HF:
+        if self.theory == Theory.RHF:
             print("set {{\n\treference rhf\n\tbasis {}\n}}\n".format(basis), file=f)
+        elif self.theory == Theory.B3LYP:
+            print("set {{\n\treference rks\n\tbasis {}\n}}\n".format(basis), file=f)
 
         print("\nset_num_threads( {} )".format(self.ncpus), file=f)
         print("memory {} gb".format(self.mem), file=f)
@@ -535,6 +634,25 @@ class QMCalculation:
         for i in range(coords.shape[0]):
             print("%s\t %f\t %f\t %f" % (self.molecule.element[i], coords[i, 0], coords[i, 1], coords[i, 2]), file=f)
         print("\n\tsymmetry c1\n}", file=f)
+
+        if self.solvent:
+           print( "set {\n  pcm true\n  pcm_scf_type total\n}", file=f )
+           print( "pcm = {", file=f ) 
+           print("  Units = Angstrom", file=f )
+           print("  Medium {", file=f )
+           print("   SolverType = IEFPCM", file=f )
+           print("   Solvent = Water", file=f )
+           print("  }", file=f )
+           print("", file=f )
+           print("  Cavity {", file=f )
+           print("   RadiiSet = UFF", file=f )
+           print("   Type = GePol", file=f )
+           print("   Scaling = False", file=f )
+           print("   Area = 0.3", file=f )
+           print("   Mode = Implicit", file=f )
+           print("  }", file=f )
+           print("}", file=f )
+
 
         if self.frozen:
             print("set optking {\n\tfrozen_dihedral = (\"", file=f)
@@ -546,10 +664,13 @@ class QMCalculation:
                     self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3], bb), file=f)
             print("\t\")\n}\n", file=f)
 
+        if   self.theory == Theory.RHF: energy="scf"
+        elif self.theory == Theory.B3LYP: energy="b3lyp-d3"
+         
         if self.optimize:
-            print("ee,wfn = optimize('scf', return_wfn=True)", file=f)
+            print("ee,wfn = optimize('%s', return_wfn=True)" % ( energy ), file=f)
         else:
-            print("ee,wfn = energy('scf', return_wfn=True)", file=f)
+            print("ee,wfn = energy('%s', return_wfn=True)" % ( energy ), file=f)
 
         print("oeprop( wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')", file=f)
         if self.points is not None:
@@ -576,31 +697,41 @@ class QMCalculation:
         coords = self.molecule.coords[:, :, frame]
         f = open(os.path.join(dirname, "input.gjf"), "w")
 
-        print("%%nprocshared={}".format(self.ncpus), file=f)
-        print("%%mem={}GB".format(self.mem), file=f)
+        print("%nprocshared={}".format(self.ncpus), file=f)
+        print("%mem={}GB".format(self.mem), file=f)
         theory = "unknown"
 
-        if self.theory == Theory.HF:
+        if self.theory == Theory.RHF:
             theory = "HF"
+            dispersion=""
+        elif self.theory == Theory.B3LYP:
+            theory = "B3LYP"
+            dispersion="EmpiricalDispersion=GD3"
 
         if self.basis == BasisSet._6_31G_star:
-            if self.charge < 0:
-                basis = "6-31+G*"
-            else:
+#            if self.charge < 0:
+#                basis = "6-31+G*"
+#            else:
                 basis = "6-31G*"
-        elif self.basis == BasisSet._cc_pVTZ:
-            if self.charge < 0:
-                basis = "AUG-cc-pVTZ"
-            else:
-                basis = "cc-pVTZ"
+        elif self.basis == BasisSet._cc_pVDZ:
+#            if self.charge < 0:
+#                basis = "AUG-cc-pVDZ"
+#            else:
+                basis = "cc-pVDZ"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
         opt = ""
         if self.optimize:
             opt = "opt=ModRedundant"
+ 
+        if self.solvent:
+            solvent = "SCRF=PCM"
+        else:
+            solvent = ""
 
-        print("#%s/%s nosymm scf=tight %s" % (theory, basis, opt), file=f)
+       
+        print("#%s/%s nosymm scf=tight\n# %s %s %s" % (theory, basis, opt, solvent, dispersion), file=f)
         if self.points is not None:
             print("prop=(read,field)", file=f)
         print("\nMol\n\n%d %d" % (self.charge, self.multiplicity), file=f)

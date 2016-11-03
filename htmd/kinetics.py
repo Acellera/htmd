@@ -175,24 +175,28 @@ class Kinetics(object):
 
         model = self.model
         if states == 'macro':  # Finding the microstates of the macrostates
-            micros = []
+            eq = model.eqDistribution(plot=False)  # If macro, use the membership probs to calculate eq prob
+            sinkeq = np.sum(eq[sink])  # sink and source might be multiple macros so we have to sum them
+            sourceeq = np.sum(eq[source])
+            sourcemicros = []
             for s in source:
-                micros += list(np.where(model.macro_ofmicro == s)[0])
-            source = micros
-            micros = []
+                sourcemicros += list(np.where(model.macro_ofmicro == s)[0])
+            sinkmicros = []
             for s in sink:
-                micros += list(np.where(model.macro_ofmicro == s)[0])
-            sink = micros
+                sinkmicros += list(np.where(model.macro_ofmicro == s)[0])
+        elif states == 'micro':
+            eq = model.msm.stationary_distribution
+            sinkeq = np.sum(eq[sink])
+            sourceeq = np.sum(eq[source])
+            sourcemicros = source
+            sinkmicros = sink
 
         from msmtools.analysis import mfpt
         r = Rates()
-        r.mfpton = model.data.fstep * model.lag * mfpt(self.model.P, origin=source, target=sink)
-        r.mfptoff = model.data.fstep * model.lag * mfpt(self.model.P, origin=sink, target=source)
+        r.mfpton = model.data.fstep * model.lag * mfpt(self.model.P, origin=sourcemicros, target=sinkmicros)
+        r.mfptoff = model.data.fstep * model.lag * mfpt(self.model.P, origin=sinkmicros, target=sourcemicros)
         r.koff = 1E9 / r.mfptoff
         r.kon = 1E9 / (r.mfpton * conc)
-        eq = model.msm.stationary_distribution
-        sinkeq = np.sum(eq[sink])
-        sourceeq = np.sum(eq[source])
         if conc != 1:
             logger.info('Concentration correction of {:.2f} kcal/mol.'.format(-self._kBT * np.log(1 / conc)))
         r.g0eq = -self._kBT * np.log(sinkeq / (conc * sourceeq))

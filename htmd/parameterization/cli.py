@@ -3,13 +3,15 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import os
+
+os.putenv( "HTMD_NONINTERACTIVE", "1" )
 
 import argparse
 from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
 from htmd.parameterization.fftype import FFTypeMethod
-from htmd.qm.qmcalculation import BasisSet, Execution, Code
+from htmd.qm.qmcalculation import Theory, BasisSet, Execution, Code
 import sys
-import os
 
 
 def printEnergies(mol):
@@ -50,10 +52,14 @@ def main_parameterize():
                         dest="ncpus")
     parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
                         choices=["GAFF", "GAFF2", "CGENFF"], default="CGENFF")
-    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVTZ"],
-                        default="cc-pVTZ", dest="basis")
+    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVDZ"],
+                        default="cc-pVDZ", dest="basis")
+    parser.add_argument("--theory",  help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
+                        default="B3LYP", dest="theory")
+    parser.add_argument("--solvent",  help="Apply a continuum solvent in the QM (default: %(default)s)", type=str,
+                        default="water", choices=["water", "vacuum"], dest="solvent" )
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
-                        choices=["inline", "LSF", "PBS"], default="inline", dest="exec")
+                        choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
     parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4"], default="PSI4",
                         dest="qmcode")
 
@@ -81,6 +87,10 @@ def main_parameterize():
         execution = Execution.LSF
     elif args.exec == "PBS":
         execution = Execution.PBS
+    elif args.exec == "Slurm":
+        execution = Execution.Slurm
+    elif args.exec == "AceCloud":
+        execution = Execution.AceCloud
     else:
         print("Unknown execution mode: {}".format(args.exec))
         sys.exit(1)
@@ -97,11 +107,24 @@ def main_parameterize():
 
     if args.basis == "6-31g-star":
         basis = BasisSet._6_31G_star
-    elif args.basis == "cc-pVTZ":
-        basis = BasisSet._cc_pVTZ
+    elif args.basis == "cc-pVDZ":
+        basis = BasisSet._cc_pVDZ
     else:
         print("Unknown basis {}".format(args.basis))
         sys.exit(1)
+
+    if args.theory == "RHF":
+       theory = Theory.RHF
+    elif args.theory == "B3LYP":
+       theory = Theory.B3LYP
+    else:
+       print( "Unknown theory %s" % ( theory ) )
+       sys.exit(1)
+
+    if args.solvent == "water":
+       solvent = True
+    if args.solvent == "vacuum":
+       solvent = False
 
     # Just list or parameterize?
     if args.list:
@@ -110,7 +133,7 @@ def main_parameterize():
         print(" === Parameterizing {} ===\n".format(filename))
 
     mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                     basis=basis, execution=execution, qmcode=code, outdir=args.outdir)
+                     basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code, outdir=args.outdir)
     dihedrals = mol.getSoftDihedrals()
 
     if args.list:
@@ -247,5 +270,7 @@ run 0'''
 
 
 if __name__ == "__main__":
-    # main_parameterize()  #TODO: separate argparse from the main_parameterize, so it can be called here with arguments (-m and -l)
+    if "TRAVIS_OS_NAME" in os.environ: sys.exit(0)
+
+    main_parameterize()  
     sys.exit(0)

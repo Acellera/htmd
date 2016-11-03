@@ -114,7 +114,7 @@ class MetricSasa(Projection):
             types += ['SASA']
             indexes += [i]
             description += ['SASA of {} {} {}'.format(mol.resname[i], mol.resid[i], mol.name[i])]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
 
 if __name__ == '__name__':

@@ -135,7 +135,7 @@ class MetricDistance(Projection):
                     types += [self.metric[:-1]]
                     indexes += [[atm1, atm2]]
                     description += [desc]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
     def _getSelections(self, mol):
         # If they have been pre-calculated return them.

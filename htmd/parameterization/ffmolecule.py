@@ -35,15 +35,24 @@ class QMFittingSet:
 
 class FFMolecule(Molecule):
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 basis=BasisSet._6_31G_star, execution=Execution.Inline, qmcode=Code.PSI4, outdir="./"):
+                 basis=BasisSet._6_31G_star, solvent=True, theory=Theory.B3LYP, execution=Execution.Inline, qmcode=Code.PSI4, outdir="./"):
         # filename -- a mol2 format input geometry
         # rtf, prm -- rtf, prm files
         # method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
         self.basis = basis
+        self.theory = theory
+        self.solvent= solvent
+
+        self.solvent_name = "vacuum"
+        if solvent: self.solvent_name="water"
+      
+        if theory == Theory.RHF:   self.theory_name="rhf" 
+        if theory == Theory.B3LYP: self.theory_name="b3lyp" 
+
         if basis == BasisSet._6_31G_star:
             self.basis_name = "6-31g-star"
-        elif basis == BasisSet._cc_pVTZ:
-            self.basis_name = "cc-pVTZ"
+        elif basis == BasisSet._cc_pVDZ:
+            self.basis_name = "cc-pVDZ"
         else:
             raise ValueError("Unknown Basis Set")
 
@@ -127,7 +136,7 @@ class FFMolecule(Molecule):
             self.resname[i] = "MOL"
 
     def minimize(self):
-        mindir = os.path.join(self.outdir, "minimize", self.basis_name)
+        mindir = os.path.join(self.outdir, "minimize", self.theory_name + "-" + self.basis_name + "-" + self.solvent_name )
         try:
             os.makedirs(mindir, exist_ok=True)
         except:
@@ -135,7 +144,7 @@ class FFMolecule(Molecule):
 
         # Kick off a QM calculation -- unconstrained geometry optimization
         qm = QMCalculation(self, charge=self.netcharge, optimize=True,
-                           directory=mindir, basis=self.basis,
+                           directory=mindir, basis=self.basis, theory=self.theory, solvent=self.solvent,
                            execution=self.execution, code=self.qmcode)
         results = qm.results()
         if results[0].errored:
@@ -208,7 +217,7 @@ class FFMolecule(Molecule):
 
     def _try_load_pointfile(self):
         # Load a point file if one exists from a previous job
-        pointfile = os.path.join(self.outdir, "esp", self.basis_name, "00000", "grid.dat")
+        pointfile = os.path.join(self.outdir, "esp", self.theory_name + "-" + self.basis_name + "-" + self.solvent_name    , "00000", "grid.dat")
         if os.path.exists(pointfile):
             f = open(pointfile, "r")
             fl = f.readlines()
@@ -228,13 +237,13 @@ class FFMolecule(Molecule):
         self._removeCOM()
         # Kick off a QM calculation -- unconstrained single point with grid
         points = self._try_load_pointfile()
-        espdir = os.path.join(self.outdir, "esp", self.basis_name)
+        espdir = os.path.join(self.outdir, "esp", self.theory_name + "-" + self.basis_name + "-" + self.solvent_name  )
         try:
             os.makedirs(espdir, exist_ok=True)
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(espdir))
 
-        qm = QMCalculation(self, charge=self.netcharge, optimize=False, esp=points,
+        qm = QMCalculation(self, charge=self.netcharge, optimize=False, esp=points, theory=self.theory, solvent=self.solvent,
                            directory=espdir, basis=self.basis, execution=self.execution,
                            code=self.qmcode)
         results = qm.results()
@@ -404,14 +413,14 @@ class FFMolecule(Molecule):
 
         dih_name = "%s-%s-%s-%s" % (self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]])
 
-        fitdir = os.path.join(self.outdir, dirname, dih_name, self.basis_name)
+        fitdir = os.path.join(self.outdir, dirname, dih_name, self.theory_name + "-" + self.basis_name + "-" + self.solvent_name  )
 
         try:
             os.makedirs(fitdir, exist_ok=True)
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(fitdir))
 
-        qmset = QMCalculation(mol, charge=self.netcharge, directory=fitdir, frozen=frozens, optimize=geomopt,
+        qmset = QMCalculation(mol, charge=self.netcharge, directory=fitdir, frozen=frozens, optimize=geomopt, theory=self.theory, solvent=self.solvent,
                               basis=self.basis, execution=self.execution, code=self.qmcode)
 
         ret = self._makeDihedralFittingSetFromQMResults(atoms, qmset.results())
@@ -736,7 +745,7 @@ class FFMolecule(Molecule):
         if show:
             plt.show()
         else:
-            plotdir = os.path.join(self.outdir, "parameters", self.method.name, self.basis_name, "plots")
+            plotdir = os.path.join(self.outdir, "parameters", self.method.name,  self.theory_name +"-"+self.basis_name + "-" + self.solvent_name, "plots")
             try:
                 os.makedirs(plotdir, exist_ok=True)
             except:
