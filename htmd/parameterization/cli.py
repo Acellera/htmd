@@ -50,10 +50,10 @@ def main_parameterize():
                         dest="ncpus")
     parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
                         choices=["GAFF", "GAFF2", "CGENFF"], default="CGENFF")
-    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVTZ"],
-                        default="cc-pVTZ", dest="basis")
+    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVDZ"],
+                        default="cc-pVDZ", dest="basis")
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
-                        choices=["inline", "LSF", "PBS"], default="inline", dest="exec")
+                        choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
     parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4"], default="PSI4",
                         dest="qmcode")
 
@@ -81,6 +81,10 @@ def main_parameterize():
         execution = Execution.LSF
     elif args.exec == "PBS":
         execution = Execution.PBS
+    elif args.exec == "Slurm":
+        execution = Execution.Slurm
+    elif args.exec == "AceCloud":
+        execution = Execution.AceCloud
     else:
         print("Unknown execution mode: {}".format(args.exec))
         sys.exit(1)
@@ -97,8 +101,8 @@ def main_parameterize():
 
     if args.basis == "6-31g-star":
         basis = BasisSet._6_31G_star
-    elif args.basis == "cc-pVTZ":
-        basis = BasisSet._cc_pVTZ
+    elif args.basis == "cc-pVDZ":
+        basis = BasisSet._cc_pVDZ
     else:
         print("Unknown basis {}".format(args.basis))
         sys.exit(1)
@@ -247,5 +251,5 @@ run 0'''
 
 
 if __name__ == "__main__":
-    # main_parameterize()  #TODO: separate argparse from the main_parameterize, so it can be called here with arguments (-m and -l)
+    main_parameterize()  
     sys.exit(0)

@@ -42,8 +42,8 @@ class FFMolecule(Molecule):
         self.basis = basis
         if basis == BasisSet._6_31G_star:
             self.basis_name = "6-31g-star"
-        elif basis == BasisSet._cc_pVTZ:
-            self.basis_name = "cc-pVTZ"
+        elif basis == BasisSet._cc_pVDZ:
+            self.basis_name = "cc-pVDZ"
         else:
             raise ValueError("Unknown Basis Set")
 
