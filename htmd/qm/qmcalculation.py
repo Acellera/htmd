@@ -63,7 +63,7 @@ class QMCalculation:
                  charge=0,
                  multiplicity=1,
                  frozen=None,
-                 solvent=False,
+                 solvent=True,
                  optimize=False,
                  esp=False,
                  esp_vdw_radii=[1.4, 1.6, 1.8, 2.0, 2.2],
