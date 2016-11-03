@@ -363,7 +363,7 @@ class QMCalculation:
         bar = ProgressBar(len(directories), description="Running QM Calculations")
 
         if self.code == Code.Gaussian:
-            cmd = self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+            cmd = self.gaussian_binary + ' < input.gjf > output.gau 2>&1'
         elif self.code == Code.PSI4:
             cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
 
