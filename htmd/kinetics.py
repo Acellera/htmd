@@ -176,8 +176,8 @@ class Kinetics(object):
         model = self.model
         if states == 'macro':  # Finding the microstates of the macrostates
             eq = model.eqDistribution(plot=False)  # If macro, use the membership probs to calculate eq prob
-            sinkeq = eq[sink]
-            sourceeq = eq[source]
+            sinkeq = np.sum(eq[sink])  # sink and source might be multiple macros so we have to sum them
+            sourceeq = np.sum(eq[source])
             sourcemicros = []
             for s in source:
                 sourcemicros += list(np.where(model.macro_ofmicro == s)[0])
