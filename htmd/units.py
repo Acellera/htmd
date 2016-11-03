@@ -31,6 +31,9 @@ def convert(fromunit, tounit, value, fstep=1, timestep=4):
     q = ureg.Quantity(value, fromunit)
     convval = q.to(tounit)
     if convval.units == 'frame' or convval.units == 'step':
-        return np.round(convval.magnitude).astype(int)
+        vals = np.round(convval.magnitude).astype(int)
+        if vals.size == 1:  # Fix for PyEMMA tica. remove in future
+            return int(vals)
+        return vals
     else:
         return convval.magnitude
