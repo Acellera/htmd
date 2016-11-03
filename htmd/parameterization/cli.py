@@ -52,6 +52,8 @@ def main_parameterize():
                         choices=["GAFF", "GAFF2", "CGENFF"], default="CGENFF")
     parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVDZ"],
                         default="cc-pVDZ", dest="basis")
+    parser.add_argument("--theory",  help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
+                        default="B3LYP", dest="theory")
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
                         choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
     parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4"], default="PSI4",
