@@ -638,6 +638,22 @@ class QMCalculation:
 
         if self.solvent:
            print( "set {\n  pcm true\n  pcm_scf_type total\n}", file=f )
+           print( "pcm = {
+   Units = Angstrom
+   Medium {
+   SolverType = IEFPCM
+   Solvent = Water
+   }
+
+   Cavity {
+   RadiiSet = UFF
+   Type = GePol
+   Scaling = False
+   Area = 0.3
+   Mode = Implicit
+   }
+}", file=f )
+
 
         if self.frozen:
             print("set optking {\n\tfrozen_dihedral = (\"", file=f)
