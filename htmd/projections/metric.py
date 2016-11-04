@@ -11,31 +11,10 @@ from htmd.molecule.molecule import Molecule
 from htmd.metricdata import MetricData
 from scipy import stats
 from joblib import Parallel, delayed
-import joblib.parallel
-from collections import defaultdict
-from htmd.progress.progress import ProgressBar
-import time
+from htmd.parallelprogress import ParallelExecutor
 import logging
 logger = logging.getLogger(__name__)
 
-def progessbar(seq, description=None, total=None):
-    p = ProgressBar(total, description=description)
-    while True:
-        try:
-            yield next(seq)
-            p.progress() # Had to put progress after yield because last call goes over the total and then I can't decrement in stop()
-        except StopIteration:
-            p.stop()
-            raise
-
-def ParallelExecutor(use_bar='txt', **joblib_args):
-    def aprun(bar=use_bar, **tq_args):
-        def tmp(op_iter):
-            foo = lambda args: lambda x: progessbar(x, **args)
-            bar_func = foo(tq_args)
-            return Parallel(**joblib_args)(bar_func(op_iter))
-        return tmp
-    return aprun
 
 
 class Metric:
@@ -202,6 +181,7 @@ def _highfreqFilter(mol,steps):
 #   print("mol: ", mol.coords.shape, " X: ",X.shape)
     mol.coords=X
 
+
 def _processSim(sim, projectionlist, uqmol, skip):
     pieces = sim.trajectory
     try:
@@ -262,141 +242,4 @@ def _projectionGenerator(metric, ncpus):
 
 def _projector(metric, i):
     return metric._projectSingle(i)
-
-
-class MetricPyemma(metaclass=ABCMeta):
-    """
-    Parent class for all trajectory projecting classes. Implements metrify() and defines abstract functions.
-    """
-
-    @staticmethod
-    @abc.abstractmethod
-    def project(self):
-        """ Subclasses need to implement and overload this method """
-        return
-
-    @abc.abstractmethod
-    def _processTraj(self, traj):
-        """ Subclasses need to implement this method """
-        return
-
-    def _getMapping(self, mol):
-        return []
-
-    def _metrify(self, sims, skip, verbose, update):
-        """
-        Takes a set of trajectory folders and projects all trajectories within them onto the given space defined by the Metric* class.
-
-        Parameters
-        ----------
-
-        simList : numpy list of structs
-              A list of structs produced by the simList function.
-
-        skip : int
-               Skips every x frames.
-
-        verbose : int
-              Verbosity toggle
-
-        update : MetricData object
-             Provide a previous MetricData object and only metrify new trajectories.
-
-        Returns
-        -------
-
-        data : MetricData object
-               Returns a MetricData object containing the projected data and the ref data.
-
-        """
-
-        if isinstance(sims, Molecule):
-            return self.processTraj(sims)
-
-        # [updList, oldList] = checkUpdate(simList, update, verbose);
-        updList = sims
-        numSim = len(updList)
-
-        # Find out if there is a unique molfile. If there is, initialize a single Molecule to speed up calculations
-        uniqueMol = 0
-        uqMol = []
-        map = []
-        (single, molfile) = _singleMolfile(updList)
-        if single:
-            uniqueMol = 1
-            uqMol = Molecule(molfile)
-            # Calculating the mapping of metric columns to atom pair indeces
-            map = self._getMapping(uqMol)
-
-        logger.info('Metric: Starting projection of trajectories.')
-        metrics = np.empty(numSim, dtype=object)
-        ref = np.empty(numSim, dtype=object)
-        deleteSims = np.zeros(numSim, dtype=bool)
-        fstep = np.empty(numSim)
-
-        #global parpool
-        Parallel(n_jobs=6, backend="threading")(delayed(_processSimPyemma)(self, i, updList, uniqueMol, uqMol, skip, deleteSims, metrics, ref, fstep) for i in range(numSim))
-
-        logger.info('Finished projecting the trajectories.')
-
-        # Removing empty trajectories
-        emptyM = [True if np.size(x) == 0 else False for x in metrics]
-        emptyR = [True if np.size(x) == 0 else False for x in ref]
-        #assert np.all(deleteSims == emptyM)# and np.all(emptyR == emptyM)
-
-        metrics = np.delete(metrics, np.where(emptyM))
-        ref = np.delete(ref, np.where(emptyM))
-        #updList = np.delete(updList, emptyM)
-
-        if len(metrics) == 0:
-            raise NameError('No trajectories were read')
-
-        # Constructing a MetricData object
-        if not update:
-            data = MetricData(dat=metrics, ref=ref, map=map, simlist=updList)
-        else:
-            data = update
-            data.dat.extend(metrics)
-            data.ref.extend(ref)
-            data.simList.extend(updList)
-
-        uqfsteps = np.unique(fstep)
-        data.fstep = stats.mode(fstep).mode
-        if len(uqfsteps) != 1:
-            logger.warning('Multiple framesteps were read from the simulations. Taking the statistical mode: ' + str(data.fstep) + 'ns.')
-            logger.warning('If it looks wrong, you can modify it by manually setting the MetricData.fstep property.')
-
-        return data
-
-    def _calcRef(self, lengths):
-        ref = np.zeros((np.sum(lengths).astype(int), 2), dtype='u4')
-        prevL = 0
-        for i in range(len(lengths)):
-            currL = prevL + lengths[i]
-            ref[prevL:currL, 0] = i
-            ref[prevL:currL, 1] = range(lengths[i])
-            prevL = currL
-        return ref
-
-
-def _processSimPyemma(obj, i, updList, uniqueMol, uqMol, skip, deleteSims, metrics, ref, fstep):
-    pieces = updList[i].trajectory
-    '''
-    try:
-        if uniqueMol:
-            mol = uqMol.copy()
-        else:
-            mol = Molecule(updList[i].molfile)
-        logging.debug(pieces[0])
-        mol.readTraj(pieces, skip=skip)
-    except Exception as e:
-        logging.warning('Error in simulation with id: ' + str(updList[i].id) + ' ' + e.__str__())
-        deleteSims[i] = True
-        return
-    '''
-
-    #fstep[i] = mol.fstep[1] / 1E6
-    (metrics[i], trajLengths) = obj._processTraj(pieces)
-    ref[i] = obj._calcRef(trajLengths)
-
 

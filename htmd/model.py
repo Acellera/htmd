@@ -437,12 +437,15 @@ class Model(object):
 
         (tmp, relframes) = self.sampleStates(states, [numsamples]*len(states), statetype=statetype, samplemode=samplemode)
 
-        from joblib import Parallel, delayed
         from htmd.config import _config
+        from htmd.parallelprogress import ParallelExecutor, delayed
         # This loop really iterates over states. sampleStates returns an array of arrays
         # Removed ncpus because it was giving errors on some systems.
-        mols = Parallel(n_jobs=1, verbose=11)(delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol)
-                                                  for i, rel in enumerate(relframes))
+        aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
+        mols = aprun(total=len(relframes), description='Getting state Molecules')\
+            (delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol) for i, rel in enumerate(relframes))
+        # mols = Parallel(n_jobs=1, verbose=11)(delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol)
+        #                                           for i, rel in enumerate(relframes))
         return np.array(mols, dtype=object)
 
     def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
