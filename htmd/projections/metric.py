@@ -117,7 +117,7 @@ class Metric:
             logger.warning('Cannot calculate description of dimensions due to different topology files for each trajectory.')
         map = self.getMapping(uqMol)
 
-        logger.info('Metric: Starting projection of trajectories.')
+        logger.debug('Metric: Starting projection of trajectories.')
         metrics = np.empty(numSim, dtype=object)
         ref = np.empty(numSim, dtype=object)
         deletesims = np.zeros(numSim, dtype=bool)
@@ -136,7 +136,7 @@ class Metric:
             fstep[i] = results[i][2]
             deletesims[i] = results[i][3]
 
-        logger.info('Finished projecting the trajectories.')
+        logger.debug('Finished projecting the trajectories.')
 
         # Removing empty trajectories
         emptyM = np.array([True if x is None else False for x in metrics], dtype=bool)
