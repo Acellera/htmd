@@ -1,15 +1,3 @@
-"""
-The Molecule class is a central object in HTMD. Most of HTMD functionalities are implemented via Molecules.
-A Molecule contains a molecular system (e.g. read from a PDB file), which can of course be composed of several
-independent real molecules.
-
-Molecule can read many input format like PDB, PSF, PRMTOP, etc and trajectories files as xtc and soon DCDs.
-Molecules can be viewed (VMD or WebGL), aligned, selected, rotated, truncated, appended, and so on.
-
-A very important feature is atomselection. This is identical to the VMD atomselection language, so that it is possible
-to verify an atomselection visually and then apply it programmatically.
-"""
-
 # (c) 2015-2016 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
@@ -661,7 +649,8 @@ class Molecule:
         self.moveBy(loc)
 
     def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all'):
-        """ Read any supported file (pdb, psf, prmtop, prm, xtc, mol2, gjf, mae)
+        """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
+        mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
         Detects from the extension the file type and loads it into Molecule
 
@@ -914,9 +903,9 @@ class Molecule:
         sel : str
             Atomselection string for a representation.
         style : str
-            Representation style.
+            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`_.
         color : str
-            Coloring mode or color ID.
+            Coloring mode or color ID. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`_.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
         viewer : str ('vmd', 'webgl')
@@ -1399,11 +1388,13 @@ class Representations:
         Parameters
         ----------
         sel : str
-            Atom selection for the given representation.
+            Atom selection for the given representation (i.e. which part of the molecule to show)
         style : str
-            Representation visual style.
+            Representation visual style (e.g. lines, NewCartoon, VdW, etc.). See more
+            `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`_.
         color : str
-            Color style or ID.
+            Color style (e.g. secondary structure) or ID (a number) See more
+            `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`_.
         """
         self.replist.append(_Representation(sel, style, color))
 
