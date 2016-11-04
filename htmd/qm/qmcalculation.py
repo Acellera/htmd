@@ -503,7 +503,7 @@ class QMCalculation:
             return None
 
     def _read_teachem(self, dirname ):
-        try:
+         try:
             data = {}
             f = open( os.path.join( dirname, "scr", "optim.xyz" ), "r" )
             fl = f.readlines()
