@@ -77,6 +77,8 @@ def main_parameterize():
         code = Code.Gaussian
     elif args.qmcode == "PSI4":
         code = Code.PSI4
+    elif args.qmcode == "TeraChem":
+        code = Code.TeraChem
     else:
         print("Unknown QM code: {}".format(args.qmcode))
         sys.exit(1)
