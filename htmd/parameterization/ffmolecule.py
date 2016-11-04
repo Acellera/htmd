@@ -243,9 +243,14 @@ class FFMolecule(Molecule):
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(espdir))
 
+        qmcode = self.qmcode
+        if self.qmcode == Code.TeraChem: 
+           print("Charge-fitting requires a feature TeraChem doesn't have yet. Using PSI4 instead")
+           qmcode = Code.PSI4
+
         qm = QMCalculation(self, charge=self.netcharge, optimize=False, esp=points, theory=self.theory, solvent=self.solvent,
                            directory=espdir, basis=self.basis, execution=self.execution,
-                           code=self.qmcode)
+                           code=qmcode)
         results = qm.results()
         if results[0].errored:
             raise RuntimeError("QM Calculation failed")

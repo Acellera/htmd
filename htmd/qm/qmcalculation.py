@@ -327,6 +327,9 @@ class QMCalculation:
                 elif self.code == Code.PSI4:
                     if not os.path.exists(os.path.join(directory, "psi4.out")):
                         to_submit.append(directory)
+                elif self.code == Code.TeraChem:
+                    if not os.path.exists(os.path.join(directory, "terachem.out")):
+                        to_submit.append(directory)
             except:
                 raise
 
@@ -335,6 +338,8 @@ class QMCalculation:
             cmd = self.gaussian_binary + " < input.gjf > output.gau 2>&1"
         elif self.code == Code.PSI4:
             cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
+        elif self.code == Code.TeraChem:
+            cmd = self.terachem_binary + " -i terachem.in > terachem.out 2>&1"
 
         for d in to_submit:
          f = open( os.path.join( d, "run.sh" ), "w" )
@@ -363,9 +368,11 @@ class QMCalculation:
         bar = ProgressBar(len(directories), description="Running QM Calculations")
 
         if self.code == Code.Gaussian:
-            cmd = self.gaussian_binary + '" < input.gjf > output.gau 2>&1'
+            cmd = self.gaussian_binary + ' < input.gjf > output.gau 2>&1'
         elif self.code == Code.PSI4:
             cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
+        elif self.code == Code.TeraChem:
+            cmd = self.terachem_binary + " -i terachem.in > terachem.out 2>&1"
 
 
         for d in directories:
@@ -384,6 +391,9 @@ class QMCalculation:
                         subprocess.call( cmd , shell=True)
                 elif self.code == Code.PSI4:
                     if not os.path.exists("psi4.out"):
+                        subprocess.call( cmd, shell=True)
+                elif self.code == Code.TeraChem:
+                    if not os.path.exists("terachem.out"):
                         subprocess.call( cmd, shell=True)
             except:
                 os.chdir(cwd)
@@ -491,6 +501,37 @@ class QMCalculation:
             return data
         except:
             return None
+
+    def _read_teachem(self, dirname ):
+        try:
+            data = {}
+            f = open( os.path.join( dirname, "scr", "optim.xyz" ), "r" )
+            fl = f.readlines()
+            f.close()
+            natoms = int(fl[0])
+            atoms = np.zeros((natoms, 3))
+            l = len(fl)
+            a=0  
+            for i in range(l-natoms, fl ):
+              atoms[ a, 0 ] = float( fl[i].split()[1] )
+              atoms[ a, 1 ] = float( fl[i].split()[2] )
+              atoms[ a, 2 ] = float( fl[i].split()[3] )
+              a=a+1
+            energy = float( fl[l-natoms-1].split()[0] ) 
+
+            data["coords"] = atoms
+            data["energy"] = energy
+
+            f = open( os.path.join( dirname, "scr", "results.dat" ), "r" )
+            fl = f.readlines()
+            f.close()
+            dp = fl[7].split()
+            dipole = [ float(dp[0]), float(dp[1]), float(dp[2]) ]
+            data["dipole"] = dipole
+            return data
+         except:
+            return None
+
 
     def _read_psi4(self, dirname):
         try:

@@ -60,7 +60,7 @@ def main_parameterize():
                         default="water", choices=["water", "vacuum"], dest="solvent" )
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
                         choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
-    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4"], default="PSI4",
+    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"], default="PSI4",
                         dest="qmcode")
 
     args = parser.parse_args()
@@ -77,6 +77,8 @@ def main_parameterize():
         code = Code.Gaussian
     elif args.qmcode == "PSI4":
         code = Code.PSI4
+    elif args.qmcode == "TeraChem":
+        code = Code.TeraChem
     else:
         print("Unknown QM code: {}".format(args.qmcode))
         sys.exit(1)
