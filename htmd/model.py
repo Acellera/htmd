@@ -540,7 +540,7 @@ class Model(object):
 
     def _nglButtons(self, ngl_widget, statetype, states):
         # Adds buttons for enabling and disabling macrostate visualizations
-        import IPython.html.widgets as widgets
+        import ipywidgets
         from IPython.display import display
         originalreps = ngl_widget.representations.copy()
         otherreps = originalreps[:-len(states)]
@@ -548,12 +548,12 @@ class Model(object):
 
         container = []
         for s in states:
-            w = widgets.Checkbox(description="{} {}".format(statetype, s))
+            w = ipywidgets.Checkbox(description="{} {}".format(statetype, s))
             w.value = True
             container.append(w)
 
         def updateReps(name):
-            ngl_widget.isClick = True
+            #ngl_widget.isClick = True
             reps = otherreps.copy()
             for i, w in enumerate(container):
                 if w.value:
@@ -562,7 +562,7 @@ class Model(object):
 
         for w in container:
             w.on_trait_change(updateReps, "value")
-        hb = widgets.HBox(container)
+        hb = ipywidgets.HBox(container)
         display(hb)
 
     def save(self, filename):

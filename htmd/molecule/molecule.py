@@ -1235,6 +1235,8 @@ class Molecule:
         if keep != 'all':
             self.coords = np.array(np.atleast_3d(self.coords[:, :, keep]))  # Copy array. Slices are dangerous with C
             self.box = np.array(np.atleast_2d(self.box[:, keep]))
+            if self.box.shape[0] == 1:
+                self.box = self.box.T
         if drop is not None:
             self.coords = np.delete(self.coords, drop, axis=2)
             self.box = np.delete(self.box, drop, axis=1)
@@ -1425,7 +1427,7 @@ class Representations:
     def _translateNGL(self, rep):
         styletrans = {'newcartoon': 'cartoon', 'licorice': 'hyperball', 'lines': 'line', 'vdw': 'spacefill',
                       'cpk': 'ball+stick'}
-        colortrans = {'name': 'element', 'index': 'atomindex', 'chain': 'chainindex', 'secondary structure': 'sstruc',
+        colortrans = {'name': 'element', 'index': 'residueindex', 'chain': 'chainindex', 'secondary structure': 'sstruc',
                       'colorid': 'color'}
         hexcolors = {0: '#0000ff', 1: '#ff0000', 2: '#333333', 3: '#ff6600', 4: '#ffff00', 5: '#4c4d00', 6: '#b2b2cc',
                      7: '#33cc33', 8: '#ffffff', 9: '#ff3399', 10: '#33ccff'}
