@@ -502,7 +502,7 @@ class QMCalculation:
         except:
             return None
 
-    def _read_teachem(self, dirname ):
+    def _read_terachem(self, dirname ):
          try:
             data = {}
             f = open( os.path.join( dirname, "scr", "optim.xyz" ), "r" )
@@ -512,13 +512,15 @@ class QMCalculation:
             atoms = np.zeros((natoms, 3))
             l = len(fl)
             a=0  
-            for i in range(l-natoms, fl ):
+            for i in range(l-natoms, len(fl) ):
               atoms[ a, 0 ] = float( fl[i].split()[1] )
               atoms[ a, 1 ] = float( fl[i].split()[2] )
               atoms[ a, 2 ] = float( fl[i].split()[3] )
               a=a+1
             energy = float( fl[l-natoms-1].split()[0] ) 
 
+#            print(atoms)
+#            print(energy)
             data["coords"] = atoms
             data["energy"] = energy
 
