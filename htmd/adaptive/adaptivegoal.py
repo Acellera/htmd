@@ -210,7 +210,12 @@ class AdaptiveGoal(AdaptiveBase):
             self._writeInputs(datadr.abs2sim(sortedabs[:self.nmax - self._running]))
 
     def _featScale(self, feat):
-        return (feat - np.min(feat)) / (np.max(feat) - np.min(feat))
+        denom = np.max(feat) - np.min(feat)
+        if denom == 0:  # Handling the trivial case where all states have equal features
+            res = np.zeros(len(feat))
+            res[:] = 1 / len(feat)
+            return res
+        return (feat - np.min(feat)) / denom
 
     def _getSpawnFrames(self, reward, model, data):
         (spawncounts, prob) = self._spawn(reward, self.nmax - self._running)

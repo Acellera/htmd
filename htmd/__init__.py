@@ -22,6 +22,7 @@ from htmd.projections.gwpca import GWPCA
 from htmd.userinterface import UserInterface
 from htmd.molecule.molecule import Molecule
 from htmd.adaptive.adaptiverun import AdaptiveRun, AdaptiveMD
+from htmd.adaptive.adaptivegoal import AdaptiveGoal
 from htmd.adaptive.adaptive import reconstructAdaptiveTraj
 from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
@@ -76,5 +77,8 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
     check_registration(product='htmd')
     show_news()
     compareVersions()
+
+import progress_reporter.bar.gui as gui  # Disabling pyemma progress widgets
+gui.ipython_notebook_session=False
 
 config()

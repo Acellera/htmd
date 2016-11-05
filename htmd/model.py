@@ -437,12 +437,15 @@ class Model(object):
 
         (tmp, relframes) = self.sampleStates(states, [numsamples]*len(states), statetype=statetype, samplemode=samplemode)
 
-        from joblib import Parallel, delayed
         from htmd.config import _config
+        from htmd.parallelprogress import ParallelExecutor, delayed
         # This loop really iterates over states. sampleStates returns an array of arrays
         # Removed ncpus because it was giving errors on some systems.
-        mols = Parallel(n_jobs=1, verbose=11)(delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol)
-                                                  for i, rel in enumerate(relframes))
+        aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
+        mols = aprun(total=len(relframes), description='Getting state Molecules')\
+            (delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol) for i, rel in enumerate(relframes))
+        # mols = Parallel(n_jobs=1, verbose=11)(delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol)
+        #                                           for i, rel in enumerate(relframes))
         return np.array(mols, dtype=object)
 
     def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
@@ -537,7 +540,7 @@ class Model(object):
 
     def _nglButtons(self, ngl_widget, statetype, states):
         # Adds buttons for enabling and disabling macrostate visualizations
-        import IPython.html.widgets as widgets
+        import ipywidgets
         from IPython.display import display
         originalreps = ngl_widget.representations.copy()
         otherreps = originalreps[:-len(states)]
@@ -545,12 +548,12 @@ class Model(object):
 
         container = []
         for s in states:
-            w = widgets.Checkbox(description="{} {}".format(statetype, s))
+            w = ipywidgets.Checkbox(description="{} {}".format(statetype, s))
             w.value = True
             container.append(w)
 
         def updateReps(name):
-            ngl_widget.isClick = True
+            #ngl_widget.isClick = True
             reps = otherreps.copy()
             for i, w in enumerate(container):
                 if w.value:
@@ -559,7 +562,7 @@ class Model(object):
 
         for w in container:
             w.on_trait_change(updateReps, "value")
-        hb = widgets.HBox(container)
+        hb = ipywidgets.HBox(container)
         display(hb)
 
     def save(self, filename):
