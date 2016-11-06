@@ -449,7 +449,7 @@ class Model(object):
         return np.array(mols, dtype=object)
 
     def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
-                   numsamples=50, wrapsel='protein', alignsel='name CA'):
+                   numsamples=50, wrapsel='protein', alignsel='name CA', gui=False):
         """ Visualize macro/micro/cluster states in VMD
 
         Parameters
@@ -485,7 +485,7 @@ class Model(object):
         self._integrityCheck(postmsm=(statetype != 'cluster'))
 
         if _config['viewer'].lower() == 'ngl':
-            return self._viewStatesNGL(states, statetype, protein, ligand, mols, numsamples)
+            return self._viewStatesNGL(states, statetype, protein, ligand, mols, numsamples, gui=gui)
 
         if viewer is None:
             viewer = getCurrentViewer()
@@ -504,7 +504,7 @@ class Model(object):
                 viewer.rep('protein')
             viewer.send('start_sscache')
 
-    def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples):
+    def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples, gui=False):
         if states is None:
             states = range(self.macronum)
         if isinstance(states, int):
@@ -512,6 +512,8 @@ class Model(object):
         if mols is None:
             mols = self.getStates(states, statetype, numsamples=min(numsamples, 15))
         colors = [0, 1, 3, 4, 5, 6, 7, 9]
+        hexcolors = {0: '#0000ff', 1: '#ff0000', 2: '#333333', 3: '#ff6600', 4: '#ffff00', 5: '#4c4d00', 6: '#b2b2cc',
+                     7: '#33cc33', 8: '#ffffff', 9: '#ff3399', 10: '#33ccff'}
         if protein is None and ligand is None:
             raise NameError('Please provide either the "protein" or "ligand" parameter for viewStates.')
         if protein:
@@ -520,21 +522,24 @@ class Model(object):
             mol = mols[0].copy()
             mol.remove(ligand, _logger=False)
             mol.coords = np.atleast_3d(mol.coords[:, :, 0])
-            mol.reps.add(sel='protein', style='NewCartoon', color='Secondary Structure')
         for i, s in enumerate(states):
-            if protein:
-                mol.reps.add(sel='segid ST{}'.format(s), style='NewCartoon', color='Index')
+            mols[i].set('chain', '{}'.format(s))
             if ligand:
-                mol.reps.add(sel='segid ST{}'.format(s), style='Licorice', color=colors[np.mod(i, len(colors))])
                 mols[i].filter(ligand, _logger=False)
-
-            mols[i].set('segid', 'ST{}'.format(s))
             tmpcoo = mols[i].coords
             for j in range(mols[i].numFrames):
                 mols[i].coords = np.atleast_3d(tmpcoo[:, :, j])
                 mol.append(mols[i])
 
-        w = mol.view(viewer='ngl')
+        w = mol.view(viewer='ngl', gui=gui, guessBonds=False)
+        w.representations = []
+        if ligand:
+            w.representations.append({"type": 'cartoon', "params": {"sele": 'protein', "color": 'sstruc'}})
+        for i, s in enumerate(states):
+            if protein:
+                w.representations.append({"type": 'cartoon', "params": {"sele": ':{}'.format(s), "color": 'residueindex'}})
+            if ligand:
+                w.representations.append({"type": 'hyperball', "params": {"sele": ':{}'.format(s), "color": hexcolors[np.mod(i, len(hexcolors))]}})
         self._nglButtons(w, statetype, states)
         return w
 
@@ -562,6 +567,9 @@ class Model(object):
 
         for w in container:
             w.on_trait_change(updateReps, "value")
+
+        #container.append(ipywidgets.Checkbox(description="all"))
+
         hb = ipywidgets.HBox(container)
         display(hb)
 
