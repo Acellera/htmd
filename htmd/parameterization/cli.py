@@ -208,6 +208,8 @@ def main_parameterize():
                     scores[idx] = ret.chisq;
                     fn = mol.plotDihedralFit(ret, show=False)
                 except:
+                    print("Error in fitting")
+                    #raise
                     scores[idx] = 0.
                     pass
                     # print(fn)
