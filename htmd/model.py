@@ -505,6 +505,7 @@ class Model(object):
             viewer.send('start_sscache')
 
     def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples, gui=False):
+        from htmd.builder.builder import sequenceID
         if states is None:
             states = range(self.macronum)
         if isinstance(states, int):
@@ -522,24 +523,32 @@ class Model(object):
             mol = mols[0].copy()
             mol.remove(ligand, _logger=False)
             mol.coords = np.atleast_3d(mol.coords[:, :, 0])
+        k = 0
         for i, s in enumerate(states):
-            mols[i].set('chain', '{}'.format(s))
             if ligand:
                 mols[i].filter(ligand, _logger=False)
+            mols[i].set('chain', '{}'.format(s))
             tmpcoo = mols[i].coords
             for j in range(mols[i].numFrames):
                 mols[i].coords = np.atleast_3d(tmpcoo[:, :, j])
+                if ligand:
+                    mols[i].set('segid', sequenceID(mols[i].resid)+k)
+                    k = int(mols[i].segid[-1])
                 mol.append(mols[i])
 
         w = mol.view(viewer='ngl', gui=gui, guessBonds=False)
-        w.representations = []
+        reps = []
         if ligand:
-            w.representations.append({"type": 'cartoon', "params": {"sele": 'protein', "color": 'sstruc'}})
+            # w.add_cartoon('protein', color='sstruc')
+            reps.append({"type": 'cartoon', "params": {"sele": 'protein', "color": 'sstruc'}})
         for i, s in enumerate(states):
             if protein:
-                w.representations.append({"type": 'cartoon', "params": {"sele": ':{}'.format(s), "color": 'residueindex'}})
+                #w.add_cartoon(':{}'.format(s), color='residueindex')
+                reps.append({"type": 'cartoon', "params": {"sele": ':{}'.format(s), "color": 'residueindex'}})
             if ligand:
-                w.representations.append({"type": 'hyperball', "params": {"sele": ':{}'.format(s), "color": hexcolors[np.mod(i, len(hexcolors))]}})
+                #w.add_hyperball(':{}'.format(s), color=hexcolors[np.mod(i, len(hexcolors))])
+                reps.append({"type": 'hyperball', "params": {"sele": ':{}'.format(s), "color": hexcolors[np.mod(i, len(hexcolors))]}})
+        w.representations = reps  # Late assignment of reps to update the view
         self._nglButtons(w, statetype, states)
         return w
 
