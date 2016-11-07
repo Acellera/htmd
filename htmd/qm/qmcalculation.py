@@ -504,7 +504,7 @@ class QMCalculation:
         except:
             return None
 
-    def _read_teachem(self, dirname):
+    def _read_terachem(self, dirname ):
         try:
             data = {}
             f = open(os.path.join(dirname, "scr", "optim.xyz"), "r")
@@ -514,13 +514,15 @@ class QMCalculation:
             atoms = np.zeros((natoms, 3))
             l = len(fl)
             a = 0
-            for i in range(l - natoms, fl):
+            for i in range(l - natoms, len(fl)):
                 atoms[a, 0] = float(fl[i].split()[1])
                 atoms[a, 1] = float(fl[i].split()[2])
                 atoms[a, 2] = float(fl[i].split()[3])
                 a = a + 1
             energy = float(fl[l - natoms - 1].split()[0])
 
+#            print(atoms)
+#            print(energy)
             data["coords"] = atoms
             data["energy"] = energy
 
@@ -532,6 +534,7 @@ class QMCalculation:
             data["dipole"] = dipole
             return data
         except:
+            raise
             return None
 
     def _read_psi4(self, dirname):
@@ -625,24 +628,28 @@ class QMCalculation:
         if self.theory == Theory.B3LYP:
             print("dftd        d3", file=f)
         else:
-            print("dftd        no", file=f)
+           print( "dftd        no", file=f )
 
-        if (self.solvent):
-            print("pcm         cosmo", file=f)
-            print("epsilon     78.39", file=f)
-
-        if (self.optimize):
-            print("run          minimize", file=f)
-        else:
-            print("run          energy", file=f)
-        print("end", file=f)
+        if( self.solvent ):
+           print( "pcm         cosmo", file=f )
+           print( "epsilon     78.39", file=f )
+        
 
         if (self.frozen):
-            print("$constraints", file=f)
+            print("$constraint_freeze", file=f)
             for i in range(len(self.frozen)):
-                print("dihedral  %d %d %d %d" % (
+                print("dihedral  %d_%d_%d_%d" % (
                 self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3]), file=f)
             print("$end", file=f)
+
+        if( self.optimize ):
+           print( "new_minimizer yes", file=f ) 
+           print( "run           minimize", file=f )
+        else: 
+           print( "run           energy", file=f )
+        print( "end", file=f )
+
+
         f.close()
 
     def _write_psi4(self, dirname, frame):

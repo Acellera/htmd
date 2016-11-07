@@ -12,6 +12,8 @@ from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
 from htmd.parameterization.fftype import FFTypeMethod
 from htmd.qm.qmcalculation import Theory, BasisSet, Execution, Code
 import sys
+import numpy as np
+import math
 
 
 def printEnergies(mol):
@@ -56,8 +58,9 @@ def main_parameterize():
                         default="cc-pVDZ", dest="basis")
     parser.add_argument("--theory",  help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
                         default="B3LYP", dest="theory")
-    parser.add_argument("--solvent",  help="Apply a continuum solvent in the QM (default: %(default)s)", type=str,
-                        default="water", choices=["water", "vacuum"], dest="solvent" )
+    parser.add_argument( "--vacuum",  help="Perform QM calculations in vacuum", action="store_true", dest="vacuum", default=False )
+    parser.add_argument( "--no-min",  help="Do not perform QM minimisation", action="store_true", dest="nomin", default=False )
+    parser.add_argument( "--no-esp",  help="Do not perform QM charge fitting", action="store_true", dest="noesp", default=False )
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
                         choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
     parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"], default="PSI4",
@@ -123,10 +126,10 @@ def main_parameterize():
        print( "Unknown theory %s" % ( theory ) )
        sys.exit(1)
 
-    if args.solvent == "water":
-       solvent = True
-    if args.solvent == "vacuum":
+    if args.vacuum: 
        solvent = False
+    else:
+       solvent = True
 
     # Just list or parameterize?
     if args.list:
@@ -146,11 +149,13 @@ def main_parameterize():
 
     if not args.list:  # Parameterize
 
-        print("\n == Minimizing ==\n")
-        mol.minimize()
+        if not args.nomin:
+          print("\n == Minimizing ==\n")
+          mol.minimize()
 
-        print("\n == Charge fitting ==\n")
-        if True:
+        if not args.noesp:
+          print("\n == Charge fitting ==\n")
+          if True:
             (score, qm_dipole, mm_dipole) = mol.fitCharges()
 
             rating = "GOOD"
@@ -173,7 +178,21 @@ def main_parameterize():
             print("Dipole Chi^2 score : %f : %s" % (d, rating))
             print("")
 
-        for d in dihedrals:
+
+        # Iterative dihedral fitting
+        print("\n == Torsion fitting ==\n" )
+
+        scores= np.zeros( len(dihedrals ) )
+        converged = False;
+        iteration = 1
+        while not converged:
+
+          print("\nIteration %d" % ( iteration ) )
+
+          last_scores = scores
+          scores= np.zeros( len(dihedrals ) )
+          idx = 0
+          for d in dihedrals:
             name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
             if not args.torsion or name in args.torsion:
                 print("\n == Fitting torsion {} ==\n".format(name))
@@ -186,15 +205,34 @@ def main_parameterize():
                     if ret.chisq > 100:
                         rating = "BAD"
                     print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
-
+                    scores[idx] = ret.chisq;
                     fn = mol.plotDihedralFit(ret, show=False)
                 except:
+                    print("Error in fitting")
+                    #raise
+                    scores[idx] = 0.
                     pass
                     # print(fn)
+            idx = idx + 1
+#          print(scores)
+          if iteration>1:
+            converged=True
+            for j in  range(len(scores)):
+              # Check convergence
+              relerr = (scores[j] - last_scores[j])/last_scores[j]
+              convstr="- converged"
+              if math.fabs(relerr) > 1.e-2 : 
+                convstr=""
+                converged = False
+              print( "Dihedral %d relative error : %f %s" % ( j, relerr, convstr ) )
+
+          iteration = iteration + 1
+
+        print(" Fitting converged at iteration %d" % (iteration-1 ) )
 
         printEnergies(mol)
 
-        paramdir = os.path.join(args.outdir, "parameters", method.name, args.basis)
+        paramdir = os.path.join(args.outdir, "parameters", method.name, mol.output_directory_name() )
         print("\n == Output to {} ==\n".format(paramdir))
         try:
             os.makedirs(paramdir, exist_ok=True)

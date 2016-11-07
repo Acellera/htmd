@@ -135,8 +135,11 @@ class FFMolecule(Molecule):
             self.name[i] = t
             self.resname[i] = "MOL"
 
+    def output_directory_name( self ):
+        return self.theory_name + "-" + self.basis_name + "-" + self.solvent_name 
+
     def minimize(self):
-        mindir = os.path.join(self.outdir, "minimize", self.theory_name + "-" + self.basis_name + "-" + self.solvent_name )
+        mindir = os.path.join(self.outdir, "minimize", self.output_directory_name()) #self.theory_name + "-" + self.basis_name + "-" + self.solvent_name )
         try:
             os.makedirs(mindir, exist_ok=True)
         except:
@@ -217,7 +220,7 @@ class FFMolecule(Molecule):
 
     def _try_load_pointfile(self):
         # Load a point file if one exists from a previous job
-        pointfile = os.path.join(self.outdir, "esp", self.theory_name + "-" + self.basis_name + "-" + self.solvent_name    , "00000", "grid.dat")
+        pointfile = os.path.join(self.outdir, "esp", self.output_directory_name()   , "00000", "grid.dat")
         if os.path.exists(pointfile):
             f = open(pointfile, "r")
             fl = f.readlines()
@@ -237,7 +240,7 @@ class FFMolecule(Molecule):
         self._removeCOM()
         # Kick off a QM calculation -- unconstrained single point with grid
         points = self._try_load_pointfile()
-        espdir = os.path.join(self.outdir, "esp", self.theory_name + "-" + self.basis_name + "-" + self.solvent_name  )
+        espdir = os.path.join(self.outdir, "esp", self.output_directory_name() )
         try:
             os.makedirs(espdir, exist_ok=True)
         except:
@@ -418,7 +421,7 @@ class FFMolecule(Molecule):
 
         dih_name = "%s-%s-%s-%s" % (self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]])
 
-        fitdir = os.path.join(self.outdir, dirname, dih_name, self.theory_name + "-" + self.basis_name + "-" + self.solvent_name  )
+        fitdir = os.path.join(self.outdir, dirname, dih_name, self.output_directory_name()) 
 
         try:
             os.makedirs(fitdir, exist_ok=True)
@@ -619,7 +622,7 @@ class FFMolecule(Molecule):
         # print( uses )
 
         # Duplicate the dihedrals types so this modified term is unique
-        print("Duplicating types..")
+#        print("Duplicating types..")
         for i in range(4):
             if not ("x" in self._rtf.type_by_index[phi_to_fit.atoms[i]]):
                 self._duplicateTypeOfAtom(phi_to_fit.atoms[i])
@@ -680,10 +683,10 @@ class FFMolecule(Molecule):
                 c += 1
                 unique_uses.append(u)
             else:
-                print(" Dih %s-%s-%s-%s and %s-%s-%s-%s are equivalent " % (
-                    self._rtf.names[aidx[0]], self._rtf.names[aidx[1]], self._rtf.names[aidx[2]],
-                    self._rtf.names[aidx[3]], self._rtf.names[u[0]], self._rtf.names[u[1]], self._rtf.names[u[2]],
-                    self._rtf.names[u[3]]))
+#                print(" Dih %s-%s-%s-%s and %s-%s-%s-%s are equivalent " % (
+#                    self._rtf.names[aidx[0]], self._rtf.names[aidx[1]], self._rtf.names[aidx[2]],
+#                    self._rtf.names[aidx[3]], self._rtf.names[u[0]], self._rtf.names[u[1]], self._rtf.names[u[2]],
+#                    self._rtf.names[u[3]]))
                 pass
                 #  return(count, uses )
             #    print( c )
@@ -741,16 +744,44 @@ class FFMolecule(Molecule):
         ax1.set_xlabel("Phi")
         ax1.set_ylabel("kcal/mol")
         ax1.set_title(fit.name)
-        ax1.plot(fit.phi, fit.qm, label="QM", color="r", marker="o")
-        ax1.plot(fit.phi, fit.mm_original, label="MM Original", color="b", marker="d")
-        #    ax1.plot( fit.phi , fit.mm_zeroed  , label="MM With phi zeroed", color="black", marker="x" )
-        #    ax1.plot( fit.phi , fit.mm_delta   , label="QM-MM target", color="magenta", marker="x" )
-        ax1.plot(fit.phi, fit.mm_fitted, label="MM Fitted", color="g", marker="s")
+
+        x = sorted(fit.phi)
+        plotdata=[]
+        for i in range(len(fit.phi) ):
+           plotdata.append( (fit.phi[i], fit.qm[i] ) )
+        plotdata=sorted(plotdata)
+        plotdatax = [float(i[0]) for i in plotdata]
+        plotdatay = [float(i[1]) for i in plotdata]
+        ax1.plot(plotdatax, plotdatay , label="QM", color="r", marker="o")
+
+        plotdata=[]
+        for i in range(len(fit.phi) ):
+           plotdata.append( (fit.phi[i], fit.mm_original[i] ) )
+        plotdata=sorted(plotdata)
+        plotdatax = [float(i[0]) for i in plotdata]
+        plotdatay = [float(i[1]) for i in plotdata]
+        ax1.plot(plotdatax, plotdatay, label="MM Original", color="b", marker="d")
+
+        plotdata=[]
+        for i in range(len(fit.phi) ):
+           plotdata.append( (fit.phi[i], fit.mm_fitted[i] ) )
+        plotdata=sorted(plotdata)
+        plotdatax = [float(i[0]) for i in plotdata]
+        plotdatay = [float(i[1]) for i in plotdata]
+        ax1.plot(plotdatax, plotdatay, label="MM Fitted", color="g", marker="s")
+
+
+
+        #ax1.plot(fit.phi, fit.qm, label="QM", color="r", marker="o")
+        #ax1.plot(fit.phi, fit.mm_original, label="MM Original", color="b", marker="d")
+        #ax1.plot(fit.phi, fit.mm_fitted, label="MM Fitted", color="g", marker="s")
+        ##    ax1.plot( fit.phi , fit.mm_zeroed  , label="MM With phi zeroed", color="black", marker="x" )
+        ##    ax1.plot( fit.phi , fit.mm_delta   , label="QM-MM target", color="magenta", marker="x" )
         ax1.legend(prop={'size': 8})
         if show:
             plt.show()
         else:
-            plotdir = os.path.join(self.outdir, "parameters", self.method.name,  self.theory_name +"-"+self.basis_name + "-" + self.solvent_name, "plots")
+            plotdir = os.path.join(self.outdir, "parameters", self.method.name, self.output_directory_name(), "plots")
             try:
                 os.makedirs(plotdir, exist_ok=True)
             except:
