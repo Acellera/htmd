@@ -15,9 +15,12 @@ from numpy.random import uniform as rand
 from htmd.molecule.vdw import VDW
 from htmd.progress.progress import ProgressBar
 
-from htmd.queues import *
-#from htmd.apps.lsf import LSF
-#from htmd.apps.pbs import PBS
+from htmd.queues.simqueue import SimQueue
+from htmd.queues.acecloudqueue import AceCloudQueue
+
+
+# from htmd.apps.lsf import LSF
+# from htmd.apps.pbs import PBS
 
 
 class BasisSet(Enum):
@@ -37,10 +40,10 @@ class Code(Enum):
 
 
 class Execution(Enum):
-    Inline   = 4000
-    LSF      = 4001
-    PBS      = 4002
-    Slurm    = 4003
+    Inline = 4000
+    LSF = 4001
+    PBS = 4002
+    Slurm = 4003
     AceCloud = 4004
 
 
@@ -81,7 +84,7 @@ class QMCalculation:
             raise ValueError("theory must of type Theory")
         if code and (not isinstance(code, Code)):
             raise ValueError("code must be of type Code")
-        if not (isinstance(execution, Execution) or  isinstance( execution, SimQueue )):
+        if not (isinstance(execution, Execution) or isinstance(execution, SimQueue)):
             print(execution)
             raise ValueError("execution must be of type Execution")
 
@@ -112,9 +115,9 @@ class QMCalculation:
         # TODO esp validation, etc
 
         # AceCloud
-        if( execution == Execution.AceCloud ): 
-           ncpus = 4
-           ngpus = 0
+        if execution == Execution.AceCloud:
+            ncpus = 4
+            ngpus = 0
 
         self.molecule = molecule.copy()
         self.basis = basis
@@ -122,7 +125,7 @@ class QMCalculation:
         self.charge = charge
         self.multiplicity = multiplicity
         self.frozen = None
-        self.solvent  = solvent
+        self.solvent = solvent
         self.esp = esp
         self.esp_vdw_radii = esp_vdw_radii
         self.esp_density = esp_density
@@ -302,7 +305,7 @@ class QMCalculation:
             self._write_xyz(dn, c)
             self._write_psi4(dn, c)
             self._write_gaussian(dn, c)
-            self._write_terachem(dn,c)
+            self._write_terachem(dn, c)
             i += 1
             self._job_dirs = dirs
         pass
@@ -342,19 +345,20 @@ class QMCalculation:
             cmd = self.terachem_binary + " -i terachem.in > terachem.out 2>&1"
 
         for d in to_submit:
-         f = open( os.path.join( d, "run.sh" ), "w" )
-         print( "#!/bin/sh\n%s\n" % ( cmd ), file=f )
-         f.close() 
-         os.chmod(  os.path.join( d, "run.sh" ), 0o700 )
+            f = open(os.path.join(d, "run.sh"), "w")
+            print("#!/bin/sh\n%s\n" % (cmd), file=f)
+            f.close()
+            os.chmod(os.path.join(d, "run.sh"), 0o700)
 
-        if isinstance( execution, SimQueue ): 
+        if isinstance(execution, SimQueue):
             lsf = execution
-        elif execution == Execution.LSF:
-            lsf = LSFQueue(ncpus=self.ncpus, executable=cmd, queue="general", resources="span[ptile={}]".format(self.ncpus), app="gaussian")
-        elif execution == Execution.PBS:
-            lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
-        elif execution == Execution.Slurm:
-            lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        # elif execution == Execution.LSF:
+        #     lsf = LSFQueue(ncpus=self.ncpus, executable=cmd, queue="general",
+        #                    resources="span[ptile={}]".format(self.ncpus), app="gaussian")
+        # elif execution == Execution.PBS:
+        #     lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        # elif execution == Execution.Slurm:
+        #     lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
         elif execution == Execution.AceCloud:
             lsf = AceCloudQueue()
         else:
@@ -374,13 +378,11 @@ class QMCalculation:
         elif self.code == Code.TeraChem:
             cmd = self.terachem_binary + " -i terachem.in > terachem.out 2>&1"
 
-
         for d in directories:
-           f = open( os.path.join( d, "run.sh" ), "w" )
-           print( "#!/bin/sh\n%s\n" % ( cmd ), file=f )
-           f.close() 
-           os.chmod(  os.path.join( d, "run.sh" ), 0o700 )
-
+            f = open(os.path.join(d, "run.sh"), "w")
+            print("#!/bin/sh\n%s\n" % (cmd), file=f)
+            f.close()
+            os.chmod(os.path.join(d, "run.sh"), 0o700)
 
         for directory in directories:
             cwd = os.getcwd()
@@ -388,13 +390,13 @@ class QMCalculation:
                 os.chdir(directory)
                 if self.code == Code.Gaussian:
                     if not os.path.exists("output.gau"):
-                        subprocess.call( cmd , shell=True)
+                        subprocess.call(cmd, shell=True)
                 elif self.code == Code.PSI4:
                     if not os.path.exists("psi4.out"):
-                        subprocess.call( cmd, shell=True)
+                        subprocess.call(cmd, shell=True)
                 elif self.code == Code.TeraChem:
                     if not os.path.exists("terachem.out"):
-                        subprocess.call( cmd, shell=True)
+                        subprocess.call(cmd, shell=True)
             except:
                 os.chdir(cwd)
                 raise
@@ -502,36 +504,38 @@ class QMCalculation:
         except:
             return None
 
-    def _read_teachem(self, dirname ):
+    def _read_terachem(self, dirname ):
         try:
             data = {}
-            f = open( os.path.join( dirname, "scr", "optim.xyz" ), "r" )
+            f = open(os.path.join(dirname, "scr", "optim.xyz"), "r")
             fl = f.readlines()
             f.close()
             natoms = int(fl[0])
             atoms = np.zeros((natoms, 3))
             l = len(fl)
-            a=0  
-            for i in range(l-natoms, fl ):
-              atoms[ a, 0 ] = float( fl[i].split()[1] )
-              atoms[ a, 1 ] = float( fl[i].split()[2] )
-              atoms[ a, 2 ] = float( fl[i].split()[3] )
-              a=a+1
-            energy = float( fl[l-natoms-1].split()[0] ) 
+            a = 0
+            for i in range(l - natoms, len(fl)):
+                atoms[a, 0] = float(fl[i].split()[1])
+                atoms[a, 1] = float(fl[i].split()[2])
+                atoms[a, 2] = float(fl[i].split()[3])
+                a = a + 1
+            energy = float(fl[l - natoms - 1].split()[0])
 
+#            print(atoms)
+#            print(energy)
             data["coords"] = atoms
             data["energy"] = energy
 
-            f = open( os.path.join( dirname, "scr", "results.dat" ), "r" )
+            f = open(os.path.join(dirname, "scr", "results.dat"), "r")
             fl = f.readlines()
             f.close()
             dp = fl[7].split()
-            dipole = [ float(dp[0]), float(dp[1]), float(dp[2]) ]
+            dipole = [float(dp[0]), float(dp[1]), float(dp[2])]
             data["dipole"] = dipole
             return data
-         except:
+        except:
+            raise
             return None
-
 
     def _read_psi4(self, dirname):
         try:
@@ -594,35 +598,35 @@ class QMCalculation:
         except:
             return None
 
-    def _write_terachem( self, dirname, frame):
+    def _write_terachem(self, dirname, frame):
         coords = self.molecule.coords[:, :, frame]
         nrealatoms = coords.shape[0]  # TODO: compensate for dummy atoms
         f = open(os.path.join(dirname, "terachem.in"), "w")
 
         if self.basis == BasisSet._6_31G_star:
-           if self.charge < 0 and ( not self.solvent ):
-              basis = "6-31+g*"
-           else:
-              basis = "6-31g*"
+            if self.charge < 0 and (not self.solvent):
+                basis = "6-31+g*"
+            else:
+                basis = "6-31g*"
         elif self.basis == BasisSet._cc_pVDZ:
-           if self.charge < 0 and ( not self.solvent ):
-              basis = "aug-cc-pvdz"
-           else:
-              basis = "cc-pvdz"
+            if self.charge < 0 and (not self.solvent):
+                basis = "aug-cc-pvdz"
+            else:
+                basis = "cc-pvdz"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
         if self.theory == Theory.B3LYP:
-          print( "method      b3lyp", file=f )
+            print("method      b3lyp", file=f)
         elif self.theory == Theory.RHF:
-          print( "method      rhf", file=f )
+            print("method      rhf", file=f)
 
-        print( "basis       %s" % ( basis ), file=f )
-        print( "coordinates input.xyz", file=f )
-        print( "charge      %d" % (self.charge), file=f )
-        print( "spinmult    %d" % (self.multiplicity), file=f )
+        print("basis       %s" % (basis), file=f)
+        print("coordinates input.xyz", file=f)
+        print("charge      %d" % (self.charge), file=f)
+        print("spinmult    %d" % (self.multiplicity), file=f)
         if self.theory == Theory.B3LYP:
-           print( "dftd        d3", file=f )
+            print("dftd        d3", file=f)
         else:
            print( "dftd        no", file=f )
 
@@ -630,6 +634,14 @@ class QMCalculation:
            print( "pcm         cosmo", file=f )
            print( "epsilon     78.39", file=f )
         
+
+        if (self.frozen):
+            print("$constraints", file=f)
+            for i in range(len(self.frozen)):
+                print("dihedral  %d %d %d %d" % (
+                self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3]), file=f)
+            print("$end", file=f)
+
         if( self.optimize ):
            print( "new_minimizer yes", file=f ) 
            print( "run          minimize", file=f )
@@ -637,11 +649,7 @@ class QMCalculation:
            print( "run          energy", file=f )
         print( "end", file=f )
 
-        if( self.frozen ):
-           print( "$constraint_freeze", file=f )
-           for i in range(len(self.frozen)):
-               print( "dihedral  %d_%d_%d_%d" % ( self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3] ), file=f ) 
-           print( "$end", file=f )
+
         f.close()
 
     def _write_psi4(self, dirname, frame):
@@ -678,23 +686,22 @@ class QMCalculation:
         print("\n\tsymmetry c1\n}", file=f)
 
         if self.solvent:
-           print( "set {\n  pcm true\n  pcm_scf_type total\n}", file=f )
-           print( "pcm = {", file=f ) 
-           print("  Units = Angstrom", file=f )
-           print("  Medium {", file=f )
-           print("   SolverType = IEFPCM", file=f )
-           print("   Solvent = Water", file=f )
-           print("  }", file=f )
-           print("", file=f )
-           print("  Cavity {", file=f )
-           print("   RadiiSet = UFF", file=f )
-           print("   Type = GePol", file=f )
-           print("   Scaling = False", file=f )
-           print("   Area = 0.3", file=f )
-           print("   Mode = Implicit", file=f )
-           print("  }", file=f )
-           print("}", file=f )
-
+            print("set {\n  pcm true\n  pcm_scf_type total\n}", file=f)
+            print("pcm = {", file=f)
+            print("  Units = Angstrom", file=f)
+            print("  Medium {", file=f)
+            print("   SolverType = IEFPCM", file=f)
+            print("   Solvent = Water", file=f)
+            print("  }", file=f)
+            print("", file=f)
+            print("  Cavity {", file=f)
+            print("   RadiiSet = UFF", file=f)
+            print("   Type = GePol", file=f)
+            print("   Scaling = False", file=f)
+            print("   Area = 0.3", file=f)
+            print("   Mode = Implicit", file=f)
+            print("  }", file=f)
+            print("}", file=f)
 
         if self.frozen:
             print("set optking {\n\tfrozen_dihedral = (\"", file=f)
@@ -706,13 +713,15 @@ class QMCalculation:
                     self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3], bb), file=f)
             print("\t\")\n}\n", file=f)
 
-        if   self.theory == Theory.RHF: energy="scf"
-        elif self.theory == Theory.B3LYP: energy="b3lyp-d3"
-         
+        if self.theory == Theory.RHF:
+            energy = "scf"
+        elif self.theory == Theory.B3LYP:
+            energy = "b3lyp-d3"
+
         if self.optimize:
-            print("ee,wfn = optimize('%s', return_wfn=True)" % ( energy ), file=f)
+            print("ee,wfn = optimize('%s', return_wfn=True)" % (energy), file=f)
         else:
-            print("ee,wfn = energy('%s', return_wfn=True)" % ( energy ), file=f)
+            print("ee,wfn = energy('%s', return_wfn=True)" % (energy), file=f)
 
         print("oeprop( wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')", file=f)
         if self.points is not None:
@@ -745,34 +754,33 @@ class QMCalculation:
 
         if self.theory == Theory.RHF:
             theory = "HF"
-            dispersion=""
+            dispersion = ""
         elif self.theory == Theory.B3LYP:
             theory = "B3LYP"
-            dispersion="EmpiricalDispersion=GD3"
+            dispersion = "EmpiricalDispersion=GD3"
 
         if self.basis == BasisSet._6_31G_star:
-#            if self.charge < 0:
-#                basis = "6-31+G*"
-#            else:
-                basis = "6-31G*"
+            #            if self.charge < 0:
+            #                basis = "6-31+G*"
+            #            else:
+            basis = "6-31G*"
         elif self.basis == BasisSet._cc_pVDZ:
-#            if self.charge < 0:
-#                basis = "AUG-cc-pVDZ"
-#            else:
-                basis = "cc-pVDZ"
+            #            if self.charge < 0:
+            #                basis = "AUG-cc-pVDZ"
+            #            else:
+            basis = "cc-pVDZ"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
         opt = ""
         if self.optimize:
             opt = "opt=ModRedundant"
- 
+
         if self.solvent:
             solvent = "SCRF=PCM"
         else:
             solvent = ""
 
-       
         print("#%s/%s nosymm scf=tight\n# %s %s %s" % (theory, basis, opt, solvent, dispersion), file=f)
         if self.points is not None:
             print("prop=(read,field)", file=f)

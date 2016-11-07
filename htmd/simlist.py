@@ -156,7 +156,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
         for inputf in inputfolders:
             inputnames[_simName(inputf)] = inputf
 
-    logger.info('Starting listing of simulations.')
+    logger.debug('Starting listing of simulations.')
     sims = []
     keys = natsort.natsorted(datanames.keys())
     i = 0
@@ -185,7 +185,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
         i += 1
         bar.progress()
     bar.stop()
-    logger.info('Finished listing of simulations.')
+    logger.debug('Finished listing of simulations.')
     return np.array(sims, dtype=object)
 
 
@@ -220,7 +220,7 @@ def simfilter(sims, outfolder, filtersel):
     if len(sims) > 0:
         _filterPDBPSF(sims[0], outfolder, filtersel)
 
-    logger.info('Starting filtering of simulations.')
+    logger.debug('Starting filtering of simulations.')
 
     filtsims = []
 
@@ -229,7 +229,7 @@ def simfilter(sims, outfolder, filtersel):
     filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
     #bar.stop()
 
-    logger.info('Finished filtering of simulations')
+    logger.debug('Finished filtering of simulations')
     return np.array(filtsims)
 
 
