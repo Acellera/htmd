@@ -636,17 +636,17 @@ class QMCalculation:
         
 
         if (self.frozen):
-            print("$constraints", file=f)
+            print("$constraint_freeze", file=f)
             for i in range(len(self.frozen)):
-                print("dihedral  %d %d %d %d" % (
+                print("dihedral  %d_%d_%d_%d" % (
                 self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3]), file=f)
             print("$end", file=f)
 
         if( self.optimize ):
            print( "new_minimizer yes", file=f ) 
-           print( "run          minimize", file=f )
+           print( "run           minimize", file=f )
         else: 
-           print( "run          energy", file=f )
+           print( "run           energy", file=f )
         print( "end", file=f )
 
 
