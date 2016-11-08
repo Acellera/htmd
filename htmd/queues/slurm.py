@@ -12,7 +12,7 @@ import os
 import pwd
 import shutil
 from os.path import isdir
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
 from htmd import UserInterface
 from htmd.queues.simqueue import SimQueue
