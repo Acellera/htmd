@@ -161,12 +161,26 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         total : int
             Total running and queued workunits
         """
+        import time
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
         user = pwd.getpwuid(os.getuid()).pw_name
         cmd = [self._squeue, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
-        ret = check_output(cmd)
+
+        # This command randomly fails so I need to allow it to repeat or it crashes adaptive
+        tries = 0
+        while tries < 3:
+            try:
+                ret = check_output(cmd)
+            except CalledProcessError:
+                if tries == 2:
+                    raise
+                tries += 1
+                time.sleep(3)
+                continue
+            break
+
         logger.debug(ret.decode("ascii"))
 
         # TODO: check lines and handle errors

@@ -355,8 +355,8 @@ class Model(object):
         >>> model.markovModel(100, 5)
         >>> model.eqDistribution()
         """
-        logger.warning('Equilibrium distribution calculations for macrostates are now done using membership '
-                       'probabilities and hence your results might differ from analyses done before this change.')
+        # logger.warning('Equilibrium distribution calculations for macrostates are now done using membership '
+        #                'probabilities and hence your results might differ from analyses done before this change.')
         self._integrityCheck(postmsm=True)
         macroeq = np.ones(self.macronum) * -1
         for i in range(self.macronum):
