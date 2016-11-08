@@ -1,3 +1,12 @@
+"""
+Markov state models are a statistical tool for analysing molecular simulations which has met with lots of success.
+The Model class here, encapsulates all functionallity for the calculation of Markov models while hiding unnecessary
+details under the hood. It uses PyEMMA [1] internally to calculate Markov models.
+
+References
+----------
+.. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
+"""
 # (c) 2015-2016 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
@@ -16,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class Model(object):
-    """ Constructor for the Model class. Model uses PyEMMA [1] internally to calculate Markov models.
+    """ Constructor for the Model class.
 
     Parameters
     ----------
@@ -34,10 +43,6 @@ class Model(object):
     .. rubric:: Attributes
     .. autoautosummary:: htmd.model.Model
         :attributes:
-
-    References
-    ----------
-    .. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
     """
 
     def __init__(self, data=None):
@@ -133,10 +138,16 @@ class Model(object):
 
     @property
     def P(self):
+        """ The transition probability matrix """
         return self.msm.transition_matrix
 
     @property
     def micro_ofcluster(self):
+        """ Mapping of clusters to microstates
+
+        Numpy array which at index i has the index of the microstate corresponding to cluster i.
+        Clusters which were not connected and thus are not in the model have a microstate value of -1.
+        """
         self._integrityCheck(postmsm=True)
         micro_ofcluster = -np.ones(self.data.K, dtype=int)
         micro_ofcluster[self.msm.active_set] = np.arange(len(self.msm.active_set))
@@ -144,21 +155,31 @@ class Model(object):
 
     @property
     def cluster_ofmicro(self):
+        """ Mapping of microstates to clusters
+
+        Numpy array which at index i has the index of the cluster corresponding to microstate i.
+        """
         self._integrityCheck(postmsm=True)
         return self.msm.active_set
 
     @property
     def micronum(self):
+        """ Number of microstates """
         self._integrityCheck(postmsm=True)
         return len(self.msm.active_set)
 
     @property
     def macronum(self):
+        """ Number of macrostates """
         self._integrityCheck(postmsm=True)
         return len(set(self.msm.metastable_assignments))
 
     @property
     def macro_ofmicro(self):
+        """ Mapping of microstates to macrostates
+
+        Numpy array which at index i has the index of the macrostate corresponding to microstate i.
+        """
         self._integrityCheck(postmsm=True)
         # Fixing pyemma macrostate numbering
         mask = np.ones(np.max(self.msm.metastable_assignments) + 1, dtype=int) * -1
@@ -167,6 +188,11 @@ class Model(object):
 
     @property
     def macro_ofcluster(self):
+        """ Mapping of clusters to microstates
+
+        Numpy array which at index i has the index of the macrostate corresponding to cluster i.
+        Clusters which were not connected and thus are not in the model have a macrostate value of -1.
+        """
         self._integrityCheck(postmsm=True)
         macro_ofcluster = -np.ones(self.data.K+1, dtype=int)
         macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
@@ -233,8 +259,9 @@ class Model(object):
             return its.get_timescales(), its.lags
 
     def maxConnectedLag(self, lags):
-        """ Calculates the last lagtime before a drop occurs in the first implied timescale
+        """ Heuristic for getting the lagtime before a timescale drops.
 
+        It calculates the last lagtime before a drop occurs in the first implied timescale due to disconnected states.
         If the top timescale is closer to the second top timescale at the previous lagtime than to itself at the previous
         lagtime it means that a drop occured. The lagtime before the drop is returned.
 
@@ -374,7 +401,7 @@ class Model(object):
             plt.show()
         return macroeq
 
-    def coarseP(self):
+    def _coarseP(self):
         M = self.msm.metastable_memberships
         Pcoarse = np.linalg.inv(M.T.dot(M)).dot(M.T).dot(self.P).dot(M)
         if len(np.where(Pcoarse < 0)[0]) != 0:
@@ -813,40 +840,6 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
             else:
                 statistic.append(method(datconcat[frames, ...], axis=axis))
     return statistic
-
-
-def reconstructContactMap(map, datavec):
-    """ Plots a given vector as a contact map
-
-    Parameters
-    ----------
-    map : np.ndarray 2D
-        The map from a MetricData object
-    datavec : np.ndarray
-        The data we want to plot in a 2D map
-    """
-    map = np.array(map, dtype=int)
-    atomidx = np.unique(map.flatten()).astype(int)
-    mask = np.zeros(max(atomidx)+1, dtype=int)
-    mask[atomidx] = range(len(atomidx))
-
-    # Create a new map which maps from vector indexes to matrix indexes
-    newmap = np.zeros(np.shape(map), dtype=int)
-    newmap[:, 0] = mask[map[:, 0]]
-    newmap[:, 1] = mask[map[:, 1]]
-
-    contactmap = np.zeros((len(atomidx), len(atomidx)))
-    for i in range(len(datavec)):
-        contactmap[newmap[i, 0], newmap[i, 1]] = datavec[i]
-        contactmap[newmap[i, 1], newmap[i, 0]] = datavec[i]
-
-    from matplotlib import pylab as plt
-    plt.imshow(contactmap, interpolation='nearest', aspect='equal')
-    plt.colorbar()
-    #plt.axis('off')
-    #plt.tick_params(axis='x', which='both', bottom='off', top='off', labelbottom='off')
-    #plt.tick_params(axis='y', which='both', left='off', right='off', labelleft='off')
-    plt.show()
 
 
 def _weightedMethod(model, method, stconcat, datconcat, st, axis):
