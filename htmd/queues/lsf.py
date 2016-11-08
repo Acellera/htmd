@@ -66,6 +66,10 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._qlist = LsfQueue._find_binary('bjobs')
         self._qcancel = LsfQueue._find_binary('bkill')
 
+        # TODO: guess which queue we're at, and instantiate queue specific parameters
+        # "gpu_priority" 'select[ngpus>0] rusage[ngpus_excl_p=1]' "module load acemd" "module load acellera/test" "module load gaussian"
+        # "phase6_normal" "rusage[ngpus_excl_p=1],span[hosts=1]" "source /home/model/MD-SOFTWARE/model_md.bashrc" "source /home/model/miniconda3/htmd.bashrc"
+
     @staticmethod
     def _find_binary(binary):
         ret = shutil.which(binary, mode=os.X_OK)
