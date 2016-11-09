@@ -9,7 +9,6 @@
 # No redistribution in whole or part
 #
 import os
-import pwd
 import shutil
 from os.path import isdir
 from subprocess import check_output, CalledProcessError
@@ -162,6 +161,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             Total running and queued workunits
         """
         import time
+        import pwd
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
         user = pwd.getpwuid(os.getuid()).pw_name
@@ -193,6 +193,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     def stop(self):
         """ Cancels all currently running and queued jobs
         """
+        import pwd
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
         user = pwd.getpwuid(os.getuid()).pw_name
