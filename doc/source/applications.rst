@@ -1,5 +1,5 @@
-Learn HTMD
-==========
+HTMD Applications
+=================
 
 Contents:
 

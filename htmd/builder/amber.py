@@ -139,8 +139,13 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     # Loading user parameters
     f.write('# Loading parameter files\n')
     for p in param:
-        shutil.copy(p, outdir)
-        f.write('loadamberparams ' + path.basename(p) + '\n')
+        try:
+            shutil.copy(p, outdir)
+            f.write('loadamberparams ' + path.basename(p) + '\n')
+        except:
+            f.write('loadamberparams ' + p + '\n')
+            logger.info("Path {:s} not found, assuming a standard AmberTools file.".
+                        format(p))
     f.write('\n')
 
     # Printing out topologies

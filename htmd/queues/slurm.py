@@ -12,7 +12,7 @@ import os
 import pwd
 import shutil
 from os.path import isdir
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
 from htmd import UserInterface
 from htmd.queues.simqueue import SimQueue
@@ -61,7 +61,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('partition', 'str', 'The queue (partition) to run on', None)
         self._cmdString('priority', 'str', 'Job priority', 'gpu_priority')
         self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
-        self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 4000, TYPE_INT, RANGE_0POS)
+        self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 1000, TYPE_INT, RANGE_0POS)
         self._cmdValue('walltime', 'int', 'Job timeout (s)', None, TYPE_INT, RANGE_POS)
         self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
         self._cmdString('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None)
@@ -161,12 +161,26 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         total : int
             Total running and queued workunits
         """
+        import time
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
         user = pwd.getpwuid(os.getuid()).pw_name
         cmd = [self._squeue, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
-        ret = check_output(cmd)
+
+        # This command randomly fails so I need to allow it to repeat or it crashes adaptive
+        tries = 0
+        while tries < 3:
+            try:
+                ret = check_output(cmd)
+            except CalledProcessError:
+                if tries == 2:
+                    raise
+                tries += 1
+                time.sleep(3)
+                continue
+            break
+
         logger.debug(ret.decode("ascii"))
 
         # TODO: check lines and handle errors

@@ -23,28 +23,33 @@ except:
 # Add packages to sync in this list here
 
 for p in [ 
-	"fftw3f",
-	"openmm",
-	"ambermini",
-	"bhmm",
-	"funcsigs",
-	"mdtraj",
-	"msmtools",
-	"openbabel",
-	"pint",
-	"progress_reporter",
-	"pyemma",
-	"thermotools"
+	"omnia:fftw3f",
+	"omnia:openmm",
+	"omnia:ambermini",
+	"omnia:bhmm",
+	"omnia:funcsigs",
+	"omnia:mdtraj",
+	"omnia:msmtools",
+	"omnia:openbabel",
+	"omnia:pint",
+	"omnia:progress_reporter",
+	"omnia:pyemma",
+	"omnia:thermotools",
+  "psi4:pcmsolver",
+  "psi4:dftd3"
 	]:
-	omnia    = api.package("omnia", p );
+
+	pp=p.split( ":" )
+	p=pp[1]
+	omnia    = api.package( pp[0], p )
 	try:
-		acellera = api.package("acellera", p );
+		acellera = api.package("acellera", p )
 	except:
 
 		acellera = {"latest_version": "0" }
 
 	if omnia["latest_version"] != acellera["latest_version"]:
-		print("Syncing %s version %s.." %(p, omnia["latest_version"]) )
+		print("Syncing %s/%s version %s.." %(pp[0], p, omnia["latest_version"]) )
 		for f in omnia["files"]:
 			if f["version"] == omnia["latest_version"]:
 				url = "https:" + f["download_url"]

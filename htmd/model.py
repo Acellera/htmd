@@ -1,3 +1,12 @@
+"""
+Markov state models are a statistical tool for analysing molecular simulations which has met with lots of success.
+The Model class here, encapsulates all functionallity for the calculation of Markov models while hiding unnecessary
+details under the hood. It uses PyEMMA [1] internally to calculate Markov models.
+
+References
+----------
+.. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
+"""
 # (c) 2015-2016 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
@@ -16,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class Model(object):
-    """ Constructor for the Model class. Model uses PyEMMA [1] internally to calculate Markov models.
+    """ Constructor for the Model class.
 
     Parameters
     ----------
@@ -34,10 +43,6 @@ class Model(object):
     .. rubric:: Attributes
     .. autoautosummary:: htmd.model.Model
         :attributes:
-
-    References
-    ----------
-    .. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
     """
 
     def __init__(self, data=None):
@@ -133,10 +138,16 @@ class Model(object):
 
     @property
     def P(self):
+        """ The transition probability matrix """
         return self.msm.transition_matrix
 
     @property
     def micro_ofcluster(self):
+        """ Mapping of clusters to microstates
+
+        Numpy array which at index i has the index of the microstate corresponding to cluster i.
+        Clusters which were not connected and thus are not in the model have a microstate value of -1.
+        """
         self._integrityCheck(postmsm=True)
         micro_ofcluster = -np.ones(self.data.K, dtype=int)
         micro_ofcluster[self.msm.active_set] = np.arange(len(self.msm.active_set))
@@ -144,21 +155,31 @@ class Model(object):
 
     @property
     def cluster_ofmicro(self):
+        """ Mapping of microstates to clusters
+
+        Numpy array which at index i has the index of the cluster corresponding to microstate i.
+        """
         self._integrityCheck(postmsm=True)
         return self.msm.active_set
 
     @property
     def micronum(self):
+        """ Number of microstates """
         self._integrityCheck(postmsm=True)
         return len(self.msm.active_set)
 
     @property
     def macronum(self):
+        """ Number of macrostates """
         self._integrityCheck(postmsm=True)
         return len(set(self.msm.metastable_assignments))
 
     @property
     def macro_ofmicro(self):
+        """ Mapping of microstates to macrostates
+
+        Numpy array which at index i has the index of the macrostate corresponding to microstate i.
+        """
         self._integrityCheck(postmsm=True)
         # Fixing pyemma macrostate numbering
         mask = np.ones(np.max(self.msm.metastable_assignments) + 1, dtype=int) * -1
@@ -167,6 +188,11 @@ class Model(object):
 
     @property
     def macro_ofcluster(self):
+        """ Mapping of clusters to microstates
+
+        Numpy array which at index i has the index of the macrostate corresponding to cluster i.
+        Clusters which were not connected and thus are not in the model have a macrostate value of -1.
+        """
         self._integrityCheck(postmsm=True)
         macro_ofcluster = -np.ones(self.data.K+1, dtype=int)
         macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
@@ -233,8 +259,9 @@ class Model(object):
             return its.get_timescales(), its.lags
 
     def maxConnectedLag(self, lags):
-        """ Calculates the last lagtime before a drop occurs in the first implied timescale
+        """ Heuristic for getting the lagtime before a timescale drops.
 
+        It calculates the last lagtime before a drop occurs in the first implied timescale due to disconnected states.
         If the top timescale is closer to the second top timescale at the previous lagtime than to itself at the previous
         lagtime it means that a drop occured. The lagtime before the drop is returned.
 
@@ -355,8 +382,8 @@ class Model(object):
         >>> model.markovModel(100, 5)
         >>> model.eqDistribution()
         """
-        logger.warning('Equilibrium distribution calculations for macrostates are now done using membership '
-                       'probabilities and hence your results might differ from analyses done before this change.')
+        # logger.warning('Equilibrium distribution calculations for macrostates are now done using membership '
+        #                'probabilities and hence your results might differ from analyses done before this change.')
         self._integrityCheck(postmsm=True)
         macroeq = np.ones(self.macronum) * -1
         for i in range(self.macronum):
@@ -374,7 +401,7 @@ class Model(object):
             plt.show()
         return macroeq
 
-    def coarseP(self):
+    def _coarseP(self):
         M = self.msm.metastable_memberships
         Pcoarse = np.linalg.inv(M.T.dot(M)).dot(M.T).dot(self.P).dot(M)
         if len(np.where(Pcoarse < 0)[0]) != 0:
@@ -437,16 +464,19 @@ class Model(object):
 
         (tmp, relframes) = self.sampleStates(states, [numsamples]*len(states), statetype=statetype, samplemode=samplemode)
 
-        from joblib import Parallel, delayed
         from htmd.config import _config
+        from htmd.parallelprogress import ParallelExecutor, delayed
         # This loop really iterates over states. sampleStates returns an array of arrays
         # Removed ncpus because it was giving errors on some systems.
-        mols = Parallel(n_jobs=1, verbose=11)(delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol)
-                                                  for i, rel in enumerate(relframes))
+        aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
+        mols = aprun(total=len(relframes), description='Getting state Molecules')\
+            (delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol) for i, rel in enumerate(relframes))
+        # mols = Parallel(n_jobs=1, verbose=11)(delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol)
+        #                                           for i, rel in enumerate(relframes))
         return np.array(mols, dtype=object)
 
     def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
-                   numsamples=50, wrapsel='protein', alignsel='name CA'):
+                   numsamples=50, wrapsel='protein', alignsel='name CA', gui=False):
         """ Visualize macro/micro/cluster states in VMD
 
         Parameters
@@ -482,7 +512,7 @@ class Model(object):
         self._integrityCheck(postmsm=(statetype != 'cluster'))
 
         if _config['viewer'].lower() == 'ngl':
-            return self._viewStatesNGL(states, statetype, protein, ligand, mols, numsamples)
+            return self._viewStatesNGL(states, statetype, protein, ligand, mols, numsamples, gui=gui)
 
         if viewer is None:
             viewer = getCurrentViewer()
@@ -501,7 +531,8 @@ class Model(object):
                 viewer.rep('protein')
             viewer.send('start_sscache')
 
-    def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples):
+    def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples, gui=False):
+        from htmd.builder.builder import sequenceID
         if states is None:
             states = range(self.macronum)
         if isinstance(states, int):
@@ -509,6 +540,8 @@ class Model(object):
         if mols is None:
             mols = self.getStates(states, statetype, numsamples=min(numsamples, 15))
         colors = [0, 1, 3, 4, 5, 6, 7, 9]
+        hexcolors = {0: '#0000ff', 1: '#ff0000', 2: '#333333', 3: '#ff6600', 4: '#ffff00', 5: '#4c4d00', 6: '#b2b2cc',
+                     7: '#33cc33', 8: '#ffffff', 9: '#ff3399', 10: '#33ccff'}
         if protein is None and ligand is None:
             raise NameError('Please provide either the "protein" or "ligand" parameter for viewStates.')
         if protein:
@@ -517,27 +550,38 @@ class Model(object):
             mol = mols[0].copy()
             mol.remove(ligand, _logger=False)
             mol.coords = np.atleast_3d(mol.coords[:, :, 0])
-            mol.reps.add(sel='protein', style='NewCartoon', color='Secondary Structure')
+        k = 0
         for i, s in enumerate(states):
-            if protein:
-                mol.reps.add(sel='segid ST{}'.format(s), style='NewCartoon', color='Index')
             if ligand:
-                mol.reps.add(sel='segid ST{}'.format(s), style='Licorice', color=colors[np.mod(i, len(colors))])
                 mols[i].filter(ligand, _logger=False)
-
-            mols[i].set('segid', 'ST{}'.format(s))
+            mols[i].set('chain', '{}'.format(s))
             tmpcoo = mols[i].coords
             for j in range(mols[i].numFrames):
                 mols[i].coords = np.atleast_3d(tmpcoo[:, :, j])
+                if ligand:
+                    mols[i].set('segid', sequenceID(mols[i].resid)+k)
+                    k = int(mols[i].segid[-1])
                 mol.append(mols[i])
 
-        w = mol.view(viewer='ngl')
+        w = mol.view(viewer='ngl', gui=gui, guessBonds=False)
+        reps = []
+        if ligand:
+            # w.add_cartoon('protein', color='sstruc')
+            reps.append({"type": 'cartoon', "params": {"sele": 'protein', "color": 'sstruc'}})
+        for i, s in enumerate(states):
+            if protein:
+                #w.add_cartoon(':{}'.format(s), color='residueindex')
+                reps.append({"type": 'cartoon', "params": {"sele": ':{}'.format(s), "color": 'residueindex'}})
+            if ligand:
+                #w.add_hyperball(':{}'.format(s), color=hexcolors[np.mod(i, len(hexcolors))])
+                reps.append({"type": 'hyperball', "params": {"sele": ':{}'.format(s), "color": hexcolors[np.mod(i, len(hexcolors))]}})
+        w.representations = reps  # Late assignment of reps to update the view
         self._nglButtons(w, statetype, states)
         return w
 
     def _nglButtons(self, ngl_widget, statetype, states):
         # Adds buttons for enabling and disabling macrostate visualizations
-        import IPython.html.widgets as widgets
+        import ipywidgets
         from IPython.display import display
         originalreps = ngl_widget.representations.copy()
         otherreps = originalreps[:-len(states)]
@@ -545,12 +589,12 @@ class Model(object):
 
         container = []
         for s in states:
-            w = widgets.Checkbox(description="{} {}".format(statetype, s))
+            w = ipywidgets.Checkbox(description="{} {}".format(statetype, s))
             w.value = True
             container.append(w)
 
         def updateReps(name):
-            ngl_widget.isClick = True
+            #ngl_widget.isClick = True
             reps = otherreps.copy()
             for i, w in enumerate(container):
                 if w.value:
@@ -559,7 +603,10 @@ class Model(object):
 
         for w in container:
             w.on_trait_change(updateReps, "value")
-        hb = widgets.HBox(container)
+
+        #container.append(ipywidgets.Checkbox(description="all"))
+
+        hb = ipywidgets.HBox(container)
         display(hb)
 
     def save(self, filename):
@@ -793,40 +840,6 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
             else:
                 statistic.append(method(datconcat[frames, ...], axis=axis))
     return statistic
-
-
-def reconstructContactMap(map, datavec):
-    """ Plots a given vector as a contact map
-
-    Parameters
-    ----------
-    map : np.ndarray 2D
-        The map from a MetricData object
-    datavec : np.ndarray
-        The data we want to plot in a 2D map
-    """
-    map = np.array(map, dtype=int)
-    atomidx = np.unique(map.flatten()).astype(int)
-    mask = np.zeros(max(atomidx)+1, dtype=int)
-    mask[atomidx] = range(len(atomidx))
-
-    # Create a new map which maps from vector indexes to matrix indexes
-    newmap = np.zeros(np.shape(map), dtype=int)
-    newmap[:, 0] = mask[map[:, 0]]
-    newmap[:, 1] = mask[map[:, 1]]
-
-    contactmap = np.zeros((len(atomidx), len(atomidx)))
-    for i in range(len(datavec)):
-        contactmap[newmap[i, 0], newmap[i, 1]] = datavec[i]
-        contactmap[newmap[i, 1], newmap[i, 0]] = datavec[i]
-
-    from matplotlib import pylab as plt
-    plt.imshow(contactmap, interpolation='nearest', aspect='equal')
-    plt.colorbar()
-    #plt.axis('off')
-    #plt.tick_params(axis='x', which='both', bottom='off', top='off', labelbottom='off')
-    #plt.tick_params(axis='y', which='both', left='off', right='off', labelleft='off')
-    plt.show()
 
 
 def _weightedMethod(model, method, stconcat, datconcat, st, axis):

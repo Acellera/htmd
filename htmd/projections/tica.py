@@ -78,7 +78,7 @@ class TICA(object):
             if self.dimensions is None:
                 datalist = data.dat.tolist()
             else:  # Sub-select dimensions for fitting
-                datalist = [x[:, self.dimensions] for x in data.dat]
+                datalist = [x[:, self.dimensions].copy() for x in data.dat]
             self.tic.fit(datalist)
 
     def project(self, ndim=None):
@@ -177,7 +177,7 @@ class TICA(object):
             types += ['tica']
             indexes += [-1]
             description += ['TICA dimension {}'.format(i+1)]
-        datatica.map = DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        datatica.map = DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
         if self.dimensions is not None:  # If TICA is done on a subset of dims
             datatica.map = keepdimdesc.append(datatica.map, ignore_index=True)
