@@ -93,6 +93,21 @@ def search(key, name):
     os.system('find {} -type f -exec grep -n "{} {}" {{}} +'.format(charmmdir, key, name))
 
 
+def defaultTopo():
+    """ Returns the default topologies used by charmm.build """
+    return ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+
+
+def defaultParam():
+    """ Returns the default parameters used by charmm.build """
+    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+
+
+def defaultStream():
+    """ Returns the default stream files used by charmm.build """
+    return ['str/prot/toppar_all36_prot_arg0.str',]
+
+
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, psfgen=None, execute=True):
     """ Builds a system for CHARMM
@@ -175,11 +190,11 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         os.makedirs(outdir)
     _cleanOutDir(outdir)
     if topo is None:
-        topo = ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+        topo = defaultTopo()
     if param is None:
-        param = ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+        param = defaultParam()
     if stream is None:
-        stream = ['str/prot/toppar_all36_prot_arg0.str']
+        stream = defaultStream()
     if caps is None:
         caps = _defaultCaps(mol)
     # patches that must _not_ be regenerated

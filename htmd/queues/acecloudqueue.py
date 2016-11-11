@@ -5,7 +5,6 @@
 #
 
 import os
-import pwd
 import shutil
 from os.path import isdir
 from subprocess import check_output

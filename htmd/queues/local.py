@@ -16,8 +16,12 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
     ngpu : int
         Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will
         use the first `ngpus` devices of the machine.
-    devices : list
+    devices : list, default=None
         A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpus`
+    datadir : str, default=None
+        The path in which to store completed trajectories.
+    trajext : str, default='xtc'
+        Extension of trajectory files. This is needed to copy them to datadir.
     """
 
     def __init__(self):
