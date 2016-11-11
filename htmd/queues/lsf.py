@@ -103,13 +103,15 @@ class LsfQueue(SimQueue, ProtocolInterface):
             f.write('#BSUB -e {}\n'.format(self.errorstream))
             if self.walltime is not None:
                 f.write('#BSUB -W {}\n'.format(self.walltime))
+            if self.resources is not None:
+                f.write('#BSUB -R {}\n'.format(self.resources))
+            f.write('\n')
             if self.environment is not None:
-                f.write('\n')
                 for call in self.environment:
                     f.write('{}\n'.format(call))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
-            f.write('touch .done')
+            f.write('\ntouch .done')
 
             # Move completed trajectories
             if self.datadir is not None:
@@ -138,6 +140,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         import time
         if isinstance(dirs, str):
             dirs = [dirs, ]
+        self._dirs.extend(dirs)
 
         # if all folders exist, submit
         for d in dirs:
