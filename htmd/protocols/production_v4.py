@@ -217,13 +217,6 @@ proc calcforces_endstep { } { }
                 inmol.write(outfile)
                 self.acemd.consref = self.acemd.coordinates
 
-        self._writeBashRun(os.path.join(outputdir, 'run.sh'))
-
-    def _writeBashRun(self, fname):
-        with open(fname, 'w') as f:
-            f.write('#!/bin/bash\nacemd >log.txt 2>&1')
-        os.chmod(fname, 0o700)
-
 if __name__ == "__main__":
     md = Production()
     md.runtime = 10000
