@@ -35,6 +35,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
         Job timeout (hour:min or min)
     environment : list of strings, default=None
         Things to run before the job (sourcing envs).
+    resources : str, default=None
+        Resources of the queue
     outputstream : str, default='slurm.%N.%j.out'
         Output stream.
     errorstream : str, default='slurm.%N.%j.err'
@@ -55,6 +57,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 4000, TYPE_INT, RANGE_0POS)
         self._cmdValue('walltime', 'int', 'Job timeout (hour:min or min)', None, TYPE_INT, RANGE_POS)
+        self._cmdString('resources', 'str', 'Resources of the queue', None)
         self._cmdList('environment', 'list', 'Things to run before the job (sourcing envs).', None)
         self._cmdString('outputstream', 'str', 'Output stream.', 'lsf.%J.out')
         self._cmdString('errorstream', 'str', 'Error stream.', 'lsf.%J.err')
@@ -63,12 +66,20 @@ class LsfQueue(SimQueue, ProtocolInterface):
 
         # Find executables
         self._qsubmit = LsfQueue._find_binary('bsub')
-        self._qlist = LsfQueue._find_binary('bjobs')
+        self._qstatus = LsfQueue._find_binary('bqueues')
         self._qcancel = LsfQueue._find_binary('bkill')
+
+        self._dirs = []
 
         # TODO: guess which queue we're at, and instantiate queue specific parameters
         # "gpu_priority" 'select[ngpus>0] rusage[ngpus_excl_p=1]' "module load acemd" "module load acellera/test" "module load gaussian"
         # "phase6_normal" "rusage[ngpus_excl_p=1],span[hosts=1]" "source /home/model/MD-SOFTWARE/model_md.bashrc" "source /home/model/miniconda3/htmd.bashrc"
+        ret = check_output(self._qstatus)
+        if 'phase6_normal' in ret.decode('ascii'):
+            self.environment = ['source /home/model/MD-SOFTWARE/model_md.bashrc', 'source /home/model/miniconda3/htmd.bashrc']
+            logger.info('environment set to {}'.format(self.environment))
+            self.resources = '"{}"'.format('rusage[ngpus_excl_p=1],span[hosts=1]')
+            logger.info('resources set to {}'.format(self.resources))
 
     @staticmethod
     def _find_binary(binary):
@@ -98,6 +109,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
                     f.write('{}\n'.format(call))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
+            f.write('touch .done')
 
             # Move completed trajectories
             if self.datadir is not None:
@@ -145,7 +157,14 @@ class LsfQueue(SimQueue, ProtocolInterface):
             except:
                 raise
 
-    def inprogress(self):
+    def inprogress(self, debug=False):
+        inprogress = 0
+        for i in self._dirs:
+            if not os.path.exists(os.path.join(i, '.done')):
+                inprogress += 1
+        return inprogress
+
+    def __inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
 
         Returns
