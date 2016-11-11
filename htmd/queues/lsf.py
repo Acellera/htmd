@@ -71,15 +71,22 @@ class LsfQueue(SimQueue, ProtocolInterface):
 
         self._dirs = []
 
-        # TODO: guess which queue we're at, and instantiate queue specific parameters
-        # "gpu_priority" 'select[ngpus>0] rusage[ngpus_excl_p=1]' "module load acemd" "module load acellera/test" "module load gaussian"
-        # "phase6_normal" "rusage[ngpus_excl_p=1],span[hosts=1]" "source /home/model/MD-SOFTWARE/model_md.bashrc" "source /home/model/miniconda3/htmd.bashrc"
+        # Specific automatic guessing
         ret = check_output(self._qstatus)
         if 'phase6_normal' in ret.decode('ascii'):
-            self.environment = ['source /home/model/MD-SOFTWARE/model_md.bashrc', 'source /home/model/miniconda3/htmd.bashrc']
-            logger.info('environment set to {}'.format(self.environment))
-            self.resources = '"{}"'.format('rusage[ngpus_excl_p=1],span[hosts=1]')
-            logger.info('resources set to {}'.format(self.resources))
+            if self.environment is None:
+                self.environment = ['source /home/model/MD-SOFTWARE/model_md.bashrc', 'source /home/model/miniconda3/htmd.bashrc']
+                logger.info('environment set to {}'.format(self.environment))
+            if self.resources is None:
+                self.resources = '"{}"'.format('rusage[ngpus_excl_p=1],span[hosts=1]')
+                logger.info('resources set to {}'.format(self.resources))
+        if 'gpu_priority' in ret.decode('ascii'):
+            if self.environment is None:
+                self.environment = ['module load acemd', 'module load acellera/test', 'module load gaussian']
+                logger.info('environment set to {}'.format(self.environment))
+            if self.resources is None:
+                self.resources = '"{}"'.format('select[ngpus>0] rusage[ngpus_excl_p=1]')
+                logger.info('resources set to {}'.format(self.resources))
 
     @staticmethod
     def _find_binary(binary):
