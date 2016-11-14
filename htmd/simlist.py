@@ -222,12 +222,10 @@ def simfilter(sims, outfolder, filtersel):
 
     logger.debug('Starting filtering of simulations.')
 
-    filtsims = []
-
-    #bar = ProgressBar(len(sims), description='Filtering simlist')
     from htmd.config import _config
-    filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
-    #bar.stop()
+    from htmd.parallelprogress import ParallelExecutor
+    aprun = ParallelExecutor(n_jobs=_config['ncpus'])
+    filtsims = aprun(total=len(sims), description='Filtering trajectories')(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
 
     logger.debug('Finished filtering of simulations')
     return np.array(filtsims)
