@@ -161,10 +161,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             Total running and queued workunits
         """
         import time
-        import pwd
+        import getpass
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
-        user = pwd.getpwuid(os.getuid()).pw_name
+        user = getpass.getuser()
         cmd = [self._squeue, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
 
@@ -193,10 +193,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     def stop(self):
         """ Cancels all currently running and queued jobs
         """
-        import pwd
+        import getpass
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
-        user = pwd.getpwuid(os.getuid()).pw_name
+        user = getpass.getuser()
         cmd = [self._scancel, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
         ret = check_output(cmd)
