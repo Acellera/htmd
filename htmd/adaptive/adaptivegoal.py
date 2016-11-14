@@ -221,7 +221,7 @@ class AdaptiveGoal(AdaptiveBase):
         (spawncounts, prob) = self._spawn(reward, self.nmax - self._running)
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
-        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=(data.K < 10))
+        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=True)
         return relFrames
 
     def _spawn(self, ranking, N):

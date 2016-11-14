@@ -147,7 +147,7 @@ class AdaptiveMD(AdaptiveBase):
         (spawncounts, prob) = self._spawn(p_i, self.nmax - self._running)
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
-        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=(data.K < 10))
+        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=True)
         logger.debug('relFrames {}'.format(relFrames))
         return relFrames
 
@@ -325,10 +325,8 @@ class AdaptiveRun(Adaptive):
             K = int(datadr.numFrames / 3)
 
         datadr.cluster(self.clustmethod(n_clusters=K), mergesmall=5)
-        replacement = False
         if datadr.K < 10:
             datadr.cluster(self.clustmethod(n_clusters=K))
-            replacement = True
 
         model = Model(datadr)
         macronum = self.macronum
@@ -345,7 +343,7 @@ class AdaptiveRun(Adaptive):
         (spawncounts, prob) = self._spawn(p_i, self.nmax-self.running)
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
-        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=replacement)
+        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=True)
         logger.debug('relFrames {}'.format(relFrames))
 
         self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
