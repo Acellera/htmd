@@ -149,6 +149,8 @@ def simlist(datafolders, molfiles, inputfolders=None):
 
     molnames = dict()
     for mol in molfiles:
+        if not os.path.exists(mol):
+            raise FileNotFoundError('File {} does not exist'.format(mol))
         molnames[_simName(mol)] = mol
 
     if inputfolders:
