@@ -68,29 +68,28 @@ class Kinetics(object):
 
     def _detectSource(self):
         dataobj = self.model.data
-        distcols = []
-        contcols = []
-
-        if not dataobj.map.empty:  # Search for distances or contacts in the data
-            if dataobj.parent is None:
-                distcols = np.where(dataobj.map.type == 'distance')[0]
-                contcols = np.where(dataobj.map.type == 'contact')[0]
-            else:
-                distcols = np.where(dataobj.parent.map.type == 'distance')[0]
-                contcols = np.where(dataobj.parent.map.type == 'contact')[0]
-
-        if len(distcols) == 0 and len(contcols) == 0:
-            raise RuntimeError('Could not detect source state. Please specify it in the Kinetics constructor.')
-
-        if len(distcols) != 0:
-            cols = distcols
-        else:
-            cols = contcols
+        # This is an ordered tuple based on priority
+        supportedProj = ('contact', 'distance', 'rmsd', 'secondary structure')
+        cols = []
+        detectedProj = None
 
         if dataobj.parent is None:
+            mapping = dataobj.map
             data = dataobj.dat
         else:
+            mapping = dataobj.parent.map
             data = dataobj.parent.dat
+
+        if not dataobj.map.empty:  # Search for supported projections in the data
+            for proj in supportedProj:
+                cols = np.where(mapping.type == proj)[0]
+                if len(cols) != 0:
+                    detectedProj = proj
+                    break
+
+        if len(cols) == 0:
+            raise RuntimeError('Could not detect source state. Please specify it in the Kinetics constructor.'
+                               'This class only detects automatic detection for the following metrics. {}'.format(supportedProj))
 
         averages = np.zeros(dataobj.K)
         for i in range(len(dataobj.St)):
@@ -104,12 +103,13 @@ class Kinetics(object):
         avg = averages / dataobj.N
         avg = avg[self.model.cluster_ofmicro]
 
-        if len(contcols) != 0:
-            logger.info('Guessing the source state as the state with minimum contacts.')
+        if detectedProj == 'contact' or detectedProj == 'secondary structure':
+            logger.info('Guessing the source state as the state with minimum {}s.'.format(detectedProj))
             sourcemicro = np.argmin(avg)
-        elif len(distcols) != 0:
-            logger.info('Guessing the source state as the state with maximum distances.')
+        elif detectedProj == 'distance' or detectedProj == 'rmsd':
+            logger.info('Guessing the source state as the state with maximum {}s.'.format(detectedProj))
             sourcemicro = np.argmax(avg)
+        # TODO: I could also detect the source by largest variance
         self.source = self.model.macro_ofmicro[sourcemicro]
         self.sourcemicro = sourcemicro
 
