@@ -13,8 +13,9 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
     """
     Parameters
     ----------
-    ngpu : int, default=None
-        Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will use the first `ngpus` devices of the machine.
+    ngpu : int
+        Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will
+        use the first `ngpus` devices of the machine.
     devices : list, default=None
         A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpus`
     datadir : str, default=None
@@ -41,7 +42,7 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
         ngpu = self.ngpu
         devices = self.devices
         if ngpu is not None and devices is not None:
-            raise ValueError('Parameters `ngpus` and `devices` are mutually exclusive.')
+            raise ValueError('Parameters `ngpu` and `devices` are mutually exclusive.')
 
         if ngpu is None and devices is None:
             try:
@@ -53,7 +54,7 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
 
         if devices is None:
             raise NameError("Could not determine which GPUs to use. "
-                            "Specify the GPUs with the `ngpus=` or `devices=` parameters")
+                            "Specify the GPUs with the `ngpu=` or `devices=` parameters")
         else:
             logger.info("Using GPU devices {}".format(','.join(map(str, devices))))
         return devices
@@ -155,20 +156,6 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
         output_queue = sum(x == 'Q' for x in self._states.values())
 
         return output_run + output_queue
-
-    def wait(self):
-        """ Blocks script execution until all queued work completes
-
-        Examples
-        --------
-        >>> app.wait()
-        """
-        from time import sleep
-        import sys
-        while self.inprogress() != 0:
-            sys.stdout.flush()
-            sleep(1)
-            # self.queue.join()
 
     def stop(self):
         self._shutdown = True
