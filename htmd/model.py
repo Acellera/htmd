@@ -198,7 +198,7 @@ class Model(object):
         macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
         return macro_ofcluster
 
-    def plotTimescales(self, lags=None, units='frames', errors=None, nits=None, results=False, plot=True):
+    def plotTimescales(self, lags=None, units='frames', errors=None, nits=None, results=False, plot=True, save=None):
         """ Plot the implied timescales of MSMs of various lag times
 
         Parameters
@@ -216,6 +216,8 @@ class Model(object):
             If the method should return the calculated implied timescales
         plot : bool
             If the method should display the plot of implied timescales
+        save : str
+            Path of the file in which to save the figure
 
         Returns
         -------
@@ -244,7 +246,7 @@ class Model(object):
 
         from htmd.config import _config
         its = msm.its(self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=_config['ncpus'])
-        if plot:
+        if plot or (save is not None):
             from matplotlib import pylab as plt
             plt.ion()
             plt.figure()
@@ -254,7 +256,10 @@ class Model(object):
                 plt.close()
                 raise ValueError('{} This is probably caused by badly set fstep in the data ({}). '.format(ve, self.data.fstep) +
                                  'Please correct the model.data.fstep to correspond to the simulation frame step in nanoseconds.')
-            plt.show()
+            if save is not None:
+                plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+            if plot:
+                plt.show()
         if results:
             return its.get_timescales(), its.lags
 
