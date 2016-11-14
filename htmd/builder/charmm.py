@@ -109,7 +109,7 @@ def defaultStream():
 
 
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, psfgen=None, execute=True):
+          saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, psfgen=None, execute=True, _clean=True):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -188,7 +188,8 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
                                     'Run `conda install psfgen`.')
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
-    _cleanOutDir(outdir)
+    if _clean:
+        _cleanOutDir(outdir)
     if topo is None:
         topo = defaultTopo()
     if param is None:
@@ -230,22 +231,26 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     f.write('psfcontext reset;\n\n')
 
     # Copying and printing out the topologies
+    if not path.exists(path.join(outdir, 'topologies')):
+        os.makedirs(path.join(outdir, 'topologies'))
     for i in range(len(alltopo)):
         if alltopo[i][0] != '.' and path.isfile(path.join(charmmdir, alltopo[i])):
             alltopo[i] = path.join(charmmdir, alltopo[i])
         localname = '{}.'.format(i) + path.basename(alltopo[i])
-        shutil.copy(alltopo[i], path.join(outdir, localname))
-        f.write('topology ' + localname + '\n')
+        shutil.copy(alltopo[i], path.join(outdir, 'topologies', localname))
+        f.write('topology ' + path.join('topologies', localname) + '\n')
     f.write('\n')
 
     _printAliases(f)
 
     # Printing out segments
+    if not path.exists(path.join(outdir, 'segments')):
+        os.makedirs(path.join(outdir, 'segments'))
     logger.info('Writing out segments.')
     segments = _getSegments(mol)
     for seg in segments:
         pdbname = 'segment' + seg + '.pdb'
-        mol.write(path.join(outdir, pdbname), sel='segid '+seg)
+        mol.write(path.join(outdir, 'segments', pdbname), sel='segid '+seg)
 
         segatoms = mol.atomselect('segid {}'.format(seg))
         segwater = mol.atomselect('segid {} and water'.format(seg))
@@ -253,12 +258,12 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         f.write('segment ' + seg + ' {\n')
         if np.all(segatoms == segwater):  # If segment only contains waters, set: auto none
             f.write('\tauto none\n')
-        f.write('\tpdb ' + pdbname + '\n')
+        f.write('\tpdb ' + path.join('segments', pdbname) + '\n')
         if caps is not None and seg in caps:
             for c in caps[seg]:
                 f.write('\t' + c + '\n')
         f.write('}\n')
-        f.write('coordpdb ' + pdbname + ' ' + seg + '\n\n')
+        f.write('coordpdb ' + path.join('segments', pdbname) + ' ' + seg + '\n\n')
 
     # Printing out patches for the disulfide bridges
     if disulfide is None:
@@ -318,15 +323,17 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             raise BuildError('No structure pdb/psf file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
-            shutil.move(path.join(outdir, 'structure.pdb'), path.join(outdir, 'structure.noions.pdb'))
-            shutil.move(path.join(outdir, 'structure.psf'), path.join(outdir, 'structure.noions.psf'))
+            os.makedirs(path.join(outdir, 'pre-ionize'))
+            data = glob(path.join(outdir, '*'))
+            for f in data:
+                shutil.move(f, path.join(outdir, 'pre-ionize'))
             totalcharge = np.sum(molbuilt.charge)
             nwater = np.sum(molbuilt.atomselect('water and noh'))
             anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc, ff='charmm', anion=saltanion, cation=saltcation)
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False, caps=caps,
-                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, noregen=noregen, psfgen=psfgen)
+                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, noregen=noregen, psfgen=psfgen, _clean=False)
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
     return molbuilt
@@ -337,9 +344,16 @@ def _cleanOutDir(outdir):
     files = glob(os.path.join(outdir, 'structure.*'))
     files += glob(os.path.join(outdir, 'log.*'))
     files += glob(os.path.join(outdir, '*.log'))
-    files += glob(os.path.join(outdir, 'segment*'))
+    files += glob(os.path.join(outdir, '*.vmd'))
+    files += glob(os.path.join(outdir, 'parameters'))
     for f in files:
         os.remove(f)
+    folders = glob(os.path.join(outdir, 'segments'))
+    folders += glob(os.path.join(outdir, 'topologies'))
+    folders += glob(os.path.join(outdir, 'pre-ionize'))
+    for f in folders:
+        shutil.rmtree(f)
+
 
 
 def _getSegments(mol):
