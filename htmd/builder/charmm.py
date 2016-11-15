@@ -502,9 +502,11 @@ def _printAliases(f):
         # Aliases for carbohydrates
         pdbalias residue NAG BGLCNA
         pdbalias residue BMA BMAN
+        pdbalias residue GLA AGAL
         pdbalias residue GAL BGAL
         pdbalias residue MAN AMAN
         pdbalias residue FUC AFUC
+        pdbalias residue FUL BFUC
     '''
     f.write(textwrap.dedent(lines))
     f.write('\n\n')
