@@ -37,8 +37,10 @@ class AdaptiveGoal(AdaptiveMD):
         Minimum number of running simulations
     nmax : int, default=1
         Maximum number of running simulations
-    nepochs : int, default=100
-        Maximum number of epochs
+    nepochs : int, default=1000
+        Stop adaptive once we have reached this number of epochs
+    nframes : int, default=0
+        Stop adaptive once we have simulated this number of aggregate simulation frames.
     inputpath : str, default='input'
         The directory used to store input folders
     generatorspath : str, default='generators'
@@ -49,6 +51,8 @@ class AdaptiveGoal(AdaptiveMD):
         When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
     coorname : str, default='input.coor'
         Name of the file containing the starting coordinates for the new simulations
+    lock : bool, default=False
+        Lock the folder while adaptive is ongoing
     datapath : str, default='data'
         The directory in which the completed simulations are stored
     filter : bool, default=True
@@ -59,10 +63,6 @@ class AdaptiveGoal(AdaptiveMD):
         The directory in which the filtered simulations will be stored
     projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None
         A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
-    goalfunction : function, default=None
-        This function will be used to convert the goal-projected simulation data to a ranking whichcan be used for the directed component of FAST.
-    ucscale : float, default=1
-        Scaling factor for undirected component.
     truncation : str, default=None
         Method for truncating the prob distribution (None, 'cumsum', 'statecut'
     statetype : str, default='micro'
@@ -78,13 +78,19 @@ class AdaptiveGoal(AdaptiveMD):
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
     ticalag : int, default=20
-        Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
     contactsym : str, default=None
         Contact symmetry
     save : bool, default=False
         Save the model generated
+    goalfunction : function, default=None
+        This function will be used to convert the goal-projected simulation data to a ranking whichcan be used for the directed component of FAST.
+    ucscale : float, default=1
+        Scaling factor for undirected component.
+    nosampledc : bool, default=False
+        Spawn only from top DC conformations without sampling
 
     Example
     -------
@@ -126,6 +132,9 @@ class AdaptiveGoal(AdaptiveMD):
 
     def _algorithm(self):
         self._createModel()
+        if self._nframes != 0 and self._model.data.numFrames >= self._nframes:
+            logging.info('Reached maximum number of frames. Stopping adaptive.')
+            return False
         model = self._model
         data = self._model.data
 

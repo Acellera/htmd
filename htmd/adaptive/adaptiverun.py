@@ -37,8 +37,10 @@ class AdaptiveMD(AdaptiveBase):
         Minimum number of running simulations
     nmax : int, default=1
         Maximum number of running simulations
-    nepochs : int, default=100
-        Maximum number of epochs
+    nepochs : int, default=1000
+        Stop adaptive once we have reached this number of epochs
+    nframes : int, default=0
+        Stop adaptive once we have simulated this number of aggregate simulation frames.
     inputpath : str, default='input'
         The directory used to store input folders
     generatorspath : str, default='generators'
@@ -49,6 +51,8 @@ class AdaptiveMD(AdaptiveBase):
         When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
     coorname : str, default='input.coor'
         Name of the file containing the starting coordinates for the new simulations
+    lock : bool, default=False
+        Lock the folder while adaptive is ongoing
     datapath : str, default='data'
         The directory in which the completed simulations are stored
     filter : bool, default=True
@@ -69,12 +73,12 @@ class AdaptiveMD(AdaptiveBase):
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
         The lagtime used to create the Markov model
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.MiniBatchKMeans'>
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
         Clustering algorithm used to cluster the contacts or distances
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
     ticalag : int, default=20
-        Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
     contactsym : str, default=None
@@ -120,6 +124,9 @@ class AdaptiveMD(AdaptiveBase):
 
     def _algorithm(self):
         self._createMSM()
+        if self._nframes != 0 and self._model.data.numFrames >= self._nframes:
+            logging.info('Reached maximum number of frames. Stopping adaptive.')
+            return False
 
         relFrames = self._getSpawnFrames(self._model, self._model.data)
         self._writeInputs(self._model.data.rel2sim(np.concatenate(relFrames)))
