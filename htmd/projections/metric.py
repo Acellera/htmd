@@ -26,6 +26,9 @@ class Metric:
         A list of simulations produced by :func:`simlist <htmd.simlist.simlist>`
     skip : int
         Frame skipping. Setting i.e. to 3 will keep only every third frame of each simulation.
+    metricdata : :class:`MetricData <htmd.metricdata.MetricData>` object
+        If a MetricData object is passed in the constructor, Metric will try to update it by only adding simulations
+        which don't exist in it yet.
 
     Examples
     --------
@@ -41,14 +44,16 @@ class Metric:
     .. autoautosummary:: htmd.projections.metric.Metric
         :attributes:
     """
-    def __init__(self, simulations, skip=1):
+    def __init__(self, simulations, skip=1, metricdata=None):
         self.simulations = simulations
         self.skip = skip
         self.projectionlist = []
+        self.metricdata = metricdata
 
     def projection(self, metric):
         """ Deprecated
         """
+        logger.warning('Projection method is deprecated. Use the .set() method of Metric instead.')
         self.projectionlist.append(metric)
 
     def set(self, projection):
@@ -107,7 +112,6 @@ class Metric:
         # Find out if there is a unique molfile. If there is, initialize a single Molecule to speed up calculations
         uqMol = None
         import pandas as pd
-        map = pd.DataFrame(columns=('type', 'atomIndexes', 'description'))
         (single, molfile) = _singleMolfile(self.simulations)
         if single:
             uqMol = Molecule(molfile)
@@ -115,21 +119,17 @@ class Metric:
                 proj._precalculate(uqMol)
         else:
             logger.warning('Cannot calculate description of dimensions due to different topology files for each trajectory.')
-        map = self.getMapping(uqMol)
+        mapping = self.getMapping(uqMol)
 
         logger.debug('Metric: Starting projection of trajectories.')
+        from htmd.config import _config
+        aprun = ParallelExecutor(n_jobs=_config['ncpus'])
+        results = aprun(total=numSim, description='Projecting trajectories')(delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
+
         metrics = np.empty(numSim, dtype=object)
         ref = np.empty(numSim, dtype=object)
         deletesims = np.zeros(numSim, dtype=bool)
         fstep = np.zeros(numSim)
-
-        from htmd.config import _config
-        #results = Parallel(n_jobs=_config['ncpus'], verbose=6)(
-        #        delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
-
-        aprun = ParallelExecutor(n_jobs=_config['ncpus'])
-        results = aprun(total=numSim, description='Projecting trajectories')(delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
-
         for i in range(len(results)):
             metrics[i] = results[i][0]
             ref[i] = results[i][1]
@@ -139,26 +139,18 @@ class Metric:
         logger.debug('Finished projecting the trajectories.')
 
         # Removing empty trajectories
-        emptyM = np.array([True if x is None else False for x in metrics], dtype=bool)
-        emptyR = np.array([True if x is None else False for x in ref], dtype=bool)
-        assert np.all(deletesims == emptyM) and np.all(emptyR == emptyM)
-
-        metrics = np.delete(metrics, np.where(emptyM)[0])
-        ref = np.delete(ref, np.where(emptyM)[0])
-        updlist = np.delete(self.simulations, np.where(emptyM)[0])
-
-        if len(metrics) == 0:
-            raise NameError('No trajectories were read')
+        metrics, ref, updlist, fstep = self._removeEmpty(metrics, ref, deletesims, fstep)
 
         # Constructing a MetricData object
-        data = MetricData(dat=metrics, ref=ref, map=map, simlist=updlist)
+        data = MetricData(dat=metrics, ref=ref, map=mapping, simlist=updlist)
 
         uqfsteps = np.unique(fstep)
         data.fstep = float(stats.mode(fstep).mode)
         if len(uqfsteps) != 1:
-            logger.warning('Multiple framesteps were read from the simulations. '
-                           'Taking the statistical mode: ' + str(data.fstep) + 'ns. '
-                           'If it looks wrong, you can modify it by manually setting the MetricData.fstep property.')
+            logger.warning('Multiple framesteps [{}] ns were read from the simulations. '
+                           'Taking the statistical mode: {}ns. '
+                           'If it looks wrong, you can modify it by manually '
+                           'setting the MetricData.fstep property.'.format(', '.join(map(str,uqfsteps)), data.fstep))
         else:
             logger.info('Frame step {}ns was read from the trajectories. If it looks wrong, redefine it by manually '
                         'setting the MetricData.fstep property.'.format(data.fstep))
@@ -168,6 +160,22 @@ class Metric:
     def _projectSingle(self, index):
         data, ref, fstep, _ = _processSim(self.simulations[index], self.projectionlist, None, self.skip)
         return data, ref, fstep
+
+    def _removeEmpty(self, metrics, ref, deletesims, fstep):
+        emptyM = np.array([True if x is None else False for x in metrics], dtype=bool)
+        emptyR = np.array([True if x is None else False for x in ref], dtype=bool)
+        assert np.all(deletesims == emptyM) and np.all(emptyR == emptyM)
+
+        metrics = np.delete(metrics, np.where(emptyM)[0])
+        ref = np.delete(ref, np.where(emptyM)[0])
+        updlist = np.delete(self.simulations, np.where(emptyM)[0])
+        fstep = np.delete(fstep, np.where(emptyM)[0])
+
+        if len(metrics) == 0:
+            raise NameError('No trajectories were projected. Check if the simlist is empty or for projection errors.')
+
+        return metrics, ref, updlist, fstep
+
 
 
 def _highfreqFilter(mol,steps):
