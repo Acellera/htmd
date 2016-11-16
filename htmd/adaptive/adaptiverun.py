@@ -124,7 +124,7 @@ class AdaptiveMD(AdaptiveBase):
 
     def _algorithm(self):
         self._createMSM()
-        if self._nframes != 0 and self._model.data.numFrames >= self._nframes:
+        if self.nframes != 0 and self._model.data.numFrames >= self.nframes:
             logging.info('Reached maximum number of frames. Stopping adaptive.')
             return False
 

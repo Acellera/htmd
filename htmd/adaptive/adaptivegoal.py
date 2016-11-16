@@ -131,8 +131,8 @@ class AdaptiveGoal(AdaptiveMD):
         self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
 
     def _algorithm(self):
-        self._createModel()
-        if self._nframes != 0 and self._model.data.numFrames >= self._nframes:
+        self._createMSM()
+        if self.nframes != 0 and self._model.data.numFrames >= self.nframes:
             logging.info('Reached maximum number of frames. Stopping adaptive.')
             return False
         model = self._model
