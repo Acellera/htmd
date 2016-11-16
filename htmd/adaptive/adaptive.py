@@ -77,7 +77,11 @@ class AdaptiveBase(ProtocolInterface):
                 logger.info(str(self._running) + ' simulations in progress')
 
                 if self._running <= self.nmin:
-                    self._algorithm()
+                    flag = self._algorithm()
+                    if flag is False:
+                        self._unsetLock()
+                        return
+
                     if not self.dryrun:
                         self.app.submit(natsorted(glob(path.join(self.inputpath, 'e' + str(epoch+1) + 's*'))))
                         logger.info('Finished submitting simulations.')
