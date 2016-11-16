@@ -29,7 +29,7 @@ import datetime
 
 
 for f in filestotest:
-    print( datetime.now() )
+    print(datetime.datetime.now())
     print(' ************************  Running "{}"  ************************'.format(f))
     if f.endswith('amber.py') or f.endswith('charmm.py'):
         out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
