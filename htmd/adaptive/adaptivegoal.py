@@ -8,7 +8,7 @@ from os import path
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
 from htmd.util import _getNcpus
-from htmd.adaptive.adaptive import AdaptiveBase
+from htmd.adaptive.adaptiverun import AdaptiveMD
 from htmd.simlist import simlist, simfilter
 from htmd.model import Model, macroAccumulate
 from htmd.projections.tica import TICA
@@ -19,7 +19,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AdaptiveGoal(AdaptiveBase):
+class AdaptiveGoal(AdaptiveMD):
     """ Adaptive class which uses a Markov state model for respawning
 
     AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
@@ -75,6 +75,8 @@ class AdaptiveGoal(AdaptiveBase):
         The lagtime used to create the Markov model
     clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
         Clustering algorithm used to cluster the contacts or distances
+    method : str, default='1/Mc'
+        Criteria used for choosing from which state to respawn from
     ticalag : int, default=20
         Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.
     ticadim : int, default=3
@@ -115,70 +117,17 @@ class AdaptiveGoal(AdaptiveBase):
     """
 
     def __init__(self):
-        from sklearn.base import ClusterMixin
-        from htmd.projections.projection import Projection
         super().__init__()
-        self._cmdString('datapath', 'str', 'The directory in which the completed simulations are stored', 'data')
-        self._cmdBoolean('filter', 'bool', 'Enable or disable filtering of trajectories.', True)
-        self._cmdString('filtersel', 'str', 'Filtering atom selection', 'not water')
-        self._cmdString('filteredpath', 'str', 'The directory in which the filtered simulations will be stored',
-                        'filtered')
-        self._cmdObject('projection', ':class:`Projection <htmd.projections.projection.Projection>` object',
-                        'A Projection class object or a list of objects which will be used to project the simulation '
-                        'data before constructing a Markov model', None, Projection)
         self._cmdFunction('goalfunction', 'function',
                           'This function will be used to convert the goal-projected simulation data to a ranking which'
                           'can be used for the directed component of FAST.', None)
         self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component.', 1, TYPE_FLOAT, RANGE_ANY)
-        self._cmdString('truncation', 'str', 'Method for truncating the prob distribution (None, \'cumsum\', '
-                                             '\'statecut\'', None)
-        self._cmdString('statetype', 'str', 'What states (cluster, micro, macro) to use for calculations.', 'micro')
-        self._cmdValue('macronum', 'int', 'The number of macrostates to produce', 8, TYPE_INT, RANGE_POS)
-        self._cmdValue('skip', 'int',
-                       'Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame',
-                       1, TYPE_INT, RANGE_POS)
-        self._cmdValue('lag', 'int', 'The lagtime used to create the Markov model', 1, TYPE_INT, RANGE_POS)
-        self._cmdObject('clustmethod', ':class:`ClusterMixin <sklearn.base.ClusterMixin>` object',
-                        'Clustering algorithm used to cluster the contacts or distances', MiniBatchKMeans, ClusterMixin)
-        self._cmdValue('ticalag', 'int',
-                       'Lagtime to use for TICA in frames. When using `skip` remember to change this accordingly.', 20,
-                       TYPE_INT, RANGE_0POS)
-        self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3,
-                       TYPE_INT, RANGE_0POS)
-        self._cmdString('contactsym', 'str', 'Contact symmetry', None)
-        self._cmdBoolean('save', 'bool', 'Save the model generated', False)
         self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
 
     def _algorithm(self):
-        logger.info('Postprocessing new data')
-        sims = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
-                       glob(path.join(self.inputpath, '*', '')))
-        if self.filter:
-            sims = simfilter(sims, self.filteredpath, filtersel=self.filtersel)
-
-        metr = Metric(sims, skip=self.skip)
-        metr.set(self.projection)
-
-        # if self.contactsym is not None:
-        #    contactSymmetry(data, self.contactsym)
-
-        if self.ticadim > 0:
-            # tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))  # gianni: without project it was tooooo slow
-            data = metr.project()
-            data.dropTraj()
-            ticalag = int(np.ceil(max(2, min(np.min(data.trajLengths)/2, self.ticalag))))  # 1 < ticalag < (trajLen / 2)
-            tica = TICA(data, ticalag)
-            datadr = tica.project(self.ticadim)
-        else:
-            datadr = metr.project()
-
-        datadr.dropTraj()  # Preferably we should do this before any projections. Corrupted sims can affect TICA
-        datadr.cluster(self.clustmethod(n_clusters=self._numClusters(datadr.numFrames)))
-        model = Model(datadr)
-        self._model = model
-        self._model.markovModel(self.lag, self._numMacrostates(datadr))
-        if self.save:
-            self._model.save('adapt_model_e{}.dat'.format(self._getEpoch()))
+        self._createModel()
+        model = self._model
+        data = self._model.data
 
         # Undirected component
         uc = -model.data.N  # Lower counts should give higher score hence the -
@@ -202,20 +151,13 @@ class AdaptiveGoal(AdaptiveBase):
         reward = dc + self.ucscale * uc
 
         if not self.nosampledc:
-            relFrames = self._getSpawnFrames(reward, self._model, datadr)
-            self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
+            relFrames = self._getSpawnFrames(reward, self._model, data)
+            self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         else:
             print('Spawning only from top DC conformations without sampling')
             sortedabs = np.argsort(dc_conf)[::-1]
-            self._writeInputs(datadr.abs2sim(sortedabs[:self.nmax - self._running]))
-
-    def _featScale(self, feat):
-        denom = np.max(feat) - np.min(feat)
-        if denom == 0:  # Handling the trivial case where all states have equal features
-            res = np.zeros(len(feat))
-            res[:] = 1 / len(feat)
-            return res
-        return (feat - np.min(feat)) / denom
+            self._writeInputs(data.abs2sim(sortedabs[:self.nmax - self._running]))
+        return True
 
     def _getSpawnFrames(self, reward, model, data):
         (spawncounts, prob) = self._spawn(reward, self.nmax - self._running)
@@ -224,43 +166,13 @@ class AdaptiveGoal(AdaptiveBase):
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=True)
         return relFrames
 
-    def _spawn(self, ranking, N):
-        if self.truncation is not None and self.truncation.lower() != 'none':
-            if self.truncation == 'cumsum':
-                idx = np.argsort(ranking)
-                idx = idx[::-1]  # decreasing sort
-                errs = ranking[idx]
-                H = (N * errs / np.cumsum(errs)) < 1
-                ranking[idx[H]] = 0
-            if self.truncation == 'statecut':
-                idx = np.argsort(ranking)
-                idx = idx[::-1]  # decreasing sort
-                ranking[idx[N:]] = 0  # Set all states ranked > N to zero.
-        prob = ranking / np.sum(ranking)
-        logger.debug('Sampling probabilities {}'.format(prob))
-        spawnmicro = np.random.multinomial(N, prob)
-        return spawnmicro, prob
-
-    def _numClusters(self, numFrames):
-        """ Heuristic that calculates number of clusters from number of frames """
-        K = int(max(np.round(0.6 * np.log10(numFrames / 1000) * 1000 + 50), 100))  # heuristic
-        if K > numFrames / 3:  # Ugly patch for low-data regimes ...
-            K = int(numFrames / 3)
-        return K
-
-    def _numMacrostates(self, data):
-        """ Heuristic for calculating the number of macrostates for the Markov model """
-        macronum = self.macronum
-        if data.K < macronum:
-            macronum = np.ceil(data.K / 2)
-            logger.warning(
-                'Using less macrostates than requested due to lack of microstates. macronum = ' + str(macronum))
-
-        # Calculating how many timescales are above the lag time to limit number of macrostates
-        from pyemma.msm import timescales_msm
-        timesc = timescales_msm(data.St.tolist(), lags=self.lag, nits=macronum).get_timescales()
-        macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
-        return macronum
+    def _featScale(self, feat):
+        denom = np.max(feat) - np.min(feat)
+        if denom == 0:  # Handling the trivial case where all states have equal features
+            res = np.zeros(len(feat))
+            res[:] = 1 / len(feat)
+            return res
+        return (feat - np.min(feat)) / denom
 
     def _calculateDirectedComponent(self, sims, St, N):
         from joblib import Parallel, delayed
