@@ -105,7 +105,7 @@ class FFMolecule(Molecule):
                 print(" {}".format(self.name[j]), end="")
             print("")
 
-        print("Soft dihedrals:")
+        print("Soft torsions:")
         for i in self._soft_dihedrals:
             for j in i.atoms:
                 print(" {}".format(self.name[j]), end="")
@@ -323,7 +323,7 @@ class FFMolecule(Molecule):
 
         return fit_chisq, results[0].dipole, [dpx, dpy, dpz, dp]
 
-    def getSoftDihedrals(self):
+    def getSoftTorsions(self):
         dd = []
         for d in self._soft_dihedrals:
             dd.append(d.atoms.copy())
@@ -377,7 +377,7 @@ class FFMolecule(Molecule):
     #      x=x+1
     #    return ret
 
-    def fitSoftDihedral(self, phi, geomopt=True):
+    def fitSoftTorsion(self, phi, geomopt=True):
         found = False
         phi_to_fit = None
         frozens = []

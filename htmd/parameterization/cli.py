@@ -139,7 +139,7 @@ def main_parameterize():
 
     mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
                      basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code, outdir=args.outdir)
-    dihedrals = mol.getSoftDihedrals()
+    dihedrals = mol.getSoftTorsions()
 
     if args.list:
         print("Detected soft torsions:")
@@ -197,7 +197,7 @@ def main_parameterize():
             if not args.torsion or name in args.torsion:
                 print("\n == Fitting torsion {} ==\n".format(name))
                 try:
-                    ret = mol.fitSoftDihedral(d)
+                    ret = mol.fitSoftTorsion(d)
 
                     rating = "GOOD"
                     if ret.chisq > 10:

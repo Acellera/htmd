@@ -87,7 +87,7 @@ def search(key, name):
         
     Examples
     --------
-    >>> charmm.search(key='RESI', name = 'CHL1')
+    >>> charmm.search(key='RESI', name = 'CHL1')  # doctest: +SKIP
     """
     charmmdir = path.join(home(), 'builder', 'charmmfiles', '')
     os.system('find {} -type f -exec grep -n "{} {}" {{}} +'.format(charmmdir, key, name))
@@ -502,9 +502,11 @@ def _printAliases(f):
         # Aliases for carbohydrates
         pdbalias residue NAG BGLCNA
         pdbalias residue BMA BMAN
+        pdbalias residue GLA AGAL
         pdbalias residue GAL BGAL
         pdbalias residue MAN AMAN
         pdbalias residue FUC AFUC
+        pdbalias residue FUL BFUC
     '''
     f.write(textwrap.dedent(lines))
     f.write('\n\n')
@@ -894,10 +896,11 @@ if __name__ == '__main__':
         match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
         if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
             raise RuntimeError(
-                'Different results produced by amber.build for test {} between {} and {} in files {}.'.format(pid,
-                                                                                                              compare,
-                                                                                                              tmpdir,
-                                                                                                              mismatch))
+                'Different results produced by charmm.build for test {} between {} and {} in files {}.'.format(pid,
+                                                                                                               compare,
+                                                                                                               tmpdir,
+                                                                                                               mismatch)
+                              )
 
         shutil.rmtree(tmpdir)
 
