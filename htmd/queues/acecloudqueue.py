@@ -62,7 +62,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         count = 0
         for j in self._jobs:
             s = j.status()
-            if s == Status.RUNNING or s == Status.QUEUED:
+            if s == Status.RUNNING or s == Status.PENDING:
                 count = count + 1
 
         return count
