@@ -32,6 +32,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         Job priority
     ngpu : int, default=1
         Number of GPUs to use for a single job
+    ncpu : int, default=1
+        Number of CPUs to use for a single job
     memory : int, default=4000
         Amount of memory per job (MB)
     walltime : int, default=None
@@ -60,6 +62,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('partition', 'str', 'The queue (partition) to run on', None)
         self._cmdString('priority', 'str', 'Job priority', 'gpu_priority')
         self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
+        self._cmdValue('ncpu', 'int', 'Number of CPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 1000, TYPE_INT, RANGE_0POS)
         self._cmdValue('walltime', 'int', 'Job timeout (s)', None, TYPE_INT, RANGE_POS)
         self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
@@ -93,6 +96,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#SBATCH --job-name={}\n'.format(self.jobname))
             f.write('#SBATCH --partition={}\n'.format(self.partition))
             f.write('#SBATCH --gres=gpu:{}\n'.format(self.ngpu))
+            f.write('#SBATCH --cpus-per-task={}\n'.format(self.ncpu))
             f.write('#SBATCH --mem={}\n'.format(self.memory))
             f.write('#SBATCH --priority={}\n'.format(self.priority))
             f.write('#SBATCH --workdir={}\n'.format(workdir))

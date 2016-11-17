@@ -359,6 +359,7 @@ class QMCalculation:
         #     execqueue = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
         elif execution == Execution.Slurm:
             execqueue = SlurmQueue()
+            execqueue.ncpu = self.ncpus
         elif execution == Execution.AceCloud:
             execqueue = AceCloudQueue()
         else:
