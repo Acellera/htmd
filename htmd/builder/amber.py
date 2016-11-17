@@ -24,9 +24,8 @@ logger = logging.getLogger(__name__)
 def listFiles():
     """ Lists all available AMBER forcefield files
     """
-    try:
-        tleap = check_output(['which', 'tleap'], stderr=DEVNULL).decode('UTF-8').rstrip('\n')
-    except:
+    tleap = shutil.which("tleap")
+    if not tleap:
         raise NameError('tleap not found. You should either have AmberTools or ambermini installed '
                         '(to install ambermini do: conda install ambermini -c acellera)')
 
@@ -38,6 +37,14 @@ def listFiles():
     print('---- Forcefield files list: ' + path.join(amberdir, '') + ' ----')
     for f in ffs:
         print(f)
+
+    # FRCMOD files
+    frcmoddir = path.join(amberhome, 'dat', 'leap', 'parm')
+    ffs = glob(frcmoddir+"/frcmod.*")
+    print('---- Parameter files list: ' + path.join(frcmoddir, '') + ' ----')
+    for f in ffs:
+        print(path.basename(f))
+
     # Extra AMBER FFs on HTMD
     htmdamberdir = path.abspath(path.join(home(), 'builder', 'amberfiles', ''))
     extraffs = [f + '/' + path.basename(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')[0])
@@ -46,6 +53,7 @@ def listFiles():
     print('---- Extra forcefield files list: ' + path.join(htmdamberdir, '') + ' ----')
     for f in extraffs:
         print(f)
+
 
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
@@ -175,6 +183,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.info('Writing PDB file for input to tleap.')
     pdbname = path.join(outdir, 'input.pdb')
+
+    # mol2 files have atomtype, here we only write parts not coming from mol2
     mol.write(pdbname, mol.atomtype == '')
     if not os.path.isfile(pdbname):
         raise NameError('Could not write a PDB file out of the given Molecule.')
@@ -408,10 +418,10 @@ def _charmmLipid2Amber(mol):
     begters = np.zeros(natoms, dtype=bool)
     finters = np.zeros(natoms, dtype=bool)
 
-    betabackup = mol.beta.copy()
-
+    # Iterate over the translation dictionary
     mol = mol.copy()
-    mol.set('beta', sequenceID(mol.resid))
+    incrresids = sequenceID((mol.resid, mol.insertion, mol.segid))
+
     for res in resdict.keys():
         molresidx = mol.resname == res
         if not np.any(molresidx):
@@ -438,18 +448,18 @@ def _charmmLipid2Amber(mol):
             if rule.order == rule.natoms - 1 and rule.ter:  # Last atom with ter
                 finters[molatomidx] = True
 
-    betas = np.unique(mol.beta[begs])
-    residuebegs = np.ones(len(betas), dtype=int) * -1
-    residuefins = np.ones(len(betas), dtype=int) * -1
-    for i in range(len(betas)):
-        residuebegs[i] = np.where(mol.beta == betas[i])[0][0]
-        residuefins[i] = np.where(mol.beta == betas[i])[0][-1]
+    uqresids = np.unique(incrresids[begs])
+    residuebegs = np.ones(len(uqresids), dtype=int) * -1
+    residuefins = np.ones(len(uqresids), dtype=int) * -1
+    for i in range(len(uqresids)):
+        residuebegs[i] = np.where(incrresids == uqresids[i])[0][0]
+        residuefins[i] = np.where(incrresids == uqresids[i])[0][-1]
     for i in range(len(residuebegs)):
         beg = residuebegs[i]
         fin = residuefins[i] + 1
         neworder[beg:fin] = neworder[beg:fin] + beg
     idx = np.argsort(neworder)
-    mol.beta = betabackup
+
     _reorderMol(mol, idx)
 
     begters = np.where(begters[idx])[0]  # Sort the begs and ters

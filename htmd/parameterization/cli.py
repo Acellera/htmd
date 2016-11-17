@@ -15,7 +15,6 @@ import sys
 import numpy as np
 import math
 
-
 def printEnergies(mol):
     print("\n == Diagnostic Energies == ")
     ffe = FFEvaluate(mol)
@@ -53,7 +52,7 @@ def main_parameterize():
     parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=ncpus,
                         dest="ncpus")
     parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
-                        choices=["GAFF", "GAFF2", "CGENFF"], default="CGENFF")
+                        choices=["GAFF", "GAFF2", "CGENFF", "all"], default="all")
     parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVDZ"],
                         default="cc-pVDZ", dest="basis")
     parser.add_argument("--theory",  help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
@@ -101,11 +100,13 @@ def main_parameterize():
         sys.exit(1)
 
     if args.forcefield == "CGENFF":
-        method = FFTypeMethod.CGenFF_2b6
+        methods = [FFTypeMethod.CGenFF_2b6]
     elif args.forcefield == "GAFF":
-        method = FFTypeMethod.GAFF
+        methods = [FFTypeMethod.GAFF]
     elif args.forcefield == "GAFF2":
-        method = FFTypeMethod.GAFF2
+        methods = [FFTypeMethod.GAFF2]
+    elif args.forcefield == "all":
+        methods = [FFTypeMethod.CGenFF_2b6, FFTypeMethod.GAFF2]
     else:
         print("Unknown initial guess force-field: {}".format(args.forcefield))
         sys.exit(1)
@@ -132,121 +133,131 @@ def main_parameterize():
        solvent = True
 
     # Just list or parameterize?
-    if args.list:
-        print(" === Listing soft torsions of {} ===\n".format(filename))
-    else:
-        print(" === Parameterizing {} ===\n".format(filename))
+    for method in methods:
+        print(" === Fitting for FF %s ===\n" % ( method.name ) ) 
+        if args.list:
+            print(" === Listing soft torsions of {} ===\n".format(filename))
+        else:
+            print(" === Parameterizing {} ===\n".format(filename))
 
-    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
+        mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
                      basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code, outdir=args.outdir)
-    dihedrals = mol.getSoftTorsions()
+        dihedrals = mol.getSoftTorsions()
 
-    if args.list:
-        print("Detected soft torsions:")
-        for d in dihedrals:
-            print("\t{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
-        sys.exit(0)
+        if args.list:
+            print("Detected soft torsions:")
+            for d in dihedrals:
+                print("\t{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
+            sys.exit(0)
 
-    if not args.list:  # Parameterize
+        if not args.list:  # Parameterize
 
-        if not args.nomin:
-          print("\n == Minimizing ==\n")
-          mol.minimize()
+            if not args.nomin:
+              print("\n == Minimizing ==\n")
+              mol.minimize()
 
-        if not args.noesp:
-          print("\n == Charge fitting ==\n")
-          if True:
-            (score, qm_dipole, mm_dipole) = mol.fitCharges()
+            if not args.noesp:
+              print("\n == Charge fitting ==\n")
+              if True:
+                (score, qm_dipole, mm_dipole) = mol.fitCharges()
 
-            rating = "GOOD"
-            if score > 1:
-                rating = "CHECK"
-            if score > 10:
-                rating = "BAD"
+                rating = "GOOD"
+                if score > 1:
+                    rating = "CHECK"
+                if score > 10:
+                    rating = "BAD"
 
-            print("Charge Chi^2 score : %f : %s" % (score, rating))
-            print("QM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
-            print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
-            d = 0.
-            for i in range(3):
-                x = qm_dipole[i] - mm_dipole[i]
-                d = d + x * x
+                print("Charge Chi^2 score : %f : %s" % (score, rating))
+                print("QM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
+                print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
+                d = 0.
+                for i in range(3):
+                    x = qm_dipole[i] - mm_dipole[i]
+                    d = d + x * x
 
-            rating = "GOOD"
-            if score > 1:
-                rating = "CHECK"
-            print("Dipole Chi^2 score : %f : %s" % (d, rating))
-            print("")
+                rating = "GOOD"
+                if score > 1:
+                    rating = "CHECK"
+                print("Dipole Chi^2 score : %f : %s" % (d, rating))
+                print("")
 
 
-        # Iterative dihedral fitting
-        print("\n == Torsion fitting ==\n" )
+            # Iterative dihedral fitting
+            print("\n == Torsion fitting ==\n" )
 
-        scores= np.zeros( len(dihedrals ) )
-        converged = False;
-        iteration = 1
-        while not converged:
+            scores= np.zeros( len(dihedrals ) )
+            converged = False;
+            iteration = 1
+            while not converged:
+              rets=[]
 
-          print("\nIteration %d" % ( iteration ) )
+              print("\nIteration %d" % ( iteration ) )
 
-          last_scores = scores
-          scores= np.zeros( len(dihedrals ) )
-          idx = 0
-          for d in dihedrals:
-            name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
-            if not args.torsion or name in args.torsion:
-                print("\n == Fitting torsion {} ==\n".format(name))
-                try:
-                    ret = mol.fitSoftTorsion(d)
+              last_scores = scores
+              scores= np.zeros( len(dihedrals ) )
+              idx = 0
+              for d in dihedrals:
+                name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
+                if not args.torsion or name in args.torsion:
+                    print("\n == Fitting torsion {} ==\n".format(name))
+                    try:
+                        ret = mol.fitSoftTorsion(d)
+                        rets.append(ret)
 
-                    rating = "GOOD"
-                    if ret.chisq > 10:
-                        rating = "CHECK"
-                    if ret.chisq > 100:
-                        rating = "BAD"
-                    print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
-                    scores[idx] = ret.chisq;
-                    fn = mol.plotDihedralFit(ret, show=False)
-                except:
-                    print("Error in fitting")
-                    #raise
-                    scores[idx] = 0.
-                    pass
-                    # print(fn)
-            idx = idx + 1
-#          print(scores)
-          if iteration>1:
-            converged=True
-            for j in  range(len(scores)):
-              # Check convergence
-              relerr = (scores[j] - last_scores[j])/last_scores[j]
-              convstr="- converged"
-              if math.fabs(relerr) > 1.e-2 : 
-                convstr=""
-                converged = False
-              print( "Dihedral %d relative error : %f %s" % ( j, relerr, convstr ) )
+                        rating = "GOOD"
+                        if ret.chisq > 10:
+                            rating = "CHECK"
+                        if ret.chisq > 100:
+                            rating = "BAD"
+                        print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
+                        scores[idx] = ret.chisq;
+                        fn = mol.plotTorsionFit(ret, show=False)
+                    except:
+                        print("Error in fitting")
+                        #raise
+                        scores[idx] = 0.
+                        pass
+                        # print(fn)
+                idx = idx + 1
+#              print(scores)
+              if iteration>1:
+                converged=True
+                for j in  range(len(scores)):
+                  # Check convergence
+                  relerr = (scores[j] - last_scores[j])/last_scores[j]
+                  convstr="- converged"
+                  if math.fabs(relerr) > 1.e-2 : 
+                    convstr=""
+                    converged = False
+                  print( " Dihedral %d relative error : %f %s" % ( j, relerr, convstr ) )
+    
+              iteration = iteration + 1
 
-          iteration = iteration + 1
+            print(" Fitting converged at iteration %d" % (iteration-1 ) )
 
-        print(" Fitting converged at iteration %d" % (iteration-1 ) )
 
-        printEnergies(mol)
+            fit = mol.plotConformerEnergies(rets, show=False)
+            print("\n Fit of conformer energies: RMS %f Variance %f" % ( fit[0], fit[1] ) )
 
-        paramdir = os.path.join(args.outdir, "parameters", method.name, mol.output_directory_name() )
-        print("\n == Output to {} ==\n".format(paramdir))
-        try:
-            os.makedirs(paramdir, exist_ok=True)
-        except:
-            raise OSError('Directory {} could not be created. Check if you have permissions.'.format(paramdir))
+            printEnergies(mol)
+        
 
-        if args.forcefield == "CGENFF":
+            # Output the ff parameters 
+            paramdir = os.path.join(args.outdir, "parameters", method.name, mol.output_directory_name() )
+            print("\n == Output to {} ==\n".format(paramdir))
             try:
-                mol._rtf.write(os.path.join(paramdir, "mol.rtf"))
-                mol._prm.write(os.path.join(paramdir, "mol.prm"))
-                for ext in ['psf', 'xyz', 'coor', 'mol2', 'pdb']:
-                    mol.write(os.path.join(paramdir, "mol." + ext))
-                f = open(os.path.join(paramdir, "input.namd"), "w")
-                tmp = '''parameters mol.prm
+                os.makedirs(paramdir, exist_ok=True)
+            except:
+                raise OSError('Directory {} could not be created. Check if you have permissions.'.format(paramdir))
+
+            if method.name == "CGenFF_2b6":
+                try:
+                    mol._rtf.write(os.path.join(paramdir, "mol.rtf"))
+                    mol._prm.write(os.path.join(paramdir, "mol.prm"))
+                    for ext in ['psf', 'xyz', 'coor', 'mol2', 'pdb']:
+                        mol.write(os.path.join(paramdir, "mol." + ext))
+                    f = open(os.path.join(paramdir, "input.namd"), "w")
+                    tmp = '''parameters mol.prm
 paraTypeCharmm on
 coordinates mol.pdb
 bincoordinates mol.coor
@@ -265,26 +276,26 @@ cellBasisVector1 50. 0. 0.
 cellBasisVector2 0. 50. 0.
 cellBasisVector3 0. 0. 50.
 run 0'''
-                print(tmp, file=f)
-                f.close()
-            except ValueError as e:
-                print("Not writing CHARMM PRM: {}".format(str(e)))
-        elif args.forcefield == "GAFF" or args.forcefield == "GAFF2":
-            try:
-                # types need to be remapped because Amber FRCMOD format limits the type to characters
-                # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
-                typemap = mol._prm.writeFrcmod(mol._rtf, os.path.join(paramdir, "mol.frcmod"))
-                for ext in ['coor', 'mol2', 'pdb']:
-                    mol.write(os.path.join(paramdir, "mol." + ext))
-                f = open(os.path.join(paramdir, "tleap.in"), "w")
-                tmp = '''loadAmberParams mol.frcmod
+                    print(tmp, file=f)
+                    f.close()
+                except ValueError as e:
+                    print("Not writing CHARMM PRM: {}".format(str(e)))
+            elif method.name == "GAFF" or method.name == "GAFF2":
+                try:
+                    # types need to be remapped because Amber FRCMOD format limits the type to characters
+                    # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
+                    typemap = mol._prm.writeFrcmod(mol._rtf, os.path.join(paramdir, "mol.frcmod"))
+                    for ext in ['coor', 'mol2', 'pdb']:
+                        mol.write(os.path.join(paramdir, "mol." + ext), typemap=typemap)
+                    f = open(os.path.join(paramdir, "tleap.in"), "w")
+                    tmp = '''loadAmberParams mol.frcmod
 A = loadMol2 mol.mol2
 saveAmberParm A structure.prmtop mol.crd
 quit'''
-                print(tmp, file=f)
-                f.close()
-                f = open(os.path.join(paramdir, "input.namd"), "w")
-                tmp = '''parmfile structure.prmtop
+                    print(tmp, file=f)
+                    f.close()
+                    f = open(os.path.join(paramdir, "input.namd"), "w")
+                    tmp = '''parmfile structure.prmtop
 amber on
 coordinates mol.pdb
 bincoordinates mol.coor
@@ -302,10 +313,11 @@ cellBasisVector1 50. 0. 0.
 cellBasisVector2 0. 50. 0.
 cellBasisVector3 0. 0. 50.
 run 0'''
-                print(tmp, file=f)
-                f.close()
-            except ValueError as e:
-                print("Not writing Amber FRCMOD: {}".format(str(e)))
+                    print(tmp, file=f)
+                    f.close()
+                except ValueError as e:
+                    print("Not writing Amber FRCMOD: {}".format(str(e)))
+
     sys.exit(0)
 
 
