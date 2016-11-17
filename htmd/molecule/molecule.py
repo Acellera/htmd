@@ -10,7 +10,7 @@ import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread
-from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write
+from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write, GROwrite
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
@@ -729,7 +729,7 @@ class Molecule:
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "crd" or ext == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
-        elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
+        elif '.'+type in _TOPOLOGY_EXTS or '.'+ext in _TOPOLOGY_EXTS:
             topo, coords = MDTRAJTOPOread(filename)
             self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
@@ -1073,7 +1073,7 @@ class Molecule:
         self.coords = wrap(self.coords, self._getBonds(fileBonds, guessBonds), self.box, centersel=centersel)
 
     def write(self, filename, sel=None, type=None):
-        """ Writes any of the supported formats (pdb, coor, psf, xtc)
+        """ Writes any of the supported formats (pdb, coor, psf, xtc, xyz, mol2, gro) and any formats supported by MDtraj
 
         Parameters
         ----------
@@ -1106,15 +1106,23 @@ class Molecule:
             PSFwrite(src, filename)
         elif type == "xtc" or ext == "xtc":
             XTCwrite(src.coords, src.box, filename, self.time, self.step)
+        elif type == "gro" or ext == "gro":
+            GROwrite(src, filename)
         else:
             try:
                 import mdtraj as md
+                from mdtraj.core.trajectory import _TOPOLOGY_EXTS
                 import tempfile
-                tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
-                tmpxtc = tempfile.NamedTemporaryFile(suffix='.xtc')
-                self.write(tmppdb.name)
-                self.write(tmpxtc.name)
-                traj = md.load(tmpxtc.name, top=tmppdb.name)
+                if '.'+ext in _TOPOLOGY_EXTS:
+                    tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
+                    self.write(tmppdb.name)
+                    traj = md.load(tmppdb.name)
+                else:
+                    tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
+                    tmpxtc = tempfile.NamedTemporaryFile(suffix='.xtc')
+                    self.write(tmppdb.name)
+                    self.write(tmpxtc.name)
+                    traj = md.load(tmpxtc.name, top=tmppdb.name)
                 # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
                 # traj.time = self.time
                 # traj.unitcell_lengths = self.box.T / 10
