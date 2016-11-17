@@ -275,7 +275,7 @@ run 0'''
                 # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
                 typemap = mol._prm.writeFrcmod(mol._rtf, os.path.join(paramdir, "mol.frcmod"))
                 for ext in ['coor', 'mol2', 'pdb']:
-                    mol.write(os.path.join(paramdir, "mol." + ext))
+                    mol.write(os.path.join(paramdir, "mol." + ext), typemap=typemap)
                 f = open(os.path.join(paramdir, "tleap.in"), "w")
                 tmp = '''loadAmberParams mol.frcmod
 A = loadMol2 mol.mol2
