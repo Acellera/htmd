@@ -731,7 +731,62 @@ class FFMolecule(Molecule):
         ffe = FFEvaluate(self)
         ffe.evaluate(self.coords)
 
-    def plotDihedralFit(self, fit, show=True):
+    def plotConformerEnergies( self, fits, show=True ):
+        import matplotlib as mpl
+        if not show:
+            mpl.use('Agg')
+        import matplotlib.pyplot as plt
+
+        fh = plt.figure()
+        ax1 = fh.gca()
+       
+        mm_energy = []
+        qm_energy = []
+        for r in fits:
+           mm_energy.extend( r.mm_fitted )
+           qm_energy.extend( r.qm )
+        qm_energy = np.array( qm_energy )
+        mm_energy = np.array( mm_energy )
+
+        qm_energy = qm_energy - min(qm_energy)
+        mm_energy = mm_energy - min(mm_energy)
+
+        qm_energy = qm_energy.reshape( qm_energy.shape[0], 1 )
+        mm_energy = mm_energy.reshape( mm_energy.shape[0], 1 )
+#        print(qm_energy)
+#        print(qm_energy.shape)
+#        print(mm_energy)
+#        print(mm_energy.shape)
+        from sklearn import linear_model
+        regr = linear_model.LinearRegression( fit_intercept=False )
+        regr.fit( qm_energy, mm_energy )
+
+        ax1.set_xlabel( "QM Energy kcal/mol")
+        ax1.set_xlabel( "MM Energy kcal/mol")
+        ax1.set_title( "Conformer Energies  MM vs QM" )
+        ax1.plot(qm_energy, mm_energy ,  color="black", marker="o")
+        ax1.plot(qm_energy, regr.predict(qm_energy), color="red", linewidth=2 )
+
+        if show:
+            plt.show()
+        else:
+            plotdir = os.path.join(self.outdir, "parameters", self.method.name, self.output_directory_name(), "plots")
+            try:
+                os.makedirs(plotdir, exist_ok=True)
+            except:
+                raise OSError('Directory {} could not be created. Check if you have permissions.'.format(plotdir))
+            tf = os.path.join(plotdir, "conformer-energies.svg" ) 
+            plt.savefig(tf, format="svg")
+
+        # Return RMS error, variance and fit coeffients
+        return (
+          np.mean( (regr.predict( qm_energy ) - mm_energy )**2 ),
+          regr.score( qm_energy, mm_energy ),
+          regr.coef_
+        )
+
+
+    def plotTorsionFit(self, fit, show=True):
         import matplotlib as mpl
         if not show:
             mpl.use('Agg')

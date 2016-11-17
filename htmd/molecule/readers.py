@@ -801,6 +801,31 @@ def MDTRAJTOPOread(filename):
     topo.bonds = bonds
     return topo, coords
 
+def GROTOPread(filename):
+    # Reader for GROMACS .top file format:
+    # http://manual.gromacs.org/online/top.html
+    topo = Topology()
+    section = None
+    with open(filename, 'r') as f:
+        for line in f:
+            if line.startswith(';') or line.startswith('#') or len(line.strip()) == 0:
+                continue
+            if not line.startswith('[') and section == 'atoms':
+                #from IPython.core.debugger import Tracer
+                #Tracer()()
+                pieces = line.split()
+                topo.resid.append(pieces[2])
+                topo.resname.append(pieces[3])
+                topo.name.append(pieces[4])
+                topo.charge.append(pieces[6])
+
+            if '[ atoms ]' in line:
+                section = 'atoms'
+            elif line.startswith('['):
+                section = None
+    return topo
+
+
 
 if __name__ == '__main__':
     from htmd.home import home

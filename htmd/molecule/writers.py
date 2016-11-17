@@ -332,7 +332,7 @@ def GROwrite(mol, filename):
                             ('posx', coor[:, 0]), ('posy', coor[:, 1]), ('posz', coor[:, 2])])
     a = pd.DataFrame(data=datadict)
     with open(filename, 'wb') as fh:
-        fh.write(b'Generated with HTMD, t= %f\n' % (mol.fstep * 1000)) 
+        fh.write(b'Generated with HTMD, t= %f\n' % (mol.fstep * 1000))
         fh.write(b'%5d\n' % mol.numAtoms)
         np.savetxt(fh, a.values, '%5d%-5s%5s%5d%8.3f%8.3f%8.3f')
         fh.write(b'%f %f %f 0 0 0 0 0 0' % (box[0], box[1], box[2]))
