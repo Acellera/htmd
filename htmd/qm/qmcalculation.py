@@ -19,7 +19,8 @@ from htmd.queues.simqueue import SimQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
 
 
-# from htmd.apps.lsf import LSF
+from htmd.queues.lsf import LsfQueue
+from htmd.queues.slurm import SlurmQueue
 # from htmd.apps.pbs import PBS
 
 
@@ -351,22 +352,21 @@ class QMCalculation:
             os.chmod(os.path.join(d, "run.sh"), 0o700)
 
         if isinstance(execution, SimQueue):
-            lsf = execution
+            execqueue = execution
         # elif execution == Execution.LSF:
-        #     lsf = LSFQueue(ncpus=self.ncpus, executable=cmd, queue="general",
-        #                    resources="span[ptile={}]".format(self.ncpus), app="gaussian")
+        #     execqueue = LsfQueue()
         # elif execution == Execution.PBS:
-        #     lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
-        # elif execution == Execution.Slurm:
-        #     lsf = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        #     execqueue = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        elif execution == Execution.Slurm:
+            execqueue = SlurmQueue()
         elif execution == Execution.AceCloud:
-            lsf = AceCloudQueue()
+            execqueue = AceCloudQueue()
         else:
             raise RuntimeError("Execution target not recognised")
 
-        lsf.submit(to_submit)
-        lsf.wait()
-        lsf.retrieve()
+        execqueue.submit(to_submit)
+        execqueue.wait()
+        execqueue.retrieve()
 
     def _start_inline(self, directories):
         bar = ProgressBar(len(directories), description="Running QM Calculations")
@@ -621,35 +621,32 @@ class QMCalculation:
         elif self.theory == Theory.RHF:
             print("method      rhf", file=f)
 
-        print("basis       %s" % (basis), file=f)
+        print("basis       %s" % basis, file=f)
         print("coordinates input.xyz", file=f)
-        print("charge      %d" % (self.charge), file=f)
-        print("spinmult    %d" % (self.multiplicity), file=f)
+        print("charge      %d" % self.charge, file=f)
+        print("spinmult    %d" % self.multiplicity, file=f)
         if self.theory == Theory.B3LYP:
             print("dftd        d3", file=f)
         else:
-           print( "dftd        no", file=f )
+            print("dftd        no", file=f)
 
-        if( self.solvent ):
-           print( "pcm         cosmo", file=f )
-           print( "epsilon     78.39", file=f )
-        
+        if self.solvent:
+            print("pcm         cosmo", file=f)
+            print("epsilon     78.39", file=f)
 
-        if (self.frozen):
+        if self.frozen:
             print("$constraint_freeze", file=f)
             for i in range(len(self.frozen)):
                 print("dihedral  %d_%d_%d_%d" % (
-                self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3]), file=f)
+                    self.frozen[i][0], self.frozen[i][1], self.frozen[i][2], self.frozen[i][3]), file=f)
             print("$end", file=f)
 
-        if( self.optimize ):
-           print( "new_minimizer yes", file=f ) 
-           print( "run           minimize", file=f )
+        if self.optimize:
+            print("new_minimizer yes", file=f)
+            print("run           minimize", file=f)
         else: 
-           print( "run           energy", file=f )
-        print( "end", file=f )
-
-
+            print("run           energy", file=f)
+        print("end", file=f)
         f.close()
 
     def _write_psi4(self, dirname, frame):
@@ -660,12 +657,12 @@ class QMCalculation:
         f = open(os.path.join(dirname, "psi4.in"), "w")
         # If the charge is < 0, need to use a diffuse basis set
         if self.basis == BasisSet._6_31G_star:
-            if self.charge < 0 and not (self.solvent):
+            if self.charge < 0 and not self.solvent:
                 basis = "6-31+G*"
             else:
                 basis = "6-31G*"
         elif self.basis == BasisSet._cc_pVDZ:
-            if self.charge < 0 and not (self.solvent):
+            if self.charge < 0 and not self.solvent:
                 basis = "aug-cc-pvdz"
             else:
                 basis = "cc-pvdz"
@@ -760,15 +757,15 @@ class QMCalculation:
             dispersion = "EmpiricalDispersion=GD3"
 
         if self.basis == BasisSet._6_31G_star:
-            #            if self.charge < 0:
-            #                basis = "6-31+G*"
-            #            else:
-            basis = "6-31G*"
+            if self.charge < 0 and not self.solvent:
+                basis = "6-31+G*"
+            else:
+                basis = "6-31G*"
         elif self.basis == BasisSet._cc_pVDZ:
-            #            if self.charge < 0:
-            #                basis = "AUG-cc-pVDZ"
-            #            else:
-            basis = "cc-pVDZ"
+            if self.charge < 0 and not self.solvent:
+                basis = "AUG-cc-pVDZ"
+            else:
+                basis = "cc-pVDZ"
         else:
             raise ValueError("Unknown basis set {}".format(self.basis))
 
