@@ -9,7 +9,7 @@ import requests
 import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
-from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread
+from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread, GROTOPread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write, GROwrite
 from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
@@ -671,6 +671,7 @@ class Molecule:
         """
         from htmd.simlist import Sim
         from mdtraj.core.trajectory import _TOPOLOGY_EXTS
+        _TOPOLOGY_EXTS = [x[1:] for x in _TOPOLOGY_EXTS]  # Removing the initial dot
         _MDTRAJ_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
 
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
@@ -697,6 +698,9 @@ class Molecule:
             self._parseTopology(topo, filename, overwrite=overwrite)
         elif type == "prm" or ext == "prm" or type == "prmtop" or ext == "prmtop":
             topo = PRMTOPread(filename)
+            self._parseTopology(topo, filename, overwrite=overwrite)
+        elif type == "top" or ext == "top":
+            topo = GROTOPread(filename)
             self._parseTopology(topo, filename, overwrite=overwrite)
         elif type == "pdb" or ext == "pdb":
             self._readPDB(filename, overwrite=overwrite)
@@ -729,7 +733,7 @@ class Molecule:
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         elif type == "crd" or ext == "crd":
             self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
-        elif '.'+type in _TOPOLOGY_EXTS or '.'+ext in _TOPOLOGY_EXTS:
+        elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
             topo, coords = MDTRAJTOPOread(filename)
             self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
@@ -1112,8 +1116,9 @@ class Molecule:
             try:
                 import mdtraj as md
                 from mdtraj.core.trajectory import _TOPOLOGY_EXTS
+                _TOPOLOGY_EXTS = [x[1:] for x in _TOPOLOGY_EXTS]  # Removing the initial dot
                 import tempfile
-                if '.'+ext in _TOPOLOGY_EXTS:
+                if ext in _TOPOLOGY_EXTS:
                     tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
                     self.write(tmppdb.name)
                     traj = md.load(tmppdb.name)
