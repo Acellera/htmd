@@ -11,7 +11,7 @@ matplotlib.use('Agg')
 
 from matplotlib import pylab as plt
 from htmd.molecule.util import maxDistance
-#from htmd.parameterization.parameterization import Parameterization
+from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.protocols.equilibration_v1 import Equilibration
 
 # TODO: This needs to be completely refactored to match the new parameterization
@@ -27,13 +27,13 @@ class Sample:
             self._prep_and_run(mol, rtf, prm, outdir, solvated)
 
         print("Analysing trajectory")
-        self._analyse(mol, pdb, traj)
+        self._analyse(mol,  rtf, prm, pdb, traj)
 
-    def _analyse(self, mol, pdb, traj):
-        m = Molecule(pdb)
+    def _analyse(self, mol, rtf, prm, pdb, traj):
+        m = FFMolecule( filename=mol, rtf=rtf, prm=prm)
         m.read(traj)
-        torsions = Parameterization.listDihedrals(mol)
-        # print(torsions)
+        torsions = m.getSortTorsions()
+        print(torsions)
         for i in range(len(torsions[0])):
             # For each torsion, measure
             title = torsions[1][i][0]
@@ -172,5 +172,5 @@ def testfile(filename):
 
 
 if __name__ == "__main__":
-    # sample_main()
+    sample_main()
     sys.exit(0)

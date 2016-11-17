@@ -60,6 +60,7 @@ def main_parameterize():
     parser.add_argument( "--vacuum",  help="Perform QM calculations in vacuum", action="store_true", dest="vacuum", default=False )
     parser.add_argument( "--no-min",  help="Do not perform QM minimisation", action="store_true", dest="nomin", default=False )
     parser.add_argument( "--no-esp",  help="Do not perform QM charge fitting", action="store_true", dest="noesp", default=False )
+    parser.add_argument( "--no-torsions",  help="Do not perform torsion fitting", action="store_true", dest="notorsion", default=False )
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
                         choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
     parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"], default="PSI4",
@@ -183,6 +184,7 @@ def main_parameterize():
 
 
             # Iterative dihedral fitting
+            if args.notorsion == True: dihedrals=[]
             print("\n == Torsion fitting ==\n" )
 
             scores= np.zeros( len(dihedrals ) )
