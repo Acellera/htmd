@@ -731,7 +731,7 @@ class FFMolecule(Molecule):
         ffe = FFEvaluate(self)
         ffe.evaluate(self.coords)
 
-    def plotDihedralFit(self, fit, show=True):
+    def plotTorsionFit(self, fit, show=True):
         import matplotlib as mpl
         if not show:
             mpl.use('Agg')

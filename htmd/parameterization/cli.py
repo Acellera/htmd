@@ -206,7 +206,7 @@ def main_parameterize():
                         rating = "BAD"
                     print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
                     scores[idx] = ret.chisq;
-                    fn = mol.plotDihedralFit(ret, show=False)
+                    fn = mol.plotTorsionFit(ret, show=False)
                 except:
                     print("Error in fitting")
                     #raise
