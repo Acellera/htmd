@@ -63,8 +63,8 @@ def main_parameterize():
     parser.add_argument( "--no-torsions",  help="Do not perform torsion fitting", action="store_true", dest="notorsion", default=False )
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
                         choices=["inline", "LSF", "PBS", "Slurm", "AceCloud" ], default="inline", dest="exec")
-    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"], default="PSI4",
-                        dest="qmcode")
+    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"], default="PSI4", dest="qmcode")
+    parser.add_argument("--freeze-charge", metavar="A1", help="Freeze the charge of the named atom", action="append", default=None, dest="freezeq" )
 
     args = parser.parse_args()
 
@@ -132,8 +132,11 @@ def main_parameterize():
        solvent = False
     else:
        solvent = True
+ 
 
+       
     # Just list or parameterize?
+    
     for method in methods:
         print(" === Fitting for FF %s ===\n" % ( method.name ) ) 
         if args.list:
@@ -145,6 +148,7 @@ def main_parameterize():
                      basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code, outdir=args.outdir)
         dihedrals = mol.getSoftTorsions()
 
+ 
         if args.list:
             print("Detected soft torsions:")
             for d in dihedrals:
@@ -159,8 +163,23 @@ def main_parameterize():
 
             if not args.noesp:
               print("\n == Charge fitting ==\n")
+
+              # Select the atoms that are to have frozen charges in the fit
+              fixq = []
+              if( args.freezeq ):
+                 for i in args.freezeq:
+                    found=False
+                    for d in range(len(mol.name)):
+                       if( mol.name[d] == i ): 
+                         ni = d 
+                         print("Fixing charge for atom %s to %f" % ( i, mol.charge[ni] ) )
+                         fixq.append(ni)
+                         found=True
+                    if not found:
+                         raise ValueError(" No atom named %s (--freeze-charge)" % ( i ) )
+
               if True:
-                (score, qm_dipole, mm_dipole) = mol.fitCharges()
+                (score, qm_dipole, mm_dipole) = mol.fitCharges( fixed = fixq )
 
                 rating = "GOOD"
                 if score > 1:
