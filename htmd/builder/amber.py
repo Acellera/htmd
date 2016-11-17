@@ -24,9 +24,8 @@ logger = logging.getLogger(__name__)
 def listFiles():
     """ Lists all available AMBER forcefield files
     """
-    try:
-        tleap = check_output(['which', 'tleap'], stderr=DEVNULL).decode('UTF-8').rstrip('\n')
-    except:
+    tleap = shutil.which("tleap")
+    if not tleap:
         raise NameError('tleap not found. You should either have AmberTools or ambermini installed '
                         '(to install ambermini do: conda install ambermini -c acellera)')
 
@@ -38,6 +37,14 @@ def listFiles():
     print('---- Forcefield files list: ' + path.join(amberdir, '') + ' ----')
     for f in ffs:
         print(f)
+
+    # FRCMOD files
+    frcmoddir = path.join(amberhome, 'dat', 'leap', 'parm')
+    ffs = glob(frcmoddir+"/frcmod.*")
+    print('---- Parameter files list: ' + path.join(frcmoddir, '') + ' ----')
+    for f in ffs:
+        print(path.basename(f))
+
     # Extra AMBER FFs on HTMD
     htmdamberdir = path.abspath(path.join(home(), 'builder', 'amberfiles', ''))
     extraffs = [f + '/' + path.basename(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')[0])
@@ -46,6 +53,7 @@ def listFiles():
     print('---- Extra forcefield files list: ' + path.join(htmdamberdir, '') + ' ----')
     for f in extraffs:
         print(f)
+
 
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
