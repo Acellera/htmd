@@ -409,17 +409,9 @@ class MetricPlumed2(Projection):
                '--mf_xtc', xtc,
                '--pdb', pdb,
                '--plumed', metainp]
-        import shlex
-        cmds = " ".join([shlex.quote(x) for x in cmd])
-        logger.debug("Invoking " + cmds)
+        logger.debug("Invoking " + " ".join(cmd))
         try:
-            # Need shell=True for plumed installed in conda - exe has no shebang
-            # in turn shell=True requires concatenation of args
-            s=subprocess.run(cmds, check=True, shell=True,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            logger.debug("Process stdout: "+s.stdout.decode("utf-8"))
-            logger.debug("Process stderr: " + s.stderr.decode("utf-8"))
-            logger.debug("Return value: "+str(s.returncode))
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
             logger.error("Error from PLUMED (stdout): " + e.stdout.decode("utf-8"))
             logger.error("Error from PLUMED (stderr):" + e.stderr.decode("utf-8"))
@@ -437,7 +429,7 @@ class MetricPlumed2(Projection):
 if __name__ == "__main__":
     import sys
     import numpy as np
-    from htmd import *
+    import htmd
     from htmd.projections.metricplumed2 import *
 
     try:

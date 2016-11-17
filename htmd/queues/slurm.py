@@ -148,7 +148,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
 
             # Automatic jobname
             if self.jobname is None:
-                os.path.basename(os.path.abspath(d)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
+                self.jobname = os.path.basename(os.path.abspath(d)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
 
             runscript = os.path.abspath(os.path.join(d, 'run.sh'))
             if not os.path.exists(runscript):

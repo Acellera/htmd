@@ -148,6 +148,7 @@ class AdaptiveMD(AdaptiveBase):
         if self.ticadim > 0:
             # tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))  # gianni: without project it was tooooo slow
             data = metr.project()
+            data.dropTraj()  # Drop before TICA to avoid broken trajectories
             ticalag = int(
                 np.ceil(max(2, min(np.min(data.trajLengths) / 2, self.ticalag))))  # 1 < ticalag < (trajLen / 2)
             tica = TICA(data, ticalag)
