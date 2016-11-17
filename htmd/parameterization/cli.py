@@ -15,7 +15,6 @@ import sys
 import numpy as np
 import math
 
-
 def printEnergies(mol):
     print("\n == Diagnostic Energies == ")
     ffe = FFEvaluate(mol)
@@ -186,6 +185,7 @@ def main_parameterize():
         converged = False;
         iteration = 1
         while not converged:
+          rets=[]
 
           print("\nIteration %d" % ( iteration ) )
 
@@ -198,6 +198,7 @@ def main_parameterize():
                 print("\n == Fitting torsion {} ==\n".format(name))
                 try:
                     ret = mol.fitSoftTorsion(d)
+                    rets.append(ret)
 
                     rating = "GOOD"
                     if ret.chisq > 10:
@@ -224,14 +225,20 @@ def main_parameterize():
               if math.fabs(relerr) > 1.e-2 : 
                 convstr=""
                 converged = False
-              print( "Dihedral %d relative error : %f %s" % ( j, relerr, convstr ) )
+              print( " Dihedral %d relative error : %f %s" % ( j, relerr, convstr ) )
 
           iteration = iteration + 1
 
         print(" Fitting converged at iteration %d" % (iteration-1 ) )
 
-        printEnergies(mol)
 
+        fit = mol.plotConformerEnergies(rets, show=False)
+        print("\n Fit of conformer energies: RMS %f Variance %f" % ( fit[0], fit[1] ) )
+
+        printEnergies(mol)
+        
+
+        # Output the ff parameters 
         paramdir = os.path.join(args.outdir, "parameters", method.name, mol.output_directory_name() )
         print("\n == Output to {} ==\n".format(paramdir))
         try:
