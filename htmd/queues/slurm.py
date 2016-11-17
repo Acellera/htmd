@@ -10,10 +10,10 @@
 #
 import os
 import shutil
-from os.path import isdir
+import random
+import string
 from subprocess import check_output, CalledProcessError
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
-from htmd import UserInterface
 from htmd.queues.simqueue import SimQueue
 import logging
 logger = logging.getLogger(__name__)
@@ -71,9 +71,11 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
 
         # Find executables
-        self._sbatch = SlurmQueue._find_binary('sbatch')
-        self._squeue = SlurmQueue._find_binary('squeue')
-        self._scancel = SlurmQueue._find_binary('scancel')
+        self._qsubmit = SlurmQueue._find_binary('sbatch')
+        self._qinfo = SlurmQueue._find_binary('sinfo')
+        self._qcancel = SlurmQueue._find_binary('scancel')
+
+        self._dirs = []
 
     @staticmethod
     def _find_binary(binary):
@@ -105,6 +107,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
+            f.write('\ntouch .done')
 
             # Move completed trajectories
             if self.datadir is not None:
@@ -130,13 +133,22 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         dist : list
             A list of executable directories.
         """
-        import time
         if isinstance(dirs, str):
-            dirs = [dirs,]
+            dirs = [dirs, ]
+        self._dirs.extend(dirs)
+
+        # Automatic partition
+        if self.partition is None:
+            ret = check_output(self._qinfo)
+            self.partition = ','.join(i.split('*')[0] for i in ret.decode('ascii').split('\n')[1:-1])
 
         # if all folders exist, submit
         for d in dirs:
             logger.info('Queueing ' + d)
+
+            # Automatic jobname
+            if self.jobname is None:
+                os.path.basename(os.path.abspath(d)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
 
             runscript = os.path.abspath(os.path.join(d, 'run.sh'))
             if not os.path.exists(runscript):
@@ -147,12 +159,19 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)
             try:
-                ret = check_output([self._sbatch, jobscript])
+                ret = check_output([self._qsubmit, jobscript])
                 logger.debug(ret)
             except:
                 raise
 
-    def inprogress(self):
+    def inprogress(self, debug=False):
+        inprogress = 0
+        for i in self._dirs:
+            if not os.path.exists(os.path.join(i, '.done')):
+                inprogress += 1
+        return inprogress
+
+    def __inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
 
         Returns
@@ -165,7 +184,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
         user = getpass.getuser()
-        cmd = [self._squeue, '-n', self.jobname, '-u', user, '-p', self.partition]
+        cmd = [self._qstatus, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
 
         # This command randomly fails so I need to allow it to repeat or it crashes adaptive
@@ -197,7 +216,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
         user = getpass.getuser()
-        cmd = [self._scancel, '-n', self.jobname, '-u', user, '-p', self.partition]
+        cmd = [self._qcancel, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))
