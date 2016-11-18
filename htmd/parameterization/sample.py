@@ -172,5 +172,5 @@ def testfile(filename):
 
 
 if __name__ == "__main__":
-    sample_main()
+    # sample_main()
     sys.exit(0)
