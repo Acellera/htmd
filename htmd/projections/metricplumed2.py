@@ -429,7 +429,7 @@ class MetricPlumed2(Projection):
 if __name__ == "__main__":
     import sys
     import numpy as np
-    import htmd
+    from htmd import *
     from htmd.projections.metricplumed2 import *
 
     try:
