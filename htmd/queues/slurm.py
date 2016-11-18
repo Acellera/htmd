@@ -12,6 +12,7 @@ import os
 import shutil
 import random
 import string
+import numpy as np
 from subprocess import check_output, CalledProcessError
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
 from htmd.queues.simqueue import SimQueue
@@ -144,7 +145,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         # Automatic partition
         if self.partition is None:
             ret = check_output(self._qinfo)
-            self.partition = ','.join(i.split('*')[0] for i in ret.decode('ascii').split('\n')[1:-1])
+            self.partition = ','.join(np.unique([i.split()[0].strip('*')
+                                                 for i in ret.decode('ascii').split('\n')[1:-1]]))
 
         # if all folders exist, submit
         for d in dirs:
