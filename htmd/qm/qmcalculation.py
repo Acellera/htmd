@@ -362,6 +362,7 @@ class QMCalculation:
         elif execution == Execution.Slurm:
             execqueue = SlurmQueue()
             execqueue.ncpu = self.ncpus
+            execqueue.memory = 4000
         elif execution == Execution.AceCloud:
             execqueue = AceCloudQueue()
         else:
