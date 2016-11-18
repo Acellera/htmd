@@ -35,7 +35,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         Number of GPUs to use for a single job
     ncpu : int, default=1
         Number of CPUs to use for a single job
-    memory : int, default=4000
+    memory : int, default=1000
         Amount of memory per job (MB)
     walltime : int, default=None
         Job timeout (s)
