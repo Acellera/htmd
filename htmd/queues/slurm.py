@@ -157,6 +157,14 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 self.jobname = os.path.basename(os.path.abspath(d)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
 
             runscript = os.path.abspath(os.path.join(d, 'run.sh'))
+
+            if os.path.exists( os.path.join( d, ".done" ) ):
+              try: 
+                 logger.info( "Removing existing .done  sentinel from %s" % (d))
+                 os.unlink( os.path.join( d, ".done" ) )
+              except: 
+                 logger.info("Cant remove .done sentinel from %s" % (d) )
+
             if not os.path.exists(runscript):
                 raise FileExistsError('File {} does not exist.'.format(runscript))
             if not os.access(runscript, os.X_OK):
