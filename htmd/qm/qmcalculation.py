@@ -163,6 +163,8 @@ class QMCalculation:
             self.psi4_binary = "psi4"
             if self.code == Code.Gaussian:
                 self.gaussian_binary = "g09"
+            if self.code == Code.TeraChem:
+                self.terachem_binary = "terachem"
 
         # Set up point cloud if esp calculation requested
 
@@ -359,6 +361,8 @@ class QMCalculation:
         #     execqueue = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
         elif execution == Execution.Slurm:
             execqueue = SlurmQueue()
+            execqueue.ncpu = self.ncpus
+            execqueue.memory = 4000
         elif execution == Execution.AceCloud:
             execqueue = AceCloudQueue()
         else:

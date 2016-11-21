@@ -150,68 +150,6 @@ def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
     return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
 
 
-def findBreaks(mol, sel='all', spatialgap=4.0):
-    """Return a list of breaks in the given sequence.
-
-     Returns a list arranged as follows [ [ res1 res2 distance nmiss ] ... ], where
-
-      * res1 and res2 are dictionaries with keys {resid, chain, insertion},
-      * distance is the gap between Cα atoms in Å
-      * nmiss is the number of missing residues.
-
-    Gaps are only reported within the same chain.
-
-    Parameters
-    ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        The Molecule object
-    sel : str
-        Atom selection on which to check for gaps.
-    spatialgap : float
-        The size of a spatial gap between CAs which validates a discontinuity (Å)
-
-    Returns
-    -------
-    breaklist : list
-        A list arranged as follows [ [ res1 res2 distance nmiss ] ... ] (see description)
-    """
-
-    selCA = np.bitwise_and(mol.atomselect(sel), mol.atomselect("name CA") )
-    xyz = mol.get('coords', selCA)
-    Dxyz = np.diff(xyz, axis=0)
-    dxyz = np.sqrt(np.sum(Dxyz*Dxyz,axis=1))
-
-    breaks = dxyz > spatialgap
-    breaks1 = np.append(breaks, False)    # So same length as selCA
-    breaks2 = np.insert(breaks, 0, False)
-
-    dxyz_ = dxyz[breaks]
-
-    nm = mol.copy()
-    nm.filter(selCA, _logger=False)
-
-    breaklist = []
-    for r1, i1, c1, rn1,  r2, i2, c2, rn2,  d in zip(
-            nm.get("resid", breaks1), nm.get("insertion", breaks1), nm.get("chain", breaks1), nm.get("resname", breaks1),
-            nm.get("resid", breaks2), nm.get("insertion", breaks2), nm.get("chain", breaks2), nm.get("resname", breaks2),
-            dxyz_ ):
-        if c1 == c2:
-            dr1 = dict(resid= r1, chain=c1, insertion=i1)
-            dr2 = dict(resid= r2, chain=c2, insertion=i2)
-            nmiss = r2 - r1 - 1
-            breaklist.append([dr1, dr2, d, nmiss])
-            logger.info("Missing {:2d} residues ({:5.2f} Å) at {:s} {:d}{:s} {:s} - {:s} {:d}{:s} {:s} ".format(
-                    nmiss, d,
-                    rn1, r1, i1, c1,
-                    rn2, r2, i2, c2
-                ))
-
-    return breaklist
-
-
-
-
-
 def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, field="segid"):
     """ Detects resid gaps in a selection and assigns incrementing segid to each fragment
 

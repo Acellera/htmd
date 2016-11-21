@@ -235,7 +235,7 @@ class FFMolecule(Molecule):
             return ret
         return True
 
-    def fitCharges(self):
+    def fitCharges(self, fixed=[] ):
         # Remove the COM from the coords, or PSI4 does it and then the grid is incorrectly centred
         self._removeCOM()
         # Kick off a QM calculation -- unconstrained single point with grid
@@ -273,6 +273,16 @@ class FFMolecule(Molecule):
         N = len(self._equivalent_atom_groups)  # - 1
         lb = np.ones((N)) * -1.25
         ub = np.ones((N)) * +1.25
+
+        # Fix the charges of the specified atoms to those already set in the 
+        # charge array. Note this also fixes the charges of the atoms in the
+        # same equivalency group.
+        # 
+        for atom in fixed:
+            group = self._equivalent_group_by_atom[ atom ]
+            lb[group] = self.charge[atom] 
+            ub[group] = self.charge[atom] 
+
         # If the restraint relates to an H, set the lower bound to 0
         for i in range(N):
             if "H" == self.element[self._equivalent_atom_groups[i][0]]:
