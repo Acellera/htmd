@@ -1,14 +1,36 @@
-all: TMalign
+CC := $(CC)
+FC := $(FC)
+PLATFORM := $(PLATFORM)
+TYPE := $(TYPE)
 
-TMalign: TMalign.cpp basic_fun.h  Kabsch.h  NW.h TMalign.h
+_SRC:= TMalign
 
-	g++ -static -O3 -ffast-math -lm -o TMalign TMalign.cpp 
+_OBJ := $(patsubst %,obj/$(PLATFORM)/%.o, $(_SRC))
+_SRC := $(patsubst %,src/$(PLATFORM)/%.cpp, $(_SRC))
 
-so: TMalign.cpp basic_fun.h  Kabsch.h  NW.h TMalign.h
-	g++ -c TMalign.cpp -o TMalign.o -g -fPIC -ffast-math -O3 -lm
-	g++ -fPIC --shared TMalign.o -o tmalign.so 
+LDFLAGS :=
+INC_FLAGS :=
+
+.PHONY: clean
+
+all: obj/$(PLATFORM) ../../htmd/lib/$(PLATFORM)/tmalign.so
+
+../../htmd/lib/$(PLATFORM)/tmalign.so: $(_OBJ)
+	$(CC) -fPIC  --shared -o $@  $(_OBJ)
+
+obj/$(PLATFORM)/%.o: %.cpp
+	$(CC) -o $@ -c $< -g -fPIC -ffast-math -O3 -lm
+
+../../htmd/lib/$(PLATFORM):
+	mkdir -p ../../htmd/lib/$(PLATFORM)
+
+obj/$(PLATFORM):
+	mkdir -p obj/$(PLATFORM)
 
 clean:
-	rm -f TMalign
-	rm -f TMalign.o
-	rm -f tmalign.so
+	rm -rf obj/* obj
+
+exe: TMalign.cpp basic_fun.h  Kabsch.h  NW.h TMalign.h
+	$(CC) -static -O3 -ffast-math -lm -o TMalign TMalign.cpp
+
+

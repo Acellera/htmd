@@ -36,7 +36,7 @@
 
 
 
-void PrintErrorAndQuit(char* sErrorString)
+void PrintErrorAndQuit(const char* sErrorString)
 {
 	cout << sErrorString << endl;
 	exit(1);
