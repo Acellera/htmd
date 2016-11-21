@@ -20,17 +20,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class SlurmQueue(SimQueue, ProtocolInterface):
-    """ Queue system for SLURM
+class PBSQueue(SimQueue, ProtocolInterface):
+    """ Queue system for PBS
 
     Parameters
     ----------
     jobname : str, default=None
         Job name (identifier)
-    partition : str, default=None
+    queue : str, default=None
         The queue (partition) to run on
-    priority : str, default='gpu_priority'
-        Job priority
     ngpu : int, default=1
         Number of GPUs to use for a single job
     ncpu : int, default=1
@@ -45,23 +43,18 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         When to send emails. Separate options with commas like 'END,FAIL'.
     mailuser : str, default=None
         User email address.
-    outputstream : str, default='slurm.%N.%j.out'
-        Output stream.
-    errorstream : str, default='slurm.%N.%j.err'
-        Error stream.
 
     Examples
     --------
     >>> from htmd import *
-    >>> s = SlurmQueue()
-    >>> s.partition = 'multiscale'
+    >>> s = PBSQueue()
+    >>> s.queue = 'multiscale'
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
     """
     def __init__(self):
         super().__init__()
         self._cmdString('jobname', 'str', 'Job name (identifier)', None)
-        self._cmdString('partition', 'str', 'The queue (partition) to run on', None)
-        self._cmdString('priority', 'str', 'Job priority', 'gpu_priority')
+        self._cmdString('queue', 'str', 'The queue to run on', None)
         self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('ncpu', 'int', 'Number of CPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 1000, TYPE_INT, RANGE_0POS)
@@ -69,15 +62,14 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
         self._cmdString('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None)
         self._cmdString('mailuser', 'str', 'User email address.', None)
-        self._cmdString('outputstream', 'str', 'Output stream.', 'slurm.%N.%j.out')
-        self._cmdString('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err')  # Maybe change these to job name
+#        self._cmdString('outputstream', 'str', 'Output stream.', 'pbs.%N.%j.out')
+#        self._cmdString('errorstream', 'str', 'Error stream.', 'pbs.%N.%j.err')  # Maybe change these to job name
         self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
         self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
 
         # Find executables
-        self._qsubmit = SlurmQueue._find_binary('sbatch')
-        self._qinfo = SlurmQueue._find_binary('sinfo')
-        self._qcancel = SlurmQueue._find_binary('scancel')
+        self._qsubmit = PBSQueue._find_binary('qsub')
+        self._qcancel = PBSQueue._find_binary('qsdel')
 
         self._dirs = []
 
@@ -94,24 +86,17 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n')
             f.write('#\n')
-            f.write('#SBATCH --job-name={}\n'.format(self.jobname))
-            f.write('#SBATCH --partition={}\n'.format(self.partition))
-            f.write('#SBATCH --gres=gpu:{}\n'.format(self.ngpu))
-            f.write('#SBATCH --cpus-per-task={}\n'.format(self.ncpu))
-            f.write('#SBATCH --mem={}\n'.format(self.memory))
-            f.write('#SBATCH --priority={}\n'.format(self.priority))
-            f.write('#SBATCH --workdir={}\n'.format(workdir))
-            f.write('#SBATCH --output={}\n'.format(self.outputstream))
-            f.write('#SBATCH --error={}\n'.format(self.errorstream))
+            f.write('#PBS -N={}\n'.format(self.jobname))
+            f.write('#PBS -lselect=%d:ncpus=%d:ngpus=%d:mem=%dMB\n' % ( 1, self.ncpus, self.ngpus, self.mem ) )
+            if( self.queue ):
+               f.write("#PBS -q  %s\n" % ( self.queue ) )
+            f.write('#PBS -lwalltime=%d:0:0\n' % ( self.walltime ) )
             if self.environment is not None:
-                f.write('#SBATCH --export={}\n'.format(self.environment))
-            if self.walltime is not None:
-                f.write('#SBATCH --time={}\n'.format(self.walltime))
-            if self.mailtype is not None and self.mailuser is not None:
-                f.write('#SBATCH --mail-type={}\n'.format(self.mailtype))
-                f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
+                f.write('#PBS -v=%s\n' % ( ",".join( self.environment )) )
+
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
+            f.write('\ntouch .done')
 
             # Move completed trajectories
             if self.datadir is not None:
@@ -123,7 +108,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 odir = os.path.join(datadir, simname)
                 os.mkdir(odir)
                 f.write('\nmv *.{} {}'.format(self.trajext, odir))
-            f.write('\ntouch .done')
         os.chmod(fname, 0o700)
 
     def retrieve(self):
@@ -177,43 +161,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 inprogress += 1
         return inprogress
 
-    def __inprogress(self):
-        """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
-
-        Returns
-        -------
-        total : int
-            Total running and queued workunits
-        """
-        import time
-        import getpass
-        if self.partition is None:
-            raise ValueError('The partition needs to be defined.')
-        user = getpass.getuser()
-        cmd = [self._qstatus, '-n', self.jobname, '-u', user, '-p', self.partition]
-        logger.debug(cmd)
-
-        # This command randomly fails so I need to allow it to repeat or it crashes adaptive
-        tries = 0
-        while tries < 3:
-            try:
-                ret = check_output(cmd)
-            except CalledProcessError:
-                if tries == 2:
-                    raise
-                tries += 1
-                time.sleep(3)
-                continue
-            break
-
-        logger.debug(ret.decode("ascii"))
-
-        # TODO: check lines and handle errors
-        l = ret.decode("ascii").split("\n")
-        l = len(l) - 2
-        if l < 0:
-            l = 0  # something odd happened
-        return l
 
     def stop(self):
         """ Cancels all currently running and queued jobs
@@ -229,12 +176,3 @@ class SlurmQueue(SimQueue, ProtocolInterface):
 
 
 
-if __name__ == "__main__":
-    """
-    s=Slurm( name="testy", partition="gpu")
-    s.submit("test/dhfr1" )
-    ret= s.inprogress( debug=False)
-    print(ret)
-    print(s)
-    pass
-    """

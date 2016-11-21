@@ -118,7 +118,6 @@ class LsfQueue(SimQueue, ProtocolInterface):
                     f.write('{}\n'.format(call))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
-            f.write('\ntouch .done')
 
             # Move completed trajectories
             if self.datadir is not None:
@@ -130,6 +129,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
                 odir = os.path.join(datadir, simname)
                 os.mkdir(odir)
                 f.write('\nmv *.{} {}'.format(self.trajext, odir))
+
+            f.write('\ntouch .done')
         os.chmod(fname, 0o700)
 
     def retrieve(self):
