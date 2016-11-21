@@ -9,12 +9,12 @@
 # No redistribution in whole or part
 #
 import os
-import pwd
 import shutil
-from os.path import isdir
-from subprocess import check_output
+import random
+import string
+import numpy as np
+from subprocess import check_output, CalledProcessError
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
-from htmd import UserInterface
 from htmd.queues.simqueue import SimQueue
 import logging
 logger = logging.getLogger(__name__)
@@ -33,7 +33,9 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         Job priority
     ngpu : int, default=1
         Number of GPUs to use for a single job
-    memory : int, default=4000
+    ncpu : int, default=1
+        Number of CPUs to use for a single job
+    memory : int, default=1000
         Amount of memory per job (MB)
     walltime : int, default=None
         Job timeout (s)
@@ -61,7 +63,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('partition', 'str', 'The queue (partition) to run on', None)
         self._cmdString('priority', 'str', 'Job priority', 'gpu_priority')
         self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
-        self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 4000, TYPE_INT, RANGE_0POS)
+        self._cmdValue('ncpu', 'int', 'Number of CPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
+        self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 1000, TYPE_INT, RANGE_0POS)
         self._cmdValue('walltime', 'int', 'Job timeout (s)', None, TYPE_INT, RANGE_POS)
         self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
         self._cmdString('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None)
@@ -72,9 +75,11 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
 
         # Find executables
-        self._sbatch = SlurmQueue._find_binary('sbatch')
-        self._squeue = SlurmQueue._find_binary('squeue')
-        self._scancel = SlurmQueue._find_binary('scancel')
+        self._qsubmit = SlurmQueue._find_binary('sbatch')
+        self._qinfo = SlurmQueue._find_binary('sinfo')
+        self._qcancel = SlurmQueue._find_binary('scancel')
+
+        self._dirs = []
 
     @staticmethod
     def _find_binary(binary):
@@ -92,6 +97,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#SBATCH --job-name={}\n'.format(self.jobname))
             f.write('#SBATCH --partition={}\n'.format(self.partition))
             f.write('#SBATCH --gres=gpu:{}\n'.format(self.ngpu))
+            f.write('#SBATCH --cpus-per-task={}\n'.format(self.ncpu))
             f.write('#SBATCH --mem={}\n'.format(self.memory))
             f.write('#SBATCH --priority={}\n'.format(self.priority))
             f.write('#SBATCH --workdir={}\n'.format(workdir))
@@ -106,6 +112,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
+            f.write('\ntouch .done')
 
             # Move completed trajectories
             if self.datadir is not None:
@@ -131,13 +138,23 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         dist : list
             A list of executable directories.
         """
-        import time
         if isinstance(dirs, str):
-            dirs = [dirs,]
+            dirs = [dirs, ]
+        self._dirs.extend(dirs)
+
+        # Automatic partition
+        if self.partition is None:
+            ret = check_output(self._qinfo)
+            self.partition = ','.join(np.unique([i.split()[0].strip('*')
+                                                 for i in ret.decode('ascii').split('\n')[1:-1]]))
 
         # if all folders exist, submit
         for d in dirs:
             logger.info('Queueing ' + d)
+
+            # Automatic jobname
+            if self.jobname is None:
+                self.jobname = os.path.basename(os.path.abspath(d)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
 
             runscript = os.path.abspath(os.path.join(d, 'run.sh'))
             if not os.path.exists(runscript):
@@ -148,12 +165,19 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)
             try:
-                ret = check_output([self._sbatch, jobscript])
+                ret = check_output([self._qsubmit, jobscript])
                 logger.debug(ret)
             except:
                 raise
 
-    def inprogress(self):
+    def inprogress(self, debug=False):
+        inprogress = 0
+        for i in self._dirs:
+            if not os.path.exists(os.path.join(i, '.done')):
+                inprogress += 1
+        return inprogress
+
+    def __inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
 
         Returns
@@ -161,12 +185,27 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         total : int
             Total running and queued workunits
         """
+        import time
+        import getpass
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
-        user = pwd.getpwuid(os.getuid()).pw_name
-        cmd = [self._squeue, '-n', self.jobname, '-u', user, '-p', self.partition]
+        user = getpass.getuser()
+        cmd = [self._qstatus, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
-        ret = check_output(cmd)
+
+        # This command randomly fails so I need to allow it to repeat or it crashes adaptive
+        tries = 0
+        while tries < 3:
+            try:
+                ret = check_output(cmd)
+            except CalledProcessError:
+                if tries == 2:
+                    raise
+                tries += 1
+                time.sleep(3)
+                continue
+            break
+
         logger.debug(ret.decode("ascii"))
 
         # TODO: check lines and handle errors
@@ -179,10 +218,11 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     def stop(self):
         """ Cancels all currently running and queued jobs
         """
+        import getpass
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
-        user = pwd.getpwuid(os.getuid()).pw_name
-        cmd = [self._scancel, '-n', self.jobname, '-u', user, '-p', self.partition]
+        user = getpass.getuser()
+        cmd = [self._qcancel, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))

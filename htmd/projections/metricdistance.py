@@ -135,7 +135,7 @@ class MetricDistance(Projection):
                     types += [self.metric[:-1]]
                     indexes += [[atm1, atm2]]
                     description += [desc]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
     def _getSelections(self, mol):
         # If they have been pre-calculated return them.
@@ -250,6 +250,39 @@ class MetricDistancePyemma(MetricPyemma):
     def _getMapping(self, mol):
         return self.feat.describe()
 '''
+
+def reconstructContactMap(map, datavec):
+    """ Plots a given vector as a contact map
+
+    Parameters
+    ----------
+    map : np.ndarray 2D
+        The map from a MetricData object
+    datavec : np.ndarray
+        The data we want to plot in a 2D map
+    """
+    map = np.array(map, dtype=int)
+    atomidx = np.unique(map.flatten()).astype(int)
+    mask = np.zeros(max(atomidx)+1, dtype=int)
+    mask[atomidx] = range(len(atomidx))
+
+    # Create a new map which maps from vector indexes to matrix indexes
+    newmap = np.zeros(np.shape(map), dtype=int)
+    newmap[:, 0] = mask[map[:, 0]]
+    newmap[:, 1] = mask[map[:, 1]]
+
+    contactmap = np.zeros((len(atomidx), len(atomidx)))
+    for i in range(len(datavec)):
+        contactmap[newmap[i, 0], newmap[i, 1]] = datavec[i]
+        contactmap[newmap[i, 1], newmap[i, 0]] = datavec[i]
+
+    from matplotlib import pylab as plt
+    plt.imshow(contactmap, interpolation='nearest', aspect='equal')
+    plt.colorbar()
+    #plt.axis('off')
+    #plt.tick_params(axis='x', which='both', bottom='off', top='off', labelbottom='off')
+    #plt.tick_params(axis='y', which='both', left='off', right='off', labelleft='off')
+    plt.show()
 
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule

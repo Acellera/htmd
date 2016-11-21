@@ -24,12 +24,14 @@ class MetricCoordinate(Projection):
         Atomselection for `refmol` from which to align to the reference structure. If None, it defaults to the same as `trajalnstr`.
     centerstr : str, optional
         Atomselection around which to wrap the simulation.
+    pbc : bool
+        Enable or disable coordinate wrapping based on periodic boundary conditions.
 
     Returns
     -------
     metr : MetricCoordinate object
     """
-    def __init__(self, refmol, atomsel, trajalnstr='protein and name CA', refalnstr=None, centerstr='protein'):
+    def __init__(self, refmol, atomsel, trajalnstr='protein and name CA', refalnstr=None, centerstr='protein', pbc=True):
         if refalnstr is None:
             refalnstr = trajalnstr
         self._refmol = refmol
@@ -40,6 +42,7 @@ class MetricCoordinate(Projection):
         self._pc_trajalnsel = None  # pc = Pre-calculated
         self._pc_atomsel = None
         self._pc_centersel = None
+        self.pbc = pbc
 
     def _precalculate(self, mol):
         self._pc_trajalnsel = mol.atomselect(self._trajalnsel)
@@ -61,7 +64,8 @@ class MetricCoordinate(Projection):
         """
         (trajalnsel, atomsel, xxx) = self._getSelections(mol)
 
-        mol.wrap(self._centersel)
+        if self.pbc:
+            mol.wrap(self._centersel)
         mol.align(trajalnsel, refmol=self._refmol, refsel=self._refalnsel)
 
         coords = np.concatenate((mol.coords[atomsel, 0, :], mol.coords[atomsel, 1, :], mol.coords[atomsel, 2, :]))
@@ -108,7 +112,7 @@ class MetricCoordinate(Projection):
                 types += ['coordinate']
                 indexes += [i]
                 description += ['{} coordinate of {} {} {}'.format(xyz, mol.resname[i], mol.resid[i], mol.name[i])]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
 
 if __name__ == "__main__":

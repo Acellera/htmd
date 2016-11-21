@@ -22,6 +22,7 @@ from htmd.projections.gwpca import GWPCA
 from htmd.userinterface import UserInterface
 from htmd.molecule.molecule import Molecule
 from htmd.adaptive.adaptiverun import AdaptiveRun, AdaptiveMD
+from htmd.adaptive.adaptivegoal import AdaptiveGoal
 from htmd.adaptive.adaptive import reconstructAdaptiveTraj
 from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
@@ -46,6 +47,7 @@ from htmd.util import tempname
 from htmd.config import config
 from htmd.clustering.kcenters import KCenter
 from htmd.clustering.regular import RegCluster
+from htmd.queues.local import LocalGPUQueue
 from htmd.queues.slurm import SlurmQueue
 import logging.config
 import htmd
@@ -71,9 +73,12 @@ try:
 except:
     print("HTMD: Logging setup failed")
 
-if not os.getenv("HTMD_NONINTERACTIVE"):
+if not (os.getenv("HTMD_NONINTERACTIVE")):
     check_registration(product='htmd')
     show_news()
     compareVersions()
+
+import progress_reporter.bar.gui as gui  # Disabling pyemma progress widgets
+gui.ipython_notebook_session=False
 
 config()

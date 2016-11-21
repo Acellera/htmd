@@ -37,8 +37,10 @@ class AdaptiveMD(AdaptiveBase):
         Minimum number of running simulations
     nmax : int, default=1
         Maximum number of running simulations
-    nepochs : int, default=100
-        Maximum number of epochs
+    nepochs : int, default=1000
+        Stop adaptive once we have reached this number of epochs
+    nframes : int, default=0
+        Stop adaptive once we have simulated this number of aggregate simulation frames.
     inputpath : str, default='input'
         The directory used to store input folders
     generatorspath : str, default='generators'
@@ -47,6 +49,10 @@ class AdaptiveMD(AdaptiveBase):
         A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations
     updateperiod : float, default=0
         When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
+    coorname : str, default='input.coor'
+        Name of the file containing the starting coordinates for the new simulations
+    lock : bool, default=False
+        Lock the folder while adaptive is ongoing
     datapath : str, default='data'
         The directory in which the completed simulations are stored
     filter : bool, default=True
@@ -57,13 +63,17 @@ class AdaptiveMD(AdaptiveBase):
         The directory in which the filtered simulations will be stored
     projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None
         A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
+    truncation : str, default=None
+        Method for truncating the prob distribution (None, 'cumsum', 'statecut'
+    statetype : str, default='micro'
+        What states (cluster, micro, macro) to use for calculations.
     macronum : int, default=8
         The number of macrostates to produce
     skip : int, default=1
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
         The lagtime used to create the Markov model
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.MiniBatchKMeans'>
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
         Clustering algorithm used to cluster the contacts or distances
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
@@ -100,6 +110,8 @@ class AdaptiveMD(AdaptiveBase):
         self._cmdObject('projection', ':class:`Projection <htmd.projections.projection.Projection>` object',
                         'A Projection class object or a list of objects which will be used to project the simulation '
                         'data before constructing a Markov model', None, Projection)
+        self._cmdString('truncation', 'str', 'Method for truncating the prob distribution (None, \'cumsum\', \'statecut\'', None)
+        self._cmdString('statetype', 'str', 'What states (cluster, micro, macro) to use for calculations.', 'micro')
         self._cmdValue('macronum', 'int', 'The number of macrostates to produce', 8, TYPE_INT, RANGE_POS)
         self._cmdValue('skip', 'int', 'Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame', 1, TYPE_INT, RANGE_POS)
         self._cmdValue('lag', 'int', 'The lagtime used to create the Markov model', 1, TYPE_INT, RANGE_POS)
@@ -111,22 +123,34 @@ class AdaptiveMD(AdaptiveBase):
         self._cmdBoolean('save', 'bool', 'Save the model generated', False)
 
     def _algorithm(self):
+        self._createMSM()
+        if self.nframes != 0 and self._model.data.numFrames >= self.nframes:
+            logger.info('Reached maximum number of frames. Stopping adaptive.')
+            return False
+
+        relFrames = self._getSpawnFrames(self._model, self._model.data)
+        self._writeInputs(self._model.data.rel2sim(np.concatenate(relFrames)))
+        return True
+
+    def _createMSM(self):
         logger.info('Postprocessing new data')
         sims = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
-                           glob(path.join(self.inputpath, '*', '')))
+                       glob(path.join(self.inputpath, '*', '')))
         if self.filter:
             sims = simfilter(sims, self.filteredpath, filtersel=self.filtersel)
 
         metr = Metric(sims, skip=self.skip)
         metr.set(self.projection)
-        
-        #if self.contactsym is not None:
+
+        # if self.contactsym is not None:
         #    contactSymmetry(data, self.contactsym)
 
         if self.ticadim > 0:
             # tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))  # gianni: without project it was tooooo slow
             data = metr.project()
-            ticalag = int(np.ceil(max(2, min(np.min(data.trajLengths)/2, self.ticalag))))  # 1 < ticalag < (trajLen / 2)
+            data.dropTraj()  # Drop before TICA to avoid broken trajectories
+            ticalag = int(
+                np.ceil(max(2, min(np.min(data.trajLengths) / 2, self.ticalag))))  # 1 < ticalag < (trajLen / 2)
             tica = TICA(data, ticalag)
             datadr = tica.project(self.ticadim)
         else:
@@ -139,15 +163,12 @@ class AdaptiveMD(AdaptiveBase):
         if self.save:
             self._model.save('adapt_model_e{}.dat'.format(self._getEpoch()))
 
-        relFrames = self._getSpawnFrames(self._model, datadr)
-        self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))
-
     def _getSpawnFrames(self, model, data):
         p_i = self._criteria(model, self.method)
         (spawncounts, prob) = self._spawn(p_i, self.nmax - self._running)
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
-        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=(data.K < 10))
+        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=True)
         logger.debug('relFrames {}'.format(relFrames))
         return relFrames
 
@@ -164,20 +185,26 @@ class AdaptiveMD(AdaptiveBase):
             ret = P_I[model.macro_ofmicro]*model.msm.stationary_distribution
         return ret
 
-    def _spawn(self, ranking, N, truncated=False):
-        if truncated:
-            idx = np.argsort(ranking)
-            idx = idx[::-1]  # decreasing sort
-            errs = ranking[idx]
-            H = (N * errs / np.cumsum(errs)) < 1
-            ranking[idx[H]] = 0
+    def _spawn(self, ranking, N):
+        if self.truncation is not None and self.truncation.lower() != 'none':
+            if self.truncation == 'cumsum':
+                idx = np.argsort(ranking)
+                idx = idx[::-1]  # decreasing sort
+                errs = ranking[idx]
+                H = (N * errs / np.cumsum(errs)) < 1
+                ranking[idx[H]] = 0
+            if self.truncation == 'statecut':
+                idx = np.argsort(ranking)
+                idx = idx[::-1]  # decreasing sort
+                ranking[idx[N:]] = 0  # Set all states ranked > N to zero.
         prob = ranking / np.sum(ranking)
+        logger.debug('Sampling probabilities {}'.format(prob))
         spawnmicro = np.random.multinomial(N, prob)
         return spawnmicro, prob
 
     def _numClusters(self, numFrames):
         """ Heuristic that calculates number of clusters from number of frames """
-        K = int(max(np.round(0.6 * np.log10(numFrames/1000)*1000+50), 100))  # heuristic
+        K = int(max(np.round(0.6 * np.log10(numFrames / 1000) * 1000 + 50), 100))  # heuristic
         if K > numFrames / 3:  # Ugly patch for low-data regimes ...
             K = int(numFrames / 3)
         return K
@@ -325,10 +352,8 @@ class AdaptiveRun(Adaptive):
             K = int(datadr.numFrames / 3)
 
         datadr.cluster(self.clustmethod(n_clusters=K), mergesmall=5)
-        replacement = False
         if datadr.K < 10:
             datadr.cluster(self.clustmethod(n_clusters=K))
-            replacement = True
 
         model = Model(datadr)
         macronum = self.macronum
@@ -345,7 +370,7 @@ class AdaptiveRun(Adaptive):
         (spawncounts, prob) = self._spawn(p_i, self.nmax-self.running)
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
-        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=replacement)
+        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=True)
         logger.debug('relFrames {}'.format(relFrames))
 
         self._writeInputs(datadr.rel2sim(np.concatenate(relFrames)))

@@ -111,7 +111,7 @@ class MetricRmsd(Projection):
         types = ['rmsd']
         indexes = [np.where(trajrmsdsel)[0]]
         description = ['RMSD to reference structure.']
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
     def _wrapPositions(self, box, pos, centersel):
         if box is None or np.sum(box) == 0:

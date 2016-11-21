@@ -24,11 +24,10 @@ logger = logging.getLogger(__name__)
 def listFiles():
     """ Lists all available AMBER forcefield files
     """
-    try:
-        tleap = check_output(['which', 'tleap'], stderr=DEVNULL).decode('UTF-8').rstrip('\n')
-    except:
+    tleap = shutil.which("tleap")
+    if not tleap:
         raise NameError('tleap not found. You should either have AmberTools or ambermini installed '
-                        '(to install ambermini do: conda install ambermini)')
+                        '(to install ambermini do: conda install ambermini -c acellera)')
 
     amberhome = path.normpath(path.join(path.dirname(tleap), '../'))
 
@@ -38,14 +37,23 @@ def listFiles():
     print('---- Forcefield files list: ' + path.join(amberdir, '') + ' ----')
     for f in ffs:
         print(f)
+
+    # FRCMOD files
+    frcmoddir = path.join(amberhome, 'dat', 'leap', 'parm')
+    ffs = glob(frcmoddir+"/frcmod.*")
+    print('---- Parameter files list: ' + path.join(frcmoddir, '') + ' ----')
+    for f in ffs:
+        print(path.basename(f))
+
     # Extra AMBER FFs on HTMD
-    htmdamberdir = path.join(home(), 'builder', 'amberfiles', '')
+    htmdamberdir = path.abspath(path.join(home(), 'builder', 'amberfiles', ''))
     extraffs = [f + '/' + path.basename(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')[0])
                 for f in os.listdir(htmdamberdir) if os.path.isdir(os.path.join(htmdamberdir, f))
                 and len(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')) == 1]
     print('---- Extra forcefield files list: ' + path.join(htmdamberdir, '') + ' ----')
     for f in extraffs:
         print(f)
+
 
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
@@ -139,8 +147,13 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     # Loading user parameters
     f.write('# Loading parameter files\n')
     for p in param:
-        shutil.copy(p, outdir)
-        f.write('loadamberparams ' + path.basename(p) + '\n')
+        try:
+            shutil.copy(p, outdir)
+            f.write('loadamberparams ' + path.basename(p) + '\n')
+        except:
+            f.write('loadamberparams ' + p + '\n')
+            logger.info("Path {:s} not found, assuming a standard AmberTools file.".
+                        format(p))
     f.write('\n')
 
     # Printing out topologies
@@ -170,6 +183,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.info('Writing PDB file for input to tleap.')
     pdbname = path.join(outdir, 'input.pdb')
+
+    # mol2 files have atomtype, here we only write parts not coming from mol2
     mol.write(pdbname, mol.atomtype == '')
     if not os.path.isfile(pdbname):
         raise NameError('Could not write a PDB file out of the given Molecule.')
@@ -215,20 +230,24 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
 
     molbuilt = None
     if execute:
-        # Source paths of extra dirs
-        htmdamberdir = path.join(home(), 'builder', 'amberfiles')
+        # Source paths of extra dirs (our dirs, not amber default)
+        htmdamberdir = path.abspath(path.join(home(), 'builder', 'amberfiles'))
         sourcepaths = [htmdamberdir]
-        sourcepaths += [path.join(htmdamberdir, path.dirname(f)) for f in ff]
-        extrasource = ''
+        sourcepaths += [path.join(htmdamberdir, path.dirname(f))
+                        for f in ff if path.isfile(path.join(htmdamberdir, f))]
+        extrasource = []
         for p in sourcepaths:
-            extrasource += '-I {} '.format(p)
-        logpath = os.path.abspath('{}/log.txt'.format(outdir))
+            extrasource.append('-I')
+            extrasource.append('{}'.format(p))
+        logpath = os.path.abspath(os.path.join(outdir, 'log.txt'))
         logger.info('Starting the build.')
         currdir = os.getcwd()
         os.chdir(outdir)
         f = open(logpath, 'w')
         try:
-            call([tleap, extrasource, '-f', './tleap.in'], stdout=f)
+            cmd = [tleap, '-f', './tleap.in']
+            cmd[1:1] = extrasource
+            call(cmd, stdout=f)
         except:
             raise NameError('tleap failed at execution')
         f.close()
@@ -262,12 +281,15 @@ def _applyProteinCaps(mol, caps):
     # This is the (horrible) way of adding caps in tleap:
     # For now, this is hardwired for ACE and NME
     # 1. Change one of the hydrogens of the N terminal (H[T]?[123]) to the ACE C atom, giving it a new resid
+    # 1a. If no hydrogen present, create the ACE C atom.
     # 2. Change one of the oxygens of the C terminal ({O,OT1,OXT}) to the NME N atom, giving it a new resid
+    # 2a. If no oxygen present, create the NME N atom.
     # 3. Reorder to put the new atoms first and last
     # 4. Remove the lingering hydrogens of the N terminal and oxygens of the C terminal.
 
     # Define the atoms to be replaced (0 and 1 corresponds to N- and C-terminal caps)
-    terminalatoms = {'ACE': 'H1 H2 H3 HT1 HT2 HT3', 'NME': 'OXT OT1 O'}  # XPLOR names for H[123] and OXT are HT[123] and OT1, respectively.
+    terminalatoms = {'ACE': 'H1 H2 H3 HT1 HT2 HT3', 'NME': 'OXT OT1 O'}  # XPLOR names for H[123] and OXT are HT[123]
+                                                                         # and OT1, respectively.
     capresname = ['ACE', 'NME']
     capatomtype = ['C', 'N']
 
@@ -281,12 +303,15 @@ def _applyProteinCaps(mol, caps):
         if len(mol.atomselect('protein and segid {}'.format(seg), indexes=True)) == 0:
             raise RuntimeError(
                 'Segment {} is not protein. Capping for non-protein segments is not supported.'.format(seg))
-        # Get info on segment and its terminals
-        resids = np.unique(mol.get('resid', sel=segment))
-        terminalids = [segment[0], segment[-1]]
-        terminalresids = [np.min(resids), np.max(resids)]
         # For each cap
         for i, cap in enumerate(caps[seg]):
+            # Get info on segment and its terminals
+            segment = mol.atomselect('segid {}'.format(seg), indexes=True)
+            resids = np.unique(mol.get('resid', sel=segment))
+            terminalids = [segment[0], segment[-1]]
+            terminalresids = [np.min(resids), np.max(resids)]
+            if i == 0:
+                orig_terminalresids = [np.min(resids), np.max(resids)]
             # In case there is no cap defined
             if cap is None or cap == '':
                 logger.warning(
@@ -304,32 +329,51 @@ def _applyProteinCaps(mol, caps):
                 continue
             # Test if the atom to change exists
             termatomsids = mol.atomselect('segid {} and resid "{}" and name {}'.format(seg,
-                                                                                    terminalresids[i],
-                                                                                    terminalatoms[cap]),
+                                                                                       terminalresids[i],
+                                                                                       terminalatoms[cap]),
                                           indexes=True)
             if len(termatomsids) == 0:
-                raise RuntimeError(
-                    'In segment {}, resid {} should have at least one of these atoms: {}. Cannot cap. '
-                    'Capping in AMBER requires one of these atoms on the residues that will be capped. '
-                    'Consider using the proteinPrepare function to prepare to your molecule before '
-                    'building.'.format(seg, terminalresids[i], terminalatoms[cap]))
+                # Create new atom
+                termcaid = mol.atomselect('segid {} and resid "{}" and name CA'.format(seg, terminalresids[i]),
+                                        indexes=True)
+                termcenterid = mol.atomselect('segid {} and resid "{}" and name {}'.format(seg, terminalresids[i],
+                                                                                           capatomtype[-i+1]),
+                                        indexes=True)  # if i=0 => capatomtype[1]; i=1 => capatomtype[0]
+                atom = Molecule()
+                atom.empty(1)
+                atom.record = 'ATOM'
+                atom.name = capatomtype[i]
+                atom.resid = terminalresids[i]-1+2*i
+                atom.resname = cap
+                atom.segid = seg
+                atom.element = capatomtype[i]
+                atom.chain = np.unique(mol.get('chain', sel='segid {}'.format(seg)))
+                atom.coords = mol.coords[termcenterid] + 0.33 * np.subtract(mol.coords[termcenterid],
+                                                                               mol.coords[termcaid])
+                mol.insert(atom, terminalids[i])
+                # newatom = mol.numAtoms - 1
+                logger.info('In segment {}, resid {} had none of these atoms: {}. Capping was performed by creating '
+                            'a new atom for cap construction by tleap.'.format(seg, terminalresids[i],
+                                                                              terminalatoms[cap]))
+            else:
+                # Select atom to change, do changes to cap, and change resid
+                newatom = np.max(termatomsids)
+                mol.set('resname', cap, sel=newatom)
+                mol.set('name', capatomtype[i], sel=newatom)
+                mol.set('element', capatomtype[i], sel=newatom)
+                mol.set('resid', terminalresids[i]-1+2*i, sel=newatom)  # if i=0 => resid-1; i=1 => resid+1
 
-            # Select atom to change, do changes to cap, and change resid
-            atomtomod = np.max(termatomsids)
-            mol.set('resname', cap, sel=atomtomod)
-            mol.set('name', capatomtype[i], sel=atomtomod)
-            mol.set('resid', terminalresids[i]-1+2*i, sel=atomtomod)  # if i=0 => resid-1; i=1 => resid+1
-
-            # Reorder
-            neworder = np.arange(mol.numAtoms)
-            neworder[atomtomod] = terminalids[i]
-            neworder[terminalids[i]] = atomtomod
-            _reorderMol(mol, neworder)
+                # Reorder
+                neworder = np.arange(mol.numAtoms)
+                neworder[newatom] = terminalids[i]
+                neworder[terminalids[i]] = newatom
+                _reorderMol(mol, neworder)
 
         # For each cap
         for i, cap in enumerate(caps[seg]):
             # Remove lingering hydrogens or oxygens in terminals
-            mol.remove('segid {} and resid "{}" and name {}'.format(seg, terminalresids[i], terminalatoms[cap]), _logger=False)
+            mol.remove('segid {} and resid "{}" and name {}'.format(seg, orig_terminalresids[i], terminalatoms[cap]),
+                       _logger=False)
 
 def _defaultProteinCaps(mol):
     # Defines ACE and NME (neutral terminals) as default for protein segments
@@ -374,10 +418,10 @@ def _charmmLipid2Amber(mol):
     begters = np.zeros(natoms, dtype=bool)
     finters = np.zeros(natoms, dtype=bool)
 
-    betabackup = mol.beta.copy()
-
+    # Iterate over the translation dictionary
     mol = mol.copy()
-    mol.set('beta', sequenceID(mol.resid))
+    incrresids = sequenceID((mol.resid, mol.insertion, mol.segid))
+
     for res in resdict.keys():
         molresidx = mol.resname == res
         if not np.any(molresidx):
@@ -404,18 +448,18 @@ def _charmmLipid2Amber(mol):
             if rule.order == rule.natoms - 1 and rule.ter:  # Last atom with ter
                 finters[molatomidx] = True
 
-    betas = np.unique(mol.beta[begs])
-    residuebegs = np.ones(len(betas), dtype=int) * -1
-    residuefins = np.ones(len(betas), dtype=int) * -1
-    for i in range(len(betas)):
-        residuebegs[i] = np.where(mol.beta == betas[i])[0][0]
-        residuefins[i] = np.where(mol.beta == betas[i])[0][-1]
+    uqresids = np.unique(incrresids[begs])
+    residuebegs = np.ones(len(uqresids), dtype=int) * -1
+    residuefins = np.ones(len(uqresids), dtype=int) * -1
+    for i in range(len(uqresids)):
+        residuebegs[i] = np.where(incrresids == uqresids[i])[0][0]
+        residuefins[i] = np.where(incrresids == uqresids[i])[0][-1]
     for i in range(len(residuebegs)):
         beg = residuebegs[i]
         fin = residuefins[i] + 1
         neworder[beg:fin] = neworder[beg:fin] + beg
     idx = np.argsort(neworder)
-    mol.beta = betabackup
+
     _reorderMol(mol, idx)
 
     begters = np.where(begters[idx])[0]  # Sort the begs and ters
@@ -512,7 +556,8 @@ if __name__ == '__main__':
         for f in deletefiles:
             os.remove(f)
 
-    pdbids = ['3PTB']  # , '1A25', '1GZM', '1U5U']
+    # Test with proteinPrepare
+    pdbids = ['3PTB', '1A25', '1GZM']  # '1U5U' out because it has AR0 (no parameters)
     for pid in pdbids:
         np.random.seed(1)
         mol = Molecule(pid)
@@ -528,29 +573,44 @@ if __name__ == '__main__':
         _compareResultFolders(refdir, tmpdir, pid)
         shutil.rmtree(tmpdir)
 
-    # Test protein-ligand building
-    folder = home(dataDir='building-protein-ligand')
-    prot = Molecule(os.path.join(folder, 'trypsin.pdb'))
-    prot.filter('protein')
-    prot = autoSegment2(prot)
-    prot = proteinPrepare(prot)
-    prot1 = prot
-    prot2 = prot.copy()
-    lig1 = Molecule(os.path.join(folder, 'benzamidine.mol2'))
-    lig1.set('segid', 'L')
-    lig2 = Molecule(os.path.join(folder, 'benzamidine.pdb'))
-    lig2.set('segid', 'L')
-    prot1.append(lig1)
-    prot2.append(lig2)
-    smol1 = solvate(prot1)
-    smol2 = solvate(prot2)
-    tmpdir1 = tempname()
-    tmpdir2 = tempname()
-    np.random.seed(1)
-    bmol1 = build(smol1, param=[os.path.join(folder, 'benzamidine.frcmod')], outdir=tmpdir1)
-    np.random.seed(1)
-    bmol2 = build(smol2, topo=[os.path.join(folder, 'benzamidine.prepi')], param=[os.path.join(folder, 'benzamidineprepi.frcmod')], outdir=tmpdir2)
+    # Test without proteinPrepare
+    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+    for pid in pdbids:
+        np.random.seed(1)
+        mol = Molecule(pid)
+        mol.filter('protein')
+        smol = solvate(mol)
+        ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+        tmpdir = tempname()
+        bmol = build(smol, ff=ffs, outdir=tmpdir)
+
+        refdir = home(dataDir=os.path.join('test-amber-build-nopp', pid))
+        _compareResultFolders(refdir, tmpdir, pid)
+        shutil.rmtree(tmpdir)
+
+    # # Test protein-ligand building
+    # folder = home(dataDir='building-protein-ligand')
+    # prot = Molecule(os.path.join(folder, 'trypsin.pdb'))
+    # prot.filter('protein')
+    # prot = autoSegment2(prot)
+    # prot = proteinPrepare(prot)
+    # prot1 = prot
+    # prot2 = prot.copy()
+    # lig1 = Molecule(os.path.join(folder, 'benzamidine.mol2'))
+    # lig1.set('segid', 'L')
+    # lig2 = Molecule(os.path.join(folder, 'benzamidine.pdb'))
+    # lig2.set('segid', 'L')
+    # prot1.append(lig1)
+    # prot2.append(lig2)
+    # smol1 = solvate(prot1)
+    # smol2 = solvate(prot2)
+    # tmpdir1 = tempname()
+    # tmpdir2 = tempname()
+    # np.random.seed(1)
+    # bmol1 = build(smol1, param=[os.path.join(folder, 'benzamidine.frcmod')], outdir=tmpdir1)
+    # np.random.seed(1)
+    # bmol2 = build(smol2, topo=[os.path.join(folder, 'benzamidine.prepi')], param=[os.path.join(folder, 'benzamidineprepi.frcmod')], outdir=tmpdir2)
     # _compareResultFolders(tmpdir1, tmpdir2, 'ben-tryp')
-    shutil.rmtree(tmpdir1)
-    shutil.rmtree(tmpdir2)
+    # shutil.rmtree(tmpdir1)
+    # shutil.rmtree(tmpdir2)
 

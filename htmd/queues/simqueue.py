@@ -35,7 +35,7 @@ class SimQueue(metaclass=ABCMeta):
         import sys
         while self.inprogress() != 0:
             sys.stdout.flush()
-            sleep(1)
+            sleep(5)
 
     @abc.abstractmethod
     def stop(self):

@@ -149,6 +149,8 @@ def simlist(datafolders, molfiles, inputfolders=None):
 
     molnames = dict()
     for mol in molfiles:
+        if not os.path.exists(mol):
+            raise FileNotFoundError('File {} does not exist'.format(mol))
         molnames[_simName(mol)] = mol
 
     if inputfolders:
@@ -156,7 +158,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
         for inputf in inputfolders:
             inputnames[_simName(inputf)] = inputf
 
-    logger.info('Starting listing of simulations.')
+    logger.debug('Starting listing of simulations.')
     sims = []
     keys = natsort.natsorted(datanames.keys())
     i = 0
@@ -185,7 +187,7 @@ def simlist(datafolders, molfiles, inputfolders=None):
         i += 1
         bar.progress()
     bar.stop()
-    logger.info('Finished listing of simulations.')
+    logger.debug('Finished listing of simulations.')
     return np.array(sims, dtype=object)
 
 
@@ -220,16 +222,14 @@ def simfilter(sims, outfolder, filtersel):
     if len(sims) > 0:
         _filterPDBPSF(sims[0], outfolder, filtersel)
 
-    logger.info('Starting filtering of simulations.')
+    logger.debug('Starting filtering of simulations.')
 
-    filtsims = []
-
-    #bar = ProgressBar(len(sims), description='Filtering simlist')
     from htmd.config import _config
-    filtsims = Parallel(n_jobs=_config['ncpus'], verbose=11)(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
-    #bar.stop()
+    from htmd.parallelprogress import ParallelExecutor
+    aprun = ParallelExecutor(n_jobs=_config['ncpus'])
+    filtsims = aprun(total=len(sims), description='Filtering trajectories')(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
 
-    logger.info('Finished filtering of simulations')
+    logger.debug('Finished filtering of simulations')
     return np.array(filtsims)
 
 

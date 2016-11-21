@@ -20,7 +20,7 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 import logging
 logger = logging.getLogger(__name__)
 
-_IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel')
+_IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel', '.done')
 
 
 class AdaptiveBase(ProtocolInterface):
@@ -32,7 +32,8 @@ class AdaptiveBase(ProtocolInterface):
         self._cmdString('project', 'str', 'The name of the project', 'adaptive')
         self._cmdValue('nmin', 'int', 'Minimum number of running simulations', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('nmax', 'int', 'Maximum number of running simulations', 1, TYPE_INT, RANGE_POS)
-        self._cmdValue('nepochs', 'int', 'Maximum number of epochs', 100, TYPE_INT, RANGE_POS)
+        self._cmdValue('nepochs', 'int', 'Stop adaptive once we have reached this number of epochs', 1000, TYPE_INT, RANGE_POS)
+        self._cmdValue('nframes', 'int', 'Stop adaptive once we have simulated this number of aggregate simulation frames.', 0, TYPE_INT, RANGE_0POS)
         self._cmdString('inputpath', 'str', 'The directory used to store input folders', 'input')
         self._cmdString('generatorspath', 'str', 'The directory containing the generators', 'generators')
         self._cmdBoolean('dryrun', 'boolean', 'A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations', False)
@@ -77,7 +78,11 @@ class AdaptiveBase(ProtocolInterface):
                 logger.info(str(self._running) + ' simulations in progress')
 
                 if self._running <= self.nmin:
-                    self._algorithm()
+                    flag = self._algorithm()
+                    if flag is False:
+                        self._unsetLock()
+                        return
+
                     if not self.dryrun:
                         self.app.submit(natsorted(glob(path.join(self.inputpath, 'e' + str(epoch+1) + 's*'))))
                         logger.info('Finished submitting simulations.')

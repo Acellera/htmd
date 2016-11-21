@@ -156,7 +156,7 @@ class MetricSecondaryStructure(Projection):
             types += ['secondary structure']
             indexes += [i]
             description += ['Secondary structure of residue {} {}'.format(mol.resname[i], mol.resid[i])]
-        return DataFrame({'type': types, 'indexes': indexes, 'description': description})
+        return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
 
 def _ssmap(sschar):

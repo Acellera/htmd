@@ -35,15 +35,24 @@ class QMFittingSet:
 
 class FFMolecule(Molecule):
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 basis=BasisSet._6_31G_star, execution=Execution.Inline, qmcode=Code.PSI4, outdir="./"):
+                 basis=BasisSet._6_31G_star, solvent=True, theory=Theory.B3LYP, execution=Execution.Inline, qmcode=Code.PSI4, outdir="./"):
         # filename -- a mol2 format input geometry
         # rtf, prm -- rtf, prm files
         # method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
         self.basis = basis
+        self.theory = theory
+        self.solvent= solvent
+
+        self.solvent_name = "vacuum"
+        if solvent: self.solvent_name="water"
+      
+        if theory == Theory.RHF:   self.theory_name="rhf" 
+        if theory == Theory.B3LYP: self.theory_name="b3lyp" 
+
         if basis == BasisSet._6_31G_star:
             self.basis_name = "6-31g-star"
-        elif basis == BasisSet._cc_pVTZ:
-            self.basis_name = "cc-pVTZ"
+        elif basis == BasisSet._cc_pVDZ:
+            self.basis_name = "cc-pVDZ"
         else:
             raise ValueError("Unknown Basis Set")
 
@@ -96,7 +105,7 @@ class FFMolecule(Molecule):
                 print(" {}".format(self.name[j]), end="")
             print("")
 
-        print("Soft dihedrals:")
+        print("Soft torsions:")
         for i in self._soft_dihedrals:
             for j in i.atoms:
                 print(" {}".format(self.name[j]), end="")
@@ -126,8 +135,11 @@ class FFMolecule(Molecule):
             self.name[i] = t
             self.resname[i] = "MOL"
 
+    def output_directory_name( self ):
+        return self.theory_name + "-" + self.basis_name + "-" + self.solvent_name 
+
     def minimize(self):
-        mindir = os.path.join(self.outdir, "minimize", self.basis_name)
+        mindir = os.path.join(self.outdir, "minimize", self.output_directory_name()) #self.theory_name + "-" + self.basis_name + "-" + self.solvent_name )
         try:
             os.makedirs(mindir, exist_ok=True)
         except:
@@ -135,7 +147,7 @@ class FFMolecule(Molecule):
 
         # Kick off a QM calculation -- unconstrained geometry optimization
         qm = QMCalculation(self, charge=self.netcharge, optimize=True,
-                           directory=mindir, basis=self.basis,
+                           directory=mindir, basis=self.basis, theory=self.theory, solvent=self.solvent,
                            execution=self.execution, code=self.qmcode)
         results = qm.results()
         if results[0].errored:
@@ -208,7 +220,7 @@ class FFMolecule(Molecule):
 
     def _try_load_pointfile(self):
         # Load a point file if one exists from a previous job
-        pointfile = os.path.join(self.outdir, "esp", self.basis_name, "00000", "grid.dat")
+        pointfile = os.path.join(self.outdir, "esp", self.output_directory_name()   , "00000", "grid.dat")
         if os.path.exists(pointfile):
             f = open(pointfile, "r")
             fl = f.readlines()
@@ -223,20 +235,25 @@ class FFMolecule(Molecule):
             return ret
         return True
 
-    def fitCharges(self):
+    def fitCharges(self, fixed=[] ):
         # Remove the COM from the coords, or PSI4 does it and then the grid is incorrectly centred
         self._removeCOM()
         # Kick off a QM calculation -- unconstrained single point with grid
         points = self._try_load_pointfile()
-        espdir = os.path.join(self.outdir, "esp", self.basis_name)
+        espdir = os.path.join(self.outdir, "esp", self.output_directory_name() )
         try:
             os.makedirs(espdir, exist_ok=True)
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(espdir))
 
-        qm = QMCalculation(self, charge=self.netcharge, optimize=False, esp=points,
+        qmcode = self.qmcode
+        if self.qmcode == Code.TeraChem: 
+           print("Charge-fitting requires a feature TeraChem doesn't have yet. Using PSI4 instead")
+           qmcode = Code.PSI4
+
+        qm = QMCalculation(self, charge=self.netcharge, optimize=False, esp=points, theory=self.theory, solvent=self.solvent,
                            directory=espdir, basis=self.basis, execution=self.execution,
-                           code=self.qmcode)
+                           code=qmcode)
         results = qm.results()
         if results[0].errored:
             raise RuntimeError("QM Calculation failed")
@@ -256,6 +273,16 @@ class FFMolecule(Molecule):
         N = len(self._equivalent_atom_groups)  # - 1
         lb = np.ones((N)) * -1.25
         ub = np.ones((N)) * +1.25
+
+        # Fix the charges of the specified atoms to those already set in the 
+        # charge array. Note this also fixes the charges of the atoms in the
+        # same equivalency group.
+        # 
+        for atom in fixed:
+            group = self._equivalent_group_by_atom[ atom ]
+            lb[group] = self.charge[atom] 
+            ub[group] = self.charge[atom] 
+
         # If the restraint relates to an H, set the lower bound to 0
         for i in range(N):
             if "H" == self.element[self._equivalent_atom_groups[i][0]]:
@@ -306,7 +333,7 @@ class FFMolecule(Molecule):
 
         return fit_chisq, results[0].dipole, [dpx, dpy, dpz, dp]
 
-    def getSoftDihedrals(self):
+    def getSoftTorsions(self):
         dd = []
         for d in self._soft_dihedrals:
             dd.append(d.atoms.copy())
@@ -360,7 +387,7 @@ class FFMolecule(Molecule):
     #      x=x+1
     #    return ret
 
-    def fitSoftDihedral(self, phi, geomopt=True):
+    def fitSoftTorsion(self, phi, geomopt=True):
         found = False
         phi_to_fit = None
         frozens = []
@@ -404,14 +431,14 @@ class FFMolecule(Molecule):
 
         dih_name = "%s-%s-%s-%s" % (self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]])
 
-        fitdir = os.path.join(self.outdir, dirname, dih_name, self.basis_name)
+        fitdir = os.path.join(self.outdir, dirname, dih_name, self.output_directory_name()) 
 
         try:
             os.makedirs(fitdir, exist_ok=True)
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(fitdir))
 
-        qmset = QMCalculation(mol, charge=self.netcharge, directory=fitdir, frozen=frozens, optimize=geomopt,
+        qmset = QMCalculation(mol, charge=self.netcharge, directory=fitdir, frozen=frozens, optimize=geomopt, theory=self.theory, solvent=self.solvent,
                               basis=self.basis, execution=self.execution, code=self.qmcode)
 
         ret = self._makeDihedralFittingSetFromQMResults(atoms, qmset.results())
@@ -605,7 +632,7 @@ class FFMolecule(Molecule):
         # print( uses )
 
         # Duplicate the dihedrals types so this modified term is unique
-        print("Duplicating types..")
+#        print("Duplicating types..")
         for i in range(4):
             if not ("x" in self._rtf.type_by_index[phi_to_fit.atoms[i]]):
                 self._duplicateTypeOfAtom(phi_to_fit.atoms[i])
@@ -666,10 +693,10 @@ class FFMolecule(Molecule):
                 c += 1
                 unique_uses.append(u)
             else:
-                print(" Dih %s-%s-%s-%s and %s-%s-%s-%s are equivalent " % (
-                    self._rtf.names[aidx[0]], self._rtf.names[aidx[1]], self._rtf.names[aidx[2]],
-                    self._rtf.names[aidx[3]], self._rtf.names[u[0]], self._rtf.names[u[1]], self._rtf.names[u[2]],
-                    self._rtf.names[u[3]]))
+#                print(" Dih %s-%s-%s-%s and %s-%s-%s-%s are equivalent " % (
+#                    self._rtf.names[aidx[0]], self._rtf.names[aidx[1]], self._rtf.names[aidx[2]],
+#                    self._rtf.names[aidx[3]], self._rtf.names[u[0]], self._rtf.names[u[1]], self._rtf.names[u[2]],
+#                    self._rtf.names[u[3]]))
                 pass
                 #  return(count, uses )
             #    print( c )
@@ -714,7 +741,62 @@ class FFMolecule(Molecule):
         ffe = FFEvaluate(self)
         ffe.evaluate(self.coords)
 
-    def plotDihedralFit(self, fit, show=True):
+    def plotConformerEnergies( self, fits, show=True ):
+        import matplotlib as mpl
+        if not show:
+            mpl.use('Agg')
+        import matplotlib.pyplot as plt
+
+        fh = plt.figure()
+        ax1 = fh.gca()
+       
+        mm_energy = []
+        qm_energy = []
+        for r in fits:
+           mm_energy.extend( r.mm_fitted )
+           qm_energy.extend( r.qm )
+        qm_energy = np.array( qm_energy )
+        mm_energy = np.array( mm_energy )
+
+        qm_energy = qm_energy - min(qm_energy)
+        mm_energy = mm_energy - min(mm_energy)
+
+        qm_energy = qm_energy.reshape( qm_energy.shape[0], 1 )
+        mm_energy = mm_energy.reshape( mm_energy.shape[0], 1 )
+#        print(qm_energy)
+#        print(qm_energy.shape)
+#        print(mm_energy)
+#        print(mm_energy.shape)
+        from sklearn import linear_model
+        regr = linear_model.LinearRegression( fit_intercept=False )
+        regr.fit( qm_energy, mm_energy )
+
+        ax1.set_xlabel( "QM Energy kcal/mol")
+        ax1.set_xlabel( "MM Energy kcal/mol")
+        ax1.set_title( "Conformer Energies  MM vs QM" )
+        ax1.plot(qm_energy, mm_energy ,  color="black", marker="o")
+        ax1.plot(qm_energy, regr.predict(qm_energy), color="red", linewidth=2 )
+
+        if show:
+            plt.show()
+        else:
+            plotdir = os.path.join(self.outdir, "parameters", self.method.name, self.output_directory_name(), "plots")
+            try:
+                os.makedirs(plotdir, exist_ok=True)
+            except:
+                raise OSError('Directory {} could not be created. Check if you have permissions.'.format(plotdir))
+            tf = os.path.join(plotdir, "conformer-energies.svg" ) 
+            plt.savefig(tf, format="svg")
+
+        # Return RMS error, variance and fit coeffients
+        return (
+          np.mean( (regr.predict( qm_energy ) - mm_energy )**2 ),
+          regr.score( qm_energy, mm_energy ),
+          regr.coef_
+        )
+
+
+    def plotTorsionFit(self, fit, show=True):
         import matplotlib as mpl
         if not show:
             mpl.use('Agg')
@@ -727,16 +809,44 @@ class FFMolecule(Molecule):
         ax1.set_xlabel("Phi")
         ax1.set_ylabel("kcal/mol")
         ax1.set_title(fit.name)
-        ax1.plot(fit.phi, fit.qm, label="QM", color="r", marker="o")
-        ax1.plot(fit.phi, fit.mm_original, label="MM Original", color="b", marker="d")
-        #    ax1.plot( fit.phi , fit.mm_zeroed  , label="MM With phi zeroed", color="black", marker="x" )
-        #    ax1.plot( fit.phi , fit.mm_delta   , label="QM-MM target", color="magenta", marker="x" )
-        ax1.plot(fit.phi, fit.mm_fitted, label="MM Fitted", color="g", marker="s")
+
+        x = sorted(fit.phi)
+        plotdata=[]
+        for i in range(len(fit.phi) ):
+           plotdata.append( (fit.phi[i], fit.qm[i] ) )
+        plotdata=sorted(plotdata)
+        plotdatax = [float(i[0]) for i in plotdata]
+        plotdatay = [float(i[1]) for i in plotdata]
+        ax1.plot(plotdatax, plotdatay , label="QM", color="r", marker="o")
+
+        plotdata=[]
+        for i in range(len(fit.phi) ):
+           plotdata.append( (fit.phi[i], fit.mm_original[i] ) )
+        plotdata=sorted(plotdata)
+        plotdatax = [float(i[0]) for i in plotdata]
+        plotdatay = [float(i[1]) for i in plotdata]
+        ax1.plot(plotdatax, plotdatay, label="MM Original", color="b", marker="d")
+
+        plotdata=[]
+        for i in range(len(fit.phi) ):
+           plotdata.append( (fit.phi[i], fit.mm_fitted[i] ) )
+        plotdata=sorted(plotdata)
+        plotdatax = [float(i[0]) for i in plotdata]
+        plotdatay = [float(i[1]) for i in plotdata]
+        ax1.plot(plotdatax, plotdatay, label="MM Fitted", color="g", marker="s")
+
+
+
+        #ax1.plot(fit.phi, fit.qm, label="QM", color="r", marker="o")
+        #ax1.plot(fit.phi, fit.mm_original, label="MM Original", color="b", marker="d")
+        #ax1.plot(fit.phi, fit.mm_fitted, label="MM Fitted", color="g", marker="s")
+        ##    ax1.plot( fit.phi , fit.mm_zeroed  , label="MM With phi zeroed", color="black", marker="x" )
+        ##    ax1.plot( fit.phi , fit.mm_delta   , label="QM-MM target", color="magenta", marker="x" )
         ax1.legend(prop={'size': 8})
         if show:
             plt.show()
         else:
-            plotdir = os.path.join(self.outdir, "parameters", self.method.name, self.basis_name, "plots")
+            plotdir = os.path.join(self.outdir, "parameters", self.method.name, self.output_directory_name(), "plots")
             try:
                 os.makedirs(plotdir, exist_ok=True)
             except:

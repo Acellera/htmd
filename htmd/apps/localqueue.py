@@ -112,6 +112,15 @@ class LocalGPUQueue(App):
 
         return output_run + output_queue
 
+    def wait(self):
+        """ Waits until all simulations have completed.
+        """
+        from time import sleep
+        import sys
+        while self.inprogress() != 0:
+            sys.stdout.flush()
+            sleep(5)
+
     def stop(self):
         self.shutdown = True
 

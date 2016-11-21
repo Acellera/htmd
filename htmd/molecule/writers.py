@@ -314,10 +314,25 @@ def MOL2write(mol, filename):
         print("@<TRIPOS>ATOM", file=f)
         for i in range(mol.coords.shape[0]):
             print("%7d %-8s %9.4f %9.4f %9.4f %-8s  1 %-4s %12.6f" % (
-            i + 1, mol.name[i], mol.coords[i, 0, 0], mol.coords[i, 1, 0], mol.coords[i, 2, 0], mol.atomtype[i], "MOL",
-            mol.charge[i]), file=f)
+            i + 1, mol.name[i], mol.coords[i, 0, mol.frame], mol.coords[i, 1, mol.frame], mol.coords[i, 2, mol.frame],
+            mol.atomtype[i], "MOL", mol.charge[i]), file=f)
 
         print("@<TRIPOS>BOND", file=f)
         for i in range(mol.bonds.shape[0]):
             print("%6d %4d %4d 1" % (i + 1, mol.bonds[i, 0] + 1, mol.bonds[i, 1] + 1), file=f)
         print("", file=f)
+
+
+def GROwrite(mol, filename):
+    import pandas as pd
+    from collections import OrderedDict
+    coor = mol.coords[:, :, mol.frame] / 10  # Convert to nm
+    box = mol.box[:, mol.frame] / 10  # Convert to nm
+    datadict = OrderedDict([('resid', mol.resid), ('resname', mol.resname), ('name', mol.name), ('serial', mol.serial),
+                            ('posx', coor[:, 0]), ('posy', coor[:, 1]), ('posz', coor[:, 2])])
+    a = pd.DataFrame(data=datadict)
+    with open(filename, 'wb') as fh:
+        fh.write(b'Generated with HTMD, t= %f\n' % (mol.fstep * 1000))
+        fh.write(b'%5d\n' % mol.numAtoms)
+        np.savetxt(fh, a.values, '%5d%-5s%5s%5d%8.3f%8.3f%8.3f')
+        fh.write(b'%f %f %f 0 0 0 0 0 0' % (box[0], box[1], box[2]))

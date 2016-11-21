@@ -14,6 +14,7 @@ import platform
 libdir = htmd.home(libDir=True)
 if platform.system() == "Windows":
     ct.cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
+    ct.cdll.LoadLibrary(os.path.join(libdir, "libstdc++-6.dll"))
     if (os.path.exists(os.path.join(libdir, "psprolib.dll"))):
         ct.cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
 

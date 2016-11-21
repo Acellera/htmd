@@ -282,6 +282,7 @@ proc calcforces_endstep { } { }
         """
         self.constraints[atomselect] = factor
 
+
 if __name__ == "__main__":
     import htmd
     eq = Equilibration()

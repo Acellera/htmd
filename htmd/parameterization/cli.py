@@ -3,13 +3,14 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-
+import os
 import argparse
 from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
 from htmd.parameterization.fftype import FFTypeMethod
-from htmd.qm.qmcalculation import BasisSet, Execution, Code
+from htmd.qm.qmcalculation import Theory, BasisSet, Execution, Code
 import sys
-import os
+import numpy as np
+import math
 
 
 def printEnergies(mol):
@@ -39,23 +40,37 @@ def main_parameterize():
     parser.add_argument("-l", "--list", help="List parameterisable torsions", action="store_true", default=False,
                         dest="list")
     parser.add_argument("-c", "--charge", help="Net charge on molecule (default: sum of the partial charges on the "
-                        ".mol2 file)", type=int, default=None, action="store", dest="charge")
+                                               ".mol2 file)", type=int, default=None, action="store", dest="charge")
     parser.add_argument("--rtf", help="Inital RTF parameters (req --prm)", type=str, default=None, dest="rtf")
     parser.add_argument("--prm", help="Inital PRM parameters (req --rtf)", type=str, default=None, dest="prm")
     parser.add_argument("-o", "--outdir", help="Output directory (default: %(default)s)", type=str, default="./",
                         dest="outdir")
-    parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default all)",
-                        action="append", default=None, dest="torsion")
+    parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default: %(default)s)",
+                        default="all", dest="torsion")
     parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=ncpus,
                         dest="ncpus")
     parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
-                        choices=["GAFF", "GAFF2", "CGENFF"], default="CGENFF")
-    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVTZ"],
-                        default="cc-pVTZ", dest="basis")
+                        choices=["GAFF", "GAFF2", "CGENFF", "all"], default="all")
+    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVDZ"],
+                        default="cc-pVDZ", dest="basis")
+    parser.add_argument("--theory", help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
+                        default="B3LYP", dest="theory")
+    parser.add_argument("--vacuum", help="Perform QM calculations in vacuum (default: %(default)s)",
+                        action="store_true", dest="vacuum",
+                        default=False)
+    parser.add_argument("--no-min", help="Do not perform QM minimisation (default: %(default)s)", action="store_true",
+                        dest="nomin", default=False)
+    parser.add_argument("--no-esp", help="Do not perform QM charge fitting (default: %(default)s)", action="store_true",
+                        dest="noesp", default=False)
+    parser.add_argument("--no-torsions", help="Do not perform torsion fitting (default: %(default)s)",
+                        action="store_true", dest="notorsion", default=False)
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
-                        choices=["inline", "LSF", "PBS"], default="inline", dest="exec")
-    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4"], default="PSI4",
-                        dest="qmcode")
+                        choices=["inline", "LSF", "PBS", "Slurm", "AceCloud"], default="inline", dest="exec")
+    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"],
+                        default="PSI4", dest="qmcode")
+    parser.add_argument("--freeze-charge", metavar="A1",
+                        help="Freeze the charge of the named atom (default: %(default)s)", action="append",
+                        default=None, dest="freezeq")
 
     args = parser.parse_args()
 
@@ -71,6 +86,8 @@ def main_parameterize():
         code = Code.Gaussian
     elif args.qmcode == "PSI4":
         code = Code.PSI4
+    elif args.qmcode == "TeraChem":
+        code = Code.TeraChem
     else:
         print("Unknown QM code: {}".format(args.qmcode))
         sys.exit(1)
@@ -81,52 +98,95 @@ def main_parameterize():
         execution = Execution.LSF
     elif args.exec == "PBS":
         execution = Execution.PBS
+    elif args.exec == "Slurm":
+        execution = Execution.Slurm
+    elif args.exec == "AceCloud":
+        execution = Execution.AceCloud
     else:
         print("Unknown execution mode: {}".format(args.exec))
         sys.exit(1)
 
     if args.forcefield == "CGENFF":
-        method = FFTypeMethod.CGenFF_2b6
+        methods = [FFTypeMethod.CGenFF_2b6]
     elif args.forcefield == "GAFF":
-        method = FFTypeMethod.GAFF
+        methods = [FFTypeMethod.GAFF]
     elif args.forcefield == "GAFF2":
-        method = FFTypeMethod.GAFF2
+        methods = [FFTypeMethod.GAFF2]
+    elif args.forcefield == "all":
+        methods = [FFTypeMethod.CGenFF_2b6, FFTypeMethod.GAFF2]
     else:
         print("Unknown initial guess force-field: {}".format(args.forcefield))
         sys.exit(1)
 
     if args.basis == "6-31g-star":
         basis = BasisSet._6_31G_star
-    elif args.basis == "cc-pVTZ":
-        basis = BasisSet._cc_pVTZ
+    elif args.basis == "cc-pVDZ":
+        basis = BasisSet._cc_pVDZ
     else:
         print("Unknown basis {}".format(args.basis))
         sys.exit(1)
 
-    # Just list or parameterize?
+    if args.theory == "RHF":
+        theory = Theory.RHF
+    elif args.theory == "B3LYP":
+        theory = Theory.B3LYP
+    else:
+        print("Unknown theory %s".format(args.theory))
+        sys.exit(1)
+
+    if args.vacuum:
+        solvent = False
+    else:
+        solvent = True
+
+    # Just list torsions?
     if args.list:
         print(" === Listing soft torsions of {} ===\n".format(filename))
-    else:
-        print(" === Parameterizing {} ===\n".format(filename))
-
-    mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                     basis=basis, execution=execution, qmcode=code, outdir=args.outdir)
-    dihedrals = mol.getSoftDihedrals()
-
-    if args.list:
+        mol = FFMolecule(filename=filename, method=methods[0], netcharge=args.charge, rtf=args.rtf, prm=args.prm,
+                         basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code,
+                         outdir=args.outdir)
+        dihedrals = mol.getSoftTorsions()
         print("Detected soft torsions:")
         for d in dihedrals:
             print("\t{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
         sys.exit(0)
 
-    if not args.list:  # Parameterize
+    # Small report
+    print(" === List of arguments used ===\n")
+    for i in vars(args):
+        print('{:>10s}:  {:<10s}'.format(i, str(vars(args)[i])))
 
-        print("\n == Minimizing ==\n")
-        mol.minimize()
+    print("\n === Parameterizing {} ===\n".format(filename))
+    for method in methods:
+        print(" === Fitting for FF %s ===\n" % (method.name))
 
-        print("\n == Charge fitting ==\n")
-        if True:
-            (score, qm_dipole, mm_dipole) = mol.fitCharges()
+        mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
+                         basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code,
+                         outdir=args.outdir)
+        dihedrals = mol.getSoftTorsions()
+
+        if not args.nomin:
+            print("\n == Minimizing ==\n")
+            mol.minimize()
+
+        if not args.noesp:
+            print("\n == Charge fitting ==\n")
+
+            # Select the atoms that are to have frozen charges in the fit
+            fixq = []
+            if args.freezeq:
+                for i in args.freezeq:
+                    found = False
+                    for d in range(len(mol.name)):
+                        if mol.name[d] == i:
+                            ni = d
+                            print("Fixing charge for atom %s to %f" % (i, mol.charge[ni]))
+                            fixq.append(ni)
+                            found = True
+                    if not found:
+                        raise ValueError(" No atom named %s (--freeze-charge)" % i)
+
+            (score, qm_dipole, mm_dipole) = mol.fitCharges(fixed=fixq)
 
             rating = "GOOD"
             if score > 1:
@@ -148,35 +208,74 @@ def main_parameterize():
             print("Dipole Chi^2 score : %f : %s" % (d, rating))
             print("")
 
-        for d in dihedrals:
-            name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
-            if not args.torsion or name in args.torsion:
-                print("\n == Fitting torsion {} ==\n".format(name))
-                try:
-                    ret = mol.fitSoftDihedral(d)
+        # Iterative dihedral fitting
+        if not args.notorsion:
+            print("\n == Torsion fitting ==\n")
 
-                    rating = "GOOD"
-                    if ret.chisq > 10:
-                        rating = "CHECK"
-                    if ret.chisq > 100:
-                        rating = "BAD"
-                    print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
+            scores = np.zeros(len(dihedrals))
+            converged = False
+            iteration = 1
+            while not converged:
+                rets = []
 
-                    fn = mol.plotDihedralFit(ret, show=False)
-                except:
-                    pass
-                    # print(fn)
+                print("\nIteration %d" % iteration)
+
+                last_scores = scores
+                scores = np.zeros(len(dihedrals))
+                idx = 0
+                for d in dihedrals:
+                    name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
+                    if args.torsion == 'all' or name in args.torsion.split(','):
+                        print("\n == Fitting torsion {} ==\n".format(name))
+                        try:
+                            ret = mol.fitSoftTorsion(d)
+                            rets.append(ret)
+
+                            rating = "GOOD"
+                            if ret.chisq > 10:
+                                rating = "CHECK"
+                            if ret.chisq > 100:
+                                rating = "BAD"
+                            print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
+                            scores[idx] = ret.chisq
+                            fn = mol.plotTorsionFit(ret, show=False)
+                        except:
+                            print("Error in fitting")
+                            # raise
+                            scores[idx] = 0.
+                            pass
+                            # print(fn)
+                    idx += 1
+                # print(scores)
+                if iteration > 1:
+                    converged = True
+                    for j in range(len(scores)):
+                        # Check convergence
+                        relerr = (scores[j] - last_scores[j]) / last_scores[j]
+                        convstr = "- converged"
+                        if math.fabs(relerr) > 1.e-2:
+                            convstr = ""
+                            converged = False
+                        print(" Dihedral %d relative error : %f %s" % (j, relerr, convstr))
+
+                iteration += 1
+
+            print(" Fitting converged at iteration %d" % (iteration - 1))
+
+            fit = mol.plotConformerEnergies(rets, show=False)
+            print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
 
         printEnergies(mol)
 
-        paramdir = os.path.join(args.outdir, "parameters", method.name, args.basis)
+        # Output the ff parameters
+        paramdir = os.path.join(args.outdir, "parameters", method.name, mol.output_directory_name())
         print("\n == Output to {} ==\n".format(paramdir))
         try:
             os.makedirs(paramdir, exist_ok=True)
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(paramdir))
 
-        if args.forcefield == "CGENFF":
+        if method.name == "CGenFF_2b6":
             try:
                 mol._rtf.write(os.path.join(paramdir, "mol.rtf"))
                 mol._prm.write(os.path.join(paramdir, "mol.prm"))
@@ -206,13 +305,13 @@ run 0'''
                 f.close()
             except ValueError as e:
                 print("Not writing CHARMM PRM: {}".format(str(e)))
-        elif args.forcefield == "GAFF" or args.forcefield == "GAFF2":
+        elif method.name == "GAFF" or method.name == "GAFF2":
             try:
                 # types need to be remapped because Amber FRCMOD format limits the type to characters
                 # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
                 typemap = mol._prm.writeFrcmod(mol._rtf, os.path.join(paramdir, "mol.frcmod"))
                 for ext in ['coor', 'mol2', 'pdb']:
-                    mol.write(os.path.join(paramdir, "mol." + ext))
+                    mol.write(os.path.join(paramdir, "mol." + ext), typemap=typemap)
                 f = open(os.path.join(paramdir, "tleap.in"), "w")
                 tmp = '''loadAmberParams mol.frcmod
 A = loadMol2 mol.mol2
@@ -247,5 +346,8 @@ run 0'''
 
 
 if __name__ == "__main__":
-    # main_parameterize()  #TODO: separate argparse from the main_parameterize, so it can be called here with arguments (-m and -l)
+    if "TRAVIS_OS_NAME" in os.environ:
+        sys.exit(0)
+
+    main_parameterize()
     sys.exit(0)

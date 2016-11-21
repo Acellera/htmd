@@ -68,29 +68,28 @@ class Kinetics(object):
 
     def _detectSource(self):
         dataobj = self.model.data
-        distcols = []
-        contcols = []
-
-        if not dataobj.map.empty:  # Search for distances or contacts in the data
-            if dataobj.parent is None:
-                distcols = np.where(dataobj.map.type == 'distance')[0]
-                contcols = np.where(dataobj.map.type == 'contact')[0]
-            else:
-                distcols = np.where(dataobj.parent.map.type == 'distance')[0]
-                contcols = np.where(dataobj.parent.map.type == 'contact')[0]
-
-        if len(distcols) == 0 and len(contcols) == 0:
-            raise RuntimeError('Could not detect source state. Please specify it in the Kinetics constructor.')
-
-        if len(distcols) != 0:
-            cols = distcols
-        else:
-            cols = contcols
+        # This is an ordered tuple based on priority
+        supportedProj = ('contact', 'distance', 'rmsd', 'secondary structure')
+        cols = []
+        detectedProj = None
 
         if dataobj.parent is None:
+            mapping = dataobj.map
             data = dataobj.dat
         else:
+            mapping = dataobj.parent.map
             data = dataobj.parent.dat
+
+        if not dataobj.map.empty:  # Search for supported projections in the data
+            for proj in supportedProj:
+                cols = np.where(mapping.type == proj)[0]
+                if len(cols) != 0:
+                    detectedProj = proj
+                    break
+
+        if len(cols) == 0:
+            raise RuntimeError('Could not detect source state. Please specify it in the Kinetics constructor.'
+                               'This class only detects automatic detection for the following metrics. {}'.format(supportedProj))
 
         averages = np.zeros(dataobj.K)
         for i in range(len(dataobj.St)):
@@ -104,12 +103,13 @@ class Kinetics(object):
         avg = averages / dataobj.N
         avg = avg[self.model.cluster_ofmicro]
 
-        if len(contcols) != 0:
-            logger.info('Guessing the source state as the state with minimum contacts.')
+        if detectedProj == 'contact' or detectedProj == 'secondary structure':
+            logger.info('Guessing the source state as the state with minimum {}s.'.format(detectedProj))
             sourcemicro = np.argmin(avg)
-        elif len(distcols) != 0:
-            logger.info('Guessing the source state as the state with maximum distances.')
+        elif detectedProj == 'distance' or detectedProj == 'rmsd':
+            logger.info('Guessing the source state as the state with maximum {}s.'.format(detectedProj))
             sourcemicro = np.argmax(avg)
+        # TODO: I could also detect the source by largest variance
         self.source = self.model.macro_ofmicro[sourcemicro]
         self.sourcemicro = sourcemicro
 
@@ -123,8 +123,8 @@ class Kinetics(object):
         nonsource = np.where(idx != self.source)[0]
         self.sinkmicro = nonsource[np.argmax(self.model.msm.stationary_distribution[nonsource])]
 
-    def getRates(self, source=None, sink=None, states='macro'):
-        """ Get the rates between two states
+    def getRates(self, source=None, sink=None, states='macro', _logger=True):
+        """ Get the rates between two (sets of) states
 
         Parameters
         ----------
@@ -158,43 +158,47 @@ class Kinetics(object):
             source = [source, ]
         if isinstance(sink, numbers.Integral):
             sink = [sink, ]
-        logger.info('Calculating rates between source: {} and sink: {} states.'.format(source, sink))
+        if _logger: logger.info('Calculating rates between source: {} and sink: {} states.'.format(source, sink))
 
         if len(np.intersect1d(source, sink)) != 0:
-            logger.info('Calculating rates between state and itself gives 0')
+            if _logger: logger.info('Calculating rates between state and itself gives 0')
             r = Rates()
             return r
 
         if self.source in source:  # Apply concentration only on the bulk state
             conc = self.concentration
         elif self.source in sink:  # Invert concentration is bulk state is in sink
-            logger.info('Bulk state detected in sink. Applying concentration correction to sink instead of source.')
+            if _logger: logger.info('Bulk state detected in sink. Applying concentration correction to sink instead of source.')
             conc = 1 / self.concentration
         else:
             conc = 1
 
         model = self.model
         if states == 'macro':  # Finding the microstates of the macrostates
-            micros = []
+            eq = model.eqDistribution(plot=False)  # If macro, use the membership probs to calculate eq prob
+            sinkeq = np.sum(eq[sink])  # sink and source might be multiple macros so we have to sum them
+            sourceeq = np.sum(eq[source])
+            sourcemicros = []
             for s in source:
-                micros += list(np.where(model.macro_ofmicro == s)[0])
-            source = micros
-            micros = []
+                sourcemicros += list(np.where(model.macro_ofmicro == s)[0])
+            sinkmicros = []
             for s in sink:
-                micros += list(np.where(model.macro_ofmicro == s)[0])
-            sink = micros
+                sinkmicros += list(np.where(model.macro_ofmicro == s)[0])
+        elif states == 'micro':
+            eq = model.msm.stationary_distribution
+            sinkeq = np.sum(eq[sink])
+            sourceeq = np.sum(eq[source])
+            sourcemicros = source
+            sinkmicros = sink
 
         from msmtools.analysis import mfpt
         r = Rates()
-        r.mfpton = model.data.fstep * model.lag * mfpt(self.model.P, origin=source, target=sink)
-        r.mfptoff = model.data.fstep * model.lag * mfpt(self.model.P, origin=sink, target=source)
+        r.mfpton = model.data.fstep * model.lag * mfpt(self.model.P, origin=sourcemicros, target=sinkmicros)
+        r.mfptoff = model.data.fstep * model.lag * mfpt(self.model.P, origin=sinkmicros, target=sourcemicros)
         r.koff = 1E9 / r.mfptoff
         r.kon = 1E9 / (r.mfpton * conc)
-        eq = model.msm.stationary_distribution
-        sinkeq = np.sum(eq[sink])
-        sourceeq = np.sum(eq[source])
         if conc != 1:
-            logger.info('Concentration correction of {:.2f} kcal/mol.'.format(-self._kBT * np.log(1 / conc)))
+            if _logger: logger.info('Concentration correction of {:.2f} kcal/mol.'.format(-self._kBT * np.log(1 / conc)))
         r.g0eq = -self._kBT * np.log(sinkeq / (conc * sourceeq))
         r.kdeq = np.exp(r.g0eq / self._kBT)
         return r
@@ -224,7 +228,7 @@ class Kinetics(object):
         for m in range(macronum):
             if m == self.source:
                 continue
-            r = self.getRates(source=self.source, sink=m)
+            r = self.getRates(source=self.source, sink=m, _logger=False)
             mfptoff[m] = r.mfptoff
             mfpton[m] = r.mfpton
             dg[m] = r.g0eq
