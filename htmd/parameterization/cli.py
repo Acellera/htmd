@@ -158,6 +158,7 @@ def main_parameterize():
 
     print("\n === Parameterizing {} ===\n".format(filename))
     for method in methods:
+        sys.stdout.flush()
         print(" === Fitting for FF %s ===\n" % (method.name))
 
         mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
@@ -169,6 +170,7 @@ def main_parameterize():
             print("\n == Minimizing ==\n")
             mol.minimize()
 
+        sys.stdout.flush()
         if not args.noesp:
             print("\n == Charge fitting ==\n")
 
@@ -208,6 +210,7 @@ def main_parameterize():
             print("Dipole Chi^2 score : %f : %s" % (d, rating))
             print("")
 
+        sys.stdout.flush()
         # Iterative dihedral fitting
         if not args.notorsion:
             print("\n == Torsion fitting ==\n")
@@ -237,6 +240,7 @@ def main_parameterize():
                             if ret.chisq > 100:
                                 rating = "BAD"
                             print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
+                            sys.stdout.flush()
                             scores[idx] = ret.chisq
                             fn = mol.plotTorsionFit(ret, show=False)
                         except:
