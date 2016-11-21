@@ -19,10 +19,10 @@ INC_FLAGS :=
 all: obj/$(PLATFORM) ../../htmd/lib/$(PLATFORM)/tmalign.so
 
 ../../htmd/lib/$(PLATFORM)/tmalign.so: $(_OBJ)
-	$(CC) -fPIC  --shared -o $@  $(_OBJ)
+	$(CC) -fPIC  --shared -o $@  $(_OBJ) -lm -lstdc++
 
 obj/$(PLATFORM)/%.o: %.cpp
-	$(CC) -o $@ -c $< -g -fPIC -ffast-math -O3 -lm -lstdc++
+	$(CC) -o $@ -c $< -g -fPIC -ffast-math -O3 
 
 ../../htmd/lib/$(PLATFORM):
 	mkdir -p ../../htmd/lib/$(PLATFORM)
