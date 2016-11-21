@@ -78,6 +78,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._qsubmit = SlurmQueue._find_binary('sbatch')
         self._qinfo = SlurmQueue._find_binary('sinfo')
         self._qcancel = SlurmQueue._find_binary('scancel')
+        self._squeue = SlurmQueue._find_binary('squeue')
 
         self._dirs = []
 
@@ -171,11 +172,35 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 raise
 
     def inprogress(self, debug=False):
-        inprogress = 0
-        for i in self._dirs:
-            if not os.path.exists(os.path.join(i, '.done')):
-                inprogress += 1
-        return inprogress
+        import time
+        import getpass
+        if self.partition is None:
+            raise ValueError('The partition needs to be defined.')
+        user = getpass.getuser()
+        cmd = [self._squeue, '-n', self.jobname, '-u', user, '-p', self.partition]
+        logger.debug(cmd)
+
+        # This command randomly fails so I need to allow it to repeat or it crashes adaptive
+        tries = 0
+        while tries < 3:
+            try:
+                ret = check_output(cmd)
+            except CalledProcessError:
+                if tries == 2:
+                    raise
+                tries += 1
+                time.sleep(3)
+                continue
+            break
+
+        logger.debug(ret.decode("ascii"))
+
+        # TODO: check lines and handle errors
+        l = ret.decode("ascii").split("\n")
+        l = len(l) - 2
+        if l < 0:
+            l = 0  # something odd happened
+        return l
 
     def __inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
