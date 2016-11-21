@@ -21,6 +21,7 @@ from htmd.queues.acecloudqueue import AceCloudQueue
 
 from htmd.queues.lsf import LsfQueue
 from htmd.queues.slurm import SlurmQueue
+from htmd.queues.pbs import PBSQueue
 # from htmd.apps.pbs import PBS
 
 
@@ -357,8 +358,8 @@ class QMCalculation:
             execqueue = execution
         # elif execution == Execution.LSF:
         #     execqueue = LsfQueue()
-        # elif execution == Execution.PBS:
-        #     execqueue = PBSQueue(ncpus=self.ncpus, executable=cmd, queue="default")
+        elif execution == Execution.PBS:
+             execqueue = PBSQueue(ncpu=self.ncpus, ngpu=1, memory=4000 )
         elif execution == Execution.Slurm:
             execqueue = SlurmQueue()
             execqueue.ncpu = self.ncpus
