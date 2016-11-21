@@ -5,12 +5,99 @@
 #
 import numpy as np
 from scipy.spatial.distance import cdist
+import ctypes as ct
+import os
+import htmd.home
 import logging
 logger = logging.getLogger(__name__)
+
+libdir = htmd.home(libDir=True)
+tmalignlib = ct.cdll.LoadLibrary(os.path.join(libdir, "tmalign.so"))
+
+
+def molTMscore(mol, ref, selCAmol, selCAref):
+    """ Calculates the TMscore between two Molecules
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        A Molecule containing a single or multiple frames
+    ref : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        A reference Molecule containing a single frame. Will automatically keep only ref.frame.
+    selCAmol : numpy.ndarray
+        An atomselection array of booleans or indexes of the CA atoms for mol
+    selCAref : numpy.ndarray
+        An atomselection array of booleans or indexes of the CA atoms for ref
+
+    Returns
+    -------
+    tmscoreRef : numpy.ndarray
+        TMscore normalized by length of ref
+    rmsd : numpy.ndarray
+        RMSD for all frames
+    """
+    from htmd.builder.builder import sequenceID
+    from htmd.molecule.molecule import _residueNameTable
+
+    def calculateVariables(currmol):
+        res = sequenceID((currmol.resid, currmol.insertion, currmol.segid, currmol.chain))
+        caidx = currmol.name == 'CA'
+        res = np.unique(res)
+        reslen = len(res)
+        res = res.astype(np.int32).ctypes.data_as(ct.POINTER(ct.c_int))
+
+        # Calculate the protein sequence
+        seq = ''.join([_residueNameTable[x] for x in currmol.resname[caidx]])
+        seq = ct.c_char_p(seq.encode('utf-8'))
+
+        # Keep only CA coordinates
+        coords = currmol.coords[caidx, :, :].copy()
+        return reslen, res, seq, coords
+
+    mol = mol.copy()
+    ref = ref.copy()
+    mol.filter(selCAmol, _logger=False)
+    ref.filter(selCAref, _logger=False)
+    ref.dropFrames(keep=ref.frame)
+
+    reslenMOL, residMOL, seqMOL, coordsMOL = calculateVariables(mol)
+    reslenREF, residREF, seqREF, coordsREF = calculateVariables(ref)
+
+    # void tmalign(int xlen, int ylen, int* xresno, int* yresno, char* seqx, char* seqy, float* xcoor, float* ycoor, int nframes, double &TM1, double &TM2, double &rmsd)
+    resTM1 = (ct.c_double * mol.numFrames)()
+    resTM2 = (ct.c_double * mol.numFrames)()
+    resRMSD = (ct.c_double * mol.numFrames)()
+    res = tmalignlib.tmalign(ct.c_int(reslenREF),
+                       ct.c_int(reslenMOL),
+                       residREF,
+                       residMOL,
+                       seqREF,
+                       seqMOL,
+                       coordsREF.ctypes.data_as(ct.POINTER(ct.c_float)),
+                       coordsMOL.ctypes.data_as(ct.POINTER(ct.c_float)),
+                       ct.c_int(mol.numFrames),
+                       ct.byref(resTM1),
+                       ct.byref(resTM2),
+                       ct.byref(resRMSD))
+    return np.ctypeslib.as_array(resTM1), np.ctypeslib.as_array(resRMSD)
 
 
 
 def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
+    """ Calculates the RMSD between two Molecules
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    refmol
+    rmsdsel1
+    rmsdsel2
+
+    Returns
+    -------
+    rmsd : float
+        The RMSD between the two structures
+    """
     dist = mol.coords[rmsdsel1, :, :] - refmol.coords[rmsdsel2, :, :]
     rmsd = np.sqrt(np.mean(np.sum(dist * dist, axis=1), axis=0))
     return np.squeeze(rmsd)
@@ -260,6 +347,21 @@ def drawCube(mi, ma, viewer=None):
 # A test method
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule
+    from htmd.home import home
+    import numpy as np
+    from os import path
     import doctest
-    doctest.testmod(extraglobs={"mol" : Molecule("3PTB")})
+    #doctest.testmod(extraglobs={"mol" : Molecule("3PTB")})
 
+    expectedTMscore = np.array([ 0.21418524,  0.2367377 ,  0.23433833,  0.21362964,  0.20935164,
+        0.20279461,  0.27012895,  0.22675238,  0.21230793,  0.2372011 ])
+    expectedRMSD = np.array([ 3.70322128,  3.43637027,  3.188193  ,  3.84455877,  3.53053882,
+        3.46781854,  2.93777629,  2.97978692,  2.70792428,  2.63051318])
+
+    mol = Molecule(path.join(home(), 'data', 'tmscore', 'filtered.pdb'))
+    mol.read(path.join(home(), 'data', 'tmscore', 'traj.xtc'))
+    ref = Molecule(path.join(home(), 'data', 'tmscore', 'ntl9_2hbb.pdb'))
+    tmscore, rmsd = molTMscore(mol, ref, mol.atomselect('protein'), ref.atomselect('protein'))
+
+    assert np.allclose(tmscore, expectedTMscore)
+    assert np.allclose(rmsd, expectedRMSD)

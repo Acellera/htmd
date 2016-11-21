@@ -1,3 +1,6 @@
+# Example call: (will write to htmd/lib/Linux/pro/)
+# make CC=g++ PLATFORM=Linux TYPE=pro
+
 CC := $(CC)
 FC := $(FC)
 PLATFORM := $(PLATFORM)

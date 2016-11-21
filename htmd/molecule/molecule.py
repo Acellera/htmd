@@ -1248,7 +1248,7 @@ class Molecule:
         if keep != 'all' and drop is not None:
             raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
         if keep != 'all':
-            self.coords = np.array(np.atleast_3d(self.coords[:, :, keep]))  # Copy array. Slices are dangerous with C
+            self.coords = np.atleast_3d(self.coords[:, :, keep]).copy()  # Copy array. Slices are dangerous with C
             self.box = np.array(np.atleast_2d(self.box[:, keep]))
             if self.box.shape[0] == 1:
                 self.box = self.box.T
