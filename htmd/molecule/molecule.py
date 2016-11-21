@@ -32,6 +32,29 @@ class TopologyInconsistencyError(Exception):
         return repr(self.value)
 
 
+_residueNameTable = {'ARG': 'R', 'AR0': 'R',
+                'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HSE': 'H', 'HSD': 'H',
+                'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
+                'ASP': 'D', 'ASH': 'D',
+                'GLU': 'E', 'GLH': 'E',
+                'SER': 'S',
+                'THR': 'T',
+                'ASN': 'N',
+                'GLN': 'Q',
+                'CYS': 'C', 'CYX': 'C',
+                'SEC': 'U',
+                'GLY': 'G',
+                'PRO': 'P',
+                'ALA': 'A',
+                'VAL': 'V',
+                'ILE': 'I',
+                'LEU': 'L',
+                'MET': 'M',
+                'PHE': 'F',
+                'TYR': 'Y',
+                'TRP': 'W'}
+
+
 class Molecule:
     """ Class to manipulate molecular structures.
 
@@ -1180,27 +1203,6 @@ class Molecule:
         '?EEI'
 
         """
-        residueTable = {'ARG': 'R', 'AR0': 'R',
-                        'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HSE': 'H', 'HSD': 'H',
-                        'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
-                        'ASP': 'D', 'ASH': 'D',
-                        'GLU': 'E', 'GLH': 'E',
-                        'SER': 'S',
-                        'THR': 'T',
-                        'ASN': 'N',
-                        'GLN': 'Q',
-                        'CYS': 'C', 'CYX': 'C',
-                        'SEC': 'U',
-                        'GLY': 'G',
-                        'PRO': 'P',
-                        'ALA': 'A',
-                        'VAL': 'V',
-                        'ILE': 'I',
-                        'LEU': 'L',
-                        'MET': 'M',
-                        'PHE': 'F',
-                        'TYR': 'Y',
-                        'TRP': 'W'}
         from htmd.builder.builder import sequenceID
         prot = self.atomselect('protein')
         segs = np.unique(self.segid[prot])
@@ -1220,7 +1222,7 @@ class Molecule:
                     raise AssertionError('Unexpected non-uniqueness of chain, resid, insertion in the sequence.')
                 resname = resname[0]
                 if oneletter:
-                    rescode = residueTable.get(resname, "?")
+                    rescode = _residueNameTable.get(resname, "?")
                     if rescode == "?":
                         logger.warning("Cannot provide one-letter code for non-standard residue %s" % resname)
                 else:
