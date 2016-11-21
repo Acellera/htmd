@@ -113,7 +113,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
-            f.write('\ntouch .done')
 
             # Move completed trajectories
             if self.datadir is not None:
@@ -125,6 +124,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 odir = os.path.join(datadir, simname)
                 os.mkdir(odir)
                 f.write('\nmv *.{} {}'.format(self.trajext, odir))
+            f.write('\ntouch .done')
         os.chmod(fname, 0o700)
 
     def retrieve(self):
@@ -158,6 +158,14 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 self.jobname = os.path.basename(os.path.abspath(d)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
 
             runscript = os.path.abspath(os.path.join(d, 'run.sh'))
+
+            if os.path.exists( os.path.join( d, ".done" ) ):
+              try: 
+                 logger.info( "Removing existing .done  sentinel from %s" % (d))
+                 os.unlink( os.path.join( d, ".done" ) )
+              except: 
+                 logger.info("Cant remove .done sentinel from %s" % (d) )
+
             if not os.path.exists(runscript):
                 raise FileExistsError('File {} does not exist.'.format(runscript))
             if not os.access(runscript, os.X_OK):
