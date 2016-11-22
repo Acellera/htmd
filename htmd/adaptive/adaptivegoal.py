@@ -218,6 +218,8 @@ if __name__ == '__main__':
     import os
     import shutil
     from htmd.util import tempname
+    from joblib import delayed
+    from htmd.home import home
 
     def rmsdgoal(proj):
         return -proj  # Lower RMSDs should give higher score
@@ -239,3 +241,88 @@ if __name__ == '__main__':
     md.goalfunction = rmsdgoal
     # md.app = AcemdLocal()
     # md.run()
+
+    # Some real testing now
+    from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
+    from htmd.projections.metricdistance import MetricSelfDistance
+    import numpy as np
+
+    os.chdir(path.join(home(), 'data', 'test-adaptive'))
+
+    goalProjectionDict = {'ss': MetricSecondaryStructure(),
+                          'contacts': MetricSelfDistance('protein and name CA', metric='contacts', threshold=10),
+                          'ss_contacts': [MetricSecondaryStructure(),
+                                          MetricSelfDistance('protein and name CA', metric='contacts', threshold=10)]}
+
+    def getLongContacts(crystal, long=8):
+        crystalMap = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).getMapping(
+            crystal)
+        indexes = np.vstack(crystalMap.atomIndexes.as_matrix())
+        return crystal.resid[indexes[:, 1]] - crystal.resid[indexes[:, 0]] > long
+
+    def getCrystalSS(crystal):
+        return MetricSecondaryStructure().project(crystal)[0]
+
+    def getCrystalCO(crystal):
+        crystalCO = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).project(
+            crystal)
+        longCO = getLongContacts(crystal)
+        return crystalCO & longCO
+
+    def ssContactGoal(mol, crystal, project=True, crystalSS=None, crystalCO=None):
+        if crystalSS is None:
+            crystalSS = getCrystalSS(crystal)
+        if crystalCO is None:
+            crystalCO = getCrystalCO(crystal)
+
+        if project:
+            projss = goalProjectionDict['ss'].copy().project(mol)
+            projco = goalProjectionDict['contacts'].copy().project(mol)
+        else:
+            projss = mol[:, :len(crystalSS)]
+            projco = mol[:, len(crystalSS):]
+
+        if len(crystalCO) != projco.shape[1]:
+            raise RuntimeError(
+                'Different lengths between crystal {} and traj {} contacts for fileloc {}'.format(len(crystalCO),
+                                                                                                  projco.shape[1],
+                                                                                                  mol.fileloc))
+        if len(crystalSS) != projss.shape[1]:
+            raise RuntimeError(
+                'Different lengths between crystal {} and traj {} SS for fileloc {}'.format(len(crystalSS),
+                                                                                            projss.shape[1],
+                                                                                            mol.fileloc))
+
+        ss_score = np.sum(projss == crystalSS, axis=1) / projss.shape[1]
+        co_score = np.sum(projco[:, crystalCO] == 1, axis=1) / np.sum(crystalCO)  # Predicted conts are True?
+        return 0.6 * ss_score + 0.4 * co_score
+
+    refmol = Molecule('ntl9_2hbb.pdb')
+    crystalSS = getCrystalSS(refmol)
+    crystalCO = getCrystalCO(refmol)
+
+    np.random.seed(10)
+    sl = SlurmQueue()
+    sl.jobname = 'projname'
+    sl.partition = 'fake'
+    ad = AdaptiveGoal()
+    ad.app = sl
+    ad.nmin = 10
+    ad.nmax = 20
+    ad.nepochs = 999999
+    # ad.nframes = nframes['ntl9'] test that as well
+    ad.generatorspath = '../../generators/'
+    ad.projection = MetricSelfDistance('protein and name CA')
+    ad.goalfunction = delayed(ssContactGoal)(refmol, True, crystalSS, crystalCO)
+    ad.statetype = 'micro'
+    ad.truncation = 'cumsum'
+    ad._debug = True
+    ad.nosampledc = True
+    ad.run()
+    assert np.array_equal(np.load('debug.npy'), np.load('ref_nosampledc.npy'))
+
+    # TODO: Make this test work. Seems to ignore the random seed
+    #np.random.seed(10)
+    #ad.nosampledc = False
+    #ad.run()
+    #assert np.array_equal(np.load('debug.npy'), np.load('ref.npy'))
