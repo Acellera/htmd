@@ -27,16 +27,21 @@
 
 using namespace std;
 
-
 #include "basic_fun.h"
 #include "NW.h"
 #include "Kabsch.h"
 #include "TMalign.h"
 
 // This define is necessary to unmangle C++ function names. Bullshit politics involved http://blog.vrplumber.com/b/2007/07/21/ctypes-for-c-is/
-#define DLLEXPORT extern "C"
-// #define DLLEXPORT extern "C" __declspec(dllexport)  The last piece is needed for windows
 // http://wolfprojects.altervista.org/articles/dll-in-c-for-python/
+#ifndef _WINDOWS
+#define DLLEXPORT extern "C"
+#endif
+
+#ifdef _WINDOWS
+#define DLLEXPORT extern "C" __declspec(dllexport)
+#endif
+
 #define Xf(atom, frame, nframes, nf3) atom*nf3+frame
 #define Yf(atom, frame, nframes, nf3) atom*nf3+nframes+frame
 #define Zf(atom, frame, nframes, nf3) atom*nf3+2*nframes+frame
