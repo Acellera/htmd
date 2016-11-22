@@ -162,7 +162,7 @@ class AdaptiveGoal(AdaptiveMD):
             uc = macroAccumulate(model, uc[model.cluster_ofmicro])
 
         # Calculating the directed component
-        dc, dc_conf = self._calculateDirectedComponent(goaldata, model.data.St, model.data.N)
+        dc = self._calculateDirectedComponent(goaldata, model.data.St, model.data.N)
         if self.statetype == 'micro':
             dc = dc[model.cluster_ofmicro]
         if self.statetype == 'macro':
@@ -206,7 +206,7 @@ class AdaptiveGoal(AdaptiveMD):
         goalconcat = np.concatenate(goaldata.dat).flatten()
         stconcat = np.concatenate(St)
         clustermeans = np.bincount(stconcat, goalconcat)
-        return clustermeans / N, goalconcat
+        return clustermeans / N
 
 
 if __name__ == '__main__':
