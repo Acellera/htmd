@@ -137,7 +137,8 @@ class AdaptiveGoal(AdaptiveMD):
             print('Spawning only from top DC conformations without sampling')
             goaldata = self._getGoalData(sims)
             if not self._checkNFrames(goaldata): return False
-            sortedabs = np.argsort(np.concatenate(goaldata.dat))[::-1]
+            datconcat = np.concatenate(goaldata.dat).flatten()
+            sortedabs = np.argsort(datconcat)[::-1]
             self._writeInputs(goaldata.abs2sim(sortedabs[:self.nmax - self._running]))
             return True
 
@@ -202,9 +203,9 @@ class AdaptiveGoal(AdaptiveMD):
         return data
 
     def _calculateDirectedComponent(self, goaldata, St, N):
-        goalconcat = np.concatenate(goaldata.dat)
+        goalconcat = np.concatenate(goaldata.dat).flatten()
         stconcat = np.concatenate(St)
-        clustermeans = np.bincount(stconcat, goalconcat.flatten())
+        clustermeans = np.bincount(stconcat, goalconcat)
         return clustermeans / N, goalconcat
 
 
