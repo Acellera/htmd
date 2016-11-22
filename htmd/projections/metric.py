@@ -17,7 +17,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-
 class Metric:
     """ Class for calculating projections of a simlist.
 
@@ -36,6 +35,18 @@ class Metric:
     >>> metr = Metric(sims)  # doctest: +SKIP
     >>> metr.projection(MetricSelfDistance('protein and name CA', metric='contacts'))  # doctest: +SKIP
     >>> data = metr.project()  # doctest: +SKIP
+    >>>
+    >>> # Or define your own function which accepts as first argument a Molecule object. Further arguments are passed as
+    >>> # function/argument tuples
+    >>> def foo(mol, ref):
+    >>>     from htmd.molecule.util import molRMSD
+    >>>     mol.wrap('protein')
+    >>>     mol.align('protein and name CA', refmol=ref)
+    >>>     return molRMSD(mol, ref, mol.atomselect('protein and name CA'), ref.atomselect('protein and name CA'))
+    >>>
+    >>> metr = Metric(sims)
+    >>> metr.set( (foo, (ref,)) )
+    >>> data2 = metr.project()
 
     .. currentmodule:: htmd.projections.metric.Metric
     .. rubric:: Methods
@@ -62,8 +73,8 @@ class Metric:
 
         Parameters
         ----------
-        projection : :class:`Projection <htmd.projections.projection.Projection>` object or list of objects
-            A projection or a list of projections which to use on the simulations
+        projection : function or :class:`Projection <htmd.projections.projection.Projection>` object or list of objects
+            A function or projection or a list of projections/functions which to use on the simulations
         """
         self.projectionlist = projection
         if not (isinstance(self.projectionlist, list) or isinstance(self.projectionlist, tuple)) \
