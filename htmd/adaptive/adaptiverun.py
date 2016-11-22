@@ -123,22 +123,29 @@ class AdaptiveMD(AdaptiveBase):
         self._cmdBoolean('save', 'bool', 'Save the model generated', False)
 
     def _algorithm(self):
-        self._createMSM()
-        if self.nframes != 0 and self._model.data.numFrames >= self.nframes:
-            logger.info('Reached maximum number of frames. Stopping adaptive.')
-            return False
+        data = self._getData(self._getSimlist())
+        if not self._checkNFrames(data): return False
+        self._createMSM(data)
 
         relFrames = self._getSpawnFrames(self._model, self._model.data)
         self._writeInputs(self._model.data.rel2sim(np.concatenate(relFrames)))
         return True
 
-    def _createMSM(self):
+    def _checkNFrames(self, data):
+        if self.nframes != 0 and data.numFrames >= self.nframes:
+            logger.info('Reached maximum number of frames. Stopping adaptive.')
+            return False
+        return True
+
+    def _getSimlist(self):
         logger.info('Postprocessing new data')
         sims = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
                        glob(path.join(self.inputpath, '*', '')))
         if self.filter:
             sims = simfilter(sims, self.filteredpath, filtersel=self.filtersel)
+        return sims
 
+    def _getData(self, sims):
         metr = Metric(sims, skip=self.skip)
         metr.set(self.projection)
 
@@ -155,11 +162,13 @@ class AdaptiveMD(AdaptiveBase):
             datadr = tica.project(self.ticadim)
         else:
             datadr = metr.project()
-
         datadr.dropTraj()  # Preferably we should do this before any projections. Corrupted sims can affect TICA
-        datadr.cluster(self.clustmethod(n_clusters=self._numClusters(datadr.numFrames)))
-        self._model = Model(datadr)
-        self._model.markovModel(self.lag, self._numMacrostates(datadr))
+        return datadr
+
+    def _createMSM(self, data):
+        data.cluster(self.clustmethod(n_clusters=self._numClusters(data.numFrames)))
+        self._model = Model(data)
+        self._model.markovModel(self.lag, self._numMacrostates(data))
         if self.save:
             self._model.save('adapt_model_e{}.dat'.format(self._getEpoch()))
 

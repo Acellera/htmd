@@ -172,8 +172,10 @@ class AdaptiveBase(ProtocolInterface):
         if len(test) != 0:
             raise NameError('Input dirs of epoch ' + str(epoch) + ' already exists.')
 
+        from htmd.parallelprogress import ParallelExecutor
         from htmd.config import _config
-        Parallel(n_jobs=_config['ncpus'], verbose=11)(
+        aprun = ParallelExecutor(n_jobs=_config['ncpus'])
+        aprun(total=len(simsframes), description='Writing inputs')(
             delayed(_writeInputsFunction)(i, f, epoch, self.inputpath, self.coorname) for i, f in enumerate(simsframes))
 
     @abc.abstractmethod

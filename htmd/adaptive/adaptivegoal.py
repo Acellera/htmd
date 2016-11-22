@@ -131,10 +131,25 @@ class AdaptiveGoal(AdaptiveMD):
         self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
 
     def _algorithm(self):
-        self._createMSM()
-        if self.nframes != 0 and self._model.data.numFrames >= self.nframes:
-            logger.info('Reached maximum number of frames. Stopping adaptive.')
-            return False
+        sims = self._getSimlist()
+
+        if self.nosampledc:
+            print('Spawning only from top DC conformations without sampling')
+            goaldata = self._getGoalData(sims)
+            if not self._checkNFrames(goaldata): return False
+            sortedabs = np.argsort(np.concatenate(goaldata.dat))[::-1]
+            self._writeInputs(goaldata.abs2sim(sortedabs[:self.nmax - self._running]))
+            return True
+
+        data = self._getData(sims)
+        if not self._checkNFrames(data): return False
+        goaldata = self._getGoalData(data.simlist)  # Using the simlist of data in case some trajectories were dropped
+        if len(data.simlist) != len(goaldata.simlist):
+            logger.warning('The goal function was not able to project all trajectories that the MSM projection could.'
+                           'Check for possible errors in the goal function.')
+        data.dropTraj(keepsims=goaldata.simlist)  # Ensuring that I use the intersection of projected simulations
+        self._createMSM(data)
+
         model = self._model
         data = self._model.data
 
@@ -146,7 +161,7 @@ class AdaptiveGoal(AdaptiveMD):
             uc = macroAccumulate(model, uc[model.cluster_ofmicro])
 
         # Calculating the directed component
-        dc, dc_conf = self._calculateDirectedComponent(model.data.simlist, model.data.St, model.data.N)
+        dc, dc_conf = self._calculateDirectedComponent(goaldata, model.data.St, model.data.N)
         if self.statetype == 'micro':
             dc = dc[model.cluster_ofmicro]
         if self.statetype == 'macro':
@@ -159,13 +174,8 @@ class AdaptiveGoal(AdaptiveMD):
 
         reward = dc + self.ucscale * uc
 
-        if not self.nosampledc:
-            relFrames = self._getSpawnFrames(reward, self._model, data)
-            self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
-        else:
-            print('Spawning only from top DC conformations without sampling')
-            sortedabs = np.argsort(dc_conf)[::-1]
-            self._writeInputs(data.abs2sim(sortedabs[:self.nmax - self._running]))
+        relFrames = self._getSpawnFrames(reward, self._model, data)
+        self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
     def _getSpawnFrames(self, reward, model, data):
@@ -183,58 +193,19 @@ class AdaptiveGoal(AdaptiveMD):
             return res
         return (feat - np.min(feat)) / denom
 
-    def _calculateDirectedComponent(self, sims, St, N):
-        from joblib import Parallel, delayed
-        from htmd.util import _getNcpus
-        from htmd.projections.metric import _singleMolfile
-        from htmd.molecule.molecule import Molecule
-        from htmd.config import _config
-
-        logger.debug('Calculating directed component')
-        single, molfile = _singleMolfile(sims)
-        singlemol = None
-        if single:
-            singlemol = Molecule(molfile)
-        logger.debug('Starting parallel')
-        results = Parallel(n_jobs=_config['ncpus'], verbose=6)(delayed(parallelFunction)(s, self.goalfunction, singlemol) for s in sims)
+    def _getGoalData(self, sims):
+        logger.debug('Starting projection of directed component')
+        metr = Metric(sims)
+        metr.set(self.goalfunction)
+        data = metr.project()
         logger.debug('Finished calculating directed component')
+        return data
 
-        goalconcat = np.concatenate(results)
+    def _calculateDirectedComponent(self, goaldata, St, N):
+        goalconcat = np.concatenate(goaldata.dat)
         stconcat = np.concatenate(St)
         clustermeans = np.bincount(stconcat, goalconcat.flatten())
         return clustermeans / N, goalconcat
-
-
-def parallelFunction(sim, goalfunction, singlemol):
-    if singlemol is not None:  # Speeds up by avoiding reading the PDB file multiple times
-        mol = singlemol.copy()
-        mol.read(sim.trajectory)
-    else:
-        mol = Molecule(sim)
-    if hasattr(goalfunction, '__call__'):
-        return goalfunction(mol)
-    elif isinstance(goalfunction, tuple) and hasattr(goalfunction[0], '__call__'):
-        return goalfunction[0](mol, *goalfunction[1])
-
-
-class _AdaptiveGoalOld(AdaptiveGoal):
-    def __init__(self):
-        from htmd.projections.projection import Projection
-        super().__init__()
-        self._cmdObject('goalprojection', ':class:`Projection <htmd.projections.projection.Projection>` object',
-                        'A Projection class object or a list of objects which will be used to project the simulation '
-                        'data. This data will be used for the directed component of FAST.', None, Projection)
-
-    def _calculateDirectedComponent(self, sims, St, N):
-        metr = Metric(sims, skip=self.skip)
-        metr.set(self.goalprojection)
-        clustermeans = np.zeros(len(N))
-        k = 0
-        for proj in _projectionGenerator(metr, _getNcpus()):
-            for pro in proj:
-                clustermeans[:np.max(St[k])+1] += np.bincount(St[k], self.goalfunction(pro[0]).flatten())
-                k += 1
-        return clustermeans / N, None
 
 
 if __name__ == '__main__':
