@@ -66,8 +66,16 @@ class Metric:
             A projection or a list of projections which to use on the simulations
         """
         self.projectionlist = projection
-        if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
-            self.projectionlist = [self.projectionlist]
+        if not (isinstance(self.projectionlist, list) or isinstance(self.projectionlist, tuple)) \
+                and (isinstance(self.projectionlist, Projection) or hasattr(self.projectionlist, '__call__')):
+            self.projectionlist = [self.projectionlist, ]
+        elif isinstance(self.projectionlist, list) or isinstance(self.projectionlist, tuple):
+            if hasattr(self.projectionlist[0], '__call__'):
+                self.projectionlist = [self.projectionlist, ]
+            pass
+        else:
+            raise AttributeError('Metric.set only accepts Projection objects, functions, function/argument tuples or '
+                                 'lists and tuples thereof.')
 
     def getMapping(self, mol):
         """ Returns the description of each projected dimension.
@@ -186,7 +194,7 @@ def _project(proj, target):
         return proj.project(target)
     if hasattr(proj, '__call__'): # If it's a function
         return proj(target)
-    elif isinstance(goalfunction, tuple) and hasattr(goalfunction[0], '__call__'): # If it's a function with extra arguments
+    elif isinstance(proj, tuple) and hasattr(proj[0], '__call__'): # If it's a function with extra arguments
         return proj[0](target, *proj[1])
 
 
