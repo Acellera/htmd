@@ -10,11 +10,11 @@ from abc import ABCMeta
 from htmd.molecule.molecule import Molecule
 from htmd.metricdata import MetricData
 from scipy import stats
+from htmd.projections.projection import Projection
 from joblib import Parallel, delayed
 from htmd.parallelprogress import ParallelExecutor
 import logging
 logger = logging.getLogger(__name__)
-
 
 
 class Metric:
@@ -35,6 +35,18 @@ class Metric:
     >>> metr = Metric(sims)  # doctest: +SKIP
     >>> metr.projection(MetricSelfDistance('protein and name CA', metric='contacts'))  # doctest: +SKIP
     >>> data = metr.project()  # doctest: +SKIP
+    >>>
+    >>> # Or define your own function which accepts as first argument a Molecule object. Further arguments are passed as
+    >>> # function/argument tuples
+    >>> def foo(mol, ref):
+    >>>     from htmd.molecule.util import molRMSD
+    >>>     mol.wrap('protein')
+    >>>     mol.align('protein and name CA', refmol=ref)
+    >>>     return molRMSD(mol, ref, mol.atomselect('protein and name CA'), ref.atomselect('protein and name CA'))
+    >>>
+    >>> metr = Metric(sims)
+    >>> metr.set( (foo, (ref,)) )
+    >>> data2 = metr.project()
 
     .. currentmodule:: htmd.projections.metric.Metric
     .. rubric:: Methods
@@ -61,12 +73,20 @@ class Metric:
 
         Parameters
         ----------
-        projection : :class:`Projection <htmd.projections.projection.Projection>` object or list of objects
-            A projection or a list of projections which to use on the simulations
+        projection : function or :class:`Projection <htmd.projections.projection.Projection>` object or list of objects
+            A function or projection or a list of projections/functions which to use on the simulations
         """
         self.projectionlist = projection
-        if not isinstance(self.projectionlist, list) and not isinstance(self.projectionlist, tuple):
-            self.projectionlist = [self.projectionlist]
+        if not (isinstance(self.projectionlist, list) or isinstance(self.projectionlist, tuple)) \
+                and (isinstance(self.projectionlist, Projection) or hasattr(self.projectionlist, '__call__')):
+            self.projectionlist = [self.projectionlist, ]
+        elif isinstance(self.projectionlist, list) or isinstance(self.projectionlist, tuple):
+            if hasattr(self.projectionlist[0], '__call__'):
+                self.projectionlist = [self.projectionlist, ]
+            pass
+        else:
+            raise AttributeError('Metric.set only accepts Projection objects, functions, function/argument tuples or '
+                                 'lists and tuples thereof.')
 
     def getMapping(self, mol):
         """ Returns the description of each projected dimension.
@@ -86,7 +106,8 @@ class Metric:
             return
         pandamap = pd.DataFrame(columns=('type', 'atomIndexes', 'description'))
         for proj in self.projectionlist:
-            pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
+            if isinstance(proj, Projection):
+                pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
         return pandamap
 
     def project(self):
@@ -99,24 +120,26 @@ class Metric:
                Returns a MetricData object containing the projected data.
         """
         if len(self.projectionlist) == 0:
-            raise NameError('You need to provide projections using the Metric.projection method.')
+            raise RuntimeError('You need to provide projections using the Metric.set method.')
 
+        # Projecting single Molecules
         if isinstance(self.simulations, Molecule):
             data = []
+            mol = self.simulations
             for proj in self.projectionlist:
-                data.append(proj.project(self.simulations))
+                data.append(_project(proj, mol))
             return data
 
         numSim = len(self.simulations)
 
         # Find out if there is a unique molfile. If there is, initialize a single Molecule to speed up calculations
         uqMol = None
-        import pandas as pd
         (single, molfile) = _singleMolfile(self.simulations)
         if single:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
-                proj._precalculate(uqMol)
+                if isinstance(proj, Projection):
+                    proj._precalculate(uqMol)
         else:
             logger.warning('Cannot calculate description of dimensions due to different topology files for each trajectory.')
         mapping = self.getMapping(uqMol)
@@ -177,6 +200,14 @@ class Metric:
         return metrics, ref, updlist, fstep
 
 
+def _project(proj, target):
+    if isinstance(proj, Projection):
+        return proj.project(target)
+    if hasattr(proj, '__call__'): # If it's a function
+        return proj(target)
+    elif isinstance(proj, tuple) and hasattr(proj[0], '__call__'): # If it's a function with extra arguments
+        return proj[0](target, *proj[1])
+
 
 def _highfreqFilter(mol,steps):
     newframes = int(mol.coords.shape[2]/steps)*steps
@@ -198,15 +229,14 @@ def _processSim(sim, projectionlist, uqmol, skip):
         else:
             mol = Molecule(sim.molfile)
         logger.debug(pieces[0])
-       
-       
+
         mol.read(pieces, skip=skip)
         #Gianni testing
         #_highfreqFilter(mol,10)
  
         data = []
         for p in projectionlist:
-            pj = p.project(mol)
+            pj = _project(p, mol)
             if pj.ndim == 1:
                 pj = np.atleast_2d(pj).T
             data.append(pj)
@@ -251,3 +281,26 @@ def _projectionGenerator(metric, ncpus):
 def _projector(metric, i):
     return metric._projectSingle(i)
 
+if __name__ == '__main__':
+    from htmd.molecule.molecule import Molecule
+    from htmd.projections.metricrmsd import MetricRmsd
+
+    # Testing the set method of Metric
+    sims = []
+    ref = Molecule('3PTB')
+    metr = Metric(sims)
+    metr.set(MetricRmsd(ref, 'protein and name CA'))
+    assert len(metr.projectionlist) == 1
+
+    metr.set([MetricRmsd(ref, 'protein and name CA'), MetricRmsd(ref, 'protein and name CA')])
+    assert len(metr.projectionlist) == 2
+
+    def foo(mol, ref):
+        from htmd.molecule.util import molRMSD
+        mol.wrap('protein')
+        mol.align('protein and name CA', refmol=ref)
+        return molRMSD(mol, ref, mol.atomselect('protein and name CA'), ref.atomselect('protein and name CA'))
+
+    metr = Metric(sims)
+    metr.set((foo, (ref,)))
+    assert len(metr.projectionlist) == 1
