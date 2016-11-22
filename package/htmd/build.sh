@@ -7,6 +7,9 @@ printenv
 
 # Compile any C code
 
+if [ "$CC" == "x86_64-w64-mingw32-g++" ]; then
+	PLATFORM=Windows
+fi
 
 T="$PWD"
 for S in "$PWD/C/"*; do
