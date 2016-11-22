@@ -774,7 +774,7 @@ class FFMolecule(Molecule):
         ax1.set_xlabel( "QM Energy kcal/mol")
         ax1.set_xlabel( "MM Energy kcal/mol")
         ax1.set_title( "Conformer Energies  MM vs QM" )
-        ax1.plot(qm_energy, mm_energy ,  color="black", marker="o")
+        ax1.plot(qm_energy, mm_energy ,  color="black", marker="o", linestyle="None")
         ax1.plot(qm_energy, regr.predict(qm_energy), color="red", linewidth=2 )
 
         if show:
