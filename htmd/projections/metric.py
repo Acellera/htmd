@@ -10,6 +10,7 @@ from abc import ABCMeta
 from htmd.molecule.molecule import Molecule
 from htmd.metricdata import MetricData
 from scipy import stats
+from htmd.projections.projection import Projection
 from joblib import Parallel, delayed
 from htmd.parallelprogress import ParallelExecutor
 import logging
@@ -86,7 +87,8 @@ class Metric:
             return
         pandamap = pd.DataFrame(columns=('type', 'atomIndexes', 'description'))
         for proj in self.projectionlist:
-            pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
+            if isinstance(proj, Projection):
+                pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
         return pandamap
 
     def project(self):
@@ -99,24 +101,26 @@ class Metric:
                Returns a MetricData object containing the projected data.
         """
         if len(self.projectionlist) == 0:
-            raise NameError('You need to provide projections using the Metric.projection method.')
+            raise RuntimeError('You need to provide projections using the Metric.set method.')
 
+        # Projecting single Molecules
         if isinstance(self.simulations, Molecule):
             data = []
+            mol = self.simulations
             for proj in self.projectionlist:
-                data.append(proj.project(self.simulations))
+                data.append(_project(proj, mol))
             return data
 
         numSim = len(self.simulations)
 
         # Find out if there is a unique molfile. If there is, initialize a single Molecule to speed up calculations
         uqMol = None
-        import pandas as pd
         (single, molfile) = _singleMolfile(self.simulations)
         if single:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
-                proj._precalculate(uqMol)
+                if isinstance(proj, Projection):
+                    proj._precalculate(uqMol)
         else:
             logger.warning('Cannot calculate description of dimensions due to different topology files for each trajectory.')
         mapping = self.getMapping(uqMol)
@@ -177,6 +181,14 @@ class Metric:
         return metrics, ref, updlist, fstep
 
 
+def _project(proj, target):
+    if isinstance(proj, Projection):
+        return proj.project(target)
+    if hasattr(proj, '__call__'): # If it's a function
+        return proj(target)
+    elif isinstance(goalfunction, tuple) and hasattr(goalfunction[0], '__call__'): # If it's a function with extra arguments
+        return proj[0](target, *proj[1])
+
 
 def _highfreqFilter(mol,steps):
     newframes = int(mol.coords.shape[2]/steps)*steps
@@ -198,15 +210,14 @@ def _processSim(sim, projectionlist, uqmol, skip):
         else:
             mol = Molecule(sim.molfile)
         logger.debug(pieces[0])
-       
-       
+
         mol.read(pieces, skip=skip)
         #Gianni testing
         #_highfreqFilter(mol,10)
  
         data = []
         for p in projectionlist:
-            pj = p.project(mol)
+            pj = _project(p, mol)
             if pj.ndim == 1:
                 pj = np.atleast_2d(pj).T
             data.append(pj)

@@ -34,7 +34,11 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     tmscoreRef : numpy.ndarray
         TMscore normalized by length of ref
     rmsd : numpy.ndarray
-        RMSD for all frames
+        RMSD only OF COMMON RESIDUES for all frames. This is not the same as a full protein RMSD!!!
+
+    Examples
+    --------
+    tmscore, rmsd = molTMscore(mol, ref, mol.atomselect('protein'), ref.atomselect('protein'))
     """
     from htmd.builder.builder import sequenceID
     from htmd.molecule.molecule import _residueNameTable
