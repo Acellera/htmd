@@ -129,6 +129,7 @@ class AdaptiveGoal(AdaptiveMD):
                           'can be used for the directed component of FAST.', None)
         self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component.', 1, TYPE_FLOAT, RANGE_ANY)
         self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
+        self._debug = False
 
     def _algorithm(self):
         sims = self._getSimlist()
@@ -139,6 +140,7 @@ class AdaptiveGoal(AdaptiveMD):
             if not self._checkNFrames(goaldata): return False
             datconcat = np.concatenate(goaldata.dat).flatten()
             sortedabs = np.argsort(datconcat)[::-1]
+            if self._debug: np.save('debug.npy', sortedabs[:self.nmax - self._running]); return True
             self._writeInputs(goaldata.abs2sim(sortedabs[:self.nmax - self._running]))
             return True
 
@@ -176,6 +178,7 @@ class AdaptiveGoal(AdaptiveMD):
         reward = dc + self.ucscale * uc
 
         relFrames = self._getSpawnFrames(reward, self._model, data)
+        if self._debug: np.save('debug.npy', relFrames); return True
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
