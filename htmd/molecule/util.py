@@ -71,7 +71,7 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     resTM1 = (ct.c_double * mol.numFrames)()
     resTM2 = (ct.c_double * mol.numFrames)()
     resRMSD = (ct.c_double * mol.numFrames)()
-    res = tmalignlib.tmalign(ct.c_int(reslenREF),
+    tmalignlib.tmalign(ct.c_int(reslenREF),
                        ct.c_int(reslenMOL),
                        residREF,
                        residMOL,
@@ -83,8 +83,9 @@ def molTMscore(mol, ref, selCAmol, selCAref):
                        ct.byref(resTM1),
                        ct.byref(resTM2),
                        ct.byref(resRMSD))
-    return np.ctypeslib.as_array(resTM1), np.ctypeslib.as_array(resRMSD)
-
+    resTM1 = np.ctypeslib.as_array(resTM1)
+    resRMSD = np.ctypeslib.as_array(resRMSD)
+    return resTM1.astype(np.float32), resRMSD.astype(np.float32)
 
 
 def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
