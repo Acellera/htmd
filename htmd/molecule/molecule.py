@@ -1565,3 +1565,15 @@ if __name__ == "__main__":
                 print(m.resname[s])
     print('done')
 
+    # Checking bonds
+    ref = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
+    ref.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
+    ref.coords = np.atleast_3d(ref.coords[:, :, 0])
+    len1 = len(ref._guessBonds())
+    ref.coords = np.array(ref.coords, dtype=np.float32)
+    len3 = len(ref._guessBonds())
+    print(len1)
+    print(len3)
+    assert len1 == 4562
+    assert len3 == 4562
+
