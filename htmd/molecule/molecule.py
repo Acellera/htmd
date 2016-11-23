@@ -1385,8 +1385,8 @@ class Representations:
     >>> mol.reps.add('protein', 'NewCartoon')
     >>> print(mol.reps)                     # doctest: +NORMALIZE_WHITESPACE
     rep 0: sel='protein', style='NewCartoon', color='Name'
-    >>> mol.view()
-    >>> mol.reps.remove()
+    >>> mol.view() # doctest: +SKIP
+    >>> mol.reps.remove() # doctest: +SKIP
     """
 
     def __init__(self, mol):
@@ -1551,4 +1551,17 @@ if __name__ == "__main__":
     # Testing DCD reader
     mol = Molecule(os.path.join(home(), 'data', '1kdx', '1kdx_0.pdb'))
     mol.read(os.path.join(home(), 'data', '1kdx', '1kdx.dcd'))
+
+    # Testing atomselect
+    for pdb in ["1gmi.pdb", "1hod.pdb", "1w7b.pdb", "1zec.pdb", "2dhi.pdb", "2lzp.pdb", "2x72.pdb"]:
+        print(pdb)
+        m = Molecule(os.path.join(home(), 'data', 'test-atomselect', pdb))
+        for v in ["P", "P1", "P2", "P3", "P4"]:
+            s = m.atomselect("segid " + v + " and not protein", indexes=True)
+            if len(s):
+                print(v)
+                print(s)
+                print(m.name[s])
+                print(m.resname[s])
+    print('done')
 
