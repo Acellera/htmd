@@ -106,9 +106,9 @@ if __name__ == "__main__":
     from htmd.simlist import simlist
     from htmd.projections.metric import Metric
     dd = home(dataDir="adaptive")
-    fsims = simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
-                         dd + '/generators/1/structure.pdb')
-    ref = Molecule(dd+"/generators/1/structure.pdb")
+    fsims = simlist([path.join(dd, 'data', 'e1s1_1'), path.join(dd, 'data', 'e1s2_1')],
+                    path.join(dd, 'generators', '1', 'structure.pdb'))
+    ref = Molecule(path.join(dd, 'generators', '1', 'structure.pdb'))
 
     metr2 = Metric(fsims)
     metr2.projection(MetricTMscore(ref, 'protein and name CA'))
