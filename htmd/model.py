@@ -549,15 +549,17 @@ class Model(object):
                      7: '#33cc33', 8: '#ffffff', 9: '#ff3399', 10: '#33ccff'}
         if protein is None and ligand is None:
             raise NameError('Please provide either the "protein" or "ligand" parameter for viewStates.')
-        if protein:
-            mol = Molecule()
-        if ligand:
-            mol = mols[0].copy()
-            mol.remove(ligand, _logger=False)
-            mol.coords = np.atleast_3d(mol.coords[:, :, 0])
         k = 0
+        from nglview import NGLWidget, HTMDTrajectory
+        view = NGLWidget(gui=gui)
+        ref = mols[0].copy()
         for i, s in enumerate(states):
+            if protein:
+                mol = Molecule()
             if ligand:
+                mol = ref.copy()
+                mol.remove(ligand, _logger=False)
+                mol.coords = np.atleast_3d(mol.coords[:, :, 0])
                 mols[i].filter(ligand, _logger=False)
             mols[i].set('chain', '{}'.format(s))
             tmpcoo = mols[i].coords
@@ -567,30 +569,26 @@ class Model(object):
                     mols[i].set('segid', sequenceID(mols[i].resid)+k)
                     k = int(mols[i].segid[-1])
                 mol.append(mols[i])
-
-        w = mol.view(viewer='ngl', gui=gui, guessBonds=False)
-        reps = []
-        if ligand:
-            # w.add_cartoon('protein', color='sstruc')
-            reps.append({"type": 'cartoon', "params": {"sele": 'protein', "color": 'sstruc'}})
-        for i, s in enumerate(states):
-            if protein:
-                #w.add_cartoon(':{}'.format(s), color='residueindex')
-                reps.append({"type": 'cartoon', "params": {"sele": ':{}'.format(s), "color": 'residueindex'}})
+            view.add_trajectory(HTMDTrajectory(mol))
+            # Setting up representations
             if ligand:
-                #w.add_hyperball(':{}'.format(s), color=hexcolors[np.mod(i, len(hexcolors))])
-                reps.append({"type": 'hyperball', "params": {"sele": ':{}'.format(s), "color": hexcolors[np.mod(i, len(hexcolors))]}})
-        w.representations = reps  # Late assignment of reps to update the view
-        self._nglButtons(w, statetype, states)
-        return w
+                #view[-1].add_cartoon('protein')#, color='sstruc')
+                #view[-1].add_hyperball(':{}'.format(s))#, color=hexcolors[np.mod(i, len(hexcolors))])
+                pass
+            if protein:
+                view[-1].add_cartoon('protein', color='residueindex')
+            mol.write('/tmp/test{}.pdb'.format(s))
+
+        self._nglButtons(view, statetype, states)
+
+        view[0].add_cartoon('protein')  # , color='sstruc')
+        view[0].add_hyperball(':{}'.format(0))  # , color=hexcolors[np.mod(i, len(hexcolors))])
+        return view
 
     def _nglButtons(self, ngl_widget, statetype, states):
         # Adds buttons for enabling and disabling macrostate visualizations
         import ipywidgets
         from IPython.display import display
-        originalreps = ngl_widget.representations.copy()
-        otherreps = originalreps[:-len(states)]
-        originalreps = originalreps[-len(states):]
 
         container = []
         for s in states:
@@ -599,12 +597,11 @@ class Model(object):
             container.append(w)
 
         def updateReps(name):
-            #ngl_widget.isClick = True
-            reps = otherreps.copy()
+            on = []
             for i, w in enumerate(container):
                 if w.value:
-                    reps.append(originalreps[i])
-            ngl_widget.representations = reps
+                    on.append(i)
+            ngl_widget.show_only(on)
 
         for w in container:
             w.on_trait_change(updateReps, "value")

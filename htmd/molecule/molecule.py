@@ -1019,33 +1019,8 @@ class Molecule:
         return widget
 
     def _viewNGL(self, gui=False):
-        from nglview import Trajectory
+        from nglview import HTMDTrajectory
         import nglview
-
-        # Subclassing http://arose.github.io/nglview/latest/_modules/nglview.html#FileStructure
-        # If issues occur check the class definition. Method names might have changed
-        class HTMDTrajectory(Trajectory):
-            def __init__(self, mol):
-                super().__init__()
-                self.mol = mol
-                self.ext = "pdb"
-                self.params = {}
-
-            def get_coordinates(self, index):
-                return np.squeeze(self.mol.coords[:, :, index])
-
-            @property
-            def n_frames(self):
-                return self.mol.numFrames
-
-            def get_structure_string(self):
-                import tempfile
-                fd, fname = tempfile.mkstemp(suffix='.pdb')
-                self.mol.write(fname)
-                pdb_string = os.fdopen(fd).read()
-                # os.close( fd )
-                return pdb_string
-
         traj = HTMDTrajectory(self)
         w = nglview.NGLWidget(traj, gui=gui)
 
