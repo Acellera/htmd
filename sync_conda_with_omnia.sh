@@ -22,6 +22,9 @@ except:
 
 # Add packages to sync in this list here
 
+# Don't sync pcmsolver -- we have modified this
+#  "psi4:pcmsolver",
+
 for p in [ 
 	"omnia:fftw3f",
 	"omnia:openmm",
@@ -35,7 +38,6 @@ for p in [
 	"omnia:progress_reporter",
 	"omnia:pyemma",
 	"omnia:thermotools",
-  "psi4:pcmsolver",
   "psi4:dftd3",
   "bioconda:nglview"
 	]:
