@@ -1,14 +1,10 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
-# All Rights Reserved
-# Distributed under HTMD Software License Agreement
-# No redistribution in whole or part
-#
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
-# All Rights Reserved
-# Distributed under HTMD Software License Agreement
-# No redistribution in whole or part
-#
 #!/usr/bin/env python3
+# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
+
 # -*- coding: utf-8 -*-
 #
 # HTMD documentation build configuration file, created by
