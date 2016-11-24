@@ -36,7 +36,8 @@ for p in [
 	"omnia:pyemma",
 	"omnia:thermotools",
   "psi4:pcmsolver",
-  "psi4:dftd3"
+  "psi4:dftd3",
+  "bioconda:nglview"
 	]:
 
 	pp=p.split( ":" )

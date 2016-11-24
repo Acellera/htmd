@@ -180,6 +180,4 @@ class PBSQueue(SimQueue, ProtocolInterface):
 
 
 if __name__ == "__main__":
- q = PBSQueue()
- q.submit(".")
- q.wait()
+  pass
