@@ -97,7 +97,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#\n')
             f.write('#SBATCH --job-name={}\n'.format(self.jobname))
             f.write('#SBATCH --partition={}\n'.format(self.partition))
-            f.write('#SBATCH --gres=gpu:{}\n'.format(self.ngpu))
+            if self.ngpu != 0:
+                f.write('#SBATCH --gres=gpu:{}\n'.format(self.ngpu))
             f.write('#SBATCH --cpus-per-task={}\n'.format(self.ncpu))
             f.write('#SBATCH --mem={}\n'.format(self.memory))
             f.write('#SBATCH --priority={}\n'.format(self.priority))
