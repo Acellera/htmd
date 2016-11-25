@@ -539,7 +539,7 @@ class QMCalculation:
             data["dipole"] = dipole
             return data
         except:
-            raise
+         #   raise
             return None
 
     def _read_psi4(self, dirname):
