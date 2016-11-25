@@ -3,11 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-# (c) 2015 Acellera Ltd
-# All Rights Reserved
-# Distributed under HTMD Software Academic License Agreement v1.0
-# No redistribution in whole or part
-#
 import os
 import shutil
 import random

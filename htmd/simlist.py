@@ -3,7 +3,6 @@ HTMD can handle a large amount of simulations.
 Simulation lists allow to create a simple list containing all relevant information about the simulations to later
 perform any type of analysis.
 """
-
 # (c) 2015-2016 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement

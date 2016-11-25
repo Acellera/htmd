@@ -1,18 +1,13 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
-# All Rights Reserved
-# Distributed under HTMD Software License Agreement
-# No redistribution in whole or part
-#
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
-# All Rights Reserved
-# Distributed under HTMD Software License Agreement
-# No redistribution in whole or part
-#
 """Sphinx ReadTheDocs theme.
 
 From https://github.com/ryan-roemer/sphinx-bootstrap-theme.
 
 """
+# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 import os
 
 VERSION = (0, 1, 7)
