@@ -26,6 +26,7 @@ exclusion = './test_license_headers'
 
 for root, dirs, files in os.walk('.'):
     for i, fname in enumerate([os.path.join(root, file) for file in files if exclusion not in root]):
+      try:
         if fname.endswith(('.py', '.sh')):
             # find all consecutive comment lines that include a flag string (exclude shebang lines that come before)
             headerlines = []
@@ -109,3 +110,5 @@ for root, dirs, files in os.walk('.'):
                             for line in diff2:
                                 sys.stdout.write(line)
             print(''.join('=' for _ in range(70)))
+      except:
+         print("Failed to process %s" %(fname))
