@@ -1,6 +1,6 @@
 #include "math.h"
 #include "string.h"
-#if PLATFORM==Linux
+#ifdef PLATFORM_Linux
 __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 #endif
 
