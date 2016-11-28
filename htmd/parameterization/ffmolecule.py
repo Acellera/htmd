@@ -603,14 +603,22 @@ class FFMolecule(Molecule):
         for q in results:
             if q.completed and not q.errored:
                 if (q.energy - qmin) < 20.:  # Only fit against QM points < 20kcal above the minimum
-                    completed += 1
-                    ret.phi.append(getPhi(q.coords, atoms))
+                    mmeval = ffe.evaluate(q.coords)
+                    if mmeval["vdw"]<200:
+                      completed += 1
+                      phi = getPhi(q.coords,	atoms );
 
-                    ret.qm.append(q.energy - qmin)
-                    ret.mm_original.append(ffe.evaluate(q.coords)['total'])
-                    ret.coords.append(q.coords)
-                    if ret.phi[0] > 175.:
-                        ret.phi[0] -= 360.
+                      ret.qm.append(q.energy - qmin)
+                      ret.mm_original.append( mmeval['total'])
+                      ret.coords.append(q.coords)
+                      if phi > 180.:
+                          phi = phi - 360.
+                      ret.phi.append(phi)
+                    else:
+                       print("Omitting optimised pose for phi=%f (MM VDW too high)" %(phi) )
+                else:
+                       print("Omitting optimised pose for phi=%f (QM energy too high)" %(phi) )
+
         mmin = min(ret.mm_original)
         # roughly align the qm with the mm
         for q in range(completed):
