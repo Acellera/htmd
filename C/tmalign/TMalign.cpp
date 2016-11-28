@@ -1,3 +1,9 @@
+#include "math.h"
+#include "string.h"
+
+__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+
+
 /*
 ===============================================================================
    This is a re-implementation of TM-align algorithm in C/C++. The code was 
