@@ -48,7 +48,7 @@ def molTMscore(mol, ref, selCAmol, selCAref):
         caidx = currmol.name == 'CA'
         res = np.unique(res)
         reslen = len(res)
-        res2 = res.astype(np.int32).ctypes.data_as(ct.POINTER(ct.c_int))
+        res2 = res.astype(np.int32).ctypes.data_as(ct.POINTER(ct.c_int32))
 
         # Calculate the protein sequence
         seq = ''.join([_residueNameTable[x] for x in currmol.resname[caidx]])
