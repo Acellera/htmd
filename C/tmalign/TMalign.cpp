@@ -27,6 +27,7 @@
 
 using namespace std;
 
+#include <cstdint>
 #include "basic_fun.h"
 #include "NW.h"
 #include "Kabsch.h"
@@ -273,7 +274,7 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
-DLLEXPORT void tmalign(int xlen, int ylen, int* xresno, int* yresno, char* seqx, char* seqy, float* xcoor, float* ycoor, int nframes, double *TM1, double *TM2, double *rmsd)
+DLLEXPORT void tmalign(int xlen, int ylen, int32_t* xresno, int32_t* yresno, char* seqx, char* seqy, float* xcoor, float* ycoor, int nframes, double *TM1, double *TM2, double *rmsd)
 {
     double **xa, **ya;
     int nf3 = nframes * 3;
@@ -291,7 +292,10 @@ DLLEXPORT void tmalign(int xlen, int ylen, int* xresno, int* yresno, char* seqx,
     tma->tempylen = ylen;
     tma->minlen = min(tma->xlen, tma->ylen);
 
+    fprintf(stderr, "xlen: %d ylen: %d\n", xlen, ylen);
+
     for (int i=0; i<ylen; i++){
+        fprintf(stderr, "yresno: %d\n", yresno[i]);
         tma->nres2[yresno[i]][32] = 1;
     }
 
