@@ -22,7 +22,7 @@ all: obj/$(PLATFORM) ../../htmd/lib/$(PLATFORM)/tmalign.so
 	$(CC) -fPIC  --shared -o $@  $(_OBJ) -lm -lstdc++
 
 obj/$(PLATFORM)/%.o: %.cpp
-	$(CC) -o $@ -c $< -g -fPIC -ffast-math -O3 
+	$(CC) -o $@ -c $< -g -fPIC -ffast-math -O3 -std=c++11
 
 ../../htmd/lib/$(PLATFORM):
 	mkdir -p ../../htmd/lib/$(PLATFORM)

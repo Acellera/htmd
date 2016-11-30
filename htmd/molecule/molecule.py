@@ -692,7 +692,7 @@ class Molecule:
         overwrite : list of str
             A list of the existing fields in Molecule that we wish to overwrite when reading this file.
         """
-        from htmd.simlist import Sim
+        from htmd.simlist import Sim, Frame
         from mdtraj.core.trajectory import _TOPOLOGY_EXTS
         _TOPOLOGY_EXTS = [x[1:] for x in _TOPOLOGY_EXTS]  # Removing the initial dot
         _MDTRAJ_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
@@ -703,7 +703,7 @@ class Molecule:
                     raise FileNotFoundError('File {} was not found.'.format(f))
             firstfile = filename[0]
         else:
-            if not isinstance(filename, Sim) and len(filename) != 4 and not os.path.exists(filename):
+            if not isinstance(filename, Sim) and not isinstance(filename, Frame) and len(filename) != 4 and not os.path.exists(filename):
                 raise FileNotFoundError('File {} was not found.'.format(filename))
             firstfile = filename
 
@@ -711,6 +711,10 @@ class Molecule:
             self.read(filename.molfile)
             self.read(filename.trajectory)
             return
+        if isinstance(filename, Frame):
+            self.read(filename.sim.molfile)
+            self.read(filename.sim.trajectory[filename.piece])
+            self.dropFrames(keep=filename.sim.frame)
 
         if type is not None:
             type = type.lower()

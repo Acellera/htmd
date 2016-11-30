@@ -44,19 +44,17 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     from htmd.molecule.molecule import _residueNameTable
 
     def calculateVariables(currmol):
-        res = sequenceID((currmol.resid, currmol.insertion, currmol.segid, currmol.chain))
+        res = sequenceID((currmol.resid, currmol.insertion, currmol.segid, currmol.chain)) - 1
         caidx = currmol.name == 'CA'
         res = np.unique(res)
         reslen = len(res)
-        res = res.astype(np.int32).ctypes.data_as(ct.POINTER(ct.c_int))
-
         # Calculate the protein sequence
         seq = ''.join([_residueNameTable[x] for x in currmol.resname[caidx]])
         seq = ct.c_char_p(seq.encode('utf-8'))
 
         # Keep only CA coordinates
         coords = currmol.coords[caidx, :, :].copy()
-        return reslen, res, seq, coords
+        return reslen, res.astype(np.int32), seq, coords
 
     mol = mol.copy()
     ref = ref.copy()
@@ -67,14 +65,19 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     reslenMOL, residMOL, seqMOL, coordsMOL = calculateVariables(mol)
     reslenREF, residREF, seqREF, coordsREF = calculateVariables(ref)
 
-    # void tmalign(int xlen, int ylen, int* xresno, int* yresno, char* seqx, char* seqy, float* xcoor, float* ycoor, int nframes, double &TM1, double &TM2, double &rmsd)
+    # DLLEXPORT void tmalign(int xlen, int ylen, int* xresno, int* yresno, char* seqx, char* seqy,
+    # float* xcoor, float* ycoor, int nframes,
+    # double *TM1, double *TM2, double *rmsd)
+    # tmalignlib.tmalign.argtypes = [ct.c_int, ct.c_int, ct.POINTER(ct.c_int), ct.POINTER(ct.c_int), ct.c_char_p, ct.c_char_p,
+    #                                ct.POINTER(ct.c_float), ct.POINTER(ct.c_float), ct.c_int,
+    #                                ct.POINTER(ct.c_double), ct.POINTER(ct.c_double), ct.POINTER(ct.c_double)]
     resTM1 = (ct.c_double * mol.numFrames)()
     resTM2 = (ct.c_double * mol.numFrames)()
     resRMSD = (ct.c_double * mol.numFrames)()
     tmalignlib.tmalign(ct.c_int(reslenREF),
                        ct.c_int(reslenMOL),
-                       residREF,
-                       residMOL,
+                       residREF.ctypes.data_as(ct.POINTER(ct.c_int32)),
+                       residMOL.ctypes.data_as(ct.POINTER(ct.c_int32)),
                        seqREF,
                        seqMOL,
                        coordsREF.ctypes.data_as(ct.POINTER(ct.c_float)),
@@ -86,6 +89,7 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     resTM1 = np.ctypeslib.as_array(resTM1)
     resRMSD = np.ctypeslib.as_array(resRMSD)
     return resTM1.astype(np.float32), resRMSD.astype(np.float32)
+
 
 
 def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
