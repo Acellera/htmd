@@ -404,13 +404,15 @@ class MetricData:
             relframe[i, :] = [trajIdx, trajFr]
         return relframe
 
-    def rel2sim(self, relFrames):
+    def rel2sim(self, relFrames, simlist=None):
         """ Converts trajectory index-frame pairs into Sim-frame pairs
 
         Parameters
         ----------
         relFrames : 2D np.ndarray
             An array containing in each row trajectory index and frame pairs
+        simlist : simlist
+            Optionally pass a different (but matching, i.e. filtered) simlist for creating the Frames.
 
         Returns
         -------
@@ -423,6 +425,12 @@ class MetricData:
         >>> simframes = data.rel2sim([100, 56])  # 100th simulation frame 56
         """
         from htmd.simlist import Frame
+        if simlist is None:
+            simlist = self.simlist
+        else:
+            if len(simlist) != len(self.simlist):
+                raise AttributeError('Provided simlist has different number of trajectories than the one used by this object.')
+
         relFrames = np.array(relFrames)
         if relFrames.ndim == 1:
             relFrames = relFrames[np.newaxis, :]
@@ -432,8 +440,8 @@ class MetricData:
         for i in range(np.size(relFrames, 0)):
             trajID = relFrames[i, 0]
             trajFrame = relFrames[i, 1]
-            sims.append(self.simlist[trajID])
-            frames.append(Frame(self.simlist[trajID], self.ref[trajID][trajFrame, 0], self.ref[trajID][trajFrame, 1]))
+            sims.append(simlist[trajID])
+            frames.append(Frame(simlist[trajID], self.ref[trajID][trajFrame, 0], self.ref[trajID][trajFrame, 1]))
         return np.array(frames)
 
     def abs2sim(self, absFrames):

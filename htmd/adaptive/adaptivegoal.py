@@ -214,7 +214,6 @@ class AdaptiveGoal(AdaptiveMD):
 
 if __name__ == '__main__':
     from htmd import *
-    from htmd.adaptive.adaptivegoal import AdaptiveGoal
     import os
     import shutil
     from htmd.util import tempname
