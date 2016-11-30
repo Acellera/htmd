@@ -1,3 +1,8 @@
+# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 import ctypes as ct
 import numpy as np
 from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_string_buffer, pack_ulong_buffer, xtc_lib

@@ -1,3 +1,11 @@
+#include "math.h"
+#include "string.h"
+#ifdef PLATFORM_Linux
+__asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+__asm__(".symver __atan2_finite,__atan2_finite@GLIBC_2.2.5");
+__asm__(".symver __pow_finite,__pow_finite@GLIBC_2.2.5");
+#endif
+
 /*
 ===============================================================================
    This is a re-implementation of TM-align algorithm in C/C++. The code was 

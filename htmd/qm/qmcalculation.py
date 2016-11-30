@@ -1,3 +1,8 @@
+# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 from __future__ import print_function
 
 from enum import Enum
@@ -539,7 +544,7 @@ class QMCalculation:
             data["dipole"] = dipole
             return data
         except:
-            raise
+         #   raise
             return None
 
     def _read_psi4(self, dirname):

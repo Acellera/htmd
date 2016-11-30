@@ -1,4 +1,9 @@
 #!/bin/bash
+# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 set -ev
 
 # TG set command above is to fail immediately, https://docs.travis-ci.com/user/customizing-the-build/#Implementing-Complex-Build-Steps
