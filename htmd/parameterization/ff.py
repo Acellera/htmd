@@ -536,7 +536,22 @@ class RTF:
                                        self.index_by_name[k[4]]])
 
             self.natoms = aidx
+        # if there weren't any "MASS" lines, we need to guess them
+        typeindex=4000
+        for idx in range( len( self.names ) ):
+            atype = self.type_by_index[idx]
+            name  = self.names[idx]
+            if atype not in self.element_by_type:
+               self.element_by_type[ atype ] = self._guessElement( name )
+               print( "Guessing element %s for atom %s type %s" % ( self.element_by_type[atype], name, atype ) )  
+            if atype not in self.mass_by_type:
+               self.mass_by_type[ atype ] = self._guessMass( self.element_by_type[ atype ] )
 
+            if atype not in self.typeindex_by_type:
+               self.typeindex_by_type[ atype ] = typeindex
+               typeindex = typeindex + 1
+            if atype not in self.types:
+                self.types.append( atype )
     def write(self, filename):
         f = open(filename, "w")
         print("* Charmm RTF built by HTMD parameterize version {}".format(htmdversion()), file=f)
@@ -566,6 +581,19 @@ class RTF:
         for i in range(self.natoms):
             name = self.names[i]
             self.charge_by_name[name] = charges[i]
+
+    @staticmethod
+    def _guessElement( name):
+        import re
+        name = re.sub('[0-9]*$', '', name)
+        name = name.lower().capitalize()
+        return name
+
+    @staticmethod
+    def _guessMass( element ):
+        from htmd.molecule.vdw import VDW
+        return VDW.massByElement(element)
+
 
 
 class AmberRTF(RTF):
@@ -645,12 +673,6 @@ class AmberRTF(RTF):
                     x = ff.split()
                     if len(x) >= 2:
                         self.mass_by_type[x[0]] = float(x[1])
-
-    def _guessElement(self, name):
-        import re
-        name = re.sub('[0-9]*$', '', name)
-        name = name.lower().capitalize()
-        return name
 
 # if __name__ == "__main__":
 #
