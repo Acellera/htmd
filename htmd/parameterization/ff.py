@@ -162,7 +162,7 @@ class PRM:
             if i.rUB != 0. or i.kUB != 0.:
                 raise ValueError("Can't express Urey-Bradley terms in Amber file format")
         for i in self.nonbonded:
-            if i.rmin_14==None or i.emin_14==None:
+            if i.rmin_14 is None or i.emin_14 is None:
                 raise ValueError("Can't express unset 1-4 VdW terms in Amber file format")
             eps = math.fabs(i.emin - i.emin_14 * 2.)
             if i.rmin != i.rmin_14 or eps > 1.e-6:
