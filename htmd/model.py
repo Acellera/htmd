@@ -581,17 +581,13 @@ class Model(object):
             view.add_trajectory(HTMDTrajectory(mol))
             # Setting up representations
             if ligand:
-                #view[-1].add_cartoon('protein')#, color='sstruc')
-                #view[-1].add_hyperball(':{}'.format(s))#, color=hexcolors[np.mod(i, len(hexcolors))])
+                view[-1].add_cartoon('protein')#, color='sstruc')
+                view[-1].add_hyperball(':{}'.format(s))#, color=hexcolors[np.mod(i, len(hexcolors))])
                 pass
             if protein:
                 view[-1].add_cartoon('protein', color='residueindex')
-            mol.write('/tmp/test{}.pdb'.format(s))
 
         self._nglButtons(view, statetype, states)
-
-        view[0].add_cartoon('protein')  # , color='sstruc')
-        view[0].add_hyperball(':{}'.format(0))  # , color=hexcolors[np.mod(i, len(hexcolors))])
         return view
 
     def _nglButtons(self, ngl_widget, statetype, states):
