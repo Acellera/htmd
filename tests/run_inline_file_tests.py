@@ -9,7 +9,7 @@ from subprocess import call, check_output
 import sys
 
 excludedfolders = ('./tests', './doc')
-excludedfiles = ('__init__.py',)   # Trailing comma needed otherwise it's not a tuple
+excludedfiles = ('__init__.py', 'license_headers.py')   # Trailing comma needed otherwise it's not a tuple
 
 
 def excluded(name, exclusionlist):
@@ -30,11 +30,8 @@ for root, dirnames, filenames in os.walk('.'):
 
 # Running py files
 failed = []
-import datetime
-
 
 for f in filestotest:
-    print(datetime.datetime.now())
     print(' ************************  Running "{}"  ************************'.format(f))
     if f.endswith('amber.py') or f.endswith('charmm.py'):
         out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
