@@ -391,9 +391,10 @@ class Model(object):
         #                'probabilities and hence your results might differ from analyses done before this change.')
         self._integrityCheck(postmsm=True)
         macroeq = np.ones(self.macronum) * -1
+        macroindexes = list(set(self.msm.metastable_assignments))
         for i in range(self.macronum):
             # macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
-            macroeq[i] = np.sum(self.msm.metastable_memberships[:, i] * self.msm.stationary_distribution)
+            macroeq[i] = np.sum(self.msm.metastable_memberships[:, macroindexes[i]] * self.msm.stationary_distribution)
 
         if plot:
             from matplotlib import pylab as plt
@@ -413,7 +414,7 @@ class Model(object):
             raise NameError('Cannot produce coarse P matrix. Ended up with negative probabilities. Try using less macrostates.')
         return Pcoarse
 
-    def getStates(self, states=None, statetype='macro', wrapsel='protein', alignsel='name CA', alignmol=None, samplemode='weighted', numsamples=50):
+    def getStates(self, states=None, statetype='macro', wrapsel='protein', alignsel='name CA', alignmol=None, samplemode='weighted', numsamples=50, simlist=None):
         """ Get samples of MSM states in Molecule classes
 
         Parameters
@@ -432,6 +433,8 @@ class Model(object):
             How to obtain the samples from the states
         numsamples : int
             Number of samples (conformations) for each state.
+        simlist : simlist
+            Optionally pass a different (but matching, i.e. filtered) simlist for creating the Molecules.
 
         Returns
         -------
@@ -447,7 +450,13 @@ class Model(object):
         >>>     m.view()
         """
         self._integrityCheck(postmsm=(statetype != 'cluster'))
-        (single, molfile) = _singleMolfile(self.data.simlist)
+        if simlist is None:
+            simlist = self.data.simlist
+        else:
+            if len(simlist) != len(self.data.simlist):
+                raise AttributeError('Provided simlist has different number of trajectories than the one used by the model.')
+
+        (single, molfile) = _singleMolfile(simlist)
         refmol = None
         if not single:
             raise NameError('Visualizer does not support yet visualization of systems with different number of atoms')
@@ -475,13 +484,11 @@ class Model(object):
         # Removed ncpus because it was giving errors on some systems.
         aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
         mols = aprun(total=len(relframes), description='Getting state Molecules')\
-            (delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol) for i, rel in enumerate(relframes))
-        # mols = Parallel(n_jobs=1, verbose=11)(delayed(_loadMols)(self, i, rel, molfile, wrapsel, alignsel, refmol)
-        #                                           for i, rel in enumerate(relframes))
+            (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, refmol, simlist) for rel in enumerate(relframes))
         return np.array(mols, dtype=object)
 
     def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
-                   numsamples=50, wrapsel='protein', alignsel='name CA', gui=False):
+                   numsamples=50, wrapsel='protein', alignsel='name CA', gui=False, simlist=None):
         """ Visualize macro/micro/cluster states in VMD
 
         Parameters
@@ -504,6 +511,8 @@ class Model(object):
             A selection to use for wrapping
         alignsel : str, optional, default='name CA'
             A selection used for aligning all frames
+        simlist : simlist
+            Optionally pass a different (but matching, i.e. filtered) simlist for visualizing the states.
 
         Examples
         --------
@@ -526,7 +535,7 @@ class Model(object):
         if isinstance(states, int):
             states = [states]
         if mols is None:
-            mols = self.getStates(states, statetype, numsamples=numsamples, wrapsel=wrapsel, alignsel=alignsel)
+            mols = self.getStates(states, statetype, numsamples=numsamples, wrapsel=wrapsel, alignsel=alignsel, simlist=simlist)
         colors = [0, 1, 3, 4, 5, 6, 7, 9]
         for i, s in enumerate(states):
             viewer.loadMol(mols[i], name=statetype+' '+str(states[i]))
@@ -572,17 +581,13 @@ class Model(object):
             view.add_trajectory(HTMDTrajectory(mol))
             # Setting up representations
             if ligand:
-                #view[-1].add_cartoon('protein')#, color='sstruc')
-                #view[-1].add_hyperball(':{}'.format(s))#, color=hexcolors[np.mod(i, len(hexcolors))])
+                view[-1].add_cartoon('protein')#, color='sstruc')
+                view[-1].add_hyperball(':{}'.format(s))#, color=hexcolors[np.mod(i, len(hexcolors))])
                 pass
             if protein:
                 view[-1].add_cartoon('protein', color='residueindex')
-            mol.write('/tmp/test{}.pdb'.format(s))
 
         self._nglButtons(view, statetype, states)
-
-        view[0].add_cartoon('protein')  # , color='sstruc')
-        view[0].add_hyperball(':{}'.format(0))  # , color=hexcolors[np.mod(i, len(hexcolors))])
         return view
 
     def _nglButtons(self, ngl_widget, statetype, states):
@@ -758,8 +763,8 @@ class Model(object):
             raise NameError('After modifying the data in the MetricData object you need to recluster and reconstruct the markov model.')
 
 
-def _loadMols(self, i, rel, molfile, wrapsel, alignsel, refmol):
-    frames = self.data.rel2sim(rel)
+def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
+    frames = self.data.rel2sim(rel, simlist=simlist)
     mol = Molecule(molfile)
     trajs = np.empty(0, dtype=str)
     frs = np.empty(0, dtype=int)

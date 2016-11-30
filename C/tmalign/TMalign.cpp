@@ -299,7 +299,10 @@ DLLEXPORT void tmalign(int xlen, int ylen, int* xresno, int* yresno, char* seqx,
     tma->tempylen = ylen;
     tma->minlen = min(tma->xlen, tma->ylen);
 
+    //fprintf(stderr, "xlen: %d ylen: %d\n", xlen, ylen);
+
     for (int i=0; i<ylen; i++){
+        //fprintf(stderr, "yresno: %d\n", yresno[i]);
         tma->nres2[yresno[i]][32] = 1;
     }
 
@@ -308,6 +311,7 @@ DLLEXPORT void tmalign(int xlen, int ylen, int* xresno, int* yresno, char* seqx,
         tma->xa[i][1] = (double)xcoor[Yf(i, 0, 1, 3)];
         tma->xa[i][2] = (double)xcoor[Zf(i, 0, 1, 3)];
         tma->nres1[xresno[i]][32] = 1;
+        //fprintf(stderr, "xlen: %d X: %lf %lf %lf\n", xlen, tma->xa[i][0], tma->xa[i][1], tma->xa[i][2]);
     }
 
     for (int f=0; f<nframes; f++){

@@ -35,19 +35,23 @@ class QMFittingSet:
 
 class FFMolecule(Molecule):
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 basis=BasisSet._6_31G_star, solvent=True, theory=Theory.B3LYP, execution=Execution.Inline, qmcode=Code.PSI4, outdir="./"):
+                 basis=BasisSet._6_31G_star, solvent=True, theory=Theory.B3LYP, execution=Execution.Inline,
+                 qmcode=Code.PSI4, outdir="./"):
         # filename -- a mol2 format input geometry
         # rtf, prm -- rtf, prm files
         # method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
         self.basis = basis
         self.theory = theory
-        self.solvent= solvent
+        self.solvent = solvent
 
         self.solvent_name = "vacuum"
-        if solvent: self.solvent_name="water"
+        if solvent:
+            self.solvent_name = "water"
       
-        if theory == Theory.RHF:   self.theory_name="rhf" 
-        if theory == Theory.B3LYP: self.theory_name="b3lyp" 
+        if theory == Theory.RHF:
+            self.theory_name = "rhf"
+        if theory == Theory.B3LYP:
+            self.theory_name = "b3lyp"
 
         if basis == BasisSet._6_31G_star:
             self.basis_name = "6-31g-star"
@@ -135,11 +139,11 @@ class FFMolecule(Molecule):
             self.name[i] = t
             self.resname[i] = "MOL"
 
-    def output_directory_name( self ):
+    def output_directory_name(self):
         return self.theory_name + "-" + self.basis_name + "-" + self.solvent_name 
 
     def minimize(self):
-        mindir = os.path.join(self.outdir, "minimize", self.output_directory_name()) #self.theory_name + "-" + self.basis_name + "-" + self.solvent_name )
+        mindir = os.path.join(self.outdir, "minimize", self.output_directory_name())
         try:
             os.makedirs(mindir, exist_ok=True)
         except:
@@ -215,12 +219,12 @@ class FFMolecule(Molecule):
                 m = self._rtf.mass_by_type[self._rtf.type_by_index[i]]
                 mass = mass + m
                 com = com + self.coords[i, :, f] * m
-            com = com / mass
+            com /= mass
             self.coords[:, :, f] = self.coords[:, :, f] - com
 
     def _try_load_pointfile(self):
         # Load a point file if one exists from a previous job
-        pointfile = os.path.join(self.outdir, "esp", self.output_directory_name()   , "00000", "grid.dat")
+        pointfile = os.path.join(self.outdir, "esp", self.output_directory_name(), "00000", "grid.dat")
         if os.path.exists(pointfile):
             f = open(pointfile, "r")
             fl = f.readlines()
@@ -235,7 +239,7 @@ class FFMolecule(Molecule):
             return ret
         return True
 
-    def fitCharges(self, fixed=[] ):
+    def fitCharges(self, fixed=[]):
         # Remove the COM from the coords, or PSI4 does it and then the grid is incorrectly centred
         self._removeCOM()
         # Kick off a QM calculation -- unconstrained single point with grid
@@ -602,22 +606,22 @@ class FFMolecule(Molecule):
         completed = 0
         for q in results:
             if q.completed and not q.errored:
-                if (q.energy - qmin) < 20.:  # Only fit against QM points < 20kcal above the minimum
+                if (q.energy - qmin) < 20.:  # Only fit against QM points < 20 kcal above the minimum
                     mmeval = ffe.evaluate(q.coords)
-                    if mmeval["vdw"]<200:
-                      completed += 1
-                      phi = getPhi(q.coords,	atoms );
+                    if mmeval["vdw"] < 200:
+                        completed += 1
+                        phi = getPhi(q.coords, atoms)
 
-                      ret.qm.append(q.energy - qmin)
-                      ret.mm_original.append( mmeval['total'])
-                      ret.coords.append(q.coords)
-                      if phi > 180.:
-                          phi = phi - 360.
-                      ret.phi.append(phi)
+                        ret.qm.append(q.energy - qmin)
+                        ret.mm_original.append(mmeval['total'])
+                        ret.coords.append(q.coords)
+                        if phi > 180.:
+                            phi -= 360.
+                        ret.phi.append(phi)
                     else:
-                       print("Omitting optimised pose for phi=%f (MM VDW too high)" %(phi) )
+                        print("Omitting optimised pose for phi=%f (MM VDW too high)" % phi)
                 else:
-                       print("Omitting optimised pose for phi=%f (QM energy too high)" %(phi) )
+                    print("Omitting optimised pose for phi=%f (QM energy too high)" % phi)
 
         mmin = min(ret.mm_original)
         # roughly align the qm with the mm
@@ -761,29 +765,29 @@ class FFMolecule(Molecule):
         mm_energy = []
         qm_energy = []
         for r in fits:
-           mm_energy.extend( r.mm_fitted )
-           qm_energy.extend( r.qm )
-        qm_energy = np.array( qm_energy )
-        mm_energy = np.array( mm_energy )
+            mm_energy.extend(r.mm_fitted)
+            qm_energy.extend(r.qm)
+        qm_energy = np.array(qm_energy)
+        mm_energy = np.array(mm_energy)
 
         qm_energy = qm_energy - min(qm_energy)
         mm_energy = mm_energy - min(mm_energy)
 
-        qm_energy = qm_energy.reshape( qm_energy.shape[0], 1 )
-        mm_energy = mm_energy.reshape( mm_energy.shape[0], 1 )
+        qm_energy = qm_energy.reshape(qm_energy.shape[0], 1)
+        mm_energy = mm_energy.reshape(mm_energy.shape[0], 1)
 #        print(qm_energy)
 #        print(qm_energy.shape)
 #        print(mm_energy)
 #        print(mm_energy.shape)
         from sklearn import linear_model
-        regr = linear_model.LinearRegression( fit_intercept=False )
-        regr.fit( qm_energy, mm_energy )
+        regr = linear_model.LinearRegression(fit_intercept=False)
+        regr.fit(qm_energy, mm_energy)
 
-        ax1.set_xlabel( "QM Energy kcal/mol")
-        ax1.set_xlabel( "MM Energy kcal/mol")
-        ax1.set_title( "Conformer Energies  MM vs QM" )
-        ax1.plot(qm_energy, mm_energy ,  color="black", marker="o", linestyle="None")
-        ax1.plot(qm_energy, regr.predict(qm_energy), color="red", linewidth=2 )
+        ax1.set_xlabel("QM Energy kcal/mol")
+        ax1.set_xlabel("MM Energy kcal/mol")
+        ax1.set_title("Conformer Energies  MM vs QM")
+        ax1.plot(qm_energy, mm_energy,  color="black", marker="o", linestyle="None")
+        ax1.plot(qm_energy, regr.predict(qm_energy), color="red", linewidth=2)
 
         if show:
             plt.show()
@@ -798,8 +802,8 @@ class FFMolecule(Molecule):
 
         # Return RMS error, variance and fit coeffients
         return (
-          np.mean( (regr.predict( qm_energy ) - mm_energy )**2 ),
-          regr.score( qm_energy, mm_energy ),
+          np.mean((regr.predict(qm_energy) - mm_energy)**2),
+          regr.score(qm_energy, mm_energy),
           regr.coef_
         )
 
@@ -819,31 +823,29 @@ class FFMolecule(Molecule):
         ax1.set_title(fit.name)
 
         x = sorted(fit.phi)
-        plotdata=[]
-        for i in range(len(fit.phi) ):
-           plotdata.append( (fit.phi[i], fit.qm[i] ) )
-        plotdata=sorted(plotdata)
+        plotdata = []
+        for i in range(len(fit.phi)):
+            plotdata.append((fit.phi[i], fit.qm[i]))
+        plotdata = sorted(plotdata)
         plotdatax = [float(i[0]) for i in plotdata]
         plotdatay = [float(i[1]) for i in plotdata]
-        ax1.plot(plotdatax, plotdatay , label="QM", color="r", marker="o")
+        ax1.plot(plotdatax, plotdatay, label="QM", color="r", marker="o")
 
         plotdata=[]
-        for i in range(len(fit.phi) ):
-           plotdata.append( (fit.phi[i], fit.mm_original[i] ) )
-        plotdata=sorted(plotdata)
+        for i in range(len(fit.phi)):
+            plotdata.append((fit.phi[i], fit.mm_original[i]))
+        plotdata = sorted(plotdata)
         plotdatax = [float(i[0]) for i in plotdata]
         plotdatay = [float(i[1]) for i in plotdata]
         ax1.plot(plotdatax, plotdatay, label="MM Original", color="b", marker="d")
 
         plotdata=[]
-        for i in range(len(fit.phi) ):
-           plotdata.append( (fit.phi[i], fit.mm_fitted[i] ) )
-        plotdata=sorted(plotdata)
+        for i in range(len(fit.phi)):
+            plotdata.append((fit.phi[i], fit.mm_fitted[i]))
+        plotdata = sorted(plotdata)
         plotdatax = [float(i[0]) for i in plotdata]
         plotdatay = [float(i[1]) for i in plotdata]
         ax1.plot(plotdatax, plotdatay, label="MM Fitted", color="g", marker="s")
-
-
 
         #ax1.plot(fit.phi, fit.qm, label="QM", color="r", marker="o")
         #ax1.plot(fit.phi, fit.mm_original, label="MM Original", color="b", marker="d")
