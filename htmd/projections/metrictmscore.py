@@ -97,10 +97,10 @@ if __name__ == "__main__":
     metr = MetricTMscore(ref, 'protein and name CA')
     data = metr.project(mol)
 
-    lastrmsd = np.array([0.9633381, 0.96441294, 0.96553609, 0.96088852, 0.96288511, 0.95677591, 0.96544727, 0.96359811,
-                         0.95658912, 0.96893117, 0.96623924, 0.96064913, 0.96207041, 0.95947848, 0.96657048, 0.95993426,
-                         0.96543296, 0.96806875, 0.96437248, 0.96144066], dtype=np.float32)
-    assert np.all(np.abs(data[-20:] - lastrmsd) < 0.001), 'Coordinates calculation is broken'
+    lasttm = np.array([0.9633381, 0.96441294, 0.96553609, 0.96088852, 0.96288511, 0.95677591, 0.96544727, 0.96359811,
+                       0.95658912, 0.96893117, 0.96623924, 0.96064913, 0.96207041, 0.95947848, 0.96657048, 0.95993426,
+                       0.96543296, 0.96806875, 0.96437248, 0.96144066], dtype=np.float32)
+    assert np.all(np.abs(data[-20:].flatten() - lasttm) < 0.001), 'Coordinates calculation is broken'
 
 
     from htmd.simlist import simlist

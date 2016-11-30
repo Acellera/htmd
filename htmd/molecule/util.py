@@ -44,19 +44,17 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     from htmd.molecule.molecule import _residueNameTable
 
     def calculateVariables(currmol):
-        res = sequenceID((currmol.resid, currmol.insertion, currmol.segid, currmol.chain))
+        res = sequenceID((currmol.resid, currmol.insertion, currmol.segid, currmol.chain)) - 1
         caidx = currmol.name == 'CA'
         res = np.unique(res)
         reslen = len(res)
-        res2 = res.astype(np.int32).ctypes.data_as(ct.POINTER(ct.c_int32))
-
         # Calculate the protein sequence
         seq = ''.join([_residueNameTable[x] for x in currmol.resname[caidx]])
         seq = ct.c_char_p(seq.encode('utf-8'))
 
         # Keep only CA coordinates
         coords = currmol.coords[caidx, :, :].copy()
-        return reslen, res2, seq, coords
+        return reslen, res.astype(np.int32), seq, coords
 
     mol = mol.copy()
     ref = ref.copy()
@@ -78,8 +76,8 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     resRMSD = (ct.c_double * mol.numFrames)()
     tmalignlib.tmalign(ct.c_int(reslenREF),
                        ct.c_int(reslenMOL),
-                       residREF,
-                       residMOL,
+                       residREF.ctypes.data_as(ct.POINTER(ct.c_int32)),
+                       residMOL.ctypes.data_as(ct.POINTER(ct.c_int32)),
                        seqREF,
                        seqMOL,
                        coordsREF.ctypes.data_as(ct.POINTER(ct.c_float)),
