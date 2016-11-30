@@ -302,11 +302,8 @@ if __name__ == '__main__':
     crystalCO = getCrystalCO(refmol)
 
     np.random.seed(10)
-    sl = SlurmQueue()
-    sl.jobname = 'projname'
-    sl.partition = 'fake'
     ad = AdaptiveGoal()
-    ad.app = sl
+    ad.app = LocalGPUQueue()
     ad.nmin = 10
     ad.nmax = 20
     ad.nepochs = 999999
