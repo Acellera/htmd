@@ -19,7 +19,7 @@ INC_FLAGS :=
 all: obj/$(PLATFORM) ../../htmd/lib/$(PLATFORM)/tmalign.so
 
 ../../htmd/lib/$(PLATFORM)/tmalign.so: $(_OBJ)
-	$(CC) -fPIC  --shared -o $@  $(_OBJ) -lm -lstdc++
+	$(CC) -fPIC  --shared -o $@  $(_OBJ) -lm 
 
 obj/$(PLATFORM)/%.o: %.cpp
 	$(CC) -o $@ -c $< -g -fPIC -O3 -DPLATFORM_$(PLATFORM)
