@@ -156,7 +156,7 @@ class PRM:
             t[tt] = n
 
         # check to see whether the parameters can be expressed in Amber FRCMOD format
-        if len(self.impropers):
+        if len(self.impropers) == 0:
             raise ValueError("Can't express CHARMM-style impropers in Amber file format")
         for i in self.angles:
             if i.rUB != 0. or i.kUB != 0.:
@@ -538,20 +538,21 @@ class RTF:
             self.natoms = aidx
         # if there weren't any "MASS" lines, we need to guess them
         typeindex=4000
-        for idx in range( len( self.names ) ):
+        for idx in range(len(self.names)):
             atype = self.type_by_index[idx]
-            name  = self.names[idx]
+            name = self.names[idx]
             if atype not in self.element_by_type:
-               self.element_by_type[ atype ] = self._guessElement( name )
-               print( "Guessing element %s for atom %s type %s" % ( self.element_by_type[atype], name, atype ) )  
+                self.element_by_type[atype] = self._guessElement(name)
+                print("Guessing element %s for atom %s type %s" % (self.element_by_type[atype], name, atype))
             if atype not in self.mass_by_type:
-               self.mass_by_type[ atype ] = self._guessMass( self.element_by_type[ atype ] )
+                self.mass_by_type[atype] = self._guessMass(self.element_by_type[atype])
 
             if atype not in self.typeindex_by_type:
-               self.typeindex_by_type[ atype ] = typeindex
-               typeindex = typeindex + 1
+                self.typeindex_by_type[atype] = typeindex
+                typeindex += 1
             if atype not in self.types:
-                self.types.append( atype )
+                self.types.append(atype)
+
     def write(self, filename):
         f = open(filename, "w")
         print("* Charmm RTF built by HTMD parameterize version {}".format(htmdversion()), file=f)
