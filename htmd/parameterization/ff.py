@@ -156,7 +156,7 @@ class PRM:
             t[tt] = n
 
         # check to see whether the parameters can be expressed in Amber FRCMOD format
-        if len(self.impropers) == 0:
+        if len(self.impropers) != 0:
             raise ValueError("Can't express CHARMM-style impropers in Amber file format")
         for i in self.angles:
             if i.rUB != 0. or i.kUB != 0.:
