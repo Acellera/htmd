@@ -73,8 +73,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._qsubmit = SlurmQueue._find_binary('sbatch')
         self._qinfo = SlurmQueue._find_binary('sinfo')
         self._qcancel = SlurmQueue._find_binary('scancel')
-        self._squeue = SlurmQueue._find_binary('squeue')
+        self._qstatus = SlurmQueue._find_binary('squeue')
 
+        self._sentinel = 'htmd.queues.done'
+        # For synchronous
         self._dirs = []
 
     @staticmethod
@@ -107,6 +109,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             if self.mailtype is not None and self.mailuser is not None:
                 f.write('#SBATCH --mail-type={}\n'.format(self.mailtype))
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" SIGTERM 15\n'.format(self._sentinel))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
 
@@ -120,7 +124,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 odir = os.path.join(datadir, simname)
                 os.mkdir(odir)
                 f.write('\nmv *.{} {}'.format(self.trajext, odir))
-            f.write('\ntouch .done')
+
         os.chmod(fname, 0o700)
 
     def retrieve(self):
@@ -132,7 +136,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
 
         Parameters
         ----------
-        dist : list
+        dirs : list
             A list of executable directories.
         """
         if isinstance(dirs, str):
@@ -151,16 +155,19 @@ class SlurmQueue(SimQueue, ProtocolInterface):
 
             # Automatic jobname
             if self.jobname is None:
-                self.jobname = os.path.basename(os.path.abspath(d)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
+                self.jobname = os.path.basename(os.path.abspath(d)) + '_' + \
+                               ''.join([random.choice(string.digits) for _ in range(5)])
 
             runscript = os.path.abspath(os.path.join(d, 'run.sh'))
 
-            if os.path.exists( os.path.join( d, ".done" ) ):
-              try: 
-                 logger.info( "Removing existing .done  sentinel from %s" % (d))
-                 os.unlink( os.path.join( d, ".done" ) )
-              except: 
-                 logger.info("Cant remove .done sentinel from %s" % (d) )
+            # Clean sentinel files , if existent
+            if os.path.exists(os.path.join(d, self._sentinel)):
+                try:
+                    os.remove(os.path.join(d, self._sentinel))
+                except:
+                    logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
+                else:
+                    logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
 
             if not os.path.exists(runscript):
                 raise FileExistsError('File {} does not exist.'.format(runscript))
@@ -176,37 +183,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 raise
 
     def inprogress(self, debug=False):
-        import time
-        import getpass
-        if self.partition is None:
-            raise ValueError('The partition needs to be defined.')
-        user = getpass.getuser()
-        cmd = [self._squeue, '-n', self.jobname, '-u', user, '-p', self.partition]
-        logger.debug(cmd)
-
-        # This command randomly fails so I need to allow it to repeat or it crashes adaptive
-        tries = 0
-        while tries < 3:
-            try:
-                ret = check_output(cmd)
-            except CalledProcessError:
-                if tries == 2:
-                    raise
-                tries += 1
-                time.sleep(3)
-                continue
-            break
-
-        logger.debug(ret.decode("ascii"))
-
-        # TODO: check lines and handle errors
-        l = ret.decode("ascii").split("\n")
-        l = len(l) - 2
-        if l < 0:
-            l = 0  # something odd happened
-        return l
-
-    def __inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
 
         Returns
@@ -244,6 +220,21 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             l = 0  # something odd happened
         return l
 
+    def notcompleted(self):
+        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
+
+        Returns
+        -------
+        total : int
+            Total number of directories which have not completed
+        """
+        total = 0
+        if len(self._dirs) == 0:
+            raise RuntimeError('This method relies on running synchronously.')
+        for i in self._dirs:
+            if not os.path.exists(os.path.join(i, self._sentinel)):
+                total += 1
+
     def stop(self):
         """ Cancels all currently running and queued jobs
         """
@@ -256,6 +247,29 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))
 
+    def wait(self, sentinel=False):
+        """ Blocks script execution until all queued work completes
+
+        Parameters
+        ----------
+        sentinel : bool, default=False
+            If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
+            relies on the filesystem, in particular on the existence of a sentinel file for job completion.
+
+        Examples
+        --------
+        >>> SlurmQueue.wait()
+        """
+        from time import sleep
+        import sys
+
+        if not sentinel:
+            total = self.inprogress()
+        else:
+            total = self.notcompleted()
+        while total != 0:
+            sys.stdout.flush()
+            sleep(5)
 
 
 if __name__ == "__main__":
