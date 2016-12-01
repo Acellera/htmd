@@ -110,7 +110,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 f.write('#SBATCH --mail-type={}\n'.format(self.mailtype))
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
             # Trap kill signals to create sentinel file
-            f.write('\ntrap "touch {}" SIGTERM 15\n'.format(self._sentinel))
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(self._sentinel))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
 
@@ -263,11 +263,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         from time import sleep
         import sys
 
-        if not sentinel:
-            total = self.inprogress()
-        else:
-            total = self.notcompleted()
-        while total != 0:
+        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
             sys.stdout.flush()
             sleep(5)
 
