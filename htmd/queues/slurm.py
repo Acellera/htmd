@@ -234,6 +234,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         for i in self._dirs:
             if not os.path.exists(os.path.join(i, self._sentinel)):
                 total += 1
+        return total
 
     def stop(self):
         """ Cancels all currently running and queued jobs
