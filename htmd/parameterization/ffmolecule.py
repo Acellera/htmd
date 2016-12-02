@@ -867,6 +867,7 @@ class FFMolecule(Molecule):
                 raise OSError('Directory {} could not be created. Check if you have permissions.'.format(plotdir))
             tf = os.path.join(plotdir, fit.name) + ".svg"
             plt.savefig(tf, format="svg")
+            plt.clf()
             return tf
 
     def write(self, filename, sel=None, type=None, typemap=None):
