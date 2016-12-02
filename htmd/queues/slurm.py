@@ -131,6 +131,13 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         # Nothing to do
         pass
 
+    def _autoQueueName(self):
+        ret = check_output(self._qinfo)
+        return ','.join(np.unique([i.split()[0].strip('*') for i in ret.decode('ascii').split('\n')[1:-1]]))
+
+    def _autoJobName(self, path):
+        return os.path.basename(os.path.abspath(path)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
+
     def submit(self, dirs):
         """ Submits all directories
 
@@ -143,20 +150,15 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             dirs = [dirs, ]
         self._dirs.extend(dirs)
 
-        # Automatic partition
         if self.partition is None:
-            ret = check_output(self._qinfo)
-            self.partition = ','.join(np.unique([i.split()[0].strip('*')
-                                                 for i in ret.decode('ascii').split('\n')[1:-1]]))
+            self.partition = self._autoQueueName()
 
         # if all folders exist, submit
         for d in dirs:
             logger.info('Queueing ' + d)
 
-            # Automatic jobname
             if self.jobname is None:
-                self.jobname = os.path.basename(os.path.abspath(d)) + '_' + \
-                               ''.join([random.choice(string.digits) for _ in range(5)])
+                self.jobname = self._autoJobName(d)
 
             runscript = os.path.abspath(os.path.join(d, 'run.sh'))
 
@@ -182,7 +184,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             except:
                 raise
 
-    def inprogress(self, debug=False):
+    def inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
 
         Returns
@@ -193,7 +195,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         import time
         import getpass
         if self.partition is None:
-            raise ValueError('The partition needs to be defined.')
+            self.partition = self._autoQueueName()
         user = getpass.getuser()
         cmd = [self._qstatus, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
@@ -241,7 +243,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         """
         import getpass
         if self.partition is None:
-            raise ValueError('The partition needs to be defined.')
+            self.partition = self._autoQueueName()
         user = getpass.getuser()
         cmd = [self._qcancel, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
