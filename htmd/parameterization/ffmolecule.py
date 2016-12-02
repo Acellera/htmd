@@ -69,6 +69,10 @@ class FFMolecule(Molecule):
             raise ValueError("Input file must be mol2 format")
 
         super().__init__(filename=filename, name=name)
+
+        if(len(self.bonds)==0):
+           print("No bounds found. Guessing them")
+           self.bonds =  self._guessBonds()
         (a, b) = guessAnglesAndDihedrals(self.bonds)
         self.natoms = self.serial.shape[0]
         self.angles = a
@@ -863,6 +867,7 @@ class FFMolecule(Molecule):
                 raise OSError('Directory {} could not be created. Check if you have permissions.'.format(plotdir))
             tf = os.path.join(plotdir, fit.name) + ".svg"
             plt.savefig(tf, format="svg")
+            plt.clf()
             return tf
 
     def write(self, filename, sel=None, type=None, typemap=None):

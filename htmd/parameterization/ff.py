@@ -27,12 +27,13 @@ class AnglePrm:
 
 
 class TorsPrm:
-    def __init__(self, types, n=0, k0=0., phi0=0., e14=1.):
+    def __init__(self, types, n=0, k0=0., phi0=0., e14=1., improper=False):
         self.types = types
         self.n = n
         self.k0 = k0
         self.phi0 = phi0
         self.e14 = e14
+        self.improper = improper
 
 
 class NBPrm:
@@ -185,6 +186,7 @@ class PRM:
         print("\nDIHE", file=f)
         output = dict()
         for i in self.dihedrals:
+          if(i.improper == False):
             name = "%s-%s-%s-%s" % (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]])
             if not (name in output):
                 output[name] = 1
@@ -196,12 +198,27 @@ class PRM:
                     scnb = 2.
                     if pi < (len(prm) - 1):
                         sign = -1
-                    print("%s-%s-%s-%s 1 %f %f %f %f %f" %
+                    print("%2s-%2s-%2s-%2s 1 %f %f %f %f %f" %
                           (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]], p.k0, p.phi0, sign * p.n, scee,
                            scnb),
                           file=f)
 
         print("\nIMPR", file=f)
+        output = dict()
+        for i in self.dihedrals:
+          if(i.improper == True):
+            name = "%s-%s-%s-%s" % (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]])
+            if not (name in output):
+                output[name] = 1
+                prm = self.dihedralParam(i.types[0], i.types[1], i.types[2], i.types[3])
+                for pi in range(len(prm)):
+                    p = prm[pi]
+                    sign = 1
+                    if p.k0 != 0.:
+                       print("%2s-%2s-%2s-%2s %f %f %f" %
+                          (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]], p.k0, p.phi0, sign * p.n ), file=f)
+
+
 
         print("\nNONB", file=f)
         # Have to iterate over the types in use
@@ -445,7 +462,7 @@ class AmberPRM(PRM):
                     # Amber impropers have the same potential as dihedrals, except the scaling factor is different
                     self.dihedrals.append(TorsPrm([y[0].strip(), y[1].strip(), y[2].strip(), y[3].strip()],
                                                   n=int(math.fabs(int(float(x[2])))), k0=float(x[0]), phi0=float(x[1]),
-                                                  e14=1. / 1.2))
+                                                  e14=1. / 1.2, improper=True))
                 elif section == "NONBON":
                     x = ff.split()
                     y = x[0].split("-")
