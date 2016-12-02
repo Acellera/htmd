@@ -77,10 +77,19 @@ def detectSoftDihedrals(mol, equivalent_atoms):
     final_soft = []
     e = mol.element
     for d in possible_soft:
+#        print("Possible soft")
+#        print(d.atoms)
+#        print(d.left)
+#        print(d.right)
+#        print("%s %s %s" % ( e[left[0]], e[left[1]], e[left[2]] ) )
+#        print("%s %s %s" % ( e[right[0]], e[right[1]], e[right[2]] ) )
         a1 = d.atoms[1]
         a2 = d.atoms[2]
+#        print( "a1 %d %s" % (a1, e[a1]))
+#        print( "a2 %d %s" % (a2, e[a2]))
         left = d.left
         right = d.right
+   
 
         # Exclude trivial dihedrals with just one H atom on a side
         #   if (len(left) == 1)   and (e[left[0]] =='H') : continue
@@ -91,7 +100,7 @@ def detectSoftDihedrals(mol, equivalent_atoms):
             if e[a1] == 'C' and e[left[0]] == 'H' and e[left[1]] == 'H' and e[left[2]] == 'H':
                 continue
         if len(right) == 3:
-            if e[a1] == 'C' and e[right[0]] == 'H' and e[right[1]] == 'H' and e[right[2]] == 'H':
+            if e[a2] == 'C' and e[right[0]] == 'H' and e[right[1]] == 'H' and e[right[2]] == 'H':
                 continue
         found = False
         # check to see if the torsional pair of atoms are already included in the list.
