@@ -37,7 +37,7 @@ def main_parameterize():
     parser = argparse.ArgumentParser(description="Acellera Small Molecule Parameterisation Version 2.0")
     parser.add_argument("-m", "--mol2", help="Molecule to parameterise, in mol2 format", required=True, type=str,
                         default=None, metavar="<input.mol2>", action="store", dest="mol")
-    parser.add_argument("-l", "--list", help="List parameterisable torsions", action="store_true", default=False,
+    parser.add_argument("-l", "--list", "--list-torsions", help="List parameterisable torsions", action="store_true", default=False,
                         dest="list")
     parser.add_argument("-c", "--charge", help="Net charge on molecule (default: sum of the partial charges on the "
                                                ".mol2 file)", type=int, default=None, action="store", dest="charge")
@@ -147,8 +147,11 @@ def main_parameterize():
                          outdir=args.outdir)
         dihedrals = mol.getSoftTorsions()
         print("Detected soft torsions:")
+        fh=open("torsions.txt", "w")
         for d in dihedrals:
             print("\t{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
+            print("{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]), file=fh)
+        fh.close()
         sys.exit(0)
 
     # Small report
