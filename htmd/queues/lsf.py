@@ -4,9 +4,11 @@
 # No redistribution in whole or part
 #
 import os
-import pwd
 import shutil
-from subprocess import check_output
+import random
+import string
+import numpy as np
+from subprocess import check_output, CalledProcessError
 from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
 from htmd.queues.simqueue import SimQueue
 import logging
@@ -61,9 +63,12 @@ class LsfQueue(SimQueue, ProtocolInterface):
 
         # Find executables
         self._qsubmit = LsfQueue._find_binary('bsub')
-        self._qstatus = LsfQueue._find_binary('bqueues')
+        self._qinfo = LsfQueue._find_binary('bqueues')
         self._qcancel = LsfQueue._find_binary('bkill')
+        self._qstatus = LsfQueue._find_binary('bjobs')
 
+        self._sentinel = 'htmd.queues.done'
+        # For synchronous
         self._dirs = []
 
         # Specific automatic guessing
@@ -107,6 +112,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
                 f.write('#BSUB -W {}\n'.format(self.walltime))
             if self.resources is not None:
                 f.write('#BSUB -R {}\n'.format(self.resources))
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\n')
             if self.environment is not None:
                 for call in self.environment:
@@ -125,38 +132,51 @@ class LsfQueue(SimQueue, ProtocolInterface):
                 os.mkdir(odir)
                 f.write('\nmv *.{} {}'.format(self.trajext, odir))
 
-            f.write('\ntouch .done')
         os.chmod(fname, 0o700)
 
     def retrieve(self):
         # Nothing to do
         pass
 
+    def _autoQueueName(self):
+        ret = check_output(self._qinfo)
+        return ','.join(np.unique([i.split()[0].strip('*') for i in ret.decode('ascii').split('\n')[1:-1]]))
+
+    def _autoJobName(self, path):
+        return os.path.basename(os.path.abspath(path)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
+
     def submit(self, dirs):
         """ Submits all directories
 
         Parameters
         ----------
-        dist : list
+        dirs : list
             A list of executable directories.
         """
-        import time
         if isinstance(dirs, str):
             dirs = [dirs, ]
         self._dirs.extend(dirs)
+
+        if self.queue is None:
+            self.queue = self._autoQueueName()
 
         # if all folders exist, submit
         for d in dirs:
             logger.info('Queueing ' + d)
 
+            if self.jobname is None:
+                self.jobname = self._autoJobName(d)
+
             runscript = os.path.abspath(os.path.join(d, 'run.sh'))
 
-            if os.path.exists( os.path.join( d, ".done" ) ):
-              try:
-                 logger.info( "Removing existing .done  sentinel from %s" % (d))
-                 os.unlink( os.path.join( d, ".done" ) )
-              except:
-                 logger.info("Cant remove .done sentinel from %s" % (d) )
+            # Clean sentinel files , if existent
+            if os.path.exists(os.path.join(d, self._sentinel)):
+                try:
+                    os.remove(os.path.join(d, self._sentinel))
+                except:
+                    logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
+                else:
+                    logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
 
             if not os.path.exists(runscript):
                 raise FileExistsError('File {} does not exist.'.format(runscript))
@@ -171,14 +191,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
             except:
                 raise
 
-    def inprogress(self, debug=False):
-        inprogress = 0
-        for i in self._dirs:
-            if not os.path.exists(os.path.join(i, '.done')):
-                inprogress += 1
-        return inprogress
-
-    def __inprogress(self):
+    def inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
 
         Returns
@@ -186,12 +199,29 @@ class LsfQueue(SimQueue, ProtocolInterface):
         total : int
             Total running and queued workunits
         """
+        import time
+        import getpass
         if self.queue is None:
-            raise ValueError('The queue needs to be defined.')
-        user = pwd.getpwuid(os.getuid()).pw_name
+            self.queue = self._autoQueueName()
+        if self.jobname is None:
+            raise ValueError('The jobname needs to be defined.')
+        user = getpass.getuser()
         cmd = [self._qlist, '-J', self.jobname, '-u', user, '-q', self.queue]
         logger.debug(cmd)
-        ret = check_output(cmd)
+
+        # This command randomly fails so I need to allow it to repeat or it crashes adaptive
+        tries = 0
+        while tries < 3:
+            try:
+                ret = check_output(cmd)
+            except CalledProcessError:
+                if tries == 2:
+                    raise
+                tries += 1
+                time.sleep(3)
+                continue
+            break
+
         logger.debug(ret.decode("ascii"))
 
         # TODO: check lines and handle errors
@@ -201,18 +231,53 @@ class LsfQueue(SimQueue, ProtocolInterface):
             l = 0  # something odd happened
         return l
 
+    def notcompleted(self):
+        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
+
+        Returns
+        -------
+        total : int
+            Total number of directories which have not completed
+        """
+        total = 0
+        if len(self._dirs) == 0:
+            raise RuntimeError('This method relies on running synchronously.')
+        for i in self._dirs:
+            if not os.path.exists(os.path.join(i, self._sentinel)):
+                total += 1
+        return total
+
     def stop(self):
         """ Cancels all currently running and queued jobs
         """
+        import getpass
         if self.queue is None:
-            raise ValueError('The queue needs to be defined.')
-        user = pwd.getpwuid(os.getuid()).pw_name
+            self.queue = self._autoQueueName()
+        user = getpass.getuser()
         cmd = [self._qcancel, '-J', self.jobname, '-u', user, '-q', self.queue]
         logger.debug(cmd)
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))
 
+    def wait(self, sentinel=False):
+        """ Blocks script execution until all queued work completes
 
+        Parameters
+        ----------
+        sentinel : bool, default=False
+            If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
+            relies on the filesystem, in particular on the existence of a sentinel file for job completion.
+
+        Examples
+        --------
+        >>> LsfQueue.wait()
+        """
+        from time import sleep
+        import sys
+
+        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
+            sys.stdout.flush()
+            sleep(5)
 
 if __name__ == "__main__":
     """

@@ -110,7 +110,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 f.write('#SBATCH --mail-type={}\n'.format(self.mailtype))
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
             # Trap kill signals to create sentinel file
-            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(self._sentinel))
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
 
@@ -196,6 +196,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         import getpass
         if self.partition is None:
             self.partition = self._autoQueueName()
+        if self.jobname is None:
+            raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
         cmd = [self._qstatus, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
@@ -244,6 +246,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         import getpass
         if self.partition is None:
             self.partition = self._autoQueueName()
+        if self.jobname is None:
+            raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
         cmd = [self._qcancel, '-n', self.jobname, '-u', user, '-p', self.partition]
         logger.debug(cmd)
