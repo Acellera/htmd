@@ -56,7 +56,7 @@ def listFiles():
 
 
 
-def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
+def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True):
     """ Builds a system for AMBER
 
@@ -76,6 +76,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./', 
         The prefix for the generated pdb and psf files
     outdir : str
         The path to the output directory
+        Default: './build'
     caps : dict
         A dictionary with keys segids and values lists of strings describing the caps for a particular protein segment.
         e.g. caps['P'] = ['ACE', 'NME']. Default: will apply ACE and NME caps to every protein segment.

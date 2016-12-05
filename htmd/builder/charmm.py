@@ -108,7 +108,7 @@ def defaultStream():
     return ['str/prot/toppar_all36_prot_arg0.str',]
 
 
-def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./', caps=None, ionize=True, saltconc=0,
+def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, psfgen=None, execute=True, _clean=True):
     """ Builds a system for CHARMM
 
@@ -134,6 +134,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         The prefix for the generated pdb and psf files
     outdir : str
         The path to the output directory
+        Default: './build'
     caps : dict
         A dictionary with keys segids and values lists of strings describing the caps of that segment.
         e.g. caps['P'] = ['first ACE', 'last CT3']. Default: will apply ACE and CT3 caps to proteins and none caps
