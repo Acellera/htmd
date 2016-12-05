@@ -74,4 +74,10 @@ chmod -R a+rX "$PREFIX"
 
 # Try this to hopefully suppess travis build error on osx "shell_session_update"# cf https://github.com/travis-ci/travis-ci/issues/6522 
 set +e
+echo $PATH
+echo PATH=$PWD:$PATH
+echo "#!/bin/sh
+exit 0
+" > shell_session_update
+chmod +x shell_session_update
 exit 0
