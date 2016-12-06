@@ -19,7 +19,7 @@ def prettyPrintResidue(r):
 
 
 # Define a type for holding information on residues decisions
-class ResidueData:
+class PreparationData:
     """Results of the system preparation and optimization steps.
 
     Contains the results of an optimization operation, notably, for each residue name, id, and chain, the
@@ -33,7 +33,7 @@ class ResidueData:
     >>> tryp = Molecule("3PTB")
     >>> tryp_op, ri = proteinPrepare(tryp, returnDetails=True)
     >>> ri                                  # doctest: +NORMALIZE_WHITESPACE
-    ResidueData object about 290 residues.
+    PreparationData object about 290 residues.
     Unparametrized residue names: CA, BEN
     Please find the full info in the .data property, e.g.:
       resname  resid insertion chain       pKa protonation flipped     buried
@@ -76,7 +76,7 @@ class ResidueData:
 
     # Columns printed by the __str__ method
     _printColumns = ['resname', 'resid', 'insertion', 'chain',
-                     'pKa', 'protonation', 'flipped', 'buried' ]
+                     'pKa', 'protonation', 'flipped', 'buried']
 
     def __init__(self):
         self.propkaContainer = None
@@ -92,7 +92,7 @@ class ResidueData:
         # self.data.flipped = self.data.flipped.astype(float)             #  should be bool, but NaN not allowed
 
     def __str__(self):
-        r = "ResidueData object about {:d} residues.\n".format(len(self.data))
+        r = "PreparationData object about {:d} residues.\n".format(len(self.data))
         if len(self.missedLigands) > 0:
             r += "Unparametrized residue names: " + ", ".join(self.missedLigands) + "\n"
         r += "Please find the full info in the .data property, e.g.: \n".format(len(self.data))
@@ -123,16 +123,19 @@ class ResidueData:
             assert False, "More than one resid matched (internal error, please report)"
         return pos
 
+    # Generic setter in the pandas table. Maybe one should use actual indices instead.
+    def _set(self, residue, key, val):
+        pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
+        self.data.set_value(pos, key, val)
+
     # residue is e.g. pdb2pqr.src.aa.ILE
     def _setProtonationState(self, residue, state):
         # logger.debug("_setProtonationState %s %s" % (residue, state))
-        pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
-        self.data.set_value(pos, 'protonation', state)
+        self._set(residue, 'protonation', state)
 
     def _setFlipped(self, residue, state):
         logger.debug("_setFlipped %s %s" % (residue, state))
-        pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
-        self.data.set_value(pos, 'flipped', state)
+        self._set(residue, 'flipped', state)
 
     def _appendPatches(self, residue, patch):
         # logger.debug("_appendPatches %s %s" % (residue, patch))
@@ -186,9 +189,9 @@ class ResidueData:
         for i, cr in self.data[changed].iterrows():
             if cr.resname in ['N+', 'C-'] or cr.protonation in ['WAT'] or type(cr.protonation) == float:
                 continue
-            cl.append("{:s} ({:s})".format(prettyPrintResidue(cr),cr.protonation))
+            cl.append("{:s} ({:s})".format(prettyPrintResidue(cr), cr.protonation))
         if cl:
-            logger.info("The following residues are in a non-standard state: "+", ".join(cl))
+            logger.info("The following residues are in a non-standard state: " + ", ".join(cl))
 
     def _warnIfpKCloseTopH(self, ph, tol=1.0):
         # Looks like NaN < 5 is False today
@@ -197,11 +200,116 @@ class ResidueData:
         if nd > 1:
             logger.warning(
                 "Dubious protonation state: the pKa of {:d} residues is within {:.1f} units of pH {:.1f}."
-                .format(nd, tol, ph))
+                    .format(nd, tol, ph))
             for i, dr in self.data[dubious].iterrows():
-                drs=prettyPrintResidue(dr)
+                drs = prettyPrintResidue(dr)
                 logger.warning("Dubious protonation state:    {:s} (pKa={:5.2f})".format(drs, dr.pKa))
 
+    def reprepare(self):
+        """Repeat the system preparation, after changin the .data table.
+
+        You should only modify the value of the .data.new_protonation column on the basis of the values
+        in the .data.resid, .data.insertion, .data.chain attributes. Any other change will be ignored.
+
+        Returns
+        -------
+        mol_out : Molecule
+            the molecule titrated and optimized. The molecule object contains an additional attribute,
+        resData : ResidueData
+            a table of residues with the corresponding protonation states, pKas, and other information
+
+        Examples
+        --------
+        mol, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
+        d = prepData.data
+        d.loc[d.resid == 40, 'new_protonation'] = 'HIP'
+        mHIP40, pHIP40 = prepData.reprepare()
+
+        """
+
+        from pdb2pqr.src.hydrogens import hydrogenRoutines
+        from pdb2pqr.src.forcefield import Forcefield
+        from pdb2pqr.src.definitions import Definition
+        from htmd.builder.preparation import _buildResAndMol
+
+        d = self.data
+        routines = self.pdb2pqr_routines
+        p = routines.protein
+
+        neutraln = neutralc = False
+        assign_only = clean = False
+        debump = opt = True
+
+
+        # Code lifted from resinter.py
+        routines.removeHydrogens()
+        for index, oldResidue in enumerate(p.getResidues()):
+            chain = p.chainmap[oldResidue.chainID]
+            chainIndex = chain.residues.index(oldResidue)
+
+            d_idx = d.pdb2pqr_idx == index
+            if sum(d_idx) != 1:
+                logger.warning("Residue {:s} appears {:d} times in data table".format(str(oldResidue), sum(d_idx)))
+                continue
+
+            newResidueName = d.new_protonation[d_idx].iloc[0]
+            if pd.isnull(newResidueName):
+                # newResidueName = d.protonation[d_idx].iloc[0]
+                continue
+            logger.debug("Replacing {} with {}".format(oldResidue, newResidueName))
+
+            # Create the replacement residue
+            residueAtoms = oldResidue.atoms
+            newResidue = routines.protein.createResidue(residueAtoms, newResidueName)
+            # Make sure our names are cleaned up for output.
+            newResidue.renameResidue(newResidueName)
+            # Drop it in
+            p.residues[index] = newResidue
+            chain.residues[chainIndex] = newResidue
+            # Run the meaty bits of PDB2PQR
+        routines.setTermini(neutraln, neutralc)
+        routines.updateBonds()
+
+        if not clean and not assign_only:
+            routines.updateSSbridges()
+            if debump:
+                routines.debumpProtein()
+            routines.addHydrogens()
+            hydRoutines = hydrogenRoutines(routines)
+            if debump:
+                routines.debumpProtein()
+            if opt:
+                hydRoutines.setOptimizeableHydrogens()
+                hydRoutines.initializeFullOptimization()
+                hydRoutines.optimizeHydrogens()
+            else:
+                hydRoutines.initializeWaterOptimization()
+                hydRoutines.optimizeHydrogens()
+            # Special for GLH/ASH, since both conformations were added
+            hydRoutines.cleanup()
+
+
+        ff = "parse"
+        ffout = "amber"
+        usernames = userff = None
+
+        routines.setStates()
+        mydef = Definition()
+        myForcefield = Forcefield(ff, mydef, userff, usernames)
+        hitlist, misslist = routines.applyForcefield(myForcefield)
+        # reslist, charge = routines.getCharge() # <--- ?
+
+        # Copied from runPDB2PQR = ?
+        if not ffout is None:
+            if ffout != ff:
+                myNameScheme = Forcefield(ffout, mydef, userff)
+            else:
+                myNameScheme = myForcefield
+                routines.applyNameScheme(myNameScheme)
+
+
+        newMol, newResData = _buildResAndMol(p)
+        return newMol, newResData
 
 
 if __name__ == "__main__":

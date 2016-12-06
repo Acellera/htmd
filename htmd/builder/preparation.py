@@ -11,7 +11,7 @@ import propka.lib
 from pdb2pqr.main import runPDB2PQR
 from pdb2pqr.src.pdb import readPDB
 
-from htmd.builder.residuedata import ResidueData
+from htmd.builder.preparationdata import PreparationData
 from htmd.molecule.molecule import Molecule
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,75 @@ def _warnIfContainsDUM(mol):
         logger.warning("OPM's DUM residues must be filtered out before preparation. Continuing, but crash likely.")
 
 
+def _buildResAndMol(pdb2pqr_protein):
+    # Here I parse the returned protein object and recreate a Molecule,
+    # because I need to access the properties.
+    logger.debug("Building Molecule object.")
+
+    name = []
+    resid = []
+    chain = []
+    insertion = []
+    coords = []
+    resname = []
+    segid = []
+    element = []
+    occupancy = []
+    beta = []
+    record = []
+    charge = []
+
+    resData = PreparationData()
+
+    for i, residue in enumerate(pdb2pqr_protein.residues):
+        # if 'ffname' in residue.__dict__:
+        if getattr(residue, 'ffname', None):
+            curr_resname = residue.ffname
+            if len(curr_resname) >= 4:
+                curr_resname = curr_resname[-3:]
+                logger.debug("Residue %s has internal name %s, replacing with %s" %
+                             (residue, residue.ffname, curr_resname))
+        else:
+            curr_resname = residue.name
+
+        resData._setProtonationState(residue, curr_resname)
+
+        # if 'patches' in residue.__dict__:
+        if getattr(residue, 'patches', None):
+            for patch in residue.patches:
+                resData._appendPatches(residue, patch)
+                if patch != "PEPTIDE":
+                    logger.debug("Residue %s has patch %s set" % (residue, patch))
+
+        if getattr(residue, 'wasFlipped', 'UNDEF') != 'UNDEF':
+            resData._setFlipped(residue, residue.wasFlipped)
+
+        resData._set(residue, 'pdb2pqr_idx', i)
+
+        for atom in residue.atoms:
+            # Fixup element fields for added H (routines.addHydrogens)
+            elt = "H" if atom.added and atom.name.startswith("H") else atom.element
+            name.append(atom.name)
+            resid.append(residue.resSeq)
+            chain.append(residue.chainID)
+            insertion.append(residue.iCode)
+            coords.append([atom.x, atom.y, atom.z])
+            resname.append(curr_resname)
+            segid.append(atom.segID)
+            element.append(elt)
+            occupancy.append(atom.occupancy)
+            beta.append(atom.tempFactor)
+            charge.append(atom.charge)
+            record.append(atom.type)
+
+    mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
+                            occupancy, beta, charge, record)
+
+    resData._importPKAs(pdb2pqr_protein.pka_protein)
+
+    return mol_out, resData
+
+
 def proteinPrepare(mol_in,
                    pH=7.0,
                    verbose=0,
@@ -103,7 +172,7 @@ def proteinPrepare(mol_in,
     ========= ======= =========
 
     A detailed table about the residues modified is returned (as a second return value) when
-    returnDetails is True (see ResidueData object).
+    returnDetails is True (see PreparationData object).
 
     If hydrophobicThickness is set to a positive value 2*h, a warning is produced for titratable residues
     having -h<z<h and are buried in the protein by less than 75%. Note that the heuristic for the
@@ -146,7 +215,7 @@ def proteinPrepare(mol_in,
     -------
     mol_out : Molecule
         the molecule titrated and optimized. The molecule object contains an additional attribute,
-    resData : ResidueData
+    resData : PreparationData
         a table of residues with the corresponding protonation states, pKas, and other information
 
 
@@ -158,7 +227,7 @@ def proteinPrepare(mol_in,
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
     >>> prepData
-    ResidueData object about 290 residues.
+    PreparationData object about 290 residues.
     Unparametrized residue names: CA, BEN
     Please find the full info in the .data property, e.g.:
       resname  resid insertion chain       pKa protonation flipped     buried
@@ -212,14 +281,13 @@ def proteinPrepare(mol_in,
 
     See Also
     --------
-    :class:`htmd.builder.residuedata.ResidueData`
+    :class:`htmd.builder.PreparationData.PreparationData`
 
     Notes
     -----
     Unsupported/To Do/To Check:
      - ligands
      - termini
-     - force residues
      - multiple chains
      - nucleic acids
      - coupled titrating residues
@@ -265,87 +333,33 @@ def proteinPrepare(mol_in,
     hlist = _selToHoldList(mol_in, holdSelection)
 
     # Relying on defaults
-    header, pqr, missedLigands, pdb2pqr_protein = runPDB2PQR(pdblist,
-                                                             ph=pH, verbose=verbose,
-                                                             ff="parse", ffout="amber",
-                                                             ph_calc_method="propka31",
-                                                             ph_calc_options=propka_opts,
-                                                             holdList=hlist)
+    pqr_res = runPDB2PQR(pdblist,
+                         ph=pH, verbose=verbose,
+                         ff="parse", ffout="amber",
+                         ph_calc_method="propka31",
+                         ph_calc_options=propka_opts,
+                         holdList=hlist)
+    header, pqr, missedLigands, pdb2pqr_protein, pdb2pqr_routines = \
+        pqr_res['header'], pqr_res['lines'], pqr_res['missedligands'], pqr_res['protein'], pqr_res['routines']
+
     tmpin.close()
 
     # Diagnostics
     for missedligand in missedLigands:
         logger.warning("The following residue has not been optimized: " + missedligand)
 
-    # Here I parse the returned protein object and recreate a Molecule,
-    # because I need to access the properties.
-    logger.debug("Building Molecule object.")
+    mol_out, resData = _buildResAndMol(pdb2pqr_protein)
 
-    name = []
-    resid = []
-    chain = []
-    insertion = []
-    coords = []
-    resname = []
-    segid = []
-    element = []
-    occupancy = []
-    beta = []
-    record = []
-    charge = []
-
-    resData = ResidueData()
-
-    resData.header = header
-    resData.pqr = pqr
-
-    for residue in pdb2pqr_protein.residues:
-        # if 'ffname' in residue.__dict__:
-        if getattr(residue, 'ffname', None):
-            curr_resname = residue.ffname
-            if len(curr_resname) >= 4:
-                curr_resname = curr_resname[-3:]
-                logger.debug("Residue %s has internal name %s, replacing with %s" %
-                             (residue, residue.ffname, curr_resname))
-        else:
-            curr_resname = residue.name
-
-        resData._setProtonationState(residue, curr_resname)
-
-        # if 'patches' in residue.__dict__:
-        if getattr(residue, 'patches', None):
-            for patch in residue.patches:
-                resData._appendPatches(residue, patch)
-                if patch != "PEPTIDE":
-                    logger.debug("Residue %s has patch %s set" % (residue, patch))
-
-        if getattr(residue, 'wasFlipped', 'UNDEF') != 'UNDEF':
-            resData._setFlipped(residue, residue.wasFlipped)
-
-        for atom in residue.atoms:
-            # Fixup element fields for added H (routines.addHydrogens)
-            elt = "H" if atom.added and atom.name.startswith("H") else atom.element
-            name.append(atom.name)
-            resid.append(residue.resSeq)
-            chain.append(residue.chainID)
-            insertion.append(residue.iCode)
-            coords.append([atom.x, atom.y, atom.z])
-            resname.append(curr_resname)
-            segid.append(atom.segID)
-            element.append(elt)
-            occupancy.append(atom.occupancy)
-            beta.append(atom.tempFactor)
-            charge.append(atom.charge)
-            record.append(atom.type)
-
-    mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
-                            occupancy, beta, charge, record)
     mol_out.box = mol_in.box
     _fixupWaterNames(mol_out)
 
+    # Misc. info
+    resData.header = header
+    resData.pqr = pqr
+
     # Return residue information
-    resData._importPKAs(pdb2pqr_protein.pka_protein)
     resData.pdb2pqr_protein = pdb2pqr_protein
+    resData.pdb2pqr_routines = pdb2pqr_routines
     resData.missedLigands = missedLigands
 
     resData._listNonStandardResidues()
@@ -376,6 +390,13 @@ if __name__ == "__main__":
         mol_op.write("./mol-test.pdb")
         prepData.data.to_excel("./mol-test.xlsx")
         prepData.data.to_csv("./mol-test.csv")
+
+        mol, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
+        d = prepData.data
+        prepData.data.loc[d.resid == 40, 'new_protonation'] = 'HIP'
+        mHIP40, pHIP40 = prepData.reprepare()
+        mHIP40.write("./mol-test-hip40.pdb")
+        pHIP40.data.to_excel("./mol-test-hip40.xlsx")
 
         """
         x_HIS91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")

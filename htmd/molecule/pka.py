@@ -10,7 +10,7 @@ import propka
 import propka.lib
 import propka.molecular_container
 
-from htmd.builder.preparation import ResidueData
+from htmd.builder.preparationdata import PreparationData
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def _pka_backend_internal(mol, pH):
     # calculating pKa values for ionizable residues -
     pka_molecule.calculate_pka()
 
-    rd = ResidueData()
+    rd = PreparationData()
     rd._importPKAs(pka_molecule)
     return rd.data
 
