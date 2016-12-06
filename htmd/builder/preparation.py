@@ -391,7 +391,7 @@ if __name__ == "__main__":
         prepData.data.to_excel("./mol-test.xlsx")
         prepData.data.to_csv("./mol-test.csv")
 
-        mol, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
+        # mol, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
         d = prepData.data
         prepData.data.loc[d.resid == 40, 'new_protonation'] = 'HIP'
         mHIP40, pHIP40 = prepData.reprepare()

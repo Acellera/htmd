@@ -106,9 +106,8 @@ class PreparationData:
     def _findRes(self, a_resname, a_resid, a_icode, a_chain, forceAppend=False):
         icode_pad = "{:1.1s}".format(a_icode)  # Pad and truncate to 1 char
         chain_pad = "{:1.1s}".format(a_chain)
-        # Identity check should ignore residue name (self.resname == a_resname)
-        mask = (self.data.resname == a_resname) & (self.data.resid == a_resid) & \
-               (self.data.insertion == icode_pad) & (self.data.chain == chain_pad)
+        # Identity check should ignore residue name (self.data.resname == a_resname)
+        mask = (self.data.chain == chain_pad) & (self.data.resid == a_resid) & (self.data.insertion == icode_pad)
         if sum(mask) == 0 or forceAppend:
             self.data = self.data.append({'resname': a_resname,
                                           'resid': a_resid,
