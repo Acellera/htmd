@@ -226,14 +226,13 @@ class PRM:
         # to original type (which has the same vdw params)
         # because a copy of a copy won't be in self.nonbonded.
 
-        for b in self.nonbonded: print(b.types[0])
         for i in set(rtf.types):
             p = None
             j = re.sub("x[0123456789]$", "", i)
             for b in self.nonbonded: 
-               if b.types[0] == j:
-                  p = b
-            print("%s %f %f" % ( t[i], 0.5 * p.rmin, -p.emin), file=f )
+                if b.types[0] == j:
+                    p = b
+            print("%s %f %f" % (t[i], 0.5 * p.rmin, -p.emin), file=f)
 
         print("", file=f)
         f.close()
