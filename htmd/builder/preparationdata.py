@@ -69,7 +69,7 @@ class PreparationData:
     # Important- all must be listed or "set_value" will silently ignore them
     _columns = ['resname', 'resid', 'insertion', 'chain',
                 'pKa', 'protonation', 'flipped', 'patches',
-                'buried', 'z', 'membraneExposed',
+                'buried', 'z', 'membraneExposed', 'forced_protonation',
                 'pka_group_id',
                 'pka_residue_type', 'pka_type', 'pka_charge',
                 'pka_atom_name', 'pka_atom_sybyl_type']
@@ -209,7 +209,7 @@ class PreparationData:
     def reprepare(self):
         """Repeat the system preparation, after changin the .data table.
 
-        You should only modify the value of the .data.new_protonation column on the basis of the values
+        You should only modify the value of the .data.forced_protonation column on the basis of the values
         in the .data.resid, .data.insertion, .data.chain attributes. Any other change will be ignored.
 
         Returns
@@ -223,7 +223,7 @@ class PreparationData:
         --------
         mol, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
         d = prepData.data
-        d.loc[d.resid == 40, 'new_protonation'] = 'HIP'
+        d.loc[d.resid == 40, 'forced_protonation'] = 'HIP'
         mHIP40, pHIP40 = prepData.reprepare()
 
         """
@@ -253,7 +253,7 @@ class PreparationData:
                 logger.warning("Residue {:s} appears {:d} times in data table".format(str(oldResidue), sum(d_idx)))
                 continue
 
-            newResidueName = d.new_protonation[d_idx].iloc[0]
+            newResidueName = d.forced_protonation[d_idx].iloc[0]
             if pd.isnull(newResidueName):
                 # newResidueName = d.protonation[d_idx].iloc[0]
                 continue
@@ -294,8 +294,8 @@ class PreparationData:
         ffout = "amber"
         usernames = userff = None
 
-        routines.setStates()
-        mydef = Definition()
+        routines.setStates()    # ?
+        mydef = Definition()    # ?
         myForcefield = Forcefield(ff, mydef, userff, usernames)
         hitlist, misslist = routines.applyForcefield(myForcefield)
         # reslist, charge = routines.getCharge() # <--- ?
@@ -310,6 +310,8 @@ class PreparationData:
 
 
         newMol, newResData = _buildResAndMol(p)
+        # Assume that the number and order of residues does not change
+        newResData.data.forced_protonation = d.forced_protonation
         return newMol, newResData
 
 
