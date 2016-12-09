@@ -312,6 +312,10 @@ class PreparationData:
         newMol, newResData = _buildResAndMol(p)
         # Assume that the number and order of residues does not change
         newResData.data.forced_protonation = d.forced_protonation
+        newResData.pdb2pqr_routines = routines
+        newResData.pdb2pqr_protein = routines.protein
+        newResData.missedLigands = self.missedLigands
+
         return newMol, newResData
 
 
