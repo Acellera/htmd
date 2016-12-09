@@ -14,6 +14,13 @@ pd.data.to_excel("4UAI-out.xlsx")
 pd.data.forced_protonation[pd.data.resid == 63] = "GLU"
 nm, npd = pd.reprepare()
 
+
+# Outstanding bugs: pKa are not carried over
+# npd.data.protonation (and nm.resname) columns do not reflect the changes
+
+
+
+
 try:
     pd.data.forced_protonation[pd.data.resid == 63] = "GLN"
     nm, npd = pd.reprepare()
