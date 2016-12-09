@@ -484,7 +484,7 @@ class Model(object):
         # Removed ncpus because it was giving errors on some systems.
         aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
         mols = aprun(total=len(relframes), description='Getting state Molecules')\
-            (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, refmol, simlist) for rel in enumerate(relframes))
+            (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, refmol, simlist) for rel in relframes)
         return np.array(mols, dtype=object)
 
     def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
