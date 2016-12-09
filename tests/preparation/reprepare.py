@@ -11,6 +11,11 @@ m, pd = proteinPrepare(prot, returnDetails=True, pH=3.0)
 m.write("4UAI-out.pdb")
 pd.data.to_excel("4UAI-out.xlsx")
 
-pd.data.forced_protonation[pd.data.resid == 62] = "GLN"
-
+pd.data.forced_protonation[pd.data.resid == 63] = "GLU"
 nm, npd = pd.reprepare()
+
+try:
+    pd.data.forced_protonation[pd.data.resid == 63] = "GLN"
+    nm, npd = pd.reprepare()
+except:
+    print("Got the expected failure")
