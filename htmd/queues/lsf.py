@@ -206,7 +206,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         if self.jobname is None:
             raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
-        cmd = [self._qlist, '-J', self.jobname, '-u', user, '-q', self.queue]
+        cmd = [self._qstatus, '-J', self.jobname, '-u', user, '-q', self.queue]
         logger.debug(cmd)
 
         # This command randomly fails so I need to allow it to repeat or it crashes adaptive
