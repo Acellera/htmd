@@ -235,6 +235,10 @@ class PreparationData:
         from pdb2pqr.src.definitions import Definition
         from htmd.builder.preparation import _buildResAndMol
 
+        keep_pka_columns = ('forced_protonation', 'buried', 'z', 'membraneExposed',
+                            'pKa', 'pka_group_id', 'pka_residue_type', 'pka_type',
+                            'pka_charge', 'pka_atom_name', 'pka_atom_sybyl_type')
+
         d = self.data
         routines = self.pdb2pqr_routines
         p = routines.protein
@@ -242,7 +246,6 @@ class PreparationData:
         neutraln = neutralc = False
         assign_only = clean = False
         debump = opt = True
-
 
         # Code lifted from resinter.py
         routines.removeHydrogens()
@@ -291,13 +294,12 @@ class PreparationData:
             # Special for GLH/ASH, since both conformations were added
             hydRoutines.cleanup()
 
-
         ff = "parse"
         ffout = "amber"
         usernames = userff = None
 
-        routines.setStates()    # ?
-        mydef = Definition()    # ?
+        routines.setStates()  # ?
+        mydef = Definition()  # ?
         myForcefield = Forcefield(ff, mydef, userff, usernames)
         hitlist, misslist = routines.applyForcefield(myForcefield)
         # reslist, charge = routines.getCharge() # <--- ?
@@ -310,10 +312,13 @@ class PreparationData:
                 myNameScheme = myForcefield
                 routines.applyNameScheme(myNameScheme)
 
-
         newMol, newResData = _buildResAndMol(p)
         # Assume that the number and order of residues does not change
-        newResData.data.forced_protonation = d.forced_protonation
+
+        # Carry over old pka and other useful info
+        for cn in keep_pka_columns:
+            newResData.data[cn] = d[cn]
+
         newResData.pdb2pqr_routines = routines
         newResData.pdb2pqr_protein = routines.protein
         newResData.missedLigands = self.missedLigands
