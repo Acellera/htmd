@@ -235,13 +235,16 @@ class PreparationData:
         from pdb2pqr.src.definitions import Definition
         from htmd.builder.preparation import _buildResAndMol
 
+        d = self.data
+        routines = self.pdb2pqr_routines
+        p = routines.protein
+
         keep_pka_columns = ('forced_protonation', 'buried', 'z', 'membraneExposed',
                             'pKa', 'pka_group_id', 'pka_residue_type', 'pka_type',
                             'pka_charge', 'pka_atom_name', 'pka_atom_sybyl_type')
 
-        d = self.data
-        routines = self.pdb2pqr_routines
-        p = routines.protein
+        copy_of_resname = d['resname']
+
 
         neutraln = neutralc = False
         assign_only = clean = False
@@ -316,6 +319,7 @@ class PreparationData:
         # Assume that the number and order of residues does not change
 
         # Carry over old pka and other useful info
+        newResData.data['resname'] = copy_of_resname
         for cn in keep_pka_columns:
             newResData.data[cn] = d[cn]
 
