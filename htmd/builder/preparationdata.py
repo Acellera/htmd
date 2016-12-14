@@ -244,7 +244,8 @@ class PreparationData:
                             'pka_charge', 'pka_atom_name', 'pka_atom_sybyl_type')
 
         copy_of_resname = d['resname']
-
+        copy_of_protonation = d['protonation']
+        list_of_forced_protonations = ~ pd.isnull(d['forced_protonation'])
 
         neutraln = neutralc = False
         assign_only = clean = False
@@ -265,6 +266,7 @@ class PreparationData:
             if pd.isnull(newResidueName):
                 # newResidueName = d.protonation[d_idx].iloc[0]
                 continue
+
             logger.debug("Replacing {} with {}".format(oldResidue, newResidueName))
 
             # Create the replacement residue
@@ -320,6 +322,9 @@ class PreparationData:
 
         # Carry over old pka and other useful info
         newResData.data['resname'] = copy_of_resname
+        newResData.data['protonation'] = copy_of_protonation
+        newResData.data.ix[list_of_forced_protonations, 'protonation'] = \
+            d.ix[list_of_forced_protonations, 'forced_protonation']
         for cn in keep_pka_columns:
             newResData.data[cn] = d[cn]
 
