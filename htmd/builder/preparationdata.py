@@ -69,7 +69,7 @@ class PreparationData:
     # Important- all must be listed or "set_value" will silently ignore them
     _columns = ['resname', 'resid', 'insertion', 'chain',
                 'pKa', 'protonation', 'flipped', 'patches',
-                'buried', 'z', 'membraneExposed',
+                'buried', 'z', 'membraneExposed', 'forced_protonation',
                 'pka_group_id',
                 'pka_residue_type', 'pka_type', 'pka_charge',
                 'pka_atom_name', 'pka_atom_sybyl_type']
@@ -188,7 +188,9 @@ class PreparationData:
         changed = self.data.resname != self.data.protonation
         cl = []
         for i, cr in self.data[changed].iterrows():
-            if cr.resname in ['N+', 'C-'] or cr.protonation in ['WAT'] or type(cr.protonation) == float:
+            if cr.resname in ['N+', 'C-'] or \
+                            cr.protonation in ['WAT'] or \
+                            type(cr.protonation) == float:
                 continue
             cl.append("{:s} ({:s})".format(prettyPrintResidue(cr), cr.protonation))
         if cl:
@@ -209,7 +211,7 @@ class PreparationData:
     def reprepare(self):
         """Repeat the system preparation, after changin the .data table.
 
-        You should only modify the value of the .data.new_protonation column on the basis of the values
+        You should only modify the value of the .data.forced_protonation column on the basis of the values
         in the .data.resid, .data.insertion, .data.chain attributes. Any other change will be ignored.
 
         Returns
@@ -223,7 +225,7 @@ class PreparationData:
         --------
         mol, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
         d = prepData.data
-        d.loc[d.resid == 40, 'new_protonation'] = 'HIP'
+        d.loc[d.resid == 40, 'forced_protonation'] = 'HIP'
         mHIP40, pHIP40 = prepData.reprepare()
 
         """
@@ -237,10 +239,17 @@ class PreparationData:
         routines = self.pdb2pqr_routines
         p = routines.protein
 
+        keep_pka_columns = ('forced_protonation', 'buried', 'z', 'membraneExposed',
+                            'pKa', 'pka_group_id', 'pka_residue_type', 'pka_type',
+                            'pka_charge', 'pka_atom_name', 'pka_atom_sybyl_type')
+
+        copy_of_resname = d['resname']
+        copy_of_protonation = d['protonation']
+        list_of_forced_protonations = ~ pd.isnull(d['forced_protonation'])
+
         neutraln = neutralc = False
         assign_only = clean = False
         debump = opt = True
-
 
         # Code lifted from resinter.py
         routines.removeHydrogens()
@@ -253,10 +262,11 @@ class PreparationData:
                 logger.warning("Residue {:s} appears {:d} times in data table".format(str(oldResidue), sum(d_idx)))
                 continue
 
-            newResidueName = d.new_protonation[d_idx].iloc[0]
+            newResidueName = d.forced_protonation[d_idx].iloc[0]
             if pd.isnull(newResidueName):
                 # newResidueName = d.protonation[d_idx].iloc[0]
                 continue
+
             logger.debug("Replacing {} with {}".format(oldResidue, newResidueName))
 
             # Create the replacement residue
@@ -289,13 +299,12 @@ class PreparationData:
             # Special for GLH/ASH, since both conformations were added
             hydRoutines.cleanup()
 
-
         ff = "parse"
         ffout = "amber"
         usernames = userff = None
 
-        routines.setStates()
-        mydef = Definition()
+        routines.setStates()  # ?
+        mydef = Definition()  # ?
         myForcefield = Forcefield(ff, mydef, userff, usernames)
         hitlist, misslist = routines.applyForcefield(myForcefield)
         # reslist, charge = routines.getCharge() # <--- ?
@@ -308,8 +317,21 @@ class PreparationData:
                 myNameScheme = myForcefield
                 routines.applyNameScheme(myNameScheme)
 
-
         newMol, newResData = _buildResAndMol(p)
+        # Assume that the number and order of residues does not change
+
+        # Carry over old pka and other useful info
+        newResData.data['resname'] = copy_of_resname
+        newResData.data['protonation'] = copy_of_protonation
+        newResData.data.ix[list_of_forced_protonations, 'protonation'] = \
+            d.ix[list_of_forced_protonations, 'forced_protonation']
+        for cn in keep_pka_columns:
+            newResData.data[cn] = d[cn]
+
+        newResData.pdb2pqr_routines = routines
+        newResData.pdb2pqr_protein = routines.protein
+        newResData.missedLigands = self.missedLigands
+
         return newMol, newResData
 
 
