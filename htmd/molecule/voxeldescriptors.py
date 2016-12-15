@@ -4,7 +4,7 @@ import ctypes
 import htmd
 import os
 
-_order = ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 'positive_ionizable', 'negative_ionizable', 'metal')
+_order = ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 'positive_ionizable', 'negative_ionizable', 'metal', 'occupancies')
 libdir = htmd.home(libDir=True)
 occupancylib = ctypes.cdll.LoadLibrary(os.path.join(libdir, "occupancy_ext.so"))
 
@@ -40,11 +40,10 @@ def getVoxelDescriptors(mol, buffer, voxelsize=1):
     N = np.ceil((bbM - bbm) / voxelsize).astype(int)
 
     # Calculate for each channel the atom sigmas
-    multisigmas = np.zeros([mol.numAtoms, len(_order) + 1])  # add 1 channel for occupancy
+    multisigmas = np.zeros([mol.numAtoms, len(_order)])
     sigmas = _getSigmas(mol)
     for i, p in enumerate(_order):
         multisigmas[properties[p], i] = sigmas[properties[p]]
-    multisigmas[:, -1] = sigmas  # occupancy
 
     # Calculate occupancies and centers
     occs, centers = _getGridDescriptors(mol, bbm, N, multisigmas, voxelsize)
@@ -114,7 +113,7 @@ def _getAtomtypePropertiesPDBQT(mol):
     props['negative_ionizable'] = mol.charge < 0
     props['metal'] = (elements == 'MG') | (elements == 'ZN') | (elements == 'MN') | \
                      (elements == 'CA') | (elements == 'FE')
-
+    props['occupancies'] = (elements != 'H') & (elements != 'HS') & (elements != 'HD')
     return props
 
 
