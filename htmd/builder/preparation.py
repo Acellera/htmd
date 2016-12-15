@@ -80,7 +80,7 @@ def _buildResAndMol(pdb2pqr_protein):
     record = []
     charge = []
 
-    resData = PreparationData()
+    prepData = PreparationData()
 
     for i, residue in enumerate(pdb2pqr_protein.residues):
         # if 'ffname' in residue.__dict__:
@@ -93,19 +93,19 @@ def _buildResAndMol(pdb2pqr_protein):
         else:
             curr_resname = residue.name
 
-        resData._setProtonationState(residue, curr_resname)
+        prepData._setProtonationState(residue, curr_resname)
 
         # if 'patches' in residue.__dict__:
         if getattr(residue, 'patches', None):
             for patch in residue.patches:
-                resData._appendPatches(residue, patch)
+                prepData._appendPatches(residue, patch)
                 if patch != "PEPTIDE":
                     logger.debug("Residue %s has patch %s set" % (residue, patch))
 
         if getattr(residue, 'wasFlipped', 'UNDEF') != 'UNDEF':
-            resData._setFlipped(residue, residue.wasFlipped)
+            prepData._setFlipped(residue, residue.wasFlipped)
 
-        resData._set(residue, 'pdb2pqr_idx', i)
+        prepData._set(residue, 'pdb2pqr_idx', i)
 
         for atom in residue.atoms:
             # Fixup element fields for added H (routines.addHydrogens)
@@ -126,9 +126,9 @@ def _buildResAndMol(pdb2pqr_protein):
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
 
-    resData._importPKAs(pdb2pqr_protein.pka_protein)
+    prepData._importPKAs(pdb2pqr_protein.pka_protein)
 
-    return mol_out, resData
+    return mol_out, prepData
 
 
 def proteinPrepare(mol_in,
@@ -339,8 +339,12 @@ def proteinPrepare(mol_in,
                          ph_calc_method="propka31",
                          ph_calc_options=propka_opts,
                          holdList=hlist)
-    header, pqr, missedLigands, pdb2pqr_protein, pdb2pqr_routines = \
-        pqr_res['header'], pqr_res['lines'], pqr_res['missedligands'], pqr_res['protein'], pqr_res['routines']
+    try:
+        header, pqr, missedLigands, pdb2pqr_protein, pdb2pqr_routines = \
+            pqr_res['header'], pqr_res['lines'], pqr_res['missedligands'], pqr_res['protein'], pqr_res['routines']
+    except:
+        logger.error("Problem calling pdb2pqr. Make sure you have htmd-pdb2pqr >= 2.1.2a9")
+        raise
 
     tmpin.close()
 

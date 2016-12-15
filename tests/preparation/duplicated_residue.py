@@ -11,3 +11,4 @@ x, y = proteinPrepare(prot, returnDetails=True)
 x.write("4UAI-out.pdb")
 y.data.to_excel("4UAI-out.xlsx")
 
+
