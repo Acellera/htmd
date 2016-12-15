@@ -339,8 +339,12 @@ def proteinPrepare(mol_in,
                          ph_calc_method="propka31",
                          ph_calc_options=propka_opts,
                          holdList=hlist)
-    header, pqr, missedLigands, pdb2pqr_protein, pdb2pqr_routines = \
-        pqr_res['header'], pqr_res['lines'], pqr_res['missedligands'], pqr_res['protein'], pqr_res['routines']
+    try:
+        header, pqr, missedLigands, pdb2pqr_protein, pdb2pqr_routines = \
+            pqr_res['header'], pqr_res['lines'], pqr_res['missedligands'], pqr_res['protein'], pqr_res['routines']
+    except:
+        logger.error("Problem calling pdb2pqr. Make sure you have htmd-pdb2pqr >= 2.1.2a9")
+        raise
 
     tmpin.close()
 

@@ -10,7 +10,7 @@ set -ev
 
 export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC
 
-
+for PACKAGE_NAME in htmd htmd-deps; do
 export CHANNEL=acellera
 echo "Uploading to channel: $CHANNEL : PACKAGE $PACKAGE_NAME"
 
@@ -20,6 +20,6 @@ if [ "$CROSS_COMPILE" == "1" ]; then
 else
 	anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
 fi
-
+done
 
 

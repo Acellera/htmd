@@ -72,7 +72,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._dirs = []
 
         # Specific automatic guessing
-        ret = check_output(self._qstatus)
+        ret = check_output(self._qinfo)
         if 'phase6_normal' in ret.decode('ascii'):
             if self.environment is None:
                 self.environment = ['source /home/model/MD-SOFTWARE/model_md.bashrc', 'source /home/model/miniconda3/htmd.bashrc']
