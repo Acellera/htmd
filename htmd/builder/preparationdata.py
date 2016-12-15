@@ -103,14 +103,15 @@ class PreparationData:
     def __repr__(self):
         return self.__str__()
 
-    def _findRes(self, a_resname, a_resid, a_icode, a_chain, forceAppend=False):
+    def _findRes(self, a_resname, a_resid, a_icode, a_chain):
         icode_pad = "{:1.1s}".format(a_icode)  # Pad and truncate to 1 char
         chain_pad = "{:1.1s}".format(a_chain)
-        # Identity check should ignore residue name (self.data.resname == a_resname). Not doing this because
-        # the N+ and C- resnames are indeed duplicated
+        # Identity check should ignore residue name (self.data.resname == a_resname).
+        # The N+ and C- resnames are indeed duplicated - distinguishing them with icode T.
+        # Ditto for ligands, icode L.
         mask = (self.data.chain == chain_pad) & (self.data.resid == a_resid) & \
-               (self.data.insertion == icode_pad) & (self.data.resname == a_resname)
-        if sum(mask) == 0 or forceAppend:
+               (self.data.insertion == icode_pad)
+        if sum(mask) == 0:
             self.data = self.data.append({'resname': a_resname,
                                           'resid': a_resid,
                                           'insertion': icode_pad,
@@ -147,19 +148,20 @@ class PreparationData:
         logger.debug("Called _importPKAs")
         self.propkaContainer = pkaCont
         for i, grp in enumerate(self.propkaContainer.conformations['AVR'].groups):
-            forceAppend = False
             # This is the key
             # Other places for the resname: grp.type  -  grp.atom.resName  grp.residue_type
             resname = grp.atom.resName
-            if grp.residue_type in ['N+', 'C-']:  # Separate info about termini
-                resname = grp.residue_type
-                forceAppend = True
-            elif grp.atom.sybyl_assigned:  # A ligand - a hack to allow multiple groups overriding key
-                forceAppend = True
             resid = grp.atom.resNumb
             chain = grp.atom.chainID
             icode = grp.atom.icode
-            pos = self._findRes(resname, resid, icode, chain, forceAppend)
+            if grp.residue_type in ['N+', 'C-']:  # Separate info about termini. See _findRes
+                resname = grp.residue_type
+                icode = "T"
+                # forceAppend = True
+            elif grp.atom.sybyl_assigned:  # A ligand - a hack to allow multiple groups overriding key. See _findRes
+                icode = "L"
+                # forceAppend = True
+            pos = self._findRes(resname, resid, icode, chain)
             self.data.set_value(pos, 'pKa', grp.pka_value)
             self.data.set_value(pos, 'buried', grp.buried * 100.0)
             self.data.set_value(pos, 'z', grp.atom.z)
