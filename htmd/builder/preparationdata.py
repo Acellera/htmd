@@ -45,9 +45,6 @@ class PreparationData:
      . . .
     >>> "%.2f" % ri.data.pKa[ri.data.resid==189]
     '4.95'
-    >>> ri.data.patches[ri.data.resid==57]
-    39    [PEPTIDE, HIP]
-    Name: patches, dtype: object
     >>> ri.data.to_csv("/tmp/report.csv")
 
     Attributes
@@ -57,7 +54,7 @@ class PreparationData:
         insertion "Insertion code (resid suffix)", chain "Chain", pKa "pKa value computed by propKa",
         "protonation" Forcefield-independent protonation code, flipped "Whether the residue was flipped during the
         optimization", buried "Fraction of residue which is buried", membraneExposed "Whether residue is exposed to
-        membrane", patches "Additional information (may change)" (etc)
+        membrane", etc.
     missedLigands : str
         List of ligands residue names which were not optimized
     header : str
@@ -112,11 +109,12 @@ class PreparationData:
         mask = (self.data.chain == chain_pad) & (self.data.resid == a_resid) & \
                (self.data.insertion == icode_pad)
         if sum(mask) == 0:
-            self.data = self.data.append({'resname': a_resname,
+            self.data = self.data.append({
+                                          'resname': a_resname,
                                           'resid': a_resid,
                                           'insertion': icode_pad,
-                                          'chain': chain_pad,
-                                          'patches': []}, ignore_index=True)
+                                          'chain': chain_pad, #     'patches': []
+                                          }, ignore_index=True)
             pos = len(self.data) - 1
         elif sum(mask) == 1:
             pos = np.argwhere(mask)
