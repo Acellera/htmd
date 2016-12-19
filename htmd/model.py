@@ -669,6 +669,19 @@ class Model(object):
         from copy import deepcopy
         return deepcopy(self)
 
+    def cktest(self):
+        """ Conducts a Chapman-Kolmogorow test.
+
+        Returns
+        -------
+
+        """
+        from copy import deepcopy
+        from pyemma.plots import plot_cktest
+        msm = deepcopy(self.msm)
+        ck = msm.cktest(self.macronum)
+        plot_cktest(ck)
+
     def createCoreSetModel(self, divisor=2):
         """ Given an MSM this function detects the states belonging to a core set and returns a new model consisting
         only of these states.
