@@ -38,6 +38,12 @@ def listFiles():
     for f in ffs:
         print(f)
 
+    amberdir = path.join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
+    ffs = [f for f in os.listdir(amberdir) if path.isfile(path.join(amberdir, f))]
+    print('---- OLD Forcefield files list: ' + path.join(amberdir, '') + ' ----')
+    for f in ffs:
+        print(f)
+
     # FRCMOD files
     frcmoddir = path.join(amberhome, 'dat', 'leap', 'parm')
     ffs = glob(frcmoddir+"/frcmod.*")
@@ -79,7 +85,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         Default: './build'
     caps : dict
         A dictionary with keys segids and values lists of strings describing the caps for a particular protein segment.
-        e.g. caps['P'] = ['ACE', 'NME']. Default: will apply ACE and NME caps to every protein segment.
+        e.g. caps['P'] = ['ACE', 'NME'] or caps['P'] = ['none', 'none']. Default: will apply ACE and NME caps to every
+        protein segment.
     ionize : bool
         Enable or disable ionization
     saltconc : float
@@ -306,6 +313,8 @@ def _applyProteinCaps(mol, caps):
                 'Segment {} is not protein. Capping for non-protein segments is not supported.'.format(seg))
         # For each cap
         for i, cap in enumerate(caps[seg]):
+            if cap is None or (isinstance(cap, str) and cap == 'none'):
+                continue
             # Get info on segment and its terminals
             segment = mol.atomselect('segid {}'.format(seg), indexes=True)
             resids = np.unique(mol.get('resid', sel=segment))
@@ -372,6 +381,8 @@ def _applyProteinCaps(mol, caps):
 
         # For each cap
         for i, cap in enumerate(caps[seg]):
+            if cap is None or (isinstance(cap, str) and cap == 'none'):
+                continue
             # Remove lingering hydrogens or oxygens in terminals
             mol.remove('segid {} and resid "{}" and name {}'.format(seg, orig_terminalresids[i], terminalatoms[cap]),
                        _logger=False)
