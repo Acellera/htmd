@@ -1224,9 +1224,9 @@ class Molecule:
         drop : int or list of ints
             Index of frame, or list of frame indexes which we want to drop (and keep all others).
         """
-        if keep != 'all' and drop is not None:
+        if not (isinstance(keep, str) and keep == 'all') and drop is not None:
             raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
-        if keep != 'all':
+        if not (isinstance(keep, str) and keep == 'all'):
             self.coords = np.atleast_3d(self.coords[:, :, keep]).copy()  # Copy array. Slices are dangerous with C
             self.box = np.array(np.atleast_2d(self.box[:, keep]))
             if self.box.shape[0] == 1:
