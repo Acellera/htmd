@@ -231,6 +231,12 @@ def BINCOORwrite(coords, filename):
 def PSFwrite(molecule, filename):
     m = molecule
 
+    import string
+    # Letters to be used for default segids, if free: 0123456789abcd...ABCD..., minus chain symbols already used
+    used_segids = set(m.segid)
+    segid_alphabet = list(string.digits + string.ascii_letters)
+    available_segids = [x for x in segid_alphabet if x not in used_segids]
+
     f = open(filename, 'w')
     print("PSF\n", file=f)
     print("%8d !NTITLE\n" % (0), file=f)
@@ -238,7 +244,7 @@ def PSFwrite(molecule, filename):
     for i in range(len(m.serial)):
         charge = 0
         mass = 1
-        segid = 'X'
+        segid = available_segids[0]
         atomtype = ""
         if (m.masses is not None) and (i < len(m.masses)):
             mass = m.masses[i]
@@ -246,8 +252,10 @@ def PSFwrite(molecule, filename):
             charge = m.charge[i]
         if (m.atomtype is not None) and (i < len(m.atomtype)):
             atomtype = m.atomtype[i]
-        if (m.segid is not None) and (i < len(m.segid)):
+        if (m.segid is not None) and (i < len(m.segid)) and m.segid[i] != '':
             segid = m.segid[i]
+        elif m.segid[i] == '' and m.chain[i] != '':
+            segid = m.chain[i]
         print("%8d %-4s %-5s%-4s %-4s %-6s %-2s %10.6f  %8.6f  %10d" %
               (int(m.serial[i]),
                segid,
