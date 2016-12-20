@@ -238,6 +238,7 @@ def PSFwrite(molecule, filename):
     for i in range(len(m.serial)):
         charge = 0
         mass = 1
+        segid = 'X'
         atomtype = ""
         if (m.masses is not None) and (i < len(m.masses)):
             mass = m.masses[i]
@@ -245,9 +246,11 @@ def PSFwrite(molecule, filename):
             charge = m.charge[i]
         if (m.atomtype is not None) and (i < len(m.atomtype)):
             atomtype = m.atomtype[i]
+        if (m.segid is not None) and (i < len(m.segid)):
+            segid = m.segid[i]
         print("%8d %-4s %-5s%-4s %-4s %-6s %-2s %10.6f  %8.6f  %10d" %
               (int(m.serial[i]),
-               m.segid[i],
+               segid,
                str(m.resid[i]) + str(m.insertion[i]),
                (m.resname[i]),
                m.name[i],

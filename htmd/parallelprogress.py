@@ -23,6 +23,20 @@ def progressbar(seq, description=None, total=None):
 
 
 def ParallelExecutor(**joblib_args):
+    """
+
+    Parameters
+    ----------
+    joblib_args
+
+    Returns
+    -------
+
+    Examples
+    --------
+    >>> pe = ParallelExecutor(n_jobs=_config['ncpus'])
+    >>> pe(total=len(subfolders), description=title)(delayed(foo)(f) for f in range(5))
+    """
     def aprun(**tq_args):
         def tmp(op_iter):
             foo = lambda args: lambda x: progressbar(x, **args)
