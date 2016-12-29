@@ -625,7 +625,7 @@ class FFMolecule(Molecule):
                     else:
                         print("Omitting optimised pose for phi=%f (MM VDW too high)" % phi)
                 else:
-                    print("Omitting optimised pose for phi=%f (QM energy too high)" % phi)
+                    print("Omitting optimised QM pose (QM energy too high %f)" % q.energy)
 
         mmin = min(ret.mm_original)
         # roughly align the qm with the mm
