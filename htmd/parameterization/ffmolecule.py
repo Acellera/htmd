@@ -765,7 +765,9 @@ class FFMolecule(Molecule):
 
         fh = plt.figure()
         ax1 = fh.gca()
-       
+     
+        if( len(fits) == 0 ): return
+  
         mm_energy = []
         qm_energy = []
         for r in fits:

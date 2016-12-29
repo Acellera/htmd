@@ -268,9 +268,9 @@ def main_parameterize():
                 iteration += 1
 
             print(" Fitting converged at iteration %d" % (iteration - 1))
-
-            fit = mol.plotConformerEnergies(rets, show=False)
-            print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
+            if( len(rets) ):
+               fit = mol.plotConformerEnergies(rets, show=False)
+               print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
 
         printEnergies(mol)
 
