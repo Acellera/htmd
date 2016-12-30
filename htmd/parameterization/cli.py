@@ -218,9 +218,10 @@ def main_parameterize():
         if not args.notorsion:
             print("\n == Torsion fitting ==\n")
 
-            scores = np.zeros(len(dihedrals))
+            scores = np.ones(len(dihedrals))
             converged = False
             iteration = 1
+            ref_mm = dict()
             while not converged:
                 rets = []
 
@@ -236,7 +237,7 @@ def main_parameterize():
                         try:
                             ret = mol.fitSoftTorsion(d)
                             rets.append(ret)
-
+                            if( iteration==1 ) : ref_mm[name] = ret;
                             rating = "GOOD"
                             if ret.chisq > 10:
                                 rating = "CHECK"
@@ -245,10 +246,13 @@ def main_parameterize():
                             print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
                             sys.stdout.flush()
                             scores[idx] = ret.chisq
+                            # Alwaysuse th mm_orig from first iteration (unmodified)
+                            ret.mm_original = ref_mm[name].mm_original;
                             fn = mol.plotTorsionFit(ret, show=False)
-                        except:
+                        except Exception as e:
                             print("Error in fitting")
-                            # raise
+                            print(str(e))
+                            raise
                             scores[idx] = 0.
                             pass
                             # print(fn)
@@ -258,7 +262,11 @@ def main_parameterize():
                     converged = True
                     for j in range(len(scores)):
                         # Check convergence
-                        relerr = (scores[j] - last_scores[j]) / last_scores[j]
+                        try:   
+                           relerr = (scores[j] - last_scores[j]) / last_scores[j]
+                        except:
+                           relerr = 0.
+                        if math.isnan(relerr): relerr=0.;
                         convstr = "- converged"
                         if math.fabs(relerr) > 1.e-2:
                             convstr = ""
