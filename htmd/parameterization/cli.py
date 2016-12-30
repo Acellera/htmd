@@ -71,6 +71,8 @@ def main_parameterize():
     parser.add_argument("--freeze-charge", metavar="A1",
                         help="Freeze the charge of the named atom (default: %(default)s)", action="append",
                         default=None, dest="freezeq")
+    parser.add_argument("--no-geomopt", help="Do not perform QM geometry optimisation when fitting torsions(default: False)", action="store_false",
+                        dest="geomopt", default=True)
 
     args = parser.parse_args()
 
@@ -235,7 +237,7 @@ def main_parameterize():
                     if args.torsion == 'all' or name in args.torsion.split(','):
                         print("\n == Fitting torsion {} ==\n".format(name))
                         try:
-                            ret = mol.fitSoftTorsion(d)
+                            ret = mol.fitSoftTorsion(d, geomopt=args.geomopt )
                             rets.append(ret)
                             if( iteration==1 ) : ref_mm[name] = ret;
                             rating = "GOOD"
