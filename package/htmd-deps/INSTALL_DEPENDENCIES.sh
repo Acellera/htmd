@@ -1,5 +1,6 @@
 #!/bin/bash
-DIR=$PWD #$(dirname $(readlink -f "$0"))
+DIR=$(dirname $(readlink -f "$0"))
+echo "DIR is [$DIR]"
 conda install $(cat $DIR/DEPENDENCIES) -y
 
 # Just in case this got installed (eg acecloud-client,acemd depend on it)
