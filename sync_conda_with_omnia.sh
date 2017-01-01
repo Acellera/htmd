@@ -72,6 +72,9 @@ for p in [
 					os.getenv("ANACONDA_TOKEN_BASIC") 
 					call([ "anaconda", "upload", "-t", os.getenv("ANACONDA_TOKEN_BASIC"),"-u",  "acellera", f["basename"] ])
 				except:
-					call([ "anaconda", "upload", "-u",  "acellera", f["basename"] ])
+					try:
+						call([ "anaconda", "upload", "-u",  "acellera", f["basename"] ])
+					except:
+						print("Failed to sync")
 	else:
 		print("Package %s up to date at version %s" % ( p, omnia["latest_version"] ) )
