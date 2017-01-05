@@ -17,7 +17,8 @@ if [ "$CC" == "x86_64-w64-mingw32-g++" ]; then
 fi
 
 T="$PWD"
-for S in "$PWD/C/"*; do
+for S in "$PWD/htmdlib/"* "$PWD/C/"*; do
+  echo "=== Compiling $S ==="
 	cd "$S"
   FLAGS=""
   if [ "$OSNAME" == "Darwin" ]; then
@@ -62,15 +63,6 @@ cd "$DIR/../../"
 chmod -R a+rX "$PREFIX"
 
 
-#for T in 3.4 3.5; do
-#	if [ "$T" != "$PY_VER" ]; then
-#		mkdir -p python${T}/site-packages
-#		cd python${T}/site-packages
-#		ln -s ../../python${PY_VER}/site-packages/htmd .
-#		ln -s ../../python${PY_VER}/site-packages/htmdx .
-#	cd -
-#	fi
-#done
 
 # Try this to hopefully suppess travis build error on osx "shell_session_update"# cf https://github.com/travis-ci/travis-ci/issues/6522 
 set +e

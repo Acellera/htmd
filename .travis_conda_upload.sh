@@ -4,9 +4,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-set -ev
-
-# TG set command above is to fail immediately, https://docs.travis-ci.com/user/customizing-the-build/#Implementing-Complex-Build-Steps
 
 export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC
 
@@ -21,5 +18,9 @@ else
 	anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
 fi
 done
+
+# htmd-data noarch
+
+anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2 -u $CHANNEL
 
 
