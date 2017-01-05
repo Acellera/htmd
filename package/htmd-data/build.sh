@@ -13,7 +13,7 @@ fi
 
 rm -rf $(find htmd -type d -name __pycache__)
 
-	DIR="$SYS_PREFIX/lib/python3.5/site-packages/"
+	DIR="$SP_DIR"
 	echo "Installing into $DIR"
 
 
@@ -35,14 +35,6 @@ rm -rf $(find htmd -type d -name __pycache__)
 chmod -R a+rX .
 chmod -R a+rX .
 
-#for T in 3.4 3.5; do
-#  if [ "$T" != "$PY_VER" ]; then
-#    mkdir -p python${T}/site-packages
-#    cd python${T}/site-packages
-#    ln -s ../../python${PY_VER}/site-packages/htmd-data .
-#    cd -
-#  fi
-#done
 
 
 exit 0
