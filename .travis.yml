@@ -41,6 +41,8 @@ install:
  - bash miniconda.sh -b -p $HOME/miniconda
  - export PATH="$HOME/miniconda/bin:$PATH"
  - hash -r
+ - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
+ - source activate travis-env
  - conda update --all -y -q
  - conda install requests conda-build -y -q
 #=1.21.14 -y
@@ -51,8 +53,6 @@ install:
  - conda update --all -y -q
  - conda config --add channels acellera
 
- - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
- - source activate travis-env
 
  - if [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then export BUILD_VERSION=$TRAVIS_TAG; else export BUILD_VERSION=0.0.0; fi
  - echo "TRAVIS_BRANCH = $TRAVIS_BRANCH"
@@ -63,7 +63,6 @@ install:
 
 
  # Update acellera channel with any updates of the omnia packages that we track
- - which python
  - python ./sync_conda_with_omnia.py
  # Install the Conda dependencies HTMD needs
  - package/htmd-deps/INSTALL_DEPENDENCIES.sh
