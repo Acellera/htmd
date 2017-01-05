@@ -23,7 +23,7 @@ rm -rf $(find htmd -type d -name __pycache__)
 	if [ -e "$DIR" ]; then
 		pwd
 		ls htmd/data
-    mkdir $DIR/htmd
+    mkdir -p $DIR/htmd
 		cp -r htmd/data  $DIR/htmd/
     rm -rf $(find "$DIR/htmd" -name .git -type d) 
 
