@@ -5,7 +5,6 @@
 # No redistribution in whole or part
 #
 
-import requests
 import os
 from subprocess import call
 
