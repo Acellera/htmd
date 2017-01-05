@@ -12,7 +12,7 @@ printenv
 
 # Compile any native code
 
-$PWD/htmdlib/C/build.sh $PWD/htmd/lib/htmd/$OSNAME
+$PWD/htmdlib/C/build.sh "$SP_DIR/../../htmd/$OSNAME"
 
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
