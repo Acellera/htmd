@@ -13,9 +13,9 @@ fi
 
 rm -rf $(find htmd -type d -name __pycache__)
 
-echo "Installing into $PREFIX"
+	DIR="$SYS_PREFIX/lib/python3.5/site-packages/"
+	echo "Installing into $DIR"
 
-	DIR="$SP_DIR"
 
 	if [ "$DIR" != "" ]; then
 		mkdir -p "$DIR"
