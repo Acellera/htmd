@@ -77,10 +77,10 @@ install:
  - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y -q
 
 script:
- - activate_license "$LICENSE_TOKEN"
- - python -c "import htmd"
- - python tests/run_inline_file_tests.py
- - tests/run_other_tests.sh
+ - if [ "$OSNAME" != "Windows" ]; then activate_license "$LICENSE_TOKEN"; fi
+ - if [ "$OSNAME" != "Windows" ]; then  python -c "import htmd"; fi
+ - if [ "$OSNAME" != "Windows" ]; then  python tests/run_inline_file_tests.py; fi
+ - if [ "$OSNAME" != "Windows" ]; then  tests/run_other_tests.sh; fi
 
 after_success:
  - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then ./.travis_conda_upload.sh; ./.travis_conda_build_upload_meta.sh ; fi
