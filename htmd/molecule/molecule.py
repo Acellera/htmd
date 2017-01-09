@@ -881,6 +881,7 @@ class Molecule:
             if frames is None:  # Reading all frames of the trajectory
                 if mdtraj:
                     coords, box, boxangles, step, time = MDTRAJread(f, tmppdb)
+                    coords = coords.copy()  # Copying is needed to fix strides from mdtraj
                 else:
                     coords, box, boxangles, step, time = XTCread(f)
                 for j in range(np.size(coords, 2)):
@@ -889,6 +890,7 @@ class Molecule:
                 if mdtraj:
                     coords, box, boxangles, step, time = MDTRAJread(f, tmppdb)
                     coords = coords[:, :, frames[i]]
+                    coords = coords.copy()  # Copying is needed to fix strides from mdtraj
                     box = box[:, frames[i]]
                     boxangles = boxangles[:, frames[i]]
                 else:
