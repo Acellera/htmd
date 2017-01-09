@@ -10,12 +10,13 @@ import threading
 import platform
 
 try:
-	# Python 2
-	import Queue as queue
+    # Python 2
+    import Queue as queue
 except:
-	# Python 3
-	import queue
-	pass
+    # Python 3
+    import queue
+
+    pass
 
 import time
 import os
@@ -25,6 +26,7 @@ import numpy as np
 import tempfile
 
 _viewers = np.empty(0, dtype=object)
+
 
 def _enqueue_output(obj, vmd, queue):
     while vmd.poll() is None:
@@ -39,14 +41,15 @@ def _enqueue_output(obj, vmd, queue):
 class VMD:
     """ Please do not directly call this class constructor. Use the `viewer` or `getCurrentViewer` function instead.
     """
+
     def __init__(self, vmd=None, host=None):
         self.done = 0
         vmd = getVMDpath(vmd=vmd)
 
-        args=[vmd]
-        if(host): 
-           args.append("--host")
-           args.append(host)
+        args = [vmd]
+        if (host):
+            args.append("--host")
+            args.append(host)
         self.vmd = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, close_fds=True,
                                     shell=False)
         self.queue = queue.Queue()
@@ -62,7 +65,6 @@ class VMD:
         self.send('axes location Off')
         # self.send('color Display Background white')
         self.send('display projection Orthographic')
-
 
     def send(self, command):
         """ Send a tcl command to VMD
@@ -125,7 +127,7 @@ class VMD:
             # Protein representation
             self.send('mol modstyle 0 top NewCartoon')
             self.send('mol modselect 0 top "protein"')
-            #self.send('mol modcolor 0 top Index')
+            # self.send('mol modcolor 0 top Index')
             # Ligand representation
             self.send('set rep [molinfo top get numreps]')
             self.send('mol color ColorID ' + str(color))
@@ -156,18 +158,19 @@ class VMD:
     def copy(self):
         return None
 
+
 def getVMDpath(vmd=None):
-        sys=platform.system()
-        if not vmd:
-            if sys=="Linux" or sys=="Darwin":
-              vmd = os.path.join( os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper")
-            elif sys=="Windows":
-              vmd = os.path.join( os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper.bat")
-            else:
-              raise OSError("Don't know how to run VMD on platform [" + sys + "]" )
-        if (not vmd) or (not os.access(vmd, os.X_OK)):
-            raise OSError("Cannot find VMD. Specify the location with 'vmd=' argument")
-        return vmd
+    sys = platform.system()
+    if not vmd:
+        if sys == "Linux" or sys == "Darwin":
+            vmd = os.path.join(os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper")
+        elif sys == "Windows":
+            vmd = os.path.join(os.path.dirname(inspect.getfile(VMD)), "vmd_wrapper.bat")
+        else:
+            raise OSError("Don't know how to run VMD on platform [" + sys + "]")
+    if (not vmd) or (not os.access(vmd, os.X_OK)):
+        raise OSError("Cannot find VMD. Specify the location with 'vmd=' argument")
+    return vmd
 
 
 def getCurrentViewer():
@@ -220,4 +223,3 @@ if __name__ == "__main__":
     vmd.send('menu main off')
     vmd.send('menu main on')
     vmd.send('exit')
-

@@ -15,6 +15,7 @@ from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import *
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
+from htmd.util import tempname
 from math import pi
 from copy import deepcopy
 from os import path
@@ -850,6 +851,10 @@ class Molecule:
         self.topoloc = os.path.abspath(filename)
 
     def _readTraj(self, filename, skip=None, frames=None, append=False, mdtraj=False):
+        if mdtraj:
+            tmppdb = tempname(suffix='.pdb')
+            self.write(tmppdb)
+        
         if not append:
             self.coords = []
             self.box = []
@@ -876,14 +881,14 @@ class Molecule:
         for i, f in enumerate(filename):
             if frames is None:
                 if mdtraj:
-                    coords, box, boxangles, step, time = MDTRAJread(f, self.topoloc)
+                    coords, box, boxangles, step, time = MDTRAJread(f, tmppdb)
                 else:
                     coords, box, boxangles, step, time = XTCread(f)
                 for j in range(np.size(coords, 2)):
                     self.fileloc.append([f, j])
             else:
                 if mdtraj:
-                    coords, box, boxangles, step, time = MDTRAJread(f, self.topoloc)
+                    coords, box, boxangles, step, time = MDTRAJread(f, tmppdb)
                     coords = coords[:, :, frames[i]]
                     box = box[:, frames[i]]
                     boxangles = boxangles[:, frames[i]]
@@ -893,7 +898,7 @@ class Molecule:
 
             if self.numAtoms != 0 and np.size(coords, 0) != self.numAtoms:
                 raise ValueError('Trajectory # of atoms ' + str(
-                    np.size(self.coords, 0)) + ' mismatch with # of already loaded atoms ' + str(self.numAtoms))
+                    np.size(coords, 0)) + ' mismatch with # of already loaded atoms ' + str(self.numAtoms))
 
             if len(self.coords) > 0 and self.coords.shape[0] > 0 and (self.coords.shape[0] != coords.shape[0]):
                 raise ValueError("Trajectory # of atoms mismatch with already loaded coordinates")
@@ -1119,17 +1124,17 @@ class Molecule:
                 import mdtraj as md
                 from mdtraj.core.trajectory import _TOPOLOGY_EXTS
                 _TOPOLOGY_EXTS = [x[1:] for x in _TOPOLOGY_EXTS]  # Removing the initial dot
-                import tempfile
+
                 if ext in _TOPOLOGY_EXTS:
-                    tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
-                    self.write(tmppdb.name)
-                    traj = md.load(tmppdb.name)
+                    tmppdb = tempname(suffix='.pdb')
+                    self.write(tmppdb)
+                    traj = md.load(tmppdb)
                 else:
-                    tmppdb = tempfile.NamedTemporaryFile(suffix='.pdb')
-                    tmpxtc = tempfile.NamedTemporaryFile(suffix='.xtc')
-                    self.write(tmppdb.name)
-                    self.write(tmpxtc.name)
-                    traj = md.load(tmpxtc.name, top=tmppdb.name)
+                    tmppdb = tempname(suffix='.pdb')
+                    tmpxtc = tempname(suffix='.xtc')
+                    self.write(tmppdb)
+                    self.write(tmpxtc)
+                    traj = md.load(tmpxtc, top=tmppdb)
                 # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
                 # traj.time = self.time
                 # traj.unitcell_lengths = self.box.T / 10

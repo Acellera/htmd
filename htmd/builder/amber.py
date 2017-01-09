@@ -278,7 +278,10 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap)
+    tmpbonds = molbuilt.bonds
+    molbuilt.bonds = []  # Removing the bonds to speed up writing
     molbuilt.write(path.join(outdir, 'structure.pdb'))
+    molbuilt.bonds = tmpbonds # Restoring the bonds
     return molbuilt
 
 
