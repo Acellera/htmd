@@ -854,39 +854,38 @@ class Molecule:
         if mdtraj:
             tmppdb = tempname(suffix='.pdb')
             self.write(tmppdb)
-        
-        if not append:
-            self.coords = []
-            self.box = []
-            self.boxangles = []
+
+        coordslist = []
+        boxlist = []
+        boxangleslist = []
+        fileloclist = []
+        if append:
+            coordslist.append(list(self.coords))
+            boxlist.append(list(self.box))
+            boxangleslist.append(list(self.boxangles))
+            fileloclist.append(list(self.fileloc))
 
         # If a single filename is specified, turn it into an array so we can iterate
         if isinstance(filename, str):
             filename = [filename]
         if not isinstance(filename, np.ndarray):
             filename = np.array(filename)
-        # print(len(filename), len(frames), type(frames))
 
-        # from IPython.core.debugger import Tracer
-        # Tracer()()
         if frames is not None:
             if not isinstance(frames, list) and not isinstance(frames, np.ndarray):
                 frames = [frames]
             if len(filename) != len(frames):
-                raise NameError(
-                    'Number of trajectories (' + str(len(filename)) + ') does not match number of frames (' + str(
-                        len(frames)) + ') given as arguments')
+                raise NameError('Number of trajectories ({}) does not match number of frames ({}) given as arguments'.format(len(filename), len(frames)))
 
-        self.fileloc = []
         for i, f in enumerate(filename):
-            if frames is None:
+            if frames is None:  # Reading all frames of the trajectory
                 if mdtraj:
                     coords, box, boxangles, step, time = MDTRAJread(f, tmppdb)
                 else:
                     coords, box, boxangles, step, time = XTCread(f)
                 for j in range(np.size(coords, 2)):
-                    self.fileloc.append([f, j])
-            else:
+                    fileloclist.append([f, j])
+            else:  # Reading only specified frames of each trajectory (faster for xtc)
                 if mdtraj:
                     coords, box, boxangles, step, time = MDTRAJread(f, tmppdb)
                     coords = coords[:, :, frames[i]]
@@ -894,30 +893,25 @@ class Molecule:
                     boxangles = boxangles[:, frames[i]]
                 else:
                     coords, box, boxangles, step, time = XTCread(f, frames[i])
-                self.fileloc.append([f, int(frames[i])])
+                fileloclist.append([f, int(frames[i])])
 
             if self.numAtoms != 0 and np.size(coords, 0) != self.numAtoms:
-                raise ValueError('Trajectory # of atoms ' + str(
-                    np.size(coords, 0)) + ' mismatch with # of already loaded atoms ' + str(self.numAtoms))
+                raise ValueError('Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(np.size(coords, 0), self.numAtoms))
 
-            if len(self.coords) > 0 and self.coords.shape[0] > 0 and (self.coords.shape[0] != coords.shape[0]):
-                raise ValueError("Trajectory # of atoms mismatch with already loaded coordinates")
-            # print(np.shape(traj.box), np.shape(self.box))
-            # TODO : check step correct increment
-            if len(self.coords) == 0:
-                self.coords = coords
-                self.box = box
-                self.boxangles = boxangles
-            else:
-                self.coords = np.append(self.coords, coords, 2)
-                self.box = np.append(self.box, box, 1)
-                self.boxangles = np.append(self.boxangles, boxangles, 1)
+            coordslist.append(coords)
+            boxlist.append(box)
+            boxangleslist.append(boxangles)
+
+        self.coords = np.concatenate(coordslist, axis=2).astype(Molecule._dtypes['coords'])
+        self.box = np.concatenate(boxlist, axis=1).astype(Molecule._dtypes['box'])
+        self.boxangles = np.concatenate(boxangleslist, axis=1).astype(Molecule._dtypes['boxangles'])
+        self.fileloc = fileloclist
 
         if skip is not None:
             self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
             self.box = np.array(self.box[:, ::skip])
-            self.fileloc = self.fileloc[::skip]
             self.boxangles = self.boxangles[:, ::skip]
+            self.fileloc = self.fileloc[::skip]
 
         self.coords = np.atleast_3d(self.coords)
         self.step = step
@@ -1549,6 +1543,16 @@ if __name__ == "__main__":
                 print(m.resname[s])
     print('done')
 
+    # Testing trajctory reading and appending
+    ref = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
+    xtcfile = path.join(home(), 'data', 'metricdistance', 'traj.xtc')
+    ref.read(xtcfile)
+    assert ref.coords.shape == (4507, 3, 200)
+    ref.read(xtcfile, append=True)
+    assert ref.coords.shape == (4507, 3, 400)
+    ref.read([xtcfile, xtcfile, xtcfile])
+    assert ref.coords.shape == (4507, 3, 600)
+
     # Checking bonds
     ref = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
     ref.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
@@ -1560,4 +1564,6 @@ if __name__ == "__main__":
     print(len3)
     assert len1 == 4562
     assert len3 == 4562
+
+
 
