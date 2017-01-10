@@ -11,7 +11,7 @@ from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_F
 
 
 class Acemd(ProtocolInterface):
-    _defaultfnames = {'bincoordinates': 'input.coor', 'binvelocities': 'input.vel', 'binindex': 'index.idx',
+    _defaultfnames = {'bincoordinates': 'input.coor', 'binvelocities': 'input.vel', 'binindex': 'input.idx',
                'structure': 'structure.*', 'parameters': 'parameters', 'extendedsystem': 'input.xsc',
                'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb',
                'parmfile': 'structure.prmtop'}
