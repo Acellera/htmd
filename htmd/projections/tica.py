@@ -104,6 +104,9 @@ class TICA(object):
         if ndim is not None:
             self.tic.set_params(dim=ndim)
 
+        if self.data.numDimensions < ndim:
+            raise RuntimeError('TICA cannot increase the dimensionality of your data. Your data has {} dimensions and you requested {} TICA dimensions'.format(self.data.numDimensions, ndim))
+
         keepdata = []
         keepdim = None
         keepdimdesc = None
