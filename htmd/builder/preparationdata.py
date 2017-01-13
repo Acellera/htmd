@@ -218,6 +218,7 @@ class PreparationData:
         import matplotlib.pyplot as plt
         from matplotlib.lines import Line2D
         from matplotlib.colors import LinearSegmentedColormap
+        import matplotlib.patheffects as PathEffects
 
         # Shading
         Xe = np.array([[1, 0], [1, 0]])
@@ -229,6 +230,7 @@ class PreparationData:
         grey_red = LinearSegmentedColormap.from_list("grey_red", [neutral_grey, my_red])
         grey_blue = LinearSegmentedColormap.from_list("grey_blue", [neutral_grey, my_blue])
         eps = .01  # Tiny overprint to avoid very thin white lines
+        outline = [PathEffects.withStroke(linewidth=2,foreground="w")]
 
         # Color for pk values
         pkcolor = "black"
@@ -306,8 +308,9 @@ class PreparationData:
                 ax.imshow(1 + Xe * 0, interpolation="none",
                           cmap=grey_blue, vmin=0, vmax=1,
                           extent=(pk + dpk - eps, right, bottom, top), alpha=1)
-                ax.text(pk - dtxt, i, " {:5.2f} ".format(pk), color=pkcolor,
-                        fontsize=pkfontsize, horizontalalignment="right", zorder=30)
+                ax.text(pk - dtxt, i, " {:5.1f} ".format(pk), color=pkcolor,
+                        fontsize=pkfontsize, horizontalalignment="right", zorder=30,
+                        path_effects=outline, weight="bold")
             else:
                 ax.imshow(1 + Xe * 0, interpolation="none",
                           cmap=grey_red, vmin=0, vmax=1,
@@ -318,8 +321,9 @@ class PreparationData:
                 ax.imshow(Xe * 0, interpolation="none",
                           cmap=grey_red, vmin=0, vmax=1,
                           extent=(pk + dpk - eps, right, bottom, top), alpha=1)
-                ax.text(pk + dtxt, i, " {:5.2f} ".format(pk), color=pkcolor,
-                        fontsize=pkfontsize, horizontalalignment="left", zorder=30)
+                ax.text(pk + dtxt, i, " {:5.1f} ".format(pk), color=pkcolor,
+                        fontsize=pkfontsize, horizontalalignment="left", zorder=30,
+                        path_effects=outline,  weight="bold")
             ax.add_line(Line2D([pk, pk], [bottom, top], linewidth=3, color='white', zorder=2))
 
             # ax.add_line(Line2D([pk,pk], [bottom,top], linewidth=3, color='blue'))
@@ -329,9 +333,11 @@ class PreparationData:
         ax.axvline(x=pH + dpk, linewidth=2, color="black", alpha=.2, linestyle="dashed")
         ax.axvline(x=pH, linewidth=3, color="black", alpha=.5)
         ax.text(pH - dpk, ymax, " 90% protonated", rotation=90,
-                horizontalalignment="right", verticalalignment="bottom")
+                horizontalalignment="right", verticalalignment="bottom",
+                style="italic", path_effects=outline)
         ax.text(pH + dpk, ymax, " 10% protonated", rotation=90,
-                horizontalalignment="left", verticalalignment="bottom")
+                horizontalalignment="left", verticalalignment="bottom",
+                style="italic", path_effects=outline)
 
         ax.set_aspect('auto')
 
