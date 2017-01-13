@@ -7,6 +7,30 @@ import abc
 from abc import ABCMeta
 
 
+class RetrieveError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class SubmitError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class InProgressError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
 class App(metaclass=ABCMeta):
 
     @abc.abstractmethod

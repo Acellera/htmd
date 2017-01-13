@@ -12,6 +12,7 @@ from os import makedirs
 from shutil import copytree, ignore_patterns
 import numpy as np
 from natsort import natsorted
+from htmd.apps.app import RetrieveError, SubmitError, InProgressError
 from joblib import Parallel, delayed
 from htmd.simlist import _simName
 from htmd.molecule.molecule import Molecule
@@ -67,7 +68,11 @@ class AdaptiveBase(ProtocolInterface):
                     self.app.submit(natsorted(glob(path.join(self.inputpath, 'e1s*'))))
             else:
                 logger.info('Retrieving simulations.')
-                self.app.retrieve()
+                try:
+                    self.app.retrieve()
+                except RetrieveError as e:
+                    logger.error('Quitting adaptive run due to error in retrieving simulations: {}'.format(e))
+                    return
 
                 if epoch >= self.nepochs:
                     logger.info('Reached maximum number of epochs ' + str(self.nepochs))
