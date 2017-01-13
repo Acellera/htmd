@@ -572,7 +572,8 @@ if __name__ == '__main__':
             os.remove(f)
 
     # Test with proteinPrepare
-    pdbids = ['3PTB', '1A25', '1GZM']  # '1U5U' out because it has AR0 (no parameters)
+    pdbids = ['3PTB']
+    #pdbids = ['3PTB', '1A25', '1GZM']  # '1U5U' out because it has AR0 (no parameters)
     for pid in pdbids:
         np.random.seed(1)
         mol = Molecule(pid)
@@ -589,7 +590,8 @@ if __name__ == '__main__':
         shutil.rmtree(tmpdir)
 
     # Test without proteinPrepare
-    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+    pdbids = ['3PTB']
+    #pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
     for pid in pdbids:
         np.random.seed(1)
         mol = Molecule(pid)
