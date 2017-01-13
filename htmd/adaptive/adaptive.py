@@ -9,10 +9,11 @@ import time
 import os.path as path
 from glob import glob
 from os import makedirs
+import shutil
 from shutil import copytree, ignore_patterns
 import numpy as np
 from natsort import natsorted
-from htmd.apps.app import RetrieveError, SubmitError, InProgressError
+from htmd.apps.app import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
 from joblib import Parallel, delayed
 from htmd.simlist import _simName
 from htmd.molecule.molecule import Molecule
@@ -67,21 +68,33 @@ class AdaptiveBase(ProtocolInterface):
                 if not self.dryrun:
                     self.app.submit(natsorted(glob(path.join(self.inputpath, 'e1s*'))))
             else:
+                # Retrieving simulations
                 logger.info('Retrieving simulations.')
                 try:
                     self.app.retrieve()
                 except RetrieveError as e:
                     logger.error('Quitting adaptive run due to error in retrieving simulations: {}'.format(e))
                     return
+                except ProjectNotExistError:
+                    logger.info('Retrieve found no previous simulations for this adaptive. Assuming this is a new adaptive run')
 
                 if epoch >= self.nepochs:
                     logger.info('Reached maximum number of epochs ' + str(self.nepochs))
                     self._unsetLock()
                     return
 
-                self._running = self.app.inprogress()
+                # Checking how many simulations are in progress (queued/running) on the queue
+                try:
+                    self._running = self.app.inprogress()
+                except InProgressError as e:
+                    logger.error('Quitting adaptive run due to error in checking number of simulations in progress: {}'.format(e))
+                    return
+                except ProjectNotExistError:
+                    logger.info('Inprogress found no previous simulations for this adaptive. Assuming this is a new adaptive run')
+
                 logger.info(str(self._running) + ' simulations in progress')
 
+                # If currently running simulations are lower than nmin start new ones to reach nmax number of sims
                 if self._running <= self.nmin:
                     flag = self._algorithm()
                     if flag is False:
@@ -89,7 +102,13 @@ class AdaptiveBase(ProtocolInterface):
                         return
 
                     if not self.dryrun:
-                        self.app.submit(natsorted(glob(path.join(self.inputpath, 'e' + str(epoch+1) + 's*'))))
+                        newsims = glob(path.join(self.inputpath, 'e' + str(epoch+1) + 's*'))
+                        try:
+                            self.app.submit(natsorted(newsims))
+                        except:
+                            # If submitting fails delete all simulation inputs to not confuse _getEpoch()
+                            for ns in newsims:
+                                shutil.rmtree(ns)
                         logger.info('Finished submitting simulations.')
 
             if self.updateperiod <= 0:

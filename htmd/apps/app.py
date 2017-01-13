@@ -31,6 +31,14 @@ class InProgressError(Exception):
         return repr(self.value)
 
 
+class ProjectNotExistError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
 class App(metaclass=ABCMeta):
 
     @abc.abstractmethod
