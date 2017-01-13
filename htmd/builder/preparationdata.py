@@ -235,7 +235,7 @@ class PreparationData:
         # Color for pk values
         pkcolor = "black"
         pkfontsize = 8
-        dtxt = .3  # Displacement
+        dtxt = 0  # Displacement
 
         # Or we could change the figure size, which scales axes
         # http://stackoverflow.com/questions/3899980/how-to-change-the-font-size-on-a-matplotlib-plot
@@ -308,7 +308,7 @@ class PreparationData:
                 ax.imshow(1 + Xe * 0, interpolation="none",
                           cmap=grey_blue, vmin=0, vmax=1,
                           extent=(pk + dpk - eps, right, bottom, top), alpha=1)
-                ax.text(pk - dtxt, i, " {:5.1f} ".format(pk), color=pkcolor,
+                ax.text(pk - dtxt, i, " {:.2f} ".format(pk), color=pkcolor,
                         fontsize=pkfontsize, horizontalalignment="right", zorder=30,
                         path_effects=outline, weight="bold")
             else:
@@ -321,7 +321,7 @@ class PreparationData:
                 ax.imshow(Xe * 0, interpolation="none",
                           cmap=grey_red, vmin=0, vmax=1,
                           extent=(pk + dpk - eps, right, bottom, top), alpha=1)
-                ax.text(pk + dtxt, i, " {:5.1f} ".format(pk), color=pkcolor,
+                ax.text(pk + dtxt, i, " {:.2f} ".format(pk), color=pkcolor,
                         fontsize=pkfontsize, horizontalalignment="left", zorder=30,
                         path_effects=outline,  weight="bold")
             ax.add_line(Line2D([pk, pk], [bottom, top], linewidth=3, color='white', zorder=2))
