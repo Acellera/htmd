@@ -158,7 +158,7 @@ proc calcforces_endstep { } { }
 
     def _amberFixes(self):
         # AMBER specific fixes
-        if self.acemd.parameters.endswith('structure.prmtop'):
+        if self.acemd.structure.endswith('.prmtop'):
             self.acemd.parmfile = self.acemd.parameters
             self.acemd.parameters = None
             self.acemd.scaling14 = '0.8333333'
