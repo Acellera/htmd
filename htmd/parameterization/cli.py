@@ -71,6 +71,8 @@ def main_parameterize():
     parser.add_argument("--freeze-charge", metavar="A1",
                         help="Freeze the charge of the named atom (default: %(default)s)", action="append",
                         default=None, dest="freezeq")
+    parser.add_argument("--no-geomopt", help="Do not perform QM geometry optimisation when fitting torsions(default: False)", action="store_false",
+                        dest="geomopt", default=True)
 
     args = parser.parse_args()
 
@@ -218,9 +220,10 @@ def main_parameterize():
         if not args.notorsion:
             print("\n == Torsion fitting ==\n")
 
-            scores = np.zeros(len(dihedrals))
+            scores = np.ones(len(dihedrals))
             converged = False
             iteration = 1
+            ref_mm = dict()
             while not converged:
                 rets = []
 
@@ -234,9 +237,9 @@ def main_parameterize():
                     if args.torsion == 'all' or name in args.torsion.split(','):
                         print("\n == Fitting torsion {} ==\n".format(name))
                         try:
-                            ret = mol.fitSoftTorsion(d)
+                            ret = mol.fitSoftTorsion(d, geomopt=args.geomopt )
                             rets.append(ret)
-
+                            if( iteration==1 ) : ref_mm[name] = ret;
                             rating = "GOOD"
                             if ret.chisq > 10:
                                 rating = "CHECK"
@@ -245,10 +248,13 @@ def main_parameterize():
                             print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
                             sys.stdout.flush()
                             scores[idx] = ret.chisq
+                            # Alwaysuse th mm_orig from first iteration (unmodified)
+                            ret.mm_original = ref_mm[name].mm_original;
                             fn = mol.plotTorsionFit(ret, show=False)
-                        except:
+                        except Exception as e:
                             print("Error in fitting")
-                            # raise
+                            print(str(e))
+                            raise
                             scores[idx] = 0.
                             pass
                             # print(fn)
@@ -258,7 +264,11 @@ def main_parameterize():
                     converged = True
                     for j in range(len(scores)):
                         # Check convergence
-                        relerr = (scores[j] - last_scores[j]) / last_scores[j]
+                        try:   
+                           relerr = (scores[j] - last_scores[j]) / last_scores[j]
+                        except:
+                           relerr = 0.
+                        if math.isnan(relerr): relerr=0.;
                         convstr = "- converged"
                         if math.fabs(relerr) > 1.e-2:
                             convstr = ""
@@ -268,9 +278,9 @@ def main_parameterize():
                 iteration += 1
 
             print(" Fitting converged at iteration %d" % (iteration - 1))
-
-            fit = mol.plotConformerEnergies(rets, show=False)
-            print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
+            if( len(rets) ):
+               fit = mol.plotConformerEnergies(rets, show=False)
+               print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
 
         printEnergies(mol)
 

@@ -4,7 +4,7 @@ matrix:
   include:
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CROSS_COMPILE=1 CPURE=gcc CC=x86_64-w64-mingw32-g++ FC=x86_64-w64-mingw32-gfortran OSNAME=Linux
+     env: TRAVIS_PYTHON_VERSION=3.5 OSNAME=Windows
      addons:
       apt:
        packages:
@@ -13,27 +13,16 @@ matrix:
        - g++-mingw-w64-x86-64
        - binutils-mingw-w64-x86-64
        - mingw-w64-dev
-#   - os: linux
-#     language: generic
-#     env: TRAVIS_PYTHON_VERSION=3.4 CPURE=gcc CC=g++ FC=gfortran STATIC="-static" OSNAME=Linux
-#     addons:
-#      apt:
-#       packages:
-#       - gfortran
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CPURE=gcc CC=g++ FC=gfortran STATIC="-static" OSNAME=Linux
+     env: TRAVIS_PYTHON_VERSION=3.5  OSNAME=Linux
      addons:
       apt:
        packages:
        - gfortran
-#   - os: osx
-#     language: generic
-#     env: TRAVIS_PYTHON_VERSION=3.4 CPURE=gcc CC=g++ FC=gfortran OSNAME=Darwin
    - os: osx
-     os_image: beta-xcode6.1
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5 CPURE=gcc CC=g++ FC=gfortran OSNAME=Darwin
+     env: TRAVIS_PYTHON_VERSION=3.5 OSNAME=Darwin
      before_install:
       - brew install gcc
 
@@ -41,27 +30,26 @@ install:
  - printenv
  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
- - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.sh -O miniconda.sh; fi
+ - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
 
- - if [ "$TRAVIS_BRANCH" == "pro" ]; then export PACKAGE_NAME=htmd-pro; export TYPE=pro; else export PACKAGE_NAME=htmd; export TYPE=basic; fi
  - echo $PACKAGE_NAME
+
+# Set up the Conda environment
 
  - bash miniconda.sh -b -p $HOME/miniconda
  - export PATH="$HOME/miniconda/bin:$PATH"
  - hash -r
- - conda install conda-build -y | grep -v \#
-#=1.21.14 -y
- - conda install anaconda -y | grep -v \#
- # Update acellera channel with any updates of the omnia packages that we track
- - ./sync_conda_with_omnia.sh
  - conda config --set always_yes yes 
- - conda update --all -y | grep -v \#
+ - conda update --all -y -q
+
+# - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
+# - source activate travis-env
+
+ - conda update --all -y -q
+ - conda install anaconda requests conda-build -y -q
  - conda config --add channels acellera
 
- - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
- - source activate travis-env
- - pwd
- - ls -la
+
  - if [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then export BUILD_VERSION=$TRAVIS_TAG; else export BUILD_VERSION=0.0.0; fi
  - echo "TRAVIS_BRANCH = $TRAVIS_BRANCH"
  - echo "TRAVIS_TAG    = $TRAVIS_TAG"
@@ -69,32 +57,30 @@ install:
  # Always set it to 0 so we don't get a new release at every successful commit
  - export BUILD_NUMBER=0
 
+ # Remove the DSOs that live in the repo so that users can work with a checkout
+ - rm htmd/lib/*/*.so || /bin/true
+
+ # Update acellera channel with any updates of the omnia packages that we track
+ - python ./sync_conda_with_omnia.py
+ # Install the Conda dependencies HTMD needs
  - package/htmd-deps/INSTALL_DEPENDENCIES.sh
+
+ # Clone the private htmdlib repo
+ - git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 1
 
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-data --no-include-recipe
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe
 
 
- - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y | grep -v \#
- - conda install $HOME/miniconda/conda-bld/*-64/htmd-data-[0-9]*.tar.bz2  -y | grep -v \#
- - conda install $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-[0-9]*.tar.bz2  -y | grep -v \#
+ - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
+ - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
+ - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y -q
 
 script:
- # Run the inline file tests 
-# - echo "HTMD TEST BEGIN"
-#
-# - pwd
-# - echo $PYTHON_PATH
-# - conda env list
-# - find $HOME -name g09_wrapper
- - which babel
- - python -c "import htmd"
- - activate_license "$LICENSE_TOKEN"
- - python tests/run_inline_file_tests.py
- - tests/run_other_tests.sh
+ - if [ "$OSNAME" != "Windows" ]; then activate_license "$LICENSE_TOKEN"; fi
+ - if [ "$OSNAME" != "Windows" ]; then  python tests/run_inline_file_tests.py; fi
+ - if [ "$OSNAME" != "Windows" ]; then  tests/run_other_tests.sh; fi
 
 after_success:
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash .travis_conda_upload_data.sh ; fi
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash .travis_conda_upload.sh ; fi
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [  "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash .travis_conda_build_upload_meta.sh; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then ./.travis_conda_upload.sh; ./.travis_conda_build_upload_meta.sh ; fi

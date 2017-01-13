@@ -237,7 +237,8 @@ def MOL2read(filename):
     end = None
     bond = None
     for i in range(len(l)):
-        if l[i].startswith("@<TRIPOS>ATOM"): start = i + 1
+        if l[i].startswith("@<TRIPOS>ATOM"):
+            start = i + 1
         if l[i].startswith("@<TRIPOS>BOND"):
             end = i - 1
             bond = i + 1
@@ -255,7 +256,7 @@ def MOL2read(filename):
         coords.append([float(x) for x in s[2:5]])
         topo.charge.append(float(s[8]))
         topo.atomtype.append(s[5])
-        topo.resname.append(s[6])
+        topo.resname.append(s[7])
     if bond:
         for i in range(bond, len(l)):
             b = l[i].split()

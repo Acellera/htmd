@@ -146,6 +146,9 @@ class TICA(object):
                 keepdimdesc = metr.getMapping(Molecule(molfile))
                 keepdimdesc = keepdimdesc.ix[keepdim]
         else:
+            if self.data.numDimensions < ndim:
+                raise RuntimeError('TICA cannot increase the dimensionality of your data. Your data has {} dimensions and you requested {} TICA dimensions'.format(self.data.numDimensions, ndim))
+
             if self.dimensions is not None:
                 keepdim = np.setdiff1d(range(self.data.numDimensions), self.dimensions)
                 keepdata = [x[:, keepdim] for x in self.data.dat]
