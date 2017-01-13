@@ -209,9 +209,11 @@ class PreparationData:
                 logger.warning("Dubious protonation state:    {:s} (pKa={:5.2f})".format(drs, dr.pKa))
 
 
-    def _get_pka_plot(self, pH=7.4, figSizeX=10, dpk=1.0):
+    def _get_pka_plot(self, pH=7.4, figSizeX=10, dpk=1.0, font_size = 12):
         """Internal function to build the protonation diagram"""
 
+        import matplotlib
+        matplotlib.use("Agg")
         import numpy as np
         import matplotlib.pyplot as plt
         from matplotlib.lines import Line2D
@@ -226,7 +228,7 @@ class PreparationData:
         my_blue = (.42, .68, .84)
         grey_red = LinearSegmentedColormap.from_list("grey_red", [neutral_grey, my_red])
         grey_blue = LinearSegmentedColormap.from_list("grey_blue", [neutral_grey, my_blue])
-        eps = .01  # Tiny overprint to avoid very think white lines
+        eps = .01  # Tiny overprint to avoid very thin white lines
 
         # Color for pk values
         pkcolor = "black"
@@ -235,15 +237,14 @@ class PreparationData:
 
         # Or we could change the figure size, which scales axes
         # http://stackoverflow.com/questions/3899980/how-to-change-the-font-size-on-a-matplotlib-plot
-        SIZE = 12
         plt.rc('font', family="Open Sans")
-        plt.rc('font', size=SIZE)  # controls default text sizes
-        plt.rc('axes', titlesize=SIZE)  # fontsize of the axes title
-        plt.rc('axes', labelsize=SIZE)  # fontsize of the x and y labels
-        plt.rc('xtick', labelsize=SIZE)  # fontsize of the tick labels
-        plt.rc('ytick', labelsize=SIZE)  # fontsize of the tick labels
-        plt.rc('legend', fontsize=SIZE)  # legend fontsize
-        plt.rc('figure', titlesize=SIZE)  # fontsize of the figure title
+        plt.rc('font', size=font_size)  # controls default text sizes
+        plt.rc('axes', titlesize=font_size)  # fontsize of the axes title
+        plt.rc('axes', labelsize=font_size)  # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=font_size)  # fontsize of the tick labels
+        plt.rc('ytick', labelsize=font_size)  # fontsize of the tick labels
+        plt.rc('legend', fontsize=font_size)  # legend fontsize
+        plt.rc('figure', titlesize=font_size)  # fontsize of the figure title
 
         # Constants
         acidicResidues = ['ASP', 'GLU', 'TYR']
@@ -340,8 +341,8 @@ class PreparationData:
         fig.savefig(imgdata, format="svg", bbox_inches='tight', )
         ret_img = imgdata.getvalue()
 
-        fig.savefig("out.svg")
-        fig.savefig("out.png")
+        # fig.savefig("out.svg")
+        # fig.savefig("out.png")
 
         # Png render may be a bit better -
         # http://stackoverflow.com/questions/14824522/dynamically-serving-a-matplotlib-image-to-the-web-using-python
