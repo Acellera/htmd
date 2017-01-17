@@ -251,38 +251,110 @@ class MetricDistancePyemma(MetricPyemma):
         return self.feat.describe()
 '''
 
-def reconstructContactMap(map, datavec):
+
+def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize=(7, 7), dpi=80, outfile=None):
     """ Plots a given vector as a contact map
 
     Parameters
     ----------
-    map : np.ndarray 2D
-        The map from a MetricData object
-    datavec : np.ndarray
-        The data we want to plot in a 2D map
+    vector : np.ndarray or list
+        A 1D vector of contacts
+    mapping : pd.DataFrame
+        A pandas DataFrame which describes the dimensions of the projection
+    truecontacts : np.ndarray or list
+        A 1D vector of true contacts
+    plot : bool
+        To plot or not to plot
+    figsize : tuple
+        The size of the final plot in inches
+    dpi : int
+        Dots per inch
+    outfile : str
+        Path of file in which to save the plot
+
+    Returns
+    -------
+    cm : np.ndarray
+        The input vector converted into a 2D numpy array
     """
-    map = np.array(map, dtype=int)
-    atomidx = np.unique(map.flatten()).astype(int)
-    mask = np.zeros(max(atomidx)+1, dtype=int)
-    mask[atomidx] = range(len(atomidx))
 
-    # Create a new map which maps from vector indexes to matrix indexes
-    newmap = np.zeros(np.shape(map), dtype=int)
-    newmap[:, 0] = mask[map[:, 0]]
-    newmap[:, 1] = mask[map[:, 1]]
+    from copy import deepcopy
+    if truecontacts is None:
+        truecontacts = np.zeros(len(vector))
+    if len(vector) != len(mapping):
+        raise RuntimeError('Vector and map length must match.')
 
-    contactmap = np.zeros((len(atomidx), len(atomidx)))
-    for i in range(len(datavec)):
-        contactmap[newmap[i, 0], newmap[i, 1]] = datavec[i]
-        contactmap[newmap[i, 1], newmap[i, 0]] = datavec[i]
+    # Checking if contacts or distances exist in the data
+    contactidx = mapping.type == 'contact'
+    if not np.any(contactidx):
+        contactidx = mapping.type == 'distance'
+        if not np.any(contactidx):
+            raise RuntimeError(
+                'No contacts or distances found in the MetricData object. Check the `.map` property of the object for a description of your projection.')
 
-    from matplotlib import pylab as plt
-    plt.imshow(contactmap, interpolation='nearest', aspect='equal')
-    plt.colorbar()
-    #plt.axis('off')
-    #plt.tick_params(axis='x', which='both', bottom='off', top='off', labelbottom='off')
-    #plt.tick_params(axis='y', which='both', left='off', right='off', labelleft='off')
-    plt.show()
+    # Calculating the unique atom groups in the mapping
+    uqAtomGroups = []
+    atomIndexes = deepcopy(list(mapping.atomIndexes))
+    for ax in atomIndexes:
+        if not isinstance(ax[0], list) and not isinstance(ax[0], tuple):
+            ax[0] = [ax[0], ]
+        if not isinstance(ax[1], list) and not isinstance(ax[1], tuple):
+            ax[1] = [ax[1], ]
+        if ax[0] not in uqAtomGroups:
+            uqAtomGroups.append(ax[0])
+        if ax[1] not in uqAtomGroups:
+            uqAtomGroups.append(ax[1])
+    uqAtomGroups.sort(key=lambda x: x[0])  # Sort by first atom in each atom list
+    num = len(uqAtomGroups)
+
+    # Creating the 2D contact maps
+    cm = np.zeros((num, num), dtype=bool)
+    cmtrue = np.zeros((num, num), dtype=bool)
+    for i in range(len(vector)):
+        row = uqAtomGroups.index(atomIndexes[i][0])
+        col = uqAtomGroups.index(atomIndexes[i][1])
+        cm[row, col] = vector[i]
+        cmtrue[row, col] = truecontacts[i]
+    cm += cm.T
+    cmtrue += cmtrue.T
+
+    if plot:
+        from matplotlib import pylab as plt
+        f = plt.figure(figsize=figsize, dpi=dpi)
+        plt.imshow(cmtrue / 2, interpolation='none', vmin=0, vmax=1, aspect='equal',
+                   cmap='Greys')  # /2 to convert to gray from black
+        rows, cols = np.where(cm)
+        plt.scatter(rows, cols, s=figsize[0] * 5, marker='o', c='r', lw=0)
+        rows, cols = np.where(cm & cmtrue)
+        plt.scatter(rows, cols, s=figsize[0] * 5, marker='o', c='#ffff00', lw=0)
+        ax = plt.gca()
+
+        # Major ticks
+        ax.set_xticks(np.arange(0, num, 1))
+        ax.set_yticks(np.arange(0, num, 1))
+
+        # Labels for major ticks
+        ax.set_xticklabels([x[0] for x in uqAtomGroups])
+        ax.set_yticklabels([x[0] for x in uqAtomGroups], )
+
+        # Minor ticks
+        ax.set_xticks(np.arange(-.5, num, 1), minor=True)
+        ax.set_yticks(np.arange(-.5, num, 1), minor=True)
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=90)
+
+        # Gridlines based on minor ticks
+        ax.grid(which='minor', color='#969696', linestyle='-', linewidth=1)
+        ax.tick_params(axis='both', which='both', length=0)
+        plt.xlim([-.5, num - .5])
+        plt.ylim([-.5, num - .5])
+        plt.xlabel('Atom index')
+        plt.ylabel('Atom index')
+        if outfile is not None:
+            plt.savefig(outfile, dpi=dpi, bbox_inches='tight', pad_inches=0.2)
+            plt.close()
+        else:
+            plt.show()
+    return cm
 
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule
