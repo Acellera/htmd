@@ -21,7 +21,7 @@ from htmd.molecule.vdw import VDW
 from htmd.progress.progress import ProgressBar
 
 from htmd.queues.simqueue import SimQueue
-from htmd.queues.acecloudqueue import AceCloudQueue
+from htmd.queues.acecloud import AceCloudQueue
 
 
 from htmd.queues.lsf import LsfQueue
