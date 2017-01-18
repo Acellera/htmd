@@ -6,6 +6,7 @@
 from htmd.projections.projection import Projection
 import numpy as np
 from htmd.projections.util import pp_calcDistances, pp_calcMinDistances
+from htmd.util import ensurelist
 import logging
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,7 @@ class MetricDistance(Projection):
         types = []
         indexes = []
         description = []
-        if np.array_equal(protatoms, ligatoms):
+        if np.array_equal(sel1, sel2):
             for i in range(numatoms1):
                 for j in range(i+1, numatoms1):
                     atm1 = protatoms[i]
@@ -252,7 +253,7 @@ class MetricDistancePyemma(MetricPyemma):
 '''
 
 
-def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize=(7, 7), dpi=80, outfile=None):
+def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize=(7, 7), dpi=80, title=None, outfile=None):
     """ Plots a given vector as a contact map
 
     Parameters
@@ -296,10 +297,8 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
     uqAtomGroups = []
     atomIndexes = deepcopy(list(mapping.atomIndexes))
     for ax in atomIndexes:
-        if not isinstance(ax[0], list) and not isinstance(ax[0], tuple):
-            ax[0] = [ax[0], ]
-        if not isinstance(ax[1], list) and not isinstance(ax[1], tuple):
-            ax[1] = [ax[1], ]
+        ax[0] = ensurelist(ax[0])
+        ax[1] = ensurelist(ax[1])
         if ax[0] not in uqAtomGroups:
             uqAtomGroups.append(ax[0])
         if ax[1] not in uqAtomGroups:
@@ -327,7 +326,7 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
         plt.scatter(rows, cols, s=figsize[0] * 5, marker='o', c='r', lw=0)
         rows, cols = np.where(cm & cmtrue)
         plt.scatter(rows, cols, s=figsize[0] * 5, marker='o', c='#ffff00', lw=0)
-        ax = plt.gca()
+        ax = f.axes[0]
 
         # Major ticks
         ax.set_xticks(np.arange(0, num, 1))
@@ -349,6 +348,8 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
         plt.ylim([-.5, num - .5])
         plt.xlabel('Atom index')
         plt.ylabel('Atom index')
+        if title:
+            plt.title(title)
         if outfile is not None:
             plt.savefig(outfile, dpi=dpi, bbox_inches='tight', pad_inches=0.2)
             plt.close()

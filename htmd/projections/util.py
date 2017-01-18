@@ -141,6 +141,7 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
     # Running the actual calculations
     lib = ctypes.cdll.LoadLibrary(os.path.join(home(libDir=True), 'mindist_ext.so'))
     mindist = np.zeros((mol.numFrames, len(groups1) * len(groups2)), dtype=np.float32)  # Preparing the return array
+    # TODO: C code should know it's self distance and not calculate symmetrical distances
     lib.mindist_trajectory(coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                            box.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                            groups1.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
@@ -152,6 +153,8 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
                            ctypes.c_int(int(pbc)),
                            mindist.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
 
+    mindist = _postProcessMinDistances(mindist, sel1, sel2, truncate)
+
     if metric == 'contacts':
         mindist = mindist <= threshold
     elif metric == 'distances':
@@ -161,15 +164,32 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
     return mindist
 
 
+def _postProcessMinDistances(distances, sel1, sel2, truncate):
+    # distances is a 2D array with numFrames * numDimensions shape
+    # Setting upper triangle to -1 if same selections
+    if np.array_equal(sel1, sel2):
+        numGroups = sel1.shape[0]
+        mask = np.ones(numGroups * numGroups, dtype=bool)
+        for r in range(numGroups):
+            mask[r*numGroups:r*numGroups+r+1] = 0
+        distances = distances[:, mask]
+
+    if truncate is not None:
+        distances[distances > truncate] = truncate
+
+    return np.atleast_1d(np.squeeze(distances))
+
+
 def _wrapCoords(coords, box):
     return coords - box * np.round(coords / box)
 
 
 def _postProcessDistances(distances, sel1, sel2, truncate):
+    # distances is a list of numpy arrays. Each numpy array is numFrames x numSel1. The list is length numSel2
     # Setting upper triangle to -1 if same selections
     if np.array_equal(sel1, sel2):
         for i in range(len(distances)):
-            distances[i][:, range(i + 1)] = -1
+                distances[i][:, range(i + 1)] = -1
 
     if np.ndim(distances[0]) > 1:  # 2D data
         distances = np.concatenate(distances, axis=1)
