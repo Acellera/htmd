@@ -167,15 +167,15 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         for at in atomtypes:
             if len(at) != 3:
                 raise RuntimeError('Atom type definitions have to be triplets. Check the AMBER documentations.')
-            f.write('    { "{}" "{}" "{}" }\n'.format(at[0], at[1], at[2]))
-        f.write('}\n')
+            f.write('    {{ "{}" "{}" "{}" }}\n'.format(at[0], at[1], at[2]))
+        f.write('}\n\n')
 
     # Loading OFF libraries
     if offlibraries is not None:
         if not isinstance(offlibraries, list) and not isinstance(offlibraries, tuple):
             offlibraries = [offlibraries, ]
         for off in offlibraries:
-            f.write('loadoff {}\n'.format(off))
+            f.write('loadoff {}\n\n'.format(off))
 
     # Loading user parameters
     f.write('# Loading parameter files\n')
