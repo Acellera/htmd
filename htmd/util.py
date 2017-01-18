@@ -8,7 +8,6 @@ import tempfile
 import logging
 import requests
 import io
-
 import os
 import numpy as np
 
@@ -37,6 +36,8 @@ def tempname(suffix='', create=False):
 def ensurelist(tocheck, tomod=None):
     if tomod is None:
         tomod = tocheck
+    if isinstance(tocheck, np.ndarray):
+        return list(tomod)
     if not isinstance(tocheck, list) and not isinstance(tocheck, tuple):
         return [tomod, ]
     return tomod
