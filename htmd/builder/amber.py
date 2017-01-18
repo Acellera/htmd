@@ -17,6 +17,7 @@ from htmd.builder.builder import _checkMixedSegment
 from subprocess import call, check_output, DEVNULL
 from htmd.molecule.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
+from htmd.util import ensurelist
 import logging
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,8 @@ def listFiles():
 
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True):
+          saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True, atomtypes=None,
+          offlibraries=None):
     """ Builds a system for AMBER
 
     Uses tleap to build a system for AMBER. Additionally it allows the user to ionize and add disulfide bridges.
@@ -77,7 +79,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     topo : list of str
         A list of topology `prepi` files.
     param : list of str
-        A list of parameter `frcmod` files.
+        A list of parameter `frcmod` files. Default: ['frcmod.ionsjc_tip3p',]
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -101,6 +103,11 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         Path to tleap executable used to build the system for AMBER
     execute : bool
         Disable building. Will only write out the input script needed by tleap. Does not include ionization.
+    atomtypes : list of triplets
+        Custom atom types defined by the user as ('type', 'element', 'hybrid') triplets
+        e.g. (('C1', 'C', 'sp2'), ('CI', 'C', 'sp3')). Check `addAtomTypes` in AmberTools docs.
+    offlibraries : str or list
+        A path or a list of paths to OFF library files. Check `loadOFF` in AmberTools docs.
 
     Returns
     -------
@@ -125,7 +132,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     if topo is None:
         topo = []
     if param is None:
-        param = []
+        param = ['frcmod.ionsjc_tip3p',]
     if caps is None:
         caps = _defaultProteinCaps(mol)
 
@@ -148,9 +155,22 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         f.write('source ' + force + '\n')
     f.write('\n')
 
-    # Loading TIP3P water parameters
-    f.write('# Loading ions and TIP3P water parameters\n')
-    f.write('loadamberparams frcmod.ionsjc_tip3p\n\n')
+    # Adding custom atom types
+    if atomtypes is not None:
+        atomtypes = ensurelist(tocheck=atomtypes[0], tomod=atomtypes)
+        f.write('addAtomTypes {\n')
+        for at in atomtypes:
+            if len(at) != 3:
+                raise RuntimeError('Atom type definitions have to be triplets. Check the AMBER documentations.')
+            f.write('    { "{}" "{}" "{}" }\n'.format(at[0], at[1], at[2]))
+        f.write('}\n')
+
+    # Loading OFF libraries
+    if offlibraries is not None:
+        if not isinstance(offlibraries, list) and not isinstance(offlibraries, tuple):
+            offlibraries = [offlibraries, ]
+        for off in offlibraries:
+            f.write('loadoff {}\n'.format(off))
 
     # Loading user parameters
     f.write('# Loading parameter files\n')
