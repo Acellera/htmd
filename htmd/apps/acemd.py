@@ -57,6 +57,7 @@ class Acemd(ProtocolInterface):
         self._cmdString('useconstantratio', 'str', '', None)
         self._cmdString('amber', 'str', '', None)
         self._cmdString('dielectric', 'str', '', None)
+        self._cmdString('pairlistdist', 'str', '', None)
 
         # Files
         self._cmdString('bincoordinates', 'str', '', None)
