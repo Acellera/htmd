@@ -95,12 +95,12 @@ def _buildResAndMol(pdb2pqr_protein):
 
         prepData._setProtonationState(residue, curr_resname)
 
-        # if 'patches' in residue.__dict__:
-        if getattr(residue, 'patches', None):
-            for patch in residue.patches:
-                prepData._appendPatches(residue, patch)
-                if patch != "PEPTIDE":
-                    logger.debug("Residue %s has patch %s set" % (residue, patch))
+        # Removed because not really useful
+        # if getattr(residue, 'patches', None):
+        #     for patch in residue.patches:
+        #         prepData._appendPatches(residue, patch)
+        #         if patch != "PEPTIDE":
+        #             logger.debug("Residue %s has patch %s set" % (residue, patch))
 
         if getattr(residue, 'wasFlipped', 'UNDEF') != 'UNDEF':
             prepData._setFlipped(residue, residue.wasFlipped)
