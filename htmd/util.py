@@ -34,6 +34,14 @@ def tempname(suffix='', create=False):
     return file.name
 
 
+def ensurelist(tocheck, tomod=None):
+    if tomod is None:
+        tomod = tocheck
+    if not isinstance(tocheck, list) and not isinstance(tocheck, tuple):
+        return [tomod, ]
+    return tomod
+
+
 def diffMolecules(mol1, mol2, sel=None):
     """Check that name, resname, resid, insertion codes match between two molecules.
 

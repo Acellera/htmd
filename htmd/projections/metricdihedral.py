@@ -102,8 +102,8 @@ class MetricDihedral(Projection):
         if self._dihquads is None:  # Default phi psi dihedrals
             dihquads = self._proteinDihedrals(resids)
         else:
-            if not isinstance(self._dihquads, list):
-                self._dihquads = [self._dihquads]
+            from htmd.util import ensurelist
+            self._dihquads = ensurelist(self._dihquads)
             dihquads = self._dihquads
 
         dih = []

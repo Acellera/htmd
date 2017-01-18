@@ -7,6 +7,7 @@ import abc
 from difflib import get_close_matches
 import os
 import re
+from htmd.util import ensurelist
 
 RANGE_ANY = 0
 RANGE_POS = 1
@@ -176,15 +177,13 @@ class ObjectValidator(Validator):
 
     def validate(self, object, basedir=None):
         classname = self.classname
-        if not (isinstance(object, list) or isinstance(object, tuple)):  # Allow lists of objects
-            object = [object,]
-        if not (isinstance(classname, list) or isinstance(classname, tuple)):  # Allow lists of classes
-            classname = [classname,]
+        object = ensurelist(object)
+        classname = ensurelist(classname)
 
         for obj in object:
             valid = False
             for cl in classname:
-                if isinstance(obj, self.classname):
+                if isinstance(obj, cl):
                     valid = True
                     break
             if not valid:
