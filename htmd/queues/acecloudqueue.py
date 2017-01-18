@@ -10,8 +10,8 @@ from os.path import isdir
 from subprocess import check_output
 from htmd.protocols.protocolinterface import ProtocolInterface
 from htmd.queues.simqueue import SimQueue
-from acecloud.cloud  import Cloud
-from acecloud.job    import Job
+from acecloud.cloud import Cloud
+from acecloud.job import Job
 from acecloud.status import Status
 import logging
 import random
