@@ -177,7 +177,7 @@ def _postProcessMinDistances(distances, sel1, sel2, truncate):
     if truncate is not None:
         distances[distances > truncate] = truncate
 
-    return np.atleast_1d(np.squeeze(distances))
+    return distances
 
 
 def _wrapCoords(coords, box):
