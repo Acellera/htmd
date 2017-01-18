@@ -28,6 +28,11 @@ def listFiles():
     if not tleap:
         raise NameError('tleap not found. You should either have AmberTools or ambermini installed '
                         '(to install ambermini do: conda install ambermini -c acellera)')
+    if os.path.islink(tleap):
+        if path.isabs(os.readlink(tleap)):
+            tleap = os.readlink(tleap)
+        else:
+            tleap = os.path.join(os.path.dirname(tleap), os.readlink(tleap))
 
     amberhome = path.normpath(path.join(path.dirname(tleap), '../'))
 
