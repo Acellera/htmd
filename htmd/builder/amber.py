@@ -102,8 +102,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         The anion type. Please use only AMBER ion atom names.
     saltcation : {'Na+', 'K+', 'Cs+'}
         The cation type. Please use only AMBER ion atom names.
-    disulfide : np.ndarray
-        If None it will guess disulfide bonds. Otherwise provide a 2D array where each row is a pair of atom indexes that makes a disulfide bond
+    disulfide : list of :class:`DisulfideBridge <htmd.builder.builder.DisulfideBridge>` objects
+        If None it will guess disulfide bonds. Otherwise provide a list of `DisulfideBridge` objects.
     tleap : str
         Path to tleap executable used to build the system for AMBER
     execute : bool
@@ -121,8 +121,20 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     Example
     -------
+    >>> from htmd import *
+    >>> mol = Molecule("3PTB")
+    >>> amber.listFiles()             # doctest: +ELLIPSIS
+    ---- Topologies files list...
+    top/top_all36_prot.rtf
+    top/top_water_ions.rtf
+    ...
+    >>> molbuilt = amber.build(mol, outdir='/tmp/build')  # doctest: +SKIP
+    ...
+    >>> # More complex example
     >>> ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
-    >>> molbuilt = amber.build(mol, ff=ffs, outdir='/tmp/build', saltconc=0.15)
+    >>> params = ['frcmod.ionsjc_tip3p',]
+    >>> disu = [DisulfideBridge('P', 157, 'P', 13), DisulfideBridge('K', 1, 'K', 25)]
+    >>> molbuilt = amber.build(mol, ff=ffs, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
     """
     # Remove pdb bonds!
     mol = mol.copy()

@@ -172,10 +172,13 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     ---- Topologies files list...
     top/top_all36_prot.rtf
     top/top_water_ions.rtf
+    >>> molbuilt = charmm.build(mol, outdir='/tmp/build')
     ...
+    >>> # More complex example
     >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf', 'top/top_water_ions.rtf']
     >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm', 'par/par_water_ions.prm']
-    >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15)  # doctest: +SKIP
+    >>> disu = [DisulfideBridge('P', 157, 'P', 13), DisulfideBridge('K', 1, 'K', 25)]
+    >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
     """
 
     mol = mol.copy()
