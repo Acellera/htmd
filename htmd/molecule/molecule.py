@@ -1125,12 +1125,15 @@ class Molecule:
                     tmppdb = tempname(suffix='.pdb')
                     self.write(tmppdb)
                     traj = md.load(tmppdb)
+                    os.remove(tmppdb)
                 else:
                     tmppdb = tempname(suffix='.pdb')
                     tmpxtc = tempname(suffix='.xtc')
                     self.write(tmppdb)
                     self.write(tmpxtc)
                     traj = md.load(tmpxtc, top=tmppdb)
+                    os.remove(tmppdb)
+                    os.remove(tmpxtc)
                 # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
                 # traj.time = self.time
                 # traj.unitcell_lengths = self.box.T / 10
