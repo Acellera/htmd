@@ -31,9 +31,9 @@ conda build package/htmd-meta --no-include-recipe
 export CHANNEL=acellera
 echo "Uploading to channel: $CHANNEL ; PACKAGE: $PACKAGE_NAME (based on $TRAVIS_BRANCH version $MAJOR.$MINOR.$BUGFIX)"
 
-if [ "$CROSS_COMPILE" == "1" ]; then
-    conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2
-    anaconda $ANACONDA_TOKEN upload win-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL -p $PACKAGE_NAME
-else
-	anaconda $ANACONDA_TOKEN upload $HOME/miniconda/conda-bld/*-64/$PACKAGE_NAME-*.tar.bz2 -u $CHANNEL -p $PACKAGE_NAME
+if [ "$OSNAME" == "Windows" ]; then
+	conda convert -f -p win-64 $HOME/miniconda*/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2
 fi
+echo "Uploading"
+anaconda $ANACONDA_TOKEN upload $HOME/miniconda*/conda-bld/*-64/$PACKAGE_NAME-*.tar.bz2 -u $CHANNEL -p $PACKAGE_NAME
+echo "Done"
