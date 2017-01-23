@@ -82,6 +82,10 @@ class ProtocolInterface:
         self._commands[key] = ObjectValidator(key, datatype, descr, default, classname)
         self.__misc(key, default)
 
+    def _cmdClass(self, key, datatype, descr, default, classname):
+        self._commands[key] = ClassValidator(key, datatype, descr, default, classname)
+        self.__misc(key, default)
+
     def _cmdBoolean(self, key, datatype, descr, default):
         self._commands[key] = BooleanValidator(key, datatype, descr, default)
         self.__misc(key, default)
@@ -188,6 +192,30 @@ class ObjectValidator(Validator):
                     break
             if not valid:
                 raise ValueError('Value must be object of {}'.format(self.classname))
+
+        return object
+
+class ClassValidator(Validator):
+    def __init__(self, key, datatype, descr, default, classname):
+        super().__init__(key, datatype, descr, default)
+        self.classname = classname
+
+    def args(self):
+        return
+
+    def validate(self, object, basedir=None):
+        classname = self.classname
+        object = ensurelist(object)
+        classname = ensurelist(classname)
+
+        for obj in object:
+            valid = False
+            for cl in classname:
+                if issubclass(obj, cl):
+                    valid = True
+                    break
+            if not valid:
+                raise ValueError('Value must be subclass of {}'.format(self.classname))
 
         return object
 
