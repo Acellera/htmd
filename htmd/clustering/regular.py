@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.clustering.kcenters import KCenter
 import numpy as np
 import random as rd
 from scipy.spatial.distance import cdist
@@ -63,6 +62,7 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
         """
         # if n_clusters is given and no r, estimate n_clusters
         if self.radius is None:
+            from htmd.clustering.kcenters import KCenter
             estClust = KCenter(n_clusters=self.n_clusters)
             estClust.fit(data)
             self.radius = estClust.distance.max()

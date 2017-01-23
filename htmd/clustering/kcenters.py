@@ -6,11 +6,12 @@
 import numpy as np
 from scipy.spatial.distance import cdist
 from htmd.progress.progress import ProgressBar
+from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
 import logging
 logger = logging.getLogger(__name__)
 
 
-class KCenter:
+class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
     """ Class to perform KCenter clustering of a given data set
 
     KCenter randomly picks one point from the data, which is now the center of the first cluster. All points are put
