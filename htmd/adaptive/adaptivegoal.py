@@ -5,6 +5,7 @@
 #
 from glob import glob
 from os import path
+import os
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
 from htmd.util import _getNcpus
@@ -145,6 +146,11 @@ class AdaptiveGoal(AdaptiveMD):
             return True
 
         data = self._getData(sims)
+        if self.save:
+            if not path.exists('saveddata'):
+                os.makedirs('saveddata')
+            np.savetxt(path.join('saveddata', 'e{}_report.npy'.format(self._getEpoch())), [self._getEpoch(), data.numFrames, len(data.dat)])
+
         if not self._checkNFrames(data): return False
         goaldata = self._getGoalData(data.simlist)  # Using the simlist of data in case some trajectories were dropped
         if len(data.simlist) != len(goaldata.simlist):
@@ -164,30 +170,41 @@ class AdaptiveGoal(AdaptiveMD):
             uc = macroAccumulate(model, uc[model.cluster_ofmicro])
 
         # Calculating the directed component
-        dc = self._calculateDirectedComponent(goaldata, model.data.St, model.data.N)
+        dcmeans = dcstds = None
         if self.statetype == 'micro':
-            dc = dc[model.cluster_ofmicro]
-        if self.statetype == 'macro':
-            dc = macroAccumulate(model, dc[model.cluster_ofmicro])
+            dcmeans, dcstds = self._calculateDirectedComponent(goaldata, model.data.St, model.micro_ofcluster)
+        elif self.statetype == 'macro':
+            # TODO: Should we weigh by equilibrium population?
+            dcmeans, dcstds = self._calculateDirectedComponent(goaldata, model.data.St, model.macro_ofcluster)
 
+        ucunscaled = uc
+        dcunscaled = dcmeans
         uc = self._featScale(uc)
-        dc = self._featScale(dc)
-        logger.debug('Undirected component: {}'.format(uc))
-        logger.debug('Directed component: {}'.format(dc))
-
+        dc = self._featScale(dcmeans)
         reward = dc + self.ucscale * uc
 
-        relFrames = self._getSpawnFrames(reward, self._model, data)
-        if self._debug: np.save('debug.npy', relFrames); return True
+        relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
+
+        if self.save:
+            if not path.exists('saveddata'):
+                os.makedirs('saveddata')
+            epoch = self._getEpoch()
+            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'ucscale': self.ucscale,
+                      'spawncounts': spawncounts, 'truncprob': truncprob, 'relFrames': relFrames, 'dcmeans': dcmeans,
+                      'dcstds': dcstds, 'reward': reward}
+            np.save(path.join('saveddata', 'e{}_goalreport.npy'.format(epoch)), tosave)
+            np.save(path.join('saveddata', 'e{}_spawnframes.npy'.format(epoch)), relFrames)
+            goaldata.save(path.join('saveddata', 'e{}_goaldata.dat'.format(epoch)))
+
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
     def _getSpawnFrames(self, reward, model, data):
-        (spawncounts, prob) = self._spawn(reward, self.nmax - self._running)
+        spawncounts, prob = self._spawn(reward, self.nmax - self._running)
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=True)
-        return relFrames
+        return relFrames, spawncounts, prob
 
     def _featScale(self, feat):
         denom = np.max(feat) - np.min(feat)
@@ -205,11 +222,25 @@ class AdaptiveGoal(AdaptiveMD):
         logger.debug('Finished calculating directed component')
         return data
 
-    def _calculateDirectedComponent(self, goaldata, St, N):
+    def _calculateDirectedComponent(self, goaldata, St, mapping=None):
+        import pandas as pd
         goalconcat = np.concatenate(goaldata.dat).flatten()
         stconcat = np.concatenate(St)
-        clustermeans = np.bincount(stconcat, goalconcat)
-        return clustermeans / N
+        if mapping is not None:
+            stconcat = mapping[stconcat]
+
+        x = pd.DataFrame({'a': stconcat})
+        indexes = x.groupby('a').groups
+
+        means = np.zeros(stconcat.max() + 1)
+        stds = np.zeros(stconcat.max() + 1)
+        for i in indexes:
+            if i == -1:  # Mappings have -1 on disconnected clusters (not used in the MSM)
+                continue
+            means[i] = np.mean(goalconcat[indexes[i]])
+            stds[i] = np.std(goalconcat[indexes[i]])
+
+        return means, stds
 
 
 if __name__ == '__main__':
