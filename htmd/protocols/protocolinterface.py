@@ -215,7 +215,7 @@ class ClassValidator(Validator):
                     valid = True
                     break
             if not valid:
-                raise ValueError('Value must be subclass of {}'.format(self.classname))
+                raise ValueError('Value must be object of {}'.format(self.classname))
 
         return object
 
