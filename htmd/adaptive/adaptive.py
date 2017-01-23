@@ -91,6 +91,7 @@ class AdaptiveBase(ProtocolInterface):
                     return
                 except ProjectNotExistError:
                     logger.info('Inprogress found no previous simulations for this adaptive. Assuming this is a new adaptive run')
+                    self._running = 0
 
                 logger.info(str(self._running) + ' simulations in progress')
 
