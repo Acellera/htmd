@@ -196,6 +196,7 @@ class AdaptiveGoal(AdaptiveMD):
             np.save(path.join('saveddata', 'e{}_spawnframes.npy'.format(epoch)), relFrames)
             goaldata.save(path.join('saveddata', 'e{}_goaldata.dat'.format(epoch)))
 
+        if self._debug: np.save('debug.npy', relFrames); return True
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
