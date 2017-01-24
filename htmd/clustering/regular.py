@@ -74,7 +74,7 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
 
     @property
     def cluster_centers_(self):
-        return list(self._reg.clustercenters)
+        return self._reg.clustercenters
 
     @property
     def clusterSize(self):
