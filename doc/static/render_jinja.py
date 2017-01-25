@@ -2,7 +2,10 @@ from jinja2 import Environment, FileSystemLoader
 import os
 from glob import glob
 import re
+import sys
 
+ind = sys.argv[1]
+outd = sys.argv[2]
 
 def render_html(indir, outdir):
     indir = os.path.abspath(indir)
@@ -19,7 +22,6 @@ def render_html(indir, outdir):
         with open(os.path.join(outdir, t), 'w') as f:
             f.write(html)
 
-if __name__ == '__main__':
-    render_html('./', './')
+render_html(ind, outd)
     
 
