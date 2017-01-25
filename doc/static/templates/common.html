@@ -1,8 +1,20 @@
+{% set navigation_bar = [
+    ('/docs/latest/index.html', 'documentation', 'Documentation'),
+    ('/download.html', 'download', 'Download'),
+    ('https://github.com/Acellera/htmd', 'github', 'Github / Issues'),
+    ('/about.html', 'about', 'About'),
+    ('http://workshop.htmd.org', 'workshop', 'Workshop'),
+    ('/cite.html', 'cite', 'Cite us')
+] -%}
+{% set active_page = active_page|default('documentation') -%}
+
 <html>
-	<head>
+    <head>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8"></meta>
-        <title>HTMD - Download</title>
+        <title>HTMD - {{ title }}</title>
         <meta content="width=device-width, initial-scale=1, maximum-scale=2" name="viewport"></meta>
+        <meta name=”description” content="HTMD is a programmable environment to prepare, handle, simulate and analyze molecular systems.">
+        <link href="/img/ben.png" rel="shortcut icon">
         <script src="/javascripts/scrollbar/jquery.min.js"></script> 
         <link href="/stylesheets/documentation.css" rel="stylesheet"></link>
         <link href="/stylesheets/scrollToTop.css" rel="stylesheet"></link>
@@ -39,32 +51,17 @@
 				</div>-->
 				<div id='cssmenu'>
 					<ul id='menu'>
-                        
-                            <li><a href="/docs/latest/index.html">Documentation</a></li>
-                        
-                            <li class="active" ><a href="/download.html">Download</a></li>
-                        
-                            <li><a href="https://github.com/Acellera/htmd">Github / Issues</a></li>
-                        
-                            <li><a href="/about.html">About</a></li>
-                        
-                            <li><a href="http://workshop.htmd.org">Workshop</a></li>
-                        
-                            <li><a href="/cite.html">Cite us</a></li>
-                        
+                        {% for href, id, caption in navigation_bar %}
+                            <li{% if id == active_page %} class="active" {% endif %}><a href="{{ href|e }}">{{ caption|e }}</a></li>
+                        {% endfor %}
 					</ul>
 				</div>
 			    </div>
 	 		</div>
 	        	<div style='clear:both'></div>
 		</div>
-        
-                <div style="padding-top:10px; padding-bottom:30px;"  id="allbody">
-                    <a href='academic-download.html' class='button'>Free HTMD standard (academia only)</a>
-                    <a href='https://www.acellera.com/contact/' class='button'>HTMD Pro</a>
-                    <a href='https://github.com/Acellera/htmd/' class='button'>Source code for code lovers</a>
-                </div>
-
+        {% block body_content %}
+        {% endblock %}
 		
 		<footer>
          	All rights reserved 2016 &copy;
