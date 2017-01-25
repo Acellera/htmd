@@ -63,7 +63,7 @@ clean:
 publish:
 	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/$(HTMDBRANCH)/*'
 	scp -r $(BUILDDIR)/html/* www.acellera.com:~/www.htmd.org/docs/$(HTMDBRANCH)/
-	scp -r static/*  www.acellera.com:~/www.htmd.org/
+	scp -r $(BUILDDIR)/static/*  www.acellera.com:~/www.htmd.org/
 	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
 
 publish-mk-test:
@@ -82,7 +82,8 @@ $(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
 tutorials: $(RST_FILES)
 
 static:
-	python ./static/render_jinja.py ./static/ ./static/
+	python render_jinja.py ./static_templates/ $(BUILDDIR)/static/
+	cp -R ./static_files/* $(BUILDDIR)/static/
 
 html: tutorials static
 	rm -f source/htmd.*
