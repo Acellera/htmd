@@ -179,7 +179,7 @@ class Acemd(ProtocolInterface):
 
     def _writeBashRun(self, fname):
         with open(fname, 'w') as f:
-            if self._Version==3:
+            if self._version==3:
                f.write('#!/bin/bash\nacemd3 >log.txt 2>&1')
             else:
                f.write('#!/bin/bash\nacemd >log.txt 2>&1')
