@@ -55,8 +55,8 @@ for p in [
 
 		acellera = {"latest_version": "0" }
 
-	if omnia["latest_version"] != acellera["latest_version"]:
-		print("Syncing %s/%s version %s.." %(pp[0], p, omnia["latest_version"]) )
+	if omnia["latest_version"] > acellera["latest_version"]:
+		print("Syncing %s/%s version %s (acellera version %s).." %(pp[0], p, omnia["latest_version"], acellera["latest_version"]) )
 		for f in omnia["files"]:
 			if f["version"] == omnia["latest_version"]:
 				url = "https:" + f["download_url"]
@@ -69,11 +69,11 @@ for p in [
 				print("Uploading.."  )
 				try:
 					os.getenv("ANACONDA_TOKEN_BASIC") 
-					call([ "anaconda", "upload", "-t", os.getenv("ANACONDA_TOKEN_BASIC"),"-u",  "acellera", f["basename"] ])
+					call([ "anaconda", "upload", "--force",  "-t", os.getenv("ANACONDA_TOKEN_BASIC"),"-u",  "acellera", f["basename"] ])
 				except:
 					try:
-						call([ "anaconda", "upload", "-u",  "acellera", f["basename"] ])
+						call([ "anaconda", "upload", "--force", "-u",  "acellera", f["basename"] ])
 					except:
 						print("Failed to sync")
 	else:
-		print("Package %s up to date at version %s" % ( p, omnia["latest_version"] ) )
+		print("Package %s up to date at version %s/%s" % ( p, omnia["latest_version"], acellera["latest_version"] ) )

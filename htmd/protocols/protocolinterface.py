@@ -7,6 +7,7 @@ import abc
 from difflib import get_close_matches
 import os
 import re
+from htmd.util import ensurelist
 
 RANGE_ANY = 0
 RANGE_POS = 1
@@ -79,6 +80,10 @@ class ProtocolInterface:
 
     def _cmdObject(self, key, datatype, descr, default, classname):
         self._commands[key] = ObjectValidator(key, datatype, descr, default, classname)
+        self.__misc(key, default)
+
+    def _cmdClass(self, key, datatype, descr, default, classname):
+        self._commands[key] = ClassValidator(key, datatype, descr, default, classname)
         self.__misc(key, default)
 
     def _cmdBoolean(self, key, datatype, descr, default):
@@ -176,19 +181,41 @@ class ObjectValidator(Validator):
 
     def validate(self, object, basedir=None):
         classname = self.classname
-        if not (isinstance(object, list) or isinstance(object, tuple)):  # Allow lists of objects
-            object = [object,]
-        if not (isinstance(classname, list) or isinstance(classname, tuple)):  # Allow lists of classes
-            classname = [classname,]
+        object = ensurelist(object)
+        classname = ensurelist(classname)
 
         for obj in object:
             valid = False
             for cl in classname:
-                if isinstance(obj, self.classname):
+                if isinstance(obj, cl):
                     valid = True
                     break
             if not valid:
                 raise ValueError('Value must be object of {}'.format(self.classname))
+
+        return object
+
+class ClassValidator(Validator):
+    def __init__(self, key, datatype, descr, default, classname):
+        super().__init__(key, datatype, descr, default)
+        self.classname = classname
+
+    def args(self):
+        return
+
+    def validate(self, object, basedir=None):
+        classname = self.classname
+        object = ensurelist(object)
+        classname = ensurelist(classname)
+
+        for obj in object:
+            valid = False
+            for cl in classname:
+                if issubclass(obj, cl):
+                    valid = True
+                    break
+            if not valid:
+                raise ValueError('Value must be subclass of {}'.format(self.classname))
 
         return object
 

@@ -143,16 +143,18 @@ class TICA(object):
                 from htmd.projections.metric import _singleMolfile
                 from htmd.molecule.molecule import Molecule
                 (single, molfile) = _singleMolfile(metr.simulations)
-                keepdimdesc = metr.getMapping(Molecule(molfile))
-                keepdimdesc = keepdimdesc.ix[keepdim]
+                if single:
+                    keepdimdesc = metr.getMapping(Molecule(molfile))
+                    keepdimdesc = keepdimdesc.ix[keepdim]
         else:
-            if self.data.numDimensions < ndim:
+            if ndim is not None and self.data.numDimensions < ndim:
                 raise RuntimeError('TICA cannot increase the dimensionality of your data. Your data has {} dimensions and you requested {} TICA dimensions'.format(self.data.numDimensions, ndim))
 
             if self.dimensions is not None:
                 keepdim = np.setdiff1d(range(self.data.numDimensions), self.dimensions)
                 keepdata = [x[:, keepdim] for x in self.data.dat]
-                keepdimdesc = self.data.map.ix[keepdim]
+                if self.data.map is not None:
+                    keepdimdesc = self.data.map.ix[keepdim]
             proj = self.tic.get_output()
             simlist = self.data.simlist
             ref = self.data.ref
@@ -182,7 +184,7 @@ class TICA(object):
             description += ['TICA dimension {}'.format(i+1)]
         datatica.map = DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
-        if self.dimensions is not None:  # If TICA is done on a subset of dims
+        if self.dimensions is not None and keepdimdesc is not None:  # If TICA is done on a subset of dims
             datatica.map = keepdimdesc.append(datatica.map, ignore_index=True)
 
         return datatica

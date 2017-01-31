@@ -94,9 +94,9 @@ def _release_version(user, package):
     laststable = None
     lastdev = None
     for ver in versionlist[::-1]:  # Iterate in reverse due to sorting of conda versions
-        if _is_stable(ver):
+        if laststable is None and _is_stable(ver):
             laststable = ver
-        else:
+        elif lastdev is None:
             lastdev = ver
         if laststable and lastdev:
             break

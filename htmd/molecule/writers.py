@@ -7,6 +7,7 @@ import numpy as np
 import ctypes as ct
 import os
 from htmd.molecule.support import xtc_lib
+from htmd.util import ensurelist
 import collections
 import logging
 
@@ -83,8 +84,7 @@ def checkTruncations(mol):
 
 
 def PDBwrite(mol, filename, frame):
-    if not isinstance(frame, list) and not isinstance(frame, tuple):
-        frame = [frame, ]
+    frame = ensurelist(frame)
 
     def format83(f):
         """Format a single float into a string of width 8, with ideally 3 decimal places of precision. If the number is

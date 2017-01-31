@@ -7,6 +7,16 @@
   {%- set titlesuffix = "" %}
 {%- endif %}
 
+{% set navigation_bar = [
+    ('/docs/latest/index.html', 'documentation', 'Documentation'),
+    ('/download.html', 'download', 'Download'),
+    ('/about.html', 'about', 'About'),
+    ('http://workshop.htmd.org', 'workshop', 'Workshop'),
+    ('https://github.com/Acellera/htmd', 'github', 'Github / Issues'),
+    ('/cite.html', 'cite', 'Cite us')
+] -%}
+{% set active_page = active_page|default('documentation') -%}
+
 <!DOCTYPE html>
 <!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
@@ -87,12 +97,9 @@
 		<a class='project-name' href="/"> {{ project }}</a>
 		<div id="cssmenu">
 		<ul id="menu">
-            <li class='menu-documentation active'><a href='/docs/latest/index.html'>Documentation</a></li>
-            <li class='menu-download'><a href='/download.html'>Download</a></li>
-            <li class='menu-forum'><a href='https://forum.htmd.org/'>Forum</a></li>
-            <li class='menu-about'><a href='/about.html'>About</a></li>
-            <li class="menu-workshop"><a href="http://workshop.htmd.org">Workshop</a></li>
-            <li class="menu-cite last"><a href="/cite.html">Cite us</a></li>
+            {% for href, id, caption in navigation_bar %}
+                <li{% if id == active_page %} class="active" {% endif %}><a href="{{ href|e }}">{{ caption|e }}</a></li>
+            {% endfor %}
 		</ul>
 		</div>
 	

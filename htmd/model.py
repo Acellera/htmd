@@ -194,7 +194,7 @@ class Model(object):
         Clusters which were not connected and thus are not in the model have a macrostate value of -1.
         """
         self._integrityCheck(postmsm=True)
-        macro_ofcluster = -np.ones(self.data.K+1, dtype=int)
+        macro_ofcluster = -np.ones(self.data.K, dtype=int)
         macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
         return macro_ofcluster
 

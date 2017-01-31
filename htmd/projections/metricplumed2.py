@@ -5,6 +5,7 @@
 #
 from htmd.projections.projection import Projection
 from htmd.molecule.molecule import Molecule
+from htmd.util import ensurelist
 
 from abc import ABC
 import logging
@@ -308,8 +309,7 @@ class MetricPlumed2(Projection):
             raise Exception("To use MetricPlumed2 please ensure PLUMED 2's executable is installed and in path")
 
         # Sanitize if single element
-        if not isinstance(plumed_inp, list):
-            plumed_inp = [plumed_inp]
+        plumed_inp = ensurelist(plumed_inp)
 
         prereqs = set()
         for i in plumed_inp:

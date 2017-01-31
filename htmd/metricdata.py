@@ -113,6 +113,17 @@ class MetricData:
         """
         return self.dat[0].shape[1]
 
+    @property
+    def aggregateTime(self):
+        """ The total aggregate simulation time
+
+        Examples
+        --------
+        >>> data.aggTime
+        """
+        if self.fstep > 0:
+            return self.numFrames * self.fstep
+
     def cluster(self, clusterobj, mergesmall=None, batchsize=False):
         """ Cluster the metrics
 
@@ -333,16 +344,15 @@ class MetricData:
         else:
             rndtraj = np.random.permutation(numtraj)[0:numtokeep]
         rndtraj = sorted(rndtraj)  # Important to keep the sorting! i.e. for data.dropTraj(keepsims=sims)
-        bootdata = self.copy()
-        bootdata.dat = self.dat[rndtraj]
-        bootdata.ref = self.ref[rndtraj]
-        bootdata.simlist = self.simlist[rndtraj]
-        bootdata._datait = random.random()
+
+        pp = None
         if self.parent is not None:
-            bootdata.parent.dat = self.parent.dat[rndtraj]
-            bootdata.parent.ref = self.parent.ref[rndtraj]
-            bootdata.parent.simlist = self.parent.simlist[rndtraj]
-            bootdata.parent._dataid = random.random()
+            pp = self.parent.copy()
+            pp.dat = self.parent.dat[rndtraj]
+            pp.ref = self.parent.ref[rndtraj]
+            pp.simlist = self.parent.simlist[rndtraj]
+            pp._dataid = random.random()
+        bootdata = MetricData(dat=self.dat[rndtraj], ref=self.ref[rndtraj], map=self.map, simlist=self.simlist[rndtraj], parent=pp, fstep=self.fstep)
         return bootdata
     
     def plotTrajSizes(self):
@@ -545,11 +555,31 @@ class MetricData:
             lags = np.append(1, np.round(np.linspace(2, modelen, 25)))
         return lags.astype(int)
 
+    def __repr__(self):
+        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
+               + self.__str__()
+
     def __str__(self):
-        s = ''
-        for k in sorted(self.__dict__):
-            s += '{} = {}, {}\n'.format(k, np.shape(self.__dict__[k]), type(self.__dict__[k]))
-        return s
+        def formatstr(name, field):
+            if isinstance(field, np.ndarray) or isinstance(field, list):
+                rep = '{} shape: {}'.format(name, np.shape(field))
+            else:
+                rep = '{}: {}'.format(name, field)
+            return rep
+
+        rep = 'MetricData object with {} trajectories of {}ns aggregate simulation time'.format(self.numTrajectories, self.aggregateTime)
+        for j in sorted(self.__dict__.keys()):
+            if j[0] == '_':
+                continue
+            if j == 'parent':
+                rep += '\nparent: {} at {}'.format(type(self.parent), hex(id(self.parent)))
+            elif j == 'map':
+                rep += '\nmap: {} at {}'.format(type(self.map), hex(id(self.map)))
+            else:
+                rep += '\n'
+                rep += formatstr(j, self.__dict__[j])
+
+        return rep
 
 
 def _mergeSmallClusters(mergesmall, data, stconcat, centers, N, metric=None):
