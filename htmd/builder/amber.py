@@ -21,7 +21,6 @@ from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist
 import logging
 logger = logging.getLogger(__name__)
-logging.getLogger().setLevel(logging.INFO)
 
 
 def listFiles():
@@ -82,7 +81,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object containing the system
     ff : list of str
-        A list of leaprc forcefield files. Default: ['leaprc.lipid14', 'oldff/leaprc.ff14SB', 'leaprc.gaff']
+        A list of leaprc forcefield files. Default: ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
     topo : list of str
         A list of topology `prepi` files.
     param : list of str
@@ -133,7 +132,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     >>> molbuilt = amber.build(mol, outdir='/tmp/build')  # doctest: +SKIP
     ...
     >>> # More complex example
-    >>> ffs = ['leaprc.lipid14', 'oldff/leaprc.ff14SB', 'leaprc.gaff']
+    >>> ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
     >>> params = ['frcmod.ionsjc_tip3p',]
     >>> disu = [DisulfideBridge('P', 157, 'P', 13), DisulfideBridge('K', 1, 'K', 25)]
     >>> molbuilt = amber.build(mol, ff=ffs, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
@@ -147,7 +146,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         os.makedirs(outdir)
     _cleanOutDir(outdir)
     if ff is None:
-        ff = ['leaprc.lipid14',  os.path.join('oldff', 'leaprc.ff14SB'), 'leaprc.gaff']
+        ff = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
     if topo is None:
         topo = []
     if param is None:
@@ -620,7 +619,7 @@ if __name__ == '__main__':
         mol = proteinPrepare(mol)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
         smol = solvate(mol)
-        ffs = ['leaprc.lipid14', os.path.join( 'oldff', 'leaprc.ff14SB'), 'leaprc.gaff']
+        ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 
@@ -636,7 +635,7 @@ if __name__ == '__main__':
         mol = Molecule(pid)
         mol.filter('protein')
         smol = solvate(mol)
-        ffs = ['leaprc.lipid14', os.path.join( 'oldff', 'leaprc.ff14SB'), 'leaprc.gaff']
+        ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 
