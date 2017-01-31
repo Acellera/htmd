@@ -16,6 +16,7 @@ cases = """
 3cll
 3jbr
 3lut
+3rhw
 3spc
 3spg
 3syq
@@ -24,26 +25,26 @@ cases = """
 4kfm
 4pe5
 4tlm
+4uqj
 5an8
 """.split()
 
 # Disable this as a test
-sys.exit(0)
+# sys.exit(0)
+
+# cases=["3cll"]
 
 print(os.getcwd())
 
 for p in cases:
     print("Working on --------------- " + p)
     m, th = opm(p)
-    m.filter("not resname DUM")
+    m.filter("protein")
     m.write("{:s}.pdb".format(p))
 
-    try:
-        mo, rd = prepareProtein(m, returnDetails=True, verbose=True)
-        mo.write("{:s}-prep.pdb".format(p))
-        rd.data.to_excel("{:s}-data.xlsx".format(p))
+    mo, rd = proteinPrepare(m, returnDetails=True, verbose=True)
+    mo.write("{:s}-prep.pdb".format(p))
+    rd.data.to_excel("{:s}-data.xlsx".format(p))
 
-        mo.set('segid', 'P')
-        build(mo, outdir="build-" + p, ionize=False)
-    except:
-        print("Unexpected error:", sys.exc_info())
+    #mo.set('segid', 'P')
+    #build(mo, outdir="build-" + p, ionize=False)
