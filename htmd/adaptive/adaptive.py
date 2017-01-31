@@ -78,11 +78,6 @@ class AdaptiveBase(ProtocolInterface):
                 except ProjectNotExistError:
                     logger.info('Retrieve found no previous simulations for this adaptive. Assuming this is a new adaptive run')
 
-                if epoch >= self.nepochs:
-                    logger.info('Reached maximum number of epochs ' + str(self.nepochs))
-                    self._unsetLock()
-                    return
-
                 # Checking how many simulations are in progress (queued/running) on the queue
                 try:
                     self._running = self.app.inprogress()
@@ -95,8 +90,13 @@ class AdaptiveBase(ProtocolInterface):
 
                 logger.info(str(self._running) + ' simulations in progress')
 
+                if epoch >= self.nepochs and self._running == 0:
+                    logger.info('Reached maximum number of epochs ' + str(self.nepochs))
+                    self._unsetLock()
+                    return
+
                 # If currently running simulations are lower than nmin start new ones to reach nmax number of sims
-                if self._running <= self.nmin:
+                if self._running <= self.nmin and epoch < self.nepochs:
                     flag = self._algorithm()
                     if flag is False:
                         self._unsetLock()
