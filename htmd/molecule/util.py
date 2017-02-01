@@ -44,7 +44,7 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     from htmd.molecule.molecule import _residueNameTable
 
     def calculateVariables(currmol):
-        res = sequenceID((currmol.resid, currmol.insertion, currmol.segid, currmol.chain)) - 1
+        res = sequenceID((currmol.resid, currmol.insertion, currmol.segid, currmol.chain))
         caidx = currmol.name == 'CA'
         res = np.unique(res)
         reslen = len(res)
@@ -144,7 +144,7 @@ def sequenceID(field, prepend=None):
     else:
         seq = np.empty(fieldlen, dtype=object)
 
-    c = int(1)
+    c = int(0)
     if prepend is None:
         seq[0] = c
     else:

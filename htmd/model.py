@@ -546,7 +546,7 @@ class Model(object):
             viewer.send('start_sscache')
 
     def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples, gui=False):
-        from htmd.builder.builder import sequenceID
+        from htmd.molecule.util import sequenceID
         if states is None:
             states = range(self.macronum)
         if isinstance(states, int):
@@ -568,7 +568,7 @@ class Model(object):
             if ligand:
                 mol = ref.copy()
                 mol.remove(ligand, _logger=False)
-                mol.coords = np.atleast_3d(mol.coords[:, :, 0])
+                mol.dropFrames(keep=0)
                 mols[i].filter(ligand, _logger=False)
             mols[i].set('chain', '{}'.format(s))
             tmpcoo = mols[i].coords

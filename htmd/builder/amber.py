@@ -215,7 +215,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         if len(disulfide) != 0:
             for d in disulfide:
                 # Convert to stupid amber residue numbering
-                uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
+                uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0]
                 uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
                 uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
                 # Rename the CYS to CYX if there is a disulfide bond
@@ -262,7 +262,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         f.write('# Adding disulfide bonds\n')
         for d in disulfide:
             # Convert to stupid amber residue numbering
-            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
+            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0]
             uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
             uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
