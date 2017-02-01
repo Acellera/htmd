@@ -16,9 +16,9 @@ class Acemd(ProtocolInterface):
                'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb',
                'parmfile': 'structure.prmtop'}
 
-    def __init__(self):
+    def __init__(self, version=2):
         super().__init__()
-
+        self._version=version 
         self._files = {}
 
         # Options
@@ -43,21 +43,26 @@ class Acemd(ProtocolInterface):
         self._cmdString('pmegridspacing', 'str', '', None)
         self._cmdString('fullelectfrequency', 'str', '', None)
         self._cmdString('energyfreq', 'str', '', None)
-        self._cmdString('constraints', 'str', '', None)
-        self._cmdString('consref', 'str', '', None)
-        self._cmdString('constraintscaling', 'str', '', None)
+        if self._version == 2:
+            self._cmdString('constraints', 'str', '', None)
+            self._cmdString('consref', 'str', '', None)
+            self._cmdString('constraintscaling', 'str', '', None)
+        if self._version == 3:
+            self._cmdString('atomrestraint', 'str', '', None)
+            self._cmdString('grouprestraint', 'str', '', None)
         self._cmdString('berendsenpressure', 'str', '', None)
         self._cmdString('berendsenpressuretarget', 'str', '', None)
         self._cmdString('berendsenpressurerelaxationtime', 'str', '', None)
         self._cmdString('tclforces', 'str', '', None)
         self._cmdString('minimize', 'str', '', None)
         self._cmdString('run', 'str', '', None)
-        self._cmdString('TCL', 'str', '', None)
         self._cmdString('celldimension', 'str', '', None)
         self._cmdString('useconstantratio', 'str', '', None)
         self._cmdString('amber', 'str', '', None)
         self._cmdString('dielectric', 'str', '', None)
         self._cmdString('pairlistdist', 'str', '', None)
+        if self._version == 2:
+            self._cmdString('TCL', 'str', '', None)
 
         # Files
         self._cmdString('bincoordinates', 'str', '', None)
@@ -68,7 +73,6 @@ class Acemd(ProtocolInterface):
         self._cmdString('extendedsystem', 'str', '', None)
         self._cmdString('coordinates', 'str', '', None)
         self._cmdString('velocities', 'str', '', None)
-        self._cmdString('consref', 'str', '', None)
         self._cmdString('parmfile', 'str', '', None)
 
     def load(self, path='.'):
@@ -175,7 +179,10 @@ class Acemd(ProtocolInterface):
 
     def _writeBashRun(self, fname):
         with open(fname, 'w') as f:
-            f.write('#!/bin/bash\nacemd >log.txt 2>&1')
+            if self._version==3:
+               f.write('#!/bin/bash\nacemd3 >log.txt 2>&1')
+            else:
+               f.write('#!/bin/bash\nacemd >log.txt 2>&1')
         os.chmod(fname, 0o700)
 
     def __repr__(self):
