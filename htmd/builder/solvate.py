@@ -171,7 +171,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
                 elif writemode == 'hex':
                     segname = '{0}{1:x}'.format(prefix, n)
                 elif writemode == 'alphanum':
-                    segname = '{0}{1:c}{2:c}{3:c}'.format(prefix, np.floor(np.floor(n/26)/26) + 65, np.mod(np.floor(n/26), 26) + 65, np.mod(n, 26) + 65)
+                    segname = '{0}{1:c}{2:c}{3:c}'.format(prefix, int(np.floor(np.floor(n/26)/26) + 65), int(np.mod(np.floor(n/26), 26) + 65), int(np.mod(n, 26) + 65))
 
                 waterboxes[w] = water.copy()
                 waterboxes[w].moveBy([movex, movey, movez])
