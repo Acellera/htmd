@@ -295,7 +295,7 @@ class Kinetics(object):
 
         if statetype == 'micro':
             tpt = msm.tpt(self.model.msm, [self.sourcemicro], [self.sinkmicro])
-            plot_flux(tpt, attribute_to_plot=mode)
+            fig, pos = plot_flux(tpt, attribute_to_plot=mode)
         elif statetype == 'macro' or statetype == 'coarse':
             metastable_sets = []
             for i in range(self.model.macronum):
@@ -312,7 +312,8 @@ class Kinetics(object):
                         setmap.append(idx2)
                         continue
             setmap = np.array(setmap)
-            plot_flux(tpt, attribute_to_plot=mode, state_labels=setmap)
+            fig, pos = plot_flux(tpt, attribute_to_plot=mode, state_labels=setmap)
+        fig.show()
 
         paths, pathfluxes = tpt.pathways(fraction=fraction)
         cumflux = 0
