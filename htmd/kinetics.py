@@ -291,8 +291,10 @@ class Kinetics(object):
         # Make mode a radio button with interactive plot
         from pyemma import msm
         from pyemma.plots import plot_flux
+        from matplotlib import pylab as plt
         self._intergrityCheck()
 
+        plt.figure()
         if statetype == 'micro':
             tpt = msm.tpt(self.model.msm, [self.sourcemicro], [self.sinkmicro])
             fig, pos = plot_flux(tpt, attribute_to_plot=mode)
