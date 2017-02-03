@@ -27,9 +27,17 @@ requirements:
   run:
 " > $DIR/meta.yaml
 
+RET=0
+
 conda list > /tmp/list
 for T in $(for i in $(cat package/htmd-deps/DEPENDENCIES); do echo ${i%%=*}; done); do
 	VER=$( egrep -e "^$T " /tmp/list |awk '{print $2}')
-	echo "Package $T at version $VER"
 	echo "    - $T $VER" >> $DIR/meta.yaml
+	if [ "$VER" == "" ]; then
+			RET=1
+			VER="[NOT FOUND]"
+	fi
+	echo "Package $T at version $VER"
 done
+
+exit $RET
