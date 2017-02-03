@@ -369,9 +369,9 @@ def removeAtomsInHull(mol1, mol2, hullsel, removesel):
 
     Parameters
     ----------
-    mol1 : Molecule
+    mol1 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         Molecule for which to calculate the convex hull
-    mol2 : Molecule
+    mol2 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         Molecule which contains the atoms which we check if they are within the hull
     hullsel : str
         Atomselection for atoms in mol1 from which to calculate the convex hull.
@@ -426,12 +426,18 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
     Parameters
     ----------
-    memb
-    xmin
-    ymin
-    xmax
-    ymax
-    buffer
+    memb : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The membrane to be tiled
+    xmin : float
+        Minimum x coordinate
+    ymin : float
+        Minimum y coordinate
+    xmax : float
+        Maximum x coordinate
+    ymax : float
+        Maximum y coordinate
+    buffer : float
+        Buffer distance between tiles
 
     Returns
     -------
