@@ -159,6 +159,27 @@ class VMD:
         return None
 
     def render(self, outfile, renderer='tachyon', resolution=(1920, 1080), aasamples=36, skylight=1, tachyon=None, convert=None, trim=False):
+        """ Renders the current VMD scene into a file.
+
+        Parameters
+        ----------
+        outfile : str
+            File to which to render image
+        renderer : ('tachyon', 'snapshot')
+            Which renderer to use
+        resolution : tuple
+            X,Y resolution of the output image
+        aasamples : int
+            Number of anti-aliasing samples
+        skylight : float
+            Add a skylight
+        tachyon : str
+            Path to tachyon renderer executable
+        convert : bool
+            Attempts to convert the image to the datatype of the `outfile` extension
+        trim : bool
+            Trims the whitespace of the image
+        """
         import shutil
         outfile = os.path.abspath(outfile)
         outname, ext = os.path.splitext(outfile)
