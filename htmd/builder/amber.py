@@ -411,10 +411,9 @@ def _applyProteinCaps(mol, caps):
                 atom.coords = mol.coords[termcenterid] + 0.33 * np.subtract(mol.coords[termcenterid],
                                                                             mol.coords[termcaid])
                 mol.insert(atom, terminalids[i])
-                # newatom = mol.numAtoms - 1
-                logger.info('In segment {}, resid {} had none of these atoms: {}. Capping was performed by creating '
-                            'a new atom for cap construction by tleap.'.format(seg, terminalresids[i],
-                                                                               ' '.join(terminalatoms[cap])))
+                # logger.info('In segment {}, resid {} had none of these atoms: {}. Capping was performed by creating '
+                #             'a new atom for cap construction by tleap.'.format(seg, terminalresids[i],
+                #                                                                ' '.join(terminalatoms[cap])))
             else:
                 # Select atom to change, do changes to cap, and change resid
                 newatom = np.max(termatomsids)
