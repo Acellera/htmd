@@ -68,7 +68,7 @@ class FFType:
             pass
 
         elif method == FFTypeMethod.CGenFF_2b6:
-            match_binary = shutil.which("match")
+            match_binary = shutil.which("match-typer")
             if not match_binary:
                 raise RuntimeError("match executable not found")
 
