@@ -194,7 +194,7 @@ class PRM:
                 for pi in range(len(prm)):
                     p = prm[pi]
                     sign = 1
-                    scee = p.e14
+                    scee = 1. / p.e14
                     scnb = 2.
                     if pi < (len(prm) - 1):
                         sign = -1

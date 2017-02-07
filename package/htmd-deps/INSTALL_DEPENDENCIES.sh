@@ -5,7 +5,10 @@ DIR="$PWD/package/htmd-deps/"
 echo "DIR is [$DIR]"
 echo "PWD is [$PWD]"
 
-conda install $(cat $DIR/DEPENDENCIES) -y
+for P in $(cat $DIR/DEPENDENCIES); do
+	conda install $P -y
+done
+#conda install $(cat $DIR/DEPENDENCIES) -y
 
 # Just in case this got installed (eg acecloud-client,acemd depend on it)
 conda remove htmd -y
