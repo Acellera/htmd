@@ -766,7 +766,7 @@ class Model(object):
 
         return Model(newdata)
 
-    def plotFES(self, dimX, dimY, temperature, states=False, s=4, cmap=None):
+    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None):
         """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
         Parameters
