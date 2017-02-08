@@ -766,6 +766,50 @@ class Model(object):
 
         return Model(newdata)
 
+    def plotFES(self, dimX, dimY, temperature, states=False, s=4, cmap=None):
+        """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
+
+        Parameters
+        ----------
+        dimX : int
+            Index of projected dimension to use for the X axis.
+        dimY : int
+            Index of projected dimension to use for the Y axis.
+        temperature : float
+            Simulation temperature.
+        states : bool
+            If True, will plot scatter plot of microstates coloured by macro state on top of FES.
+        s : float
+            Marker size for states.
+        cmap :
+            Matplotlib colormap.
+        """
+        self._integrityCheck(postmsm=True)
+        from matplotlib import pylab as plt
+        if cmap is None:
+            cmap = plt.cm.jet
+        if self.data.map is not None:
+            xlabel = self.data.map.description[dimX]
+        else:
+            xlabel = 'Dimension {}'.format(dimX)
+        if self.data.map is not None:
+            ylabel = self.data.map.description[dimY]
+        else:
+            ylabel = 'Dimension {}'.format(dimY)
+        title = 'Free energy surface'
+        micros = self.data.Centers[self.cluster_ofmicro, :]
+        energy = -0.0019872041 * temperature * np.log(self.msm.stationary_distribution)
+        f, ax, cf = self.data._contourPlot(micros[:, dimX], micros[:, dimY], energy, cmap=cmap, xlabel=xlabel, ylabel=ylabel, title=title)
+        self.data._setColorbar(f, cf, 'kcal/mol', scientific=False)
+        if states:
+            colors = cmap(np.linspace(0, 1, self.macronum))
+            for m in range(self.macronum):
+                macromicro = micros[self.macro_ofmicro == m, :]
+                y = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, c=colors[m], label='Macro {}'.format(m), edgecolors='none')
+            ax.legend(prop={'size': 8})
+            #self.data._setColorbar(f, y, 'Macrostates')
+        f.show()
+
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:
             raise NameError('You need to call markovModel before calling this command')
