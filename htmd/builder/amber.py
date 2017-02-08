@@ -5,6 +5,7 @@
 #
 from __future__ import print_function
 
+
 from htmd.home import home
 import numpy as np
 import os
@@ -44,15 +45,15 @@ def listFiles():
     for f in ffs:
         print(f)
 
-    amberdir = path.join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
-    ffs = [f for f in os.listdir(amberdir) if path.isfile(path.join(amberdir, f))]
+    oldffdir = path.join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
+    ffs = [path.join('oldff', f) for f in os.listdir(oldffdir) if path.isfile(path.join(oldffdir, f))]
     print('---- OLD Forcefield files list: ' + path.join(amberdir, '') + ' ----')
     for f in ffs:
         print(f)
 
     # FRCMOD files
     frcmoddir = path.join(amberhome, 'dat', 'leap', 'parm')
-    ffs = glob(frcmoddir+"/frcmod.*")
+    ffs = [f for f in os.listdir(frcmoddir) if path.isfile(path.join(frcmoddir, f)) and f.startswith('frcmod')]
     print('---- Parameter files list: ' + path.join(frcmoddir, '') + ' ----')
     for f in ffs:
         print(path.basename(f))
@@ -67,6 +68,20 @@ def listFiles():
         print(f)
 
 
+def defaultFf():
+    """ Returns the default leaprc forcefield files used by amber.build """
+    return ['leaprc.lipid14', path.join('oldff', 'leaprc.ff14SB'), 'leaprc.gaff']
+
+
+def defaultTopo():
+    """ Returns the default topology `prepi` files used by amber.build """
+    return []
+
+
+def defaultParam():
+    """ Returns the default parameter `frcmod` files used by amber.build """
+    return ['frcmod.ionsjc_tip3p']
+
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True, atomtypes=None,
@@ -80,11 +95,17 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object containing the system
     ff : list of str
-        A list of leaprc forcefield files. Default: ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+        A list of leaprc forcefield files.
+        Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available forcefield files.
+        Default: :func:`amber.defaultFf <htmd.builder.amber.defaultFf>`
     topo : list of str
         A list of topology `prepi` files.
+        Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available topology files.
+        Default: :func:`amber.defaultTopo <htmd.builder.amber.defaultTopo>`
     param : list of str
-        A list of parameter `frcmod` files. Default: ['frcmod.ionsjc_tip3p',]
+        A list of parameter `frcmod` files.
+        Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available parameter files.
+        Default: :func:`amber.defaultParam <htmd.builder.amber.defaultParam>`
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -131,10 +152,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     >>> molbuilt = amber.build(mol, outdir='/tmp/build')  # doctest: +SKIP
     ...
     >>> # More complex example
-    >>> ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
-    >>> params = ['frcmod.ionsjc_tip3p',]
     >>> disu = [DisulfideBridge('P', 157, 'P', 13), DisulfideBridge('K', 1, 'K', 25)]
-    >>> molbuilt = amber.build(mol, ff=ffs, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
+    >>> molbuilt = amber.build(mol, foutdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
     """
     # Remove pdb bonds!
     mol = mol.copy()
@@ -145,11 +164,11 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         os.makedirs(outdir)
     _cleanOutDir(outdir)
     if ff is None:
-        ff = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+        ff = defaultFf()
     if topo is None:
-        topo = []
+        topo = defaultTopo()
     if param is None:
-        param = ['frcmod.ionsjc_tip3p',]
+        param = defaultParam()
     if caps is None:
         caps = _defaultProteinCaps(mol)
 
@@ -208,22 +227,20 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         f.write('loadamberprep ' + path.basename(t) + '\n')
     f.write('\n')
 
-    # Detect disulfide bonds
+    # Detect disulfide bridges if not defined by user
     if disulfide is None and not ionize:
         logger.info('Detecting disulfide bonds.')
         disulfide = detectDisulfideBonds(mol)
-        if len(disulfide) != 0:
-            for d in disulfide:
-                # Convert to stupid amber residue numbering
-                uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
-                uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
-                uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
-                # Rename the CYS to CYX if there is a disulfide bond
-                mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
-                mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
-                # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
-                mol.remove('name HG and segid {} and resid {}'.format(d.segid1, d.resid1), _logger=False)
-                mol.remove('name HG and segid {} and resid {}'.format(d.segid2, d.resid2), _logger=False)
+
+    # Fix structure to match the disulfide patching
+    if not ionize and len(disulfide) != 0:
+        for d in disulfide:
+            # Rename the residues to CYX if there is a disulfide bond
+            mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
+            mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
+            # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
+            mol.remove('name HG and segid {} and resid {}'.format(d.segid1, d.resid1), _logger=False)
+            mol.remove('name HG and segid {} and resid {}'.format(d.segid2, d.resid2), _logger=False)
 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.info('Writing PDB file for input to tleap.')
@@ -252,17 +269,12 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         combstr += '}\n\n'
         f.write(combstr)
 
-    # Printing out patches for the disulfide bridges
-    if disulfide is None and not ionize:
-        logger.info('Detecting disulfide bonds.')
-        disulfide = detectDisulfideBonds(mol)
-
     # Write patches for disulfide bonds (only after ionizing)
     if not ionize and len(disulfide) != 0:
         f.write('# Adding disulfide bonds\n')
         for d in disulfide:
             # Convert to stupid amber residue numbering
-            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0] - 1
+            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0]
             uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
             uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
@@ -336,7 +348,7 @@ def _applyProteinCaps(mol, caps):
     # 4. Remove the lingering hydrogens of the N terminal and oxygens of the C terminal.
 
     # Define the atoms to be replaced (0 and 1 corresponds to N- and C-terminal caps)
-    terminalatoms = {'ACE': 'H1 H2 H3 HT1 HT2 HT3', 'NME': 'OXT OT1 O'}  # XPLOR names for H[123] and OXT are HT[123]
+    terminalatoms = {'ACE': ['H1', 'H2', 'H3', 'HT1', 'HT2', 'HT3'], 'NME': ['OXT', 'OT1', 'O']}  # XPLOR names for H[123] and OXT are HT[123]
                                                                          # and OT1, respectively.
     capresname = ['ACE', 'NME']
     capatomtype = ['C', 'N']
@@ -344,51 +356,49 @@ def _applyProteinCaps(mol, caps):
     # For each caps definition
     for seg in caps:
         # Get the segment
-        segment = mol.atomselect('segid {}'.format(seg), indexes=True)
+        segment = np.where(mol.segid == seg)[0]
         # Test segment
         if len(segment) == 0:
             raise RuntimeError('There is no segment {} in the molecule.'.format(seg))
         if len(mol.atomselect('protein and segid {}'.format(seg), indexes=True)) == 0:
-            raise RuntimeError(
-                'Segment {} is not protein. Capping for non-protein segments is not supported.'.format(seg))
+            raise RuntimeError('Segment {} is not protein. Capping for non-protein segments is not supported.'.format(seg))
         # For each cap
         for i, cap in enumerate(caps[seg]):
             if cap is None or (isinstance(cap, str) and cap == 'none'):
                 continue
             # Get info on segment and its terminals
-            segment = mol.atomselect('segid {}'.format(seg), indexes=True)
-            resids = np.unique(mol.get('resid', sel=segment))
-            terminalids = [segment[0], segment[-1]]
-            terminalresids = [np.min(resids), np.max(resids)]
+            segidm = mol.segid == seg  # Mask for segid
+            segididx = np.where(segidm)[0]
+            resids = mol.resid[segididx]
+            terminalids = [segididx[0], segididx[-1]]
+            terminalresids = [resids[0], resids[-1]]
+            residm = mol.resid == terminalresids[i]  # Mask for resid
+
             if i == 0:
-                orig_terminalresids = [np.min(resids), np.max(resids)]
-            # In case there is no cap defined
-            if cap is None or cap == '':
-                logger.warning(
-                    'No cap provided for resid {} on segment {}. Did not apply it.'.format(terminalresids[i], seg))
+                orig_terminalresids = terminalresids
+
+            if cap is None or cap == '':  # In case there is no cap defined
+                logger.warning('No cap provided for resid {} on segment {}. Did not apply it.'.format(terminalresids[i], seg))
                 continue
-            # If it is defined, test if supported
-            elif cap not in capresname:
-                raise RuntimeError(
-                    'In segment {}, the {} cap is not supported. Try using {} instead.'.format(seg, cap, capresname))
+            elif cap not in capresname:  # If it is defined, test if supported
+                raise RuntimeError('In segment {}, the {} cap is not supported. Try using {} instead.'.format(seg, cap, capresname))
+
             # Test if cap is already applied
-            testcap = mol.atomselect('segid {} and resid "{}" and resname {}'.format(seg, terminalresids[i], cap),
-                                     indexes=True)
+            testcap = np.where(segidm & residm & (mol.resname == cap))[0]
             if len(testcap) != 0:
                 logger.warning('Cap {} already exists on segment {}. Did not re-apply it.'.format(cap, seg))
                 continue
+
             # Test if the atom to change exists
-            termatomsids = mol.atomselect('segid {} and resid "{}" and name {}'.format(seg,
-                                                                                       terminalresids[i],
-                                                                                       terminalatoms[cap]),
-                                          indexes=True)
+            termatomsids = np.zeros(residm.shape, dtype=bool)
+            for atm in terminalatoms[cap]:
+                termatomsids |= mol.name == atm
+            termatomsids = np.where(termatomsids & segidm & residm)[0]
+
             if len(termatomsids) == 0:
                 # Create new atom
-                termcaid = mol.atomselect('segid {} and resid "{}" and name CA'.format(seg, terminalresids[i]),
-                                        indexes=True)
-                termcenterid = mol.atomselect('segid {} and resid "{}" and name {}'.format(seg, terminalresids[i],
-                                                                                           capatomtype[-i+1]),
-                                        indexes=True)  # if i=0 => capatomtype[1]; i=1 => capatomtype[0]
+                termcaid = np.where(segidm & residm & (mol.name == 'CA'))[0]
+                termcenterid = np.where(segidm & residm & (mol.name == capatomtype[1-i]))[0]
                 atom = Molecule()
                 atom.empty(1)
                 atom.record = 'ATOM'
@@ -397,14 +407,13 @@ def _applyProteinCaps(mol, caps):
                 atom.resname = cap
                 atom.segid = seg
                 atom.element = capatomtype[i]
-                atom.chain = np.unique(mol.get('chain', sel='segid {}'.format(seg)))
+                atom.chain = np.unique(mol.chain[segidm])  # TODO: Assumption of single chain in a segment might be wrong
                 atom.coords = mol.coords[termcenterid] + 0.33 * np.subtract(mol.coords[termcenterid],
-                                                                               mol.coords[termcaid])
+                                                                            mol.coords[termcaid])
                 mol.insert(atom, terminalids[i])
-                # newatom = mol.numAtoms - 1
-                logger.info('In segment {}, resid {} had none of these atoms: {}. Capping was performed by creating '
-                            'a new atom for cap construction by tleap.'.format(seg, terminalresids[i],
-                                                                              terminalatoms[cap]))
+                # logger.info('In segment {}, resid {} had none of these atoms: {}. Capping was performed by creating '
+                #             'a new atom for cap construction by tleap.'.format(seg, terminalresids[i],
+                #                                                                ' '.join(terminalatoms[cap])))
             else:
                 # Select atom to change, do changes to cap, and change resid
                 newatom = np.max(termatomsids)
@@ -424,8 +433,9 @@ def _applyProteinCaps(mol, caps):
             if cap is None or (isinstance(cap, str) and cap == 'none'):
                 continue
             # Remove lingering hydrogens or oxygens in terminals
-            mol.remove('segid {} and resid "{}" and name {}'.format(seg, orig_terminalresids[i], terminalatoms[cap]),
+            mol.remove('segid {} and resid "{}" and name {}'.format(seg, orig_terminalresids[i], ' '.join(terminalatoms[cap])),
                        _logger=False)
+
 
 def _defaultProteinCaps(mol):
     # Defines ACE and NME (neutral terminals) as default for protein segments
@@ -517,14 +527,14 @@ def _charmmLipid2Amber(mol):
     begters = np.where(begters[idx])[0]  # Sort the begs and ters
     finters = np.where(finters[idx])[0]
 
-    if len(begters) > 999:
-        raise NameError('More than 999 lipids. Cannot define separate segments for all of them.')
+    #if len(begters) > 999:
+    #    raise NameError('More than 999 lipids. Cannot define separate segments for all of them.')
 
     for i in range(len(begters)):
         map = np.zeros(len(mol.resid), dtype=bool)
         map[begters[i]:finters[i]+1] = True
         mol.set('resid', sequenceID(mol.get('resname', sel=map)), sel=map)
-        mol.set('segid', 'L' + str(i+1), sel=map)
+        mol.set('segid', 'L{}'.format(i % 2), sel=map)
 
     return mol
 
@@ -618,7 +628,7 @@ if __name__ == '__main__':
         mol = proteinPrepare(mol)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
         smol = solvate(mol)
-        ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+        ffs = defaultFf()
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 
@@ -634,7 +644,7 @@ if __name__ == '__main__':
         mol = Molecule(pid)
         mol.filter('protein')
         smol = solvate(mol)
-        ffs = ['leaprc.lipid14', 'leaprc.ff14SB', 'leaprc.gaff']
+        ffs = defaultFf()
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 

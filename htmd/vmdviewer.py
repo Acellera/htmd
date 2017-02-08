@@ -158,6 +158,62 @@ class VMD:
     def copy(self):
         return None
 
+    def render(self, outfile, renderer='tachyon', resolution=(1920, 1080), aasamples=36, skylight=1, tachyon=None, convert=None, trim=False):
+        """ Renders the current VMD scene into a file.
+
+        Parameters
+        ----------
+        outfile : str
+            File to which to render image
+        renderer : ('tachyon', 'snapshot')
+            Which renderer to use
+        resolution : tuple
+            X,Y resolution of the output image
+        aasamples : int
+            Number of anti-aliasing samples
+        skylight : float
+            Add a skylight
+        tachyon : str
+            Path to tachyon renderer executable
+        convert : bool
+            Attempts to convert the image to the datatype of the `outfile` extension
+        trim : bool
+            Trims the whitespace of the image
+        """
+        import shutil
+        outfile = os.path.abspath(outfile)
+        outname, ext = os.path.splitext(outfile)
+
+        if renderer == 'tachyon':
+            tmpext = '.psd'
+            if tachyon is None:
+                try:
+                    tachyon = shutil.which('tachyon', mode=os.X_OK)
+                except:
+                    raise FileNotFoundError("Could not find `tachyon` executable, or no execute permissions are given. Try using renderer='snapshot' instead.")
+            rendercommand = 'render Tachyon {out} "{tachyon}" -res {resx} {resy} -aasamples {aa} -add_skylight {sl} {out} -format PSD48 -o {out}.psd'.format(tachyon=tachyon, resx=resolution[0], resy=resolution[1], aa=aasamples, sl=skylight, out=outname)
+        elif renderer == 'snapshot':
+            tmpext = '.tga'
+            rendercommand = 'render snapshot {}{}'.format(outname, tmpext)
+
+        self.send(rendercommand)
+        print(rendercommand)
+        if not os.path.exists(outname+tmpext):
+            raise RuntimeError('Rendering failed to produce image with following command: {}'.format(rendercommand))
+        if os.path.exists(outname):
+            os.remove(outname)
+
+        if ext != tmpext:
+            if convert is None:
+                try:
+                    convert = shutil.which('convert', mode=os.X_OK)
+                except:
+                    raise FileNotFoundError('Could not find `convert` executable, or no execute permissions are given. You can find the temporary render file in {}', outname+tmpext)
+            os.system('{convert} {outname}{tmpext} {outname}{ext}'.format(convert=convert, tmpext=tmpext, outname=outname, ext=ext))
+            if trim:
+                os.system('{convert} {outname}{ext} -trim {outname}{ext}'.format(convert=convert, outname=outname, ext=ext))
+            os.remove(outname+tmpext)
+
 
 def getVMDpath(vmd=None):
     sys = platform.system()

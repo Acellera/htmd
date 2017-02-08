@@ -8,18 +8,21 @@ matrix:
      addons:
       apt:
        packages:
-       - gfortran-mingw-w64-x86-64
+#       - gfortran-mingw-w64-x86-64
        - gcc-mingw-w64-x86-64
        - g++-mingw-w64-x86-64
        - binutils-mingw-w64-x86-64
        - mingw-w64-dev
    - os: linux
      language: generic
+     env: TRAVIS_PYTHON_VERSION=3.6  OSNAME=Linux
+   - os: linux
+     language: generic
      env: TRAVIS_PYTHON_VERSION=3.5  OSNAME=Linux
-     addons:
-      apt:
-       packages:
-       - gfortran
+#     addons:
+#      apt:
+#       packages:
+#       - gfortran
    - os: osx
      language: generic
      env: TRAVIS_PYTHON_VERSION=3.5 OSNAME=Darwin
@@ -27,7 +30,6 @@ matrix:
       - brew install gcc
 
 install:
- - printenv
  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
  - if [ "$TRAVIS_OS_NAME" == "windows" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
@@ -40,14 +42,15 @@ install:
  - export PATH="$HOME/miniconda/bin:$PATH"
  - hash -r
  - conda config --set always_yes yes 
-
-# - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
-# - source activate travis-env
+ - conda install conda conda-build anaconda anaconda-client requests -y -q # this has to go into the root environment
+ - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
+ - source activate travis-env
 
  - conda config --add channels acellera
- - conda install -c acellera toolz=0.8.0 -y -q
+# - conda install -c acellera toolz=0.8.0 -y -q 
+ - conda install anaconda-client -y -q
  - conda update --all -y -q
- - conda install anaconda requests conda-build -y -q
+ 
 
 
  - if [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then export BUILD_VERSION=$TRAVIS_TAG; else export BUILD_VERSION=0.0.0; fi
@@ -61,7 +64,7 @@ install:
  - rm htmd/lib/*/*.so || /bin/true
 
  # Update acellera channel with any updates of the omnia packages that we track
- - python ./sync_conda_with_omnia.py
+ - python ./sync_acellera_conda_channel_deps.py
  # Install the Conda dependencies HTMD needs
  - package/htmd-deps/INSTALL_DEPENDENCIES.sh
 

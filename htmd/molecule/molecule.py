@@ -222,6 +222,11 @@ class Molecule:
             raise NameError("Frame index out of range. Molecule contains {} frame(s). Frames are 0-indexed.".format(self.numFrames))
         self._frame = value
 
+    @property
+    def numResidues(self):
+        from htmd.molecule.util import sequenceID
+        return sequenceID((self.resid, self.insertion, self.chain))
+
     def insert(self, mol, index, collisions=False, coldist=1.3):
         """Insert the contents of one molecule into another at a specific index.
 
@@ -973,21 +978,27 @@ class Molecule:
         self.write(xtc)
 
         # Call the specified backend
+        retval = None
         if viewer is None:
             from htmd.config import _config
             viewer = _config['viewer']
         if viewer.lower() == 'notebook':
-            return self._viewMDTraj(psf, xtc)
+            retval = self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
             self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
+            #retval = viewerhandle
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
-            return self._viewNGL(gui=gui)
+            retval = self._viewNGL(gui=gui)
         else:
+            os.remove(xtc)
+            os.remove(psf)
             raise ValueError('Unknown viewer.')
 
         # Remove temporary files
         os.remove(xtc)
         os.remove(psf)
+        if retval is not None:
+            return retval
 
     def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
         if name is None:
@@ -1186,7 +1197,7 @@ class Molecule:
         '?EEI'
 
         """
-        from htmd.builder.builder import sequenceID
+        from htmd.molecule.util import sequenceID
         prot = self.atomselect('protein')
         segs = np.unique(self.segid[prot])
         increm = sequenceID((self.resid, self.insertion, self.chain))

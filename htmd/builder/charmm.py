@@ -585,7 +585,7 @@ def _protonationPatches(mol):
     # TODO: Remember to alias all of them before applying patches
     patches = []
 
-    for pro in protonations:
+    for pro in sorted(protonations.keys()):
         pseg = mol.get('segid', sel='resname {} and name CA'.format(pro))
         pres = mol.get('resid', sel='resname {} and name CA'.format(pro))
         if len(pseg) == 0:

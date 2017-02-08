@@ -27,7 +27,7 @@ I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 
 RST_FILES := $(addprefix $(TUTORIALSDIR)/,$(notdir $(IPYNB_FILES:.ipynb=.rst)))
 
-.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext
+.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext static
 
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -63,7 +63,7 @@ clean:
 publish:
 	ssh www.acellera.com 'rm -rf ~/www.htmd.org/docs/$(HTMDBRANCH)/*'
 	scp -r $(BUILDDIR)/html/* www.acellera.com:~/www.htmd.org/docs/$(HTMDBRANCH)/
-	scp -r static/*  www.acellera.com:~/www.htmd.org/
+	scp -r $(BUILDDIR)/static/*  www.acellera.com:~/www.htmd.org/
 	ssh www.acellera.com chmod -R g+rwX www.htmd.org/
 
 publish-mk-test:
@@ -81,7 +81,11 @@ $(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
 
 tutorials: $(RST_FILES)
 
-html: tutorials
+static:
+	python render_jinja.py ./static_templates/ $(BUILDDIR)/static/
+	cp -R ./static_files/* $(BUILDDIR)/static/
+
+html: tutorials static
 	rm -f source/htmd.*
 	$(SPHINXAPIDOC) --force --separate -o  source ../htmd/ >/dev/null
 	$(SPHINXBUILD) -a -E -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
