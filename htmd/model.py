@@ -808,7 +808,8 @@ class Model(object):
                 y = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, c=colors[m], label='Macro {}'.format(m), edgecolors='none')
             ax.legend(prop={'size': 8})
             #self.data._setColorbar(f, y, 'Macrostates')
-        f.show()
+        #f.show() Raises warnings in notebooks
+        plt.show()
 
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:

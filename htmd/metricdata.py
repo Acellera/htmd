@@ -617,6 +617,7 @@ class MetricData:
         logplot : bool
             Set True to plot the logarithm of counts.
         """
+        from matplotlib import pylab as plt
         dc = np.concatenate(self.dat)
         if self.map is not None:
             xlabel = self.map.description[dimX]
@@ -630,7 +631,8 @@ class MetricData:
 
         f, ax, cf = self._contourPlot(dc[:, dimX], dc[:, dimY], resolution=resolution, xlabel=xlabel, ylabel=ylabel, title=title, logplot=logplot)
         self._setColorbar(f, cf, 'Counts')
-        f.show()
+        # f.show() Raises warnings in notebooks
+        plt.show()
 
     def plotClusters(self, dimX, dimY, resolution=100, s=4, c=None, cmap=None, logplot=False):
         """ Plot a scatter-plot of the locations of the clusters on top of the count histogram.
@@ -672,7 +674,8 @@ class MetricData:
         y = ax.scatter(cent[:, dimX], cent[:, dimY], s=s, c=c, cmap=cmap, linewidths=0, marker='o')
         if c is not None:
             self._setColorbar(f, y, 'Cluster groups')
-        f.show()
+        # f.show() Raises warnings in notebooks
+        plt.show()
 
     def __repr__(self):
         return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
