@@ -71,6 +71,7 @@ class MutualInformation:
 
         self.mi_matrix = None
         self.graph_array = None
+        self.graph = None
 
 
     def calculate(self):
@@ -192,44 +193,40 @@ class MutualInformation:
         mask = (self.mi_matrix > mi_threshold) & (contacts_matrix > (time_treshold * contactcat.shape[0]))
         self.graph_array[mask] = self.mi_matrix[mask]
 
-        # intermed = []
-        # for source in range(self.graph_array.shape[0]):
-        #     for target in range(source, self.graph_array.shape[1]):
-        #         if self.graph_array[source, target] != 0 and target > source:
-        #             intermed.append(
-        #                 [int(self.resids[source]), int(self.resids[target]), float(self.graph_array[source, target])])
-        # import pandas as pd
-        # from sklearn.cluster.spectral import SpectralClustering
-        # pd = pd.DataFrame(intermed, columns=['source', 'target', 'weight'])
-        # pd[['source', 'target']] = pd[['source', 'target']].astype(type('int', (int,), {}))
-        # pd['weight'] = pd['weight'].astype(type('float', (float,), {}))
-        # G = nx.from_pandas_dataframe(pd, 'source', 'target', ['weight'])
-        # ## setSegment
-        # segids = self.mol.get('segid', 'name CA')
-        # seg_res_dict = {key: value for (key, value) in zip(self.resids, segids) if
-        #                 np.any(pd.loc[(pd['source'] == key)].index) or np.any(pd.loc[(pd['target'] == key)].index)}
-        # nx.set_node_attributes(G, 'Segment', seg_res_dict)
-        # ## set
-        # if not nx.is_connected(G):
-        #     G = max(nx.connected_component_subgraphs(G), key=len)
-        # flow_cent = nx.current_flow_betweenness_centrality(G, weight='weight')
-        # nx.set_node_attributes(G, 'flowcent', flow_cent)
-        # Spectre = SpectralClustering(n_clusters=10, affinity='precomputed')
-        # model = Spectre.fit_predict(self.graph_array)
-        # model = model.astype(type('float', (float,), {}))
-        # spectral_dict = {key: value for (key, value) in zip(self.resids, model) if key in G.nodes()}
-        # nx.set_node_attributes(G, 'spectral', spectral_dict)
-        # self.graph = G
+        intermed = []
+        for source in range(self.graph_array.shape[0]):
+            for target in range(source, self.graph_array.shape[1]):
+                if self.graph_array[source, target] != 0 and target > source:
+                    intermed.append(
+                        [int(self.resids[source]), int(self.resids[target]), float(self.graph_array[source, target])])
+        import pandas as pd
+        import networkx as nx
+        from sklearn.cluster.spectral import SpectralClustering
+
+        pd = pd.DataFrame(intermed, columns=['source', 'target', 'weight'])
+        pd[['source', 'target']] = pd[['source', 'target']].astype(type('int', (int,), {}))
+        pd['weight'] = pd['weight'].astype(type('float', (float,), {}))
+        G = nx.from_pandas_dataframe(pd, 'source', 'target', ['weight'])
+        ## setSegment
+        segids = self.mol.get('segid', 'name CA')
+        seg_res_dict = {key: value for (key, value) in zip(self.resids, segids) if
+                        np.any(pd.loc[(pd['source'] == key)].index) or np.any(pd.loc[(pd['target'] == key)].index)}
+        nx.set_node_attributes(G, 'Segment', seg_res_dict)
+        ## set
+        if not nx.is_connected(G):
+            G = max(nx.connected_component_subgraphs(G), key=len)
+        flow_cent = nx.current_flow_betweenness_centrality(G, weight='weight')
+        nx.set_node_attributes(G, 'flowcent', flow_cent)
+        Spectre = SpectralClustering(n_clusters=10, affinity='precomputed')
+        model = Spectre.fit_predict(self.graph_array)
+        model = model.astype(type('float', (float,), {}))
+        spectral_dict = {key: value for (key, value) in zip(self.resids, model) if key in G.nodes()}
+        nx.set_node_attributes(G, 'spectral', spectral_dict)
+        self.graph = G
 
     def save_graphml(self, path):
         import networkx as nx
-        WG = nx.from_numpy_matrix(self.graph_array)
-        nx.write_graphml(WG, path)
-
-    def save_gexf(self, path):
-        import networkx as nx
-        WG = nx.from_numpy_matrix(self.graph_array)
-        nx.write_gexf(WG, path)
+        nx.write_graphml(self.graph, path)
 
     # def save_pdf(self, graphpath, outpath):
     #     print(self.graph_array)
