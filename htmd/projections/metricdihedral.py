@@ -232,6 +232,8 @@ class MetricDihedral(Projection):
         ----------
         res : int
             The resid of the residue
+        resname : str
+            The resname of the residue
 
         Returns
         -------
@@ -255,6 +257,8 @@ class MetricDihedral(Projection):
         ----------
         res : int
             The resid of the residue
+        resname : str
+            The resname of the residue
 
         Returns
         -------
@@ -279,6 +283,8 @@ class MetricDihedral(Projection):
         ----------
         res : int
             The resid of the residue
+        resname : str
+            The resname of the residue
 
         Returns
         -------
@@ -299,6 +305,8 @@ class MetricDihedral(Projection):
         ----------
         res : int
             The resid of the residue
+        resname : str
+            The resname of the residue
 
         Returns
         -------
@@ -318,6 +326,8 @@ class MetricDihedral(Projection):
         ----------
         res : int
             The resid of the residue
+        resname : str
+            The resname of the residue
 
         Returns
         -------
