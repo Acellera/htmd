@@ -156,7 +156,7 @@ def detectDisulfideBonds(mol, thresh=3):
         logger.info('One disulfide bond was added')
     else:
         logger.info('{} disulfide bonds were added'.format(len(disubonds)))
-    return disubonds
+    return sorted(disubonds, key=lambda x: x.resid1)
 
 
 # TODO: Remove in upcoming versions
