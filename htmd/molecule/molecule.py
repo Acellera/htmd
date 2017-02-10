@@ -225,7 +225,7 @@ class Molecule:
     @property
     def numResidues(self):
         from htmd.molecule.util import sequenceID
-        return sequenceID((self.resid, self.insertion, self.chain))
+        return len(np.unique(sequenceID((self.resid, self.insertion, self.chain))))
 
     def insert(self, mol, index, collisions=False, coldist=1.3):
         """Insert the contents of one molecule into another at a specific index.
