@@ -222,7 +222,7 @@ class PRM:
                     p = prm[pi]
                     sign = 1
                     if p.k0 != 0.:
-                       print("%2s-%2s-%2s-%2s %f %f %f" %
+                       print("%2s-%2s-%2s-%2s     %f %f %f" %
                           (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]], p.k0, p.phi0, sign * p.n ), file=f)
 
 
