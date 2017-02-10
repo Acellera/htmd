@@ -1,4 +1,4 @@
-from htmd.projections.metricdihedral import MetricDihedral
+from htmd.projections.metricdihedral import MetricDihedral, Dihedral
 from htmd.projections.metric import Metric
 from htmd.molecule.molecule import Molecule
 from joblib import Parallel, delayed
@@ -103,7 +103,7 @@ class MutualInformation:
         resids = self.mol.resid[caidx]
         resnames = self.mol.resname[caidx]
         for residue, resname in zip(resids, resnames):
-            ch = MetricDihedral.chi1(residue, resname)
+            ch = Dihedral.chi1(self.mol, residue)
             if ch is not None:
                 chis.append(ch)
 
