@@ -246,6 +246,7 @@ def MOL2read(filename):
     if not start or not end:
         raise ValueError("File cannot be read")
 
+    # TODO: Error on bad format (using pandas?)
     natoms = end - start + 1
     for i in range(natoms):
         s = l[i + start].strip().split()
@@ -254,9 +255,13 @@ def MOL2read(filename):
         topo.element.append(re.sub("[^A-Za-z]*", "", s[1]))
         topo.name.append(s[1])
         coords.append([float(x) for x in s[2:5]])
-        topo.charge.append(float(s[8]))
         topo.atomtype.append(s[5])
-        topo.resname.append(s[7])
+        if len(s) > 6:
+            topo.resid.append(int(s[6]))
+            if len(s) > 7:
+                topo.resname.append(s[7])
+                if len(s) > 8:
+                    topo.charge.append(float(s[8]))
     if bond:
         for i in range(bond, len(l)):
             b = l[i].split()
