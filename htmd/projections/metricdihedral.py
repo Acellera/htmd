@@ -685,11 +685,11 @@ if __name__ == "__main__":
     metr = MetricDihedral(protsel='protein')
     data = metr.project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', 'ref.npy'))
-    assert np.array_equal(data, dataref), 'Diherdals calculation is broken'
+    assert np.allclose(data, dataref, atol=1e-05), 'Diherdals calculation gave different results from reference'
 
     mol = Molecule('5MAT')
     mol.filter('not insertion A and not altloc A B')
     mol = autoSegment(mol)
     data = MetricDihedral().project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', '5mat.npy'))
-    assert np.array_equal(data, dataref), 'Diherdals calculation is broken'
+    assert np.allclose(data, dataref, atol=1e-05), 'Diherdals calculation gave different results from reference'
