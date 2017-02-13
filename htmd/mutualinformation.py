@@ -1,3 +1,8 @@
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 from htmd.projections.metricdihedral import MetricDihedral, Dihedral
 from htmd.projections.metric import Metric
 from htmd.molecule.molecule import Molecule

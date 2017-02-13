@@ -1,4 +1,9 @@
 #!/bin/bash
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 #DIR=$(dirname $(readlink -f "$0"))
 DIR="$PWD/package/htmd-deps/"
 
