@@ -119,13 +119,15 @@ class Dihedral:
         return uqresname[0]
 
     @staticmethod
-    def proteinDihedrals(mol, dih=('psi', 'phi')):
+    def proteinDihedrals(mol, sel='protein', dih=('psi', 'phi')):
         """ Returns a list of tuples containing the four resid/atom pairs for each dihedral of the protein
 
         Parameters
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
+        sel : str
+            An atomselection string to restrict the atoms for which to calculate dihedrals (i.e. only one of many chains)
         dih : tuple
             A tuple of the dihedral types we want to calculate (phi, psi, omega, chi1, chi2, chi3, chi4, chi5)
 
@@ -135,7 +137,7 @@ class Dihedral:
             A list of Dihedral objects
         """
         mol = mol.copy()
-        mol.filter('protein', _logger=False)
+        mol.filter(sel, _logger=False)
         segments = []  # Here I consider segments both chains and segments
         residues = []
         ro = io = co = so = None  # "old" values as in previous atom's
@@ -566,7 +568,7 @@ class MetricDihedral(Projection):
         protatoms = mol.atomselect(protsel)
 
         if self._dihedrals is None:  # Default phi psi dihedrals
-            dihedrals = Dihedral.proteinDihedrals(mol)
+            dihedrals = Dihedral.proteinDihedrals(mol, protsel)
         else:
             from htmd.util import ensurelist
             self._dihedrals = ensurelist(self._dihedrals)
