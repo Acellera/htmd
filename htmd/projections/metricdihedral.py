@@ -87,7 +87,7 @@ class Dihedral:
 
         idx2 = np.where(idx)[0]
         if not np.array_equal(idx2, np.arange(idx2[0], idx2[-1]+1)):
-            raise RuntimeError('Residue with ({}) has non-continuous indexes in PBD file ({})'.format(descr, idx))
+            raise RuntimeError('Residue with ({}) has non-continuous indexes in PBD file ({})'.format(descr, np.where(idx)[0]))
 
         uqins = np.unique(mol.insertion[idx])
         if len(uqins) > 1:

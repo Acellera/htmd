@@ -104,11 +104,13 @@ class MutualInformation:
 
     def _computeChiDihedrals(self, fstep=0.1, skip=1):
         chis = []
+        protmol = self.mol.copy()
+        protmol.filter('protein')
         caidx = self.mol.atomselect('protein and name CA')
         resids = self.mol.resid[caidx]
         resnames = self.mol.resname[caidx]
         for residue, resname in zip(resids, resnames):
-            ch = Dihedral.chi1(self.mol, residue)
+            ch = Dihedral.chi1(protmol, residue)
             if ch is not None:
                 chis.append(ch)
 
