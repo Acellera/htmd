@@ -908,6 +908,9 @@ class Molecule:
                     coords, box, boxangles, step, time = XTCread(f, frames[i])
                 fileloclist.append([f, int(frames[i])])
 
+            # Writing hidden index file containing number of frames in trajectory file
+            self._writeNumFrames(f, coords.shape[2])
+
             if self.numAtoms != 0 and np.size(coords, 0) != self.numAtoms:
                 raise ValueError('Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(np.size(coords, 0), self.numAtoms))
 
@@ -936,6 +939,24 @@ class Molecule:
             self.fstep = (time[1] - time[0]) / 1E6  # convert femtoseconds to nanoseconds
         if skip is not None:
             self.fstep *= skip
+
+    def _writeNumFrames(self, filepath, numFrames):
+        """ Write the number of frames in a hidden file. Allows us to check for trajectory length issues before projecting
+
+        Parameters
+        ----------
+        filepath : str
+            Path to trajectory file
+        numFrames : int
+            Number of frames in trajectory file
+        """
+        filepath = os.path.abspath(filepath)
+        filedir = os.path.dirname(filepath)
+        basename = os.path.basename(filepath)
+        numframefile = os.path.join(filedir, '.{}.numframes'.format(basename))
+        if not os.path.exists(numframefile) or (os.path.exists(numframefile) and (os.path.getmtime(numframefile) < os.path.getmtime(filepath))):
+            with open(numframefile, 'w') as f:
+                f.write(str(numFrames))
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
              viewerhandle=None, gui=False):
