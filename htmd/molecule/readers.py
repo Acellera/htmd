@@ -531,8 +531,28 @@ def PDBread(filename, mode='pdb'):
     56 - 66       LString       sGroup         Space  group.
     67 - 70       Integer       z              Z value.
     """
-    boxcolspecs = [(6, 15), (15, 24), (24, 33)]
-    boxnames = ('a', 'b', 'c')
+    cryst1colspecs = [(6, 15), (15, 24), (24, 33), (33, 40), (40, 47), (47, 54), (55, 66), (66, 70)]
+    cryst1names = ('a', 'b', 'c', 'alpha', 'beta', 'gamma', 'sGroup', 'z')
+
+    """
+    Guessing columns for REMARK 290 SMTRY from the example since the specs don't define them
+              1         2         3         4         5         6         7
+    01234567890123456789012345678901234567890123456789012345678901234567890
+    REMARK 290   SMTRY1   1  1.000000  0.000000  0.000000        0.00000
+    REMARK 290   SMTRY2   1  0.000000  1.000000  0.000000        0.00000
+    REMARK 290   SMTRY3   1  0.000000  0.000000  1.000000        0.00000
+    REMARK 290   SMTRY1   2 -1.000000  0.000000  0.000000       36.30027
+    REMARK 290   SMTRY2   2  0.000000 -1.000000  0.000000        0.00000
+    REMARK 290   SMTRY3   2  0.000000  0.000000  1.000000       59.50256
+    REMARK 290   SMTRY1   3 -1.000000  0.000000  0.000000        0.00000
+    REMARK 290   SMTRY2   3  0.000000  1.000000  0.000000       46.45545
+    REMARK 290   SMTRY3   3  0.000000  0.000000 -1.000000       59.50256
+    REMARK 290   SMTRY1   4  1.000000  0.000000  0.000000       36.30027
+    REMARK 290   SMTRY2   4  0.000000 -1.000000  0.000000       46.45545
+    REMARK 290   SMTRY3   4  0.000000  0.000000 -1.000000        0.00000
+    """
+    symmetrycolspecs = [(20, 23), (23, 33), (33, 43), (43, 53), (53, 68)]
+    symmetrynames = ('idx', 'rot1', 'rot2', 'rot3', 'trans')
 
     def concatCoords(coords, coorddata):
         if coorddata.tell() != 0:  # Not empty
@@ -548,17 +568,18 @@ def PDBread(filename, mode='pdb'):
     currter = 0
     topoend = False
 
-    crystdata = io.StringIO()
+    cryst1data = io.StringIO()
     topodata = io.StringIO()
     conectdata = io.StringIO()
     coorddata = io.StringIO()
+    symmetrydata = io.StringIO()
 
     coords = None
 
     with open(filename, 'r') as f:
         for line in f:
             if line.startswith('CRYST1'):
-                crystdata.write(line)
+                cryst1data.write(line)
             if line.startswith('ATOM') or line.startswith('HETATM'):
                 coorddata.write(line)
             if (line.startswith('ATOM') or line.startswith('HETATM')) and not topoend:
@@ -573,15 +594,20 @@ def PDBread(filename, mode='pdb'):
             if line.startswith('MODEL'):
                 coords = concatCoords(coords, coorddata)
                 coorddata = io.StringIO()
-        crystdata.seek(0)
+            if line.startswith('REMARK 290   SMTRY'):
+                symmetrydata.write(line)
+
+        cryst1data.seek(0)
         topodata.seek(0)
         conectdata.seek(0)
+        symmetrydata.seek(0)
 
         coords = concatCoords(coords, coorddata)
 
         parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
-        parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames, na_values=_NA_VALUES, keep_default_na=False)
+        parsedcryst1 = read_fwf(cryst1data, colspecs=cryst1colspecs, names=cryst1names, na_values=_NA_VALUES, keep_default_na=False)
         parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
+        parsedsymmetry = read_fwf(symmetrydata, colspecs=symmetrycolspecs, names=symmetrynames, na_values=_NA_VALUES, keep_default_na=False)
 
     # if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
     #    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
@@ -598,6 +624,16 @@ def PDBread(filename, mode='pdb'):
 
     if len(parsedtopo) > 99999:
         logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
+
+    crystalinfo = {}
+    if len(parsedcryst1):
+        crystalinfo = parsedcryst1.ix[0].to_dict()
+        crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
+    if len(parsedsymmetry):
+        numcopies = int(len(parsedsymmetry)/3)
+        crystalinfo['numcopies'] = numcopies
+        crystalinfo['rotations'] = parsedsymmetry[['rot1', 'rot2', 'rot3']].as_matrix().reshape((numcopies, 3, 3))
+        crystalinfo['translations'] = parsedsymmetry['trans'].as_matrix().reshape((numcopies, 3))
 
     topo = Topology(parsedtopo)
 
@@ -629,7 +665,7 @@ def PDBread(filename, mode='pdb'):
 
     if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx
-    return topo, coords
+    return topo, coords, crystalinfo
 
 
 def BINCOORread(filename):
