@@ -159,22 +159,3 @@ def _build_hexagon(molunit, hexagonal_molunit):
                             [0, 0, 1]])
         cellunit.rotateBy(rot_mat)
         hexagonal_molunit.append(cellunit)
-
-
-if __name__ == "__main__":
-    # ###---VARIABLE DEFINITION---###
-    # filename = "./3v03.pdb"
-    # display_type = 'NewCartoon'
-    # draw_crystal_type = False  # This variable determines whether an hexagonal crystal will be drawn as hexagonal or not.
-    # full_build = False  # This variable determines whether, for an hexagonal crystal, the three different crystal pieces will be rotated.
-    #
-    # ###---MAIN PROCESS---###
-    #
-    # # First, a UnitCell object is built with the input PDB in filename is created.
-    # # Next, the Unit Cell is created.
-    # # Lastly, the copies of each molecule are drawn inside the Unit Cell and its visualization is called.
-    # unitcell = UnitCell(filename)
-    # unitcell.draw_cell()
-    # unitcell.draw_copies()
-    # unitcell.view_unit_cell()
-    pass
