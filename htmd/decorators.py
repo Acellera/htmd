@@ -8,6 +8,33 @@ import warnings
 
 
 class _Deprecated(object):
+    """
+    Flags a class or function as deprecated
+
+    Parameters
+    ----------
+    version : str
+        The HTMD version at which the class or function was deprecated.
+    newname : str
+        The replacement function, with complete Namespace.
+
+    Examples
+    --------
+    >>> @_Deprecated('0.0.0')
+    ... class ExampleClass:
+    ...     @_Deprecated('0.0.1')
+    ...     def example_method(self):
+    ...         pass
+    ...     pass
+    >>> ExampleClass.__doc__
+    '\\n    .. warning:: Deprecated since version 0.0.0. \\n                '
+    >>> ExampleClass().example_method.__doc__
+    '\\n        .. warning:: Deprecated since version 0.0.1. \\n                '
+    >>> ExampleClass() # doctest:+ELLIPSIS
+    <__main__.ExampleClass object ...>
+    >>> ExampleClass().example_method # doctest:+ELLIPSIS
+    <bound method ExampleClass.example_method of <__main__.ExampleClass object ...>>
+    """
     def __init__(self, version, newname=None):
         self.version = version
         self.newname = newname
@@ -52,3 +79,8 @@ class _Deprecated(object):
             return wrapped
         else:
             return new_func
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
