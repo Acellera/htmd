@@ -16,6 +16,7 @@ from htmd.projections.tica import TICA
 from htmd.projections.metric import Metric
 from htmd.protocols.protocolinterface import TYPE_INT, RANGE_0POS, RANGE_POS
 import logging
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
@@ -234,6 +235,7 @@ class AdaptiveMD(AdaptiveBase):
         return macronum
 
 
+@_Deprecated('1.3.2', 'htmd.adaptive.adaptiverun.AdaptiveMD')
 class AdaptiveRun(Adaptive):
     """ Adaptive class which uses a Markov state model for respawning
 
@@ -312,7 +314,6 @@ class AdaptiveRun(Adaptive):
                  clustmethod=MiniBatchKMeans, method='1/Mc', ticadim=0, filtersel='not water'):
 
         super().__init__(app, project, nmin, nmax, nepochs, inputpath, generatorspath, dryrun, updateperiod)
-        logger.warning('AdaptiveRun will be deprecated. Please use AdaptiveMD for any future adaptive runs.')
         self.metrictype = metrictype
         self.datapath = datapath
         self.filteredpath = filteredpath

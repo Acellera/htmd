@@ -9,6 +9,7 @@ from htmd.molecule.util import sequenceID
 import numpy as np
 import logging
 import string
+from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -159,11 +160,8 @@ def detectDisulfideBonds(mol, thresh=3):
     return sorted(disubonds, key=lambda x: x.resid1)
 
 
-# TODO: Remove in upcoming versions
+@_Deprecated('1.0.8', 'htmd.builder.builder.autoSegment')
 def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
-    logger.warning('segmentgaps will be deprecated in next versions of HTMD. '
-                   'It is replaced by autoSegment to reflect the usage rather than the underlying method. '
-                   'Please change all usages.')
     return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
 
 

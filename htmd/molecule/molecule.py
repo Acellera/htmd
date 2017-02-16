@@ -21,6 +21,7 @@ from copy import deepcopy
 from os import path
 import logging
 import re
+from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,8 @@ _residueNameTable = {'ARG': 'R', 'AR0': 'R',
 
 
 class Molecule:
-    """ Class to manipulate molecular structures.
+    """
+    Class to manipulate molecular structures.
 
     Molecule contains all the fields of a PDB and it is independent of any force field. It can contain multiple
     conformations and trajectories, however all operations are done on the current frame. The following PDB fields 
@@ -304,7 +306,8 @@ class Molecule:
             _resolveCollisions(self, occ1, occ2, coldist)
 
     def remove(self, selection, _logger=True):
-        """ Remove atoms from the Molecule
+        """
+        Remove atoms from the Molecule
 
         Parameters
         ----------
@@ -615,8 +618,10 @@ class Molecule:
         for f in range(self.numFrames):
             self.coords[s, :, f] += vector
 
+    @_Deprecated('1.3.2', 'htmd.molecule.molecule.Molecule.rotateBy')
     def rotate(self, axis, angle, sel=None):
-        """ Rotate atoms around an axis for a given angle in radians.
+        """
+        Rotate atoms around an axis for a given angle in radians.
 
         Parameters
         ----------
@@ -632,7 +637,6 @@ class Molecule:
         >>> mol=tryp.copy()
         >>> mol.rotate([0, 1, 0], 1.57)
         """
-        logger.warning('Molecule.rotate is deprecated and will be removed. Use Molecule.rotateBy instead.')
         M = rotationMatrix(axis, angle)
         self.rotateBy(M, sel=sel)
 
