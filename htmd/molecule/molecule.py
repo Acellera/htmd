@@ -185,6 +185,7 @@ class Molecule:
         self.fileloc = []
         self.time = []
         self.step = []
+        self.crystalinfo = None
 
         self.reps = Representations(self)
         self._tempreps = Representations(self)
@@ -802,7 +803,8 @@ class Molecule:
         else:
             raise NameError('File {} not found'.format(filename))
 
-        topo, coords = PDBread(filepath, mode=mode)
+        topo, coords, crystalinfo = PDBread(filepath, mode=mode)
+        self.crystalinfo = crystalinfo
         self._parseTopology(topo, filepath, overwrite=overwrite)
         self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         if tempfile:
@@ -1253,6 +1255,13 @@ class Molecule:
         if drop is not None:
             self.coords = np.delete(self.coords, drop, axis=2)
             self.box = np.delete(self.box, drop, axis=1)
+
+    def viewCrystalPacking(self):
+        """
+        If the Molecule was read from a crystallographic PDB structure it shows the crystal packing of the molecule.
+        """
+        from htmd.molecule.crystalpacking import viewCrystalPacking
+        viewCrystalPacking(self)
 
     @property
     def numFrames(self):
