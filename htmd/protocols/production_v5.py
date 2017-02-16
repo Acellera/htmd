@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class Production(ProtocolInterface):
-    ''' Production protocol v4
+    ''' Production protocol v5
 
         Production protocol for globular and membrane proteins. You can optionally define a flatbottom potential box and
         atom constraints for the production run.
@@ -37,11 +37,12 @@ class Production(ProtocolInterface):
             Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]
         useconstantratio : bool, default=False
             For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
-        useconstraints: bool, default=False
+        useconstraints : bool, default=False
             Apply constraints to the production simulation, defined by the constraints parameter
         constraints : dict, default={}
             A dictionary of atomselections and values of the constraint to be applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.
-
+        adaptive : bool, default=False
+            Set to True if making production runs for adaptive sampling.
     '''
     def __init__(self):
         super().__init__()
@@ -58,6 +59,7 @@ class Production(ProtocolInterface):
         self._cmdDict('constraints', 'dict', 'A dictionary of atomselections and values of the constraint to be applied '
                                              '(in kcal/mol/A^2). Atomselects must be mutually exclusive.'
                                              , {})
+        self._cmdBoolean('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False)
 
         self.acemd = Acemd()
         #self.acemd.binindex='input.idx'
@@ -207,6 +209,9 @@ proc calcforces_endstep { } { }
             self.acemd.useconstantratio = 'on'
         self.acemd.setup(inputdir, outputdir, overwrite=True)
 
+        if self.adaptive:
+            self.acemd.binvelocities = None
+
         # Adding constraints
         if self.useconstraints:
             inmol = Molecule(os.path.join(inputdir, self.acemd.coordinates))
@@ -221,6 +226,8 @@ proc calcforces_endstep { } { }
                 outfile = os.path.join(outputdir, self.acemd.coordinates)
                 inmol.write(outfile)
                 self.acemd.consref = self.acemd.coordinates
+
+
 
 if __name__ == "__main__":
     md = Production()
