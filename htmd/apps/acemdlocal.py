@@ -33,11 +33,11 @@ class AcemdLocal(LocalGPUQueue):
     timeout : float
         Timeout for simulations. Can be used to run simulations only for X amounts of minutes before exiting.
 
+
     .. currentmodule:: htmd.apps.acemdlocal.AcemdLocal
     .. rubric:: Methods
     .. autoautosummary:: htmd.apps.acemdlocal.AcemdLocal
         :methods:
-        :inherited-members:
     .. rubric:: Attributes
     .. autoautosummary:: htmd.apps.acemdlocal.AcemdLocal
         :attributes:
