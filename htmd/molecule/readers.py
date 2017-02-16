@@ -550,6 +550,14 @@ def PDBread(filename, mode='pdb'):
     REMARK 290   SMTRY1   4  1.000000  0.000000  0.000000       36.30027
     REMARK 290   SMTRY2   4  0.000000 -1.000000  0.000000       46.45545
     REMARK 290   SMTRY3   4  0.000000  0.000000 -1.000000        0.00000
+
+    Guessing columns for REMARK 350   BIOMT from the example since the specs don't define them
+    REMARK 350   BIOMT1   1 -0.981559  0.191159  0.000000        0.00000
+    REMARK 350   BIOMT2   1 -0.191159 -0.981559  0.000000        0.00000
+    REMARK 350   BIOMT3   1  0.000000  0.000000  1.000000      -34.13878
+    REMARK 350   BIOMT1   2 -0.838088  0.545535  0.000000        0.00000
+    REMARK 350   BIOMT2   2 -0.545535 -0.838088  0.000000        0.00000
+    REMARK 350   BIOMT3   2  0.000000  0.000000  1.000000      -32.71633
     """
     symmetrycolspecs = [(20, 23), (23, 33), (33, 43), (43, 53), (53, 68)]
     symmetrynames = ('idx', 'rot1', 'rot2', 'rot3', 'trans')
@@ -594,7 +602,7 @@ def PDBread(filename, mode='pdb'):
             if line.startswith('MODEL'):
                 coords = concatCoords(coords, coorddata)
                 coorddata = io.StringIO()
-            if line.startswith('REMARK 290   SMTRY'):
+            if line.startswith('REMARK 290   SMTRY'):  # TODO: Support BIOMT fields. It's a bit more complicated. Can't be done with pandas
                 symmetrydata.write(line)
 
         cryst1data.seek(0)
