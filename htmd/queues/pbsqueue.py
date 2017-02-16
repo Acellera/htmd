@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 class PBSQueue(SimQueue, ProtocolInterface):
-    """ Queue system for PBS
+    """
+
+    .. warning:: This queue system has not been tested and can possibly fail.
+
+    Queue system for PBS
 
     Parameters
     ----------

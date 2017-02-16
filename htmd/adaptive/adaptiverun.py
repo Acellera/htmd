@@ -237,7 +237,8 @@ class AdaptiveMD(AdaptiveBase):
 
 @_Deprecated('1.3.2', 'htmd.adaptive.adaptiverun.AdaptiveMD')
 class AdaptiveRun(Adaptive):
-    """ Adaptive class which uses a Markov state model for respawning
+    """
+    Adaptive class which uses a Markov state model for respawning
 
     AdaptiveRun uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
     currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using

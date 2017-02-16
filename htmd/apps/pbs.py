@@ -13,7 +13,10 @@ import shutil
 import os
 import string
 import random
+from htmd.decorators import _Deprecated
 
+
+@_Deprecated('1.5.15', 'htmd.queues.pbsqueue.PBSQueue')
 class PBS(UserInterface):
     _commands = {
        'name'      : "",                           
