@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 from difflib import get_close_matches
+from htmd.decorators import _Deprecated
 
 
 def uisetattr(self, key, value, keylist):
@@ -23,9 +24,11 @@ def uisetattr(self, key, value, keylist):
             raise NameError('Option "' + key + '" is not recognized.')
 
 
+@_Deprecated('1.5.15', 'htmd.protocols.protocolinterface.ProtocolInterface')
 class UserInterface:
-    """ Creates a class for which only certain public attributes can be created.
-        All private attribute can be freely created.
+    """
+    Creates a class for which only certain public attributes can be created.
+    All private attribute can be freely created.
     """
 
     def __setattr__(self, key, value):

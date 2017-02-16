@@ -10,7 +10,10 @@ import os
 import string
 import random
 from htmd import UserInterface
+from htmd.decorators import _Deprecated
 
+
+@_Deprecated('1.5.15', 'htmd.queues.lsfqueue.LsfQueue')
 class LSF(UserInterface):
     _commands = {
         'name': "",
