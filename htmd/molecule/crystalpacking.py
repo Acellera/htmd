@@ -63,7 +63,7 @@ def viewCrystalPacking(mol, hexagonal=False, style_display='NewCartoon'):
     pdbfile : str
         Path to the pdb file which to read. Can also be a 4-letter PDB ID
     """
-    if mol.crystalinfo is None:
+    if mol.crystalinfo is None or 'numcopies' not in mol.crystalinfo:
         raise RuntimeError('No crystallography data found in Molecule.')
     ci = mol.crystalinfo
 
