@@ -74,7 +74,7 @@ class AdaptiveGoal(AdaptiveMD):
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
         The lagtime used to create the Markov model
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` class, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
         Clustering algorithm used to cluster the contacts or distances
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
@@ -92,6 +92,8 @@ class AdaptiveGoal(AdaptiveMD):
         Scaling factor for undirected component.
     nosampledc : bool, default=False
         Spawn only from top DC conformations without sampling
+    autoscale : bool, default=False
+        Automatically scales exploration and exploitation ratios depending on how stuck the adaptive is at a give goal score.
 
     Example
     -------
@@ -128,8 +130,11 @@ class AdaptiveGoal(AdaptiveMD):
         self._cmdFunction('goalfunction', 'function',
                           'This function will be used to convert the goal-projected simulation data to a ranking which'
                           'can be used for the directed component of FAST.', None)
-        self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component.', 1, TYPE_FLOAT, RANGE_ANY)
+        self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component. Directed component scaling '
+                                           'automatically calculated as (1-uscale)', 0.5, TYPE_FLOAT, RANGE_ANY)
         self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
+        self._cmdBoolean('autoscale', 'bool', 'Automatically scales exploration and exploitation ratios depending on '
+                                              'how stuck the adaptive is at a give goal score.', False)
         self._debug = False
 
     def _algorithm(self):
@@ -181,7 +186,11 @@ class AdaptiveGoal(AdaptiveMD):
         dcunscaled = dcmeans
         uc = self._featScale(uc)
         dc = self._featScale(dcmeans)
-        reward = dc + self.ucscale * uc
+
+        scale = self.ucscale
+        if self.autoscale:
+            scale = self._calculateScale(goaldata)
+        reward = scale * uc + (1 - scale) * dc
 
         relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
 
@@ -200,6 +209,28 @@ class AdaptiveGoal(AdaptiveMD):
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
+    def _calculateScale(self, goaldata):
+        from htmd.adaptive.adaptive import epochSimIndexes
+        epochs = epochSimIndexes(goaldata.simlist)
+        epochmaxgoal = np.zeros(len(epochs))
+        totalmin = None
+        for e in sorted(epochs.keys()):
+            idx = epochs[e]
+            epochmaxgoal[e] = 0
+            for i in idx:
+                if goaldata.dat[i].max() > epochmaxgoal[e]:
+                    epochmaxgoal[e] = goaldata.dat[i].max()
+                if totalmin is None or goaldata.dat[i].min() < totalmin:
+                    totalmin = goaldata.dat[i].min()
+        epochmaxgoal = (epochmaxgoal - totalmin) / (epochmaxgoal.max() - totalmin)
+        dx = np.abs(np.diff(epochmaxgoal))
+        dxn = self._featScale(dx)
+        scale = 0.5
+        for d in dxn[::-1]:
+            if d < 0.1:
+                scale = max(1, scale+0.1)
+        return scale
+
     def _getSpawnFrames(self, reward, model, data):
         spawncounts, prob = self._spawn(reward, self.nmax - self._running)
         logger.debug('spawncounts {}'.format(spawncounts))
@@ -217,7 +248,7 @@ class AdaptiveGoal(AdaptiveMD):
 
     def _getGoalData(self, sims):
         logger.debug('Starting projection of directed component')
-        metr = Metric(sims)
+        metr = Metric(sims, skip=self.skip)
         metr.set(self.goalfunction)
         data = metr.project()
         logger.debug('Finished calculating directed component')
