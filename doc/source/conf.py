@@ -48,6 +48,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.ifconfig',
     'sphinx.ext.napoleon',
+    'sphinxarg.ext'
 ]
 
 # "'sphinx.ext.viewcode'," was removed to avoid showing code
