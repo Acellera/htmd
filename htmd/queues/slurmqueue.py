@@ -60,6 +60,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('ncpu', 'int', 'Number of CPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 1000, TYPE_INT, RANGE_0POS)
+        self._cmdValue('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.', None, TYPE_INT, RANGE_0POS)
         self._cmdValue('walltime', 'int', 'Job timeout (s)', None, TYPE_INT, RANGE_POS)
         self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
         self._cmdString('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None)
@@ -95,7 +96,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#SBATCH --job-name={}\n'.format(self.jobname))
             f.write('#SBATCH --partition={}\n'.format(self.partition))
             if self.ngpu != 0:
-                f.write('#SBATCH --gres=gpu:{}\n'.format(self.ngpu))
+                f.write('#SBATCH --gres=gpu:{}'.format(self.ngpu))
+                if self.gpumemory is not None:
+                    f.write(',gpu_mem:{}'.format(self.gpumemory))
+                f.write('\n')
             f.write('#SBATCH --cpus-per-task={}\n'.format(self.ncpu))
             f.write('#SBATCH --mem={}\n'.format(self.memory))
             f.write('#SBATCH --priority={}\n'.format(self.priority))
