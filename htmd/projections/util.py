@@ -138,10 +138,16 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
         idx = np.where(sel2[i, :])[0]
         groups2[i, 0:len(idx)] = idx
 
+    selfdist = np.array_equal(sel1, sel2)
+
     # Running the actual calculations
     lib = ctypes.cdll.LoadLibrary(os.path.join(home(libDir=True), 'mindist_ext.so'))
     mindist = np.zeros((mol.numFrames, len(groups1) * len(groups2)), dtype=np.float32)  # Preparing the return array
-    # TODO: C code should know it's self distance and not calculate symmetrical distances
+    if selfdist:
+        mindist = np.zeros((mol.numFrames, int((len(groups1) * (len(groups2)-1))/2)), dtype=np.float32)
+
+    #import time
+    #t = time.time()
     lib.mindist_trajectory(coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                            box.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                            groups1.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
@@ -151,9 +157,12 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
                            ctypes.c_int(mol.numAtoms),
                            ctypes.c_int(mol.numFrames),
                            ctypes.c_int(int(pbc)),
+                           ctypes.c_int(int(selfdist)),
                            mindist.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
+    #print(time.time() - t)
 
-    mindist = _postProcessMinDistances(mindist, sel1, sel2, truncate)
+    if truncate is not None:
+        mindist[mindist > truncate] = truncate
 
     if metric == 'contacts':
         mindist = mindist <= threshold
@@ -162,22 +171,6 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
     else:
         raise NameError('The metric you asked for is not supported. Check spelling and documentation')
     return mindist
-
-
-def _postProcessMinDistances(distances, sel1, sel2, truncate):
-    # distances is a 2D array with numFrames * numDimensions shape
-    # Setting upper triangle to -1 if same selections
-    if np.array_equal(sel1, sel2):
-        numGroups = sel1.shape[0]
-        mask = np.ones(numGroups * numGroups, dtype=bool)
-        for r in range(numGroups):
-            mask[r*numGroups:r*numGroups+r+1] = 0
-        distances = distances[:, mask]
-
-    if truncate is not None:
-        distances[distances > truncate] = truncate
-
-    return distances
 
 
 def _wrapCoords(coords, box):
