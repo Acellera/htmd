@@ -51,6 +51,7 @@ from htmd.clustering.regular import RegCluster
 from htmd.queues.localqueue import LocalGPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
+from htmd.vmdgraphics import VMDConvexHull, VMDBox
 import logging.config
 import htmd
 
