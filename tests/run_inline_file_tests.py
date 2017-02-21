@@ -7,6 +7,7 @@ import fnmatch
 import os
 from subprocess import call, check_output
 import sys
+import time
 
 excludedfolders = ('./tests', './doc', './htmdlib')
 excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_conda_with_omnia.py', 'makerelease.py')   # Trailing comma needed otherwise it's not a tuple
@@ -32,12 +33,13 @@ for root, dirnames, filenames in os.walk('.'):
 failed = []
 
 for f in filestotest:
+    t = time.time()
     print(' ************************  Running "{}"  ************************'.format(f))
     if f.endswith('amber.py') or f.endswith('charmm.py'):
         out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
     else:
         out = call('python {}'.format(f), shell=True)
-    print(' ************************  Result : {}  ************************'.format(out))
+    print(' ************************  Result : {} Time : {} ************************'.format(out, time.time() - t))
     if out != 0:
         failed.append(f)
 
