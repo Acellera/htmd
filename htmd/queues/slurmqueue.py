@@ -51,7 +51,9 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     trajext : str, default='xtc'
         Extension of trajectory files. This is needed to copy them to datadir.
     nodelist : list, default=None
-        A list of accepted nodes on which to run the job
+        A list of nodes on which to run every job at the *same time*! Careful! The jobs will be duplicated!
+    exclude : list
+        A list of nodes on which *not* to run the jobs. Use this to select nodes on which to allow the jobs to run on.
 
     Examples
     --------
@@ -77,7 +79,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err')  # Maybe change these to job name
         self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
         self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
-        self._cmdList('nodelist', 'list', 'A list of accepted nodes on which to run the job', None)
+        self._cmdList('nodelist', 'list', 'A list of nodes on which to run every job at the *same time*! Careful! The jobs will be duplicated!', None)
+        self._cmdList('exclude', 'list', 'A list of nodes on which *not* to run the jobs. Use this to select nodes on which to allow the jobs to run on.', None)
 
         # Find executables
         self._qsubmit = SlurmQueue._find_binary('sbatch')
@@ -98,6 +101,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         return ret
 
     def _createJobScript(self, fname, workdir, runsh):
+        from htmd.util import ensurelist
         workdir = os.path.abspath(workdir)
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n')
@@ -123,7 +127,9 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 f.write('#SBATCH --mail-type={}\n'.format(self.mailtype))
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
             if self.nodelist is not None:
-                f.write('#SBATCH --nodelist={}\n'.format(','.join(self.nodelist)))
+                f.write('#SBATCH --nodelist={}\n'.format(','.join(ensurelist(self.nodelist))))
+            if self.exclude is not None:
+                f.write('#SBATCH --exclude={}\n'.format(','.join(ensurelist(self.exclude))))
             # Trap kill signals to create sentinel file
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\ncd {}\n'.format(workdir))
