@@ -42,14 +42,16 @@ class VMD:
     """ Please do not directly call this class constructor. Use the `viewer` or `getCurrentViewer` function instead.
     """
 
-    def __init__(self, vmd=None, host=None):
+    def __init__(self, vmd=None, host=None, dispdev='win'):
         self.done = 0
         vmd = getVMDpath(vmd=vmd)
 
         args = [vmd]
-        if (host):
-            args.append("--host")
+        if host:
+            args.append('--host')
             args.append(host)
+        args.append('--dispdev')
+        args.append(dispdev)
         self.vmd = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, close_fds=True,
                                     shell=False)
         self.queue = queue.Queue()
@@ -229,7 +231,7 @@ def getVMDpath(vmd=None):
     return vmd
 
 
-def getCurrentViewer():
+def getCurrentViewer(dispdev='win'):
     """ Get the handle to the current molecular viewer
 
     Returns
@@ -246,11 +248,11 @@ def getCurrentViewer():
     _viewers = np.delete(_viewers, todrop)
     # Creating a new viewer if none exist or otherwise returning the last viewer
     if len(_viewers) == 0:
-        _viewers = np.append(_viewers, VMD())
+        _viewers = np.append(_viewers, VMD(dispdev=dispdev))
     return _viewers[-1]
 
 
-def viewer():
+def viewer(dispdev='win'):
     """ Start a new molecular viewer
 
     Returns
@@ -266,7 +268,7 @@ def viewer():
             todrop = np.append(todrop, i)
     _viewers = np.delete(_viewers, todrop)
     # Creating a new viewer
-    _viewers = np.append(_viewers, VMD())
+    _viewers = np.append(_viewers, VMD(dispdev=dispdev))
     print(_viewers)
 
 
