@@ -8,7 +8,7 @@ from htmd.home import home
 from htmd.session import htmdsave, htmdload
 from htmd.simlist import simlist, simfilter, simmerge
 from htmd.metricdata import MetricData
-from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance
+from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance, reconstructContactMap
 from htmd.projections.metricrmsd import MetricRmsd
 from htmd.projections.metriccoordinate import MetricCoordinate
 from htmd.projections.metricdihedral import MetricDihedral, Dihedral
