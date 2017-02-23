@@ -21,7 +21,7 @@ except:
 import time
 import os
 import sys
-from htmd.molecule.support import *
+from htmd.molecule.support import string_to_tempfile
 import numpy as np
 import tempfile
 

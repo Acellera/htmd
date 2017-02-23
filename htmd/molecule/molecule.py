@@ -12,7 +12,7 @@ from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread, GROTOPread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write, GROwrite
 from htmd.molecule.support import string_to_tempfile
-from htmd.molecule.wrap import *
+from htmd.molecule.wrap import wrap
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
 from htmd.util import tempname
@@ -20,6 +20,7 @@ from math import pi
 from copy import deepcopy
 from os import path
 import logging
+import os
 import re
 from htmd.decorators import _Deprecated
 
@@ -484,10 +485,10 @@ class Molecule:
         bonds = np.empty((0, 2), dtype=np.uint32)
         if fileBonds:
             if len(self.bonds) == 0:  # This is a patch for the other readers not returning correct empty dimensions
-                self.bonds = np.empty((0, 2), dtype=numpy.uint32)
-            bonds = numpy.vstack((bonds, self.bonds))
+                self.bonds = np.empty((0, 2), dtype=np.uint32)
+            bonds = np.vstack((bonds, self.bonds))
         if guessBonds:
-            bonds = numpy.vstack((bonds, self._guessBonds()))
+            bonds = np.vstack((bonds, self._guessBonds()))
         return bonds
 
     def atomselect(self, sel, indexes=False, strict=False, fileBonds=True, guessBonds=True):
@@ -781,12 +782,13 @@ class Molecule:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
 
     def _readPDB(self, filename, mode='pdb', overwrite='all'):
+        from htmd.home import home
         tempfile = False
         if os.path.isfile(filename):
             filepath = filename
         elif len(filename) == 4:
             # Try loading it from the pdb data directory
-            localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
+            localpdb = os.path.join(home(dataDir="pdb"), filename.lower() + ".pdb")
             if os.path.isfile(localpdb):
                 logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
                 filepath = localpdb
@@ -811,9 +813,9 @@ class Molecule:
             os.unlink(filepath)
 
         if self.masses is None or len(self.masses) == 0:
-            self.masses = numpy.zeros(self.numAtoms, dtype=numpy.float32)
+            self.masses = np.zeros(self.numAtoms, dtype=np.float32)
         if self.charge is None or len(self.charge) == 0:
-            self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
+            self.charge = np.zeros(self.numAtoms, dtype=np.float32)
 
         for pf in self._atom_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
             if self._dtypes[pf] == object and len(self.__dict__[pf]) != 0:
