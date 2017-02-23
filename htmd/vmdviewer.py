@@ -189,16 +189,17 @@ class VMD:
         if renderer == 'tachyon':
             tmpext = '.psd'
             if tachyon is None:
-                try:
-                    tachyon = shutil.which('tachyon', mode=os.X_OK)
-                except:
-                    raise FileNotFoundError("Could not find `tachyon` executable, or no execute permissions are given. Try using renderer='snapshot' instead.")
-            rendercommand = 'render Tachyon {out} "{tachyon}" -res {resx} {resy} -aasamples {aa} -add_skylight {sl} {out} -format PSD48 -o {out}.psd'.format(tachyon=tachyon, resx=resolution[0], resy=resolution[1], aa=aasamples, sl=skylight, out=outname)
+                tachyon = shutil.which('tachyon', mode=os.X_OK)
+            if tachyon is None:
+                raise FileNotFoundError("Could not find `tachyon` executable, or no execute permissions are given. Try using renderer='snapshot' instead.")
+            rendercommand = 'render Tachyon {}'.format(outname)
         elif renderer == 'snapshot':
             tmpext = '.tga'
             rendercommand = 'render snapshot {}{}'.format(outname, tmpext)
 
         self.send(rendercommand)
+        if renderer == 'tachyon':
+            os.system('{tachyon} -res {resx} {resy} -aasamples {aa} -add_skylight {sl} {out} -format PSD48 -o {out}.psd'.format(tachyon=tachyon, resx=resolution[0], resy=resolution[1], aa=aasamples, sl=skylight, out=outname))
         print(rendercommand)
         if not os.path.exists(outname+tmpext):
             raise RuntimeError('Rendering failed to produce image with following command: {}'.format(rendercommand))
@@ -207,10 +208,10 @@ class VMD:
 
         if ext != tmpext:
             if convert is None:
-                try:
-                    convert = shutil.which('convert', mode=os.X_OK)
-                except:
-                    raise FileNotFoundError('Could not find `convert` executable, or no execute permissions are given. You can find the temporary render file in {}', outname+tmpext)
+                convert = shutil.which('convert', mode=os.X_OK)
+            if convert is None:
+                raise FileNotFoundError('Could not find `convert` executable, or no execute permissions are given. You can find the temporary render file in {}'.format(outname + tmpext))
+
             os.system('{convert} {outname}{tmpext} {outname}{ext}'.format(convert=convert, tmpext=tmpext, outname=outname, ext=ext))
             if trim:
                 os.system('{convert} {outname}{ext} -trim {outname}{ext}'.format(convert=convert, outname=outname, ext=ext))
