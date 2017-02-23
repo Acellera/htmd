@@ -123,9 +123,10 @@ class ProtocolInterface:
         cmd = self._commands[key]
         return cmd.validate(value, basedir=basedir)
 
-    def _toArgParse(self, description):
+    def _toArgParse(self, description, parser=None):
         import argparse
-        parser = argparse.ArgumentParser(description=description)
+        if parser is None:
+            parser = argparse.ArgumentParser(description=description)
 
         sortedkeys = [x[0] for x in sorted(self._commandsOrder.items(), key=lambda x: x[1])]
         for k in sortedkeys:
