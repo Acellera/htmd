@@ -71,6 +71,35 @@ def _deduce_PDB_atom_name(name, resname):
     return ' {:<3}'.format(name)
 
 
+def _getPDBElement(name, element):
+    """
+    Given a PDB atom name of 4 characters (including spaces), get the element
+    """
+    import re
+    regH_old = re.compile('H.[123][123]') # Matches i.e. HE13
+    regH_inv = re.compile('[123]H')  # Matches i.e. 2H
+    element_backup = element.strip()
+    if not element.isalpha():
+        element = name[0:2].strip()
+        if element and element[0].isdigit():
+            if element_backup:
+                element = element_backup
+            else:
+                element = name[1]
+        if element and len(element) > 1 and element[1].isdigit():
+            if element_backup:
+                element = element_backup
+            else:
+                element = name[0]
+    if element:
+        element = element.strip()
+    if regH_old.match(name.strip()) or regH_inv.match(name.strip()):
+        element = 'H'
+    if len(element) == 2:
+        element = element[0] + element[1].lower()
+    return element
+
+
 def checkTruncations(mol):
     fieldsizes = {'record': 6, 'serial': 5, 'name': 4, 'altloc': 1, 'resname': 4, 'chain': 1, 'resid': 4,
                   'insertion': 1, 'segid': 4, 'element': 2}

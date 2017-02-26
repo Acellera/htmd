@@ -1286,6 +1286,32 @@ class Molecule:
         from htmd.molecule.crystalpacking import viewCrystalPacking
         viewCrystalPacking(self)
 
+    def _guessElements(self):
+        babel_elements = ['Cr', 'Pt', 'Mn', 'Np', 'Be', 'Co', 'Rn', 'C', 'Ag', 'Xe', 'D', 'Th', 'Sb', 'Al', 'Ir', 'In', 'Te', 'Tl', 'K', 'Tb', 'Br', 'Eu', 'Ne', 'Rb', 'Ar', 'Sm', 'Xx', 'Fe', 'Lr', 'S', 'H', 'He', 'At', 'Li', 'Cs', 'Rh', 'Nb', 'Pr', 'Fm', 'Cu', 'Ru', 'Ga', 'Er', 'Hg', 'Nd', 'Ba', 'Ta', 'Pu', 'O', 'Pb', 'Yb', 'Bk', 'Pd', 'F', 'Gd', 'Y', 'Ac', 'Au', 'Hf', 'Ra', 'V', 'I', 'Ge', 'Re', 'Fr', 'Cm', 'Kr', 'Sr', 'Sn', 'Pm', 'Ca', 'No', 'Si', 'Es', 'U', 'Am', 'Sc', 'Md', 'As', 'Na', 'N', 'Dy', 'Os', 'Po', 'Se', 'Lu', 'Mo', 'Zn', 'Cd', 'Mg', 'Tm', 'Cl', 'P', 'B', 'W', 'Tc', 'Cf', 'Bi', 'Ni', 'Ti', 'Pa', 'La', 'Ce', 'Zr', 'Ho']
+        guess_babel_elements = ['D', 'M', 'V', 'A', 'X', 'R', 'F', 'Z', 'T', 'E', 'G', 'L']
+        from htmd.molecule.writers import _deduce_PDB_atom_name, _getPDBElement
+        elements = []
+        for i, elem in enumerate(self.element):
+            if len(elem) != 0 and isinstance(elem, str) and elem in babel_elements:
+                elements.append(elem)
+            else:
+                # Get the 4 character PDB atom name
+                name = _deduce_PDB_atom_name(self.name[i], self.resname[i])
+                # Deduce from the 4 character atom name the element
+                elem = _getPDBElement(name, elem)
+                if elem in babel_elements:
+                    elements.append(elem)
+                else:
+                    # Really risky business here
+                    celem = name[0].upper()
+                    if len(name) > 1:
+                        celem += name[1].lower()
+                    if celem in babel_elements:
+                        elements.append(celem)
+                    else:
+                        elements.append('Xx')
+        return elements
+
     @property
     def numFrames(self):
         """ Number of coordinate frames in the molecule
