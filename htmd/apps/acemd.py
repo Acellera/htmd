@@ -18,7 +18,7 @@ class Acemd(ProtocolInterface):
 
     def __init__(self, version=2):
         super().__init__()
-        self._version=version 
+        self._version = version
         self._files = {}
 
         # Options
@@ -179,10 +179,10 @@ class Acemd(ProtocolInterface):
 
     def _writeBashRun(self, fname):
         with open(fname, 'w') as f:
-            if self._version==3:
-               f.write('#!/bin/bash\nacemd3 >log.txt 2>&1')
+            if self._version == 3:
+                f.write('#!/bin/bash\nacemd3 >log.txt 2>&1')
             else:
-               f.write('#!/bin/bash\nacemd >log.txt 2>&1')
+                f.write('#!/bin/bash\nacemd >log.txt 2>&1')
         os.chmod(fname, 0o700)
 
     def __repr__(self):
