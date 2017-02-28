@@ -1236,7 +1236,7 @@ class Molecule:
         # Iterate over segments
         for seg in segs:
             segSequences[seg] = []
-            segatoms = self.atomselect('protein and segid {}'.format(seg))
+            segatoms = self.atomselect('protein and segid "{}"'.format(seg))
             resnames = self.resname[segatoms]
             incremseg = increm[segatoms]
             for i in np.unique(incremseg):  # Iterate over residues
