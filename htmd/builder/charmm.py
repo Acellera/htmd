@@ -795,9 +795,9 @@ def split(filename, outdir):
     f.close()
 
     if rtfsection > 1:
-        logger.warning('Multiple ({}) rtf topology sections found in {} stream file.'.format(rtfsection, filename))
+        raise BuildError('Multiple ({}) rtf topology sections found in {} stream file.'.format(rtfsection, filename))
     if prmsection > 1:
-        logger.warning('Multiple ({}) prm parameter sections found in {} stream file.'.format(prmsection, filename))
+        raise BuildError('Multiple ({}) prm parameter sections found in {} stream file.'.format(prmsection, filename))
 
     f = open(outrtf, 'w')
     f.write(rtfstr + 'END\n')
