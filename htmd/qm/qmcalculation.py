@@ -361,10 +361,10 @@ class QMCalculation:
 
         if isinstance(execution, SimQueue):
             execqueue = execution
-        # elif execution == Execution.LSF:
-        #     execqueue = LsfQueue()
-        elif execution == Execution.PBS:
-             execqueue = PBSQueue(ncpu=self.ncpus, ngpu=1, memory=4000 )
+        elif execution == Execution.LSF:
+            execqueue = LsfQueue()
+        # elif execution == Execution.PBS:
+        #      execqueue = PBSQueue(ncpu=self.ncpus, ngpu=1, memory=4000 )
         elif execution == Execution.Slurm:
             execqueue = SlurmQueue()
             execqueue.ncpu = self.ncpus

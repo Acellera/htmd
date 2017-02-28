@@ -6,6 +6,7 @@
 import ctypes as ct
 import numpy as np
 from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_string_buffer, pack_ulong_buffer, xtc_lib
+from htmd.molecule.util import sequenceID
 import logging
 logger = logging.getLogger(__name__)
 
@@ -629,6 +630,14 @@ def PDBread(filename, mode='pdb'):
         for p in pluses:
             parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
         parsedtopo.loc[parsedtopo.charge.isnull(), 'charge'] = 0
+    # Fixing hexadecimal index and resids
+    # Support for reading hexadecimal
+    if parsedtopo.serial.dtype == 'object':
+        logger.warning('Non-integer values were read from the PDB "serial" field. Dropping PDB values and assigning new ones.')
+        parsedtopo.serial = sequenceID(parsedtopo.serial)
+    if parsedtopo.resid.dtype == 'object':
+        logger.warning('Non-integer values were read from the PDB "resid" field. Dropping PDB values and assigning new ones.')
+        parsedtopo.resid = sequenceID(parsedtopo.resid)
 
     if len(parsedtopo) > 99999:
         logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
@@ -648,10 +657,10 @@ def PDBread(filename, mode='pdb'):
     # Bond formatting part
     # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
     serials = parsedtopo.serial.as_matrix()
-    if isinstance(serials[0], str) and np.any(serials == '*****'):
-        logger.info('Non-integer serials were read. For safety we will discard all bond information and serials will be assigned automatically.')
-        topo.serial = np.arange(1, len(serials)+1, dtype=np.int)
-    elif np.max(parsedbonds.max()) > np.max(serials):
+    # if isinstance(serials[0], str) and np.any(serials == '*****'):
+    #     logger.info('Non-integer serials were read. For safety we will discard all bond information and serials will be assigned automatically.')
+    #     topo.serial = np.arange(1, len(serials)+1, dtype=np.int)
+    if np.max(parsedbonds.max()) > np.max(serials):
         logger.info('Bond indexes in PDB file exceed atom indexes. For safety we will discard all bond information.')
     else:
         mapserials = np.empty(np.max(serials)+1)

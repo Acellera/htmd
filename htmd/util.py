@@ -193,38 +193,41 @@ def opm(pdb):
     return mol, thickness
 
 
-_issuedDeprecationWarnings = {}
+def testDHFR():
+    import conda
+    from . import tempname
+    import shutil
+    from htmd.queues.localqueue import LocalGPUQueue
 
+    dhfrdir = os.path.abspath(os.path.join(conda.__file__, '../../../../../acemd-examples/dhfr'))
 
-def issueDeprecationWarning(msg):
-    """ Issue a deprecation warning, only once.
+    if not os.path.isdir(dhfrdir):
+        raise logger.error('Could not find acemd-examples directory. Do `conda install acemd-examples -c acellera`')
 
-    Parameters
-    ----------
-    msg : str
-        The message.
+    tmpdir = tempname()
+    print(tmpdir)
+    shutil.copytree(dhfrdir, tmpdir)
 
-    """
+    runsh = os.path.join(tmpdir, 'run.sh')
+    with open(runsh, 'w') as f:
+        f.write('#!/bin/bash\nacemd >log.txt 2>&1')
+    os.chmod(runsh, 0o700)
 
-    import inspect
-    caller = inspect.stack()[1][3]
-    if not caller in _issuedDeprecationWarnings:
-        _issuedDeprecationWarnings[caller] = 1
-        logger.warning(
-            "Deprecation warning (%s). The function is obsolete and will be removed in a future version! Additional info: %s" % (
-                caller, msg))
-
-
-def _testDeprecation():
-    issueDeprecationWarning("Please ignore this first warning")
-    issueDeprecationWarning("This second warning should not appear")
+    logger.info('Starting to run the DHFR test')
+    md = LocalGPUQueue()
+    try:
+        md.submit(tmpdir)
+        md.wait()
+    except:
+        logger.error('Some error occurred. Check {}'.format(tmpdir))
+    else:
+        shutil.rmtree(tmpdir)
+        logger.info('Successfully ran the DHRF test. Temporary dir cleaned.')
+    return
 
 
 if __name__ == "__main__":
     from htmd import *
-
-    _testDeprecation()
-
     import doctest
 
     doctest.testmod()

@@ -46,6 +46,7 @@ from htmd.dock import dock
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.util import tempname
+from htmd.util import testDHFR
 from htmd.config import config
 from htmd.clustering.kcenters import KCenter
 from htmd.clustering.regular import RegCluster
