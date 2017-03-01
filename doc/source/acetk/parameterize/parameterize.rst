@@ -1,5 +1,12 @@
-Parameterization
-================
+Parameterize
+============
+
+Contents:
+
+.. toctree::
+    :maxdepth: 1
+
+    Tutorial <parameterize-tutorial>
 
 Parameterization of small molecules is an important aspect of molecular simulations, especially when dealing with
 molecules which are not readily available by default on CHARMM or AMBER. Even when parameters can be obtained from

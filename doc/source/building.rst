@@ -20,7 +20,6 @@ Contents:
 .. toctree::
     :maxdepth: 1
 
-    General considerations <building-considerations>
     Solvating <htmd.builder.solvate>
     Protein preparation <htmd.builder.preparation>
     CHARMM builder <htmd.builder.charmm>

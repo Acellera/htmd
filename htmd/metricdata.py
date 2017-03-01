@@ -421,7 +421,7 @@ class MetricData:
         ----------
         relFrames : 2D np.ndarray
             An array containing in each row trajectory index and frame pairs
-        simlist : simlist
+        simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for creating the Frames.
 
         Returns

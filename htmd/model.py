@@ -433,7 +433,7 @@ class Model(object):
             How to obtain the samples from the states
         numsamples : int
             Number of samples (conformations) for each state.
-        simlist : simlist
+        simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for creating the Molecules.
 
         Returns
@@ -511,7 +511,7 @@ class Model(object):
             A selection to use for wrapping
         alignsel : str, optional, default='name CA'
             A selection used for aligning all frames
-        simlist : simlist
+        simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for visualizing the states.
 
         Examples

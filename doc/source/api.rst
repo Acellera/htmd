@@ -1,4 +1,4 @@
-User Documentation
+HTMD Documentation
 ==================
 
 Here one can find documentation for most of the modules that HTMD provides. One can either explore the tree of contents
@@ -19,6 +19,5 @@ Contents:
     Markov state models <htmd.model>
     Kinetics <htmd.kinetics>
     Molecular viewer <htmd.vmdviewer>
-    Parameterization <parameterization>
 
 
