@@ -7,9 +7,12 @@ Changelog
 
 Concomitant release of 1.7.0 (latest).
 
-**New features (relative to 1.4.0):**
+**Main new features (relative to 1.4.0):**
 
 - AdaptiveGoal implemented
-- Apps changed for Queues
 - Parameterize tool released
+- Apps changed for Queues
+- New Metrics implemented: MetricSasa, MetricTMscore, MetricFluctuation
+- Equilibration and Production protocols updated
+- Documentation improved
 
