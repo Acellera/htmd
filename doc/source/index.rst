@@ -20,7 +20,10 @@ The tutorials are a good place to start playing around.
 
     tutorials
     api
+    userguide
+    developers
     acemd
+    acetk/acetk
 
 
 
