@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class LocalGPUQueue(SimQueue, ProtocolInterface):
-    """
+    """ Local machine queue system
+
     Parameters
     ----------
     ngpu : int
@@ -28,6 +29,7 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
     trajext : str, default='xtc'
         Extension of trajectory files. This is needed to copy them to datadir.
 
+
     .. currentmodule:: htmd.queues.localqueue.LocalGPUQueue
     .. rubric:: Methods
     .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
@@ -35,6 +37,7 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
     .. rubric:: Attributes
     .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
        :attributes:
+
     """
 
     def __init__(self):

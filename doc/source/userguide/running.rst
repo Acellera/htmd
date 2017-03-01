@@ -86,7 +86,7 @@ conformation was taken from simulation 1 of epoch 2 from the first piece
 of the simulation [*]_ and from frame 45 of that simulation piece.
 
 .. [*] some MD software might fragment simulations into pieces. Usually
-though this number will be 1 and can be ignored.
+       though this number will be 1 and can be ignored.
 
 Simulation length
 -----------------

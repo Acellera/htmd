@@ -12,4 +12,3 @@ Contents:
     Protein folding analysis <tutorials/protein-folding-analysis>
     CXCL12 conformational analysis <tutorials/cxcl12-conformational-analysis>
     Equilibration protocol for the mu opioid GPCR <tutorials/mu-opioid-receptor-gpcr-equilibration>
-    Unbinding a ligand using AdaptiveGoal <tutorials/unbinding-adaptivegoal>

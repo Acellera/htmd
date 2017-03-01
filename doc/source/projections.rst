@@ -21,3 +21,5 @@ Contents:
     MetricSecondaryStructure - secondary structure-based metric <htmd.projections.metricsecondarystructure>
     MetricPlumed2 - access all Plumed2 metrics (CVs) <htmd.projections.metricplumed2>
     MetricSasa - Solvent accessible surface area <htmd.projections.metricsasa>
+    MetricTMscore - TMscore-based metric <htmd.projections.metrictmscore>
+    MetricFluctuation - RMSF-based metric <htmd.projections.metricfluctuation>

@@ -969,9 +969,9 @@ class Molecule:
         sel : str
             Atomselection string for a representation.
         style : str
-            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`_.
+            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
         color : str
-            Coloring mode or color ID. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`_.
+            Coloring mode or color ID. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
         viewer : str ('vmd', 'webgl')
@@ -1464,10 +1464,10 @@ class Representations:
             Atom selection for the given representation (i.e. which part of the molecule to show)
         style : str
             Representation visual style (e.g. lines, NewCartoon, VdW, etc.). See more
-            `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`_.
+            `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
         color : str
             Color style (e.g. secondary structure) or ID (a number) See more
-            `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`_.
+            `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
         """
         self.replist.append(_Representation(sel, style, color))
 
