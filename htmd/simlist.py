@@ -307,6 +307,8 @@ def _filtSim(i, sims, outFolder, filterSel):
 
 
 def _getNumFrames(sim, trajectories):
+    if trajectories is None:
+        return None
     numframes = sim.numframes
     if numframes is None or np.any([f is None for f in sim.numframes]):
         numframes = [_readNumFrames(f) for f in trajectories]
