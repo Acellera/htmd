@@ -27,7 +27,7 @@ class PBSQueue(SimQueue, ProtocolInterface):
     jobname : str, default=None
         Job name (identifier)
     queue : str, default=None
-        The queue (partition) to run on
+        The queue to run on
     ngpu : int, default=0
         Number of GPUs to use for a single job
     ncpu : int, default=1
@@ -38,10 +38,15 @@ class PBSQueue(SimQueue, ProtocolInterface):
         Job timeout (s)
     environment : str, default='ACEMD_HOME,HTMD_LICENSE_FILE'
         Envvars to propagate to the job.
-    mailtype : str, default=None
-        When to send emails. Separate options with commas like 'END,FAIL'.
-    mailuser : str, default=None
-        User email address.
+    datadir : str, default=None
+        The path in which to store completed trajectories.
+    trajext : str, default='xtc'
+        Extension of trajectory files. This is needed to copy them to datadir.
+    cluster : str, default=None
+        Select nodes from a single specified cluster
+    scratch_local : int, default=None
+        Local scratch in MB
+
 
     Examples
     --------
@@ -61,6 +66,8 @@ class PBSQueue(SimQueue, ProtocolInterface):
         self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
         self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
         self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
+        self._cmdString('cluster', 'str', 'Select nodes from a single specified cluster', None)
+        self._cmdValue('scratch_local', 'int', 'Local scratch in MB', None, TYPE_INT, RANGE_0POS)
 
         # Find executables
         self._qsubmit = PBSQueue._find_binary('qsub')
@@ -90,7 +97,12 @@ class PBSQueue(SimQueue, ProtocolInterface):
             f.write('#\n')
             if self.jobname:
                 f.write('#PBS -N={}\n'.format(self.jobname))
-            f.write('#PBS -lselect=%d:ncpus=%d:ngpus=%d:mem=%dMB\n' % (1, self.ncpu, self.ngpu, self.memory))
+            f.write('#PBS -lselect=1:ncpus={}:ngpus={}:mem={}MB'.format(self.ncpu, self.ngpu, self.memory))
+            if self.scratch_local is not None:
+                f.write(':scratch_local={}MB'.format(self.scratch_local))
+            if self.cluster is not None:
+                f.write(':cl_{}=True'.format(self.cluster))
+            f.write('\n')
             if self.queue:
                 f.write("#PBS -q  %s\n" % self.queue)
             hours = int(self.walltime/3600)
