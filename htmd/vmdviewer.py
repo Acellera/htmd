@@ -160,14 +160,14 @@ class VMD:
     def copy(self):
         return None
 
-    def render(self, outfile, renderer='tachyon', resolution=(1920, 1080), aasamples=36, skylight=1, tachyon=None, convert=None, trim=False):
+    def render(self, outfile, renderer='TachyonInternal', resolution=(1920, 1080), aasamples=36, skylight=1, tachyon=None, convert=None, trim=False):
         """ Renders the current VMD scene into a file.
 
         Parameters
         ----------
         outfile : str
             File to which to render image
-        renderer : ('tachyon', 'snapshot')
+        renderer : ('TachyonInternal', 'tachyon', 'snapshot')
             Which renderer to use
         resolution : tuple
             X,Y resolution of the output image
@@ -196,6 +196,9 @@ class VMD:
         elif renderer == 'snapshot':
             tmpext = '.tga'
             rendercommand = 'render snapshot {}{}'.format(outname, tmpext)
+        elif renderer == 'TachyonInternal':
+            tmpext = '.tga'
+            rendercommand = 'render TachyonInternal {}{}'.format(outname, tmpext)
 
         self.send(rendercommand)
         if renderer == 'tachyon':
