@@ -371,6 +371,22 @@ class Rates(object):
         if g0eq is None:
             self.g0eq = 0
 
+    def __add__(self, other):
+        if isinstance(other, Rates):
+            for k in self.__dict__.keys():
+                self.__dict__[k] += other.__dict__[k]
+        else:
+            for k in self.__dict__.keys():
+                self.__dict__[k] += other
+
+    def __truediv__(self, other):
+        if isinstance(other, Rates):
+            for k in self.__dict__.keys():
+                self.__dict__[k] /= other.__dict__[k]
+        else:
+            for k in self.__dict__.keys():
+                self.__dict__[k] /= other
+
     def __repr__(self):
         s = ''
         s += 'mfpton = {:.2E} (ns)\n'.format(self.mfpton)
@@ -380,5 +396,5 @@ class Rates(object):
         if self.kon != 0:
             s += 'koff/kon = {:.2E} (M)\n'.format(self.koff/self.kon)
         s += 'kdeq = {:.2E} (M)\n'.format(self.kdeq)
-        s += 'g0eq = {:.2f} (kcal/mol)\n'.format(self.g0eq)
+        s += 'g0eq = {:.2f} (kcal/M)\n'.format(self.g0eq)
         return s
