@@ -193,7 +193,6 @@ def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
     occupancies
     centers
     """
-    center = np.array(llc + 0.5 * resolution * np.array(N))
     xrange = [llc[0] + resolution * x for x in range(0, N[0])]
     yrange = [llc[1] + resolution * x for x in range(0, N[1])]
     zrange = [llc[2] + resolution * x for x in range(0, N[2])]
@@ -211,8 +210,6 @@ def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
                        coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                        channelsigmas.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                        occus.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-                       center.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-                       ctypes.c_double(np.max(0.5 * np.array(N) * resolution)),  # max distance
                        ctypes.c_int(occus.shape[0]),  # n of centers
                        ctypes.c_int(coords.shape[0]),  # n of atoms
                        ctypes.c_int(nchannels))  # n of channels
