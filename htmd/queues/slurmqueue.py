@@ -9,7 +9,7 @@ import random
 import string
 import numpy as np
 from subprocess import check_output, CalledProcessError
-from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
+from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
 import logging
 logger = logging.getLogger(__name__)
@@ -64,23 +64,23 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     """
     def __init__(self):
         super().__init__()
-        self._cmdString('jobname', 'str', 'Job name (identifier)', None)
-        self._cmdString('partition', 'str', 'The queue (partition) to run on', None)
-        self._cmdString('priority', 'str', 'Job priority', 'gpu_priority')
-        self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
-        self._cmdValue('ncpu', 'int', 'Number of CPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
-        self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 1000, TYPE_INT, RANGE_0POS)
-        self._cmdValue('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.', None, TYPE_INT, RANGE_0POS)
-        self._cmdValue('walltime', 'int', 'Job timeout (s)', None, TYPE_INT, RANGE_POS)
-        self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
-        self._cmdString('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None)
-        self._cmdString('mailuser', 'str', 'User email address.', None)
-        self._cmdString('outputstream', 'str', 'Output stream.', 'slurm.%N.%j.out')
-        self._cmdString('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err')  # Maybe change these to job name
-        self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
-        self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
-        self._cmdList('nodelist', 'list', 'A list of nodes on which to run every job at the *same time*! Careful! The jobs will be duplicated!', None)
-        self._cmdList('exclude', 'list', 'A list of nodes on which *not* to run the jobs. Use this to select nodes on which to allow the jobs to run on.', None)
+        self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
+        self._arg('partition', 'str', 'The queue (partition) to run on', None, val.String())
+        self._arg('priority', 'str', 'Job priority', 'gpu_priority', val.String())
+        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', 1, val.Number(int, '0POS'))
+        self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', 1, val.Number(int, 'POS'))
+        self._arg('memory', 'int', 'Amount of memory per job (MB)', 1000, val.Number(int, 'POS'))
+        self._arg('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.', None, val.Number(int, '0POS'))
+        self._arg('walltime', 'int', 'Job timeout (s)', None, val.Number(int, 'POS'))
+        self._arg('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE', val.String())
+        self._arg('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None, val.String())
+        self._arg('mailuser', 'str', 'User email address.', None, val.String())
+        self._arg('outputstream', 'str', 'Output stream.', 'slurm.%N.%j.out', val.String())
+        self._arg('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err'), val.String()  # Maybe change these to job name
+        self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
+        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
+        self._arg('nodelist', 'list', 'A list of nodes on which to run every job at the *same time*! Careful! The jobs will be duplicated!', None, val.String(), nargs='*')
+        self._arg('exclude', 'list', 'A list of nodes on which *not* to run the jobs. Use this to select nodes on which to allow the jobs to run on.', None, val.String(), nargs='*')
 
         # Find executables
         self._qsubmit = SlurmQueue._find_binary('sbatch')

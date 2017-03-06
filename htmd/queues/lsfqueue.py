@@ -9,7 +9,7 @@ import random
 import string
 import numpy as np
 from subprocess import check_output, CalledProcessError
-from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
+from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
 import logging
 logger = logging.getLogger(__name__)
@@ -49,17 +49,17 @@ class LsfQueue(SimQueue, ProtocolInterface):
     """
     def __init__(self):
         super().__init__()
-        self._cmdString('jobname', 'str', 'Job name (identifier)', None)
-        self._cmdString('queue', 'str', 'The queue to run on', None)
-        self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
-        self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 4000, TYPE_INT, RANGE_0POS)
-        self._cmdValue('walltime', 'int', 'Job timeout (hour:min or min)', None, TYPE_INT, RANGE_POS)
-        self._cmdString('resources', 'str', 'Resources of the queue', None)
-        self._cmdList('environment', 'list', 'Things to run before the job (sourcing envs).', None)
-        self._cmdString('outputstream', 'str', 'Output stream.', 'lsf.%J.out')
-        self._cmdString('errorstream', 'str', 'Error stream.', 'lsf.%J.err')
-        self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
-        self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
+        self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
+        self._arg('queue', 'str', 'The queue to run on', None, val.String())
+        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', 1, val.Number(int, '0POS'))
+        self._arg('memory', 'int', 'Amount of memory per job (MB)', 4000, val.Number(int, '0POS'))
+        self._arg('walltime', 'int', 'Job timeout (hour:min or min)', None, val.Number(int, '0POS'))
+        self._arg('resources', 'str', 'Resources of the queue', None, val.String())
+        self._arg('environment', 'list', 'Things to run before the job (sourcing envs).', None, val.String(), nargs='*')
+        self._arg('outputstream', 'str', 'Output stream.', 'lsf.%J.out', val.String())
+        self._arg('errorstream', 'str', 'Error stream.', 'lsf.%J.err', val.String())
+        self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
+        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
 
         # Find executables
         self._qsubmit = LsfQueue._find_binary('bsub')

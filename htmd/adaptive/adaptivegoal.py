@@ -3,18 +3,10 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from glob import glob
 from os import path
-import os
-import numpy as np
-from sklearn.cluster import MiniBatchKMeans
-from htmd.util import _getNcpus
 from htmd.adaptive.adaptiverun import AdaptiveMD
-from htmd.simlist import simlist, simfilter
-from htmd.model import Model, macroAccumulate
-from htmd.projections.tica import TICA
-from htmd.projections.metric import Metric, _projectionGenerator
-from htmd.protocols.protocolinterface import TYPE_INT, RANGE_0POS, RANGE_POS, TYPE_FLOAT, RANGE_ANY
+from htmd.model import macroAccumulate
+from protocolinterface import val
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,8 +22,8 @@ class AdaptiveGoal(AdaptiveMD):
 
     Parameters
     ----------
-    app : :class:`App <htmd.apps.app.App>` object, default=None
-        An App class object used to retrieve and submit simulations
+    app : :class:`SimQueue <htmd.queues.simqueue.SimQueue>` object, default=None
+        A SimQueue class object used to retrieve and submit simulations
     project : str, default='adaptive'
         The name of the project
     nmin : int, default=1
@@ -66,7 +58,7 @@ class AdaptiveGoal(AdaptiveMD):
         A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
     truncation : str, default=None
         Method for truncating the prob distribution (None, 'cumsum', 'statecut'
-    statetype : str, default='micro'
+    statetype : ('micro', 'cluster', 'macro'), str, default='micro'
         What states (cluster, micro, macro) to use for calculations.
     macronum : int, default=8
         The number of macrostates to produce
@@ -88,12 +80,12 @@ class AdaptiveGoal(AdaptiveMD):
         Save the model generated
     goalfunction : function, default=None
         This function will be used to convert the goal-projected simulation data to a ranking whichcan be used for the directed component of FAST.
-    ucscale : float, default=1
-        Scaling factor for undirected component.
+    ucscale : float, default=0.5
+        Scaling factor for undirected component. Directed component scaling automatically calculated as (1-uscale)
     nosampledc : bool, default=False
         Spawn only from top DC conformations without sampling
     autoscale : bool, default=False
-        Automatically scales exploration and exploitation ratios depending on how stuck the adaptive is at a give goal score.
+        Automatically scales exploration and exploitation ratios depending on how stuck the adaptive is at a given goal score.
 
     Example
     -------
@@ -127,14 +119,14 @@ class AdaptiveGoal(AdaptiveMD):
 
     def __init__(self):
         super().__init__()
-        self._cmdFunction('goalfunction', 'function',
-                          'This function will be used to convert the goal-projected simulation data to a ranking which'
-                          'can be used for the directed component of FAST.', None)
-        self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component. Directed component scaling '
-                                           'automatically calculated as (1-uscale)', 0.5, TYPE_FLOAT, RANGE_ANY)
-        self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
-        self._cmdBoolean('autoscale', 'bool', 'Automatically scales exploration and exploitation ratios depending on '
-                                              'how stuck the adaptive is at a give goal score.', False)
+        self._arg('goalfunction', 'function',
+                  'This function will be used to convert the goal-projected simulation data to a ranking which'
+                  'can be used for the directed component of FAST.', None, val.Function())
+        self._arg('ucscale', 'float', 'Scaling factor for undirected component. Directed component scaling '
+                                       'automatically calculated as (1-uscale)', 0.5, val.Number(float, 'ANY'))
+        self._arg('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False, val.Boolean())
+        self._arg('autoscale', 'bool', 'Automatically scales exploration and exploitation ratios depending on '
+                                       'how stuck the adaptive is at a given goal score.', False, val.Boolean())
         self._debug = False
 
     def _algorithm(self):

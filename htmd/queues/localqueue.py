@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.queues.simqueue import SimQueue
-from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, RANGE_0POS
+from protocolinterface import ProtocolInterface, val
 import queue
 import threading
 from subprocess import check_output
@@ -42,13 +42,13 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
 
     def __init__(self):
         super().__init__()
-        self._cmdValue('ngpu', 'int', 'Number of GPU devices that the queue will use. Each simulation will be run on '
-                                      'a different GPU. The queue will use the first `ngpus` devices of the machine.',
-                       None, TYPE_INT, RANGE_0POS)
-        self._cmdList('devices', 'list', 'A list of GPU device indexes on which the queue is allowed to run '
-                                         'simulations. Mutually exclusive with `ngpus`', None)
-        self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
-        self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
+        self._arg('ngpu', 'int', 'Number of GPU devices that the queue will use. Each simulation will be run on '
+                                  'a different GPU. The queue will use the first `ngpus` devices of the machine.',
+                       None, val.Number(int, '0POS'))
+        self._arg('devices', 'list', 'A list of GPU device indexes on which the queue is allowed to run '
+                                     'simulations. Mutually exclusive with `ngpus`', None, val.Number(int, '0POS'), nargs='*')
+        self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
+        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
 
         self._states = dict()
         self._queue = None

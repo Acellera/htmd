@@ -9,7 +9,7 @@ import random
 import string
 import numpy as np
 from subprocess import check_output, CalledProcessError
-from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_FLOAT, TYPE_INT, RANGE_ANY, RANGE_0POS, RANGE_POS
+from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
 import logging
 logger = logging.getLogger(__name__)
@@ -57,17 +57,17 @@ class PBSQueue(SimQueue, ProtocolInterface):
     """
     def __init__(self):
         super().__init__()
-        self._cmdString('jobname', 'str', 'Job name (identifier)', None)
-        self._cmdString('queue', 'str', 'The queue to run on', None)
-        self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 0, TYPE_INT, RANGE_0POS)
-        self._cmdValue('ncpu', 'int', 'Number of CPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
-        self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 1000, TYPE_INT, RANGE_0POS)
-        self._cmdValue('walltime', 'int', 'Job timeout (s)', 3600, TYPE_INT, RANGE_POS)
-        self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
-        self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
-        self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
-        self._cmdString('cluster', 'str', 'Select nodes from a single specified cluster', None)
-        self._cmdValue('scratch_local', 'int', 'Local scratch in MB', None, TYPE_INT, RANGE_0POS)
+        self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
+        self._arg('queue', 'str', 'The queue to run on', None, val.String())
+        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', 0, val.Number(int, '0POS'))
+        self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', 1, val.Number(int, '0POS'))
+        self._arg('memory', 'int', 'Amount of memory per job (MB)', 1000, val.Number(int, '0POS'))
+        self._arg('walltime', 'int', 'Job timeout (s)', 3600, val.Number(int, 'POS'))
+        self._arg('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE', val.String())
+        self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
+        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
+        self._arg('cluster', 'str', 'Select nodes from a single specified cluster', None, val.String())
+        self._arg('scratch_local', 'int', 'Local scratch in MB', None, val.Number(int, '0POS'))
 
         # Find executables
         self._qsubmit = PBSQueue._find_binary('qsub')
