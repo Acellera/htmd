@@ -363,12 +363,13 @@ class MetricData:
         >>> data = MetricSelfDistance.project(sims, 'protein and name CA')
         >>> data.plotTrajSizes()
         """
-        trajLengths = self.trajLengths
+        trajLengths = self.trajLengths * self.fstep
         import matplotlib.pyplot as plt
         plt.ion()
-        plt.bar(range(len(trajLengths)), np.sort(trajLengths), color='b', edgecolor='b')
-        plt.ylabel('Length of trajectories (in frames)')
-        plt.xlabel('Trajectories')
+        _ = plt.hist(trajLengths)
+        #plt.bar(range(len(trajLengths)), np.sort(trajLengths), color='b', edgecolor='b')
+        plt.ylabel('Num trajectories')
+        plt.xlabel('Length of trajectories (in ns)')
         plt.show()
         return
     
