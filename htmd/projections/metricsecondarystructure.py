@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -64,7 +64,7 @@ class MetricSecondaryStructure(Projection):
         mol = mol.copy()
         mol.filter(self.sel, _logger=False)
 
-        residues = sequenceID((mol.resid, mol.chain, mol.insertion)) - 1  # Start at 0
+        residues = sequenceID((mol.resid, mol.chain, mol.insertion))
 
         backbone = mol.atomselect('backbone')
         ca_indices = np.where(mol.name == 'CA')[0].astype(np.int32)

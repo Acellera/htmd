@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -35,24 +35,27 @@ def compareVersions():
     f.close()
 
     currver = version()
-    if currver != 'unpackaged' and len(latestversions) == 2:  # Supporting users which still haven't passed the one day limit. Can remove in next
+    if currver != 'unpackaged':
         if _is_stable(currver):
-            latest = latestversions[0].strip()
+            pieces = latestversions[0].split()
+            latest = pieces[0].strip()
             verstring = 'stable'
         else:
-            latest = latestversions[1].strip()
+            pieces = latestversions[1].split()
+            latest = pieces[0].strip()
             verstring = 'devel'
-    elif len(latestversions) == 1:  # Supporting users which still haven't passed the one day limit. Can remove in next version
-        latest = latestversions[0].strip()
-        verstring = ''
+        pydeps = ''
+        if len(pieces) > 1:
+            pydeps = ' python[{}]'.format(pieces[1])
     elif currver == 'unpackaged':
         pass
     else:
         return
 
     if currver != 'unpackaged' and natsorted((latest, currver))[1] != currver:
-        print('New {} HTMD version ({}) is available. You are currently on ({}). Use \'conda update -c acellera htmd\' to '
-              'update to the new version.'.format(verstring, latest, currver))
+        print('New {} HTMD version ({}{}) is available. You are currently on ({}). Use \'conda update -c '
+              'acellera htmd\' to update to the new version. You might need to update your python version as well '
+              'if there is no release for your current version.'.format(verstring, latest, pydeps, currver))
     else:
         if currver != 'unpackaged':
             print('You are on the latest HTMD version ({}).'.format(currver))
@@ -72,19 +75,17 @@ def _writeLatestVersionFile(fname):
         return
     
     try:
-        stable, dev = _release_version('acellera', 'htmd')
+        stable, dev, stabledeps, devdeps = _release_version('acellera', 'htmd')
     except Exception as err:
         print("Failed at checking latest conda version. {}".format(err))
         f.close()
         return
-    
-    f.write('{}\n{}'.format(stable, dev))
+    f.write('{} {}\n{} {}'.format(stable, ','.join(stabledeps), dev, ','.join(devdeps)))
     os.utime(fname, None)
     f.close()
 
 
 def _release_version(user, package):
-    import requests
     from binstar_client.utils import get_server_api
 
     api = get_server_api()
@@ -101,7 +102,10 @@ def _release_version(user, package):
         if laststable and lastdev:
             break
 
-    return laststable, lastdev
+    stabledeps = _release_python_dep(package, laststable)
+    devdeps = _release_python_dep(package, lastdev)
+
+    return laststable, lastdev, stabledeps, devdeps
 
 
 def _is_stable(ver):
@@ -110,4 +114,25 @@ def _is_stable(ver):
         return True
     else:
         return False
+
+
+def _release_python_dep(package, version, opersys=None):
+    import platform
+    if opersys is None:
+        opersys = platform.system().lower()
+        if opersys == 'windows':
+            opersys = 'win'
+    try:
+        versions = []
+        for f in package['files']:
+            if f['version'] == version and f['attrs']['operatingsystem'].lower().startswith(opersys.lower()):
+                for d in f['dependencies']['depends']:
+                    if d['name'].lower() == 'python':
+                        versions.append(''.join(d['specs'][0]))
+        if len(versions):
+            return versions
+        else:
+            return ' does not exist for your platform. Please create an issue on HTMD git issue tracker.'
+    except:
+        return
 

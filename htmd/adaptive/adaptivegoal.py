@@ -1,10 +1,11 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
 from glob import glob
 from os import path
+import os
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
 from htmd.util import _getNcpus
@@ -73,7 +74,7 @@ class AdaptiveGoal(AdaptiveMD):
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
         The lagtime used to create the Markov model
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` class, default=<class 'htmd.clustering.kcenters.KCenter'>
         Clustering algorithm used to cluster the contacts or distances
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
@@ -91,6 +92,8 @@ class AdaptiveGoal(AdaptiveMD):
         Scaling factor for undirected component.
     nosampledc : bool, default=False
         Spawn only from top DC conformations without sampling
+    autoscale : bool, default=False
+        Automatically scales exploration and exploitation ratios depending on how stuck the adaptive is at a give goal score.
 
     Example
     -------
@@ -127,8 +130,11 @@ class AdaptiveGoal(AdaptiveMD):
         self._cmdFunction('goalfunction', 'function',
                           'This function will be used to convert the goal-projected simulation data to a ranking which'
                           'can be used for the directed component of FAST.', None)
-        self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component.', 1, TYPE_FLOAT, RANGE_ANY)
+        self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component. Directed component scaling '
+                                           'automatically calculated as (1-uscale)', 0.5, TYPE_FLOAT, RANGE_ANY)
         self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
+        self._cmdBoolean('autoscale', 'bool', 'Automatically scales exploration and exploitation ratios depending on '
+                                              'how stuck the adaptive is at a give goal score.', False)
         self._debug = False
 
     def _algorithm(self):
@@ -145,6 +151,11 @@ class AdaptiveGoal(AdaptiveMD):
             return True
 
         data = self._getData(sims)
+        if self.save:
+            if not path.exists('saveddata'):
+                os.makedirs('saveddata')
+            np.savetxt(path.join('saveddata', 'e{}_report.npy'.format(self._getEpoch())), [self._getEpoch(), data.numFrames, len(data.dat)])
+
         if not self._checkNFrames(data): return False
         goaldata = self._getGoalData(data.simlist)  # Using the simlist of data in case some trajectories were dropped
         if len(data.simlist) != len(goaldata.simlist):
@@ -164,30 +175,68 @@ class AdaptiveGoal(AdaptiveMD):
             uc = macroAccumulate(model, uc[model.cluster_ofmicro])
 
         # Calculating the directed component
-        dc = self._calculateDirectedComponent(goaldata, model.data.St, model.data.N)
+        dcmeans = dcstds = None
         if self.statetype == 'micro':
-            dc = dc[model.cluster_ofmicro]
-        if self.statetype == 'macro':
-            dc = macroAccumulate(model, dc[model.cluster_ofmicro])
+            dcmeans, dcstds = self._calculateDirectedComponent(goaldata, model.data.St, model.micro_ofcluster)
+        elif self.statetype == 'macro':
+            # TODO: Should we weigh by equilibrium population?
+            dcmeans, dcstds = self._calculateDirectedComponent(goaldata, model.data.St, model.macro_ofcluster)
 
+        ucunscaled = uc
+        dcunscaled = dcmeans
         uc = self._featScale(uc)
-        dc = self._featScale(dc)
-        logger.debug('Undirected component: {}'.format(uc))
-        logger.debug('Directed component: {}'.format(dc))
+        dc = self._featScale(dcmeans)
 
-        reward = dc + self.ucscale * uc
+        scale = self.ucscale
+        if self.autoscale:
+            scale = self._calculateScale(goaldata)
+        reward = scale * uc + (1 - scale) * dc
 
-        relFrames = self._getSpawnFrames(reward, self._model, data)
+        relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
+
+        if self.save:
+            if not path.exists('saveddata'):
+                os.makedirs('saveddata')
+            epoch = self._getEpoch()
+            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'ucscale': self.ucscale,
+                      'spawncounts': spawncounts, 'truncprob': truncprob, 'relFrames': relFrames, 'dcmeans': dcmeans,
+                      'dcstds': dcstds, 'reward': reward}
+            np.save(path.join('saveddata', 'e{}_goalreport.npy'.format(epoch)), tosave)
+            np.save(path.join('saveddata', 'e{}_spawnframes.npy'.format(epoch)), relFrames)
+            goaldata.save(path.join('saveddata', 'e{}_goaldata.dat'.format(epoch)))
+
         if self._debug: np.save('debug.npy', relFrames); return True
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
+    def _calculateScale(self, goaldata):
+        from htmd.adaptive.adaptive import epochSimIndexes
+        epochs = epochSimIndexes(goaldata.simlist)
+        epochmaxgoal = np.zeros(len(epochs))
+        totalmin = None
+        for e in sorted(epochs.keys()):
+            idx = epochs[e]
+            epochmaxgoal[e] = 0
+            for i in idx:
+                if goaldata.dat[i].max() > epochmaxgoal[e]:
+                    epochmaxgoal[e] = goaldata.dat[i].max()
+                if totalmin is None or goaldata.dat[i].min() < totalmin:
+                    totalmin = goaldata.dat[i].min()
+        epochmaxgoal = (epochmaxgoal - totalmin) / (epochmaxgoal.max() - totalmin)
+        dx = np.abs(np.diff(epochmaxgoal))
+        dxn = self._featScale(dx)
+        scale = 0.5
+        for d in dxn[::-1]:
+            if d < 0.1:
+                scale = max(1, scale+0.1)
+        return scale
+
     def _getSpawnFrames(self, reward, model, data):
-        (spawncounts, prob) = self._spawn(reward, self.nmax - self._running)
+        spawncounts, prob = self._spawn(reward, self.nmax - self._running)
         logger.debug('spawncounts {}'.format(spawncounts))
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=True)
-        return relFrames
+        return relFrames, spawncounts, prob
 
     def _featScale(self, feat):
         denom = np.max(feat) - np.min(feat)
@@ -199,17 +248,31 @@ class AdaptiveGoal(AdaptiveMD):
 
     def _getGoalData(self, sims):
         logger.debug('Starting projection of directed component')
-        metr = Metric(sims)
+        metr = Metric(sims, skip=self.skip)
         metr.set(self.goalfunction)
         data = metr.project()
         logger.debug('Finished calculating directed component')
         return data
 
-    def _calculateDirectedComponent(self, goaldata, St, N):
+    def _calculateDirectedComponent(self, goaldata, St, mapping=None):
+        import pandas as pd
         goalconcat = np.concatenate(goaldata.dat).flatten()
         stconcat = np.concatenate(St)
-        clustermeans = np.bincount(stconcat, goalconcat)
-        return clustermeans / N
+        if mapping is not None:
+            stconcat = mapping[stconcat]
+
+        x = pd.DataFrame({'a': stconcat})
+        indexes = x.groupby('a').groups
+
+        means = np.zeros(stconcat.max() + 1)
+        stds = np.zeros(stconcat.max() + 1)
+        for i in indexes:
+            if i == -1:  # Mappings have -1 on disconnected clusters (not used in the MSM)
+                continue
+            means[i] = np.mean(goalconcat[indexes[i]])
+            stds[i] = np.std(goalconcat[indexes[i]])
+
+        return means, stds
 
 
 if __name__ == '__main__':

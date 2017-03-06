@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -16,6 +16,7 @@ from htmd.projections.tica import TICA
 from htmd.projections.metric import Metric
 from htmd.protocols.protocolinterface import TYPE_INT, RANGE_0POS, RANGE_POS
 import logging
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
@@ -73,7 +74,7 @@ class AdaptiveMD(AdaptiveBase):
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
         The lagtime used to create the Markov model
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` object, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` class, default=<class 'htmd.clustering.kcenters.KCenter'>
         Clustering algorithm used to cluster the contacts or distances
     method : str, default='1/Mc'
         Criteria used for choosing from which state to respawn from
@@ -85,6 +86,7 @@ class AdaptiveMD(AdaptiveBase):
         Contact symmetry
     save : bool, default=False
         Save the model generated
+
 
     Example
     -------
@@ -101,6 +103,7 @@ class AdaptiveMD(AdaptiveBase):
 
     def __init__(self):
         from sklearn.base import ClusterMixin
+        from htmd.clustering.kcenters import KCenter
         from htmd.projections.projection import Projection
         super().__init__()
         self._cmdString('datapath', 'str', 'The directory in which the completed simulations are stored', 'data')
@@ -115,7 +118,7 @@ class AdaptiveMD(AdaptiveBase):
         self._cmdValue('macronum', 'int', 'The number of macrostates to produce', 8, TYPE_INT, RANGE_POS)
         self._cmdValue('skip', 'int', 'Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame', 1, TYPE_INT, RANGE_POS)
         self._cmdValue('lag', 'int', 'The lagtime used to create the Markov model', 1, TYPE_INT, RANGE_POS)
-        self._cmdClass('clustmethod', ':class:`ClusterMixin <sklearn.base.ClusterMixin>` class', 'Clustering algorithm used to cluster the contacts or distances', MiniBatchKMeans, ClusterMixin)
+        self._cmdClass('clustmethod', ':class:`ClusterMixin <sklearn.base.ClusterMixin>` class', 'Clustering algorithm used to cluster the contacts or distances', KCenter, ClusterMixin)
         self._cmdString('method', 'str', 'Criteria used for choosing from which state to respawn from', '1/Mc')
         self._cmdValue('ticalag', 'int', 'Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.', 20, TYPE_INT, RANGE_0POS)
         self._cmdValue('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3, TYPE_INT, RANGE_0POS)
@@ -170,7 +173,7 @@ class AdaptiveMD(AdaptiveBase):
         self._model = Model(data)
         self._model.markovModel(self.lag, self._numMacrostates(data))
         if self.save:
-            self._model.save('adapt_model_e{}.dat'.format(self._getEpoch()))
+            self._model.save(path.join('saveddata', 'e{}_adapt_model.dat'.format(self._getEpoch())))
 
     def _getSpawnFrames(self, model, data):
         p_i = self._criteria(model, self.method)
@@ -232,8 +235,10 @@ class AdaptiveMD(AdaptiveBase):
         return macronum
 
 
+@_Deprecated('1.3.2', 'htmd.adaptive.adaptiverun.AdaptiveMD')
 class AdaptiveRun(Adaptive):
-    """ Adaptive class which uses a Markov state model for respawning
+    """
+    Adaptive class which uses a Markov state model for respawning
 
     AdaptiveRun uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
     currently retrieved simulations on either contacts or distances, clusters those and then builds a Markov model using
@@ -310,7 +315,6 @@ class AdaptiveRun(Adaptive):
                  clustmethod=MiniBatchKMeans, method='1/Mc', ticadim=0, filtersel='not water'):
 
         super().__init__(app, project, nmin, nmax, nepochs, inputpath, generatorspath, dryrun, updateperiod)
-        logger.warning('AdaptiveRun will be deprecated. Please use AdaptiveMD for any future adaptive runs.')
         self.metrictype = metrictype
         self.datapath = datapath
         self.filteredpath = filteredpath

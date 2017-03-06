@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -32,6 +32,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         Number of CPUs to use for a single job
     memory : int, default=1000
         Amount of memory per job (MB)
+    gpumemory : int, default=None
+        Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.
     walltime : int, default=None
         Job timeout (s)
     environment : str, default='ACEMD_HOME,HTMD_LICENSE_FILE'
@@ -44,6 +46,14 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         Output stream.
     errorstream : str, default='slurm.%N.%j.err'
         Error stream.
+    datadir : str, default=None
+        The path in which to store completed trajectories.
+    trajext : str, default='xtc'
+        Extension of trajectory files. This is needed to copy them to datadir.
+    nodelist : list, default=None
+        A list of nodes on which to run every job at the *same time*! Careful! The jobs will be duplicated!
+    exclude : list
+        A list of nodes on which *not* to run the jobs. Use this to select nodes on which to allow the jobs to run on.
 
     Examples
     --------
@@ -60,6 +70,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdValue('ngpu', 'int', 'Number of GPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('ncpu', 'int', 'Number of CPUs to use for a single job', 1, TYPE_INT, RANGE_0POS)
         self._cmdValue('memory', 'int', 'Amount of memory per job (MB)', 1000, TYPE_INT, RANGE_0POS)
+        self._cmdValue('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.', None, TYPE_INT, RANGE_0POS)
         self._cmdValue('walltime', 'int', 'Job timeout (s)', None, TYPE_INT, RANGE_POS)
         self._cmdString('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE')
         self._cmdString('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None)
@@ -68,6 +79,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._cmdString('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err')  # Maybe change these to job name
         self._cmdString('datadir', 'str', 'The path in which to store completed trajectories.', None)
         self._cmdString('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc')
+        self._cmdList('nodelist', 'list', 'A list of nodes on which to run every job at the *same time*! Careful! The jobs will be duplicated!', None)
+        self._cmdList('exclude', 'list', 'A list of nodes on which *not* to run the jobs. Use this to select nodes on which to allow the jobs to run on.', None)
 
         # Find executables
         self._qsubmit = SlurmQueue._find_binary('sbatch')
@@ -88,6 +101,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         return ret
 
     def _createJobScript(self, fname, workdir, runsh):
+        from htmd.util import ensurelist
         workdir = os.path.abspath(workdir)
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n')
@@ -95,7 +109,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#SBATCH --job-name={}\n'.format(self.jobname))
             f.write('#SBATCH --partition={}\n'.format(self.partition))
             if self.ngpu != 0:
-                f.write('#SBATCH --gres=gpu:{}\n'.format(self.ngpu))
+                f.write('#SBATCH --gres=gpu:{}'.format(self.ngpu))
+                if self.gpumemory is not None:
+                    f.write(',gpu_mem:{}'.format(self.gpumemory))
+                f.write('\n')
             f.write('#SBATCH --cpus-per-task={}\n'.format(self.ncpu))
             f.write('#SBATCH --mem={}\n'.format(self.memory))
             f.write('#SBATCH --priority={}\n'.format(self.priority))
@@ -109,6 +126,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             if self.mailtype is not None and self.mailuser is not None:
                 f.write('#SBATCH --mail-type={}\n'.format(self.mailtype))
                 f.write('#SBATCH --mail-user={}\n'.format(self.mailuser))
+            if self.nodelist is not None:
+                f.write('#SBATCH --nodelist={}\n'.format(','.join(ensurelist(self.nodelist))))
+            if self.exclude is not None:
+                f.write('#SBATCH --exclude={}\n'.format(','.join(ensurelist(self.exclude))))
             # Trap kill signals to create sentinel file
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\ncd {}\n'.format(workdir))

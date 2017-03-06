@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -291,11 +291,13 @@ class Kinetics(object):
         # Make mode a radio button with interactive plot
         from pyemma import msm
         from pyemma.plots import plot_flux
+        from matplotlib import pylab as plt
         self._intergrityCheck()
 
+        plt.figure()
         if statetype == 'micro':
             tpt = msm.tpt(self.model.msm, [self.sourcemicro], [self.sinkmicro])
-            plot_flux(tpt, attribute_to_plot=mode)
+            fig, pos = plot_flux(tpt, attribute_to_plot=mode)
         elif statetype == 'macro' or statetype == 'coarse':
             metastable_sets = []
             for i in range(self.model.macronum):
@@ -312,7 +314,8 @@ class Kinetics(object):
                         setmap.append(idx2)
                         continue
             setmap = np.array(setmap)
-            plot_flux(tpt, attribute_to_plot=mode, state_labels=setmap)
+            fig, pos = plot_flux(tpt, attribute_to_plot=mode, state_labels=setmap)
+        fig.show()
 
         paths, pathfluxes = tpt.pathways(fraction=fraction)
         cumflux = 0
@@ -368,6 +371,22 @@ class Rates(object):
         if g0eq is None:
             self.g0eq = 0
 
+    def __add__(self, other):
+        if isinstance(other, Rates):
+            for k in self.__dict__.keys():
+                self.__dict__[k] += other.__dict__[k]
+        else:
+            for k in self.__dict__.keys():
+                self.__dict__[k] += other
+
+    def __truediv__(self, other):
+        if isinstance(other, Rates):
+            for k in self.__dict__.keys():
+                self.__dict__[k] /= other.__dict__[k]
+        else:
+            for k in self.__dict__.keys():
+                self.__dict__[k] /= other
+
     def __repr__(self):
         s = ''
         s += 'mfpton = {:.2E} (ns)\n'.format(self.mfpton)
@@ -377,5 +396,5 @@ class Rates(object):
         if self.kon != 0:
             s += 'koff/kon = {:.2E} (M)\n'.format(self.koff/self.kon)
         s += 'kdeq = {:.2E} (M)\n'.format(self.kdeq)
-        s += 'g0eq = {:.2f} (kcal/mol)\n'.format(self.g0eq)
+        s += 'g0eq = {:.2f} (kcal/M)\n'.format(self.g0eq)
         return s

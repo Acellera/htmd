@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -10,6 +10,7 @@ from htmd.molecule.support import xtc_lib
 from htmd.util import ensurelist
 import collections
 import logging
+import numbers
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,35 @@ def _deduce_PDB_atom_name(name, resname):
           and _Pair(resname, name) not in _exclude_pairs):
         return '{:<4}'.format(name)
     return ' {:<3}'.format(name)
+
+
+def _getPDBElement(name, element):
+    """
+    Given a PDB atom name of 4 characters (including spaces), get the element
+    """
+    import re
+    regH_old = re.compile('H.[123][123]') # Matches i.e. HE13
+    regH_inv = re.compile('[123]H')  # Matches i.e. 2H
+    element_backup = element.strip()
+    if not element.isalpha():
+        element = name[0:2].strip()
+        if element and element[0].isdigit():
+            if element_backup:
+                element = element_backup
+            else:
+                element = name[1]
+        if element and len(element) > 1 and element[1].isdigit():
+            if element_backup:
+                element = element_backup
+            else:
+                element = name[0]
+    if element:
+        element = element.strip()
+    if regH_old.match(name.strip()) or regH_inv.match(name.strip()):
+        element = 'H'
+    if len(element) == 2:
+        element = element[0] + element[1].lower()
+    return element
 
 
 def checkTruncations(mol):
@@ -325,17 +355,54 @@ def MOL2write(mol, filename):
     with open(filename, "w") as f:
         print("@<TRIPOS>MOLECULE", file=f)
         print("    MOL", file=f)
-        print("%5d %5d %5d %5d %5d" % (mol.numAtoms, mol.bonds.shape[0], 0, 0, 0), file=f)
+        unique_bonds = np.array([list(t) for t in set(map(tuple, [sorted(x) for x in mol.bonds]))])
+        print("%5d %5d %5d %5d %5d" % (mol.numAtoms, unique_bonds.shape[0], 0, 0, 0), file=f)
         print("SMALL\nUSER_CHARGES\n\n", file=f)
+        '''
+        @<TRIPOS>ATOM
+        Each data record associated with this RTI consists of a single data line. This
+        data line contains all the information necessary to reconstruct one atom
+        contained within the molecule. The atom ID numbers associated with the atoms
+        in the molecule will be assigned sequentially when the .mol2 file is read into
+        SYBYL.
+        Format:
+        atom_id atom_name x y z atom_type [subst_id [subst_name [charge [status_bit]]]]
+
+        • atom_id (integer) = the ID number of the atom at the time the file was
+        created. This is provided for reference only and is not used when the
+        .mol2 file is read into SYBYL.
+        • atom_name (string) = the name of the atom.
+        • x (real) = the x coordinate of the atom.
+        • y (real) = the y coordinate of the atom.
+        • z (real) = the z coordinate of the atom.
+        • atom_type (string) = the SYBYL atom type for the atom.
+        • subst_id (integer) = the ID number of the substructure containing the
+        atom.
+        • subst_name (string) = the name of the substructure containing the atom.
+        • charge (real) = the charge associated with the atom.
+        • status_bit (string) = the internal SYBYL status bits associated with the
+        atom. These should never be set by the user. Valid status bits are
+        DSPMOD, TYPECOL, CAP, BACKBONE, DICT, ESSENTIAL, WATER and
+        DIRECT.
+        '''
         print("@<TRIPOS>ATOM", file=f)
         for i in range(mol.coords.shape[0]):
-            print("%7d %-8s %9.4f %9.4f %9.4f %-8s  1 %-4s %12.6f" % (
-            i + 1, mol.name[i], mol.coords[i, 0, mol.frame], mol.coords[i, 1, mol.frame], mol.coords[i, 2, mol.frame],
-            mol.atomtype[i], "MOL", mol.charge[i]), file=f)
-
+            print('{:7d} {:8s} {:9.4f} {:9.4f} {:9.4f} {:8s} '.format(i + 1, mol.name[i], mol.coords[i, 0, mol.frame],
+                                                                      mol.coords[i, 1, mol.frame],
+                                                                      mol.coords[i, 2, mol.frame],
+                                                                      mol.element[i]),  # TODO: implement SYBYL atom types
+                  end='',
+                  file=f)
+            if isinstance(mol.resid[i], numbers.Integral):
+                print('{:3d} '.format(mol.resid[i]), end='', file=f)
+                if mol.resname[i] != '':
+                    print('{:4s} '.format(mol.resname[i]), end='', file=f)
+                    if isinstance(mol.charge[i], numbers.Real):
+                        print('{:12.6f}'.format(mol.charge[i]), end='', file=f)
+            print('', file=f)
         print("@<TRIPOS>BOND", file=f)
-        for i in range(mol.bonds.shape[0]):
-            print("%6d %4d %4d 1" % (i + 1, mol.bonds[i, 0] + 1, mol.bonds[i, 1] + 1), file=f)
+        for i in range(unique_bonds.shape[0]):
+            print("%6d %4d %4d un" % (i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1), file=f) # TODO: implement SYBYL bond types
         print("", file=f)
 
 

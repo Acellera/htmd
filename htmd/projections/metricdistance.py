@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -253,7 +253,7 @@ class MetricDistancePyemma(MetricPyemma):
 '''
 
 
-def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize=(7, 7), dpi=80, title=None, outfile=None):
+def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize=(7, 7), dpi=80, title=None, outfile=None, colors=None):
     """ Plots a given vector as a contact map
 
     Parameters
@@ -280,6 +280,7 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
     """
 
     from copy import deepcopy
+    from matplotlib import cm as colormaps
     if truecontacts is None:
         truecontacts = np.zeros(len(vector))
     if len(vector) != len(mapping):
@@ -306,28 +307,47 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
     uqAtomGroups.sort(key=lambda x: x[0])  # Sort by first atom in each atom list
     num = len(uqAtomGroups)
 
+    def vecToMatrix(vector, num):
+        matrix = np.zeros((num, num), dtype=bool)
+        mapping = np.ones((num, num), dtype=int) * -1
+        for i in range(len(vector)):
+            row = uqAtomGroups.index(atomIndexes[i][0])
+            col = uqAtomGroups.index(atomIndexes[i][1])
+            matrix[row, col] = vector[i]
+            mapping[row, col] = i
+            mapping[col, row] = i
+        matrix |= matrix.T
+        return matrix, mapping
+
     # Creating the 2D contact maps
-    cm = np.zeros((num, num), dtype=bool)
-    cmtrue = np.zeros((num, num), dtype=bool)
-    for i in range(len(vector)):
-        row = uqAtomGroups.index(atomIndexes[i][0])
-        col = uqAtomGroups.index(atomIndexes[i][1])
-        cm[row, col] = vector[i]
-        cmtrue[row, col] = truecontacts[i]
-    cm += cm.T
-    cmtrue += cmtrue.T
+    cm, mapping = vecToMatrix(vector, num)
+    cmtrue, _ = vecToMatrix(truecontacts, num)
 
     if plot:
         from matplotlib import pylab as plt
         f = plt.figure(figsize=figsize, dpi=dpi)
         plt.imshow(cmtrue / 2, interpolation='none', vmin=0, vmax=1, aspect='equal',
                    cmap='Greys')  # /2 to convert to gray from black
-        rows, cols = np.where(cm)
-        plt.scatter(rows, cols, s=figsize[0] * 5, marker='o', c='r', lw=0)
-        rows, cols = np.where(cm & cmtrue)
-        plt.scatter(rows, cols, s=figsize[0] * 5, marker='o', c='#ffff00', lw=0)
-        ax = f.axes[0]
 
+        rows, cols = np.where(cm)
+        colorbar = False
+        if colors is None:
+            truecms = vector & truecontacts
+            colors = np.array(['r']*len(vector), dtype=object)
+            colors[truecms] = '#ffff00'
+        elif isinstance(colors, np.ndarray) and isinstance(colors[0], float):
+            mpbl = colormaps.ScalarMappable(cmap=colormaps.jet)
+            mpbl.set_array(colors)
+            colors = mpbl.to_rgba(colors)
+            colorbar = True
+        if len(colors) == len(vector):
+            colors = colors[mapping[rows, cols]]
+
+        plt.scatter(rows, cols, s=figsize[0] * 5, marker='o', c=colors, lw=0)
+        if colorbar:
+            plt.colorbar(mpbl)
+
+        ax = f.axes[0]
         # Major ticks
         ax.set_xticks(np.arange(0, num, 1))
         ax.set_yticks(np.arange(0, num, 1))
@@ -390,6 +410,16 @@ if __name__ == "__main__":
                           23.08990097,  22.45937729,  18.47289085,  18.41271782,
                           20.87875175,  19.73318672,  15.1692543 ,  12.0577631 ], dtype=np.float32)
     assert np.all(np.abs(data[-1, -20:] - lastdists) < 0.001), 'Minimum distance calculation is broken'
+
+    metr = MetricDistance('protein and resid 1 to 50 and noh', 'protein and resid 1 to 50 and noh', groupsel1='residue', groupsel2='residue')
+    data = metr.project(mol)
+    dataref = np.load(path.join(home(), 'data', 'metricdistance', 'selfdist1.npy'))
+    assert np.all(np.abs(data - dataref) < 0.001), 'Manual self-distance is broken'
+
+    metr = MetricSelfDistance('protein and resid 1 to 50 and noh', groupsel='residue')
+    data = metr.project(mol)
+    dataref = np.load(path.join(home(), 'data', 'metricdistance', 'selfdist2.npy'))
+    assert np.all(np.abs(data - dataref) < 0.001), 'Automatic self-distance is broken'
 
     mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'), skip=10)
     data2 = metr.project(mol)

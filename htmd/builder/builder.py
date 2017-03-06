@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -9,6 +9,7 @@ from htmd.molecule.util import sequenceID
 import numpy as np
 import logging
 import string
+from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,12 @@ class DisulfideBridge(object):
         self.resid1 = resid1
         self.segid2 = segid2
         self.resid2 = resid2
+
+    def __str__(self):
+        return 'Disulfide bridge between (segid, resid) ({}, {}) and ({}, {})'.format(self.segid1, self.resid1, self.segid2, self.resid2)
+
+    def __repr__(self):
+        return self.__str__()
 
 
 def embed(mol1, mol2, gap=1.3):
@@ -82,10 +89,7 @@ def embed(mol1, mol2, gap=1.3):
 
 
 def detectDisulfideBonds(mol, thresh=3):
-    """ Detect disulfide bonds in a molecule
-
-    Automatically detects disulfide bonds and stores them in the Molecule.disubonds field. Returns the pairs of
-    atom indexes.
+    """ Automatically detects disulfide bonds in a molecule
 
     Parameters
     ----------
@@ -96,57 +100,68 @@ def detectDisulfideBonds(mol, thresh=3):
 
     Returns
     -------
-    pairs : np.ndarray
-        The pairs of atom indexes forming a disulfide bond
+    disubonds : np.ndarray
+        A list of :class:`DisulfideBridge <htmd.builder.builder.DisulfideBridge>` objects
     """
+    from scipy.spatial.distance import pdist, squareform
+    from scipy.sparse.csgraph import connected_components
+    import pandas as pd
     disubonds = []
 
-    idx = np.where(mol.atomselect('resname "CY.*" and name SG'))[0]
+    # Find all SG atoms belonging to resnames starting with CY
+    idx = np.where([(rn[0:2] == 'CY') and (n == 'SG') for rn, n in zip(mol.resname, mol.name)])[0] # 'resname "CY.*" and name SG'
     if len(idx) == 0:
             return disubonds
 
     # Used only for displaying nice messages
     if mol.chain is None:
-        chains = [''] * np.size(mol.serial, 0)
+        chains = [''] * len(idx)
     else:
-        chains = mol.chain
-    if mol.segid is None:
-        raise NameError('Cannot detect disulfide bonds without segment names defined.')
-        #segids = [''] * np.size(mol.serial, 0)
-    else:
-        segids = mol.segid
+        chains = mol.chain[idx]
+    segids = mol.segid[idx]
+    resids = mol.resid[idx]
+    serials = mol.serial[idx]
+    resnames = mol.resname[idx]
+    if np.any([len(s) == 0 for s in segids]):
+        raise RuntimeError('Cannot detect disulfide bonds without segment names defined.')
 
-    for sg in idx:
-        resid = mol.resid[sg]
-        segid = mol.segid[sg]
-        sel = '(not resid "{0}" or not segid "{1}") and resname "CY.*" and name SG and index > {2} and exwithin {3} of index {2}'.format(resid, segid, sg, thresh)
-        idx2 = np.where(mol.atomselect(sel))[0]
+    # Check that there is only one SG atom in the same resid/segid combo
+    df = pd.DataFrame({'segids': segids, 'resids': resids, 'indexes': idx})
+    groups = df.groupby(['resids','segids']).groups
+    for k in groups:
+        if len(df['indexes'][groups[k]].tolist()) != 1:
+            raise RuntimeError('Multiple SG atoms detected in segment {} resid {}. Can\'t guess disulfide bridges.'.format(k[1], k[0]))
 
-        if len(idx2) == 0:
-            continue
+    sd = squareform(pdist(mol.coords[idx, :, mol.frame]))
+    sd[np.diag_indices(sd.shape[0])] = thresh+1  # Set the diagonal over threshold
+    close = sd < thresh
+    rows, cols = np.where(close)
 
-        for sg2 in idx2:
-            disubonds.append(DisulfideBridge(mol.segid[sg], mol.resid[sg], mol.segid[sg2], mol.resid[sg2]))
+    numbonds = np.sum(close, axis=0)
+    if np.any(numbonds > 1):
+        pairs = [(s, r) for r, s in zip(resids[np.where(numbonds > 1)[0]], segids[np.where(numbonds > 1)[0]])]
+        raise RuntimeError('SG atoms with (segid, resid) pairs {} have multiple possible bonds. Cannot guess disulfide bonds. Please specify them manually.'.format(pairs))
 
+    uniquerowcols = list(set([tuple(sorted((r, c))) for r, c in zip(rows, cols)]))
+    for rc in uniquerowcols:
+        disubonds.append(DisulfideBridge(segids[rc[0]], resids[rc[0]], segids[rc[1]], resids[rc[1]]))
         msg = 'Bond between A: [serial {0} resid {1} resname {2} chain {3} segid {4}]\n' \
               '             B: [serial {5} resid {6} resname {7} chain {8} segid {9}]\n'.format(
-            mol.serial[sg], mol.resid[sg], mol.resname[sg], chains[sg], segids[sg],
-            mol.serial[sg2], mol.resid[sg2], mol.resname[sg2], chains[sg2], segids[sg2]
+            serials[rc[0]], resids[rc[0]], resnames[rc[0]], chains[rc[0]], segids[rc[0]],
+            serials[rc[1]], resids[rc[1]], resnames[rc[1]], chains[rc[1]], segids[rc[1]]
         )
-        # logger.info(msg)
         print(msg)
+        #logger.info(msg)
+
     if len(disubonds) == 1:
         logger.info('One disulfide bond was added')
     else:
         logger.info('{} disulfide bonds were added'.format(len(disubonds)))
-    return disubonds
+    return sorted(disubonds, key=lambda x: x.resid1)
 
 
-# TODO: Remove in upcoming versions
+@_Deprecated('1.0.8', 'htmd.builder.builder.autoSegment')
 def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
-    logger.warning('segmentgaps will be deprecated in next versions of HTMD. '
-                   'It is replaced by autoSegment to reflect the usage rather than the underlying method. '
-                   'Please change all usages.')
     return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
 
 
@@ -369,9 +384,9 @@ def removeAtomsInHull(mol1, mol2, hullsel, removesel):
 
     Parameters
     ----------
-    mol1 : Molecule
+    mol1 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         Molecule for which to calculate the convex hull
-    mol2 : Molecule
+    mol2 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         Molecule which contains the atoms which we check if they are within the hull
     hullsel : str
         Atomselection for atoms in mol1 from which to calculate the convex hull.
@@ -426,12 +441,18 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
     Parameters
     ----------
-    memb
-    xmin
-    ymin
-    xmax
-    ymax
-    buffer
+    memb : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The membrane to be tiled
+    xmin : float
+        Minimum x coordinate
+    ymin : float
+        Minimum y coordinate
+    xmax : float
+        Maximum x coordinate
+    ymax : float
+        Maximum y coordinate
+    buffer : float
+        Buffer distance between tiles
 
     Returns
     -------

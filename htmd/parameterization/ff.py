@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -190,15 +190,22 @@ class PRM:
             name = "%s-%s-%s-%s" % (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]])
             if not (name in output):
                 output[name] = 1
-                prm = self.dihedralParam(i.types[0], i.types[1], i.types[2], i.types[3])
+                prmx = self.dihedralParam(i.types[0], i.types[1], i.types[2], i.types[3])
+
+                # Prune prms that are zero
+                prm=list()
+                for pi in range(len(prmx)):
+                    p = prmx[pi]
+                    if p.k0 != 0.: prm.append(p)
+
                 for pi in range(len(prm)):
                     p = prm[pi]
                     sign = 1
-                    scee = p.e14
+                    scee = 1. / p.e14
                     scnb = 2.
                     if pi < (len(prm) - 1):
                         sign = -1
-                    print("%2s-%2s-%2s-%2s 1 %f %f %f %f %f" %
+                    print("%2s-%2s-%2s-%2s 1 %12.6f %12.6f %12.6f %12.6f %12.6f" %
                           (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]], p.k0, p.phi0, sign * p.n, scee,
                            scnb),
                           file=f)
@@ -215,7 +222,7 @@ class PRM:
                     p = prm[pi]
                     sign = 1
                     if p.k0 != 0.:
-                       print("%2s-%2s-%2s-%2s %f %f %f" %
+                       print("%2s-%2s-%2s-%2s     %f %f %f" %
                           (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]], p.k0, p.phi0, sign * p.n ), file=f)
 
 
@@ -353,7 +360,6 @@ class PRM:
                 r = []
                 # print(b)
                 for c in b:
-                    #   print(c)
                     c = deepcopy(c)
                     c.types[0] = n1
                     c.types[1] = n2

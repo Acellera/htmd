@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -10,43 +10,43 @@ import numpy.linalg as npla
 import numpy as np
 from optparse import OptionParser
 import sys
-
 import matplotlib
 matplotlib.use('Agg')
-
 from matplotlib import pylab as plt
 from htmd.molecule.util import maxDistance
 from htmd.parameterization.ffmolecule import FFMolecule
-from htmd.protocols.equilibration_v1 import Equilibration
+from htmd.protocols.equilibration_v2 import Equilibration
 
-# TODO: This needs to be completely refactored to match the new parameterization
 
 class Sample:
     def __init__(self, mol, rtf, prm, outdir, solvated):
         out = os.path.join(outdir, "equil")
         traj = os.path.join(out, "output.xtc")
+        ftraj = os.path.join(out, "filtered.xtc")
         pdb = os.path.join(out, "structure.pdb")
 
         if not os.access(traj, os.R_OK):
-            print("Preparing a running 50ns of MD")
+            print("Preparing a MD run of 50 ns:")
             self._prep_and_run(mol, rtf, prm, outdir, solvated)
 
         print("Analysing trajectory")
-        self._analyse(mol,  rtf, prm, pdb, traj)
+        self._analyse(mol, pdb, rtf, prm, traj, ftraj)
 
-    def _analyse(self, mol, rtf, prm, pdb, traj):
-        m = FFMolecule( filename=mol, rtf=rtf, prm=prm)
-        m.read(traj)
-        torsions = m.getSortTorsions()
-        print(torsions)
-        for i in range(len(torsions[0])):
-            # For each torsion, measure
-            title = torsions[1][i][0]
-            title = title + "-" + torsions[1][i][1]
-            title = title + "-" + torsions[1][i][2]
-            title = title + "-" + torsions[1][i][3]
-
-            (r, theta) = self._measure_torsion(torsions[0][i], m.coords)
+    def _analyse(self, mol, pdb, rtf, prm, traj, ftraj):
+        t = Molecule(pdb)
+        t.read(traj)
+        t.filter('not water')
+        t.write(ftraj)
+        m = FFMolecule(filename=mol, rtf=rtf, prm=prm)
+        m.read(ftraj)
+        torsions = m.getSoftTorsions()
+        # For each torsion
+        for i in range(len(torsions)):
+            # Create title
+            title = '{}-{}-{}-{}'.format(m.name[torsions[i][0]], m.name[torsions[i][1]], m.name[torsions[i][2]],
+                                         m.name[torsions[i][3]])
+            # Measure
+            (r, theta) = self._measure_torsion(torsions[i], m.coords)
 
             self._plot_scatter(r, theta, title)
             self._plot_hist(theta, title)
@@ -82,7 +82,7 @@ class Sample:
         rb = 1. / npla.norm(b)
         rc = 1. / npla.norm(c)
 
-        b = b * rb
+        b *= rb
 
         cos_phi = (np.dot(a, b)) * ra
         sin_phi = (np.dot(c, b)) * rc
@@ -112,7 +112,7 @@ class Sample:
 
         # area = np.ones(len(r)) * 10
         ax = plt.subplot(111)
-        # c = plt.hist(theta, (90), normed=1, alpha=0.75, range=[-180, 180])
+        plt.hist(theta, 90, normed=1, alpha=0.75, range=[-180, 180])
         plt.xlim(-180, 180)
         plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
         ax.set_title(title)
@@ -137,15 +137,13 @@ class Sample:
 
         build_dir = os.path.join(outdir, "build")
         equil_dir = os.path.join(outdir, "equil")
-        os.mkdir(build_dir, 0o700)
-        os.mkdir(equil_dir, 0o700)
 
         rtfs = ['top/top_water_ions.rtf', rtf]
         prms = ['par/par_water_ions.prm', prm]
         charmm.build(mol, topo=rtfs, param=prms, outdir=build_dir, ionize=ionize)
         md = Equilibration()
-        md.numsteps = 50 * 1000000 / 4  # 50ns simulation
-        md.box = [-d, -d, -d, d, d, d]
+        md.runtime = 50
+        md.timeunits = 'ns'
         md.temperature = 300
         md.write(build_dir, equil_dir)
         mdx = AcemdLocal()
@@ -159,8 +157,9 @@ def sample_main():
                       help="Molecule in mol2 or PDB format")
     parser.add_option("-r", "--rtf", action="store", dest="rtf", default="mol.rtf", help="RTF parameter file")
     parser.add_option("-p", "--prm", action="store", dest="prm", default="mol.prm", help="PRM parameter file")
-    parser.add_option("-o", "--out", action="store", dest="out", default=".", help="Output directory")
+    parser.add_option("-o", "--out", action="store", dest="out", default="./", help="Output directory")
     #   parser.add_option( "-s", action="store_true", dest="solvated", default=False, help="Solvate model" )
+    # TODO: the non-solvated run needs more work than just changing solvation (vacuum simulation MD parameters)
 
     options, args = parser.parse_args()
     testfile(options.mol)

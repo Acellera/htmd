@@ -12,5 +12,5 @@ Contents:
     System building protein-ligand <tutorials/system-building-protein-ligand>
     System building protein in Membrane <tutorials/system-building-protein-in-membrane>
     Molecular Dynamics in HTMD <tutorials/md-protocols>
-    Adaptive Sampling Basics <tutorials/adaptive-sampling-basics>
     Adaptive Sampling <tutorials/adaptive-sampling>
+    Projections <tutorials/projections>

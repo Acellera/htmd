@@ -1,10 +1,10 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
 from htmd.home import home
-from ctypes import *
+import ctypes as ct
 import os
 import platform
 
@@ -17,13 +17,13 @@ def licenseEntitlements():
         return dict()
 
     if platform.system() == "Windows":
-        cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
+        ct.cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
         if os.path.exists(os.path.join(libdir, "psprolib.dll")):
-            cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
+            ct.cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
 
-    lib = cdll.LoadLibrary(os.path.join(libdir, "liblicense.so"))
-    arg1 = create_string_buffer(2048)
-    arg2 = c_int(2048)
+    lib = ct.cdll.LoadLibrary(os.path.join(libdir, "liblicense.so"))
+    arg1 = ct.create_string_buffer(2048)
+    arg2 = ct.c_int(2048)
     lib.license_check(arg1, arg2)
     val = (arg1.value.decode("utf-8")).split(":")
 

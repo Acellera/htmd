@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -48,6 +48,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.ifconfig',
     'sphinx.ext.napoleon',
+    'sphinxarg.ext'
 ]
 
 # "'sphinx.ext.viewcode'," was removed to avoid showing code

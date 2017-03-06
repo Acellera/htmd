@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -8,10 +8,11 @@ from htmd.home import home
 from htmd.session import htmdsave, htmdload
 from htmd.simlist import simlist, simfilter, simmerge
 from htmd.metricdata import MetricData
-from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance
+from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance, reconstructContactMap
 from htmd.projections.metricrmsd import MetricRmsd
+from htmd.projections.metricfluctuation import MetricFluctuation
 from htmd.projections.metriccoordinate import MetricCoordinate
-from htmd.projections.metricdihedral import MetricDihedral
+from htmd.projections.metricdihedral import MetricDihedral, Dihedral
 from htmd.projections.metricshell import MetricShell
 from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
 from htmd.projections.metricsasa import MetricSasa
@@ -45,12 +46,15 @@ from htmd.dock import dock
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.util import tempname
+from htmd.util import testDHFR
 from htmd.config import config
 from htmd.clustering.kcenters import KCenter
 from htmd.clustering.regular import RegCluster
 from htmd.queues.localqueue import LocalGPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
+from htmd.queues.pbsqueue import PBSQueue
+from htmd.vmdgraphics import VMDConvexHull, VMDBox
 import logging.config
 import htmd
 

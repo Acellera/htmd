@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -68,7 +68,7 @@ class FFType:
             pass
 
         elif method == FFTypeMethod.CGenFF_2b6:
-            match_binary = shutil.which("match")
+            match_binary = shutil.which("match-typer")
             if not match_binary:
                 raise RuntimeError("match executable not found")
 

@@ -1,43 +1,25 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
 import os
 import argparse
-from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
-from htmd.parameterization.fftype import FFTypeMethod
-from htmd.qm.qmcalculation import Theory, BasisSet, Execution, Code
 import sys
-import numpy as np
-import math
 
 
-def printEnergies(mol):
-    print("\n == Diagnostic Energies == ")
-    ffe = FFEvaluate(mol)
-    energies = ffe.evaluate(mol.coords[:, :, 0])
-    print("")
-    print(" Bond     : %f" % (energies['bond']))
-    print(" Angle    : %f" % (energies['angle']))
-    print(" Dihedral : %f" % (energies['dihedral']))
-    print(" Improper : %f" % (energies['improper']))
-    print(" Electro  : %f" % (energies['elec']))
-    print(" VdW      : %f" % (energies['vdw']))
-    print("")
-
-
-def main_parameterize():
+def cli_parser():
     ncpus = os.cpu_count()
     try:
         ncpus = int(os.getenv("NCPUS"))
     except:
         pass
 
-    parser = argparse.ArgumentParser(description="Acellera Small Molecule Parameterisation Version 2.0")
+    parser = argparse.ArgumentParser(description="Acellera Small Molecule Parameterization Tool")
     parser.add_argument("-m", "--mol2", help="Molecule to parameterise, in mol2 format", required=True, type=str,
                         default=None, metavar="<input.mol2>", action="store", dest="mol")
-    parser.add_argument("-l", "--list", "--list-torsions", help="List parameterisable torsions", action="store_true", default=False,
+    parser.add_argument("-l", "--list", "--list-torsions", help="List parameterisable torsions", action="store_true",
+                        default=False,
                         dest="list")
     parser.add_argument("-c", "--charge", help="Net charge on molecule (default: sum of the partial charges on the "
                                                ".mol2 file)", type=int, default=None, action="store", dest="charge")
@@ -71,10 +53,32 @@ def main_parameterize():
     parser.add_argument("--freeze-charge", metavar="A1",
                         help="Freeze the charge of the named atom (default: %(default)s)", action="append",
                         default=None, dest="freezeq")
-    parser.add_argument("--no-geomopt", help="Do not perform QM geometry optimisation when fitting torsions(default: False)", action="store_false",
-                        dest="geomopt", default=True)
+    parser.add_argument("--no-geomopt", help="Do not perform QM geometry optimisation when fitting torsions (default: "
+                                             "%(default)s)", action="store_false", dest="geomopt", default=True)
+    return parser
 
-    args = parser.parse_args()
+
+def main_parameterize():
+    args = cli_parser().parse_args()
+
+    from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
+    from htmd.parameterization.fftype import FFTypeMethod
+    from htmd.qm.qmcalculation import Theory, BasisSet, Execution, Code
+    import numpy as np
+    import math
+
+    def printEnergies(m):
+        print("\n == Diagnostic Energies == ")
+        ffe = FFEvaluate(m)
+        energies = ffe.evaluate(m.coords[:, :, 0])
+        print("")
+        print(" Bond     : %f" % (energies['bond']))
+        print(" Angle    : %f" % (energies['angle']))
+        print(" Dihedral : %f" % (energies['dihedral']))
+        print(" Improper : %f" % (energies['improper']))
+        print(" Electro  : %f" % (energies['elec']))
+        print(" VdW      : %f" % (energies['vdw']))
+        print("")
 
     # Communicate the # of CPUs to use to the QM engine via environment variable
     os.environ['NCPUS'] = str(args.ncpus)
@@ -149,7 +153,7 @@ def main_parameterize():
                          outdir=args.outdir)
         dihedrals = mol.getSoftTorsions()
         print("Detected soft torsions:")
-        fh=open("torsions.txt", "w")
+        fh = open("torsions.txt", "w")
         for d in dihedrals:
             print("\t{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
             print("{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]), file=fh)
@@ -164,7 +168,7 @@ def main_parameterize():
     print("\n === Parameterizing {} ===\n".format(filename))
     for method in methods:
         sys.stdout.flush()
-        print(" === Fitting for FF %s ===\n" % (method.name))
+        print(" === Fitting for FF %s ===\n" % method.name)
 
         mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
                          basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code,
@@ -237,9 +241,10 @@ def main_parameterize():
                     if args.torsion == 'all' or name in args.torsion.split(','):
                         print("\n == Fitting torsion {} ==\n".format(name))
                         try:
-                            ret = mol.fitSoftTorsion(d, geomopt=args.geomopt )
+                            ret = mol.fitSoftTorsion(d, geomopt=args.geomopt)
                             rets.append(ret)
-                            if( iteration==1 ) : ref_mm[name] = ret;
+                            if iteration == 1:
+                                ref_mm[name] = ret
                             rating = "GOOD"
                             if ret.chisq > 10:
                                 rating = "CHECK"
@@ -248,8 +253,8 @@ def main_parameterize():
                             print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
                             sys.stdout.flush()
                             scores[idx] = ret.chisq
-                            # Alwaysuse th mm_orig from first iteration (unmodified)
-                            ret.mm_original = ref_mm[name].mm_original;
+                            # Always use the mm_orig from first iteration (unmodified)
+                            ret.mm_original = ref_mm[name].mm_original
                             fn = mol.plotTorsionFit(ret, show=False)
                         except Exception as e:
                             print("Error in fitting")
@@ -264,11 +269,12 @@ def main_parameterize():
                     converged = True
                     for j in range(len(scores)):
                         # Check convergence
-                        try:   
-                           relerr = (scores[j] - last_scores[j]) / last_scores[j]
+                        try:
+                            relerr = (scores[j] - last_scores[j]) / last_scores[j]
                         except:
-                           relerr = 0.
-                        if math.isnan(relerr): relerr=0.;
+                            relerr = 0.
+                        if math.isnan(relerr):
+                            relerr = 0.
                         convstr = "- converged"
                         if math.fabs(relerr) > 1.e-2:
                             convstr = ""
@@ -278,9 +284,9 @@ def main_parameterize():
                 iteration += 1
 
             print(" Fitting converged at iteration %d" % (iteration - 1))
-            if( len(rets) ):
-               fit = mol.plotConformerEnergies(rets, show=False)
-               print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
+            if len(rets):
+                fit = mol.plotConformerEnergies(rets, show=False)
+                print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
 
         printEnergies(mol)
 

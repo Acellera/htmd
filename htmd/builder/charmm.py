@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -585,7 +585,7 @@ def _protonationPatches(mol):
     # TODO: Remember to alias all of them before applying patches
     patches = []
 
-    for pro in protonations:
+    for pro in sorted(protonations.keys()):
         pseg = mol.get('segid', sel='resname {} and name CA'.format(pro))
         pres = mol.get('resid', sel='resname {} and name CA'.format(pro))
         if len(pseg) == 0:
@@ -795,9 +795,9 @@ def split(filename, outdir):
     f.close()
 
     if rtfsection > 1:
-        logger.warning('Multiple ({}) rtf topology sections found in {} stream file.'.format(rtfsection, filename))
+        raise BuildError('Multiple ({}) rtf topology sections found in {} stream file.'.format(rtfsection, filename))
     if prmsection > 1:
-        logger.warning('Multiple ({}) prm parameter sections found in {} stream file.'.format(prmsection, filename))
+        raise BuildError('Multiple ({}) prm parameter sections found in {} stream file.'.format(prmsection, filename))
 
     f = open(outrtf, 'w')
     f.write(rtfstr + 'END\n')

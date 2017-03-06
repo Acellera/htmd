@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -423,6 +423,51 @@ class Adaptive(object):
     @abc.abstractmethod
     def _algorithm(self):
         return
+
+
+def epochSimIndexes(simlist):
+    """ Finds the simulation indexes for each epoch.
+
+    Creates a dictionary with the epoch number as key and values the simlist indexes of the simulations corresponding to
+    the given epoch.
+
+    Parameters
+    ----------
+    simlist : list
+        A simulation list created using the :func:`simlist <htmd.simlist.simlist>` function
+
+    Returns
+    -------
+
+    """
+    epochidx = {}
+    for i, sl in enumerate(simlist):
+        simepoch = getEpochFromName(sl.trajectory[0])
+        if simepoch not in epochidx:
+            epochidx[simepoch] = []
+        epochidx[simepoch].append(i)
+    return epochidx
+
+
+def getEpochFromName(name):
+    """ Given a adaptive simulation name, tells you which epoch it belongs to.
+
+    Parameters
+    ----------
+    name : str
+        Simulation name
+
+    Returns
+    -------
+    epoch : int
+        The epoch
+    """
+    import re
+    reg = re.compile('/e(\d+)s\d+_')
+    matches = reg.findall(name)
+    if len(matches) == 0:
+        raise RuntimeError('{} is not an adaptive trajectory'.format(name))
+    return int(matches[0])
 
 
 def reconstructAdaptiveTraj(simlist, trajID):

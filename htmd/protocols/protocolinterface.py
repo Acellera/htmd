@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -122,6 +122,22 @@ class ProtocolInterface:
 
         cmd = self._commands[key]
         return cmd.validate(value, basedir=basedir)
+
+    def _toArgParse(self, description, parser=None):
+        import argparse
+        if parser is None:
+            parser = argparse.ArgumentParser(description=description)
+
+        sortedkeys = [x[0] for x in sorted(self._commandsOrder.items(), key=lambda x: x[1])]
+        for k in sortedkeys:
+            parser.add_argument('--{}'.format(k), help=self._commands[k].descr, default=self._commands[k].default)
+
+        return parser
+
+    def _fromArgParse(self, args):
+        argsdict = vars(args)
+        for k in argsdict:
+            self.__dict__[k] = argsdict[k]
 
 
 '''class ProtocolInterface(CommandInterface, metaclass=abc.ABCMeta):

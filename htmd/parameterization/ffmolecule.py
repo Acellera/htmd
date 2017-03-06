@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -10,11 +10,12 @@ from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
-from htmd.qm.qmcalculation import *
+from htmd.qm.qmcalculation import Theory, BasisSet, Code, QMCalculation, Execution
 from htmd.parameterization.phi import setPhi, getPhi
 from htmd.progress.progress import ProgressBar
 import re
 import math
+from math import cos
 import os
 import scipy.optimize as optimize
 import numpy as np
@@ -473,7 +474,7 @@ class FFMolecule(Molecule):
 
         for t in param:
             t.k0 = t.phi0 = 0.
-            t.e14 = 1.  # Always fit with e14 scaling of 1. per CHARMM
+            #t.e14 = 1.  # Use whatever e14 has been inherited for the type
         self._prm.updateDihedral(param)
 
         ffe = FFEvaluate(self)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -21,7 +21,7 @@ except:
 import time
 import os
 import sys
-from htmd.molecule.support import *
+from htmd.molecule.support import string_to_tempfile
 import numpy as np
 import tempfile
 
@@ -42,14 +42,16 @@ class VMD:
     """ Please do not directly call this class constructor. Use the `viewer` or `getCurrentViewer` function instead.
     """
 
-    def __init__(self, vmd=None, host=None):
+    def __init__(self, vmd=None, host=None, dispdev='win'):
         self.done = 0
         vmd = getVMDpath(vmd=vmd)
 
         args = [vmd]
-        if (host):
-            args.append("--host")
+        if host:
+            args.append('--host')
             args.append(host)
+        args.append('--dispdev')
+        args.append(dispdev)
         self.vmd = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, close_fds=True,
                                     shell=False)
         self.queue = queue.Queue()
@@ -158,6 +160,66 @@ class VMD:
     def copy(self):
         return None
 
+    def render(self, outfile, renderer='TachyonInternal', resolution=(1920, 1080), aasamples=36, skylight=1, tachyon=None, convert=None, trim=False):
+        """ Renders the current VMD scene into a file.
+
+        Parameters
+        ----------
+        outfile : str
+            File to which to render image
+        renderer : ('TachyonInternal', 'tachyon', 'snapshot')
+            Which renderer to use
+        resolution : tuple
+            X,Y resolution of the output image
+        aasamples : int
+            Number of anti-aliasing samples
+        skylight : float
+            Add a skylight
+        tachyon : str
+            Path to tachyon renderer executable
+        convert : bool
+            Attempts to convert the image to the datatype of the `outfile` extension
+        trim : bool
+            Trims the whitespace of the image
+        """
+        import shutil
+        outfile = os.path.abspath(outfile)
+        outname, ext = os.path.splitext(outfile)
+
+        if renderer == 'tachyon':
+            tmpext = '.psd'
+            if tachyon is None:
+                tachyon = shutil.which('tachyon', mode=os.X_OK)
+            if tachyon is None:
+                raise FileNotFoundError("Could not find `tachyon` executable, or no execute permissions are given. Try using renderer='snapshot' instead.")
+            rendercommand = 'render Tachyon {}'.format(outname)
+        elif renderer == 'snapshot':
+            tmpext = '.tga'
+            rendercommand = 'render snapshot {}{}'.format(outname, tmpext)
+        elif renderer == 'TachyonInternal':
+            tmpext = '.tga'
+            rendercommand = 'render TachyonInternal {}{}'.format(outname, tmpext)
+
+        self.send(rendercommand)
+        if renderer == 'tachyon':
+            os.system('{tachyon} -res {resx} {resy} -aasamples {aa} -add_skylight {sl} {out} -format PSD48 -o {out}.psd'.format(tachyon=tachyon, resx=resolution[0], resy=resolution[1], aa=aasamples, sl=skylight, out=outname))
+        print(rendercommand)
+        if not os.path.exists(outname+tmpext):
+            raise RuntimeError('Rendering failed to produce image with following command: {}'.format(rendercommand))
+        if os.path.exists(outname):
+            os.remove(outname)
+
+        if ext != tmpext:
+            if convert is None:
+                convert = shutil.which('convert', mode=os.X_OK)
+            if convert is None:
+                raise FileNotFoundError('Could not find `convert` executable, or no execute permissions are given. You can find the temporary render file in {}'.format(outname + tmpext))
+
+            os.system('{convert} {outname}{tmpext} {outname}{ext}'.format(convert=convert, tmpext=tmpext, outname=outname, ext=ext))
+            if trim:
+                os.system('{convert} {outname}{ext} -trim {outname}{ext}'.format(convert=convert, outname=outname, ext=ext))
+            os.remove(outname+tmpext)
+
 
 def getVMDpath(vmd=None):
     sys = platform.system()
@@ -173,7 +235,7 @@ def getVMDpath(vmd=None):
     return vmd
 
 
-def getCurrentViewer():
+def getCurrentViewer(dispdev='win'):
     """ Get the handle to the current molecular viewer
 
     Returns
@@ -190,11 +252,11 @@ def getCurrentViewer():
     _viewers = np.delete(_viewers, todrop)
     # Creating a new viewer if none exist or otherwise returning the last viewer
     if len(_viewers) == 0:
-        _viewers = np.append(_viewers, VMD())
+        _viewers = np.append(_viewers, VMD(dispdev=dispdev))
     return _viewers[-1]
 
 
-def viewer():
+def viewer(dispdev='win'):
     """ Start a new molecular viewer
 
     Returns
@@ -210,7 +272,7 @@ def viewer():
             todrop = np.append(todrop, i)
     _viewers = np.delete(_viewers, todrop)
     # Creating a new viewer
-    _viewers = np.append(_viewers, VMD())
+    _viewers = np.append(_viewers, VMD(dispdev=dispdev))
     print(_viewers)
 
 

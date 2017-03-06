@@ -1,5 +1,5 @@
 """"""
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -14,6 +14,7 @@ from htmd.projections.projection import Projection
 from joblib import Parallel, delayed
 from htmd.parallelprogress import ParallelExecutor
 import logging
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
@@ -62,10 +63,8 @@ class Metric:
         self.projectionlist = []
         self.metricdata = metricdata
 
+    @_Deprecated('1.3.2', 'htmd.projections.metric.Metric.set')
     def projection(self, metric):
-        """ Deprecated
-        """
-        logger.warning('Projection method is deprecated. Use the .set() method of Metric instead.')
         self.projectionlist.append(metric)
 
     def set(self, projection):

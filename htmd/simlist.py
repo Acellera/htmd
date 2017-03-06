@@ -3,7 +3,7 @@ HTMD can handle a large amount of simulations.
 Simulation lists allow to create a simple list containing all relevant information about the simulations to later
 perform any type of analysis.
 """
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -44,7 +44,6 @@ class Frame(object):
         return 'sim = {}\npiece = {}\nframe = {}'.format(self.sim, self.piece, self.frame)
 
 
-
 class Sim(object):
     """ Information class for a single simulation.
 
@@ -62,23 +61,33 @@ class Sim(object):
         The parent of the simulations
     input : str
         The path to the input folder which generated this simulation
+    trajectory : list
+        A list of trajectory files
     molfile : str
         The path to the structural information about the simulation. Usually a PDB file
+    numframes : list
+        Number of frames in trajectories
     """
     # __slots__ = ['simid', 'parent', 'input', 'trajectory', 'molfile']
 
-    def __init__(self, simid, parent, input, trajectory, molfile):
+    def __init__(self, simid, parent, input, trajectory, molfile, numframes=None):
         self.simid = simid
         self.parent = parent
         self.input = input
         self.trajectory = trajectory
         self.molfile = molfile
+        self.numframes = numframes
 
     def __repr__(self):
-        if self.parent is None:
-            return 'simid = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}'.format(self.simid, self.parent, self.input, self.trajectory, self.molfile)
-        else:
-            return 'simid = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}'.format(self.simid, self.parent.simid, self.input, self.trajectory, self.molfile)
+        parent = self.parent
+        if self.parent is not None:
+            parent = self.parent.simid
+        return 'simid = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}\nnumframes = {}'.format(self.simid,
+                                                                                                         parent,
+                                                                                                         self.input,
+                                                                                                         self.trajectory,
+                                                                                                         self.molfile,
+                                                                                                         self.numframes)
 
     def __eq__(self, other):
         iseq = True
@@ -182,7 +191,8 @@ def simlist(datafolders, molfiles, inputfolders=None):
                 raise FileNotFoundError('Did not find input with folder name ' + k + ' in the given glob')
             inputf = inputnames[k]
 
-        sims.append(Sim(simid=i, parent=None, input=inputf, trajectory=trajectories, molfile=molfile))
+        numframes = [_readNumFrames(f) for f in trajectories]
+        sims.append(Sim(simid=i, parent=None, input=inputf, trajectory=trajectories, molfile=molfile, numframes=numframes))
         i += 1
         bar.progress()
     bar.stop()
@@ -271,7 +281,8 @@ def _filtSim(i, sims, outFolder, filterSel):
     (traj, outtraj) = _renameSims(sims[i].trajectory, name, outFolder)
     if not traj:
         ftrajectory = _listTrajectories(path.join(outFolder, name))
-        return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
+        numframes = _getNumFrames(sims[i], ftrajectory)
+        return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile, numframes=numframes)
 
     try:
         mol = Molecule(sims[i].molfile)
@@ -291,8 +302,29 @@ def _filtSim(i, sims, outFolder, filterSel):
         mol.write(outtraj[j], sel)
 
     ftrajectory = _listTrajectories(path.join(outFolder, name))
-    #bar.progress()
-    return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile)
+    numframes = _getNumFrames(sims[i], ftrajectory)
+    return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile, numframes=numframes)
+
+
+def _getNumFrames(sim, trajectories):
+    if trajectories is None:
+        return None
+    numframes = sim.numframes
+    if numframes is None or np.any([f is None for f in sim.numframes]):
+        numframes = [_readNumFrames(f) for f in trajectories]
+    return numframes
+
+
+def _readNumFrames(filepath):
+    filepath = os.path.abspath(filepath)
+    filedir = os.path.dirname(filepath)
+    basename = os.path.basename(filepath)
+    numframefile = os.path.join(filedir, '.{}.numframes'.format(basename))
+    numframes = None
+    if os.path.exists(numframefile):
+        with open(numframefile, 'r') as f:
+            numframes = int(f.readline())
+    return numframes
 
 
 def _renameSims(trajectory, simname, outfolder):

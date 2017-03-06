@@ -1,14 +1,45 @@
 #!/usr/bin/env bash
 
+function usage()
+{
+    echo "VMD wrapper"
+    echo ""
+    echo "./vmd_wrapper"
+    echo "\t-h --help"
+    echo "\t--host VALUE"
+    echo "\t--dispdev VALUE"
+    echo ""
+}
 
 SSH=""
-if [ "$1" == "--host" ]; then
-	SSH="/usr/bin/ssh $2 -oTCPKeepAlive=True -oSendEnv=True"
-	shift
-	shift
-	exec $SSH $(readlink -f "$0")  $* 
-	exit 0
-fi
+DISPDEV="win"
+while [ "$1" != "" ]; do
+    PARAM=$1
+    VALUE=$2
+    case $PARAM in
+        -h | --help)
+            usage
+            exit
+            ;;
+        --host)
+            SSH="/usr/bin/ssh $2 -oTCPKeepAlive=True -oSendEnv=True"
+	        shift
+	        shift
+            exec $SSH $(readlink -f "$0")  $*
+            exit 0
+            ;;
+        --dispdev)
+            DISPDEV=$VALUE
+            ;;
+        *)
+            echo "ERROR: unknown parameter \"$PARAM\""
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+    shift
+done
 
 
 if [ ! -d "$VMD_PATH" ]; then
@@ -47,7 +78,7 @@ fi
 export LD_LIBRARY_PATH="$VMD_PATH:$LD_LIBRARY_PATH"
 export VMDDIR="$VMD_PATH"
 export MASTERVMDDIR="$VMD_PATH"
-export VMDDISPLAYDEVICE=win
+export VMDDISPLAYDEVICE="$DISPDEV"
 export VMDTITLE=off
 export TCL_LIBRARY="$VMD_PATH/scripts/tcl"
 export PYTHONPATH="$VMD_PATH/scripts/python"

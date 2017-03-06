@@ -7,7 +7,7 @@ References
 ----------
 .. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
 """
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -433,7 +433,7 @@ class Model(object):
             How to obtain the samples from the states
         numsamples : int
             Number of samples (conformations) for each state.
-        simlist : simlist
+        simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for creating the Molecules.
 
         Returns
@@ -511,7 +511,7 @@ class Model(object):
             A selection to use for wrapping
         alignsel : str, optional, default='name CA'
             A selection used for aligning all frames
-        simlist : simlist
+        simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for visualizing the states.
 
         Examples
@@ -546,7 +546,7 @@ class Model(object):
             viewer.send('start_sscache')
 
     def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples, gui=False):
-        from htmd.builder.builder import sequenceID
+        from htmd.molecule.util import sequenceID
         if states is None:
             states = range(self.macronum)
         if isinstance(states, int):
@@ -568,7 +568,7 @@ class Model(object):
             if ligand:
                 mol = ref.copy()
                 mol.remove(ligand, _logger=False)
-                mol.coords = np.atleast_3d(mol.coords[:, :, 0])
+                mol.dropFrames(keep=0)
                 mols[i].filter(ligand, _logger=False)
             mols[i].set('chain', '{}'.format(s))
             tmpcoo = mols[i].coords
@@ -765,6 +765,51 @@ class Model(object):
             data.simlist = np.array(simstmp)
 
         return Model(newdata)
+
+    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None):
+        """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
+
+        Parameters
+        ----------
+        dimX : int
+            Index of projected dimension to use for the X axis.
+        dimY : int
+            Index of projected dimension to use for the Y axis.
+        temperature : float
+            Simulation temperature.
+        states : bool
+            If True, will plot scatter plot of microstates coloured by macro state on top of FES.
+        s : float
+            Marker size for states.
+        cmap :
+            Matplotlib colormap.
+        """
+        self._integrityCheck(postmsm=True)
+        from matplotlib import pylab as plt
+        if cmap is None:
+            cmap = plt.cm.jet
+        if self.data.map is not None:
+            xlabel = self.data.map.description[dimX]
+        else:
+            xlabel = 'Dimension {}'.format(dimX)
+        if self.data.map is not None:
+            ylabel = self.data.map.description[dimY]
+        else:
+            ylabel = 'Dimension {}'.format(dimY)
+        title = 'Free energy surface'
+        micros = self.data.Centers[self.cluster_ofmicro, :]
+        energy = -0.0019872041 * temperature * np.log(self.msm.stationary_distribution)
+        f, ax, cf = self.data._contourPlot(micros[:, dimX], micros[:, dimY], energy, cmap=cmap, xlabel=xlabel, ylabel=ylabel, title=title)
+        self.data._setColorbar(f, cf, 'kcal/mol', scientific=False)
+        if states:
+            colors = cmap(np.linspace(0, 1, self.macronum))
+            for m in range(self.macronum):
+                macromicro = micros[self.macro_ofmicro == m, :]
+                y = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, c=colors[m], label='Macro {}'.format(m), edgecolors='none')
+            ax.legend(prop={'size': 8})
+            #self.data._setColorbar(f, y, 'Macrostates')
+        #f.show() Raises warnings in notebooks
+        plt.show()
 
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:

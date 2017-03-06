@@ -20,4 +20,3 @@ Contents:
     :maxdepth: 1
 
     Molecule module <htmd.molecule.molecule>
-    Atom selections in HTMD Molecules <atom-selection>

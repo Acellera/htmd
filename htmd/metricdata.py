@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -421,7 +421,7 @@ class MetricData:
         ----------
         relFrames : 2D np.ndarray
             An array containing in each row trajectory index and frame pairs
-        simlist : simlist
+        simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for creating the Frames.
 
         Returns
@@ -554,6 +554,128 @@ class MetricData:
         else:
             lags = np.append(1, np.round(np.linspace(2, modelen, 25)))
         return lags.astype(int)
+
+    def _contourPlot(self, x, y, z=None, resolution=100, levels=100, logplot=False, cmap=None, title=None, xlabel=None, ylabel=None):
+        """ Plots a contour plot.
+
+        If only x, y are given it will calculate a histogram for the contours. If z is given it will use that instead.
+        """
+        from matplotlib import pylab as plt
+        from matplotlib.mlab import griddata
+
+        if cmap is None:
+            cmap = plt.cm.Greys
+
+        f = plt.figure()
+        ax = f.gca()
+        if z is None:
+            # If no z is given calculate z as a histogram
+            zi, xi, yi = np.histogram2d(x, y, bins=resolution)
+            zi = zi.T
+            if logplot:
+                zi = -np.log(zi)
+            xi = xi[:-1] + (xi[1] - xi[0]) / 2  # Convert edges to bin centers
+            yi = yi[:-1] + (yi[1] - yi[0]) / 2  # Convert edges to bin centers
+        else:
+            # Else if z is given interpolate on a grid
+            xi = np.linspace(np.min(x), np.max(x), resolution)
+            yi = np.linspace(np.min(y), np.max(y), resolution)
+            zi = griddata(x, y, z, xi, yi, interp='linear')
+        cf = ax.contourf(xi, yi, zi, levels, cmap=cmap)
+        _ = ax.axis('equal')
+        if title is not None:
+            ax.set_title(title)
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
+        return f, ax, cf
+
+    def _setColorbar(self, f, mappable, label=None, scientific=True):
+        import matplotlib.ticker as ticker
+        def fmt(x, pos):
+            a, b = '{:.2e}'.format(x).split('e')
+            b = int(b)
+            return r'${} \times 10^{{{}}}$'.format(a, b)
+        if scientific:
+            f.colorbar(mappable, format=ticker.FuncFormatter(fmt), label=label)
+        else:
+            f.colorbar(mappable, label=label)
+
+
+    def plotCounts(self, dimX, dimY, resolution=100, logplot=False):
+        """ Plots a histogram of counts on any two given dimensions.
+
+        Parameters
+        ----------
+        dimX : int
+            Index of projected dimension to use for the X axis.
+        dimY : int
+            Index of projected dimension to use for the Y axis.
+        resolution : int
+            Resolution of bincount grid.
+        logplot : bool
+            Set True to plot the logarithm of counts.
+        """
+        from matplotlib import pylab as plt
+        dc = np.concatenate(self.dat)
+        if self.map is not None:
+            xlabel = self.map.description[dimX]
+        else:
+            xlabel = 'Dimension {}'.format(dimX)
+        if self.map is not None:
+            ylabel = self.map.description[dimY]
+        else:
+            ylabel = 'Dimension {}'.format(dimY)
+        title = 'Counts histogram'
+
+        f, ax, cf = self._contourPlot(dc[:, dimX], dc[:, dimY], resolution=resolution, xlabel=xlabel, ylabel=ylabel, title=title, logplot=logplot)
+        self._setColorbar(f, cf, 'Counts')
+        # f.show() Raises warnings in notebooks
+        plt.show()
+
+    def plotClusters(self, dimX, dimY, resolution=100, s=4, c=None, cmap=None, logplot=False):
+        """ Plot a scatter-plot of the locations of the clusters on top of the count histogram.
+
+        Parameters
+        ----------
+        dimX : int
+            Index of projected dimension to use for the X axis.
+        dimY : int
+            Index of projected dimension to use for the Y axis.
+        resolution : int
+            Resolution of bincount grid.
+        s : float
+            Marker size for clusters.
+        c : list
+            Colors or indexes for each cluster.
+        cmap : matplotlib.colors.Colormap
+            Matplotlib colormap for the scatter plot.
+        logplot : bool
+            Set True to plot the logarithm of counts.
+        """
+        if self.Centers is None:
+            raise RuntimeError('Data has not been clustered yet. Cannot plot clusters.')
+        from matplotlib import pylab as plt
+        if cmap is None:
+            cmap = plt.cm.jet
+        if self.map is not None:
+            xlabel = self.map.description[dimX]
+        else:
+            xlabel = 'Dimension {}'.format(dimX)
+        if self.map is not None:
+            ylabel = self.map.description[dimY]
+        else:
+            ylabel = 'Dimension {}'.format(dimY)
+        title = 'Clusters plotted onto counts histogram'
+        dc = np.concatenate(self.dat)
+        cent = self.Centers
+        f, ax, cf = self._contourPlot(dc[:, dimX], dc[:, dimY], resolution=resolution, xlabel=xlabel, ylabel=ylabel, title=title, logplot=logplot)
+        y = ax.scatter(cent[:, dimX], cent[:, dimY], s=s, c=c, cmap=cmap, linewidths=0, marker='o')
+        if c is not None:
+            self._setColorbar(f, y, 'Cluster groups')
+        # f.show() Raises warnings in notebooks
+        plt.show()
 
     def __repr__(self):
         return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \

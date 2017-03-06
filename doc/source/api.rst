@@ -1,4 +1,4 @@
-User Documentation
+HTMD Documentation
 ==================
 
 Here one can find documentation for most of the modules that HTMD provides. One can either explore the tree of contents

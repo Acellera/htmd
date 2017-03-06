@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -6,6 +6,7 @@
 import ctypes as ct
 import numpy as np
 from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_string_buffer, pack_ulong_buffer, xtc_lib
+from htmd.molecule.util import sequenceID
 import logging
 logger = logging.getLogger(__name__)
 
@@ -246,6 +247,7 @@ def MOL2read(filename):
     if not start or not end:
         raise ValueError("File cannot be read")
 
+    # TODO: Error on bad format (using pandas?)
     natoms = end - start + 1
     for i in range(natoms):
         s = l[i + start].strip().split()
@@ -254,9 +256,13 @@ def MOL2read(filename):
         topo.element.append(re.sub("[^A-Za-z]*", "", s[1]))
         topo.name.append(s[1])
         coords.append([float(x) for x in s[2:5]])
-        topo.charge.append(float(s[8]))
         topo.atomtype.append(s[5])
-        topo.resname.append(s[7])
+        if len(s) > 6:
+            topo.resid.append(int(s[6]))
+            if len(s) > 7:
+                topo.resname.append(s[7])
+                if len(s) > 8:
+                    topo.charge.append(float(s[8]))
     if bond:
         for i in range(bond, len(l)):
             b = l[i].split()
@@ -526,8 +532,36 @@ def PDBread(filename, mode='pdb'):
     56 - 66       LString       sGroup         Space  group.
     67 - 70       Integer       z              Z value.
     """
-    boxcolspecs = [(6, 15), (15, 24), (24, 33)]
-    boxnames = ('a', 'b', 'c')
+    cryst1colspecs = [(6, 15), (15, 24), (24, 33), (33, 40), (40, 47), (47, 54), (55, 66), (66, 70)]
+    cryst1names = ('a', 'b', 'c', 'alpha', 'beta', 'gamma', 'sGroup', 'z')
+
+    """
+    Guessing columns for REMARK 290 SMTRY from the example since the specs don't define them
+              1         2         3         4         5         6         7
+    01234567890123456789012345678901234567890123456789012345678901234567890
+    REMARK 290   SMTRY1   1  1.000000  0.000000  0.000000        0.00000
+    REMARK 290   SMTRY2   1  0.000000  1.000000  0.000000        0.00000
+    REMARK 290   SMTRY3   1  0.000000  0.000000  1.000000        0.00000
+    REMARK 290   SMTRY1   2 -1.000000  0.000000  0.000000       36.30027
+    REMARK 290   SMTRY2   2  0.000000 -1.000000  0.000000        0.00000
+    REMARK 290   SMTRY3   2  0.000000  0.000000  1.000000       59.50256
+    REMARK 290   SMTRY1   3 -1.000000  0.000000  0.000000        0.00000
+    REMARK 290   SMTRY2   3  0.000000  1.000000  0.000000       46.45545
+    REMARK 290   SMTRY3   3  0.000000  0.000000 -1.000000       59.50256
+    REMARK 290   SMTRY1   4  1.000000  0.000000  0.000000       36.30027
+    REMARK 290   SMTRY2   4  0.000000 -1.000000  0.000000       46.45545
+    REMARK 290   SMTRY3   4  0.000000  0.000000 -1.000000        0.00000
+
+    Guessing columns for REMARK 350   BIOMT from the example since the specs don't define them
+    REMARK 350   BIOMT1   1 -0.981559  0.191159  0.000000        0.00000
+    REMARK 350   BIOMT2   1 -0.191159 -0.981559  0.000000        0.00000
+    REMARK 350   BIOMT3   1  0.000000  0.000000  1.000000      -34.13878
+    REMARK 350   BIOMT1   2 -0.838088  0.545535  0.000000        0.00000
+    REMARK 350   BIOMT2   2 -0.545535 -0.838088  0.000000        0.00000
+    REMARK 350   BIOMT3   2  0.000000  0.000000  1.000000      -32.71633
+    """
+    symmetrycolspecs = [(20, 23), (23, 33), (33, 43), (43, 53), (53, 68)]
+    symmetrynames = ('idx', 'rot1', 'rot2', 'rot3', 'trans')
 
     def concatCoords(coords, coorddata):
         if coorddata.tell() != 0:  # Not empty
@@ -543,17 +577,18 @@ def PDBread(filename, mode='pdb'):
     currter = 0
     topoend = False
 
-    crystdata = io.StringIO()
+    cryst1data = io.StringIO()
     topodata = io.StringIO()
     conectdata = io.StringIO()
     coorddata = io.StringIO()
+    symmetrydata = io.StringIO()
 
     coords = None
 
     with open(filename, 'r') as f:
         for line in f:
             if line.startswith('CRYST1'):
-                crystdata.write(line)
+                cryst1data.write(line)
             if line.startswith('ATOM') or line.startswith('HETATM'):
                 coorddata.write(line)
             if (line.startswith('ATOM') or line.startswith('HETATM')) and not topoend:
@@ -568,15 +603,20 @@ def PDBread(filename, mode='pdb'):
             if line.startswith('MODEL'):
                 coords = concatCoords(coords, coorddata)
                 coorddata = io.StringIO()
-        crystdata.seek(0)
+            if line.startswith('REMARK 290   SMTRY'):  # TODO: Support BIOMT fields. It's a bit more complicated. Can't be done with pandas
+                symmetrydata.write(line)
+
+        cryst1data.seek(0)
         topodata.seek(0)
         conectdata.seek(0)
+        symmetrydata.seek(0)
 
         coords = concatCoords(coords, coorddata)
 
         parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
-        parsedbox = read_fwf(crystdata, colspecs=boxcolspecs, names=boxnames, na_values=_NA_VALUES, keep_default_na=False)
+        parsedcryst1 = read_fwf(cryst1data, colspecs=cryst1colspecs, names=cryst1names, na_values=_NA_VALUES, keep_default_na=False)
         parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
+        parsedsymmetry = read_fwf(symmetrydata, colspecs=symmetrycolspecs, names=symmetrynames, na_values=_NA_VALUES, keep_default_na=False)
 
     # if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
     #    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
@@ -590,19 +630,37 @@ def PDBread(filename, mode='pdb'):
         for p in pluses:
             parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
         parsedtopo.loc[parsedtopo.charge.isnull(), 'charge'] = 0
+    # Fixing hexadecimal index and resids
+    # Support for reading hexadecimal
+    if parsedtopo.serial.dtype == 'object':
+        logger.warning('Non-integer values were read from the PDB "serial" field. Dropping PDB values and assigning new ones.')
+        parsedtopo.serial = sequenceID(parsedtopo.serial)
+    if parsedtopo.resid.dtype == 'object':
+        logger.warning('Non-integer values were read from the PDB "resid" field. Dropping PDB values and assigning new ones.')
+        parsedtopo.resid = sequenceID(parsedtopo.resid)
 
     if len(parsedtopo) > 99999:
         logger.warning('Reading PDB file with more than 99999 atoms. Bond information can be wrong.')
+
+    crystalinfo = {}
+    if len(parsedcryst1):
+        crystalinfo = parsedcryst1.ix[0].to_dict()
+        crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
+    if len(parsedsymmetry):
+        numcopies = int(len(parsedsymmetry)/3)
+        crystalinfo['numcopies'] = numcopies
+        crystalinfo['rotations'] = parsedsymmetry[['rot1', 'rot2', 'rot3']].as_matrix().reshape((numcopies, 3, 3))
+        crystalinfo['translations'] = parsedsymmetry['trans'].as_matrix().reshape((numcopies, 3))
 
     topo = Topology(parsedtopo)
 
     # Bond formatting part
     # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
     serials = parsedtopo.serial.as_matrix()
-    if isinstance(serials[0], str) and np.any(serials == '*****'):
-        logger.info('Non-integer serials were read. For safety we will discard all bond information and serials will be assigned automatically.')
-        topo.serial = np.arange(1, len(serials)+1, dtype=np.int)
-    elif np.max(parsedbonds.max()) > np.max(serials):
+    # if isinstance(serials[0], str) and np.any(serials == '*****'):
+    #     logger.info('Non-integer serials were read. For safety we will discard all bond information and serials will be assigned automatically.')
+    #     topo.serial = np.arange(1, len(serials)+1, dtype=np.int)
+    if np.max(parsedbonds.max()) > np.max(serials):
         logger.info('Bond indexes in PDB file exceed atom indexes. For safety we will discard all bond information.')
     else:
         mapserials = np.empty(np.max(serials)+1)
@@ -624,7 +682,7 @@ def PDBread(filename, mode='pdb'):
 
     if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx
-    return topo, coords
+    return topo, coords, crystalinfo
 
 
 def BINCOORread(filename):

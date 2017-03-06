@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -102,6 +102,50 @@ class VMDConvexHull(VMDGraphicObject):
                 self._remember("draw line {:s} {:s} {:s}".format(c2s, c3s, style))
                 self.script.write("\n")
 
+        self.script.write("set htmd_graphics_mol({:d}) [molinfo top]".format(self.n))
+        cmd = self.script.getvalue()
+        vmd = getCurrentViewer()
+        vmd.send(cmd)
+
+
+class VMDBox(VMDGraphicObject):
+    def __init__(self, box, color='red'):
+        """ Displays a box in VMD as lines of its edges.
+
+        The function returns an instance of VMDGraphicsObject. To delete it, use the delete() method.
+
+        Parameters
+        ----------
+        box : list
+            The min and max positions of the edges. Given as [xmin, xmax, ymin, ymax, zmin, zmax]
+        color : str
+            Color of the lines
+        """
+        super().__init__(box)
+        xmin, xmax, ymin, ymax, zmin, zmax = box
+        mi = [xmin, ymin, zmin]
+        ma = [xmax, ymax, zmax]
+
+        self._remember('draw materials off')
+        self._remember('draw color {}'.format(color))
+
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], ma[0], mi[1], mi[2]))
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], ma[1], mi[2]))
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], mi[1], ma[2]))
+
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], ma[1], mi[2]))
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], mi[1], ma[2]))
+
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], ma[0], ma[1], mi[2]))
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], mi[0], ma[1], ma[2]))
+
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], ma[0], mi[1], ma[2]))
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], mi[0], ma[1], ma[2]))
+
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], ma[1], mi[2]))
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], mi[0], ma[1], ma[2]))
+        self._remember('draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], mi[1], ma[2]))
+        self.script.write("\n")
         self.script.write("set htmd_graphics_mol({:d}) [molinfo top]".format(self.n))
         cmd = self.script.getvalue()
         vmd = getCurrentViewer()

@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -9,10 +9,12 @@ from os.path import isdir, abspath, basename, exists,join
 from os import getcwd, getlogin, makedirs, chdir
 from subprocess import call,check_output
 from htmd import UserInterface
+from htmd.decorators import _Deprecated
 
+
+@_Deprecated('1.5.15', 'htmd.queues.acecloudqueue.AceCloudQueue')
 class AWS(UserInterface, App):
 
-  
     def __init__(self, name=None):
         from acecloud import Cloud, Job
         self._cloud  = Cloud()

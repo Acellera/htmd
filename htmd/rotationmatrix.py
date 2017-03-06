@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -6,6 +6,7 @@
 import numpy as np
 from math import cos, sqrt, sin
 import logging
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
@@ -54,9 +55,8 @@ def rotationMatrix(axis, theta):
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
 
+@_Deprecated('1.0.13', 'htmd.rotationmatrix.rotationMatrix')
 def rotationmatrix(axis, theta):
-    logger.warning('The rotationmatrix method is deprecated. '
-                   'It has been renamed to rotationMatrix to follow the naming style. Please change all uses.')
     return rotationMatrix(axis, theta)
 
 

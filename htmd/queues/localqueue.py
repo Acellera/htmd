@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class LocalGPUQueue(SimQueue, ProtocolInterface):
-    """
+    """ Local machine queue system
+
     Parameters
     ----------
     ngpu : int
@@ -27,6 +28,16 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
         The path in which to store completed trajectories.
     trajext : str, default='xtc'
         Extension of trajectory files. This is needed to copy them to datadir.
+
+
+    .. currentmodule:: htmd.queues.localqueue.LocalGPUQueue
+    .. rubric:: Methods
+    .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
+       :methods:
+    .. rubric:: Attributes
+    .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
+       :attributes:
+
     """
 
     def __init__(self):

@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -10,9 +10,11 @@ from subprocess import check_output
 import os
 from glob import glob as glob
 import logging
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+@_Deprecated('1.5.15', 'htmd.queues.localqueue.LocalGPUQueue')
 class LocalGPUQueue(App):
     """
     Parameters

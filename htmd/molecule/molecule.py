@@ -1,4 +1,4 @@
-# (c) 2015-2016 Acellera Ltd http://www.acellera.com
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -12,7 +12,7 @@ from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread, GROTOPread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write, GROwrite
 from htmd.molecule.support import string_to_tempfile
-from htmd.molecule.wrap import *
+from htmd.molecule.wrap import wrap
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
 from htmd.util import tempname
@@ -20,7 +20,9 @@ from math import pi
 from copy import deepcopy
 from os import path
 import logging
+import os
 import re
+from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +59,8 @@ _residueNameTable = {'ARG': 'R', 'AR0': 'R',
 
 
 class Molecule:
-    """ Class to manipulate molecular structures.
+    """
+    Class to manipulate molecular structures.
 
     Molecule contains all the fields of a PDB and it is independent of any force field. It can contain multiple
     conformations and trajectories, however all operations are done on the current frame. The following PDB fields 
@@ -183,6 +186,7 @@ class Molecule:
         self.fileloc = []
         self.time = []
         self.step = []
+        self.crystalinfo = None
 
         self.reps = Representations(self)
         self._tempreps = Representations(self)
@@ -221,6 +225,11 @@ class Molecule:
         if value < 0 or value >= self.numFrames:
             raise NameError("Frame index out of range. Molecule contains {} frame(s). Frames are 0-indexed.".format(self.numFrames))
         self._frame = value
+
+    @property
+    def numResidues(self):
+        from htmd.molecule.util import sequenceID
+        return len(np.unique(sequenceID((self.resid, self.insertion, self.chain))))
 
     def insert(self, mol, index, collisions=False, coldist=1.3):
         """Insert the contents of one molecule into another at a specific index.
@@ -299,7 +308,8 @@ class Molecule:
             _resolveCollisions(self, occ1, occ2, coldist)
 
     def remove(self, selection, _logger=True):
-        """ Remove atoms from the Molecule
+        """
+        Remove atoms from the Molecule
 
         Parameters
         ----------
@@ -475,10 +485,10 @@ class Molecule:
         bonds = np.empty((0, 2), dtype=np.uint32)
         if fileBonds:
             if len(self.bonds) == 0:  # This is a patch for the other readers not returning correct empty dimensions
-                self.bonds = np.empty((0, 2), dtype=numpy.uint32)
-            bonds = numpy.vstack((bonds, self.bonds))
+                self.bonds = np.empty((0, 2), dtype=np.uint32)
+            bonds = np.vstack((bonds, self.bonds))
         if guessBonds:
-            bonds = numpy.vstack((bonds, self._guessBonds()))
+            bonds = np.vstack((bonds, self._guessBonds()))
         return bonds
 
     def atomselect(self, sel, indexes=False, strict=False, fileBonds=True, guessBonds=True):
@@ -610,8 +620,10 @@ class Molecule:
         for f in range(self.numFrames):
             self.coords[s, :, f] += vector
 
+    @_Deprecated('1.3.2', 'htmd.molecule.molecule.Molecule.rotateBy')
     def rotate(self, axis, angle, sel=None):
-        """ Rotate atoms around an axis for a given angle in radians.
+        """
+        Rotate atoms around an axis for a given angle in radians.
 
         Parameters
         ----------
@@ -627,7 +639,6 @@ class Molecule:
         >>> mol=tryp.copy()
         >>> mol.rotate([0, 1, 0], 1.57)
         """
-        logger.warning('Molecule.rotate is deprecated and will be removed. Use Molecule.rotateBy instead.')
         M = rotationMatrix(axis, angle)
         self.rotateBy(M, sel=sel)
 
@@ -771,12 +782,13 @@ class Molecule:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
 
     def _readPDB(self, filename, mode='pdb', overwrite='all'):
+        from htmd.home import home
         tempfile = False
         if os.path.isfile(filename):
             filepath = filename
         elif len(filename) == 4:
             # Try loading it from the pdb data directory
-            localpdb = os.path.join(htmd.home(dataDir="pdb"), filename.lower() + ".pdb")
+            localpdb = os.path.join(home(dataDir="pdb"), filename.lower() + ".pdb")
             if os.path.isfile(localpdb):
                 logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
                 filepath = localpdb
@@ -793,16 +805,17 @@ class Molecule:
         else:
             raise NameError('File {} not found'.format(filename))
 
-        topo, coords = PDBread(filepath, mode=mode)
+        topo, coords, crystalinfo = PDBread(filepath, mode=mode)
+        self.crystalinfo = crystalinfo
         self._parseTopology(topo, filepath, overwrite=overwrite)
         self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
         if tempfile:
             os.unlink(filepath)
 
         if self.masses is None or len(self.masses) == 0:
-            self.masses = numpy.zeros(self.numAtoms, dtype=numpy.float32)
+            self.masses = np.zeros(self.numAtoms, dtype=np.float32)
         if self.charge is None or len(self.charge) == 0:
-            self.charge = numpy.zeros(self.numAtoms, dtype=numpy.float32)
+            self.charge = np.zeros(self.numAtoms, dtype=np.float32)
 
         for pf in self._atom_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
             if self._dtypes[pf] == object and len(self.__dict__[pf]) != 0:
@@ -897,6 +910,9 @@ class Molecule:
                     coords, box, boxangles, step, time = XTCread(f, frames[i])
                 fileloclist.append([f, int(frames[i])])
 
+            # Writing hidden index file containing number of frames in trajectory file
+            self._writeNumFrames(f, coords.shape[2])
+
             if self.numAtoms != 0 and np.size(coords, 0) != self.numAtoms:
                 raise ValueError('Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(np.size(coords, 0), self.numAtoms))
 
@@ -926,6 +942,24 @@ class Molecule:
         if skip is not None:
             self.fstep *= skip
 
+    def _writeNumFrames(self, filepath, numFrames):
+        """ Write the number of frames in a hidden file. Allows us to check for trajectory length issues before projecting
+
+        Parameters
+        ----------
+        filepath : str
+            Path to trajectory file
+        numFrames : int
+            Number of frames in trajectory file
+        """
+        filepath = os.path.abspath(filepath)
+        filedir = os.path.dirname(filepath)
+        basename = os.path.basename(filepath)
+        numframefile = os.path.join(filedir, '.{}.numframes'.format(basename))
+        if not os.path.exists(numframefile) or (os.path.exists(numframefile) and (os.path.getmtime(numframefile) < os.path.getmtime(filepath))):
+            with open(numframefile, 'w') as f:
+                f.write(str(numFrames))
+
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
              viewerhandle=None, gui=False):
         """ Visualizes the molecule in a molecular viewer
@@ -935,9 +969,9 @@ class Molecule:
         sel : str
             Atomselection string for a representation.
         style : str
-            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`_.
+            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
         color : str
-            Coloring mode or color ID. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`_.
+            Coloring mode or color ID. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
         viewer : str ('vmd', 'webgl')
@@ -973,21 +1007,27 @@ class Molecule:
         self.write(xtc)
 
         # Call the specified backend
+        retval = None
         if viewer is None:
             from htmd.config import _config
             viewer = _config['viewer']
         if viewer.lower() == 'notebook':
-            return self._viewMDTraj(psf, xtc)
+            retval = self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
             self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
+            #retval = viewerhandle
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
-            return self._viewNGL(gui=gui)
+            retval = self._viewNGL(gui=gui)
         else:
+            os.remove(xtc)
+            os.remove(psf)
             raise ValueError('Unknown viewer.')
 
         # Remove temporary files
         os.remove(xtc)
         os.remove(psf)
+        if retval is not None:
+            return retval
 
     def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
         if name is None:
@@ -1186,7 +1226,7 @@ class Molecule:
         '?EEI'
 
         """
-        from htmd.builder.builder import sequenceID
+        from htmd.molecule.util import sequenceID
         prot = self.atomselect('protein')
         segs = np.unique(self.segid[prot])
         increm = sequenceID((self.resid, self.insertion, self.chain))
@@ -1196,7 +1236,7 @@ class Molecule:
         # Iterate over segments
         for seg in segs:
             segSequences[seg] = []
-            segatoms = self.atomselect('protein and segid {}'.format(seg))
+            segatoms = self.atomselect('protein and segid "{}"'.format(seg))
             resnames = self.resname[segatoms]
             incremseg = increm[segatoms]
             for i in np.unique(incremseg):  # Iterate over residues
@@ -1238,6 +1278,39 @@ class Molecule:
         if drop is not None:
             self.coords = np.delete(self.coords, drop, axis=2)
             self.box = np.delete(self.box, drop, axis=1)
+
+    def viewCrystalPacking(self):
+        """
+        If the Molecule was read from a crystallographic PDB structure it shows the crystal packing of the molecule.
+        """
+        from htmd.molecule.crystalpacking import viewCrystalPacking
+        viewCrystalPacking(self)
+
+    def _guessElements(self):
+        babel_elements = ['Cr', 'Pt', 'Mn', 'Np', 'Be', 'Co', 'Rn', 'C', 'Ag', 'Xe', 'D', 'Th', 'Sb', 'Al', 'Ir', 'In', 'Te', 'Tl', 'K', 'Tb', 'Br', 'Eu', 'Ne', 'Rb', 'Ar', 'Sm', 'Xx', 'Fe', 'Lr', 'S', 'H', 'He', 'At', 'Li', 'Cs', 'Rh', 'Nb', 'Pr', 'Fm', 'Cu', 'Ru', 'Ga', 'Er', 'Hg', 'Nd', 'Ba', 'Ta', 'Pu', 'O', 'Pb', 'Yb', 'Bk', 'Pd', 'F', 'Gd', 'Y', 'Ac', 'Au', 'Hf', 'Ra', 'V', 'I', 'Ge', 'Re', 'Fr', 'Cm', 'Kr', 'Sr', 'Sn', 'Pm', 'Ca', 'No', 'Si', 'Es', 'U', 'Am', 'Sc', 'Md', 'As', 'Na', 'N', 'Dy', 'Os', 'Po', 'Se', 'Lu', 'Mo', 'Zn', 'Cd', 'Mg', 'Tm', 'Cl', 'P', 'B', 'W', 'Tc', 'Cf', 'Bi', 'Ni', 'Ti', 'Pa', 'La', 'Ce', 'Zr', 'Ho']
+        guess_babel_elements = ['D', 'M', 'V', 'A', 'X', 'R', 'F', 'Z', 'T', 'E', 'G', 'L']
+        from htmd.molecule.writers import _deduce_PDB_atom_name, _getPDBElement
+        elements = []
+        for i, elem in enumerate(self.element):
+            if len(elem) != 0 and isinstance(elem, str) and elem in babel_elements:
+                elements.append(elem)
+            else:
+                # Get the 4 character PDB atom name
+                name = _deduce_PDB_atom_name(self.name[i], self.resname[i])
+                # Deduce from the 4 character atom name the element
+                elem = _getPDBElement(name, elem)
+                if elem in babel_elements:
+                    elements.append(elem)
+                else:
+                    # Really risky business here
+                    celem = name[0].upper()
+                    if len(name) > 1:
+                        celem += name[1].lower()
+                    if celem in babel_elements:
+                        elements.append(celem)
+                    else:
+                        elements.append('Xx')
+        return elements
 
     @property
     def numFrames(self):
@@ -1391,10 +1464,10 @@ class Representations:
             Atom selection for the given representation (i.e. which part of the molecule to show)
         style : str
             Representation visual style (e.g. lines, NewCartoon, VdW, etc.). See more
-            `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`_.
+            `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
         color : str
             Color style (e.g. secondary structure) or ID (a number) See more
-            `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`_.
+            `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
         """
         self.replist.append(_Representation(sel, style, color))
 
