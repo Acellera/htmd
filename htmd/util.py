@@ -210,7 +210,7 @@ def assertSameAsReferenceDir(compareDir, outdir="."):
     match, mismatch, error = filecmp.cmpfiles(outdir, compareDir, toCompare, shallow=False)
     if len(mismatch) != 0 or len(error) != 0 or len(match) != len(toCompare):
         raise Exception(
-            'Files {} in {} did not match references in {}. Being checked: {}.'.
+            'Files {} in {} did not match references in {} . Being checked: {}.'.
                 format(mismatch, outdir, compareDir, toCompare)
         )
 

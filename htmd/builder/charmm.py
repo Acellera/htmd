@@ -868,9 +868,8 @@ if __name__ == '__main__':
     from htmd.molecule.molecule import Molecule
     from htmd.builder.solvate import solvate
     from htmd.home import home
-    from htmd.util import tempname
+    from htmd.util import tempname, assertSameAsReferenceDir
     from htmd.builder.preparation import proteinPrepare
-    import filecmp
     import os
     from glob import glob
     import numpy as np
@@ -878,34 +877,39 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
 
+    # Use pre-prepared files so we can tell whether the error is in prepare or in build
+    preparedInputDir = home(dataDir=os.path.join('test-charmm-build', "prepared-inputs"))
+
     pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
-    for pid in pdbids:
-        np.random.seed(1)
-        mol = Molecule(pid)
-        mol.filter('protein')
-        mol = proteinPrepare(mol)
+    for pdb in pdbids:
+        np.random.seed(1)       # Probably unnecessary
+
+        inFile = os.path.join(preparedInputDir, "{}-prepared.pdb".format(pdb))
+        mol = Molecule(inFile)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+
         smol = solvate(mol)
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
         params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
         tmpdir = tempname()
         bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
 
-        compareDir = home(dataDir=os.path.join('test-charmm-build', pid))
-        files = []
-        filestmp = glob(os.path.join(compareDir, '*'))
-        for f in filestmp:
-            files.append(os.path.basename(f))
+        compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
 
-        match, mismatch, error = filecmp.cmpfiles(tmpdir, compareDir, files, shallow=False)
-        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-            raise RuntimeError(
-                'Different results produced by charmm.build for test {} between {} and {} in files {}.'.format(pid,
-                                                                                                               compareDir,
-                                                                                                               tmpdir,
-                                                                                                               mismatch)
-                              )
+        assertSameAsReferenceDir(compareDir, tmpdir)
 
-        shutil.rmtree(tmpdir)
+        # shutil.rmtree(tmpdir)
 
 
+"""
+    from htmd import *
+    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+    preparedInputDir = home(dataDir=os.path.join('test-charmm-build', "prepared-inputs"))
+    for p in pdbids:
+        m=Molecule(p)
+        m.filter("protein")
+        mp=proteinPrepare(m)
+        inFile = os.path.join(preparedInputDir, "{}-prepared.pdb".format(p))
+        m.write(infile)
+
+"""
