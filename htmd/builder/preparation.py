@@ -125,6 +125,7 @@ def _buildResAndMol(pdb2pqr_protein):
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
+    mol_out.set("element", " ")
 
     prepData._importPKAs(pdb2pqr_protein.pka_protein)
 
@@ -365,6 +366,9 @@ def proteinPrepare(mol_in,
     resData.pdb2pqr_protein = pdb2pqr_protein
     resData.pdb2pqr_routines = pdb2pqr_routines
     resData.missedLigands = missedLigands
+
+    # Store un-reprepared info
+    resData.data['default_protonation'] = resData.data['protonation']
 
     resData._listNonStandardResidues()
     resData._warnIfpKCloseTopH(pH)

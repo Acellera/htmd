@@ -66,7 +66,7 @@ class PreparationData:
     # Important- all must be listed or "set_value" will silently ignore them
     _columns = ['resname', 'resid', 'insertion', 'chain',
                 'pKa', 'protonation', 'flipped', 'patches',
-                'buried', 'z', 'membraneExposed', 'forced_protonation',
+                'buried', 'z', 'membraneExposed', 'forced_protonation', 'default_protonation',
                 'pka_group_id',
                 'pka_residue_type', 'pka_type', 'pka_charge',
                 'pka_atom_name', 'pka_atom_sybyl_type']
