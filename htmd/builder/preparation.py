@@ -125,7 +125,7 @@ def _buildResAndMol(pdb2pqr_protein):
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
-    mol_out.set("element", " ")
+    # mol_out.set("element", " ")
 
     prepData._importPKAs(pdb2pqr_protein.pka_protein)
 
