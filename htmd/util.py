@@ -34,6 +34,11 @@ def tempname(suffix='', create=False):
 
 
 def ensurelist(tocheck, tomod=None):
+    """Convert np.ndarray and scalars to lists.
+
+    Lists and tuples are left as is. If a second argument is given,
+    the type check is performed on the first argument, and the second argument is converted.
+    """
     if tomod is None:
         tomod = tocheck
     if isinstance(tocheck, np.ndarray):
@@ -191,6 +196,23 @@ def opm(pdb):
     thickness = 2.0 * float(hs[-1])
 
     return mol, thickness
+
+
+def assertSameAsReferenceDir(compareDir, outdir="."):
+    """Check if files in refdir are present in the directory given as second argument AND their content matches.
+
+    Raise an exception if not."""
+
+    import filecmp
+    import os
+
+    toCompare = os.listdir(compareDir)
+    match, mismatch, error = filecmp.cmpfiles(outdir, compareDir, toCompare, shallow=False)
+    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(toCompare):
+        raise Exception(
+            'Files {} in {} did not match references in {}. Being checked: {}.'.
+                format(mismatch, outdir, compareDir, toCompare)
+        )
 
 
 def testDHFR():

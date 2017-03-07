@@ -891,17 +891,17 @@ if __name__ == '__main__':
         tmpdir = tempname()
         bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
 
-        compare = home(dataDir=os.path.join('test-charmm-build', pid))
+        compareDir = home(dataDir=os.path.join('test-charmm-build', pid))
         files = []
-        filestmp = glob(os.path.join(compare, '*'))
+        filestmp = glob(os.path.join(compareDir, '*'))
         for f in filestmp:
             files.append(os.path.basename(f))
 
-        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
+        match, mismatch, error = filecmp.cmpfiles(tmpdir, compareDir, files, shallow=False)
         if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
             raise RuntimeError(
                 'Different results produced by charmm.build for test {} between {} and {} in files {}.'.format(pid,
-                                                                                                               compare,
+                                                                                                               compareDir,
                                                                                                                tmpdir,
                                                                                                                mismatch)
                               )

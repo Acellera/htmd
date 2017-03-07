@@ -385,36 +385,54 @@ def proteinPrepare(mol_in,
         return mol_out
 
 
+
+# Reproducibility test
+# rm mol-test-*; for i in `seq 9`; do py ./proteinpreparation.py ./1r1j.pdb > mol-test-$i.log ; cp ./mol-test.pdb mol-test-$i.pdb; cp mol-test.csv mol-test-$i.csv ; done
+
+
 # A test method
 if __name__ == "__main__":
     import sys
+    import htmd
+    import os
 
     if len(sys.argv) > 1:
-        # Reproducibility test
-        # rm mol-test-*; for i in `seq 9`; do py ./proteinpreparation.py ./1r1j.pdb > mol-test-$i.log ; cp ./mol-test.pdb mol-test-$i.pdb; cp mol-test.csv mol-test-$i.csv ; done
+        # Prepare named argument
         mol = Molecule(sys.argv[1])
         mol.filter("protein")
         mol_op, prepData = proteinPrepare(mol, returnDetails=True)
-        mol_op.write("./mol-test.pdb")
-        prepData.data.to_excel("./mol-test.xlsx")
-        prepData.data.to_csv("./mol-test.csv")
-
-        # mol, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
-        d = prepData.data
-        prepData.data.loc[d.resid == 40, 'new_protonation'] = 'HIP'
-        mHIP40, pHIP40 = prepData.reprepare()
-        mHIP40.write("./mol-test-hip40.pdb")
-        pHIP40.data.to_excel("./mol-test-hip40.xlsx")
-
-        """
-        x_HIS91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
-        x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
-        assert len(x_SER93_H) == 3
-        assert np.linalg.norm(x_HIS91_ND1-x_SER93_H) > 2
-        assert tryp_op.get("resname","resid 91 and  name CA") == "HIE"
-        """
+        mol_op.write("./prepared.pdb")
+        prepData.data.to_excel("./prepared.xlsx")
+        prepData.data.to_csv("./prepared.csv")
 
     else:
-        import doctest
+        # Test
+        tryp_op, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
+        d = prepData.data
 
+        # x_HIS91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
+        # x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
+        # assert len(x_SER93_H) == 3
+        # assert np.linalg.norm(x_HIS91_ND1-x_SER93_H) > 2
+        # assert tryp_op.get("resname","resid 91 and  name CA") == "HIE"
+
+        # prepData.data.loc[d.resid == 40, 'new_protonation'] = 'HIP'
+        # mHIP40, pHIP40 = prepData.reprepare()
+        # mHIP40.write("./mol-test-hip40.pdb")
+        # pHIP40.data.to_excel("./mol-test-hip40.xlsx")
+
+        pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+        for pdb in pdbids:
+            mol = Molecule(pdb)
+            mol.filter("protein")
+            mol_op, prepData = proteinPrepare(mol, returnDetails=True)
+            mol_op.write("./prepared.pdb")
+            prepData.data.to_csv("./prepared.csv")
+
+            compareDir = htmd.home(dataDir=os.path.join('test-proteinprepare', pdb))
+            htmd.util.assertSameAsReferenceDir(compareDir)
+
+
+
+        import doctest
         doctest.testmod()
