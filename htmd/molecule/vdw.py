@@ -3,6 +3,8 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+# All values taken from VMD
+# 
 class VDW:
   elements = [
     "X",  "H",  "He", "Li", "Be", "B",  "C",  "N",  "O",  "F",  "Ne",
