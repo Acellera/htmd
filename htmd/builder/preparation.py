@@ -426,8 +426,8 @@ if __name__ == "__main__":
             mol = Molecule(pdb)
             mol.filter("protein")
             mol_op, prepData = proteinPrepare(mol, returnDetails=True)
-            mol_op.write("./prepared.pdb")
-            prepData.data.to_csv("./prepared.csv")
+            mol_op.write("./{}-prepared.pdb".format(pdb))
+            prepData.data.to_csv("./{}-prepared.csv".format(pdb))
 
             compareDir = htmd.home(dataDir=os.path.join('test-proteinprepare', pdb))
             htmd.util.assertSameAsReferenceDir(compareDir)
