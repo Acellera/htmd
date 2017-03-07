@@ -7,6 +7,7 @@ from os import path
 from htmd.adaptive.adaptiverun import AdaptiveMD
 from htmd.model import macroAccumulate
 from protocolinterface import val
+import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
@@ -239,6 +240,7 @@ class AdaptiveGoal(AdaptiveMD):
         return (feat - np.min(feat)) / denom
 
     def _getGoalData(self, sims):
+        from htmd.projections.metric import Metric
         logger.debug('Starting projection of directed component')
         metr = Metric(sims, skip=self.skip)
         metr.set(self.goalfunction)
