@@ -71,7 +71,7 @@ def _deduce_PDB_atom_name(name, resname):
     return ' {:<3}'.format(name)
 
 
-def _getPDBElement(name, element):
+def _getPDBElement(name, element, lowersecond=True):
     """
     Given a PDB atom name of 4 characters (including spaces), get the element
     """
@@ -96,7 +96,10 @@ def _getPDBElement(name, element):
     if regH_old.match(name.strip()) or regH_inv.match(name.strip()):
         element = 'H'
     if len(element) == 2:
-        element = element[0] + element[1].lower()
+        if lowersecond:
+            element = element[0] + element[1].lower()
+        else:
+            element = element[0] + element[1]
     return element
 
 
