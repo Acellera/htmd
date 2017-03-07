@@ -121,7 +121,7 @@ class AdaptiveGoal(AdaptiveMD):
         super().__init__()
         self._arg('goalfunction', 'function',
                   'This function will be used to convert the goal-projected simulation data to a ranking which'
-                  'can be used for the directed component of FAST.', None, val.Function())
+                  'can be used for the directed component of FAST.', None, val.Function(), nargs='any')
         self._arg('ucscale', 'float', 'Scaling factor for undirected component. Directed component scaling '
                                        'automatically calculated as (1-uscale)', 0.5, val.Number(float, 'ANY'))
         self._arg('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False, val.Boolean())
