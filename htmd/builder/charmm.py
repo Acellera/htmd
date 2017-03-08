@@ -156,8 +156,10 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     -------
     >>> from htmd import *
     >>> mol = Molecule("3PTB")
-    >>> molbuilt = charmm.build(mol, outdir='/tmp/build')
-    ...
+    >>> mol.filter("not resname BEN")
+    >>> molbuilt = charmm.build(mol, outdir='/tmp/build', ionize=False)  # doctest: +ELLIPSIS
+    Bond between A: [serial 185 resid 42 resname CYS chain A segid 0]
+                 B: [serial 298 resid 58 resname CYS chain A segid 0]...
     >>> # More complex example
     >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf', 'top/top_water_ions.rtf']
     >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm', 'par/par_water_ions.prm']
