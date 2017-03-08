@@ -26,25 +26,6 @@ from natsort import natsorted
 import logging
 logger = logging.getLogger(__name__)
 
-__test__ = {'build-opm-1u5u': """
-    >>> from htmd.builder.preparation import proteinPrepare
-    >>> from htmd.util import diffMolecules
-
-    >>> pdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_opm.pdb')
-    >>> mol = Molecule(pdb)
-    >>> mol.filter('protein')
-    >>> mol.set('segid', 'P')
-
-    >>> pmol = proteinPrepare(mol)
-    >>> bmol = build(pmol, outdir='/tmp/build/', ionize=False)
-
-    >>> refpdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_built_protonated.pdb')
-    >>> ref = Molecule(refpdb)
-
-    >>> difflist = diffMolecules(bmol, ref, sel="name CA")
-    >>> print(difflist)
-    []
-""" }
 
 class BuildError(Exception):
     def __init__(self, value):
@@ -56,6 +37,13 @@ class BuildError(Exception):
 
 def listFiles():
     """ Lists all available Charmm topologies and parameter files
+
+    Examples
+    --------
+    >>> from htmd import charmm
+    >>> charmm.listFiles()             # doctest: +ELLIPSIS
+    ---- Topologies files list...
+
     """
     charmmdir = path.join(home(), 'builder', 'charmmfiles', '')  # maybe just lookup current module?
     topos = natsorted(glob(path.join(charmmdir, 'top', '*.rtf')))
@@ -168,10 +156,6 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     -------
     >>> from htmd import *
     >>> mol = Molecule("3PTB")
-    >>> charmm.listFiles()             # doctest: +ELLIPSIS
-    ---- Topologies files list...
-    top/top_all36_prot.rtf
-    top/top_water_ions.rtf
     >>> molbuilt = charmm.build(mol, outdir='/tmp/build')
     ...
     >>> # More complex example
@@ -878,13 +862,14 @@ if __name__ == '__main__':
     doctest.testmod()
 
     # Use pre-prepared files so we can tell whether the error is in prepare or in build
-    preparedInputDir = home(dataDir=os.path.join('test-charmm-build', "prepared-inputs"))
+    # Inputs are reference outputs of proteinprepare.
+    preparedInputDir = home(dataDir='test-proteinprepare')
 
     pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
     for pdb in pdbids:
         np.random.seed(1)       # Probably unnecessary
 
-        inFile = os.path.join(preparedInputDir, "{}-prepared.pdb".format(pdb))
+        inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
         mol = Molecule(inFile)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
 
