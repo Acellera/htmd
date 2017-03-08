@@ -230,7 +230,7 @@ def proteinPrepare(mol_in,
     >>> tryp_op, prepData = proteinPrepare(tryp, returnDetails=True)
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
-    >>> prepData
+    >>> prepData                                                        # doctest: +NORMALIZE_WHITESPACE
     PreparationData object about 290 residues.
     Unparametrized residue names: CA, BEN
     Please find the full info in the .data property, e.g.:
