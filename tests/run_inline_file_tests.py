@@ -35,7 +35,7 @@ failed = []
 for f in filestotest:
     t = time.time()
     print(' ************************  Running "{}"  ************************'.format(f))
-    if f.endswith('amber.py') or f.endswith('charmm.py'):
+    if f.endswith('amber.py') or f.endswith('charmm.py') or f.endswith('preparation.py'):
         out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
     else:
         out = call('python {}'.format(f), shell=True)
