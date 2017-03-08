@@ -149,32 +149,39 @@ def _findDonors(mol, bonds):
 
 
 def _getSigmas(mol):
-    """ Returns the VDW radii of each atom in the molecule
+    # Sigmas taken from VMD vdW radii.
+    sigmas = {
+     'A':   1.5,
+     'D':   4.0,
+     'C':   1.7,
+     'Cl':  2.27,
+     'Co':  2.0,
+     'F':   1.47,
+     'Fe':  2.0,
+     'HD':  1.2,
+     'I':   1.98,
+     'Mg':  1.18,
+     'Mn':  2.0,
+     'N':   1.55,
+     'NA':  1.55,
+     'OA':  1.52,
+     'P':   1.8,
+     'S':   1.8,
+     'SA':  1.8,
+     'Zn':  1.39,
+     'Se':  1.9}
 
-    Parameters
-    ----------
-    mol :
-        A Molecule object
-
-    Returns
-    -------
-    sigmas : np.ndarray
-        The radius of each atom in Molecule
-    """
-    # NOTE: this should improved. Element or name? More than first characeter? FF based?
-    # e.g. Cl gets transformed wrongly to C. Also Mn and Zn are not present in dictionary
-    sigmas = {"H": 1.0, "C": 1.5, "N": 1.4, "O": 1.3, "F": 1.2, "P": 2.0, "S": 1.9,
-              "Cl": 2.5, "D": 4.0, "A": 1.5}
     sig = np.zeros(mol.numAtoms)
-    for a in range(mol.numAtoms):  # TODO: STEFAN - Should be doable faster, although it's not really time-consuming
-        elem = mol.element[a][0]
+    for a in range(mol.numAtoms):
+        elem = mol.element[a]
         if elem in sigmas:
             sigma = sigmas[elem]
         else:
-            print('unknown element -', mol.element[a], '- at atom index ', a)
-            sigma = 1.3
+            print('Unknown element -', mol.element[a],'- at atom index ', a)
+            sigma = 1.5
         sig[a] = sigma
     return sig
+
 
 
 def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
