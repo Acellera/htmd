@@ -867,12 +867,11 @@ if __name__ == '__main__':
 
     pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
     for pdb in pdbids:
-        np.random.seed(1)       # Probably unnecessary
-
         inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
         mol = Molecule(inFile)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
 
+        np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
         params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
