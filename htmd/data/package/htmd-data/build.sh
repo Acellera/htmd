@@ -10,31 +10,25 @@ if [ "$?" != "0" ]; then
 	exit 1
 fi
 
-
 rm -rf $(find htmd -type d -name __pycache__)
 
-	DIR="$SP_DIR"
-	echo "Installing into $DIR"
+DIR="$SP_DIR"
+echo "Installing into $DIR"
 
-
-	if [ "$DIR" != "" ]; then
-		mkdir -p "$DIR"
-	fi
-	if [ -e "$DIR" ]; then
-		pwd
-		ls htmd/data
+if [ "$DIR" != "" ]; then
+    mkdir -p "$DIR"
+fi
+if [ -e "$DIR" ]; then
+    pwd
     mkdir -p $DIR/htmd
-		cp -r htmd/data  $DIR/htmd/
-    rm -rf $(find "$DIR/htmd" -name .git -type d) 
-
- 	else
-		echo "Error: SP_DIR not defined"
-		exit 1
-	fi
+    cp -r . $DIR/htmd/
+    rm -rf $(find "$DIR/htmd" -name .git -type d)
+else
+    echo "Error: SP_DIR not defined"
+    exit 1
+fi
 
 chmod -R a+rX .
 chmod -R a+rX .
-
-
 
 exit 0
