@@ -881,8 +881,7 @@ if __name__ == '__main__':
         bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
 
         compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
-
         assertSameAsReferenceDir(compareDir, tmpdir)
 
-        # shutil.rmtree(tmpdir)
+        shutil.rmtree(tmpdir)
 
