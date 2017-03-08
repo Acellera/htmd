@@ -910,6 +910,5 @@ if __name__ == '__main__':
         m.filter("protein")
         mp=proteinPrepare(m)
         inFile = os.path.join(preparedInputDir, "{}-prepared.pdb".format(p))
-        m.write(infile)
-
+        m.write(inFile)
 """
