@@ -439,3 +439,18 @@ if __name__ == "__main__":
 
         import doctest
         doctest.testmod()
+
+
+
+"""
+    # Code to regenerate reference files. Run with PYTHONHASHSEED=1
+    from htmd import *
+    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+    for p in pdbids:
+        preparedInputDir = home(dataDir=os.path.join('test-proteinprepare', p))
+        m=Molecule(p)
+        m.filter("protein")
+        mp=proteinPrepare(m)
+        inFile = os.path.join(preparedInputDir, "{}-prepared.pdb".format(p))
+        mp.write(inFile)
+"""
