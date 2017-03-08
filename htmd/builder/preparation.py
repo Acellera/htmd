@@ -399,8 +399,8 @@ if __name__ == "__main__":
     import htmd
     import os
 
+    # Stand-alone executable: prepare the PDB given as argument
     if len(sys.argv) > 1:
-        # Prepare named argument
         mol = Molecule(sys.argv[1])
         mol.filter("protein")
         mol_op, prepData = proteinPrepare(mol, returnDetails=True)
@@ -430,7 +430,7 @@ if __name__ == "__main__":
             mol.filter("protein")
             mol_op, prepData = proteinPrepare(mol, returnDetails=True)
             mol_op.write("./{}-prepared.pdb".format(pdb))
-            prepData.data.to_csv("./{}-prepared.csv".format(pdb))
+            prepData.data.to_csv("./{}-prepared.csv".format(pdb), float_format="%.2f")
 
             compareDir = htmd.home(dataDir=os.path.join('test-proteinprepare', pdb))
             htmd.util.assertSameAsReferenceDir(compareDir)
@@ -450,7 +450,8 @@ if __name__ == "__main__":
         preparedInputDir = home(dataDir=os.path.join('test-proteinprepare', p))
         m=Molecule(p)
         m.filter("protein")
-        mp=proteinPrepare(m)
-        inFile = os.path.join(preparedInputDir, "{}-prepared.pdb".format(p))
-        mp.write(inFile)
+        mp,dp = proteinPrepare(m, returnDetails=True)
+        inFile = os.path.join(preparedInputDir, "{}-prepared".format(p))
+        mp.write(inFile+".pdb")
+        dp.data.to_csv(inFile+".csv",float_format="%.2f")
 """

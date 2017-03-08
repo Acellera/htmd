@@ -209,10 +209,12 @@ def assertSameAsReferenceDir(compareDir, outdir="."):
     toCompare = os.listdir(compareDir)
     match, mismatch, error = filecmp.cmpfiles(outdir, compareDir, toCompare, shallow=False)
     if len(mismatch) != 0 or len(error) != 0 or len(match) != len(toCompare):
-        raise Exception(
-            'Files {} in {} did not match references in {} . Being checked: {}.'.
-                format(mismatch, outdir, compareDir, toCompare)
-        )
+        logger.error("Mismatch while checking directory {} versus reference {}".format(outdir,compareDir))
+        logger.error("Files being checked: {}".format(toCompare))
+        for f in mismatch:
+            logger.error("    diff {} {}".format(os.path.join(outdir, f),
+                                                 os.path.join(compareDir, f)   ))
+        raise Exception('Mismatch in regression testing.')
 
 
 def testDHFR():
