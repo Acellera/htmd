@@ -23,13 +23,18 @@ package:
 source:
    path: .
 
+# https://www.continuum.io/blog/developer-blog/condas-new-noarch-packages
+build:
+ number: 0
+ noarch: python
+
 requirements:
   build:
     - python
     - requests
 
-
   run:
+    - python
 " > $DIR/meta.yaml
 
 RET=0
