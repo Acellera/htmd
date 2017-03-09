@@ -230,7 +230,7 @@ def proteinPrepare(mol_in,
     >>> tryp_op, prepData = proteinPrepare(tryp, returnDetails=True)
     >>> tryp_op.write('proteinpreparation-test-main-ph-7.pdb')
     >>> prepData.data.to_excel("/tmp/tryp-report.xlsx")
-    >>> prepData
+    >>> prepData                                                        # doctest: +NORMALIZE_WHITESPACE
     PreparationData object about 290 residues.
     Unparametrized residue names: CA, BEN
     Please find the full info in the .data property, e.g.:
@@ -399,8 +399,8 @@ if __name__ == "__main__":
     import htmd
     import os
 
+    # Stand-alone executable: prepare the PDB given as argument
     if len(sys.argv) > 1:
-        # Prepare named argument
         mol = Molecule(sys.argv[1])
         mol.filter("protein")
         mol_op, prepData = proteinPrepare(mol, returnDetails=True)
@@ -430,7 +430,7 @@ if __name__ == "__main__":
             mol.filter("protein")
             mol_op, prepData = proteinPrepare(mol, returnDetails=True)
             mol_op.write("./{}-prepared.pdb".format(pdb))
-            prepData.data.to_csv("./{}-prepared.csv".format(pdb))
+            prepData.data.to_csv("./{}-prepared.csv".format(pdb), float_format="%.2f")
 
             compareDir = htmd.home(dataDir=os.path.join('test-proteinprepare', pdb))
             htmd.util.assertSameAsReferenceDir(compareDir)
@@ -439,3 +439,19 @@ if __name__ == "__main__":
 
         import doctest
         doctest.testmod()
+
+
+
+"""
+    # Code to regenerate reference files. Run with PYTHONHASHSEED=1
+    from htmd import *
+    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+    for p in pdbids:
+        preparedInputDir = home(dataDir=os.path.join('test-proteinprepare', p))
+        m=Molecule(p)
+        m.filter("protein")
+        mp,dp = proteinPrepare(m, returnDetails=True)
+        inFile = os.path.join(preparedInputDir, "{}-prepared".format(p))
+        mp.write(inFile+".pdb")
+        dp.data.to_csv(inFile+".csv",float_format="%.2f")
+"""

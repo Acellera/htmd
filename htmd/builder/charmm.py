@@ -881,20 +881,7 @@ if __name__ == '__main__':
         bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
 
         compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
-
         assertSameAsReferenceDir(compareDir, tmpdir)
 
-        # shutil.rmtree(tmpdir)
+        shutil.rmtree(tmpdir)
 
-
-"""
-    from htmd import *
-    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
-    preparedInputDir = home(dataDir=os.path.join('test-charmm-build', "prepared-inputs"))
-    for p in pdbids:
-        m=Molecule(p)
-        m.filter("protein")
-        mp=proteinPrepare(m)
-        inFile = os.path.join(preparedInputDir, "{}-prepared.pdb".format(p))
-        m.write(inFile)
-"""
