@@ -258,7 +258,10 @@ def uniformRandomRotation():
         A uniformly distributed rotation matrix
     """
     q, r = np.linalg.qr(np.random.normal(size=(3, 3)))
-    return np.dot(q, np.diag(np.sign(np.diag(r))))
+    M = np.dot(q, np.diag(np.sign(np.diag(r))))
+    if np.linalg.det(M) < 0:  # Fixing the flipping
+        M[:, 0] = -M[:, 0]  # det(M)=1
+    return M
 
 
 def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
@@ -311,46 +314,128 @@ def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
     outFile.close()
 
 
-def drawCube(mi, ma, viewer=None):
-    from htmd.vmdviewer import getCurrentViewer
-    if viewer is None:
-        viewer = getCurrentViewer()
+def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10):
+    from htmd.util import ensurelist
+    try:
+        from Bio import pairwise2
+    except ImportError as e:
+        raise ImportError('You need to install the biopython package to use this function. Try using `conda install biopython`.')
+    from Bio.SubsMat import MatrixInfo as matlist
 
-    viewer.send('draw materials off')
-    viewer.send('draw color red')
-    c = ''
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], ma[0], mi[1], mi[2])
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], ma[1], mi[2])
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], mi[1], ma[2])
+    seqmol = mol.sequence()
+    seqref = ref.sequence()
 
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], ma[1], mi[2])
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], mi[1], ma[2])
+    if len(seqmol) > 1:
+        logger.info('Multiple segments ({}) detected in `mol`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqmol.keys())))
+        seqmol = mol.sequence(noseg=True)
+    if len(seqref) > 1:
+        logger.info('Multiple segments ({}) detected in `molref`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqref.keys())))
+        seqref = ref.sequence(noseg=True)
 
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], ma[0], ma[1], mi[2])
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], mi[0], ma[1], ma[2])
+    if molseg is None:
+        molseg = list(seqmol.keys())[0]
+    if refseg is None:
+        refseg = list(seqref.keys())[0]
 
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], ma[0], mi[1], ma[2])
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], mi[0], ma[1], ma[2])
+    def getSegIdx(m, mseg):
+        # Calculate the atoms which belong to the selected segments
+        if isinstance(mseg, str) and mseg == 'protein':
+            msegidx = m.atomselect('protein and name CA')
+        else:
+            msegidx = np.zeros(m.numAtoms, dtype=bool)
+            for seg in ensurelist(mseg):
+                msegidx |= (m.segid == seg) & (m.name == 'CA')
+        return np.where(msegidx)[0]
+    molsegidx = getSegIdx(mol, molseg)
+    refsegidx = getSegIdx(ref, refseg)
 
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], ma[1], mi[2])
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], mi[0], ma[1], ma[2])
-    c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], mi[1], ma[2])
-    viewer.send(c)
+    # Create fake residue numbers for the selected segment
+    molfakeresid = sequenceID((mol.resid[molsegidx], mol.insertion[molsegidx], mol.chain[molsegidx]))
+    reffakeresid = sequenceID((ref.resid[refsegidx], ref.insertion[refsegidx], ref.chain[refsegidx]))
 
-    """
-    draw line "$minx $miny $minz" "$maxx $miny $minz"
-    draw line "$minx $miny $minz" "$minx $maxy $minz"
-    draw line "$minx $miny $minz" "$minx $miny $maxz"
-    draw line "$maxx $miny $minz" "$maxx $maxy $minz"
-    draw line "$maxx $miny $minz" "$maxx $miny $maxz"
-    draw line "$minx $maxy $minz" "$maxx $maxy $minz"
-    draw line "$minx $maxy $minz" "$minx $maxy $maxz"
-    draw line "$minx $miny $maxz" "$maxx $miny $maxz"
-    draw line "$minx $miny $maxz" "$minx $maxy $maxz"
-    draw line "$maxx $maxy $maxz" "$maxx $maxy $minz"
-    draw line "$maxx $maxy $maxz" "$minx $maxy $maxz"
-    draw line "$maxx $maxy $maxz" "$maxx $miny $maxz"
-    """
+    # TODO: Use BLOSUM62?
+    alignments = pairwise2.align.globaldx(seqref[refseg], seqmol[molseg], matlist.blosum62)
+    numaln = len(alignments)
+
+    if numaln > maxalignments:
+        logger.warning('{} alignments found. Limiting to {} as specified in the `maxalignments` argument.'.format(numaln, maxalignments))
+
+    alignedstructs = []
+    for i in range(min(maxalignments, numaln)):
+        refaln = np.array(list(alignments[i][0]))
+        molaln = np.array(list(alignments[i][1]))
+
+        # By doing cumsum we calculate how many letters were before the current letter (i.e. residues before current)
+        residref = np.cumsum(refaln != '-')
+        residmol = np.cumsum(molaln != '-')
+
+        # True wherever there is a real alignment (both have a letter aligned)
+        alignedres = (refaln != '-') & (molaln != '-')
+
+        # Get the "resids" of the aligned residues only
+        refalnresid = residref[alignedres] - 1  # Start them from 0
+        molalnresid = residmol[alignedres] - 1  # Start them from 0
+
+        refidx = []
+        for r in refalnresid:
+            refidx += list(refsegidx[reffakeresid == r])
+        molidx = []
+        for r in molalnresid:
+            molidx += list(molsegidx[molfakeresid == r])
+
+        alignedmol = mol.copy()
+
+        molboolidx = np.zeros(mol.numAtoms, dtype=bool)
+        molboolidx[molidx] = True
+        refboolidx = np.zeros(ref.numAtoms, dtype=bool)
+        refboolidx[refidx] = True
+
+        alignedmol.align(molboolidx, ref, refboolidx)
+        alignedstructs.append(alignedmol)
+
+    return alignedstructs
+
+
+# def drawCube(mi, ma, viewer=None):
+#     from htmd.vmdviewer import getCurrentViewer
+#     if viewer is None:
+#         viewer = getCurrentViewer()
+#
+#     viewer.send('draw materials off')
+#     viewer.send('draw color red')
+#     c = ''
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], ma[0], mi[1], mi[2])
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], ma[1], mi[2])
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], mi[2], mi[0], mi[1], ma[2])
+#
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], ma[1], mi[2])
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], mi[1], mi[2], ma[0], mi[1], ma[2])
+#
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], ma[0], ma[1], mi[2])
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], ma[1], mi[2], mi[0], ma[1], ma[2])
+#
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], ma[0], mi[1], ma[2])
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(mi[0], mi[1], ma[2], mi[0], ma[1], ma[2])
+#
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], ma[1], mi[2])
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], mi[0], ma[1], ma[2])
+#     c += 'draw line "{} {} {}" "{} {} {}"\n'.format(ma[0], ma[1], ma[2], ma[0], mi[1], ma[2])
+#     viewer.send(c)
+#
+#     """
+#     draw line "$minx $miny $minz" "$maxx $miny $minz"
+#     draw line "$minx $miny $minz" "$minx $maxy $minz"
+#     draw line "$minx $miny $minz" "$minx $miny $maxz"
+#     draw line "$maxx $miny $minz" "$maxx $maxy $minz"
+#     draw line "$maxx $miny $minz" "$maxx $miny $maxz"
+#     draw line "$minx $maxy $minz" "$maxx $maxy $minz"
+#     draw line "$minx $maxy $minz" "$minx $maxy $maxz"
+#     draw line "$minx $miny $maxz" "$maxx $miny $maxz"
+#     draw line "$minx $miny $maxz" "$minx $maxy $maxz"
+#     draw line "$maxx $maxy $maxz" "$maxx $maxy $minz"
+#     draw line "$maxx $maxy $maxz" "$minx $maxy $maxz"
+#     draw line "$maxx $maxy $maxz" "$maxx $miny $maxz"
+#     """
 
 
 # A test method
@@ -374,3 +459,9 @@ if __name__ == "__main__":
 
     assert np.allclose(tmscore, expectedTMscore)
     assert np.allclose(rmsd, expectedRMSD)
+
+
+    rhodopsin = Molecule('1F88')
+    d3r = Molecule('3PBL')
+    alnmol = sequenceStructureAlignment(rhodopsin, d3r)
+
