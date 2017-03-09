@@ -23,11 +23,6 @@ package:
 source:
    path: .
 
-# https://www.continuum.io/blog/developer-blog/condas-new-noarch-packages
-build:
- number: 0
- noarch: python
-
 requirements:
   build:
     - python
@@ -49,5 +44,7 @@ for T in $(for i in $(cat package/htmd-deps/DEPENDENCIES); do echo ${i%%=*}; don
 	fi
 	echo "Package $T at version $VER"
 done
+
+cat $DIR/meta.yaml
 
 exit $RET
