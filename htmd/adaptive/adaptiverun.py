@@ -108,7 +108,7 @@ class AdaptiveMD(AdaptiveBase):
         self._arg('filteredpath', 'str', 'The directory in which the filtered simulations will be stored', 'filtered', val.String())
         self._arg('projection', ':class:`Projection <htmd.projections.projection.Projection>` object',
                   'A Projection class object or a list of objects which will be used to project the simulation '
-                   'data before constructing a Markov model', None, val.Object(Projection))
+                   'data before constructing a Markov model', None, val.Object(Projection), nargs='+')
         self._arg('truncation', 'str', 'Method for truncating the prob distribution (None, \'cumsum\', \'statecut\'', None, val.String())
         self._arg('statetype', 'str', 'What states (cluster, micro, macro) to use for calculations.', 'micro', val.String(), valid_values=('micro', 'cluster', 'macro'))
         self._arg('macronum', 'int', 'The number of macrostates to produce', 8, val.Number(int, 'POS'))
