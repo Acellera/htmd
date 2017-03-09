@@ -460,8 +460,8 @@ if __name__ == "__main__":
     assert np.allclose(tmscore, expectedTMscore)
     assert np.allclose(rmsd, expectedRMSD)
 
-
-    rhodopsin = Molecule('1F88')
-    d3r = Molecule('3PBL')
-    alnmol = sequenceStructureAlignment(rhodopsin, d3r)
+    #
+    # rhodopsin = Molecule('1F88')
+    # d3r = Molecule('3PBL')
+    # alnmol = sequenceStructureAlignment(rhodopsin, d3r)
 
