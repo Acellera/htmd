@@ -46,7 +46,7 @@ def getVoxelDescriptors(mol, buffer, voxelsize=1):
 
     # Calculate for each channel the atom sigmas
     multisigmas = np.zeros([mol.numAtoms, len(_order)])
-    sigmas = _getSigmas(mol)
+    sigmas = _getRadii(mol)
     for i, p in enumerate(_order):
         multisigmas[properties[p], i] = sigmas[properties[p]]
 
@@ -148,33 +148,52 @@ def _findDonors(mol, bonds):
     return donors
 
 
-def _getSigmas(mol):
-    """ Returns the VDW radii of each atom in the molecule
-
+def _getRadii(mol):
+    """ Gets vdW radius for each elem in mol.element. Source VMD.
+    
     Parameters
     ----------
     mol :
-        A Molecule object
+        A Molecule object. Needs to be read from Autodock 4 .pdbqt format
 
     Returns
     -------
-    sigmas : np.ndarray
-        The radius of each atom in Molecule
+    radii : np.ndarray
+        vdW radius for each element in mol.
     """
-    # NOTE: this should improved. Element or name? More than first characeter? FF based?
-    # e.g. Cl gets transformed wrongly to C. Also Mn and Zn are not present in dictionary
-    sigmas = {"H": 1.0, "C": 1.5, "N": 1.4, "O": 1.3, "F": 1.2, "P": 2.0, "S": 1.9,
-              "Cl": 2.5, "D": 4.0, "A": 1.5}
-    sig = np.zeros(mol.numAtoms)
-    for a in range(mol.numAtoms):  # TODO: STEFAN - Should be doable faster, although it's not really time-consuming
-        elem = mol.element[a][0]
-        if elem in sigmas:
-            sigma = sigmas[elem]
+
+    radii = {
+     'A':   1.5,
+     'D':   4.0,
+     'C':   1.7,
+     'Cl':  2.27,
+     'Co':  2.0,
+     'F':   1.47,
+     'Fe':  2.0,
+     'HD':  1.2,
+     'I':   1.98,
+     'Mg':  1.18,
+     'Mn':  2.0,
+     'N':   1.55,
+     'NA':  1.55,
+     'OA':  1.52,
+     'P':   1.8,
+     'S':   1.8,
+     'SA':  1.8,
+     'Zn':  1.39,
+     'Se':  1.9}
+
+    res = np.zeros(mol.numAtoms)
+    for a in range(mol.numAtoms):
+        elem = mol.element[a]
+        if elem in radii:
+            rad = radii[elem]
         else:
-            print('unknown element -', mol.element[a], '- at atom index ', a)
-            sigma = 1.3
-        sig[a] = sigma
-    return sig
+            print('Unknown element -', mol.element[a],'- at atom index ', a)
+            rad = 1.5
+        res[a] = rad
+    return res
+
 
 
 def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
