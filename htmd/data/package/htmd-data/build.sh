@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-printenv
 
 if [ "$?" != "0" ]; then
 	echo "Error: Build failed"
@@ -22,7 +21,8 @@ if [ -e "$DIR" ]; then
     pwd
     mkdir -p $DIR/htmd
     mkdir -p $DIR/htmd/data
-    cp -r . $DIR/htmd/data/
+    # Move all files except the license
+    mv ./*/ $DIR/htmd/data/
     rm -rf $(find "$DIR/htmd/data/" -name .git -type d)
 else
     echo "Error: SP_DIR not defined"
