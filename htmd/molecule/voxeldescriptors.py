@@ -46,7 +46,7 @@ def getVoxelDescriptors(mol, buffer, voxelsize=1):
 
     # Calculate for each channel the atom sigmas
     multisigmas = np.zeros([mol.numAtoms, len(_order)])
-    sigmas = _getSigmas(mol)
+    sigmas = _getRadii(mol)
     for i, p in enumerate(_order):
         multisigmas[properties[p], i] = sigmas[properties[p]]
 
@@ -148,9 +148,21 @@ def _findDonors(mol, bonds):
     return donors
 
 
-def _getSigmas(mol):
-    # Sigmas taken from VMD vdW radii.
-    sigmas = {
+def _getRadii(mol):
+    """ Gets vdW radius for each elem in mol.element. Source VMD.
+    
+    Parameters
+    ----------
+    mol :
+        A Molecule object. Needs to be read from Autodock 4 .pdbqt format
+
+    Returns
+    -------
+    radii : np.ndarray
+        vdW radius for each element in mol.
+    """
+
+    radii = {
      'A':   1.5,
      'D':   4.0,
      'C':   1.7,
@@ -171,16 +183,16 @@ def _getSigmas(mol):
      'Zn':  1.39,
      'Se':  1.9}
 
-    sig = np.zeros(mol.numAtoms)
+    res = np.zeros(mol.numAtoms)
     for a in range(mol.numAtoms):
         elem = mol.element[a]
-        if elem in sigmas:
-            sigma = sigmas[elem]
+        if elem in radii:
+            rad = radii[elem]
         else:
             print('Unknown element -', mol.element[a],'- at atom index ', a)
-            sigma = 1.5
-        sig[a] = sigma
-    return sig
+            rad = 1.5
+        res[a] = rad
+    return res
 
 
 
