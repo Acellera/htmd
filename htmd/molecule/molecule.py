@@ -1198,13 +1198,15 @@ class Molecule:
             self.__dict__[field] = self._empty(numAtoms, field)
         self.box = np.zeros(self._dims['box'], dtype=np.float32)
 
-    def sequence(self, oneletter=True):
+    def sequence(self, oneletter=True, noseg=False):
         """ Return the AA sequence of the Molecule.
 
         Parameters
         ----------
         oneletter : bool
             Whether to return one-letter or three-letter AA codes. There should be only one atom per residue.
+        noseg : bool
+            Ignore segments and return the whole sequence as single string.
 
         Returns
         -------
@@ -1228,15 +1230,20 @@ class Molecule:
         """
         from htmd.molecule.util import sequenceID
         prot = self.atomselect('protein')
-        segs = np.unique(self.segid[prot])
-        increm = sequenceID((self.resid, self.insertion, self.chain))
 
+        increm = sequenceID((self.resid, self.insertion, self.chain))
+        segs = np.unique(self.segid[prot])
         segSequences = {}
+        if noseg:
+            segs = ['protein']
 
         # Iterate over segments
         for seg in segs:
             segSequences[seg] = []
-            segatoms = self.atomselect('protein and segid "{}"'.format(seg))
+            if seg != 'protein':
+                segatoms = prot & (self.segid == seg)
+            else:
+                segatoms = prot
             resnames = self.resname[segatoms]
             incremseg = increm[segatoms]
             for i in np.unique(incremseg):  # Iterate over residues
