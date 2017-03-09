@@ -366,7 +366,10 @@ class Molecule:
             raise NameError("Invalid field '" + field + "'")
         s = self.atomselect(sel)
         if field == 'coords':
-            return np.squeeze(self.coords[s, :, self.frame])
+            cc = np.squeeze(self.coords[s, :, self.frame])
+            if cc.ndim == 1:
+                cc = cc[np.newaxis, :]
+            return cc
         elif field == 'index':
             return np.where(s)[0]
         else:
