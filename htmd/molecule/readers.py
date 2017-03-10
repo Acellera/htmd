@@ -645,7 +645,8 @@ def PDBread(filename, mode='pdb'):
     crystalinfo = {}
     if len(parsedcryst1):
         crystalinfo = parsedcryst1.ix[0].to_dict()
-        crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
+        if not np.isnan(crystalinfo['sGroup']):
+            crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
     if len(parsedsymmetry):
         numcopies = int(len(parsedsymmetry)/3)
         crystalinfo['numcopies'] = numcopies
