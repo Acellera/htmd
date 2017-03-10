@@ -326,7 +326,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
-                         execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap)
+                         execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap, atomtypes=atomtypes,
+                         offlibraries=offlibraries)
     tmpbonds = molbuilt.bonds
     molbuilt.bonds = []  # Removing the bonds to speed up writing
     molbuilt.write(path.join(outdir, 'structure.pdb'))
