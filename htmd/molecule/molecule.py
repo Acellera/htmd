@@ -1288,6 +1288,7 @@ class Molecule:
         if drop is not None:
             self.coords = np.delete(self.coords, drop, axis=2)
             self.box = np.delete(self.box, drop, axis=1)
+        self.frame = 0  # Reset to 0 since the frames changed indexes
 
     def viewCrystalPacking(self):
         """
