@@ -182,7 +182,7 @@ class AdaptiveGoal(AdaptiveMD):
 
         scale = self.ucscale
         if self.autoscale:
-            scale = self._calculateScale(goaldata)
+            scale = AdaptiveGoal._calculateScale(goaldata)
         reward = scale * uc + (1 - scale) * dc
 
         relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
@@ -202,27 +202,53 @@ class AdaptiveGoal(AdaptiveMD):
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
-    def _calculateScale(self, goaldata):
+    @staticmethod
+    def _calculateScale(goaldata):
         from htmd.adaptive.adaptive import epochSimIndexes
+
+        # Calculate the max goal of each epoch and the total min of the goal to normalize the goals to a [0, 1]
         epochs = epochSimIndexes(goaldata.simlist)
-        epochmaxgoal = np.zeros(len(epochs))
+        g = np.zeros(len(epochs))
         totalmin = None
-        for e in sorted(epochs.keys()):
+
+        for i, e in enumerate(sorted(epochs.keys())):
             idx = epochs[e]
-            epochmaxgoal[e] = 0
-            for i in idx:
-                if goaldata.dat[i].max() > epochmaxgoal[e]:
-                    epochmaxgoal[e] = goaldata.dat[i].max()
-                if totalmin is None or goaldata.dat[i].min() < totalmin:
-                    totalmin = goaldata.dat[i].min()
-        epochmaxgoal = (epochmaxgoal - totalmin) / (epochmaxgoal.max() - totalmin)
-        dx = np.abs(np.diff(epochmaxgoal))
-        dxn = self._featScale(dx)
-        scale = 0.5
-        for d in dxn[::-1]:
-            if d < 0.1:
-                scale = max(1, scale+0.1)
-        return scale
+            epochgoals = np.concatenate(goaldata.dat[idx])
+            g[i] = epochgoals.max()
+            if totalmin is None or epochgoals.min() < totalmin:
+                totalmin = epochgoals.min()
+
+        rangeG = g.max() - totalmin
+
+        # Calculate the dG
+        epochdiff = 10
+        g = np.hstack(([g[0]] * epochdiff, g))  # Prepending the first element epochdiff-times to calculate the dG
+        dG = np.abs(g[epochdiff:] - g[:-epochdiff]) / rangeG
+
+        # Really we only use the last dG. I could skip the rest of the calculations.
+        # But we need the total min and max for scaling!
+        c = 0.2  # This is the range of what we consider a significant change on a scale of [0, 1]
+        s = 1    # Scaling factor in case we want to react stronger to
+        grad = -s * (dG - c)
+        # Euler integration
+        tstep = 1
+        y = [0, ]
+        #print(dG, g, grad)
+        for t in range(1, len(dG), tstep):
+            y.append(max(min(y[-1] + tstep * grad[t], 1), 0))
+            #print('time: {} a: {} gradient: {} rangemax: {} rangemin: {}'.format(t, y[-1], grad[t], g.max(), totalmin))
+        #print("END")
+
+        return y, grad, dG, g
+        #return y[-1]
+
+        # dx = np.abs(np.diff(g))
+        # dxn = self._featScale(dx)
+        # scale = 0.5
+        # for d in dxn[::-1]:
+        #     if d < 0.1:
+        #         scale = max(1, scale+0.1)
+        # return scale
 
     def _getSpawnFrames(self, reward, model, data):
         spawncounts, prob = self._spawn(reward, self.nmax - self._running)
