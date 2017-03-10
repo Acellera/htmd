@@ -239,8 +239,9 @@ if __name__ == '__main__':
     from htmd.home import home
     import os
     import numpy as np
-    resOcc, resCent = getVoxelDescriptors(Molecule('3PTB'), buffer=8, voxelsize=1)
-    refOcc = np.load(os.path.join(home(), 'data', 'test-voxeldescriptors', '3PTB_occ.npy'))
-    refCent = np.load(os.path.join(home(), 'data', 'test-voxeldescriptors', '3PTB_center.npy'))
+    testf = os.path.join(home(), 'data', 'test-voxeldescriptors')
+    resOcc, resCent = getVoxelDescriptors(Molecule(os.path.join(testf, '3ptb.pdbqt')), buffer=8, voxelsize=1)
+    refOcc = np.load(os.path.join(testf, '3PTB_occ.npy'))
+    refCent = np.load(os.path.join(testf, '3PTB_center.npy'))
     assert np.allclose(resOcc, refOcc)
     assert np.allclose(resCent, refCent)
