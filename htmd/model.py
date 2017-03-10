@@ -348,7 +348,7 @@ class Model(object):
         absFrames = []
         relFrames = []
         for i in range(len(states)):
-            if frames[i] == 0 and not all:
+            if frames[i] == 0 and not allframes:
                 continue
             st = states[i]
             if statetype == 'macro':
