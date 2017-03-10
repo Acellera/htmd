@@ -250,12 +250,22 @@ def boundingBox(mol, sel='all'):
 
 
 def uniformRandomRotation():
-    """ Return a uniformly distributed rotation matrix
+    """
+    Return a uniformly distributed rotation 3 x 3 matrix
+
+    The initial description of the calculation can be found in the section 5 of "How to generate random matrices from
+    the classical compact groups" of Mezzadri (PDF: https://arxiv.org/pdf/math-ph/0609050.pdf; arXiv:math-ph/0609050;
+    and NOTICES of the AMS, Vol. 54 (2007), 592-604). Sample code is provided in that section as the ``haar_measure``
+    function.
+
+    Apparently this code can randomly provide flipped molecules (chirality-wise), so a fix found in
+    https://github.com/tmadl/sklearn-random-rotation-ensembles/blob/5346f29855eb87241e616f6599f360eba12437dc/randomrotation.py
+    was applied.
 
     Returns
     -------
     M : np.ndarray
-        A uniformly distributed rotation matrix
+        A uniformly distributed rotation 3 x 3 matrix
     """
     q, r = np.linalg.qr(np.random.normal(size=(3, 3)))
     M = np.dot(q, np.diag(np.sign(np.diag(r))))
