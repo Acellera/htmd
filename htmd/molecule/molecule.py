@@ -1166,14 +1166,14 @@ class Molecule:
 
                 if ext in _TOPOLOGY_EXTS:
                     tmppdb = tempname(suffix='.pdb')
-                    self.write(tmppdb)
+                    src.write(tmppdb)
                     traj = md.load(tmppdb)
                     os.remove(tmppdb)
                 else:
                     tmppdb = tempname(suffix='.pdb')
                     tmpxtc = tempname(suffix='.xtc')
-                    self.write(tmppdb)
-                    self.write(tmpxtc)
+                    src.write(tmppdb)
+                    src.write(tmpxtc)
                     traj = md.load(tmpxtc, top=tmppdb)
                     os.remove(tmppdb)
                     os.remove(tmpxtc)
