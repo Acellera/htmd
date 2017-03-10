@@ -645,7 +645,7 @@ def PDBread(filename, mode='pdb'):
     crystalinfo = {}
     if len(parsedcryst1):
         crystalinfo = parsedcryst1.ix[0].to_dict()
-        if not np.isnan(crystalinfo['sGroup']):
+        if isinstance(crystalinfo['sGroup'], str) or not np.isnan(crystalinfo['sGroup']):
             crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
     if len(parsedsymmetry):
         numcopies = int(len(parsedsymmetry)/3)
@@ -924,3 +924,6 @@ if __name__ == '__main__':
     mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
     mol.read(natsorted(glob(os.path.join(testfolder, '*.xtc'))))
     print('Can read/append XTC trajectories.')
+
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'weird-cryst.pdb'))
+    print('Can read missing crystal info.')

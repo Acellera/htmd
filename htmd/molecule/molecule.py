@@ -1646,7 +1646,7 @@ if __name__ == "__main__":
                 print(m.resname[s])
     print('done')
 
-    # Testing trajctory reading and appending
+    # Testing trajectory reading and appending
     ref = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
     xtcfile = path.join(home(), 'data', 'metricdistance', 'traj.xtc')
     ref.read(xtcfile)

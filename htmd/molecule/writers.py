@@ -422,3 +422,30 @@ def GROwrite(mol, filename):
         fh.write(b'%5d\n' % mol.numAtoms)
         np.savetxt(fh, a.values, '%5d%-5s%5s%5d%8.3f%8.3f%8.3f')
         fh.write(b'%f %f %f 0 0 0 0 0 0' % (box[0], box[1], box[2]))
+
+
+if __name__ == '__main__':
+    from htmd.home import home
+    from htmd.molecule.molecule import Molecule
+    import filecmp
+    from htmd.util import tempname
+    import os
+    testfolder = home(dataDir='molecule-writers/')
+    mol = Molecule('3PTB')
+    tmp = tempname(suffix='.h5')
+    mol.write(tmp, 'name CA')
+    #
+    # from difflib import Differ
+    # d = Differ()
+    #
+    # with open(tmp, 'rb') as f1, open(a, 'rb') as f2:
+    #     res = d.compare([x.decode('utf8') for x in f1.readlines()], [x.decode('utf8') for x in f2.readlines()])
+    #
+    #     try:
+    #         next(res)
+    #     except StopIteration:
+    #         print('Same files')
+    #     else:
+    #         assert('Error in MDtraj writer.')
+    #
+    # assert filecmp.cmp(tmp, os.path.join(testfolder, '3PTB.h5'))

@@ -8,6 +8,7 @@ from htmd.adaptive.adaptiverun import AdaptiveMD
 from htmd.model import macroAccumulate
 from protocolinterface import val
 import numpy as np
+import os
 import logging
 
 logger = logging.getLogger(__name__)
