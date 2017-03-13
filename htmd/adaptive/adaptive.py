@@ -241,7 +241,7 @@ def _writeInputsFunction(i, f, epoch, inputpath, coorname):
     else:
         mol = Molecule()
     mol.read(traj)
-    mol.frame = frameNum
+    mol.dropFrames(keep=frameNum)  # Making sure only specific frame to write is kept
     mol.write(path.join(newDir, coorname))
 
 
