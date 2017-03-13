@@ -240,8 +240,8 @@ class AdaptiveGoal(AdaptiveMD):
             #print('time: {} a: {} gradient: {} rangemax: {} rangemin: {}'.format(t, y[-1], grad[t], g.max(), totalmin))
         #print("END")
 
-        return y, grad, dG, g
-        #return y[-1]
+        #return y, grad, dG, g
+        return y[-1]
 
         # dx = np.abs(np.diff(g))
         # dxn = self._featScale(dx)
