@@ -192,7 +192,7 @@ class AdaptiveGoal(AdaptiveMD):
             if not path.exists('saveddata'):
                 os.makedirs('saveddata')
             epoch = self._getEpoch()
-            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'ucscale': self.ucscale,
+            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'ucscale': scale,
                       'spawncounts': spawncounts, 'truncprob': truncprob, 'relFrames': relFrames, 'dcmeans': dcmeans,
                       'dcstds': dcstds, 'reward': reward}
             np.save(path.join('saveddata', 'e{}_goalreport.npy'.format(epoch)), tosave)
