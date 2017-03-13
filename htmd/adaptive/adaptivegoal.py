@@ -129,6 +129,8 @@ class AdaptiveGoal(AdaptiveMD):
         self._arg('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False, val.Boolean())
         self._arg('autoscale', 'bool', 'Automatically scales exploration and exploitation ratios depending on '
                                        'how stuck the adaptive is at a given goal score.', False, val.Boolean())
+        self._arg('autoscalemult', 'float', 'Multiplier for the scaling factor.', 1, val.Number(float, '0POS'))
+        self._arg('autoscaletol', 'float', 'Tolerance for the scaling factor.', 0.2, val.Number(float, '0POS'))
         self._debug = False
 
     def _algorithm(self):
@@ -183,7 +185,7 @@ class AdaptiveGoal(AdaptiveMD):
 
         scale = self.ucscale
         if self.autoscale:
-            scale = AdaptiveGoal._calculateScale(goaldata)
+            scale = AdaptiveGoal._calculateScale(goaldata, self.autoscalemult, self.autoscaletol)
         reward = scale * uc + (1 - scale) * dc
 
         relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
@@ -204,7 +206,7 @@ class AdaptiveGoal(AdaptiveMD):
         return True
 
     @staticmethod
-    def _calculateScale(goaldata):
+    def _calculateScale(goaldata, multiplier=1, tolerance=0.2):
         from htmd.adaptive.adaptive import epochSimIndexes
 
         # Calculate the max goal of each epoch and the total min of the goal to normalize the goals to a [0, 1]
@@ -226,11 +228,9 @@ class AdaptiveGoal(AdaptiveMD):
         g = np.hstack(([g[0]] * epochdiff, g))  # Prepending the first element epochdiff-times to calculate the dG
         dG = np.abs(g[epochdiff:] - g[:-epochdiff]) / rangeG
 
-        # Really we only use the last dG. I could skip the rest of the calculations.
-        # But we need the total min and max for scaling!
-        c = 0.2  # This is the range of what we consider a significant change on a scale of [0, 1]
-        s = 1    # Scaling factor in case we want to react stronger to
-        grad = -s * (dG - c)
+        # Tolerance is the range of what we consider a significant change on a scale of [0, 1]
+        # Multiplier is a scaling factor in case we want to react stronger to
+        grad = -multiplier * (dG - tolerance)
         # Euler integration
         tstep = 1
         y = [0, ]
