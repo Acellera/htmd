@@ -16,4 +16,7 @@ conda install --file $DIR/DEPENDENCIES -y
 conda remove htmd -y
 
 python $DIR/write_meta_yaml.py $DIR
+
+cat $DIR/meta.yaml
+
 exit $?
