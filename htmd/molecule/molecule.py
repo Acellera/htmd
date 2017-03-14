@@ -1668,5 +1668,11 @@ if __name__ == "__main__":
     assert len1 == 4562
     assert len3 == 4562
 
+    # Testing MDtraj writer
+    m = Molecule('3PTB')
+    tmp = tempname(suffix='.h5')
+    m.write(tmp, 'name CA')
+
+
 
 

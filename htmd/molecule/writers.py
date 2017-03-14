@@ -289,19 +289,18 @@ def PSFwrite(molecule, filename):
             segid = m.segid[i]
         elif m.segid[i] == '' and m.chain[i] != '':
             segid = m.chain[i]
-        print("%8d %-4s %-5s%-4s %-4s %-6s %-2s %10.6f  %8.6f  %10d" %
-              (int(m.serial[i]),
-               segid,
-               str(m.resid[i]) + str(m.insertion[i]),
-               (m.resname[i]),
-               m.name[i],
-               atomtype,
-               "",  # m.element[i], # NAMD barfs if this is set
-               charge,
-               mass,
-               0
-               ),
-              file=f)
+        print("{!s:>8.8} {!s:4.4} {!s:5.5}{!s:4.4} {!s:4.4} {!s:6.6} {!s:2.2} {:10.6}  {:8.6}  {!s:>10.10}".format(
+            int(m.serial[i]),
+            segid,
+            str(m.resid[i]) + str(m.insertion[i]),
+            (m.resname[i]),
+            m.name[i],
+            atomtype,
+            "",  # m.element[i], # NAMD barfs if this is set
+            charge,
+            mass,
+            0
+        ), file=f)
     print("\n\n", file=f)
     print(" %8d !NBOND: bonds" % (m.bonds.shape[0]), file=f)
     for i in range(m.bonds.shape[0]):
