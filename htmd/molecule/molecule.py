@@ -865,6 +865,7 @@ class Molecule:
         self.viewname = fnamestr
         self.fileloc = [[fnamestr, 0]]
         self.topoloc = os.path.abspath(filename)
+        self.element = self._guessMissingElements()
 
     def _readTraj(self, filename, skip=None, frames=None, append=False, mdtraj=False):
         if mdtraj:
@@ -1323,18 +1324,16 @@ class Molecule:
                         elements.append('Xx')
         return elements
 
-    def _guessElements(self):
+    def _guessMissingElements(self):
         from htmd.molecule.writers import _deduce_PDB_atom_name, _getPDBElement
-        elements = []
-        for i, elem in enumerate(self.element):
-            if len(elem) != 0 and isinstance(elem, str):
-                elements.append(elem)
-            else:
-                # Get the 4 character PDB atom name
-                name = _deduce_PDB_atom_name(self.name[i], self.resname[i])
-                # Deduce from the 4 character atom name the element
-                elem = _getPDBElement(name, elem, lowersecond=False)
-                elements.append(elem)
+        elements = self.element.copy()
+        emptyidx = np.where(elements == '')[0]
+        for i in emptyidx:
+            # Get the 4 character PDB atom name
+            name = _deduce_PDB_atom_name(self.name[i], self.resname[i])
+            # Deduce from the 4 character atom name the element
+            elem = _getPDBElement(name, '', lowersecond=False)
+            elements[i] = elem
         return elements
 
     @property

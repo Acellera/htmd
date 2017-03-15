@@ -128,7 +128,7 @@ def _buildResAndMol(pdb2pqr_protein):
     # mol_out.set("element", " ")
     # Re-calculating elements
     mol_out.element[:] = ''
-    mol_out.element[:] = mol_out._guessElements()
+    mol_out.element = mol_out._guessMissingElements()
 
     prepData._importPKAs(pdb2pqr_protein.pka_protein)
 
