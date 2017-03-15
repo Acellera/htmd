@@ -4,12 +4,13 @@
 # No redistribution in whole or part
 #
 from htmd.molecule.util import boundingBox
-import numpy as np
+from htmd.molecule.vdw import VDW, radiusByElement
 import ctypes
 import htmd
 import os
 
-_order = ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 'positive_ionizable', 'negative_ionizable', 'metal', 'occupancies')
+_order = ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 'positive_ionizable',
+          'negative_ionizable', 'metal', 'occupancies')
 libdir = htmd.home(libDir=True)
 occupancylib = ctypes.cdll.LoadLibrary(os.path.join(libdir, "occupancy_ext.so"))
 
@@ -162,38 +163,35 @@ def _getRadii(mol):
         vdW radius for each element in mol.
     """
 
-    radii = {
-     'A':   1.5,
-     'D':   4.0,
-     'C':   1.7,
-     'Cl':  2.27,
-     'Co':  2.0,
-     'F':   1.47,
-     'Fe':  2.0,
-     'HD':  1.2,
-     'I':   1.98,
-     'Mg':  1.18,
-     'Mn':  2.0,
-     'N':   1.55,
-     'NA':  1.55,
-     'OA':  1.52,
-     'P':   1.8,
-     'S':   1.8,
-     'SA':  1.8,
-     'Zn':  1.39,
-     'Se':  1.9}
+    mappings = {  # Mapping pdbqt representation to element.
+        'HD': 'H',
+        'HS': 'H',
+        'A': 'C',
+        'NA': 'N',
+        'NS': 'N',
+        'OA': 'O',
+        'OS': 'O',
+        'MG': 'Mg',
+        'SA': 'S',
+        'CL': 'Cl',
+        'CA': 'Ca',
+        'MN': 'Mn',
+        'FE': 'Fe',
+        'ZN': 'Zn',
+        'BR': 'Br'
+    }
 
     res = np.zeros(mol.numAtoms)
     for a in range(mol.numAtoms):
         elem = mol.element[a]
-        if elem in radii:
-            rad = radii[elem]
+        elem = mappings.get(elem, elem)
+        if elem in VDW.elements:
+            rad = radiusByElement(elem)
         else:
-            print('Unknown element -', mol.element[a],'- at atom index ', a)
+            print('Unknown element -', mol.element[a], '- at atom index ', a)
             rad = 1.5
         res[a] = rad
     return res
-
 
 
 def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
