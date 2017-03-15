@@ -162,31 +162,48 @@ def _getRadii(mol):
         vdW radius for each element in mol.
     """
 
+    ###############################################################################
+    # Radii are taken reused from htmd.molecule.vdw and adopted for PDBQT format  #
+    #                                                                             #
+    # Original source:                                                            #
+    #    """                                                                      #
+    #    All values below are taken from PeriodicTable.C from VMD source code     #
+    #                                                                             #
+    #    van der Waals radii are taken from A. Bondi,                             #
+    #    J. Phys. Chem., 68, 441 - 452, 1964,                                     #
+    #    except the value for H, which is taken from R.S. Rowland & R. Taylor,    #
+    #    J.Phys.Chem., 100, 7384 - 7391, 1996. Radii that are not available in    #
+    #    either of these publications have RvdW = 2.00 �.                         #
+    #    The radii for Ions (Na, K, Cl, Ca, Mg, and Cs are based on the CHARMM27  #
+    #    Rmin/2 parameters for (SOD, POT, CLA, CAL, MG, CES) by default.          #
+    #    """                                                                      #
+    ###############################################################################
+
     radii = {
-     'A':   1.7,
-     'D':   4.0,
-     'C':   1.7,
-     'Cl':  2.27,
+     'A':  1.70,
+     'D':  4.00,
+     'C':  1.70,
+     'Cl': 2.27,
      'CL': 2.27,
-     'Co':  2.0,
-     'F':   1.47,
-     'Fe':  2.0,
-     'HD':  1.2,
-     'I':   1.98,
-     'Mg':  1.18,
-     'Mn':  2.0,
-     'N':   1.55,
-     'NA':  1.55,
+     'Co': 2.00,
+     'F':  1.47,
+     'Fe': 2.00,
+     'HD': 1.20,
+     'I':  1.98,
+     'Mg': 1.18,
+     'Mn': 2.00,
+     'N':  1.55,
+     'NA': 1.55,
      'NS': 1.55,
-     'OA':  1.52,
+     'OA': 1.52,
      'OS': 1.52,
-     'P':   1.8,
-     'S':   1.8,
-     'SA':  1.8,
-     'Zn':  1.39,
-     'Se':  1.9,
+     'P':  1.80,
+     'S':  1.80,
+     'SA': 1.80,
+     'Zn': 1.39,
+     'Se': 1.90,
      'Br': 1.85,
-     'Cu': 1.4,
+     'Cu': 1.40,
      'Hg': 1.55,
      'Pt': 1.72
     }
