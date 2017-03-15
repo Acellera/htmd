@@ -163,10 +163,11 @@ def _getRadii(mol):
     """
 
     radii = {
-     'A':   1.5,
+     'A':   1.7,
      'D':   4.0,
      'C':   1.7,
      'Cl':  2.27,
+     'CL': 2.27,
      'Co':  2.0,
      'F':   1.47,
      'Fe':  2.0,
@@ -176,12 +177,19 @@ def _getRadii(mol):
      'Mn':  2.0,
      'N':   1.55,
      'NA':  1.55,
+     'NS': 1.55,
      'OA':  1.52,
+     'OS': 1.52,
      'P':   1.8,
      'S':   1.8,
      'SA':  1.8,
      'Zn':  1.39,
-     'Se':  1.9}
+     'Se':  1.9,
+     'Br': 1.85,
+     'Cu': 1.4,
+     'Hg': 1.55,
+     'Pt': 1.72
+    }
 
     res = np.zeros(mol.numAtoms)
     for a in range(mol.numAtoms):
@@ -189,7 +197,7 @@ def _getRadii(mol):
         if elem in radii:
             rad = radii[elem]
         else:
-            print('Unknown element -', mol.element[a],'- at atom index ', a)
+            print('Unknown element -', mol.element[a], '- at atom index ', a)
             rad = 1.5
         res[a] = rad
     return res
@@ -237,8 +245,6 @@ def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
 if __name__ == '__main__':
     from htmd.molecule.molecule import Molecule
     from htmd.home import home
-    import os
-    import numpy as np
     testf = os.path.join(home(), 'data', 'test-voxeldescriptors')
     resOcc, resCent = getVoxelDescriptors(Molecule(os.path.join(testf, '3ptb.pdbqt')), buffer=8, voxelsize=1)
     refOcc = np.load(os.path.join(testf, '3PTB_occ.npy'))
