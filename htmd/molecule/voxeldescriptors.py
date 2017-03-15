@@ -5,6 +5,7 @@
 #
 from htmd.molecule.util import boundingBox
 from htmd.molecule.vdw import VDW, radiusByElement
+import numpy as np
 import ctypes
 import htmd
 import os
@@ -181,10 +182,17 @@ def _getRadii(mol):
         'BR': 'Br'
     }
 
+    for el in ['H', 'C', 'N', 'O', 'F', 'Mg', 'P', 'S', 'Cl', 'Ca', 'Fe', 'Zn', 'Br', 'I']:
+        mappings[el] = el
+
     res = np.zeros(mol.numAtoms)
     for a in range(mol.numAtoms):
         elem = mol.element[a]
-        elem = mappings.get(elem, elem)
+
+        if elem not in mappings:
+            raise ValueError('PDBQT element {} does not exist in mappings.'.format(elem))
+        elem = mappings[elem]
+
         if elem in VDW.elements:
             rad = radiusByElement(elem)
         else:
