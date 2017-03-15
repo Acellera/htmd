@@ -4,12 +4,14 @@
 # No redistribution in whole or part
 #
 import os
-
 import htmd.home
 import ctypes as ct
 from htmd.molecule.support import pack_string_buffer, pack_int_buffer, pack_ulong_buffer, pack_double_buffer
 import numpy as np
 import platform
+import logging
+
+logger = logging.getLogger(__name__)
 
 libdir = htmd.home(libDir=True)
 if platform.system() == "Windows":
@@ -24,6 +26,11 @@ parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
                  altloc=None, beta=None, occupancy=None, bonds=None):
 
+    maxseglen = np.max([len(x) for x in segname])
+    if maxseglen > 3:
+        logger.warning('More than 3 characters were used for segnames. '
+                       'Due to limitations in VMD atomselect segids will be dropped for the atomselection.')
+        segname[:] = ''
 
     if coordinates.ndim == 2:
         coordinates = np.atleast_3d(coordinates)
@@ -255,8 +262,8 @@ def guessbonds(coordinates, element, name, resname, resid, chain, segname, inser
         raise NameError("'resid' not natoms in length")
 
     c_natoms = ct.c_int(natoms)
-    c_atomname = pack_string_buffer(element)
-    c_atomtype = pack_string_buffer(name)
+    c_element = pack_string_buffer(element)
+    c_name = pack_string_buffer(name)
     c_resname = pack_string_buffer(resname)
 
     c_chain = pack_string_buffer(chain)
@@ -267,8 +274,9 @@ def guessbonds(coordinates, element, name, resname, resid, chain, segname, inser
     c_nframes = ct.c_int(nframes)
 
     c_nbonds = (ct.c_int * 1)()
-    lenv = natoms * 10  # some dumb guess about the max # of bonds likely to be created -- natoms*5
-    c_bonds = (ct.c_int * lenv)()
+    maxbonds = natoms * 5  # some dumb guess about the max # of bonds likely to be created
+    tmp = maxbonds * 2
+    c_bonds = (ct.c_int * tmp)()
 
     c_nbonds[0] = 0
     c_coords = coordinates.ctypes.data_as(ct.POINTER(ct.c_float))
@@ -276,8 +284,8 @@ def guessbonds(coordinates, element, name, resname, resid, chain, segname, inser
     retval = parser.guessbonds(
         c_natoms,
         c_nframes,
-        c_atomtype,
-        c_atomname,
+        c_name,
+        c_element,
         c_resname,
         c_resid,
         c_chain,
@@ -286,6 +294,7 @@ def guessbonds(coordinates, element, name, resname, resid, chain, segname, inser
         c_altLoc,
         c_coords,
         c_nbonds,
+        ct.c_int(maxbonds),
         c_bonds
     )
 
