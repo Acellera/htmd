@@ -802,6 +802,8 @@ class Molecule:
         self.fileloc = [[fnamestr, 0]]
         self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
+        if not hasattr(self, 'fstep'):
+            self.fstep = None
 
     def _readTraj(self, filename, reader, skip=None, frames=None, append=False, mdtraj=False):
         def checkCoords(coords, reader, f):
@@ -1086,7 +1088,7 @@ class Molecule:
         type : str, optional
             The filetype we want to write. By default, detected from the file extension
         """
-        from htmd.molecule.writers import _TOPOLOGY_WRITERS, _TRAJECTORY_WRITERS
+        from htmd.molecule.writers import _WRITERS
         if type:
             type = type.lower()
         ext = os.path.splitext(filename)[1][1:]
@@ -1096,14 +1098,10 @@ class Molecule:
             src = self.copy()
             src.filter(sel, _logger=False)
 
-        if type in _TOPOLOGY_WRITERS:
+        if type in _WRITERS:
             ext = type
-        if type in _TRAJECTORY_WRITERS:
-            ext = type
-        if ext in _TOPOLOGY_WRITERS:
-            _TOPOLOGY_WRITERS[ext](src, filename)
-        elif ext in _TRAJECTORY_WRITERS:
-            _TRAJECTORY_WRITERS[ext](src, filename)
+        if ext in _WRITERS:
+            _WRITERS[ext](src, filename)
 
     def empty(self, numAtoms):
         """ Creates an empty molecule of N atoms.
