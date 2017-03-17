@@ -735,6 +735,13 @@ class Molecule:
             self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             return
+        elif type == "pdbqt" or ext == "pdbqt":
+            from htmd.molecule.readers import PDBread
+            topo, coords, crystalinfo = PDBread(filename, mode='pdbqt')
+            self.crystalinfo = crystalinfo
+            self._parseTopology(topo, filename, overwrite=overwrite)
+            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            return
 
         if type in _TOPOLOGY_READERS:
             ext = type
