@@ -116,7 +116,9 @@ def checkTruncations(mol):
                                                                                                                        f]))
 
 
-def PDBwrite(mol, filename, frame):
+def PDBwrite(mol, filename, frame=None):
+    if frame is None:
+        frame = mol.frame
     frame = ensurelist(frame)
 
     def format83(f):
@@ -205,8 +207,13 @@ def PDBwrite(mol, filename, frame):
     fh.close()
 
 
-def XTCwrite(coords, box, filename, time=None, step=None):
-    numFrames = coords.shape[2]
+def XTCwrite(mol, filename):
+    coords = mol.coords
+    box = mol.box
+    time = mol.time
+    step = mol.step
+    numFrames = mol.numFrames
+
     if np.size(box, 1) != numFrames:  # Box should have as many frames as trajectory
         box = np.tile(box, (1, numFrames))
 
@@ -244,12 +251,12 @@ def XTCwrite(coords, box, filename, time=None, step=None):
             bbox)
 
 
-def BINCOORwrite(coords, filename):
+def BINCOORwrite(mol, filename):
     import struct
-    natoms = np.array([coords.shape[0]])
+    natoms = np.array([mol.numAtoms])
     f = open(filename, 'wb')
 
-    dat = coords[:, :, 0]
+    dat = mol.coords[:, :, mol.frame].copy()
     dat = dat.reshape(dat.shape[0] * 3).astype(np.float64)
 
     fmt1 = 'i' * natoms.shape[0]
@@ -423,16 +430,68 @@ def GROwrite(mol, filename):
         fh.write(b'%f %f %f 0 0 0 0 0 0' % (box[0], box[1], box[2]))
 
 
+def MDTRAJwrite(mol, filename):
+    try:
+        import mdtraj as md
+        from htmd.molecule.readers import _MDTRAJ_TOPOLOGY_EXTS, _MDTRAJ_TRAJECTORY_EXTS
+        from htmd.util import tempname
+
+        if ext in _MDTRAJ_TOPOLOGY_EXTS:
+            tmppdb = tempname(suffix='.pdb')
+            mol.write(tmppdb)
+            traj = md.load(tmppdb)
+            os.remove(tmppdb)
+        elif ext in _MDTRAJ_TRAJECTORY_EXTS:
+            tmppdb = tempname(suffix='.pdb')
+            tmpxtc = tempname(suffix='.xtc')
+            mol.write(tmppdb)
+            mol.write(tmpxtc)
+            traj = md.load(tmpxtc, top=tmppdb)
+            os.remove(tmppdb)
+            os.remove(tmpxtc)
+        else:
+            raise ValueError('Unknown file type for file {}'.format(filename))
+        # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
+        # traj.time = self.time
+        # traj.unitcell_lengths = self.box.T / 10
+        traj.save(filename)
+    except Exception as e:
+        raise ValueError('MDtraj reader failed for file {} with error "{}"'.format(filename, e))
+
+
+_TOPOLOGY_WRITERS = {'psf': PSFwrite,
+                     'pdb': PDBwrite,
+                     'mol2': MOL2write,
+                     'xyz': XYZwrite,
+                     'gro': GROwrite}
+
+from htmd.molecule.readers import _MDTRAJ_TOPOLOGY_EXTS, _MDTRAJ_TRAJECTORY_EXTS
+for ext in _MDTRAJ_TOPOLOGY_EXTS:
+    if ext not in _TOPOLOGY_WRITERS:
+        _TOPOLOGY_WRITERS[ext] = MDTRAJwrite
+
+_TRAJECTORY_WRITERS = {'coor': BINCOORwrite,
+                       'xtc': XTCwrite}
+
+for ext in _MDTRAJ_TRAJECTORY_EXTS:
+    if ext not in _TRAJECTORY_WRITERS:
+        _TRAJECTORY_WRITERS[ext] = MDTRAJwrite
+
+
 if __name__ == '__main__':
     from htmd.home import home
-    from htmd.molecule.molecule import Molecule
-    import filecmp
+    from htmd.molecule.molecule import Molecule, mol_equal
     from htmd.util import tempname
     import os
     testfolder = home(dataDir='molecule-writers/')
     mol = Molecule('3PTB')
     tmp = tempname(suffix='.h5')
-    mol.write(tmp, 'name CA')
+    mol.write(tmp)
+    mol2 = Molecule(tmp)
+    # assert mol_equal(mol, mol2)
+
+    mol.write(tmp, 'name CA')  # Testing filtering
+
     #
     # from difflib import Differ
     # d = Differ()

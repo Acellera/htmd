@@ -6,20 +6,15 @@
 from __future__ import print_function
 
 import numpy as np
-from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
-from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread, GROTOPread
-from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write, GROwrite
 from htmd.molecule.wrap import wrap
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
 from htmd.util import tempname
-from math import pi
 from copy import deepcopy
 from os import path
 import logging
 import os
-import re
 from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
@@ -734,6 +729,7 @@ class Molecule:
 
         # TODO: I need to remove these exceptions
         if (not os.path.isfile(firstfile) and len(firstfile) == 4) or type == "pdb" or ext == "pdb":
+            from htmd.molecule.readers import PDBread
             topo, coords, crystalinfo = PDBread(filename)
             self.crystalinfo = crystalinfo
             self._parseTopology(topo, filename, overwrite=overwrite)
@@ -775,6 +771,11 @@ class Molecule:
             self.empty(natoms)
 
         for field in topo.__dict__:
+            if np.all([x is None for x in topo.__dict__[field]]):
+                if field in Molecule._atom_fields:
+                    self.__dict__[field] = self._empty(natoms, field)
+                continue
+
             newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
 
             # Objects could be ints for example but we want them as str
@@ -1085,6 +1086,7 @@ class Molecule:
         type : str, optional
             The filetype we want to write. By default, detected from the file extension
         """
+        from htmd.molecule.writers import _TOPOLOGY_WRITERS, _TRAJECTORY_WRITERS
         if type:
             type = type.lower()
         ext = os.path.splitext(filename)[1][1:]
@@ -1094,46 +1096,14 @@ class Molecule:
             src = self.copy()
             src.filter(sel, _logger=False)
 
-        if type == "coor" or ext == "coor":
-            coords = np.atleast_3d(src.coords[:, :, self.frame].copy())
-            BINCOORwrite(coords, filename)
-        elif type == "pdb" or ext == "pdb":
-            PDBwrite(src, filename, self.frame)
-        elif type == "mol2" or ext == "mol2":
-            MOL2write(src, filename)
-        elif type == "xyz" or ext == "xyz":
-            XYZwrite(src, filename)
-        elif type == "psf" or ext == "psf":
-            PSFwrite(src, filename)
-        elif type == "xtc" or ext == "xtc":
-            XTCwrite(src.coords, src.box, filename, self.time, self.step)
-        elif type == "gro" or ext == "gro":
-            GROwrite(src, filename)
-        else:
-            try:
-                import mdtraj as md
-                from mdtraj.core.trajectory import _TOPOLOGY_EXTS
-                _TOPOLOGY_EXTS = [x[1:] for x in _TOPOLOGY_EXTS]  # Removing the initial dot
-
-                if ext in _TOPOLOGY_EXTS:
-                    tmppdb = tempname(suffix='.pdb')
-                    src.write(tmppdb)
-                    traj = md.load(tmppdb)
-                    os.remove(tmppdb)
-                else:
-                    tmppdb = tempname(suffix='.pdb')
-                    tmpxtc = tempname(suffix='.xtc')
-                    src.write(tmppdb)
-                    src.write(tmpxtc)
-                    traj = md.load(tmpxtc, top=tmppdb)
-                    os.remove(tmppdb)
-                    os.remove(tmpxtc)
-                # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
-                # traj.time = self.time
-                # traj.unitcell_lengths = self.box.T / 10
-                traj.save(filename)
-            except:
-                raise ValueError("Unknown file type")
+        if type in _TOPOLOGY_WRITERS:
+            ext = type
+        if type in _TRAJECTORY_WRITERS:
+            ext = type
+        if ext in _TOPOLOGY_WRITERS:
+            _TOPOLOGY_WRITERS[ext](src, filename)
+        elif ext in _TRAJECTORY_WRITERS:
+            _TRAJECTORY_WRITERS[ext](src, filename)
 
     def empty(self, numAtoms):
         """ Creates an empty molecule of N atoms.
