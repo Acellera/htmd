@@ -73,7 +73,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
 
         # Specific automatic guessing
         ret = check_output(self._qinfo)
-        if 'phase6_normal' in ret.decode('ascii'):
+        if 'phase6_48_hour' in ret.decode('ascii'):
             if self.environment is None:
                 self.environment = ['source /home/model/MD-SOFTWARE/model_md.bashrc', 'source /home/model/miniconda3/htmd.bashrc']
                 logger.info('environment set to {}'.format(self.environment))
