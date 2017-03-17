@@ -5,13 +5,11 @@
 #
 from __future__ import print_function
 
-import requests
 import numpy as np
 from htmd.molecule.pdbparser import PDBParser
 from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.readers import XTCread, CRDread, BINCOORread, PRMTOPread, PSFread, MAEread, MOL2read, GJFread, XYZread, PDBread, MDTRAJread, MDTRAJTOPOread, GROTOPread
 from htmd.molecule.writers import XTCwrite, PSFwrite, BINCOORwrite, XYZwrite, PDBwrite, MOL2write, GROwrite
-from htmd.molecule.support import string_to_tempfile
 from htmd.molecule.wrap import wrap
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
@@ -708,9 +706,7 @@ class Molecule:
             A list of the existing fields in Molecule that we wish to overwrite when reading this file.
         """
         from htmd.simlist import Sim, Frame
-        from mdtraj.core.trajectory import _TOPOLOGY_EXTS
-        _TOPOLOGY_EXTS = [x[1:] for x in _TOPOLOGY_EXTS]  # Removing the initial dot
-        _MDTRAJ_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
+        from htmd.molecule.readers import _TOPOLOGY_READERS, _TRAJECTORY_READERS, _MDTRAJ_TRAJECTORY_EXTS
 
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
@@ -730,102 +726,35 @@ class Molecule:
             self.read(filename.sim.molfile)
             self.read(filename.sim.trajectory[filename.piece])
             self.dropFrames(keep=filename.sim.frame)
+            return
 
         if type is not None:
             type = type.lower()
         ext = os.path.splitext(firstfile)[1][1:]
 
-        if type == "psf" or ext == "psf":
-            topo = PSFread(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite)
-        elif type == "prm" or ext == "prm" or type == "prmtop" or ext == "prmtop":
-            topo = PRMTOPread(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite)
-        elif type == "top" or ext == "top":
-            topo = GROTOPread(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite)
-        elif type == "pdb" or ext == "pdb":
-            self._readPDB(filename, overwrite=overwrite)
-        elif type == "pdbqt" or ext == "pdbqt":
-            self._readPDB(filename, mode='pdbqt', overwrite=overwrite)
-        elif type == "xtc" or ext == "xtc":
-            self._readTraj(filename, skip=skip, frames=frames, append=append)
-        elif type == "coor" or ext == "coor":
-            if append:
-                self.coords = np.append(self.coords, BINCOORread(filename), axis=2)
-            else:
-                self.coords = BINCOORread(filename)
-        elif len(firstfile) == 4:  # Could be a PDB id. Try to load it from the PDB website
-            self._readPDB(filename)
-        elif type == "xyz" or ext == "xyz":
-            topo, coords = XYZread(filename)
+        # TODO: I need to remove these exceptions
+        if (not os.path.isfile(firstfile) and len(firstfile) == 4) or type == "pdb" or ext == "pdb":
+            topo, coords, crystalinfo = PDBread(filename)
+            self.crystalinfo = crystalinfo
             self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif type == "gjf" or ext == "gjf":
-            topo, coords = GJFread(filename)
+            return
+
+        if type in _TOPOLOGY_READERS:
+            ext = type
+        elif type in _TRAJECTORY_READERS:
+            ext = type
+        if ext in _TOPOLOGY_READERS:
+            reader = _TOPOLOGY_READERS[ext]
+            topo, coords = reader(filename)
             self._parseTopology(topo, filename, overwrite=overwrite)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif type == "mae" or ext == "mae":
-            topo, coords = MAEread(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif type == "mol2" or ext == "mol2":
-            topo, coords = MOL2read(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif type == "crd" or ext == "crd":
-            self.coords = np.atleast_3d(np.array(CRDread(filename), dtype=np.float32))
-        elif type in _TOPOLOGY_EXTS or ext in _TOPOLOGY_EXTS:
-            topo, coords = MDTRAJTOPOread(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        elif type in _MDTRAJ_EXTS or ext in _MDTRAJ_EXTS:
-            self._readTraj(filename, skip=skip, frames=frames, append=append, mdtraj=True)
+            if coords is not None:
+                self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            self.fileloc.append([filename, 0])
+        elif ext in _TRAJECTORY_READERS:
+            self._readTraj(filename, _TRAJECTORY_READERS[ext], skip=skip, frames=frames, append=append, mdtraj=(ext in _MDTRAJ_TRAJECTORY_EXTS))
         else:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
-
-    def _readPDB(self, filename, mode='pdb', overwrite='all'):
-        from htmd.home import home
-        tempfile = False
-        if os.path.isfile(filename):
-            filepath = filename
-        elif len(filename) == 4:
-            # Try loading it from the pdb data directory
-            localpdb = os.path.join(home(dataDir="pdb"), filename.lower() + ".pdb")
-            if os.path.isfile(localpdb):
-                logger.info("Using local copy for {:s}: {:s}".format(filename, localpdb))
-                filepath = localpdb
-            else:
-                # or the PDB website
-                logger.info("Attempting PDB query for {:s}".format(filename))
-                r = requests.get(
-                    "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + filename)
-                if r.status_code == 200:
-                    filepath = string_to_tempfile(r.content.decode('ascii'), "pdb")
-                    tempfile = True
-                else:
-                    raise NameError('Invalid PDB code')
-        else:
-            raise NameError('File {} not found'.format(filename))
-
-        topo, coords, crystalinfo = PDBread(filepath, mode=mode)
-        self.crystalinfo = crystalinfo
-        self._parseTopology(topo, filepath, overwrite=overwrite)
-        self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-        if tempfile:
-            os.unlink(filepath)
-
-        if self.masses is None or len(self.masses) == 0:
-            self.masses = np.zeros(self.numAtoms, dtype=np.float32)
-        if self.charge is None or len(self.charge) == 0:
-            self.charge = np.zeros(self.numAtoms, dtype=np.float32)
-
-        for pf in self._atom_fields:  # TODO: Remove this once I make pandas dtype argument for read_fwf
-            if self._dtypes[pf] == object and len(self.__dict__[pf]) != 0:
-                for i in range(self.numAtoms):
-                    self.__dict__[pf][i] = str(self.__dict__[pf][i])
-
-        self.fileloc.append([filename, 0])
 
     def _parseTopology(self, topo, filename, overwrite='all'):
         if isinstance(overwrite, str):
@@ -847,10 +776,16 @@ class Molecule:
 
         for field in topo.__dict__:
             newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
-            if len(newfielddata) == 0:
+
+            # Objects could be ints for example but we want them as str
+            if self._dtypes[field] == object and len(newfielddata) != 0:
+                newfielddata = np.array([str(x) for x in newfielddata], dtype=object)
+
+            if newfielddata is None or len(newfielddata) == 0:
                 if field in Molecule._atom_fields:
                     self.__dict__[field] = self._empty(natoms, field)
                 continue
+
             if overwrite[0] == 'all' or field in overwrite or len(self.__dict__[field]) == 0:
                 self.__dict__[field] = newfielddata
             else:
@@ -867,7 +802,12 @@ class Molecule:
         self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
 
-    def _readTraj(self, filename, skip=None, frames=None, append=False, mdtraj=False):
+    def _readTraj(self, filename, reader, skip=None, frames=None, append=False, mdtraj=False):
+        def checkCoords(coords, reader, f):
+            assert coords.ndim == 3, 'Reader {} must return 3D coordinates array for file {}'.format(reader, f)
+            assert coords.shape[1] == 3, 'Reader {} must return 3 values in 2nd dimension for file {}'.format(reader, f)
+
+        tmppdb = None
         if mdtraj:
             tmppdb = tempname(suffix='.pdb')
             self.write(tmppdb)
@@ -896,53 +836,63 @@ class Molecule:
 
         for i, f in enumerate(filename):
             if frames is None:  # Reading all frames of the trajectory
-                if mdtraj:
-                    coords, box, boxangles, step, time = MDTRAJread(f, tmppdb)
-                    coords = coords.copy()  # Copying is needed to fix strides from mdtraj
-                else:
-                    coords, box, boxangles, step, time = XTCread(f)
+                coords, box, boxangles, step, time = reader(f, topoloc=tmppdb)
+                checkCoords(coords, reader, f)
                 for j in range(np.size(coords, 2)):
                     fileloclist.append([f, j])
+                # Writing hidden index file containing number of frames in trajectory file
+                self._writeNumFrames(f, coords.shape[2])
             else:  # Reading only specified frames of each trajectory (faster for xtc)
-                if mdtraj:
-                    coords, box, boxangles, step, time = MDTRAJread(f, tmppdb)
-                    coords = coords[:, :, frames[i]]
+                coords, box, boxangles, step, time = reader(f, topoloc=tmppdb, givenframes=frames[i])
+                checkCoords(coords, reader, f)
+                if coords.shape[2] != 1:
+                    # Reader doesn't support specific frame reading. Drop frames manually
+                    coords = coords[:, :, frames[i]][:, :, np.newaxis]
                     coords = coords.copy()  # Copying is needed to fix strides from mdtraj
-                    box = box[:, frames[i]]
-                    boxangles = boxangles[:, frames[i]]
-                else:
-                    coords, box, boxangles, step, time = XTCread(f, frames[i])
+                    if box is not None:
+                        box = box[:, frames[i]][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
+                    if boxangles is not None:
+                        boxangles = boxangles[:, frames[i]][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
                 fileloclist.append([f, int(frames[i])])
 
-            # Writing hidden index file containing number of frames in trajectory file
-            self._writeNumFrames(f, coords.shape[2])
-
-            if self.numAtoms != 0 and np.size(coords, 0) != self.numAtoms:
-                raise ValueError('Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(np.size(coords, 0), self.numAtoms))
+            if self.numAtoms != 0 and coords.shape[0] != self.numAtoms:
+                raise ValueError('Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(coords.shape[0], self.numAtoms))
 
             coordslist.append(coords)
             boxlist.append(box)
             boxangleslist.append(boxangles)
 
         self.coords = np.concatenate(coordslist, axis=2).astype(Molecule._dtypes['coords'])
-        self.box = np.concatenate(boxlist, axis=1).astype(Molecule._dtypes['box'])
-        self.boxangles = np.concatenate(boxangleslist, axis=1).astype(Molecule._dtypes['boxangles'])
+        if np.all([x is None for x in boxlist]):
+            self.box = None
+        else:
+            self.box = np.concatenate(boxlist, axis=1).astype(Molecule._dtypes['box'])
+        if np.all([x is None for x in boxangleslist]):
+            self.boxangles = None
+        else:
+            self.boxangles = np.concatenate(boxangleslist, axis=1).astype(Molecule._dtypes['boxangles'])
         self.fileloc = fileloclist
 
         if skip is not None:
             self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
-            self.box = np.array(self.box[:, ::skip])
-            self.boxangles = self.boxangles[:, ::skip]
+            if self.box is not None:
+                self.box = np.array(self.box[:, ::skip])
+            if self.boxangles is not None:
+                self.boxangles = self.boxangles[:, ::skip]
             self.fileloc = self.fileloc[::skip]
 
         self.coords = np.atleast_3d(self.coords)
         self.step = step
         self.time = time
+
+        # TODO: Move out. This looks like a XTC reader fix!!!
         if len(time) < 2:
+            # Trajectory has broken framestep. Cannot read correctly, setting to 0.1ns.
             # logger.info('Trajectory has broken framestep. Cannot read correctly, setting to 0.1ns.')
             self.fstep = 0.1
         else:
             self.fstep = (time[1] - time[0]) / 1E6  # convert femtoseconds to nanoseconds
+
         if skip is not None:
             self.fstep *= skip
 
@@ -1631,6 +1581,9 @@ if __name__ == "__main__":
     # Testing DCD reader
     mol = Molecule(os.path.join(home(), 'data', '1kdx', '1kdx_0.pdb'))
     mol.read(os.path.join(home(), 'data', '1kdx', '1kdx.dcd'))
+    tmpcoo = mol.coords.copy()
+    mol.read([os.path.join(home(), 'data', '1kdx', '1kdx.dcd')], frames=[8])
+    assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
 
     # Testing atomselect
     for pdb in ["1gmi.pdb", "1hod.pdb", "1w7b.pdb", "1zec.pdb", "2dhi.pdb", "2lzp.pdb", "2x72.pdb"]:
