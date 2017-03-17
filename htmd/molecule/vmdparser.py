@@ -28,8 +28,8 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
 
     maxseglen = np.max([len(x) for x in segname])
     if maxseglen > 3:
-        logger.warning('More than 3 characters were used for segnames. '
-                       'Due to limitations in VMD atomselect segids will be dropped for the atomselection.')
+        logger.warning('More than 3 characters were used for segids. '
+                       'Due to limitations in VMD atomselect segids will be ignored for the atomselection.')
         segname[:] = ''
 
     if coordinates.ndim == 2:
