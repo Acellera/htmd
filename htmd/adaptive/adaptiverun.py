@@ -138,7 +138,7 @@ class AdaptiveMD(AdaptiveBase):
 
     def _getSimlist(self):
         logger.info('Postprocessing new data')
-        sims = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', 'structure.pdb')),
+        sims = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '')),
                        glob(path.join(self.inputpath, '*', '')))
         if self.filter:
             sims = simfilter(sims, self.filteredpath, filtersel=self.filtersel)
