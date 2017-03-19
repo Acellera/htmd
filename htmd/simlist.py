@@ -107,6 +107,22 @@ class Sim(object):
         return deepcopy(self)
 
 
+class _simlist2(np.ndarray):
+    def __new__(cls, datafolders, topologies, inputfolders=None):
+        obj = simlist(datafolders, topologies, inputfolders).view(cls)
+        return obj
+
+    # def __array_finalize__(self, obj):
+    #     # see InfoArray.__array_finalize__ for comments
+    #     if obj is None: return
+    #     self.info = getattr(obj, 'info', None)
+
+    def numFrames(self):
+        return [x.numframes for x in self]
+
+    def append(self):
+
+
 def simlist(datafolders, topologies, inputfolders=None):
     """Creates a list of simulations
 
