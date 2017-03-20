@@ -17,7 +17,7 @@ from math import cos
 from math import sin
 from numpy.random import uniform as rand
 
-from htmd.molecule.vdw import VDW
+from htmd.molecule.vdw import radiusByElement
 from htmd.progress.progress import ProgressBar
 
 from htmd.queues.simqueue import SimQueue
@@ -229,7 +229,7 @@ class QMCalculation:
         radii = np.zeros((elements.shape[0]), dtype=np.float32)
         i = 0
         for e in elements:
-            radii[i] = VDW.radiusByElement(e)
+            radii[i] = radiusByElement(e)
             i += 1
         return radii
 
