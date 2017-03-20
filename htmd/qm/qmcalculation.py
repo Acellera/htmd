@@ -345,38 +345,39 @@ class QMCalculation:
             except:
                 raise
 
-        cmd = ''
-        if self.code == Code.Gaussian:
-            cmd = self.gaussian_binary + " < input.gjf > output.gau 2>&1"
-        elif self.code == Code.PSI4:
-            cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
-        elif self.code == Code.TeraChem:
-            cmd = self.terachem_binary + " -i terachem.in > terachem.out 2>&1"
+        if len(to_submit) != 0:
+            cmd = ''
+            if self.code == Code.Gaussian:
+                cmd = self.gaussian_binary + " < input.gjf > output.gau 2>&1"
+            elif self.code == Code.PSI4:
+                cmd = self.psi4_binary + " -i psi4.in -o psi4.out 2>&1"
+            elif self.code == Code.TeraChem:
+                cmd = self.terachem_binary + " -i terachem.in > terachem.out 2>&1"
 
-        for d in to_submit:
-            f = open(os.path.join(d, "run.sh"), "w")
-            print("#!/bin/sh\n%s\n" % (cmd), file=f)
-            f.close()
-            os.chmod(os.path.join(d, "run.sh"), 0o700)
+            for d in to_submit:
+                f = open(os.path.join(d, "run.sh"), "w")
+                print("#!/bin/sh\n%s\n" % (cmd), file=f)
+                f.close()
+                os.chmod(os.path.join(d, "run.sh"), 0o700)
 
-        if isinstance(execution, SimQueue):
-            execqueue = execution
-        elif execution == Execution.LSF:
-            execqueue = LsfQueue()
-        # elif execution == Execution.PBS:
-        #      execqueue = PBSQueue(ncpu=self.ncpus, ngpu=1, memory=4000 )
-        elif execution == Execution.Slurm:
-            execqueue = SlurmQueue()
-            execqueue.ncpu = self.ncpus
-            execqueue.memory = 4000
-        elif execution == Execution.AceCloud:
-            execqueue = AceCloudQueue()
-        else:
-            raise RuntimeError("Execution target not recognised")
+            if isinstance(execution, SimQueue):
+                execqueue = execution
+            elif execution == Execution.LSF:
+                execqueue = LsfQueue()
+            # elif execution == Execution.PBS:
+            #      execqueue = PBSQueue(ncpu=self.ncpus, ngpu=1, memory=4000 )
+            elif execution == Execution.Slurm:
+                execqueue = SlurmQueue()
+                execqueue.ncpu = self.ncpus
+                execqueue.memory = 4000
+            elif execution == Execution.AceCloud:
+                execqueue = AceCloudQueue()
+            else:
+                raise RuntimeError("Execution target not recognised")
 
-        execqueue.submit(to_submit)
-        execqueue.wait()
-        execqueue.retrieve()
+            execqueue.submit(to_submit)
+            execqueue.wait(sentinel=True)
+            execqueue.retrieve()
 
     def _start_inline(self, directories):
         bar = ProgressBar(len(directories), description="Running QM Calculations")
