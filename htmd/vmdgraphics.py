@@ -152,6 +152,74 @@ class VMDBox(VMDGraphicObject):
         vmd.send(cmd)
 
 
+class VMDIsosurface(VMDGraphicObject):
+    def __init__(self, arr, vecMin, vecMax, vecRes, color='red'):
+        """ Displays an isosurface in VMD
+
+        The function returns an instance of VMDGraphicsObject. To delete it, use the delete() method.
+
+        Parameters
+        ----------
+        arr: np.ndarray
+                array with volumetric data
+        filename: str
+                string with the name of the cubefile
+        vecMin: np.ndarray
+                3D vector denoting the minimal corner of the grid
+        vecMax np.ndarray
+                3D vector denoting the maximal corner of the grid
+        vecRes: np.ndarray
+                3D vector denoting the resolution of the grid in each dimension
+        """
+        super().__init__(arr)
+        from htmd.util import tempname
+        import numpy as np
+        import os
+        filename = tempname(suffix='.cube')
+        outFile = open(filename, 'w')
+
+        # conversion to gaussian units
+        L = 1 / 0.52917725
+        gauss_bin = vecRes * L
+        # minCorner = 0.5*L*(vecMin - vecMax + vecRes)
+        minCorner = L * (vecMin + 0.5 * vecRes)
+
+        ngrid = np.array(np.floor((vecMax - vecMin) / vecRes), dtype=int)
+
+        # write header
+        outFile.write("CUBE FILE\n")
+        outFile.write("OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n")
+        outFile.write("%5d %12.6f %12.6f %12.6f\n" % (1, minCorner[0], minCorner[1], minCorner[2]))
+        outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[0], gauss_bin[0], 0, 0))
+        outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[1], 0, gauss_bin[1], 0))
+        outFile.write("%5d %12.6f %12.6f %12.6f\n" % (ngrid[2], 0, 0, gauss_bin[2]))
+        outFile.write("%5d %12.6f %12.6f %12.6f %12.6f\n" % (1, 0, minCorner[0], minCorner[1], minCorner[2]))
+
+        # main loop
+        cont = 0
+
+        for i in range(ngrid[0]):
+            for j in range(ngrid[1]):
+                for k in range(ngrid[2]):
+                    outFile.write("%13.5g" % arr[i][j][k])
+                    if np.mod(cont, 6) == 5:
+                        outFile.write("\n")
+                    cont += 1
+
+        outFile.close()
+        vmd = getCurrentViewer()
+
+        vmd.send('mol new {} type cube first 0 last -1 step 1 waitfor 1 volsets {{0 }}'.format(filename))
+        vmd.send('mol modstyle 0 top Isosurface -0.4 0 2 0 1 1')
+        vmd.send('set htmd_graphics_mol({:d}) [molinfo top]'.format(self.n))
+
+        os.unlink(filename)
+
+    def delete(self):
+        vmd = getCurrentViewer()
+        vmd.send('mol delete htmd_graphics_mol({:d})'.format(self.n))
+
+
 if __name__ == "__main__":
     from htmd import *
     from htmd import vmdgraphics

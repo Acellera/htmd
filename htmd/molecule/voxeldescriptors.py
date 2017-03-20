@@ -16,7 +16,7 @@ libdir = htmd.home(libDir=True)
 occupancylib = ctypes.cdll.LoadLibrary(os.path.join(libdir, "occupancy_ext.so"))
 
 
-def getVoxelDescriptors(mol, buffer, voxelsize=1):
+def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
     """ Calculate descriptors of atom properties for voxels in a grid bounding the Molecule object.
 
     Constructs a bounding box around Molecule with some buffer space. Then it
@@ -25,11 +25,14 @@ def getVoxelDescriptors(mol, buffer, voxelsize=1):
     ----------
     mol :
         A Molecule object.
-    buffer : float
-        The buffer space to add to the bounding box. This adds zeros to the grid around the protein so that properties
-        which are at the edge of the box can be found in the center of one. Should be usually set to boxsize/2.
+    usercenters : np.ndarray
+        A 2D array specifying the centers of the voxels. If None is give, it will discretize the bounding box of the
+        Molecule plus any buffer space requested into voxels of voxelsize.
     voxelsize : float
         The voxel size in A
+    buffer : float
+        The buffer space to add to the bounding box. This adds zeros to the grid around the protein so that properties
+        which are at the edge of the box can be found in the center of one. Should be usually set to localimagesize/2.
 
     Returns
     -------
@@ -40,26 +43,35 @@ def getVoxelDescriptors(mol, buffer, voxelsize=1):
     """
     properties = _getAtomtypePropertiesPDBQT(mol)
 
-    # Calculate the bbox and the number of voxels
-    [bbm, bbM] = boundingBox(mol)
-    bbm -= buffer
-    bbM += buffer
-    N = np.ceil((bbM - bbm) / voxelsize).astype(int)
-
     # Calculate for each channel the atom sigmas
     multisigmas = np.zeros([mol.numAtoms, len(_order)])
     sigmas = _getRadii(mol)
     for i, p in enumerate(_order):
         multisigmas[properties[p], i] = sigmas[properties[p]]
 
-    # Calculate occupancies and centers
-    occs, centers = _getGridDescriptors(mol, bbm, N, multisigmas, voxelsize)
+    if usercenters is None:
+        # Calculate the bbox and the number of voxels
+        [bbm, bbM] = boundingBox(mol)
+        bbm -= buffer
+        bbM += buffer
+        N = np.ceil((bbM - bbm) / voxelsize).astype(int)
 
-    occs = np.swapaxes(occs, 2, 3)
-    occs = np.swapaxes(occs, 1, 2)
-    occs = np.swapaxes(occs, 0, 1)
+        # Calculate grid centers
+        centers = _getGridCenters(bbm, N, voxelsize)
+        centers2D = centers.reshape(np.prod(N), 3)
+    else:
+        centers2D = usercenters
 
-    return occs, centers
+    # Calculate features
+    features = _getGridDescriptors(mol, centers2D, multisigmas)
+
+    if usercenters is None:
+        features = features.reshape((N[0], N[1], N[2], len(properties)))
+        features = np.swapaxes(features, 2, 3)
+        features = np.swapaxes(features, 1, 2)
+        features = np.swapaxes(features, 0, 1)
+
+    return features, centers
 
 
 def _getAtomtypePropertiesPDBQT(mol):
@@ -202,7 +214,19 @@ def _getRadii(mol):
     return res
 
 
-def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
+def _getGridCenters(llc, N, resolution):
+    xrange = [llc[0] + resolution * x for x in range(0, N[0])]
+    yrange = [llc[1] + resolution * x for x in range(0, N[1])]
+    zrange = [llc[2] + resolution * x for x in range(0, N[2])]
+    centers = np.zeros((N[0], N[1], N[2], 3))
+    for i, x in enumerate(xrange):
+        for j, y in enumerate(yrange):
+            for k, z in enumerate(zrange):
+                centers[i, j, k, :] = np.array([x, y, z])
+    return centers
+
+
+def _getGridDescriptors(mol, centers, channelsigmas):
     """ Calls the C code to calculate the voxels values for each property.
 
     Parameters
@@ -218,27 +242,18 @@ def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
     occupancies
     centers
     """
-    xrange = [llc[0] + resolution * x for x in range(0, N[0])]
-    yrange = [llc[1] + resolution * x for x in range(0, N[1])]
-    zrange = [llc[2] + resolution * x for x in range(0, N[2])]
-    centers = np.zeros((N[0], N[1], N[2], 3))
-    for i, x in enumerate(xrange):
-        for j, y in enumerate(yrange):
-            for k, z in enumerate(zrange):
-                centers[i, j, k, :] = np.array([x, y, z])
-    centers1D = centers.reshape(np.prod(N), 3)
     nchannels = channelsigmas.shape[1]
-    occus = np.zeros((centers1D.shape[0], nchannels))
+    occus = np.zeros((centers.shape[0], nchannels))
     coords = np.squeeze(mol.coords[:, :, 0])
 
-    occupancylib.descriptor_ext(centers1D.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+    occupancylib.descriptor_ext(centers.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                        coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                        channelsigmas.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                        occus.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                        ctypes.c_int(occus.shape[0]),  # n of centers
                        ctypes.c_int(coords.shape[0]),  # n of atoms
                        ctypes.c_int(nchannels))  # n of channels
-    return occus.reshape((N[0], N[1], N[2], nchannels)), centers
+    return occus
 
 if __name__ == '__main__':
     from htmd.molecule.molecule import Molecule
