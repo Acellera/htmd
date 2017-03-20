@@ -121,6 +121,7 @@ class _simlist2(np.ndarray):
         return [x.numframes for x in self]
 
     def append(self):
+        pass
 
 
 def simlist(datafolders, topologies, inputfolders=None):
