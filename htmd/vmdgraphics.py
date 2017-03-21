@@ -152,6 +152,60 @@ class VMDBox(VMDGraphicObject):
         vmd.send(cmd)
 
 
+class VMDSphere(VMDGraphicObject):
+    def __init__(self, xyz, color='red', radius=1):
+        """ Displays a sphere in VMD.
+
+        The function returns an instance of VMDGraphicsObject. To delete it, use the delete() method.
+
+        Parameters
+        ----------
+        xyz : list
+            The center of the sphere
+        color : str
+            Color of the sphere
+        radius : float
+            The radius of the sphere
+        """
+        super().__init__(xyz)
+        #self._remember('draw materials off')
+        self._remember('draw color {}'.format(color))
+
+        self._remember('draw sphere "{} {} {}" radius {}\n'.format(xyz[0], xyz[1], xyz[2], radius))
+        self.script.write("\n")
+        self.script.write("set htmd_graphics_mol({:d}) [molinfo top]".format(self.n))
+        cmd = self.script.getvalue()
+        vmd = getCurrentViewer()
+        vmd.send(cmd)
+
+
+class VMDText(VMDGraphicObject):
+    def __init__(self, text, xyz, color='red'):
+        """ Displays a text in VMD.
+
+        The function returns an instance of VMDGraphicsObject. To delete it, use the delete() method.
+
+        Parameters
+        ----------
+        text : str
+            The text
+        xyz : list
+            The position of the text
+        color : str
+            Color of the text
+        """
+        super().__init__(xyz)
+        self._remember('draw materials off')
+        self._remember('draw color {}'.format(color))
+
+        self._remember('draw text "{} {} {}" "{}"\n'.format(xyz[0], xyz[1], xyz[2], text))
+        self.script.write("\n")
+        self.script.write("set htmd_graphics_mol({:d}) [molinfo top]".format(self.n))
+        cmd = self.script.getvalue()
+        vmd = getCurrentViewer()
+        vmd.send(cmd)
+
+
 class VMDIsosurface(VMDGraphicObject):
     def __init__(self, arr, vecMin, vecMax, vecRes, color='red'):
         """ Displays an isosurface in VMD
