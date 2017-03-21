@@ -23,7 +23,7 @@ from htmd.projections.kmeanstri import KMeansTri
 from htmd.projections.gwpca import GWPCA
 from htmd.userinterface import UserInterface
 from htmd.molecule.molecule import Molecule
-from htmd.adaptive.adaptiverun import AdaptiveRun, AdaptiveMD
+from htmd.adaptive.adaptiverun import AdaptiveMD
 from htmd.adaptive.adaptivegoal import AdaptiveGoal
 from htmd.adaptive.adaptive import reconstructAdaptiveTraj
 from htmd.model import Model, getStateStatistic

@@ -26,25 +26,6 @@ from natsort import natsorted
 import logging
 logger = logging.getLogger(__name__)
 
-__test__ = {'build-opm-1u5u': """
-    >>> from htmd.builder.preparation import proteinPrepare
-    >>> from htmd.util import diffMolecules
-
-    >>> pdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_opm.pdb')
-    >>> mol = Molecule(pdb)
-    >>> mol.filter('protein')
-    >>> mol.set('segid', 'P')
-
-    >>> pmol = proteinPrepare(mol)
-    >>> bmol = build(pmol, outdir='/tmp/build/', ionize=False)
-
-    >>> refpdb = os.path.join(home(dataDir="test-charmm-build"), '1u5u_built_protonated.pdb')
-    >>> ref = Molecule(refpdb)
-
-    >>> difflist = diffMolecules(bmol, ref, sel="name CA")
-    >>> print(difflist)
-    []
-""" }
 
 class BuildError(Exception):
     def __init__(self, value):
@@ -56,6 +37,13 @@ class BuildError(Exception):
 
 def listFiles():
     """ Lists all available Charmm topologies and parameter files
+
+    Examples
+    --------
+    >>> from htmd import charmm
+    >>> charmm.listFiles()             # doctest: +ELLIPSIS
+    ---- Topologies files list...
+
     """
     charmmdir = path.join(home(), 'builder', 'charmmfiles', '')  # maybe just lookup current module?
     topos = natsorted(glob(path.join(charmmdir, 'top', '*.rtf')))
@@ -168,12 +156,10 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     -------
     >>> from htmd import *
     >>> mol = Molecule("3PTB")
-    >>> charmm.listFiles()             # doctest: +ELLIPSIS
-    ---- Topologies files list...
-    top/top_all36_prot.rtf
-    top/top_water_ions.rtf
-    >>> molbuilt = charmm.build(mol, outdir='/tmp/build')
-    ...
+    >>> mol.filter("not resname BEN")
+    >>> molbuilt = charmm.build(mol, outdir='/tmp/build', ionize=False)  # doctest: +ELLIPSIS
+    Bond between A: [serial 185 resid 42 resname CYS chain A segid 0]
+                 B: [serial 298 resid 58 resname CYS chain A segid 0]...
     >>> # More complex example
     >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf', 'top/top_water_ions.rtf']
     >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm', 'par/par_water_ions.prm']
@@ -868,9 +854,8 @@ if __name__ == '__main__':
     from htmd.molecule.molecule import Molecule
     from htmd.builder.solvate import solvate
     from htmd.home import home
-    from htmd.util import tempname
+    from htmd.util import tempname, assertSameAsReferenceDir
     from htmd.builder.preparation import proteinPrepare
-    import filecmp
     import os
     from glob import glob
     import numpy as np
@@ -878,34 +863,25 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
 
+    # Use pre-prepared files so we can tell whether the error is in prepare or in build
+    # Inputs are reference outputs of proteinprepare.
+    preparedInputDir = home(dataDir='test-proteinprepare')
+
     pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
-    for pid in pdbids:
-        np.random.seed(1)
-        mol = Molecule(pid)
-        mol.filter('protein')
-        mol = proteinPrepare(mol)
+    for pdb in pdbids:
+        inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
+        mol = Molecule(inFile)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+
+        np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
         params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
         tmpdir = tempname()
         bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
 
-        compare = home(dataDir=os.path.join('test-charmm-build', pid))
-        files = []
-        filestmp = glob(os.path.join(compare, '*'))
-        for f in filestmp:
-            files.append(os.path.basename(f))
-
-        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
-        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-            raise RuntimeError(
-                'Different results produced by charmm.build for test {} between {} and {} in files {}.'.format(pid,
-                                                                                                               compare,
-                                                                                                               tmpdir,
-                                                                                                               mismatch)
-                              )
+        compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
+        assertSameAsReferenceDir(compareDir, tmpdir)
 
         shutil.rmtree(tmpdir)
-
 

@@ -9,8 +9,8 @@ from subprocess import call, check_output
 import sys
 import time
 
-excludedfolders = ('./tests', './doc', './htmdlib')
-excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_conda_with_omnia.py', 'sync_acellera_conda_channel_deps.py', 'makerelease.py')   # Trailing comma needed otherwise it's not a tuple
+excludedfolders = ('./tests', './doc', './htmdlib', './package')
+excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_conda_with_omnia.py', 'sync_acellera_conda_channel_deps.py', 'makerelease.py')
 
 
 def excluded(name, exclusionlist):
@@ -35,7 +35,7 @@ failed = []
 for f in filestotest:
     t = time.time()
     print(' ************************  Running "{}"  ************************'.format(f))
-    if f.endswith('amber.py') or f.endswith('charmm.py'):
+    if f.endswith('amber.py') or f.endswith('charmm.py') or f.endswith('preparation.py'):
         out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
     else:
         out = call('python {}'.format(f), shell=True)

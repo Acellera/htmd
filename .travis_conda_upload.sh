@@ -6,21 +6,28 @@
 #
 
 export ANACONDA_TOKEN=$ANACONDA_TOKEN_BASIC
-
-for PACKAGE_NAME in htmd htmd-deps htmd-data; do
 export CHANNEL=acellera
-echo "Uploading to channel: $CHANNEL : PACKAGE $PACKAGE_NAME"
 
-if [ "$OSNAME" == "Windows" ]; then
-    conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2
-    anaconda -t $ANACONDA_TOKEN upload win-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
-elif [ "$OSNAME" == "Linux" ]; then
-	anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
-elif [ "$OSNAME" == "Darwin" ]; then
-	anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/osx-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
-fi
+for PACKAGE_NAME in htmd htmd-deps; do
+    echo "Uploading to channel: $CHANNEL : PACKAGE $PACKAGE_NAME"
+
+    if [ "$OSNAME" == "Windows" ]; then
+        conda convert -f -p win-64 $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2
+        anaconda -t $ANACONDA_TOKEN upload win-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
+    elif [ "$OSNAME" == "Linux" ]; then
+        anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/linux-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
+    elif [ "$OSNAME" == "Darwin" ]; then
+        anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/osx-64/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
+    fi
 done
 
 
+if [ "$MAKE_NOARCH" == "1" ]; then
+    # Loop in case we need to add more noarch packages
+    for PACKAGE_NAME in htmd-data; do
+        echo "Uploading to channel: $CHANNEL : PACKAGE $PACKAGE_NAME"
+        anaconda -t $ANACONDA_TOKEN upload  $HOME/miniconda/conda-bld/*/$PACKAGE_NAME-[0-9]*.tar.bz2 -u $CHANNEL
+    done
+fi
 
 

@@ -7,6 +7,7 @@ import ctypes as ct
 import numpy as np
 from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_string_buffer, pack_ulong_buffer, xtc_lib
 from htmd.molecule.util import sequenceID
+import os
 import logging
 logger = logging.getLogger(__name__)
 
@@ -54,123 +55,6 @@ class Topology:
     def atominfo(self):
         return ['record', 'serial', 'name', 'altloc', 'element', 'resname', 'chain', 'resid', 'insertion',
                      'occupancy', 'beta', 'segid', 'charge', 'masses', 'atomtype']
-
-
-def XTCread(filename, givenframes=None):
-    """ Reads XTC file
-
-    Parameters
-    ----------
-    filename : str
-        Path of xtc file.
-    givenframes : list
-        A list of integer frames which we want to read from the file. If None will read all.
-
-    Returns
-    -------
-    coords : nd.array
-    box : nd.array
-    boxangles : nd.array
-    step : nd.array
-    time : nd.array
-    """
-    class __xtc(ct.Structure):
-        _fields_ = [("box", (ct.c_float * 3)),
-                    ("natoms", ct.c_int),
-                    ("step", ct.c_ulong),
-                    ("time", ct.c_double),
-                    ("pos", ct.POINTER(ct.c_float))]
-
-    lib = xtc_lib()
-    nframes = pack_ulong_buffer([0])
-    natoms = pack_int_buffer([0])
-    deltastep = pack_int_buffer([0])
-    deltat = pack_double_buffer([0])
-
-    lib['libxtc'].xtc_read.restype = ct.POINTER(__xtc)
-    lib['libxtc'].xtc_read_frame.restype = ct.POINTER(__xtc)
-
-    coords = None
-    if givenframes is None:  # Read the whole XTC file at once
-        retval = lib['libxtc'].xtc_read(
-            ct.c_char_p(filename.encode("ascii")),
-            natoms,
-            nframes, deltat, deltastep)
-        if not retval:
-            raise IOError('XTC file {} possibly corrupt.'.format(filename))
-        nframes = nframes[0]
-        frames = range(nframes)
-        coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
-    else:
-        if not isinstance(givenframes, list) and not isinstance(givenframes, np.ndarray):
-            givenframes = [givenframes]
-        nframes = len(givenframes)
-        frames = givenframes
-
-
-    step = np.zeros(nframes, dtype=np.uint64)
-    time = np.zeros(nframes, dtype=np.float32)
-    box = np.zeros((3, nframes), dtype=np.float32)
-    boxangles = np.zeros((3, nframes), dtype=np.float32)
-
-    for i, f in enumerate(frames):
-        if givenframes is not None:  # If frames were given, read specific frame
-            retval = lib['libxtc'].xtc_read_frame(
-                ct.c_char_p(filename.encode("ascii")),
-                natoms,
-                ct.c_int(f))
-            if not retval:
-                raise IOError('XTC file {} possibly corrupt.'.format(filename))
-            if coords is None:
-                coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
-            fidx = 0
-        else:
-            fidx = f
-
-        step[i] = retval[fidx].step
-        time[i] = retval[fidx].time
-        box[:, i] = retval[fidx].box
-        coords[:, :, i] = np.ctypeslib.as_array(retval[fidx].pos, shape=(natoms[0], 3))
-
-        if givenframes is not None:
-            lib['libc'].free(retval[0].pos)
-            lib['libc'].free(retval)
-
-    if givenframes is None:
-        for f in range(len(frames)):
-            lib['libc'].free(retval[f].pos)
-        lib['libc'].free(retval)
-
-    if np.size(coords, 2) == 0:
-        raise NameError('Malformed XTC file. No frames read from: {}'.format(filename))
-    if np.size(coords, 0) == 0:
-        raise NameError('Malformed XTC file. No atoms read from: {}'.format(filename))
-
-    coords *= 10.  # Convert from nm to Angstrom
-    box *= 10.  # Convert from nm to Angstrom
-    return coords, box, boxangles, step, time
-
-
-def CRDread(filename):
-    #default_name
-    #  7196
-    #  -7.0046035  10.4479194  20.8320000  -7.3970000   9.4310000  20.8320000
-    #  -7.0486898   8.9066002  21.7218220  -7.0486899   8.9065995  19.9421780
-
-    with open(filename, 'r') as f:
-        coords = []
-
-        fieldlen = 12
-        k = 0
-        for line in f:
-            k += 1
-            if k < 3:  # skip first 2 lines
-                continue
-
-            coords += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
-                       if len(line[i:i + fieldlen].strip()) != 0]
-
-    return [coords[i:i+3] for i in range(0, len(coords), 3)]
 
 
 def XYZread(filename):
@@ -375,82 +259,36 @@ def MAEread(fname):
     return topo, coords
 
 
-# def MAEreadPandas(fname):
-#     """ Reads maestro files.
-#
-#     Parameters
-#     ----------
-#     fname : str
-#         .mae file
-#
-#     Returns
-#     -------
-#     topo : Topology
-#     coords : list of lists
-#     """
-#     import io
-#     from pandas import read_csv
-#
-#     section = None
-#     section_desc = False
-#     section_data = False
-#
-#     topo = Topology()
-#     coords = []
-#     data = None
-#
-#     f = open(fname, 'r')
-#     for line in f:
-#         if len(line) == 0:
-#             continue
-#
-#         if line.strip().startswith('m_atom'):
-#             section = 'atoms'
-#             section_desc = True
-#             section_cols = []
-#         elif line.strip().startswith('m_bond'):
-#             section = 'bonds'
-#             section_desc = True
-#             section_cols = []
-#         elif line.strip().startswith('m_PDB_het_residues'):
-#             section = 'hetresidues'
-#             section_desc = True
-#             section_cols = []
-#         elif section_desc and line.strip() == ':::':  # Once the section description has finished create a map from names to columns
-#             section_desc = False
-#             section_data = True
-#         elif section_data and (line.strip() == ':::' or line.strip() == '}'):
-#             data.seek(0)
-#             if section == 'atoms':
-#                 atomdata = read_csv(data, delim_whitespace=True, skipinitialspace=True)
-#             elif section == 'bonds':
-#                 bonddata = read_csv(data, delim_whitespace=True, skipinitialspace=True)
-#             elif section == 'hetresidues':
-#                 hetdata = read_csv(data, delim_whitespace=True, skipinitialspace=True)
-#             data = None
-#             section = None
-#             section_data = False
-#         else:  # Descriptions or data
-#             # Reading the section description column names
-#             if section_desc:
-#                 section_cols.append(line.strip())
-#             # Reading the data
-#             if section_data and (section == 'atoms' or section == 'bonds' or section =='hetresidues'):
-#                 if data is None:
-#                     data = io.StringIO()
-#                     data.write(' '.join(section_cols) + '\n')
-#                 data.write(line)
-#
-#     from IPython.core.debugger import Tracer
-#     Tracer()()
-#
-#     for h in heteros:
-#         topo.record[topo.resname == h] = 'HETATM'
-#     return topo, coords
+def _getPDB(pdbid):
+    import requests
+    from htmd.molecule.support import string_to_tempfile
+    from htmd.home import home
+    # Try loading it from the pdb data directory
+    tempfile = False
+    localpdb = os.path.join(home(dataDir="pdb"), pdbid.lower() + ".pdb")
+    if os.path.isfile(localpdb):
+        logger.info("Using local copy for {:s}: {:s}".format(pdbid, localpdb))
+        filepath = localpdb
+    else:
+        # or the PDB website
+        logger.info("Attempting PDB query for {:s}".format(pdbid))
+        r = requests.get(
+            "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + pdbid)
+        if r.status_code == 200:
+            filepath = string_to_tempfile(r.content.decode('ascii'), "pdb")
+            tempfile = True
+        else:
+            raise NameError('Invalid PDB code')
+    return filepath, tempfile
+
 
 def PDBread(filename, mode='pdb'):
     from pandas import read_fwf
     import io
+
+    tempfile = False
+    if not os.path.isfile(filename) and len(filename) == 4:  # Could be a PDB id. Try to load it from the PDB website
+        filename, tempfile = _getPDB(filename)
 
     """
     COLUMNS        DATA  TYPE    FIELD        DEFINITION
@@ -645,7 +483,8 @@ def PDBread(filename, mode='pdb'):
     crystalinfo = {}
     if len(parsedcryst1):
         crystalinfo = parsedcryst1.ix[0].to_dict()
-        crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
+        if isinstance(crystalinfo['sGroup'], str) or not np.isnan(crystalinfo['sGroup']):
+            crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
     if len(parsedsymmetry):
         numcopies = int(len(parsedsymmetry)/3)
         crystalinfo['numcopies'] = numcopies
@@ -682,20 +521,14 @@ def PDBread(filename, mode='pdb'):
 
     if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx
+
+    if tempfile:
+        os.unlink(filename)
     return topo, coords, crystalinfo
 
 
-def BINCOORread(filename):
-    import struct
-    with open(filename, 'rb') as f:
-        dat = f.read(4)
-        fmt = 'i'
-        natoms = struct.unpack(fmt, dat)[0]
-        dat = f.read(natoms * 3 * 8)
-        fmt = 'd' * (natoms * 3)
-        coords = struct.unpack(fmt, dat)
-        coords = np.array(coords, dtype=np.float32).reshape((natoms, 3, 1))
-    return coords
+def PDBQTread(filename):
+    return PDBread(filename, 'pdbqt')
 
 
 def PRMTOPread(filename):
@@ -770,7 +603,7 @@ def PRMTOPread(filename):
     for i in range(0, len(bondsidx), 3):
         topo.bonds.append([int(bondsidx[i] / 3), int(bondsidx[i+1] / 3)])
 
-    return topo
+    return topo, None
 
 
 def PSFread(filename):
@@ -831,10 +664,140 @@ def PSFread(filename):
                 mode = 'dihedral'
             elif '!NIMPHI' in line:
                 mode = 'improper'
-    return topo
+    return topo, None
 
 
-def MDTRAJread(filename, topoloc):
+def XTCread(filename, givenframes=None, topoloc=None):
+    """ Reads XTC file
+
+    Parameters
+    ----------
+    filename : str
+        Path of xtc file.
+    givenframes : list
+        A list of integer frames which we want to read from the file. If None will read all.
+
+    Returns
+    -------
+    coords : nd.array
+    box : nd.array
+    boxangles : nd.array
+    step : nd.array
+    time : nd.array
+    """
+    class __xtc(ct.Structure):
+        _fields_ = [("box", (ct.c_float * 3)),
+                    ("natoms", ct.c_int),
+                    ("step", ct.c_ulong),
+                    ("time", ct.c_double),
+                    ("pos", ct.POINTER(ct.c_float))]
+
+    lib = xtc_lib()
+    nframes = pack_ulong_buffer([0])
+    natoms = pack_int_buffer([0])
+    deltastep = pack_int_buffer([0])
+    deltat = pack_double_buffer([0])
+
+    lib['libxtc'].xtc_read.restype = ct.POINTER(__xtc)
+    lib['libxtc'].xtc_read_frame.restype = ct.POINTER(__xtc)
+
+    coords = None
+    if givenframes is None:  # Read the whole XTC file at once
+        retval = lib['libxtc'].xtc_read(
+            ct.c_char_p(filename.encode("ascii")),
+            natoms,
+            nframes, deltat, deltastep)
+        if not retval:
+            raise IOError('XTC file {} possibly corrupt.'.format(filename))
+        nframes = nframes[0]
+        frames = range(nframes)
+        coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
+    else:
+        if not isinstance(givenframes, list) and not isinstance(givenframes, np.ndarray):
+            givenframes = [givenframes]
+        nframes = len(givenframes)
+        frames = givenframes
+
+    step = np.zeros(nframes, dtype=np.uint64)
+    time = np.zeros(nframes, dtype=np.float32)
+    box = np.zeros((3, nframes), dtype=np.float32)
+    boxangles = np.zeros((3, nframes), dtype=np.float32)
+
+    for i, f in enumerate(frames):
+        if givenframes is not None:  # If frames were given, read specific frame
+            retval = lib['libxtc'].xtc_read_frame(
+                ct.c_char_p(filename.encode("ascii")),
+                natoms,
+                ct.c_int(f))
+            if not retval:
+                raise IOError('XTC file {} possibly corrupt.'.format(filename))
+            if coords is None:
+                coords = np.zeros((natoms[0], 3, nframes), dtype=np.float32)
+            fidx = 0
+        else:
+            fidx = f
+
+        step[i] = retval[fidx].step
+        time[i] = retval[fidx].time
+        box[:, i] = retval[fidx].box
+        coords[:, :, i] = np.ctypeslib.as_array(retval[fidx].pos, shape=(natoms[0], 3))
+
+        if givenframes is not None:
+            lib['libc'].free(retval[0].pos)
+            lib['libc'].free(retval)
+
+    if givenframes is None:
+        for f in range(len(frames)):
+            lib['libc'].free(retval[f].pos)
+        lib['libc'].free(retval)
+
+    if np.size(coords, 2) == 0:
+        raise NameError('Malformed XTC file. No frames read from: {}'.format(filename))
+    if np.size(coords, 0) == 0:
+        raise NameError('Malformed XTC file. No atoms read from: {}'.format(filename))
+
+    coords *= 10.  # Convert from nm to Angstrom
+    box *= 10.  # Convert from nm to Angstrom
+    return coords, box, boxangles, step, time
+
+
+def CRDread(filename, givenframes=None, topoloc=None):
+    #default_name
+    #  7196
+    #  -7.0046035  10.4479194  20.8320000  -7.3970000   9.4310000  20.8320000
+    #  -7.0486898   8.9066002  21.7218220  -7.0486899   8.9065995  19.9421780
+
+    with open(filename, 'r') as f:
+        coords = []
+
+        fieldlen = 12
+        k = 0
+        for line in f:
+            k += 1
+            if k < 3:  # skip first 2 lines
+                continue
+
+            coords += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                       if len(line[i:i + fieldlen].strip()) != 0]
+
+    coords = np.vstack([coords[i:i + 3] for i in range(0, len(coords), 3)])[:, :, np.newaxis]
+    return coords, None, None, np.zeros(1), np.zeros(1)
+
+
+def BINCOORread(filename, givenframes=None, topoloc=None):
+    import struct
+    with open(filename, 'rb') as f:
+        dat = f.read(4)
+        fmt = 'i'
+        natoms = struct.unpack(fmt, dat)[0]
+        dat = f.read(natoms * 3 * 8)
+        fmt = 'd' * (natoms * 3)
+        coords = struct.unpack(fmt, dat)
+        coords = np.array(coords, dtype=np.float32).reshape((natoms, 3, 1))
+    return coords, None, None, np.zeros(1), np.zeros(1)
+
+
+def MDTRAJread(filename, topoloc, givenframes=None):
     import mdtraj as md
     traj = md.load(filename, top=topoloc)
     coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
@@ -846,7 +809,7 @@ def MDTRAJread(filename, topoloc):
         step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
     box = traj.unitcell_lengths.T * 10
     boxangles = traj.unitcell_angles.T
-    return coords, box, boxangles, step, time
+    return coords.copy(), box, boxangles, step, time  # Copying coords needed to fix MDtraj stride
 
 
 def MDTRAJTOPOread(filename):
@@ -864,6 +827,7 @@ def MDTRAJTOPOread(filename):
     coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
     topo.bonds = bonds
     return topo, coords
+
 
 def GROTOPread(filename):
     # Reader for GROMACS .top file format:
@@ -887,8 +851,35 @@ def GROTOPread(filename):
                 section = 'atoms'
             elif line.startswith('['):
                 section = None
-    return topo
+    return topo, None
 
+
+# Register here all readers with their extensions
+_TOPOLOGY_READERS = {'prmtop': PRMTOPread,
+                     'prm': PRMTOPread,
+                     'psf': PSFread,
+                     'mae': MAEread,
+                     'mol2': MOL2read,
+                     'gjf': GJFread,
+                     'xyz': XYZread,
+                     'pdb': PDBread,
+                     'pdbqt': PDBQTread,
+                     'top': GROTOPread}
+
+from mdtraj.core.trajectory import _TOPOLOGY_EXTS as _MDTRAJ_TOPOLOGY_EXTS
+_MDTRAJ_TOPOLOGY_EXTS = [x[1:] for x in _MDTRAJ_TOPOLOGY_EXTS]  # Removing the initial dot
+for ext in _MDTRAJ_TOPOLOGY_EXTS:
+    if ext not in _TOPOLOGY_READERS:
+        _TOPOLOGY_READERS[ext] = MDTRAJTOPOread
+
+_TRAJECTORY_READERS = {'xtc': XTCread,
+                       'crd': CRDread,
+                       'coor': BINCOORread}
+
+_MDTRAJ_TRAJECTORY_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
+for ext in _MDTRAJ_TRAJECTORY_EXTS:
+    if ext not in _TRAJECTORY_READERS:
+        _TRAJECTORY_READERS[ext] = MDTRAJread
 
 
 if __name__ == '__main__':
@@ -923,3 +914,6 @@ if __name__ == '__main__':
     mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
     mol.read(natsorted(glob(os.path.join(testfolder, '*.xtc'))))
     print('Can read/append XTC trajectories.')
+
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'weird-cryst.pdb'))
+    print('Can read missing crystal info.')

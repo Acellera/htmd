@@ -7,7 +7,7 @@ import os
 import htmd
 import shutil
 import numpy as np
-from htmd.protocols.protocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
+from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 
 
 class Acemd(ProtocolInterface):

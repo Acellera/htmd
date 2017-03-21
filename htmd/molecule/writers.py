@@ -71,7 +71,7 @@ def _deduce_PDB_atom_name(name, resname):
     return ' {:<3}'.format(name)
 
 
-def _getPDBElement(name, element):
+def _getPDBElement(name, element, lowersecond=True):
     """
     Given a PDB atom name of 4 characters (including spaces), get the element
     """
@@ -96,7 +96,10 @@ def _getPDBElement(name, element):
     if regH_old.match(name.strip()) or regH_inv.match(name.strip()):
         element = 'H'
     if len(element) == 2:
-        element = element[0] + element[1].lower()
+        if lowersecond:
+            element = element[0] + element[1].lower()
+        else:
+            element = element[0] + element[1]
     return element
 
 
@@ -113,7 +116,9 @@ def checkTruncations(mol):
                                                                                                                        f]))
 
 
-def PDBwrite(mol, filename, frame):
+def PDBwrite(mol, filename, frame=None):
+    if frame is None:
+        frame = mol.frame
     frame = ensurelist(frame)
 
     def format83(f):
@@ -202,8 +207,13 @@ def PDBwrite(mol, filename, frame):
     fh.close()
 
 
-def XTCwrite(coords, box, filename, time=None, step=None):
-    numFrames = coords.shape[2]
+def XTCwrite(mol, filename):
+    coords = mol.coords
+    box = mol.box
+    time = mol.time
+    step = mol.step
+    numFrames = mol.numFrames
+
     if np.size(box, 1) != numFrames:  # Box should have as many frames as trajectory
         box = np.tile(box, (1, numFrames))
 
@@ -241,12 +251,12 @@ def XTCwrite(coords, box, filename, time=None, step=None):
             bbox)
 
 
-def BINCOORwrite(coords, filename):
+def BINCOORwrite(mol, filename):
     import struct
-    natoms = np.array([coords.shape[0]])
+    natoms = np.array([mol.numAtoms])
     f = open(filename, 'wb')
 
-    dat = coords[:, :, 0]
+    dat = mol.coords[:, :, mol.frame].copy()
     dat = dat.reshape(dat.shape[0] * 3).astype(np.float64)
 
     fmt1 = 'i' * natoms.shape[0]
@@ -286,19 +296,18 @@ def PSFwrite(molecule, filename):
             segid = m.segid[i]
         elif m.segid[i] == '' and m.chain[i] != '':
             segid = m.chain[i]
-        print("%8d %-4s %-5s%-4s %-4s %-6s %-2s %10.6f  %8.6f  %10d" %
-              (int(m.serial[i]),
-               segid,
-               str(m.resid[i]) + str(m.insertion[i]),
-               (m.resname[i]),
-               m.name[i],
-               atomtype,
-               "",  # m.element[i], # NAMD barfs if this is set
-               charge,
-               mass,
-               0
-               ),
-              file=f)
+        print("{!s:>8.8} {!s:4.4} {!s:5.5}{!s:4.4} {!s:4.4} {!s:6.6} {!s:2.2} {:10.6}  {:8.6}  {!s:>10.10}".format(
+            int(m.serial[i]),
+            segid,
+            str(m.resid[i]) + str(m.insertion[i]),
+            (m.resname[i]),
+            m.name[i],
+            atomtype,
+            "",  # m.element[i], # NAMD barfs if this is set
+            charge,
+            mass,
+            0
+        ), file=f)
     print("\n\n", file=f)
     print(" %8d !NBOND: bonds" % (m.bonds.shape[0]), file=f)
     for i in range(m.bonds.shape[0]):
@@ -415,7 +424,99 @@ def GROwrite(mol, filename):
                             ('posx', coor[:, 0]), ('posy', coor[:, 1]), ('posz', coor[:, 2])])
     a = pd.DataFrame(data=datadict)
     with open(filename, 'wb') as fh:
-        fh.write(b'Generated with HTMD, t= %f\n' % (mol.fstep * 1000))
+        if mol.fstep is not None:
+            fh.write(b'Generated with HTMD, t= %f\n' % (mol.fstep * 1000))
+        else:
+            fh.write(b'Generated with HTMD\n')
         fh.write(b'%5d\n' % mol.numAtoms)
         np.savetxt(fh, a.values, '%5d%-5s%5s%5d%8.3f%8.3f%8.3f')
         fh.write(b'%f %f %f 0 0 0 0 0 0' % (box[0], box[1], box[2]))
+
+
+# Taken from trajectory.py Trajectory()._savers() method of MDtraj
+_MDTRAJ_TOPOLOGY_SAVERS = ('pdb', 'pdb.gz', 'xyz', 'xyz.gz')
+
+_MDTRAJ_TRAJECTORY_SAVERS = ('xtc', 'trr', 'dcd', 'h5', 'binpos', 'nc', 'netcdf', 'ncrst', 'crd', 'mdcrd', 'ncdf',
+                             'lh5', 'lammpstrj', 'gro', 'rst7', 'tng')
+
+_MDTRAJ_SAVERS = _MDTRAJ_TRAJECTORY_SAVERS + _MDTRAJ_TOPOLOGY_SAVERS
+
+
+def MDTRAJwrite(mol, filename):
+    try:
+        import mdtraj as md
+        from htmd.util import tempname
+
+        if ext in _MDTRAJ_TOPOLOGY_SAVERS:
+            tmppdb = tempname(suffix='.pdb')
+            mol.write(tmppdb)
+            traj = md.load(tmppdb)
+            os.remove(tmppdb)
+        elif ext in _MDTRAJ_TRAJECTORY_SAVERS:
+            tmppdb = tempname(suffix='.pdb')
+            tmpxtc = tempname(suffix='.xtc')
+            mol.write(tmppdb)
+            mol.write(tmpxtc)
+            traj = md.load(tmpxtc, top=tmppdb)
+            os.remove(tmppdb)
+            os.remove(tmpxtc)
+        else:
+            raise ValueError('Unknown file type for file {}'.format(filename))
+        # traj.xyz = np.swapaxes(np.swapaxes(self.coords, 1, 2), 0, 1) / 10
+        # traj.time = self.time
+        # traj.unitcell_lengths = self.box.T / 10
+        traj.save(filename)
+    except Exception as e:
+        raise ValueError('MDtraj reader failed for file {} with error "{}"'.format(filename, e))
+
+
+_WRITERS = {'psf': PSFwrite,
+            'pdb': PDBwrite,
+            'mol2': MOL2write,
+            'xyz': XYZwrite,
+            'gro': GROwrite,
+            'coor': BINCOORwrite,
+            'xtc': XTCwrite}
+
+
+for ext in _MDTRAJ_SAVERS:
+    if ext not in _WRITERS:
+        _WRITERS[ext] = MDTRAJwrite
+
+
+if __name__ == '__main__':
+    from htmd.home import home
+    from htmd.molecule.molecule import Molecule, mol_equal
+    from htmd.util import tempname
+    import os
+    testfolder = home(dataDir='metricdistance')
+    mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
+    mol.read(os.path.join(testfolder, 'traj.xtc'))
+    # tmp = tempname(suffix='.h5')
+    # mol.write(tmp)
+    # mol2 = Molecule(tmp)
+    # # assert mol_equal(mol, mol2)
+    #
+    # mol.write(tmp, 'name CA')  # Testing filtering
+    mol.filter('protein')
+
+    for ext in _WRITERS:
+        tmp = tempname(suffix='.'+ext)
+        mol.write(tmp)
+        print('Can write {} files'.format(ext))
+
+
+    # from difflib import Differ
+    # d = Differ()
+    #
+    # with open(tmp, 'rb') as f1, open(a, 'rb') as f2:
+    #     res = d.compare([x.decode('utf8') for x in f1.readlines()], [x.decode('utf8') for x in f2.readlines()])
+    #
+    #     try:
+    #         next(res)
+    #     except StopIteration:
+    #         print('Same files')
+    #     else:
+    #         assert('Error in MDtraj writer.')
+    #
+    # assert filecmp.cmp(tmp, os.path.join(testfolder, '3PTB.h5'))

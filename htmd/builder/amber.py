@@ -80,7 +80,17 @@ def defaultTopo():
 
 def defaultParam():
     """ Returns the default parameter `frcmod` files used by amber.build """
+
+    # Common choices:
+    #  * frcmod.ionsjc_tip3p:  Monovalent ion parameters for Ewald and TIP3P water from Joung & Cheatham JPCB (2008)
+    #  * frcmod.ions1lm_126_tip3p + frcmod.ions234lm_126_tip3p :
+    #       Li/Merz ion parameters of monovalent ions for TIP3P water model (12-6 normal usage set)
+    #       Li/Merz ion parameters of divalent to tetravalent ions for TIP3P water model (12-6 normal usage set)
+    #
+    # See page 50 of Amber16 manual.
+
     return ['frcmod.ionsjc_tip3p']
+
 
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
@@ -326,7 +336,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
-                         execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap)
+                         execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap, atomtypes=atomtypes,
+                         offlibraries=offlibraries)
     tmpbonds = molbuilt.bonds
     molbuilt.bonds = []  # Removing the bonds to speed up writing
     molbuilt.write(path.join(outdir, 'structure.pdb'))

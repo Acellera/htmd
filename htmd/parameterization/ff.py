@@ -157,8 +157,8 @@ class PRM:
             t[tt] = n
 
         # check to see whether the parameters can be expressed in Amber FRCMOD format
-        if len(self.impropers) != 0:
-            raise ValueError("Can't express CHARMM-style impropers in Amber file format")
+  #      if len(self.impropers) != 0:
+  #          raise ValueError("Can't express CHARMM-style impropers in Amber file format")
         for i in self.angles:
             if i.rUB != 0. or i.kUB != 0.:
                 raise ValueError("Can't express Urey-Bradley terms in Amber file format")
@@ -212,12 +212,12 @@ class PRM:
 
         print("\nIMPR", file=f)
         output = dict()
-        for i in self.dihedrals:
+        for i in self.impropers:
           if(i.improper == True):
             name = "%s-%s-%s-%s" % (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]])
             if not (name in output):
                 output[name] = 1
-                prm = self.dihedralParam(i.types[0], i.types[1], i.types[2], i.types[3])
+                prm = self.improperParam(i.types[0], i.types[1], i.types[2], i.types[3])
                 for pi in range(len(prm)):
                     p = prm[pi]
                     sign = 1
@@ -465,7 +465,7 @@ class AmberPRM(PRM):
                     x = ff[11:].split()
                     y = ff[0:11].split("-")
                     # Amber impropers have the same potential as dihedrals, except the scaling factor is different
-                    self.dihedrals.append(TorsPrm([y[0].strip(), y[1].strip(), y[2].strip(), y[3].strip()],
+                    self.impropers.append(TorsPrm([y[0].strip(), y[1].strip(), y[2].strip(), y[3].strip()],
                                                   n=int(math.fabs(int(float(x[2])))), k0=float(x[0]), phi0=float(x[1]),
                                                   e14=1. / 1.2, improper=True))
                 elif section == "NONBON":

@@ -4,17 +4,19 @@
 # No redistribution in whole or part
 #
 from htmd.molecule.util import boundingBox
+from htmd.molecule.vdw import VDW, radiusByElement
 import numpy as np
 import ctypes
 import htmd
 import os
 
-_order = ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 'positive_ionizable', 'negative_ionizable', 'metal', 'occupancies')
+_order = ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 'positive_ionizable',
+          'negative_ionizable', 'metal', 'occupancies')
 libdir = htmd.home(libDir=True)
 occupancylib = ctypes.cdll.LoadLibrary(os.path.join(libdir, "occupancy_ext.so"))
 
 
-def getVoxelDescriptors(mol, buffer, voxelsize=1):
+def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
     """ Calculate descriptors of atom properties for voxels in a grid bounding the Molecule object.
 
     Constructs a bounding box around Molecule with some buffer space. Then it
@@ -23,11 +25,14 @@ def getVoxelDescriptors(mol, buffer, voxelsize=1):
     ----------
     mol :
         A Molecule object.
-    buffer : float
-        The buffer space to add to the bounding box. This adds zeros to the grid around the protein so that properties
-        which are at the edge of the box can be found in the center of one. Should be usually set to boxsize/2.
+    usercenters : np.ndarray
+        A 2D array specifying the centers of the voxels. If None is give, it will discretize the bounding box of the
+        Molecule plus any buffer space requested into voxels of voxelsize.
     voxelsize : float
         The voxel size in A
+    buffer : float
+        The buffer space to add to the bounding box. This adds zeros to the grid around the protein so that properties
+        which are at the edge of the box can be found in the center of one. Should be usually set to localimagesize/2.
 
     Returns
     -------
@@ -38,26 +43,35 @@ def getVoxelDescriptors(mol, buffer, voxelsize=1):
     """
     properties = _getAtomtypePropertiesPDBQT(mol)
 
-    # Calculate the bbox and the number of voxels
-    [bbm, bbM] = boundingBox(mol)
-    bbm -= buffer
-    bbM += buffer
-    N = np.ceil((bbM - bbm) / voxelsize).astype(int)
-
     # Calculate for each channel the atom sigmas
     multisigmas = np.zeros([mol.numAtoms, len(_order)])
-    sigmas = _getSigmas(mol)
+    sigmas = _getRadii(mol)
     for i, p in enumerate(_order):
         multisigmas[properties[p], i] = sigmas[properties[p]]
 
-    # Calculate occupancies and centers
-    occs, centers = _getGridDescriptors(mol, bbm, N, multisigmas, voxelsize)
+    if usercenters is None:
+        # Calculate the bbox and the number of voxels
+        [bbm, bbM] = boundingBox(mol)
+        bbm -= buffer
+        bbM += buffer
+        N = np.ceil((bbM - bbm) / voxelsize).astype(int)
 
-    occs = np.swapaxes(occs, 2, 3)
-    occs = np.swapaxes(occs, 1, 2)
-    occs = np.swapaxes(occs, 0, 1)
+        # Calculate grid centers
+        centers = _getGridCenters(bbm, N, voxelsize)
+        centers2D = centers.reshape(np.prod(N), 3)
+    else:
+        centers2D = usercenters
 
-    return occs, centers
+    # Calculate features
+    features = _getGridDescriptors(mol, centers2D, multisigmas)
+
+    if usercenters is None:
+        features = features.reshape((N[0], N[1], N[2], len(properties)))
+        features = np.swapaxes(features, 2, 3)
+        features = np.swapaxes(features, 1, 2)
+        features = np.swapaxes(features, 0, 1)
+
+    return features, centers
 
 
 def _getAtomtypePropertiesPDBQT(mol):
@@ -148,36 +162,71 @@ def _findDonors(mol, bonds):
     return donors
 
 
-def _getSigmas(mol):
-    """ Returns the VDW radii of each atom in the molecule
-
+def _getRadii(mol):
+    """ Gets vdW radius for each elem in mol.element. Source VMD.
+    
     Parameters
     ----------
     mol :
-        A Molecule object
+        A Molecule object. Needs to be read from Autodock 4 .pdbqt format
 
     Returns
     -------
-    sigmas : np.ndarray
-        The radius of each atom in Molecule
+    radii : np.ndarray
+        vdW radius for each element in mol.
     """
-    # NOTE: this should improved. Element or name? More than first characeter? FF based?
-    # e.g. Cl gets transformed wrongly to C. Also Mn and Zn are not present in dictionary
-    sigmas = {"H": 1.0, "C": 1.5, "N": 1.4, "O": 1.3, "F": 1.2, "P": 2.0, "S": 1.9,
-              "Cl": 2.5, "D": 4.0, "A": 1.5}
-    sig = np.zeros(mol.numAtoms)
-    for a in range(mol.numAtoms):  # TODO: STEFAN - Should be doable faster, although it's not really time-consuming
-        elem = mol.element[a][0]
-        if elem in sigmas:
-            sigma = sigmas[elem]
+
+    mappings = {  # Mapping pdbqt representation to element.
+        'HD': 'H',
+        'HS': 'H',
+        'A': 'C',
+        'NA': 'N',
+        'NS': 'N',
+        'OA': 'O',
+        'OS': 'O',
+        'MG': 'Mg',
+        'SA': 'S',
+        'CL': 'Cl',
+        'CA': 'Ca',
+        'MN': 'Mn',
+        'FE': 'Fe',
+        'ZN': 'Zn',
+        'BR': 'Br'
+    }
+
+    for el in ['H', 'C', 'N', 'O', 'F', 'Mg', 'P', 'S', 'Cl', 'Ca', 'Fe', 'Zn', 'Br', 'I']:
+        mappings[el] = el
+
+    res = np.zeros(mol.numAtoms)
+    for a in range(mol.numAtoms):
+        elem = mol.element[a]
+
+        if elem not in mappings:
+            raise ValueError('PDBQT element {} does not exist in mappings.'.format(elem))
+        elem = mappings[elem]
+
+        if elem in VDW.elements:
+            rad = radiusByElement(elem)
         else:
-            print('unknown element -', mol.element[a], '- at atom index ', a)
-            sigma = 1.3
-        sig[a] = sigma
-    return sig
+            print('Unknown element -', mol.element[a], '- at atom index ', a)
+            rad = 1.5
+        res[a] = rad
+    return res
 
 
-def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
+def _getGridCenters(llc, N, resolution):
+    xrange = [llc[0] + resolution * x for x in range(0, N[0])]
+    yrange = [llc[1] + resolution * x for x in range(0, N[1])]
+    zrange = [llc[2] + resolution * x for x in range(0, N[2])]
+    centers = np.zeros((N[0], N[1], N[2], 3))
+    for i, x in enumerate(xrange):
+        for j, y in enumerate(yrange):
+            for k, z in enumerate(zrange):
+                centers[i, j, k, :] = np.array([x, y, z])
+    return centers
+
+
+def _getGridDescriptors(mol, centers, channelsigmas):
     """ Calls the C code to calculate the voxels values for each property.
 
     Parameters
@@ -193,35 +242,27 @@ def _getGridDescriptors(mol, llc, N, channelsigmas, resolution):
     occupancies
     centers
     """
-    xrange = [llc[0] + resolution * x for x in range(0, N[0])]
-    yrange = [llc[1] + resolution * x for x in range(0, N[1])]
-    zrange = [llc[2] + resolution * x for x in range(0, N[2])]
-    centers = np.zeros((N[0], N[1], N[2], 3))
-    for i, x in enumerate(xrange):
-        for j, y in enumerate(yrange):
-            for k, z in enumerate(zrange):
-                centers[i, j, k, :] = np.array([x, y, z])
-    centers1D = centers.reshape(np.prod(N), 3)
     nchannels = channelsigmas.shape[1]
-    occus = np.zeros((centers1D.shape[0], nchannels))
+    occus = np.zeros((centers.shape[0], nchannels))
     coords = np.squeeze(mol.coords[:, :, 0])
 
-    occupancylib.descriptor_ext(centers1D.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+    occupancylib.descriptor_ext(centers.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                        coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                        channelsigmas.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                        occus.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                        ctypes.c_int(occus.shape[0]),  # n of centers
                        ctypes.c_int(coords.shape[0]),  # n of atoms
                        ctypes.c_int(nchannels))  # n of channels
-    return occus.reshape((N[0], N[1], N[2], nchannels)), centers
+    return occus
 
 if __name__ == '__main__':
     from htmd.molecule.molecule import Molecule
     from htmd.home import home
     import os
     import numpy as np
-    resOcc, resCent = getVoxelDescriptors(Molecule('3PTB'), buffer=8, voxelsize=1)
-    refOcc = np.load(os.path.join(home(), 'data', 'test-voxeldescriptors', '3PTB_occ.npy'))
-    refCent = np.load(os.path.join(home(), 'data', 'test-voxeldescriptors', '3PTB_center.npy'))
+    testf = os.path.join(home(), 'data', 'test-voxeldescriptors')
+    resOcc, resCent = getVoxelDescriptors(Molecule(os.path.join(testf, '3ptb.pdbqt')), buffer=8, voxelsize=1)
+    refOcc = np.load(os.path.join(testf, '3PTB_occ.npy'))
+    refCent = np.load(os.path.join(testf, '3PTB_center.npy'))
     assert np.allclose(resOcc, refOcc)
     assert np.allclose(resCent, refCent)

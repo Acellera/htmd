@@ -3,18 +3,12 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from glob import glob
 from os import path
-import os
-import numpy as np
-from sklearn.cluster import MiniBatchKMeans
-from htmd.util import _getNcpus
 from htmd.adaptive.adaptiverun import AdaptiveMD
-from htmd.simlist import simlist, simfilter
-from htmd.model import Model, macroAccumulate
-from htmd.projections.tica import TICA
-from htmd.projections.metric import Metric, _projectionGenerator
-from htmd.protocols.protocolinterface import TYPE_INT, RANGE_0POS, RANGE_POS, TYPE_FLOAT, RANGE_ANY
+from htmd.model import macroAccumulate
+from protocolinterface import val
+import numpy as np
+import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,8 +24,8 @@ class AdaptiveGoal(AdaptiveMD):
 
     Parameters
     ----------
-    app : :class:`App <htmd.apps.app.App>` object, default=None
-        An App class object used to retrieve and submit simulations
+    app : :class:`SimQueue <htmd.queues.simqueue.SimQueue>` object, default=None
+        A SimQueue class object used to retrieve and submit simulations
     project : str, default='adaptive'
         The name of the project
     nmin : int, default=1
@@ -66,7 +60,7 @@ class AdaptiveGoal(AdaptiveMD):
         A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
     truncation : str, default=None
         Method for truncating the prob distribution (None, 'cumsum', 'statecut'
-    statetype : str, default='micro'
+    statetype : ('micro', 'cluster', 'macro'), str, default='micro'
         What states (cluster, micro, macro) to use for calculations.
     macronum : int, default=8
         The number of macrostates to produce
@@ -88,12 +82,12 @@ class AdaptiveGoal(AdaptiveMD):
         Save the model generated
     goalfunction : function, default=None
         This function will be used to convert the goal-projected simulation data to a ranking whichcan be used for the directed component of FAST.
-    ucscale : float, default=1
-        Scaling factor for undirected component.
+    ucscale : float, default=0.5
+        Scaling factor for undirected component. Directed component scaling automatically calculated as (1-uscale)
     nosampledc : bool, default=False
         Spawn only from top DC conformations without sampling
     autoscale : bool, default=False
-        Automatically scales exploration and exploitation ratios depending on how stuck the adaptive is at a give goal score.
+        Automatically scales exploration and exploitation ratios depending on how stuck the adaptive is at a given goal score.
 
     Example
     -------
@@ -127,14 +121,16 @@ class AdaptiveGoal(AdaptiveMD):
 
     def __init__(self):
         super().__init__()
-        self._cmdFunction('goalfunction', 'function',
-                          'This function will be used to convert the goal-projected simulation data to a ranking which'
-                          'can be used for the directed component of FAST.', None)
-        self._cmdValue('ucscale', 'float', 'Scaling factor for undirected component. Directed component scaling '
-                                           'automatically calculated as (1-uscale)', 0.5, TYPE_FLOAT, RANGE_ANY)
-        self._cmdBoolean('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False)
-        self._cmdBoolean('autoscale', 'bool', 'Automatically scales exploration and exploitation ratios depending on '
-                                              'how stuck the adaptive is at a give goal score.', False)
+        self._arg('goalfunction', 'function',
+                  'This function will be used to convert the goal-projected simulation data to a ranking which'
+                  'can be used for the directed component of FAST.', None, val.Function(), nargs='any')
+        self._arg('ucscale', 'float', 'Scaling factor for undirected component. Directed component scaling '
+                                       'automatically calculated as (1-uscale)', 0.5, val.Number(float, 'ANY'))
+        self._arg('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False, val.Boolean())
+        self._arg('autoscale', 'bool', 'Automatically scales exploration and exploitation ratios depending on '
+                                       'how stuck the adaptive is at a given goal score.', False, val.Boolean())
+        self._arg('autoscalemult', 'float', 'Multiplier for the scaling factor.', 1, val.Number(float, '0POS'))
+        self._arg('autoscaletol', 'float', 'Tolerance for the scaling factor.', 0.2, val.Number(float, '0POS'))
         self._debug = False
 
     def _algorithm(self):
@@ -189,7 +185,7 @@ class AdaptiveGoal(AdaptiveMD):
 
         scale = self.ucscale
         if self.autoscale:
-            scale = self._calculateScale(goaldata)
+            scale = AdaptiveGoal._calculateScale(goaldata, self.autoscalemult, self.autoscaletol)
         reward = scale * uc + (1 - scale) * dc
 
         relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
@@ -198,7 +194,7 @@ class AdaptiveGoal(AdaptiveMD):
             if not path.exists('saveddata'):
                 os.makedirs('saveddata')
             epoch = self._getEpoch()
-            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'ucscale': self.ucscale,
+            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'ucscale': scale,
                       'spawncounts': spawncounts, 'truncprob': truncprob, 'relFrames': relFrames, 'dcmeans': dcmeans,
                       'dcstds': dcstds, 'reward': reward}
             np.save(path.join('saveddata', 'e{}_goalreport.npy'.format(epoch)), tosave)
@@ -209,27 +205,51 @@ class AdaptiveGoal(AdaptiveMD):
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
-    def _calculateScale(self, goaldata):
+    @staticmethod
+    def _calculateScale(goaldata, multiplier=1, tolerance=0.2):
         from htmd.adaptive.adaptive import epochSimIndexes
+
+        # Calculate the max goal of each epoch and the total min of the goal to normalize the goals to a [0, 1]
         epochs = epochSimIndexes(goaldata.simlist)
-        epochmaxgoal = np.zeros(len(epochs))
+        g = np.zeros(len(epochs))
         totalmin = None
-        for e in sorted(epochs.keys()):
+
+        for i, e in enumerate(sorted(epochs.keys())):
             idx = epochs[e]
-            epochmaxgoal[e] = 0
-            for i in idx:
-                if goaldata.dat[i].max() > epochmaxgoal[e]:
-                    epochmaxgoal[e] = goaldata.dat[i].max()
-                if totalmin is None or goaldata.dat[i].min() < totalmin:
-                    totalmin = goaldata.dat[i].min()
-        epochmaxgoal = (epochmaxgoal - totalmin) / (epochmaxgoal.max() - totalmin)
-        dx = np.abs(np.diff(epochmaxgoal))
-        dxn = self._featScale(dx)
-        scale = 0.5
-        for d in dxn[::-1]:
-            if d < 0.1:
-                scale = max(1, scale+0.1)
-        return scale
+            epochgoals = np.concatenate(goaldata.dat[idx])
+            g[i] = epochgoals.max()
+            if totalmin is None or epochgoals.min() < totalmin:
+                totalmin = epochgoals.min()
+
+        rangeG = g.max() - totalmin
+
+        # Calculate the dG
+        epochdiff = 10
+        g = np.hstack(([g[0]] * epochdiff, g))  # Prepending the first element epochdiff-times to calculate the dG
+        dG = np.abs(g[epochdiff:] - g[:-epochdiff]) / rangeG
+
+        # Tolerance is the range of what we consider a significant change on a scale of [0, 1]
+        # Multiplier is a scaling factor in case we want to react stronger to
+        grad = -multiplier * (dG - tolerance)
+        # Euler integration
+        tstep = 1
+        y = [0, ]
+        #print(dG, g, grad)
+        for t in range(1, len(dG), tstep):
+            y.append(max(min(y[-1] + tstep * grad[t], 1), 0))
+            #print('time: {} a: {} gradient: {} rangemax: {} rangemin: {}'.format(t, y[-1], grad[t], g.max(), totalmin))
+        #print("END")
+
+        #return y, grad, dG, g
+        return y[-1]
+
+        # dx = np.abs(np.diff(g))
+        # dxn = self._featScale(dx)
+        # scale = 0.5
+        # for d in dxn[::-1]:
+        #     if d < 0.1:
+        #         scale = max(1, scale+0.1)
+        # return scale
 
     def _getSpawnFrames(self, reward, model, data):
         spawncounts, prob = self._spawn(reward, self.nmax - self._running)
@@ -247,6 +267,7 @@ class AdaptiveGoal(AdaptiveMD):
         return (feat - np.min(feat)) / denom
 
     def _getGoalData(self, sims):
+        from htmd.projections.metric import Metric
         logger.debug('Starting projection of directed component')
         metr = Metric(sims, skip=self.skip)
         metr.set(self.goalfunction)

@@ -1,5 +1,7 @@
 # Note on releases -- HTMD releases are now only made when a tag is pushed
- 
+
+# Set MAKENOARCH=1 to the one combination which will make and release noarch packages. It's used in conda upload.
+
 matrix:
   include:
    - os: linux
@@ -18,7 +20,7 @@ matrix:
      env: TRAVIS_PYTHON_VERSION=3.6  OSNAME=Linux
    - os: linux
      language: generic
-     env: TRAVIS_PYTHON_VERSION=3.5  OSNAME=Linux
+     env: TRAVIS_PYTHON_VERSION=3.5  OSNAME=Linux  MAKE_NOARCH=1
 #     addons:
 #      apt:
 #       packages:
@@ -28,6 +30,12 @@ matrix:
      env: TRAVIS_PYTHON_VERSION=3.5 OSNAME=Darwin
      before_install:
       - brew install gcc
+#   - os: osx
+#     language: generic
+#     env: TRAVIS_PYTHON_VERSION=3.6 OSNAME=Darwin
+#     before_install:
+#      - brew install gcc
+
 
 install:
  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
@@ -72,7 +80,7 @@ install:
  - git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 1
 
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe
- - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-data --no-include-recipe
+ - conda build package/htmd-data --no-include-recipe
  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe
 
 
@@ -86,4 +94,4 @@ script:
  - if [ "$OSNAME" != "Windows" ]; then  tests/run_other_tests.sh; fi
 
 after_success:
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then ./.travis_conda_upload.sh; ./.travis_conda_build_upload_meta.sh ; fi
+ - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./.travis_conda_upload.sh; bash -x ./.travis_conda_build_upload_meta.sh ; fi
