@@ -364,7 +364,7 @@ class PreparationData:
 
 
     def reprepare(self):
-        """Repeat the system preparation, after changin the .data table.
+        """Repeat the system preparation, after the user edited the .data table.
 
         You should only modify the value of the .data.forced_protonation column on the basis of the values
         in the .data.resid, .data.insertion, .data.chain attributes. Any other change will be ignored.
@@ -400,6 +400,7 @@ class PreparationData:
 
         copy_of_resname = d['resname']
         copy_of_protonation = d['protonation']
+        copy_of_default_protonation = d['default_protonation']
         list_of_forced_protonations = ~ pd.isnull(d['forced_protonation'])
 
         neutraln = neutralc = False
@@ -478,6 +479,7 @@ class PreparationData:
         # Carry over old pka and other useful info
         newResData.data['resname'] = copy_of_resname
         newResData.data['protonation'] = copy_of_protonation
+        newResData.data['default_protonation'] = copy_of_default_protonation
         newResData.data.ix[list_of_forced_protonations, 'protonation'] = \
             d.ix[list_of_forced_protonations, 'forced_protonation']
         for cn in keep_pka_columns:
