@@ -872,8 +872,9 @@ for ext in _MDTRAJ_TOPOLOGY_EXTS:
     if ext not in _TOPOLOGY_READERS:
         _TOPOLOGY_READERS[ext] = MDTRAJTOPOread
 
-_TRAJECTORY_READERS = {'xtc': XTCread,
-                       'crd': CRDread,
+_TRAJECTORY_READERS = {'xtc': XTCread}
+
+_COORDINATE_READERS = {'crd': CRDread,
                        'coor': BINCOORread}
 
 _MDTRAJ_TRAJECTORY_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
