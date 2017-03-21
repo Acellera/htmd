@@ -313,7 +313,6 @@ def reconstructAdaptiveTraj(simlist, trajID):
     --------
     >>> mol, chain, pathlist = reconstructAdaptiveTraj(data.simlist, 52)
     """
-    from IPython.core.debugger import Tracer
 
     sim = None
     for s in simlist:
@@ -356,7 +355,6 @@ def reconstructAdaptiveTraj(simlist, trajID):
         mol.coords = np.concatenate((mol.coords, tmpmol.coords), axis=2)
         mol.box = np.concatenate((mol.box, tmpmol.box), axis=1)
         mol.fileloc += tmpmol.fileloc
-        #Tracer()()
     #mol.fileloc[:, 1] = range(np.size(mol.fileloc, 0))
 
     return mol, chain, pathlist
@@ -465,3 +463,28 @@ if __name__ == "__main__":
     for i in inputodel:
         shutil.rmtree(i, ignore_errors=True, acemd='/shared/acemd/bin/acemd')
     os.remove(path.join(home(), 'data', 'adaptive', 'input', 'e2_writeinputs.log'))'''
+
+    from htmd import *
+    import htmd
+    import os
+    import shutil
+    from htmd.queues.localqueue import LocalGPUQueue
+    from htmd.simlist import Frame
+    from htmd.util import tempname
+
+    filedir = htmd.home()+'/data/adaptive/'
+    sims = simlist(glob(os.path.join(filedir, 'data', '*', '')),
+                   glob(os.path.join(filedir, 'input', '*', '')),
+                   glob(os.path.join(filedir, 'input', '*', '')))
+
+    outf = tempname()
+    os.makedirs(outf)
+
+    f = Frame(sims[0], 0, 5)
+    _writeInputsFunction(1, f, 2, outf, 'input.coor')
+
+    mol = Molecule(sims[0])
+    mol.read(os.path.join(outf, 'e2s2_e1s1p0f5', 'input.coor'))
+
+    shutil.rmtree(outf)
+

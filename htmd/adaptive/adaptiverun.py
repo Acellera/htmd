@@ -232,7 +232,6 @@ class AdaptiveMD(AdaptiveBase):
 
 
 if __name__ == "__main__":
-    from htmd import AcemdLocal
     import htmd
     import os
     import shutil

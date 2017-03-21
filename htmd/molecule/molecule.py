@@ -1271,7 +1271,10 @@ class Molecule:
     def numAtoms(self):
         """ Number of atoms in the molecule
         """
-        return len(self.record)
+        natoms = len(self.record)
+        if natoms == 0:
+            natoms = self.coords.shape[0]
+        return natoms
 
     @property
     def x(self):

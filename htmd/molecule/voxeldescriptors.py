@@ -26,7 +26,7 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
     mol :
         A Molecule object.
     usercenters : np.ndarray
-        A 2D array specifying the centers of the voxels. If None is give, it will discretize the bounding box of the
+        A 2D array specifying the centers of the voxels. If None is given, it will discretize the bounding box of the
         Molecule plus any buffer space requested into voxels of voxelsize.
     voxelsize : float
         The voxel size in A
@@ -60,6 +60,7 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
         centers = _getGridCenters(bbm, N, voxelsize)
         centers2D = centers.reshape(np.prod(N), 3)
     else:
+        centers = usercenters
         centers2D = usercenters
 
     # Calculate features
