@@ -383,7 +383,7 @@ def _autoDetectTrajectories(folder):
 
 def _autoDetectTopology(folder):
     from htmd.molecule.readers import _TOPOLOGY_READERS
-    topotypes = ['pdb'] + list(_TOPOLOGY_READERS.keys())  # Prepending PDB so that it's the default
+    topotypes = ['pdb', 'prmtop', 'psf'] + list(_TOPOLOGY_READERS.keys())  # Prepending PDB, PSF, PRMTOP so that they are the default
     topo = None
     for tt in topotypes:
         files = glob(path.join(folder, '*.{}'.format(tt)))

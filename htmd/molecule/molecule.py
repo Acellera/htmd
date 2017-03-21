@@ -701,7 +701,7 @@ class Molecule:
             A list of the existing fields in Molecule that we wish to overwrite when reading this file.
         """
         from htmd.simlist import Sim, Frame
-        from htmd.molecule.readers import _TOPOLOGY_READERS, _TRAJECTORY_READERS, _MDTRAJ_TRAJECTORY_EXTS
+        from htmd.molecule.readers import _TOPOLOGY_READERS, _TRAJECTORY_READERS, _MDTRAJ_TRAJECTORY_EXTS, _COORDINATE_READERS
 
         if isinstance(filename, list) or isinstance(filename, np.ndarray):
             for f in filename:
@@ -743,9 +743,7 @@ class Molecule:
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             return
 
-        if type in _TOPOLOGY_READERS:
-            ext = type
-        elif type in _TRAJECTORY_READERS:
+        if type in _TOPOLOGY_READERS or type in _TRAJECTORY_READERS or type in _COORDINATE_READERS:
             ext = type
         if ext in _TOPOLOGY_READERS:
             reader = _TOPOLOGY_READERS[ext]
@@ -756,6 +754,8 @@ class Molecule:
             self.fileloc.append([filename, 0])
         elif ext in _TRAJECTORY_READERS:
             self._readTraj(filename, _TRAJECTORY_READERS[ext], skip=skip, frames=frames, append=append, mdtraj=(ext in _MDTRAJ_TRAJECTORY_EXTS))
+        elif ext in _COORDINATE_READERS:
+            self._readTraj(filename, _COORDINATE_READERS[ext], skip=skip, frames=frames, append=append, mdtraj=(ext in _MDTRAJ_TRAJECTORY_EXTS))
         else:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
 
