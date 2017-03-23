@@ -26,6 +26,11 @@ def show_news():
 
 
 def check_approval(product, prefix):
+    from htmdx.license import licenseEntitlements
+    jj = licenseEntitlements()
+    if "HTMD" in jj: return True
+    if "htmd" in jj: return True
+
     j = {}
     try:
         with open(os.path.join(prefix, "registration"), "r") as f:

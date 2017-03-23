@@ -3,14 +3,14 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.home import home
 import ctypes as ct
 import os
 import platform
 
 
 def licenseEntitlements():
-    libdir = home(libDir=True)
+    libdir = inspect.getfile(htmdx)
+    libdir = os.path.join( libdir, "..", "htmd", "lib", platform.system() )		
 
     # No liblicense.so for OS X yet. Need to buy it
     if platform.system() == "Darwin":

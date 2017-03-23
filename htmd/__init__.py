@@ -56,6 +56,10 @@ from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.vmdgraphics import VMDConvexHull, VMDBox
 import logging.config
+
+from htmd.version import version
+__version__ = version()
+
 import htmd
 
 # -------- Shortcuts ---------
