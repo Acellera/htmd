@@ -6,11 +6,11 @@
 import ctypes as ct
 import os
 import platform
+from htmd import home as htmd_home
 
 
 def licenseEntitlements():
-    libdir = inspect.getfile(htmdx)
-    libdir = os.path.join( libdir, "..", "htmd", "lib", platform.system() )		
+    libdir = os.path.join(htmd_home(), "lib", platform.system())
 
     # No liblicense.so for OS X yet. Need to buy it
     if platform.system() == "Darwin":
@@ -33,15 +33,15 @@ def licenseEntitlements():
         if len(x) > 1:
             if x[0] not in toks:
                 toks[x[0]] = dict()
-            if (x[1] not in toks[x[0]]):
+            if x[1] not in toks[x[0]]:
                 toks[x[0]][x[1]] = 0
             try:
-                toks[x[0]][x[1]] = toks[x[0]][x[1]] + int(x[2])
+                toks[x[0]][x[1]] += int(x[2])
             except:
                 pass
     return toks
 
 
 if __name__ == "__main__":
-    print("License entitlements:");
+    print("License entitlements:")
     print(licenseEntitlements())
