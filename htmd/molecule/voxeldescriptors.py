@@ -19,12 +19,13 @@ occupancylib = ctypes.cdll.LoadLibrary(os.path.join(libdir, "occupancy_ext.so"))
 def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
     """ Calculate descriptors of atom properties for voxels in a grid bounding the Molecule object.
 
-    Constructs a bounding box around Molecule with some buffer space. Then it
+    Constructs a bounding box around Molecule with some buffer space. Then it computes
+    pharmacophoric-like descriptors on a defined grid.
 
     Parameters
     ----------
     mol :
-        A Molecule object.
+        A Molecule object. Needs to be read from Autodock 4 .pdbqt format
     usercenters : np.ndarray
         A 2D array specifying the centers of the voxels. If None is given, it will discretize the bounding box of the
         Molecule plus any buffer space requested into voxels of voxelsize.
@@ -54,7 +55,7 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
         [bbm, bbM] = boundingBox(mol)
         bbm -= buffer
         bbM += buffer
-        N = np.ceil((bbM - bbm) / voxelsize).astype(int)
+        N = np.ceil((bbM - bbm) / voxelsize).astype(int) + 1
 
         # Calculate grid centers
         centers = _getGridCenters(bbm, N, voxelsize)
@@ -74,6 +75,33 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
 
     return features, centers
 
+def getPointDescriptors(mol, point, size, resolution=1):
+    """ Compute descriptors around a specific point in space.
+
+    Parameters
+    ----------
+    mol:
+        A Molecule object. Needs to be read from Autodock 4 .pdbqt format
+    point: array-like
+        Central box point where descriptors are computed.
+    size: array-like
+        Size of the resulting box.
+    resolution: float
+        Resolution of the internal grid.
+
+    Returns
+    -------
+    features: array-like
+        Computed features around queried point.
+
+    """
+    size = np.array(size)
+    bbm = point - (size * resolution) / 2 + resolution / 2 # Position centers + half res.
+    inbox = _getGridCenters(bbm, size, resolution)
+    inbox = inbox.reshape(np.prod(size), 3)
+    features, _ = getVoxelDescriptors(mol, usercenters=inbox)
+    features = features.reshape((size[0], size[1], size[2], features.shape[1]))
+    return features
 
 def _getAtomtypePropertiesPDBQT(mol):
     """ Matches PDBQT atom types to specific properties
