@@ -406,6 +406,69 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
     return alignedstructs
 
 
+def rcsbFindMutatedResidues(pdbid):
+    import requests
+    try:
+        from bs4 import BeautifulSoup
+        import lxml
+    except ImportError:
+        raise ImportError('You need to install the \'beautifulsoup4\' and \'lxml\' packages to use this function.')
+    tomutate = {}
+
+    connected = False
+    while not connected:
+        try:
+            res = requests.get('http://www.rcsb.org/pdb/explore.do?structureId={}'.format(pdbid))
+        except requests.ConnectionError as coer:
+            import time
+            time.sleep(5)
+            continue
+        connected = True
+
+    soup = BeautifulSoup(res.text, 'lxml')
+    table = soup.find(id='ModifiedResidueTable')
+
+    if table:
+        trs = table.find_all('tr')
+
+        for tr in trs:
+            td = tr.find_all('td')
+            if td:
+                mutname = td[0].find_all('a')[0].text.strip()
+                orgname = td[5].text.strip()
+                tomutate[mutname] = orgname
+    return tomutate
+
+
+def rcsbFindLigands(pdbid):
+    import requests
+    from bs4 import BeautifulSoup
+    ligands = []
+
+    connected = False
+    while not connected:
+        try:
+            res = requests.get('http://www.rcsb.org/pdb/explore.do?structureId={}'.format(pdbid))
+        except requests.ConnectionError as coer:
+            import time
+            time.sleep(5)
+            continue
+        connected = True
+
+    soup = BeautifulSoup(res.text, 'lxml')
+    table = soup.find(id='LigandsTable')
+    if table:
+        trs = table.find_all('tr')
+
+        for tr in trs:
+            td = tr.find_all('td')
+            if td:
+                name = td[0].find_all('a')[0].text.strip()
+                ligands.append(name)
+    return ligands
+
+
+
 # def drawCube(mi, ma, viewer=None):
 #     from htmd.vmdviewer import getCurrentViewer
 #     if viewer is None:
