@@ -29,26 +29,26 @@ class TopologyInconsistencyError(Exception):
 
 
 _residueNameTable = {'ARG': 'R', 'AR0': 'R',
-                'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HSE': 'H', 'HSD': 'H',
-                'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
-                'ASP': 'D', 'ASH': 'D',
-                'GLU': 'E', 'GLH': 'E',
-                'SER': 'S',
-                'THR': 'T',
-                'ASN': 'N',
-                'GLN': 'Q',
-                'CYS': 'C', 'CYX': 'C',
-                'SEC': 'U',
-                'GLY': 'G',
-                'PRO': 'P',
-                'ALA': 'A',
-                'VAL': 'V',
-                'ILE': 'I',
-                'LEU': 'L',
-                'MET': 'M',
-                'PHE': 'F',
-                'TYR': 'Y',
-                'TRP': 'W'}
+                     'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HSE': 'H', 'HSD': 'H', 'HSP': 'H',
+                     'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
+                     'ASP': 'D', 'ASH': 'D',
+                     'GLU': 'E', 'GLH': 'E',
+                     'SER': 'S',
+                     'THR': 'T',
+                     'ASN': 'N',
+                     'GLN': 'Q',
+                     'CYS': 'C', 'CYX': 'C',
+                     'SEC': 'U',
+                     'GLY': 'G',
+                     'PRO': 'P',
+                     'ALA': 'A',
+                     'VAL': 'V',
+                     'ILE': 'I',
+                     'LEU': 'L',
+                     'MET': 'M',
+                     'PHE': 'F',
+                     'TYR': 'Y',
+                     'TRP': 'W'}
 
 
 class Molecule:
@@ -720,7 +720,7 @@ class Molecule:
         if isinstance(filename, Frame):
             self.read(filename.sim.molfile)
             self.read(filename.sim.trajectory[filename.piece])
-            self.dropFrames(keep=filename.sim.frame)
+            self.dropFrames(keep=filename.frame)
             return
 
         if type is not None:
