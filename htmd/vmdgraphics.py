@@ -207,7 +207,7 @@ class VMDText(VMDGraphicObject):
 
 
 class VMDIsosurface(VMDGraphicObject):
-    def __init__(self, arr, vecMin, vecMax, vecRes, color='red'):
+    def __init__(self, arr, vecMin, vecRes, color='red'):
         """ Displays an isosurface in VMD
 
         The function returns an instance of VMDGraphicsObject. To delete it, use the delete() method.
@@ -220,8 +220,6 @@ class VMDIsosurface(VMDGraphicObject):
                 string with the name of the cubefile
         vecMin: np.ndarray
                 3D vector denoting the minimal corner of the grid
-        vecMax np.ndarray
-                3D vector denoting the maximal corner of the grid
         vecRes: np.ndarray
                 3D vector denoting the resolution of the grid in each dimension
         """
@@ -238,7 +236,7 @@ class VMDIsosurface(VMDGraphicObject):
         # minCorner = 0.5*L*(vecMin - vecMax + vecRes)
         minCorner = L * (vecMin + 0.5 * vecRes)
 
-        ngrid = np.array(np.floor((vecMax - vecMin) / vecRes), dtype=int)
+        ngrid = arr.shape
 
         # write header
         outFile.write("CUBE FILE\n")

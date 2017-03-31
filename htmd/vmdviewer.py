@@ -24,6 +24,9 @@ import sys
 from htmd.molecule.support import string_to_tempfile
 import numpy as np
 import tempfile
+import logging
+logger = logging.getLogger(__name__)
+
 
 _viewers = np.empty(0, dtype=object)
 
@@ -160,7 +163,7 @@ class VMD:
     def copy(self):
         return None
 
-    def render(self, outfile, renderer='TachyonInternal', resolution=(1920, 1080), aasamples=36, skylight=1, tachyon=None, convert=None, trim=False):
+    def render(self, outfile, renderer='TachyonInternal', resolution=None, aasamples=None, skylight=None, tachyon=None, convert=None, trim=False):
         """ Renders the current VMD scene into a file.
 
         Parameters
@@ -170,13 +173,13 @@ class VMD:
         renderer : ('TachyonInternal', 'tachyon', 'snapshot')
             Which renderer to use
         resolution : tuple
-            X,Y resolution of the output image
+            X,Y resolution of the output image i.e. (1920, 1080). Only used with the renderer='tachyon' option.
         aasamples : int
-            Number of anti-aliasing samples
+            Number of anti-aliasing samples. Only used with the renderer='tachyon' option.
         skylight : float
-            Add a skylight
+            Add a skylight. Only used with the renderer='tachyon' option.
         tachyon : str
-            Path to tachyon renderer executable
+            Path to tachyon renderer executable. Only used with the renderer='tachyon' option.
         convert : bool
             Attempts to convert the image to the datatype of the `outfile` extension
         trim : bool
@@ -186,24 +189,29 @@ class VMD:
         outfile = os.path.abspath(outfile)
         outname, ext = os.path.splitext(outfile)
 
-        if renderer == 'tachyon':
+        if (renderer.lower() != 'tachyon') and \
+                (resolution is not None or aasamples is not None or skylight is not None or tachyon is not None):
+            raise AttributeError('resolution, aasamples, skylight and tachyon parameters only accepted with the '
+                                 'renderer=\'tachyon\' option.')
+
+        if renderer.lower() == 'tachyon':
             tmpext = '.psd'
             if tachyon is None:
                 tachyon = shutil.which('tachyon', mode=os.X_OK)
             if tachyon is None:
                 raise FileNotFoundError("Could not find `tachyon` executable, or no execute permissions are given. Try using renderer='snapshot' instead.")
             rendercommand = 'render Tachyon {}'.format(outname)
-        elif renderer == 'snapshot':
+        elif renderer.lower() == 'snapshot':
             tmpext = '.tga'
             rendercommand = 'render snapshot {}{}'.format(outname, tmpext)
-        elif renderer == 'TachyonInternal':
+        elif renderer.lower() == 'tachyoninternal':
             tmpext = '.tga'
             rendercommand = 'render TachyonInternal {}{}'.format(outname, tmpext)
 
         self.send(rendercommand)
         if renderer == 'tachyon':
             os.system('{tachyon} -res {resx} {resy} -aasamples {aa} -add_skylight {sl} {out} -format PSD48 -o {out}.psd'.format(tachyon=tachyon, resx=resolution[0], resy=resolution[1], aa=aasamples, sl=skylight, out=outname))
-        print(rendercommand)
+        logger.debug(rendercommand)
         if not os.path.exists(outname+tmpext):
             raise RuntimeError('Rendering failed to produce image with following command: {}'.format(rendercommand))
         if os.path.exists(outname):
