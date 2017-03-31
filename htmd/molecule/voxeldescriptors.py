@@ -41,6 +41,19 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
         A list of boxes containing voxels and their properties
     centers : np.ndarray
         A list of the centers of all boxes
+    N : np.ndarray
+        Is returned only when no user centers are passed. It corresponds to the number of centers in each of the x,y,z
+        dimensions
+
+    Examples
+    --------
+    >>> mol = Molecule('3PTB')
+    >>> mol.filter('protein')
+    >>> features, centers, N = getVoxelDescriptors(mol, buffer=8)
+    >>> # Features can be reshaped to a 4D array (3D for each grid center in xyz, 1D for the properties) like this:
+    >>> features = features.reshape(N[0], N[1], N[2], features.shape[1])
+    >>> # The user can provide his own centers
+    >>> features, centers = getVoxelDescriptors(mol, usercenters=[[0, 0, 0], [16, 24, -5]], buffer=8)
     """
     properties = _getAtomtypePropertiesPDBQT(mol)
 
@@ -50,6 +63,7 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
     for i, p in enumerate(_order):
         multisigmas[properties[p], i] = sigmas[properties[p]]
 
+    N = None
     if usercenters is None:
         # Calculate the bbox and the number of voxels
         [bbm, bbM] = boundingBox(mol)
@@ -61,19 +75,16 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
         centers = _getGridCenters(bbm, N, voxelsize)
         centers2D = centers.reshape(np.prod(N), 3)
     else:
-        centers = usercenters
         centers2D = usercenters
 
     # Calculate features
     features = _getGridDescriptors(mol, centers2D, multisigmas)
 
-    if usercenters is None:
-        features = features.reshape((N[0], N[1], N[2], len(properties)))
-        features = np.swapaxes(features, 2, 3)
-        features = np.swapaxes(features, 1, 2)
-        features = np.swapaxes(features, 0, 1)
+    if N is None:
+        return features, centers2D
+    else:
+        return features, centers2D, N
 
-    return features, centers
 
 def getPointDescriptors(mol, point, size, resolution=1):
     """ Compute descriptors around a specific point in space.
@@ -96,12 +107,13 @@ def getPointDescriptors(mol, point, size, resolution=1):
 
     """
     size = np.array(size)
-    bbm = point - (size * resolution) / 2 + resolution / 2 # Position centers + half res.
+    bbm = point - (size * resolution) / 2 + resolution / 2  # Position centers + half res.
     inbox = _getGridCenters(bbm, size, resolution)
     inbox = inbox.reshape(np.prod(size), 3)
     features, _ = getVoxelDescriptors(mol, usercenters=inbox)
     features = features.reshape((size[0], size[1], size[2], features.shape[1]))
     return features
+
 
 def _getAtomtypePropertiesPDBQT(mol):
     """ Matches PDBQT atom types to specific properties
@@ -290,7 +302,8 @@ if __name__ == '__main__':
     import os
     import numpy as np
     testf = os.path.join(home(), 'data', 'test-voxeldescriptors')
-    resOcc, resCent = getVoxelDescriptors(Molecule(os.path.join(testf, '3ptb.pdbqt')), buffer=8, voxelsize=1)
+    resOcc, resCent, N = getVoxelDescriptors(Molecule(os.path.join(testf, '3ptb.pdbqt')), buffer=8, voxelsize=1)
+    resOcc = resOcc.reshape(N[0], N[1], N[2], resOcc.shape[1])
     refOcc = np.load(os.path.join(testf, '3PTB_occ.npy'))
     refCent = np.load(os.path.join(testf, '3PTB_center.npy'))
     assert np.allclose(resOcc, refOcc)
