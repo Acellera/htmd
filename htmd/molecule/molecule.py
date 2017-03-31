@@ -29,7 +29,7 @@ class TopologyInconsistencyError(Exception):
 
 
 _residueNameTable = {'ARG': 'R', 'AR0': 'R',
-                     'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HSE': 'H', 'HSD': 'H', 'HSP': 'H',
+                     'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HIP': 'H', 'HSD': 'H', 'HSE': 'H', 'HSP': 'H',
                      'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
                      'ASP': 'D', 'ASH': 'D',
                      'GLU': 'E', 'GLH': 'E',
