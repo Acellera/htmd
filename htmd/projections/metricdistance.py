@@ -253,6 +253,33 @@ class MetricDistancePyemma(MetricPyemma):
 '''
 
 
+def contactVecToMatrix(vector, atomIndexes):
+    from copy import deepcopy
+    # Calculating the unique atom groups in the mapping
+    uqAtomGroups = []
+    atomIndexes = deepcopy(list(atomIndexes))
+    for ax in atomIndexes:
+        ax[0] = ensurelist(ax[0])
+        ax[1] = ensurelist(ax[1])
+        if ax[0] not in uqAtomGroups:
+            uqAtomGroups.append(ax[0])
+        if ax[1] not in uqAtomGroups:
+            uqAtomGroups.append(ax[1])
+    uqAtomGroups.sort(key=lambda x: x[0])  # Sort by first atom in each atom list
+    num = len(uqAtomGroups)
+
+    matrix = np.zeros((num, num), dtype=vector.dtype)
+    mapping = np.ones((num, num), dtype=int) * -1
+    for i in range(len(vector)):
+        row = uqAtomGroups.index(atomIndexes[i][0])
+        col = uqAtomGroups.index(atomIndexes[i][1])
+        matrix[row, col] = vector[i]
+        mapping[row, col] = i
+        mapping[col, row] = i
+    matrix |= matrix.T
+    return matrix, mapping, uqAtomGroups
+
+
 def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize=(7, 7), dpi=80, title=None, outfile=None, colors=None):
     """ Plots a given vector as a contact map
 
@@ -282,7 +309,7 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
     from copy import deepcopy
     from matplotlib import cm as colormaps
     if truecontacts is None:
-        truecontacts = np.zeros(len(vector))
+        truecontacts = np.zeros(len(vector), dtype=bool)
     if len(vector) != len(mapping):
         raise RuntimeError('Vector and map length must match.')
 
@@ -294,34 +321,10 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
             raise RuntimeError(
                 'No contacts or distances found in the MetricData object. Check the `.map` property of the object for a description of your projection.')
 
-    # Calculating the unique atom groups in the mapping
-    uqAtomGroups = []
-    atomIndexes = deepcopy(list(mapping.atomIndexes))
-    for ax in atomIndexes:
-        ax[0] = ensurelist(ax[0])
-        ax[1] = ensurelist(ax[1])
-        if ax[0] not in uqAtomGroups:
-            uqAtomGroups.append(ax[0])
-        if ax[1] not in uqAtomGroups:
-            uqAtomGroups.append(ax[1])
-    uqAtomGroups.sort(key=lambda x: x[0])  # Sort by first atom in each atom list
-    num = len(uqAtomGroups)
-
-    def vecToMatrix(vector, num):
-        matrix = np.zeros((num, num), dtype=bool)
-        mapping = np.ones((num, num), dtype=int) * -1
-        for i in range(len(vector)):
-            row = uqAtomGroups.index(atomIndexes[i][0])
-            col = uqAtomGroups.index(atomIndexes[i][1])
-            matrix[row, col] = vector[i]
-            mapping[row, col] = i
-            mapping[col, row] = i
-        matrix |= matrix.T
-        return matrix, mapping
-
     # Creating the 2D contact maps
-    cm, mapping = vecToMatrix(vector, num)
-    cmtrue, _ = vecToMatrix(truecontacts, num)
+    cm, newmapping, uqAtomGroups = contactVecToMatrix(vector, mapping.atomIndexes)
+    cmtrue, _, _ = contactVecToMatrix(truecontacts, mapping.atomIndexes)
+    num = len(uqAtomGroups)
 
     if plot:
         from matplotlib import pylab as plt
@@ -341,7 +344,7 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
             colors = mpbl.to_rgba(colors)
             colorbar = True
         if len(colors) == len(vector):
-            colors = colors[mapping[rows, cols]]
+            colors = colors[newmapping[rows, cols]]
 
         plt.scatter(rows, cols, s=figsize[0] * 5, marker='o', c=colors, lw=0)
         if colorbar:
