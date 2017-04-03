@@ -399,7 +399,7 @@ def MOL2write(mol, filename):
             print('{:7d} {:8s} {:9.4f} {:9.4f} {:9.4f} {:8s} '.format(i + 1, mol.name[i], mol.coords[i, 0, mol.frame],
                                                                       mol.coords[i, 1, mol.frame],
                                                                       mol.coords[i, 2, mol.frame],
-                                                                      mol.element[i]),  # TODO: implement SYBYL atom types
+                                                                      mol.atomtype[i]),  # TODO: implement SYBYL atom types
                   end='',
                   file=f)
             if isinstance(mol.resid[i], numbers.Integral):
