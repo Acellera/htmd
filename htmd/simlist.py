@@ -155,8 +155,14 @@ def simlist(datafolders, topologies, inputfolders=None):
         raise FileNotFoundError('No molecule files were given, check your arguments.')
     topologies = ensurelist(topologies)
     datafolders = ensurelist(datafolders)
+    for folder in datafolders:
+        if not os.path.isdir(folder):
+            raise NotADirectoryError('{}'.format(folder))
     if inputfolders:
         inputfolders = ensurelist(inputfolders)
+        for folder in inputfolders:
+            if not os.path.isdir(folder):
+                raise NotADirectoryError('{}'.format(folder))
 
     # I need to match the simulation names inside the globs given. The
     # reason is that there can be more input folders in the glob than in
