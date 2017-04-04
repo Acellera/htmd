@@ -6,11 +6,11 @@
 import ctypes as ct
 import os
 import platform
-from htmd import home as htmd_home
+import htmdx
 
 
 def licenseEntitlements():
-    libdir = os.path.join(htmd_home(), "lib", platform.system())
+    libdir = os.path.join(htmdx.__path__._path[0], "..", "htmd", "lib", platform.system())
 
     # No liblicense.so for OS X yet. Need to buy it
     if platform.system() == "Darwin":

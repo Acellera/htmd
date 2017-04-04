@@ -89,6 +89,6 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
     compareVersions()
 
 import progress_reporter.bar.gui as gui  # Disabling pyemma progress widgets
-gui.ipython_notebook_session=False
+gui.ipython_notebook_session = False
 
 config()

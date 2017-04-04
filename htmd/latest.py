@@ -10,8 +10,8 @@ def compareVersions():
     from natsort import natsorted
     import os
     import time
-    #t = time.time()
     from os.path import expanduser
+
     __home = expanduser("~")
     __htmdconf = os.path.join(__home, '.htmd')
     if not os.path.exists(__htmdconf):
