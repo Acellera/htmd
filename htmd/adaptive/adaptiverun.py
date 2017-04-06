@@ -169,6 +169,8 @@ class AdaptiveMD(AdaptiveBase):
         self._model = Model(data)
         self._model.markovModel(self.lag, self._numMacrostates(data))
         if self.save:
+            if not path.exists('saveddata'):
+                os.makedirs('saveddata')
             self._model.save(path.join('saveddata', 'e{}_adapt_model.dat'.format(self._getEpoch())))
 
     def _getSpawnFrames(self, model, data):
