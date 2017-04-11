@@ -459,7 +459,8 @@ class Model(object):
         (single, molfile) = _singleMolfile(simlist)
         refmol = None
         if not single:
-            raise NameError('Visualizer does not support yet visualization of systems with different number of atoms')
+            raise NameError('Visualizer does not support yet visualization of systems with different structure files. '
+                            'The simlist should be created with a single molfile (for example a filtered one)')
         if alignmol is None:
             alignmol = molfile
         if statetype != 'macro' and statetype != 'micro' and statetype != 'cluster':
@@ -682,26 +683,30 @@ class Model(object):
         ck = msm.cktest(self.macronum)
         plot_cktest(ck)
 
-    def createCoreSetModel(self, divisor=2):
+    def createCoreSetModel(self, threshold=0.5):
         """ Given an MSM this function detects the states belonging to a core set and returns a new model consisting
         only of these states.
 
         Parameters
         ----------
-        divisor : float
-            Heuristic hyperparameter for modifying the amoung of core state.
+        threshold : float
+            Membership probability threshold over which microstates belong to the core of a macrostate
 
         Returns
         -------
         newmodel :
             A new model object
         """
-        def calcCoreSet(distr, assign, divisor=2):
+        if (threshold >= 1) or (threshold <= 0):
+            raise AttributeError('threshold argument only accepts values between (0, 1)')
+
+        def calcCoreSet(distr, assign, threshold):
             coreset = []
             for i, md in enumerate(distr):
                 microofmacro = np.where(assign == i)[0]
                 prob = md[microofmacro]
-                coreset.append(microofmacro[np.where(prob > (prob.max() - prob.min()) / divisor)[0]])
+                tt = threshold * (prob.max() - prob.min())
+                coreset.append(microofmacro[np.where(prob > tt)[0]])
             return coreset
 
         def coreDtraj(St, micro_ofcluster, coreset):
@@ -742,7 +747,7 @@ class Model(object):
             newdiscretetraj = np.array([x for x in newdiscretetraj if len(x) != 0], dtype=object)
             return newdiscretetraj, len(corestates), newcounts, frames
 
-        coreset = calcCoreSet(self.msm.metastable_distributions, self.msm.metastable_assignments, divisor)
+        coreset = calcCoreSet(self.msm.metastable_distributions, self.msm.metastable_assignments, threshold)
         newdata = self.data.copy()
         newdata.St, newdata.K, newdata.N, frames = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
 
