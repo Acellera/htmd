@@ -1646,6 +1646,14 @@ if __name__ == "__main__":
     tmp = tempname(suffix='.h5')
     m.write(tmp, 'name CA')
 
+    # Testing dihedral setting
+    from htmd.molecule.util import dihedralAngle
+    mol = Molecule('2HBB')
+    quad = [124, 125, 132, 133]
+    mol.setDihedral(quad, np.deg2rad(-90))
+    angle = dihedralAngle(mol.coords[quad, :, :])
+    assert np.abs(-90 - angle) < 1E-3
+
 
 
 
