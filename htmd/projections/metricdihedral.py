@@ -590,11 +590,11 @@ class MetricDihedral(Projection):
         return sels
 
     def _calcDihedralAngles(self, mol, dihedrals, sincos=True):
+        from htmd.molecule.util import dihedralAngle
         metric = np.zeros((np.size(mol.coords, 2), len(dihedrals)))
 
         for i, dih in enumerate(dihedrals):
-            metric[:, i] = _angle(mol.coords[dih[0], :, :], mol.coords[dih[1], :, :],
-                                  mol.coords[dih[2], :, :], mol.coords[dih[3], :, :])
+            metric[:, i] = dihedralAngle(mol.coords[dih, :, :])
 
         if sincos:
             sc_metric = np.zeros((np.size(metric, 0), np.size(metric, 1) * 2))
@@ -635,45 +635,6 @@ class MetricDihedral(Projection):
     def chi5(res, resname):
         raise DeprecationWarning('MetricDihedral.chi5 has been replaced with Dihedral.chi5. Check the latest documentation.')
 
-
-def _angle(A0, A1, A2, A3):
-    '''
-    http://en.wikipedia.org/wiki/Dihedral_angle#Methods_of_computation
-    https://www.cs.unc.edu/cms/publications/dissertations/hoffman_doug.pdf
-    http://www.cs.umb.edu/~nurith/cs612/hw4_2012.pdf
-
-    Ua = (A2 - A1) x (A3 - A1)
-    Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
-    angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
-    '''
-    A10 = np.transpose(A1 - A0)
-    A21 = np.transpose(A2 - A1)
-    A32 = np.transpose(A3 - A2)
-    Ua = np.cross(A10, A21)
-    Ub = np.cross(A21, A32)
-    #from IPython.core.debugger import Tracer
-    #Tracer()()
-    if np.any(np.sum(Ua == 0, 1) == 3) or np.any(np.sum(Ub == 0, 1) == 3):
-        raise ZeroDivisionError('Two dihedral planes are exactly parallel or antiparallel. There is probably something broken in the simulation.')
-    x = np.squeeze(_inner(Ua, Ub)) / (np.squeeze(np.linalg.norm(Ua, axis=1)) * np.squeeze(np.linalg.norm(Ub, axis=1)))
-
-    # Fix machine precision errors (I hope at least that's what I'm doing...)
-    if isinstance(x, np.ndarray):
-        x[x > 1] = 1
-        x[x < -1] = -1
-    elif x > 1:
-        x = 1
-    elif x < -1:
-        x = -1
-
-    signV = np.squeeze(np.sign(_inner(Ua, A32)))
-    signV[signV == 0] = 1  # Angle sign is 0. Maybe I should handle this better...
-
-    return (np.arccos(x) * 180. / np.pi) * signV
-
-
-def _inner(A, B):
-    return np.sum(A * B, 1)
 
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule

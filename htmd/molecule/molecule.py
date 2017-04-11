@@ -617,7 +617,7 @@ class Molecule:
             self.coords[s, :, f] += vector
 
     @_Deprecated('1.3.2', 'htmd.molecule.molecule.Molecule.rotateBy')
-    def rotate(self, axis, angle, sel=None):
+    def rotate(self, axis, angle, center=(0, 0, 0), sel=None):
         """
         Rotate atoms around an axis for a given angle in radians.
 
@@ -627,8 +627,10 @@ class Molecule:
             Axis of rotation
         angle : float
             Angle of rotation in radians
+        center : list
+            The rotation center
         sel :
-            selection text
+            Atomselection for atoms to rotate
 
         Examples
         --------
@@ -636,7 +638,7 @@ class Molecule:
         >>> mol.rotate([0, 1, 0], 1.57)
         """
         M = rotationMatrix(axis, angle)
-        self.rotateBy(M, sel=sel)
+        self.rotateBy(M, center=center, sel=sel)
 
     def rotateBy(self, M, center=(0, 0, 0), sel='all'):
         """ Rotate a selection of atoms by a given rotation around a center
@@ -647,6 +649,8 @@ class Molecule:
             The rotation matrix
         center : list
             The rotation center
+        sel :
+            Atomselection for atoms to rotate
 
         Examples
         --------
@@ -657,6 +661,42 @@ class Molecule:
         newcoords = coords - center
         newcoords = np.dot(newcoords, np.transpose(M)) + center
         self.set('coords', newcoords, sel=sel)
+
+    def setDihedral(self, atom_quad, radians):
+        """ Sets the angle of a dihedral.
+        
+        Parameters
+        ----------
+        atom_quad : list
+            Four atom indexes corresponding to the atoms defining the dihedral
+        radians : float
+            The angle in radians to which we want to set the dihedral
+        """
+        import scipy.sparse.csgraph as sp
+        from htmd.molecule.util import dihedralAngle
+        bonds = self._getBonds()
+
+        # Now we have to make the lists of atoms that are on either side of the dihedral bond
+        natoms = self.numAtoms
+        conn = np.zeros((natoms, natoms), dtype=np.bool)
+        for b in bonds:
+            conn[b[0], b[1]] = True
+            conn[b[1], b[0]] = True
+
+        # disconnect the structure across the dihedral bond
+        conn[[atom_quad[1], atom_quad[2]]] = 0
+        conn[[atom_quad[2], atom_quad[1]]] = 0
+        left = np.unique(sp.breadth_first_tree(conn, atom_quad[1], directed=False).indices.flatten())
+        right = np.unique(sp.breadth_first_tree(conn, atom_quad[2], directed=False).indices.flatten())
+
+        if (atom_quad[2] in left) or (atom_quad[1] in right):
+            raise RuntimeError('Loop detected in molecule. Cannot change dihedral')
+
+        quad_coords = self.coords[atom_quad, :, 0]
+        rotax = quad_coords[2] - quad_coords[1]
+        rotax /= np.linalg.norm(rotax)
+        rads = np.deg2rad(dihedralAngle(quad_coords))
+        self.rotate(rotax, radians-rads, center=self.coords[atom_quad[1], :, 0], sel=right)
 
     def center(self, loc=(0, 0, 0), sel='all'):
         """ Moves the geometric center of the Molecule to a given location
@@ -921,8 +961,11 @@ class Molecule:
         basename = os.path.basename(filepath)
         numframefile = os.path.join(filedir, '.{}.numframes'.format(basename))
         if not os.path.exists(numframefile) or (os.path.exists(numframefile) and (os.path.getmtime(numframefile) < os.path.getmtime(filepath))):
-            with open(numframefile, 'w') as f:
-                f.write(str(numFrames))
+            try:
+                with open(numframefile, 'w') as f:
+                    f.write(str(numFrames))
+            except:
+                pass
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
              viewerhandle=None, gui=False):
