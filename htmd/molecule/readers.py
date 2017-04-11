@@ -434,7 +434,8 @@ def PDBread(filename, mode='pdb'):
                 teridx.append(str(currter))
             if line.startswith('TER'):
                 currter += 1
-            if line.startswith('END') and mode == 'pdb':  # pdbqt should not stop reading at ENDROOT or ENDBRANCH
+            if (mode == 'pdb' and line.startswith('END')) or \
+               (mode == 'pdbqt' and line.startswith('ENDMDL')):  # pdbqt should not stop reading at ENDROOT or ENDBRANCH
                 topoend = True
             if line.startswith('CONECT'):
                 conectdata.write(line)
