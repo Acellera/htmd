@@ -662,7 +662,7 @@ class Molecule:
         newcoords = np.dot(newcoords, np.transpose(M)) + center
         self.set('coords', newcoords, sel=sel)
 
-    def setDihedral(self, atom_quad, radians):
+    def setDihedral(self, atom_quad, radians, bonds=None):
         """ Sets the angle of a dihedral.
         
         Parameters
@@ -671,10 +671,14 @@ class Molecule:
             Four atom indexes corresponding to the atoms defining the dihedral
         radians : float
             The angle in radians to which we want to set the dihedral
+        bonds : np.ndarray
+            An array containing all bonds of the molecule. This is needed if more than one rotation is performed as the
+            bond guessing can get messed up if atoms come very close after the rotation.
         """
         import scipy.sparse.csgraph as sp
         from htmd.molecule.util import dihedralAngle
-        bonds = self._getBonds()
+        if bonds is None:
+            bonds = self._getBonds()
 
         # Now we have to make the lists of atoms that are on either side of the dihedral bond
         natoms = self.numAtoms
@@ -692,11 +696,11 @@ class Molecule:
         if (atom_quad[2] in left) or (atom_quad[1] in right):
             raise RuntimeError('Loop detected in molecule. Cannot change dihedral')
 
-        quad_coords = self.coords[atom_quad, :, 0]
+        quad_coords = self.coords[atom_quad, :, self.frame]
         rotax = quad_coords[2] - quad_coords[1]
         rotax /= np.linalg.norm(rotax)
         rads = np.deg2rad(dihedralAngle(quad_coords))
-        self.rotate(rotax, radians-rads, center=self.coords[atom_quad[1], :, 0], sel=right)
+        self.rotate(rotax, radians-rads, center=self.coords[atom_quad[1], :, self.frame], sel=right)
 
     def center(self, loc=(0, 0, 0), sel='all'):
         """ Moves the geometric center of the Molecule to a given location
