@@ -69,6 +69,47 @@ class Dihedral:
         return descr
 
     @staticmethod
+    def dihedralsToIndexes(mol, dihedrals, sel='all'):
+        """ Converts dihedral objects to atom indexes of a given Molecule
+        
+        Parameters
+        ----------
+        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+            A Molecule object from which to obtain atom information
+        dihedrals : list
+            A single dihedral or a list of Dihedral objects
+        sel : str
+            An atomselection to restrict the application of the selections.
+
+        Returns
+        -------
+        indexes : list of lists
+            A list containing a list of atoms that correspond to each dihedral.
+            
+        Examples
+        --------
+        >>> dihs = []
+        >>> dihs.append(Dihedral.phi(mol, 1, 2))
+        >>> dihs.append(Dihedral.psi(mol, 2, 3))
+        >>> indexes = Dihedral.dihedralsToIndexes(mol, dihs)
+        """
+        selatoms = mol.atomselect(sel)
+        from htmd.util import ensurelist
+        indexes = []
+        for dih in ensurelist(dihedrals):
+            idx = []
+            for a in dih.atoms:
+                atomsel = (mol.name == a['name']) & (mol.resid == a['resid']) & (mol.insertion == a['insertion']) & \
+                          (mol.chain == a['chain']) & (mol.segid == a['segid'])
+                atomsel = atomsel & selatoms
+                if np.sum(atomsel) != 1:
+                    raise RuntimeError(
+                        'Expected one atom from atomselection {}. Got {} instead.'.format(a, np.sum(atomsel)))
+                idx.append(np.where(atomsel)[0][0])
+            indexes.append(idx)
+        return indexes
+
+    @staticmethod
     def _findResidue(mol, resid, insertion=None, chain=None, segid=None):
         idx = (mol.resid == resid)
         descr = 'Resid "{}"'.format(resid)
@@ -574,20 +615,7 @@ class MetricDihedral(Projection):
             self._dihedrals = ensurelist(self._dihedrals)
             dihedrals = self._dihedrals
 
-        dih = []
-        for d in dihedrals:
-            dih.append(self._dihedralAtomIndexes(d, protatoms, mol))
-        return dih
-
-    def _dihedralAtomIndexes(self, dihedral, selatoms, mol):
-        sels = []
-        for a in dihedral.atoms:
-            atomsel = (mol.name == a['name']) & (mol.resid == a['resid']) & (mol.insertion == a['insertion']) & (mol.chain == a['chain']) & (mol.segid == a['segid'])
-            atomsel = atomsel & selatoms
-            if np.sum(atomsel) != 1:
-                raise RuntimeError('Expected one atom from atomselection {}. Got {} instead.'.format(a, np.sum(atomsel)))
-            sels.append(np.where(atomsel)[0][0])
-        return sels
+        return Dihedral.dihedralsToIndexes(mol, dihedrals, protatoms)
 
     def _calcDihedralAngles(self, mol, dihedrals, sincos=True):
         from htmd.molecule.util import dihedralAngle
