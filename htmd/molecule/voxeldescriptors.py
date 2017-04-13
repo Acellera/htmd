@@ -16,7 +16,7 @@ libdir = htmd.home(libDir=True)
 occupancylib = ctypes.cdll.LoadLibrary(os.path.join(libdir, "occupancy_ext.so"))
 
 
-def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
+def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0, channels=None):
     """ Calculate descriptors of atom properties for voxels in a grid bounding the Molecule object.
 
     Constructs a bounding box around Molecule with some buffer space. Then it computes
@@ -34,11 +34,19 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
     buffer : float
         The buffer space to add to the bounding box. This adds zeros to the grid around the protein so that properties
         which are at the edge of the box can be found in the center of one. Should be usually set to localimagesize/2.
+    channels : np.ndarray
+        A 2D array of size (mol.numAtoms, nchannels) where nchannels is the number of channels we want to have.
+        Each column i then has True (or a float) in the rows of the atoms which belong to channel i and False (or 0) 
+        otherwise. Such boolean arrays can be obtained for example by using mol.atomselect.
+        If the array is boolean, each atom will get assigned its VdW radius. If the array is float, these floats will 
+        be used as the corresponding atom radii. Make sure the numpy array is of dtype=bool if passing boolean values.
+        If no channels are given, the default ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 
+        'positive_ionizable', 'negative_ionizable', 'metal', 'occupancies') channels will be used.
 
     Returns
     -------
     features : np.ndarray
-        A list of boxes containing voxels and their properties
+        A 2D array of size (centers, channels) containing the effect of each channel in the voxel with that center. 
     centers : np.ndarray
         A list of the centers of all boxes
     N : np.ndarray
@@ -55,13 +63,13 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
     >>> # The user can provide his own centers
     >>> features, centers = getVoxelDescriptors(mol, usercenters=[[0, 0, 0], [16, 24, -5]], buffer=8)
     """
-    properties = _getAtomtypePropertiesPDBQT(mol)
+    if channels is None:
+        channels = _getAtomtypePropertiesPDBQT(mol)
 
-    # Calculate for each channel the atom sigmas
-    multisigmas = np.zeros([mol.numAtoms, len(_order)])
-    sigmas = _getRadii(mol)
-    for i, p in enumerate(_order):
-        multisigmas[properties[p], i] = sigmas[properties[p]]
+    if channels.dtype == bool:
+        # Calculate for each channel the atom sigmas
+        sigmas = _getRadii(mol)
+        channels = sigmas[:, np.newaxis] * channels.astype(float)
 
     N = None
     if usercenters is None:
@@ -78,7 +86,7 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0):
         centers2D = usercenters
 
     # Calculate features
-    features = _getGridDescriptors(mol, centers2D, multisigmas)
+    features = _getGridDescriptors(mol, centers2D, channels)
 
     if N is None:
         return features, centers2D
@@ -161,7 +169,8 @@ def _getAtomtypePropertiesPDBQT(mol):
     atom_par BR     4.33  0.389  42.5661  -0.00110  0.0  0.0  0  -1  -1  4    # Non H-bonding Bromine
     atom_par I      4.72  0.550  55.0585  -0.00110  0.0  0.0  0  -1  -1  4    # Non H-bonding Iodine
     """
-    props = dict()
+    from collections import OrderedDict
+    props = OrderedDict()
     elements = np.array([el.upper() for el in mol.element])
 
     props['hydrophobic'] = (elements == 'C') | (elements == 'A')
@@ -174,7 +183,11 @@ def _getAtomtypePropertiesPDBQT(mol):
     props['metal'] = (elements == 'MG') | (elements == 'ZN') | (elements == 'MN') | \
                      (elements == 'CA') | (elements == 'FE')
     props['occupancies'] = (elements != 'H') & (elements != 'HS') & (elements != 'HD')
-    return props
+
+    channels = np.zeros((len(elements), len(props)), dtype=bool)
+    for i, p in enumerate(_order):
+        channels[:, i] = props[p]
+    return channels
 
 
 def _findDonors(mol, bonds):
