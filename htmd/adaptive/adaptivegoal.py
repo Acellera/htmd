@@ -131,6 +131,7 @@ class AdaptiveGoal(AdaptiveMD):
                                        'how stuck the adaptive is at a given goal score.', False, val.Boolean())
         self._arg('autoscalemult', 'float', 'Multiplier for the scaling factor.', 1, val.Number(float, '0POS'))
         self._arg('autoscaletol', 'float', 'Tolerance for the scaling factor.', 0.2, val.Number(float, '0POS'))
+        self._arg('autoscalediff', 'int', 'Diff in epochs to use for scaling factor.', 10, val.Number(int, 'POS'))
         self._debug = False
 
     def _algorithm(self):
@@ -185,7 +186,7 @@ class AdaptiveGoal(AdaptiveMD):
 
         scale = self.ucscale
         if self.autoscale:
-            scale = AdaptiveGoal._calculateScale(goaldata, self.autoscalemult, self.autoscaletol)
+            scale = AdaptiveGoal._calculateScale(goaldata, self.autoscalediff, self.autoscalemult, self.autoscaletol)
         reward = scale * uc + (1 - scale) * dc
 
         relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
@@ -206,7 +207,7 @@ class AdaptiveGoal(AdaptiveMD):
         return True
 
     @staticmethod
-    def _calculateScale(goaldata, multiplier=1, tolerance=0.2):
+    def _calculateScale(goaldata, epochdiff, multiplier=1, tolerance=0.2):
         from htmd.adaptive.adaptive import epochSimIndexes
 
         # Calculate the max goal of each epoch and the total min of the goal to normalize the goals to a [0, 1]
@@ -224,7 +225,6 @@ class AdaptiveGoal(AdaptiveMD):
         rangeG = g.max() - totalmin
 
         # Calculate the dG
-        epochdiff = 10
         g = np.hstack(([g[0]] * epochdiff, g))  # Prepending the first element epochdiff-times to calculate the dG
         dG = np.abs(g[epochdiff:] - g[:-epochdiff]) / rangeG
 

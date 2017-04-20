@@ -296,6 +296,9 @@ def _getGridDescriptors(mol, centers, channelsigmas):
     occupancies
     centers
     """
+    centers = centers.astype(np.float64)
+    channelsigmas = channelsigmas.astype(np.float64)
+
     nchannels = channelsigmas.shape[1]
     occus = np.zeros((centers.shape[0], nchannels))
     coords = np.squeeze(mol.coords[:, :, 0])
