@@ -131,6 +131,7 @@ class AdaptiveGoal(AdaptiveMD):
                                        'how stuck the adaptive is at a given goal score.', False, val.Boolean())
         self._arg('autoscalemult', 'float', 'Multiplier for the scaling factor.', 1, val.Number(float, '0POS'))
         self._arg('autoscaletol', 'float', 'Tolerance for the scaling factor.', 0.2, val.Number(float, '0POS'))
+        self._arg('autoscalediff', 'int', 'Diff in epochs to use for scaling factor.', 10, val.Number(int, 'POS'))
         self._debug = False
 
     def _algorithm(self):
@@ -224,7 +225,7 @@ class AdaptiveGoal(AdaptiveMD):
         rangeG = g.max() - totalmin
 
         # Calculate the dG
-        epochdiff = 10
+        epochdiff = self.autoscalediff
         g = np.hstack(([g[0]] * epochdiff, g))  # Prepending the first element epochdiff-times to calculate the dG
         dG = np.abs(g[epochdiff:] - g[:-epochdiff]) / rangeG
 
