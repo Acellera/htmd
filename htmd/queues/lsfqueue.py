@@ -47,15 +47,20 @@ class LsfQueue(SimQueue, ProtocolInterface):
     >>> s.queue = 'multiscale'
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
     """
+
+    _defaults = {'default_queue': 'gpu_queue', 'gpu_queue': None, 'cpu_queue': None, 'ngpu': 1, 'memory': 4000,
+                 'walltime': None, 'resources': None, 'environment': None}
+
     def __init__(self):
         super().__init__()
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
-        self._arg('queue', 'str', 'The queue to run on', None, val.String())
-        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', 1, val.Number(int, '0POS'))
-        self._arg('memory', 'int', 'Amount of memory per job (MB)', 4000, val.Number(int, '0POS'))
-        self._arg('walltime', 'int', 'Job timeout (hour:min or min)', None, val.Number(int, '0POS'))
-        self._arg('resources', 'str', 'Resources of the queue', None, val.String())
-        self._arg('environment', 'list', 'Things to run before the job (sourcing envs).', None, val.String(), nargs='*')
+        self._arg('queue', 'str', 'The queue to run on', self._defaults[self._defaults['default_queue']], val.String())
+        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'], val.Number(int, '0POS'))
+        self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, '0POS'))
+        self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'], val.Number(int, '0POS'))
+        self._arg('resources', 'str', 'Resources of the queue', self._defaults['resources'], val.String())
+        self._arg('environment', 'list', 'Things to run before the job (sourcing envs).', self._defaults['environment'],
+                  val.String(), nargs='*')
         self._arg('outputstream', 'str', 'Output stream.', 'lsf.%J.out', val.String())
         self._arg('errorstream', 'str', 'Error stream.', 'lsf.%J.err', val.String())
         self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
@@ -79,13 +84,6 @@ class LsfQueue(SimQueue, ProtocolInterface):
                 logger.info('environment set to {}'.format(self.environment))
             if self.resources is None:
                 self.resources = '"{}"'.format('rusage[ngpus_excl_p=1],span[hosts=1]')
-                logger.info('resources set to {}'.format(self.resources))
-        if 'gpu_priority' in ret.decode('ascii'):
-            if self.environment is None:
-                self.environment = ['module load acemd', 'module load acellera/test', 'module load gaussian']
-                logger.info('environment set to {}'.format(self.environment))
-            if self.resources is None:
-                self.resources = '"{}"'.format('select[ngpus>0] rusage[ngpus_excl_p=1]')
                 logger.info('resources set to {}'.format(self.resources))
 
     @staticmethod
@@ -138,10 +136,6 @@ class LsfQueue(SimQueue, ProtocolInterface):
         # Nothing to do
         pass
 
-    def _autoQueueName(self):
-        ret = check_output(self._qinfo)
-        return ','.join(np.unique([i.split()[0].strip('*') for i in ret.decode('ascii').split('\n')[1:-1]]))
-
     def _autoJobName(self, path):
         return os.path.basename(os.path.abspath(path)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
 
@@ -158,7 +152,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._dirs.extend(dirs)
 
         if self.queue is None:
-            self.queue = self._autoQueueName()
+            raise ValueError('The queue needs to be defined.')
 
         # if all folders exist, submit
         for d in dirs:
@@ -202,7 +196,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         import time
         import getpass
         if self.queue is None:
-            self.queue = self._autoQueueName()
+            raise ValueError('The queue needs to be defined.')
         if self.jobname is None:
             raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
@@ -252,7 +246,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         """
         import getpass
         if self.queue is None:
-            self.queue = self._autoQueueName()
+            raise ValueError('The queue needs to be defined.')
         user = getpass.getuser()
         cmd = [self._qcancel, '-J', self.jobname, '-u', user, '-q', self.queue]
         logger.debug(cmd)

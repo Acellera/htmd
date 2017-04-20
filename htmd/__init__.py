@@ -92,3 +92,19 @@ import progress_reporter.bar.gui as gui  # Disabling pyemma progress widgets
 gui.ipython_notebook_session = False
 
 config()
+
+if os.getenv('HTMD_CONFIG'):
+    configfile = os.getenv('HTMD_CONFIG')
+    if not os.path.isfile(configfile):
+        raise FileNotFoundError('HTMD Config file {} does not exist (Check HTMD_CONFIG).'.format(configfile))
+    elif not configfile.endswith('.py'):
+        raise Warning('HTMD Config file {} may not be a python file (Check HTMD_CONFIG).'.format(configfile))
+    else:
+        try:
+            with open(configfile) as f:
+                code = compile(f.read(), configfile, 'exec')
+                exec(code)
+        except:
+            raise RuntimeError('Failed to execute the HTMD Config file {}.'.format(configfile))
+        else:
+            print('\nHTMD Config file {} executed.'.format(configfile))
