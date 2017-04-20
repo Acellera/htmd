@@ -62,17 +62,23 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     >>> s.partition = 'multiscale'
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
     """
+
+    _defaults = {'default_partition': 'gpu_partition', 'gpu_partition': None, 'cpu_partition': None, 'priority': None,
+                 'ngpu': 1, 'ncpu': 1, 'memory': 1000, 'walltime': None, 'environment': 'ACEMD_HOME,HTMD_LICENSE_FILE'}
+
     def __init__(self):
         super().__init__()
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
-        self._arg('partition', 'str', 'The queue (partition) to run on', None, val.String())
-        self._arg('priority', 'str', 'Job priority', 'gpu_priority', val.String())
-        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', 1, val.Number(int, '0POS'))
-        self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', 1, val.Number(int, 'POS'))
-        self._arg('memory', 'int', 'Amount of memory per job (MB)', 1000, val.Number(int, 'POS'))
-        self._arg('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.', None, val.Number(int, '0POS'))
-        self._arg('walltime', 'int', 'Job timeout (s)', None, val.Number(int, 'POS'))
-        self._arg('environment', 'str', 'Envvars to propagate to the job.', 'ACEMD_HOME,HTMD_LICENSE_FILE', val.String())
+        self._arg('partition', 'str', 'The queue (partition) to run on',
+                  self._defaults[self._defaults['default_partition']], val.String())
+        self._arg('priority', 'str', 'Job priority', self._defaults['priority'], val.String())
+        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'], val.Number(int, '0POS'))
+        self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'], val.Number(int, 'POS'))
+        self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, 'POS'))
+        self._arg('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. '
+                                      'Check how to define gpu_mem on SLURM.', None, val.Number(int, '0POS'))
+        self._arg('walltime', 'int', 'Job timeout (s)', self._defaults['walltime'], val.Number(int, 'POS'))
+        self._arg('environment', 'str', 'Envvars to propagate to the job.', self._defaults['environment'], val.String())
         self._arg('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None, val.String())
         self._arg('mailuser', 'str', 'User email address.', None, val.String())
         self._arg('outputstream', 'str', 'Output stream.', 'slurm.%N.%j.out', val.String())
@@ -152,10 +158,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         # Nothing to do
         pass
 
-    def _autoQueueName(self):
-        ret = check_output(self._qinfo)
-        return ','.join(np.unique([i.split()[0].strip('*') for i in ret.decode('ascii').split('\n')[1:-1]]))
-
     def _autoJobName(self, path):
         return os.path.basename(os.path.abspath(path)) + '_' + ''.join([random.choice(string.digits) for _ in range(5)])
 
@@ -172,7 +174,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._dirs.extend(dirs)
 
         if self.partition is None:
-            self.partition = self._autoQueueName()
+            raise ValueError('The partition needs to be defined.')
 
         # if all folders exist, submit
         for d in dirs:
@@ -216,7 +218,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         import time
         import getpass
         if self.partition is None:
-            self.partition = self._autoQueueName()
+            raise ValueError('The partition needs to be defined.')
         if self.jobname is None:
             raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
@@ -266,7 +268,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         """
         import getpass
         if self.partition is None:
-            self.partition = self._autoQueueName()
+            raise ValueError('The partition needs to be defined.')
         if self.jobname is None:
             raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
