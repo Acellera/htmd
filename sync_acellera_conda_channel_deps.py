@@ -12,71 +12,68 @@ from binstar_client.utils import get_server_api
 
 api = get_server_api()
 
-os.chdir("/tmp")
-
-try:
-    os.mkdir("linux-64")
-    os.mkdir("linux-32")
-    os.mkdir("osx-64")
-    os.mkdir("osx-32")
-    os.mkdir("win-64")
-    os.mkdir("win-32")
-    os.mkdir("noarch")
-except:
-    pass
+os.chdir('/tmp')
 
 # Add packages to sync in this list here
 
 # Don't sync pcmsolver -- we have modified this
-#  "psi4:pcmsolver",
+#  'psi4:pcmsolver',
+packages = [
+    ['omnia', 'fftw3f'],
+    ['omnia', 'openmm'],
+    ['omnia', 'ambermini'],
+    ['omnia', 'bhmm'],
+    ['omnia', 'funcsigs'],
+    ['omnia', 'mdtraj'],
+    ['omnia', 'msmtools'],
+    ['openbabel', 'openbabel'],
+    ['omnia', 'pint'],
+    ['omnia', 'progress_reporter'],
+    ['omnia', 'pyemma'],
+    ['omnia', 'thermotools'],
+    ['psi4', 'dftd3'],
+    ['bioconda', 'nglview'],
+]
 
-for p in [
-    "omnia:fftw3f",
-    "omnia:openmm",
-    "omnia:ambermini",
-    "omnia:bhmm",
-    "omnia:funcsigs",
-    "omnia:mdtraj",
-    "omnia:msmtools",
-    "omnia:openbabel",
-    "omnia:pint",
-    "omnia:progress_reporter",
-    "omnia:pyemma",
-    "omnia:thermotools",
-    "psi4:dftd3",
-    "bioconda:nglview"
-]:
-
-    pp = p.split(":")
-    p = pp[1]
-    omnia = api.package(pp[0], p)
+for channel, package in packages:
+    remote = api.package(channel, package)
     try:
-        acellera = api.package("acellera", p)
+        acellera = api.package('acellera', package)
     except:
+        acellera = None
 
-        acellera = {"latest_version": "0"}
+    # For each file on the remove channel of the given version
+    for rf in remote['files']:
+        if rf['version'] != remote['latest_version']:
+            continue
 
-    if omnia["latest_version"] > acellera["latest_version"]:
-        print("Syncing %s/%s version %s (acellera version %s).." % (
-        pp[0], p, omnia["latest_version"], acellera["latest_version"]))
-        for f in omnia["files"]:
-            if f["version"] == omnia["latest_version"]:
-                url = "https:" + f["download_url"]
-                print("Downloading %s" % (url))
+        # Searching for the file in acellera channel
+        found = False
+        if acellera is not None:
+            for af in acellera['files']:
+                if (af['version'] == rf['version']) and (af['basename'] == rf['basename']):
+                    found = True
+                    break
+
+        if not found:
+            print('\nSyncing {}/{} file "{}" to acellera'.format(channel, package, rf['basename']))
+
+            url = 'https:' + rf['download_url']
+            print('Downloading {}'.format(url))
+
+            odir = os.path.dirname(os.path.abspath(rf['basename']))
+            if not os.path.exists(odir):
+                os.makedirs(odir)
+
+            call(['curl', '-L', '-s', url, '-o', rf['basename']])
+            print('Uploading...')
+            try:
+                os.getenv('ANACONDA_TOKEN_BASIC')
+                call(['anaconda', 'upload', '--force', '-t', os.getenv('ANACONDA_TOKEN_BASIC'), '-u', 'acellera', rf['basename']])
+            except:
                 try:
-                    os.unlink("/tmp/package.bz2")
+                    call(['anaconda', 'upload', '--force', '-u', 'acellera', rf['basename']])
                 except:
-                    pass
-                call(["curl", "-L", "-s", url, "-o", f["basename"]])
-                print("Uploading..")
-                try:
-                    os.getenv("ANACONDA_TOKEN_BASIC")
-                    call(["anaconda", "upload", "--force", "-t", os.getenv("ANACONDA_TOKEN_BASIC"), "-u", "acellera",
-                          f["basename"]])
-                except:
-                    try:
-                        call(["anaconda", "upload", "--force", "-u", "acellera", f["basename"]])
-                    except:
-                        print("Failed to sync")
-    else:
-        print("Package %s up to date at version %s/%s" % (p, omnia["latest_version"], acellera["latest_version"]))
+                        print('Failed to sync')
+            os.remove(rf['basename'])
+
