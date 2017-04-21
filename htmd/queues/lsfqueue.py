@@ -76,16 +76,6 @@ class LsfQueue(SimQueue, ProtocolInterface):
         # For synchronous
         self._dirs = []
 
-        # Specific automatic guessing
-        ret = check_output(self._qinfo)
-        if 'phase6_48_hour' in ret.decode('ascii'):
-            if self.environment is None:
-                self.environment = ['source /home/model/MD-SOFTWARE/model_md.bashrc', 'source /home/model/miniconda3/htmd.bashrc']
-                logger.info('environment set to {}'.format(self.environment))
-            if self.resources is None:
-                self.resources = '"{}"'.format('rusage[ngpus_excl_p=1],span[hosts=1]')
-                logger.info('resources set to {}'.format(self.resources))
-
     @staticmethod
     def _find_binary(binary):
         ret = shutil.which(binary, mode=os.X_OK)

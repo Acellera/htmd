@@ -66,6 +66,7 @@ class QMResult:
     mulliken = None
 
 
+# TODO: Rewrite to ProtocolInterface
 class QMCalculation:
     def __init__(self, molecule,
                  basis=BasisSet._cc_pVDZ,
@@ -360,14 +361,21 @@ class QMCalculation:
                 f.close()
                 os.chmod(os.path.join(d, "run.sh"), 0o700)
 
+            if self.code == Code.Gaussian or self.code == Code.PSI4:
+                queue_type = 'cpu'
+            elif self.code == Code.TeraChem:
+                queue_type = 'gpu'
+
             if isinstance(execution, SimQueue):
                 execqueue = execution
             elif execution == Execution.LSF:
                 execqueue = LsfQueue()
+                execqueue.queue = LsfQueue._defaults['{}_queue'.format(queue_type)]
             # elif execution == Execution.PBS:
             #      execqueue = PBSQueue(ncpu=self.ncpus, ngpu=1, memory=4000 )
             elif execution == Execution.Slurm:
                 execqueue = SlurmQueue()
+                execqueue.partition = SlurmQueue._defaults['{}_queue'.format(queue_type)]
                 execqueue.ncpu = self.ncpus
                 execqueue.memory = 4000
             elif execution == Execution.AceCloud:
