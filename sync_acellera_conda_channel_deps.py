@@ -44,7 +44,7 @@ for channel, package in packages:
 
     # For each file on the remove channel of the given version
     for rf in remote['files']:
-        if rf['version'] != remote['latest_version']:
+        if (rf['version'] != remote['latest_version']) or ('py27' in rf['basename']):
             continue
 
         # Searching for the file in acellera channel
