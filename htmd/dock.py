@@ -16,7 +16,7 @@ from natsort import natsorted
 from glob import glob
 
 
-def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='babel', vinaexe=None):
+def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabel', vinaexe=None):
     """ Molecular docking, using Vina
 
     If centre and extent are not provided, docking will be performed over the whole protein
@@ -80,6 +80,17 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='babel
     protein.write(protein_pdb)
     ligand.write(ligand_pdb)
 
+    # Dirty hack to remove the 'END' line from the PDBs since babel hates it
+    with open(protein_pdb, 'r') as f:
+        lines = f.readlines()
+    with open(protein_pdb, 'w') as f:
+        f.writelines(lines[:-1])
+    with open(ligand_pdb, 'r') as f:
+        lines = f.readlines()
+    with open(ligand_pdb, 'w') as f:
+        f.writelines(lines[:-1])
+    # End of dirty hack
+
     try:
         if vinaexe is None:
             import platform
@@ -100,8 +111,8 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='babel
     except:
         raise NameError('Could not find babel, or no execute permissions are given')
 
-    call([babelexe, '-i', 'pdb', protein_pdb, '-o', 'pdbqt', protein_pdbqt, '-xr'])
-    call([babelexe, '-i', 'pdb', ligand_pdb, '-o', 'pdbqt', ligand_pdbqt, '-xhn'])
+    call([babelexe, '-i', 'pdb', protein_pdb, '-o', 'pdbqt', '-O', protein_pdbqt, '-xr'])
+    call([babelexe, '-i', 'pdb', ligand_pdb, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xhn'])
 
     if not path.isfile(ligand_pdbqt):
         raise NameError('Ligand could not be converted to PDBQT')
@@ -112,33 +123,33 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='babel
           '--center_x', str(center[0]), '--center_y', str(center[1]), '--center_z', str(center[2]),
           '--size_x', str(extent[0]), '--size_y', str(extent[1]), '--size_z', str(extent[2]), '--num_modes', str(numposes)])
 
-    call([babelexe, '-m', '-i', 'pdbqt', output_pdbqt, '-o', 'pdb', output_pdb, '-xhn'])
+    call([babelexe, '-m', '-i', 'pdbqt', output_pdbqt, '-o', 'pdb', '-O', output_pdb, '-xhn'])
+
+    outfiles = natsorted(glob('{}*.pdb'.format(output_prefix)))
+    # !!! This assumed that the atoms have unique names which is quite uncommon. Disabling it
+    # for outf in outfiles:
+    #     # First get the scoring
+    #     scoring.append(_parseScoring(outf))
+    #     next_pose = Molecule(outf)
+    #     os.remove(outf)
+    #     c = next_pose.coords
+    #     co = c.copy()
+    #     natoms = len(ligand.name)
+    #
+    #     # Order atoms back to original order
+    #     for idx_i in range(natoms):
+    #         for idx_j in range(natoms):
+    #             if ligand.name[idx_i] == next_pose.name[idx_j]:
+    #                 co[idx_i, :, :] = c[idx_j, :, :]
+    #
+    #     coords.append(co)
 
     scoring = []
-    coords = []
-    outfiles = natsorted(glob('{}*.pdb'.format(output_prefix)))
-    for outf in outfiles:
-        # First get the scoring
-        scoring.append(_parseScoring(outf))
-        next_pose = Molecule(outf)
-        os.remove(outf)
-        c = next_pose.coords
-        co = c.copy()
-        natoms = len(ligand.name)
-
-        # Order atoms back to original order
-        for idx_i in range(natoms):
-            for idx_j in range(natoms):
-                if ligand.name[idx_i] == next_pose.name[idx_j]:
-                    co[idx_i, :, :] = c[idx_j, :, :]
-
-        coords.append(co)
-
     poses = []
-    for i, c in enumerate(coords):
-        l = ligand.copy()
+    for i, ligf in enumerate(outfiles):
+        scoring.append(_parseScoring(ligf))
+        l = Molecule(ligf)
         l.viewname = 'Pose {}'.format(i)
-        l.coords = c
         poses.append(l)
 
     os.remove(protein_pdb)
