@@ -12,10 +12,15 @@ import json
 import requests
 import platform
 
-has_connection=True
+has_connection = True
+
 
 def main_do_nothing():
     import htmd
+
+
+def htmd_do_register():
+    do_register('htmd')
 
 def show_news():
     try:
@@ -79,8 +84,14 @@ def check_registration(product=None):
                 print("Licence accepted automatically. License terms apply")
                 return 
             else:
-                accept_license(product=product)
-                do_register(product=product)
+                if product == 'htmd':
+                    print('\nHTMD License accepted automatically. Check license here: '
+                          'https://raw.githubusercontent.com/Acellera/htmd/master/htmd/LICENCE.txt')
+                    print('\nFor advanced features (e.g. parameterize) and to remove this message, we recommend '
+                          'registering. Run htmd_register in your terminal.')
+                else:
+                    accept_license(product=product)
+                    do_register(product=product)
 
 
 def accept_license(product=None):
@@ -226,6 +237,7 @@ def main_activate():
          print( "\n License installed in /opt/acellera/license.dat\n\n" );
        except:
          pass
+
 
 def main_htmd():
     check_registration(product="htmd")
