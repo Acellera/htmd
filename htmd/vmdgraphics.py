@@ -207,7 +207,7 @@ class VMDText(VMDGraphicObject):
 
 
 class VMDIsosurface(VMDGraphicObject):
-    def __init__(self, arr, vecMin, vecRes, color='red'):
+    def __init__(self, arr, vecMin, vecRes, color=8, isovalue=0.5):
         """ Displays an isosurface in VMD
 
         The function returns an instance of VMDGraphicsObject. To delete it, use the delete() method.
@@ -215,13 +215,13 @@ class VMDIsosurface(VMDGraphicObject):
         Parameters
         ----------
         arr: np.ndarray
-                array with volumetric data
-        filename: str
-                string with the name of the cubefile
+            3D array with volumetric data.
         vecMin: np.ndarray
-                3D vector denoting the minimal corner of the grid
+            3D vector denoting the minimal corner of the grid
         vecRes: np.ndarray
-                3D vector denoting the resolution of the grid in each dimension
+            3D vector denoting the resolution of the grid in each dimension
+        color: str
+            The color to be used for the isosurface
         """
         super().__init__(arr)
         from htmd.util import tempname
@@ -262,7 +262,8 @@ class VMDIsosurface(VMDGraphicObject):
         vmd = getCurrentViewer()
 
         vmd.send('mol new {} type cube first 0 last -1 step 1 waitfor 1 volsets {{0 }}'.format(filename))
-        vmd.send('mol modstyle 0 top Isosurface -0.4 0 2 0 1 1')
+        vmd.send('mol modstyle top top Isosurface {} 0 2 0 2 1'.format(isovalue))
+        vmd.send('mol modcolor top top ColorID {}'.format(color))
         vmd.send('set htmd_graphics_mol({:d}) [molinfo top]'.format(self.n))
 
         os.unlink(filename)
