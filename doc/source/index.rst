@@ -18,9 +18,8 @@ The tutorials are a good place to start playing around.
 .. toctree::
     :maxdepth: 3
 
-    tutorials
-    api
     userguide
+    api
     developers
     acemd
     acetk/acetk
