@@ -429,7 +429,8 @@ class EquilibrationAcemd3(ProtocolInterface):
         restraints = list()
         restraints.append(AtomRestraint('protein and noh and not name CA', 0, [(0.1, 0), (0, constrsteps)]))
         restraints.append(AtomRestraint('protein and name CA', 0, [(1, 0), (0, constrsteps)]))
-        restraints += self.restraints
+        if self.restraints is not None:
+            restraints += self.restraints
         self.acemd.restraints = restraints
 
         if self.acemd.celldimension is None and self.acemd.extendedsystem is None:
