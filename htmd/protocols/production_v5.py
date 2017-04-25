@@ -5,7 +5,9 @@
 #
 
 from htmd.molecule.molecule import Molecule
-from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
+from htmd.protocols.oldprotocolinterface import TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
+from htmd.protocols.oldprotocolinterface import ProtocolInterface as OldProtocolInterface
+from protocolinterface import ProtocolInterface, val
 from htmd.apps.acemd import Acemd
 import os
 import htmd
@@ -13,7 +15,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class Production(ProtocolInterface):
+class Production(OldProtocolInterface):
     ''' Production protocol v5
 
         Production protocol for globular and membrane proteins. You can optionally define a flatbottom potential box and
@@ -207,7 +209,6 @@ proc calcforces_endstep { } { }
                                'If you want to use constraints, define useconstraints=True'.format(self.constraints))
         if self.useconstantratio:
             self.acemd.useconstantratio = 'on'
-        self.acemd.setup(inputdir, outputdir, overwrite=True)
 
         if self.adaptive:
             self.acemd.binvelocities = None
@@ -227,6 +228,115 @@ proc calcforces_endstep { } { }
                 inmol.write(outfile)
                 self.acemd.consref = self.acemd.coordinates
 
+        self.acemd.setup(inputdir, outputdir, overwrite=True)
+
+
+from htmd.apps.acemd3 import Acemd3, _Restraint, GroupRestraint, AtomRestraint
+class ProductionAcemd3(ProtocolInterface):
+    ''' Production protocol v5 for Acemd 3
+
+        Production protocol for globular and membrane proteins. You can optionally define a flatbottom potential box and
+        atom constraints for the production run.
+
+        Parameters
+        ----------
+        runtime : float, default=0
+            Running time of the simulation.
+        timeunits : str, default='steps'
+            Units for runtime. Can be 'steps', 'ns' etc.
+        temperature : float, default=300
+            Temperature of the thermostat in Kelvin
+        restraints : list, default=None
+            A list of restraint objects
+        useconstantratio : bool, default=False
+            For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
+        adaptive : bool, default=False
+            Set to True if making production runs for adaptive sampling.
+    '''
+    def __init__(self):
+        super().__init__()
+        self._arg('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, val.Object(Acemd3))
+        self._arg('runtime', 'float', 'Running time of the simulation.', 0, val.Number(float, '0POS'))
+        self._arg('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps', val.String())
+        self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, val.Number(float, 'ANY'))
+        self._arg('restraints', 'list', 'A list of restraint objects', None, val.Object(_Restraint), nargs='*')
+        self._arg('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False, val.Boolean())
+        self._arg('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False, val.Boolean())
+
+        self.acemd = Acemd3()
+        self.acemd.binvelocities = None
+        self.acemd.bincoordinates = 'output.coor'
+        self.acemd.extendedsystem='output.xsc'
+        self.acemd.coordinates = None
+        self.acemd.structure = None
+        self.acemd.parameters = None
+        self.acemd.restart = 'on'
+        self.acemd.trajectoryfile = 'output.xtc'
+        self.acemd.trajectoryfreq = 25000
+        self.acemd.timestep = 4
+        self.acemd.switching = 'on'
+        self.acemd.switchdist = 7.5
+        self.acemd.cutoff = 9
+        self.acemd.thermostat = 'on'
+        self.acemd.thermostatdamping = 0.1
+        self.acemd.pme = 'on'
+
+    def _findFiles(self, inputdir):
+        # Tries to find default files if the given don't exist
+        defaults = {'coordinates': ('structure.pdb',),
+                    'structure': ('structure.psf', 'structure.prmtop'),
+                    'parameters': ('parameters', 'structure.prmtop')}
+
+        for field in defaults:
+            userval = self.acemd.__dict__[field]
+            if userval is not None and not os.path.exists(os.path.join(inputdir, userval)):
+                self.acemd.__dict__[field] = None
+
+            if self.acemd.__dict__[field] is None:
+                for val in defaults[field]:
+                    if os.path.exists(os.path.join(inputdir, val)):
+                        self.acemd.__dict__[field] = val
+                        break
+
+            if userval is not None and self.acemd.__dict__[field] is not None and self.acemd.__dict__[field] != userval:
+                logger.warning('Could not locate structure file {}. Using {} instead.'.format(
+                    os.path.join(inputdir, userval), os.path.join(inputdir, self.acemd.__dict__[field])
+                ))
+            elif self.acemd.__dict__[field] is None:
+                raise RuntimeError('Could not locate any {f:} file in {i:}. '
+                                   'Please set the Equilibration.acemd.{f:} property to '
+                                   'point to the {f:} file'.format(f=field, i=inputdir))
+
+    def _amberFixes(self):
+        # AMBER specific fixes
+        if self.acemd.structure.endswith('.prmtop'):
+            self.acemd.parmfile = self.acemd.parameters
+            self.acemd.parameters = None
+
+    def write(self, inputdir, outputdir):
+        """ Writes the production protocol and files into a folder.
+
+        Parameters
+        ----------
+        inputdir : str
+            Path to a directory containing the files produced by a equilibration process.
+        outputdir : str
+            Directory where to write the production setup files.
+        """
+        self._findFiles(inputdir)
+        self._amberFixes()
+
+        from htmd.units import convert
+        numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
+        self.acemd.temperature = self.temperature
+        self.acemd.thermostattemp = self.temperature
+        self.acemd.run = str(numsteps)
+        self.acemd.restraints = self.restraints
+        if self.adaptive:
+            self.acemd.binvelocities = None
+
+        self.acemd.setup(inputdir, outputdir, overwrite=True)
+
 
 
 if __name__ == "__main__":
@@ -235,3 +345,15 @@ if __name__ == "__main__":
     md.timeunits = 'ns'
     md.temperature = 350
     # md.write(g, outdir)
+
+    # from htmd.protocols.production_v5 import ProductionAcemd3, GroupRestraint, AtomRestraint
+    r = list()
+    r.append(GroupRestraint('segid P2', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z'))
+    r.append(AtomRestraint('segid P1 and name CA', 0.1, [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
+
+    p = ProductionAcemd3()
+    p.runtime = 50
+    p.timeunits = 'ns'
+    p.temperature = 290
+    p.restraints = r
+    # p.write('/workspace5/pablo/bound_KIX_cMYB/2_equil/2-gen/', '/tmp/testdir/')

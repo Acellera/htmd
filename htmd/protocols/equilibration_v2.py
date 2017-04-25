@@ -5,14 +5,16 @@
 #
 from htmd.molecule.molecule import Molecule
 from htmd.apps.acemd import Acemd
-from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
+from htmd.protocols.oldprotocolinterface import TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
+from htmd.protocols.oldprotocolinterface import ProtocolInterface as OldProtocolInterface
+from protocolinterface import ProtocolInterface, val
 import os
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
 
 
-class Equilibration(ProtocolInterface):
+class Equilibration(OldProtocolInterface):
     """ Equilibration protocol v2
 
         Equilibration protocol for globular and membrane proteins
@@ -283,6 +285,169 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
+from htmd.apps.acemd3 import Acemd3, _Restraint, GroupRestraint, AtomRestraint
+class EquilibrationAcemd3(ProtocolInterface):
+    """ Equilibration protocol v2
+
+        Equilibration protocol for globular and membrane proteins
+        It includes a flatbottom potential box to retrain a ligand
+        for example within this box.
+
+        Parameters
+        ----------
+        runtime : float, default=0
+            Running time of the simulation.
+        timeunits : str, default='steps'
+            Units for time arguments. Can be 'steps', 'ns' etc.
+        temperature : float, default=300
+            Temperature of the thermostat in Kelvin
+        fb_k : float, default=0
+            Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5
+        fb_reference : str, default='none'
+            Reference selection to use as dynamic center of the flatbottom box.
+        fb_selection : str, default='none'
+            Selection of atoms to apply the flatbottom potential
+        fb_box : list, default=[0, 0, 0, 0, 0, 0]
+            Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]
+        useconstantratio : bool, default=False
+            For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
+        constraints : dict, default={'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
+            A dictionary of atomselections and values of the constraint to be applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.
+        nvtsteps : int, default=500
+            Number of initial steps to apply NVT in units of 4fs.
+        constraintsteps : int, default=None
+            Number of initial steps to apply constraints in units of 4fs. Defaults to half the simulation time.
+
+        Example
+        -------
+        >>> from htmd.protocols.equilibration_v2 import Equilibration
+        >>> md = Equilibration()
+        >>> md.runtime = 4
+        >>> md.timeunits = 'ns'
+        >>> md.temperature = 300
+        >>> md.useconstantratio = True  # only for membrane sims
+        >>> # this is only needed for setting the flatbottom potential, otherwise remove it
+        >>> md.fb_reference = 'protein and resid 293'
+        >>> md.fb_selection = 'segname L and noh'
+        >>> md.fb_box = [-25, 25, -25, 25, 43, 45]
+        >>> md.fb_k = 5
+        >>> md.write('./build','./equil')
+    """
+    def __init__(self):
+        super().__init__()
+        self._arg('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, val.Object(Acemd3))
+        self._arg('runtime', 'float', 'Running time of the simulation.', 0, val.Number(float, '0POS'))
+        self._arg('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps', val.String())
+        self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, val.Number(float, 'ANY'))
+        self._arg('restraints', 'list', 'A list of restraint objects', None, val.Object(_Restraint), nargs='*')
+        self._arg('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False, val.Boolean())
+        self._arg('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the simulation time.', None, val.Number(int, 'ANY'))
+
+        self.acemd = Acemd3()
+        self.acemd.coordinates = None
+        self.acemd.structure = None
+        self.acemd.parameters = None
+        self.acemd.restart = 'on'
+        self.acemd.trajectoryfile = 'output.xtc'
+        self.acemd.trajectoryfreq = 25000
+        self.acemd.timestep = 4
+        self.acemd.switching = 'on'
+        self.acemd.switchdist = 7.5
+        self.acemd.cutoff = 9
+        self.acemd.thermostat = 'on'
+        self.acemd.thermostatdamping = 1
+        self.acemd.pme = 'on'
+        self.acemd.barostat = 'on'
+        self.acemd.barostatpressure = 1.01325
+        self.acemd.minimize = 500
+
+    def _findFiles(self, inputdir):
+        # Tries to find default files if the given don't exist
+        defaults = {'coordinates': ('structure.pdb', ),
+                    'structure': ('structure.psf', 'structure.prmtop'),
+                    'parameters': ('parameters', 'structure.prmtop')}
+
+        for field in defaults:
+            userval = self.acemd.__dict__[field]
+            if userval is not None and not os.path.exists(os.path.join(inputdir, userval)):
+                self.acemd.__dict__[field] = None
+
+            if self.acemd.__dict__[field] is None:
+                for val in defaults[field]:
+                    if os.path.exists(os.path.join(inputdir, val)):
+                        self.acemd.__dict__[field] = val
+                        break
+
+            if userval is not None and self.acemd.__dict__[field] is not None and self.acemd.__dict__[field] != userval:
+                logger.warning('Could not locate structure file {}. Using {} instead.'.format(
+                    os.path.join(inputdir, userval), os.path.join(inputdir, self.acemd.__dict__[field])
+                ))
+            elif self.acemd.__dict__[field] is None:
+                raise RuntimeError('Could not locate any {f:} file in {i:}. '
+                                   'Please set the Equilibration.acemd.{f:} property to '
+                                   'point to the {f:} file'.format(f=field, i=inputdir))
+
+    def _amberFixes(self):
+        # AMBER specific fixes
+        if self.acemd.parameters.endswith('structure.prmtop'):
+            self.acemd.parmfile = self.acemd.parameters
+            self.acemd.parameters = None
+
+    def write(self, inputdir, outputdir):
+        """ Write the equilibration protocol
+
+        Writes the equilibration protocol and files into a folder for execution
+        using files inside the inputdir directory
+
+        Parameters
+        ----------
+        inputdir : str
+            Path to a directory containing the files produced by a build process.
+        outputdir : str
+            Directory where to write the equilibration setup files.
+
+        Examples
+        --------
+        >>> md = Equilibration()
+        >>> md.write('./build','./equil')
+        """
+        self._findFiles(inputdir)
+        self._amberFixes()
+
+        from htmd.units import convert
+        numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
+        self.acemd.temperature = self.temperature
+        self.acemd.thermostattemp = self.temperature
+        self.acemd.run = str(numsteps)
+
+        if self.constraintsteps is None:
+            constrsteps = int(numsteps / 2)
+        else:
+            constrsteps = int(self.constraintsteps)
+
+        # Adding the default restraints of the equilibration
+        restraints = list()
+        restraints.append(AtomRestraint('protein and noh and not name CA', 0, [(0.1, 0), (0, constrsteps)]))
+        restraints.append(AtomRestraint('protein and name CA', 0, [(1, 0), (0, constrsteps)]))
+        restraints += self.restraints
+        self.acemd.restraints = restraints
+
+        if self.acemd.celldimension is None and self.acemd.extendedsystem is None:
+            inmol = Molecule(os.path.join(inputdir, self.acemd.coordinates))
+            coords = inmol.get('coords', sel='water')
+            if coords.size == 0:  # It's a vacuum simulation
+                coords = inmol.get('coords', sel='all')
+                dim = np.max(coords, axis=0) - np.min(coords, axis=0)
+                dim = dim + 12.
+            else:
+                dim = np.max(coords, axis=0) - np.min(coords, axis=0)
+            self.acemd.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
+        if self.useconstantratio:
+            self.acemd.useconstantratio = 'on'
+        self.acemd.setup(inputdir, outputdir, overwrite=True)
+
+
+
 if __name__ == "__main__":
     import htmd
     eq = Equilibration()
@@ -294,4 +459,17 @@ if __name__ == "__main__":
     eq.fb_box = [-20, 20, -20, 20, 43, 45]
     eq.fb_k = 5
     eq.write(htmd.home() + '/data/equilibrate', '/tmp/equil')
+
+    # from htmd.protocols.production_v5 import ProductionAcemd3, GroupRestraint, AtomRestraint
+    r = list()
+    r.append(GroupRestraint('segid P2', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z'))
+    r.append(AtomRestraint('segid P1 and name CA', 0.1, [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
+
+    eq = EquilibrationAcemd3()
+    eq.runtime = 4
+    eq.timeunits = 'ns'
+    eq.temperature = 300
+    eq.restraints = r
+    # eq.write('/workspace5/pablo/bound_KIX_cMYB/1_build/2-struct/', '/tmp/testdir2/')
+
 
