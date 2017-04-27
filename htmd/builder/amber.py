@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 def listFiles():
     """ Lists all available AMBER forcefield files
     """
-    tleap = shutil.which("tleap")
+    tleap = shutil.which("tleap", mode=os.X_OK)
     if not tleap:
-        raise NameError('tleap not found. You should either have AmberTools or ambermini installed '
-                        '(to install ambermini do: conda install ambermini -c acellera)')
+        raise FileNotFoundError('tleap not found. You should either have AmberTools or ambermini installed '
+                                '(to install ambermini do: conda install ambermini -c acellera)')
     if os.path.islink(tleap):
         if path.isabs(os.readlink(tleap)):
             tleap = os.readlink(tleap)

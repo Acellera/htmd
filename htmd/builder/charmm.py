@@ -171,9 +171,8 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     _missingSegID(mol)
     _checkMixedSegment(mol)
     if psfgen is None:
-        try:
-            psfgen = shutil.which('psfgen', mode=os.X_OK)
-        except:
+        psfgen = shutil.which('psfgen', mode=os.X_OK)
+        if not psfgen:
             raise FileNotFoundError('Could not find psfgen executable, or no execute permissions are given. '
                                     'Run `conda install psfgen`.')
     if not os.path.isdir(outdir):
