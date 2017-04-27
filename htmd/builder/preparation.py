@@ -108,8 +108,6 @@ def _buildResAndMol(pdb2pqr_protein):
         prepData._set(residue, 'pdb2pqr_idx', i)
 
         for atom in residue.atoms:
-            # Fixup element fields for added H (routines.addHydrogens)
-            elt = "H" if atom.added and atom.name.startswith("H") else atom.element
             name.append(atom.name)
             resid.append(residue.resSeq)
             chain.append(residue.chainID)
@@ -117,11 +115,17 @@ def _buildResAndMol(pdb2pqr_protein):
             coords.append([atom.x, atom.y, atom.z])
             resname.append(curr_resname)
             segid.append(atom.segID)
+            # Fixup element fields for added H (routines.addHydrogens)
+            elt = "H" if atom.added and atom.name.startswith("H") else atom.element
             element.append(elt)
-            occupancy.append(atom.occupancy)
-            beta.append(atom.tempFactor)
+            occupancy.append(0.0 if atom.added else atom.occupancy)
+            beta.append(99.0 if atom.added else atom.tempFactor)
             charge.append(atom.charge)
             record.append(atom.type)
+            if atom.added:
+                logger.debug("Coordinates of atom {:s} in residue {:s} were guessed".format(residue.__str__(),atom.name))
+                prepData._set(residue, 'guessedAtoms', atom.name, append=True)
+
 
     mol_out = _fillMolecule(name, resname, chain, resid, insertion, coords, segid, element,
                             occupancy, beta, charge, record)
@@ -211,7 +215,7 @@ def proteinPrepare(mol_in,
         the thickness of the membrane in which the protein is embedded, or None if globular protein.
         Used to provide a warning about membrane-exposed residues.
     holdSelection : str
-        Atom selection to be excluded from optimization.
+        (Untested) Atom selection to be excluded from optimization.
         Only the carbon-alpha atom will be considered for the corresponding residue.
 
 
@@ -335,6 +339,8 @@ def proteinPrepare(mol_in,
 
     # Hold list (None -> None)
     hlist = _selToHoldList(mol_in, holdSelection)
+    if hlist:
+        logger.warning("The holdSelection option is untested and deprecated. Please use reprepare()")
 
     # Relying on defaults
     pqr_res = runPDB2PQR(pdblist,

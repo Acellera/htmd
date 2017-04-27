@@ -7,6 +7,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+import math
 
 from htmd.molecule.molecule import Molecule
 
@@ -123,10 +124,21 @@ class PreparationData:
             assert False, "More than one resid matched: either duplicated chain-residue-icode, or internal error (please report if the latter)."
         return pos
 
-    # Generic setter in the pandas table. Maybe one should use actual indices instead.
-    def _set(self, residue, key, val):
+    # Generic setter in the pandas table. Maybe we should use actual indices instead.
+    def _set(self, residue, key, val, append=False):
         pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
-        self.data.set_value(pos, key, val)
+        if not append:
+            self.data.set_value(pos, key, val)
+        else:
+            try:
+                ov = self.data.iloc[pos][key]
+                if type(ov)==float and math.isnan(ov):
+                    ov = list()
+            except:
+                ov = list()
+            self.data.set_value(pos, key, ov+[val])
+
+
 
     # residue is e.g. pdb2pqr.src.aa.ILE
     def _setProtonationState(self, residue, state):
