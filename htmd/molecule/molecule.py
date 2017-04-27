@@ -1250,14 +1250,22 @@ class Molecule:
             Index of frame, or list of frame indexes which we want to keep (and drop all others).
         drop : int or list of ints
             Index of frame, or list of frame indexes which we want to drop (and keep all others).
+        Examples
+        --------
+        >>> mol = Molecule('1sb0')
+        >>> mol.dropFrames(keep=[1,2])
+        >>> mol.numFrames == 2
+        >>> mol.dropFrames(drop=[0])
+        >>> mol.numFrames == 1
         """
         if not (isinstance(keep, str) and keep == 'all') and drop is not None:
             raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
         if not (isinstance(keep, str) and keep == 'all'):
             self.coords = np.atleast_3d(self.coords[:, :, keep]).copy()  # Copy array. Slices are dangerous with C
-            self.box = np.array(np.atleast_2d(self.box[:, keep]))
-            if self.box.shape[0] == 1:
-                self.box = self.box.T
+            if self.box.shape[1] != 1:
+                self.box = np.array(np.atleast_2d(self.box[:, keep]))
+                if self.box.shape[0] == 1:
+                    self.box = self.box.T
         if drop is not None:
             self.coords = np.delete(self.coords, drop, axis=2)
             self.box = np.delete(self.box, drop, axis=1)
