@@ -14,6 +14,7 @@ from htmd.molecule.molecule import Molecule
 logger = logging.getLogger(__name__)
 
 
+# This takes a pdb2pqr Residue
 def prettyPrintResidue(r):
     rs = "{:4s} {:4d}{:1s} {:1s}".format(r.resname, r.resid, r.insertion, r.chain)
     return rs
@@ -221,6 +222,7 @@ class PreparationData:
                 logger.warning("Dubious protonation state:    {:s} (pKa={:5.2f})".format(drs, dr.pKa))
 
 
+    # This is used by the proteinprepare web interface.
     def _get_pka_plot(self, pH=7.4, figSizeX=10, dpk=1.0, font_size = 12):
         """Internal function to build the protonation diagram"""
 
@@ -375,6 +377,99 @@ class PreparationData:
         return ret_img
 
 
+    def findHbonds(self, angleCutoff=30.0, distanceCutoff=3.4):
+        """Return a list of H bonds determined by pdb2pqr.
+        
+        Lifted from the "hbond.py" extension of pdb2pqr.
+        
+        Residue information of the donor and acceptor atoms returned are of type pdb2pqr.src.structures.Atom
+        and their information can be accessed e.g. as follows:
+        
+            atom.name 
+            atom.serial
+            atom.residue.__str__()
+            atom.residue.name
+            ...
+        
+        Parameters
+        ----------
+        
+        angleCutoff: float
+            H-bond angle cut-off (in degrees)
+        distanceCutoff: float
+            donor to acceptor distance cut-off (in Å)
+            
+        Returns
+        -------
+        A list of dicts containing donor (Atom), acceptor (Atom), distance (float), angle (float)
+        for each hydrogen bond found by pdb2pqr.
+        
+        Example
+        -------        
+        >>> m=Molecule("3ptb")
+        >>> mp, md = proteinPrepare(m, returnDetails=True)
+        >>> hlist=md.findHbonds()
+        >>> hlist[0]['donor'].name
+        'N'
+        >>> hlist[0]['donor'].residue.__str__()
+        'VAL A 17'
+        >>> hlist[0]['acceptor'].name
+        'O'
+        >>> hlist[0]['acceptor'].residue.__str__()
+        'ASP A 189'
+        """
+
+        from pdb2pqr.src.routines import Cells
+        from pdb2pqr.src.utilities import distance, getAngle
+
+        routines = self.pdb2pqr_routines
+        cellsize = int(distanceCutoff + 1.0 + 1.0)
+        # protein = routines.protein
+        protein = self.pdb2pqr_protein
+        routines.setDonorsAndAcceptors()
+        routines.cells = Cells(cellsize)
+        routines.cells.assignCells(protein)
+
+        ret=[]
+
+        for donor in protein.getAtoms():
+            # Grab the list of donors
+            if not donor.hdonor:
+                continue
+            donorhs = []
+            for bond in donor.bonds:
+                if bond.isHydrogen():
+                    donorhs.append(bond)
+            if donorhs == []:
+                continue
+
+            # For each donor, grab all acceptors
+            closeatoms = routines.cells.getNearCells(donor)
+            for acc in closeatoms:
+                if not acc.hacceptor:
+                    continue
+                if donor.residue == acc.residue:
+                    continue
+
+                dist = distance(donor.getCoords(), acc.getCoords())
+                if dist > distanceCutoff:
+                    continue
+
+                for donorh in donorhs:
+                    # Do angle check
+                    angle = getAngle(acc.getCoords(), donor.getCoords(), donorh.getCoords())
+                    if angle > angleCutoff:
+                        continue
+
+                    ret.append( {"donor": donor,   "acceptor": acc,
+                                 "distance": dist, "angle": angle} )
+
+                    s = "Donor: %s %s\tAcceptor: %s %s\tdist: %.2f\tAngle: %.2f" % \
+                        (donor.residue, donor.name, acc.residue, acc.name, dist, angle)
+                    logger.debug(s)
+        return ret
+
+
     def reprepare(self):
         """Repeat the system preparation, after the user edited the .data table.
 
@@ -507,6 +602,8 @@ class PreparationData:
 if __name__ == "__main__":
     from htmd.builder.preparation import proteinPrepare
 
-    import doctest
+    m=Molecule("3ptb")
+    mp, md = proteinPrepare(m, returnDetails=True)
 
+    import doctest
     doctest.testmod()
