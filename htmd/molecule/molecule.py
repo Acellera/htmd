@@ -75,8 +75,8 @@ class Molecule:
     >>> mol = Molecule( '3PTB', name='Trypsin' )
     >>> print(mol)                                     # doctest: +ELLIPSIS
     Molecule with 1701 atoms and 1 frames
-    PDB field - altloc shape: (1701,)
-    PDB field - beta shape: (1701,)
+    Atom field - altloc shape: (1701,)
+    Atom field - atomtype shape: (1701,)
     ...
 
     .. currentmodule:: htmd.molecule.molecule.Molecule
