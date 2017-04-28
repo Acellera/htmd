@@ -1260,15 +1260,19 @@ class Molecule:
         """
         if not (isinstance(keep, str) and keep == 'all') and drop is not None:
             raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
+        numframes = self.numFrames
+        if drop is not None:
+            keep = np.setdiff1d(np.arange(numframes), drop)
         if not (isinstance(keep, str) and keep == 'all'):
             self.coords = np.atleast_3d(self.coords[:, :, keep]).copy()  # Copy array. Slices are dangerous with C
-            if self.box.shape[1] != 1:
+            if self.box.shape[1] == numframes:
                 self.box = np.array(np.atleast_2d(self.box[:, keep]))
                 if self.box.shape[0] == 1:
                     self.box = self.box.T
-        if drop is not None:
-            self.coords = np.delete(self.coords, drop, axis=2)
-            self.box = np.delete(self.box, drop, axis=1)
+            if len(self.step) == numframes:
+                self.step = self.step[keep]
+            if len(self.time) == numframes:
+                self.time = self.time[keep]
         self.frame = 0  # Reset to 0 since the frames changed indexes
 
     def viewCrystalPacking(self):
