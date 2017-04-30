@@ -35,6 +35,10 @@ build: false # Not a C# project, build stuff at the test step instead.
 
 test_script:
   # run testsuite and upload test results to AppVeyor; return exit code of testsuite
+
+  - set BUILD_VERSION=0.0.0
+  - cmd: IF "%APPVEYOR_REPO_TAG%" == "true" (set BUILD_VERSION=%APPVEYOR_REPO_TAG_NAME:~1%)
+
   - conda build --python %PYTHON_VERSION% package/htmd-deps --no-include-recipe
   - conda build package/htmd-data --no-include-recipe
   - conda build --python %PYTHON_VERSION% package/htmd --no-include-recipe
@@ -51,4 +55,4 @@ on_success:
   # Upload built binaries to binstar.org. The globbing and handling of the
   # exit-status code is tricky in cmd.exe or powershell, so we're just using
   # a python script.
-  - python continuous-integration\binstar-push.py
+  - cmd: IF "%APPVEYOR_REPO_TAG%" == "true" (python continuous-integration\binstar-push.py)
