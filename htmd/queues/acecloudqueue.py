@@ -6,9 +6,6 @@
 
 import os
 from htmd.queues.simqueue import SimQueue
-from acecloud.cloud import Cloud
-from acecloud.job import Job
-from acecloud.status import Status
 from protocolinterface import ProtocolInterface
 import logging
 import random
@@ -21,6 +18,7 @@ logging.getLogger("boto3").setLevel(logging.CRITICAL)
 
 class AceCloudQueue(SimQueue, ProtocolInterface):
     def __init__(self, groupname=None):
+        from acecloud.cloud import Cloud
         super().__init__()
         if not groupname:
             groupname = ''.join(
@@ -33,6 +31,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         self._jobs = []
 
     def submit(self, dirs):
+        from acecloud.job import Job
         if isinstance(dirs, str):
             dirs = [dirs, ]
 
@@ -56,6 +55,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
             self._jobs.append(j)
 
     def inprogress(self):
+        from acecloud.status import Status
         count = 0
         for j in self._jobs:
             s = j.status()
@@ -65,6 +65,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         return count
 
     def retrieve(self):
+        from acecloud.status import Status
         for j in self._jobs:
             if j.status() == Status.COMPLETED:
                 try:
