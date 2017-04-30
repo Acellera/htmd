@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from setuptools import setup
+from setuptools import setup, find_packages
 import subprocess
 
 version = subprocess.Popen(["git", "describe", "--tags"], stdout=subprocess.PIPE).stdout.read().decode("utf8")
@@ -12,20 +12,15 @@ version = version[0]
 
 f = open("package/htmd-deps/DEPENDENCIES", "r")
 deps = None
-# deps = '['pyEMMA<2.3']
-# for a in f.readlines():
-#	deps.append(a.strip().split("=")[0]) #.decode("utf8"))
 
 print("Version [%s]" % (version))
 print("Dependencies:")
 print(deps)
 
 setup(name='htmd',
-      version='0.15.11',
+      version=version,
       description='HTMD',
-      packages=['htmd', 'htmdx', 'htmd.molecule', 'htmd.parameterization', 'htmd.adaptive', 'htmd.apps', 'htmd.builder',
-                'htmd.clustering', 'htmd.progress', 'htmd.projections', 'htmd.protocols', 'htmd.qm', 'htmd.queues',
-                'htmd.data'],
+      packages=find_packages(),
       install_requires=deps,
       zip_safe=False,
       url="https://www.htmd.org",
