@@ -33,6 +33,7 @@ packages = [
     ['omnia', 'thermotools'],
     ['psi4', 'dftd3'],
     ['bioconda', 'nglview'],
+    ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
 ]
 
 for channel, package in packages:
