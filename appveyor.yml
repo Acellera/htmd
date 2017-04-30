@@ -25,7 +25,7 @@ install:
 
   - conda config --set always_yes true
   - conda install conda conda-build anaconda anaconda-client requests -y -q # this has to go into the root environment
-  - conda create -q -n travis-env python=$PYTHON_VERSION
+  - conda create -q -n travis-env python=%PYTHON_VERSION%
   - source activate travis-env
 
   - conda config --add channels acellera
@@ -36,9 +36,9 @@ build: false # Not a C# project, build stuff at the test step instead.
 
 test_script:
   # run testsuite and upload test results to AppVeyor; return exit code of testsuite
-  - "%CMD_IN_ENV% conda build --python $PYTHON_VERSION package/htmd-deps --no-include-recipe"
-  - "%CMD_IN_ENV% conda build package/htmd-data --no-include-recipe"
-  - "%CMD_IN_ENV% conda build --python $PYTHON_VERSION package/htmd --no-include-recipe"
+  - conda build --python %PYTHON_VERSION% package/htmd-deps --no-include-recipe
+  - conda build package/htmd-data --no-include-recipe
+  - conda build --python %PYTHON_VERSION% package/htmd --no-include-recipe
 
   - python continuous-integration\move-conda-package.py conda-recipe
 
