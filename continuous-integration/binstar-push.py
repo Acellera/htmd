@@ -4,7 +4,7 @@ import subprocess
 import traceback
 
 token = os.environ['BINSTAR_TOKEN']
-cmd = ['binstar', '-t', token, 'upload', '--force']
+cmd = ['anaconda', '-t', token, 'upload', '--force', '-u', 'acellera']
 cmd.extend(glob.glob('*.tar.bz2'))
 try:
     subprocess.check_call(cmd)
