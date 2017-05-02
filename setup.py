@@ -20,7 +20,7 @@ print(deps)
 setup(name='htmd',
       version=version,
       description='HTMD',
-      packages=find_packages(),
+      packages=find_packages(exclude=['data']),
       install_requires=deps,
       zip_safe=False,
       url="https://www.htmd.org",

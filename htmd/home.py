@@ -45,24 +45,13 @@ def home(dataDir=None, libDir=False):
     if dataDir:
         return os.path.join(homeDir, "data", dataDir)
     elif libDir:
-        libdir = os.path.join(homeDir, "lib", platform.system() )
-        if not os.path.exists( libdir ):
+        libdir = os.path.join(homeDir, "lib", platform.system())
+        if not os.path.exists(libdir):
             raise FileNotFoundError('Could not find libs.')
         return libdir
-#        if os.path.exists(os.path.join(libdir, "basic")):
-#            return os.path.join(libdir, "basic", platform.system())
-#        elif os.path.exists(os.path.join(libdir, "pro")):
-#            return os.path.join(libdir, "pro", platform.system())
-#        else:
-#            raise FileNotFoundError('Could not find libs.')
     else:
         return homeDir
 
-
-
-#Don't know how to do this
-# def modulehome(modname):
-#    return os.path.dirname(os.path.dirname(inspect.getfile(modname)))
 
 if __name__ == "__main__":
     import doctest
