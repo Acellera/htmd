@@ -220,11 +220,13 @@ proc calcforces_endstep { } { }
             inmol.set('beta', 0)
             if len(self.constraints) == 0:
                 raise RuntimeError('You have set the production to use constraints (useconstraints=True), but have not '
-                               'defined any constraints (constraints={}).')
+                                   'defined any constraints (constraints={}).')
             else:
                 for sel in self.constraints:
                     inmol.set('beta', self.constraints[sel], sel)
                 outfile = os.path.join(outputdir, self.acemd.coordinates)
+                if not os.path.exists(outputdir):
+                    os.makedirs(outputdir)
                 inmol.write(outfile)
                 self.acemd.consref = self.acemd.coordinates
 
