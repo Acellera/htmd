@@ -401,7 +401,7 @@ class PreparationData:
             
         Returns
         -------
-        A list of dicts containing donor (Atom), acceptor (Atom), distance (float), angle (float)
+        A list of dicts containing donor (Atom), acceptor (Atom), hydrogen (Atom), distance (float), angle (float)
         for each hydrogen bond found by pdb2pqr.
         
         Example
@@ -461,7 +461,7 @@ class PreparationData:
                     if angle > angleCutoff:
                         continue
 
-                    ret.append( {"donor": donor,   "acceptor": acc,
+                    ret.append( {"donor": donor,   "acceptor": acc, "hydrogen": donorh,
                                  "distance": dist, "angle": angle} )
 
                     s = "Donor: %s %s\tAcceptor: %s %s\tdist: %.2f\tAngle: %.2f" % \
