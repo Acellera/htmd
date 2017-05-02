@@ -54,7 +54,8 @@ from htmd.queues.localqueue import LocalGPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
-from htmd.vmdgraphics import VMDConvexHull, VMDBox
+from htmd.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
+from htmd.builder.loopmodeler import loopModeller
 import logging.config
 
 from htmd.version import version

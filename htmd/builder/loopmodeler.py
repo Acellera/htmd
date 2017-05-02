@@ -7,9 +7,10 @@ from htmd.util import tempname
 from subprocess import call
 import numpy as np
 from htmd.molecule.molecule import Molecule
+import shutil
 
 
-def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modellerexe='/shared/sdoerr/Software/modeller-9.16/build/bin/mod9.16'):
+def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modellerexe='mod9.18'):
     """ Uses the Modeller software to predict missing loops in a Molecule.
 
     Parameters
@@ -36,16 +37,23 @@ def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modell
 
     Examples
     --------
-    >>> newmol = loopModeller(mol, 'B', 'MLSGSK', 263)
+    >>> mol = Molecule('1qg8')
+    >>> mol2 = loopModeller(mol, '0', 'ENR', 133)
     """
+    if shutil.which(modellerexe) is None:
+        raise NameError('Could not find a Modeller executable called `{}` in the PATH. This might indicate a wrong path'
+                        ' to the executable or a missing installation. To install modeller use `conda install -c '
+                        'salilab modeller` and follow the instructions. To provide the correct path change the '
+                        '`modellerexe` argument'.format(modellerexe))
+
     if movstart is None:
         movstart = startresid
     if movend is None:
         movend = movstart + len(seq) + 1
 
-    segatm = mol.atomselect('segid {}'.format(segid))
-    segres = np.unique(mol.get('resid', sel=segatm))
-    chain = np.unique(mol.get('chain', sel=segatm))
+    segatm = mol.segid == segid
+    segres = np.unique(mol.resid[segatm])
+    chain = np.unique(mol.chain[segatm])
     if len(chain) != 1:
         raise RuntimeError('More than one chain detected in segment {}'.format(segid))
     pos = np.where(segres == startresid)[0][0]
@@ -58,9 +66,8 @@ def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modell
     segresidend = np.max(segres)
 
     currseq = mol.sequence()[segid]
-    minuses = ['-'] * len(seq)
-    minuses = ''.join(minuses)
-    inspos = np.where(segres == startresid)[0] + 1
+    minuses = ''.join(['-'] * len(seq))
+    inspos = np.where(segres == startresid)[0][0] + 1
     gapseq = currseq[:inspos] + minuses + currseq[inspos:] + '*'
     fullseq = currseq[:inspos] + seq + currseq[inspos:] + '*'
 
@@ -104,6 +111,8 @@ a.make()
 
     call('{} {}'.format(modellerexe, pyfile), shell=True)
     newmol = Molecule('./prot_fill.B99990001.pdb')
+    print('You can ignore the `import site` error (https://salilab.org/modeller/release.html#issues).'
+          ' The results should have been returned.')
     return newmol
 
 
@@ -129,3 +138,9 @@ def loopmodelerFALC(mol, segid, seq, pos, inspos, outname='loop'):
 
     call('/shared/sdoerr/Software/FALC/bin/falc.py -title {} -pdb {} -fa {} -ulr {} -n {}'.format(outname, pdbfile, seqfile, ulrfile, 1))
 '''
+
+if __name__ == '__main__':
+    pass
+    # from htmd.molecule.molecule import Molecule
+    # mol = Molecule('1qg8')
+    # mol2 = loopModeller(mol, '0', 'ENR', 133)
