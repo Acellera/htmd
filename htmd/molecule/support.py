@@ -20,11 +20,11 @@ def xtc_lib():
         ct.cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
         if os.path.exists(os.path.join(libdir, "psprolib.dll")):
             ct.cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
+        lib['libxtc'] = ct.cdll.LoadLibrary(os.path.join(libdir, "libxtc.dll"))
     else:
         # lib['libc'] = cdll.LoadLibrary("libc.so.6")
         lib['libc'] = ct.cdll.LoadLibrary("libc.{}".format("so.6" if platform.uname()[0] != "Darwin" else "dylib"))
-
-    lib['libxtc'] = ct.cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
+        lib['libxtc'] = ct.cdll.LoadLibrary(os.path.join(libdir, "libxtc.so"))
     return lib
 
 
