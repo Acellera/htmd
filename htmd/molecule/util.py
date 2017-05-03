@@ -8,11 +8,15 @@ from scipy.spatial.distance import cdist
 import ctypes as ct
 import os
 import htmd.home
+import platform
 import logging
 logger = logging.getLogger(__name__)
 
 libdir = htmd.home(libDir=True)
-tmalignlib = ct.cdll.LoadLibrary(os.path.join(libdir, "tmalign.so"))
+if platform.system() == "Windows":
+    tmalignlib = ct.cdll.LoadLibrary(os.path.join(libdir, "tmalign.dll"))
+else:
+    tmalignlib = ct.cdll.LoadLibrary(os.path.join(libdir, "tmalign.so"))
 
 
 def molTMscore(mol, ref, selCAmol, selCAref):

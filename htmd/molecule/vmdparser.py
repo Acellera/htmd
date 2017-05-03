@@ -19,8 +19,9 @@ if platform.system() == "Windows":
     ct.cdll.LoadLibrary(os.path.join(libdir, "libstdc++-6.dll"))
     if (os.path.exists(os.path.join(libdir, "psprolib.dll"))):
         ct.cdll.LoadLibrary(os.path.join(libdir, "psprolib.dll"))
-
-parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
+    parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.dll"))
+else:
+    parser = ct.cdll.LoadLibrary(os.path.join(libdir, "libvmdparser.so"))
 
 
 def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, chain=None, segname=None, insert=None,
