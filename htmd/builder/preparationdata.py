@@ -514,6 +514,17 @@ class PreparationData:
         assign_only = clean = False
         debump = opt = True
 
+        # Some water molecules seem to have fixed=1 at this point. This makes initializeFullOptimization() skip them
+        # when it builds the resmap dict, which in turns breaks later stages. So, let's reset it.
+        for res in p.getResidues():
+            try:
+                if res.fixed==1:
+                    logger.debug("Resetting fixed flag on {:s}".format(str(res)))
+                    res.fixed=0
+            except:
+                logger.debug("Residue {:s} has no fixed attribute".format(str(res)))
+                pass
+
         # Code lifted from resinter.py
         routines.removeHydrogens()
         for index, oldResidue in enumerate(p.getResidues()):
@@ -604,6 +615,9 @@ if __name__ == "__main__":
 
     m=Molecule("3ptb")
     mp, md = proteinPrepare(m, returnDetails=True)
+    mHIP40, pHIP40 = md.reprepare()
 
     import doctest
     doctest.testmod()
+
+
