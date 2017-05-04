@@ -4,67 +4,67 @@
 
 matrix:
   include:
-   - os: linux
-     language: generic
-     env: TRAVIS_PYTHON_VERSION=3.6  OSNAME=Linux
-   - os: osx
-     language: generic
-     env: TRAVIS_PYTHON_VERSION=3.6 OSNAME=Darwin
-     before_install:
-      - brew install gcc
+    - os: linux
+      language: generic
+      env: TRAVIS_PYTHON_VERSION=3.6  OSNAME=Linux
+    - os: osx
+      language: generic
+      env: TRAVIS_PYTHON_VERSION=3.6 OSNAME=Darwin
+      before_install:
+        - brew install gcc
 
 
 install:
- - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
- - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
+  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
+  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
 
- - echo $PACKAGE_NAME
+  - echo $PACKAGE_NAME
 
-# Set up the Conda environment
+  # Set up the Conda environment
 
- - bash miniconda.sh -b -p $HOME/miniconda
- - export PATH="$HOME/miniconda/bin:$PATH"
- - hash -r
- - conda config --set always_yes yes 
- - conda install conda conda-build anaconda anaconda-client requests -y -q # this has to go into the root environment
- - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION 
- - source activate travis-env
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes
+  - conda install conda conda-build anaconda anaconda-client requests -y -q # this has to go into the root environment
+  - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION
+  - source activate travis-env
 
- - conda config --add channels acellera
-# - conda install -c acellera toolz=0.8.0 -y -q 
- - conda install anaconda-client -y -q
- - conda update --all -y -q
+  - conda config --add channels acellera
+  # - conda install -c acellera toolz=0.8.0 -y -q
+  - conda install anaconda-client -y -q
+  - conda update --all -y -q
 
- - if [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then export BUILD_VERSION=$TRAVIS_TAG; else export BUILD_VERSION=0.0.0; fi
- - echo "TRAVIS_BRANCH = $TRAVIS_BRANCH"
- - echo "TRAVIS_TAG    = $TRAVIS_TAG"
- - echo "BUILD_VERSION = $BUILD_VERSION"
- # Always set it to 0 so we don't get a new release at every successful commit
- - export BUILD_NUMBER=0
+  - if [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then export BUILD_VERSION=$TRAVIS_TAG; else export BUILD_VERSION=0.0.0; fi
+  - echo "TRAVIS_BRANCH = $TRAVIS_BRANCH"
+  - echo "TRAVIS_TAG    = $TRAVIS_TAG"
+  - echo "BUILD_VERSION = $BUILD_VERSION"
+  # Always set it to 0 so we don't get a new release at every successful commit
+  - export BUILD_NUMBER=0
 
- # Remove the DSOs that live in the repo so that users can work with a checkout
- - rm htmd/lib/*/*.so || /bin/true
+  # Remove the DSOs that live in the repo so that users can work with a checkout
+  - rm htmd/lib/*/*.so || /bin/true
 
- # Install the Conda dependencies HTMD needs
+  # Install the Conda dependencies HTMD needs
   - conda install --file package/htmd-deps/DEPENDENCIES -y
   - python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
- # Clone the private htmdlib repo
- - git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 1
+  # Clone the private htmdlib repo
+  - git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 1
 
- - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe
- - conda build package/htmd-data --no-include-recipe
- - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe
+  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe
+  - conda build package/htmd-data --no-include-recipe
+  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe
 
 
- - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
- - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
- - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y -q
+  - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
+  - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
+  - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y -q
 
 script:
- - activate_license "$LICENSE_TOKEN"
- - python tests/run_inline_file_tests.py
- - tests/run_other_tests.sh
+  - activate_license "$LICENSE_TOKEN"
+  - python tests/run_inline_file_tests.py
+  - tests/run_other_tests.sh
 
 after_success:
- - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./.travis_conda_upload.sh; bash -x ./.travis_conda_build_upload_meta.sh ; fi
+  - if [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./.travis_conda_upload.sh; bash -x ./.travis_conda_build_upload_meta.sh ; fi
