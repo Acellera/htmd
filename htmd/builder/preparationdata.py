@@ -591,6 +591,8 @@ class PreparationData:
                 myNameScheme = myForcefield
                 routines.applyNameScheme(myNameScheme)
 
+        p.reSerialize()
+
         newMol, newResData = _buildResAndMol(p)
         # Assume that the number and order of residues does not change
 
@@ -614,8 +616,12 @@ if __name__ == "__main__":
     from htmd.builder.preparation import proteinPrepare
 
     m=Molecule("3ptb")
-    mp, md = proteinPrepare(m, returnDetails=True)
-    mHIP40, pHIP40 = md.reprepare()
+    mp, dp = proteinPrepare(m, returnDetails=True)
+    hb = dp.findHbonds()
+    d=dp.data
+    d.loc[d.resid == 40, 'forced_protonation'] = 'HIP'
+    mp2, dp2 = dp.reprepare()
+    hb2 = dp2.findHbonds()
 
     import doctest
     doctest.testmod()
