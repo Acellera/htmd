@@ -60,9 +60,11 @@ test_script:
   - cmd: IF "%APPVEYOR_REPO_TAG%" == "true" (set BUILD_VERSION=%APPVEYOR_REPO_TAG_NAME%)
 
   - conda build --python %PYTHON_VERSION% package/htmd-deps --no-include-recipe
-  - conda build --python %PYTHON_VERSION% package/htmd --no-include-recipe
+  - deactivate travis-env
+  - python continuous-integration\move-conda-package.py
 
-  # Deactivate htmd environment to continue with moving and pushing
+  - activate travis-env
+  - conda build --python %PYTHON_VERSION% package/htmd --no-include-recipe
   - deactivate travis-env
   - python continuous-integration\move-conda-package.py
 
