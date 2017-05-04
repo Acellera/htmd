@@ -21,6 +21,16 @@ install:
   - conda config --set always_yes true
   - conda install conda conda-build anaconda anaconda-client requests jinja2 -y -q # this has to go into the root environment
 
+  # Compile DLLs
+  - git clone https://%GITHUB_HTMDLIB_USERNAME%:%GITHUB_HTMDLIB_PASSWORD%@github.com/Acellera/htmdlib --depth 1
+  - choco install mingw
+  - conda create -q -n py27 python=2.7
+  - activate py27
+  - conda install -c anaconda scons
+  - cd htmdlib
+  - scons -q --prefix="../htmd/htmd/lib/Windows/"
+  - cd ..
+
   ### Creating an environment to install htmd deps and build
   - conda create -q -n travis-env python=%PYTHON_VERSION%
   - activate travis-env
@@ -29,7 +39,6 @@ install:
   - conda install --file package/htmd-deps/DEPENDENCIES_WIN -y
   - python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
-  - git clone https://%GITHUB_HTMDLIB_USERNAME%:%GITHUB_HTMDLIB_PASSWORD%@github.com/Acellera/htmdlib --depth 1
 
 build: false # Not a C# project, build stuff at the test step instead.
 
@@ -37,10 +46,9 @@ test_script:
   # run testsuite and upload test results to AppVeyor; return exit code of testsuite
 
   - set BUILD_VERSION=0.0.0
-  - cmd: IF "%APPVEYOR_REPO_TAG%" == "true" (set BUILD_VERSION=%APPVEYOR_REPO_TAG_NAME:~1%)
+  - cmd: IF "%APPVEYOR_REPO_TAG%" == "true" (set BUILD_VERSION=%APPVEYOR_REPO_TAG_NAME%)
 
   - conda build --python %PYTHON_VERSION% package/htmd-deps --no-include-recipe
-  - conda build package/htmd-data --no-include-recipe
   - conda build --python %PYTHON_VERSION% package/htmd --no-include-recipe
 
   # Deactivate htmd environment to continue with moving and pushing
