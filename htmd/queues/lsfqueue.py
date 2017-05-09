@@ -32,7 +32,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         Job timeout (hour:min or min)
     environment : list of strings, default=None
         Things to run before the job (sourcing envs).
-    resources : str, default=None
+    resources : list of strings, default=None
         Resources of the queue
     outputstream : str, default='slurm.%N.%j.out'
         Output stream.
@@ -58,7 +58,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'], val.Number(int, '0POS'))
         self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, '0POS'))
         self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'], val.Number(int, '0POS'))
-        self._arg('resources', 'str', 'Resources of the queue', self._defaults['resources'], val.String())
+        self._arg('resources', 'list', 'Resources of the queue', self._defaults['resources'], val.String(), nargs='*')
         self._arg('environment', 'list', 'Things to run before the job (sourcing envs).', self._defaults['environment'],
                   val.String(), nargs='*')
         self._arg('outputstream', 'str', 'Output stream.', 'lsf.%J.out', val.String())
@@ -99,7 +99,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
             if self.walltime is not None:
                 f.write('#BSUB -W {}\n'.format(self.walltime))
             if self.resources is not None:
-                f.write('#BSUB -R {}\n'.format(self.resources))
+                for resource in self.resources:
+                    f.write('#BSUB -R {}\n'.format(resource))
             # Trap kill signals to create sentinel file
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\n')
