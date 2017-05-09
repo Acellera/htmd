@@ -426,7 +426,7 @@ class Model(object):
         wrapsel : str, optional, default='protein'
             A selection to use for wrapping
         alignsel : str, optional, default='name CA'
-            A selection used for aligning all frames
+            A selection used for aligning all frames. Set to None to disable aligning
         alignmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A reference molecule onto which to align all others
         samplemode : ['weighted','random'], optional, default='weighted'
@@ -457,12 +457,11 @@ class Model(object):
                 raise AttributeError('Provided simlist has different number of trajectories than the one used by the model.')
 
         (single, molfile) = _singleMolfile(simlist)
-        refmol = None
         if not single:
             raise NameError('Visualizer does not support yet visualization of systems with different structure files. '
                             'The simlist should be created with a single molfile (for example a filtered one)')
         if alignmol is None:
-            alignmol = molfile
+            alignmol = Molecule(molfile)
         if statetype != 'macro' and statetype != 'micro' and statetype != 'cluster':
             raise NameError("'statetype' must be either 'macro', 'micro' or ''cluster'")
         if states is None:
@@ -474,8 +473,6 @@ class Model(object):
                 states = range(self.data.K)
         if len(states) == 0:
             raise NameError('No ' + statetype + ' states exist in the model')
-        if len(alignsel) > 0 and len(alignmol) > 0:
-            refmol = Molecule(alignmol)
 
         (tmp, relframes) = self.sampleStates(states, [numsamples]*len(states), statetype=statetype, samplemode=samplemode)
 
@@ -485,7 +482,7 @@ class Model(object):
         # Removed ncpus because it was giving errors on some systems.
         aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
         mols = aprun(total=len(relframes), description='Getting state Molecules')\
-            (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, refmol, simlist) for rel in relframes)
+            (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist) for rel in relframes)
         return np.array(mols, dtype=object)
 
     def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
@@ -836,7 +833,7 @@ def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
     mol.read(trajs, frames=frs)
     if len(wrapsel) > 0:
         mol.wrap(wrapsel)
-    if refmol is not None:
+    if (refmol is not None) and (alignsel is not None):
         mol.align(alignsel, refmol=refmol)
     return mol
 
