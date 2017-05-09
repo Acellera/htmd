@@ -255,7 +255,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     return mol
 
 
-def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('segid'), residgaps=False, residgaptol=1, chaingaps=True):
+def autoSegment2(mol, sel='(protein or resname ACE NME)', basename='P', fields=('segid',), residgaps=False, residgaptol=1, chaingaps=True):
     """ Detects bonded segments in a selection and assigns incrementing segid to each segment
 
     Parameters
@@ -266,7 +266,7 @@ def autoSegment2(mol, sel='(protein or name ACE NME)', basename='P', fields=('se
         Atom selection on which to check for gaps.
     basename : str
         The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
-    field : tuple of strings
+    fields : tuple of strings
         Field to fix. Can be "segid" (default) or any other Molecule field or combinations thereof.
     residgaps : bool
         Set to True to consider gaps in resids as structural gaps. Set to False to ignore resids
