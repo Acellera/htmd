@@ -478,7 +478,7 @@ def PDBread(filename, mode='pdb'):
         logger.warning('Non-integer values were read from the PDB "resid" field. Dropping PDB values and assigning new ones.')
         parsedtopo.resid = sequenceID(parsedtopo.resid)
 
-    if parsedtopo.insertion.dtype == np.float64:
+    if parsedtopo.insertion.dtype == np.float64 and not np.all(np.isnan(parsedtopo.insertion)):
         # Trying to minimize damage from resids overflowing into insertion field
         logger.warning('Integer values detected in "insertion" field. Your resids might be overflowing. Take care')
         parsedtopo.insertion = [str(int(x)) if not np.isnan(x) else '' for x in parsedtopo.insertion]
