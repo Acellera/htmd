@@ -9,7 +9,7 @@ from subprocess import call, check_output
 import sys
 import time
 
-excludedfolders = ('./tests', './doc', './htmdlib', './package', './continuous-integration')
+excludedfolders = ('./tests', './doc', './htmdlib', './package', './continuous-integration', './tutorials')
 excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_conda_with_omnia.py', 'sync_acellera_conda_channel_deps.py', 'makerelease.py')
 
 

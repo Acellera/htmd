@@ -6,9 +6,31 @@
 import os
 import shutil
 from subprocess import call, check_output
+from tutorials.test_tutorials import test_tutorials
 
 
-def makeMajorRelease(version, message):
+def run_tests(testfolder):
+    excode = test_tutorials(testfolder)
+    if excode == 0:
+        print('All tests were collected and passed successfully.')
+    else:
+        print('Error occured in running tests.')
+
+    # Error codes taken from pytest documentation
+    if excode == 1:
+        raise RuntimeError('Tests were collected and run but some of the tests failed.')
+    elif excode == 2:
+        raise RuntimeError('Test execution was interrupted by the user.')
+    elif excode == 3:
+        raise RuntimeError('Internal error happened while executing tests.')
+    elif excode == 4:
+        raise RuntimeError('pytest command line usage error.')
+    elif excode == 5:
+        raise RuntimeError('No tests were collected.')
+
+
+def makeMajorRelease(version, message, testfolder):
+    run_tests(testfolder)
     relname = 'rel-{}'.format(version)
     call(['git', 'checkout', 'master'])
     call(['git', 'fetch'])
@@ -21,7 +43,8 @@ def makeMajorRelease(version, message):
     call(['git', 'push', '--tags'])
 
 
-def makeMinorDevRelease(version, message):
+def makeMinorDevRelease(version, message, testfolder):
+    run_tests(testfolder)
     call(['git', 'checkout', 'master'])
     call(['git', 'fetch'])
     call(['git', 'pull'])
@@ -29,7 +52,8 @@ def makeMinorDevRelease(version, message):
     call(['git', 'push', '--tags', 'origin', 'master'])
 
 
-def makeStableBugFix(versiontofix, newversion, message):
+def makeStableBugFix(versiontofix, newversion, message, testfolder):
+    run_tests(testfolder)
     relname = 'rel-{}'.format(versiontofix)
     call(['git', 'checkout', 'master'])
     call(['git', 'fetch'])
