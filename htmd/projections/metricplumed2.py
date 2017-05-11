@@ -421,7 +421,8 @@ class MetricPlumed2(Projection):
             logger.error("Error from PLUMED (stdout): " + e.stdout.decode("utf-8"))
             logger.error("Error from PLUMED (stderr):" + e.stderr.decode("utf-8"))
             logger.error("Leaving temporary data in " + td)
-            raise e
+            errstr=[x for x in e.stdout.decode("utf-8").split("\n") if "PLUMED: ERROR" in x]
+            raise NameError("".join(errstr))
 
         data = self._readColvar()
         shutil.rmtree(td)
