@@ -58,8 +58,8 @@ from htmd.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VM
 from htmd.builder.loopmodeler import loopModeller
 import logging.config
 
-from htmd.version import version
-__version__ = version()
+from htmd.version import version as _version
+__version__ = _version()
 
 import htmd
 
@@ -68,8 +68,6 @@ import os
 import numpy as np
 import math
 import shutil
-import tempfile
-import random
 from glob import glob
 from sklearn.cluster import MiniBatchKMeans
 
@@ -89,8 +87,8 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
     show_news()
     compareVersions()
 
-import progress_reporter.bar.gui as gui  # Disabling pyemma progress widgets
-gui.ipython_notebook_session = False
+import progress_reporter.bar.gui as __gui  # Disabling pyemma progress widgets
+__gui.ipython_notebook_session = False
 
 config()
 
