@@ -125,8 +125,8 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         Default: './build'
     caps : dict
         A dictionary with keys segids and values lists of strings describing the caps of that segment.
-        e.g. caps['P'] = ['first ACE', 'last CT3']. Default: will apply ACE and CT3 caps to proteins and none caps
-        to the rest
+        e.g. caps['P'] = ['first ACE', 'last CT3'] or caps['P'] = ['first none', 'last none']. 
+        Default: will apply ACE and CT3 caps to proteins and none caps to the rest.
     ionize : bool
         Enable or disable ionization
     saltconc : float
