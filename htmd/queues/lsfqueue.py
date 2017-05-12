@@ -93,7 +93,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
             f.write('#BSUB -q {}\n'.format(self.queue))
             f.write('#BSUB -n {}\n'.format(self.ngpu))
             f.write('#BSUB -M {}\n'.format(self.memory))
-            f.write('#BSUB {}\n'.format(workdir))
+            f.write('#BSUB -cwd {}\n'.format(workdir))
+            f.write('#BSUB -outdir {}\n'.format(workdir))
             f.write('#BSUB -o {}\n'.format(self.outputstream))
             f.write('#BSUB -e {}\n'.format(self.errorstream))
             if self.walltime is not None:

@@ -470,6 +470,36 @@ class PreparationData:
         return ret
 
 
+    def checkTerminiHbonds(self):
+        """Check if the termini are involved in H bonds. 
+        
+        Returns a dictionary with keys N and C. Each value is a list, possibly empty,
+        containing the H bonds involving respectively the N atom of the N terminus and
+        the O atoms of the C terminus.
+        
+        Returns
+        -------
+        A dictionary, as above.
+          
+        """
+
+        ret = {"N": [],
+               "C": []}
+        hbl=self.findHbonds()
+
+        for hb in hbl:
+            if hb["donor"].name == "N" and hb["donor"].residue.isNterm == 1:
+                ret["N"].append(hb)
+            if hb["acceptor"].name == "N" and hb["acceptor"].residue.isNterm == 1:
+                ret["N"].append(hb)
+            if hb["donor"].name in ("O", "OXT") and hb["donor"].residue.isCterm == 1:
+                ret["C"].append(hb)
+            if hb["acceptor"].name in ("O", "OXT") and hb["acceptor"].residue.isCterm == 1:
+                ret["C"].append(hb)
+
+        return ret
+
+
     def reprepare(self):
         """Repeat the system preparation, after the user edited the .data table.
 
