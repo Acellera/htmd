@@ -30,12 +30,14 @@ def run_tests(testfolder):
 
 
 def makeMajorRelease(version, message, testfolder):
-    run_tests(testfolder)
     relname = 'rel-{}'.format(version)
     call(['git', 'checkout', 'master'])
     call(['git', 'fetch'])
     call(['git', 'pull'])
     call(['git', 'checkout', '-b', relname])
+
+    run_tests(testfolder)
+
     call(['git', 'tag', version, '-m', message])
     call(['git', 'push', '--tags', 'origin', relname])
     call(['git', 'checkout', 'master'])
@@ -44,16 +46,17 @@ def makeMajorRelease(version, message, testfolder):
 
 
 def makeMinorDevRelease(version, message, testfolder):
-    run_tests(testfolder)
     call(['git', 'checkout', 'master'])
     call(['git', 'fetch'])
     call(['git', 'pull'])
+
+    run_tests(testfolder)
+
     call(['git', 'tag', version, '-m', message])
     call(['git', 'push', '--tags', 'origin', 'master'])
 
 
 def makeStableBugFix(versiontofix, newversion, message, testfolder):
-    run_tests(testfolder)
     relname = 'rel-{}'.format(versiontofix)
     call(['git', 'checkout', 'master'])
     call(['git', 'fetch'])
@@ -61,6 +64,9 @@ def makeStableBugFix(versiontofix, newversion, message, testfolder):
     call(['git', 'checkout', versiontofix])
     call(['git', 'fetch'])
     call(['git', 'pull'])
+
+    run_tests(testfolder)
+
     call(['git', 'tag', newversion, '-m', message])
     call(['git', 'push', '--tags', 'origin', relname])
     call(['git', 'checkout', 'master'])
