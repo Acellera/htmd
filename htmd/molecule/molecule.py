@@ -981,7 +981,7 @@ class Molecule:
             Atomselection string for a representation.
         style : str
             Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
-        color : str
+        color : str or int
             Coloring mode or color ID. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
@@ -1540,10 +1540,11 @@ class Representations:
                     color = rep.color
                 viewer.send('mol selection {}'.format(rep.sel))
                 viewer.send('mol representation {}'.format(rep.style))
-                if isinstance(rep.color, int):
-                    viewer.send('mol color ColorID {}'.format(color))
-                else:
+                if isinstance(rep.color, str) and not rep.color.isnumeric():
                     viewer.send('mol color {}'.format(color))
+                else:
+                    viewer.send('mol color ColorID {}'.format(color))
+
                 viewer.send('mol addrep top')
 
     def _repsNGL(self, viewer):
