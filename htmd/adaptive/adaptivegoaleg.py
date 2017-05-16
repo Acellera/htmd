@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AdaptiveGoal2(AdaptiveGoal):
+class AdaptiveGoalEG(AdaptiveGoal):
     """ Adaptive class which uses a Markov state model for respawning
 
     AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
@@ -121,6 +121,8 @@ class AdaptiveGoal2(AdaptiveGoal):
 
     def __init__(self):
         super().__init__()
+        self._arg('epsilon', 'float', 'The epsilon for epsilon greedy, epsilon being the exploration ratio', 0.5,
+                  val.Number(float, 'ANY'))
 
     def _algorithm(self):
         sims = self._getSimlist()
@@ -153,11 +155,12 @@ class AdaptiveGoal2(AdaptiveGoal):
         data = self._model.data
 
         # Undirected component
-        uc = 1 / model.data.N  # Lower counts should give higher score
+        uc = model.data.N  # Lower counts should give higher score
         if self.statetype == 'micro':
             uc = uc[model.cluster_ofmicro]
         if self.statetype == 'macro':
             uc = macroAccumulate(model, uc[model.cluster_ofmicro])
+        uc = 1 / uc
 
         # Calculating the directed component
         dcmeans = dcstds = None
@@ -167,33 +170,148 @@ class AdaptiveGoal2(AdaptiveGoal):
             # TODO: Should we weigh by equilibrium population?
             dcmeans, dcstds = self._calculateDirectedComponent(goaldata, model.data.St, model.macro_ofcluster)
 
-        ucunscaled = uc
-        dcunscaled = dcmeans
-        uc = self._featScale(uc)
-        dc = self._featScale(dcmeans)
+        ucunscaled = uc.copy()
+        dcunscaled = dcmeans.copy()
+        dc = dcmeans / np.sum(dcmeans)
+        uc = uc / np.sum(uc)
 
-        scale = self.ucscale
-        if self.autoscale:
-            scale = AdaptiveGoal._calculateScale(goaldata, self.autoscalediff, self.autoscalemult, self.autoscaletol)
-        reward = (scale * uc) * ((1 - scale) * dc)
+        N = self.nmax - self._running
+        Nuc, Ndc = np.random.multinomial(N, [self.epsilon, 1-self.epsilon])
+        rewardDC = self._truncate(uc * dc, Ndc)
+        rewardUC = self._truncate(uc, Nuc)
 
-        relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
+        relFramesDC, spawncountsDC, truncprobDC = self._getSpawnFrames(rewardDC, self._model, data, Ndc)
+        relFramesUC, spawncountsUC, truncprobUC = self._getSpawnFrames(rewardUC, self._model, data, Nuc)
+        relFrames = np.concatenate((np.concatenate(relFramesDC), np.concatenate(relFramesUC)))
 
         if self.save:
             if not path.exists('saveddata'):
                 os.makedirs('saveddata')
             epoch = self._getEpoch()
-            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'ucscale': scale,
-                      'spawncounts': spawncounts, 'truncprob': truncprob, 'relFrames': relFrames, 'dcmeans': dcmeans,
-                      'dcstds': dcstds, 'reward': reward}
+            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'epsilon': self.epsilon,
+                      'spawncountsDC': spawncountsDC, 'spawncountsUC': spawncountsUC,
+                      'truncprobDC': truncprobDC, 'truncprobUC': truncprobUC,
+                      'relFramesDC': relFramesDC, 'relFramesUC': relFramesUC,
+                      'dcmeans': dcmeans, 'dcstds': dcstds, 'rewardDC': rewardDC, 'rewardUC': rewardUC}
             np.save(path.join('saveddata', 'e{}_goalreport.npy'.format(epoch)), tosave)
             np.save(path.join('saveddata', 'e{}_spawnframes.npy'.format(epoch)), relFrames)
             goaldata.save(path.join('saveddata', 'e{}_goaldata.dat'.format(epoch)))
 
-        if self._debug: np.save('debug.npy', relFrames); return True
+        if self._debug:
+            np.save('debug.npy', relFrames)
+            return True
+
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
 
 if __name__ == '__main__':
-    pass
+    from htmd import *
+    import os
+    import shutil
+    from htmd.util import tempname
+    from joblib import delayed
+    from htmd.home import home
+
+    def rmsdgoal(proj):
+        return -proj  # Lower RMSDs should give higher score
+
+    tmpdir = tempname()
+    shutil.copytree(htmd.home() + '/data/adaptive/', tmpdir)
+    os.chdir(tmpdir)
+    md = AdaptiveGoal()
+    md.dryrun = True
+    md.nmin = 1
+    md.nmax = 2
+    md.nepochs = 3
+    md.ticalag = 2
+    md.ticadim = 3
+    md.updateperiod = 5
+    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh')
+    # md.goalprojection = MetricRmsd(Molecule(htmd.home() + '/data/adaptive/generators/1/structure.pdb'),
+    #                               'protein and name CA')
+    md.goalfunction = rmsdgoal
+    # md.app = AcemdLocal()
+    # md.run()
+
+    # Some real testing now
+    from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
+    from htmd.projections.metricdistance import MetricSelfDistance
+    import numpy as np
+
+    os.chdir(path.join(home(), 'data', 'test-adaptive'))
+
+    goalProjectionDict = {'ss': MetricSecondaryStructure(),
+                          'contacts': MetricSelfDistance('protein and name CA', metric='contacts', threshold=10),
+                          'ss_contacts': [MetricSecondaryStructure(),
+                                          MetricSelfDistance('protein and name CA', metric='contacts', threshold=10)]}
+
+    def getLongContacts(crystal, long=8):
+        crystalMap = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).getMapping(
+            crystal)
+        indexes = np.vstack(crystalMap.atomIndexes.as_matrix())
+        return crystal.resid[indexes[:, 1]] - crystal.resid[indexes[:, 0]] > long
+
+    def getCrystalSS(crystal):
+        return MetricSecondaryStructure().project(crystal)[0]
+
+    def getCrystalCO(crystal):
+        crystalCO = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).project(
+            crystal)
+        longCO = getLongContacts(crystal)
+        return crystalCO & longCO
+
+    def ssContactGoal(mol, crystal, project=True, crystalSS=None, crystalCO=None):
+        if crystalSS is None:
+            crystalSS = getCrystalSS(crystal)
+        if crystalCO is None:
+            crystalCO = getCrystalCO(crystal)
+
+        if project:
+            projss = goalProjectionDict['ss'].copy().project(mol)
+            projco = goalProjectionDict['contacts'].copy().project(mol)
+        else:
+            projss = mol[:, :len(crystalSS)]
+            projco = mol[:, len(crystalSS):]
+
+        if len(crystalCO) != projco.shape[1]:
+            raise RuntimeError(
+                'Different lengths between crystal {} and traj {} contacts for fileloc {}'.format(len(crystalCO),
+                                                                                                  projco.shape[1],
+                                                                                                  mol.fileloc))
+        if len(crystalSS) != projss.shape[1]:
+            raise RuntimeError(
+                'Different lengths between crystal {} and traj {} SS for fileloc {}'.format(len(crystalSS),
+                                                                                            projss.shape[1],
+                                                                                            mol.fileloc))
+
+        ss_score = np.sum(projss == crystalSS, axis=1) / projss.shape[1]
+        co_score = np.sum(projco[:, crystalCO] == 1, axis=1) / np.sum(crystalCO)  # Predicted conts are True?
+        return 0.6 * ss_score + 0.4 * co_score
+
+    refmol = Molecule('ntl9_2hbb.pdb')
+    crystalSS = getCrystalSS(refmol)
+    crystalCO = getCrystalCO(refmol)
+
+    np.random.seed(10)
+    ad = AdaptiveGoalEG()
+    ad.app = LocalGPUQueue()
+    ad.nmin = 10
+    ad.nmax = 20
+    ad.nepochs = 999999
+    # ad.nframes = nframes['ntl9'] test that as well
+    ad.generatorspath = '../../generators/'
+    ad.projection = MetricSelfDistance('protein and name CA')
+    ad.goalfunction = delayed(ssContactGoal)(refmol, True, crystalSS, crystalCO)
+    ad.statetype = 'micro'
+    ad.truncation = 'cumsum'
+    ad.epsilon = 0.5
+    ad._debug = True
+    ad.run()
+    assert np.array_equal(np.load('debug.npy'), np.load('ref_adaptivegoaleg.npy'))
+
+    # TODO: Make this test work. Seems to ignore the random seed
+    #np.random.seed(10)
+    #ad.nosampledc = False
+    #ad.run()
+    #assert np.array_equal(np.load('debug.npy'), np.load('ref.npy'))

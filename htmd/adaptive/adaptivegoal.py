@@ -189,7 +189,9 @@ class AdaptiveGoal(AdaptiveMD):
             scale = AdaptiveGoal._calculateScale(goaldata, self.autoscalediff, self.autoscalemult, self.autoscaletol)
         reward = scale * uc + (1 - scale) * dc
 
-        relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data)
+        N = self.nmax - self._running
+        reward = self._truncate(reward, N)
+        relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data, N)
 
         if self.save:
             if not path.exists('saveddata'):
@@ -251,11 +253,15 @@ class AdaptiveGoal(AdaptiveMD):
         #         scale = max(1, scale+0.1)
         # return scale
 
-    def _getSpawnFrames(self, reward, model, data):
-        spawncounts, prob = self._spawn(reward, self.nmax - self._running)
+    def _getSpawnFrames(self, reward, model, data, N):
+        prob = reward / np.sum(reward)
+        logger.debug('Sampling probabilities {}'.format(prob))
+        spawncounts = np.random.multinomial(N, prob)
         logger.debug('spawncounts {}'.format(spawncounts))
+
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=True)
+        logger.debug('relFrames {}'.format(relFrames))
         return relFrames, spawncounts, prob
 
     def _featScale(self, feat):

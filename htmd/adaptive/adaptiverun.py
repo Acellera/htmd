@@ -126,7 +126,10 @@ class AdaptiveMD(AdaptiveBase):
         if not self._checkNFrames(data): return False
         self._createMSM(data)
 
-        relFrames = self._getSpawnFrames(self._model, self._model.data)
+        N = self.nmax - self._running
+        reward = self._criteria(self._model, self.method)
+        reward = self._truncate(reward, N)
+        relFrames, _, _ = self._getSpawnFrames(reward, self._model, self._model.data, N)
         self._writeInputs(self._model.data.rel2sim(np.concatenate(relFrames)))
         return True
 
@@ -173,14 +176,16 @@ class AdaptiveMD(AdaptiveBase):
                 os.makedirs('saveddata')
             self._model.save(path.join('saveddata', 'e{}_adapt_model.dat'.format(self._getEpoch())))
 
-    def _getSpawnFrames(self, model, data):
-        p_i = self._criteria(model, self.method)
-        (spawncounts, prob) = self._spawn(p_i, self.nmax - self._running)
+    def _getSpawnFrames(self, reward, model, data, N):
+        prob = reward / np.sum(reward)
+        logger.debug('Sampling probabilities {}'.format(prob))
+        spawncounts = np.random.multinomial(N, prob)
         logger.debug('spawncounts {}'.format(spawncounts))
+
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=True)
         logger.debug('relFrames {}'.format(relFrames))
-        return relFrames
+        return relFrames, spawncounts, prob
 
     def _criteria(self, model, criteria):
         if criteria == '1/Mc':
@@ -195,7 +200,7 @@ class AdaptiveMD(AdaptiveBase):
             ret = P_I[model.macro_ofmicro]*model.msm.stationary_distribution
         return ret
 
-    def _spawn(self, ranking, N):
+    def _truncate(self, ranking, N):
         if self.truncation is not None and self.truncation.lower() != 'none':
             if self.truncation == 'cumsum':
                 idx = np.argsort(ranking)
@@ -207,10 +212,7 @@ class AdaptiveMD(AdaptiveBase):
                 idx = np.argsort(ranking)
                 idx = idx[::-1]  # decreasing sort
                 ranking[idx[N:]] = 0  # Set all states ranked > N to zero.
-        prob = ranking / np.sum(ranking)
-        logger.debug('Sampling probabilities {}'.format(prob))
-        spawnmicro = np.random.multinomial(N, prob)
-        return spawnmicro, prob
+        return ranking
 
     def _numClusters(self, numFrames):
         """ Heuristic that calculates number of clusters from number of frames """
