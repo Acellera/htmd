@@ -408,7 +408,17 @@ if __name__ == '__main__':
     assert np.array_equal(np.load('debug.npy'), np.load('ref_nosampledc.npy'))
 
     # TODO: Make this test work. Seems to ignore the random seed
-    #np.random.seed(10)
-    #ad.nosampledc = False
-    #ad.run()
-    #assert np.array_equal(np.load('debug.npy'), np.load('ref.npy'))
+    np.random.seed(10)
+    ad = AdaptiveGoal()
+    ad.app = LocalGPUQueue()
+    ad.nmin = 10
+    ad.nmax = 20
+    ad.nepochs = 999999
+    ad.generatorspath = '../../generators/'
+    ad.projection = MetricSelfDistance('protein and name CA')
+    ad.goalfunction = delayed(ssContactGoal)(refmol, True, crystalSS, crystalCO)
+    ad.statetype = 'micro'
+    ad.truncation = 'cumsum'
+    ad._debug = True
+    ad.run()
+    assert np.array_equal(np.concatenate(np.load('debug.npy')), np.concatenate(np.load('ref.npy')))
