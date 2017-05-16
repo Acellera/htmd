@@ -446,6 +446,7 @@ def MDTRAJwrite(mol, filename):
     try:
         import mdtraj as md
         from htmd.util import tempname
+        ext = os.path.splitext(filename)[1][1:]
 
         if ext in _MDTRAJ_TOPOLOGY_SAVERS:
             tmppdb = tempname(suffix='.pdb')
