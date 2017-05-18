@@ -95,6 +95,9 @@ class PlumedStatement(ABC):
     def __init__(self):
         self.prereq = []
 
+    def __str__(self):
+        return "# Rendered PlumedStatement"
+
 
 class PlumedCV(PlumedStatement):
     """ Define a Plumed2 CV.
@@ -230,6 +233,43 @@ class PlumedCV(PlumedStatement):
         return tmpl
 
 
+class PlumedMolinfo(PlumedStatement):
+    """ The MOLINFO statement 
+    
+    Parameters
+    ----------
+    mol: Molecule
+        Will be written to file, and the corresponding MOLINFO statement generated,
+    """
+
+    def __init__(self, mol):
+        self.pdbfp = tempfile.NamedTemporaryFile(suffix=".pdb")
+        mol.write(self.pdbfp.name)
+
+    def __str__(self):
+        return "MOLINFO STRUCTURE={}".format(self.pdbfp.name)
+
+
+class PlumedVerbatim(PlumedStatement):
+    """ An arbitrary Plumed statement, as a string. 
+    
+    Parameters
+    ----------
+    txt:
+        The statement
+    comment: bool
+        Whether it is a comment.
+    """
+    def __init__(self, txt, comment=False):
+        if comment:
+            self.txt = "# "+txt
+        else:
+            self.txt = txt
+
+    def __str__(self):
+        return self.txt
+
+
 class PlumedGenericGroup(PlumedStatement):
     """ Abstract class from which PLUMED groups are inherited. Do not use directly. """
 
@@ -333,6 +373,7 @@ class MetricPlumed2(Projection):
         self._plumed_exe = shutil.which("plumed")
         self.colvar = None
         self.cvnames = None
+        self.stmt = None
 
         try:
             pp = _getPlumedRoot()
@@ -344,9 +385,10 @@ class MetricPlumed2(Projection):
         if type(plumed_inp) == str:
             self._plumed_inp = plumed_inp
         else:
-            cvs = PlumedStatement()
-            cvs.prereq = ensurelist(plumed_inp)
-            stmts = _printDFS(cvs)
+            # This should keep the CVs etc in scope
+            self.stmt = PlumedStatement()
+            self.stmt.prereq = ensurelist(plumed_inp)
+            stmts = _printDFS(self.stmt)
             self._plumed_inp = "\n".join(stmts)
 
     def __str__(self):
@@ -392,13 +434,15 @@ class MetricPlumed2(Projection):
             # raise Exception("MetricPlumed's getMapping can only be called after the projection")
 
     # Arguments are actually self, mol
-    def project(self, mol):
+    def project(self, mol, debug=False):
         """ Project molecule.
 
         Parameters
         ------------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
             A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        debug : bool
+            Do not delete intermediate files.
 
         Returns
         -------
@@ -449,10 +493,13 @@ class MetricPlumed2(Projection):
             logger.error("Error from PLUMED (stderr):" + e.stderr.decode("utf-8"))
             logger.error("Leaving temporary data in " + td)
             errstr=[x for x in e.stdout.decode("utf-8").split("\n") if "PLUMED: ERROR" in x]
-            raise NameError("".join(errstr))
+            raise Exception("".join(errstr))
 
         data = self._readColvar()
-        shutil.rmtree(td)
+        if debug:
+            logger.info("Leaving temporary data in " + td)
+        else:
+            shutil.rmtree(td)
 
         return data
 
