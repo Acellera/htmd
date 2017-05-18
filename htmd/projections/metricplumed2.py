@@ -38,6 +38,29 @@ def _getPlumedInfo(what):
     info = info.strip().decode("utf-8")
     return info
 
+def _printDFS(n):
+    """ Depth-first traversal of nodes """
+    # https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search
+    _L = []
+    _tempmarked = dict()
+    _marked = dict()
+
+    def _printDFS_aux(nn):
+        nonlocal _tempmarked,_marked,_L
+        if nn in _tempmarked:
+            raise Exception("Not a DAG!")
+        if not nn in _marked:
+            _tempmarked[nn]=True
+            if hasattr(nn,'prereq'):
+                for d in nn.prereq:
+                    _printDFS_aux(d)
+            _marked[nn]=True
+            del _tempmarked[nn]
+            _L = [str(nn)] + _L
+
+    _printDFS_aux(n)
+    return list(reversed(_L))
+
 
 # Static utility functions ---------------------------------------------------------
 def genTemplate(action, include_optional=False):
@@ -69,7 +92,8 @@ def genTemplate(action, include_optional=False):
 # ABC should prevent instantiation but doesn't
 class PlumedStatement(ABC):
     """ Abstract base class for Plumed statements. Do not use directly. """
-    pass
+    def __init__(self):
+        self.prereq = []
 
 
 class PlumedCV(PlumedStatement):
@@ -153,6 +177,8 @@ class PlumedCV(PlumedStatement):
                     elif isinstance(le, PlumedCV):
                         # e.g. for COMBINE
                         self.prereq.append(le)
+                        if hasattr(le,"prereq"):
+                            self.prereq = le.prereq+self.prereq
                         v[l] = le.label
                     elif isinstance(le, Molecule):
                         tmpGrp = PlumedGroup(label=None, mol=le, sel="all")
@@ -315,22 +341,16 @@ class MetricPlumed2(Projection):
             raise Exception("To use MetricPlumed2 please ensure PLUMED 2's executable is installed and in path")
 
         # Sanitize if single element
-        plumed_inp = ensurelist(plumed_inp)
-
-        # This should recurse
-        prereqs = set()
-        for i in plumed_inp:
-            if hasattr(i,'prereq'):
-                prereqs=prereqs.union(i.prereq)
-
-        prereqs_s = "\n".join([str(x) for x in prereqs])
-        inp_s     = "\n".join([str(x) for x in plumed_inp])
-
-        self._plumed_inp = prereqs_s+"\n\n"+inp_s
+        if type(plumed_inp) == str:
+            self._plumed_inp = plumed_inp
+        else:
+            cvs = PlumedStatement()
+            cvs.prereq = ensurelist(plumed_inp)
+            stmts = _printDFS(cvs)
+            self._plumed_inp = "\n".join(stmts)
 
     def __str__(self):
         return self._plumed_inp
-
 
     def _readColvar(self):
         # Assumptions: file begins with #! FIELDS time
