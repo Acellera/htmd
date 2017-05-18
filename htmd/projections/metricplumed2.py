@@ -150,6 +150,10 @@ class PlumedCV(PlumedStatement):
                     if isinstance(le, PlumedGenericGroup):
                         self.prereq.append(le)
                         v[l] = le.label
+                    elif isinstance(le, PlumedCV):
+                        # e.g. for COMBINE
+                        self.prereq.append(le)
+                        v[l] = le.label
                     elif isinstance(le, Molecule):
                         tmpGrp = PlumedGroup(label=None, mol=le, sel="all")
                         self.prereq.append(tmpGrp)
@@ -159,10 +163,12 @@ class PlumedCV(PlumedStatement):
                     elif isinstance(le, int):
                         v[l] = str(le)
                     else:
-                        raise TypeError("Unexpected type passed at argument (list): " + k)
+                        raise TypeError("Unexpected type {} passed to argument {} (list context)".
+                                        format(str(type(le)),k))
                 self.args[k] = ",".join(v)
             else:
-                raise TypeError("Unexpected type passed at argument: " + k)
+                raise TypeError("Unexpected type {} passed to argument {}".
+                                        format(str(type(v)),k))
 
     def __str__(self):
         r = ""
@@ -311,6 +317,7 @@ class MetricPlumed2(Projection):
         # Sanitize if single element
         plumed_inp = ensurelist(plumed_inp)
 
+        # This should recurse
         prereqs = set()
         for i in plumed_inp:
             if hasattr(i,'prereq'):
@@ -444,8 +451,6 @@ if __name__ == "__main__":
         print("Tests in %s skipped because plumed executable not found." % __file__)
         sys.exit()
 
-    import doctest
-    doctest.testmod()
 
 
     # Simlist
@@ -479,5 +484,9 @@ if __name__ == "__main__":
     # datadirs=glob(os.path.join(home(), 'data', 'adaptive', 'data', '*' )
     # fsims=simlist(glob(os.path.join(home(), 'data', 'adaptive', 'data', '*', '/')),
     #              os.path.join(home(), 'data', 'adaptive', 'generators', '1','structure.pdb'))
+
+    import doctest
+    doctest.testmod()
+
 
     pass
