@@ -48,7 +48,7 @@ def _printDFS(n):
     def _printDFS_aux(nn):
         nonlocal _tempmarked,_marked,_L
         if nn in _tempmarked:
-            raise Exception("Not a DAG!")
+            raise Exception("Not a DAG! There may be cyclic dependencies in the colvars.")
         if not nn in _marked:
             _tempmarked[nn]=True
             if hasattr(nn,'prereq'):
@@ -85,6 +85,25 @@ def genTemplate(action, include_optional=False):
         info = subprocess.check_output(cl)
         info = info.strip().decode("utf-8")
         return info
+
+
+def manual(action):
+    """ Return the manual for the given action
+
+    Parameters
+    ----------
+    action : str
+        The action to be documenteds
+
+    Examples
+    --------
+    >> manual("GYRATION")
+    """
+
+    cl = ["plumed", "--standalone-executable", "manual", "--action", action]
+    info = subprocess.check_output(cl)
+    info = info.strip().decode("utf-8")
+    return info
 
 
 # Plumed statement wrappers --------------------------------------------------------
