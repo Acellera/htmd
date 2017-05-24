@@ -262,6 +262,8 @@ class PlumedMolinfo(PlumedStatement):
     The supplied Molecule will also be written to a temporary file, and deleted 
     when the object goes off scope.
     
+    Note: this may not behave well under multiprocessing. 
+    
     Parameters
     ----------
     mol: Molecule
@@ -282,16 +284,18 @@ class PlumedMolinfo(PlumedStatement):
     # Rendered PlumedStatement
     >>> ah_metric.project(m)        # doctest: +ELLIPSIS
     array([[ 20.10917664],
-       [ 19.43626404],
-       [ 20.09723854], ...
+           [ 19.43626404],
+           [ 20.09723854], ...
     """
 
     def __init__(self, mol):
-        self.pdbfp = tempfile.NamedTemporaryFile(suffix=".pdb")
-        mol.write(self.pdbfp.name)
+        self.localmol = mol.copy()
 
     def __str__(self):
-        return "MOLINFO STRUCTURE={}".format(self.pdbfp.name)
+        # TODO Need to find a better pickle-compatible way which is deleted at end
+        pdbfp = tempfile.NamedTemporaryFile(suffix=".pdb", delete=False)
+        self.localmol.write(pdbfp.name)
+        return "MOLINFO STRUCTURE={}".format(pdbfp.name)
 
 
 class PlumedVerbatim(PlumedStatement):
@@ -394,6 +398,8 @@ class MetricPlumed2(Projection):
     The script can be defined as
      * a string, or a list of strings (which are concatenated), or
      * a list of PlumedCV objects (see PlumedCV for examples)
+     
+     TODO: allow selection of CVs to print
 
     Parameters
     ----------
@@ -465,6 +471,8 @@ class MetricPlumed2(Projection):
         """ Return the labels of the colvars used in this projection.
 
         Can only be used after the projection has been executed.
+        
+        TODO: Improve.
 
         Returns
         -------
