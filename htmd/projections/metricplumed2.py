@@ -257,12 +257,33 @@ class PlumedCV(PlumedStatement):
 
 
 class PlumedMolinfo(PlumedStatement):
-    """ The MOLINFO statement 
+    """ Add a MOLINFO statement. 
+    
+    The supplied Molecule will also be written to a temporary file, and deleted 
+    when the object goes off scope.
     
     Parameters
     ----------
     mol: Molecule
-        Will be written to file, and the corresponding MOLINFO statement generated,
+        Will be written to file, and the corresponding MOLINFO statement generated.
+        
+    Examples
+    --------
+    >>> m = Molecule("1kdx")
+    >>> mc = m.copy()
+    >>> mc.dropFrames(keep=[0])
+    >>> mc.set("resname","SER","resname SEP")
+    >>> molinfo = PlumedMolinfo(mc)
+    >>> ah = PlumedCV("ALPHARMSD",RESIDUES="119-146", R_0="1.0", label="ah")
+    >>> ah_metric = MetricPlumed2([molinfo,ah])
+    >>> print(ah_metric)
+    MOLINFO STRUCTURE=/var/folders/qz/7p0f8wdj4zdd8nwxm89xzhy80000gn/T/tmpqqhsi644.pdb
+    ah: ALPHARMSD RESIDUES=all R_0=1.0
+    # Rendered PlumedStatement
+    >>> ah_metric.project(m)        # doctest: +ELLIPSIS
+    array([[ 20.10917664],
+       [ 19.43626404],
+       [ 20.09723854], ...
     """
 
     def __init__(self, mol):
