@@ -88,12 +88,16 @@ def genTemplate(action, include_optional=False):
 
 
 def manual(action):
-    """ Return the manual for the given action
+    """ Return the manual for the given action.
+    
+    The manual is returned as a pseudo-HTML string. 
+    
+    Bugs: prints some text on stderr. The returned string should be reformatted to a more readable format.
 
     Parameters
     ----------
     action : str
-        The action to be documenteds
+        The action to be documented
 
     Examples
     --------
@@ -380,7 +384,7 @@ class MetricPlumed2(Projection):
     >>> dd = htmd.home(dataDir="adaptive")
     >>> fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'], dd + '/generators/1/structure.pdb')
     >>> metr = Metric(fsims)
-    >>> metr.projection(MetricPlumed2( ['d1: DISTANCE ATOMS=2,3', 'd2: DISTANCE ATOMS=5,6'])) # As strings
+    >>> metr.set(MetricPlumed2( ['d1: DISTANCE ATOMS=2,3', 'd2: DISTANCE ATOMS=5,6'])) # As strings
     >>> data=metr.project()
     >>> data.dat
     array([ array([[ 1.68597198,  1.09485197], ...
@@ -544,7 +548,7 @@ if __name__ == "__main__":
     fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
                          dd + '/generators/1/structure.pdb')
     metr = Metric(fsims)
-    metr.projection(MetricPlumed2(
+    metr.set(MetricPlumed2(
         ['d1: DISTANCE ATOMS=2,3',
          'd2: DISTANCE ATOMS=5,6']))
     data2 = metr.project()
