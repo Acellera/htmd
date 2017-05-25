@@ -23,7 +23,7 @@ def compareVersions():
     __file = os.path.join(__htmdconf, '.latestversion')
 
     # Check if one day has passed since last version check. If yes, get new version and write to file
-    if not os.path.isfile(__file) or time.time() > os.path.getmtime(__file) + 86400:
+    if not os.path.isfile(__file) or time.time() > os.path.getmtime(__file) + 86400 or os.stat(__file).st_size == 0:
         _writeLatestVersionFile(__file)
 
     try:
@@ -33,6 +33,10 @@ def compareVersions():
         return
     latestversions = f.readlines()
     f.close()
+
+    if len(latestversions) != 2:
+        print('There is something wrong with your {} file. Will not check for new HTMD versions.'.format(__file))
+        return
 
     currver = version()
     if currver != 'unpackaged':
@@ -68,28 +72,29 @@ def compareVersions():
 
 def _writeLatestVersionFile(fname):
     import os
+    from binstar_client.utils import get_server_api
+
     try:
         f = open(fname, 'w')
     except:
         print('Unable to open {} file for writing. Will not check for new HTMD versions.'.format(fname))
         return
-    
+
+    api = get_server_api(log_level=0)
     try:
-        stable, dev, stabledeps, devdeps = _release_version('acellera', 'htmd')
+        package = api.package('acellera', 'htmd')
     except Exception as err:
-        print("Failed at checking latest conda version. {}".format(err))
-        f.close()
+        print("Failed at checking latest conda version. ({})".format(type(err).__name__))
         return
+
+    stable, dev, stabledeps, devdeps = _release_version(package)
+
     f.write('{} {}\n{} {}'.format(stable, ','.join(stabledeps), dev, ','.join(devdeps)))
     os.utime(fname, None)
     f.close()
 
 
-def _release_version(user, package):
-    from binstar_client.utils import get_server_api
-
-    api = get_server_api()
-    package = api.package(user, package)
+def _release_version(package):
 
     versionlist = package['versions']
     laststable = None
@@ -128,7 +133,7 @@ def _release_python_dep(package, version, opersys=None):
             if f['version'] == version and f['attrs']['operatingsystem'].lower().startswith(opersys.lower()):
                 for d in f['dependencies']['depends']:
                     if d['name'].lower() == 'python':
-                        versions.append(''.join(d['specs'][0]))
+                        versions.append(d['specs'][0][1])
         if len(versions):
             return versions
         else:
