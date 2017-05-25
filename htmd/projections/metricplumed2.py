@@ -472,7 +472,7 @@ class MetricPlumed2(Projection):
 
         Can only be used after the projection has been executed.
         
-        TODO: Improve.
+        TODO: Update to pandas.
 
         Returns
         -------
