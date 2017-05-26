@@ -201,7 +201,7 @@ class AdaptiveGoalEG(AdaptiveGoal):
             np.save('debug.npy', relFrames)
             return True
 
-        self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
+        self._writeInputs(data.rel2sim(relFrames))
         return True
 
 

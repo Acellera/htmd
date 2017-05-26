@@ -374,6 +374,7 @@ def _applyProteinCaps(mol, caps):
         if len(mol.atomselect('protein and segid {}'.format(seg), indexes=True)) == 0:
             raise RuntimeError('Segment {} is not protein. Capping for non-protein segments is not supported.'.format(seg))
         # For each cap
+        passed = False
         for i, cap in enumerate(caps[seg]):
             if cap is None or (isinstance(cap, str) and cap == 'none'):
                 continue
@@ -385,8 +386,9 @@ def _applyProteinCaps(mol, caps):
             terminalresids = [resids[0], resids[-1]]
             residm = mol.resid == terminalresids[i]  # Mask for resid
 
-            if i == 0:
+            if not passed:
                 orig_terminalresids = terminalresids
+                passed = True
 
             if cap is None or cap == '':  # In case there is no cap defined
                 logger.warning('No cap provided for resid {} on segment {}. Did not apply it.'.format(terminalresids[i], seg))
