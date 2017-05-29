@@ -509,6 +509,9 @@ def _defaultCaps(mol):
     segsNonProt = np.unique(mol.get('segid', sel='not protein'))
     caps = dict()
     for s in segsProt:
+        if len(np.unique(mol.resid[mol.segid == s])) < 10:
+            raise RuntimeError('Caps cannot be automatically set for segment {}. The caps argument of charmm.build '
+                               'must be defined explicitly by the user for segments: {}'.format(s, segsProt))
         nter, cter = _removeCappedResidues(mol, s)
         caps[s] = ['first {}'.format(nter), 'last {}'.format(cter)]
     for s in segsNonProt:

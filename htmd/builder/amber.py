@@ -457,6 +457,9 @@ def _defaultProteinCaps(mol):
     segsProt = np.unique(mol.get('segid', sel='protein'))
     caps = dict()
     for s in segsProt:
+        if len(np.unique(mol.resid[mol.segid == s])) < 10:
+            raise RuntimeError('Caps cannot be automatically set for segment {}. The caps argument of amber.build '
+                               'must be defined explicitly by the user for segments: {}'.format(s, segsProt))
         caps[s] = ['ACE', 'NME']
     return caps
 
