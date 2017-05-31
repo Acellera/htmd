@@ -533,17 +533,17 @@ class Molecule:
             return s
 
     def copy(self):
-        ''' Create a copy of the molecule object
+        """ Create a copy of the molecule object
 
         Returns
         -------
         newmol : :class:`Molecule`
             A copy of the object
-        '''
+        """
         return deepcopy(self)
 
     def filter(self, sel, _logger=True):
-        '''Removes all atoms not included in the atomselection
+        """Removes all atoms not included in the atomselection
 
         Parameters
         ----------
@@ -554,20 +554,20 @@ class Molecule:
         --------
         >>> mol=tryp.copy()
         >>> mol.filter('protein')
-        '''
+        """
         s = self.atomselect(sel)
         if np.all(s):  # If all are selected do nothing
             return
 
         if not isinstance(s, np.ndarray) or s.dtype != bool:
             raise NameError('Filter can only work with string inputs or boolean arrays')
-        self.remove(np.invert(s), _logger=_logger)
+        return self.remove(np.invert(s), _logger=_logger)
 
     def _removeBonds(self, idx):
-        ''' Renumbers bonds after removing atoms and removes non-existent bonds
+        """ Renumbers bonds after removing atoms and removes non-existent bonds
 
         Needs to be called before removing atoms!
-        '''
+        """
         if len(self.bonds) == 0:
             return
         map = np.ones(self.numAtoms, dtype=int)
@@ -593,7 +593,7 @@ class Molecule:
                                 self.insertion, self.altloc)
 
     def moveBy(self, vector, sel=None):
-        '''Move a selection of molecule atoms by a given vector
+        """Move a selection of molecule atoms by a given vector
 
         Parameters
         ----------
@@ -606,7 +606,7 @@ class Molecule:
         --------
         >>> mol=tryp.copy()
         >>> mol.moveBy([3, 45 , -8])
-        '''
+        """
         vector = np.array(vector)
         if np.size(vector) != 3:
             raise NameError('Move vector must be a 1x3 dimensional vector.')
