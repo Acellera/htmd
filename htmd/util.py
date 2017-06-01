@@ -7,6 +7,7 @@
 import tempfile
 import logging
 import requests
+import re
 import io
 import os
 import numpy as np
@@ -160,7 +161,7 @@ def opm(pdb):
     mol: Molecule
         The oriented molecule
 
-    thickness: float
+    thickness: float or None
         The bilayer thickness (both layers)
 
     Examples
@@ -170,6 +171,9 @@ def opm(pdb):
     7902
     >>> thickness
     28.2
+    >>> _, thickness = opm('4u15')
+    >>> thickness is None
+    True
 
     """
 
@@ -185,15 +189,23 @@ def opm(pdb):
     mol = Molecule(tempfile)
     mol.filter("not resname DUM")
 
-    # Assuming the half-thickness is the last word in the first line
+    # Assuming the half-thickness is the last word in the matched line
     # REMARK      1/2 of bilayer thickness:   14.1
-    f = open(tempfile)
-    h = f.readline()
-    f.close()
+    tmp = open(tempfile)
+    pattern = re.compile('^REMARK.+thickness')
+
+    match = None
+    for line in tmp:
+        if re.match(pattern, line):
+            match = line
+    tmp.close()
     os.unlink(tempfile)
 
-    hs = h.split()
-    thickness = 2.0 * float(hs[-1])
+    if not match:
+        thickness = None
+    else:
+        split_line = match.split()
+        thickness = 2.0 * float(split_line[-1])
 
     return mol, thickness
 
