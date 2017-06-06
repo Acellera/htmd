@@ -517,16 +517,26 @@ to enable very verbose (complete trace) debugging.
     proc tracer { a b } { puts "TRACE $b: $a" }
     trace add execution calcforces enterstep tracer
 
+
+
+PLUMED library
+--------------
+
+Interfaces exist for `PLUMED <http://www.plumed.org>`_ (versions 1 and 2),
+a flexible library implementing a number of
+biased free energy calculation methods, such as metadynamics.
+Please  see the `ACEMD-PLUMED <https://github.com/tonigi/ACEMD-PLUMED>`_ repository
+for examples.
+
+
 Plugin interface
 ----------------
 
 ACEMD is easily extended by adding plugin modules written in C and
-dynamically loaded by the application. Current plugins include
-metadynamics, a power biased free energy calculation method. It is easy
+dynamically loaded at simulation time. The plugin interface give access to the
+position, velocities and forces at each iteration from a C interface. It is easy
 to think of ways on which users might want to customize ACEMD for their
-needs. In practice, the plugin interface give access to the
-position,velocities and forces at each iteration from a C interface.
-Please visit the plugin web page for more information.
+needs.
 
 Getting support
 ---------------
@@ -543,7 +553,7 @@ When publishing results with ACEMD please cite:
    molecular dynamics simulations in the microseconds timescale, J.
    Chem. Theory and Comput. 5, 1632 (2009).
 
-Additonally, please read and consider citing the following methods
+Additionally, please read and consider citing the following methods
 papers:
 
 -  M. J. Harvey and G. De Fabritiis, An implementation of the smooth
