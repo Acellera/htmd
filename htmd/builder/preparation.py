@@ -381,6 +381,7 @@ def proteinPrepare(mol_in,
 
     resData._listNonStandardResidues()
     resData._warnIfpKCloseTopH(pH)
+    resData.warnIfTerminiSuspect()
 
     if hydrophobicThickness:
         resData._setMembraneExposureAndWarn(hydrophobicThickness)
