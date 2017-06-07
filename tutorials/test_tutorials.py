@@ -19,7 +19,7 @@ def test_tutorials(testfolder, tutorials=('ligand-binding-analysis', 'protein-fo
         if name not in tutorials:
             continue
 
-        testsubf = os.path.join(testfolder, name)
+        testsubf = os.path.abspath(os.path.join(testfolder, name))
         if not os.path.exists(testsubf):
             os.makedirs(testsubf)
 
