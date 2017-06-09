@@ -118,7 +118,7 @@ class Model(object):
         microstates : list
             The microstates to split out into a new macrostate.
         indexpairs : list
-            List of lists. Each row is a simulation index - frame pair which should be added to a new cluster.
+            List of lists. Each row is a simulation index-frame pair which should be added to a new cluster.
         """
         if microstates is not None and indexpairs is not None:
             raise AttributeError('microstates and indexpairs arguments are mutually exclusive')
@@ -130,6 +130,8 @@ class Model(object):
                 self.msm.metastable_sets[i] = np.array(np.sort(list(set(metset) - set(microstates))))
             self.msm.metastable_sets.append(np.array(microstates, dtype=np.int64))
 
+            todelete = np.where([len(x) == 0 for x in self.msm.metastable_sets])[0]
+
             # Fixing hard assignments
             self.msm.metastable_assignments[microstates] = newmacro
 
@@ -137,6 +139,12 @@ class Model(object):
             self.msm._metastable_memberships = np.pad(self.msm.metastable_memberships, ((0, 0), (0, 1)), mode='constant', constant_values=(0))
             self.msm._metastable_memberships[microstates, :] = 0
             self.msm._metastable_memberships[microstates, -1] = 1
+
+            # Moving probabilities of empty states to new one
+            othermicro = np.ones(self.micronum, dtype=bool)
+            othermicro[microstates] = False
+            othermicro = np.where(othermicro)[0]
+            self.msm._metastable_memberships[othermicro, -1] = np.sum(self.msm._metastable_memberships[othermicro[:, None], todelete], axis=1)
 
             # Fixing distributions
             self.msm._metastable_distributions = np.pad(self.msm.metastable_distributions, ((0, 1), (0, 0)), mode='constant', constant_values=(0))
