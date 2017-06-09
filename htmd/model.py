@@ -86,7 +86,16 @@ class Model(object):
 
         self.lag = lag
         self.msm = msm.estimate_markov_model(self.data.St.tolist(), self.lag, sparse=sparse)
-        self.coarsemsm = self.msm.pcca(macronum)
+        modelflag = False
+        while not modelflag:
+            self.coarsemsm = self.msm.pcca(macronum)
+            if len(np.unique(self.msm.metastable_assignments)) != macronum:
+                macronum -= 1
+                logger.warning('PCCA returned empty macrostates. Reducing the number of macrostates to {}.'.format(macronum))
+            else:
+                modelflag = True
+            if macronum < 2:
+                raise RuntimeError('Could not create even two macrostates. Please revise your clustering.')
 
         self._modelid = random.random()
 
