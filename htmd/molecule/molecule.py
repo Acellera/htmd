@@ -822,23 +822,17 @@ class Molecule:
             self.empty(natoms)
 
         for field in topo.__dict__:
-            if np.all([x is None for x in topo.__dict__[field]]):
-                if field in Molecule._atom_fields:
-                    self.__dict__[field] = self._empty(natoms, field)
-                continue
-
             newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
+
+            # Skip on empty new field data
+            if newfielddata is None or len(newfielddata) == 0 or np.all([x is None for x in topo.__dict__[field]]):
+                continue
 
             # Objects could be ints for example but we want them as str
             if self._dtypes[field] == object and len(newfielddata) != 0:
                 newfielddata = np.array([str(x) for x in newfielddata], dtype=object)
 
-            if newfielddata is None or len(newfielddata) == 0:
-                if field in Molecule._atom_fields:
-                    self.__dict__[field] = self._empty(natoms, field)
-                continue
-
-            if overwrite[0] == 'all' or field in overwrite or len(self.__dict__[field]) == 0:
+            if (overwrite[0] == 'all') or (field in overwrite) or (len(self.__dict__[field])) == 0:
                 self.__dict__[field] = newfielddata
             else:
                 if np.shape(self.__dict__[field]) != np.shape(newfielddata):
