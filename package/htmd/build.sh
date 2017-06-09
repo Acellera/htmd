@@ -10,6 +10,9 @@ echo "building"
 export PATH=$PATH:/usr/bin/:/bin/
 printenv
 
+# copy compiled libs
+cp -R $PWD/htmdlib/$OSNAME "$SP_DIR/htmd/lib/$OSNAME"
+
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
 echo "Installing into $PREFIX"
