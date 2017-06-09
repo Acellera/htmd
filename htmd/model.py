@@ -45,17 +45,20 @@ class Model(object):
         :attributes:
     """
 
-    def __init__(self, data=None):
+    def __init__(self, data=None, file=None):
         if data is None:
+            if file is not None:
+                self.load(file)
             return
-        self.data = data
+        else:
+            self.data = data
         self.hmm = None
         self._modelid = None
-        if data._clusterid is None:
+        if self.data._clusterid is None:
             raise NameError('You need to cluster your data before making a Markov model')
-        if data._dataid != data._clusterid:
+        if self.data._dataid != self.data._clusterid:
             raise NameError('You have modified the data in data.dat after clustering. Please re-cluster.')
-        self._clusterid = data._clusterid
+        self._clusterid = self.data._clusterid
 
     def markovModel(self, lag, macronum, units='frames', sparse=False, hmm=False):
         """ Build a Markov model at a given lag time and calculate metastable states
