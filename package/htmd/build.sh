@@ -11,7 +11,8 @@ export PATH=$PATH:/usr/bin/:/bin/
 printenv
 
 # copy compiled libs
-cp -R $PWD/htmdlib/$OSNAME "$SP_DIR/htmd/lib/$OSNAME"
+ls -l "$SP_DIR/htmd/lib/$OSNAME"
+cp -R $PWD/htmd/lib/$OSNAME "$SP_DIR/htmd/lib/$OSNAME"
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
