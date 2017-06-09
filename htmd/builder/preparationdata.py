@@ -112,11 +112,11 @@ class PreparationData:
                (self.data.insertion == icode_pad)
         if sum(mask) == 0:
             self.data = self.data.append({
-                                          'resname': a_resname,
-                                          'resid': a_resid,
-                                          'insertion': icode_pad,
-                                          'chain': chain_pad, #     'patches': []
-                                          }, ignore_index=True)
+                'resname': a_resname,
+                'resid': a_resid,
+                'insertion': icode_pad,
+                'chain': chain_pad,  # 'patches': []
+            }, ignore_index=True)
             pos = len(self.data) - 1
         elif sum(mask) == 1:
             pos = np.argwhere(mask)
@@ -133,13 +133,11 @@ class PreparationData:
         else:
             try:
                 ov = self.data.iloc[pos][key]
-                if type(ov)==float and math.isnan(ov):
+                if type(ov) == float and math.isnan(ov):
                     ov = list()
             except:
                 ov = list()
-            self.data.set_value(pos, key, ov+[val])
-
-
+            self.data.set_value(pos, key, ov + [val])
 
     # residue is e.g. pdb2pqr.src.aa.ILE
     def _setProtonationState(self, residue, state):
@@ -221,9 +219,8 @@ class PreparationData:
                 drs = prettyPrintResidue(dr)
                 logger.warning("Dubious protonation state:    {:s} (pKa={:5.2f})".format(drs, dr.pKa))
 
-
     # This is used by the proteinprepare web interface.
-    def _get_pka_plot(self, pH=7.4, figSizeX=10, dpk=1.0, font_size = 12):
+    def _get_pka_plot(self, pH=7.4, figSizeX=10, dpk=1.0, font_size=12):
         """Internal function to build the protonation diagram"""
 
         import matplotlib
@@ -244,7 +241,7 @@ class PreparationData:
         grey_red = LinearSegmentedColormap.from_list("grey_red", [neutral_grey, my_red])
         grey_blue = LinearSegmentedColormap.from_list("grey_blue", [neutral_grey, my_blue])
         eps = .01  # Tiny overprint to avoid very thin white lines
-        outline = [PathEffects.withStroke(linewidth=2,foreground="w")]
+        outline = [PathEffects.withStroke(linewidth=2, foreground="w")]
 
         # Color for pk values
         pkcolor = "black"
@@ -337,7 +334,7 @@ class PreparationData:
                           extent=(pk + dpk - eps, right, bottom, top), alpha=1)
                 ax.text(pk + dtxt, i, " {:.2f} ".format(pk), color=pkcolor,
                         fontsize=pkfontsize, horizontalalignment="left", zorder=30,
-                        path_effects=outline,  weight="bold")
+                        path_effects=outline, weight="bold")
             ax.add_line(Line2D([pk, pk], [bottom, top], linewidth=3, color='white', zorder=2))
 
             # ax.add_line(Line2D([pk,pk], [bottom,top], linewidth=3, color='blue'))
@@ -375,7 +372,6 @@ class PreparationData:
 
         plt.close(fig)
         return ret_img
-
 
     def findHbonds(self, angleCutoff=30.0, distanceCutoff=3.4):
         """Return a list of H bonds determined by pdb2pqr.
@@ -430,7 +426,7 @@ class PreparationData:
         routines.cells = Cells(cellsize)
         routines.cells.assignCells(protein)
 
-        ret=[]
+        ret = []
 
         for donor in protein.getAtoms():
             # Grab the list of donors
@@ -461,16 +457,15 @@ class PreparationData:
                     if angle > angleCutoff:
                         continue
 
-                    ret.append( {"donor": donor,   "acceptor": acc, "hydrogen": donorh,
-                                 "distance": dist, "angle": angle} )
+                    ret.append({"donor": donor, "acceptor": acc, "hydrogen": donorh,
+                                "distance": dist, "angle": angle})
 
                     s = "Donor: %s %s\tAcceptor: %s %s\tdist: %.2f\tAngle: %.2f" % \
                         (donor.residue, donor.name, acc.residue, acc.name, dist, angle)
                     logger.debug(s)
         return ret
 
-
-    def checkTerminiHbonds(self):
+    def getTerminiHbonds(self):
         """Check if the termini are involved in H bonds. 
         
         Returns a dictionary with keys N and C. Each value is a list, possibly empty,
@@ -485,7 +480,7 @@ class PreparationData:
 
         ret = {"N": [],
                "C": []}
-        hbl=self.findHbonds()
+        hbl = self.findHbonds()
 
         for hb in hbl:
             if hb["donor"].name == "N" and hb["donor"].residue.isNterm == 1:
@@ -499,6 +494,50 @@ class PreparationData:
 
         return ret
 
+    def getTerminiBuriedness(self):
+        """Compute the buriedness of termini.
+
+        Returns a dictionary with keys N and C. Each value is a list, possibly empty,
+        containing the buried fraction (as per propka).
+
+        Returns
+        -------
+        A dictionary, as above.
+
+        """
+
+        ret = {"N": self.data.buried[self.data.resname == "N+"],
+               "C": self.data.buried[self.data.resname == "C-"]}
+        return ret
+
+    def warnIfTerminiSuspect(self, buriedThreshold=50):
+        """Return true and warn if termini are involved in H bonds or are >50% buried
+        
+        Parameters
+        ----------
+        buriedThreshold: float
+            Warn if a terminus is more buried then this threshold (default 50)
+        
+        Returns
+        -------
+        flag: bool
+            Whether a warning was raised
+        """
+
+        th = self.getTerminiHbonds()
+        tb = self.getTerminiBuriedness()
+        flag = False
+
+        for t in ['N', 'C']:
+            if len(th[t]) > 0:
+                flag = True
+                logger.warning("Found {}-terminus involved in H bonds".format(t))
+            for bf in tb[t]:
+                if bf > buriedThreshold:
+                    flag = True
+                    logger.warning(
+                        "Found {}-terminus {:.1f}% buried (> {:.1f}% threshold)".format(t, bf, buriedThreshold))
+        return flag
 
     def reprepare(self):
         """Repeat the system preparation, after the user edited the .data table.
@@ -548,9 +587,9 @@ class PreparationData:
         # when it builds the resmap dict, which in turns breaks later stages. So, let's reset it.
         for res in p.getResidues():
             try:
-                if res.fixed==1:
+                if res.fixed == 1:
                     logger.debug("Resetting fixed flag on {:s}".format(str(res)))
-                    res.fixed=0
+                    res.fixed = 0
             except:
                 logger.debug("Residue {:s} has no fixed attribute".format(str(res)))
                 pass
@@ -645,15 +684,14 @@ class PreparationData:
 if __name__ == "__main__":
     from htmd.builder.preparation import proteinPrepare
 
-    m=Molecule("3ptb")
+    m = Molecule("3ptb")
     mp, dp = proteinPrepare(m, returnDetails=True)
     hb = dp.findHbonds()
-    d=dp.data
+    d = dp.data
     d.loc[d.resid == 40, 'forced_protonation'] = 'HIP'
     mp2, dp2 = dp.reprepare()
     hb2 = dp2.findHbonds()
 
     import doctest
+
     doctest.testmod()
-
-

@@ -14,7 +14,7 @@ def run_tests(testfolder):
     if excode == 0:
         print('All tests were collected and passed successfully.')
     else:
-        print('Error occured in running tests.')
+        print('Error occurred in running tests.')
 
     # Error codes taken from pytest documentation
     if excode == 1:

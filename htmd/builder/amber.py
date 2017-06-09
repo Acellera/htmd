@@ -92,7 +92,6 @@ def defaultParam():
     return ['frcmod.ionsjc_tip3p']
 
 
-
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True, atomtypes=None,
           offlibraries=None):
@@ -226,8 +225,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             f.write('loadamberparams ' + path.basename(p) + '\n')
         except:
             f.write('loadamberparams ' + p + '\n')
-            logger.info("Path {:s} not found, assuming a standard AmberTools file.".
-                        format(p))
+            logger.info("File {:s} not found, assuming its present on the standard Amber location".format(p))
     f.write('\n')
 
     # Printing out topologies
