@@ -286,11 +286,10 @@ def simmerge(simlist1, simlist2):
     if len(simlist2) == 0:
         return simlist1
 
-    maxid = simlist1[-1].simid + 1
-    for s in simlist2:
-        s.simid = maxid
-        maxid += 1
-    return np.append(simlist1, simlist2)
+    newsimlist = np.append(simlist1, simlist2)
+    for i, s in enumerate(newsimlist):
+        s.simid = i
+    return newsimlist
 
 
 def _filtSim(i, sims, outFolder, filterSel):
