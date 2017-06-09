@@ -12,7 +12,7 @@ printenv
 
 # copy compiled libs
 if [ -e "$PWD/htmd/lib/$OSNAME" ]; then
-    cp -R $PWD/htmd/lib/$OSNAME "$SP_DIR/htmd/lib/$OSNAME"
+    cp -R $PWD/htmd/lib/$OSNAME "$SP_DIR/htmd/lib/"
 fi
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
