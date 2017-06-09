@@ -53,12 +53,12 @@ install:
   - python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
   # Clone the private htmdlib repo
-  - git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 1
+  - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 1; fi
+  - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then ./htmdlib/C/build.sh "./htmd/lib/$OSNAME"; fi
 
   - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe
   - conda build package/htmd-data --no-include-recipe
   - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe
-
 
   - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
   - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
