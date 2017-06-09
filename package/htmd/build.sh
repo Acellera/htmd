@@ -12,6 +12,8 @@ printenv
 
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
+STARTDIR="$PWD"
+
 echo "Installing into $PREFIX"
 
 DIR="$SP_DIR"
@@ -38,11 +40,11 @@ else
 fi
 
 # copy compiled libs
-if [ -e "$PWD/htmd/lib/$OSNAME" ]; then
+if [ -e "$STARTDIR/htmd/lib/$OSNAME" ]; then
     if [ -e "$DIR/htmd/lib/$OSNAME" ]; then
         rm -R "$DIR/htmd/lib/$OSNAME"
     fi
-    cp -R $PWD/htmd/lib/$OSNAME "$DIR/htmd/lib/"
+    cp -R $STARTDIR/htmd/lib/$OSNAME "$DIR/htmd/lib/"
 fi
 
 cd "$DIR/../../"
