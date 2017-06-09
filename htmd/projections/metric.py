@@ -164,7 +164,7 @@ class Metric:
         metrics, ref, updlist, fstep = self._removeEmpty(metrics, ref, deletesims, fstep)
 
         # Constructing a MetricData object
-        data = MetricData(dat=metrics, ref=ref, map=mapping, simlist=updlist)
+        data = MetricData(dat=metrics, ref=ref, description=mapping, simlist=updlist)
 
         uqfsteps = np.unique(fstep)
         data.fstep = float(stats.mode(fstep).mode)

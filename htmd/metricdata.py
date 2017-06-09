@@ -13,6 +13,86 @@ import pickle
 logger = logging.getLogger(__name__)
 
 
+def _getsizes(x):
+    if x is not None:
+        if isinstance(x, np.ndarray):
+            return x.shape[0]
+        else:
+            return len(x)
+
+
+class Trajectory:
+    def __init__(self, projection=None, reference=None, sim=None, cluster=None):
+        self._projection = projection
+        self._reference = reference
+        self._cluster = cluster
+        self.sim = sim
+        self._checkframes((self.projection, self.reference, self.cluster))
+
+    @property
+    def projection(self):
+        return self._projection
+
+    @projection.setter
+    def projection(self, value):
+        self._checkframes((value, self.reference, self.cluster))
+        self._projection = value
+
+    @property
+    def reference(self):
+        return self._reference
+
+    @reference.setter
+    def reference(self, value):
+        self._checkframes((self.projection, value, self.cluster))
+        self._reference = value
+
+    @property
+    def cluster(self):
+        return self._cluster
+
+    @cluster.setter
+    def cluster(self, value):
+        self._checkframes((self.projection, self.reference, value))
+        self._cluster = value
+
+    @property
+    def numFrames(self):
+        return self._numframes((self.projection, self.reference, self.cluster))
+
+    def _numframes(self, args):
+        return np.unique([x for x in list(map(_getsizes, args)) if x is not None])
+
+    def _checkframes(self, args):
+        if len(self._numframes(args)) > 1:
+            raise RuntimeError('projection, reference and cluster must have same lengths')
+
+    def dropFrames(self, frames):
+        if np.min(frames) < 0 or np.max(frames) >= self.numFrames:
+            raise RuntimeError('Frames to drop must be > 0 and < {}'.format(self.numFrames))
+        if self._projection is not None:
+            self._projection = np.delete(self._projection, frames, axis=0)
+        if self._reference is not None:
+            self._reference = np.delete(self._reference, frames, axis=0)
+        if self._cluster is not None:
+            self._cluster = np.delete(self._cluster, frames, axis=0)
+        self._checkframes((self.projection, self.reference, self.cluster))
+
+    def copy(self):
+        return deepcopy(self)
+
+    def __repr__(self):
+        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
+               + self.__str__()
+
+    def __str__(self):
+        return 'sim: {}\nprojection: {}\nreference: {}\ncluster: {}\n'.format(
+            'simid = {}'.format(self.sim.simid) if self.sim is not None else None,
+            'np.array(shape={})'.format(np.shape(self.projection)) if self.projection is not None else None,
+            'np.array(shape={})'.format(np.shape(self.reference)) if self.reference is not None else None,
+            'np.array(shape={})'.format(np.shape(self.cluster)) if self.cluster is not None else None)
+
+
 class MetricData:
     """ Class used for storing projected trajectories, their clustering and state assignments. Objects of this class
     are constructed by the `project` methods of the other projection classes. Only construct this class if you want to
@@ -42,16 +122,24 @@ class MetricData:
         Centers of clusters
     """
     
-    def __init__(self, dat=None, ref=None, map=None, simlist=None, fstep=0, parent=None, file=None):
-        self.dat = dat
-        self.ref = ref
-        self.simlist = simlist
+    def __init__(self, dat=None, ref=None, description=None, simlist=None, fstep=0, parent=None, file=None, trajectories=None):
+        if trajectories is None:
+            sizes = np.unique([x for x in list(map(_getsizes, (dat, ref, simlist))) if x is not None])
+            if len(sizes) > 1:
+                raise RuntimeError('dat, ref and simlist must have same lengths')
+            if dat is None:
+                dat = np.empty(sizes, dtype=object)
+            if ref is None:
+                ref = np.empty(sizes, dtype=object)
+            if simlist is None:
+                simlist = np.empty(sizes, dtype=object)
+            self.trajectories = [Trajectory(d, r, s) for d, r, s in zip(dat, ref, simlist)]
+        else:
+            self.trajectories = trajectories
+
         self.fstep = fstep
-        self.map = map
-
+        self.description = description
         self.parent = parent
-
-        self.St = None
         self.K = None
         self.N = None
         self.Centers = None
@@ -62,6 +150,26 @@ class MetricData:
         self._dataid = random.random()
         self._clusterid = None
         return
+
+    @property
+    def dat(self):
+        return np.array([x.projection for x in self.trajectories], dtype=object)
+
+    @property
+    def ref(self):
+        return np.array([x.reference for x in self.trajectories], dtype=object)
+
+    @property
+    def St(self):
+        return np.array([x.cluster for x in self.trajectories], dtype=object)
+
+    @property
+    def simlist(self):
+        return np.array([x.sim for x in self.trajectories], dtype=object)
+
+    @property
+    def map(self):
+        return self.description
 
     @property
     def trajLengths(self):
@@ -76,7 +184,7 @@ class MetricData:
         --------
         >>> data.trajLengths
         """
-        return np.array([np.size(x, 0) for x in self.dat])
+        return np.array([x.numFrames for x in self.trajectories])
 
     @property
     def numFrames(self):
@@ -101,7 +209,8 @@ class MetricData:
         --------
         >>> data.numTrajectories
         """
-        return len(self.dat)
+        return len(self.trajectories)
+
 
     @property
     def numDimensions(self):
@@ -111,7 +220,7 @@ class MetricData:
         --------
         >>> data.numDimensions
         """
-        return self.dat[0].shape[1]
+        return self.trajectories[0].projection.shape[1]
 
     @property
     def aggregateTime(self):
@@ -153,11 +262,11 @@ class MetricData:
                 if currsum > batchsize:
                     starts.append(i+1)
                     currsum = 0
-            starts.append(len(self.dat))
+            starts.append(self.numTrajectories)
             for i in range(len(starts) - 1):
                 clusterobj.partial_fit(np.concatenate(self.dat[starts[i]:starts[i+1]]))
             labels = []
-            for i in range(len(self.dat)):
+            for i in range(self.numTrajectories):
                 labels.append(clusterobj.predict(self.dat[i].astype(np.float32)))
             # This is retarded
             labels = np.concatenate(labels)
@@ -179,14 +288,16 @@ class MetricData:
         map[uqclu] = range(self.K)
         labels = map[labels]
         # ------------------------------------
-        self.St = self.deconcatenate(labels)
+        for i, s in enumerate(self.deconcatenate(labels)):
+            self.trajectories[i].cluster = s
         self.N = np.bincount(labels)
 
         if mergesmall is not None:
             oldK = self.K
-            self.K, self.St, self.Centers, self.N, xxx = _mergeSmallClusters(mergesmall, datconcat, labels, self.Centers, self.N)
+            self.K, St, self.Centers, self.N, xxx = _mergeSmallClusters(mergesmall, datconcat, labels, self.Centers, self.N)
+            for i, s in enumerate(self.deconcatenate(St)):
+                self.trajectories[i].cluster = s
             logger.info('Mergesmall removed {} clusters. Original ncluster {}, new ncluster {}.'.format(oldK-self.K, oldK, self.K))
-            self.St = self.deconcatenate(self.St)
 
         self._dataid = random.random()
         self._clusterid = self._dataid
@@ -210,9 +321,9 @@ class MetricData:
         for i in range(self.numTrajectories):
             if self.simlist[i].simid != otherdata.simlist[i].simid:
                 raise NameError('Simulation ids do not match. Cannot combine. Please generate both data from the same simlist')
-        for i in range(self.numTrajectories):
-            self.dat[i] = np.concatenate((self.dat[i], otherdata.dat[i]), axis=1)
-        self.map = self.map.append(otherdata.map, ignore_index=True)
+        for t1, t2 in zip(self.trajectories, otherdata.trajectories):
+            t1.projection = np.concatenate((t1.projection, t2.projection), axis=1)
+        self.description = self.description.append(otherdata.description, ignore_index=True)
         self._dataid = random.random()
 
     def dropDimensions(self, drop=None, keep=None):
@@ -245,10 +356,10 @@ class MetricData:
             keepidx = np.arange(self.numDimensions)
             keepidx = np.setdiff1d(keepidx, dropidx)
 
-        for i, d in enumerate(self.dat):
-            self.dat[i] = self.dat[i][:, keepidx]
-        self.map = self.map.drop(self.map.index[dropidx])
-        self.map = self.map.reset_index(drop=True)
+        for t in self.trajectories:
+            t.projection = t.projection[:, keepidx]
+        self.description = self.description.drop(self.description.index[dropidx])
+        self.description = self.description.reset_index(drop=True)
 
     def dropTraj(self, limits=None, multiple=None, partial=None, idx=None, keepsims=None):
         """ Drops trajectories based on their lengths
@@ -275,7 +386,7 @@ class MetricData:
         >>> data.dropTraj(multiple=[100])
         """
         trajLengths = self.trajLengths
-        orgNum = len(self.dat)
+        orgNum = self.numTrajectories
 
         if limits is not None:
             drop = (trajLengths < limits[0]) | (trajLengths > limits[1])
@@ -287,13 +398,13 @@ class MetricData:
             for i in range(len(multiple)):
                 idxNew = np.where(np.mod(trajLengths, multiple[i]) != 0)
                 idx = np.intersect1d(idxNew, idx)
-            drop = np.zeros(len(self.dat), dtype=bool)
+            drop = np.zeros(orgNum, dtype=bool)
             drop[idx] = True
         elif idx is not None:
-            drop = np.zeros(len(self.dat), dtype=bool)
+            drop = np.zeros(orgNum, dtype=bool)
             drop[idx] = True
         elif keepsims is not None:
-            drop = np.ones(len(self.dat), dtype=bool)
+            drop = np.ones(orgNum, dtype=bool)
             for i, s in enumerate(self.simlist):
                 for k in keepsims:
                     if s == k:
@@ -304,18 +415,21 @@ class MetricData:
         keep = np.invert(drop)
         dropIdx = np.where(drop)[0]
 
-        self.dat = self.dat[keep]
-        self.ref = self.ref[keep]
-        self.simlist = self.simlist[keep]
+        self.trajectories = [self.trajectories[x] for x in np.where(keep)[0]]
         self._dataid = random.random()
         if self.parent:
-            self.parent.dat = self.parent.dat[keep]
-            self.parent.ref = self.parent.ref[keep]
-            self.parent.simlist = self.parent.simlist[keep]
+            self.parent.trajectories = [self.parent.trajectories[x] for x in np.where(keep)[0]]
             self.parent._dataid = random.random()
 
-        logger.info('Dropped ' + str(np.sum(drop)) + ' trajectories from ' + str(orgNum) + ' resulting in ' + str(len(self.dat)))
+        logger.info('Dropped ' + str(np.sum(drop)) + ' trajectories from ' + str(orgNum) + ' resulting in ' + str(self.numTrajectories))
         return dropIdx
+
+    def dropFrames(self, idx, frames):
+        self.trajectories[idx].dropFrames(frames)
+        self._dataid = random.random()
+        if self.parent:
+            self.parent.trajectories[idx].dropFrames(frames)
+            self.parent._dataid = random.random()
 
     def bootstrap(self, ratio, replacement=False):
         """ Randomly sample a set of trajectories
@@ -348,11 +462,9 @@ class MetricData:
         pp = None
         if self.parent is not None:
             pp = self.parent.copy()
-            pp.dat = self.parent.dat[rndtraj]
-            pp.ref = self.parent.ref[rndtraj]
-            pp.simlist = self.parent.simlist[rndtraj]
+            pp.trajectories = [self.parent.trajectories[x] for x in rndtraj]
             pp._dataid = random.random()
-        bootdata = MetricData(dat=self.dat[rndtraj], ref=self.ref[rndtraj], map=self.map, simlist=self.simlist[rndtraj], parent=pp, fstep=self.fstep)
+        bootdata = MetricData(trajectories=[self.trajectories[x].copy() for x in rndtraj], description=self.description, parent=pp, fstep=self.fstep)
         return bootdata
     
     def plotTrajSizes(self):
@@ -377,8 +489,7 @@ class MetricData:
         raise NameError('Not implemented yet')
 
     def deconcatenate(self, array):
-        sizes = [np.size(x, 0) for x in self.dat]
-        indeces = np.cumsum(sizes)
+        indeces = np.cumsum(self.trajLengths)
         if np.ndim(array) == 1:
             return np.array(np.split(array, indeces[:-1]))
         else:
@@ -452,7 +563,8 @@ class MetricData:
             trajID = relFrames[i, 0]
             trajFrame = relFrames[i, 1]
             sims.append(simlist[trajID])
-            frames.append(Frame(simlist[trajID], self.ref[trajID][trajFrame, 0], self.ref[trajID][trajFrame, 1]))
+            ref = self.trajectories[trajID].reference
+            frames.append(Frame(simlist[trajID], ref[trajFrame, 0], ref[trajFrame, 1]))
         return np.array(frames)
 
     def abs2sim(self, absFrames):
@@ -603,7 +715,6 @@ class MetricData:
         else:
             f.colorbar(mappable, label=label)
 
-
     def plotCounts(self, dimX, dimY, resolution=100, logplot=False):
         """ Plots a histogram of counts on any two given dimensions.
 
@@ -696,13 +807,34 @@ class MetricData:
                 continue
             if j == 'parent':
                 rep += '\nparent: {} at {}'.format(type(self.parent), hex(id(self.parent)))
-            elif j == 'map':
-                rep += '\nmap: {} at {}'.format(type(self.map), hex(id(self.map)))
+            elif j == 'description':
+                rep += '\ndescription: {} at {}'.format(type(self.map), hex(id(self.map)))
             else:
                 rep += '\n'
                 rep += formatstr(j, self.__dict__[j])
 
         return rep
+
+    def append(self, other):
+        self.trajectories += other.trajectories
+        for i, t in enumerate(self.trajectories):
+            t.sim.simid = i
+
+        if self.parent and other.parent:
+            self.parent.trajectories += other.parent.trajectories
+            for i, t in enumerate(self.parent.trajectories):
+                t.sim.simid = i
+
+        self._dataid = random.random()
+        self._resetClustering()
+        return self
+
+    def _resetClustering(self):
+        for t in self.trajectories:
+            t.cluster = None
+        self.K = None
+        self.N = None
+        self.Centers = None
 
 
 def _mergeSmallClusters(mergesmall, data, stconcat, centers, N, metric=None):
