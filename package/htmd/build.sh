@@ -10,45 +10,44 @@ echo "building"
 export PATH=$PATH:/usr/bin/:/bin/
 printenv
 
-# copy compiled libs
-if [ -e "$PWD/htmd/lib/$OSNAME" ]; then
-    cp -R $PWD/htmd/lib/$OSNAME "$SP_DIR/htmd/lib/"
-fi
-
 find htmd -type d -name __pycache__ -exec rm -rf {} \; -print || true
 
 echo "Installing into $PREFIX"
 
-	DIR="$SP_DIR"
+DIR="$SP_DIR"
 
-	if [ "$DIR" != "" ]; then
-		mkdir -p "$DIR"
-	fi
-	if [ -e "$DIR" ]; then
-		pwd
-		ls
-		cp -r htmd  $DIR/
-		cp -r htmdx  $DIR/
-		rm -rf $(find "$DIR" -name .git -type d) 
+if [ "$DIR" != "" ]; then
+    mkdir -p "$DIR"
+fi
+if [ -e "$DIR" ]; then
+    pwd
+    ls
+    cp -r htmd  $DIR/
+    cp -r htmdx  $DIR/
+    rm -rf $(find "$DIR" -name .git -type d)
     rm -rf $DIR/htmd/data
-	  rm -rf $DIR/htmd/.idea
-	  rm -rf $DIR/htmdx/.idea
+    rm -rf $DIR/htmd/.idea
+    rm -rf $DIR/htmdx/.idea
     rm -rf $DIR/htmd/.ipynb_checkpoints
     rm -rf $DIR/htmd/Untitled*
-
-
     echo "def version():" > $DIR/htmd/version.py
     echo "    return \"$PKG_VERSION\"" >> $DIR/htmd/version.py
+else
+    echo "Error: PREFIX not defined"
+    exit 1
+fi
 
-	else
-		echo "Error: PREFIX not defined"
-		exit 1
-	fi
+# copy compiled libs
+if [ -e "$PWD/htmd/lib/$OSNAME" ]; then
+    if [ -e "$DIR/htmd/lib/$OSNAME" ]; then
+        rm -R "$DIR/htmd/lib/$OSNAME"
+    fi
+    cp -R $PWD/htmd/lib/$OSNAME "$DIR/htmd/lib/"
+fi
 
 cd "$DIR/../../"
 
 chmod -R a+rX "$PREFIX"
-
 
 
 # Try this to hopefully suppess travis build error on osx "shell_session_update"# cf https://github.com/travis-ci/travis-ci/issues/6522 
