@@ -20,6 +20,7 @@ class Acemd(ProtocolInterface):
         super().__init__()
         self._version = version
         self._files = {}
+        self._outnames = {}
 
         # Options
         self._cmdString('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None)
@@ -87,7 +88,7 @@ class Acemd(ProtocolInterface):
         for cmd in self._defaultfnames.keys():
             if cmd in self.__dict__ and self.__dict__[cmd] is not None:
                 fname = os.path.join(path, self.__dict__[cmd])
-                f = open(fname, 'rb')  #read all as binary
+                f = open(fname, 'rb')  # read all as binary
                 data = f.read()
                 f.close()
                 self._files[cmd] = data
@@ -95,8 +96,7 @@ class Acemd(ProtocolInterface):
                 defaultname = self._defaultfnames[cmd]
                 if defaultname.endswith('*'):
                     defaultname = '{}.{}'.format(os.path.splitext(defaultname)[0], os.path.splitext(fname)[1][1:])
-
-                self.__dict__[cmd] = defaultname  # use default file names
+                self._outnames[cmd] = defaultname
 
     def save(self, path, overwrite=False):
         """ Create a directory with all necessary input to run acemd.
@@ -117,7 +117,7 @@ class Acemd(ProtocolInterface):
 
         # Write all files using default filenames
         for f in self._files:
-            fo = open(os.path.join(path, self.__dict__[f]), 'wb')  # write all as binary
+            fo = open(os.path.join(path, self._outnames[f]), 'wb')  # write all as binary
             fo.write(self._files[f])
             fo.close()
 
@@ -167,10 +167,13 @@ class Acemd(ProtocolInterface):
         keys = keys + [keys.pop(keys.index('run'))]  # Move the run command to the end
         for cmd in keys:
             if not cmd.startswith('_') and self.__dict__[cmd] is not None and cmd != 'TCL':
+                val = self.__dict__[cmd]
+                if cmd in self._outnames:
+                    val = self._outnames[cmd]
                 name = cmd
                 if cmd == 'scaling14':  # variables cannot start with numbers. We need to rename it here for acemd
                     name = '1-4scaling'
-                text += '{name: <{maxwidth}}\t{val:}\n'.format(name=name, val=str(self.__dict__[cmd]), maxwidth=maxwidth)
+                text += '{name: <{maxwidth}}\t{val:}\n'.format(name=name, val=val, maxwidth=maxwidth)
 
         if not quiet:
             print(text)
