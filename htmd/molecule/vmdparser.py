@@ -217,15 +217,15 @@ def guessAnglesAndDihedrals( bonds ):
         #b3-b2-b1-a3
         #b3-b2-b1-a1
 
-        if (a2 == b1) and (a3 == b2): dihedrals.append( [ a1, a2, a3, b3 ] )
-        elif (a2 == b3) and (a3 == b1): dihedrals.append( [ a1, a2, a3, b1 ] )
-        elif (b2 == a1) and (b3 == a2): dihedrals.append( [ b1, b2, b3, a3 ] )
-        elif (b2 == a3) and (b3 == a2): dihedrals.append( [ b1, b2, b3, a1 ] )
+        if   (a2 == b1) and (a3 == b2) and (a1 != b3): dihedrals.append( [ a1, a2, a3, b3 ] )
+        elif (a2 == b3) and (a3 == b1) and (a1 != b1): dihedrals.append( [ a1, a2, a3, b1 ] )
+        elif (b2 == a1) and (b3 == a2) and (b1 != a3): dihedrals.append( [ b1, b2, b3, a3 ] )
+        elif (b2 == a3) and (b3 == a2) and (b1 != a1): dihedrals.append( [ b1, b2, b3, a1 ] )
 
-        elif (a2 == b1) and (a1 == b2): dihedrals.append( [ a3, a2, a1, b3 ] )
-        elif (a2 == b3) and (a1 == b2): dihedrals.append( [ a3, a2, a1, b1 ] )
-        elif (b2 == a1) and (b1 == a2): dihedrals.append( [ b3, b2, b1, a3 ] )
-        elif (b2 == a3) and (b1 == a2): dihedrals.append( [ b3, b2, b1, a1 ] )
+        elif (a2 == b1) and (a1 == b2) and (a3 != b3): dihedrals.append( [ a3, a2, a1, b3 ] )
+        elif (a2 == b3) and (a1 == b2) and (a3 != b1): dihedrals.append( [ a3, a2, a1, b1 ] )
+        elif (b2 == a1) and (b1 == a2) and (b3 != a3): dihedrals.append( [ b3, b2, b1, a3 ] )
+        elif (b2 == a3) and (b1 == a2) and (b3 != a1): dihedrals.append( [ b3, b2, b1, a1 ] )
 
 
     dihedrals = np.asarray( dihedrals, dtype=np.integer )
