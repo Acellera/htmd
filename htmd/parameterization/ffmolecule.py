@@ -129,9 +129,16 @@ class FFMolecule(Molecule):
         hh = dict()
 
         for i in range(len(self.name)):
+            # This fixes the specific case where a name is 3 characters, as X-TOOL seems to make
+            t = self.name[i].upper()
+            if re.match( "^[A-Z][A-Z][A-Z]", t ): 
+               t = t[0]
             # Remove any character that isn't alpha
-            t = re.sub('[^A-Z]*', "", self.name[i].upper())
-            # print("RENAMED %s to %s" %(self.name[i], t ) )
+            t = re.sub('[^A-Z]*', "", t )
+            if t != self.name[i].upper():
+#               print(" Atom #%d renamed from [%s] to [%s]" %(i, self.name[i], t ) )
+               pass
+
             idx = 0
 
             if not t in hh:
