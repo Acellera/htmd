@@ -58,7 +58,11 @@ class Trajectory:
 
     @property
     def numFrames(self):
-        return self._numframes((self.projection, self.reference, self.cluster))
+        return int(self._numframes((self.projection, self.reference, self.cluster)))
+
+    @property
+    def numDimensions(self):
+        return self.projection.shape[1]
 
     def _numframes(self, args):
         num = np.unique([x for x in list(map(_getsizes, args)) if x is not None])
@@ -236,7 +240,7 @@ class MetricData:
         --------
         >>> data.numDimensions
         """
-        return self.trajectories[0].projection.shape[1]
+        return self.trajectories[0].numDimensions
 
     @property
     def aggregateTime(self):
@@ -756,12 +760,12 @@ class MetricData:
         """
         from matplotlib import pylab as plt
         dc = np.concatenate(self.dat)
-        if self.map is not None:
-            xlabel = self.map.description[dimX]
+        if self.description is not None:
+            xlabel = self.description.description[dimX]
         else:
             xlabel = 'Dimension {}'.format(dimX)
-        if self.map is not None:
-            ylabel = self.map.description[dimY]
+        if self.description is not None:
+            ylabel = self.description.description[dimY]
         else:
             ylabel = 'Dimension {}'.format(dimY)
         title = 'Counts histogram'
@@ -796,12 +800,12 @@ class MetricData:
         from matplotlib import pylab as plt
         if cmap is None:
             cmap = plt.cm.jet
-        if self.map is not None:
-            xlabel = self.map.description[dimX]
+        if self.description is not None:
+            xlabel = self.description.description[dimX]
         else:
             xlabel = 'Dimension {}'.format(dimX)
-        if self.map is not None:
-            ylabel = self.map.description[dimY]
+        if self.description is not None:
+            ylabel = self.description.description[dimY]
         else:
             ylabel = 'Dimension {}'.format(dimY)
         title = 'Clusters plotted onto counts histogram'
@@ -833,7 +837,7 @@ class MetricData:
             if j == 'parent':
                 rep += '\nparent: {} at {}'.format(type(self.parent), hex(id(self.parent)))
             elif j == 'description':
-                rep += '\ndescription: {} at {}'.format(type(self.map), hex(id(self.map)))
+                rep += '\ndescription: {} at {}'.format(type(self.description), hex(id(self.description)))
             else:
                 rep += '\n'
                 rep += formatstr(j, self.__dict__[j])
@@ -929,21 +933,21 @@ if __name__ == '__main__':
     data1.combine(data2)
 
     # Testing dimensions
-    assert np.array_equal(data1.map.shape, (897, 3)), 'combine not working correct'
-    assert np.array_equal(data1.dat[0].shape, (6, 897)), 'combine not working correct'
-    assert np.array_equal(np.where(data1.map.type == 'contact')[0], [0, 1, 2, 3, 4, 5, 6, 7, 8]), 'combine not working correct'
+    assert np.array_equal(data1.description.shape, (897, 3)), 'combine not working correct'
+    assert np.array_equal(data1.trajectories[0].projection.shape, (6, 897)), 'combine not working correct'
+    assert np.array_equal(np.where(data1.description.type == 'contact')[0], [0, 1, 2, 3, 4, 5, 6, 7, 8]), 'combine not working correct'
 
     # Testing dimension dropping / keeping
     datatmp = data1.copy()
     data1.dropDimensions(range(9))
-    assert np.array_equal(data1.map.shape, (888, 3)), 'dropDimensions not working correct'
-    assert np.array_equal(data1.dat[0].shape, (6, 888)), 'dropDimensions not working correct'
-    assert len(np.where(data1.map.type == 'contact')[0]) == 0, 'dropDimensions not working correct'
+    assert np.array_equal(data1.description.shape, (888, 3)), 'dropDimensions not working correct'
+    assert np.array_equal(data1.trajectories[0].projection.shape, (6, 888)), 'dropDimensions not working correct'
+    assert len(np.where(data1.description.type == 'contact')[0]) == 0, 'dropDimensions not working correct'
     data1 = datatmp.copy()
     data1.dropDimensions(keep=range(9))
-    assert np.array_equal(data1.map.shape, (9, 3)), 'dropDimensions not working correct'
-    assert np.array_equal(data1.dat[0].shape, (6, 9)), 'dropDimensions not working correct'
-    assert len(np.where(data1.map.type == 'dihedral')[0]) == 0, 'dropDimensions not working correct'
+    assert np.array_equal(data1.description.shape, (9, 3)), 'dropDimensions not working correct'
+    assert np.array_equal(data1.trajectories[0].projection.shape, (6, 9)), 'dropDimensions not working correct'
+    assert len(np.where(data1.description.type == 'dihedral')[0]) == 0, 'dropDimensions not working correct'
 
 
 

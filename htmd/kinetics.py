@@ -74,13 +74,13 @@ class Kinetics(object):
         detectedProj = None
 
         if dataobj.parent is None:
-            mapping = dataobj.map
+            mapping = dataobj.description
             data = dataobj.dat
         else:
-            mapping = dataobj.parent.map
+            mapping = dataobj.parent.description
             data = dataobj.parent.dat
 
-        if not dataobj.map.empty:  # Search for supported projections in the data
+        if not dataobj.description.empty:  # Search for supported projections in the data
             for proj in supportedProj:
                 cols = np.where(mapping.type == proj)[0]
                 if len(cols) != 0:
@@ -92,13 +92,14 @@ class Kinetics(object):
                                'This class only detects automatic detection for the following metrics. {}'.format(supportedProj))
 
         averages = np.zeros(dataobj.K)
-        for i in range(len(dataobj.St)):
+        St = dataobj.St
+        for i in range(dataobj.numTrajectories):
             if data[i].ndim == 2:
                 rowsums = np.sum(data[i][:, cols], axis=1)
             else:
                 rowsums = data[i][:, cols]
-            totalsums = np.bincount(dataobj.St[i], weights=rowsums)
-            idx = list(set(dataobj.St[i]))
+            totalsums = np.bincount(St[i], weights=rowsums)
+            idx = list(set(St[i]))
             averages[idx] += totalsums[idx]
         avg = averages / dataobj.N
         avg = avg[self.model.cluster_ofmicro]

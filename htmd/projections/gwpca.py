@@ -68,19 +68,18 @@ class GWPCA(object):
         """
         from sklearn.decomposition import IncrementalPCA
         from htmd.progress.progress import ProgressBar
-        from htmd.metricdata import MetricData
 
         pca = IncrementalPCA(n_components=ndim, batch_size=10000)
-        p = ProgressBar(len(self.data.dat))
-        for d in self.data.dat:
-            pca.partial_fit(d * self.weights)
+        p = ProgressBar(self.data.numTrajectories)
+        for t in self.data.trajectories:
+            pca.partial_fit(t.projection * self.weights)
             p.progress()
         p.stop()
 
         projdata = self.data.copy()
-        p = ProgressBar(len(self.data.dat))
-        for i, d in enumerate(self.data.dat):
-            projdata.dat[i] = pca.transform(d * self.weights)
+        p = ProgressBar(self.data.numTrajectories)
+        for i, t in enumerate(self.data.trajectories):
+            projdata.trajectories[i].projection = pca.transform(t.projection * self.weights)
             p.progress()
         p.stop()
 

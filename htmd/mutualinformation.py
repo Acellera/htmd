@@ -97,8 +97,8 @@ class MutualInformation:
                 dih1, dih2 = p
                 if dih1 == dih2:
                     continue
-                resid1 = self.residmap[self.mol.resid[self.chi.map.atomIndexes[dih1][0]]]
-                resid2 = self.residmap[self.mol.resid[self.chi.map.atomIndexes[dih2][0]]]
+                resid1 = self.residmap[self.mol.resid[self.chi.description.atomIndexes[dih1][0]]]
+                resid2 = self.residmap[self.mol.resid[self.chi.description.atomIndexes[dih2][0]]]
                 MI_all[resid1][resid2] = self._calcMutualInfo(dihc)
         self.mi_matrix = self._cleanautocorrelations(MI_all)
 
@@ -192,8 +192,8 @@ class MutualInformation:
         contacts_matrix = np.zeros([len(self.resids), len(self.resids)])
         for i in range(contactcat.shape[1]):
             counter = np.count_nonzero(contactcat[:, i])
-            resid1 = self.residmap[self.mol.resid[datacontacts.map.atomIndexes[i][0]]]
-            resid2 = self.residmap[self.mol.resid[datacontacts.map.atomIndexes[i][1]]]
+            resid1 = self.residmap[self.mol.resid[datacontacts.description.atomIndexes[i][0]]]
+            resid2 = self.residmap[self.mol.resid[datacontacts.description.atomIndexes[i][1]]]
             contacts_matrix[resid1][resid2] = counter
 
         self.graph_array = np.zeros([contacts_matrix.shape[0], contacts_matrix.shape[0]])

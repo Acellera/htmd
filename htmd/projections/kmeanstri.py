@@ -57,10 +57,5 @@ class KMeansTri(object):
         dist = np.mean(dist, axis=1)[:, np.newaxis] - dist
         dist[dist < 0] = 0
 
-        projdata = MetricData()
-        projdata.simlist = self.data.simlist
-        projdata.dat = self.data.deconcatenate(dist)
-        projdata.ref = self.data.ref
-        projdata.parent = self.data
-        projdata.fstep = self.data.fstep
-        return projdata
+        return MetricData(dat=self.data.deconcatenate(dist), ref=self.data.ref, simlist=self.data.simlist,
+                          fstep=self.data.fstep, parent=self.data)

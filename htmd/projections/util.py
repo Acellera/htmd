@@ -235,7 +235,6 @@ def _wrapDistances(box, dist, diffchain):
 
 
 
-
 def convertProjectionToDataFrame(md):
     """ Export results of a projection into a pandas data frame
 
@@ -261,7 +260,7 @@ def convertProjectionToDataFrame(md):
 
     import pandas as pd
 
-    nTrajs = len(md.simlist)
+    nTrajs = md.numTrajectories
     if nTrajs == 0:
         raise Exception("MetricData does not contain any trajectory")
 
@@ -270,7 +269,7 @@ def convertProjectionToDataFrame(md):
 
     curf=0
     for tr in range(nTrajs):
-        df0 = pd.DataFrame(md.dat[tr])
+        df0 = pd.DataFrame(md.trajectories[tr].projection)
         nf = len(df0)
         nfl = curf+np.array(range(nf))
         nfs = md.abs2sim(nfl)

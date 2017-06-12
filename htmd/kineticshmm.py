@@ -45,9 +45,9 @@ class KineticsHMM(object):
 
         distcols = []
         contcols = []
-        if not dataobj.map.empty:  # Search for distances or contacts in the data
-            distcols = np.where(dataobj.map.type == 'distance')[0]
-            contcols = np.where(dataobj.map.type == 'contact')[0]
+        if not dataobj.description.empty:  # Search for distances or contacts in the data
+            distcols = np.where(dataobj.description.type == 'distance')[0]
+            contcols = np.where(dataobj.description.type == 'contact')[0]
         if len(distcols) == 0 and len(contcols) == 0:
             raise RuntimeError('Could not detect source state. Please specify it in the Kinetics constructor.')
 
@@ -58,11 +58,12 @@ class KineticsHMM(object):
 
         averages = np.zeros(self.model.hmm.nstates)
         N = np.zeros(self.model.hmm.nstates)
+        dat = dataobj.dat
         for i in range(len(St)):
-            if dataobj.dat[i].ndim == 2:
-                rowsums = np.sum(dataobj.dat[i][:, cols], axis=1)
+            if dataobj.trajectories[i].projection.ndim == 2:
+                rowsums = np.sum(dat[i][:, cols], axis=1)
             else:
-                rowsums = dataobj.dat[i][:, cols]
+                rowsums = dat[i][:, cols]
             macroSt = self.model.hmm.metastable_assignments[St[i]]
             totalsums = np.bincount(macroSt, weights=rowsums)
             N[0:np.max(macroSt)+1] += np.bincount(macroSt)

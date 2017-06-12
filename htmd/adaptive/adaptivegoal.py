@@ -217,9 +217,10 @@ class AdaptiveGoal(AdaptiveMD):
         g = np.zeros(len(epochs))
         totalmin = None
 
+        dat = goaldata.dat
         for i, e in enumerate(sorted(epochs.keys())):
             idx = epochs[e]
-            epochgoals = np.concatenate(goaldata.dat[idx])
+            epochgoals = np.concatenate(dat[idx])
             g[i] = epochgoals.max()
             if totalmin is None or epochgoals.min() < totalmin:
                 totalmin = epochgoals.min()

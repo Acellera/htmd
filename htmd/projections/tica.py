@@ -153,8 +153,8 @@ class TICA(object):
             if self.dimensions is not None:
                 keepdim = np.setdiff1d(range(self.data.numDimensions), self.dimensions)
                 keepdata = [x[:, keepdim] for x in self.data.dat]
-                if self.data.map is not None:
-                    keepdimdesc = self.data.map.ix[keepdim]
+                if self.data.description is not None:
+                    keepdimdesc = self.data.description.ix[keepdim]
             proj = self.tic.get_output()
             simlist = self.data.simlist
             ref = self.data.ref
@@ -182,10 +182,10 @@ class TICA(object):
             types += ['tica']
             indexes += [-1]
             description += ['TICA dimension {}'.format(i+1)]
-        datatica.map = DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
+        datatica.description = DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
         if self.dimensions is not None and keepdimdesc is not None:  # If TICA is done on a subset of dims
-            datatica.map = keepdimdesc.append(datatica.map, ignore_index=True)
+            datatica.description = keepdimdesc.append(datatica.description, ignore_index=True)
 
         return datatica
 
@@ -210,17 +210,17 @@ if __name__ == '__main__':
     expected = [[ 3.69098878, -0.33862674,  0.85779184],
                 [ 3.77816105, -0.31887317,  0.87724227],
                 [ 3.83537507, -0.11878026,  0.65236956]]
-    assert np.allclose(np.abs(datatica.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
-    assert np.allclose(np.abs(datatica5.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
-    assert np.all(datatica.map.ix[[587, 588]].type == 'tica')
-    assert np.all(datatica.map.ix[range(587)].type == 'distance')
+    assert np.allclose(np.abs(datatica.trajectories[0].projection[-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.allclose(np.abs(datatica5.trajectories[0].projection[-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.all(datatica.description.ix[[587, 588]].type == 'tica')
+    assert np.all(datatica.description.ix[range(587)].type == 'distance')
     print('In-memory TICA with subset of dimensions passed test.')
 
     tica2 = TICA(met, 2, dimensions=range(2, 10))
     datatica2 = tica2.project(2)
-    assert np.allclose(np.abs(datatica2.dat[0][-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
-    assert np.all(datatica2.map.ix[[587, 588]].type == 'tica')
-    assert np.all(datatica2.map.ix[range(587)].type == 'distance')
+    assert np.allclose(np.abs(datatica2.trajectories[0].projection[-3:, -3:]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.all(datatica2.description.ix[[587, 588]].type == 'tica')
+    assert np.all(datatica2.description.ix[range(587)].type == 'distance')
     print('Streaming TICA with subset of dimensions passed test.')
 
     #assert np.max(np.abs(datatica.dat[0][:, -2:]) - np.abs(datatica2.dat[0][:, -2:])) < 0.01, 'Streaming and memory subdim TICA inconsistent.'
@@ -230,14 +230,14 @@ if __name__ == '__main__':
     expected = [[-1.36328638, -0.35354128],
                 [-1.35348749, -0.13028328],
                 [-1.43249917, -0.31004715]]
-    assert np.allclose(np.abs(datatica3.dat[0][-3:, :]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
-    assert np.all(datatica3.map.ix[[0, 1]].type == 'tica')
+    assert np.allclose(np.abs(datatica3.trajectories[0].projection[-3:, :]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.all(datatica3.description.ix[[0, 1]].type == 'tica')
     print('In-memory TICA passed test.')
 
     tica4 = TICA(met, 2)
     datatica4 = tica4.project(2)
-    assert np.allclose(np.abs(datatica4.dat[0][-3:, :]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
-    assert np.all(datatica4.map.ix[[0, 1]].type == 'tica')
+    assert np.allclose(np.abs(datatica4.trajectories[0].projection[-3:, :]), np.abs(np.array(expected, dtype=np.float32)), rtol=0, atol=0.01)
+    assert np.all(datatica4.description.ix[[0, 1]].type == 'tica')
     print('Streaming TICA passed test.')
 
-    assert np.max(np.abs(datatica4.dat[0]) - np.abs(datatica3.dat[0])) < 0.01, 'Streaming and memory TICA inconsistent.'
+    assert np.max(np.abs(datatica4.trajectories[0].projection) - np.abs(datatica3.trajectories[0].projection)) < 0.01, 'Streaming and memory TICA inconsistent.'

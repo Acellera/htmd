@@ -53,12 +53,12 @@ class MetricShell(MetricDistance):
 
         self.numshells = numshells
         self.shellwidth = shellwidth
-        self.map = None
+        self.description = None
         self.shellcenters = None
 
     def _precalculate(self, mol):
-        self.map = np.vstack(super().getMapping(mol).atomIndexes)
-        self.shellcenters = np.unique(self.map[:, 0])
+        self.description = np.vstack(super().getMapping(mol).atomIndexes)
+        self.shellcenters = np.unique(self.description[:, 0])
 
     def project(self, mol):
         """ Project molecule.
@@ -84,8 +84,8 @@ class MetricShell(MetricDistance):
 
     def _getPrecalc(self, mol):
         sel1, sel2 = self._getSelections(mol)
-        if self.shellcenters is not None and self.map is not None:
-            return self.shellcenters, self.map, sel1, sel2
+        if self.shellcenters is not None and self.description is not None:
+            return self.shellcenters, self.description, sel1, sel2
         else:
             map = np.vstack(super().getMapping(mol).atomIndexes)
             return np.unique(map[:, 0]), map, sel1, sel2

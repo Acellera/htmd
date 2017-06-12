@@ -80,11 +80,11 @@ if __name__ == "__main__":
     metr2 = htmd.Metric(fsims)
     metr2.projection(htmd.projections.metricnull.MetricNull(2))
     data2 = metr2.project()
-    assert data2.dat[0].shape == (6, 2)
+    assert data2.trajectories[0].projection.shape == (6, 2)
 
     metr1 = htmd.Metric(fsims)
     metr1.projection(htmd.projections.metricnull.MetricNull(1))
     data1 = metr1.project()
-    assert data1.dat[0].shape == (6, 1)
+    assert data1.trajectories[0].projection.shape == (6, 1)
 
     pass

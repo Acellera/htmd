@@ -152,7 +152,7 @@ class Model(object):
         if indexpairs is not None:
             newcluster = self.data.K
             for ip in indexpairs:
-                self.data.St[ip[0]][ip[1]] = newcluster
+                self.data.trajectories[ip[0]].cluster[ip[1]] = newcluster
             self.data.K += 1
             self.data.N = np.bincount(np.concatenate(self.data.St))
 
@@ -779,7 +779,9 @@ class Model(object):
 
         coreset = calcCoreSet(self.msm.metastable_distributions, self.msm.metastable_assignments, threshold)
         newdata = self.data.copy()
-        newdata.St, newdata.K, newdata.N, frames = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
+        St, newdata.K, newdata.N, frames = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
+        for i, s in enumerate(St):
+            newdata.trajectories[i].cluster = s
 
         logger.info('Kept {} microstates from each macrostate.'.format([len(x) for x in coreset]))
 
@@ -792,12 +794,10 @@ class Model(object):
             simstmp = []
             for i, fr in enumerate(frames):
                 if len(fr):
-                    dat.append(data.dat[i][fr, :])
-                    ref.append(data.ref[i][fr, :])
-                    simstmp.append(data.simlist[i])
-            data.dat = np.array(dat, dtype=object)
-            data.ref = np.array(ref, dtype=object)
-            data.simlist = np.array(simstmp)
+                    dat.append(data.trajectories[i].projection[fr, :])
+                    ref.append(data.trajectories[i].reference[fr, :])
+                    simstmp.append(data.trajectories[i].sim)
+            data._loadTrajectories(dat, ref, simstmp)
 
         return Model(newdata)
 
@@ -823,12 +823,12 @@ class Model(object):
         from matplotlib import pylab as plt
         if cmap is None:
             cmap = plt.cm.jet
-        if self.data.map is not None:
-            xlabel = self.data.map.description[dimX]
+        if self.data.description is not None:
+            xlabel = self.data.description.description[dimX]
         else:
             xlabel = 'Dimension {}'.format(dimX)
-        if self.data.map is not None:
-            ylabel = self.data.map.description[dimY]
+        if self.data.description is not None:
+            ylabel = self.data.description.description[dimY]
         else:
             ylabel = 'Dimension {}'.format(dimY)
         title = 'Free energy surface'
@@ -915,7 +915,7 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
     """
     if axis != 0:
         logger.warning('Axis different than 0 might not work correctly yet')
-    if len(model.data.dat) > 0 and np.any(model.data.trajLengths != data.trajLengths):
+    if model.data.numTrajectories > 0 and np.any(model.data.trajLengths != data.trajLengths):
         raise NameError('Data trajectories need to match in size and number to the trajectories in the model')
     stconcat = np.concatenate(model.data.St)
     datconcat = np.concatenate(data.dat)
