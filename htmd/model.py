@@ -665,12 +665,25 @@ class Model(object):
         >>> model = Model()
         >>> model.load('./model.dat')
         """
+        import sys
         import pickle
+        from htmd.metricdata import MetricData
+        try:
+            import pandas.indexes
+        except ImportError:
+            import pandas.core.indexes
+            sys.modules['pandas.indexes'] = pandas.core.indexes  # Hacky fix for new pandas version
+
         f = open(filename, 'rb')
         z = pickle.load(f)
         f.close()
         for k in z:
-            self.__dict__[k] = z[k]
+            if k == 'data':
+                m = MetricData()
+                m.load(z[k].__dict__)
+                self.__dict__[k] = m
+            else:
+                self.__dict__[k] = z[k]
 
     def copy(self):
         """ Produces a deep copy of the object

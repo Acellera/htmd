@@ -61,7 +61,10 @@ class Trajectory:
         return self._numframes((self.projection, self.reference, self.cluster))
 
     def _numframes(self, args):
-        return np.unique([x for x in list(map(_getsizes, args)) if x is not None])
+        num = np.unique([x for x in list(map(_getsizes, args)) if x is not None])
+        if len(num) > 1:
+            raise RuntimeError('projection, reference and cluster must have same lengths for traj {}'.format(num))
+        return num
 
     def _checkframes(self, args):
         if len(self._numframes(args)) > 1:
@@ -122,18 +125,9 @@ class MetricData:
         Centers of clusters
     """
     
-    def __init__(self, dat=None, ref=None, description=None, simlist=None, fstep=0, parent=None, file=None, trajectories=None):
+    def __init__(self, dat=None, ref=None, description=None, simlist=None, fstep=0, parent=None, file=None, trajectories=None, cluster=None):
         if trajectories is None:
-            sizes = np.unique([x for x in list(map(_getsizes, (dat, ref, simlist))) if x is not None])
-            if len(sizes) > 1:
-                raise RuntimeError('dat, ref and simlist must have same lengths')
-            if dat is None:
-                dat = np.empty(sizes, dtype=object)
-            if ref is None:
-                ref = np.empty(sizes, dtype=object)
-            if simlist is None:
-                simlist = np.empty(sizes, dtype=object)
-            self.trajectories = [Trajectory(d, r, s) for d, r, s in zip(dat, ref, simlist)]
+            self._loadTrajectories(dat, ref, simlist, cluster)
         else:
             self.trajectories = trajectories
 
@@ -150,6 +144,22 @@ class MetricData:
         self._dataid = random.random()
         self._clusterid = None
         return
+
+    def _loadTrajectories(self, projection=None, reference=None, simlist=None, cluster=None):
+        size = np.unique([x for x in list(map(_getsizes, (projection, reference, simlist, cluster))) if x is not None])
+        if len(size) == 0:
+            size = 0
+        elif len(size) > 1:
+            raise RuntimeError('dat, ref and simlist must have same lengths')
+        if projection is None:
+            projection = np.empty(size, dtype=object)
+        if reference is None:
+            reference = np.empty(size, dtype=object)
+        if simlist is None:
+            simlist = np.empty(size, dtype=object)
+        if cluster is None:
+            cluster = np.empty(size, dtype=object)
+        self.trajectories = [Trajectory(d, r, s, c) for d, r, s, c in zip(projection, reference, simlist, cluster)]
 
     @property
     def dat(self):
@@ -640,25 +650,34 @@ class MetricData:
         >>> data = MetricData()
         >>> data.load('./data.dat')
         """
-        #z = np.load(filename)
-        #for i, k in enumerate(self.__dict__):
-        #    self.__dict__[k] = z[i]
-        f = open(filename, 'rb')
-        z = pickle.load(f)
-        f.close()
+        import sys
+        try:
+            import pandas.indexes
+        except ImportError:
+            import pandas.core.indexes
+            sys.modules['pandas.indexes'] = pandas.core.indexes  # Hacky fix for new pandas version
+
+        if isinstance(filename, str):
+            f = open(filename, 'rb')
+            vardict = pickle.load(f)
+            f.close()
+        elif isinstance(filename, dict):
+            vardict = filename
+
         for k in self.__dict__:
-            try:
-                self.__dict__[k] = z[k]
-            except:
-                logger.warning('Could not find class property {} in file {}'.format(k, filename))
-        if self.parent is not None:
-            parentdict = self.parent
-            self.parent = MetricData()
-            for k in self.parent.__dict__:
+            if k == 'description' and 'map' in vardict:  # Patch for loading old data
+                self.description = vardict['map']
+            elif k == 'trajectories' and 'dat' in vardict:  # Patch for loading old data
+                self._loadTrajectories(vardict['dat'], vardict['ref'], vardict['simlist'], vardict['St'])
+            elif k != 'parent':
                 try:
-                    self.parent.__dict__[k] = parentdict[k]
+                    self.__dict__[k] = vardict[k]
                 except:
                     logger.warning('Could not find class property {} in file {}'.format(k, filename))
+
+        if 'parent' in vardict and vardict['parent'] is not None:
+            self.parent = MetricData()
+            self.parent.load(vardict['parent'].__dict__)
 
     def _defaultLags(self):
         modelen = stats.mode(self.trajLengths).mode - 1  # -1 to avoid warnings in timescales calc
