@@ -163,15 +163,21 @@ class MetricData:
 
     @property
     def dat(self):
-        return np.array([x.projection for x in self.trajectories], dtype=object)
+        ret = np.empty(self.numTrajectories, dtype=object)
+        ret[:] = [t.projection for t in self.trajectories]
+        return ret
 
     @property
     def ref(self):
-        return np.array([x.reference for x in self.trajectories], dtype=object)
+        ret = np.empty(self.numTrajectories, dtype=object)
+        ret[:] = [t.reference for t in self.trajectories]
+        return ret
 
     @property
     def St(self):
-        return np.array([x.cluster for x in self.trajectories], dtype=object)
+        ret = np.empty(self.numTrajectories, dtype=object)
+        ret[:] = [t.cluster for t in self.trajectories]
+        return ret
 
     @property
     def simlist(self):
