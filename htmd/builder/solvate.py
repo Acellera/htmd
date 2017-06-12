@@ -178,7 +178,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
                 waterboxes[w].set('segid', segname)
 
                 mol.append(waterboxes[w])
-                watsel = mol.atomselect('segid ' + segname)
+                watsel = mol.segid == segname
 
                 selover = np.zeros(len(watsel), dtype=bool)
                 if xoverlap and yoverlap and zoverlap:  # Remove water overlapping with other segids
@@ -188,7 +188,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
                 sel = selover | selout
 
                 #mol.write('temp.pdb')
-                mol.filter('not segid ' + segname, _logger=False)
+                mol.filter(mol.segid != segname, _logger=False)
                 waterboxes[w].filter(np.invert(sel[watsel]), _logger=False)
                 #waterboxes[w].write('wat' + str(w) + '.pdb')
                 n += 1
