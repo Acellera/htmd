@@ -298,7 +298,11 @@ class Molecule:
             raise NameError('Failed to insert/append molecule at position {} with error: "{}"'.format(index, err))
 
         if collisions:
-            _resolveCollisions(self, occ1, occ2, coldist)
+            resid_overlaping = _resolveCollisions(self, occ1, occ2, coldist) # store resid collisioning
+            return(resid_overlaping)
+        else:
+            return(None)
+
 
     def remove(self, selection, _logger=True):
         """
@@ -461,7 +465,8 @@ class Molecule:
         >>> lig.filter("resname BEN")
         >>> mol.append(lig)
         """
-        self.insert(mol, self.numAtoms, collisions=collisions, coldist=coldist)
+        resid_overlaping = self.insert(mol, self.numAtoms, collisions=collisions, coldist=coldist) # store resid collisioning
+        return(np.unique(resid_overlaping))
 
     def _getBonds(self, fileBonds=True, guessBonds=True):
         """ Returns an array of all bonds.
@@ -1393,6 +1398,7 @@ def _resolveCollisions(mol, occ1, occ2, gap):
     mol.set('beta', sequenceID(mol.resid))
     # Calculate overlapping atoms
     overlaps = mol.atomselect('(occupancy 2) and same beta as exwithin {} of (occupancy 1)'.format(gap))
+    resid_overlaping = mol.get('resid', '(occupancy 2) and same beta as exwithin {} of (occupancy 1)'.format(gap)) # store resid collisioning
     # Restore original beta and occupancy
     mol.set('beta', beta)
     mol.set('occupancy', occ1, s1)
@@ -1402,6 +1408,7 @@ def _resolveCollisions(mol, occ1, occ2, gap):
         'Removed {} residues from appended Molecule due to collisions.'.format(len(np.unique(mol.resid[overlaps]))))
     # Remove the overlaps
     mol.remove(overlaps, _logger=False)
+    return(resid_overlaping) # return resid collisioning
 
 
 def _pp_measure_fit(P, Q):
