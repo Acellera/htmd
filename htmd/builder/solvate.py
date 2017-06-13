@@ -119,8 +119,8 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
     ny = int(np.ceil((dy + 2 * buffer) / watsize))
     nz = int(np.ceil((dz + 2 * buffer) / watsize))
 
-    # Calculate number of preexisting waters with given prefix
-    preexist = len(np.unique(mol.get('segid', sel='segid "WT.*"')))
+    # Calculate number of preexisting water segments with given prefix
+    preexist = len(np.unique(mol.get('segid', sel='segid "{}.*"'.format(prefix))))
 
     numsegs = nx * ny * nz
     logger.info('Replicating ' + str(numsegs) + ' water segments, ' + str(nx) + ' by ' + str(ny) + ' by ' + str(nz))
