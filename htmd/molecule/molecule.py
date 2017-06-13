@@ -224,7 +224,7 @@ class Molecule:
         from htmd.molecule.util import sequenceID
         return len(np.unique(sequenceID((self.resid, self.insertion, self.chain))))
 
-    def insert(self, mol, index, collisions=False, coldist=1.3):
+    def insert(self, mol, index, collisions=0, coldist=1.3):
         """Insert the contents of one molecule into another at a specific index.
 
         Parameters
@@ -263,11 +263,11 @@ class Molecule:
         append = index == self.numAtoms
 
         if collisions:
-            # Set different occupancy to separate atoms of mol1 and mol2
-            occ1 = self.get('occupancy')
-            occ2 = mol.get('occupancy')
-            self.set('occupancy', 1)
-            mol.set('occupancy', 2)
+            idx1, idx2 = _detectCollisions(self, self.frame, mol, mol.frame, coldist)
+            torem, numres = _getResidueIndexesByAtom(mol, idx2)
+            mol = mol.copy()
+            logger.info('Removed {} residues from appended Molecule due to collisions.'.format(numres))
+            mol.remove(torem, _logger=False)
 
         backup = self.copy()
         try:
@@ -296,9 +296,6 @@ class Molecule:
         except Exception as err:
             self = backup
             raise NameError('Failed to insert/append molecule at position {} with error: "{}"'.format(index, err))
-
-        if collisions:
-            _resolveCollisions(self, occ1, occ2, coldist)
 
     def remove(self, selection, _logger=True):
         """
@@ -1383,25 +1380,23 @@ def mol_equal(mol1, mol2):
     return True
 
 
-def _resolveCollisions(mol, occ1, occ2, gap):
+def _detectCollisions(mol1, frame1, mol2, frame2, gap):
+    from scipy.spatial.distance import cdist
+
+    distances = cdist(mol1.coords[:, :, frame1], mol2.coords[:, :, frame2])
+    idx1, idx2 = np.where(distances < gap)
+
+    return idx1, idx2
+
+
+def _getResidueIndexesByAtom(mol, idx):
     from htmd.molecule.util import sequenceID
-
-    s1 = mol.atomselect('occupancy 1')
-    s2 = mol.atomselect('occupancy 2')
-    # Give unique "residue" beta number to all resids
-    beta = mol.get('beta')
-    mol.set('beta', sequenceID(mol.resid))
-    # Calculate overlapping atoms
-    overlaps = mol.atomselect('(occupancy 2) and same beta as exwithin {} of (occupancy 1)'.format(gap))
-    # Restore original beta and occupancy
-    mol.set('beta', beta)
-    mol.set('occupancy', occ1, s1)
-    mol.set('occupancy', occ2, s2)
-
-    logger.info(
-        'Removed {} residues from appended Molecule due to collisions.'.format(len(np.unique(mol.resid[overlaps]))))
-    # Remove the overlaps
-    mol.remove(overlaps, _logger=False)
+    seqid = sequenceID(mol.resid)
+    allres = np.unique(seqid[idx])
+    torem = np.zeros(len(seqid), dtype=bool)
+    for r in allres:
+        torem[seqid == r] = True
+    return torem, len(allres)
 
 
 def _pp_measure_fit(P, Q):
