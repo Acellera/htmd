@@ -113,8 +113,7 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
 
     call([babelexe, '-i', 'pdb', protein_pdb, '-o', 'pdbqt', '-O', protein_pdbqt, '-xr'])
     call([babelexe, '-i', 'pdb', ligand_pdb, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xn', '-xh', '--partialcharge', 'gasteiger'])
-    from IPython.core.debugger import Tracer
-    Tracer()()
+    
     if not path.isfile(ligand_pdbqt):
         raise NameError('Ligand could not be converted to PDBQT')
     if not path.isfile(protein_pdbqt):
