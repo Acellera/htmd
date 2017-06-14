@@ -112,7 +112,7 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
         raise NameError('Could not find babel, or no execute permissions are given')
 
     call([babelexe, '-i', 'pdb', protein_pdb, '-o', 'pdbqt', '-O', protein_pdbqt, '-xr'])
-    call([babelexe, '-i', 'pdb', ligand_pdb, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xnh'])
+    call([babelexe, '-i', 'pdb', ligand_pdb, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xn', '-xh'])
 
     if not path.isfile(ligand_pdbqt):
         raise NameError('Ligand could not be converted to PDBQT')
