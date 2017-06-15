@@ -77,7 +77,7 @@ class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
         dist = self._dist(self.cluster_centers_, data)
         countCluster = 1
 
-        p = ProgressBar(self.n_clusters)
+        # p = ProgressBar(self.n_clusters, description='KCenters clustering')
         while len(self.cluster_centers_) < self.n_clusters:
             if np.max(dist) == 0:
                 break
@@ -97,8 +97,8 @@ class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
             dist[switchIdx] = newdist[switchIdx]
 
             countCluster += 1
-            p.progress()
-        p.stop()
+            # p.progress()
+        # p.stop()
 
         # update clusterSize
         self.clusterSize = np.bincount(self.labels_)
@@ -129,9 +129,9 @@ if __name__ == '__main__':
     K = len(set(properLabels))
     """
 
-    data = np.random.rand(100000, 100)
+    data = np.random.rand(100, 10)
 
-    cluster1 = KCenter(n_clusters=2000)
+    cluster1 = KCenter(n_clusters=20)
     cluster1.fit(data)
 
     """

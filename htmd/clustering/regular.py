@@ -192,7 +192,7 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
 
 if __name__ == '__main__':
     import numpy as np
-    X = np.random.random((10000, 2))
+    X = np.random.random((100, 2))
     reg = RegCluster(radius=0.4)
     reg.fit(X)
 
