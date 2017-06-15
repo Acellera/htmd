@@ -58,17 +58,14 @@ class Trajectory:
 
     @property
     def numFrames(self):
-        return int(self._numframes((self.projection, self.reference, self.cluster)))
+        return self.projection.shape[0]
 
     @property
     def numDimensions(self):
         return self.projection.shape[1]
 
     def _numframes(self, args):
-        num = np.unique([x for x in list(map(_getsizes, args)) if x is not None])
-        if len(num) > 1:
-            raise RuntimeError('projection, reference and cluster must have same lengths for traj {}'.format(num))
-        return num
+        return np.unique([x for x in list(map(_getsizes, args)) if x is not None])
 
     def _checkframes(self, args):
         if len(self._numframes(args)) > 1:
@@ -424,11 +421,23 @@ class MetricData:
             drop = np.zeros(orgNum, dtype=bool)
             drop[idx] = True
         elif keepsims is not None:
+            # Fast check to see if simlists are identical
+            if len(keepsims) == self.numTrajectories:
+                allsame = True
+                for i, t in enumerate(self.trajectories):
+                    if keepsims[i] != t.sim:
+                        allsame = False
+                        break
+                if allsame:
+                    return
+
+            # Slow check where all sims are checked against each other
             drop = np.ones(orgNum, dtype=bool)
             for i, s in enumerate(self.simlist):
                 for k in keepsims:
                     if s == k:
                         drop[i] = False
+                        break
         else:
             drop = trajLengths != np.array(stats.mode(trajLengths).mode)
 
@@ -450,6 +459,46 @@ class MetricData:
         if self.parent:
             self.parent.trajectories[idx].dropFrames(frames)
             self.parent._dataid = random.random()
+
+    def sampleClusters(self, clusters, frames, replacement=False, allframes=False):
+        """ Samples frames from a set of clusters
+
+        Parameters
+        ----------
+        clusters : list
+            A list of cluster indexes from which we want to sample
+        frames : list
+            A list of same length as `clusters` which contains the number of frames we want from each of the clusters
+        replacement : bool
+            If we want to sample with or without replacement.
+        allframes : bool
+            If we want to simply retrieve all frames of the clusters. Ignores the `frames` argument.
+
+        Returns
+        -------
+        absframes : numpy.ndarray
+            An array which contains for each state an array containing absolute trajectory frames
+        relframes : numpy.ndarray
+            An array which contains for each state a 2D array containing the trajectory ID and frame number for each of
+            the sampled frames
+
+        Examples
+        --------
+        >>> data.sampleClusters(range(5), [10, 3, 2, 50, 1])  # Sample from first 5 clusters, 10, 3, etc frames respectively
+        """
+        stConcat = np.concatenate(self.St)
+        absFrames = []
+        relFrames = []
+        for i in range(len(clusters)):
+            if frames[i] == 0 and not allframes:
+                continue
+            st = clusters[i]
+            absFrames.append(_sampleCluster(st, stConcat, frames[i], allframes, replacement))
+            if len(absFrames[-1]) == 0:
+                raise NameError('No frames could be sampled from cluster {}. Cluster is empty.'.format(st))
+
+            relFrames.append(self.abs2rel(absFrames[-1]))
+        return absFrames, relFrames
 
     def bootstrap(self, ratio, replacement=False):
         """ Randomly sample a set of trajectories
@@ -830,7 +879,9 @@ class MetricData:
                 rep = '{}: {}'.format(name, field)
             return rep
 
-        rep = 'MetricData object with {} trajectories of {}ns aggregate simulation time'.format(self.numTrajectories, self.aggregateTime)
+        rep = 'MetricData object with {} trajectories'.format(self.numTrajectories)
+        if self.fstep > 0:
+            rep += 'of {}ns aggregate simulation time'.format(self.aggregateTime)
         for j in sorted(self.__dict__.keys()):
             if j[0] == '_':
                 continue
@@ -864,6 +915,21 @@ class MetricData:
         self.K = None
         self.N = None
         self.Centers = None
+
+
+def _sampleCluster(cluster, stConcat, numFrames, allFrames, replacement):
+    frames = np.where(stConcat == cluster)[0]
+    return _randomSample(frames, numFrames, allFrames, replacement)
+
+
+def _randomSample(frames, numFr, allFrames, replacement):
+    if numFr == 0:
+        return []
+    if allFrames or (numFr >= len(frames) and not replacement):
+        rnd = list(range(len(frames)))
+    else:
+        rnd = np.random.randint(len(frames), size=numFr)
+    return frames[rnd]
 
 
 def _mergeSmallClusters(mergesmall, data, stconcat, centers, N, metric=None):
