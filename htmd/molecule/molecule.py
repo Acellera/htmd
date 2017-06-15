@@ -1597,37 +1597,27 @@ if __name__ == "__main__":
     a = m.get('resid', sel='resname TRP')
     a = m.get('coords')
     print(a.ndim)
-    m.write('/tmp/test.pdb')
-    m.write('/tmp/test.coor')
-    m.write('/tmp/test.xtc')
     m.moveBy([1, 1, 1])
     m.align('name CA')
     m = Molecule('2OV5')
     m.filter('protein or water')
 
-    # Testing DCD reader
-    mol = Molecule(os.path.join(home(), 'data', '1kdx', '1kdx_0.pdb'))
-    mol.read(os.path.join(home(), 'data', '1kdx', '1kdx.dcd'))
-    tmpcoo = mol.coords.copy()
-    mol.read([os.path.join(home(), 'data', '1kdx', '1kdx.dcd')], frames=[8])
-    assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
-
-    # Testing atomselect
-    for pdb in ["1gmi.pdb", "1hod.pdb", "1w7b.pdb", "1zec.pdb", "2dhi.pdb", "2lzp.pdb", "2x72.pdb"]:
-        print(pdb)
-        m = Molecule(os.path.join(home(), 'data', 'test-atomselect', pdb))
-        for v in ["P", "P1", "P2", "P3", "P4"]:
-            s = m.atomselect("segid " + v + " and not protein", indexes=True)
-            if len(s):
-                print(v)
-                print(s)
-                print(m.name[s])
-                print(m.resname[s])
-    print('done')
+    # # Testing atomselect
+    # for pdb in ["1gmi.pdb", "1hod.pdb", "1w7b.pdb", "1zec.pdb", "2dhi.pdb", "2lzp.pdb", "2x72.pdb"]:
+    #     print(pdb)
+    #     m = Molecule(os.path.join(home(), 'data', 'test-atomselect', pdb))
+    #     for v in ["P", "P1", "P2", "P3", "P4"]:
+    #         s = m.atomselect("segid " + v + " and not protein", indexes=True)
+    #         if len(s):
+    #             print(v)
+    #             print(s)
+    #             print(m.name[s])
+    #             print(m.resname[s])
+    # print('done')
 
     # Testing trajectory reading and appending
-    ref = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
-    xtcfile = path.join(home(), 'data', 'metricdistance', 'traj.xtc')
+    ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
+    xtcfile = path.join(home(dataDir='metricdistance'), 'traj.xtc')
     ref.read(xtcfile)
     assert ref.coords.shape == (4507, 3, 200)
     ref.read(xtcfile, append=True)
@@ -1636,8 +1626,8 @@ if __name__ == "__main__":
     assert ref.coords.shape == (4507, 3, 600)
 
     # Checking bonds
-    ref = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
-    ref.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
+    ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
+    ref.read(path.join(home(dataDir='metricdistance'), 'traj.xtc'))
     ref.coords = np.atleast_3d(ref.coords[:, :, 0])
     len1 = len(ref._guessBonds())
     ref.coords = np.array(ref.coords, dtype=np.float32)

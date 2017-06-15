@@ -924,3 +924,12 @@ if __name__ == '__main__':
 
     mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'weird-cryst.pdb'))
     print('Can read missing crystal info.')
+
+    # Testing DCD reader
+    mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
+    mol.read(os.path.join(home(dataDir='1kdx'), '1kdx.dcd'))
+    print('Can read DCD files.')
+    tmpcoo = mol.coords.copy()
+    mol.read([os.path.join(home(dataDir='1kdx'), '1kdx.dcd')], frames=[8])
+    assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
+    print('Can read DCD specific frames.')
