@@ -362,8 +362,12 @@ def autoSegment2(mol, sel='(protein or resname ACE NME)', basename='P', fields=(
 
 
 def _checkMixedSegment(mol):
-    segsProt = np.unique(mol.get('segid', sel='protein or resname ACE NME'))
-    segsNonProt = np.unique(mol.get('segid', sel='not protein and not resname ACE NME'))
+    prot = mol.atomselect('protein')
+    acenme = (mol.resname == 'ACE') | (mol.resname == 'NME')
+    sel1 = prot | acenme  # 'protein or resname ACE NME'
+    sel2 = ~prot & ~acenme  # 'not protein and not resname ACE NME'
+    segsProt = np.unique(mol.segid[sel1])
+    segsNonProt = np.unique(mol.segid[sel2])
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
         logger.warning('Segments {} contain both protein and non-protein atoms. '
