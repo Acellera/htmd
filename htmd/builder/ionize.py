@@ -156,7 +156,7 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
     ntries = 0
     maxtries = 10
     while True:
-        ionlist = np.empty(0, dtype=int)
+        ionlist = []
         watindex = newmol.atomselect('noh and water and not (within ' + str(dfrom) + ' of not water)', indexes=True)
         watsize = len(watindex)
 
@@ -177,7 +177,7 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
                 if np.any(dists < dbetween):
                     addit = False
             if addit:
-                ionlist = np.append(ionlist, thision)
+                ionlist.append(thision)
                 watindex = np.delete(watindex, randwat)
         if len(ionlist) == nions:
             break
@@ -188,13 +188,13 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
 
     # Delete waters but keep their coordinates
     waterpos = np.atleast_2d(newmol.get('coords', ionlist))
-    stringsel = 'beta'
-    for x in newmol.beta[ionlist]:
-        stringsel += ' ' + str(int(x))
-    atmrem = np.sum(newmol.atomselect(stringsel))
+    betasel = np.zeros(newmol.numAtoms, dtype=bool)
+    for b in newmol.beta[ionlist]:
+        betasel |= newmol.beta == b
+    atmrem = np.sum(betasel)
     atmput = 3 * len(ionlist)
     # assert atmrem == atmput, 'Removing {} atoms instead of {}. Report this bug.'.format(atmrem, atmput)
-    sel = newmol.atomselect(stringsel, indexes=True)
+    sel = np.where(betasel)[0]
     newmol.remove(sel, _logger=False)
     # assert np.size(sel) == atmput, 'Removed {} atoms instead of {}. Report this bug.'.format(np.size(sel), atmput)
     betabackup = np.delete(betabackup, sel)
@@ -232,13 +232,13 @@ def _getSegname(mol, segname):
     # Make sure segname is not taken
     if segname is None:
         for i in range(len(defsegnames)):
-            sel = mol.atomselect('segname ' + defsegnames[i])
+            sel = mol.segid == defsegnames[i]
             if not np.any(sel):
                 segname = defsegnames[i]
                 break
         if segname is None:
             raise NameError('All default segnames taken! Provide your own.')
     else:
-        sel = mol.atomselect('segname ' + segname)
+        sel = mol.segid == segname
         if np.any(sel):
             raise NameError('Segname already taken. Provide a different one.')
