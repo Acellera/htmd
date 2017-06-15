@@ -490,17 +490,17 @@ if __name__ == '__main__':
     from htmd.home import home
     from htmd.molecule.molecule import Molecule, mol_equal
     from htmd.util import tempname
+    import numpy as np
     import os
     testfolder = home(dataDir='metricdistance')
     mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
-    mol.read(os.path.join(testfolder, 'traj.xtc'))
-    # tmp = tempname(suffix='.h5')
-    # mol.write(tmp)
-    # mol2 = Molecule(tmp)
-    # # assert mol_equal(mol, mol2)
-    #
-    # mol.write(tmp, 'name CA')  # Testing filtering
-    mol.filter('protein')
+    mol.coords = np.tile(mol.coords, (1, 1, 2))
+    mol.filter('protein and resid 1 to 20')
+    mol.boxangles = np.ones((3, 2), dtype=np.float32) * 90
+    mol.box = np.ones((3, 2), dtype=np.float32) * 15
+    mol.step = np.arange(2)
+    mol.time = np.arange(2)
+    mol.fstep = 0.1
 
     for ext in _WRITERS:
         tmp = tempname(suffix='.'+ext)
