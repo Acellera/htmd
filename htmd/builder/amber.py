@@ -244,11 +244,13 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     if not ionize and len(disulfide) != 0:
         for d in disulfide:
             # Rename the residues to CYX if there is a disulfide bond
-            mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid1, d.resid1))
-            mol.set('resname', 'CYX', sel='segid {} and resid {}'.format(d.segid2, d.resid2))
+            atoms1 = (mol.segid == d.segid1) & (mol.resid == d.resid1)
+            atoms2 = (mol.segid == d.segid2) & (mol.resid == d.resid2)
+            mol.resname[atoms1] = 'CYX'
+            mol.resname[atoms2] = 'CYX'
             # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
-            mol.remove('name HG and segid {} and resid {}'.format(d.segid1, d.resid1), _logger=False)
-            mol.remove('name HG and segid {} and resid {}'.format(d.segid2, d.resid2), _logger=False)
+            mol.remove(atoms1 & (mol.name == 'HG'), _logger=False)
+            mol.remove(atoms2 & (mol.name == 'HG'), _logger=False)
 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.info('Writing PDB file for input to tleap.')
@@ -283,8 +285,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         for d in disulfide:
             # Convert to stupid amber residue numbering
             uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0]
-            uqres1 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid1, d.resid1))]))
-            uqres2 = int(np.unique(uqseqid[mol.atomselect('segid {} and resid {}'.format(d.segid2, d.resid2))]))
+            uqres1 = int(np.unique(uqseqid[(mol.segid == mol.segid1) & (mol.resid == mol.resid1)]))
+            uqres2 = int(np.unique(uqseqid[(mol.segid == mol.segid2) & (mol.resid == mol.resid2)]))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
         f.write('\n')
 
@@ -363,13 +365,14 @@ def _applyProteinCaps(mol, caps):
     capatomtype = ['C', 'N']
 
     # For each caps definition
+    prot = mol.atomselect('protein')
     for seg in caps:
         # Get the segment
         segment = np.where(mol.segid == seg)[0]
         # Test segment
         if len(segment) == 0:
             raise RuntimeError('There is no segment {} in the molecule.'.format(seg))
-        if len(mol.atomselect('protein and segid {}'.format(seg), indexes=True)) == 0:
+        if not np.any(prot & (mol.segid == seg)):
             raise RuntimeError('Segment {} is not protein. Capping for non-protein segments is not supported.'.format(seg))
         # For each cap
         passed = False
