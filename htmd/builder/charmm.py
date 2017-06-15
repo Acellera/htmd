@@ -237,13 +237,13 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         os.makedirs(path.join(outdir, 'segments'))
     logger.info('Writing out segments.')
     segments = _getSegments(mol)
+    wateratoms = mol.atomselect('water')
     for seg in segments:
         pdbname = 'segment' + seg + '.pdb'
-        mol.write(path.join(outdir, 'segments', pdbname), sel='segid '+seg)
+        segatoms = mol.segid == seg
+        mol.write(path.join(outdir, 'segments', pdbname), sel=segatoms)
 
-        segatoms = mol.atomselect('segid {}'.format(seg))
-        segwater = mol.atomselect('segid {} and water'.format(seg))
-
+        segwater = wateratoms & segatoms
         f.write('segment ' + seg + ' {\n')
         if np.all(segatoms == segwater):  # If segment only contains waters, set: auto none
             f.write('\tauto none\n')
@@ -504,9 +504,9 @@ def _printAliases(f):
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
-
-    segsProt = np.unique(mol.get('segid', sel='protein'))
-    segsNonProt = np.unique(mol.get('segid', sel='not protein'))
+    prot = mol.atomselect('protein')
+    segsProt = np.unique(mol.segid[prot])
+    segsNonProt = np.unique(mol.segid[~prot])
     caps = dict()
     for s in segsProt:
         if len(np.unique(mol.resid[mol.segid == s])) < 10:
@@ -550,15 +550,13 @@ def _removeCappedResidues(mol, seg):
 
     # If caps already exist, remove them and convert them to charmm caps
     for n in ntercaps:
-        sel = 'segid {} and resname {}'.format(seg, n)
-        asel = mol.atomselect(sel)
+        asel = (mol.segid == seg) & (mol.resname == n)
         if np.sum(asel) != 0:
             mol.remove(asel, _logger=False)
             nter = ntercaps[n]
             break  # I expect only one capped n-terminal residue in one segment!
     for c in ctercaps:
-        sel = 'segid {} and resname {}'.format(seg, c)
-        asel = mol.atomselect(sel)
+        asel = (mol.segid == seg) & (mol.resname == c)
         if np.sum(asel) != 0:
             mol.remove(asel, _logger=False)
             cter = ctercaps[c]
@@ -574,8 +572,9 @@ def _protonationPatches(mol):
     patches = []
 
     for pro in sorted(protonations.keys()):
-        pseg = mol.get('segid', sel='resname {} and name CA'.format(pro))
-        pres = mol.get('resid', sel='resname {} and name CA'.format(pro))
+        sel = (mol.resname == pro) & (mol.name == 'CA')
+        pseg = mol.segid[sel]
+        pres = mol.resid[sel]
         if len(pseg) == 0:
             continue
         for r in range(len(pseg)):
@@ -591,8 +590,8 @@ def _protonationPatches(mol):
                            'and will be reverted to {}.'.format(pro, aliases[pro]))
             mol.set('resname', aliases[pro], sel=sel)'''
     for pro in aliases:
-        sel = mol.atomselect('resname {}'.format(pro))
-        if np.sum(sel) != 0:
+        sel = mol.resname == pro
+        if np.any(sel):
             raise RuntimeError('Found resname {}. This protonation state does not exist in CHARMM. Cannot build.')
 
     return patches
