@@ -359,10 +359,15 @@ class Model(object):
         >>> model.sampleStates(range(5), [10, 3, 2, 50, 1])  # Sample from all 5 macrostates
         >>> model.sampleStates(range(model.micronum), samplesnum, statetype='micro')  # Sample from all microstates
         """
-        self._integrityCheck(postmsm=(statetype != 'cluster'))
+        if statetype == 'cluster':
+            if samplemode != 'random':
+                logger.warning("'cluster' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'")
+            return self.data.sampleClusters(states, frames, replacement, allframes)
+
+        self._integrityCheck(postmsm=True)
         if statetype != 'macro' and samplemode != 'random':
             samplemode = 'random'
-            logger.warning("'micro' and 'cluster' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'")
+            logger.warning("'micro' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'")
 
         stConcat = np.concatenate(self.data.St)
         absFrames = []
@@ -372,13 +377,10 @@ class Model(object):
                 continue
             st = states[i]
             if statetype == 'macro':
-                self._integrityCheck(postmsm=True)
                 (selFr, selMicro) = _sampleMacro(self, st, stConcat, samplemode, frames[i], allframes, replacement)
                 absFrames.append(selFr)
             elif statetype == 'micro':
                 absFrames.append(_sampleMicro(self, st, stConcat, frames[i], allframes, replacement))
-            elif statetype == 'cluster':
-                absFrames.append(_sampleCluster(st, stConcat, frames[i], allframes, replacement))
             else:
                 raise NameError('No valid state type given (read documentation)')
 
@@ -979,6 +981,7 @@ def macroAccumulate(model, microvalue):
 
 
 def _sampleMacro(obj, macro, stConcat, mode, numFrames, allFrames, replacement):
+    from htmd.metricdata import _randomSample
     if mode == 'random':
         frames = np.where(obj.macro_ofcluster[stConcat] == macro)[0]
         selFrames = _randomSample(frames, numFrames, allFrames, replacement)
@@ -1021,23 +1024,9 @@ def _sampleMacro(obj, macro, stConcat, mode, numFrames, allFrames, replacement):
 
 
 def _sampleMicro(obj, micro, stConcat, numFrames, allFrames, replacement):
+    from htmd.metricdata import _randomSample
     frames = np.where(obj.micro_ofcluster[stConcat] == micro)[0]
     return _randomSample(frames, numFrames, allFrames, replacement)
-
-
-def _sampleCluster(cluster, stConcat, numFrames, allFrames, replacement):
-    frames = np.where(stConcat == cluster)[0]
-    return _randomSample(frames, numFrames, allFrames, replacement)
-
-
-def _randomSample(frames, numFr, allFrames, replacement):
-    if numFr == 0:
-        return []
-    if allFrames or (numFr >= len(frames) and not replacement):
-        rnd = list(range(len(frames)))
-    else:
-        rnd = np.random.randint(len(frames), size=numFr)
-    return frames[rnd]
 
 
 def _macroTrajectoriesReport(macronum, macrost, simlist=None):
@@ -1090,5 +1079,16 @@ def _macroTrajSt(St, macro_ofcluster):
 
     from msmtools.estimation import transition_matrix
     return transition_matrix(macroC, reversible=True)'''
+
+if __name__ == '__main__':
+    from htmd import *
+    from htmd.util import tempname
+    from htmd.home import home
+    from os.path import join
+
+    testfolder = home(dataDir='model')
+    model = Model(file=join(testfolder, 'model.dat'))
+    tmpsave = tempname(suffix='.dat')
+    model.save(tmpsave)
 
 
