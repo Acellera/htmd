@@ -57,7 +57,8 @@ for f in filestotest:
     if out != 0:
         failed.append(f)
 
-print(sorted(times, key=lambda x: x[1]))
+for p in sorted(times, key=lambda x: x[1]):
+    print(p)
 
 # Reporting errors
 if len(failed) != 0:
