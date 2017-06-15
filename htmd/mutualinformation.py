@@ -242,35 +242,34 @@ class MutualInformation:
     #     compile_java('./GraphTest.java')
     #     execute_java('GraphTest', graphpath, outpath)
 
-if __name__ == '__main__':
-    pass
-    # from htmd.mutualinformation import MutualInformation
-    # from htmd import *
-    #
-    # sims = simlist(glob('/shared/adria/2ov5/adaptive_amber/batches/1/filtered/*/'),
-    #                '/shared/adria/2ov5/adaptive_amber/batches/1/filtered/filtered.pdb')
-    # mol = Molecule('/shared/adria/2ov5/adaptive_amber/batches/1/filtered/filtered.pdb')
-    #
-    # metr = Metric(sims[0:100])
-    # metr.set(MetricDihedral())
-    # datadih = metr.project()
-    # datadih.fstep = 0.1
-    # datadih.dropTraj()
-    #
-    # metr = Metric(datadih.simlist)
-    # metr.set(MetricSelfDistance('protein and name CA', metric='contacts', threshold=8))
-    # dataco = metr.project()
-    # dataco.fstep = 0.1
-    # dataco.dropTraj()
-    #
-    # tica = TICA(datadih, 20, units='ns')
-    # datatica = tica.project(3)
-    # datatica.cluster(MiniBatchKMeans(n_clusters=1500))
-    # model = Model(datatica)
-    # model.markovModel(12, 4, units='ns')
-    #
-    # mu = MutualInformation(model)
-    # mu.calculate()
-    # mu.saveMI('/tmp/mi_matrix.npy')
-    # mu.weightGraph(dataco, 0.005)
-    # mu.save_graphml('/tmp/weightgraph_0-005.graphml')
+# if __name__ == '__main__':
+#     from htmd.mutualinformation import MutualInformation
+#     from htmd import *
+#
+#     sims = simlist(glob('/shared/adria/2ov5/adaptive_amber/batches/1/filtered/*/'),
+#                    '/shared/adria/2ov5/adaptive_amber/batches/1/filtered/filtered.pdb')
+#     mol = Molecule('/shared/adria/2ov5/adaptive_amber/batches/1/filtered/filtered.pdb')
+#
+#     metr = Metric(sims[0:100])
+#     metr.set(MetricDihedral())
+#     datadih = metr.project()
+#     datadih.fstep = 0.1
+#     datadih.dropTraj()
+#
+#     metr = Metric(datadih.simlist)
+#     metr.set(MetricSelfDistance('protein and name CA', metric='contacts', threshold=8))
+#     dataco = metr.project()
+#     dataco.fstep = 0.1
+#     dataco.dropTraj()
+#
+#     tica = TICA(datadih, 20, units='ns')
+#     datatica = tica.project(3)
+#     datatica.cluster(MiniBatchKMeans(n_clusters=1500))
+#     model = Model(datatica)
+#     model.markovModel(12, 4, units='ns')
+#
+#     mu = MutualInformation(model)
+#     mu.calculate()
+#     mu.saveMI('/tmp/mi_matrix.npy')
+#     mu.weightGraph(dataco, 0.005)
+#     mu.save_graphml('/tmp/weightgraph_0-005.graphml')

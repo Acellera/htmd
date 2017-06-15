@@ -19,6 +19,16 @@ def excluded(name, exclusionlist):
             return True
     return False
 
+
+def containsTests(fname):
+    with open(fname, 'r') as f:
+        lines = f.readlines()
+        for l in lines:
+            if l.startswith('if __name__'):
+                return True
+        return False
+
+
 # Collecting py files to run
 filestotest = []
 for root, dirnames, filenames in os.walk('.'):
@@ -31,17 +41,23 @@ for root, dirnames, filenames in os.walk('.'):
 
 # Running py files
 failed = []
-
+times = []
 for f in filestotest:
+    if not containsTests(f):
+        continue
     t = time.time()
     print(' ************************  Running "{}"  ************************'.format(f))
     if f.endswith('amber.py') or f.endswith('charmm.py') or f.endswith('preparation.py'):
         out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
     else:
         out = call('python {}'.format(f), shell=True)
-    print(' ************************  Result : {} Time : {} ************************'.format(out, time.time() - t))
+    finishtime = time.time() - t
+    print(' ************************  Result : {} Time : {} ************************'.format(out, finishtime))
+    times.append([f, finishtime])
     if out != 0:
         failed.append(f)
+
+print(sorted(times, key=lambda x: x[1]))
 
 # Reporting errors
 if len(failed) != 0:
