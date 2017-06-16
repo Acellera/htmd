@@ -681,15 +681,16 @@ class PreparationData:
 
 if __name__ == "__main__":
     from htmd.builder.preparation import proteinPrepare
-
-    m = Molecule("3ptb")
-    mp, dp = proteinPrepare(m, returnDetails=True)
-    hb = dp.findHbonds()
-    d = dp.data
-    d.loc[d.resid == 40, 'forced_protonation'] = 'HIP'
-    mp2, dp2 = dp.reprepare()
-    hb2 = dp2.findHbonds()
+    import sys
 
     import doctest
-
     doctest.testmod()
+
+    if len(sys.argv) > 1 and sys.argv[0] == 'long-test':
+        m = Molecule("3ptb")
+        mp, dp = proteinPrepare(m, returnDetails=True)
+        hb = dp.findHbonds()
+        d = dp.data
+        d.loc[d.resid == 40, 'forced_protonation'] = 'HIP'
+        mp2, dp2 = dp.reprepare()
+        hb2 = dp2.findHbonds()
