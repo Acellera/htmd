@@ -285,8 +285,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         for d in disulfide:
             # Convert to stupid amber residue numbering
             uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0]
-            uqres1 = int(np.unique(uqseqid[(mol.segid == mol.segid1) & (mol.resid == mol.resid1)]))
-            uqres2 = int(np.unique(uqseqid[(mol.segid == mol.segid2) & (mol.resid == mol.resid2)]))
+            uqres1 = int(np.unique(uqseqid[(mol.segid == d.segid1) & (mol.resid == d.resid1)]))
+            uqres2 = int(np.unique(uqseqid[(mol.segid == d.segid2) & (mol.resid == d.resid2)]))
             f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
         f.write('\n')
 
