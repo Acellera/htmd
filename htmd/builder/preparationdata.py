@@ -228,6 +228,7 @@ class PreparationData:
         from matplotlib.lines import Line2D
         from matplotlib.colors import LinearSegmentedColormap
         import matplotlib.patheffects as PathEffects
+        from io import StringIO
 
         # Shading
         Xe = np.array([[1, 0], [1, 0]])
@@ -242,8 +243,8 @@ class PreparationData:
         outline = [PathEffects.withStroke(linewidth=2, foreground="w")]
 
         # Color for pk values
-        pkcolor = "black"
-        pkfontsize = 8
+        pKa_color = "black"
+        pKa_fontsize = 8
         dtxt = 0  # Displacement
 
         # Or we could change the figure size, which scales axes
@@ -258,8 +259,8 @@ class PreparationData:
         plt.rc('figure', titlesize=font_size)  # fontsize of the figure title
 
         # Constants
-        acidicResidues = ['ASP', 'GLU', 'TYR']
-        basicResidues = ['HIS', 'LYS', 'ARG']
+        acidicResidues = ['ASP', 'GLU', 'TYR', 'C-']
+        basicResidues = ['HIS', 'LYS', 'ARG', 'N+']
 
         # titr =  (~ pd.isnull(d.pKa)) & d.pKa < 99
         d = self.data.copy()
@@ -277,7 +278,8 @@ class PreparationData:
                                                     x.resname)
                   for i, x in d.loc[titr].iterrows()]
         pKas = d.pKa.loc[titr]
-        restypes = ["neg" if x.resname in acidicResidues else "pos" for i, x in d.loc[titr].iterrows()]
+        restypes = ["neg" if x.resname in acidicResidues else "pos"
+                    for i, x in d.loc[titr].iterrows()]
 
         xmin, xmax = xlim = 0, 14
         ymin, ymax = ylim = -1, N
@@ -317,8 +319,8 @@ class PreparationData:
                 ax.imshow(1 + Xe * 0, interpolation="none",
                           cmap=grey_blue, vmin=0, vmax=1,
                           extent=(pk + dpk - eps, right, bottom, top), alpha=1)
-                ax.text(pk - dtxt, i, " {:.2f} ".format(pk), color=pkcolor,
-                        fontsize=pkfontsize, horizontalalignment="right", zorder=30,
+                ax.text(pk - dtxt, i, " {:.2f} ".format(pk), color=pKa_color,
+                        fontsize=pKa_fontsize, horizontalalignment="right", zorder=30,
                         path_effects=outline, weight="bold")
             else:
                 ax.imshow(1 + Xe * 0, interpolation="none",
@@ -330,8 +332,8 @@ class PreparationData:
                 ax.imshow(Xe * 0, interpolation="none",
                           cmap=grey_red, vmin=0, vmax=1,
                           extent=(pk + dpk - eps, right, bottom, top), alpha=1)
-                ax.text(pk + dtxt, i, " {:.2f} ".format(pk), color=pkcolor,
-                        fontsize=pkfontsize, horizontalalignment="left", zorder=30,
+                ax.text(pk + dtxt, i, " {:.2f} ".format(pk), color=pKa_color,
+                        fontsize=pKa_fontsize, horizontalalignment="left", zorder=30,
                         path_effects=outline, weight="bold")
             ax.add_line(Line2D([pk, pk], [bottom, top], linewidth=3, color='white', zorder=2))
 
@@ -351,13 +353,11 @@ class PreparationData:
         ax.set_aspect('auto')
 
         # show()   # for interactive use
-        from io import StringIO
         imgdata = StringIO()
         fig.savefig(imgdata, format="svg", bbox_inches='tight', )
-        ret_img = imgdata.getvalue()
-
         # fig.savefig("out.svg")
         # fig.savefig("out.png")
+        plt.close(fig)
 
         # Png render may be a bit better -
         # http://stackoverflow.com/questions/14824522/dynamically-serving-a-matplotlib-image-to-the-web-using-python
@@ -368,7 +368,7 @@ class PreparationData:
         # image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8').replace('\n', '')
         # buf.close()
 
-        plt.close(fig)
+        ret_img = imgdata.getvalue()
         return ret_img
 
     def findHbonds(self, angleCutoff=30.0, distanceCutoff=3.4):
