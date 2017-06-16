@@ -108,9 +108,8 @@ class PreparationData:
         # Identity check should ignore residue name (self.data.resname == a_resname).
         # The N+ and C- resnames are indeed duplicated - distinguishing them with icode T.
         # Ditto for ligands, icode L.
-        mask = (self.data.chain == chain_pad) & (self.data.resid == a_resid) & \
-               (self.data.insertion == icode_pad)
-        if sum(mask) == 0:
+        mask = (self.data.chain == chain_pad) & (self.data.resid == a_resid) & (self.data.insertion == icode_pad)
+        if not np.any(mask):
             self.data = self.data.append({
                 'resname': a_resname,
                 'resid': a_resid,
@@ -118,9 +117,8 @@ class PreparationData:
                 'chain': chain_pad,  # 'patches': []
             }, ignore_index=True)
             pos = len(self.data) - 1
-        elif sum(mask) == 1:
-            pos = np.argwhere(mask)
-            pos = int(pos)
+        elif mask.sum() == 1:
+            pos = int(np.argwhere(mask))
         else:
             assert False, "More than one resid matched: either duplicated chain-residue-icode, or internal error (please report if the latter)."
         return pos
