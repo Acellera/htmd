@@ -4,12 +4,10 @@
 # No redistribution in whole or part
 #
 import numpy as np
-from scipy import stats
 import random
 from copy import deepcopy
-from scipy.spatial import distance
-import logging
 import pickle
+import logging
 logger = logging.getLogger(__name__)
 
 
@@ -439,6 +437,7 @@ class MetricData:
                         drop[i] = False
                         break
         else:
+            from scipy import stats
             drop = trajLengths != np.array(stats.mode(trajLengths).mode)
 
         keep = np.invert(drop)
@@ -739,6 +738,7 @@ class MetricData:
             self.parent.load(vardict['parent'].__dict__)
 
     def _defaultLags(self):
+        from scipy import stats
         modelen = stats.mode(self.trajLengths).mode - 1  # -1 to avoid warnings in timescales calc
         if modelen > 20:
             lags = np.append(1, np.round(np.linspace(10, modelen, 25)))
@@ -958,6 +958,7 @@ def _mergeSmallClusters(mergesmall, data, stconcat, centers, N, metric=None):
     badframeidx = np.where(frames >= 0)[0]
 
     # Calculate distance of all frames belonging to bad clusters to the good cluster centers
+    from scipy.spatial import distance
     dists = distance.cdist(np.atleast_2d(data[badframeidx, :]), np.atleast_2d(centers), metric)
     minidx = np.argmin(dists, axis=1)  # Find closest center. Indexes are relative to goodidx
     newclu = goodcluidx[minidx]  # Back to absolute cluster indexes

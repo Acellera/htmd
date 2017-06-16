@@ -12,11 +12,7 @@ import os
 import os.path as path
 from os import makedirs
 from glob import glob as glob
-import natsort
 import numpy as np
-from htmd.molecule.molecule import Molecule
-from joblib import Parallel, delayed
-from htmd.progress.progress import ProgressBar
 import logging
 logger = logging.getLogger(__name__)
 
@@ -148,6 +144,7 @@ def simlist(datafolders, topologies, inputfolders=None):
     >>> simlist(glob('./test/data/*/'), glob('./test/input/*/*.pdb'), glob('./test/input/*/'))
     """
     from htmd.util import ensurelist
+    import natsort
 
     if not datafolders:
         raise FileNotFoundError('No data folders were given, check your arguments.')
@@ -189,8 +186,10 @@ def simlist(datafolders, topologies, inputfolders=None):
 
     logger.debug('Starting listing of simulations.')
     sims = []
+
     keys = natsort.natsorted(datanames.keys())
     i = 0
+    from htmd.progress.progress import ProgressBar
     bar = ProgressBar(len(keys), description='Creating simlist')
     for k in keys:
         trajectories = _autoDetectTrajectories(datanames[k])
@@ -258,7 +257,7 @@ def simfilter(sims, outfolder, filtersel):
     logger.debug('Starting filtering of simulations.')
 
     from htmd.config import _config
-    from htmd.parallelprogress import ParallelExecutor
+    from htmd.parallelprogress import ParallelExecutor, delayed
     aprun = ParallelExecutor(n_jobs=_config['ncpus'])
     filtsims = aprun(total=len(sims), description='Filtering trajectories')(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
 
@@ -308,6 +307,7 @@ def _filtSim(i, sims, outFolder, filterSel):
         return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile, numframes=numframes)
 
     try:
+        from htmd.molecule.molecule import Molecule
         mol = Molecule(sims[i].molfile)
     except:
         logger.warning('Error! Skipping simulation ' + name)
@@ -368,6 +368,7 @@ def _renameSims(trajectory, simname, outfolder):
 
 def _filterPDBPSF(sim, outfolder, filtsel):
     try:
+        from htmd.molecule.molecule import Molecule
         mol = Molecule(sim.molfile)
     except IOError as e:
         raise RuntimeError('simFilter: {}. Cannot create filtered.pdb due to problematic pdb: {}'.format(e, sim.molfile))
@@ -380,6 +381,7 @@ def _filterPDBPSF(sim, outfolder, filtsel):
 
 def _autoDetectTrajectories(folder):
     from htmd.molecule.readers import _TRAJECTORY_READERS
+    import natsort
     for tt in _TRAJECTORY_READERS:
         trajectories = glob(path.join(folder, '*.{}'.format(tt)))
         if len(trajectories) > 0:

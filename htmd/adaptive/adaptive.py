@@ -12,7 +12,6 @@ from os import makedirs
 import shutil
 from shutil import copytree, ignore_patterns
 import numpy as np
-from natsort import natsorted
 from htmd.apps.app import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
 from joblib import Parallel, delayed
 from htmd.simlist import _simName
@@ -53,6 +52,7 @@ class AdaptiveBase(ProtocolInterface):
         >>> adapt = Adaptive()
         >>> adapt.run()
         """
+        from natsort import natsorted
         if self.nmax <= self.nmin:
             raise RuntimeError('nmax option should be larger than nmin.')
 
@@ -138,6 +138,7 @@ class AdaptiveBase(ProtocolInterface):
                 os.remove(lockfile)
 
     def _init(self):
+        from natsort import natsorted
         folders = natsorted(glob(path.join(self.generatorspath, '*', ''))) # I need the extra ''  to add a finishing /
         if len(folders) == 0:
             logger.info('Generators folder has no subdirectories, using folder itself')

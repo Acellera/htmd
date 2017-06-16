@@ -3,9 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from scipy.sparse import lil_matrix
 import numpy as np
-from IPython.core.debugger import Tracer
 import logging
 import htmd.molecule.molecule
 import htmd.progress.progress
@@ -18,6 +16,7 @@ def pp_calcDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=True,
     distances = _postProcessDistances(distances, sel1, sel2, truncate)
 
     if metric == 'contacts':
+        # from scipy.sparse import lil_matrix
         # metric = lil_matrix(distances <= threshold)
         metric = distances <= threshold
     elif metric == 'distances':

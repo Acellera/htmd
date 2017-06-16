@@ -21,7 +21,7 @@ from htmd.builder.builder import _checkMixedSegment
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
 from glob import glob
-from natsort import natsorted
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ def listFiles():
     ---- Topologies files list...
 
     """
+    from natsort import natsorted
     charmmdir = path.join(home(), 'builder', 'charmmfiles', '')  # maybe just lookup current module?
     topos = natsorted(glob(path.join(charmmdir, 'top', '*.rtf')))
     params = natsorted(glob(path.join(charmmdir, 'par', '*.prm')))
