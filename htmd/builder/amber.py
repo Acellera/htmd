@@ -30,8 +30,10 @@ def listFiles():
     >>> from htmd.builder import amber
     >>> amber.listFiles()             # doctest: +ELLIPSIS
     ---- Forcefield files list: ... ----
-    leaprc.DNA.OL15
+    leaprc.constph
     leaprc.DNA.bsc1
+    leaprc.DNA.OL15
+    leaprc.ff14SB.redq
     ...
     """
     tleap = shutil.which("tleap", mode=os.X_OK)
@@ -48,29 +50,29 @@ def listFiles():
 
     # Original AMBER FFs
     amberdir = os.path.join(amberhome, 'dat', 'leap', 'cmd')
-    ffs = [f for f in os.listdir(amberdir) if os.path.isfile(os.path.join(amberdir, f))]
+    ffs = sorted([f for f in os.listdir(amberdir) if os.path.isfile(os.path.join(amberdir, f))], key=str.lower)
     print('---- Forcefield files list: ' + os.path.join(amberdir, '') + ' ----')
     for f in ffs:
         print(f)
 
     oldffdir = os.path.join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
-    ffs = [os.path.join('oldff', f) for f in os.listdir(oldffdir) if os.path.isfile(os.path.join(oldffdir, f))]
+    ffs = sorted([os.path.join('oldff', f) for f in os.listdir(oldffdir) if os.path.isfile(os.path.join(oldffdir, f))], key=str.lower)
     print('---- OLD Forcefield files list: ' + os.path.join(amberdir, '') + ' ----')
     for f in ffs:
         print(f)
 
     # FRCMOD files
     frcmoddir = os.path.join(amberhome, 'dat', 'leap', 'parm')
-    ffs = [f for f in os.listdir(frcmoddir) if os.path.isfile(os.path.join(frcmoddir, f)) and f.startswith('frcmod')]
+    ffs = sorted([f for f in os.listdir(frcmoddir) if os.path.isfile(os.path.join(frcmoddir, f)) and f.startswith('frcmod')], key=str.lower)
     print('---- Parameter files list: ' + os.path.join(frcmoddir, '') + ' ----')
     for f in ffs:
         print(os.path.basename(f))
 
     # Extra AMBER FFs on HTMD
     htmdamberdir = os.path.abspath(os.path.join(home(), 'builder', 'amberfiles', ''))
-    extraffs = [os.path.join(f, os.path.basename(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')[0]))
+    extraffs = sorted([os.path.join(f, os.path.basename(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')[0]))
                 for f in os.listdir(htmdamberdir) if os.path.isdir(os.path.join(htmdamberdir, f))
-                and len(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')) == 1]
+                and len(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')) == 1], key=str.lower)
     print('---- Extra forcefield files list: ' + os.path.join(htmdamberdir, '') + ' ----')
     for f in extraffs:
         print(f)
