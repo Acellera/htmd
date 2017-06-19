@@ -1249,11 +1249,13 @@ class Molecule:
         >>> mol.dropFrames(drop=[0])
         >>> mol.numFrames == 1
         """
+        from htmd.util import ensurelist
         if not (isinstance(keep, str) and keep == 'all') and drop is not None:
             raise RuntimeError('Cannot both drop and keep trajectories. Please use only one of the two arguments.')
         numframes = self.numFrames
         if drop is not None:
             keep = np.setdiff1d(np.arange(numframes), drop)
+        keep = ensurelist(keep)
         if not (isinstance(keep, str) and keep == 'all'):
             self.coords = np.atleast_3d(self.coords[:, :, keep]).copy()  # Copy array. Slices are dangerous with C
             if self.box.shape[1] == numframes:
@@ -1325,7 +1327,7 @@ class Molecule:
         mol : :class:`Molecule`
             A Molecule object.
         """
-        if self.fstep != mol.fstep:
+        if (self.fstep !=0 and mol.fstep !=0) and (self.fstep != mol.fstep):
             raise RuntimeError('Cannot concatenate Molecules with different fsteps')
         self.coords = np.concatenate((self.coords, mol.coords), axis=2)
         self.box = np.concatenate((self.box, mol.box), axis=1)
