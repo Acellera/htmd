@@ -942,6 +942,13 @@ class MetricData:
         mols : Molecule or list of Molecules
             The conformations stored in a Molecule or a list of Molecules
 
+        Examples
+        --------
+        >>> # Working with 4 dimensional data for example
+        >>> abs, rel, mols = data.sampleRegion(point=(0.5, 3, None, None), radius=0.1)  # Point undefined in dim 3, 4
+        >>> minlims = [-1, None, None, 4]  # No min limit for 2, 3 dim
+        >>> maxlims = [2,     3, None, 7]  # No max limit for 3 dim
+        >>> abs, rel, mols = data.sampleRegion(limits=np.array([minlims, maxlims]))
         """
         from scipy.spatial.distance import cdist
         datconcat = np.concatenate(self.dat)
