@@ -12,8 +12,9 @@ import shutil
 from subprocess import call, check_output
 from htmd.util import tempname
 from htmd.molecule.molecule import Molecule
-from natsort import natsorted
 from glob import glob
+import logging
+logger = logging.getLogger(__name__)
 
 
 def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabel', vinaexe=None):
@@ -69,7 +70,7 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
     # babel -m -i pdbqt ligand_out.pdbqt -o pdb out_.pdb -xhn
 
     protein_pdb = tempname(suffix=".pdb")
-    ligand_pdb = tempname(suffix=".pdb")
+    ligand_mol2 = tempname(suffix=".mol2")
     output_pdb = tempname(suffix="_.pdb")
     output_prefix = path.splitext(output_pdb)[0]
 
@@ -78,16 +79,14 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
     output_pdbqt = tempname(suffix=".pdbqt")
 
     protein.write(protein_pdb)
-    ligand.write(ligand_pdb)
+    lig2 = ligand.copy()
+    lig2.atomtype = lig2.element  # babel does not understand mol2 atomtypes and requires elements instead
+    lig2.write(ligand_mol2)
 
     # Dirty hack to remove the 'END' line from the PDBs since babel hates it
     with open(protein_pdb, 'r') as f:
         lines = f.readlines()
     with open(protein_pdb, 'w') as f:
-        f.writelines(lines[:-1])
-    with open(ligand_pdb, 'r') as f:
-        lines = f.readlines()
-    with open(ligand_pdb, 'w') as f:
         f.writelines(lines[:-1])
     # End of dirty hack
 
@@ -112,8 +111,13 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
         raise NameError('Could not find babel, or no execute permissions are given')
 
     call([babelexe, '-i', 'pdb', protein_pdb, '-o', 'pdbqt', '-O', protein_pdbqt, '-xr'])
-    call([babelexe, '-i', 'pdb', ligand_pdb, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xn', '-xh', '--partialcharge', 'gasteiger'])
-    
+    if np.all(ligand.charge != 0):
+        logger.info('Charges detected in ligand and will be used for docking.')
+        call([babelexe, '-i', 'mol2', ligand_mol2, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xn', '-xh'])
+    else:
+        logger.info('Charges were not defined for all atoms. Will guess charges anew using gasteiger method.')
+        call([babelexe, '-i', 'mol2', ligand_mol2, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xn', '-xh', '--partialcharge', 'gasteiger'])
+
     if not path.isfile(ligand_pdbqt):
         raise NameError('Ligand could not be converted to PDBQT')
     if not path.isfile(protein_pdbqt):
@@ -125,24 +129,8 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
 
     call([babelexe, '-m', '-i', 'pdbqt', output_pdbqt, '-o', 'pdb', '-O', output_pdb, '-xhn'])
 
+    from natsort import natsorted
     outfiles = natsorted(glob('{}*.pdb'.format(output_prefix)))
-    # !!! This assumed that the atoms have unique names which is quite uncommon. Disabling it
-    # for outf in outfiles:
-    #     # First get the scoring
-    #     scoring.append(_parseScoring(outf))
-    #     next_pose = Molecule(outf)
-    #     os.remove(outf)
-    #     c = next_pose.coords
-    #     co = c.copy()
-    #     natoms = len(ligand.name)
-    #
-    #     # Order atoms back to original order
-    #     for idx_i in range(natoms):
-    #         for idx_j in range(natoms):
-    #             if ligand.name[idx_i] == next_pose.name[idx_j]:
-    #                 co[idx_i, :, :] = c[idx_j, :, :]
-    #
-    #     coords.append(co)
 
     scoring = []
     poses = []
@@ -153,7 +141,7 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
         poses.append(l)
 
     os.remove(protein_pdb)
-    os.remove(ligand_pdb)
+    os.remove(ligand_mol2)
     os.remove(protein_pdbqt)
     os.remove(ligand_pdbqt)
     os.remove(output_pdbqt)
