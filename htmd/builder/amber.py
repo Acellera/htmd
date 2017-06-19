@@ -9,7 +9,6 @@ from __future__ import print_function
 from htmd.home import home
 import numpy as np
 import os
-import os.path as path
 from glob import glob
 from htmd.molecule.util import _missingSegID, sequenceID
 import shutil
@@ -25,52 +24,61 @@ logger = logging.getLogger(__name__)
 
 def listFiles():
     """ Lists all available AMBER forcefield files
+
+    Example
+    -------
+    >>> from htmd.builder import amber
+    >>> amber.listFiles()             # doctest: +ELLIPSIS
+    ---- Forcefield files list: ... ----
+    leaprc.DNA.OL15
+    leaprc.DNA.bsc1
+    ...
     """
     tleap = shutil.which("tleap", mode=os.X_OK)
     if not tleap:
         raise FileNotFoundError('tleap not found. You should either have AmberTools or ambermini installed '
                                 '(to install ambermini do: conda install ambermini -c acellera)')
     if os.path.islink(tleap):
-        if path.isabs(os.readlink(tleap)):
+        if os.path.isabs(os.readlink(tleap)):
             tleap = os.readlink(tleap)
         else:
             tleap = os.path.join(os.path.dirname(tleap), os.readlink(tleap))
 
-    amberhome = path.normpath(path.join(path.dirname(tleap), '../'))
+    amberhome = os.path.normpath(os.path.join(os.path.dirname(tleap), '../'))
 
     # Original AMBER FFs
-    amberdir = path.join(amberhome, 'dat', 'leap', 'cmd')
-    ffs = [f for f in os.listdir(amberdir) if path.isfile(path.join(amberdir, f))]
-    print('---- Forcefield files list: ' + path.join(amberdir, '') + ' ----')
+    amberdir = os.path.join(amberhome, 'dat', 'leap', 'cmd')
+    ffs = [f for f in os.listdir(amberdir) if os.path.isfile(os.path.join(amberdir, f))]
+    print('---- Forcefield files list: ' + os.path.join(amberdir, '') + ' ----')
     for f in ffs:
         print(f)
 
-    oldffdir = path.join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
-    ffs = [path.join('oldff', f) for f in os.listdir(oldffdir) if path.isfile(path.join(oldffdir, f))]
-    print('---- OLD Forcefield files list: ' + path.join(amberdir, '') + ' ----')
+    oldffdir = os.path.join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
+    ffs = [os.path.join('oldff', f) for f in os.listdir(oldffdir) if os.path.isfile(os.path.join(oldffdir, f))]
+    print('---- OLD Forcefield files list: ' + os.path.join(amberdir, '') + ' ----')
     for f in ffs:
         print(f)
 
     # FRCMOD files
-    frcmoddir = path.join(amberhome, 'dat', 'leap', 'parm')
-    ffs = [f for f in os.listdir(frcmoddir) if path.isfile(path.join(frcmoddir, f)) and f.startswith('frcmod')]
-    print('---- Parameter files list: ' + path.join(frcmoddir, '') + ' ----')
+    frcmoddir = os.path.join(amberhome, 'dat', 'leap', 'parm')
+    ffs = [f for f in os.listdir(frcmoddir) if os.path.isfile(os.path.join(frcmoddir, f)) and f.startswith('frcmod')]
+    print('---- Parameter files list: ' + os.path.join(frcmoddir, '') + ' ----')
     for f in ffs:
-        print(path.basename(f))
+        print(os.path.basename(f))
 
     # Extra AMBER FFs on HTMD
-    htmdamberdir = path.abspath(path.join(home(), 'builder', 'amberfiles', ''))
-    extraffs = [f + '/' + path.basename(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')[0])
+    htmdamberdir = os.path.abspath(os.path.join(home(), 'builder', 'amberfiles', ''))
+    extraffs = [os.path.join(f, os.path.basename(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')[0]))
                 for f in os.listdir(htmdamberdir) if os.path.isdir(os.path.join(htmdamberdir, f))
                 and len(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')) == 1]
-    print('---- Extra forcefield files list: ' + path.join(htmdamberdir, '') + ' ----')
+    print('---- Extra forcefield files list: ' + os.path.join(htmdamberdir, '') + ' ----')
     for f in extraffs:
         print(f)
 
 
 def defaultFf():
     """ Returns the default leaprc forcefield files used by amber.build """
-    return ['leaprc.lipid14', path.join('oldff', 'leaprc.ff14SB'), 'leaprc.gaff']
+    return ['leaprc.lipid14', os.path.join('oldff', 'leaprc.ff14SB'), 'leaprc.gaff']
 
 
 def defaultTopo():
@@ -153,22 +161,17 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     -------
     >>> from htmd import *
     >>> mol = Molecule("3PTB")
-    >>> amber.listFiles()             # doctest: +ELLIPSIS
-    ---- Topologies files list...
-    top/top_all36_prot.rtf
-    top/top_water_ions.rtf
-    ...
     >>> molbuilt = amber.build(mol, outdir='/tmp/build')  # doctest: +SKIP
     ...
     >>> # More complex example
     >>> disu = [DisulfideBridge('P', 157, 'P', 13), DisulfideBridge('K', 1, 'K', 25)]
-    >>> molbuilt = amber.build(mol, foutdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
+    >>> molbuilt = amber.build(mol, outdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
     """
     # Remove pdb bonds!
     mol = mol.copy()
     mol.bonds = np.empty((0, 2), dtype=np.uint32)
     if shutil.which(tleap) is None:
-        raise NameError('Could not find executable: `' + tleap + '` in the PATH. Cannot build for AMBER.')
+        raise NameError('Could not find executable: `{}` in the PATH. Cannot build for AMBER.'.format(tleap))
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
     _cleanOutDir(outdir)
@@ -187,10 +190,9 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     logger.info('Converting CHARMM membranes to AMBER.')
     mol = _charmmLipid2Amber(mol)
 
-    #_checkProteinGaps(mol)
     _applyProteinCaps(mol, caps)
 
-    f = open(path.join(outdir, 'tleap.in'), 'w')
+    f = open(os.path.join(outdir, 'tleap.in'), 'w')
     f.write('# tleap file generated by amber.build\n')
 
     # Printing out the forcefields
@@ -206,7 +208,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         f.write('addAtomTypes {\n')
         for at in atomtypes:
             if len(at) != 3:
-                raise RuntimeError('Atom type definitions have to be triplets. Check the AMBER documentations.')
+                raise RuntimeError('Atom type definitions have to be triplets. Check the AMBER documentation.')
             f.write('    {{ "{}" "{}" "{}" }}\n'.format(at[0], at[1], at[2]))
         f.write('}\n\n')
 
@@ -217,22 +219,22 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         for off in offlibraries:
             f.write('loadoff {}\n\n'.format(off))
 
-    # Loading user parameters
+    # Loading frcmod parameters
     f.write('# Loading parameter files\n')
     for p in param:
         try:
             shutil.copy(p, outdir)
-            f.write('loadamberparams ' + path.basename(p) + '\n')
+            f.write('loadamberparams ' + os.path.basename(p) + '\n')
         except:
             f.write('loadamberparams ' + p + '\n')
             logger.info("File {:s} not found, assuming its present on the standard Amber location".format(p))
     f.write('\n')
 
-    # Printing out topologies
+    # Loading prepi topologies
     f.write('# Loading prepi topologies\n')
     for t in topo:
         shutil.copy(t, outdir)
-        f.write('loadamberprep ' + path.basename(t) + '\n')
+        f.write('loadamberprep ' + os.path.basename(t) + '\n')
     f.write('\n')
 
     # Detect disulfide bridges if not defined by user
@@ -254,7 +256,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.info('Writing PDB file for input to tleap.')
-    pdbname = path.join(outdir, 'input.pdb')
+    pdbname = os.path.join(outdir, 'input.pdb')
 
     # mol2 files have atomtype, here we only write parts not coming from mol2
     mol.write(pdbname, mol.atomtype == '')
@@ -269,7 +271,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         combstr = 'mol = combine {mol'
         for s in segs:
             name = 'segment{}'.format(s)
-            mol2name = path.join(outdir, '{}.mol2'.format(name))
+            mol2name = os.path.join(outdir, '{}.mol2'.format(name))
             mol.write(mol2name, (mol.atomtype != '') & (mol.segid == s))
             if not os.path.isfile(mol2name):
                 raise NameError('Could not write a mol2 file out of the given Molecule.')
@@ -298,10 +300,10 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     molbuilt = None
     if execute:
         # Source paths of extra dirs (our dirs, not amber default)
-        htmdamberdir = path.abspath(path.join(home(), 'builder', 'amberfiles'))
+        htmdamberdir = os.path.abspath(os.path.join(home(), 'builder', 'amberfiles'))
         sourcepaths = [htmdamberdir]
-        sourcepaths += [path.join(htmdamberdir, path.dirname(f))
-                        for f in ff if path.isfile(path.join(htmdamberdir, f))]
+        sourcepaths += [os.path.join(htmdamberdir, os.path.dirname(f))
+                        for f in ff if os.path.isfile(os.path.join(htmdamberdir, f))]
         extrasource = []
         for p in sourcepaths:
             extrasource.append('-I')
@@ -321,15 +323,16 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         os.chdir(currdir)
         logger.info('Finished building.')
 
-        if path.getsize(path.join(outdir, 'structure.crd')) != 0 and path.getsize(path.join(outdir, 'structure.prmtop')) != 0:
-            molbuilt = Molecule(path.join(outdir, 'structure.prmtop'))
-            molbuilt.read(path.join(outdir, 'structure.crd'))
+        if os.path.getsize(os.path.join(outdir, 'structure.crd')) != 0 \
+                and os.path.getsize(os.path.join(outdir, 'structure.prmtop')) != 0:
+            molbuilt = Molecule(os.path.join(outdir, 'structure.prmtop'))
+            molbuilt.read(os.path.join(outdir, 'structure.crd'))
         else:
             raise NameError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
-            shutil.move(path.join(outdir, 'structure.crd'), path.join(outdir, 'structure.noions.crd'))
-            shutil.move(path.join(outdir, 'structure.prmtop'), path.join(outdir, 'structure.noions.prmtop'))
+            shutil.move(os.path.join(outdir, 'structure.crd'), os.path.join(outdir, 'structure.noions.crd'))
+            shutil.move(os.path.join(outdir, 'structure.prmtop'), os.path.join(outdir, 'structure.noions.prmtop'))
             totalcharge = np.sum(molbuilt.charge)
             nwater = np.sum(molbuilt.atomselect('water and noh'))
             anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc, ff='amber', anion=saltanion, cation=saltcation)
@@ -340,8 +343,8 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
                          offlibraries=offlibraries)
     tmpbonds = molbuilt.bonds
     molbuilt.bonds = []  # Removing the bonds to speed up writing
-    molbuilt.write(path.join(outdir, 'structure.pdb'))
-    molbuilt.bonds = tmpbonds # Restoring the bonds
+    molbuilt.write(os.path.join(outdir, 'structure.pdb'))
+    molbuilt.bonds = tmpbonds  # Restoring the bonds
     return molbuilt
 
 
@@ -487,7 +490,8 @@ def _charmmLipid2Amber(mol):
     newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         A new Molecule object with the membrane converted to AMBER
     """
-    resdict = _readcsvdict(path.join(home(), 'builder', 'charmmlipid2amber.csv'))
+
+    resdict = _readcsvdict(os.path.join(home(), 'builder', 'charmmlipid2amber.csv'))
 
     natoms = mol.numAtoms
     neworder = np.array(list(range(natoms)))  # After renaming the atoms and residues I have to reorder them
@@ -602,6 +606,11 @@ if __name__ == '__main__':
     from glob import glob
     import numpy as np
     import filecmp
+    import doctest
+
+    failure_count, _ = doctest.testmod()
+    if failure_count != 0:
+        raise Exception('Doctests failed')
 
     def cutfirstline(infile, outfile):
         # Cut out the first line of prmtop which has a build date in it
@@ -637,7 +646,7 @@ if __name__ == '__main__':
 
     # Test with proteinPrepare
     pdbids = ['3PTB']
-    #pdbids = ['3PTB', '1A25', '1GZM']  # '1U5U' out because it has AR0 (no parameters)
+    # pdbids = ['3PTB', '1A25', '1GZM']  # '1U5U' out because it has AR0 (no parameters)
     for pid in pdbids:
         np.random.seed(1)
         mol = Molecule(pid)
@@ -655,7 +664,7 @@ if __name__ == '__main__':
 
     # Test without proteinPrepare
     pdbids = ['3PTB']
-    #pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+    # pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
     for pid in pdbids:
         np.random.seed(1)
         mol = Molecule(pid)
