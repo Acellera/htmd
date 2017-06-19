@@ -916,6 +916,73 @@ class MetricData:
         self.N = None
         self.Centers = None
 
+    def sampleRegion(self, point=None, radius=None, limits=None, nsamples=20, singlemol=False):
+        """ Samples conformations from a region in the projected space.
+
+        Parameters
+        ----------
+        point : list or np.ndarray
+            A point in the projected space. Undefined dimensions should have None value.
+        radius : float
+            The radius in around the point in which to sample conformations.
+        limits : np.ndarray
+            A (2, ndim) dimensional array containing the min (1st row) and max (2nd row) limits for each dimension.
+            None values will be interpreted as no limit in that dimension, or min/max value.
+        nsamples : int
+            The number of conformations to sample.
+        singlemol : bool
+            If True it will return all samples within a single Molecule instead of a list of Molecules.
+
+        Returns
+        -------
+        absFrames : list
+            A list of the absolute frame indexes sampled
+        relFrames : list of tuples
+            A list of (trajNum, frameNum) tuples sampled
+        mols : Molecule or list of Molecules
+            The conformations stored in a Molecule or a list of Molecules
+
+        """
+        from scipy.spatial.distance import cdist
+        datconcat = np.concatenate(self.dat)
+        numdim = datconcat.shape[1]
+        if point is not None:
+            if radius is None:
+                raise RuntimeError('You must define a radius with a point.')
+            point = np.array(point)
+            if len(point) != numdim:
+                raise RuntimeError(
+                    'Argument `point` should be same dimensionality as your data ({} dimensions)'.format(numdim))
+            keepdim = np.array([p is not None for p in point])
+            dists = cdist(datconcat[:, keepdim], [point[keepdim]])
+            confs = np.where(dists < radius)[0]
+        elif limits is not None:
+            if limits.shape != (2, numdim):
+                raise RuntimeError('Argument `limits` should be of shape (2, {})'.format(numdim))
+            mask = np.ones(datconcat.shape[0], dtype=bool)
+            for i in range(numdim):
+                if limits[0, i] is not None:
+                    mask &= datconcat[:, i] > limits[0, i]
+                if limits[1, i] is not None:
+                    mask &= datconcat[:, i] < limits[1, i]
+            confs = np.where(mask)[0]
+
+        if len(confs) > nsamples:
+            confs = np.random.choice(confs, nsamples, replace=False)
+        sims = self.abs2sim(confs)
+
+        from htmd.molecule.molecule import Molecule
+        if singlemol:
+            mol = Molecule(sims[0])
+            for i in range(1, len(sims)):
+                m = Molecule(sims[i])
+                mol.appendFrames(m)
+        else:
+            mol = []
+            for s in sims:
+                mol.append(Molecule(s))
+        return confs, self.abs2rel(confs), mol
+
 
 def _sampleCluster(cluster, stConcat, numFrames, allFrames, replacement):
     frames = np.where(stConcat == cluster)[0]
