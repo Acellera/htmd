@@ -406,19 +406,37 @@ if __name__ == "__main__":
     import htmd
     import os
 
+    # No arguments - quick travis test
+    if len(sys.argv) == 1:
+        tryp_op, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
+        d = prepData.data
+        assert d.protonation[d.resid == 40].iloc[0] == 'HIE'
+        assert d.protonation[d.resid == 57].iloc[0] == 'HIP'
+        assert d.protonation[d.resid == 91].iloc[0] == 'HID'
+
+    # Long test
+    elif sys.argv[1] == "long-test":
+        pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+        for pdb in pdbids:
+            mol = Molecule(pdb)
+            mol.filter("protein")
+            mol_op, prepData = proteinPrepare(mol, returnDetails=True)
+            mol_op.write("./{}-prepared.pdb".format(pdb))
+            prepData.data.to_csv("./{}-prepared.csv".format(pdb), float_format="%.2f")
+
+            compareDir = htmd.home(dataDir=os.path.join('test-proteinprepare', pdb))
+            htmd.util.assertSameAsReferenceDir(compareDir)
+        import doctest
+        doctest.testmod()
+
     # Stand-alone executable: prepare the PDB given as argument
-    if len(sys.argv) > 1:
+    else:
         mol = Molecule(sys.argv[1])
         mol.filter("protein")
         mol_op, prepData = proteinPrepare(mol, returnDetails=True)
         mol_op.write("./prepared.pdb")
         prepData.data.to_excel("./prepared.xlsx")
         prepData.data.to_csv("./prepared.csv")
-
-    else:
-        # Test
-        tryp_op, prepData = proteinPrepare(Molecule("3PTB"), returnDetails=True)
-        d = prepData.data
 
         # x_HIS91_ND1 = tryp_op.get("coords","resid 91 and  name ND1")
         # x_SER93_H =   tryp_op.get("coords","resid 93 and  name H")
@@ -430,23 +448,6 @@ if __name__ == "__main__":
         # mHIP40, pHIP40 = prepData.reprepare()
         # mHIP40.write("./mol-test-hip40.pdb")
         # pHIP40.data.to_excel("./mol-test-hip40.xlsx")
-
-        pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
-        for pdb in pdbids:
-            mol = Molecule(pdb)
-            mol.filter("protein")
-            mol_op, prepData = proteinPrepare(mol, returnDetails=True)
-            mol_op.write("./{}-prepared.pdb".format(pdb))
-            prepData.data.to_csv("./{}-prepared.csv".format(pdb), float_format="%.2f")
-
-            compareDir = htmd.home(dataDir=os.path.join('test-proteinprepare', pdb))
-            htmd.util.assertSameAsReferenceDir(compareDir)
-
-
-
-        import doctest
-        doctest.testmod()
-
 
 
 """

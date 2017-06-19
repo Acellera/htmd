@@ -39,6 +39,9 @@ for root, dirnames, filenames in os.walk('.'):
         if not excluded(filename, excludedfiles):
             filestotest.append(os.path.join(root, filename))
 
+# Avoid network communication at each import
+os.environ['HTMD_NONINTERACTIVE']='1'
+
 # Running py files
 failed = []
 times = []
