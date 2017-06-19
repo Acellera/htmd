@@ -1260,10 +1260,16 @@ class Molecule:
                 self.box = np.array(np.atleast_2d(self.box[:, keep]))
                 if self.box.shape[0] == 1:
                     self.box = self.box.T
+            if self.boxangles.shape[1] == numframes:
+                self.boxangles = np.array(np.atleast_2d(self.boxangles[:, keep]))
+                if self.boxangles.shape[0] == 1:
+                    self.boxangles = self.boxangles.T
             if len(self.step) == numframes:
                 self.step = self.step[keep]
             if len(self.time) == numframes:
                 self.time = self.time[keep]
+            if len(self.fileloc) == numframes:
+                self.fileloc = [f for i, f in enumerate(self.fileloc) if i in keep]
         self.frame = 0  # Reset to 0 since the frames changed indexes
 
     def viewCrystalPacking(self):
@@ -1310,6 +1316,23 @@ class Molecule:
             elem = _getPDBElement(name, '', lowersecond=False)
             elements[i] = elem
         return elements
+
+    def appendFrames(self, mol):
+        """ Appends the frames of a Molecule to the current Molecule.
+
+        Parameters
+        ----------
+        mol : :class:`Molecule`
+            A Molecule object.
+        """
+        if self.fstep != mol.fstep:
+            raise RuntimeError('Cannot concatenate Molecules with different fsteps')
+        self.coords = np.concatenate((self.coords, mol.coords), axis=2)
+        self.box = np.concatenate((self.box, mol.box), axis=1)
+        self.boxangles = np.concatenate((self.boxangles, mol.boxangles), axis=1)
+        self.fileloc += mol.fileloc
+        self.step = np.arange(self.coords.shape[2])
+        self.time = self.fstep * self.step
 
     @property
     def numFrames(self):
