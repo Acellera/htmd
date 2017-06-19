@@ -169,7 +169,8 @@ class TICA(object):
             proj = newproj
 
         if ndim is None:
-            logger.info('Kept {} dimension(s) to cover 95% of kinetic variance.'.format(self.tic.dimension()))
+            ndim = self.tic.dimension()
+            logger.info('Kept {} dimension(s) to cover 95% of kinetic variance.'.format(ndim))
 
         from htmd.metricdata import MetricData
         datatica = MetricData(dat=np.array(proj), simlist=simlist, ref=ref, fstep=fstep, parent=parent)
