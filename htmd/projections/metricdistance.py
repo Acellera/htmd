@@ -274,9 +274,9 @@ def contactVecToMatrix(vector, atomIndexes):
         row = uqAtomGroups.index(atomIndexes[i][0])
         col = uqAtomGroups.index(atomIndexes[i][1])
         matrix[row, col] = vector[i]
+        matrix[col, row] = vector[i]
         mapping[row, col] = i
         mapping[col, row] = i
-    matrix |= matrix.T
     return matrix, mapping, uqAtomGroups
 
 
