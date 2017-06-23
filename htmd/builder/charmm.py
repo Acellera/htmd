@@ -94,7 +94,7 @@ def defaultParam():
 
 def defaultStream():
     """ Returns the default stream files used by charmm.build """
-    return ['str/prot/toppar_all36_prot_arg0.str',]
+    return ['str/prot/toppar_all36_prot_arg0.str', 'str/misc/toppar_ions_won.str']
 
 
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
@@ -424,6 +424,8 @@ def _printAliases(f):
         pdbalias residue CD CD2
         pdbalias residue CS CES
         pdbalias residue BA BAR
+        pdbalias residue NI Ni2p
+        pdbalias residue HG Hg2p
 
         # Aliases for Maestro residues
         pdbalias residue AR0 ARG
@@ -497,6 +499,7 @@ def _printAliases(f):
         pdbalias residue MAN AMAN
         pdbalias residue FUC AFUC
         pdbalias residue FUL BFUC
+
     '''
     f.write(textwrap.dedent(lines))
     f.write('\n\n')
