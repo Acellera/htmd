@@ -329,6 +329,26 @@ def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
 
 
 def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10):
+    """ Aligns two structures by their longest sequence alignment
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The Molecule we want to align
+    ref : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The reference Molecule to which we want to align
+    molseg : str
+        The segment of `mol` we want to align
+    refseg : str
+        The segment of `ref` we want to align to
+    maxalignments : int
+        The maximum number of alignments we want to produce
+
+    Returns
+    -------
+    mols : list
+        A list of Molecules each containing a different alignment.
+    """
     from htmd.util import ensurelist
     try:
         from Bio import pairwise2
@@ -343,7 +363,7 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         logger.info('Multiple segments ({}) detected in `mol`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqmol.keys())))
         seqmol = mol.sequence(noseg=True)
     if len(seqref) > 1:
-        logger.info('Multiple segments ({}) detected in `molref`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqref.keys())))
+        logger.info('Multiple segments ({}) detected in `ref`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqref.keys())))
         seqref = ref.sequence(noseg=True)
 
     if molseg is None:
@@ -380,15 +400,21 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         molaln = np.array(list(alignments[i][1]))
 
         # By doing cumsum we calculate how many letters were before the current letter (i.e. residues before current)
-        residref = np.cumsum(refaln != '-')
-        residmol = np.cumsum(molaln != '-')
+        residref = np.cumsum(refaln != '-') - 1  # Start them from 0
+        residmol = np.cumsum(molaln != '-') - 1  # Start them from 0
 
-        # True wherever there is a real alignment (both have a letter aligned)
-        alignedres = (refaln != '-') & (molaln != '-')
+        # Find the region of maximum alignment between the molecules
+        dsig = np.hstack(([False], (refaln != '-') & (molaln != '-'), [False])).astype(int)
+        dsigdiff = np.diff(dsig)
+        startIndex = np.where(dsigdiff > 0)[0]
+        endIndex = np.where(dsigdiff < 0)[0]
+        duration = endIndex - startIndex
+        start = startIndex[np.argmax(duration)]
+        finish = endIndex[np.argmax(duration)]
 
         # Get the "resids" of the aligned residues only
-        refalnresid = residref[alignedres] - 1  # Start them from 0
-        molalnresid = residmol[alignedres] - 1  # Start them from 0
+        refalnresid = residref[start:finish]
+        molalnresid = residmol[start:finish]
 
         refidx = []
         for r in refalnresid:
@@ -397,13 +423,15 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         for r in molalnresid:
             molidx += list(molsegidx[molfakeresid == r])
 
-        alignedmol = mol.copy()
-
         molboolidx = np.zeros(mol.numAtoms, dtype=bool)
         molboolidx[molidx] = True
         refboolidx = np.zeros(ref.numAtoms, dtype=bool)
         refboolidx[refidx] = True
 
+        logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}-{}'.format(
+            i, np.max(duration), np.unique(mol.segid[molidx])[0], mol.resid[molidx[0]], mol.resid[molidx[-1]]))
+
+        alignedmol = mol.copy()
         alignedmol.align(molboolidx, ref, refboolidx)
         alignedstructs.append(alignedmol)
 
