@@ -146,7 +146,7 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
 
 
 
-def opm(pdb):
+def opm(pdb, keep=False):
     """Download a molecule from the OPM.
 
     Removes DUM atoms.
@@ -155,6 +155,8 @@ def opm(pdb):
     ----------
     pdb: str
         The 4-letter PDB code
+    keep: bool
+        If False, removes the DUM atoms. If True, it keeps them.
 
     Returns
     -------
@@ -187,7 +189,8 @@ def opm(pdb):
 
     tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
     mol = Molecule(tempfile)
-    mol.filter("not resname DUM")
+    if not keep:
+        mol.filter("not resname DUM")
 
     # Assuming the half-thickness is the last word in the matched line
     # REMARK      1/2 of bilayer thickness:   14.1
