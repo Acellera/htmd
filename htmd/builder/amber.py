@@ -78,20 +78,20 @@ def listFiles():
         print(f)
 
     # Extra AMBER FFs on HTMD (*.frcmod, *.in) @cuzzo87
-    extratopos = [f +  '/' + path.basename(glob(os.path.join(htmdamberdir, f) + '/*.in')[0])
+    extratopos = [f +  '/' + os.path.basename(glob(os.path.join(htmdamberdir, f) + '/*.in')[0])
                for f in os.listdir(htmdamberdir) if os.path.isdir(os.path.join(htmdamberdir, f))  
                and len(glob(os.path.join(htmdamberdir, f) + '/*.in')) == 1  ]
     
-    print('---- Extra *.in files list: ' + path.join(htmdamberdir, '') + ' ----')
+    print('---- Extra *.in files list: ' + os.path.join(htmdamberdir, '') + ' ----')
     for f in extratopos:
         print(f)
 
-    extraparams = [ f + '/' + path.basename( os.path.join(htmdamberdir, f) + fparam )
+    extraparams = [ f + '/' + os.path.basename( os.path.join(htmdamberdir, f) + fparam )
                for f in os.listdir(htmdamberdir) 
                for fparam in glob(os.path.join(htmdamberdir, f) + '/*.frcmod' )
                 ]
     
-    print('---- Extra *.in files list: ' + path.join(htmdamberdir, '') + ' ----')
+    print('---- Extra *.in files list: ' + os.path.join(htmdamberdir, '') + ' ----')
     for f in extraparams:
         print(f)
 
