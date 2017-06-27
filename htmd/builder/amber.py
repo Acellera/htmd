@@ -77,6 +77,23 @@ def listFiles():
     for f in extraffs:
         print(f)
 
+    # Extra AMBER FFs on HTMD (*.frcmod, *.in) @cuzzo87
+    extratopos = [f +  '/' + os.path.basename(glob(os.path.join(htmdamberdir, f) + '/*.in')[0])
+               for f in os.listdir(htmdamberdir) if os.path.isdir(os.path.join(htmdamberdir, f))  
+               and len(glob(os.path.join(htmdamberdir, f) + '/*.in')) == 1  ]
+    
+    print('---- Extra *.in files list: ' + os.path.join(htmdamberdir, '') + ' ----')
+    for f in extratopos:
+        print(f)
+
+    extraparams = [ f + '/' + os.path.basename( os.path.join(htmdamberdir, f) + fparam )
+               for f in os.listdir(htmdamberdir) 
+               for fparam in glob(os.path.join(htmdamberdir, f) + '/*.frcmod' )
+                ]
+    
+    print('---- Extra *.in files list: ' + os.path.join(htmdamberdir, '') + ' ----')
+    for f in extraparams:
+        print(f)
 
 def defaultFf():
     """ Returns the default leaprc forcefield files used by amber.build """
@@ -99,7 +116,7 @@ def defaultParam():
     #
     # See page 50 of Amber16 manual.
 
-    return ['frcmod.ionsjc_tip3p']
+    return ['frcmod.ionsjc_tip3p', 'frcmod.ions234lm_126_tip3p']
 
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
