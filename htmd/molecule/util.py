@@ -356,6 +356,11 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         raise ImportError('You need to install the biopython package to use this function. Try using `conda install biopython`.')
     from Bio.SubsMat import MatrixInfo as matlist
 
+    if len([x for x in np.unique(mol.altloc) if len(x)]) > 1:
+        raise RuntimeError('Alternative atom locations detected in `mol`. Please remove these before calling this function.')
+    if len([x for x in np.unique(ref.altloc) if len(x)]) > 1:
+        raise RuntimeError('Alternative atom locations detected in `ref`. Please remove these before calling this function.')
+
     seqmol = mol.sequence()
     seqref = ref.sequence()
 
