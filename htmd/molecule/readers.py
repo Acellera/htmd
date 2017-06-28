@@ -265,17 +265,16 @@ def _getPDB(pdbid):
     from htmd.home import home
     # Try loading it from the pdb data directory
     tempfile = False
-    localpdb = os.path.join(home(dataDir="pdb"), pdbid.lower() + ".pdb")
+    localpdb = os.path.join(home(dataDir='pdb'), pdbid.lower() + '.pdb')
     if os.path.isfile(localpdb):
-        logger.info("Using local copy for {:s}: {:s}".format(pdbid, localpdb))
+        logger.info('Using local copy for {:s}: {:s}'.format(pdbid, localpdb))
         filepath = localpdb
     else:
         # or the PDB website
-        logger.info("Attempting PDB query for {:s}".format(pdbid))
-        r = requests.get(
-            "http://www.rcsb.org/pdb/download/downloadFile.do?fileFormat=pdb&compression=NO&structureId=" + pdbid)
+        logger.info('Attempting PDB query for {:s}'.format(pdbid))
+        r = requests.get('https://files.rcsb.org/download/{}.pdb'.format(pdbid))
         if r.status_code == 200:
-            filepath = string_to_tempfile(r.content.decode('ascii'), "pdb")
+            filepath = string_to_tempfile(r.content.decode('ascii'), 'pdb')
             tempfile = True
         else:
             raise NameError('Invalid PDB code')
