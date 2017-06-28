@@ -6,7 +6,7 @@
 from os.path import isdir, abspath, basename, exists,join
 from os import getcwd, getlogin, makedirs, chdir
 from subprocess import call,check_output
-from htmd import UserInterface
+from htmd.userinterface import UserInterface
 import inspect
 import shutil
 #import pwd

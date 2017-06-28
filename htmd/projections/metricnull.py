@@ -70,19 +70,21 @@ class MetricNull(Projection):
 
 
 if __name__ == "__main__":
-    import htmd
+    import htmd.home
+    from htmd.simlist import simlist
+    from htmd.projections.metric import Metric
     import htmd.projections.metricnull
 
-    dd = htmd.home(dataDir="adaptive")
-    fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
+    dd = htmd.home.home(dataDir="adaptive")
+    fsims = simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
                          dd + '/generators/1/structure.pdb')
 
-    metr2 = htmd.Metric(fsims)
+    metr2 = Metric(fsims)
     metr2.projection(htmd.projections.metricnull.MetricNull(2))
     data2 = metr2.project()
     assert data2.trajectories[0].projection.shape == (6, 2)
 
-    metr1 = htmd.Metric(fsims)
+    metr1 = Metric(fsims)
     metr1.projection(htmd.projections.metricnull.MetricNull(1))
     data1 = metr1.project()
     assert data1.trajectories[0].projection.shape == (6, 1)

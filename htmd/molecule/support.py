@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from tempfile import NamedTemporaryFile
-import htmd
+import htmd.home
 import numpy
 import os
 import ctypes as ct
@@ -12,7 +12,7 @@ import ctypes as ct
 
 def xtc_lib():
     lib = {}
-    libdir = htmd.home(libDir=True)
+    libdir = htmd.home.home(libDir=True)
 
     import platform
     if platform.system() == "Windows":

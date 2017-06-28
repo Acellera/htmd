@@ -8,7 +8,6 @@ from htmd.molecule.molecule import Molecule
 from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 from htmd.apps.acemd import Acemd
 import os
-import htmd
 import logging
 logger = logging.getLogger(__name__)
 
@@ -176,6 +175,7 @@ proc calcforces_terminate { } { }
         self.acemd.setup(inputdir, outputdir, overwrite=True)
 
 if __name__ == "__main__":
+    import htmd.home
     md = Production()
     md.temperature = 300
     md.reference = 'protein and name CA'
@@ -184,6 +184,6 @@ if __name__ == "__main__":
     md.acemd.binindex = None  # use different data
     md.box = [-20, 20, -20, 20, 43, 45]
     md.k = 5
-    md.write(htmd.home() +'/data/equilibrate', '/tmp/prod')
+    md.write(htmd.home.home() +'/data/equilibrate', '/tmp/prod')
     md.k = 0
-    md.write(htmd.home() +'/data/equilibrate', '/tmp/prod0')
+    md.write(htmd.home.home() +'/data/equilibrate', '/tmp/prod0')

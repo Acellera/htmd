@@ -7,12 +7,12 @@ from htmd.molecule.util import boundingBox
 from htmd.molecule.vdw import VDW, radiusByElement
 import numpy as np
 import ctypes
-import htmd
+import htmd.home
 import os
 
 _order = ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 'positive_ionizable',
           'negative_ionizable', 'metal', 'occupancies')
-libdir = htmd.home(libDir=True)
+libdir = htmd.home.home(libDir=True)
 occupancylib = ctypes.cdll.LoadLibrary(os.path.join(libdir, "occupancy_ext.so"))
 
 

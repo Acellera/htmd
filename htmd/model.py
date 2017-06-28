@@ -1081,7 +1081,6 @@ def _macroTrajSt(St, macro_ofcluster):
     return transition_matrix(macroC, reversible=True)'''
 
 if __name__ == '__main__':
-    from htmd import *
     from htmd.util import tempname
     from htmd.home import home
     from os.path import join

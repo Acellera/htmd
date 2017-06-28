@@ -31,7 +31,7 @@ the second way removes the need to use HTMD, all the modules are shortcut:
 
 .. code:: python
 
-    from htmd import *
+    from htmd.ui import *
     m = Molecule('41ny')
 
 We should avoid importing modules at different depths from htmd. So from XXX import * only removes the namespace XXX.

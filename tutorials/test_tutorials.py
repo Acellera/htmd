@@ -39,7 +39,8 @@ def format_script(script, outdir, name):
     # 1. Need to remove the * imports. Python doesn't allow * imports in functions
     # 2. Wrap it all in a test function for pytest
     # 3. Indent everything one tab to be inside the function
-    htmdimports = [x for x in htmd.__dict__.keys() if not x.startswith('_')]
+    import htmd.ui
+    htmdimports = [x for x in htmd.ui.__dict__.keys() if not x.startswith('_')]
 
     splitt = script.split('\n')
     lines = ['def test_{}():\n'.format(name.replace('-', '_')),

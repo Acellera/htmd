@@ -274,9 +274,6 @@ class VMDIsosurface(VMDGraphicObject):
 
 
 if __name__ == "__main__":
-    from htmd import *
-    from htmd import vmdgraphics
-
     """
     from htmd import *
     import htmd.vmdgraphics
@@ -294,6 +291,6 @@ if __name__ == "__main__":
     ngh=htmd.vmdgraphics.VMDConvexHull(nf,solid=True)
 
     """
-
+    from htmd.ui import *
     import doctest
     doctest.testmod()

@@ -178,7 +178,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     Example
     -------
-    >>> from htmd import *
+    >>> from htmd.ui import *
     >>> mol = Molecule("3PTB")
     >>> molbuilt = amber.build(mol, outdir='/tmp/build')  # doctest: +SKIP
     ...

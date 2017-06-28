@@ -1612,7 +1612,7 @@ if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
-    from htmd import home
+    from htmd.home import home
 
     m = Molecule('3PTB')
     doctest.testmod(extraglobs={'tryp': m.copy()})

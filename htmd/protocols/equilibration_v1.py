@@ -261,7 +261,7 @@ proc calcforces_terminate { } { }
         self.constraints[atomselect] = factor
 
 if __name__ == "__main__":
-    import htmd
+    import htmd.home
     eq = Equilibration()
     eq.numsteps = 1000000
     eq.temperature = 300
@@ -269,4 +269,4 @@ if __name__ == "__main__":
     eq.selection = 'segname L and noh'
     eq.box = [-20, 20, -20, 20, 43, 45]
     eq.k = 5
-    eq.write(htmd.home() + '/data/equilibrate', '/tmp/equil1')
+    eq.write(htmd.home.home() + '/data/equilibrate', '/tmp/equil1')

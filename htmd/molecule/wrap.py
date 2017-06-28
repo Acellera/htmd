@@ -9,7 +9,7 @@ import ctypes as ct
 import numpy
 import numpy as np
 
-import htmd.home
+from htmd.home import home
 
 
 def wrap(coordinates, bonds, box, centersel=None):
@@ -29,7 +29,7 @@ def wrap(coordinates, bonds, box, centersel=None):
     """
 
     import platform
-    libdir = htmd.home(libDir=True)
+    libdir = home(libDir=True)
 
     if coordinates.dtype != np.float32:
         raise ValueError("Coordinates is not float32")

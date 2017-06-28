@@ -308,8 +308,8 @@ class Acemd3(ProtocolInterface):
 
 if __name__ == "__main__":
     #l=Acemd.protocols(quiet=True)
-    import htmd
-    homedir = htmd.home()
+    import htmd.home
+    homedir = htmd.home.home()
 
     r = list()
     r.append(GroupRestraint('resname MOL', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z'))

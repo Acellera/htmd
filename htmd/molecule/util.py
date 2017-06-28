@@ -7,12 +7,12 @@ import numpy as np
 from scipy.spatial.distance import cdist
 import ctypes as ct
 import os
-import htmd.home
+from htmd.home import home
 import platform
 import logging
 logger = logging.getLogger(__name__)
 
-libdir = htmd.home(libDir=True)
+libdir = home(libDir=True)
 if platform.system() == "Windows":
     tmalignlib = ct.cdll.LoadLibrary(os.path.join(libdir, "tmalign.dll"))
 else:

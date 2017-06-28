@@ -403,7 +403,8 @@ def proteinPrepare(mol_in,
 # A test method
 if __name__ == "__main__":
     import sys
-    import htmd
+    import htmd.home
+    import htmd.util
     import os
 
     # No arguments - quick travis test
@@ -424,7 +425,7 @@ if __name__ == "__main__":
             mol_op.write("./{}-prepared.pdb".format(pdb))
             prepData.data.to_csv("./{}-prepared.csv".format(pdb), float_format="%.2f")
 
-            compareDir = htmd.home(dataDir=os.path.join('test-proteinprepare', pdb))
+            compareDir = htmd.home.home(dataDir=os.path.join('test-proteinprepare', pdb))
             htmd.util.assertSameAsReferenceDir(compareDir)
         import doctest
         doctest.testmod()

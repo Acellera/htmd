@@ -205,10 +205,11 @@ class Acemd(ProtocolInterface):
 
 if __name__ == "__main__":
     #l=Acemd.protocols(quiet=True)
+    import htmd.home
     acemd = Acemd()
     acemd.structure = '5dhfr_cube.psf'
     acemd.parameters = 'par_all22_prot.inp'
-    homedir = htmd.home()
+    homedir = htmd.home.home()
     acemd.coordinates = '5dhfr_cube.pdb'
     acemd.setup(homedir + '/data/dhfr', '/tmp/testdir', overwrite=True)
     print(acemd)

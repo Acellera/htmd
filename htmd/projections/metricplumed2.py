@@ -561,8 +561,10 @@ class MetricPlumed2(Projection):
 if __name__ == "__main__":
     import sys
     import numpy as np
-    from htmd import *
-    from htmd.projections.metricplumed2 import *
+    import htmd.home
+    from htmd.simlist import simlist
+    from htmd.projections.metricplumed2 import MetricPlumed2
+    from htmd.projections.metric import Metric
 
     try:
         _getPlumedRoot()
@@ -573,8 +575,8 @@ if __name__ == "__main__":
 
 
     # Simlist
-    dd = htmd.home(dataDir="adaptive")
-    fsims = htmd.simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
+    dd = htmd.home.home(dataDir="adaptive")
+    fsims = simlist([dd + '/data/e1s1_1/', dd + '/data/e1s2_1/'],
                          dd + '/generators/1/structure.pdb')
     metr = Metric(fsims)
     metr.set(MetricPlumed2(
@@ -584,9 +586,9 @@ if __name__ == "__main__":
 
 
     # One simulation
-    testpath=os.path.join(htmd.home(), 'data', '1kdx')
+    testpath=os.path.join(htmd.home.home(), 'data', '1kdx')
     mol = Molecule(os.path.join(testpath, '1kdx_0.pdb'))
-    mol.read(os.path.join(htmd.home(), 'data', '1kdx', '1kdx.dcd'))
+    mol.read(os.path.join(htmd.home.home(), 'data', '1kdx', '1kdx.dcd'))
 
     metric = MetricPlumed2(['d1: DISTANCE ATOMS=1,200',
                             'd2: DISTANCE ATOMS=5,6'])

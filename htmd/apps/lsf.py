@@ -9,7 +9,7 @@ from subprocess import check_output
 import os
 import string
 import random
-from htmd import UserInterface
+from htmd.userinterface import UserInterface
 from htmd.decorators import _Deprecated
 
 

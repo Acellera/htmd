@@ -64,7 +64,7 @@ def compareVersions():
         if currver != 'unpackaged':
             print('You are on the latest HTMD version ({}).'.format(currver))
         else:
-            from htmd import home
+            from htmd.home import home
             print('You are on the latest HTMD version ({} : {}).'.format(currver, home()))
 
     print("")

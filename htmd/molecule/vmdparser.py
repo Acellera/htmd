@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 import os
-import htmd.home
+from htmd.home import home
 import ctypes as ct
 from htmd.molecule.support import pack_string_buffer, pack_int_buffer, pack_ulong_buffer, pack_double_buffer
 import numpy as np
@@ -13,7 +13,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-libdir = htmd.home(libDir=True)
+libdir = home(libDir=True)
 if platform.system() == "Windows":
     ct.cdll.LoadLibrary(os.path.join(libdir, "libgcc_s_seh-1.dll"))
     ct.cdll.LoadLibrary(os.path.join(libdir, "libstdc++-6.dll"))

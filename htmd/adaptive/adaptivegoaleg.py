@@ -206,7 +206,10 @@ class AdaptiveGoalEG(AdaptiveGoal):
 
 
 if __name__ == '__main__':
-    from htmd import *
+    import htmd.home
+    from htmd.projections.metricdistance import MetricDistance
+    from htmd.queues.localqueue import LocalGPUQueue
+    from htmd.molecule.molecule import Molecule
     import os
     import shutil
     from htmd.util import tempname
@@ -217,7 +220,7 @@ if __name__ == '__main__':
         return -proj  # Lower RMSDs should give higher score
 
     tmpdir = tempname()
-    shutil.copytree(htmd.home() + '/data/adaptive/', tmpdir)
+    shutil.copytree(htmd.home.home() + '/data/adaptive/', tmpdir)
     os.chdir(tmpdir)
     md = AdaptiveGoal()
     md.dryrun = True

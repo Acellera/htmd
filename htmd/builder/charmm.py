@@ -40,7 +40,7 @@ def listFiles():
 
     Examples
     --------
-    >>> from htmd import charmm
+    >>> from htmd.builder import charmm
     >>> charmm.listFiles()             # doctest: +ELLIPSIS
     ---- Topologies files list...
 
@@ -865,9 +865,6 @@ if __name__ == '__main__':
     from glob import glob
     import numpy as np
 
-    import doctest
-    doctest.testmod()
-
     # Use pre-prepared files so we can tell whether the error is in prepare or in build
     # Inputs are reference outputs of proteinprepare.
     preparedInputDir = home(dataDir='test-proteinprepare')
@@ -889,4 +886,8 @@ if __name__ == '__main__':
         assertSameAsReferenceDir(compareDir, tmpdir)
 
         shutil.rmtree(tmpdir)
+
+    from htmd.ui import *
+    import doctest
+    doctest.testmod()
 

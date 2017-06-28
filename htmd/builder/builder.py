@@ -528,7 +528,8 @@ def minimalRotation(prot):
 
 
 if __name__ == "__main__":
-    from htmd import *
+    from htmd.molecule.molecule import Molecule
+    from htmd.home import home
     from os import path
 
     p = Molecule(path.join(home(), 'data', 'building-protein-membrane', '4dkl.pdb'))

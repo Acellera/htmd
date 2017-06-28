@@ -234,7 +234,6 @@ def assertSameAsReferenceDir(compareDir, outdir="."):
 
 def testDHFR():
     import conda
-    from . import tempname
     import shutil
     from htmd.queues.localqueue import LocalGPUQueue
 
@@ -266,7 +265,7 @@ def testDHFR():
 
 
 if __name__ == "__main__":
-    from htmd import *
+    from htmd.ui import *
     import doctest
 
     doctest.testmod()

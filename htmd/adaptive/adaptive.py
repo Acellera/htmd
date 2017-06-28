@@ -465,15 +465,14 @@ if __name__ == "__main__":
         shutil.rmtree(i, ignore_errors=True, acemd='/shared/acemd/bin/acemd')
     os.remove(path.join(home(), 'data', 'adaptive', 'input', 'e2_writeinputs.log'))'''
 
-    from htmd import *
     import htmd
     import os
     import shutil
     from htmd.queues.localqueue import LocalGPUQueue
-    from htmd.simlist import Frame
+    from htmd.simlist import Frame, simlist
     from htmd.util import tempname
 
-    filedir = htmd.home()+'/data/adaptive/'
+    filedir = htmd.home.home()+'/data/adaptive/'
     sims = simlist(glob(os.path.join(filedir, 'data', '*', '')),
                    glob(os.path.join(filedir, 'input', '*', '')),
                    glob(os.path.join(filedir, 'input', '*', '')))

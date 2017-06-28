@@ -236,13 +236,13 @@ class AdaptiveMD(AdaptiveBase):
 
 
 if __name__ == "__main__":
-    import htmd
+    import htmd.home
     import os
     import shutil
     from htmd.util import tempname
 
     tmpdir = tempname()
-    shutil.copytree(htmd.home()+'/data/adaptive/', tmpdir)
+    shutil.copytree(htmd.home.home()+'/data/adaptive/', tmpdir)
     os.chdir(tmpdir)
     md = AdaptiveMD()
     # md.dryrun = True

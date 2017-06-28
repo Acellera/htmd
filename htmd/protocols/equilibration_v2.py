@@ -450,7 +450,7 @@ class EquilibrationAcemd3(ProtocolInterface):
 
 
 if __name__ == "__main__":
-    import htmd
+    import htmd.home
     eq = Equilibration()
     eq.runtime = 4
     eq.timeunits = 'ns'
@@ -459,7 +459,7 @@ if __name__ == "__main__":
     eq.fb_selection = 'segname L and noh'
     eq.fb_box = [-20, 20, -20, 20, 43, 45]
     eq.fb_k = 5
-    eq.write(htmd.home() + '/data/equilibrate', '/tmp/equil')
+    eq.write(htmd.home.home() + '/data/equilibrate', '/tmp/equil')
 
     # from htmd.protocols.production_v5 import ProductionAcemd3, GroupRestraint, AtomRestraint
     r = list()
