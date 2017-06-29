@@ -146,7 +146,7 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
 
 
 
-def opm(pdb, keep=False):
+def opm(pdb, keep=False, keepaltloc='A'):
     """Download a molecule from the OPM.
 
     Removes DUM atoms.
@@ -188,7 +188,7 @@ def opm(pdb, keep=False):
         raise NameError('PDB code not found in the OPM database')
 
     tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-    mol = Molecule(tempfile)
+    mol = Molecule(tempfile, keepaltloc=keepaltloc)
     if not keep:
         mol.filter("not resname DUM")
 

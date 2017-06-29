@@ -68,6 +68,8 @@ class Molecule:
             assume it is a PDB accession code and try to download from the RCSB web server.
     name : str
         Give a name to the Molecule that will be used for visualization
+    kwargs :
+        Accepts any further arguments that should be passed to the Molecule.read method.
 
     Examples
     --------
@@ -171,7 +173,7 @@ class Molecule:
         'boxangles': (3, 1),
     }
 
-    def __init__(self, filename=None, name=None):
+    def __init__(self, filename=None, name=None, **kwargs):
         for field in self._dtypes:
             self.__dict__[field] = np.empty(self._dims[field], dtype=self._dtypes[field])
         self.ssbonds = []
@@ -186,7 +188,7 @@ class Molecule:
         self.viewname = name
 
         if filename:
-            self.read(filename)
+            self.read(filename, **kwargs)
             if isinstance(filename, str):
                 self.topoloc = os.path.abspath(filename)
                 if name is None and isinstance(filename, str):
@@ -720,7 +722,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all'):
+    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A'):
         """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
         mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
@@ -740,6 +742,8 @@ class Molecule:
             If the file is a trajectory or coor file, append the coordinates to the previous coordinates. Note append is slow.
         overwrite : list of str
             A list of the existing fields in Molecule that we wish to overwrite when reading this file.
+        keepaltloc : bool
+            Set to any string to only keep that specific altloc. Set to 'all' if you want to keep all alternative atom positions.
         """
         from htmd.simlist import Sim, Frame
         from htmd.molecule.readers import _TOPOLOGY_READERS, _TRAJECTORY_READERS, _MDTRAJ_TRAJECTORY_EXTS, _COORDINATE_READERS
@@ -773,14 +777,14 @@ class Molecule:
             from htmd.molecule.readers import PDBread
             topo, coords, crystalinfo = PDBread(filename)
             self.crystalinfo = crystalinfo
-            self._parseTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite, keepaltloc=keepaltloc)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             return
         elif type == "pdbqt" or ext == "pdbqt":
             from htmd.molecule.readers import PDBread
             topo, coords, crystalinfo = PDBread(filename, mode='pdbqt')
             self.crystalinfo = crystalinfo
-            self._parseTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite, keepaltloc=keepaltloc)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             return
 
@@ -789,7 +793,7 @@ class Molecule:
         if ext in _TOPOLOGY_READERS:
             reader = _TOPOLOGY_READERS[ext]
             topo, coords = reader(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, filename, overwrite=overwrite, keepaltloc=keepaltloc)
             if coords is not None:
                 self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self.fileloc.append([filename, 0])
@@ -800,7 +804,7 @@ class Molecule:
         else:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
 
-    def _parseTopology(self, topo, filename, overwrite='all'):
+    def _parseTopology(self, topo, filename, overwrite='all', keepaltloc='A'):
         if isinstance(overwrite, str):
             overwrite = (overwrite, )
 
@@ -838,6 +842,16 @@ class Molecule:
                 if not np.array_equal(self.__dict__[field], newfielddata):
                     raise TopologyInconsistencyError(
                         'Different atom information read from topology file {} for field {}'.format(filename, field))
+
+        # Dropping atom alternative positions
+        from htmd.util import ensurelist
+        otheraltlocs = [x for x in np.unique(self.altloc) if len(x) and x != keepaltloc]
+        if len(otheraltlocs) >= 1 and not keepaltloc == 'all':
+            logger.warning('Alternative atom locations detected. Only altloc {} was kept. If you prefer to keep all '
+                           'use the keepaltloc="all" option when reading the file.'.format(keepaltloc))
+            for a in otheraltlocs:
+                self.remove(self.altloc == a)
+
 
         fnamestr = os.path.splitext(os.path.basename(filename))[0]
         self.viewname = fnamestr
