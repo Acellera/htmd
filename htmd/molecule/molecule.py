@@ -777,15 +777,17 @@ class Molecule:
             from htmd.molecule.readers import PDBread
             topo, coords, crystalinfo = PDBread(filename)
             self.crystalinfo = crystalinfo
-            self._parseTopology(topo, filename, overwrite=overwrite, keepaltloc=keepaltloc)
+            self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            self._dropAltLoc(keepaltloc=keepaltloc)
             return
         elif type == "pdbqt" or ext == "pdbqt":
             from htmd.molecule.readers import PDBread
             topo, coords, crystalinfo = PDBread(filename, mode='pdbqt')
             self.crystalinfo = crystalinfo
-            self._parseTopology(topo, filename, overwrite=overwrite, keepaltloc=keepaltloc)
+            self._parseTopology(topo, filename, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
+            self._dropAltLoc(keepaltloc=keepaltloc)
             return
 
         if type in _TOPOLOGY_READERS or type in _TRAJECTORY_READERS or type in _COORDINATE_READERS:
@@ -793,7 +795,7 @@ class Molecule:
         if ext in _TOPOLOGY_READERS:
             reader = _TOPOLOGY_READERS[ext]
             topo, coords = reader(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite, keepaltloc=keepaltloc)
+            self._parseTopology(topo, filename, overwrite=overwrite)
             if coords is not None:
                 self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self.fileloc.append([filename, 0])
@@ -803,8 +805,19 @@ class Molecule:
             self._readTraj(filename, _COORDINATE_READERS[ext], skip=skip, frames=frames, append=append, mdtraj=(ext in _MDTRAJ_TRAJECTORY_EXTS))
         else:
             raise ValueError('Unknown file type with extension "{}".'.format(ext))
+        self._dropAltLoc(keepaltloc=keepaltloc)
 
-    def _parseTopology(self, topo, filename, overwrite='all', keepaltloc='A'):
+    def _dropAltLoc(self, keepaltloc='A'):
+        # Dropping atom alternative positions
+        from htmd.util import ensurelist
+        otheraltlocs = [x for x in np.unique(self.altloc) if len(x) and x != keepaltloc]
+        if len(otheraltlocs) >= 1 and not keepaltloc == 'all':
+            logger.warning('Alternative atom locations detected. Only altloc {} was kept. If you prefer to keep all '
+                           'use the keepaltloc="all" option when reading the file.'.format(keepaltloc))
+            for a in otheraltlocs:
+                self.remove(self.altloc == a)
+
+    def _parseTopology(self, topo, filename, overwrite='all'):
         if isinstance(overwrite, str):
             overwrite = (overwrite, )
 
@@ -842,16 +855,6 @@ class Molecule:
                 if not np.array_equal(self.__dict__[field], newfielddata):
                     raise TopologyInconsistencyError(
                         'Different atom information read from topology file {} for field {}'.format(filename, field))
-
-        # Dropping atom alternative positions
-        from htmd.util import ensurelist
-        otheraltlocs = [x for x in np.unique(self.altloc) if len(x) and x != keepaltloc]
-        if len(otheraltlocs) >= 1 and not keepaltloc == 'all':
-            logger.warning('Alternative atom locations detected. Only altloc {} was kept. If you prefer to keep all '
-                           'use the keepaltloc="all" option when reading the file.'.format(keepaltloc))
-            for a in otheraltlocs:
-                self.remove(self.altloc == a)
-
 
         fnamestr = os.path.splitext(os.path.basename(filename))[0]
         self.viewname = fnamestr
