@@ -465,7 +465,7 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
     """
     from htmd.progress.progress import ProgressBar
     memb = memb.copy()
-    memb.resid = sequenceID(memb.resid)
+    memb.resid = sequenceID((memb.resid, memb.insertion, memb.chain, memb.segid))
 
     minmemb = np.min(memb.get('coords', 'water'), axis=0).flatten()
 
@@ -488,15 +488,17 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
             tmpmemb.moveBy([-float(minmemb[0]) + xpos, -float(minmemb[1]) + ypos, 0])
             tmpmemb.remove('same resid as (x > {} or y > {})'.format(xmax, ymax), _logger=False)
-            tmpmemb.set('segid', 'M{}'.format(k))
+            tmpmemb.set('segid', 'M{}'.format(k), sel='not water')
+            tmpmemb.set('segid', 'MW{}'.format(k), sel='water')
 
             megamemb.append(tmpmemb)
             k += 1
             bar.progress()
     bar.stop()
+
     # Membranes don't tile perfectly. Need to remove waters that clash with lipids of other tiles
     # Some clashes will still occur between periodic images however
-    megamemb.remove('same fragment as water and within 1.5 of not water', _logger=False)
+    megamemb.remove('same resid as water and within 1.5 of not water', _logger=False)
     return megamemb
 
 
