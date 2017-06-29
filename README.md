@@ -1,5 +1,7 @@
 [![Build Status](https://travis-ci.org/Acellera/htmd.svg?branch=master)](https://travis-ci.org/Acellera/htmd) 
 [![Conda](https://anaconda.org/acellera/htmd/badges/version.svg)](https://anaconda.org/acellera/HTMD)
+[![Build status](https://ci.appveyor.com/api/projects/status/m1bxrop34b2qw68x/branch/master?svg=true)](https://ci.appveyor.com/project/acelleraci/htmd/branch/master)
+
 
 # HTMD main repository
 [HTMD](https://www.htmd.org) (high-throughput molecular dynamics) is a programmable, extensible platform written in Python.
