@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from glob import glob
-from os import path
+from os import path, makedirs
 import numpy as np
 from htmd.adaptive.adaptive import AdaptiveBase
 from htmd.simlist import simlist, simfilter
@@ -173,7 +173,7 @@ class AdaptiveMD(AdaptiveBase):
         self._model.markovModel(self.lag, self._numMacrostates(data))
         if self.save:
             if not path.exists('saveddata'):
-                os.makedirs('saveddata')
+                makedirs('saveddata')
             self._model.save(path.join('saveddata', 'e{}_adapt_model.dat'.format(self._getEpoch())))
 
     def _getSpawnFrames(self, reward, model, data, N):
