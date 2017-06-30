@@ -278,11 +278,12 @@ class Molecule:
             if np.size(self.coords) != 0 and (np.size(self.coords, 2) != 1 or np.size(mol.coords, 2) != 1):
                 raise NameError('Cannot concatenate molecules which contain multiple frames.')
 
+            if len(self.bonds) > 0:
+                self.bonds[self.bonds >= index] += mol.numAtoms
             if len(mol.bonds) > 0:
                 newbonds = mol.bonds.copy()
                 newbonds += index
                 if len(self.bonds) > 0:
-                    self.bonds[self.bonds >= index] += mol.numAtoms
                     self.bonds = np.append(self.bonds, newbonds, axis=0)
                 else:
                     self.bonds = newbonds
@@ -827,6 +828,8 @@ class Molecule:
             if len(topo.__dict__[field]) != 0:
                 natoms.append(len(topo.__dict__[field]))
         natoms = np.unique(natoms)
+        if len(natoms) == 0:
+            raise RuntimeError('No atoms were read from file {}.'.format(filename))
         if len(natoms) != 1:
             raise TopologyInconsistencyError('Different number of atoms read from file {} for different fields: {}.'
                                              .format(filename, natoms))
@@ -926,11 +929,11 @@ class Molecule:
 
         self.coords = np.concatenate(coordslist, axis=2).astype(Molecule._dtypes['coords'])
         if np.all([x is None for x in boxlist]):
-            self.box = None
+            self.box = np.zeros((3, 1), dtype=Molecule._dtypes['box'])
         else:
             self.box = np.concatenate(boxlist, axis=1).astype(Molecule._dtypes['box'])
         if np.all([x is None for x in boxangleslist]):
-            self.boxangles = None
+            self.boxangles = np.zeros((3, 1), dtype=Molecule._dtypes['box'])
         else:
             self.boxangles = np.concatenate(boxangleslist, axis=1).astype(Molecule._dtypes['boxangles'])
         self.fileloc = fileloclist
