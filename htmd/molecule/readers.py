@@ -563,6 +563,8 @@ def PRMTOPread(filename):
                 section = 'bonds'
             elif line.startswith('%FLAG BOX_DIMENSIONS'):
                 section = 'box'
+            elif line.startswith('%FLAG AMBER_ATOM_TYPE'):
+                section = 'amberatomtype'
             elif line.startswith('%FLAG'):
                 section = None
 
@@ -574,7 +576,7 @@ def PRMTOPread(filename):
             elif section == 'names':
                 fieldlen = 4
                 topo.name += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
-                          if len(line[i:i + fieldlen].strip()) != 0]
+                              if len(line[i:i + fieldlen].strip()) != 0]
             elif section == 'charges':
                 fieldlen = 16
                 topo.charge += [float(line[i:i + fieldlen].strip()) / 18.2223 for i in range(0, len(line), fieldlen)
@@ -595,6 +597,10 @@ def PRMTOPread(filename):
                 fieldlen = 8
                 bondsidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
                              if len(line[i:i + fieldlen].strip()) != 0]
+            elif section == 'amberatomtype':
+                fieldlen = 4
+                topo.atomtype += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
+                                  if len(line[i:i + fieldlen].strip()) != 0]
 
     # Replicating unique resnames according to their start and end indeces
     residx.append(len(topo.name)+1)
@@ -786,7 +792,7 @@ def CRDread(filename, givenframes=None, topoloc=None):
                        if len(line[i:i + fieldlen].strip()) != 0]
 
     coords = np.vstack([coords[i:i + 3] for i in range(0, len(coords), 3)])[:, :, np.newaxis]
-    return coords, None, None, np.zeros(1), np.zeros(1)
+    return coords, None, None, np.zeros(1, dtype=int), np.zeros(1)
 
 
 def BINCOORread(filename, givenframes=None, topoloc=None):
