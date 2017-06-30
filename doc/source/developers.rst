@@ -9,5 +9,6 @@ Contents:
 .. toctree::
     :maxdepth: 2
 
-    Coding Style <developers/codingstyle>
+    How to contribute <developers/howto>
+    Guidelines for developers <developers/guidelines>
     Versioning <developers/versioning>
