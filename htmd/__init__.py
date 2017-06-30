@@ -1,3 +1,4 @@
+from htmd.ui import *  # TODO: This will be deprecated in a few versions
 from htmd.config import config
 from htmd.version import version as _version
 import os
@@ -21,4 +22,5 @@ if os.getenv('HTMD_CONFIG'):
         else:
             print('\nHTMD Config file {} executed.'.format(configfile))
 
-print('Deprecation warning: To import all HTMD shortcuts please use "from htmd.ui import *"')
+print('Deprecation warning: "from htmd import *" will be deprecated. '
+      '\nTo import all HTMD shortcuts please from now on use "from htmd.ui import *"')
