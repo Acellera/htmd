@@ -210,6 +210,16 @@ class Molecule:
         return data
 
     @property
+    def fstep(self):
+        if self.time is not None and len(self.time) > 1:
+            diff = np.unique(np.diff(self.time))
+            if len(diff) != 1:
+                logger.warning('Different timesteps in Molecule.time. Cannot calculate fstep.')
+                return None
+            return float(diff / 1E6)  # convert femtoseconds to nanoseconds
+        return None
+
+    @property
     def frame(self):
         if self._frame < 0 or self._frame >= self.numFrames:
             raise NameError("frame out of range")
@@ -872,8 +882,6 @@ class Molecule:
         self.fileloc = [[fnamestr, 0]]
         self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
-        if not hasattr(self, 'fstep'):
-            self.fstep = None
 
     def _readTraj(self, filename, reader, skip=None, frames=None, append=False, mdtraj=False):
         def checkCoords(coords, reader, f):
@@ -889,21 +897,22 @@ class Molecule:
         boxlist = []
         boxangleslist = []
         fileloclist = []
+        steplist = []
+        timelist = []
         if append:
             coordslist.append(list(self.coords))
             boxlist.append(list(self.box))
             boxangleslist.append(list(self.boxangles))
             fileloclist.append(list(self.fileloc))
+            steplist.append(list(self.step))
+            timelist.append(list(self.time))
 
         # If a single filename is specified, turn it into an array so we can iterate
-        if isinstance(filename, str):
-            filename = [filename]
-        if not isinstance(filename, np.ndarray):
-            filename = np.array(filename)
+        from htmd.util import ensurelist
+        filename = ensurelist(filename)
 
         if frames is not None:
-            if not isinstance(frames, list) and not isinstance(frames, np.ndarray):
-                frames = [frames]
+            frames = ensurelist(frames)
             if len(filename) != len(frames):
                 raise NameError('Number of trajectories ({}) does not match number of frames ({}) given as arguments'.format(len(filename), len(frames)))
 
@@ -927,6 +936,8 @@ class Molecule:
                     if boxangles is not None:
                         boxangles = boxangles[:, frames[i]][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
                 fileloclist.append([f, int(frames[i])])
+            steplist.append(step)
+            timelist.append(time)
 
             if self.numAtoms != 0 and coords.shape[0] != self.numAtoms:
                 raise ValueError('Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(coords.shape[0], self.numAtoms))
@@ -945,6 +956,8 @@ class Molecule:
         else:
             self.boxangles = np.concatenate(boxangleslist, axis=1).astype(Molecule._dtypes['boxangles'])
         self.fileloc = fileloclist
+        self.step = np.hstack(steplist)
+        self.time = np.hstack(timelist)
 
         if skip is not None:
             self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
@@ -952,22 +965,13 @@ class Molecule:
                 self.box = np.array(self.box[:, ::skip])
             if self.boxangles is not None:
                 self.boxangles = self.boxangles[:, ::skip]
+            if self.step is not None:
+                self.step = self.step[::skip]
+            if self.time is not None:
+                self.time = self.time[::skip]
             self.fileloc = self.fileloc[::skip]
 
         self.coords = np.atleast_3d(self.coords)
-        self.step = step
-        self.time = time
-
-        # TODO: Move out. This looks like a XTC reader fix!!!
-        if len(time) < 2:
-            # Trajectory has broken framestep. Cannot read correctly, setting to 0.1ns.
-            # logger.info('Trajectory has broken framestep. Cannot read correctly, setting to 0.1ns.')
-            self.fstep = 0.1
-        else:
-            self.fstep = (time[1] - time[0]) / 1E6  # convert femtoseconds to nanoseconds
-
-        if skip is not None:
-            self.fstep *= skip
 
     def _writeNumFrames(self, filepath, numFrames):
         """ Write the number of frames in a hidden file. Allows us to check for trajectory length issues before projecting
@@ -1355,14 +1359,15 @@ class Molecule:
         mol : :class:`Molecule`
             A Molecule object.
         """
-        if (self.fstep !=0 and mol.fstep !=0) and (self.fstep != mol.fstep):
+        fstep = self.fstep
+        if (fstep !=0 and mol.fstep !=0) and (fstep != mol.fstep):
             raise RuntimeError('Cannot concatenate Molecules with different fsteps')
         self.coords = np.concatenate((self.coords, mol.coords), axis=2)
         self.box = np.concatenate((self.box, mol.box), axis=1)
         self.boxangles = np.concatenate((self.boxangles, mol.boxangles), axis=1)
         self.fileloc += mol.fileloc
         self.step = np.arange(self.coords.shape[2])
-        self.time = self.fstep * self.step
+        self.time = fstep * self.step
 
     @property
     def numFrames(self):
