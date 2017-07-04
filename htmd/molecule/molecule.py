@@ -733,7 +733,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A'):
+    def read(self, filenames, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A'):
         """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
         mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
@@ -741,7 +741,7 @@ class Molecule:
 
         Parameters
         ----------
-        filename : str
+        filenames : str
             Name of the file we want to read
         type : str, optional
             File type of the file. If None, it's automatically determined by the extension
@@ -751,84 +751,134 @@ class Molecule:
             If the file is a trajectory, read only the given frames
         append : bool, optional
             If the file is a trajectory or coor file, append the coordinates to the previous coordinates. Note append is slow.
-        overwrite : list of str
+        overwrite : str, list of str
             A list of the existing fields in Molecule that we wish to overwrite when reading this file.
-        keepaltloc : bool
+        keepaltloc : str
             Set to any string to only keep that specific altloc. Set to 'all' if you want to keep all alternative atom positions.
         """
         from htmd.simlist import Sim, Frame
-        from htmd.molecule.readers import _TOPOLOGY_READERS, _TRAJECTORY_READERS, _MDTRAJ_TRAJECTORY_EXTS, _COORDINATE_READERS
+        from htmd.molecule.readers import _MDTRAJ_TRAJECTORY_EXTS, _ALL_READERS, FormatError
 
-        if isinstance(filename, list) or isinstance(filename, np.ndarray):
-            for f in filename:
-                if len(f) != 4 and not os.path.exists(f):
-                    raise FileNotFoundError('File {} was not found.'.format(f))
-            firstfile = filename[0]
+        # If a single filename is specified, turn it into an array so we can iterate
+        from htmd.util import ensurelist
+        filenames = ensurelist(filenames)
+
+        if frames is not None:
+            frames = ensurelist(frames)
+            if len(filenames) != len(frames):
+                raise NameError('Number of trajectories ({}) does not match number of frames ({}) given as arguments'.format(len(filenames), len(frames)))
         else:
-            if not isinstance(filename, Sim) and not isinstance(filename, Frame) and len(filename) != 4 and not os.path.exists(filename):
-                raise FileNotFoundError('File {} was not found.'.format(filename))
-            firstfile = filename
+            frames = [None] * len(filenames)
 
-        if isinstance(filename, Sim):
-            self.read(filename.molfile)
-            self.read(filename.trajectory)
+        for f in filenames:
+            if not isinstance(f, Sim) and not isinstance(f, Frame) and len(f) != 4 and not os.path.exists(f):
+                raise FileNotFoundError('File {} was not found.'.format(f))
+
+        if len(filenames) == 1 and isinstance(filenames[0], Sim):
+            self.read(filenames[0].molfile)
+            self.read(filenames[0].trajectory)
             return
-        if isinstance(filename, Frame):
-            self.read(filename.sim.molfile)
-            self.read(filename.sim.trajectory[filename.piece])
-            self.dropFrames(keep=filename.frame)
+        if len(filenames) == 1 and isinstance(filenames[0], Frame):
+            self.read(filenames[0].sim.molfile)
+            self.read(filenames[0].sim.trajectory[filenames[0].piece])
+            self.dropFrames(keep=filenames[0].frame)
             return
 
-        if firstfile.endswith('gz'):
-            import gzip
-            from htmd.util import tempname
-            with gzip.open(filename, 'r') as f:
-                firstfile = tempname(suffix='.{}'.format(firstfile.split('.')[-2]))
-                with open(firstfile, 'w') as fo:
-                    fo.write(f.read().decode('utf-8', errors='ignore'))
+        from htmd.molecule.readers import Trajectory
+        topo = None
+        if append:
+            traj = Trajectory(self.coords, self.box, self.boxangles, self.fileloc, self.step, self.time)
+        else:
+            traj = Trajectory()
 
+        for fname, frame in zip(filenames, frames):
+            fname = self._unzip(fname)
+            ext = self._getExt(fname, type)
+
+            # To use MDTraj we need to write out a PDB file to use it to read the trajs
+            tmppdb = None
+            if ext in _MDTRAJ_TRAJECTORY_EXTS:
+                tmppdb = tempname(suffix='.pdb')
+                self.write(tmppdb)
+
+            if ext not in _ALL_READERS:
+                raise ValueError('Unknown file type with extension "{}".'.format(ext))
+            readers = _ALL_READERS[ext]
+            for rr in readers:
+                try:
+                    to, tr = rr(fname, frame=frame, topoloc=tmppdb)
+                except FormatError:
+                    continue
+                else:
+                    break
+
+            if tr is not None:
+                self._keepFrame(tr, frame)
+                self._checkCoords(tr, rr, fname)
+                # TODO: Get rid of this if by moving it to a function
+                if frames is None:
+                    # Writing hidden index file containing number of frames in trajectory file
+                    self._writeNumFrames(fname, tr.coords[0].shape[2])
+                    ff = range(np.size(tr.coords[0], 2))
+                else:
+                    ff = [frame]
+                tr.fileloc = [[fname, j] for j in ff]
+                traj += tr
+
+            if to is not None and topo is None:  # We only use the first topology we read
+                self._parseTopology(to, fname, overwrite=overwrite)
+                self._dropAltLoc(keepaltloc=keepaltloc)
+                topo = to
+
+        if len(traj.coords) != 0:
+            self._parseTraj(traj, skip=skip)
+
+    def _checkCoords(self, traj, reader, f):
+        coords = traj.coords[0]
+        if self.numAtoms != 0 and coords.shape[0] != self.numAtoms:
+            raise ValueError(
+                'Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(
+                    coords.shape[0], self.numAtoms))
+
+        assert coords.ndim == 3, 'Reader {} must return 3D coordinates array for file {}'.format(reader, f)
+        assert coords.shape[1] == 3, 'Reader {} must return 3 values in 2nd dimension for file {}'.format(reader, f)
+
+    def _keepFrame(self, traj, frame):
+        if frame is not None and traj.coords[0].shape[2] > 1:
+            traj.coords[0] = traj.coords[0][:, :, frame][:, :, np.newaxis]
+            traj.coords[0] = traj.coords[0].copy()  # Copying is needed to fix strides from mdtraj
+            if traj.box[0] is not None:
+                traj.box[0] = traj.box[0][:, frame][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
+            if traj.boxangles[0] is not None:
+                traj.boxangles[0] = traj.boxangles[0][:, frame][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
+            if traj.step[0] is not None:
+                traj.step[0] = traj.step[0][frame]
+            if traj.time[0] is not None:
+                traj.time[0] = traj.time[0][frame]
+
+    def _getExt(self, fname, type):
+        from htmd.molecule.readers import _TOPOLOGY_READERS, _TRAJECTORY_READERS, _COORDINATE_READERS
         if type is not None:
             type = type.lower()
-        ext = os.path.splitext(firstfile)[1][1:]
-
-        # TODO: I need to remove these exceptions
-        if (not os.path.isfile(firstfile) and len(firstfile) == 4) or type == "pdb" or ext == "pdb" or ext == 'ent':
-            from htmd.molecule.readers import PDBread
-            topo, coords, crystalinfo = PDBread(firstfile)
-            self.crystalinfo = crystalinfo
-            self._parseTopology(topo, firstfile, overwrite=overwrite)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-            self._dropAltLoc(keepaltloc=keepaltloc)
-            return
-        elif type == "pdbqt" or ext == "pdbqt":
-            from htmd.molecule.readers import PDBread
-            topo, coords, crystalinfo = PDBread(firstfile, mode='pdbqt')
-            self.crystalinfo = crystalinfo
-            self._parseTopology(topo, firstfile, overwrite=overwrite)
-            self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-            self._dropAltLoc(keepaltloc=keepaltloc)
-            return
-
+        ext = os.path.splitext(fname)[1][1:]
+        if not os.path.isfile(fname) and len(fname) == 4:
+            type = 'pdb'
         if type in _TOPOLOGY_READERS or type in _TRAJECTORY_READERS or type in _COORDINATE_READERS:
             ext = type
-        if ext in _TOPOLOGY_READERS:
-            reader = _TOPOLOGY_READERS[ext]
-            topo, coords = reader(filename)
-            self._parseTopology(topo, filename, overwrite=overwrite)
-            if coords is not None:
-                self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
-            self.fileloc.append([filename, 0])
-        elif ext in _TRAJECTORY_READERS:
-            self._readTraj(filename, _TRAJECTORY_READERS[ext], skip=skip, frames=frames, append=append, mdtraj=(ext in _MDTRAJ_TRAJECTORY_EXTS))
-        elif ext in _COORDINATE_READERS:
-            self._readTraj(filename, _COORDINATE_READERS[ext], skip=skip, frames=frames, append=append, mdtraj=(ext in _MDTRAJ_TRAJECTORY_EXTS))
-        else:
-            raise ValueError('Unknown file type with extension "{}".'.format(ext))
-        self._dropAltLoc(keepaltloc=keepaltloc)
+        return ext
+
+    def _unzip(self, fname):
+        if fname.endswith('gz'):
+            import gzip
+            from htmd.util import tempname
+            with gzip.open(fname, 'r') as f:
+                fname = tempname(suffix='.{}'.format(fname.split('.')[-2]))
+                with open(fname, 'w') as fo:
+                    fo.write(f.read().decode('utf-8', errors='ignore'))
+        return fname
 
     def _dropAltLoc(self, keepaltloc='A'):
         # Dropping atom alternative positions
-        from htmd.util import ensurelist
         otheraltlocs = [x for x in np.unique(self.altloc) if len(x) and x != keepaltloc]
         if len(otheraltlocs) >= 1 and not keepaltloc == 'all':
             logger.warning('Alternative atom locations detected. Only altloc {} was kept. If you prefer to keep all '
@@ -857,6 +907,8 @@ class Molecule:
             self.empty(natoms)
 
         for field in topo.__dict__:
+            if field == 'crystalinfo':
+                continue
             newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
 
             # Skip on empty new field data
@@ -882,69 +934,9 @@ class Molecule:
         self.fileloc = [[fnamestr, 0]]
         self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
+        self.crystalinfo = topo.crystalinfo
 
-    def _readTraj(self, filename, reader, skip=None, frames=None, append=False, mdtraj=False):
-        from htmd.molecule.readers import Trajectory
-
-        def checkCoords(coords, reader, f):
-            assert coords.ndim == 3, 'Reader {} must return 3D coordinates array for file {}'.format(reader, f)
-            assert coords.shape[1] == 3, 'Reader {} must return 3 values in 2nd dimension for file {}'.format(reader, f)
-
-        def keepFrame(coords, box, boxangles, step, time, frame):
-            coords = coords[:, :, frame][:, :, np.newaxis]
-            coords = coords.copy()  # Copying is needed to fix strides from mdtraj
-            if box is not None:
-                box = box[:, frame][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
-            if boxangles is not None:
-                boxangles = boxangles[:, frame][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
-            if step is not None:
-                step = step[frame]
-            if time is not None:
-                time = time[frame]
-            return coords, box, boxangles, step, time
-
-        tmppdb = None
-        if mdtraj:
-            tmppdb = tempname(suffix='.pdb')
-            self.write(tmppdb)
-
-        if append:
-            traj = Trajectory(self.coords, self.box, self.boxangles, self.fileloc, self.step, self.time)
-        else:
-            traj = Trajectory()
-
-        # If a single filename is specified, turn it into an array so we can iterate
-        from htmd.util import ensurelist
-        filename = ensurelist(filename)
-
-        if frames is not None:
-            frames = ensurelist(frames)
-            if len(filename) != len(frames):
-                raise NameError('Number of trajectories ({}) does not match number of frames ({}) given as arguments'.format(len(filename), len(frames)))
-        else:
-            frames = [None] * len(filename)
-
-        for i, f in enumerate(filename):
-            coords, box, boxangles, step, time = reader(f, topoloc=tmppdb, givenframes=frames[i])
-            if self.numAtoms != 0 and coords.shape[0] != self.numAtoms:
-                raise ValueError('Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(coords.shape[0], self.numAtoms))
-            checkCoords(coords, reader, f)
-
-            if frames[i] is not None:
-                ff = [frames[i]]
-                if coords.shape[2] != 1:  # Reader doesn't support specific frame reading. Keep single frame manually
-                    coords, box, boxangles, step, time = keepFrame(coords, box, boxangles, step, time, frames[i])
-            else:
-                ff = range(np.size(coords, 2))
-                # Writing hidden index file containing number of frames in trajectory file
-                self._writeNumFrames(f, coords.shape[2])
-            traj.fileloc += [[f, j] for j in ff]
-            traj.coords.append(coords)
-            traj.box.append(box)
-            traj.boxangles.append(boxangles)
-            traj.step.append(step)
-            traj.time.append(time)
-
+    def _parseTraj(self, traj, skip=None):
         self.coords = np.concatenate(traj.coords, axis=2).astype(Molecule._dtypes['coords'])
         if np.all([x is None for x in traj.box]):
             self.box = np.zeros((3, 1), dtype=Molecule._dtypes['box'])

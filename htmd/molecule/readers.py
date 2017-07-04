@@ -19,6 +19,14 @@ _NA_VALUES = set([
 ])
 
 
+class FormatError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
 class Topology:
     def __init__(self, pandasdata=None):
         self.record = []
@@ -40,6 +48,7 @@ class Topology:
         self.dihedrals = []
         self.impropers = []
         self.atomtype = []
+        self.crystalinfo = None
 
         if pandasdata is not None:
             for field in self.__dict__:
@@ -67,6 +76,15 @@ class Trajectory:
         self.time = []
         if coords is not None:
             self.coords = [coords]
+            nframes = coords.shape[2]
+            if box is None:
+                self.box = np.zeros((3, nframes), np.float32)
+            if boxangles is None:
+                self.boxangles = np.zeros((3, nframes), np.float32)
+            if step is None:
+                self.step = np.arange(nframes, dtype=int)
+            if time is None:
+                self.time = np.arange(nframes) * 1E5  # Default is 0.1ns in femtoseconds = 100.000 fs
         if box is not None:
             self.box = [box]
         if boxangles is not None:
@@ -78,8 +96,21 @@ class Trajectory:
         if time is not None:
             self.time = [time]
 
+    def __add__(self, other):
+        traj = Trajectory()
+        traj.coords = self.coords + other.coords
+        traj.box = self.box + other.box
+        traj.boxangles = self.boxangles + other.boxangles
+        traj.fileloc = self.fileloc + other.fileloc
+        traj.step = self.step + other.step
+        traj.time = self.time + other.time
+        return traj
 
-def XYZread(filename):
+    def __radd__(self, other):
+        return self.__add__(other)
+
+
+def XYZread(filename, frame=None, topoloc=None):
     topo = Topology()
     coords = []
 
@@ -95,10 +126,11 @@ def XYZread(filename):
             topo.resname.append('MOL')
             coords.append(s[1:4])
 
-    return topo, coords
+    traj = Trajectory(coords=coords)
+    return topo, traj
 
 
-def GJFread(filename):
+def GJFread(filename, frame=None, topoloc=None):
     # $rungauss
     # %chk=ts_rhf
     # %mem=2000000
@@ -128,10 +160,11 @@ def GJFread(filename):
                 coords.append([float(s) for s in pieces[1:4]])
         topo.serial = range(len(topo.record))
 
-    return topo, coords
+    traj = Trajectory(coords=coords)
+    return topo, traj
 
 
-def MOL2read(filename):
+def MOL2read(filename, frame=None, topoloc=None):
     import re
 
     topo = Topology()
@@ -175,10 +208,12 @@ def MOL2read(filename):
             if len(b) < 4:
                 break
             topo.bonds.append([int(b[1]) - 1, int(b[2]) - 1])
-    return topo, coords
+
+    traj = Trajectory(coords=coords)
+    return topo, traj
 
 
-def MAEread(fname):
+def MAEread(fname, frame=None, topoloc=None):
     """ Reads maestro files.
 
     Parameters
@@ -278,7 +313,9 @@ def MAEread(fname):
 
     for h in heteros:
         topo.record[topo.resname == h] = 'HETATM'
-    return topo, coords
+
+    traj = Trajectory(coords=coords)
+    return topo, traj
 
 
 def _getPDB(pdbid):
@@ -303,7 +340,7 @@ def _getPDB(pdbid):
     return filepath, tempfile
 
 
-def PDBread(filename, mode='pdb'):
+def PDBread(filename, mode='pdb', frame=None, topoloc=None):
     from pandas import read_fwf
     import io
 
@@ -551,14 +588,17 @@ def PDBread(filename, mode='pdb'):
 
     if tempfile:
         os.unlink(filename)
-    return topo, coords, crystalinfo
+
+    topo.crystalinfo = crystalinfo
+    traj = Trajectory(coords=coords)
+    return topo, traj
 
 
-def PDBQTread(filename):
-    return PDBread(filename, 'pdbqt')
+def PDBQTread(filename, frame=None, topoloc=None):
+    return PDBread(filename, mode='pdbqt', frame=frame, topoloc=topoloc)
 
 
-def PRMTOPread(filename):
+def PRMTOPread(filename, frame=None, topoloc=None):
     with open(filename, 'r') as f:
         topo = Topology()
         uqresnames = []
@@ -639,7 +679,7 @@ def PRMTOPread(filename):
     return topo, None
 
 
-def PSFread(filename):
+def PSFread(filename, frame=None, topoloc=None):
     import re
     residinsertion = re.compile('(\d+)([a-zA-Z])')
 
@@ -700,14 +740,14 @@ def PSFread(filename):
     return topo, None
 
 
-def XTCread(filename, givenframes=None, topoloc=None):
+def XTCread(filename, frame=None, topoloc=None):
     """ Reads XTC file
 
     Parameters
     ----------
     filename : str
         Path of xtc file.
-    givenframes : list
+    frame : list
         A list of integer frames which we want to read from the file. If None will read all.
 
     Returns
@@ -718,6 +758,7 @@ def XTCread(filename, givenframes=None, topoloc=None):
     step : nd.array
     time : nd.array
     """
+    givenframes = frame
     class __xtc(ct.Structure):
         _fields_ = [("box", (ct.c_float * 3)),
                     ("natoms", ct.c_int),
@@ -797,10 +838,10 @@ def XTCread(filename, givenframes=None, topoloc=None):
     if len(time) != nframes:
         logger.warning('No time information read from XTC. Defaulting to 0.1ns.')
         time = np.arange(nframes) * 1E5  # Default is 0.1ns in femtoseconds = 100.000 fs
-    return coords, box, boxangles, step, time
+    return None, Trajectory(coords=coords, box=box, boxangles=boxangles, step=step, time=time)
 
 
-def CRDread(filename, givenframes=None, topoloc=None):
+def CRDread(filename, frame=None, topoloc=None):
     #default_name
     #  7196
     #  -7.0046035  10.4479194  20.8320000  -7.3970000   9.4310000  20.8320000
@@ -817,10 +858,10 @@ def CRDread(filename, givenframes=None, topoloc=None):
                        if len(line[i:i + fieldlen].strip()) != 0]
 
     coords = np.vstack([coords[i:i + 3] for i in range(0, len(coords), 3)])[:, :, np.newaxis]
-    return coords, None, None, np.zeros(1, dtype=int), np.zeros(1)
+    return None, Trajectory(coords=coords)
 
 
-def CRDCARDread(filename, givenframes=None, topoloc=None):
+def CRDCARDread(filename, frame=None, topoloc=None):
     """ https://www.charmmtutorial.org/index.php/CHARMM:The_Basics
         title = * WATER
         title = *  DATE:     4/10/07      4:25:51      CREATED BY USER: USER
@@ -851,21 +892,21 @@ def CRDCARDread(filename, givenframes=None, topoloc=None):
             6    2 TIP3 H2     0.40780  -0.02508  -0.02820 W    2      0.00000
     """
     coords = []
-    t = Topology()
+    topo = Topology()
     with open(filename, 'r') as f:
         lines = f.readlines()
         for line in lines[4:]:
             pieces = line.split()
-            t.resname = pieces[2]
-            t.name = pieces[3]
+            topo.resname = pieces[2]
+            topo.name = pieces[3]
             coords.append([float(x) for x in pieces[4:7]])
-            t.segid = pieces[7]
-            t.resid = int(pieces[8])
+            topo.segid = pieces[7]
+            topo.resid = int(pieces[8])
     coords = np.vstack(coords)[:, :, np.newaxis]
-    return t, coords
+    return topo, Trajectory(coords=coords)
 
 
-def BINCOORread(filename, givenframes=None, topoloc=None):
+def BINCOORread(filename, frame=None, topoloc=None):
     import struct
     with open(filename, 'rb') as f:
         dat = f.read(4)
@@ -875,10 +916,10 @@ def BINCOORread(filename, givenframes=None, topoloc=None):
         fmt = 'd' * (natoms * 3)
         coords = struct.unpack(fmt, dat)
         coords = np.array(coords, dtype=np.float32).reshape((natoms, 3, 1))
-    return coords, None, None, np.zeros(1), np.zeros(1)
+    return None, Trajectory(coords=coords)
 
 
-def MDTRAJread(filename, topoloc, givenframes=None):
+def MDTRAJread(filename, frame=None, topoloc=None):
     import mdtraj as md
     traj = md.load(filename, top=topoloc)
     coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
@@ -890,10 +931,10 @@ def MDTRAJread(filename, topoloc, givenframes=None):
         step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
     box = traj.unitcell_lengths.T * 10
     boxangles = traj.unitcell_angles.T
-    return coords.copy(), box, boxangles, step, time  # Copying coords needed to fix MDtraj stride
+    return None, Trajectory(coords=coords.copy(), box=box, boxangles=boxangles, step=step, time=time)  # Copying coords needed to fix MDtraj stride
 
 
-def MDTRAJTOPOread(filename):
+def MDTRAJTOPOread(filename, frame=None, topoloc=None):
     translate = {'serial': 'serial', 'name': 'name', 'element': 'element', 'resSeq': 'resid', 'resName': 'resname',
                  'chainID': 'chain', 'segmentID': 'segid'}
     import mdtraj as md
@@ -907,10 +948,10 @@ def MDTRAJTOPOread(filename):
 
     coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
     topo.bonds = bonds
-    return topo, coords
+    return topo, Trajectory(coords=coords)
 
 
-def GROTOPread(filename):
+def GROTOPread(filename, frame=None, topoloc=None):
     # Reader for GROMACS .top file format:
     # http://manual.gromacs.org/online/top.html
     topo = Topology()
@@ -946,7 +987,8 @@ _TOPOLOGY_READERS = {'prmtop': PRMTOPread,
                      'pdb': PDBread,
                      'ent': PDBread,
                      'pdbqt': PDBQTread,
-                     'top': GROTOPread}
+                     'top': [GROTOPread, PRMTOPread],
+                     'crd': CRDCARDread}
 
 from mdtraj.core.trajectory import _TOPOLOGY_EXTS as _MDTRAJ_TOPOLOGY_EXTS
 _MDTRAJ_TOPOLOGY_EXTS = [x[1:] for x in _MDTRAJ_TOPOLOGY_EXTS]  # Removing the initial dot
@@ -963,6 +1005,23 @@ _MDTRAJ_TRAJECTORY_EXTS = ('dcd', 'binpos', 'trr', 'nc', 'h5', 'lh5', 'netcdf')
 for ext in _MDTRAJ_TRAJECTORY_EXTS:
     if ext not in _TRAJECTORY_READERS:
         _TRAJECTORY_READERS[ext] = MDTRAJread
+
+_ALL_READERS = {}
+for k in _TOPOLOGY_READERS:
+    if k not in _ALL_READERS:
+        _ALL_READERS[k] = [_TOPOLOGY_READERS[k]]
+    else:
+        _ALL_READERS[k].append(_TOPOLOGY_READERS[k])
+for k in _TRAJECTORY_READERS:
+    if k not in _ALL_READERS:
+        _ALL_READERS[k] = [_TRAJECTORY_READERS[k]]
+    else:
+        _ALL_READERS[k].append(_TRAJECTORY_READERS[k])
+for k in _COORDINATE_READERS:
+    if k not in _ALL_READERS:
+        _ALL_READERS[k] = [_COORDINATE_READERS[k]]
+    else:
+        _ALL_READERS[k].append(_COORDINATE_READERS[k])
 
 
 if __name__ == '__main__':

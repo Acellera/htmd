@@ -326,7 +326,7 @@ def readSimlistIndices(prj, selector):
         tset.add(tn)
         bar.progress()
         # print("Read frame {:d} from trajectory {:s}, frame {:d}".format(i, tn, f.frame))
-        mol.read(filename=tn,
+        mol.read(filenames=tn,
                  frames=f.frame,
                  append=True)
 
