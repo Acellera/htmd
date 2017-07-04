@@ -57,6 +57,28 @@ class Topology:
                      'occupancy', 'beta', 'segid', 'charge', 'masses', 'atomtype']
 
 
+class Trajectory:
+    def __init__(self, coords=None, box=None, boxangles=None, fileloc=None, step=None, time=None):
+        self.coords = []
+        self.box = []
+        self.boxangles = []
+        self.fileloc = []
+        self.step = []
+        self.time = []
+        if coords is not None:
+            self.coords = [coords]
+        if box is not None:
+            self.box = [box]
+        if boxangles is not None:
+            self.boxangles = [boxangles]
+        if fileloc is not None:
+            self.fileloc = [fileloc]
+        if step is not None:
+            self.step = [step]
+        if time is not None:
+            self.time = [time]
+
+
 def XYZread(filename):
     topo = Topology()
     coords = []
