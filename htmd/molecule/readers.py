@@ -874,6 +874,7 @@ _TOPOLOGY_READERS = {'prmtop': PRMTOPread,
                      'gjf': GJFread,
                      'xyz': XYZread,
                      'pdb': PDBread,
+                     'ent': PDBread,
                      'pdbqt': PDBQTread,
                      'top': GROTOPread}
 

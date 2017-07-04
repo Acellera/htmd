@@ -769,24 +769,32 @@ class Molecule:
             self.dropFrames(keep=filename.frame)
             return
 
+        if firstfile.endswith('gz'):
+            import gzip
+            from htmd.util import tempname
+            with gzip.open(filename, 'r') as f:
+                firstfile = tempname(suffix='.{}'.format(firstfile.split('.')[-2]))
+                with open(firstfile, 'w') as fo:
+                    fo.write(f.read().decode('utf-8', errors='ignore'))
+
         if type is not None:
             type = type.lower()
         ext = os.path.splitext(firstfile)[1][1:]
 
         # TODO: I need to remove these exceptions
-        if (not os.path.isfile(firstfile) and len(firstfile) == 4) or type == "pdb" or ext == "pdb":
+        if (not os.path.isfile(firstfile) and len(firstfile) == 4) or type == "pdb" or ext == "pdb" or ext == 'ent':
             from htmd.molecule.readers import PDBread
-            topo, coords, crystalinfo = PDBread(filename)
+            topo, coords, crystalinfo = PDBread(firstfile)
             self.crystalinfo = crystalinfo
-            self._parseTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, firstfile, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._dropAltLoc(keepaltloc=keepaltloc)
             return
         elif type == "pdbqt" or ext == "pdbqt":
             from htmd.molecule.readers import PDBread
-            topo, coords, crystalinfo = PDBread(filename, mode='pdbqt')
+            topo, coords, crystalinfo = PDBread(firstfile, mode='pdbqt')
             self.crystalinfo = crystalinfo
-            self._parseTopology(topo, filename, overwrite=overwrite)
+            self._parseTopology(topo, firstfile, overwrite=overwrite)
             self.coords = np.atleast_3d(np.array(coords, dtype=self._dtypes['coords']))
             self._dropAltLoc(keepaltloc=keepaltloc)
             return
