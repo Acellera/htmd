@@ -769,6 +769,12 @@ def XTCread(filename, givenframes=None, topoloc=None):
 
     coords *= 10.  # Convert from nm to Angstrom
     box *= 10.  # Convert from nm to Angstrom
+    nframes = coords.shape[2]
+    if len(step) != nframes:
+        step = np.arange(nframes)
+    if len(time) != nframes:
+        logger.warning('No time information read from XTC. Defaulting to 0.1ns.')
+        time = np.arange(nframes) * 1E5  # Default is 0.1ns in femtoseconds = 100.000 fs
     return coords, box, boxangles, step, time
 
 
@@ -779,20 +785,62 @@ def CRDread(filename, givenframes=None, topoloc=None):
     #  -7.0486898   8.9066002  21.7218220  -7.0486899   8.9065995  19.9421780
 
     with open(filename, 'r') as f:
-        coords = []
+        lines = f.readlines()
 
+        coords = []
         fieldlen = 12
         k = 0
-        for line in f:
-            k += 1
-            if k < 3:  # skip first 2 lines
-                continue
-
+        for line in lines[2:]:  # skip first 2 lines
             coords += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
                        if len(line[i:i + fieldlen].strip()) != 0]
 
     coords = np.vstack([coords[i:i + 3] for i in range(0, len(coords), 3)])[:, :, np.newaxis]
     return coords, None, None, np.zeros(1, dtype=int), np.zeros(1)
+
+
+def CRDCARDread(filename, givenframes=None, topoloc=None):
+    """ https://www.charmmtutorial.org/index.php/CHARMM:The_Basics
+        title = * WATER
+        title = *  DATE:     4/10/07      4:25:51      CREATED BY USER: USER
+        title = *
+        Number of atoms (NATOM)       = 6
+        Atom number (ATOMNO)          = 1 (just an exmaple)
+        Residue number (RESNO)        = 1
+        Residue name (RESName)        = TIP3
+        Atom type (TYPE)              = OH2
+        Coordinate (X)                = -1.30910
+        Coordinate (Y)                = -0.25601
+        Coordinate (Z)                = -0.24045
+        Segment ID (SEGID)            = W
+        Residue ID (RESID)            = 1
+        Atom weight (Weighting)       = 0.00000
+
+        now what that looks like...
+
+        * WATER
+        *  DATE:     4/10/07      4:25:51      CREATED BY USER: USER
+        *
+            6
+            1    1 TIP3 OH2   -1.30910  -0.25601  -0.24045 W    1      0.00000
+            2    1 TIP3 H1    -1.85344   0.07163   0.52275 W    1      0.00000
+            3    1 TIP3 H2    -1.70410   0.16529  -1.04499 W    1      0.00000
+            4    2 TIP3 OH2    1.37293   0.05498   0.10603 W    2      0.00000
+            5    2 TIP3 H1     1.65858  -0.85643   0.10318 W    2      0.00000
+            6    2 TIP3 H2     0.40780  -0.02508  -0.02820 W    2      0.00000
+    """
+    coords = []
+    t = Topology()
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        for line in lines[4:]:
+            pieces = line.split()
+            t.resname = pieces[2]
+            t.name = pieces[3]
+            coords.append([float(x) for x in pieces[4:7]])
+            t.segid = pieces[7]
+            t.resid = int(pieces[8])
+    coords = np.vstack(coords)[:, :, np.newaxis]
+    return t, coords
 
 
 def BINCOORread(filename, givenframes=None, topoloc=None):
