@@ -817,7 +817,7 @@ class Molecule:
                 self._keepFrame(tr, frame)
                 self._checkCoords(tr, rr, fname)
                 # TODO: Get rid of this if by moving it to a function
-                if frames is None:
+                if frame is None:
                     # Writing hidden index file containing number of frames in trajectory file
                     self._writeNumFrames(fname, tr.coords[0].shape[2])
                     ff = range(np.size(tr.coords[0], 2))
