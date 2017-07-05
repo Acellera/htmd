@@ -915,11 +915,11 @@ def CRDCARDread(filename, frame=None, topoloc=None):
 
         for line in lines[4:]:
             pieces = line.split()
-            topo.resname = pieces[2]
-            topo.name = pieces[3]
+            topo.resname.append(pieces[2])
+            topo.name.append(pieces[3])
             coords.append([float(x) for x in pieces[4:7]])
-            topo.segid = pieces[7]
-            topo.resid = int(pieces[8])
+            topo.segid.append(pieces[7])
+            topo.resid.append(int(pieces[8]))
     coords = np.vstack(coords)[:, :, np.newaxis]
     return topo, Trajectory(coords=coords)
 
