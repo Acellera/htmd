@@ -509,7 +509,7 @@ def PDBread(filename, mode='pdb'):
 
     crystalinfo = {}
     if len(parsedcryst1):
-        crystalinfo = parsedcryst1.ix[0].to_dict()
+        crystalinfo = parsedcryst1.iloc[0].to_dict()
         if isinstance(crystalinfo['sGroup'], str) or not np.isnan(crystalinfo['sGroup']):
             crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
     if len(parsedsymmetry):
