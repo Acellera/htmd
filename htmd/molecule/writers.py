@@ -364,7 +364,8 @@ def MOL2write(mol, filename):
     with open(filename, "w") as f:
         print("@<TRIPOS>MOLECULE", file=f)
         print("    MOL", file=f)
-        unique_bonds = np.array([list(t) for t in set(map(tuple, [sorted(x) for x in mol.bonds]))])
+        unique_bonds = [list(t) for t in set(map(tuple, [sorted(x) for x in mol.bonds]))]
+        unique_bonds = np.array(sorted(unique_bonds, key=lambda x: (x[0], x[1])))
         print("%5d %5d %5d %5d %5d" % (mol.numAtoms, unique_bonds.shape[0], 0, 0, 0), file=f)
         print("SMALL\nUSER_CHARGES\n\n", file=f)
         '''
@@ -412,7 +413,7 @@ def MOL2write(mol, filename):
             print('', file=f)
         print("@<TRIPOS>BOND", file=f)
         for i in range(unique_bonds.shape[0]):
-            print("%6d %4d %4d un" % (i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1), file=f) # TODO: implement SYBYL bond types
+            print("%6d %4d %4d un" % (i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1), file=f)  # TODO: implement SYBYL bond types
         print("", file=f)
 
 

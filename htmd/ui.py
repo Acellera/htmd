@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from __future__ import print_function
-from htmd.home import home
+import htmd.home
 from htmd.session import htmdsave, htmdload
 from htmd.simlist import simlist, simfilter, simmerge
 from htmd.metricdata import MetricData
@@ -73,7 +73,7 @@ from sklearn.cluster import MiniBatchKMeans
 # from matplotlib import pylab as plt
 # ----------------------------
 try:
-    logging.config.fileConfig(os.path.join(home(), 'logging.ini'), disable_existing_loggers=False)
+    logging.config.fileConfig(os.path.join(htmd.home.home(), 'logging.ini'), disable_existing_loggers=False)
 except:
     print("HTMD: Logging setup failed")
 

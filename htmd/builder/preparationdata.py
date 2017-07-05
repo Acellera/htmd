@@ -667,8 +667,8 @@ class PreparationData:
         newResData.data['resname'] = copy_of_resname
         newResData.data['protonation'] = copy_of_protonation
         newResData.data['default_protonation'] = copy_of_default_protonation
-        newResData.data.ix[list_of_forced_protonations, 'protonation'] = \
-            d.ix[list_of_forced_protonations, 'forced_protonation']
+        newResData.data.iloc[list_of_forced_protonations, 'protonation'] = \
+            d.iloc[list_of_forced_protonations, 'forced_protonation']
         for cn in keep_pka_columns:
             newResData.data[cn] = d[cn]
 
