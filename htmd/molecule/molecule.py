@@ -817,9 +817,10 @@ class Molecule:
                 self._keepFrame(tr, frame)
                 self._checkCoords(tr, rr, fname)
                 # TODO: Get rid of this if by moving it to a function
-                if frame is None:
+                if tr.numFrames >1 and frame is None:
                     # Writing hidden index file containing number of frames in trajectory file
-                    self._writeNumFrames(fname, tr.coords[0].shape[2])
+                    if os.path.isfile(fname):
+                        self._writeNumFrames(fname, tr.coords[0].shape[2])
                     ff = range(np.size(tr.coords[0], 2))
                 else:
                     ff = [frame]
@@ -828,11 +829,13 @@ class Molecule:
 
             if to is not None and topo is None:  # We only use the first topology we read
                 self._parseTopology(to, fname, overwrite=overwrite)
-                self._dropAltLoc(keepaltloc=keepaltloc)
                 topo = to
 
         if len(traj.coords) != 0:
             self._parseTraj(traj, skip=skip)
+            
+        if topo:
+            self._dropAltLoc(keepaltloc=keepaltloc)
 
     def _checkCoords(self, traj, reader, f):
         coords = traj.coords[0]
