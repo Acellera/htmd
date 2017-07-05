@@ -734,7 +734,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filenames, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A'):
+    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A'):
         """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
         mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
@@ -742,7 +742,7 @@ class Molecule:
 
         Parameters
         ----------
-        filenames : str
+        filename : str
             Name of the file we want to read
         type : str, optional
             File type of the file. If None, it's automatically determined by the extension
@@ -762,27 +762,27 @@ class Molecule:
 
         # If a single filename is specified, turn it into an array so we can iterate
         from htmd.util import ensurelist
-        filenames = ensurelist(filenames)
+        filename = ensurelist(filename)
 
         if frames is not None:
             frames = ensurelist(frames)
-            if len(filenames) != len(frames):
-                raise NameError('Number of trajectories ({}) does not match number of frames ({}) given as arguments'.format(len(filenames), len(frames)))
+            if len(filename) != len(frames):
+                raise NameError('Number of trajectories ({}) does not match number of frames ({}) given as arguments'.format(len(filename), len(frames)))
         else:
-            frames = [None] * len(filenames)
+            frames = [None] * len(filename)
 
-        for f in filenames:
+        for f in filename:
             if not isinstance(f, Sim) and not isinstance(f, Frame) and len(f) != 4 and not os.path.exists(f):
                 raise FileNotFoundError('File {} was not found.'.format(f))
 
-        if len(filenames) == 1 and isinstance(filenames[0], Sim):
-            self.read(filenames[0].molfile)
-            self.read(filenames[0].trajectory)
+        if len(filename) == 1 and isinstance(filename[0], Sim):
+            self.read(filename[0].molfile)
+            self.read(filename[0].trajectory)
             return
-        if len(filenames) == 1 and isinstance(filenames[0], Frame):
-            self.read(filenames[0].sim.molfile)
-            self.read(filenames[0].sim.trajectory[filenames[0].piece])
-            self.dropFrames(keep=filenames[0].frame)
+        if len(filename) == 1 and isinstance(filename[0], Frame):
+            self.read(filename[0].sim.molfile)
+            self.read(filename[0].sim.trajectory[filename[0].piece])
+            self.dropFrames(keep=filename[0].frame)
             return
 
         from htmd.molecule.readers import Trajectory
@@ -792,7 +792,7 @@ class Molecule:
         else:
             traj = Trajectory()
 
-        for fname, frame in zip(filenames, frames):
+        for fname, frame in zip(filename, frames):
             fname = self._unzip(fname)
             ext = self._getExt(fname, type)
 
