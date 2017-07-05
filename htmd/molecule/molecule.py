@@ -710,7 +710,8 @@ class Molecule:
         rotax = quad_coords[2] - quad_coords[1]
         rotax /= np.linalg.norm(rotax)
         rads = np.deg2rad(dihedralAngle(quad_coords))
-        self.rotate(rotax, radians-rads, center=self.coords[atom_quad[1], :, self.frame], sel=right)
+        M = rotationMatrix(rotax, radians-rads)
+        self.rotateBy(M, center=self.coords[atom_quad[1], :, self.frame], sel=right)
 
     def center(self, loc=(0, 0, 0), sel='all'):
         """ Moves the geometric center of the Molecule to a given location
@@ -857,13 +858,13 @@ class Molecule:
                 traj.time[0] = traj.time[0][frame]
 
     def _getExt(self, fname, type):
-        from htmd.molecule.readers import _TOPOLOGY_READERS, _TRAJECTORY_READERS, _COORDINATE_READERS
+        from htmd.molecule.readers import _ALL_READERS
         if type is not None:
             type = type.lower()
         ext = os.path.splitext(fname)[1][1:]
         if not os.path.isfile(fname) and len(fname) == 4:
             type = 'pdb'
-        if type in _TOPOLOGY_READERS or type in _TRAJECTORY_READERS or type in _COORDINATE_READERS:
+        if type in _ALL_READERS:
             ext = type
         return ext
 

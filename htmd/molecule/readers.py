@@ -76,15 +76,15 @@ class Trajectory:
         self.time = []
         if coords is not None:
             self.coords = [coords]
-            nframes = coords.shape[2]
+            nframes = self.numFrames
             if box is None:
-                self.box = np.zeros((3, nframes), np.float32)
+                self.box = [np.zeros((3, nframes), np.float32)]
             if boxangles is None:
-                self.boxangles = np.zeros((3, nframes), np.float32)
+                self.boxangles = [np.zeros((3, nframes), np.float32)]
             if step is None:
-                self.step = np.arange(nframes, dtype=int)
+                self.step = [np.arange(nframes, dtype=int)]
             if time is None:
-                self.time = np.arange(nframes) * 1E5  # Default is 0.1ns in femtoseconds = 100.000 fs
+                self.time = [np.arange(nframes) * 1E5]  # Default is 0.1ns in femtoseconds = 100.000 fs
         if box is not None:
             self.box = [box]
         if boxangles is not None:
@@ -95,6 +95,13 @@ class Trajectory:
             self.step = [step]
         if time is not None:
             self.time = [time]
+
+    @property
+    def numFrames(self):
+        n = 0
+        for c in self.coords:
+            n += c.shape[2]
+        return n
 
     def __add__(self, other):
         traj = Trajectory()
@@ -126,6 +133,7 @@ def XYZread(filename, frame=None, topoloc=None):
             topo.resname.append('MOL')
             coords.append(s[1:4])
 
+    coords = np.vstack(coords)[:, :, np.newaxis]
     traj = Trajectory(coords=coords)
     return topo, traj
 
@@ -160,6 +168,7 @@ def GJFread(filename, frame=None, topoloc=None):
                 coords.append([float(s) for s in pieces[1:4]])
         topo.serial = range(len(topo.record))
 
+    coords = np.vstack(coords)[:, :, np.newaxis]
     traj = Trajectory(coords=coords)
     return topo, traj
 
@@ -209,6 +218,7 @@ def MOL2read(filename, frame=None, topoloc=None):
                 break
             topo.bonds.append([int(b[1]) - 1, int(b[2]) - 1])
 
+    coords = np.vstack(coords)[:, :, np.newaxis]
     traj = Trajectory(coords=coords)
     return topo, traj
 
@@ -314,6 +324,7 @@ def MAEread(fname, frame=None, topoloc=None):
     for h in heteros:
         topo.record[topo.resname == h] = 'HETATM'
 
+    coords = np.vstack(coords)[:, :, np.newaxis]
     traj = Trajectory(coords=coords)
     return topo, traj
 
@@ -850,6 +861,9 @@ def CRDread(filename, frame=None, topoloc=None):
     with open(filename, 'r') as f:
         lines = f.readlines()
 
+        if lines[0].startswith('*'):
+            raise FormatError('CRDread failed. Try other reader.')
+
         coords = []
         fieldlen = 12
         k = 0
@@ -895,6 +909,10 @@ def CRDCARDread(filename, frame=None, topoloc=None):
     topo = Topology()
     with open(filename, 'r') as f:
         lines = f.readlines()
+
+        if not lines[0].startswith('*'):
+            raise FormatError('CRDread failed. Try other reader.')
+
         for line in lines[4:]:
             pieces = line.split()
             topo.resname = pieces[2]
