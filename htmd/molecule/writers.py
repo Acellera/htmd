@@ -501,7 +501,6 @@ if __name__ == '__main__':
     mol.box = np.ones((3, 2), dtype=np.float32) * 15
     mol.step = np.arange(2)
     mol.time = np.arange(2)
-    mol.fstep = 0.1
 
     for ext in _WRITERS:
         tmp = tempname(suffix='.'+ext)
