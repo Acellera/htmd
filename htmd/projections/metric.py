@@ -49,7 +49,6 @@ class Metric:
     >>> metr.set( (foo, (ref,)) )
     >>> data2 = metr.project()
 
-    .. currentmodule:: htmd.projections.metric.Metric
     .. rubric:: Methods
     .. autoautosummary:: htmd.projections.metric.Metric
         :methods:

@@ -29,7 +29,6 @@ class Kinetics(object):
     --------
     >>> kin = Kinetics(model, temperature=300, concentration=0.015)
 
-    .. currentmodule:: htmd.kinetics.Kinetics
     .. rubric:: Methods
     .. autoautosummary:: htmd.kinetics.Kinetics
         :methods:

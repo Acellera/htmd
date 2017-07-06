@@ -81,7 +81,6 @@ class Molecule:
     Atom field - atomtype shape: (1701,)
     ...
 
-    .. currentmodule:: htmd.molecule.molecule.Molecule
     .. rubric:: Methods
     .. autoautosummary:: htmd.molecule.molecule.Molecule
        :methods:
