@@ -979,23 +979,36 @@ def GROTOPread(filename, frame=None, topoloc=None):
     # http://manual.gromacs.org/online/top.html
     topo = Topology()
     section = None
+    atmidx = []
     with open(filename, 'r') as f:
         for line in f:
             if line.startswith(';') or line.startswith('#') or len(line.strip()) == 0:
                 continue
             if not line.startswith('[') and section == 'atoms':
-                #from IPython.core.debugger import Tracer
-                #Tracer()()
                 pieces = line.split()
+                atmidx.append(int(pieces[0]))
                 topo.resid.append(pieces[2])
                 topo.resname.append(pieces[3])
                 topo.name.append(pieces[4])
                 topo.charge.append(pieces[6])
+                topo.element.append(pieces[1])
+            if not line.startswith('[') and section == 'bonds':
+                pieces = line.split()
+                topo.bonds.append([int(pieces[0]), int(pieces[1])])
 
             if '[ atoms ]' in line:
                 section = 'atoms'
+            elif '[ bonds ]' in line:
+                section = 'bonds'
             elif line.startswith('['):
                 section = None
+
+    atmidx = np.array(atmidx)
+    atommapping = np.ones(np.max(atmidx) + 1) * -1
+    atommapping[atmidx] = np.arange(len(atmidx))
+    for i in range(len(topo.bonds)):
+        topo.bonds[i][0] = atommapping[topo.bonds[i][0]]
+
     if section is None and len(topo.name) == 0:
         raise FormatError('No atoms read in GROTOP file. Trying a different reader.')
     return topo, None
@@ -1093,3 +1106,7 @@ if __name__ == '__main__':
     mol.read([os.path.join(home(dataDir='1kdx'), '1kdx.dcd')], frames=[8])
     assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
     print('Can read DCD specific frames.')
+
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'gromacs.top'))
+    print('Can read GROMACS top files.')
+
