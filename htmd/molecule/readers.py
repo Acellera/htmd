@@ -477,6 +477,10 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
             if coords is None:
                 coords = np.zeros((len(parsedcoor), 3, 0), dtype=np.float32)
             currcoords = np.vstack((parsedcoor.x, parsedcoor.y, parsedcoor.z)).T
+            if coords.shape[0] != currcoords.shape[0]:
+                logger.warning('Different number of atoms read in different MODELs in the PDB file. '
+                               'Keeping only the first {} model(s)'.format(coords.shape[2]))
+                return coords
             coords = np.append(coords, currcoords[:, :, np.newaxis], axis=2)
         return coords
 
@@ -615,7 +619,6 @@ def PRMTOPread(filename, frame=None, topoloc=None):
         uqresnames = []
         residx = []
         bondsidx = []
-
         section = None
         for line in f:
             if line.startswith('%FLAG POINTERS'):
@@ -675,6 +678,8 @@ def PRMTOPread(filename, frame=None, topoloc=None):
                 topo.atomtype += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
                                   if len(line[i:i + fieldlen].strip()) != 0]
 
+    if len(topo.name) == 0:
+        raise FormatError('No atoms read in PRMTOP file. Trying a different reader.')
     # Replicating unique resnames according to their start and end indeces
     residx.append(len(topo.name)+1)
 
@@ -862,7 +867,7 @@ def CRDread(filename, frame=None, topoloc=None):
         lines = f.readlines()
 
         if lines[0].startswith('*'):
-            raise FormatError('CRDread failed. Try other reader.')
+            raise FormatError('CRDread failed. Trying other readers.')
 
         coords = []
         fieldlen = 12
@@ -911,7 +916,7 @@ def CRDCARDread(filename, frame=None, topoloc=None):
         lines = f.readlines()
 
         if not lines[0].startswith('*'):
-            raise FormatError('CRDread failed. Try other reader.')
+            raise FormatError('CRDCARDread failed. Trying other readers.')
 
         for line in lines[4:]:
             pieces = line.split()
@@ -991,6 +996,8 @@ def GROTOPread(filename, frame=None, topoloc=None):
                 section = 'atoms'
             elif line.startswith('['):
                 section = None
+    if section is None and len(topo.name) == 0:
+        raise FormatError('No atoms read in GROTOP file. Trying a different reader.')
     return topo, None
 
 
@@ -1024,22 +1031,22 @@ for ext in _MDTRAJ_TRAJECTORY_EXTS:
     if ext not in _TRAJECTORY_READERS:
         _TRAJECTORY_READERS[ext] = MDTRAJread
 
+from htmd.util import ensurelist
 _ALL_READERS = {}
 for k in _TOPOLOGY_READERS:
     if k not in _ALL_READERS:
-        _ALL_READERS[k] = [_TOPOLOGY_READERS[k]]
-    else:
-        _ALL_READERS[k].append(_TOPOLOGY_READERS[k])
+        _ALL_READERS[k] = []
+    _ALL_READERS[k] += ensurelist(_TOPOLOGY_READERS[k])
+
 for k in _TRAJECTORY_READERS:
     if k not in _ALL_READERS:
-        _ALL_READERS[k] = [_TRAJECTORY_READERS[k]]
-    else:
-        _ALL_READERS[k].append(_TRAJECTORY_READERS[k])
+        _ALL_READERS[k] = []
+    _ALL_READERS[k] += ensurelist(_TRAJECTORY_READERS[k])
+
 for k in _COORDINATE_READERS:
     if k not in _ALL_READERS:
-        _ALL_READERS[k] = [_COORDINATE_READERS[k]]
-    else:
-        _ALL_READERS[k].append(_COORDINATE_READERS[k])
+        _ALL_READERS[k] = []
+    _ALL_READERS[k] += ensurelist(_COORDINATE_READERS[k])
 
 
 if __name__ == '__main__':

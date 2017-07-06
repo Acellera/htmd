@@ -1246,8 +1246,8 @@ class Molecule:
                     raise AssertionError('Unexpected non-uniqueness of chain, resid, insertion in the sequence.')
                 resname = resname[0]
                 if oneletter:
-                    rescode = _residueNameTable.get(resname, "?")
-                    if rescode == "?":
+                    rescode = _residueNameTable.get(resname, 'X')
+                    if rescode == 'X':
                         logger.warning("Cannot provide one-letter code for non-standard residue %s" % resname)
                 else:
                     rescode = resname
