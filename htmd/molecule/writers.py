@@ -500,8 +500,7 @@ if __name__ == '__main__':
     mol.boxangles = np.ones((3, 2), dtype=np.float32) * 90
     mol.box = np.ones((3, 2), dtype=np.float32) * 15
     mol.step = np.arange(2)
-    mol.time = np.arange(2)
-    mol.fstep = 0.1
+    mol.time = np.arange(2) * 1E5
 
     for ext in _WRITERS:
         tmp = tempname(suffix='.'+ext)
