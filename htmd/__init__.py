@@ -1,10 +1,16 @@
 from htmd.ui import *  # TODO: This will be deprecated in a few versions
-from htmd.config import config
 from htmd.version import version as _version
+from htmdx.cli import check_registration, show_news
+from htmd.latest import compareVersions
 import os
 
 config()
 __version__ = _version()
+
+if not (os.getenv("HTMD_NONINTERACTIVE")):
+    check_registration(product='htmd')
+    show_news()
+    compareVersions()
 
 if os.getenv('HTMD_CONFIG'):
     configfile = os.getenv('HTMD_CONFIG')

@@ -1,7 +1,6 @@
-HTMD
-====
 
-**What is it?**
+What is it?
+===========
 
 HTMD is a molecular-specific programmable environment to prepare, handle, simulate, visualize and analyze molecular systems.
 HTMD is based on Python, so scientists can easily extend it to their needs. With HTMD is possible to do very
@@ -10,8 +9,8 @@ complex protocols in just few lines.
 In a single script, it is possible to plan an entire computational experiment, from manipulating PDBs, building,
 executing and analyzing simulations, computing Markov state models, kinetic rates, affinities and pathways.
 
-**Citing HTMD:**
-
+Citing HTMD
+===========
 If you are using HTMD in your publications please cite following papers:
 
 | **HTMD: High-Throughput Molecular Dynamics for Molecular Discovery**
@@ -21,9 +20,10 @@ If you are using HTMD in your publications please cite following papers:
  
 
 
-**Where to start**
+Where to start 
+==============
 
-The user guide is a good place to start playing around.
+The tutorials are a good place to start playing around. 
 
 .. toctree::
     :maxdepth: 3
@@ -31,10 +31,13 @@ The user guide is a good place to start playing around.
     userguide
     api
     developers
+    acemd
+    acetk/acetk
 
 
 
-**Indices and tables**
+Indices and tables
+==================
 
 * :ref:`genindex`
 * :ref:`modindex`

@@ -36,7 +36,6 @@ class Model(object):
     -------
     >>> model = Model(data)
 
-    .. currentmodule:: htmd.model.Model
     .. rubric:: Methods
     .. autoautosummary:: htmd.model.Model
         :methods:
