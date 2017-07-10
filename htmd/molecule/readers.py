@@ -65,6 +65,15 @@ class Topology:
         return ['record', 'serial', 'name', 'altloc', 'element', 'resname', 'chain', 'resid', 'insertion',
                      'occupancy', 'beta', 'segid', 'charge', 'masses', 'atomtype']
 
+    def fromMolecule(self, mol):
+        for field in self.__dict__:
+            data = mol.__dict__[field]
+            if data is None:
+                continue
+            if isinstance(data, np.ndarray):
+                self.__dict__[field] = data.tolist()
+            self.__dict__[field] = data
+
 
 class Trajectory:
     def __init__(self, coords=None, box=None, boxangles=None, fileloc=None, step=None, time=None):
@@ -849,10 +858,10 @@ def XTCread(filename, frame=None, topoloc=None):
     coords *= 10.  # Convert from nm to Angstrom
     box *= 10.  # Convert from nm to Angstrom
     nframes = coords.shape[2]
-    if len(step) != nframes:
+    if len(step) != nframes or np.sum(step) == 0:
         step = np.arange(nframes)
-    if len(time) != nframes:
-        logger.warning('No time information read from XTC. Defaulting to 0.1ns.')
+    if len(time) != nframes or np.sum(time) == 0:
+        logger.warning('No time information read from {}. Defaulting to 0.1ns framestep.'.format(filename))
         time = np.arange(nframes) * 1E5  # Default is 0.1ns in femtoseconds = 100.000 fs
     return None, Trajectory(coords=coords, box=box, boxangles=boxangles, step=step, time=time)
 
@@ -918,7 +927,11 @@ def CRDCARDread(filename, frame=None, topoloc=None):
         if not lines[0].startswith('*'):
             raise FormatError('CRDCARDread failed. Trying other readers.')
 
-        for line in lines[4:]:
+        i = 0
+        while lines[i].startswith('*'):
+            i += 1
+
+        for line in lines[i+1:]:
             pieces = line.split()
             topo.resname.append(pieces[2])
             topo.name.append(pieces[3])

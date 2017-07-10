@@ -84,12 +84,12 @@ def search(key, name):
 
 def defaultTopo():
     """ Returns the default topologies used by charmm.build """
-    return ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
+    return ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf', 'top/top_all36_cgenff.rtf']
 
 
 def defaultParam():
     """ Returns the default parameters used by charmm.build """
-    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm', 'par/par_all36_cgenff.prm']
 
 
 def defaultStream():
