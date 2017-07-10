@@ -822,8 +822,12 @@ class Molecule:
                     if os.path.isfile(fname):
                         self._writeNumFrames(fname, tr.coords[0].shape[2])
                     ff = range(np.size(tr.coords[0], 2))
-                else:
+                elif frame is None:
+                    ff = [0]
+                elif frame is not None:
                     ff = [frame]
+                else:
+                    raise AssertionError('Should not reach here')
                 tr.fileloc = [[fname, j] for j in ff]
                 traj += tr
 
