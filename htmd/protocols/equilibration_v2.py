@@ -64,7 +64,7 @@ class Equilibration(OldProtocolInterface):
     def __init__(self):
         super().__init__()
         self._cmdObject('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Acemd)
-        self._cmdValue('runtime', 'float', 'Running time of the simulation.', 0, TYPE_FLOAT, RANGE_0POS)
+        self._cmdValue('runtime', 'float', 'Running time of the simulation.', 25000, TYPE_FLOAT, RANGE_0POS)
         self._cmdString('timeunits', 'str', 'Units for time arguments. Can be \'steps\', \'ns\' etc.', 'steps')
         self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
         self._cmdValue('fb_k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0, TYPE_FLOAT, RANGE_ANY)
@@ -233,6 +233,10 @@ proc calcforces_endstep { } { }
 
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
         inmol = Molecule(pdbfile)
+
+        if np.any(inmol.atomselect('lipids')) and not self.useconstantratio:
+            logger.warning('Lipids detected in input structure. We highly recommend setting eq.useconstantratio=True '
+                           'for membrane simulations.')
 
         if self.constraintsteps is None:
             constrsteps = int(numsteps / 2)
