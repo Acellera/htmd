@@ -758,7 +758,7 @@ class Molecule:
             Set to any string to only keep that specific altloc. Set to 'all' if you want to keep all alternative atom positions.
         """
         from htmd.simlist import Sim, Frame
-        from htmd.molecule.readers import _MDTRAJ_TRAJECTORY_EXTS, _ALL_READERS, FormatError
+        from htmd.molecule.readers import _MDTRAJ_TRAJECTORY_EXTS, _ALL_READERS, FormatError, _TRAJECTORY_READERS
 
         # If a single filename is specified, turn it into an array so we can iterate
         from htmd.util import ensurelist
@@ -817,7 +817,7 @@ class Molecule:
                 self._keepFrame(tr, frame)
                 self._checkCoords(tr, rr, fname)
                 # TODO: Get rid of this if by moving it to a function
-                if tr.numFrames >1 and frame is None:
+                if ext in _TRAJECTORY_READERS and frame is None:
                     # Writing hidden index file containing number of frames in trajectory file
                     if os.path.isfile(fname):
                         self._writeNumFrames(fname, tr.coords[0].shape[2])
