@@ -56,9 +56,6 @@ from htmd.builder.loopmodeler import loopModeller
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 import logging.config
-from htmd.config import config
-
-config()
 
 # -------- Shortcuts ---------
 import os
