@@ -3,6 +3,7 @@ from htmd.version import version as _version
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 import os
+from htmd.config import config
 
 config()
 __version__ = _version()
