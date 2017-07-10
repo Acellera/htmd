@@ -1376,8 +1376,8 @@ class Molecule:
         self.box = np.concatenate((self.box, mol.box), axis=1)
         self.boxangles = np.concatenate((self.boxangles, mol.boxangles), axis=1)
         self.fileloc += mol.fileloc
-        self.step = np.arange(self.coords.shape[2])
-        self.time = fstep * self.step
+        self.step = np.concatenate((self.step, mol.step))
+        self.time = np.concatenate((self.time, mol.time))
 
     @property
     def numFrames(self):

@@ -858,10 +858,10 @@ def XTCread(filename, frame=None, topoloc=None):
     coords *= 10.  # Convert from nm to Angstrom
     box *= 10.  # Convert from nm to Angstrom
     nframes = coords.shape[2]
-    if len(step) != nframes:
+    if len(step) != nframes or np.sum(step) == 0:
         step = np.arange(nframes)
-    if len(time) != nframes:
-        logger.warning('No time information read from XTC. Defaulting to 0.1ns.')
+    if len(time) != nframes or np.sum(time) == 0:
+        logger.warning('No time information read from {}. Defaulting to 0.1ns framestep.'.format(filename))
         time = np.arange(nframes) * 1E5  # Default is 0.1ns in femtoseconds = 100.000 fs
     return None, Trajectory(coords=coords, box=box, boxangles=boxangles, step=step, time=time)
 
