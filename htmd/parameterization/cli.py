@@ -174,6 +174,7 @@ def main_parameterize():
                          basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code,
                          outdir=args.outdir)
         dihedrals = mol.getSoftTorsions()
+        mol_orig = mol.copy()
 
         if not args.nomin:
             print("\n == Minimizing ==\n")
@@ -304,6 +305,7 @@ def main_parameterize():
                 mol._prm.write(os.path.join(paramdir, "mol.prm"))
                 for ext in ['psf', 'xyz', 'coor', 'mol2', 'pdb']:
                     mol.write(os.path.join(paramdir, "mol." + ext))
+                mol_orig.write(os.path.join(paramdir, "mol-orig.mol2"))
                 f = open(os.path.join(paramdir, "input.namd"), "w")
                 tmp = '''parameters mol.prm
 paraTypeCharmm on
@@ -335,6 +337,7 @@ run 0'''
                 typemap = mol._prm.writeFrcmod(mol._rtf, os.path.join(paramdir, "mol.frcmod"))
                 for ext in ['coor', 'mol2', 'pdb']:
                     mol.write(os.path.join(paramdir, "mol." + ext), typemap=typemap)
+                mol_orig.write(os.path.join(paramdir, "mol-orig.mol2"), typemap=typemap)
                 f = open(os.path.join(paramdir, "tleap.in"), "w")
                 tmp = '''loadAmberParams mol.frcmod
 A = loadMol2 mol.mol2
