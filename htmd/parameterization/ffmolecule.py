@@ -72,7 +72,7 @@ class FFMolecule(Molecule):
         super().__init__(filename=filename, name=name)
 
         if(len(self.bonds)==0):
-           print("No bounds found. Guessing them")
+           print("No bonds found. Guessing them")
            self.bonds =  self._guessBonds()
         (a, b) = guessAnglesAndDihedrals(self.bonds)
         self.natoms = self.serial.shape[0]
