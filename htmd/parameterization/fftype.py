@@ -21,6 +21,27 @@ class FFTypeMethod(Enum):
 
 
 class FFType:
+    """
+    Class to assign atom types and force field parameters for a given molecule.
+
+    The assigment can be done:
+      1. For CHARMM CGenFF_2b6 with MATCH (method = FFTypeMethod.CGenFF_2b6);
+      2. For AMBER GAFF with antechamber (method = FFTypeMethod.GAFF);
+      3. For AMBER GAFF2 with antechamber (method = FFTypeMethod.GAFF2);
+      4. Manualy with CHARMM RTF and PRM files (method = FFTypeMethod.CHARMM).
+
+    Parameters
+    ----------
+    mol : FFMolecule
+        A molecule to use for the assigment
+    method : FFTypeMethod
+        Assigment method
+    rtf: str
+        CHARMM RTF file name
+    prm: str
+        CHAMMM PRM file name
+    """
+
     def __init__(self, mol, method=FFTypeMethod.CGenFF_2b6, rtf=None, prm=None):
         self.frcmod = None
         self.prepi = None
