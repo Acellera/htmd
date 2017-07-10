@@ -212,11 +212,21 @@ class Molecule:
     @property
     def fstep(self):
         if self.time is not None and len(self.time) > 1:
-            diff = np.unique(np.diff(self.time))
-            if len(diff) != 1:
-                logger.warning('Different timesteps in Molecule.time. Cannot calculate fstep.')
+            uqf, uqidx = np.unique([f[0] for f in self.fileloc], return_inverse=True)
+            diff = None
+            for f, n in enumerate(uqf):
+                df = np.unique(np.diff(self.time[uqidx == f]))
+                if len(df) != 1:
+                    logger.warning('Different timesteps in Molecule.time for file {}. Cannot calculate fstep.'.format(n))
+                    return None
+                if diff is None:
+                    diff = df
+                if df != diff:
+                    logger.warning('Different timesteps detected between files {} and {}. Cannot calculate fstep.'.format(uqf[f], uqf[f-1]))
+            if diff is not None:
+                return float(diff / 1E6)  # convert femtoseconds to nanoseconds
+            else:
                 return None
-            return float(diff / 1E6)  # convert femtoseconds to nanoseconds
         return None
 
     @property
@@ -822,6 +832,7 @@ class Molecule:
                     if os.path.isfile(fname):
                         self._writeNumFrames(fname, tr.coords[0].shape[2])
                     ff = range(np.size(tr.coords[0], 2))
+                    #tr.step = tr.step + traj[-1].step[-1] + 1
                 elif frame is None:
                     ff = [0]
                 elif frame is not None:
