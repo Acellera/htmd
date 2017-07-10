@@ -111,3 +111,23 @@ class FFType:
                 raise RuntimeError("FFTyping failed reading Match output: see {}".format(tmpdir))
         else:
             raise RuntimeError("Unknown method for FFType: {}".format(method))
+
+if __name__ == '__main__':
+
+    from htmd.parameterization.ffmolecule import FFMolecule
+
+    mol = FFMolecule('../data/building-protein-ligand/benzamidine.mol2')
+
+    dir = tempfile.mkdtemp()
+
+    ff = FFType(mol, method=FFTypeMethod.CGenFF_2b6)
+    ff._rtf.write(os.path.join(dir, 'test.rtf'))
+    ff._prm.write(os.path.join(dir, 'test.prm'))
+
+    ff = FFType(mol, method=FFTypeMethod.GAFF)
+    ff._prm.writeFrcmod(ff._rtf, os.path.join(dir, 'test.frcmod'))
+
+    ff = FFType(mol, method=FFTypeMethod.GAFF2)
+    ff._prm.writeFrcmod(ff._rtf, os.path.join(dir, 'test.frcmod'))
+
+    shutil.rmtree(dir)
