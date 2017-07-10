@@ -65,6 +65,15 @@ class Topology:
         return ['record', 'serial', 'name', 'altloc', 'element', 'resname', 'chain', 'resid', 'insertion',
                      'occupancy', 'beta', 'segid', 'charge', 'masses', 'atomtype']
 
+    def fromMolecule(self, mol):
+        for field in self.__dict__:
+            data = mol.__dict__[field]
+            if data is None:
+                continue
+            if isinstance(data, np.ndarray):
+                self.__dict__[field] = data.tolist()
+            self.__dict__[field] = data
+
 
 class Trajectory:
     def __init__(self, coords=None, box=None, boxangles=None, fileloc=None, step=None, time=None):
@@ -918,7 +927,11 @@ def CRDCARDread(filename, frame=None, topoloc=None):
         if not lines[0].startswith('*'):
             raise FormatError('CRDCARDread failed. Trying other readers.')
 
-        for line in lines[4:]:
+        i = 0
+        while lines[i].startswith('*'):
+            i += 1
+
+        for line in lines[i+1:]:
             pieces = line.split()
             topo.resname.append(pieces[2])
             topo.name.append(pieces[3])
