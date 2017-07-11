@@ -346,7 +346,11 @@ def _readNumFrames(filepath):
     numframes = None
     if os.path.exists(numframefile):
         with open(numframefile, 'r') as f:
-            numframes = int(f.readline())
+            try:
+                numframes = int(f.readline())
+            except:
+                raise RuntimeError('{} does not contain an integer number of frames. '
+                                   'Please delete this file.'.format(numframefile))
     return numframes
 
 
