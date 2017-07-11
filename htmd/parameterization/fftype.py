@@ -3,6 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+
 import tempfile
 import shutil
 import subprocess
@@ -113,6 +114,7 @@ class FFType:
 
 if __name__ == '__main__':
 
+    import re
     from tempfile import TemporaryDirectory
     from htmd.home import home
     from htmd.parameterization.ffmolecule import FFMolecule
@@ -140,4 +142,9 @@ if __name__ == '__main__':
                 with open(os.path.join(refDir, testFile)) as refFile:
                     with open(os.path.join(tmpDir, testFile)) as tmpFile:
                         # The line order for antichamber is unstable, so the files are sorted.
-                        assert sorted(refFile.readlines()) == sorted(tmpFile.readlines())
+                        # Also, it get rids of HTMD version string
+                        refData = sorted([line for line in refFile.readlines() if not re.search('HTMD', line)])
+                        tmpData = sorted([line for line in tmpFile.readlines() if not re.search('HTMD', line)])
+                        print(refData)
+                        print(tmpData)
+                        assert refData == tmpData
