@@ -114,6 +114,7 @@ class FFType:
 
 if __name__ == '__main__':
 
+    import sys
     import re
     from tempfile import TemporaryDirectory
     from htmd.home import home
@@ -121,6 +122,11 @@ if __name__ == '__main__':
 
     molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
     mol = FFMolecule(molFile)
+
+    # MATCH does not work on Mac!
+    if 'TRAVIS_OS_NAME' in os.environ:
+        if os.environ['TRAVIS_OS_NAME'] == 'osx':
+            sys.exit(0)
 
     with TemporaryDirectory() as tmpDir:
 
