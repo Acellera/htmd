@@ -4,7 +4,6 @@
 # No redistribution in whole or part
 #
 
-import tempfile
 import shutil
 import subprocess
 import os
@@ -114,20 +113,21 @@ class FFType:
 
 if __name__ == '__main__':
 
+    from tempfile import TemporaryDirectory
+    from htmd.home import home
     from htmd.parameterization.ffmolecule import FFMolecule
 
-    mol = FFMolecule('../data/building-protein-ligand/benzamidine.mol2')
+    molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
+    mol = FFMolecule(molFile)
 
-    dir = tempfile.mkdtemp()
+    with TemporaryDirectory() as tempDir:
 
-    ff = FFType(mol, method=FFTypeMethod.CGenFF_2b6)
-    ff._rtf.write(os.path.join(dir, 'test.rtf'))
-    ff._prm.write(os.path.join(dir, 'test.prm'))
+        ff = FFType(mol, method=FFTypeMethod.CGenFF_2b6)
+        ff._rtf.write(os.path.join(tempDir, 'cgenff.rtf'))
+        ff._prm.write(os.path.join(tempDir, 'cgenff.prm'))
 
-    ff = FFType(mol, method=FFTypeMethod.GAFF)
-    ff._prm.writeFrcmod(ff._rtf, os.path.join(dir, 'test.frcmod'))
+        ff = FFType(mol, method=FFTypeMethod.GAFF)
+        ff._prm.writeFrcmod(ff._rtf, os.path.join(tempDir, 'gaff.frcmod'))
 
-    ff = FFType(mol, method=FFTypeMethod.GAFF2)
-    ff._prm.writeFrcmod(ff._rtf, os.path.join(dir, 'test.frcmod'))
-
-    shutil.rmtree(dir)
+        ff = FFType(mol, method=FFTypeMethod.GAFF2)
+        ff._prm.writeFrcmod(ff._rtf, os.path.join(tempDir, 'gaff2.frcmod'))
