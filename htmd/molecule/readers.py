@@ -210,14 +210,13 @@ def MOL2read(filename, frame=None, topoloc=None):
         s = l[i + start].strip().split()
         topo.record.append("HETATM")
         topo.serial.append(int(s[0]))
-        topo.element.append(re.sub("[^A-Za-z]*", "", s[1]))
         topo.name.append(s[1])
         coords.append([float(x) for x in s[2:5]])
         topo.atomtype.append(s[5])
         if len(s) > 6:
             topo.resid.append(int(s[6]))
             if len(s) > 7:
-                topo.resname.append(s[7])
+                topo.resname.append(s[7][:3])
                 if len(s) > 8:
                     topo.charge.append(float(s[8]))
     if bond:
@@ -1016,14 +1015,15 @@ def GROTOPread(filename, frame=None, topoloc=None):
             elif line.startswith('['):
                 section = None
 
+    if section is None and len(topo.name) == 0:
+        raise FormatError('No atoms read in GROTOP file. Trying a different reader.')
+
     atmidx = np.array(atmidx)
     atommapping = np.ones(np.max(atmidx) + 1) * -1
     atommapping[atmidx] = np.arange(len(atmidx))
     for i in range(len(topo.bonds)):
         topo.bonds[i][0] = atommapping[topo.bonds[i][0]]
 
-    if section is None and len(topo.name) == 0:
-        raise FormatError('No atoms read in GROTOP file. Trying a different reader.')
     return topo, None
 
 
