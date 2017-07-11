@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-
+import tempfile
 import shutil
 import subprocess
 import os
@@ -120,14 +120,24 @@ if __name__ == '__main__':
     molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
     mol = FFMolecule(molFile)
 
-    with TemporaryDirectory() as tempDir:
+    with TemporaryDirectory() as tmpDir:
 
         ff = FFType(mol, method=FFTypeMethod.CGenFF_2b6)
-        ff._rtf.write(os.path.join(tempDir, 'cgenff.rtf'))
-        ff._prm.write(os.path.join(tempDir, 'cgenff.prm'))
+        ff._rtf.write(os.path.join(tmpDir, 'cgenff.rtf'))
+        ff._prm.write(os.path.join(tmpDir, 'cgenff.prm'))
 
         ff = FFType(mol, method=FFTypeMethod.GAFF)
-        ff._prm.writeFrcmod(ff._rtf, os.path.join(tempDir, 'gaff.frcmod'))
+        ff._prm.writeFrcmod(ff._rtf, os.path.join(tmpDir, 'gaff.frcmod'))
 
         ff = FFType(mol, method=FFTypeMethod.GAFF2)
-        ff._prm.writeFrcmod(ff._rtf, os.path.join(tempDir, 'gaff2.frcmod'))
+        ff._prm.writeFrcmod(ff._rtf, os.path.join(tmpDir, 'gaff2.frcmod'))
+
+        refDir = home('test-fftype/benzamidine')
+        # TODO remove this condition when htmd-data is updated
+        if os.path.isdir(refDir):
+            for testFile in os.listdir(refDir):
+                print(testFile)
+                with open(os.path.join(refDir, testFile)) as refFile:
+                    with open(os.path.join(tmpDir, testFile)) as tmpFile:
+                        # The line order for antichamber is unstable, so the files are sorted.
+                        assert sorted(refFile.readlines()) == sorted(tmpFile.readlines())
