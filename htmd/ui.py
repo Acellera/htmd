@@ -55,6 +55,7 @@ from htmd.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VM
 from htmd.builder.loopmodeler import loopModeller
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
+from htmd.config import config
 import logging.config
 
 # -------- Shortcuts ---------
