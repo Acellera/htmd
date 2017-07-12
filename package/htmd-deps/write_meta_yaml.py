@@ -19,7 +19,6 @@ requirements:
     - requests
 
   run:
-    - python
 """
 
 # Read in all dependencies

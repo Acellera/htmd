@@ -41,6 +41,8 @@ install:
   - if [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then export BUILD_VERSION=$TRAVIS_TAG; else export BUILD_VERSION=0.0.0; fi
   - echo "TRAVIS_BRANCH = $TRAVIS_BRANCH"
   - echo "TRAVIS_TAG    = $TRAVIS_TAG"
+  - echo "TRAVIS_PULL_REQUEST = $TRAVIS_PULL_REQUEST"
+  - echo "TRAVIS_REPO_SLUG = $TRAVIS_REPO_SLUG"
   - echo "BUILD_VERSION = $BUILD_VERSION"
   # Always set it to 0 so we don't get a new release at every successful commit
   - export BUILD_NUMBER=0
@@ -67,5 +69,5 @@ script:
 
 after_success:
   # If not PR, on Acellera/htmd and tagged build, do anaconda upload tasks
-  - if [ "$TRAVIS_PULL_REQUEST" != "false" ] && [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./continuous-integration/travis/conda_upload.sh; bash -x ./continuous-integration/travis/conda_build_upload_meta.sh ; fi
+  - if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./continuous-integration/travis/conda_upload.sh; bash -x ./continuous-integration/travis/conda_build_upload_meta.sh ; fi
 

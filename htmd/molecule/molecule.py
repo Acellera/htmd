@@ -81,7 +81,6 @@ class Molecule:
     Atom field - atomtype shape: (1701,)
     ...
 
-    .. currentmodule:: htmd.molecule.molecule.Molecule
     .. rubric:: Methods
     .. autoautosummary:: htmd.molecule.molecule.Molecule
        :methods:
@@ -212,11 +211,21 @@ class Molecule:
     @property
     def fstep(self):
         if self.time is not None and len(self.time) > 1:
-            diff = np.unique(np.diff(self.time))
-            if len(diff) != 1:
-                logger.warning('Different timesteps in Molecule.time. Cannot calculate fstep.')
+            uqf, uqidx = np.unique([f[0] for f in self.fileloc], return_inverse=True)
+            diff = None
+            for f, n in enumerate(uqf):
+                df = np.unique(np.diff(self.time[uqidx == f]))
+                if len(df) != 1:
+                    logger.warning('Different timesteps in Molecule.time for file {}. Cannot calculate fstep.'.format(n))
+                    return None
+                if diff is None:
+                    diff = df
+                if df != diff:
+                    logger.warning('Different timesteps detected between files {} and {}. Cannot calculate fstep.'.format(uqf[f], uqf[f-1]))
+            if diff is not None:
+                return float(diff / 1E6)  # convert femtoseconds to nanoseconds
+            else:
                 return None
-            return float(diff / 1E6)  # convert femtoseconds to nanoseconds
         return None
 
     @property
@@ -758,7 +767,7 @@ class Molecule:
             Set to any string to only keep that specific altloc. Set to 'all' if you want to keep all alternative atom positions.
         """
         from htmd.simlist import Sim, Frame
-        from htmd.molecule.readers import _MDTRAJ_TRAJECTORY_EXTS, _ALL_READERS, FormatError
+        from htmd.molecule.readers import _MDTRAJ_TRAJECTORY_EXTS, _ALL_READERS, FormatError, _TRAJECTORY_READERS
 
         # If a single filename is specified, turn it into an array so we can iterate
         from htmd.util import ensurelist
@@ -817,13 +826,18 @@ class Molecule:
                 self._keepFrame(tr, frame)
                 self._checkCoords(tr, rr, fname)
                 # TODO: Get rid of this if by moving it to a function
-                if tr.numFrames >1 and frame is None:
+                if ext in _TRAJECTORY_READERS and frame is None:
                     # Writing hidden index file containing number of frames in trajectory file
                     if os.path.isfile(fname):
                         self._writeNumFrames(fname, tr.coords[0].shape[2])
                     ff = range(np.size(tr.coords[0], 2))
-                else:
+                    #tr.step = tr.step + traj[-1].step[-1] + 1
+                elif frame is None:
+                    ff = [0]
+                elif frame is not None:
                     ff = [frame]
+                else:
+                    raise AssertionError('Should not reach here')
                 tr.fileloc = [[fname, j] for j in ff]
                 traj += tr
 
@@ -939,6 +953,15 @@ class Molecule:
         self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
         self.crystalinfo = topo.crystalinfo
+        _ = self._checkInsertions()
+
+    def _checkInsertions(self):
+        ins = np.unique([x for x in self.insertion if x != ''])
+        if len(ins) != 0:
+            logger.warning('Residue insertions were detected in the Molecule. It is recommended to renumber the '
+                           'residues using the Molecule.renumberResidues() method.')
+            return True
+        return False
 
     def _parseTraj(self, traj, skip=None):
         self.coords = np.concatenate(traj.coords, axis=2).astype(Molecule._dtypes['coords'])
@@ -1361,8 +1384,47 @@ class Molecule:
         self.box = np.concatenate((self.box, mol.box), axis=1)
         self.boxangles = np.concatenate((self.boxangles, mol.boxangles), axis=1)
         self.fileloc += mol.fileloc
-        self.step = np.arange(self.coords.shape[2])
-        self.time = fstep * self.step
+        self.step = np.concatenate((self.step, mol.step))
+        self.time = np.concatenate((self.time, mol.time))
+
+    def renumberResidues(self, returnMapping=False):
+        """ Renumbers residues incrementally.
+
+        It checks for changes in either of the resid, insertion, chain or segid fields and in case of a change it
+        creates a new residue number.
+
+        Parameters
+        ----------
+        returnMapping : bool
+            If set to True, the method will also return the mapping between the old and new residues
+
+        Examples
+        --------
+        >>> mapping = mol.renumberResidues(returnMapping=True)
+        """
+        from htmd.molecule.util import sequenceID
+        if returnMapping:
+            resid = self.resid.copy()
+            insertion = self.insertion.copy()
+            resname = self.resname.copy()
+            chain = self.chain.copy()
+            segid = self.segid.copy()
+
+        self.resid[:] = sequenceID((self.resid, self.insertion, self.chain, self.segid))
+        self.insertion[:] = ''
+
+        if returnMapping:
+            import pandas as pd
+            from collections import OrderedDict
+            firstidx = np.where(np.diff([-1] + self.resid.tolist()) == 1)[0]
+            od = OrderedDict({'new_resid': self.resid[firstidx],
+                              'resid': resid[firstidx],
+                              'insertion': insertion[firstidx],
+                              'resname': resname[firstidx],
+                              'chain': chain[firstidx],
+                              'segid': segid[firstidx]})
+            mapping = pd.DataFrame(od)
+            return mapping
 
     @property
     def numFrames(self):

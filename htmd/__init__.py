@@ -1,10 +1,11 @@
 from htmd.ui import *  # TODO: This will be deprecated in a few versions
-from htmd.config import config
 from htmd.version import version as _version
 import os
+from htmd.config import config
 
 config()
 __version__ = _version()
+
 
 if os.getenv('HTMD_CONFIG'):
     configfile = os.getenv('HTMD_CONFIG')

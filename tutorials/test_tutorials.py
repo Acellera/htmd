@@ -52,7 +52,7 @@ def format_script(script, outdir, name):
              '\timport os\n',
              '\tos.chdir("{}")\n'.format(outdir)]
     for l in splitt:
-        if not l.startswith('get_ipython(') and not l.startswith('from htmd import *'):
+        if not l.startswith('get_ipython(') and not l.startswith('from htmd.ui import *'):
             l = l.replace('webgl', 'vmd')
             l = l.replace('ngl', 'vmd')
             lines.append('\t' + l + '\n')

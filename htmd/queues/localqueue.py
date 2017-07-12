@@ -30,7 +30,6 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
         Extension of trajectory files. This is needed to copy them to datadir.
 
 
-    .. currentmodule:: htmd.queues.localqueue.LocalGPUQueue
     .. rubric:: Methods
     .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
        :methods:

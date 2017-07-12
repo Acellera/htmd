@@ -43,8 +43,6 @@ from htmd.molecule.util import uniformRandomRotation
 from htmd.rotationmatrix import rotationMatrix
 from htmd.builder.preparation import proteinPrepare
 from htmd.dock import dock
-from htmdx.cli import check_registration, show_news
-from htmd.latest import compareVersions
 from htmd.util import tempname
 from htmd.util import testDHFR
 from htmd.clustering.kcenters import KCenter
@@ -55,6 +53,9 @@ from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
 from htmd.builder.loopmodeler import loopModeller
+from htmdx.cli import check_registration, show_news
+from htmd.latest import compareVersions
+from htmd.config import config
 import logging.config
 
 # -------- Shortcuts ---------
@@ -64,6 +65,11 @@ import math
 import shutil
 from glob import glob
 from sklearn.cluster import MiniBatchKMeans
+
+if not (os.getenv("HTMD_NONINTERACTIVE")):
+    check_registration(product='htmd')
+    show_news()
+    compareVersions()
 
 # No longer import matplotlib here, as it breaks
 # Parameterise's import and attmept to set alternate
@@ -75,11 +81,6 @@ try:
     logging.config.fileConfig(os.path.join(htmd.home.home(), 'logging.ini'), disable_existing_loggers=False)
 except:
     print("HTMD: Logging setup failed")
-
-if not (os.getenv("HTMD_NONINTERACTIVE")):
-    check_registration(product='htmd')
-    show_news()
-    compareVersions()
 
 import progress_reporter.bar.gui as __gui  # Disabling pyemma progress widgets
 __gui.ipython_notebook_session = False
