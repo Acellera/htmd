@@ -60,25 +60,28 @@ class FFType:
 
                 mol.write(os.path.join(tmpdir, 'mol.mol2'))
 
-                try:
-                    subprocess.call([antechamber_binary, '-at', atomtype,
-                                                         '-nc', str(mol.netcharge),
-                                                         '-fi', 'mol2',
-                                                         '-i', 'mol.mol2',
-                                                         '-fo', 'prepi',
-                                                         '-o', 'mol.prepi'], cwd=tmpdir)
-                    subprocess.call([parmchk2_binary, '-f', 'prepi',
-                                                      '-i', 'mol.prepi',
-                                                      '-o', 'mol.frcmod',
-                                                      '-a', 'Y'], cwd=tmpdir)
+                returncode = subprocess.call([antechamber_binary,
+                                              '-at', atomtype,
+                                              '-nc', str(mol.netcharge),
+                                              '-fi', 'mol2',
+                                              '-i', 'mol.mol2',
+                                              '-fo', 'prepi',
+                                              '-o', 'mol.prepi'], cwd=tmpdir)
+                if returncode != 0:
+                    raise RuntimeError('"antechamber" failed')
 
-                    self._rtf = AmberRTF(mol, os.path.join(tmpdir, 'mol.prepi'),
-                                              os.path.join(tmpdir, 'mol.frcmod'))
-                    self._prm = AmberPRM(os.path.join(tmpdir, 'mol.prepi'),
-                                         os.path.join(tmpdir, 'mol.frcmod'))
-                except:
-                    raise RuntimeError("FFTyping failed running Antechamber and Parmchk2")
+                returncode = subprocess.call([parmchk2_binary,
+                                              '-f', 'prepi',
+                                              '-i', 'mol.prepi',
+                                              '-o', 'mol.frcmod',
+                                              '-a', 'Y'], cwd=tmpdir)
+                if returncode != 0:
+                    raise RuntimeError('"parmchk2" failed')
 
+                self._rtf = AmberRTF(mol, os.path.join(tmpdir, 'mol.prepi'),
+                                          os.path.join(tmpdir, 'mol.frcmod'))
+                self._prm = AmberPRM(os.path.join(tmpdir, 'mol.prepi'),
+                                     os.path.join(tmpdir, 'mol.frcmod'))
 
         elif method == FFTypeMethod.CGenFF_2b6:
 
@@ -90,17 +93,15 @@ class FFType:
 
                 mol.write(os.path.join(tmpdir, 'mol.pdb'))
 
-                try:
-                    subprocess.call([match_binary, '-charge', str(mol.netcharge),
-                                                   '-forcefield', 'top_all36_cgenff_new',
-                                                   'mol.pdb'], cwd=tmpdir)
+                returncode = subprocess.call([match_binary,
+                                              '-charge', str(mol.netcharge),
+                                              '-forcefield', 'top_all36_cgenff_new',
+                                              'mol.pdb'], cwd=tmpdir)
+                if returncode != 0:
+                    raise RuntimeError('"match-typer" failed')
 
-                    self._rtf = RTF(os.path.join(tmpdir, 'mol.rtf'))
-                    self._prm = PRM(os.path.join(tmpdir, 'mol.prm'))
-
-                except:
-                    raise RuntimeError("FFTyping failed running Match")
-
+                self._rtf = RTF(os.path.join(tmpdir, 'mol.rtf'))
+                self._prm = PRM(os.path.join(tmpdir, 'mol.prm'))
 
         else:
             raise ValueError('method')
