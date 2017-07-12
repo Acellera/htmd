@@ -514,8 +514,10 @@ def _defaultCaps(mol):
     caps = dict()
     for s in segsProt:
         if len(np.unique(mol.resid[mol.segid == s])) < 10:
-            raise RuntimeError('Caps cannot be automatically set for segment {}. The caps argument of charmm.build '
-                               'must be defined explicitly by the user for segments: {}'.format(s, segsProt))
+            logger.warning('Segment {} consists of a peptide with less than 10 residues. It will not be capped by '
+                           'default. If you want to cap it use the caps argument of charmm.build to manually define '
+                           'caps for all segments'.format(s))
+            continue
         nter, cter = _removeCappedResidues(mol, s)
         caps[s] = ['first {}'.format(nter), 'last {}'.format(cter)]
     for s in segsNonProt:
