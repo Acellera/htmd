@@ -1378,6 +1378,20 @@ class Molecule:
         self.step = np.concatenate((self.step, mol.step))
         self.time = np.concatenate((self.time, mol.time))
 
+    def renumberResidues(self):
+        """ Renumbers residues incrementally.
+
+        It checks for changes in either of the resid, insertion, chain or segid fields and in case of a change it
+        creates a new residue number.
+
+        Examples
+        --------
+        >>> mol.renumberResidues()
+        """
+        from htmd.molecule.util import sequenceID
+        self.resid[:] = sequenceID((self.resid, self.insertion, self.chain, self.segid))
+        self.insertion[:] = ''
+
     @property
     def numFrames(self):
         """ Number of coordinate frames in the molecule
