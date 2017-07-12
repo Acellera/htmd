@@ -120,13 +120,14 @@ if __name__ == '__main__':
     from htmd.home import home
     from htmd.parameterization.ffmolecule import FFMolecule
 
-    molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
-    mol = FFMolecule(molFile)
-
-    # MATCH does not work on Mac!
+    # BUG: MATCH does not work on Mac!
     if 'TRAVIS_OS_NAME' in os.environ:
         if os.environ['TRAVIS_OS_NAME'] == 'osx':
             sys.exit(0)
+
+    molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
+    refDir = home('test-fftype/benzamidine')
+    mol = FFMolecule(molFile)
 
     with TemporaryDirectory() as tmpDir:
 
@@ -140,17 +141,16 @@ if __name__ == '__main__':
         ff = FFType(mol, method=FFTypeMethod.GAFF2)
         ff._prm.writeFrcmod(ff._rtf, os.path.join(tmpDir, 'gaff2.frcmod'))
 
-        refDir = home('test-fftype/benzamidine')
-        # TODO remove this condition when htmd-data is updated
-        if os.path.isdir(refDir):
-            for testFile in os.listdir(refDir):
-                print(testFile)
-                with open(os.path.join(refDir, testFile)) as refFile:
-                    with open(os.path.join(tmpDir, testFile)) as tmpFile:
-                        # The line order for antichamber is unstable, so the files are sorted.
-                        # Also, it get rids of HTMD version string
-                        refData = sorted([line for line in refFile.readlines() if not re.search('HTMD', line)])
-                        tmpData = sorted([line for line in tmpFile.readlines() if not re.search('HTMD', line)])
-                        print(refData)
-                        print(tmpData)
-                        assert refData == tmpData
+        # TODO: remove this condition when htmd-data is updated.
+        if not os.path.isdir(refDir):
+             sys.exit(0)
+
+        for testFile in os.listdir(refDir):
+            print(testFile)
+            with open(os.path.join(refDir, testFile)) as refFile:
+                with open(os.path.join(tmpDir, testFile)) as tmpFile:
+                    # The line order for antichamber is unstable, so the files are sorted.
+                    # Also, it get rids of HTMD version string
+                    refData = sorted([line for line in refFile.readlines() if not re.search('HTMD', line)])
+                    tmpData = sorted([line for line in tmpFile.readlines() if not re.search('HTMD', line)])
+                    assert refData == tmpData
