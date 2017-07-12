@@ -28,7 +28,6 @@ class FFType:
       1. For CHARMM CGenFF_2b6 with MATCH (method = FFTypeMethod.CGenFF_2b6);
       2. For AMBER GAFF with antechamber (method = FFTypeMethod.GAFF);
       3. For AMBER GAFF2 with antechamber (method = FFTypeMethod.GAFF2);
-      4. Manualy with CHARMM RTF and PRM files (method = FFTypeMethod.CHARMM).
 
     Parameters
     ----------
@@ -36,29 +35,16 @@ class FFType:
         A molecule to use for the assigment
     method : FFTypeMethod
         Assigment method
-    rtf: str
-        CHARMM RTF file name
-    prm: str
-        CHAMMM PRM file name
     """
 
-    def __init__(self, mol, method=FFTypeMethod.CGenFF_2b6, rtf=None, prm=None):
-        self.frcmod = None
-        self.prepi = None
-        self.rtf = None
-        self.prm = None
-        if method == FFTypeMethod.CHARMM:
-            self._rtf = RTF(rtf)
-            self._prm = PRM(prm)
-            # self._makeTopoFromCharmm()
-        # elif (method == FFTypeMethod.AMBER):
-        #    self._prepi = PREPI(prepi)
-        #    self._frcmod = FRCMOD(frcmod)
-        #    self._makeTopoFromAmber()
-        elif method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2:
+    def __init__(self, mol, method=FFTypeMethod.CGenFF_2b6):
+
+        if method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2:
+
             antechamber_binary = shutil.which("antechamber")
             if not antechamber_binary:
                 raise RuntimeError("antechamber executable not found")
+
             parmchk2_binary = shutil.which("parmchk2")
             if not parmchk2_binary:
                 raise RuntimeError("parmchk2 executable not found")
@@ -68,9 +54,13 @@ class FFType:
             try:
                 os.chdir(tmpdir)
                 mol.write("mol.mol2")
-                atomtype = "gaff"
-                if method == FFTypeMethod.GAFF2:
+
+                if method == FFTypeMethod.GAFF:
+                    atomtype = "gaff"
+                elif method == FFTypeMethod.GAFF2:
                     atomtype = "gaff2"
+                else:
+                    raise ValueError('method')
 
                 subprocess.call(
                     [antechamber_binary, "-at", atomtype, "-nc", str(mol.netcharge), "-fi", "mol2", "-i", "mol.mol2",
@@ -83,12 +73,12 @@ class FFType:
             except:
                 os.chdir(cwd)
                 raise RuntimeError("FFTyping failed running Antechamber and Parmchk2")
+
             if not self._rtf or not self._prm:
                 raise RuntimeError("FFTyping failed reading Antechamber/Parmchk2 output: see {}".format(tmpdir))
 
-            pass
-
         elif method == FFTypeMethod.CGenFF_2b6:
+
             match_binary = shutil.which("match-typer")
             if not match_binary:
                 raise RuntimeError("match executable not found")
@@ -107,10 +97,11 @@ class FFType:
             except:
                 os.chdir(cwd)
                 raise RuntimeError("FFTyping failed running Match")
+
             if not self._rtf or not self._prm:
                 raise RuntimeError("FFTyping failed reading Match output: see {}".format(tmpdir))
         else:
-            raise RuntimeError("Unknown method for FFType: {}".format(method))
+            raise ValueError("Unknown method for FFType: {}".format(method))
 
 if __name__ == '__main__':
 
