@@ -158,6 +158,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     >>> from htmd import *
     >>> mol = Molecule("3PTB")
     >>> mol.filter("not resname BEN")
+    >>> mol.renumberResidues()
     >>> molbuilt = charmm.build(mol, outdir='/tmp/build', ionize=False)  # doctest: +ELLIPSIS
     Bond between A: [serial 185 resid 42 resname CYS chain A segid 0]
                  B: [serial 298 resid 58 resname CYS chain A segid 0]...
@@ -877,6 +878,8 @@ if __name__ == '__main__':
         inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
         mol = Molecule(inFile)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+        if mol._checkInsertions():
+            mol.renumberResidues()
 
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)

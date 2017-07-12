@@ -953,13 +953,15 @@ class Molecule:
         self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
         self.crystalinfo = topo.crystalinfo
-        self._checkInsertions()
+        _ = self._checkInsertions()
 
     def _checkInsertions(self):
         ins = np.unique([x for x in self.insertion if x != ''])
         if len(ins) != 0:
             logger.warning('Residue insertions were detected in the Molecule. It is recommended to renumber the '
                            'residues using the Molecule.renumberResidues() method.')
+            return True
+        return False
 
     def _parseTraj(self, traj, skip=None):
         self.coords = np.concatenate(traj.coords, axis=2).astype(Molecule._dtypes['coords'])

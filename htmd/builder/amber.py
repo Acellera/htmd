@@ -686,6 +686,8 @@ if __name__ == '__main__':
         np.random.seed(1)
         mol = Molecule(pid)
         mol.filter('protein')
+        if mol._checkInsertions():
+            mol.renumberResidues()
         mol = proteinPrepare(mol)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
         smol = solvate(mol)
@@ -704,6 +706,8 @@ if __name__ == '__main__':
         np.random.seed(1)
         mol = Molecule(pid)
         mol.filter('protein')
+        if mol._checkInsertions():
+            mol.renumberResidues()
         smol = solvate(mol)
         ffs = defaultFf()
         tmpdir = tempname()
