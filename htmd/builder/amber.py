@@ -13,7 +13,7 @@ from glob import glob
 from htmd.molecule.util import _missingSegID, sequenceID
 import shutil
 from htmd.builder.builder import detectDisulfideBonds
-from htmd.builder.builder import _checkMixedSegment
+from htmd.builder.builder import _checkMixedSegment, _checkResidueInsertions
 from subprocess import call, check_output, DEVNULL
 from htmd.molecule.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
@@ -207,6 +207,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     _missingSegID(mol)
     _checkMixedSegment(mol)
+    _checkResidueInsertions(mol)
 
     mol = _charmmLipid2Amber(mol)
 

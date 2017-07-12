@@ -13,7 +13,16 @@ from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
+
 class MixedSegmentError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class ResidueInsertionError(Exception):
     def __init__(self, value):
         self.value = value
 
@@ -371,7 +380,16 @@ def _checkMixedSegment(mol):
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
         logger.warning('Segments {} contain both protein and non-protein atoms. '
-                       'Please assign separate segments to them or the build procedue might fail.'.format(intersection))
+                       'Please assign separate segments to them or the build procedure might fail.'.format(intersection))
+
+
+def _checkResidueInsertions(mol):
+    ins = np.unique([x for x in mol.insertion if x != ''])
+    if len(ins) > 0:
+        raise ResidueInsertionError('Residue insertions "{}" were detected in input molecule and are not supported for'
+                                    ' building. Please use mol.renumberResidues() on your protein '
+                                    'Molecule.'.format(' '.join(ins)))
+    pass
 
 
 def removeLipidsInProtein(prot, memb, lipidsel='lipids'):

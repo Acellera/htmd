@@ -17,7 +17,7 @@ from htmd.home import home
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds
-from htmd.builder.builder import _checkMixedSegment
+from htmd.builder.builder import _checkMixedSegment, _checkResidueInsertions
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
 from glob import glob
@@ -171,6 +171,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     mol = mol.copy()
     _missingSegID(mol)
     _checkMixedSegment(mol)
+    _checkResidueInsertions(mol)
     if psfgen is None:
         psfgen = shutil.which('psfgen', mode=os.X_OK)
         if not psfgen:
