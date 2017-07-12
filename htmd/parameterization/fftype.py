@@ -42,8 +42,8 @@ class FFType:
 
     def __init__(self, mol, method=FFTypeMethod.CGenFF_2b6, tmpDir=None):
 
+        # Find the executables
         if method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2:
-
             antechamber_binary = shutil.which("antechamber")
             if not antechamber_binary:
                 raise RuntimeError("antechamber executable not found")
@@ -52,20 +52,32 @@ class FFType:
             if not parmchk2_binary:
                 raise RuntimeError("parmchk2 executable not found")
 
-            if method == FFTypeMethod.GAFF:
-                atomtype = "gaff"
-            elif method == FFTypeMethod.GAFF2:
-                atomtype = "gaff2"
-            else:
-                raise ValueError('method')
+        elif method == FFTypeMethod.CGenFF_2b6:
+            match_binary = shutil.which("match-typer")
+            if not match_binary:
+                raise RuntimeError("match-typer executable not found")
 
-            with TemporaryDirectory() as tmpdir:
+        else:
+            raise ValueError('method')
 
-                # HACK: to keep the files
-                tmpdir = tmpdir if tmpDir is None else tmpDir
+        # Create a temporary directory
+        with TemporaryDirectory() as tmpdir:
 
+            # HACK to keep the files
+            tmpdir = tmpdir if tmpDir is None else tmpDir
+
+            if method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2:
+
+                # Write the molecule to a file
                 mol.write(os.path.join(tmpdir, 'mol.mol2'))
 
+                # Run antechamber
+                if method == FFTypeMethod.GAFF:
+                    atomtype = "gaff"
+                elif method == FFTypeMethod.GAFF2:
+                    atomtype = "gaff2"
+                else:
+                    raise ValueError('method')
                 returncode = subprocess.call([antechamber_binary,
                                               '-at', atomtype,
                                               '-nc', str(mol.netcharge),
@@ -76,6 +88,7 @@ class FFType:
                 if returncode != 0:
                     raise RuntimeError('"antechamber" failed')
 
+                # Run parmchk2
                 returncode = subprocess.call([parmchk2_binary,
                                               '-f', 'prepi',
                                               '-i', 'mol.prepi',
@@ -84,24 +97,18 @@ class FFType:
                 if returncode != 0:
                     raise RuntimeError('"parmchk2" failed')
 
+                # Read the results
                 self._rtf = AmberRTF(mol, os.path.join(tmpdir, 'mol.prepi'),
                                           os.path.join(tmpdir, 'mol.frcmod'))
                 self._prm = AmberPRM(os.path.join(tmpdir, 'mol.prepi'),
                                      os.path.join(tmpdir, 'mol.frcmod'))
 
-        elif method == FFTypeMethod.CGenFF_2b6:
+            elif method == FFTypeMethod.CGenFF_2b6:
 
-            match_binary = shutil.which("match-typer")
-            if not match_binary:
-                raise RuntimeError("match-typer executable not found")
-
-            with TemporaryDirectory() as tmpdir:
-
-                # HACK: to keep the files
-                tmpdir = tmpdir if tmpDir is None else tmpDir
-
+                # Write the molecule to a file
                 mol.write(os.path.join(tmpdir, 'mol.pdb'))
 
+                # Run match-type
                 returncode = subprocess.call([match_binary,
                                               '-charge', str(mol.netcharge),
                                               '-forcefield', 'top_all36_cgenff_new',
@@ -109,11 +116,12 @@ class FFType:
                 if returncode != 0:
                     raise RuntimeError('"match-typer" failed')
 
+                # Read the results
                 self._rtf = RTF(os.path.join(tmpdir, 'mol.rtf'))
                 self._prm = PRM(os.path.join(tmpdir, 'mol.prm'))
 
-        else:
-            raise ValueError('method')
+            else:
+                raise ValueError('method')
 
 if __name__ == '__main__':
 
