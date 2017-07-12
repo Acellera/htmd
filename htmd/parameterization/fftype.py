@@ -32,12 +32,15 @@ class FFType:
     Parameters
     ----------
     mol : FFMolecule
-        A molecule to use for the assigment
+        Molecule to use for the assigment
     method : FFTypeMethod
         Assigment method
+    tmpDir: str
+        Directory for temporary files. If None, a directory is created and
+        deleted automatically.
     """
 
-    def __init__(self, mol, method=FFTypeMethod.CGenFF_2b6):
+    def __init__(self, mol, method=FFTypeMethod.CGenFF_2b6, tmpDir=None):
 
         if method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2:
 
@@ -57,6 +60,9 @@ class FFType:
                 raise ValueError('method')
 
             with TemporaryDirectory() as tmpdir:
+
+                # HACK: to keep the files
+                tmpdir = tmpdir if tmpDir is None else tmpDir
 
                 mol.write(os.path.join(tmpdir, 'mol.mol2'))
 
@@ -90,6 +96,9 @@ class FFType:
                 raise RuntimeError("match-typer executable not found")
 
             with TemporaryDirectory() as tmpdir:
+
+                # HACK: to keep the files
+                tmpdir = tmpdir if tmpDir is None else tmpDir
 
                 mol.write(os.path.join(tmpdir, 'mol.pdb'))
 
@@ -147,3 +156,17 @@ if __name__ == '__main__':
                     refData = sorted([line for line in refFile.readlines() if not re.search('HTMD', line)])
                     tmpData = sorted([line for line in tmpFile.readlines() if not re.search('HTMD', line)])
                     assert refData == tmpData
+
+    with TemporaryDirectory() as tmpDir:
+
+        ff = FFType(mol, method=FFTypeMethod.CGenFF_2b6, tmpDir=tmpDir)
+        assert sorted(os.listdir(tmpDir)) == ['mol.pdb', 'mol.prm', 'mol.rtf', 'top_mol.rtf']
+
+    with TemporaryDirectory() as tmpDir:
+
+        ff = FFType(mol, method=FFTypeMethod.GAFF2, tmpDir=tmpDir)
+        assert sorted(os.listdir(tmpDir)) == ['ANTECHAMBER.FRCMOD', 'ANTECHAMBER_AC.AC', 'ANTECHAMBER_AC.AC0',
+                                              'ANTECHAMBER_BOND_TYPE.AC', 'ANTECHAMBER_BOND_TYPE.AC0',
+                                              'ANTECHAMBER_PREP.AC', 'ANTECHAMBER_PREP.AC0', 'ATOMTYPE.INF',
+                                              'NEWPDB.PDB', 'PREP.INF', 'mol.frcmod', 'mol.mol2', 'mol.prepi']
+
