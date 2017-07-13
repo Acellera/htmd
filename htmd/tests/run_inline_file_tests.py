@@ -8,9 +8,15 @@ import os
 from subprocess import call, check_output
 import sys
 import time
+try:
+    from htmd.home import home
+except ImportError:
+    raise ImportError('Could not import htmd.home')
 
-excludedfolders = ('./oldtests', './htmd/tests', './doc', './htmdlib', './package', './continuous-integration', './tutorials')
-excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_acellera_conda_channel_deps.py', 'makerelease.py')
+excludedfolders = ('./oldtests', './htmd/tests', './doc', './htmdlib', './package', './continuous-integration',
+                   './tutorials')
+excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_acellera_conda_channel_deps.py',
+                 'makerelease.py')
 
 
 def excluded(name, exclusionlist):
@@ -31,7 +37,7 @@ def containsTests(fname):
 
 # Collecting py files to run
 filestotest = []
-for root, dirnames, filenames in os.walk('.'):
+for root, dirnames, filenames in os.walk(home()):
     if excluded(root, excludedfolders):
         continue
 
