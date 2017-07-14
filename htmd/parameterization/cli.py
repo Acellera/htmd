@@ -58,8 +58,8 @@ def cli_parser():
     return parser
 
 
-def main_parameterize():
-    args = cli_parser().parse_args()
+def main_parameterize(arguments=None):
+    args = cli_parser().parse_args(args=arguments)
 
     from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
     from htmd.parameterization.fftype import FFTypeMethod
@@ -372,8 +372,6 @@ run 0'''
 
 
 if __name__ == "__main__":
-    if "TRAVIS_OS_NAME" in os.environ:
-        sys.exit(0)
 
-    main_parameterize()
+    main_parameterize(arguments=['-h'])
     sys.exit(0)

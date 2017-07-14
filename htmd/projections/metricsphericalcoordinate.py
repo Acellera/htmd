@@ -140,4 +140,5 @@ if __name__ == "__main__":
     res = MetricSphericalCoordinate(ref, 'resname MOL', 'within 8 of resid 98').project(mol)
     _ = MetricSphericalCoordinate(ref, 'resname MOL', 'within 8 of resid 98').getMapping(mol)
 
-    assert np.allclose(res, np.load(path.join(home(dataDir='test-metrics'), 'metricsphericalcoordinate', 'res.npy')))
+    ref_array = np.load(path.join(home(dataDir='test-metrics'), 'metricsphericalcoordinate', 'res.npy'))
+    assert np.allclose(res, ref_array, rtol=0, atol=1e-04)
