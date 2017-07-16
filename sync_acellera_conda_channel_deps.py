@@ -31,6 +31,8 @@ packages = [
     ['omnia', 'thermotools'],
     ['psi4', 'dftd3'],
     ['psi4', 'psi4'],
+    ['psi4', 'gcc-5-mp'],
+    ['psi4', 'psi4-lt-mp'],
     ['psi4', 'pcmsolver'],
     ['bioconda', 'nglview'],
     ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
