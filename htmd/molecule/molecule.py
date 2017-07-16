@@ -953,6 +953,15 @@ class Molecule:
         self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
         self.crystalinfo = topo.crystalinfo
+        _ = self._checkInsertions()
+
+    def _checkInsertions(self):
+        ins = np.unique([x for x in self.insertion if x != ''])
+        if len(ins) != 0:
+            logger.warning('Residue insertions were detected in the Molecule. It is recommended to renumber the '
+                           'residues using the Molecule.renumberResidues() method.')
+            return True
+        return False
 
     def _parseTraj(self, traj, skip=None):
         self.coords = np.concatenate(traj.coords, axis=2).astype(Molecule._dtypes['coords'])
@@ -1377,6 +1386,45 @@ class Molecule:
         self.fileloc += mol.fileloc
         self.step = np.concatenate((self.step, mol.step))
         self.time = np.concatenate((self.time, mol.time))
+
+    def renumberResidues(self, returnMapping=False):
+        """ Renumbers residues incrementally.
+
+        It checks for changes in either of the resid, insertion, chain or segid fields and in case of a change it
+        creates a new residue number.
+
+        Parameters
+        ----------
+        returnMapping : bool
+            If set to True, the method will also return the mapping between the old and new residues
+
+        Examples
+        --------
+        >>> mapping = mol.renumberResidues(returnMapping=True)
+        """
+        from htmd.molecule.util import sequenceID
+        if returnMapping:
+            resid = self.resid.copy()
+            insertion = self.insertion.copy()
+            resname = self.resname.copy()
+            chain = self.chain.copy()
+            segid = self.segid.copy()
+
+        self.resid[:] = sequenceID((self.resid, self.insertion, self.chain, self.segid))
+        self.insertion[:] = ''
+
+        if returnMapping:
+            import pandas as pd
+            from collections import OrderedDict
+            firstidx = np.where(np.diff([-1] + self.resid.tolist()) == 1)[0]
+            od = OrderedDict({'new_resid': self.resid[firstidx],
+                              'resid': resid[firstidx],
+                              'insertion': insertion[firstidx],
+                              'resname': resname[firstidx],
+                              'chain': chain[firstidx],
+                              'segid': segid[firstidx]})
+            mapping = pd.DataFrame(od)
+            return mapping
 
     @property
     def numFrames(self):

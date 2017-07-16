@@ -134,9 +134,11 @@ def sequenceID(field, prepend=None):
 
     Examples
     --------
-    >>> # A change in resid or segid will cause an increase in the sequence
-    >>> sequenceID((mol.resid, mol.insertion, mol.segid))
+    >>> # A change in resid, insertion, chain or segid will cause an increase in the sequence
+    >>> sequenceID((mol.resid, mol.insertion, mol.chain, mol.segid))
     array([  1,   1,   1, ..., 285, 286, 287])
+    >>> # it is typically used to renumber resids as follows
+    >>> mol.set('resid', sequenceID((mol.resid, mol.insertion, mol.chain, mol.segid)))
     """
     if isinstance(field, tuple):
         fieldlen = len(field[0])

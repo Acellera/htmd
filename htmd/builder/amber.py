@@ -13,7 +13,7 @@ from glob import glob
 from htmd.molecule.util import _missingSegID, sequenceID
 import shutil
 from htmd.builder.builder import detectDisulfideBonds
-from htmd.builder.builder import _checkMixedSegment
+from htmd.builder.builder import _checkMixedSegment, _checkResidueInsertions
 from subprocess import call, check_output, DEVNULL
 from htmd.molecule.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
@@ -207,6 +207,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     _missingSegID(mol)
     _checkMixedSegment(mol)
+    _checkResidueInsertions(mol)
 
     mol = _charmmLipid2Amber(mol)
 
@@ -494,8 +495,10 @@ def _defaultProteinCaps(mol):
     caps = dict()
     for s in segsProt:
         if len(np.unique(mol.resid[mol.segid == s])) < 10:
-            raise RuntimeError('Caps cannot be automatically set for segment {}. The caps argument of amber.build '
-                               'must be defined explicitly by the user for segments: {}'.format(s, segsProt))
+            logger.warning('Segment {} consists of a peptide with less than 10 residues. It will not be capped by '
+                           'default. If you want to cap it use the caps argument of amber.build to manually define caps'
+                           'for all segments.'.format(s))
+            continue
         caps[s] = ['ACE', 'NME']
     return caps
 
@@ -683,6 +686,8 @@ if __name__ == '__main__':
         np.random.seed(1)
         mol = Molecule(pid)
         mol.filter('protein')
+        if mol._checkInsertions():
+            mol.renumberResidues()
         mol = proteinPrepare(mol)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
         smol = solvate(mol)
@@ -701,6 +706,8 @@ if __name__ == '__main__':
         np.random.seed(1)
         mol = Molecule(pid)
         mol.filter('protein')
+        if mol._checkInsertions():
+            mol.renumberResidues()
         smol = solvate(mol)
         ffs = defaultFf()
         tmpdir = tempname()

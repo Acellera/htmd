@@ -17,7 +17,7 @@ from htmd.home import home
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds
-from htmd.builder.builder import _checkMixedSegment
+from htmd.builder.builder import _checkMixedSegment, _checkResidueInsertions
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
 from glob import glob
@@ -158,6 +158,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     >>> from htmd import *
     >>> mol = Molecule("3PTB")
     >>> mol.filter("not resname BEN")
+    >>> mol.renumberResidues()
     >>> molbuilt = charmm.build(mol, outdir='/tmp/build', ionize=False)  # doctest: +ELLIPSIS
     Bond between A: [serial 185 resid 42 resname CYS chain A segid 0]
                  B: [serial 298 resid 58 resname CYS chain A segid 0]...
@@ -171,6 +172,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     mol = mol.copy()
     _missingSegID(mol)
     _checkMixedSegment(mol)
+    _checkResidueInsertions(mol)
     if psfgen is None:
         psfgen = shutil.which('psfgen', mode=os.X_OK)
         if not psfgen:
@@ -514,8 +516,10 @@ def _defaultCaps(mol):
     caps = dict()
     for s in segsProt:
         if len(np.unique(mol.resid[mol.segid == s])) < 10:
-            raise RuntimeError('Caps cannot be automatically set for segment {}. The caps argument of charmm.build '
-                               'must be defined explicitly by the user for segments: {}'.format(s, segsProt))
+            logger.warning('Segment {} consists of a peptide with less than 10 residues. It will not be capped by '
+                           'default. If you want to cap it use the caps argument of charmm.build to manually define '
+                           'caps for all segments'.format(s))
+            continue
         nter, cter = _removeCappedResidues(mol, s)
         caps[s] = ['first {}'.format(nter), 'last {}'.format(cter)]
     for s in segsNonProt:
@@ -874,6 +878,8 @@ if __name__ == '__main__':
         inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
         mol = Molecule(inFile)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+        if mol._checkInsertions():
+            mol.renumberResidues()
 
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
