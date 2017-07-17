@@ -29,7 +29,6 @@ packages = [
     ['omnia', 'progress_reporter'],
     ['omnia', 'pyemma'],
     ['omnia', 'thermotools'],
-    ['psi4', 'dftd3'],
     ['bioconda', 'nglview'],
     ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
 ]
