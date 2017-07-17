@@ -30,18 +30,6 @@ packages = [
     ['omnia', 'pyemma'],
     ['omnia', 'thermotools'],
     ['psi4', 'dftd3'],
-    ['psi4', 'psi4'],
-    ['psi4', 'gcc-5-mp'],
-    ['psi4', 'gcc-5'],
-    ['psi4', 'psi4-lt-mp'],
-    ['psi4', 'chemps2'],
-    ['psi4', 'dkh'],
-    ['psi4', 'erd'],
-    ['psi4', 'gdma'],
-    ['psi4', 'libefp'],
-    ['psi4', 'libint'],
-    ['psi4', 'libxc'],
-    ['psi4', 'simint'],
     ['bioconda', 'nglview'],
     ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
 ]
