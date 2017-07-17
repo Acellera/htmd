@@ -38,8 +38,8 @@ def cli_parser():
     parser.add_argument("--theory", help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
                         default="B3LYP", dest="theory")
     parser.add_argument("--vacuum", help="Perform QM calculations in vacuum (default: %(default)s)",
-                        action="store_true", dest="vacuum",
-                        default=False)
+                        action="store_false", dest="vacuum",
+                        default=True)
     parser.add_argument("--no-min", help="Do not perform QM minimisation (default: %(default)s)", action="store_true",
                         dest="nomin", default=False)
     parser.add_argument("--no-esp", help="Do not perform QM charge fitting (default: %(default)s)", action="store_true",
