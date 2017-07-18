@@ -518,6 +518,28 @@ class AmberPRM(PRM):
             raise ValueError("Could not find dihedral parameters for %s-%s-%s-%s" % (n1, n2, n3, n4))
         return ret
 
+    def improperParam(self, n1, n2, n3, n4):
+
+        ret = []
+        for b in self.impropers:
+            # The 3rd atom is central
+            if b.types[0] == n1 and b.types[1] == n2 and b.types[2] == n3 and b.types[3] == n4:
+                ret.append(b)
+            elif b.types[0] == n1 and b.types[3] == n2 and b.types[2] == n3 and b.types[1] == n4:
+                ret.append(b)
+            elif b.types[1] == n1 and b.types[0] == n2 and b.types[2] == n3 and b.types[3] == n4:
+                ret.append(b)
+            elif b.types[1] == n1 and b.types[3] == n2 and b.types[2] == n3 and b.types[0] == n4:
+                ret.append(b)
+            elif b.types[3] == n1 and b.types[0] == n2 and b.types[2] == n3 and b.types[1] == n4:
+                ret.append(b)
+            elif b.types[3] == n1 and b.types[1] == n2 and b.types[2] == n3 and b.types[0] == n4:
+                ret.append(b)
+
+        if len(ret) == 0:
+            raise ValueError("Could not find improper parameters for %s-%s-%s-%s" % (n1, n2, n3, n4))
+
+        return ret
 
 class RTF:
     def __init__(self, filename):
@@ -683,6 +705,17 @@ class AmberRTF(RTF):
                     self.types) - 1  # add a big offset so it doesn't collide with real charm types
             self.element_by_type[ff[2]] = self._guessElement(ff[1])
             ctr += 1
+
+        # Read improper section
+        with open(prepi) as file:
+            text = file.read()
+        impropers = re.search('^IMPROPER\n(.+)\n\n', text, re.MULTILINE|re.DOTALL) # extract improper section
+        if impropers:
+            impropers = impropers.group(1).split('\n') # array of improper lines
+            impropers = [improper.split() for improper in impropers] # impropers by names
+            for improper in impropers:
+                impoper_indices = [self.index_by_name[name] for name in improper] # convert atom name to indices
+                self.impropers.append(impoper_indices)
 
         f = open(frcmod, "r")
         lines = f.readlines()
