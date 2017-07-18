@@ -714,7 +714,7 @@ class AmberRTF(RTF):
             impropers = impropers.group(1).split('\n') # array of improper lines
             impropers = [improper.split() for improper in impropers] # impropers by names
             for improper in impropers:
-                impoper_indices = [self.index_by_name[name] for name in improper] # convert atom name to indices
+                impoper_indices = [self.index_by_name[name.upper()] for name in improper] # convert atom name to indices
                 self.impropers.append(impoper_indices)
 
         f = open(frcmod, "r")
