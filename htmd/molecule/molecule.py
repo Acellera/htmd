@@ -1013,7 +1013,7 @@ class Molecule:
                 pass
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
-             viewerhandle=None, gui=False):
+             viewerhandle=None, showlabels=None, gui=False):
         """ Visualizes the molecule in a molecular viewer
 
         Parameters
@@ -1034,6 +1034,8 @@ class Molecule:
             A name to give to the molecule in VMD
         viewerhandle : :class:`VMD <htmd.vmdviewer.VMD>` object, optional
             A specific viewer in which to visualize the molecule. If None it will use the current default viewer.
+        showlabels : str
+            Atomselection string for applying atom labels
         """
         from htmd.util import tempname
 
@@ -1066,7 +1068,7 @@ class Molecule:
         if viewer.lower() == 'notebook':
             retval = self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
-            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
+            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds, showlabels)
             #retval = viewerhandle
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
             retval = self._viewNGL(gui=gui)
@@ -1081,7 +1083,8 @@ class Molecule:
         if retval is not None:
             return retval
 
-    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
+    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds, showlabels):
+        
         if name is None:
             name = self.viewname
         if vhandle is None:
@@ -1098,6 +1101,9 @@ class Molecule:
             vhandle.send('mol rename top "' + name + '"')
         else:
             vhandle.send('mol rename top "Mol [molinfo top]: psf+xtc"')
+
+        if showlabels is not None:
+            pass
 
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
