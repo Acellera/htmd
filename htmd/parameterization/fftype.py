@@ -136,7 +136,7 @@ if __name__ == '__main__':
             sys.exit(0)
 
     molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
-    refDir = home('test-fftype/benzamidine')
+    refDir = home(dataDir='test-fftype/benzamidine')
     mol = FFMolecule(molFile)
 
     with TemporaryDirectory() as tmpDir:
@@ -151,15 +151,11 @@ if __name__ == '__main__':
         ff = FFType(mol, method=FFTypeMethod.GAFF2)
         ff._prm.writeFrcmod(ff._rtf, os.path.join(tmpDir, 'gaff2.frcmod'))
 
-        # TODO: remove this condition when htmd-data is updated.
-        if not os.path.isdir(refDir):
-             sys.exit(0)
-
         for testFile in os.listdir(refDir):
             print(testFile)
             with open(os.path.join(refDir, testFile)) as refFile:
                 with open(os.path.join(tmpDir, testFile)) as tmpFile:
-                    # The line order for antichamber is unstable, so the files are sorted.
+                    # The line order for antechamber is unstable, so the files are sorted.
                     # Also, it get rids of HTMD version string
                     refData = sorted([line for line in refFile.readlines() if not re.search('HTMD', line)])
                     tmpData = sorted([line for line in tmpFile.readlines() if not re.search('HTMD', line)])
