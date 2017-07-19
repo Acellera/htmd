@@ -16,8 +16,6 @@ os.chdir('/tmp')
 
 # Add packages to sync in this list here
 
-# Don't sync pcmsolver -- we have modified this
-#  'psi4:pcmsolver',
 packages = [
     ['omnia', 'fftw3f'],
     ['omnia', 'openmm'],
@@ -31,7 +29,6 @@ packages = [
     ['omnia', 'progress_reporter'],
     ['omnia', 'pyemma'],
     ['omnia', 'thermotools'],
-    ['psi4', 'dftd3'],
     ['bioconda', 'nglview'],
     ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
 ]

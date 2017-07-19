@@ -719,6 +719,10 @@ class QMCalculation:
             print("  }", file=f)
             print("}", file=f)
 
+        # Enable a dynamic optimization algorithm selection to converge problematic cases:
+        # http://www.psicode.org/psi4manual/master/optking.html#dealing-with-problematic-optimizations
+        print("set optking { dynamic_level = 1 }", file=f)
+
         if self.frozen:
             print("set optking {\n\tfrozen_dihedral = (\"", file=f)
             for i in range(len(self.frozen)):

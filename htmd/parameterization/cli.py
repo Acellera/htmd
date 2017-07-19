@@ -38,8 +38,8 @@ def cli_parser():
     parser.add_argument("--theory", help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
                         default="B3LYP", dest="theory")
     parser.add_argument("--vacuum", help="Perform QM calculations in vacuum (default: %(default)s)",
-                        action="store_true", dest="vacuum",
-                        default=False)
+                        action="store_false", dest="vacuum",
+                        default=True)
     parser.add_argument("--no-min", help="Do not perform QM minimisation (default: %(default)s)", action="store_true",
                         dest="nomin", default=False)
     parser.add_argument("--no-esp", help="Do not perform QM charge fitting (default: %(default)s)", action="store_true",
@@ -58,8 +58,8 @@ def cli_parser():
     return parser
 
 
-def main_parameterize():
-    args = cli_parser().parse_args()
+def main_parameterize(arguments=None):
+    args = cli_parser().parse_args(args=arguments)
 
     from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
     from htmd.parameterization.fftype import FFTypeMethod
@@ -372,8 +372,6 @@ run 0'''
 
 
 if __name__ == "__main__":
-    if "TRAVIS_OS_NAME" in os.environ:
-        sys.exit(0)
 
-    main_parameterize()
+    main_parameterize(arguments=['-h'])
     sys.exit(0)
