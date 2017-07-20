@@ -49,9 +49,7 @@ class Code(Enum):
 class Execution(Enum):
     Inline = 4000
     LSF = 4001
-    PBS = 4002
     Slurm = 4003
-    AceCloud = 4004
 
 
 class QMResult:
@@ -371,15 +369,13 @@ class QMCalculation:
             elif execution == Execution.LSF:
                 execqueue = LsfQueue()
                 execqueue.queue = LsfQueue._defaults['{}_queue'.format(queue_type)]
-            # elif execution == Execution.PBS:
-            #      execqueue = PBSQueue(ncpu=self.ncpus, ngpu=1, memory=4000 )
+                execqueue.ncpu = self.ncpus
             elif execution == Execution.Slurm:
                 execqueue = SlurmQueue()
-                execqueue.partition = SlurmQueue._defaults['{}_queue'.format(queue_type)]
+                execqueue.partition = SlurmQueue._defaults['{}_partition'.format(queue_type)]
                 execqueue.ncpu = self.ncpus
-                execqueue.memory = 4000
-            elif execution == Execution.AceCloud:
-                execqueue = AceCloudQueue()
+            # elif execution == Execution.AceCloud:
+            #     execqueue = AceCloudQueue()
             else:
                 raise RuntimeError("Execution target not recognised")
 
