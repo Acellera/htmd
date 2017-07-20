@@ -1034,8 +1034,11 @@ class Molecule:
             A name to give to the molecule in VMD
         viewerhandle : :class:`VMD <htmd.vmdviewer.VMD>` object, optional
             A specific viewer in which to visualize the molecule. If None it will use the current default viewer.
-        showlabels : str
-            Atomselection string for applying atom labels
+        showlabels : str or dict ('selection': str, textsize: float, textcolor: str or int)
+            str: Atomselection string for applying atom labels. The textsize is set to 0.7 and textcolor is set to 'green'
+            dict: {'selection': Atomselection string for applying atom labels,
+                   'textsize':  The textsize of the labels,
+                   'textcolor': The text color}
         """
         from htmd.util import tempname
 
@@ -1102,12 +1105,21 @@ class Molecule:
         else:
             vhandle.send('mol rename top "Mol [molinfo top]: psf+xtc"')
 
-        if showlabels is not None:
-            pass
-
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
         self._tempreps.remove()
+
+        if showlabels is not None:
+            from htmd.home import home as htmdhome
+            from htmd.vmdfunctions.addlabelatoms import addLabelAtoms
+            tcllabel = os.path.join(htmdhome(), 'vmdfunctions', 'addlabelatoms.tcl')
+            if isinstance(showlabels, dict):
+                text = addLabelAtoms(showlabels['selection'], showlabels['textsize'], showlabels['textcolor'])
+            else:
+                text = addLabelAtoms(showlabels)
+            vhandle.send(text)
+            
+
 
     def _viewMDTraj(self, psf, xtc):
         from mdtraj.html import TrajectoryView, TrajectorySliderView, enable_notebook
