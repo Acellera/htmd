@@ -26,6 +26,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
         The queue to run on
     ngpu : int, default=1
         Number of GPUs to use for a single job
+    ncpu : int, default=1
+        Number of CPUs to use for a single job
     memory : int, default=4000
         Amount of memory per job (MB)
     walltime : int, default=None
@@ -48,14 +50,17 @@ class LsfQueue(SimQueue, ProtocolInterface):
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
     """
 
-    _defaults = {'default_queue': 'gpu_queue', 'gpu_queue': None, 'cpu_queue': None, 'ngpu': 1, 'memory': 4000,
-                 'walltime': None, 'resources': None, 'environment': None}
+    _defaults = {'default_queue': 'gpu_queue', 'gpu_queue': None, 'cpu_queue': None, 'ngpu': 1, 'ncpu': 1,
+                 'memory': 4000, 'walltime': None, 'resources': None, 'environment': None}
 
     def __init__(self):
         super().__init__()
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
         self._arg('queue', 'str', 'The queue to run on', self._defaults[self._defaults['default_queue']], val.String())
-        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'], val.Number(int, '0POS'))
+        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
+                  val.Number(int, '0POS'))
+        self._arg('ncpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ncpu'],
+                  val.Number(int, '0POS'))
         self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, '0POS'))
         self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'], val.Number(int, '0POS'))
         self._arg('resources', 'list', 'Resources of the queue', self._defaults['resources'], val.String(), nargs='*')
@@ -91,7 +96,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
             f.write('#\n')
             f.write('#BSUB -J {}\n'.format(self.jobname))
             f.write('#BSUB -q {}\n'.format(self.queue))
-            f.write('#BSUB -n {}\n'.format(self.ngpu))
+            f.write('#BSUB -n {}\n'.format(self.ncpu))
+            f.write('#BSUB -R "rusage[ngpus_excl_p={}]"'.format(self.ngpu))
             f.write('#BSUB -M {}\n'.format(self.memory))
             f.write('#BSUB -cwd {}\n'.format(workdir))
             f.write('#BSUB -outdir {}\n'.format(workdir))
