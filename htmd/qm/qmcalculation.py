@@ -21,13 +21,8 @@ from htmd.molecule.vdw import radiusByElement
 from htmd.progress.progress import ProgressBar
 
 from htmd.queues.simqueue import SimQueue
-from htmd.queues.acecloudqueue import AceCloudQueue
-
-
 from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.slurmqueue import SlurmQueue
-from htmd.queues.pbsqueue import PBSQueue
-# from htmd.apps.pbs import PBS
 
 
 class BasisSet(Enum):
@@ -119,11 +114,6 @@ class QMCalculation:
             ncpus = os.cpu_count()
 
         # TODO esp validation, etc
-
-        # AceCloud
-        if execution == Execution.AceCloud:
-            ncpus = 4
-            ngpus = 0
 
         self.molecule = molecule.copy()
         self.basis = basis
