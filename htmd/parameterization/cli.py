@@ -252,7 +252,8 @@ def main_parameterize(arguments=None):
                             scores[idx] = ret.chisq
                             # Always use the mm_orig from first iteration (unmodified)
                             ret.mm_original = ref_mm[name].mm_original
-                            fn = mol.plotTorsionFit(ret, show=False)
+                            phi_original = ref_mm[name].phi
+                            fn = mol.plotTorsionFit(ret, phi_original, show=False)
                         except Exception as e:
                             print("Error in fitting")
                             print(str(e))

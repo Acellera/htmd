@@ -97,7 +97,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
             f.write('#BSUB -J {}\n'.format(self.jobname))
             f.write('#BSUB -q {}\n'.format(self.queue))
             f.write('#BSUB -n {}\n'.format(self.ncpu))
-            f.write('#BSUB -R "rusage[ngpus_excl_p={}]"'.format(self.ngpu))
+            f.write('#BSUB -R "rusage[ngpus_excl_p={}]"\n'.format(self.ngpu))
             f.write('#BSUB -M {}\n'.format(self.memory))
             f.write('#BSUB -cwd {}\n'.format(workdir))
             f.write('#BSUB -outdir {}\n'.format(workdir))
