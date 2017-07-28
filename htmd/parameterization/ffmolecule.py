@@ -821,8 +821,7 @@ class FFMolecule(Molecule):
           regr.coef_
         )
 
-
-    def plotTorsionFit(self, fit, show=True):
+    def plotTorsionFit(self, fit, phi_original, show=True):
         import matplotlib as mpl
         if not show:
             mpl.use('Agg')
@@ -846,8 +845,8 @@ class FFMolecule(Molecule):
         ax1.plot(plotdatax, plotdatay, label="QM", color="r", marker="o")
 
         plotdata=[]
-        for i in range(len(fit.phi)):
-            plotdata.append((fit.phi[i], fit.mm_original[i]))
+        for i in range(len(phi_original)):
+            plotdata.append((phi_original[i], fit.mm_original[i]))
         plotdata = sorted(plotdata)
         plotdatax = [float(i[0]) for i in plotdata]
         plotdatay = [float(i[1]) for i in plotdata]
