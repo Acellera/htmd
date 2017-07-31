@@ -651,7 +651,6 @@ class RTF:
         return VDW.massByElement(element)
 
 
-
 class AmberRTF(RTF):
     def __init__(self, mol, prepi, frcmod):
         f = open(prepi, "r")
@@ -709,13 +708,13 @@ class AmberRTF(RTF):
         # Read improper section
         with open(prepi) as file:
             text = file.read()
-        impropers = re.search('^IMPROPER\n(.+)\n\n', text, re.MULTILINE|re.DOTALL) # extract improper section
+        impropers = re.search('^IMPROPER\n(.+)\n\n', text, re.MULTILINE | re.DOTALL)  # extract improper section
         if impropers:
-            impropers = impropers.group(1).split('\n') # array of improper lines
-            impropers = [improper.split() for improper in impropers] # impropers by names
+            impropers = impropers.group(1).split('\n')  # array of improper lines
+            impropers = [improper.split() for improper in impropers]  # impropers by names
             for improper in impropers:
-                impoper_indices = [self.index_by_name[name.upper()] for name in improper] # convert atom name to indices
-                self.impropers.append(impoper_indices)
+                improper_indices = [self.index_by_name[name.upper()] for name in improper]  # conv atom name to indices
+                self.impropers.append(improper_indices)
 
         f = open(frcmod, "r")
         lines = f.readlines()
