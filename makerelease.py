@@ -56,17 +56,17 @@ def makeMinorDevRelease(version, message, testfolder):
     call(['git', 'push', '--tags', 'origin', 'master'])
 
 
-def makeStableBugFix(versiontofix, newversion, message, testfolder):
-    relname = 'rel-{}'.format(versiontofix)
+def makeStableBugFix(version, message, testfolder):
+    relname = 'rel-{}.x'.format('.'.join(version.split(sep='.')[:2]))
     call(['git', 'checkout', 'master'])
     call(['git', 'fetch'])
     call(['git', 'pull'])
-    call(['git', 'checkout', versiontofix])
+    call(['git', 'checkout', relname])
     call(['git', 'fetch'])
     call(['git', 'pull'])
 
     run_tests(testfolder)
 
-    call(['git', 'tag', newversion, '-m', message])
+    call(['git', 'tag', version, '-m', message])
     call(['git', 'push', '--tags', 'origin', relname])
     call(['git', 'checkout', 'master'])
