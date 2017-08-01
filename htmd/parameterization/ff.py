@@ -197,6 +197,10 @@ class PRM:
                 for pi in range(len(prmx)):
                     p = prmx[pi]
                     if p.k0 != 0.: prm.append(p)
+                # HACK: leave at least one dihedral, even if the force constant is 0,
+                #       otherwise "tleap" is not happy!
+                if len(prm) == 0:
+                    prm.append(prmx[0])
 
                 for pi in range(len(prm)):
                     p = prm[pi]
