@@ -112,7 +112,7 @@ class Equilibration(OldProtocolInterface):
         self.acemd.tclforces = 'on'
         self.acemd.minimize = '500'
         self.acemd.run = '$numsteps'
-        self.acemd.TCL=('''
+        self.acemd.TCL = ('''
 set numsteps {NUMSTEPS}
 set temperature {TEMPERATURE}
 set nvtsteps {NVTSTEPS}
@@ -243,13 +243,16 @@ proc calcforces_endstep { } { }
         else:
             constrsteps = int(self.constraintsteps)
 
-        tcl = list(self.acemd.TCL)
-        tcl[0] = tcl[0].format(NUMSTEPS=numsteps, KCONST=self.fb_k,
-                               REFINDEX=' '.join(map(str, inmol.get('index', self.fb_reference))),
-                               SELINDEX=' '.join(map(str, inmol.get('index', self.fb_selection))),
-                               BOX=' '.join(map(str, self.fb_box)),
-                               NVTSTEPS=self.nvtsteps, CONSTRAINTSTEPS=constrsteps, TEMPERATURE=self.temperature)
-        self.acemd.TCL = tcl[0] + tcl[1]
+        if isinstance(self.acemd.TCL, tuple):
+            tcl = list(self.acemd.TCL)
+            tcl[0] = tcl[0].format(NUMSTEPS=numsteps, KCONST=self.fb_k,
+                                   REFINDEX=' '.join(map(str, inmol.get('index', self.fb_reference))),
+                                   SELINDEX=' '.join(map(str, inmol.get('index', self.fb_selection))),
+                                   BOX=' '.join(map(str, self.fb_box)),
+                                   NVTSTEPS=self.nvtsteps, CONSTRAINTSTEPS=constrsteps, TEMPERATURE=self.temperature)
+            self.acemd.TCL = tcl[0] + tcl[1]
+        else:
+            logger.warning('{} default TCL was already formatted.'.format(self.__class__.__name__))
 
         if self.acemd.celldimension is None and self.acemd.extendedsystem is None:
             coords = inmol.get('coords', sel='water')

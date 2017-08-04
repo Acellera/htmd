@@ -341,10 +341,8 @@ def PSFwrite(molecule, filename):
     print("\n\n", file=f)
     print("%10d !NDON: donors\n" % (0), file=f)
     print("%10d !NACC: acceptors\n" % (0), file=f)
-    # According ParmEd, CHARMM PSF has to have an extra blank line after NNB
-    # https: // github.com / ParmEd / ParmEd / blob / master / parmed / charmm / psf.py#L151
-    print("%10d !NNB\n\n" % (0), file=f)
-    print("%10d %10d !NGRP\n" % (0, 0), file=f)
+    print("%10d !NNB: acceptors\n" % (0), file=f)
+    print("%10d %10d !NGRP \n" % (0, 0), file=f)
     f.close()
 
 
