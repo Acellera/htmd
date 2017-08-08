@@ -10,3 +10,4 @@ cd htmdlib/C
 scons --prefix=../../htmd/htmd/lib/Windows/
 cd ../../htmd/
 deactivate py27
+echo "DONE!!!!"
