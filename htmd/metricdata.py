@@ -459,19 +459,21 @@ class MetricData:
             self.parent.trajectories[idx].dropFrames(frames)
             self.parent._dataid = random.random()
 
-    def sampleClusters(self, clusters, frames, replacement=False, allframes=False):
+    def sampleClusters(self, clusters=None, frames=20, replacement=False, allframes=False):
         """ Samples frames from a set of clusters
 
         Parameters
         ----------
-        clusters : list
+        clusters : Union[None, list]
             A list of cluster indexes from which we want to sample
-        frames : list
-            A list of same length as `clusters` which contains the number of frames we want from each of the clusters
+        frames : Union[None, int, list]
+            An integer with the number of frames we want to sample from each state or a list of same length as
+            `clusters` which contains the number of frames we want from each of the clusters.
+            If None is given it will return all frames.
         replacement : bool
             If we want to sample with or without replacement.
         allframes : bool
-            If we want to simply retrieve all frames of the clusters. Ignores the `frames` argument.
+            Deprecated. Use frames=None instead.
 
         Returns
         -------
@@ -485,6 +487,16 @@ class MetricData:
         --------
         >>> data.sampleClusters(range(5), [10, 3, 2, 50, 1])  # Sample from first 5 clusters, 10, 3, etc frames respectively
         """
+        if clusters is None:
+            clusters = range(self.K)
+        if isinstance(clusters, int):
+            clusters = [clusters, ]
+        if allframes:
+            logger.warning('allframes option is deprecated. Please use frames=None')
+            frames = None
+        if frames is None or isinstance(frames, int):
+            frames = np.repeat(frames, len(clusters))
+
         stConcat = np.concatenate(self.St)
         absFrames = []
         relFrames = []
@@ -991,15 +1003,15 @@ class MetricData:
         return confs, self.abs2rel(confs), mol
 
 
-def _sampleCluster(cluster, stConcat, numFrames, allFrames, replacement):
+def _sampleCluster(cluster, stConcat, numFrames, replacement):
     frames = np.where(stConcat == cluster)[0]
-    return _randomSample(frames, numFrames, allFrames, replacement)
+    return _randomSample(frames, numFrames, replacement)
 
 
-def _randomSample(frames, numFr, allFrames, replacement):
+def _randomSample(frames, numFr, replacement):
     if numFr == 0:
         return []
-    if allFrames or (numFr >= len(frames) and not replacement):
+    if numFr is None or (numFr >= len(frames) and not replacement):
         rnd = list(range(len(frames)))
     else:
         rnd = np.random.randint(len(frames), size=numFr)
