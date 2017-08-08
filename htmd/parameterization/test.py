@@ -16,7 +16,11 @@ class TestParametrize(unittest.TestCase):
 
     def tests(self):
 
-        testDir = os.path.abspath(os.path.join('..', 'data', 'test-param'))
+        testDir = os.path.join('..', 'data', 'test-param')
+        if not os.path.exists(testDir):
+            testDir = os.path.join('htmd', 'data', 'test-param')
+        testDir = os.path.abspath(testDir)
+
         refDirs = [os.path.join(testDir, test) for test in os.listdir(testDir)]
         refDirs = [test for test in refDirs if os.path.isdir(test)]
 
