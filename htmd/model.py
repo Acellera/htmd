@@ -912,7 +912,7 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
     >>> model = Model(data)
     >>> model.markovModel(100, 5)
     >>> # Get the standard deviation of distances in all macrostates
-    >>> getStateStatistic(model, data, method=np.std)
+    >>> getStateStatistic(model, data, list(range(5)), method=np.std)
     """
     if axis != 0:
         logger.warning('Axis different than 0 might not work correctly yet')
