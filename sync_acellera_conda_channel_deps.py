@@ -23,7 +23,7 @@ packages = [
     ['omnia', 'bhmm'],
     ['omnia', 'funcsigs'],
     ['omnia', 'mdtraj'],
-    ['omnia', 'msmtools'],
+    ['conda-forge', 'msmtools'],
     ['openbabel', 'openbabel'],
     ['omnia', 'pint'],
     ['omnia', 'progress_reporter'],
