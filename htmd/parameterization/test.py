@@ -47,6 +47,12 @@ class TestParametrize(unittest.TestCase):
                             with open(refFile) as ref, open(resFile) as res:
                                 refLines, resLines = ref.readlines(), res.readlines()
 
+                                refLines = [line for line in refLines if not re.search('Deprecation warning:', line)]
+                                refLines = [line for line in refLines if not re.search('To import all HTMD shortcuts please from now on use', line)]
+
+                                resLines = [line for line in resLines if not re.search('Deprecation warning:', line)]
+                                resLines = [line for line in resLines if not re.search('To import all HTMD shortcuts please from now on use', line)]
+
                             for refLine, resLine in zip(refLines, resLines):
                                 if re.search('HTMD version', refLine):
                                     continue
