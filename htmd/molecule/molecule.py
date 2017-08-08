@@ -1187,6 +1187,9 @@ class Molecule:
         if type:
             type = type.lower()
         ext = os.path.splitext(filename)[1][1:]
+        if ext == 'gz':
+            pieces = filename.split('.')
+            ext = '{}.{}'.format(pieces[-2], pieces[-1])
 
         src = self
         if not (sel is None or (isinstance(sel, str) and sel == 'all')):
