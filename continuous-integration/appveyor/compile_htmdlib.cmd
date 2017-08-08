@@ -1,7 +1,6 @@
 cd ..
 git clone https://%GITHUB_HTMDLIB_USERNAME%:%GITHUB_HTMDLIB_PASSWORD%@github.com/Acellera/htmdlib --depth 1
 choco install mingw
-refreshenv
 conda create -q -n py27 python=2.7
 activate py27
 conda install -c anaconda scons
