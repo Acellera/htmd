@@ -20,7 +20,9 @@ class TestParametrize(unittest.TestCase):
         self.dataDir = os.path.join('..', 'data', 'test-param')
         if not os.path.exists(self.dataDir):
             self.dataDir = os.path.join('htmd', 'data', 'test-param')
-        self.dataDir = os.path.abspath(self.dataDir)
+
+        suffix = 'travis' if 'TRAVIS' in os.environ else 'local'
+        self.dataDir = os.path.abspath(os.path.join(self.dataDir, suffix))
 
     def test_doc(self):
 
@@ -58,27 +60,9 @@ class TestParametrize(unittest.TestCase):
                         resFile = os.path.join(resDir, file)
 
                         if file in ('stdout'):
-                            with open(refFile) as ref:
-                                refLines = []
-                                for line in ref.readlines():
-                                    if re.search('HTMD: Logging setup failed', line):
-                                        continue
-                                    if re.search('Number of CPUs to use \(default:', line):
-                                        continue
-                                    if re.search('ncpus:', line):
-                                        continue
-                                    refLines.append(line)
-
-                            with open(resFile) as res:
-                                resLines = []
-                                for line in res.readlines():
-                                    if re.search('HTMD: Logging setup failed', line):
-                                        continue
-                                    if re.search('Number of CPUs to use \(default:', line):
-                                        continue
-                                    if re.search('ncpus:', line):
-                                        continue
-                                    resLines.append(line)
+                            with open(refFile) as ref, open(resFile) as res:
+                                refLines = ref.readlines()
+                                resLines = res.readlines()
 
                             self.assertListEqual(refLines, resLines, msg=file)
 
