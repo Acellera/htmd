@@ -24,18 +24,6 @@ class TestParametrize(unittest.TestCase):
         suffix = 'travis' if 'TRAVIS' in os.environ else 'local'
         self.dataDir = os.path.abspath(os.path.join(self.dataDir, suffix))
 
-    def test_doc(self):
-
-        self._test(os.path.join(self.dataDir, 'doc'))
-
-    def test_h2o2_list(self):
-
-        self._test(os.path.join(self.dataDir, 'list'))
-
-    def test_h2o2_gaff2(self):
-
-        self._test(os.path.join(self.dataDir, 'gaff2'))
-
     def _test(self, refDir):
 
         with TemporaryDirectory() as resDir:
@@ -54,29 +42,39 @@ class TestParametrize(unittest.TestCase):
             for directory, _, files in os.walk(refDir):
                 for file in files:
                     file = os.path.relpath(os.path.join(directory, file), refDir)
+                    refFile, resFile = os.path.join(refDir, file), os.path.join(resDir, file)
 
                     with self.subTest(file=file):
-                        refFile = os.path.join(refDir, file)
-                        resFile = os.path.join(resDir, file)
+                        self.assertTrue(os.path.exists(refFile))
+                        self.assertTrue(os.path.exists(resFile))
 
                         if file in ('stdout'):
                             with open(refFile) as ref, open(resFile) as res:
-                                refLines = ref.readlines()
-                                resLines = res.readlines()
-
+                                refLines, resLines = ref.readlines(), res.readlines()
                             self.assertListEqual(refLines, resLines, msg=file)
 
                         elif file.endswith('frcmod'):
                             with open(refFile) as ref, open(resFile) as res:
                                 # HACK! FRCMOD file lines are swapped randomly, so first sort them and compare.
-                                #       Also the first live with the version is removed
+                                #       Also the first line with the version is removed
                                 refLines = sorted(ref.readlines()[1:])
                                 resLines = sorted(res.readlines()[1:])
-
                             self.assertListEqual(refLines, resLines, msg=file)
 
                         else:
                             self.assertTrue(cmp(refFile, resFile, shallow=False), msg=file)
+
+    def test_doc(self):
+
+        self._test(os.path.join(self.dataDir, 'doc'))
+
+    def test_h2o2_list(self):
+
+        self._test(os.path.join(self.dataDir, 'list'))
+
+    def test_h2o2_gaff2(self):
+
+        self._test(os.path.join(self.dataDir, 'gaff2'))
 
 
 if __name__ == '__main__':
