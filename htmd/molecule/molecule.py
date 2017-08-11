@@ -1187,6 +1187,9 @@ class Molecule:
         if type:
             type = type.lower()
         ext = os.path.splitext(filename)[1][1:]
+        if ext == 'gz':
+            pieces = filename.split('.')
+            ext = '{}.{}'.format(pieces[-2], pieces[-1])
 
         src = self
         if not (sel is None or (isinstance(sel, str) and sel == 'all')):
@@ -1197,6 +1200,9 @@ class Molecule:
             ext = type
         if ext in _WRITERS:
             _WRITERS[ext](src, filename)
+        else:
+            raise IOError('Molecule cannot write files with "{}" extension yet. If you need such support please notify '
+                          'us on the github htmd issue tracker.'.format(ext))
 
     def empty(self, numAtoms):
         """ Creates an empty molecule of N atoms.

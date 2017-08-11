@@ -200,11 +200,28 @@ class Metric:
 
 def _project(proj, target):
     if isinstance(proj, Projection):
-        return proj.project(target)
-    if hasattr(proj, '__call__'): # If it's a function
-        return proj(target)
+        res = proj.project(target)
+    elif hasattr(proj, '__call__'): # If it's a function
+        res = proj(target)
     elif isinstance(proj, tuple) and hasattr(proj[0], '__call__'): # If it's a function with extra arguments
-        return proj[0](target, *proj[1])
+        res = proj[0](target, *proj[1])
+    else:
+        raise RuntimeError('Invalid projection type {}'.format(type(proj)))
+
+    if isinstance(res, list) or isinstance(res, tuple):
+        res = np.array(res)
+
+    _checkProjectionDims(res, target, 'projection')
+    return res
+
+
+def _checkProjectionDims(result, mol, name):
+    if (result.ndim == 1 and len(result) != mol.numFrames) or \
+       (result.ndim == 2 and result.shape[0] != mol.numFrames):
+        raise RuntimeError('The {} produced an incorrect result. It produced a {} shaped array for {} frames. '
+                           'The {} should return a numpy array of (nframes, ndim) shape '
+                           'where nframes the number of frames in the Molecule it accepts as an '
+                           'argument.'.format(name, result.shape, mol.numFrames, name))
 
 
 def _highfreqFilter(mol,steps):

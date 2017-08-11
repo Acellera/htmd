@@ -252,7 +252,7 @@ def simfilter(sims, outfolder, filtersel):
         makedirs(outfolder)
 
     if len(sims) > 0:
-        _filterPDBPSF(sims[0], outfolder, filtersel)
+        _filterTopology(sims[0], outfolder, filtersel)
 
     logger.debug('Starting filtering of simulations.')
 
@@ -370,17 +370,22 @@ def _renameSims(trajectory, simname, outfolder):
     return traj, outtraj
 
 
-def _filterPDBPSF(sim, outfolder, filtsel):
+def _filterTopology(sim, outfolder, filtsel):
     try:
         from htmd.molecule.molecule import Molecule
         mol = Molecule(sim.molfile)
     except IOError as e:
-        raise RuntimeError('simFilter: {}. Cannot create filtered.pdb due to problematic pdb: {}'.format(e, sim.molfile))
+        raise RuntimeError('simFilter: {}. Cannot read topology file {}'.format(e, sim.molfile))
 
-    if not path.isfile(path.join(outfolder, 'filtered.pdb')):
+    ext = os.path.splitext(sim.molfile)[1][1:]
+    filttopo = path.join(outfolder, 'filtered.{}'.format(ext))
+    filtpdb = path.join(outfolder, 'filtered.pdb')
+
+    if not path.isfile(filttopo):
+        mol.write(filttopo, filtsel)
         if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere
             mol.coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
-        mol.write(path.join(outfolder, 'filtered.pdb'), filtsel)
+        mol.write(filtpdb, filtsel)
 
 
 def _autoDetectTrajectories(folder):

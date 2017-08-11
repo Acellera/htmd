@@ -28,7 +28,11 @@ install:
   - conda install conda conda-build anaconda anaconda-client requests jinja2 -y -q # this has to go into the root environment
 
   # Compile DLLs
+  - cmd: IF "%APPVEYOR_PULL_REQUEST_NUMBER%" == "" (cmd /E:ON /V:ON /C .\\continuous-integration\\appveyor\\compile_htmdlib.cmd)
+
+  # Keep this in while debugging the above script which seems to no execute fully
   - cd ..
+  - rm -rf htmdlib
   - git clone https://%GITHUB_HTMDLIB_USERNAME%:%GITHUB_HTMDLIB_PASSWORD%@github.com/Acellera/htmdlib --depth 1
   - choco install mingw
   - refreshenv
