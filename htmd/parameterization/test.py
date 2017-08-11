@@ -93,9 +93,11 @@ class TestParameterize(unittest.TestCase):
         with TemporaryDirectory() as resDir:
             self._test(refDir, resDir)
 
-    @unittest.skip('Finish')
     def test_h2o2_outdir(self):
-        pass
+
+        refDir = os.path.join(self.dataDir, 'h2o2_dir')
+        with TemporaryDirectory() as resDir:
+            self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_h2o2_min(self):
