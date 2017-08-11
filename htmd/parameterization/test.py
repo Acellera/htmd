@@ -46,9 +46,12 @@ class TestParameterize(unittest.TestCase):
                 file = os.path.relpath(os.path.join(directory, file), refDir)
                 refFile, resFile = os.path.join(refDir, file), os.path.join(resDir, file)
 
-                if file.startswith('minimize') or\
-                   file.startswith('esp') or\
-                   file.endswith('mol.coor'):
+                if file.startswith('minimize') or \
+                   file.startswith('esp') or \
+                   file.startswith('dihedral-single-point') or \
+                   file.startswith('dihedral-opt') or \
+                   file.endswith('.coor') or \
+                   file.endswith('.svg'):
                     continue
 
                 with self.subTest(file=file):
@@ -71,52 +74,98 @@ class TestParameterize(unittest.TestCase):
 
     def test_doc(self):
 
+        refDir = os.path.join(self.dataDir, 'doc')
         with TemporaryDirectory() as resDir:
-            self._test(os.path.join(self.dataDir, 'doc'), resDir)
+            self._test(refDir, resDir)
 
     def test_h2o2_list(self):
 
+        refDir = os.path.join(self.dataDir, 'h2o2_list')
         with TemporaryDirectory() as resDir:
-            self._test(os.path.join(self.dataDir, 'list'), resDir)
+            self._test(refDir, resDir)
 
     def test_h2o2_gaff2(self):
 
+        refDir = os.path.join(self.dataDir, 'h2o2_gaff2')
         with TemporaryDirectory() as resDir:
-            self._test(os.path.join(self.dataDir, 'gaff2'), resDir)
+            self._test(refDir, resDir)
 
-    def test_h2o2_gaff2_outdir(self):
+    @unittest.skip('Finish')
+    def test_h2o2_outdir(self):
         pass
 
-    @unittest.skip
-    def test_h2o2_gaff2_min(self):
+    @unittest.skip('Finish')
+    def test_h2o2_min(self):
 
         with TemporaryDirectory() as resDir:
             self._test(os.path.join(self.dataDir, 'gaff2_min'), resDir)
 
-    def test_h2o2_gaff2_min_restart(self):
+    @unittest.skip('Finish')
+    def test_h2o2_min_restart(self):
         pass
 
-    @unittest.skip
-    def test_h2o2_gaff2_esp(self):
+    @unittest.skip('Finish')
+    def test_h2o2_esp(self):
+
+        with TemporaryDirectory() as resDir:
+            self._test(os.path.join(self.dataDir, 'gaff2_esp'), resDir)
+
+    @unittest.skip('Finish')
+    def test_h2o2_esp_restart(self):
+        pass
+
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    def test_h2o2_dihed_fix(self):
+
+        with TemporaryDirectory() as resDir:
+            self._test(os.path.join(self.dataDir, 'gaff2_dihed_fix'), resDir)
+
+    @unittest.skip('Finish')
+    def test_h2o2_dihed_fix_restart(self):
+        pass
+
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    def test_h2o2_dihed_opt(self):
 
         with TemporaryDirectory() as resDir:
             #resDir = 'res'
             #os.mkdir(resDir)
-            self._test(os.path.join(self.dataDir, 'gaff2_esp'), resDir)
+            self._test(os.path.join(self.dataDir, 'gaff2_dihed_opt'), resDir)
 
-    def test_h2o2_gaff2_esp_restart(self):
-        pass
-
-    def test_h2o2_gaff2_dihed_fix(self):
-        pass
-
-    def test_h2o2_gaff2_dihed_fix_restart(self):
-        pass
-
-    def test_h2o2_gaff2_dihed_opt(self):
-        pass
-
+    @unittest.skip('Finish')
     def test_h2o2_gaff2_dihed_opt_restart(self):
+        pass
+
+    @unittest.skip('Finish')
+    def test_benzamidine_gaff(self):
+        pass
+
+    @unittest.skip('Finish')
+    def test_benzamidine_gaff2(self):
+        pass
+
+    @unittest.skip('Finish')
+    def test_benzamidine_cfgen(self):
+        pass
+
+    @unittest.skip('Finish')
+    def test_benzamidine_rtf_prm(self):
+        pass
+
+    @unittest.skip('Finish')
+    def test_benzamidine_full(self):
+        pass
+
+    @unittest.skip('Finish')
+    def test_benzamidine_full_restart(self):
+        pass
+
+    @unittest.skip('Finish')
+    def test_benzamidine_esp_freeze_restart(self):
+        pass
+
+    @unittest.skip('Finish')
+    def test_benzamidine_dihed_select_restart(self):
         pass
 
 
