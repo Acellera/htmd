@@ -26,9 +26,9 @@ packages = [
     ['conda-forge', 'msmtools'],
     ['openbabel', 'openbabel'],
     ['omnia', 'pint'],
-    ['omnia', 'progress_reporter'],
-    ['omnia', 'pyemma'],
-    ['omnia', 'thermotools'],
+    ['conda-forge', 'progress_reporter'],
+    ['conda-forge', 'pyemma'],
+    ['conda-forge', 'thermotools'],
     ['bioconda', 'nglview'],
     ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
 ]
