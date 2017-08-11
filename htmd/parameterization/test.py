@@ -110,7 +110,8 @@ class TestParameterize(unittest.TestCase):
 
         refDir = os.path.join(self.dataDir, 'h2o2_min_restart')
         with TemporaryDirectory() as resDir:
-            shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
+            shutil.copytree(os.path.join(refDir, 'minimize'),
+                            os.path.join(resDir, 'minimize'))
             self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
@@ -124,7 +125,8 @@ class TestParameterize(unittest.TestCase):
 
         refDir = os.path.join(self.dataDir, 'h2o2_esp_restart')
         with TemporaryDirectory() as resDir:
-            shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
+            shutil.copytree(os.path.join(refDir, 'esp'),
+                            os.path.join(resDir, 'esp'))
             self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
@@ -161,29 +163,27 @@ class TestParameterize(unittest.TestCase):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_gaff')
         with TemporaryDirectory() as resDir:
-            #resDir = 'benzamidine_gaff'
-            #os.mkdir(resDir)
             self._test(refDir, resDir)
 
     def test_benzamidine_gaff2(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_gaff2')
         with TemporaryDirectory() as resDir:
-            #resDir = 'benzamidine_gaff2'
-            #os.mkdir(resDir)
             self._test(refDir, resDir)
 
     def test_benzamidine_cgenff(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_cgenff')
         with TemporaryDirectory() as resDir:
-            #resDir = 'benzamidine_cgenff'
-            #os.mkdir(resDir)
             self._test(refDir, resDir)
 
-    @unittest.skip('Finish')
     def test_benzamidine_rtf_prm(self):
-        pass
+
+        refDir = os.path.join(self.dataDir, 'benzamidine_rtf_prm')
+        with TemporaryDirectory() as resDir:
+            shutil.copy(os.path.join(refDir, 'input.rtf'), resDir)
+            shutil.copy(os.path.join(refDir, 'input.prm'), resDir)
+            self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_full(self):
@@ -196,7 +196,16 @@ class TestParameterize(unittest.TestCase):
 
     @unittest.skip('Finish')
     def test_benzamidine_full_restart(self):
-        pass
+
+        refDir = os.path.join(self.dataDir, 'benzamidine_full_restart')
+        with TemporaryDirectory() as resDir:
+            shutil.copytree(os.path.join(refDir, 'minimize'),
+                            os.path.join(resDir, 'minimize'))
+            shutil.copytree(os.path.join(refDir, 'esp'),
+                            os.path.join(resDir, 'esp'))
+            shutil.copytree(os.path.join(refDir, 'dihedral-opt'),
+                            os.path.join(resDir, 'dihedral-opt'))
+            self._test(refDir, resDir)
 
     @unittest.skip('Finish')
     def test_benzamidine_esp_freeze_restart(self):
