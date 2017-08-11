@@ -94,15 +94,19 @@ class TestParameterize(unittest.TestCase):
     def test_h2o2_outdir(self):
         pass
 
-    @unittest.skip('Finish')
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_h2o2_min(self):
 
+        refDir = os.path.join(self.dataDir, 'h2o2_min')
         with TemporaryDirectory() as resDir:
-            self._test(os.path.join(self.dataDir, 'gaff2_min'), resDir)
+            self._test(refDir, resDir)
 
-    @unittest.skip('Finish')
     def test_h2o2_min_restart(self):
-        pass
+
+        refDir = os.path.join(self.dataDir, 'h2o2_min_restart')
+        with TemporaryDirectory() as resDir:
+            shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
+            self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_h2o2_esp(self):
