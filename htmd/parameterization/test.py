@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 import os
+import sys
 import shutil
 import unittest
 from tempfile import TemporaryDirectory
@@ -54,9 +55,13 @@ class TestParameterize(unittest.TestCase):
                     with open(refFile) as ref, open(resFile) as res:
                         refLines, resLines = ref.readlines(), res.readlines()
 
+                    # HACK! Before Python 3.6 dict does not preserve order, so the lines are sorted before comparison
+                    if file == 'stdout' and sys.version_info.major == 3 and sys.version_info.minor < 6:
+                        refLines, resLines = sorted(refLines), sorted(resLines)
+
+                    # HACK! FRCMOD file lines are swapped randomly, so first sort them and compare.
+                    #       Also the first line with the version is removed
                     if file.endswith('frcmod'):
-                        # HACK! FRCMOD file lines are swapped randomly, so first sort them and compare.
-                        #       Also the first line with the version is removed
                         refLines, resLines = sorted(refLines[1:]), sorted(resLines[1:])
 
                     self.assertListEqual(refLines, resLines, msg=file)
