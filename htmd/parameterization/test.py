@@ -152,27 +152,42 @@ class TestParameterize(unittest.TestCase):
                             os.path.join(resDir, 'dihedral-opt'))
             self._test(refDir, resDir)
 
-    @unittest.skip('Finish')
     def test_benzamidine_gaff(self):
-        pass
-        # resDir = 'res'
-        # os.mkdir(resDir)
 
-    @unittest.skip('Finish')
+        refDir = os.path.join(self.dataDir, 'benzamidine_gaff')
+        with TemporaryDirectory() as resDir:
+            #resDir = 'benzamidine_gaff'
+            #os.mkdir(resDir)
+            self._test(refDir, resDir)
+
     def test_benzamidine_gaff2(self):
-        pass
 
-    @unittest.skip('Finish')
-    def test_benzamidine_cfgen(self):
-        pass
+        refDir = os.path.join(self.dataDir, 'benzamidine_gaff2')
+        with TemporaryDirectory() as resDir:
+            #resDir = 'benzamidine_gaff2'
+            #os.mkdir(resDir)
+            self._test(refDir, resDir)
+
+    def test_benzamidine_cgenff(self):
+
+        refDir = os.path.join(self.dataDir, 'benzamidine_cgenff')
+        with TemporaryDirectory() as resDir:
+            #resDir = 'benzamidine_cgenff'
+            #os.mkdir(resDir)
+            self._test(refDir, resDir)
 
     @unittest.skip('Finish')
     def test_benzamidine_rtf_prm(self):
         pass
 
-    @unittest.skip('Finish')
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_full(self):
-        pass
+
+        refDir = os.path.join(self.dataDir, 'benzamidine_full')
+        with TemporaryDirectory() as resDir:
+            resDir = 'benzamidine_full'
+            os.mkdir(resDir)
+            self._test(refDir, resDir)
 
     @unittest.skip('Finish')
     def test_benzamidine_full_restart(self):
