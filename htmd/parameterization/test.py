@@ -41,36 +41,39 @@ class TestParameterize(unittest.TestCase):
             returncode = call(arguments, stdout=stdout, stderr=stderr, cwd=resDir)
             self.assertEqual(returncode, 0)
 
-        for directory, _, files in os.walk(refDir):
-            for file in files:
-                file = os.path.relpath(os.path.join(directory, file), refDir)
-                refFile, resFile = os.path.join(refDir, file), os.path.join(resDir, file)
+        paths = [[os.path.join(directory, file) for file in files] for  directory, _, files in os.walk(refDir)]
+        paths = sum(paths, [])
+        paths = [os.path.relpath(path, refDir) for path in paths]
 
-                if file.startswith('minimize') or \
-                   file.startswith('esp') or \
-                   file.startswith('dihedral-single-point') or \
-                   file.startswith('dihedral-opt') or \
-                   file.endswith('.coor') or \
-                   file.endswith('.svg'):
-                    continue
+        paths = [path for path in paths if not path.startswith('minimize')]
+        paths = [path for path in paths if not path.startswith('esp')]
+        paths = [path for path in paths if not path.startswith('dihedral')]
+        paths = [path for path in paths if not path.endswith('.coor')]
+        paths = [path for path in paths if not path.endswith('.svg')]
 
-                with self.subTest(file=file):
-                    self.assertTrue(os.path.exists(refFile))
-                    self.assertTrue(os.path.exists(resFile))
+        self.assertTrue('stdout' in paths)
+        self.assertTrue('stderr' in paths)
 
-                    with open(refFile) as ref, open(resFile) as res:
-                        refLines, resLines = ref.readlines(), res.readlines()
+        for path in paths:
+            refFile, resFile = os.path.join(refDir, path), os.path.join(resDir, path)
 
-                    # HACK! Before Python 3.6 dict does not preserve order, so the lines are sorted before comparison
-                    if file == 'stdout' and sys.version_info.major == 3 and sys.version_info.minor < 6:
-                        refLines, resLines = sorted(refLines), sorted(resLines)
+            with self.subTest(path=path):
+                self.assertTrue(os.path.exists(refFile))
+                self.assertTrue(os.path.exists(resFile))
 
-                    # HACK! FRCMOD file lines are swapped randomly, so first sort them and compare.
-                    #       Also the first line with the version is removed
-                    if file.endswith('frcmod'):
-                        refLines, resLines = sorted(refLines[1:]), sorted(resLines[1:])
+                with open(refFile) as ref, open(resFile) as res:
+                    refLines, resLines = ref.readlines(), res.readlines()
 
-                    self.assertListEqual(refLines, resLines, msg=file)
+                # HACK! Before Python 3.6 dict does not preserve order, so the lines are sorted before comparison
+                if path == 'stdout' and sys.version_info.major == 3 and sys.version_info.minor < 6:
+                    refLines, resLines = sorted(refLines), sorted(resLines)
+
+                # HACK! FRCMOD file lines are swapped randomly, so first sort them and compare.
+                #       Also the first line with the version is removed
+                if path.endswith('frcmod'):
+                    refLines, resLines = sorted(refLines[1:]), sorted(resLines[1:])
+
+                self.assertListEqual(refLines, resLines, msg=path)
 
     def test_doc(self):
 
