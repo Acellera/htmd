@@ -125,28 +125,38 @@ class TestParameterize(unittest.TestCase):
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_fix(self):
 
+        refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix')
         with TemporaryDirectory() as resDir:
-            self._test(os.path.join(self.dataDir, 'gaff2_dihed_fix'), resDir)
+            self._test(refDir, resDir)
 
-    @unittest.skip('Finish')
     def test_h2o2_dihed_fix_restart(self):
-        pass
+
+        refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix_restart')
+        with TemporaryDirectory() as resDir:
+            shutil.copytree(os.path.join(refDir, 'dihedral-single-point'),
+                            os.path.join(resDir, 'dihedral-single-point'))
+            self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_opt(self):
 
+        refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt')
         with TemporaryDirectory() as resDir:
-            #resDir = 'res'
-            #os.mkdir(resDir)
-            self._test(os.path.join(self.dataDir, 'gaff2_dihed_opt'), resDir)
+            self._test(refDir, resDir)
 
-    @unittest.skip('Finish')
-    def test_h2o2_gaff2_dihed_opt_restart(self):
-        pass
+    def test_h2o2_dihed_opt_restart(self):
+
+        refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt_restart')
+        with TemporaryDirectory() as resDir:
+            shutil.copytree(os.path.join(refDir, 'dihedral-opt'),
+                            os.path.join(resDir, 'dihedral-opt'))
+            self._test(refDir, resDir)
 
     @unittest.skip('Finish')
     def test_benzamidine_gaff(self):
         pass
+        # resDir = 'res'
+        # os.mkdir(resDir)
 
     @unittest.skip('Finish')
     def test_benzamidine_gaff2(self):
