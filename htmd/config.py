@@ -3,9 +3,28 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-_config = dict()
+import os
+
+_config = {'viewer': 'VMD',
+           'ncpus': -2,
+           'configfile': os.getenv('HTMD_CONFIG') if os.getenv('HTMD_CONFIG') else None}
 
 
-def config(viewer='VMD', ncpus=-2):
+def config(viewer=_config['viewer'],
+           ncpus=_config['ncpus'],
+           configfile=_config['configfile']):
+    """
+    Function to change HTMD configuration variables.
+
+    Parameters
+    ----------
+    viewer : str
+        Defines the backend viewer for molecular visualization
+    ncpus : int
+        Defines the number of cpus available for several HTMD operations
+    configfile : str
+        Defines the HTMD configuration file that is called at the beginning of importing
+    """
     _config['viewer'] = viewer
     _config['ncpus'] = ncpus
+    _config['configfile'] = configfile
