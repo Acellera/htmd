@@ -893,7 +893,7 @@ class MetricData:
 
         rep = 'MetricData object with {} trajectories'.format(self.numTrajectories)
         if self.fstep > 0:
-            rep += 'of {}ns aggregate simulation time'.format(self.aggregateTime)
+            rep += ' of {:.1f}ns aggregate simulation time'.format(self.aggregateTime)
         for j in sorted(self.__dict__.keys()):
             if j[0] == '_':
                 continue

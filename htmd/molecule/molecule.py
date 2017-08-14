@@ -681,6 +681,26 @@ class Molecule:
         newcoords = np.dot(newcoords, np.transpose(M)) + center
         self.set('coords', newcoords, sel=sel)
 
+    def getDihedral(self, atom_quad):
+        """ Gets a dihedral angle.
+
+        Parameters
+        ----------
+        atom_quad : list
+            Four atom indexes corresponding to the atoms defining the dihedral
+
+        Returns
+        -------
+        angle: float
+            The angle in radians
+
+        Examples
+        --------
+        >>> mol.getDihedral([0, 5, 8, 12])
+        """
+        from htmd.molecule.util import dihedralAngle
+        return np.deg2rad(dihedralAngle(self.coords[atom_quad, :, self.frame]))
+
     def setDihedral(self, atom_quad, radians, bonds=None):
         """ Sets the angle of a dihedral.
         
@@ -691,8 +711,16 @@ class Molecule:
         radians : float
             The angle in radians to which we want to set the dihedral
         bonds : np.ndarray
-            An array containing all bonds of the molecule. This is needed if more than one rotation is performed as the
+            An array containing all bonds of the molecule. This is needed if multiple modifications are done as the
             bond guessing can get messed up if atoms come very close after the rotation.
+
+        Examples
+        --------
+        >>> mol.setDihedral([0, 5, 8, 12], 0.16)
+        >>> # If we perform multiple modifications, calculate bonds first and pass them as argument to be safe
+        >>> bonds = mol._getBonds()
+        >>> mol.setDihedral([0, 5, 8, 12], 0.16, bonds=bonds)
+        >>> mol.setDihedral([18, 20, 24, 30], -1.8, bonds=bonds)
         """
         import scipy.sparse.csgraph as sp
         from htmd.molecule.util import dihedralAngle
