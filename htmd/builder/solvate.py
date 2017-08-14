@@ -202,7 +202,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
         if waterboxes[i].numAtoms != 0:
             mol.append(waterboxes[i])
 
-    logger.info('After removing water molecules colliding with other molecules, {} water molecules were added to the system.'.format(int(waters/3)))
+    logger.info('{} water molecules were added to the system.'.format(int(waters/3)))
     return mol
 
 
