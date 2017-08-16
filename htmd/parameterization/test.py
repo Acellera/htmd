@@ -199,8 +199,6 @@ class TestParameterize(unittest.TestCase):
             os.mkdir(resDir)
             self._test(refDir, resDir)
 
-    # TODO enbable then AMBER bug fixed
-    @unittest.skipIf('TRAVIS' in os.environ, 'AMBER bug')
     def test_benzamidine_full_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_full_restart')
@@ -213,8 +211,6 @@ class TestParameterize(unittest.TestCase):
                             os.path.join(resDir, 'dihedral-opt'))
             self._test(refDir, resDir)
 
-    # TODO enbable then AMBER bug fixed
-    @unittest.skipIf('TRAVIS' in os.environ, 'AMBER bug')
     def test_benzamidine_esp_freeze_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_esp_freeze_restart')
@@ -225,14 +221,10 @@ class TestParameterize(unittest.TestCase):
                             os.path.join(resDir, 'esp'))
             self._test(refDir, resDir)
 
-    # TODO enbable then AMBER bug fixed
-    @unittest.skipIf('TRAVIS' in os.environ, 'AMBER bug')
     def test_benzamidine_dihed_select_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_dihed_select_restart')
         with TemporaryDirectory() as resDir:
-            resDir = 'benzamidine_dihed'
-            os.mkdir(resDir)
             shutil.copytree(os.path.join(refDir, 'minimize'),
                             os.path.join(resDir, 'minimize'))
             shutil.copytree(os.path.join(refDir, 'esp'),
