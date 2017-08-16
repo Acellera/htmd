@@ -506,9 +506,7 @@ class AmberPRM(PRM):
                 xn4 = re.sub("x[0123456789]$", "", n4)
                 b = self.dihedralParam(xn1, xn2, xn3, xn4)
                 r = []
-                # print(b)
                 for c in b:
-                    #   print(c)
                     c = deepcopy(c)
                     c.types[0] = n1
                     c.types[1] = n2
@@ -539,6 +537,22 @@ class AmberPRM(PRM):
                 ret.append(b)
             elif b.types[3] == n1 and b.types[1] == n2 and b.types[2] == n3 and b.types[0] == n4:
                 ret.append(b)
+
+        # Check if it is a duplicate that needs new parameters
+        if len(ret) == 0:
+            if ('x' in n1) or ('x' in n2) or ('x' in n3) or ('x' in n4):
+                n1x = re.sub('x\d$', '', n1)
+                n2x = re.sub('x\d$', '', n2)
+                n3x = re.sub('x\d$', '', n3)
+                n4x = re.sub('x\d$', '', n4)
+                ret = self.improperParam(n1x, n2x, n3x, n4x)
+                for param in ret:
+                    param = deepcopy(param)
+                    param.types[0] = n1
+                    param.types[1] = n2
+                    param.types[2] = n3
+                    param.types[3] = n4
+                    self.impropers.append(param)
 
         if len(ret) == 0:
             raise ValueError("Could not find improper parameters for %s-%s-%s-%s" % (n1, n2, n3, n4))
