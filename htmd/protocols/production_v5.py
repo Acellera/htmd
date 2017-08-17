@@ -152,7 +152,8 @@ proc calcforces_endstep { } { }
         for field in defaults:
             userval = self.acemd.__dict__[field]
             if userval is not None and not os.path.exists(os.path.join(inputdir, userval)):
-                self.acemd.__dict__[field] = None
+                raise RuntimeError('Could not locate file {} set by the user for argument '
+                                   'Production.acemd.{}'.format(os.path.join(inputdir, userval), field))
 
             if self.acemd.__dict__[field] is None:
                 for val in defaults[field]:
@@ -166,7 +167,7 @@ proc calcforces_endstep { } { }
                 ))
             elif self.acemd.__dict__[field] is None:
                 raise RuntimeError('Could not locate any {f:} file in {i:}. '
-                                   'Please set the Equilibration.acemd.{f:} property to '
+                                   'Please set the Production.acemd.{f:} property to '
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
             if self.useconstraints and self.acemd.consref is None:
@@ -323,7 +324,8 @@ class ProductionAcemd3(ProtocolInterface):
         for field in defaults:
             userval = self.acemd.__dict__[field]
             if userval is not None and not os.path.exists(os.path.join(inputdir, userval)):
-                self.acemd.__dict__[field] = None
+                raise RuntimeError('Could not locate file {} set by the user for argument '
+                                   'Production.acemd.{}'.format(os.path.join(inputdir, userval), field))
 
             if self.acemd.__dict__[field] is None:
                 for val in defaults[field]:
@@ -337,7 +339,7 @@ class ProductionAcemd3(ProtocolInterface):
                 ))
             elif self.acemd.__dict__[field] is None:
                 raise RuntimeError('Could not locate any {f:} file in {i:}. '
-                                   'Please set the Equilibration.acemd.{f:} property to '
+                                   'Please set the Production.acemd.{f:} property to '
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
     def _amberFixes(self):
