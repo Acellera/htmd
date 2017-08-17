@@ -221,6 +221,7 @@ class TestParameterize(unittest.TestCase):
                             os.path.join(resDir, 'esp'))
             self._test(refDir, resDir)
 
+    @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 instability')
     def test_benzamidine_dihed_select_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_dihed_select_restart')
