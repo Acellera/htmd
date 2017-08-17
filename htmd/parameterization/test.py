@@ -199,6 +199,7 @@ class TestParameterize(unittest.TestCase):
             os.mkdir(resDir)
             self._test(refDir, resDir)
 
+    @unittest.skipIf('TRAVIS' in os.environ, 'Too long for Travis')
     def test_benzamidine_full_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_full_restart')
