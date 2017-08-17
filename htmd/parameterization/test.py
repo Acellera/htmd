@@ -189,7 +189,6 @@ class TestParameterize(unittest.TestCase):
             shutil.copy(os.path.join(refDir, 'input.prm'), resDir)
             self._test(refDir, resDir)
 
-    # TODO recompute
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_full(self):
 
