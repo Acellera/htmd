@@ -323,15 +323,17 @@ class Model(object):
     def _defaultLags(self):
         return self.data._defaultLags()
 
-    def sampleStates(self, states, frames, statetype='macro', replacement=False, samplemode='random', allframes=False):
+    def sampleStates(self, states=None, frames=20, statetype='macro', replacement=False, samplemode='random', allframes=False):
         """ Samples frames from a set of states
 
         Parameters
         ----------
-        states : list
+        states : Union[list, int]
             A list of state indexes from which we want to sample
-        frames : list
-            A list of same length as `states` which contains the number of frames we want from each of the states
+        frames : Union[None, int, list]
+            An integer with the number of frames we want to sample per state or a list of same length as
+            `states` which contains the number of frames we want from each of the states.
+            If set to None it will return all frames of the states.
         statetype : ['micro','macro','cluster'], optional
             The type of state we want to sample from.
         replacement : bool
@@ -341,7 +343,7 @@ class Model(object):
             all microstates in the macrostate or to 'weighted' to sample proportional to the equilibium probability of
             each microstate in the macrostate.
         allframes : bool
-            If we want to simply retrieve all frames of the states. Ignores the `frames` argument.
+            Deprecated. Use frames=None instead.
 
         Returns
         -------
@@ -363,23 +365,41 @@ class Model(object):
                 logger.warning("'cluster' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'")
             return self.data.sampleClusters(states, frames, replacement, allframes)
 
+        if states is None:
+            if statetype == 'macro':
+                states = range(self.macronum)
+            elif statetype == 'micro':
+                states = range(self.micronum)
+        if isinstance(states, int):
+            states = [states, ]
+
+        if allframes:
+            logger.warning('The allframes option will be deprecated. Use frames=None instead.')
+            frames = None
+
         self._integrityCheck(postmsm=True)
         if statetype != 'macro' and samplemode != 'random':
             samplemode = 'random'
             logger.warning("'micro' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'")
 
+        if frames is None or isinstance(frames, int):
+            frames = np.repeat(frames, len(states))
+
         stConcat = np.concatenate(self.data.St)
         absFrames = []
         relFrames = []
         for i in range(len(states)):
-            if frames[i] == 0 and not allframes:
+            if frames[i] == 0:
+                absFrames.append(np.array([], dtype=int))
+                relFrames.append(np.array([], dtype=int))
                 continue
+
             st = states[i]
             if statetype == 'macro':
-                (selFr, selMicro) = _sampleMacro(self, st, stConcat, samplemode, frames[i], allframes, replacement)
+                (selFr, selMicro) = _sampleMacro(self, st, stConcat, samplemode, frames[i], replacement)
                 absFrames.append(selFr)
             elif statetype == 'micro':
-                absFrames.append(_sampleMicro(self, st, stConcat, frames[i], allframes, replacement))
+                absFrames.append(_sampleMicro(self, st, stConcat, frames[i], replacement))
             else:
                 raise NameError('No valid state type given (read documentation)')
 
@@ -495,7 +515,7 @@ class Model(object):
         if len(states) == 0:
             raise NameError('No ' + statetype + ' states exist in the model')
 
-        (tmp, relframes) = self.sampleStates(states, [numsamples]*len(states), statetype=statetype, samplemode=samplemode)
+        (tmp, relframes) = self.sampleStates(states, numsamples, statetype=statetype, samplemode=samplemode)
 
         from htmd.config import _config
         from htmd.parallelprogress import ParallelExecutor, delayed
@@ -912,7 +932,7 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
     >>> model = Model(data)
     >>> model.markovModel(100, 5)
     >>> # Get the standard deviation of distances in all macrostates
-    >>> getStateStatistic(model, data, method=np.std)
+    >>> getStateStatistic(model, data, list(range(5)), method=np.std)
     """
     if axis != 0:
         logger.warning('Axis different than 0 might not work correctly yet')
@@ -979,18 +999,18 @@ def macroAccumulate(model, microvalue):
     return res
 
 
-def _sampleMacro(obj, macro, stConcat, mode, numFrames, allFrames, replacement):
+def _sampleMacro(obj, macro, stConcat, mode, numFrames, replacement):
     from htmd.metricdata import _randomSample
     if mode == 'random':
         frames = np.where(obj.macro_ofcluster[stConcat] == macro)[0]
-        selFrames = _randomSample(frames, numFrames, allFrames, replacement)
+        selFrames = _randomSample(frames, numFrames, replacement)
         selMicro = obj.micro_ofcluster[stConcat[selFrames]]
     elif mode == 'even':
         micros = np.where(obj.macro_ofmicro == macro)[0]
         selFrames = []
         selMicro = []
         for i in range(len(micros)):
-            selFrames.append(_sampleMicro(obj, micros[i], stConcat, numFrames, allFrames, replacement))
+            selFrames.append(_sampleMicro(obj, micros[i], stConcat, numFrames, replacement))
             selMicro.append(np.ones(numFrames) * micros[i])
     elif mode == 'weighted':
         micros = np.where(obj.macro_ofmicro == macro)[0]
@@ -1000,7 +1020,7 @@ def _sampleMacro(obj, macro, stConcat, mode, numFrames, allFrames, replacement):
         selFrames = []
         selMicro = []
         for i in range(len(micros)):
-            selFrames = np.append(selFrames, _sampleMicro(obj, micros[i], stConcat, framespermicro[i], allFrames, replacement))
+            selFrames = np.append(selFrames, _sampleMicro(obj, micros[i], stConcat, framespermicro[i], replacement))
             selMicro = np.append(selMicro, [micros[i]] * framespermicro[i])
     elif mode == 'weightedTrunc':
         micros = np.where(obj.macro_ofmicro == macro)[0]
@@ -1015,17 +1035,17 @@ def _sampleMacro(obj, macro, stConcat, mode, numFrames, allFrames, replacement):
         selFrames = []
         selMicro = []
         for i in range(len(micros)):
-            selFrames = np.append(selFrames, _sampleMicro(obj, micros[i], stConcat, framespermicro[i], allFrames, replacement))
+            selFrames = np.append(selFrames, _sampleMicro(obj, micros[i], stConcat, framespermicro[i], replacement))
             selMicro = np.append(selMicro, [micros[i]] * framespermicro[i])
     else:
         raise NameError('No valid mode given (read documentation)')
     return selFrames, selMicro
 
 
-def _sampleMicro(obj, micro, stConcat, numFrames, allFrames, replacement):
+def _sampleMicro(obj, micro, stConcat, numFrames, replacement):
     from htmd.metricdata import _randomSample
     frames = np.where(obj.micro_ofcluster[stConcat] == micro)[0]
-    return _randomSample(frames, numFrames, allFrames, replacement)
+    return _randomSample(frames, numFrames, replacement)
 
 
 def _macroTrajectoriesReport(macronum, macrost, simlist=None):

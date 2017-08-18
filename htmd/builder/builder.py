@@ -506,6 +506,9 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
             tmpmemb.moveBy([-float(minmemb[0]) + xpos, -float(minmemb[1]) + ypos, 0])
             tmpmemb.remove('same resid as (x > {} or y > {})'.format(xmax, ymax), _logger=False)
+            if tmpmemb.numAtoms == 0:
+                continue
+
             tmpmemb.set('segid', 'M{}'.format(k), sel='not water')
             tmpmemb.set('segid', 'MW{}'.format(k), sel='water')
 
