@@ -76,13 +76,13 @@ Then the adaptive will generate an ``input``, ``data`` and later a
     └── input/         # Contains the files needed to start all simulations of all epochs (automatically created)
 
 Adaptive uses a naming scheme for simulations which follows the pattern:
-``e4s3_e2s1p1f45``. This name tells us that this simulation was
+``e4s3_e2s1p0f45``. This name tells us that this simulation was
 generated in epoch 4 as the 3rd simulation of the batch. The starting
 conformation was taken from simulation 1 of epoch 2 from the first piece
 of the simulation [*]_ and from frame 45 of that simulation piece.
 
 .. [*] some MD software might fragment simulations into pieces. Usually
-       though this number will be 1 and can be ignored.
+       though this number will be 0 and can be ignored.
 
 Simulation length
 -----------------
