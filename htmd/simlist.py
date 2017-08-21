@@ -382,10 +382,18 @@ def _filterTopology(sim, outfolder, filtsel):
     filtpdb = path.join(outfolder, 'filtered.pdb')
 
     if not path.isfile(filttopo):
-        mol.write(filttopo, filtsel)
+        try:
+            mol.write(filttopo, filtsel)
+        except Exception as e:
+            logger.warning('Was not able to write {} due to error: {}'.format(filttopo, e))
+
         if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere
             mol.coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
-        mol.write(filtpdb, filtsel)
+
+        try:
+            mol.write(filtpdb, filtsel)
+        except Exception as e:
+            logger.warning('Was not able to write {} due to error: {}'.format(filtpdb, e))
 
 
 def _autoDetectTrajectories(folder):
