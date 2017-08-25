@@ -70,7 +70,7 @@ def main_parameterize(arguments=None):
     def printEnergies(m, filename):
         fener = open(filename, "w")
         ffe = FFEvaluate(m)
-        energies = ffe.evaluate(m.coords[:, :, 0])
+        energies = ffe.run(m.coords[:, :, 0])
         for out in sys.stdout, fener:
             print('''
 == Diagnostic Energies ==

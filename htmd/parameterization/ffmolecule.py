@@ -104,6 +104,8 @@ class FFMolecule(Molecule):
         if not self._rtf or not self._prm:
             raise ValueError("RTF and PRM not defined")
 
+        self.impropers = np.array(self._rtf.impropers)
+
         self.report()
 
     def report(self):
@@ -484,12 +486,12 @@ class FFMolecule(Molecule):
             #t.e14 = 1.  # Use whatever e14 has been inherited for the type
         self._prm.updateDihedral(param)
 
-        ffe = FFEvaluate(self)
+        ffeval = FFEvaluate(self)
         #  print(ffe.evaluate( ret.coords[0] ) )
         #  input
         # Now evaluate the ff without the dihedral being fitted
         for t in range(ret.N):
-            mm_zeroed = (ffe.evaluate(ret.coords[t])["total"])
+            mm_zeroed = ffeval.run(ret.coords[t][:, :, 0])['total']
             ret.mm_delta.append(ret.qm[t] - mm_zeroed)
             ret.mm_zeroed.append(mm_zeroed)
 
@@ -556,9 +558,9 @@ class FFMolecule(Molecule):
         # print(param)
 
         # Finally evaluate the fitted potential
-        ffe = FFEvaluate(self)
+        ffeval = FFEvaluate(self)
         for t in range(ret.N):
-            ret.mm_fitted.append(ffe.evaluate(ret.coords[t])["total"])
+            ret.mm_fitted.append(ffeval.run(ret.coords[t][:, :, 0])['total'])
         mmin = min(ret.mm_fitted)
         chisq = 0.
 
@@ -601,7 +603,7 @@ class FFMolecule(Molecule):
     def _makeDihedralFittingSetFromQMResults(self, atoms, results):
         # Extract the valid QM poses and energies from the QM result set
         # Evaluate the MM on those poses
-        ffe = FFEvaluate(self)
+        ffeval = FFEvaluate(self)
 
         ret = QMFittingSet()
         ret.name = "%s-%s-%s-%s" % (
@@ -619,7 +621,7 @@ class FFMolecule(Molecule):
         for q in results:
             if q.completed and not q.errored:
                 if (q.energy - qmin) < 20.:  # Only fit against QM points < 20 kcal above the minimum
-                    mmeval = ffe.evaluate(q.coords)
+                    mmeval = ffeval.run(q.coords[:, :, 0])
                     if mmeval["vdw"] < 200:
                         completed += 1
                         phi = getPhi(q.coords, atoms)
@@ -762,8 +764,7 @@ class FFMolecule(Molecule):
                 self._rtf.type_by_name[self._rtf.names[bidx]] = newtype
 
         # the PRM parameters will be automatically duplicated by forcing an ff evaluation
-        ffe = FFEvaluate(self)
-        ffe.evaluate(self.coords)
+        FFEvaluate(self).run(self.coords[:, :, 0])
 
     def plotConformerEnergies( self, fits, show=True ):
         import matplotlib as mpl
