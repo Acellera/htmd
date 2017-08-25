@@ -85,6 +85,7 @@ VdW      : {VDW_ENERGY}
 '''.format(BOND_ENERGY=energies['bond'], ANGLE_ENERGY=energies['angle'], DIHEDRAL_ENERGY=energies['dihedral'],
            IMPROPER_ENERGY=energies['improper'], ELEC_ENERGY=energies['elec'], VDW_ENERGY=energies['vdw']),
                   file=out)
+        fener.close()
 
     # Communicate the # of CPUs to use to the QM engine via environment variable
     os.environ['NCPUS'] = str(args.ncpus)
