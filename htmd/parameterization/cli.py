@@ -67,18 +67,25 @@ def main_parameterize(arguments=None):
     import numpy as np
     import math
 
-    def printEnergies(m):
-        print("\n == Diagnostic Energies == ")
+    def printEnergies(m, filename):
+        fener = open(filename, "w")
         ffe = FFEvaluate(m)
         energies = ffe.evaluate(m.coords[:, :, 0])
-        print("")
-        print(" Bond     : %f" % (energies['bond']))
-        print(" Angle    : %f" % (energies['angle']))
-        print(" Dihedral : %f" % (energies['dihedral']))
-        print(" Improper : %f" % (energies['improper']))
-        print(" Electro  : %f" % (energies['elec']))
-        print(" VdW      : %f" % (energies['vdw']))
-        print("")
+        for out in sys.stdout, fener:
+            print('''
+== Diagnostic Energies ==
+
+Bond     : {BOND_ENERGY}
+Angle    : {ANGLE_ENERGY}
+Dihedral : {DIHEDRAL_ENERGY}
+Improper : {IMPROPER_ENERGY}
+Electro  : {ELEC_ENERGY}
+VdW      : {VDW_ENERGY}
+
+'''.format(BOND_ENERGY=energies['bond'], ANGLE_ENERGY=energies['angle'], DIHEDRAL_ENERGY=energies['dihedral'],
+           IMPROPER_ENERGY=energies['improper'], ELEC_ENERGY=energies['elec'], VDW_ENERGY=energies['vdw']),
+                  file=out)
+        fener.close()
 
     # Communicate the # of CPUs to use to the QM engine via environment variable
     os.environ['NCPUS'] = str(args.ncpus)
@@ -286,7 +293,7 @@ def main_parameterize(arguments=None):
                 fit = mol.plotConformerEnergies(rets, show=False)
                 print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
 
-        printEnergies(mol)
+        printEnergies(mol, 'energies.txt')
 
         # Output the ff parameters
         paramdir = os.path.join(args.outdir, "parameters", method.name, mol.output_directory_name())
