@@ -1,0 +1,240 @@
+# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
+import os
+import numpy as np
+
+from htmd.qm.base import QMBase, QMResult
+
+
+class Psi4(QMBase):
+    """
+    Class to set up and run QM calculations with Psi4
+
+    Capabilities
+    ------------
+    - Single-point energy calculations with HF and DFT.
+    - Electronic properties: dipole and quadrupole monents, Mulliken charges, ESP at given points
+    - Geometry optimization with/without dihedral restraints
+    - Can use various queuing systems and on AceCloud
+
+    Attributes
+    ----------
+    molecule : :class:`FFMolecule`
+        Molecule
+    multiplity : int, default = 1
+        Multiplicity of the molecule (1 = singlet, 2 = doublet, 3 = triplet, etc.)
+    theory : str, default = 'BLYP3'
+        Level of theory. A full list is at Psi4.THEORIES
+    basis : str, default = '6-31G*'
+        Basis set. A full list is at Psi4.BASIS_SETS
+    correction : str, default = None
+        Empirical dispersion correction. A full list is at Psi4.CORRECTIONS
+    solvent : str, default = 'vacuum'
+         Implicit solvent model. A full isit is at Psi4.SOLVENTS
+    esp_points : nunpy.ndarray, default = None
+        Point coordinates to compute ESP values. The array shape has to be (number_of_points, 3)
+    optimize : bool, default = False
+        Run geometery optimization
+    restrained_dihedrals : nunpy.ndarray, default = None
+        List of restrained dihedrals (0-based atom indices). The array shape has to be (number_of_restrained_dihedrals, 4).
+    queue : :class:`SimQueue`, defualt = :class:`LocalCPUQueue`
+        Queue object used to run simulations
+    directory : str, default = '.'
+        Working directoy
+
+    Examples
+    --------
+
+    Create an object of H2 molecule.
+    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> mol = FFMolecule('htmd/data/test-qm/H2-0.74.mol2', method=FFTypeMethod.NONE)
+    Net Charge: 0
+    Equivalent atom groups:
+     H1 H2
+    Soft torsions:
+
+    Create a Psi4 object
+    >>> from htmd.qm import Psi4
+    >>> qm = Psi4()
+    >>> qm # doctest: +ELLIPSIS
+    <htmd.qm.psi4.Psi4 object at 0x...>
+
+    Run single-point QM calculation of H2 with BLYP and cc-pVDZ
+    >>> from tempfile import TemporaryDirectory
+    >>> with TemporaryDirectory() as tmp:
+    ...     qm.molecule = mol
+    ...     qm.theory = 'BLYP'
+    ...     qm.basis = 'cc-pVDZ'
+    ...     qm.directory = tmp
+    ...     result = qm.run()
+
+    The QM results are returned as a list of htmd.qm.QMResult objects. See htmd.qm.QMResult documentation for details.
+    >>> result # doctest: +ELLIPSIS
+    [<htmd.qm.base.QMResult object at 0x...>]
+    >>> result[0].errored
+    False
+    >>> result[0].energy # doctest: +ELLIPSIS
+    -728.97082622...
+    >>> result[0].mulliken
+    [0.0, -0.0]
+
+    Run the geometry optimization of H2 with BLYP, but change basis to 3-21G.
+    NOTE: the `directory` attribut needs to be set to empty or non-existing directory, overwise the previous
+    calculation results are read.
+    >>> with TemporaryDirectory() as tmp:
+    ...     qm.basis = '3-21G'
+    ...     qm.optimize = True
+    ...     qm.directory = tmp
+    ...     result = qm.run()
+
+    The initial coordinates and optimize coordinates of H2 can be compared
+    >>> mol.coords
+    array([[[ 0.  ],
+            [ 0.  ],
+            [-0.37]],
+    <BLANKLINE>
+           [[ 0.  ],
+            [ 0.  ],
+            [ 0.37]]], dtype=float32)
+    >>> result[0].coords
+    array([[[ 0.        ],
+            [ 0.        ],
+            [-0.37527978]],
+    <BLANKLINE>
+           [[ 0.        ],
+            [ 0.        ],
+            [ 0.37527978]]])
+
+    The QM calculations run using LocalCPUQueue by default, but this can be changed to the others.
+    >>> from htmd.queues.acecloudqueue import AceCloudQueue
+    >>> qm.queue = AceCloudQueue() # doctest: +SKIP
+    """
+
+    @property
+    def _command(self):
+        return 'psi4 -i psi4.in -o psi4.out &> psi4.log'
+
+    def _completed(self, directory):
+        return os.path.exists(os.path.join(directory, 'psi4.out'))
+
+    def _writeInput(self, directory, iframe):
+
+        with open(os.path.join(directory, 'psi4.in'), 'w') as f:
+
+            f.write('set_num_threads( %d )\n' % self._ncpus)
+            f.write('memory %f gb\n\n' % self._mem)
+
+            reference = 'r' if self.multiplicity == 1 else 'u'
+            reference += 'hf' if self.theory == 'RHF' else 'ks'
+            f.write('set { reference %s }\n' % reference)
+            f.write('set { basis %s }\n\n' % self.basis)
+
+            if self.solvent == 'vacuum':
+                pass
+            elif self.solvent == 'PCM':
+                # TODO check all agruments
+                f.write('set { PCM true\n      PCM_scf_type total }\n')
+                f.write('PCM = {\n')
+                f.write('  Units = Angstrom\n')
+                f.write('  Medium {\n    SolverType = IEFPCM\n    Solvent = Water\n  }\n')
+                f.write('  Cavity {\n    RadiiSet = UFF\n    Type = GePol\n')
+                f.write('    Scaling = False\n    Area = 0.3\n    Mode = Implicit\n  }\n')
+                f.write('}\n\n')
+            else:
+                raise NotImplementedError
+
+            # Write the molecule
+            f.write('molecule MOL {\n    %d %d\n' % (self._charge, self.multiplicity))
+            elements = self._molecule.element
+            coords = self._molecule.coords[:, :, iframe]
+            for element, coord in zip(elements, coords):
+                f.write('    %-2s %10f %10f %10f\n' % (element, coord[0], coord[1], coord[2]))
+            f.write('    symmetry c1 }\n\n')
+
+            if self._restrained_dihedrals is not None:
+                dihedrals = ['%d %d %d %d' % tuple(dihedral) for dihedral in self._restrained_dihedrals]
+                dihedrals = ', '.join(dihedrals)
+                f.write('set optking { frozen_dihedral = (" %s ") }\n\n' % dihedrals)
+
+            # Enable a dynamic optimization algorithm selection to converge problematic cases:
+            # http://www.psicode.org/psi4manual/master/optking.html#dealing-with-problematic-optimizations
+            if self.optimize:
+                f.write('set optking { dynamic_level = 1 }\n\n')
+
+            theory_correction = 'SCF' if self.theory == 'HF' else self.theory
+            theory_correction += '' if self.correction == 'none' else '-%s' % self.correction
+            function = 'optimize' if self.optimize else 'energy'
+            f.write('energy, wfn = %s(\'%s\', return_wfn=True)\n' % (function, theory_correction))
+
+            f.write('oeprop(wfn, \'DIPOLE\', \'QUADRUPOLE\', \'MULLIKEN_CHARGES\')\n')
+            if self.esp_points is not None:
+                f.write('oeprop(wfn, \'GRID_ESP\')\n')
+
+            # The path has to be absolute because Psi4 changes a working directory then PCM is used
+            xyzFile = os.path.join(os.path.abspath(directory), 'psi4out.xyz')
+            f.write('with open(\'%s\', \'w\') as f:\n' % xyzFile)
+            f.write('    f.write(\'%d \' )\n' % len(coords))
+            f.write('    f.write(\'%.12f\\n\' % energy)\n')
+            f.write('    f.write(MOL.save_string_xyz())\n')
+
+    def _readOutput(self, directory):
+
+        result = QMResult()
+        result.completed = True
+
+        xyzFile = os.path.join(directory, 'psi4out.xyz')
+        if os.path.exists(xyzFile):
+            with open(xyzFile) as f:
+                result.energy = float(f.readline().split()[1])  # Read the 2nd number on the 1st line
+                result.energy *= 627.509469  # Hartree to kcal
+            result.coords = np.loadtxt(xyzFile, skiprows=2, usecols=(1, 2, 3))
+            result.coords = np.atleast_3d(result.coords)  # TODO get rid of this
+        else:
+            result.errored = True
+
+        if self.esp_points is not None:
+            espFile = os.path.join(directory, 'grid_esp.dat')
+            if os.path.exists(espFile):
+                result.esp_points = self.esp_points
+                result.esp_values = np.loadtxt(espFile)/0.529177249  # Bohrs to Angstoms
+            else:
+                result.errored = True
+
+        outFile = os.path.join(directory, 'psi4.out')
+        if os.path.exists(outFile):
+            with open(outFile) as f:
+                lines = f.readlines()
+
+            for i in range(len(lines)):
+                if "Mulliken Charges: (a.u.)" in lines[i]:
+                    result.mulliken = []
+                    for j in range(self._natoms):
+                        s = lines[i + 2 + j].split()
+                        result.mulliken.append(float(s[5]))
+
+                if "Dipole Moment: (Debye)" in lines[i]:
+                    s = lines[i + 1].split()
+                    result.dipole = [float(s[1]), float(s[3]), float(s[5]), float(s[7])]
+
+                if " Traceless Quadrupole Moment: (Debye Ang)" in lines[i]:
+                    s1, s2 = lines[i + 1].split(), lines[i + 2].split()
+                    result.quadrupole = [float(s1[1]), float(s1[3]), float(s1[5]),
+                                         float(s2[1]), float(s2[3]), float(s2[5])]
+
+        else:
+            result.errored = True
+
+        return result
+
+
+if __name__ == '__main__':
+
+    import sys
+    import doctest
+
+    if os.environ.get('TRAVIS_OS_NAME') != 'osx':  # Psi4 does not work in Mac
+        if doctest.testmod().failed:
+            sys.exit(1)

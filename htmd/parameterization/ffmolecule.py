@@ -10,8 +10,9 @@ from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
-from htmd.qm.qmcalculation import Theory, BasisSet, Code, QMCalculation, Execution
+from htmd.qm import Psi4
 from htmd.parameterization.phi import setPhi, getPhi
+from htmd.parameterization.esp import ESP
 from htmd.progress.progress import ProgressBar
 import re
 import math
@@ -36,33 +37,10 @@ class QMFittingSet:
 
 class FFMolecule(Molecule):
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 basis=BasisSet._6_31G_star, solvent=True, theory=Theory.B3LYP, execution=Execution.Inline,
-                 qmcode=Code.PSI4, outdir="./"):
+                 qm=None, outdir="./"):
         # filename -- a mol2 format input geometry
         # rtf, prm -- rtf, prm files
         # method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
-        self.basis = basis
-        self.theory = theory
-        self.solvent = solvent
-
-        self.solvent_name = "vacuum"
-        if solvent:
-            self.solvent_name = "water"
-      
-        if theory == Theory.RHF:
-            self.theory_name = "rhf"
-        if theory == Theory.B3LYP:
-            self.theory_name = "b3lyp"
-
-        if basis == BasisSet._6_31G_star:
-            self.basis_name = "6-31g-star"
-        elif basis == BasisSet._cc_pVDZ:
-            self.basis_name = "cc-pVDZ"
-        else:
-            raise ValueError("Unknown Basis Set")
-
-        self.execution = execution
-        self.qmcode = qmcode
         self.method = method
         self.outdir = outdir
 
@@ -95,16 +73,33 @@ class FFMolecule(Molecule):
             # If the user has specified explicit RTF and PRM files go ahead and load those
             self._rtf = RTF(rtf)
             self._prm = PRM(prm)
+        elif method == FFTypeMethod.NONE:
+            # Don't assign any atom types
+            pass
         else:
             # Otherwise make atom types using the specified method
-            # (Right now only MATCH)
             fftype = FFType(self, method=self.method)
             self._rtf = fftype._rtf
             self._prm = fftype._prm
-        if not self._rtf or not self._prm:
-            raise ValueError("RTF and PRM not defined")
+
+        self.qm = qm if qm else Psi4()
+
+        self.theory_name = self.qm.theory.lower()
+        self.basis_name = self.qm.basis
+        self.basis_name = re.sub('\+', 'plus', self.basis_name)  # Replace '+' with 'plus'
+        self.basis_name = re.sub('\*', 'star', self.basis_name)  # Replace '*' with 'star'
+        self.solvent_name = self.qm.solvent.lower()
 
         self.report()
+
+    def copy(self):
+
+        # HACK! Circumvent 'qm' coping problem
+        qm, self.qm = self.qm, None
+        copy = super().copy()
+        self.qm = copy.qm = qm
+
+        return copy
 
     def report(self):
         print("Net Charge: {}".format(self.netcharge))
@@ -161,13 +156,15 @@ class FFMolecule(Molecule):
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(mindir))
 
-        # Kick off a QM calculation -- unconstrained geometry optimization
-        qm = QMCalculation(self, charge=self.netcharge, optimize=True,
-                           directory=mindir, basis=self.basis, theory=self.theory, solvent=self.solvent,
-                           execution=self.execution, code=self.qmcode)
-        results = qm.results()
+        self.qm.molecule = self
+        self.qm.esp_points = None
+        self.qm.optimize = True
+        self.qm.restrained_dihedrals = None
+        self.qm.directory = mindir
+        results = self.qm.run()
         if results[0].errored:
             raise RuntimeError("QM Optimization failed")
+
         # Replace coordinates with the minimized set
         self.coords = np.atleast_3d(results[0].coords)
 
@@ -235,6 +232,7 @@ class FFMolecule(Molecule):
             self.coords[:, :, f] = self.coords[:, :, f] - com
 
     def _try_load_pointfile(self):
+
         # Load a point file if one exists from a previous job
         pointfile = os.path.join(self.outdir, "esp", self.output_directory_name(), "00000", "grid.dat")
         if os.path.exists(pointfile):
@@ -249,32 +247,36 @@ class FFMolecule(Molecule):
                 ret[i, 2] = float(s[2])
             print("Reusing previously-generated point cloud")
             return ret
-        return True
+
+        return None
 
     def fitCharges(self, fixed=[]):
+
         # Remove the COM from the coords, or PSI4 does it and then the grid is incorrectly centred
         self._removeCOM()
-        # Kick off a QM calculation -- unconstrained single point with grid
+
+        # Get ESP points
         points = self._try_load_pointfile()
+        if points is None:
+            points = ESP._generate_points(self)[0]
+
         espdir = os.path.join(self.outdir, "esp", self.output_directory_name() )
         try:
             os.makedirs(espdir, exist_ok=True)
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(espdir))
 
-        qmcode = self.qmcode
-        if self.qmcode == Code.TeraChem: 
-           print("Charge-fitting requires a feature TeraChem doesn't have yet. Using PSI4 instead")
-           qmcode = Code.PSI4
-
-        qm = QMCalculation(self, charge=self.netcharge, optimize=False, esp=points, theory=self.theory, solvent=self.solvent,
-                           directory=espdir, basis=self.basis, execution=self.execution,
-                           code=qmcode)
-        results = qm.results()
+        self.qm.molecule = self
+        self.qm.esp_points = points
+        self.qm.optimize = False
+        self.qm.restrained_dihedrals = None
+        self.qm.directory = espdir
+        results = self.qm.run()
         if results[0].errored:
             raise RuntimeError("QM Calculation failed")
+
         esp_grid = results[0].esp_points
-        esp = results[0].esp_scalar
+        esp = results[0].esp_values
         self.coords = results[0].coords
 
         #    print(results[0].dipole )
@@ -441,23 +443,23 @@ class FFMolecule(Molecule):
         mol = self.copy()
         mol.coords = cset
 
-        dirname = "dihedral-single-point"
-        if geomopt:
-            dirname = "dihedral-opt"
-
+        dirname = 'dihedral-opt' if geomopt else 'dihedral-single-point'
         dih_name = "%s-%s-%s-%s" % (self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]])
-
-        fitdir = os.path.join(self.outdir, dirname, dih_name, self.output_directory_name()) 
+        fitdir = os.path.join(self.outdir, dirname, dih_name, self.output_directory_name())
 
         try:
             os.makedirs(fitdir, exist_ok=True)
         except:
             raise OSError('Directory {} could not be created. Check if you have permissions.'.format(fitdir))
 
-        qmset = QMCalculation(mol, charge=self.netcharge, directory=fitdir, frozen=frozens, optimize=geomopt, theory=self.theory, solvent=self.solvent,
-                              basis=self.basis, execution=self.execution, code=self.qmcode)
+        self.qm.molecule = mol
+        self.qm.esp_points = None
+        self.qm.optimize = geomopt
+        self.qm.restrained_dihedrals = np.array(frozens)
+        self.qm.directory = fitdir
+        results = self.qm.run()
 
-        ret = self._makeDihedralFittingSetFromQMResults(atoms, qmset.results())
+        ret = self._makeDihedralFittingSetFromQMResults(atoms, results)
 
         # Get the initial parameters of the dihedral we are going to fit
 
@@ -607,17 +609,15 @@ class FFMolecule(Molecule):
         ret.name = "%s-%s-%s-%s" % (
             self._rtf.names[atoms[0]], self._rtf.names[atoms[1]], self._rtf.names[atoms[2]], self._rtf.names[atoms[3]])
 
-        completed = 0
-
         qmin = 1.e100
         for q in results:
-            if q.completed and not q.errored:
+            if not q.errored:
                 if q.energy < qmin:
                     qmin = q.energy
 
         completed = 0
         for q in results:
-            if q.completed and not q.errored:
+            if not q.errored:
                 if (q.energy - qmin) < 20.:  # Only fit against QM points < 20 kcal above the minimum
                     mmeval = ffe.evaluate(q.coords)
                     if mmeval["vdw"] < 200:
