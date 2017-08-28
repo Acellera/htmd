@@ -47,7 +47,7 @@ def cli_parser():
     parser.add_argument("--no-torsions", help="Do not perform torsion fitting (default: %(default)s)",
                         action="store_true", dest="notorsion", default=False)
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
-                        choices=["inline", "LSF", "PBS", "Slurm", "AceCloud"], default="inline", dest="exec")
+                        choices=["inline", "LSF", "Slurm"], default="inline", dest="exec")
     parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"],
                         default="PSI4", dest="qmcode")
     parser.add_argument("--freeze-charge", metavar="A1",
@@ -102,12 +102,8 @@ def main_parameterize(arguments=None):
         execution = Execution.Inline
     elif args.exec == "LSF":
         execution = Execution.LSF
-    elif args.exec == "PBS":
-        execution = Execution.PBS
     elif args.exec == "Slurm":
         execution = Execution.Slurm
-    elif args.exec == "AceCloud":
-        execution = Execution.AceCloud
     else:
         print("Unknown execution mode: {}".format(args.exec))
         sys.exit(1)
@@ -256,7 +252,8 @@ def main_parameterize(arguments=None):
                             scores[idx] = ret.chisq
                             # Always use the mm_orig from first iteration (unmodified)
                             ret.mm_original = ref_mm[name].mm_original
-                            fn = mol.plotTorsionFit(ret, show=False)
+                            phi_original = ref_mm[name].phi
+                            fn = mol.plotTorsionFit(ret, phi_original, show=False)
                         except Exception as e:
                             print("Error in fitting")
                             print(str(e))
