@@ -401,7 +401,7 @@ if __name__ == "__main__":
     pd.write(home(dataDir=os.path.join('test-equilibration', pdbid, 'postrun')), tmpdir)
 
     # Compare with reference
-    refdir = home(dataDir=os.path.join('test-production', pdbid, 'prerun'))
+    refdir = home(dataDir=os.path.join('test-production-v6', pdbid, 'prerun'))
     files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
     match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
 

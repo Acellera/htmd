@@ -175,7 +175,7 @@ class Acemd(ProtocolInterface):
         self._arg('tclforces', 'str', 'Enable TCL force scripting.', None, val.String(), valid_values=('on', 'off'))
         self._arg('minimize', 'int', 'Number of steps of conjugate-gradient minimisation to perform.',
                   None, val.Number(int, '0POS'))
-        self._arg('run', 'str', 'The number of simulation iterations to perform.', None, val.String())
+        self._arg('run', 'str', 'The number of simulation iterations to perform.', None)
         self._arg('celldimension', 'str', 'Dimensions of the unit cell.', None, val.Number(float, 'ANY'), nargs=3)
         self._arg('useconstantratio', 'str',
                   'Keep the ratio of the X-Y dimensions constant while allowing Z to fluctuate independently.',
@@ -334,13 +334,72 @@ class Acemd(ProtocolInterface):
 
 if __name__ == "__main__":
     # l=Acemd.protocols(quiet=True)
-    import htmd.home
+    from htmd.home import home
+    from htmd.util import tempname
+    import filecmp
+    from glob import glob
+    import sys
+
+    tmpdir = tempname()
 
     acemd = Acemd()
+    acemd.temperature = 350
+    acemd.restart = 'on'
+    acemd.restartfreq = 25
+    acemd.outputname = 'output'
+    acemd.xtcfile = 'myout.xtc'
+    acemd.xtcfreq = 500
+    acemd.timestep = 4
+    acemd.rigidbonds = 'all'
+    acemd.hydrogenscale = 0.3
+    acemd.switching = 'on'
+    acemd.switchdist = 9
+    acemd.cutoff = 5
+    acemd.exclude = 'scaled1-4'
+    acemd.scaling14 = 5.6
+    acemd.langevin = 'on'
+    acemd.langevintemp = 300
+    acemd.langevindamping = 0.8
+    acemd.pme = 'on'
+    acemd.pmegridspacing = 5
+    acemd.fullelectfrequency = 3
+    acemd.energyfreq = 10
+    acemd.constraints = 'on'
+    acemd.consref = '5dhfr_cube.pdb'
+    acemd.constraintscaling = 3.2
+    acemd.berendsenpressure = 'on'
+    acemd.berendsenpressuretarget = 14
+    acemd.berendsenpressurerelaxationtime = 2
+    acemd.tclforces = 'on'
+    acemd.minimize = 150
+    acemd.run = 555
+    acemd.celldimension = [3, 56, 2]
+    acemd.useconstantratio = 'on'
+    acemd.amber = 'off'
+    acemd.dielectric = 16
+    acemd.pairlistdist = 9
+    acemd.TCL = 'on'
+    acemd.bincoordinates = None
+    acemd.binvelocities = None
+    acemd.binindex = None
     acemd.structure = '5dhfr_cube.psf'
     acemd.parameters = 'par_all22_prot.inp'
-    homedir = htmd.home.home()
+    acemd.extendedsystem = None
     acemd.coordinates = '5dhfr_cube.pdb'
-    acemd.setup(homedir + '/data/dhfr', '/tmp/testdir', overwrite=True)
-    print(acemd)
+    acemd.velocities = None
+    acemd.parmfile = None
 
+    acemd.coordinates = '5dhfr_cube.pdb'
+    acemd.setup(home(dataDir='dhfr/'), tmpdir, overwrite=True)
+
+    # Compare with reference
+    refdir = home(dataDir='test-acemd-v2')
+    files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
+    match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
+
+    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+            raise RuntimeError('Different results produced by Acemd.write between {} and {} '
+                               'in files {}.'.format(refdir, tmpdir, mismatch))
+
+    import shutil
+    shutil.rmtree(tmpdir)
