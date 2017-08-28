@@ -64,6 +64,10 @@ class TestParameterize(unittest.TestCase):
                 if file.endswith('frcmod'):
                     refLines, resLines = sorted(refLines[1:]), sorted(resLines[1:])
 
+                # Removes first line with the version
+                if file.endswith('prm') or file.endswith('rtf'):
+                    refLines, resLines = refLines[1:], resLines[1:]
+
                 if file.endswith('prm') or file.endswith('frcmod') or \
                         os.path.relpath(file, start=refDir).startswith('energies'):
                     refFields = [field for line in refLines for field in line.split()]
