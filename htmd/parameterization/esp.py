@@ -8,6 +8,9 @@ from math import pi as PI
 from math import sqrt, sin, cos, acos
 import numpy as np
 from numpy.random import uniform as rand
+from scipy.spatial.distance import cdist
+import scipy.optimize as optimize
+
 from htmd.molecule.vdw import radiusByElement
 
 class ESP:
@@ -92,7 +95,7 @@ class ESP:
         return np.asarray(points, dtype=np.float32)
 
     @staticmethod
-    def _generate_points(molecule, vdw_radii=[1.4, 1.6, 1.8, 2.0, 2.2], density=10):
+    def generate_points(molecule, vdw_radii=[1.4, 1.6, 1.8, 2.0, 2.2], density=10):
 
         points = []
         for frame in range(molecule.coords.shape[2]):
@@ -102,6 +105,74 @@ class ESP:
             points.append(pp)
 
         return points
+
+    def __init__(self):
+
+        self.molecule = None
+        self.qm_results = None
+        self.fixed = None
+
+        self._reciprocal_distances = None
+
+    def map_groups_to_atoms(self, group_charges):
+
+        charges = np.zeros(self.molecule.natoms)
+        for atom_group, group_charge in zip(self.molecule._equivalent_atom_groups, group_charges):
+            charges[atom_group] = group_charge
+
+        return charges
+
+    def compute_constraint(self, group_charges):
+
+        charges = self.map_groups_to_atoms(group_charges)
+        constraint = np.sum(charges) - self.molecule.netcharge
+
+        return constraint
+
+    def compute_objective(self, group_charges):
+
+        qm_result = self.qm_results[0]
+
+        charges = self.map_groups_to_atoms(group_charges)
+        esp_values = np.dot(self._reciprocal_distances, charges)
+        loss = np.sum((esp_values - qm_result.esp_values)**2)
+
+        return loss
+
+    def run(self):
+
+        qm_result = self.qm_results[0]
+
+        ngroups = len(self.molecule._equivalent_atom_groups)
+        lower_bounds = np.ones(ngroups) * -1.25
+        upper_bounds = np.ones(ngroups) * +1.25
+
+        # Fix the charges of the specified atoms to those already set in the
+        # charge array. Note this also fixes the charges of the atoms in the
+        # same equivalency group.
+        for atom in self.fixed:
+            group = self.molecule._equivalent_group_by_atom[atom]
+            lower_bounds[group] = self.molecule.charge[atom]
+            upper_bounds[group] = self.molecule.charge[atom]
+
+        # If the restraint relates to an H, set the lower bound to 0
+        for i in range(ngroups):
+            if "H" == self.molecule.element[self.molecule._equivalent_atom_groups[i][0]]:
+                lower_bounds[i] = 0.001
+
+        # Compute the reciprocal distances between ESP points and atomic charges
+        distances = cdist(qm_result.esp_points, self.molecule.coords[:, :, 0])
+        self._reciprocal_distances = np.reciprocal(distances)
+
+        # Optimize the charges
+        result = optimize.minimize(self.compute_objective, method="SLSQP", options={'disp': True},
+                                   x0 = np.zeros(ngroups),
+                                   bounds=list(zip(lower_bounds, upper_bounds)),
+                                   constraints={'type': 'eq', 'fun': self.compute_constraint})
+        charges = self.map_groups_to_atoms(result.x) # Optimized charges
+        loss = self.compute_objective(result.x)
+
+        return {'charges': charges, 'loss': loss}
 
 
 if __name__ == '__main__':

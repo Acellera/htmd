@@ -22,7 +22,6 @@ import scipy.optimize as optimize
 import numpy as np
 from copy import deepcopy
 
-
 class QMFittingSet:
     # phi_coords  = []
     def __init__(self):
@@ -85,7 +84,7 @@ class FFMolecule(Molecule):
         self.qm = qm if qm else Psi4()
 
         self.theory_name = self.qm.theory.lower()
-        self.basis_name = self.qm.basis
+        self.basis_name = self.qm.basis.lower()
         self.basis_name = re.sub('\+', 'plus', self.basis_name)  # Replace '+' with 'plus'
         self.basis_name = re.sub('\*', 'star', self.basis_name)  # Replace '*' with 'star'
         self.solvent_name = self.qm.solvent.lower()
@@ -168,39 +167,6 @@ class FFMolecule(Molecule):
         # Replace coordinates with the minimized set
         self.coords = np.atleast_3d(results[0].coords)
 
-    def _fitCharges_map_back_to_charges(self, x):
-        charges = np.zeros((self.natoms))
-
-        qsum = 0.
-        for i in range(len(x)):
-            charges[self._equivalent_atom_groups[i]] = x[i]
-            qsum += x[i] * len(self._equivalent_atom_groups[i])
-            #  diff = self.netcharge - qsum;
-            #  diff = diff / len(self._equivalent_atom_groups[ len(x) ])
-            #  print( self._equivalent_atom_groups[ len(x) ] )
-            #  print( diff )
-            #  charges[ self._equivalent_atom_groups[ len(x) ] ] = diff
-        return charges
-
-    def _fitCharges_con(self, x):
-        charges = self._fitCharges_map_back_to_charges(x)
-        s = np.sum(charges) - self.netcharge
-        return s
-
-    def _fitCharges_objective(self, x):
-        # Map the fit variables back to per-atom charges
-        chisq = 0.
-        charges = self._fitCharges_map_back_to_charges(x)
-
-        #    if( range_penalty == 1 ): chisq = 1000.
-
-        for i in range(self._fitCharges_grid.shape[0]):
-            ee = np.sum(charges * self._fitCharges_distances[i, :])
-            delta_ee = self._fitCharges_esp[i] - ee
-            chisq = chisq + (delta_ee * delta_ee)
-
-        return chisq
-
     def _fitDihedral_objective(self, x):
         inv = math.pi / 180.
 
@@ -219,137 +185,69 @@ class FFMolecule(Molecule):
 
         return chisq
 
-    def _removeCOM(self):
-        # Relocate centre of mass to the origin
-        for f in range(self.coords.shape[2]):
-            com = np.zeros(3)
-            mass = 0.
-            for i in range(self.coords.shape[0]):
-                m = self._rtf.mass_by_type[self._rtf.type_by_index[i]]
-                mass = mass + m
-                com = com + self.coords[i, :, f] * m
-            com /= mass
-            self.coords[:, :, f] = self.coords[:, :, f] - com
+    def removeCOM(self):
+        '''Relocate centre of mass to the origin'''
 
-    def _try_load_pointfile(self):
-
-        # Load a point file if one exists from a previous job
-        pointfile = os.path.join(self.outdir, "esp", self.output_directory_name(), "00000", "grid.dat")
-        if os.path.exists(pointfile):
-            f = open(pointfile, "r")
-            fl = f.readlines()
-            f.close()
-            ret = np.zeros((len(fl), 3))
-            for i in range(len(fl)):
-                s = fl[i].split()
-                ret[i, 0] = float(s[0])
-                ret[i, 1] = float(s[1])
-                ret[i, 2] = float(s[2])
-            print("Reusing previously-generated point cloud")
-            return ret
-
-        return None
+        masses = np.array([self._rtf.mass_by_type[self._rtf.type_by_index[i]] for i in range(self.natoms)])
+        for frame in range(self.numFrames):
+            self.coords[:, :, frame] -= np.dot(masses, self.coords[:, :, frame])/np.sum(masses)
 
     def fitCharges(self, fixed=[]):
 
-        # Remove the COM from the coords, or PSI4 does it and then the grid is incorrectly centred
-        self._removeCOM()
+        # Remove the COM from the coords, because PSI4 does it and then the grid is incorrectly centred
+        self.removeCOM()
+
+        # Cereate an ESP directory
+        espDir = os.path.join(self.outdir, "esp", self.output_directory_name() )
+        os.makedirs(espDir, exist_ok=True)
 
         # Get ESP points
-        points = self._try_load_pointfile()
-        if points is None:
-            points = ESP._generate_points(self)[0]
+        point_file = os.path.join(espDir, "00000", "grid.dat")
+        if os.path.exists(point_file):
+            # Load a point file if one exists from a previous job
+            esp_points = np.loadtxt(point_file)
+            print("Reusing previously-generated point cloud")
+        else:
+            # Generate ESP points
+            esp_points = ESP.generate_points(self)[0]
 
-        espdir = os.path.join(self.outdir, "esp", self.output_directory_name() )
-        try:
-            os.makedirs(espdir, exist_ok=True)
-        except:
-            raise OSError('Directory {} could not be created. Check if you have permissions.'.format(espdir))
-
+        # Run QM simulation
         self.qm.molecule = self
-        self.qm.esp_points = points
+        self.qm.esp_points = esp_points
         self.qm.optimize = False
         self.qm.restrained_dihedrals = None
-        self.qm.directory = espdir
-        results = self.qm.run()
-        if results[0].errored:
+        self.qm.directory = espDir
+        qm_results = self.qm.run()
+        if qm_results[0].errored:
             raise RuntimeError("QM Calculation failed")
+        self.coords = qm_results[0].coords
 
-        esp_grid = results[0].esp_points
-        esp = results[0].esp_values
-        self.coords = results[0].coords
+        # Fit ESP charges
+        self.esp = ESP()
+        self.esp.molecule = self
+        self.esp.qm_results = qm_results
+        self.esp.fixed = fixed
+        esp_result = self.esp.run()
+        esp_charges, esp_loss = esp_result['charges'], esp_result['loss']
 
-        #    print(results[0].dipole )
-        #    print(results[0].quadrupole )
-        #    print(results[0].mulliken )
+        # Update the charges
+        self.charge[:] = esp_charges
+        self._rtf.updateCharges(esp_charges)
 
-        self._fitCharges_grid = esp_grid
-        self._fitCharges_esp = esp
+        return esp_loss, qm_results[0].dipole
 
-        # set up the restraints to fit
+    def getDipole(self):
+        """Calculate the dipole moment (in Debyes) of the molecule"""
 
-        N = len(self._equivalent_atom_groups)  # - 1
-        lb = np.ones((N)) * -1.25
-        ub = np.ones((N)) * +1.25
+        coords = self.coords[:, :, self.frame]
+        coords -= np.mean(coords, axis=0)
 
-        # Fix the charges of the specified atoms to those already set in the 
-        # charge array. Note this also fixes the charges of the atoms in the
-        # same equivalency group.
-        # 
-        for atom in fixed:
-            group = self._equivalent_group_by_atom[ atom ]
-            lb[group] = self.charge[atom] 
-            ub[group] = self.charge[atom] 
+        dipole = np.zeros(4)
+        dipole[:3] = np.dot(self.charge, coords)
+        dipole[3] = np.linalg.norm(dipole[:3]) # Total dipole moment
+        dipole /= 0.20819434 # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
 
-        # If the restraint relates to an H, set the lower bound to 0
-        for i in range(N):
-            if "H" == self.element[self._equivalent_atom_groups[i][0]]:
-                lb[i] = 0.001
-
-        bounds = []
-        for a in range(len(lb)):
-            bounds.append((lb[a], ub[a]))
-            # Start off by equally distributing the mol's charge
-        start = np.zeros(N)
-
-        # Precompute the 1/r distances
-        self._fitCharges_distances = np.zeros((self._fitCharges_grid.shape[0], self.coords.shape[0]))
-
-        for i in range(self._fitCharges_grid.shape[0]):
-            p1 = self._fitCharges_grid[i, :]
-            for j in range(self.coords.shape[0]):
-                p2 = self.coords[j, :, 0]
-                r = np.linalg.norm(p1 - p2)
-                self._fitCharges_distances[i, j] = 1. / r
-            #    initial_chisq = self._fitCharges_objective( start )
-
-        xopt = optimize.minimize(self._fitCharges_objective, start, method="SLSQP", bounds=bounds,
-                                 options={"disp": False}, constraints={'type': 'eq', 'fun': self._fitCharges_con})
-        #    xopt = optimize.minimize( self._fitCharges_objective, start, method="L-BFGS-B",
-        # bounds = bounds, options={"disp":False} )
-
-        charges = self._fitCharges_map_back_to_charges(xopt.x)
-
-        # Calculate the dipole from the fitted charges
-        dpx = dpy = dpz = 0.
-        nc = 0.
-        for i in range(len(charges)):
-            dpx = dpx + charges[i] * self.coords[i, 0, 0]
-            dpy = dpy + charges[i] * self.coords[i, 1, 0]
-            dpz = dpz + charges[i] * self.coords[i, 2, 0]
-            nc = nc + charges[i]
-        fac = (2.541766 / 0.529177249)
-        dpx *= fac
-        dpy *= fac
-        dpz *= fac
-        dp = math.sqrt(dpx * dpx + dpy * dpy + dpz * dpz)
-
-        fit_chisq = self._fitCharges_objective(xopt.x)
-
-        self.charges = charges
-        self._rtf.updateCharges(charges)
-
-        return fit_chisq, results[0].dipole, [dpx, dpy, dpz, dp]
+        return dipole
 
     def getSoftTorsions(self):
         dd = []
