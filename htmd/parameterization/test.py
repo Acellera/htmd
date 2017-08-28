@@ -61,11 +61,11 @@ class TestParameterize(unittest.TestCase):
 
                 # HACK! FRCMOD file lines are swapped randomly, so first sort them and compare.
                 #       Also the first line with the version is removed
-                if file.endswith('frcmod'):
+                if file.endswith('frcmod') or file.endswith('rtf'):
                     refLines, resLines = sorted(refLines[1:]), sorted(resLines[1:])
 
                 # Removes first line with the version
-                if file.endswith('prm') or file.endswith('rtf'):
+                if file.endswith('prm'):
                     refLines, resLines = refLines[1:], resLines[1:]
 
                 if file.endswith('prm') or file.endswith('frcmod') or \
