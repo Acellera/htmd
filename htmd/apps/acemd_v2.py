@@ -4,10 +4,7 @@
 # No redistribution in whole or part
 #
 import os
-import htmd
-import shutil
 import numpy as np
-from htmd.protocols.oldprotocolinterface import ProtocolInterface as OldProtocolInterface
 from protocolinterface import ProtocolInterface, val
 
 
@@ -238,6 +235,7 @@ class Acemd(ProtocolInterface):
         """
         if os.path.exists(path):
             if overwrite:
+                import shutil
                 shutil.rmtree(path)
             else:
                 raise NameError('Directory exists, use overwrite=True or remove directory')
