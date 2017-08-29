@@ -39,21 +39,25 @@ class TestParameterize(unittest.TestCase):
 
         filestotest = []
         excluded = ('minimize', 'esp', 'dihedral', '.coor', '.svg')
-        for root, _, files in os.walk(refDir):
+        for root, _, files in os.walk(refDir, followlinks=True):
             for file in files:
                 flag = False
-                relfile = os.path.relpath(os.path.join(root, file), start=refDir)
+                relFile = os.path.relpath(os.path.join(root, file), start=refDir)
                 for exc in excluded:
-                    if relfile.startswith(exc) or relfile.endswith(exc):
+                    if relFile.startswith(exc) or relFile.endswith(exc):
                         flag = True
                 if not flag:
                     filestotest.append(os.path.join(root, file))
 
+        print('Compared files:')
         for file in filestotest:
-            refFile = os.path.join(refDir, os.path.relpath(file, start=refDir))
-            resFile = os.path.join(resDir, os.path.relpath(file, start=refDir))
+            relFile = os.path.relpath(file, start=refDir)
+            print('  %s' % relFile)
 
-            with self.subTest(file=file):
+            refFile = os.path.join(refDir, relFile)
+            resFile = os.path.join(resDir, relFile)
+
+            with self.subTest(refFile=refFile):
                 self.assertTrue(os.path.exists(resFile))
 
                 with open(refFile) as ref, open(resFile) as res:
@@ -73,14 +77,17 @@ class TestParameterize(unittest.TestCase):
                     refFields = [field for line in refLines for field in line.split()]
                     resFields = [field for line in resLines for field in line.split()]
                     for refField, resField in zip(refFields, resFields):
-                        try:
-                            refFloat = float(refField)
-                            resFloat = float(resField)
-                            self.assertAlmostEqual(refFloat, resFloat, places=4, msg=file)
-                        except ValueError:
-                            self.assertEqual(refField, resField, msg=file)
+                        with self.subTest():
+                            try:
+                                refFloat = float(refField)
+                                resFloat = float(resField)
+                                self.assertAlmostEqual(refFloat, resFloat, places=4, msg=refFile)
+                            except ValueError:
+                                self.assertEqual(refField, resField, msg=refFile)
                 else:
-                    self.assertListEqual(refLines, resLines, msg=file)
+                    self.assertListEqual(refLines, resLines, msg=refFile)
+
+        print('')
 
     def test_h2o2_list(self):
 
