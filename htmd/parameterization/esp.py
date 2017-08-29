@@ -143,9 +143,15 @@ class ESP:
 
         qm_result = self.qm_results[0]
 
+        # Set bounds
         ngroups = len(self.molecule._equivalent_atom_groups)
         lower_bounds = np.ones(ngroups) * -1.25
         upper_bounds = np.ones(ngroups) * +1.25
+
+        # If the restraint relates to an H, set the lower bound to 0
+        for i in range(ngroups):
+            if 'H' == self.molecule.element[self.molecule._equivalent_atom_groups[i][0]]:
+                lower_bounds[i] = 0.001
 
         # Fix the charges of the specified atoms to those already set in the
         # charge array. Note this also fixes the charges of the atoms in the
@@ -155,17 +161,12 @@ class ESP:
             lower_bounds[group] = self.molecule.charge[atom]
             upper_bounds[group] = self.molecule.charge[atom]
 
-        # If the restraint relates to an H, set the lower bound to 0
-        for i in range(ngroups):
-            if "H" == self.molecule.element[self.molecule._equivalent_atom_groups[i][0]]:
-                lower_bounds[i] = 0.001
-
         # Compute the reciprocal distances between ESP points and atomic charges
         distances = cdist(qm_result.esp_points, self.molecule.coords[:, :, 0])
         self._reciprocal_distances = np.reciprocal(distances)
 
         # Optimize the charges
-        result = optimize.minimize(self.compute_objective, method="SLSQP", options={'disp': True},
+        result = optimize.minimize(self.compute_objective, method="SLSQP", options={'disp': True, 'ftol': 1.e-12},
                                    x0 = np.zeros(ngroups),
                                    bounds=list(zip(lower_bounds, upper_bounds)),
                                    constraints={'type': 'eq', 'fun': self.compute_constraint})
