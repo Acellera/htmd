@@ -14,6 +14,17 @@ from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+class BuildError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        if isinstance(self.value, str):
+            return repr(self.value)
+        elif isinstance(self.value, list):
+            return '\n'.join([v if isinstance(v, str) else repr(v) for v in self.value])
+
+
 class MixedSegmentError(Exception):
     def __init__(self, value):
         self.value = value
@@ -23,6 +34,54 @@ class MixedSegmentError(Exception):
 
 
 class ResidueInsertionError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class UnknownResidueError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class MissingParameterError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class MissingTorsionError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class MissingBondError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class MissingAngleError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class MissingAtomTypeError(Exception):
     def __init__(self, value):
         self.value = value
 
