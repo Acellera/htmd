@@ -163,6 +163,7 @@ class ESP:
 
         # Compute the reciprocal distances between ESP points and atomic charges
         distances = cdist(qm_result.esp_points, self.molecule.coords[:, :, 0])
+        distances *= 0.52917721067 # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
         self._reciprocal_distances = np.reciprocal(distances)
 
         # Optimize the charges

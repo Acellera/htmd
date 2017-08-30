@@ -66,8 +66,9 @@ class FakeQM(QMBase):
 
         # Compute ESP values
         if self.esp_points is not None:
-            reciprocal_distances = 1/cdist(result.esp_points, result.coords[:, :, 0]) # 1/Angstrom
-            result.esp_values = np.dot(reciprocal_distances, self.molecule.charge) # Hartree/Angstrom
+            distances = cdist(result.esp_points, result.coords[:, :, 0]) # Angstrom
+            distances *= 0.52917721067  # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
+            result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge) # Hartree/Bohr
 
         return [result]
 
