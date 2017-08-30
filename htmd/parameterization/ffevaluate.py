@@ -341,7 +341,7 @@ if __name__ == '__main__':
             ff = FFEvaluate(mol)
             result = ff.run(coords)
 
-            if not np.isclose(reference['total'], result['total']):
+            if not np.isclose(reference['total'], result['total'], atol=1e-5):
                 print('\nReference:')
                 for term in reference:
                     print(term, reference[term])
