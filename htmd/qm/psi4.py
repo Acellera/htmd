@@ -115,7 +115,7 @@ class Psi4(QMBase):
 
     @property
     def _command(self):
-        return 'psi4 -i psi4.in -o psi4.out &> psi4.log'
+        return 'export HTMD_PSI4_WORKDIR=$(pwd)\npsi4 -i psi4.in -o psi4.out &> psi4.log'
 
     def _completed(self, directory):
         return os.path.exists(os.path.join(directory, 'psi4.out'))
@@ -167,15 +167,18 @@ class Psi4(QMBase):
             theory_correction = 'SCF' if self.theory == 'HF' else self.theory
             theory_correction += '' if self.correction == 'none' else '-%s' % self.correction
             function = 'optimize' if self.optimize else 'energy'
-            f.write('energy, wfn = %s(\'%s\', return_wfn=True)\n' % (function, theory_correction))
+            f.write('energy, wfn = %s(\'%s\', return_wfn=True)\n\n' % (function, theory_correction))
+
+            # Psi4 changes directory then PCM is used, so we need to return
+            f.write('import os\n')
+            f.write('os.chdir(os.environ[\'HTMD_PSI4_WORKDIR\'])\n\n')
 
             f.write('oeprop(wfn, \'DIPOLE\', \'QUADRUPOLE\', \'MULLIKEN_CHARGES\')\n')
             if self.esp_points is not None:
                 f.write('oeprop(wfn, \'GRID_ESP\')\n')
+            f.write('\n')
 
-            # The path has to be absolute because Psi4 changes a working directory then PCM is used
-            xyzFile = os.path.join(os.path.abspath(directory), 'psi4out.xyz')
-            f.write('with open(\'%s\', \'w\') as f:\n' % xyzFile)
+            f.write('with open(\'psi4out.xyz\', \'w\') as f:\n')
             f.write('    f.write(\'%d \' )\n' % len(coords))
             f.write('    f.write(\'%.12f\\n\' % energy)\n')
             f.write('    f.write(MOL.save_string_xyz())\n')
