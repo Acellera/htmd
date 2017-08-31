@@ -6,8 +6,8 @@
 import numpy as np
 import scipy as sp
 from scipy import constants as const
-
 from htmd.molecule.util import dihedralAngle
+
 
 class FFEvaluate:
     """
@@ -139,7 +139,7 @@ class FFEvaluate:
         energy = 0.
         for angle in self.mol.angles:
 
-            # TODO move htmd.molecule.util
+            # TODO: move htmd.molecule.util
             r23 = coords[angle[2], :] - coords[angle[1], :]
             r21 = coords[angle[0], :] - coords[angle[1], :]
             cos_theta = np.dot(r21, r23) / (np.linalg.norm(r21) * np.linalg.norm(r23))
@@ -151,7 +151,7 @@ class FFEvaluate:
             theta0 = np.deg2rad(parameters.theta0)
             energy += parameters.k0 * (theta - theta0)**2
 
-            # TODO no idea what is happening here. Dead code!
+            # TODO: no idea what is happening here. Dead code!
             if (parameters.kUB is None) and (parameters.kUB != 0.):
                 r13 = r23 - r21
                 r12len = np.linalg.norm(r13)
@@ -216,7 +216,7 @@ class FFEvaluate:
         assert coords.ndim == 2
         assert coords.shape[1] == 3
 
-        energy = {}
+        energy = dict()
         energy['elec'] = self._evaluate_elec(coords)
         energy['vdw'] = self._evaluate_vdw(coords)
         energy['bond'] = self._evaluate_bonds(coords)
@@ -226,6 +226,7 @@ class FFEvaluate:
         energy['total'] = sum(energy.values())
 
         return energy
+
 
 def _openmm_energy_charmm(psfFile, rtfFile, prmFile, coords):
 
@@ -248,6 +249,7 @@ def _openmm_energy_charmm(psfFile, rtfFile, prmFile, coords):
     energies = parmed.openmm.energy_decomposition(psf, context)
 
     return energies
+
 
 def _openmm_energy_amber(mol2File, frcmodFile, coords, tempDir=None):
 
@@ -299,7 +301,7 @@ if __name__ == '__main__':
     molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
     methods = (FFTypeMethod.CGenFF_2b6, FFTypeMethod.GAFF, FFTypeMethod.GAFF2)
 
-    # TODO remove then MATCH is fixed on Mac
+    # TODO: remove then MATCH is fixed on Mac
     methods = methods[1:] if os.environ.get('TRAVIS_OS_NAME') == 'osx' else methods
 
     for method in methods:
@@ -339,8 +341,8 @@ if __name__ == '__main__':
             ff = FFEvaluate(mol)
             result = ff.run(coords)
 
-            if not np.isclose(reference['total'], result['total']):
-                print('\nReferece:')
+            if not np.isclose(reference['total'], result['total'], atol=1e-5):
+                print('\nReference:')
                 for term in reference:
                     print(term, reference[term])
                 print('\nResult:')
