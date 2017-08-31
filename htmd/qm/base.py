@@ -80,12 +80,12 @@ class QMBase(ABC, ProtocolInterface):
         self._arg('solvent', 'str', 'Implicit solvent',
                   default='vacuum', validator=val.String(), valid_values=self.SOLVENTS)
         self._arg('esp_points', ':class: `numpy.ndarray`', 'Point to calculate ESP',
-                  default=None)  # TODO implement validator
+                  default=None, nargs='*')  # TODO implement validator
         self._arg('optimize', 'boolean', 'Optimize geometry',
                   default=False, validator=val.Boolean())
         self._arg('restrained_dihedrals', ':class: `numpy.ndarray`',
                   'List of restrained dihedrals (0-based indices)',
-                  default=None)  # TODO implement validator
+                  default=None, nargs='*')  # TODO implement validator
         self._arg('queue', ':class:`SimQueue <htmd.queues.simqueue.SimQueue>` object',
                   'Queue object used to run simulations',
                   default=LocalCPUQueue())

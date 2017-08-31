@@ -201,7 +201,7 @@ class TestParameterize(unittest.TestCase):
     def test_benzamidine_full(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_full')
-        self._test(refDir, tempname(), 'parameterize -m input.mol2 --charge 1 --basis 6-31g-star')
+        self._test(refDir, tempname(), 'parameterize -m input.mol2 --charge 1 --basis 6-31G*')
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_full_restart(self):
@@ -211,7 +211,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._test(refDir, resDir, 'parameterize -m input.mol2 --charge 1 --basis 6-31g-star')
+        self._test(refDir, resDir, 'parameterize -m input.mol2 --charge 1 --basis 6-31G*')
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_esp_freeze_restart(self):
@@ -221,7 +221,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         self._test(refDir, resDir,
-                   'parameterize -m input.mol2 --charge 1 --basis 6-31g-star --no-torsions --freeze-charge N2')
+                   'parameterize -m input.mol2 --charge 1 --basis 6-31G* --no-torsions --freeze-charge N2')
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_dihed_select_restart(self):
@@ -231,7 +231,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._test(refDir, resDir, 'parameterize -m input.mol2 --charge 1 --basis 6-31g-star --torsion C2-C1-C7-N1')
+        self._test(refDir, resDir, 'parameterize -m input.mol2 --charge 1 --basis 6-31G* --torsion C2-C1-C7-N1')
 
 
 if __name__ == '__main__':

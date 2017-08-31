@@ -70,6 +70,7 @@ REF_BASIS_ENERGIES['6-311++G**']  = -710.6500249812631
 REF_BASIS_ENERGIES['cc-pVDZ']     = -708.2705859786104
 REF_BASIS_ENERGIES['cc-pVTZ']     = -710.9482930575448
 REF_BASIS_ENERGIES['cc-pVQZ']     = -711.2616797163256
+
 REF_BASIS_ENERGIES['aug-cc-pVDZ'] = -708.3194872230060
 REF_BASIS_ENERGIES['aug-cc-pVTZ'] = -710.9898870056296
 REF_BASIS_ENERGIES['aug-cc-pVQZ'] = -711.2704032224416
@@ -105,18 +106,12 @@ class TestBase:
     def setUp(self):
 
         self.h2_074_file = os.path.join(home('test-qm'), 'H2-0.74.mol2')
-        if not os.path.exists(self.h2_074_file):
-            self.h2_074_file = '../data/test-qm/H2-0.74.mol2'  # TODO remove then htmd-data updated
         self.h2_074 = FFMolecule(self.h2_074_file, method=FFTypeMethod.NONE)
 
         molFile = os.path.join(home('test-qm'), 'H2-1.00.mol2')
-        if not os.path.exists(molFile):
-            molFile = '../data/test-qm/H2-1.00.mol2'  # TODO remove then htmd-data updated
         self.h2_100 = FFMolecule(molFile, method=FFTypeMethod.NONE)
 
         molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-        if not os.path.exists(molFile):
-            molFile = '../data/test-qm/H2O2-90.mol2'  # TODO remove then htmd-data updated
         self.h2o2_90 = FFMolecule(molFile, method=FFTypeMethod.NONE)
 
     def test_type(self):
@@ -354,4 +349,4 @@ class TestGaussian(TestBase, unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)
