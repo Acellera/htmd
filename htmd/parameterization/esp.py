@@ -9,7 +9,8 @@ from math import sqrt, sin, cos, acos
 import numpy as np
 from numpy.random import uniform as rand
 from scipy.spatial.distance import cdist
-import scipy.optimize as optimize
+import nlopt
+import unittest
 
 from htmd.molecule.vdw import radiusByElement
 
@@ -95,7 +96,7 @@ class ESP:
         return np.asarray(points, dtype=np.float32)
 
     @staticmethod
-    def generate_points(molecule, vdw_radii=[1.4, 1.6, 1.8, 2.0, 2.2], density=10):
+    def generate_points(molecule, vdw_radii=(1.4, 1.6, 1.8, 2.0, 2.2), density=10):
 
         points = []
         for frame in range(molecule.coords.shape[2]):
@@ -135,9 +136,9 @@ class ESP:
 
         charges = self.map_groups_to_atoms(group_charges)
         esp_values = np.dot(self._reciprocal_distances, charges)
-        loss = np.sum((esp_values - qm_result.esp_values)**2)
+        rms = np.sqrt(np.mean((esp_values - qm_result.esp_values)**2))
 
-        return loss
+        return rms
 
     def run(self):
 
@@ -166,16 +167,40 @@ class ESP:
         distances *= 0.52917721067 # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
         self._reciprocal_distances = np.reciprocal(distances)
 
+        # Set up NLopt
+        opt = nlopt.opt(nlopt.LN_COBYLA, ngroups)
+        opt.set_min_objective(lambda x, grad: self.compute_objective(x))
+        opt.set_lower_bounds(lower_bounds)
+        opt.set_upper_bounds(upper_bounds)
+        opt.add_equality_constraint(lambda x, grad: self.compute_constraint(x))
+        opt.set_xtol_rel(1.e-6)
+        opt.set_maxeval(1000*ngroups)
+        opt.set_initial_step(0.001)
+
         # Optimize the charges
-        result = optimize.minimize(self.compute_objective, method="SLSQP", options={'disp': True, 'ftol': 1.e-12},
-                                   x0 = np.zeros(ngroups),
-                                   bounds=list(zip(lower_bounds, upper_bounds)),
-                                   constraints={'type': 'eq', 'fun': self.compute_constraint})
-        charges = self.map_groups_to_atoms(result.x) # Optimized charges
-        loss = self.compute_objective(result.x)
+        group_charges = opt.optimize(np.zeros(ngroups) + 0.001)
+        charges = self.map_groups_to_atoms(group_charges) # Optimized charges
+        loss = self.compute_objective(group_charges)
 
         return {'charges': charges, 'loss': loss}
 
 
 if __name__ == '__main__':
-    pass
+
+    #from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    #from htmd.qm.fake import FakeQM
+
+    #m = FFMolecule('H2O.mol2', method=FFTypeMethod.GAFF2)
+    #m = FFMolecule('H2O.mol2', method=FFTypeMethod.GAFF2, qm=FakeQM())
+
+    #print(m.charge)
+
+    #res = m.fitCharges()
+    #print(res)
+
+    #print(m.charge)
+    #print(m.getDipole())
+
+    esp = ESP()
+
+    #unittest.main()
