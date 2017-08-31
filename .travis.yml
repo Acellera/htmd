@@ -33,9 +33,11 @@ install:
   - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION
   - source activate travis-env
 
-  - conda config --add channels acellera
-  - conda config --add channels psi4
-  # - conda install -c acellera toolz=0.8.0 -y -q
+  # Add necessary channels for dependencies
+  - conda config --prepend channels psi4
+  - conda config --append channels conda-forge
+  - conda config --append channels omnia
+  - conda config --append channels acellera
   - conda install anaconda-client -y -q
   - conda update --all -y -q
 
@@ -50,6 +52,9 @@ install:
 
   # Install the Conda dependencies HTMD needs
   - conda install --file package/htmd-deps/DEPENDENCIES -y
+  # Sync the dependencies to the Acellera channel
+  - python sync_acellera_conda_channel_deps.py
+  # Write dependencies for packaging purposes
   - python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
   # If not PR, clone the private htmdlib repo,
