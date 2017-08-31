@@ -429,16 +429,16 @@ class FFMolecule(Molecule):
         equivs = phi_to_fit.equivalents
 
         # Number of rotamers for each dihedral to compute
-        nrotemer = 36
+        nrotamer = 36
 
-        # Create a copy of molecule with nrotemer frames
+        # Create a copy of molecule with nrotamer frames
         mol = self.copy()
-        for _ in range(nrotemer-1):
+        for _ in range(nrotamer-1):
             mol.appendFrames(self)
-        assert mol.numFrames == nrotemer
+        assert mol.numFrames == nrotamer
 
         # Set rotamer coordinates
-        angles = np.linspace(-np.pi, np.pi, num=nrotemer, endpoint=False)
+        angles = np.linspace(-np.pi, np.pi, num=nrotamer, endpoint=False)
         for frame, angle in enumerate(angles):
             mol.frame = frame
             mol.setDihedral(atoms, angle, bonds=mol.bonds)
