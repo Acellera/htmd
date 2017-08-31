@@ -84,13 +84,14 @@ class FFMolecule(Molecule):
 
         self.qm = qm if qm else Psi4()
 
-        self.theory_name = self.qm.theory.lower()
+        self.theory_name = self.qm.theory
         self.basis_name = self.qm.basis
         self.basis_name = re.sub('\+', 'plus', self.basis_name)  # Replace '+' with 'plus'
         self.basis_name = re.sub('\*', 'star', self.basis_name)  # Replace '*' with 'star'
         self.solvent_name = self.qm.solvent.lower()
 
-        self.impropers = np.array(self._rtf.impropers)
+        if hasattr(self, '_rtf'):
+            self.impropers = np.array(self._rtf.impropers)
 
         self.report()
 
