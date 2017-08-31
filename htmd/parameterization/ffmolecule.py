@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.molecule.molecule import Molecule
+from htmd.molecule.util import dihedralAngle
 from htmd.molecule.vmdparser import guessAnglesAndDihedrals
 from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
@@ -408,43 +409,43 @@ class FFMolecule(Molecule):
     #      x=x+1
     #    return ret
 
-    def fitSoftTorsion(self, phi, geomopt=True):
-        found = False
-        phi_to_fit = None
-        frozens = []
-        dih_index = 0
-        i = 0
+    def fitSoftTorsion(self, angle, geomopt=True):
+
         bkp_coords = self.coords.copy()
 
+        phi_to_fit = None
+        frozens = []
+
         for d in self._soft_dihedrals:
-            if (d.atoms == phi).all():
+            if (d.atoms == angle).all():
                 phi_to_fit = d
-                dih_index = i
                 frozens.append(d.atoms)
             else:
                 if not geomopt:
                     frozens.append(d.atoms)
-            i += 1
+
         if not phi_to_fit:
             raise ValueError("specified phi is not a recognised soft dihedral")
+
         self._makeDihedralUnique(phi_to_fit)
 
         atoms = phi_to_fit.atoms
-        left = phi_to_fit.left
-        right = phi_to_fit.right
         equivs = phi_to_fit.equivalents
 
-        step = 10  # degrees
-        nstep = int(360 / step)
-        cset = np.zeros((self.natoms, 3, nstep))
+        # Number of rotamers for each dihedral to compute
+        nrotamer = 36
 
-        i = 0
-        for phi in range(-180, 180, step):
-            cset[:, :, i] = setPhi(self.coords[:, :, 0], atoms, left, right, phi)
-            i += 1
-
+        # Create a copy of molecule with nrotamer frames
         mol = self.copy()
-        mol.coords = cset
+        for _ in range(nrotamer-1):
+            mol.appendFrames(self)
+        assert mol.numFrames == nrotamer
+
+        # Set rotamer coordinates
+        angles = np.linspace(-np.pi, np.pi, num=nrotamer, endpoint=False)
+        for frame, angle in enumerate(angles):
+            mol.frame = frame
+            mol.setDihedral(atoms, angle, bonds=mol.bonds)
 
         dirname = 'dihedral-opt' if geomopt else 'dihedral-single-point'
         dih_name = "%s-%s-%s-%s" % (self.name[atoms[0]], self.name[atoms[1]], self.name[atoms[2]], self.name[atoms[3]])
@@ -478,8 +479,6 @@ class FFMolecule(Molecule):
             best_param[t + 6] = param[t].phi0
         best_param[12] = 0.
 
-        #    print(param)
-
         # Evalaute the mm potential with this dihedral zeroed out
         # The objective function will try to fit to the delta between
         # The QM potential and the this modified mm potential
@@ -490,8 +489,7 @@ class FFMolecule(Molecule):
         self._prm.updateDihedral(param)
 
         ffeval = FFEvaluate(self)
-        #  print(ffe.evaluate( ret.coords[0] ) )
-        #  input
+
         # Now evaluate the ff without the dihedral being fitted
         for t in range(ret.N):
             mm_zeroed = ffeval.run(ret.coords[t][:, :, 0])['total']
@@ -509,56 +507,39 @@ class FFMolecule(Molecule):
 
         # Now measure all of the soft dihedrals phis that are mapped to this dihedral
         ret.phis = []
-        for i in range(ret.N):
-            ret.phis.append([ret.phi[i]])
-            for e in equivs:
-                ret.phis[i].append(getPhi(ret.coords[i], e))
-            #    print ("EQUIVALENT DIHEDRALS FOR THIS DIHEDRAL" )
-            #    print(equivs)
-            #    print ("PHI VALUES TO FIT")
-            #    print (ret.phis)
-        # Set up the NOLOPT fit
-        #  There are 13 parameters, k,phi for n=1,2,3,4,5,6 and a shift
-        N = 13
-        # initial guess,
-        st = np.zeros(13)
-        # bounds
+        for iframe in range(ret.N):
+            ret.phis.append([ret.phi[iframe]])
+            for atoms in equivs:
+                angle = dihedralAngle(ret.coords[iframe][atoms, :, 0])
+                ret.phis[iframe].append(angle)
 
         best_chisq = self._fitDihedral_objective(best_param)
-        #    print("CHISQ of initial = %f" % ( best_chisq ) )
 
-        # Now zero out the terms of the dihedral we are going to fit
         bar = ProgressBar(64, description="Fitting")
-        for i in range(64):
+        for iframe in range(64):
 
-            (bounds, start) = self._fitDihedral_make_bounds(i)
+            (bounds, start) = self._fitDihedral_make_bounds(iframe)
 
             xopt = optimize.minimize(self._fitDihedral_objective, start, method="L-BFGS-B", bounds=bounds,
                                      options={'disp': False})
 
             chisq = self._fitDihedral_objective(xopt.x)
-            #      print( "CHISQ of fit = %f " % (chisq) )
             if (chisq < best_chisq):
                 best_chisq = chisq
                 best_param = xopt.x
             bar.progress()
         bar.stop()
-        #    print("Best ChiSQ = %f" %(best_chisq) )
 
         # Update the target dihedral with the optimized parameters
-        # print(param)
-        # print(best_param )
-        for i in range(6):
-            param[i].k0 = best_param[0 + i]
-            param[i].phi0 = best_param[6 + i]
+        for iframe in range(6):
+            param[iframe].k0 = best_param[0 + iframe]
+            param[iframe].phi0 = best_param[6 + iframe]
 
         self._prm.updateDihedral(param)
-        # print(param)
         param = self._prm.dihedralParam(self._rtf.type_by_index[atoms[0]],
                                         self._rtf.type_by_index[atoms[1]],
                                         self._rtf.type_by_index[atoms[2]],
                                         self._rtf.type_by_index[atoms[3]])
-        # print(param)
 
         # Finally evaluate the fitted potential
         ffeval = FFEvaluate(self)
@@ -566,9 +547,6 @@ class FFMolecule(Molecule):
             ret.mm_fitted.append(ffeval.run(ret.coords[t][:, :, 0])['total'])
         mmin = min(ret.mm_fitted)
         chisq = 0.
-
-        #    print( "QM energies" )
-        #    print( ret.qm )
 
         for t in range(ret.N):
             ret.mm_fitted[t] = ret.mm_fitted[t] - mmin
@@ -623,18 +601,15 @@ class FFMolecule(Molecule):
             if not q.errored:
                 if (q.energy - qmin) < 20.:  # Only fit against QM points < 20 kcal above the minimum
                     mmeval = ffeval.run(q.coords[:, :, 0])
+                    angle = dihedralAngle(q.coords[atoms, :, 0])
                     if mmeval["vdw"] < 200:
                         completed += 1
-                        phi = getPhi(q.coords, atoms)
-
                         ret.qm.append(q.energy - qmin)
                         ret.mm_original.append(mmeval['total'])
                         ret.coords.append(q.coords)
-                        if phi > 180.:
-                            phi -= 360.
-                        ret.phi.append(phi)
+                        ret.phi.append(angle)
                     else:
-                        print("Omitting optimised pose for phi=%f (MM VDW too high)" % phi)
+                        print("Omitting optimised pose for phi=%f (MM VDW too high)" % angle)
                 else:
                     print("Omitting optimised QM pose (QM energy too high %f)" % q.energy)
 
