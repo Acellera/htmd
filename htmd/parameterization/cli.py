@@ -164,7 +164,13 @@ VdW      : {VDW_ENERGY}
         mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
                          qm=qm, outdir=args.outdir)
 
+        # Update B3LYP to B3LYP-D3
+        # TODO: this is silent and not documented stuff
+        if qm.theory == 'B3LYP':
+            qm.correction = 'D3'
+
         # Update basis sets
+        # TODO: this is silent and not documented stuff
         if mol.netcharge < 0 and qm.solvent == 'vacuum':
             if qm.basis == '6-31G*':
                 qm.basis = '6-31+G*'
