@@ -19,6 +19,7 @@ os.chdir('/tmp')
 packages = [
     ['omnia', 'fftw3f'],
     ['omnia', 'openmm'],
+    ['omnia', 'parmed'],
     ['omnia', 'ambermini'],
     ['omnia', 'bhmm'],
     ['omnia', 'funcsigs'],

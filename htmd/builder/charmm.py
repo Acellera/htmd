@@ -17,7 +17,7 @@ from htmd.home import home
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds
-from htmd.builder.builder import _checkMixedSegment, _checkResidueInsertions
+from htmd.builder.builder import _checkMixedSegment, _checkResidueInsertions, UnknownResidueError, BuildError
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
 from glob import glob
@@ -26,13 +26,6 @@ from glob import glob
 import logging
 logger = logging.getLogger(__name__)
 
-
-class BuildError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
 
 
 def listFiles():
@@ -304,8 +297,10 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         #call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
         call([psfgen, './build.vmd'], stdout=f)
         f.close()
-        _logParser(logpath)
+        errors = _logParser(logpath)
         os.chdir(currdir)
+        if errors:
+            raise BuildError(errors + ['Check {} for further information on errors in building.'.format(logpath)])
         logger.info('Finished building.')
 
         if path.isfile(path.join(outdir, 'structure.pdb')) and path.isfile(path.join(outdir, 'structure.psf')):
@@ -812,6 +807,7 @@ def _prepareStream(filename):
 
 def _logParser(fname):
     import re
+    unknownres_regex = re.compile('unknown residue type (\w+)')
     failedcoor = re.compile('Warning: failed to set coordinate for atom')
     failedangle = re.compile('Warning: failed to guess coordinate due to bad angle')
     poorlycoor = re.compile('Warning: poorly guessed coordinate(s?)')
@@ -821,19 +817,22 @@ def _logParser(fname):
     failedanglecount = 0
     poorlycoorcount = -1  # Discount the summary report message in the log
     otherwarncount = 0
-    f = open(fname, 'r')
-    for line in f:
-        if failedcoor.search(line):
-            failedcoorcount += 1
-        elif failedangle.search(line):
-            failedanglecount += 1
-        elif poorlycoor.search(line):
-            poorlycoorcount += 1
-        elif otherwarn.search(line):
-            otherwarncount += 1
+    unknownres = []
+    with open(fname, 'r') as f:
+        for line in f:
+            if failedcoor.search(line):
+                failedcoorcount += 1
+            elif failedangle.search(line):
+                failedanglecount += 1
+            elif poorlycoor.search(line):
+                poorlycoorcount += 1
+            elif otherwarn.search(line):
+                otherwarncount += 1
+            elif unknownres_regex.search(line):
+                unknownres.append(unknownres_regex.findall(line)[0])
 
-    f.close()
     warnings = False
+    errors = []
     if failedcoorcount > 0:
         warnings = True
         logger.warning('Failed to set coordinates for {} atoms.'.format(failedcoorcount))
@@ -846,8 +845,14 @@ def _logParser(fname):
     if otherwarncount > 0:
         warnings = True
         logger.warning('{} undefined warnings were produced during building.'.format(otherwarncount))
+    if len(unknownres):
+        errors.append(UnknownResidueError('Unknown residue(s) {} found in the input structure. '
+                                          'You are either missing a topology definition for the residue or you need to '
+                                          'rename it to the correct residue name'.format(np.unique(unknownres))))
     if warnings:
         logger.warning('Please check {} for further information.'.format(fname))
+
+    return errors
 
 
 def _checkFailedAtoms(mol):
