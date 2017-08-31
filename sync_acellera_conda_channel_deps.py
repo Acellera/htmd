@@ -47,6 +47,7 @@ for package in nd_packages:
     version = package['version']
     build_number = package['build_number']
 
+    print('{}/{}'.format(channel, name))
     remote = api.package(channel, name)
     try:
         acellera = api.package('acellera', name)
@@ -74,7 +75,7 @@ for package in nd_packages:
                     break
 
         if not found:
-            print('\nSyncing {}/{} file "{}" to acellera channel'.format(channel, package, rf['basename']))
+            print('\nSyncing {}/{} file "{}" to acellera channel'.format(channel, name, rf['basename']))
 
             url = 'https:' + rf['download_url']
             print('Downloading {}'.format(url))
@@ -87,7 +88,7 @@ for package in nd_packages:
             print('Uploading...')
             try:
                 os.getenv('ANACONDA_TOKEN_BASIC')
-                call(['anaconda', 'upload', '--force', '-t', os.getenv('ANACONDA_TOKEN_BASIC'), '-u', 'acellera', rf['basename']])
+                call(['anaconda', '-t', os.getenv('ANACONDA_TOKEN_BASIC'), 'upload', '--force', '-u', 'acellera', rf['basename']])
             except:
                 try:
                     call(['anaconda', 'upload', '--force', '-u', 'acellera', rf['basename']])
