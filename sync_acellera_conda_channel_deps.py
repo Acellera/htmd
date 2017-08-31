@@ -88,7 +88,8 @@ for package in nd_packages:
             print('Uploading...')
             try:
                 os.getenv('ANACONDA_TOKEN_BASIC')
-                call(['anaconda', '-t', os.getenv('ANACONDA_TOKEN_BASIC'), 'upload', '--force', '-u', 'acellera', rf['basename']])
+                call(['anaconda', '-t', os.getenv('ANACONDA_TOKEN_BASIC'), 'upload', '--no-progress', '--force', '-u',
+                      'acellera', rf['basename']])
             except:
                 try:
                     call(['anaconda', 'upload', '--force', '-u', 'acellera', rf['basename']])
