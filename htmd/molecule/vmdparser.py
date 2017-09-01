@@ -169,25 +169,29 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
 
 #    return (retval.reshape(natoms, nframes))
 
+
 def guessAnglesAndDihedrals(bonds):
-    # Generate a guess of angle and dihedral N-body terms
-    # based on a list of bond index pairs
-    # O(n^2) so SLOW for large N
+    """
+    Generate a guess of angle and dihedral N-body terms based on a list of bond index pairs.
+    """
+
     import networkx as nx
 
     g = nx.Graph()
-    g.add_nodes_from(np.unique(bonds[:]))
+    g.add_nodes_from(np.unique(bonds))
     g.add_edges_from([tuple(b) for b in bonds])
 
     angles = []
-    dihedrals = []
     for n in g.nodes():
         neighbors = g.neighbors(n)
         for e1 in range(len(neighbors)):
             for e2 in range(e1+1, len(neighbors)):
                 angles.append((neighbors[e1], n, neighbors[e2]))
 
+    angles = sorted([sorted([angle, angle[::-1]])[0] for angle in angles])
     angles = np.array(angles)
+
+    dihedrals = []
     for a1 in range(len(angles)):
         for a2 in range(a1+1, len(angles)):
             a1a = angles[a1]
@@ -202,7 +206,10 @@ def guessAnglesAndDihedrals(bonds):
             if np.all(a2f[1:] == a1a[:2]):
                 dihedrals.append(list(a2f) + [a1a[2]])
 
-    return angles, np.array(dihedrals)
+    dihedrals = sorted([sorted([dihedral, dihedral[::-1]])[0] for dihedral in dihedrals])
+    dihedrals = np.array(dihedrals)
+
+    return angles, dihedrals
 
 
 def guessbonds(coordinates, element, name, resname, resid, chain, segname, insertion, altloc):
