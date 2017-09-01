@@ -197,9 +197,6 @@ class FFMolecule(Molecule):
 
     def fitCharges(self, fixed=[]):
 
-        # Remove the COM from the coords, because PSI4 does it and then the grid is incorrectly centred
-        self.removeCOM()
-
         # Cereate an ESP directory
         espDir = os.path.join(self.outdir, "esp", self.output_directory_name() )
         os.makedirs(espDir, exist_ok=True)
@@ -223,7 +220,9 @@ class FFMolecule(Molecule):
         qm_results = self.qm.run()
         if qm_results[0].errored:
             raise RuntimeError("QM Calculation failed")
-        self.coords = qm_results[0].coords
+
+        # Safeguard QM code from changing coordinates :)
+        assert np.all(np.isclose(self.coords, qm_results[0].coords))
 
         # Fit ESP charges
         self.esp = ESP()

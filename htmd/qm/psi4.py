@@ -147,12 +147,16 @@ class Psi4(QMBase):
                 raise NotImplementedError
 
             # Write the molecule
-            f.write('molecule MOL {\n    %d %d\n' % (self._charge, self.multiplicity))
+            f.write('molecule MOL {\n' )
+            f.write('    %d %d\n' % (self._charge, self.multiplicity))
+            f.write('    noreorient\n')
+            f.write('    nocom\n')
+            f.write('    symmetry c1\n')
             elements = self._molecule.element
             coords = self._molecule.coords[:, :, iframe]
             for element, coord in zip(elements, coords):
                 f.write('    %-2s %10f %10f %10f\n' % (element, coord[0], coord[1], coord[2]))
-            f.write('    symmetry c1 }\n\n')
+            f.write('}\n\n')
 
             if self._restrained_dihedrals is not None:
                 dihedrals = ['%d %d %d %d' % tuple(dihedral) for dihedral in self._restrained_dihedrals]
