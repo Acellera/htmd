@@ -12,7 +12,6 @@ from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.qm import Psi4
-from htmd.parameterization.phi import setPhi, getPhi
 from htmd.parameterization.esp import ESP
 from htmd.progress.progress import ProgressBar
 import re
