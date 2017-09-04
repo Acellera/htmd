@@ -156,4 +156,4 @@ def distributeLipids(boxsize,
 
 
 if __name__ == '__main__':
-    finalpos = distributeLipids(reduced_density=1)
+    pass
