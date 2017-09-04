@@ -28,7 +28,7 @@ class FakeQM(QMBase):
     Create a face QM object
     >>> qm = FakeQM()
     >>> qm # doctest: +ELLIPSIS
-    <htmd.qm.fake.FakeQM object at ...
+    <htmd.qm.fake.FakeQM object at ...>
     >>> qm.molecule = mol
     >>> qm.esp_points = np.array([[1., 1., 1.]])
     >>> result = qm.run()[0]
@@ -42,8 +42,8 @@ class FakeQM(QMBase):
     0
     >>> result.esp_points
     array([[ 1.,  1.,  1.]])
-    >>> result.esp_values
-    array([ 0.01507904])
+    >>> result.esp_values # doctest: +ELLIPSIS
+    array([ 0.0284952...])
     """
 
     # Fake implementations of the abstract methods
