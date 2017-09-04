@@ -222,7 +222,7 @@ class FFMolecule(Molecule):
             raise RuntimeError("QM Calculation failed")
 
         # Safeguard QM code from changing coordinates :)
-        assert np.all(np.isclose(self.coords, qm_results[0].coords))
+        assert np.all(np.isclose(self.coords, qm_results[0].coords, atol=1e-6))
 
         # Fit ESP charges
         self.esp = ESP()
