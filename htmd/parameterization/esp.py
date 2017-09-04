@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-
 from math import pi as PI
 from math import sqrt, sin, cos, acos
 import numpy as np
@@ -153,7 +152,7 @@ class ESP:
 
         self._reciprocal_distances = None
 
-    def map_groups_to_atoms(self, group_charges):
+    def _map_groups_to_atoms(self, group_charges):
 
         charges = np.zeros(self.molecule.natoms)
         for atom_group, group_charge in zip(self.molecule._equivalent_atom_groups, group_charges):
@@ -161,18 +160,18 @@ class ESP:
 
         return charges
 
-    def compute_constraint(self, group_charges):
+    def _compute_constraint(self, group_charges):
 
-        charges = self.map_groups_to_atoms(group_charges)
+        charges = self._map_groups_to_atoms(group_charges)
         constraint = np.sum(charges) - self.molecule.netcharge
 
         return constraint
 
-    def compute_objective(self, group_charges):
+    def _compute_objective(self, group_charges):
 
         qm_result = self.qm_results[0]
 
-        charges = self.map_groups_to_atoms(group_charges)
+        charges = self._map_groups_to_atoms(group_charges)
         esp_values = np.dot(self._reciprocal_distances, charges)
         rms = np.sqrt(np.mean((esp_values - qm_result.esp_values)**2))
 
@@ -207,10 +206,10 @@ class ESP:
 
         # Set up NLopt
         opt = nlopt.opt(nlopt.LN_COBYLA, ngroups)
-        opt.set_min_objective(lambda x, grad: self.compute_objective(x))
+        opt.set_min_objective(lambda x, grad: self._compute_objective(x))
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
-        opt.add_equality_constraint(lambda x, grad: self.compute_constraint(x))
+        opt.add_equality_constraint(lambda x, grad: self._compute_constraint(x))
         opt.set_xtol_rel(1.e-6)
         opt.set_maxeval(1000*ngroups)
         opt.set_initial_step(0.001)
@@ -218,8 +217,8 @@ class ESP:
         # Optimize the charges
         group_charges = opt.optimize(np.zeros(ngroups) + 0.001) # TODO: a more elegant way to set initial charges
         # TODO: check optimizer status
-        charges = self.map_groups_to_atoms(group_charges)
-        loss = self.compute_objective(group_charges)
+        charges = self._map_groups_to_atoms(group_charges)
+        loss = self._compute_objective(group_charges)
 
         return {'charges': charges, 'loss': loss}
 
