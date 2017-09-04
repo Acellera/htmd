@@ -17,20 +17,44 @@ class ESP:
     """
     Electrostatic potential (ESP) charge fitting
 
+    Capabilities
+    ------------
+    - Generate points
+    - Consider equivalent atoms
+    - Impose total molecule charge
+    - Impose charge values bounds
+    - Charge values can be frozen
+
+    The charges are fitting to reproduce ESP at the reference point computed by QM. The fitting is performed with
+    COBYLA algorithm considering the equivalent atoms and imposing the total charge of the molecule.
+
+    The charge values are confined to [-1.25; 1.25] ([0.001; 1.25] for hydrogen) range to prevent non-physical results.
+    Also, the specific charges can be fixed to the orginal values (as defined in the molecule object).
+
+    Attributes
+    ----------
+    molecule : FFMolecule
+        Molecule object
+    qm_results : List of QMResult
+        Reference QM results
+    fixed : list of ints
+        List of fixed atom indices
+
+    Examples
+    --------
+
+    Load water molecule
     >>> import os
     >>> from htmd.home import home
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-    >>> from htmd.qm import Psi4
-    >>> from tempfile import mkdtemp
-    >>> from htmd.parameterization.esp import ESP
-
-    Load water molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
     >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2) # doctest: +ELLIPSIS
     Net Charge: 0
     ...
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
+    >>> from htmd.qm import Psi4
+    >>> from tempfile import mkdtemp
     >>> qm = Psi4()
     >>> qm.molecule = mol
     >>> qm.esp_points = ESP.generate_points(mol)[0]
@@ -39,17 +63,18 @@ class ESP:
     >>> qm_results[0].errored
     False
 
-    # Create an ESP charge fitting object
+    Create an ESP charge fitting object
+    >>> from htmd.parameterization.esp import ESP
     >>> esp = ESP()
     >>> esp # doctest: +ELLIPSIS
     <htmd.parameterization.esp.ESP object at 0x...>
 
-    # Set up and run charge fitting
+    Set up and run charge fitting
     >>> esp.molecule = mol
     >>> esp.qm_results = qm_results
     >>> esp_results = esp.run()
 
-    # ESP charges for water molecule
+    ESP charges for water molecule
     >>> esp_results['charges'] # doctest: +ELLIPSIS
     array([-0.394059...,  0.1970297...,  0.1970297...])
     """
@@ -134,7 +159,27 @@ class ESP:
 
     @staticmethod
     def generate_points(molecule, vdw_radii=(1.4, 1.6, 1.8, 2.0, 2.2), density=10):
+        """
+        Generate points for ESP fitting around a molecule.
 
+        The points are distributed on concentric spheres with centres at the atom positions. The radii of the spheres are
+        the computed as van der Waals radii multiplied by a factor. The point are close to other atoms that the the radius
+        are excluded.
+
+        Parameters
+        ----------
+        molecule : FFMolecule
+            Molecule object
+        vdw_radii : list of floats
+            List of van der Waals factors
+        density: float
+            Density of points
+
+        Return
+        ------
+        points : list of list
+            Set of points
+        """
         points = []
         for frame in range(molecule.coords.shape[2]):
             pp = ESP._points(molecule.coords[:, :, frame],
@@ -178,6 +223,14 @@ class ESP:
         return rms
 
     def run(self):
+        """
+        Run ESP charge fitting
+
+        Return
+        ------
+        results : dict
+            Dictionary with the fitted charges and fitting loss value
+        """
 
         qm_result = self.qm_results[0]
 
