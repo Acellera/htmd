@@ -76,7 +76,7 @@ class ESP:
 
     ESP charges for water molecule
     >>> esp_results['charges'] # doctest: +ELLIPSIS
-    array([-0.394059...,  0.1970297...,  0.1970297...])
+    array([-0.3940...,  0.1970...,  0.1970...])
     """
 
     @staticmethod
