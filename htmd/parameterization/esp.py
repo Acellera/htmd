@@ -15,7 +15,45 @@ import unittest
 from htmd.molecule.vdw import radiusByElement
 
 class ESP:
-    # A temporary class to collect ESP stuff
+    """
+    Electrostatic potential (ESP) charge fitting
+
+    >>> import os
+    >>> from htmd.home import home
+    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.qm import Psi4
+    >>> from tempfile import mkdtemp
+    >>> from htmd.parameterization.esp import ESP
+
+    Load water molecule
+    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2) # doctest: +ELLIPSIS
+    Net Charge: 0
+    ...
+
+    Set up and run a QM (B3LYP/6-31G*) calculation of ESP
+    >>> qm = Psi4()
+    >>> qm.molecule = mol
+    >>> qm.esp_points = ESP.generate_points(mol)[0]
+    >>> qm.directory = mkdtemp()
+    >>> qm_results = qm.run()
+    >>> qm_results[0].errored
+    False
+
+    # Create an ESP charge fitting object
+    >>> esp = ESP()
+    >>> esp # doctest: +ELLIPSIS
+    <htmd.parameterization.esp.ESP object at 0x...>
+
+    # Set up and run charge fitting
+    >>> esp.molecule = mol
+    >>> esp.qm_results = qm_results
+    >>> esp_results = esp.run()
+
+    # ESP charges for water molecule
+    >>> esp_results['charges'] # doctest: +ELLIPSIS
+    array([-0.394059...,  0.1970297...,  0.1970297...])
+    """
 
     @staticmethod
     def _dist(a, b):
@@ -111,7 +149,7 @@ class ESP:
 
         self.molecule = None
         self.qm_results = None
-        self.fixed = None
+        self.fixed = []
 
         self._reciprocal_distances = None
 
@@ -178,29 +216,24 @@ class ESP:
         opt.set_initial_step(0.001)
 
         # Optimize the charges
-        group_charges = opt.optimize(np.zeros(ngroups) + 0.001)
-        charges = self.map_groups_to_atoms(group_charges) # Optimized charges
+        group_charges = opt.optimize(np.zeros(ngroups) + 0.001) # TODO: a more elegant way to set initial charges
+        # TODO: check optimizer status
+        charges = self.map_groups_to_atoms(group_charges)
         loss = self.compute_objective(group_charges)
 
         return {'charges': charges, 'loss': loss}
 
 
+class TestWater(unittest.TestCase):
+    pass
+
+
 if __name__ == '__main__':
 
-    #from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-    #from htmd.qm.fake import FakeQM
+    import sys
+    import os
+    import doctest
 
-    #m = FFMolecule('H2O.mol2', method=FFTypeMethod.GAFF2)
-    #m = FFMolecule('H2O.mol2', method=FFTypeMethod.GAFF2, qm=FakeQM())
-
-    #print(m.charge)
-
-    #res = m.fitCharges()
-    #print(res)
-
-    #print(m.charge)
-    #print(m.getDipole())
-
-    esp = ESP()
-
-    #unittest.main()
+    if os.environ.get('TRAVIS_OS_NAME') != 'osx':  # Psi4 does not work on Mac
+        if doctest.testmod().failed:
+            sys.exit(1)
