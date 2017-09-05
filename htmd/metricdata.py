@@ -124,7 +124,7 @@ class MetricData:
         Centers of clusters
     """
     
-    def __init__(self, dat=None, ref=None, description=None, simlist=None, fstep=0, parent=None, file=None, trajectories=None, cluster=None):
+    def __init__(self, dat=None, ref=None, description=None, simlist=None, fstep=0, parent=None, file=None, trajectories=None, cluster=None, hdf5file=None, hdf5handle=None):
         if trajectories is None:
             self._loadTrajectories(dat, ref, simlist, cluster)
         else:
@@ -142,7 +142,29 @@ class MetricData:
 
         self._dataid = random.random()
         self._clusterid = None
+        self._hdf5file = hdf5file
+        self._hdf5handle = hdf5handle
         return
+
+    @staticmethod
+    def _fromHDF5(fname, simlist):
+        import h5py
+        hdf = h5py.File(fname)
+        metrics = []
+        ref = []
+        updlist = []
+        fstep = []
+        for simid in hdf:
+            sim = None
+            for s in simlist:
+                if s.simid == int(simid):
+                    sim = s
+                    break
+            metrics.append(hdf[simid]['data'])
+            ref.append(hdf[simid]['ref'])
+            updlist.append(sim)
+            fstep.append(hdf[simid]['fstep'].value)
+        return hdf, metrics, ref, updlist, fstep
 
     def _loadTrajectories(self, projection=None, reference=None, simlist=None, cluster=None):
         size = np.unique([x for x in list(map(_getsizes, (projection, reference, simlist, cluster))) if x is not None])

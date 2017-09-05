@@ -56,11 +56,16 @@ class Metric:
     .. autoautosummary:: htmd.projections.metric.Metric
         :attributes:
     """
-    def __init__(self, simulations, skip=1, metricdata=None):
+    def __init__(self, simulations, skip=1, metricdata=None, inmemory=True, hdf5file=None):
         self.simulations = simulations
         self.skip = skip
         self.projectionlist = []
         self.metricdata = metricdata
+        self.inmemory = inmemory
+        self.hdf5file = hdf5file
+        if not inmemory and hdf5file is None:
+            raise AttributeError('If calculation is done out of memory you must provide a path for an hdf5 file in '
+                                 'which to store the projections with the hdf5file argument.')
 
     @_Deprecated('1.3.2', 'htmd.projections.metric.Metric.set')
     def projection(self, metric):
@@ -145,25 +150,49 @@ class Metric:
         logger.debug('Metric: Starting projection of trajectories.')
         from htmd.config import _config
         aprun = ParallelExecutor(n_jobs=_config['ncpus'])
-        results = aprun(total=numSim, description='Projecting trajectories')(delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
+        if self.inmemory:
+            results = aprun(total=numSim, description='Projecting trajectories')(delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
+            metrics = np.empty(numSim, dtype=object)
+            ref = np.empty(numSim, dtype=object)
+            deletesims = np.zeros(numSim, dtype=bool)
+            fstep = np.zeros(numSim)
+            for i in range(len(results)):
+                metrics[i] = results[i][0]
+                ref[i] = results[i][1]
+                fstep[i] = results[i][2]
+                deletesims[i] = results[i][3]
 
-        metrics = np.empty(numSim, dtype=object)
-        ref = np.empty(numSim, dtype=object)
-        deletesims = np.zeros(numSim, dtype=bool)
-        fstep = np.zeros(numSim)
-        for i in range(len(results)):
-            metrics[i] = results[i][0]
-            ref[i] = results[i][1]
-            fstep[i] = results[i][2]
-            deletesims[i] = results[i][3]
+            # Removing empty trajectories
+            metrics, ref, updlist, fstep = self._removeEmpty(metrics, ref, deletesims, fstep)
+            hdf = None
+        else:
+            import multiprocessing as mp
+            from htmd.util import _getNcpus
+            outqueue = mp.Queue()
+            inqueue = mp.Queue()
+            jobs = []
+            proc = mp.Process(target=_writeToHDF5, args=(self.hdf5file, outqueue, numSim))
+            proc.start()
+            num_processes = _getNcpus()
+            for i in range(num_processes):
+                p = mp.Process(target=_processSimMP, args=(inqueue, outqueue))
+                jobs.append(p)
+                p.start()
+            for i in range(numSim):
+                inqueue.put((self.simulations[i], self.projectionlist, uqMol, self.skip))
+            for i in range(num_processes):
+                # Send the sentinel to tell Simulation to end
+                inqueue.put(None)
+            for p in jobs:
+                p.join()
+            outqueue.put(None)
+            proc.join()
+            hdf, metrics, ref, updlist, fstep = MetricData._fromHDF5(self.hdf5file, self.simulations)
 
         logger.debug('Finished projecting the trajectories.')
 
-        # Removing empty trajectories
-        metrics, ref, updlist, fstep = self._removeEmpty(metrics, ref, deletesims, fstep)
-
         # Constructing a MetricData object
-        data = MetricData(dat=metrics, ref=ref, description=mapping, simlist=updlist)
+        data = MetricData(dat=metrics, ref=ref, description=mapping, simlist=updlist, hdf5file=self.hdf5file, hdf5handle=hdf)
 
         uqfsteps = np.unique(fstep)
         data.fstep = float(stats.mode(fstep).mode)
@@ -236,6 +265,36 @@ def _highfreqFilter(mol,steps):
     mol.coords=X
 
 
+def _writeToHDF5(hdf5file, outqueue, total):
+    from htmd.progress.progress import ProgressBar
+    import h5py
+    hdf = h5py.File(hdf5file, 'w')
+    p = ProgressBar(total, description='Projecting')
+    while True:
+        results = outqueue.get()
+        if results:
+            data, ref, fstep, failed, simid = results
+            if failed:
+                continue
+            grp = hdf.create_group("{}".format(simid))
+            grp.create_dataset('data', data=data)
+            grp.create_dataset('ref', data=ref)
+            grp.create_dataset('fstep', data=fstep)
+            # grp.create_dataset('sim', data=sim)  # HDF5 doesn't like strings, classes etc
+            # sim.toHDF5(grp)
+            p.progress()
+        else:
+            break
+    p.stop()
+    hdf.close()
+
+
+def _processSimMP(inqueue, outqueue):
+    for args in iter(inqueue.get, None):
+        results = _processSim(*args)
+        outqueue.put(results)
+
+
 def _processSim(sim, projectionlist, uqmol, skip):
     pieces = sim.trajectory
     try:
@@ -260,9 +319,9 @@ def _processSim(sim, projectionlist, uqmol, skip):
             data = data.astype(np.float32)
     except Exception as e:
         logger.warning('Error in simulation with id: ' + str(sim.simid) + '. "' + e.__str__() + '"')
-        return None, None, None, True
+        return None, None, None, True, None
 
-    return data, _calcRef(pieces, mol.fileloc), mol.fstep, False
+    return data, _calcRef(pieces, mol.fileloc), mol.fstep, False, sim.simid  # , sim.toDict()
 
 
 def _calcRef(pieces, fileloc):

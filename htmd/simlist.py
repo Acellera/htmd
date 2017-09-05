@@ -66,7 +66,7 @@ class Sim(object):
     """
     # __slots__ = ['simid', 'parent', 'input', 'trajectory', 'molfile']
 
-    def __init__(self, simid, parent, input, trajectory, molfile, numframes=None):
+    def __init__(self, simid=None, parent=None, input=None, trajectory=None, molfile=None, numframes=None):
         self.simid = simid
         self.parent = parent
         self.input = input
@@ -101,6 +101,38 @@ class Sim(object):
     def copy(self):
         from copy import deepcopy
         return deepcopy(self)
+
+    def toDict(self):
+        res = dict()
+        res['simid'] = self.simid
+        res['input'] = self.input
+        res['trajectory'] = self.trajectory
+        res['molfile'] = self.molfile
+        res['numframes'] = self.numframes
+        if self.parent is not None:
+            res['parent'] = self.parent.toDict()
+        return res
+
+    def toHDF5(self, hdf):
+        hdf.create_dataset('simid', data=self.simid)
+        hdf.create_dataset('input', data=self.input)
+        hdf.create_dataset('trajectory', data=self.trajectory)
+        hdf.create_dataset('molfile', data=self.molfile)
+        hdf.create_dataset('numframes', data=self.numframes)
+        if self.parent is not None:
+            hdf = hdf.create_group('parent')
+            self.parent.toHDF5(hdf)
+
+    @staticmethod
+    def fromHDF5(hdf):
+        sim = Sim()
+        sim.simid = hdf['simid'].value
+        sim.input = hdf['input'].value
+        sim.trajectory = hdf['trajectory'].value
+        sim.molfile = hdf['molfile'].value
+        sim.numframes = hdf['numframes'].value
+        if 'parent' in hdf:
+            sim.parent = Sim._fromHDF5(hdf['parent'])
 
 
 class _simlist2(np.ndarray):
