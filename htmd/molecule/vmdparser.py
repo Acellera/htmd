@@ -169,69 +169,46 @@ def vmdselection(selection, coordinates, atomname, atomtype, resname, resid, cha
 
 #    return (retval.reshape(natoms, nframes))
 
-def guessAnglesAndDihedrals( bonds ):
- # Generate a guess of angle and dihedral N-body terms
- # based on a list of bond index pairs
- # O(n^2) so SLOW for large N 
+def guessAnglesAndDihedrals(bonds):
+    """
+    Generate a guess of angle and dihedral N-body terms based on a list of bond index pairs.
+    """
 
-    import gc
+    import networkx as nx
 
-    angles=[]
-    dihedrals=[]
-    for i in range( bonds.shape[0] ):
-      a1 = bonds[i,0]
-      a2 = bonds[i,1]
+    g = nx.Graph()
+    g.add_nodes_from(np.unique(bonds))
+    g.add_edges_from([tuple(b) for b in bonds])
 
-      for j in range( i+1, bonds.shape[0]  ):
-        b1 = bonds[j,0]
-        b2 = bonds[j,1]
+    angles = []
+    for n in g.nodes():
+        neighbors = g.neighbors(n)
+        for e1 in range(len(neighbors)):
+            for e2 in range(e1+1, len(neighbors)):
+                angles.append((neighbors[e1], n, neighbors[e2]))
 
-        # a1-a2
-        # b1-b2
+    angles = sorted([sorted([angle, angle[::-1]])[0] for angle in angles])
+    angles = np.array(angles)
 
-        # a1-a2-b1
-        # a1-a2-b2
-        # a2-a1-b1
-        # a2-a1-b2
-        if( a2 == b2 ) : angles.append( [ a1, a2, b1 ] )
-        elif( a2 == b1 ) : angles.append( [ a1, a2, b2 ] )
-        elif( a1 == b2 ) : angles.append( [ a2, a1, b1 ] )
-        elif( a1 == b1 ) : angles.append( [ a2, a1, b2 ] )
+    dihedrals = []
+    for a1 in range(len(angles)):
+        for a2 in range(a1+1, len(angles)):
+            a1a = angles[a1]
+            a2a = angles[a2]
+            a2f = a2a[::-1]  # Flipped a2a. We don't need flipped a1a as it produces the flipped versions of these 4
+            if np.all(a1a[1:] == a2a[:2]):
+                dihedrals.append(list(a1a) + [a2a[2]])
+            if np.all(a1a[1:] == a2f[:2]):
+                dihedrals.append(list(a1a) + [a2f[2]])
+            if np.all(a2a[1:] == a1a[:2]):
+                dihedrals.append(list(a2a) + [a1a[2]])
+            if np.all(a2f[1:] == a1a[:2]):
+                dihedrals.append(list(a2f) + [a1a[2]])
 
-    angles = np.asarray( angles, dtype=np.integer )
+    dihedrals = sorted([sorted([dihedral, dihedral[::-1]])[0] for dihedral in dihedrals])
+    dihedrals = np.array(dihedrals)
 
-    for i in range( angles.shape[0] ):
-      a1 = angles[i,0]
-      a2 = angles[i,1]
-      a3 = angles[i,2]
-      for j in range( i+1, angles.shape[0]  ):
-        b1 = angles[j,0]
-        b2 = angles[j,1]
-        b3 = angles[j,2]
-        #a1-a2-a3-b3
-        #a1-a2-a3-b1
-        #b1-b2-b3-a3
-        #b1-b2-b3-a1
-
-        #a3-a2-a1-b3
-        #a3-a2-a1-b1
-        #b3-b2-b1-a3
-        #b3-b2-b1-a1
-
-        if   (a2 == b1) and (a3 == b2) and (a1 != b3): dihedrals.append( [ a1, a2, a3, b3 ] )
-        elif (a2 == b3) and (a3 == b1) and (a1 != b1): dihedrals.append( [ a1, a2, a3, b1 ] )
-        elif (b2 == a1) and (b3 == a2) and (b1 != a3): dihedrals.append( [ b1, b2, b3, a3 ] )
-        elif (b2 == a3) and (b3 == a2) and (b1 != a1): dihedrals.append( [ b1, b2, b3, a1 ] )
-
-        elif (a2 == b1) and (a1 == b2) and (a3 != b3): dihedrals.append( [ a3, a2, a1, b3 ] )
-        elif (a2 == b3) and (a1 == b2) and (a3 != b1): dihedrals.append( [ a3, a2, a1, b1 ] )
-        elif (b2 == a1) and (b1 == a2) and (b3 != a3): dihedrals.append( [ b3, b2, b1, a3 ] )
-        elif (b2 == a3) and (b1 == a2) and (b3 != a1): dihedrals.append( [ b3, b2, b1, a1 ] )
-
-
-    dihedrals = np.asarray( dihedrals, dtype=np.integer )
-
-    return( angles, dihedrals )
+    return angles, dihedrals
 
 
 def guessbonds(coordinates, element, name, resname, resid, chain, segname, insertion, altloc):

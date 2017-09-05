@@ -911,14 +911,11 @@ class Molecule:
 
     def _getExt(self, fname, type):
         from htmd.molecule.readers import _ALL_READERS
-        if type is not None:
-            type = type.lower()
-        ext = os.path.splitext(fname)[1][1:]
+        if type is not None and type.lower() in _ALL_READERS:
+            return type
         if not os.path.isfile(fname) and len(fname) == 4:
-            type = 'pdb'
-        if type in _ALL_READERS:
-            ext = type
-        return ext
+            return 'pdb'
+        return os.path.splitext(fname)[1][1:]
 
     def _unzip(self, fname):
         if fname.endswith('gz'):

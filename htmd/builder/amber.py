@@ -272,8 +272,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             mol.resname[atoms1] = 'CYX'
             mol.resname[atoms2] = 'CYX'
             # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
-            mol.remove(atoms1 & (mol.name == 'HG'), _logger=False)
-            mol.remove(atoms2 & (mol.name == 'HG'), _logger=False)
+            mol.remove((atoms1 & (mol.name == 'HG')) | (atoms2 & (mol.name == 'HG')), _logger=False)
 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.debug('Writing PDB file for input to tleap.')
