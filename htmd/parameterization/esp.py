@@ -3,6 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import os
 from math import pi as PI
 from math import sqrt, sin, cos, acos
 import numpy as np
@@ -197,6 +198,12 @@ class ESP:
 
         self._reciprocal_distances = None
 
+    @property
+    def ngroups(self):
+        """Number of charge groups"""
+
+        return len(self.molecule._equivalent_atom_groups)
+
     def _map_groups_to_atoms(self, group_charges):
 
         charges = np.zeros(self.molecule.natoms)
@@ -205,16 +212,43 @@ class ESP:
 
         return charges
 
-    def _compute_constraint(self, group_charges):
+    def _compute_constraint(self, group_charges, _):
 
         charges = self._map_groups_to_atoms(group_charges)
         constraint = np.sum(charges) - self.molecule.netcharge
 
         return constraint
 
-    def _compute_objective(self, group_charges):
+    def _get_bounds(self):
+
+        # Set bound arrays
+        lower_bounds = np.ones(self.ngroups) * -1.25
+        upper_bounds = np.ones(self.ngroups) * +1.25
+
+        # If the restraint relates to an H, set the lower bound to 0
+        for i in range(self.ngroups):
+            if 'H' == self.molecule.element[self.molecule._equivalent_atom_groups[i][0]]:
+                lower_bounds[i] = 0.001
+
+        # Fix the charges of the specified atoms to those already set in the
+        # charge array. Note this also fixes the charges of the atoms in the
+        # same equivalency group.
+        for atom in self.fixed:
+            group = self.molecule._equivalent_group_by_atom[atom]
+            lower_bounds[group] = self.molecule.charge[atom]
+            upper_bounds[group] = self.molecule.charge[atom]
+
+        return lower_bounds, upper_bounds
+
+    def _compute_objective(self, group_charges, _):
 
         qm_result = self.qm_results[0]
+
+        # Compute the reciprocal distances between ESP points and atomic charges
+        if self._reciprocal_distances is None:
+            distances = cdist(qm_result.esp_points, self.molecule.coords[:, :, 0])
+            distances *= 0.52917721067 # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
+            self._reciprocal_distances = np.reciprocal(distances)
 
         charges = self._map_groups_to_atoms(group_charges)
         esp_values = np.dot(self._reciprocal_distances, charges)
@@ -232,60 +266,93 @@ class ESP:
             Dictionary with the fitted charges and fitting loss value
         """
 
-        qm_result = self.qm_results[0]
-
-        # Set bounds
-        ngroups = len(self.molecule._equivalent_atom_groups)
-        lower_bounds = np.ones(ngroups) * -1.25
-        upper_bounds = np.ones(ngroups) * +1.25
-
-        # If the restraint relates to an H, set the lower bound to 0
-        for i in range(ngroups):
-            if 'H' == self.molecule.element[self.molecule._equivalent_atom_groups[i][0]]:
-                lower_bounds[i] = 0.001
-
-        # Fix the charges of the specified atoms to those already set in the
-        # charge array. Note this also fixes the charges of the atoms in the
-        # same equivalency group.
-        for atom in self.fixed:
-            group = self.molecule._equivalent_group_by_atom[atom]
-            lower_bounds[group] = self.molecule.charge[atom]
-            upper_bounds[group] = self.molecule.charge[atom]
-
-        # Compute the reciprocal distances between ESP points and atomic charges
-        distances = cdist(qm_result.esp_points, self.molecule.coords[:, :, 0])
-        distances *= 0.52917721067 # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
-        self._reciprocal_distances = np.reciprocal(distances)
+        # Get charge bounds
+        lower_bounds, upper_bounds = self._get_bounds()
 
         # Set up NLopt
-        opt = nlopt.opt(nlopt.LN_COBYLA, ngroups)
-        opt.set_min_objective(lambda x, grad: self._compute_objective(x))
+        opt = nlopt.opt(nlopt.LN_COBYLA, self.ngroups)
+        opt.set_min_objective(self._compute_objective)
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
-        opt.add_equality_constraint(lambda x, grad: self._compute_constraint(x))
+        opt.add_equality_constraint(self._compute_constraint)
         opt.set_xtol_rel(1.e-6)
-        opt.set_maxeval(1000*ngroups)
+        opt.set_maxeval(1000*self.ngroups)
         opt.set_initial_step(0.001)
 
         # Optimize the charges
-        group_charges = opt.optimize(np.zeros(ngroups) + 0.001) # TODO: a more elegant way to set initial charges
+        group_charges = opt.optimize(np.zeros(self.ngroups) + 0.001) # TODO: a more elegant way to set initial charges
         # TODO: check optimizer status
         charges = self._map_groups_to_atoms(group_charges)
-        loss = self._compute_objective(group_charges)
+        loss = self._compute_objective(group_charges, None)
 
         return {'charges': charges, 'loss': loss}
 
 
-class TestWater(unittest.TestCase):
-    pass
+class TestESP(unittest.TestCase):
 
+    def setUp(self):
 
-if __name__ == '__main__':
+        from htmd.home import home
+        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
 
-    import sys
-    import os
+        molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+        self.mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+        self.esp = ESP()
+        self.esp.molecule = self.mol
+
+    def test_ngroups(self):
+
+        self.assertEqual(self.esp.ngroups, 2)
+
+    def test_mapping(self):
+
+        charges = self.esp._map_groups_to_atoms([1, 2])
+        self.assertListEqual(list(charges), [1, 1, 2, 2])
+
+    def test_constraint_function(self):
+
+        self.assertEqual(self.esp._compute_constraint([1, 2], None), 6)
+
+    def test_get_bounds(self):
+
+        lower_bounds, upper_bounds = self.esp._get_bounds()
+        self.assertEqual(list(lower_bounds), [-1.25, 0.001])
+        self.assertEqual(list(upper_bounds), [1.25, 1.25])
+
+        self.esp.fixed = [0]
+        lower_bounds, upper_bounds = self.esp._get_bounds()
+        self.assertEqual(list(lower_bounds), [-0.25279998779296875, 0.001])
+        self.assertEqual(list(upper_bounds), [-0.25279998779296875, 1.25])
+
+        self.esp.fixed = [3]
+        lower_bounds, upper_bounds = self.esp._get_bounds()
+        self.assertEqual(list(lower_bounds), [-1.25, 0.25279998779296875])
+        self.assertEqual(list(upper_bounds), [1.25, 0.25279998779296875])
+
+    def test_compute_objective(self):
+
+        from htmd.qm import QMResult
+
+        np.random.seed(20170901) # Make the test deterministic
+
+        result = QMResult
+        result.esp_points = np.random.normal(size=(100, 3))
+        result.esp_values = np.random.normal(size=100)
+
+        self.esp.qm_results = [result]
+
+        rms = self.esp._compute_objective([1, 2], None)
+        self.assertAlmostEqual(rms, 6.0746907953331517)
+
+def load_tests(loader, tests, ignore):
+    """Load DocTests into as a Unittest suite"""
+
     import doctest
 
     if os.environ.get('TRAVIS_OS_NAME') != 'osx':  # Psi4 does not work on Mac
-        if doctest.testmod().failed:
-            sys.exit(1)
+        tests.addTests(doctest.DocTestSuite(__name__))
+
+    return tests
+
+if __name__ == '__main__':
+    unittest.main()
