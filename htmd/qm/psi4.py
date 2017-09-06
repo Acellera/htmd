@@ -48,13 +48,14 @@ class Psi4(QMBase):
     Examples
     --------
 
-    Create an object of H2 molecule.
+    Create an object of H2 molecule
+    >>> import os
+    >>> from htmd.home import home
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-    >>> mol = FFMolecule('htmd/data/test-qm/H2-0.74.mol2', method=FFTypeMethod.NONE)
-    Net Charge: 0
-    Equivalent atom groups:
-     H1 H2
-    Soft torsions:
+    >>> molFile = os.path.join(home('test-qm'), 'H2-0.74.mol2')
+    >>> mol = FFMolecule(molFile, method=FFTypeMethod.NONE) # doctest: +ELLIPSIS
+    <BLANKLINE>
+    ...
 
     Create a Psi4 object
     >>> from htmd.qm import Psi4
