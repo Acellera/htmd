@@ -5,6 +5,7 @@
 #
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.util import dihedralAngle
+from htmd.molecule.vdw import VDW
 from htmd.molecule.vmdparser import guessAnglesAndDihedrals
 from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
@@ -91,6 +92,13 @@ class FFMolecule(Molecule):
 
         if hasattr(self, '_rtf'):
             self.impropers = np.array(self._rtf.impropers)
+
+        # Set atom masses
+        if self.masses.size == 0:
+            if hasattr(self, '_rtf'):
+                self.masses[:] = [self._rtf.mass_by_type[self._rtf.type_by_index[i]] for i in range(self.natoms)]
+            else:
+                self.masses[:] = [VDW.masses[VDW.elements.index(element)] for element in self.element]
 
         self.report()
 
@@ -185,12 +193,16 @@ class FFMolecule(Molecule):
 
         return chisq
 
+    @property
+    def centreOfMass(self):
+        return np.dot(self.masses, self.coords[:, :, self.frame])/np.sum(self.masses)
+
     def removeCOM(self):
         '''Relocate centre of mass to the origin'''
 
-        masses = np.array([self._rtf.mass_by_type[self._rtf.type_by_index[i]] for i in range(self.natoms)])
         for frame in range(self.numFrames):
-            self.coords[:, :, frame] -= np.dot(masses, self.coords[:, :, frame])/np.sum(masses)
+            self.frame = frame
+            self.coords[:, :, frame] -= self.centreOfMass
 
     def fitCharges(self, fixed=[]):
 
@@ -238,8 +250,7 @@ class FFMolecule(Molecule):
     def getDipole(self):
         """Calculate the dipole moment (in Debyes) of the molecule"""
 
-        coords = self.coords[:, :, self.frame]
-        coords -= np.mean(coords, axis=0)
+        coords = self.coords[:, :, self.frame] - self.centreOfMass
 
         dipole = np.zeros(4)
         dipole[:3] = np.dot(self.charge, coords)

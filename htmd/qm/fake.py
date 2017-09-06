@@ -43,7 +43,7 @@ class FakeQM(QMBase):
     >>> result.esp_points
     array([[ 1.,  1.,  1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
-    array([ 0.0284952...])
+    array([ 0.371352...])
     """
 
     # Fake implementations of the abstract methods
