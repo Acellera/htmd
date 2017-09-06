@@ -11,8 +11,6 @@ from subprocess import call
 from htmd.home import home
 from htmd.util import tempname
 
-os.environ['HTMD_LONGTESTS'] = 'yes'
-
 
 class TestParameterize(unittest.TestCase):
 
@@ -104,7 +102,6 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'h2o2_outdir')
         self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-torsions -o dir')
 
-    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_h2o2_min(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_min')
@@ -117,7 +114,6 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-esp --no-torsions')
 
-    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_h2o2_esp(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_esp')
@@ -130,16 +126,14 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-torsions')
 
-    # @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
-    # TODO: Test fails on Dihedral energy from energies.txt
-    @unittest.skip('Unstable dihedral parameters')
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_h2o2_dihed_fix(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix')
         self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
 
-    # TODO: Test fails on Dihedral energy from energies.txt
-    @unittest.skip('Unstable dihedral parameters')
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_fix_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix_restart')
@@ -147,24 +141,45 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
 
-    # @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
-    # TODO: Test fails on Dihedral energy from energies.txt
-    @unittest.skip('Unstable dihedral parameters')
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_h2o2_dihed_opt(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt')
         self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp')
 
     # TODO find why it fails on Python 3.5
-    # @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
-    # TODO: Test fails on Dihedral energy from energies.txt
-    @unittest.skip('Unstable dihedral parameters')
+    @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_h2o2_dihed_opt_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp')
+
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
+    def test_glycol_dihed_fix(self):
+
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
+        self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
+
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
+    def test_glycol_dihed_fix_restart(self):
+
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
+        resDir = tempname()
+        shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
+        self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
+
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
+    def test_glycol_dihed_select_restart(self):
+
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_select_restart')
+        resDir = tempname()
+        shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
+        self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt --torsion O1-C1-C2-O2')
 
     def test_benzamidine_gaff(self):
 
@@ -195,15 +210,14 @@ class TestParameterize(unittest.TestCase):
                    'parameterize -m input.mol2 --charge 1 --forcefield CGENFF --rtf input.rtf --prm input.prm --no-min '
                    '--no-esp --no-torsions')
 
-    # TODO: Not tested yet with the latest setting
-    # @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
-    @unittest.skip('Too long')
+    @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_full(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_full')
         self._test(refDir, tempname(), 'parameterize -m input.mol2 --charge 1 --basis 6-31G*')
 
-    @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_full_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_full_restart')
@@ -213,7 +227,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 --charge 1 --basis 6-31G*')
 
-    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_esp_freeze_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_esp_freeze_restart')
@@ -223,7 +237,7 @@ class TestParameterize(unittest.TestCase):
         self._test(refDir, resDir,
                    'parameterize -m input.mol2 --charge 1 --basis 6-31G* --no-torsions --freeze-charge N2')
 
-    @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_dihed_select_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_dihed_select_restart')
