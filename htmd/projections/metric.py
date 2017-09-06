@@ -208,8 +208,8 @@ class Metric:
         return data
 
     def _projectSingle(self, index):
-        data, ref, fstep, _ = _processSim(self.simulations[index], self.projectionlist, None, self.skip)
-        return data, ref, fstep
+        res = _processSim(self.simulations[index], self.projectionlist, None, self.skip)
+        return res[0], res[1], res[2]
 
     def _removeEmpty(self, metrics, ref, deletesims, fstep):
         emptyM = np.array([True if x is None else False for x in metrics], dtype=bool)
