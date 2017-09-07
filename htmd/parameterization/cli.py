@@ -232,81 +232,18 @@ VdW      : {VDW_ENERGY}
             all_dihedrals = mol.getSoftTorsions()
 
             # Choose which dihedrals to fit
+            dihedrals = []
             if args.torsion == 'all':
                 dihedrals = all_dihedrals
             else:
-                dihedrals = []
-                for dihedral in all_dihedrals:
-                    name = '%s-%s-%s-%s' % tuple(mol.name[dihedral])
-                    if name in args.torsion.split(','):
-                        dihedrals.append(dihedral)
+                all_names = ['%s-%s-%s-%s' % tuple(mol.name[dihedral]) for dihedral in all_dihedrals]
+                for name in args.torsion.split(','):
+                    if name in all_names:
+                        dihedrals.append(all_dihedrals[all_names.index(name)])
+                    else:
+                        raise ValueError('%s is not recognized as a soft torsion\n' % name)
 
-            scores = np.ones(len(dihedrals))
-            converged = False
-            iteration = 1
-            ref_mm = dict()
-
-            while not converged:
-                rets = []
-
-                print("\nIteration %d" % iteration)
-
-                last_scores = scores
-                scores = np.zeros(len(dihedrals))
-
-                for idx, dihedral in enumerate(dihedrals):
-                    name = '%s-%s-%s-%s' % tuple(mol.name[dihedral])
-
-                    print("\n == Fitting torsion {} ==\n".format(name))
-                    try:
-                        ret = mol.fitSoftTorsion(dihedral, geomopt=args.geomopt)
-                        rets.append(ret)
-
-                        if iteration == 1:
-                            ref_mm[name] = ret
-
-                        rating = "GOOD"
-                        if ret.chisq > 10:
-                            rating = "CHECK"
-                        if ret.chisq > 100:
-                            rating = "BAD"
-                        print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
-
-                        sys.stdout.flush()
-                        scores[idx] = ret.chisq
-
-                        # Always use the mm_orig from first iteration (unmodified)
-                        ret.mm_original = ref_mm[name].mm_original
-                        mol.plotTorsionFit(ret)
-
-                    except Exception as e:
-                        print("Error in fitting")
-                        print(str(e))
-                        raise
-
-                if iteration > 1:
-                    converged = True
-                    for j in range(len(scores)):
-                        # Check convergence
-                        try:
-                            relerr = (scores[j] - last_scores[j]) / last_scores[j]
-                        except:
-                            relerr = 0.
-                        if np.isnan(relerr):
-                            relerr = 0.
-                        convstr = "- converged"
-                        if np.fabs(relerr) > 1.e-2:
-                            convstr = ""
-                            converged = False
-                        print(" Dihedral %d relative error : %f %s" % (j, relerr, convstr))
-
-                iteration += 1
-
-            print(" Fitting converged at iteration %d" % (iteration - 1))
-
-            if len(rets):
-                fit = mol.plotConformerEnergies(rets)
-                print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
+            mol.fitSoftTorsions(dihedrals, args.geomopt)
 
         printEnergies(mol, 'energies.txt')
 
