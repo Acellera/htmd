@@ -6,10 +6,8 @@
 import os
 import re
 import numpy as np
-import scipy.optimize as optimize
 
 from htmd.molecule.molecule import Molecule
-from htmd.molecule.util import dihedralAngle
 from htmd.molecule.vdw import VDW
 from htmd.molecule.vmdparser import guessAnglesAndDihedrals
 from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
@@ -18,9 +16,8 @@ from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
-from htmd.parameterization.dihedral import QMFittingSet, DihedralFitting
+from htmd.parameterization.dihedral import DihedralFitting
 from htmd.qm import Psi4
-from htmd.progress.progress import ProgressBar
 
 
 class FFMolecule(Molecule):
@@ -247,174 +244,62 @@ class FFMolecule(Molecule):
 
         return [dihedral.atoms.copy() for dihedral in self._soft_dihedrals]
 
-    def fitSoftTorsion(self, dihedral, geomopt=True):
-
-        bkp_coords = self.coords.copy()
-
-        phi_to_fit = None
-        frozens = []
-
-        for d in self._soft_dihedrals:
-            if np.all(d.atoms == dihedral):
-                phi_to_fit = d
-                frozens.append(d.atoms)
-            else:
-                if not geomopt:
-                    frozens.append(d.atoms)
-
-        if not phi_to_fit:
-            raise ValueError("specified phi is not a recognised soft dihedral")
-
-        self._makeDihedralUnique(self, phi_to_fit)
-
-        atoms = phi_to_fit.atoms
-        equivs = phi_to_fit.equivalents
-
-        # Number of rotamers for each dihedral to compute
-        nrotamer = 36
-
-        # Create a copy of molecule with nrotamer frames
-        mol = self.copy()
-        for _ in range(nrotamer-1):
-            mol.appendFrames(self)
-        assert mol.numFrames == nrotamer
-
-        # Set rotamer coordinates
-        angles = np.linspace(-np.pi, np.pi, num=nrotamer, endpoint=False)
-        for frame, dihedral in enumerate(angles):
-            mol.frame = frame
-            mol.setDihedral(atoms, dihedral, bonds=mol.bonds)
-
-        dirname = 'dihedral-opt' if geomopt else 'dihedral-single-point'
-        dihedral_name = "%s-%s-%s-%s" % tuple(self.name[atoms])
-        fitdir = os.path.join(self.outdir, dirname, dihedral_name, self.output_directory_name())
-        os.makedirs(fitdir, exist_ok=True)
-
-        self.qm.molecule = mol
-        self.qm.esp_points = None
-        self.qm.optimize = geomopt
-        self.qm.restrained_dihedrals = np.array(frozens)
-        self.qm.directory = fitdir
-        qm_results = self.qm.run()
-
-        fittingData = DihedralFitting._makeFittingData(self, atoms, qm_results)
-
-        # Get the initial parameters of the dihedral we are going to fit
-        types = tuple([self._rtf.type_by_index[atom] for atom in atoms])
-        param = self._prm.dihedralParam(*types)
-
-        # Save these parameters as the best fit (fit to beat)
-        best_param = np.zeros(13)
-        for t in range(6):
-            best_param[t] = param[t].k0
-            best_param[t + 6] = param[t].phi0
-        best_param[12] = 0.
-
-        # Evalaute the mm potential with this dihedral zeroed out
-        # The objective function will try to fit to the delta between
-        # The QM potential and the this modified mm potential
-        for t in param:
-            t.k0 = t.phi0 = 0.
-        self._prm.updateDihedral(param)
-
-        # Now evaluate the ff without the dihedral being fitted
-        ffeval = FFEvaluate(self)
-        fittingData.mm_zeroed = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in fittingData.coords])
-        fittingData.mm_delta = fittingData.qm - fittingData.mm_zeroed
-        fittingData.mm_zeroed -= np.min(fittingData.mm_zeroed)
-        fittingData.mm_delta -= np.min(fittingData.mm_delta)
-
-        # Now measure all of the soft dihedrals phis that are mapped to this dihedral
-        # TODO get rid of this insanity
-        fittingData.phis = []
-        for iframe in range(len(fittingData.phi)):
-            fittingData.phis.append([fittingData.phi[iframe]])
-            for atoms in equivs:
-                fittingData.phis[iframe].append(dihedralAngle(fittingData.coords[iframe][atoms, :, 0]))
-
-        # Optimize parameters
-        best_chisq = DihedralFitting._objective(best_param, fittingData)
-        bar = ProgressBar(64, description="Fitting")
-        for i in range(64):
-            bounds, start = DihedralFitting._make_bounds(i)
-            xopt = optimize.minimize(DihedralFitting._objective, start, args=(fittingData,),
-                                     method="L-BFGS-B", bounds=bounds, options={'disp': False})
-            chisq = DihedralFitting._objective(xopt.x, fittingData)
-            if chisq < best_chisq:
-                best_chisq = chisq
-                best_param = xopt.x
-            bar.progress()
-        bar.stop()
-
-        # Update the target dihedral with the optimized parameters
-        for iframe in range(6):
-            param[iframe].k0 = best_param[0 + iframe]
-            param[iframe].phi0 = best_param[6 + iframe]
-        self._prm.updateDihedral(param)
-
-        # Finally evaluate the fitted potential
-        ffeval = FFEvaluate(self)
-        fittingData.mm_fitted = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in fittingData.coords])
-        fittingData.mm_fitted -= np.min(fittingData.mm_fitted)
-        fittingData.chisq = np.sum((fittingData.mm_fitted - fittingData.qm)**2)
-
-        # TODO Score it
-        self.coords = bkp_coords
-
-        return fittingData
-
     def fitSoftTorsions(self, dihedrals, geomopt=True):
-
-        DihedralFitting.fitTorsionParameters(self, dihedrals, geomopt=geomopt)
-
-    @staticmethod
-    def _makeDihedralUnique(molecule, dihedral):
-        # Create a new type for (arbitrarily) a middle atom of the dihedral
-        # So that the dihedral we are going to modify is unique
-        # TODO -- check symmetry
-
-        # Duplicate the dihedrals types so this modified term is unique
-        for i in range(4):
-            if not ("x" in molecule._rtf.type_by_index[dihedral.atoms[i]]):
-                molecule._duplicateTypeOfAtom(molecule, dihedral.atoms[i])
-
-        number_of_uses, uses = molecule._countUsesOfDihedral(molecule, dihedral.atoms)
-        if number_of_uses > 1:
-            print(dihedral.atoms)
-            print(number_of_uses)
-            print(uses)
-            raise ValueError("Dihedral term still not unique after duplication")
-
-    @staticmethod
-    def _countUsesOfDihedral(molecule, indices):
         """
-        Return the number of uses of the dihedral specified by the types of the 4 atom indices
+        Dihedrals passed as 4 atom indices
         """
 
-        types = [molecule._rtf.type_by_index[index] for index in indices]
+        # Create molecules with romtamers
+        molecules = []
+        for dihedral in dihedrals:
 
-        all_uses = []
-        for dihedral_indices in molecule.dihedrals:
-            dihedral_types = [molecule._rtf.type_by_index[index] for index in dihedral_indices]
-            if types == dihedral_types or types == dihedral_types[::-1]:
-                all_uses.append(dihedral_indices)
+            nrotamers = 36  # Number of rotamers for each dihedral to compute
 
-        # Now for each of the uses, remove any which are equivalent
-        unique_uses = [indices]
-        groups = [molecule._equivalent_group_by_atom[index] for index in indices]
-        for dihedral in all_uses:
-            dihedral_groups = [molecule._equivalent_group_by_atom[index] for index in dihedral]
-            if groups != dihedral_groups and groups != dihedral_groups[::-1]:
-                unique_uses.append(dihedral)
+            # Create a copy of molecule with "nrotamers" frames
+            mol = self.copy()
+            while mol.numFrames < nrotamers:
+                mol.appendFrames(self)
+            assert mol.numFrames == nrotamers
 
-        return len(unique_uses), unique_uses
+            # Set rotamer coordinates
+            angles = np.linspace(-np.pi, np.pi, num=nrotamers, endpoint=False)
+            for frame, angle in enumerate(angles):
+                mol.frame = frame
+                mol.setDihedral(dihedral, angle, bonds=mol.bonds)
 
-    @staticmethod
-    def _duplicateTypeOfAtom(molecule, atom_index):
+            molecules.append(mol)
+
+        # Run QM calculation of the romaters
+        dirname = 'dihedral-opt' if geomopt else 'dihedral-single-point'
+        qm_results = []
+        for dihedral, molecule in zip(dihedrals, molecules):
+            name = "%s-%s-%s-%s" % tuple(self.name[dihedral])
+            fitdir = os.path.join(self.outdir, dirname, name, self.output_directory_name())
+            os.makedirs(fitdir, exist_ok=True)
+
+            self.qm.molecule = molecule
+            self.qm.esp_points = None
+            self.qm.optimize = geomopt
+            self.qm.restrained_dihedrals = np.array([dihedral])
+            self.qm.directory = fitdir
+            qm_results.append(self.qm.run())
+
+        # Fit the dihedral parameters
+        df = DihedralFitting()
+        df.molecule = self
+        df.dihedrals = dihedrals
+        df.qm_resutls = qm_results
+        df.result_directory = os.path.join(self.outdir, 'parameters', self.method.name,
+                                           self.output_directory_name(), 'plots')
+
+        df.run()
+        # TODO explicit parameter update
+
+    def duplicateTypeOfAtom(self, atom_index):
         """Duplicate the type of the specified atom"""
 
         # First get the type
-        type_ = molecule._rtf.type_by_index[atom_index]
+        type_ = self._rtf.type_by_index[atom_index]
 
         # perhaps the type is already a duplicate? if so
         # remove the duplicated suffix
@@ -422,82 +307,32 @@ class FFMolecule(Molecule):
 
         # make the new type name
         i = 0
-        while ('%sx%d' % (type_, i)) in molecule._rtf.types:
+        while ('%sx%d' % (type_, i)) in self._rtf.types:
             i += 1
         newtype = '%sx%d' % (type_, i)
-        print("Creating new type %s from %s for atom %s" % (newtype, type_, molecule._rtf.names[atom_index]))
+        print("Creating new type %s from %s for atom %s" % (newtype, type_, self._rtf.names[atom_index]))
 
         # TODO: move to RTF class
         # duplicate the type in the fields RTF --
-        molecule._rtf.type_by_index[atom_index] = newtype
-        molecule._rtf.mass_by_type[newtype] = molecule._rtf.mass_by_type[type_]
-        molecule._rtf.types.append(newtype)
-        molecule._rtf.type_by_name[molecule._rtf.names[atom_index]] = newtype
-        molecule._rtf.type_by_index[atom_index] = newtype
-        molecule._rtf.typeindex_by_type[newtype] = molecule._rtf.typeindex_by_type[type_] + 1000
-        molecule._rtf.element_by_type[newtype] = molecule._rtf.element_by_type[type_]
+        self._rtf.type_by_index[atom_index] = newtype
+        self._rtf.mass_by_type[newtype] = self._rtf.mass_by_type[type_]
+        self._rtf.types.append(newtype)
+        self._rtf.type_by_name[self._rtf.names[atom_index]] = newtype
+        self._rtf.type_by_index[atom_index] = newtype
+        self._rtf.typeindex_by_type[newtype] = self._rtf.typeindex_by_type[type_] + 1000
+        self._rtf.element_by_type[newtype] = self._rtf.element_by_type[type_]
 
         # Now also reset the type of  any atoms that share equivalency
-        for index in molecule._equivalent_atoms[atom_index]:
+        for index in self._equivalent_atoms[atom_index]:
             if atom_index != index:
-                if "x" in molecule._rtf.type_by_index[index]:
+                if "x" in self._rtf.type_by_index[index]:
                     raise RuntimeError(
-                        "Equivalent atom already has a duplicated type: {} {}".format(index, molecule._rtf.type_by_index[index]))
-                molecule._rtf.type_by_index[index] = newtype
-                molecule._rtf.type_by_name[molecule._rtf.names[index]] = newtype
+                        "Equivalent atom already has a duplicated type: {} {}".format(index, self._rtf.type_by_index[index]))
+                self._rtf.type_by_index[index] = newtype
+                self._rtf.type_by_name[self._rtf.names[index]] = newtype
 
         # the PRM parameters will be automatically duplicated by forcing an ff evaluation
-        FFEvaluate(molecule).run(molecule.coords[:, :, 0])
-
-    def plotConformerEnergies(self, fits):
-
-        import matplotlib.pyplot as plt
-        from sklearn.linear_model import LinearRegression
-
-        qm_energy = np.concatenate([fit.qm for fit in fits])[:, None]
-        mm_energy = np.concatenate([fit.mm_fitted for fit in fits])[:, None]
-        qm_energy -= np.min(qm_energy)
-        mm_energy -= np.min(mm_energy)
-
-        regr = LinearRegression(fit_intercept=False)
-        regr.fit(qm_energy, mm_energy)
-        prediction = regr.predict(qm_energy)
-        rms = np.sqrt(np.mean((prediction - mm_energy)**2))
-        score = regr.score(qm_energy, mm_energy)
-
-        plotdir = os.path.join(self.outdir, 'parameters', self.method.name, self.output_directory_name(), 'plots')
-        os.makedirs(plotdir, exist_ok=True)
-
-        plt.figure()
-        plt.title('Conformer Energies MM vs QM')
-        plt.xlabel('QM energy, kcal/mol')
-        plt.ylabel('MM energy, kcal/mol')
-        plt.plot(qm_energy, mm_energy, 'ko')
-        plt.plot(qm_energy, prediction, 'r-', lw=2)
-        plt.savefig(os.path.join(plotdir, 'conformer-energies.svg'))
-        plt.close()
-
-        return rms, score, regr.coef_
-
-    def plotTorsionFit(self, fit):
-
-        import matplotlib.pyplot as plt
-
-        plotdir = os.path.join(self.outdir, 'parameters', self.method.name, self.output_directory_name(), 'plots')
-        os.makedirs(plotdir, exist_ok=True)
-
-        plt.figure()
-        plt.title(fit.name)
-        plt.xlabel('Dihedral angle, deg')
-        plt.xlim(-180, 180)
-        plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
-        plt.ylabel('Energy, kcal/mol')
-        plt.plot(fit.phi, fit.qm, 'r-', marker='o', lw=3, label='QM')
-        plt.plot(fit.phi, fit.mm_original, 'g-', marker='o', label='MM original')
-        plt.plot(fit.phi, fit.mm_fitted, 'b-', marker='o', label='MM fitted',)
-        plt.legend()
-        plt.savefig(os.path.join(plotdir, fit.name + '.svg'))
-        plt.close()
+        FFEvaluate(self).run(self.coords[:, :, 0])
 
     def write(self, filename, sel=None, type=None, typemap=None):
 
