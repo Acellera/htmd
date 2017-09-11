@@ -28,27 +28,34 @@ class TopologyInconsistencyError(Exception):
         return repr(self.value)
 
 
-_residueNameTable = {'ARG': 'R', 'AR0': 'R',
-                     'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HIP': 'H', 'HSD': 'H', 'HSE': 'H', 'HSP': 'H',
-                     'LYS': 'K', 'LSN': 'K', 'LYN': 'K', 'MLZ': 'K', 'MLY': 'K',
-                     'ASP': 'D', 'ASH': 'D',
-                     'GLU': 'E', 'GLH': 'E',
-                     'SER': 'S',
-                     'THR': 'T',
-                     'ASN': 'N',
-                     'GLN': 'Q',
-                     'CYS': 'C', 'CYX': 'C',
-                     'SEC': 'U',
-                     'GLY': 'G',
-                     'PRO': 'P',
-                     'ALA': 'A',
-                     'VAL': 'V',
-                     'ILE': 'I',
-                     'LEU': 'L',
-                     'MET': 'M', 'MSE': 'M',
-                     'PHE': 'F',
-                     'TYR': 'Y',
-                     'TRP': 'W'}
+_residueNameTable = {
+    'ARG': 'R', 'AR0': 'R',
+    'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HIP': 'H', 'HSD': 'H', 'HSE': 'H', 'HSP': 'H',
+    'LYS': 'K', 'LSN': 'K', 'LYN': 'K',
+    'ASP': 'D', 'ASH': 'D',
+    'GLU': 'E', 'GLH': 'E',
+    'SER': 'S',
+    'THR': 'T',
+    'ASN': 'N',
+    'GLN': 'Q',
+    'CYS': 'C', 'CYX': 'C',
+    'SEC': 'U',
+    'GLY': 'G',
+    'PRO': 'P',
+    'ALA': 'A',
+    'VAL': 'V',
+    'ILE': 'I',
+    'LEU': 'L',
+    'MET': 'M',
+    'PHE': 'F',
+    'TYR': 'Y',
+    'TRP': 'W'
+}
+
+_modResidueNameTable = {
+    'MLZ': 'K', 'MLY': 'K',
+    'MSE': 'M'
+}
 
 
 class Molecule:
@@ -443,7 +450,7 @@ class Molecule:
         # raise NameError('Reference molecule has to be a Molecule object')
         sel = self.atomselect(sel)
         refsel = refmol.atomselect(refsel)
-        if np.sum(sel) != np.sum(refsel):
+        if (type(sel[0]) == bool) and (np.sum(sel) != np.sum(refsel)):
             raise NameError('Cannot align molecules. The two selections produced different number of atoms')
         for f in frames:
             P = self.coords[sel, :, f]
@@ -771,7 +778,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A'):
+    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', _logger=True):
         """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
         mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
@@ -870,14 +877,14 @@ class Molecule:
                 traj += tr
 
             if to is not None and topo is None:  # We only use the first topology we read
-                self._parseTopology(to, fname, overwrite=overwrite)
+                self._parseTopology(to, fname, overwrite=overwrite, _logger=_logger)
                 topo = to
 
         if len(traj.coords) != 0:
             self._parseTraj(traj, skip=skip)
             
         if topo:
-            self._dropAltLoc(keepaltloc=keepaltloc)
+            self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
 
     def _checkCoords(self, traj, reader, f):
         coords = traj.coords[0]
@@ -904,14 +911,11 @@ class Molecule:
 
     def _getExt(self, fname, type):
         from htmd.molecule.readers import _ALL_READERS
-        if type is not None:
-            type = type.lower()
-        ext = os.path.splitext(fname)[1][1:]
+        if type is not None and type.lower() in _ALL_READERS:
+            return type
         if not os.path.isfile(fname) and len(fname) == 4:
-            type = 'pdb'
-        if type in _ALL_READERS:
-            ext = type
-        return ext
+            return 'pdb'
+        return os.path.splitext(fname)[1][1:]
 
     def _unzip(self, fname):
         if fname.endswith('gz'):
@@ -923,16 +927,16 @@ class Molecule:
                     fo.write(f.read().decode('utf-8', errors='ignore'))
         return fname
 
-    def _dropAltLoc(self, keepaltloc='A'):
+    def _dropAltLoc(self, keepaltloc='A', _logger=True):
         # Dropping atom alternative positions
         otheraltlocs = [x for x in np.unique(self.altloc) if len(x) and x != keepaltloc]
-        if len(otheraltlocs) >= 1 and not keepaltloc == 'all':
+        if len(otheraltlocs) >= 1 and not keepaltloc == 'all' and _logger:
             logger.warning('Alternative atom locations detected. Only altloc {} was kept. If you prefer to keep all '
                            'use the keepaltloc="all" option when reading the file.'.format(keepaltloc))
             for a in otheraltlocs:
-                self.remove(self.altloc == a)
+                self.remove(self.altloc == a, _logger=_logger)
 
-    def _parseTopology(self, topo, filename, overwrite='all'):
+    def _parseTopology(self, topo, filename, overwrite='all', _logger=True):
         if isinstance(overwrite, str):
             overwrite = (overwrite, )
 
@@ -981,11 +985,11 @@ class Molecule:
         self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
         self.crystalinfo = topo.crystalinfo
-        _ = self._checkInsertions()
+        _ = self._checkInsertions(_logger=_logger)
 
-    def _checkInsertions(self):
+    def _checkInsertions(self, _logger=True):
         ins = np.unique([x for x in self.insertion if x != ''])
-        if len(ins) != 0:
+        if len(ins) != 0 and _logger:
             logger.warning('Residue insertions were detected in the Molecule. It is recommended to renumber the '
                            'residues using the Molecule.renumberResidues() method.')
             return True
@@ -1303,9 +1307,15 @@ class Molecule:
                     raise AssertionError('Unexpected non-uniqueness of chain, resid, insertion in the sequence.')
                 resname = resname[0]
                 if oneletter:
-                    rescode = _residueNameTable.get(resname, 'X')
-                    if rescode == 'X':
-                        logger.warning("Cannot provide one-letter code for non-standard residue %s" % resname)
+                    if resname in _residueNameTable:
+                        rescode = _residueNameTable[resname]
+                    elif resname in _modResidueNameTable:
+                        rescode = _modResidueNameTable[resname]
+                        logger.warning("Modified residue{} was detected in the protein and mapped to one-letter "
+                                       "code {}".format(resname, rescode))
+                    else:
+                        rescode = 'X'
+                        logger.warning("Cannot provide one-letter code for non-standard residue {}".format(resname))
                 else:
                     rescode = resname
                 segSequences[seg].append(rescode)

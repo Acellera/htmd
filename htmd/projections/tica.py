@@ -37,7 +37,17 @@ class TICA(object):
     Example
     -------
     >>> from htmd.projections.tica import TICA
-    >>> tica = TICA(data,20)
+    >>> metr = Metric(sims)
+    >>> metr.set(MetricSelfDistance('protein and name CA'))
+    >>> data = metr.project()
+    >>> tica = TICA(data, 20)
+    >>> datatica = tica.project(3)
+    Alternatively you can pass a Metric object to TICA. Uses less memory but is slower.
+    >>> metr = Metric(sims)
+    >>> metr.set(MetricSelfDistance('protein and name CA'))
+    >>> slowtica = TICA(metr, 20)
+    >>> datatica = slowtica.project(3)
+
 
     References
     ----------
