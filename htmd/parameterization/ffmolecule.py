@@ -288,7 +288,7 @@ class FFMolecule(Molecule):
         df = DihedralFitting()
         df.molecule = self
         df.dihedrals = dihedrals
-        df.qm_resutls = qm_results
+        df.qm_results = qm_results
         df.result_directory = os.path.join(self.outdir, 'parameters', self.method.name,
                                            self.output_directory_name(), 'plots')
 

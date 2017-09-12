@@ -15,24 +15,6 @@ from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.progress.progress import ProgressBar
 
 
-class DihedralFittingData:
-
-    def __init__(self):
-
-        self.name = None
-        self.atom_indices = None
-        self.equivalents = None
-
-        self.qm_energies = []
-        self.mm_initial_energies = []
-        self.mm_delta_energies = []
-
-        self.coords = []
-        self.anlge_values = []
-
-        self.mm_fitted_energies = []
-
-
 class DihedralFitting:
     """
     Dihedral parameter fitting from QM data
@@ -42,10 +24,23 @@ class DihedralFitting:
 
         self.molecule = None
         self.dihedrals = []
-        self.qm_resutls = []
+        self.qm_results = []
         self.result_directory = None
 
-        self._data = []
+        self._names = None
+        self._types = None
+        self._parameters = None
+        self._equivalent_indices = None
+
+        self._valid_qm_results = None
+        self._reference_energies = None
+
+        self._coords = None
+        self._angle_values = None
+
+        self._initial_energies = None
+        self._target_energies = None
+        self._fitted_energies = None
 
     def _countUsesOfDihedral(self, dihedral):
         """
@@ -89,53 +84,88 @@ class DihedralFitting:
             print(uses)
             raise ValueError("Dihedral term still not unique after duplication")
 
-    def _makeFittingData(self, dihedral, qm_results):
-        """
-        Extract the valid QM poses and energies from the QM result set.
-        Evaluate the MM on those poses.
-        """
+    def _get_valid_qm_results(self):
 
-        # Remove failed QM results
-        # TODO print failed QM jobs
-        results = [result for result in qm_results if not result.errored]
+        all_valid_results = []
 
-        # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
-        # TODO print removed QM jobs
-        qm_min = np.min([result.energy for result in results])
-        results = [result for result in results if (result.energy - qm_min) < 20]
+        for results in self.qm_results:
 
-        if len(results) < 13:
-            raise RuntimeError("Fewer than 13 valid QM points. Not enough to fit!")
+            # Remove failed QM results
+            # TODO print removed QM jobs
+            valid_results = [result for result in results if not result.errored]
 
-        fittingData = DihedralFittingData()
-        fittingData.name = '%s-%s-%s-%s' % tuple(self.molecule.name[dihedral])
-        fittingData.atom_indices = dihedral
-        for rotableDihedral in self.molecule._soft_dihedrals:
+            # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
+            # TODO print removed QM jobs
+            qm_min = np.min([result.energy for result in valid_results])
+            valid_results = [result for result in valid_results if (result.energy - qm_min) < 20]
+
+            if len(valid_results) < 13:
+                raise RuntimeError("Fewer than 13 valid QM points. Not enough to fit!")
+
+            all_valid_results.append(valid_results)
+
+        return all_valid_results
+
+    def _setup(self):
+
+        assert len(self.dihedrals) == len(self.qm_results)
+
+        # Get dihedral names
+        self._names = ['%s-%s-%s-%s' % tuple(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
+
+        # Get equivalent dihedral atom indices
+        self._equivalent_indices = []
+        for idihed, dihedral in enumerate(self.dihedrals):
+            for rotableDihedral in self.molecule._soft_dihedrals:
                 if np.all(rotableDihedral.atoms == dihedral):
-                    fittingData.equivalents = rotableDihedral.equivalents
+                    self._equivalent_indices.append([dihedral] + rotableDihedral.equivalents)
                     break
-        else:
-            raise ValueError('%s are not recognized as the rotable dihedrals\n' % fittingData.name)
+            else:
+                raise ValueError('%s is not recognized as a rotable dihedral\n' % self._names[idihed])
 
+        # Get dihedral atom types
+        for dihedral in self.dihedrals:
+            self._makeDihedralUnique(dihedral)
+        self._types = [tuple([self.molecule._rtf.type_by_index[index] for index in dihedral]) for dihedral in self.dihedrals]
 
-        fittingData.coords = [result.coords for result in results]
+        # Get dihedral parameters
+        self._parameters = [self.molecule._prm.dihedralParam(*types) for types in self._types]
 
-        # Calculate angle values for all equivaltent dihedrals
-        equivalentDihedrals = [fittingData.atom_indices] + fittingData.equivalents
-        fittingData.anlge_values = []
-        for coords in fittingData.coords:
-            angles = [dihedralAngle(coords[indices, :, 0]) for indices in equivalentDihedrals]
-            fittingData.anlge_values.append(angles)
-        fittingData.anlge_values = np.array(fittingData.anlge_values)
+        # Get valid QM results
+        self._valid_qm_results = self._get_valid_qm_results()
 
-        fittingData.qm_energies = np.array([result.energy for result in results])
-        fittingData.qm_energies -= np.min(fittingData.qm_energies)
+        # Get reference QM energies
+        self._reference_energies = []
+        for results in self._valid_qm_results:
+            energies = np.array([result.energy for result in results])
+            energies -= np.min(energies)
+            self._reference_energies.append(energies)
 
+        # Get rotamer coordinates
+        self._coords = []
+        for results in self._valid_qm_results:
+            self._coords.append([result.coords for result in results])
+
+        # Calculate dihedral angle values
+        self._angle_values = []
+        for idihed, rotamer_coords in enumerate(self._coords):
+            angle_values = []
+            for coords in rotamer_coords:
+                angles = [dihedralAngle(coords[indices, :, 0]) for indices in self._equivalent_indices[idihed]]
+                angle_values.append(angles)
+            self._angle_values.append(np.array(angle_values))
+
+        # Get initial MM energies
         ff = FFEvaluate(self.molecule)
-        fittingData.mm_initial_energies = np.array([ff.run(result.coords[:, :, 0])['total'] for result in results])
-        fittingData.mm_initial_energies -= np.min(fittingData.mm_initial_energies)
+        self._initial_energies = []
+        for rotamer_coords in self._coords:
+            energies = np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords])
+            energies -= np.min(energies)
+            self._initial_energies.append(energies)
 
-        return fittingData
+        # Create a directory for results, i.e. plots
+        if self.result_directory:
+            os.makedirs(self.result_directory, exist_ok=True)
 
     @staticmethod
     def _makeBounds(i):
@@ -158,7 +188,7 @@ class DihedralFitting:
         return bounds, start
 
     @staticmethod
-    def _objective(x, data):
+    def _objective(x, self, idihed):
         """
         Evaluate the torsion with the input params for each of the phi's poses
         """
@@ -168,115 +198,87 @@ class DihedralFitting:
         offset = x[12]
 
         n = np.arange(6) + 1
-        phis = np.deg2rad(data.anlge_values)[:, :, None]  # rotamers x equivalent dihedral values
+        phis = np.deg2rad(self._angle_values[idihed])[:, :, None]  # rotamers x equivalent dihedral values
 
         energies = np.sum(k0 * (1. + np.cos(n * phis - phi0)), axis=(1, 2)) + offset
-        chisq = np.sum((energies - data.mm_delta_energies)**2)
+        chisq = np.sum((energies - self._target_energies[idihed])**2)
 
         return chisq
 
-    def _fitDihedral(self, fittingData):
+    @staticmethod
+    def _params_to_vector(params, offset):
 
-        # Get the initial parameters of the dihedral we are going to fit
-        types = tuple([self.molecule._rtf.type_by_index[index] for index in fittingData.atom_indices])
-        param = self.molecule._prm.dihedralParam(*types)
+        vector = [param.k0 for param in params]
+        vector += [param.phi0 for param in params]
+        vector += [offset]
+        vector = np.array(vector)
 
-        # Save these parameters as the best fit (fit to beat)
-        best_param = np.zeros(13)
-        for i, term in enumerate(param):
-            best_param[i] = term.k0
-            best_param[i + 6] = term.phi0
-        best_param[12] = 0.
+        return vector
+
+    @staticmethod
+    def _vector_to_params(vector, params):
+
+        nparams = len(params)
+        assert vector.size == 2*nparams + 1
+
+        for i, param in enumerate(params):
+            param.k0 = float(vector[i])
+            param.phi0 = float(vector[i + nparams])
+
+        offset = float(vector[-1])
+
+        return params, offset
+
+    def _fitDihedral(self, idihed):
+
+        # Save the initial parameters as the best ones
+        best_params = self._params_to_vector(self._parameters[idihed], 0)
 
         # Evalaute the mm potential with this dihedral zeroed out
         # The objective function will try to fit to the delta between
         # The QM potential and the this modified mm potential
-        for term in param:
-            term.k0 = term.phi0 = 0.
-        self.molecule._prm.updateDihedral(param)
+        for param in self._parameters[idihed]:
+            param.k0 = 0
+        self.molecule._prm.updateDihedral(self._parameters[idihed])
 
         # Now evaluate the ff without the dihedral being fitted
-        ffeval = FFEvaluate(self.molecule)
-        mm_zeroed = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in fittingData.coords])
-        fittingData.mm_delta_energies = fittingData.qm_energies - mm_zeroed
-        fittingData.mm_delta_energies -= np.min(fittingData.mm_delta_energies)
+        ff = FFEvaluate(self.molecule)
+        self._target_energies[idihed] = -np.array([ff.run(coords[:, :, 0])['total'] for coords in self._coords[idihed]])
+        self._target_energies[idihed] += self._reference_energies[idihed]
+        self._target_energies[idihed] -= np.min(self._target_energies[idihed])
 
         # Optimize parameters
-        best_chisq = DihedralFitting._objective(best_param, fittingData)
+        best_chisq = DihedralFitting._objective(best_params, self, idihed)
         bar = ProgressBar(64, description="Fitting")
         for i in range(64):
             bar.progress()
             bounds, start = DihedralFitting._makeBounds(i)
-            xopt = optimize.minimize(self._objective, start, args=fittingData, method="L-BFGS-B", bounds=bounds,
+            xopt = optimize.minimize(self._objective, start, args=(self, idihed), method="L-BFGS-B", bounds=bounds,
                                      options={'disp': False})
-            chisq = DihedralFitting._objective(xopt.x, fittingData)
+            chisq = DihedralFitting._objective(xopt.x, self, idihed)
             if chisq < best_chisq:
                 best_chisq = chisq
-                best_param = xopt.x
+                best_params = xopt.x
         bar.stop()
 
         # Update the target dihedral with the optimized parameters
-        for i in range(6):
-            param[i].k0 = best_param[i]
-            param[i].phi0 = best_param[i + 6]
-        self.molecule._prm.updateDihedral(param)
+        params, _ = self._vector_to_params(best_params, self._parameters[idihed])
+        self.molecule._prm.updateDihedral(params)
 
         # Finally evaluate the fitted potential
         ffeval = FFEvaluate(self.molecule)
-        fittingData.mm_fitted_energies = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in fittingData.coords])
-        fittingData.mm_fitted_energies -= np.min(fittingData.mm_fitted_energies)
-        chisq = np.sum((fittingData.mm_fitted_energies - fittingData.qm_energies)**2)
+        energies = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in self._coords[idihed]])
+        energies -= np.min(energies)
+        chisq = np.sum((energies - self._reference_energies[idihed])**2)
 
-        return chisq
-
-    def plotDihedralEnergies(self, fittingData):
-
-        plt.figure()
-        plt.title(fittingData.name)
-        plt.xlabel('Dihedral angle, deg')
-        plt.xlim(-180, 180)
-        plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
-        plt.ylabel('Energy, kcal/mol')
-        plt.plot(fittingData.anlge_values[:, 0], fittingData.qm_energies, 'r-', marker='o', lw=3, label='QM')
-        plt.plot(fittingData.anlge_values[:, 0], fittingData.mm_initial_energies, 'g-', marker='o', label='MM original')
-        plt.plot(fittingData.anlge_values[:, 0], fittingData.mm_fitted_energies, 'b-', marker='o', label='MM fitted', )
-        plt.legend()
-        plt.savefig(os.path.join(self.result_directory, fittingData.name + '.svg'))
-        plt.close()
-
-    def plotConformerEnergies(self, fits):
-
-        qm_energy = np.concatenate([fit.qm_energies for fit in fits])[:, None]
-        mm_energy = np.concatenate([fit.mm_fitted_energies for fit in fits])[:, None]
-        qm_energy -= np.min(qm_energy)
-        mm_energy -= np.min(mm_energy)
-
-        regr = LinearRegression(fit_intercept=False)
-        regr.fit(qm_energy, mm_energy)
-        prediction = regr.predict(qm_energy)
-
-        plt.figure()
-        plt.title('Conformer Energies MM vs QM')
-        plt.xlabel('QM energy, kcal/mol')
-        plt.ylabel('MM energy, kcal/mol')
-        plt.plot(qm_energy, mm_energy, 'ko')
-        plt.plot(qm_energy, prediction, 'r-', lw=2)
-        plt.savefig(os.path.join(self.result_directory, 'conformer-energies.svg'))
-        plt.close()
+        return chisq, energies
 
     def run(self):
 
-        if self.result_directory:
-            os.makedirs(self.result_directory, exist_ok=True)
+        self._setup()
 
-        assert len(self.dihedrals) == len(self.qm_resutls)
-
-        for dihedral in self.dihedrals:
-            self._makeDihedralUnique(dihedral)
-
-        self._data = [self._makeFittingData(dihedral, qm_results)
-                      for dihedral, qm_results in zip(self.dihedrals, self.qm_resutls)]
-
+        self._target_energies = [None]*len(self.dihedrals)
+        self._fitted_energies = [None]*len(self.dihedrals)
         scores = np.ones(len(self.dihedrals))
         converged = False
         iteration = 1
@@ -287,10 +289,10 @@ class DihedralFitting:
             last_scores = scores
             scores = np.zeros(len(self.dihedrals))
 
-            for i, fittingData in enumerate(self._data):
-                print('\n == Fitting torsion %s ==\n' % fittingData.name)
+            for i, name in enumerate(self._names):
+                print('\n == Fitting torsion %s ==\n' % name)
 
-                chisq = self._fitDihedral(fittingData)
+                chisq, self._fitted_energies[i] = self._fitDihedral(i)
                 scores[i] = chisq
 
                 rating = 'GOOD'
@@ -322,9 +324,45 @@ class DihedralFitting:
         print(" Fitting converged at iteration %d" % (iteration - 1))
 
         if self.result_directory:
-            self.plotConformerEnergies(self._data)
-            for fittingData in self._data:
-                self.plotDihedralEnergies(fittingData)
+            self.plotConformerEnergies()
+            for idihed in range(len(self._names)):
+                self.plotDihedralEnergies(idihed)
+
+    def plotDihedralEnergies(self, idihed):
+
+        plt.figure()
+        plt.title(self._names[idihed])
+        plt.xlabel('Dihedral angle, deg')
+        plt.xlim(-180, 180)
+        plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
+        plt.ylabel('Energy, kcal/mol')
+        angles = self._angle_values[idihed][:, 0]
+        plt.plot(angles, self._reference_energies[idihed], 'r-', marker='o', lw=3, label='QM')
+        plt.plot(angles, self._initial_energies[idihed], 'g-', marker='o', label='MM initial')
+        plt.plot(angles, self._fitted_energies[idihed], 'b-', marker='o', label='MM fitted', )
+        plt.legend()
+        plt.savefig(os.path.join(self.result_directory, self._names[idihed] + '.svg'))
+        plt.close()
+
+    def plotConformerEnergies(self):
+
+        qm_energy = np.concatenate(self._reference_energies)[:, None]
+        mm_energy = np.concatenate(self._fitted_energies)[:, None]
+        qm_energy -= np.min(qm_energy)
+        mm_energy -= np.min(mm_energy)
+
+        regr = LinearRegression(fit_intercept=False)
+        regr.fit(qm_energy, mm_energy)
+        prediction = regr.predict(qm_energy)
+
+        plt.figure()
+        plt.title('Conformer Energies MM vs QM')
+        plt.xlabel('QM energy, kcal/mol')
+        plt.ylabel('MM energy, kcal/mol')
+        plt.plot(qm_energy, mm_energy, 'ko')
+        plt.plot(qm_energy, prediction, 'r-', lw=2)
+        plt.savefig(os.path.join(self.result_directory, 'conformer-energies.svg'))
+        plt.close()
 
 
 if __name__ == '__main__':
