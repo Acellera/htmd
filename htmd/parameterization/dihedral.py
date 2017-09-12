@@ -141,21 +141,20 @@ class DihedralFitting:
         return bounds, start
 
     @staticmethod
-    def _objective(params, data):
+    def _objective(x, data):
         """
         Evaluate the torsion with the input params for each of the phi's poses
         """
 
-        chisq = 0.
-        for phis, mm_delta in zip(np.deg2rad(data.phis), data.mm_delta):
-            energy = 0.
-            for phi in phis:
-                for j in range(6):
-                    n = j + 1
-                    phi0 = np.deg2rad(params[6 + j])
-                    energy += params[j] * (1. + np.cos(n * phi - phi0))
-            energy += params[12]
-            chisq += (mm_delta - energy)**2
+        k0 = x[0:6]
+        phi0 = np.deg2rad(x[6:12])
+        offset = x[12]
+
+        n = np.arange(6) + 1
+        phis = np.deg2rad(data.phis)[:, :, None]  # rotamers x equivalent dihedral values
+
+        energies = np.sum(k0 * (1. + np.cos(n * phis - phi0)), axis=(1, 2)) + offset
+        chisq = np.sum((energies - data.mm_delta)**2)
 
         return chisq
 
@@ -170,16 +169,16 @@ class DihedralFitting:
 
         # Save these parameters as the best fit (fit to beat)
         best_param = np.zeros(13)
-        for t in range(6):
-            best_param[t] = param[t].k0
-            best_param[t + 6] = param[t].phi0
+        for i, term in enumerate(param):
+            best_param[i] = term.k0
+            best_param[i + 6] = term.phi0
         best_param[12] = 0.
 
         # Evalaute the mm potential with this dihedral zeroed out
         # The objective function will try to fit to the delta between
         # The QM potential and the this modified mm potential
-        for t in param:
-            t.k0 = t.phi0 = 0.
+        for term in param:
+            term.k0 = term.phi0 = 0.
         self.molecule._prm.updateDihedral(param)
 
         # Now evaluate the ff without the dihedral being fitted
@@ -203,8 +202,8 @@ class DihedralFitting:
         for i in range(64):
             bar.progress()
             bounds, start = DihedralFitting._makeBounds(i)
-            xopt = optimize.minimize(DihedralFitting._objective, start, args=(fittingData,),
-                                     method="L-BFGS-B", bounds=bounds, options={'disp': False})
+            xopt = optimize.minimize(self._objective, start, args=fittingData, method="L-BFGS-B", bounds=bounds,
+                                     options={'disp': False})
             chisq = DihedralFitting._objective(xopt.x, fittingData)
             if chisq < best_chisq:
                 best_chisq = chisq
@@ -225,7 +224,7 @@ class DihedralFitting:
 
         return fittingData
 
-    def plotTorsionFit(self, fit):
+    def plotDihedralEnergies(self, fit):
 
         plt.figure()
         plt.title(fit.name)
@@ -310,7 +309,7 @@ class DihedralFitting:
                     sys.stdout.flush()
 
                     if self.result_directory:
-                        self.plotTorsionFit(ret)
+                        self.plotDihedralEnergies(ret)
 
                 except Exception as e:
                     print("Error in fitting")

@@ -282,7 +282,7 @@ class FFMolecule(Molecule):
             self.qm.optimize = geomopt
             self.qm.restrained_dihedrals = np.array([dihedral])
             self.qm.directory = fitdir
-            qm_results.append(self.qm.run())
+            qm_results.append(self.qm.run())  # TODO submit all jobs at once
 
         # Fit the dihedral parameters
         df = DihedralFitting()
