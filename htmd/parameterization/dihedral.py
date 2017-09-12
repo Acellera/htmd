@@ -18,17 +18,19 @@ from htmd.progress.progress import ProgressBar
 class DihedralFittingData:
 
     def __init__(self):
-        self.name = None
-        self.phi = []
-        self.qm = []
-        self.mm_original = []
-        self.mm_zeroed = []
-        self.mm_delta = []
-        self.mm_fitted = []
-        self.coords = []
 
-        self.phis = []  # TODO factor out
-        self.chisq = None
+        self.name = None
+        self.atom_indices = None
+        self.equivalents = None
+
+        self.qm_energies = []
+        self.mm_initial_energies = []
+        self.mm_delta_energies = []
+
+        self.coords = []
+        self.anlge_values = []
+
+        self.mm_fitted_energies = []
 
 
 class DihedralFitting:
@@ -105,20 +107,35 @@ class DihedralFitting:
         if len(results) < 13:
             raise RuntimeError("Fewer than 13 valid QM points. Not enough to fit!")
 
-        data = DihedralFittingData()
-        data.name = '%s-%s-%s-%s' % tuple(self.molecule.name[dihedral])
-        data.phi = np.array([dihedralAngle(result.coords[dihedral, :, 0]) for result in results])
+        fittingData = DihedralFittingData()
+        fittingData.name = '%s-%s-%s-%s' % tuple(self.molecule.name[dihedral])
+        fittingData.atom_indices = dihedral
+        for rotableDihedral in self.molecule._soft_dihedrals:
+                if np.all(rotableDihedral.atoms == dihedral):
+                    fittingData.equivalents = rotableDihedral.equivalents
+                    break
+        else:
+            raise ValueError('%s are not recognized as the rotable dihedrals\n' % fittingData.name)
 
-        data.qm = np.array([result.energy for result in results])
-        data.qm -= np.min(data.qm)
+
+        fittingData.coords = [result.coords for result in results]
+
+        # Calculate angle values for all equivaltent dihedrals
+        equivalentDihedrals = [fittingData.atom_indices] + fittingData.equivalents
+        fittingData.anlge_values = []
+        for coords in fittingData.coords:
+            angles = [dihedralAngle(coords[indices, :, 0]) for indices in equivalentDihedrals]
+            fittingData.anlge_values.append(angles)
+        fittingData.anlge_values = np.array(fittingData.anlge_values)
+
+        fittingData.qm_energies = np.array([result.energy for result in results])
+        fittingData.qm_energies -= np.min(fittingData.qm_energies)
 
         ff = FFEvaluate(self.molecule)
-        data.mm_original = np.array([ff.run(result.coords[:, :, 0])['total'] for result in results])
-        data.mm_original -= np.min(data.mm_original)
+        fittingData.mm_initial_energies = np.array([ff.run(result.coords[:, :, 0])['total'] for result in results])
+        fittingData.mm_initial_energies -= np.min(fittingData.mm_initial_energies)
 
-        data.coords = [result.coords for result in results]
-
-        return data
+        return fittingData
 
     @staticmethod
     def _makeBounds(i):
@@ -151,20 +168,17 @@ class DihedralFitting:
         offset = x[12]
 
         n = np.arange(6) + 1
-        phis = np.deg2rad(data.phis)[:, :, None]  # rotamers x equivalent dihedral values
+        phis = np.deg2rad(data.anlge_values)[:, :, None]  # rotamers x equivalent dihedral values
 
         energies = np.sum(k0 * (1. + np.cos(n * phis - phi0)), axis=(1, 2)) + offset
-        chisq = np.sum((energies - data.mm_delta)**2)
+        chisq = np.sum((energies - data.mm_delta_energies)**2)
 
         return chisq
 
-    def _fitDihedral(self, rotableDihedral, fittingData):
-
-        atoms = rotableDihedral.atoms
-        equivs = rotableDihedral.equivalents
+    def _fitDihedral(self, fittingData):
 
         # Get the initial parameters of the dihedral we are going to fit
-        types = tuple([self.molecule._rtf.type_by_index[atom] for atom in atoms])
+        types = tuple([self.molecule._rtf.type_by_index[index] for index in fittingData.atom_indices])
         param = self.molecule._prm.dihedralParam(*types)
 
         # Save these parameters as the best fit (fit to beat)
@@ -183,18 +197,9 @@ class DihedralFitting:
 
         # Now evaluate the ff without the dihedral being fitted
         ffeval = FFEvaluate(self.molecule)
-        fittingData.mm_zeroed = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in fittingData.coords])
-        fittingData.mm_delta = fittingData.qm - fittingData.mm_zeroed
-        fittingData.mm_zeroed -= np.min(fittingData.mm_zeroed)
-        fittingData.mm_delta -= np.min(fittingData.mm_delta)
-
-        # Now measure all of the soft dihedrals phis that are mapped to this dihedral
-        # TODO get rid of this insanity
-        fittingData.phis = []
-        for iframe in range(len(fittingData.phi)):
-            fittingData.phis.append([fittingData.phi[iframe]])
-            for atoms in equivs:
-                fittingData.phis[iframe].append(dihedralAngle(fittingData.coords[iframe][atoms, :, 0]))
+        mm_zeroed = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in fittingData.coords])
+        fittingData.mm_delta_energies = fittingData.qm_energies - mm_zeroed
+        fittingData.mm_delta_energies -= np.min(fittingData.mm_delta_energies)
 
         # Optimize parameters
         best_chisq = DihedralFitting._objective(best_param, fittingData)
@@ -218,31 +223,31 @@ class DihedralFitting:
 
         # Finally evaluate the fitted potential
         ffeval = FFEvaluate(self.molecule)
-        fittingData.mm_fitted = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in fittingData.coords])
-        fittingData.mm_fitted -= np.min(fittingData.mm_fitted)
-        fittingData.chisq = np.sum((fittingData.mm_fitted - fittingData.qm)**2)
+        fittingData.mm_fitted_energies = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in fittingData.coords])
+        fittingData.mm_fitted_energies -= np.min(fittingData.mm_fitted_energies)
+        chisq = np.sum((fittingData.mm_fitted_energies - fittingData.qm_energies)**2)
 
-        return fittingData
+        return chisq
 
-    def plotDihedralEnergies(self, fit):
+    def plotDihedralEnergies(self, fittingData):
 
         plt.figure()
-        plt.title(fit.name)
+        plt.title(fittingData.name)
         plt.xlabel('Dihedral angle, deg')
         plt.xlim(-180, 180)
         plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
         plt.ylabel('Energy, kcal/mol')
-        plt.plot(fit.phi, fit.qm, 'r-', marker='o', lw=3, label='QM')
-        plt.plot(fit.phi, fit.mm_original, 'g-', marker='o', label='MM original')
-        plt.plot(fit.phi, fit.mm_fitted, 'b-', marker='o', label='MM fitted',)
+        plt.plot(fittingData.anlge_values[:, 0], fittingData.qm_energies, 'r-', marker='o', lw=3, label='QM')
+        plt.plot(fittingData.anlge_values[:, 0], fittingData.mm_initial_energies, 'g-', marker='o', label='MM original')
+        plt.plot(fittingData.anlge_values[:, 0], fittingData.mm_fitted_energies, 'b-', marker='o', label='MM fitted', )
         plt.legend()
-        plt.savefig(os.path.join(self.result_directory, fit.name + '.svg'))
+        plt.savefig(os.path.join(self.result_directory, fittingData.name + '.svg'))
         plt.close()
 
     def plotConformerEnergies(self, fits):
 
-        qm_energy = np.concatenate([fit.qm for fit in fits])[:, None]
-        mm_energy = np.concatenate([fit.mm_fitted for fit in fits])[:, None]
+        qm_energy = np.concatenate([fit.qm_energies for fit in fits])[:, None]
+        mm_energy = np.concatenate([fit.mm_fitted_energies for fit in fits])[:, None]
         qm_energy -= np.min(qm_energy)
         mm_energy -= np.min(mm_energy)
 
@@ -266,14 +271,6 @@ class DihedralFitting:
 
         assert len(self.dihedrals) == len(self.qm_resutls)
 
-        rotableDihedrals = []
-        for dihedral in self.dihedrals:
-            for dihed in self.molecule._soft_dihedrals:
-                if np.all(dihed.atoms == dihedral):
-                    rotableDihedrals.append(dihed)
-        if len(rotableDihedrals) != len(self.dihedrals):
-            raise ValueError('Some dihedrals are not recognized as the rotable dihedrals\n')
-
         for dihedral in self.dihedrals:
             self._makeDihedralUnique(dihedral)
 
@@ -285,36 +282,24 @@ class DihedralFitting:
         iteration = 1
 
         while not converged:
-            rets = []
-
             print("\nIteration %d" % iteration)
 
             last_scores = scores
             scores = np.zeros(len(self.dihedrals))
 
-            for idx, rotableDihedral in enumerate(rotableDihedrals):
-                name = '%s-%s-%s-%s' % tuple(self.molecule.name[rotableDihedral.atoms])
-                print('\n == Fitting torsion %s ==\n' % name)
-                try:
-                    ret = self._fitDihedral(rotableDihedral, self._data[idx])
-                    scores[idx] = ret.chisq
-                    rets.append(ret)
+            for i, fittingData in enumerate(self._data):
+                print('\n == Fitting torsion %s ==\n' % fittingData.name)
 
-                    rating = 'GOOD'
-                    if ret.chisq > 10:
-                        rating = 'CHECK'
-                    if ret.chisq > 100:
-                        rating = 'BAD'
-                    print('Chi^2 score : %f : %s' % (ret.chisq, rating))
-                    sys.stdout.flush()
+                chisq = self._fitDihedral(fittingData)
+                scores[i] = chisq
 
-                    if self.result_directory:
-                        self.plotDihedralEnergies(ret)
-
-                except Exception as e:
-                    print("Error in fitting")
-                    print(str(e))
-                    raise
+                rating = 'GOOD'
+                if chisq > 10:
+                    rating = 'CHECK'
+                if chisq > 100:
+                    rating = 'BAD'
+                print('Chi^2 score : %f : %s' % (chisq, rating))
+                sys.stdout.flush()
 
             if iteration > 1:
                 converged = True
@@ -337,7 +322,9 @@ class DihedralFitting:
         print(" Fitting converged at iteration %d" % (iteration - 1))
 
         if self.result_directory:
-            self.plotConformerEnergies(rets)
+            self.plotConformerEnergies(self._data)
+            for fittingData in self._data:
+                self.plotDihedralEnergies(fittingData)
 
 
 if __name__ == '__main__':
