@@ -92,8 +92,12 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
         raise NameError('Rotation not implemented yet')
 
     # Calculate min max coordinates from molecule
-    minmol = np.min(mol.get('coords'), axis=0)
-    maxmol = np.max(mol.get('coords'), axis=0)
+    if mol.numAtoms > 0:
+        minmol = np.min(mol.get('coords'), axis=0)
+        maxmol = np.max(mol.get('coords'), axis=0)
+    else:
+        minmol = [np.inf, np.inf, np.inf]
+        maxmol = [-np.inf, -np.inf, -np.inf]
 
     if minmax is None:
         minc = minmol
@@ -120,7 +124,10 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
     nz = int(np.ceil((dz + 2 * buffer) / watsize))
 
     # Calculate number of preexisting water segments with given prefix
-    preexist = len(np.unique(mol.get('segid', sel='segid "{}.*"'.format(prefix))))
+    if mol.numAtoms > 0:
+        preexist = len(np.unique(mol.get('segid', sel='segid "{}.*"'.format(prefix))))
+    else:
+        preexist = 0
 
     numsegs = nx * ny * nz
     logger.info('Replicating ' + str(numsegs) + ' water segments, ' + str(nx) + ' by ' + str(ny) + ' by ' + str(nz))
