@@ -6,13 +6,12 @@
 import os
 import sys
 import numpy as np
-import scipy.optimize as optimize
+import nlopt
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 from htmd.molecule.util import dihedralAngle
 from htmd.parameterization.ffevaluate import FFEvaluate
-from htmd.progress.progress import ProgressBar
 
 
 class DihedralFitting:
@@ -30,6 +29,7 @@ class DihedralFitting:
         self._names = None
         self._types = None
         self._parameters = None
+        self._offsets = None
         self._equivalent_indices = None
 
         self._valid_qm_results = None
@@ -130,6 +130,7 @@ class DihedralFitting:
 
         # Get dihedral parameters
         self._parameters = [self.molecule._prm.dihedralParam(*types) for types in self._types]
+        self._offsets = np.zeros(len(self.dihedrals))
 
         # Get valid QM results
         self._valid_qm_results = self._get_valid_qm_results()
@@ -167,28 +168,19 @@ class DihedralFitting:
         if self.result_directory:
             os.makedirs(self.result_directory, exist_ok=True)
 
-    @staticmethod
-    def _makeBounds(i):
+    def _get_bounds(self):
 
-        start = np.zeros(13)
-        bounds = []
+        lower_bounds = np.zeros(13)
+        lower_bounds[-1] = -10
 
-        for j in range(6):
-            bounds.append((-20., 20.))
+        upper_bounds = np.zeros(13)
+        upper_bounds[0:6] = 20
+        upper_bounds[6:12] = 180/np.arange(1, 7)
+        upper_bounds[-1] = 10
 
-        for j in range(6):
-            if i & (2 ** j):
-                bounds.append((180., 180.))
-                start[6 + j] = 180.
-            else:
-                bounds.append((0., 0.))
+        return lower_bounds, upper_bounds
 
-        bounds.append((-10., 10.))
-
-        return bounds, start
-
-    @staticmethod
-    def _objective(x, self, idihed):
+    def _objective(self, x, idihed):
         """
         Evaluate the objective function of the torsion with the input params for each of the phi's poses
         """
@@ -197,7 +189,7 @@ class DihedralFitting:
         phi0 = np.deg2rad(x[6:12])
         offset = x[12]
 
-        n = np.arange(6) + 1
+        n = np.arange(1, 7)
         phis = np.deg2rad(self._angle_values[idihed])[:, :, None]  # rotamers x equivalent dihedral values
 
         energies = np.sum(k0 * (1. + np.cos(n * phis - phi0)), axis=(1, 2)) + offset
@@ -232,7 +224,7 @@ class DihedralFitting:
     def _fitDihedral(self, idihed):
 
         # Save the initial parameters as the best ones
-        best_params = self._params_to_vector(self._parameters[idihed], 0)
+        best_params = self._params_to_vector(self._parameters[idihed], self._offsets[idihed])
 
         # Evalaute the mm potential with this dihedral zeroed out
         # The objective function will try to fit to the delta between
@@ -247,22 +239,35 @@ class DihedralFitting:
         self._target_energies[idihed] += self._reference_energies[idihed]
         self._target_energies[idihed] -= np.min(self._target_energies[idihed])
 
+        # Create global optimizer
+        opt = nlopt.opt(nlopt.G_MLSL_LDS, best_params.size)
+        opt.set_min_objective(lambda x, _: self._objective(x, idihed))
+        lower_bounds, upper_bounds = self._get_bounds()
+        opt.set_lower_bounds(lower_bounds)
+        opt.set_upper_bounds(upper_bounds)
+        opt.set_maxeval(int(1e4)*opt.get_dimension())
+        opt.set_population(opt.get_dimension())
+
+        # Create local optimizer
+        local_opt = nlopt.opt(nlopt.LN_BOBYQA, opt.get_dimension())
+        local_opt.set_xtol_rel(1e-6)
+        local_opt.set_initial_step(1e-1)
+        opt.set_local_optimizer(local_opt)
+
+        # Calculate the best loss
+        best_chisq = self._objective(best_params, idihed)
+
         # Optimize parameters
-        best_chisq = DihedralFitting._objective(best_params, self, idihed)
-        bar = ProgressBar(64, description="Fitting")
-        for i in range(64):
-            bar.progress()
-            bounds, start = DihedralFitting._makeBounds(i)
-            xopt = optimize.minimize(self._objective, start, args=(self, idihed), method="L-BFGS-B", bounds=bounds,
-                                     options={'disp': False})
-            chisq = DihedralFitting._objective(xopt.x, self, idihed)
-            if chisq < best_chisq:
-                best_chisq = chisq
-                best_params = xopt.x
-        bar.stop()
+        initial = np.random.uniform(low=lower_bounds, high=upper_bounds)
+        xopt = opt.optimize(initial)
+        chisq = opt.last_optimum_value()
+
+        if chisq < best_chisq:
+            best_chisq = chisq
+            best_params = xopt.copy()
 
         # Update the target dihedral with the optimized parameters
-        params, _ = self._vector_to_params(best_params, self._parameters[idihed])
+        params, self._offsets[idihed] = self._vector_to_params(best_params, self._parameters[idihed])
         self.molecule._prm.updateDihedral(params)
 
         # Finally evaluate the fitted potential
@@ -339,9 +344,12 @@ class DihedralFitting:
         plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
         plt.ylabel('Energy, kcal/mol')
         angles = self._angle_values[idihed][:, 0]
-        plt.plot(angles, self._reference_energies[idihed], 'r-', marker='o', lw=3, label='QM')
-        plt.plot(angles, self._initial_energies[idihed], 'g-', marker='o', label='MM initial')
-        plt.plot(angles, self._fitted_energies[idihed], 'b-', marker='o', label='MM fitted', )
+        refs = self._reference_energies[idihed] - np.min(self._reference_energies[idihed])
+        inits = self._initial_energies[idihed] - np.min(self._initial_energies[idihed])
+        fits = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
+        plt.plot(angles, refs, 'r-', marker='o', lw=3, label='QM')
+        plt.plot(angles, inits, 'g-', marker='o', label='MM initial')
+        plt.plot(angles, fits, 'b-', marker='o', label='MM fitted', )
         plt.legend()
         plt.savefig(os.path.join(self.result_directory, self._names[idihed] + '.svg'))
         plt.close()
