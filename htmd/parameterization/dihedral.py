@@ -138,7 +138,7 @@ class DihedralFitting:
         self._reference_energies = []
         for results in self._valid_qm_results:
             energies = np.array([result.energy for result in results])
-            energies -= np.min(energies)
+            energies -= np.mean(energies)
             self._reference_energies.append(energies)
 
         # Get rotamer coordinates
@@ -160,7 +160,7 @@ class DihedralFitting:
         self._initial_energies = []
         for rotamer_coords in self._coords:
             energies = np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords])
-            energies -= np.min(energies)
+            energies -= np.mean(energies)
             self._initial_energies.append(energies)
 
         # Create a directory for results, i.e. plots
@@ -190,7 +190,7 @@ class DihedralFitting:
     @staticmethod
     def _objective(x, self, idihed):
         """
-        Evaluate the torsion with the input params for each of the phi's poses
+        Evaluate the objective function of the torsion with the input params for each of the phi's poses
         """
 
         k0 = x[0:6]
@@ -241,7 +241,7 @@ class DihedralFitting:
             param.k0 = 0
         self.molecule._prm.updateDihedral(self._parameters[idihed])
 
-        # Now evaluate the ff without the dihedral being fitted
+        # Now evaluate the FF without the dihedral being fitted
         ff = FFEvaluate(self.molecule)
         self._target_energies[idihed] = -np.array([ff.run(coords[:, :, 0])['total'] for coords in self._coords[idihed]])
         self._target_energies[idihed] += self._reference_energies[idihed]
@@ -268,10 +268,12 @@ class DihedralFitting:
         # Finally evaluate the fitted potential
         ffeval = FFEvaluate(self.molecule)
         energies = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in self._coords[idihed]])
-        energies -= np.min(energies)
-        chisq = np.sum((energies - self._reference_energies[idihed])**2)
+        energies -= np.mean(energies)
+        final_chisq = np.sum((energies - self._reference_energies[idihed])**2)
 
-        return chisq, energies
+        assert np.isclose(best_chisq, final_chisq)
+
+        return final_chisq, energies
 
     def run(self):
 
