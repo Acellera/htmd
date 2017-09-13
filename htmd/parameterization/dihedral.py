@@ -139,7 +139,6 @@ class DihedralFitting:
         self._reference_energies = []
         for results in self._valid_qm_results:
             energies = np.array([result.energy for result in results])
-            energies -= np.mean(energies)
             self._reference_energies.append(energies)
 
         # Get rotamer coordinates
@@ -161,7 +160,6 @@ class DihedralFitting:
         self._initial_energies = []
         for rotamer_coords in self._coords:
             energies = np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords])
-            energies -= np.mean(energies)
             self._initial_energies.append(energies)
 
         # Create a directory for results, i.e. plots
@@ -180,22 +178,24 @@ class DihedralFitting:
 
         return lower_bounds, upper_bounds
 
-    def _objective(self, x, idihed):
+    def _objective(self, x, idiheds):
         """
         Evaluate the objective function of the torsion with the input params for each of the phi's poses
         """
 
-        k0 = x[0:6]
-        phi0 = np.deg2rad(x[6:12])
-        offset = x[12]
+        k0, phi0 = np.reshape(x[:-1], (2, -1, 6))
+        offset = x[-1]
 
         n = np.arange(1, 7)
-        phis = np.deg2rad(self._angle_values[idihed])[:, :, None]  # rotamers x equivalent dihedral values
+        phi0 = np.deg2rad(phi0)
 
-        energies = np.sum(k0 * (1. + np.cos(n * phis - phi0)), axis=(1, 2)) + offset
-        chisq = np.sum((energies - self._target_energies[idihed])**2)
+        loss = 0
+        for i, idihed in enumerate(idiheds):
+            phis = np.deg2rad(self._angle_values[idihed])[:, :, None]  # rotamers x equivalent dihedral values
+            energies = np.sum(k0[i]*(1 + np.cos(n*phis - phi0[i])), axis=(1, 2)) + offset
+            loss += np.sum((energies - self._target_energies[idihed])**2)
 
-        return chisq
+        return loss
 
     @staticmethod
     def _params_to_vector(params, offset):
@@ -235,17 +235,21 @@ class DihedralFitting:
 
         # Now evaluate the FF without the dihedral being fitted
         ff = FFEvaluate(self.molecule)
-        self._target_energies[idihed] = -np.array([ff.run(coords[:, :, 0])['total'] for coords in self._coords[idihed]])
-        self._target_energies[idihed] += self._reference_energies[idihed]
-        self._target_energies[idihed] -= np.min(self._target_energies[idihed])
+        for i in range(len(self.dihedrals)):
+            self._target_energies[i] = -np.array([ff.run(coords[:, :, 0])['total'] for coords in self._coords[i]])
+            self._target_energies[i] += self._reference_energies[i]
+
+        min_energy = min(map(np.min, self._target_energies))
+        for energies in self._target_energies:
+            energies -= min_energy
 
         # Create global optimizer
         opt = nlopt.opt(nlopt.G_MLSL_LDS, best_params.size)
-        opt.set_min_objective(lambda x, _: self._objective(x, idihed))
+        opt.set_min_objective(lambda x, _: self._objective(x, [idihed]))
         lower_bounds, upper_bounds = self._get_bounds()
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
-        opt.set_maxeval(int(1e4)*opt.get_dimension())
+        opt.set_maxeval(int(1e4)*opt.get_dimension()) # TODO allow to tune this parameter
         opt.set_population(opt.get_dimension())
 
         # Create local optimizer
@@ -255,7 +259,7 @@ class DihedralFitting:
         opt.set_local_optimizer(local_opt)
 
         # Calculate the best loss
-        best_chisq = self._objective(best_params, idihed)
+        best_chisq = self._objective(best_params, [idihed])
 
         # Optimize parameters
         initial = np.random.uniform(low=lower_bounds, high=upper_bounds)
@@ -273,23 +277,19 @@ class DihedralFitting:
         # Finally evaluate the fitted potential
         ffeval = FFEvaluate(self.molecule)
         energies = np.array([ffeval.run(coords[:, :, 0])['total'] for coords in self._coords[idihed]])
-        energies -= np.mean(energies)
-        final_chisq = np.sum((energies - self._reference_energies[idihed])**2)
+        ref_energies = self._reference_energies[idihed] - np.mean(self._reference_energies[idihed])
+        res_energies = energies - np.mean(energies)
+        final_chisq = np.sum((res_energies - ref_energies)**2)
 
         assert np.isclose(best_chisq, final_chisq)
 
         return final_chisq, energies
 
-    def run(self):
+    def _fitDihedrals(self):
 
-        self._setup()
-
-        self._target_energies = [None]*len(self.dihedrals)
-        self._fitted_energies = [None]*len(self.dihedrals)
         scores = np.ones(len(self.dihedrals))
         converged = False
         iteration = 1
-
         while not converged:
             print("\nIteration %d" % iteration)
 
@@ -330,9 +330,18 @@ class DihedralFitting:
 
         print(" Fitting converged at iteration %d" % (iteration - 1))
 
+    def run(self):
+
+        self._setup()
+
+        self._target_energies = [None]*len(self.dihedrals)
+        self._fitted_energies = [None]*len(self.dihedrals)
+
+        self._fitDihedrals()
+
         if self.result_directory:
             self.plotConformerEnergies()
-            for idihed in range(len(self._names)):
+            for idihed in range(len(self.dihedrals)):
                 self.plotDihedralEnergies(idihed)
 
     def plotDihedralEnergies(self, idihed):
