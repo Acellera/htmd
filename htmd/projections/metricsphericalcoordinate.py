@@ -80,7 +80,7 @@ class MetricSphericalCoordinate(Projection):
 
         r = np.sqrt(np.sum(xyz ** 2, axis=0))
         theta = np.arccos(xyz[2, :] / r)
-        phi = np.arctan(xyz[1, :] / xyz[0, :])
+        phi = np.arctan2(xyz[1, :], xyz[0, :])
 
         return np.stack((r, theta, phi), axis=1)
 
