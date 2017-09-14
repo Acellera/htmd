@@ -232,9 +232,9 @@ def guessbonds(coordinates, element, name, resname, resid, chain, segname, inser
     nframes = coordinates.shape[2]
 
     if len(element) != natoms:
-        raise NameError("'atomname' not natoms in length")
+        raise NameError("'element' not natoms in length")
     if len(name) != natoms:
-        raise NameError("'atomtype' not natoms in length")
+        raise NameError("'name' not natoms in length")
     if len(resname) != natoms:
         raise NameError("'resname' not natoms in length")
     if len(resid) != natoms:
