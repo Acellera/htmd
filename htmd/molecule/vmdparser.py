@@ -196,13 +196,13 @@ def guessAnglesAndDihedrals(bonds):
             a1a = angles[a1]
             a2a = angles[a2]
             a2f = a2a[::-1]  # Flipped a2a. We don't need flipped a1a as it produces the flipped versions of these 4
-            if np.all(a1a[1:] == a2a[:2]):
+            if np.all(a1a[1:] == a2a[:2]) and a1a[0] != a2a[2]:
                 dihedrals.append(list(a1a) + [a2a[2]])
-            if np.all(a1a[1:] == a2f[:2]):
+            if np.all(a1a[1:] == a2f[:2]) and a1a[0] != a2f[2]:
                 dihedrals.append(list(a1a) + [a2f[2]])
-            if np.all(a2a[1:] == a1a[:2]):
+            if np.all(a2a[1:] == a1a[:2]) and a2a[0] != a1a[2]:
                 dihedrals.append(list(a2a) + [a1a[2]])
-            if np.all(a2f[1:] == a1a[:2]):
+            if np.all(a2f[1:] == a1a[:2]) and a2f[0] != a1a[2]:
                 dihedrals.append(list(a2f) + [a1a[2]])
 
     dihedrals = sorted([sorted([dihedral, dihedral[::-1]])[0] for dihedral in dihedrals])
