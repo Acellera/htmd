@@ -10,20 +10,16 @@ import threading
 from subprocess import check_output
 import os
 from glob import glob as glob
+import abc
 import logging
 logger = logging.getLogger(__name__)
 
 
-class LocalGPUQueue(SimQueue, ProtocolInterface):
+class _LocalQueue(SimQueue, ProtocolInterface):
     """ Local machine queue system
 
     Parameters
     ----------
-    ngpu : int
-        Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will
-        use the first `ngpus` devices of the machine.
-    devices : list, default=None
-        A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpus`
     datadir : str, default=None
         The path in which to store completed trajectories.
     trajext : str, default='xtc'
@@ -31,54 +27,29 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
 
 
     .. rubric:: Methods
-    .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
+    .. autoautosummary:: htmd.queues.localqueue._LocalQueue
        :methods:
     .. rubric:: Attributes
-    .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
+    .. autoautosummary:: htmd.queues.localqueue._LocalQueue
        :attributes:
-
     """
 
     def __init__(self):
         super().__init__()
-        self._arg('ngpu', 'int', 'Number of GPU devices that the queue will use. Each simulation will be run on '
-                                  'a different GPU. The queue will use the first `ngpus` devices of the machine.',
-                       None, val.Number(int, '0POS'))
-        self._arg('devices', 'list', 'A list of GPU device indexes on which the queue is allowed to run '
-                                     'simulations. Mutually exclusive with `ngpus`', None, val.Number(int, '0POS'), nargs='*')
         self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
         self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
+        self._arg('copy', 'list', 'A list of file names or globs for the files to copy to datadir', ('*.xtc'), val.String(), nargs='*')
+        self._cmdDeprecated('trajext', 'copy')
 
         self._states = dict()
         self._queue = None
         self._shutdown = False
 
-    def _getGPUdevices(self):
-        ngpu = self.ngpu
-        devices = self.devices
-        if ngpu is not None and devices is not None:
-            raise ValueError('Parameters `ngpu` and `devices` are mutually exclusive.')
-
-        if ngpu is None and devices is None:
-            try:
-                devices = range(int(check_output("nvidia-smi -L | wc -l", shell=True).decode("ascii")))
-            except:
-                raise
-        elif ngpu is not None:
-            devices = range(ngpu)
-
-        if devices is None:
-            raise NameError("Could not determine which GPUs to use. "
-                            "Specify the GPUs with the `ngpu=` or `devices=` parameters")
-        else:
-            logger.info("Using GPU devices {}".format(','.join(map(str, devices))))
-        return devices
-
     def _setupQueue(self):
         if self._queue is None:
             self._queue = queue.Queue()
 
-            devices = self._getGPUdevices()
+            devices = self._getdevices()
 
             self._threads = []
             for d in devices:
@@ -87,10 +58,11 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
                 t.start()
                 self._threads.append(t)
 
-    def _createJobScript(self, fname, workdir, runsh, device):
+    def _createJobScript(self, fname, workdir, runsh, gpudevice=None):
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n\n')
-            f.write('export CUDA_VISIBLE_DEVICES={}\n'.format(device))
+            if gpudevice is not None:
+                f.write('export CUDA_VISIBLE_DEVICES={}\n'.format(gpudevice))
             f.write('cd {}\n'.format(os.path.abspath(workdir)))
             f.write('{}'.format(runsh))
 
@@ -103,7 +75,7 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
                 # create directory for new file
                 odir = os.path.join(datadir, simname)
                 os.mkdir(odir)
-                f.write('\nmv *.{} {}'.format(self.trajext, odir))
+                f.write('\nmv {} {}'.format(' '.join(self.copy), odir))
 
         os.chmod(fname, 0o700)
 
@@ -175,6 +147,104 @@ class LocalGPUQueue(SimQueue, ProtocolInterface):
     def stop(self):
         self._shutdown = True
 
+    @abc.abstractmethod
+    def _getdevices(self):
+        pass
+
+
+class LocalGPUQueue(_LocalQueue):
+    """ Local machine queue system
+
+    Parameters
+    ----------
+    datadir : str, default=None
+        The path in which to store completed trajectories.
+    copy : list, default='*.xtc'
+        A list of file names or globs for the files to copy to datadir
+    ngpu : int, default=None
+        Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will use the first `ngpus` devices of the machine.
+    devices : list, default=None
+        A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpus`
+
+
+    .. rubric:: Methods
+    .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
+       :methods:
+    .. rubric:: Attributes
+    .. autoautosummary:: htmd.queues.localqueue.LocalGPUQueue
+       :attributes:
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._arg('ngpu', 'int', 'Number of GPU devices that the queue will use. Each simulation will be run on '
+                                  'a different GPU. The queue will use the first `ngpus` devices of the machine.',
+                       None, val.Number(int, '0POS'))
+        self._arg('devices', 'list', 'A list of GPU device indexes on which the queue is allowed to run '
+                                     'simulations. Mutually exclusive with `ngpus`', None, val.Number(int, '0POS'), nargs='*')
+
+    def _getdevices(self):
+        ngpu = self.ngpu
+        devices = self.devices
+        if ngpu is not None and devices is not None:
+            raise ValueError('Parameters `ngpu` and `devices` are mutually exclusive.')
+
+        if ngpu is None and devices is None:
+            try:
+                check_output("nvidia-smi -L", shell=True)
+                devices = range(int(check_output("nvidia-smi -L | wc -l", shell=True).decode("ascii")))
+            except:
+                raise
+        elif ngpu is not None:
+            devices = range(ngpu)
+
+        if devices is None:
+            raise NameError("Could not determine which GPUs to use. "
+                            "Specify the GPUs with the `ngpu=` or `devices=` parameters")
+        else:
+            logger.info("Using GPU devices {}".format(','.join(map(str, devices))))
+        return devices
+
+
+class LocalCPUQueue(_LocalQueue):
+    """ Local CPU machine queue system
+
+    Parameters
+    ----------
+    datadir : str, default=None
+        The path in which to store completed trajectories.
+    copy : list, default='*.xtc'
+        A list of file names or globs for the files to copy to datadir
+    ncpu : int, default=None
+        Number of CPU threads that the queue will use. If None it will use the `ncpu` configured for HTMD in htmd.configure()
+
+
+    .. rubric:: Methods
+    .. autoautosummary:: htmd.queues.localqueue.LocalCPUQueue
+       :methods:
+    .. rubric:: Attributes
+    .. autoautosummary:: htmd.queues.localqueue.LocalCPUQueue
+       :attributes:
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._arg('ncpu', 'int', 'Number of CPU threads that the queue will use. If None it will use the `ncpu` '
+                                 'configured for HTMD in htmd.configure()', None, val.Number(int, 'POS'))
+
+    def _getdevices(self):
+        import multiprocessing
+        ncpu = self.ncpu
+        totalcpus = multiprocessing.cpu_count()
+        if ncpu is None:
+            from htmd.config import _config
+            ncpu = totalcpus + _config['ncpus'] + 1
+        if ncpu > totalcpus:
+            raise RuntimeError('You can only use up to {} threads on this machine'.format(totalcpus))
+        return [None] * ncpu
+
 
 def run_job(self, gpuid):
     queue = self._queue
@@ -186,7 +256,10 @@ def run_job(self, gpuid):
             pass
 
         if path:
-            logger.info("Running " + path + " on GPU device " + str(gpuid))
+            if gpuid is None:
+                logger.info('Running ' + path)
+            else:
+                logger.info("Running " + path + " on GPU device " + str(gpuid))
             self._setRunning(path)
 
             runsh = os.path.join(path, 'run.sh')
@@ -217,24 +290,26 @@ class LocalCPUQueue(LocalGPUQueue):
 
 
 if __name__ == "__main__":
-    from time import sleep
+    from htmd.home import home
+    import os
 
-    # TODO: Fix this to work
-    """
-    a = AcemdLocal(acemd="/shared/acemd/bin/acemd", ngpus=2)
-    a.submit("/tmp/job/1")
-    a.submit("/tmp/job/2")
-    a.submit("/tmp/job/3")
-    a.submit("/tmp/job/4")
-    a.wait()
+    lo = LocalCPUQueue()
+    lo.ncpu = 1
+    folder = os.path.join(home(dataDir='test-localqueue'), 'test_cpu')
+    lo.submit([folder] * 2)
+    lo.wait()
 
-    r = a.retrieve()
-    if len(r):
-        print("Retrieved: ")
-        print(r)
-    sleep(1)
-    a.stop()
-    sleep(10)
-    print("Done")
-    """
+    lo = LocalGPUQueue()
+    try:
+        lo._getdevices()
+        folders = glob(os.path.join(home(dataDir='test-localqueue'), 'test_gpu*'))
+        lo.submit(folders)
+        lo.wait()
+        for f in folders:
+            torem = glob(os.path.join(f, 'output.*')) + glob(os.path.join(f, 'restart.*')) + glob(os.path.join(f, 'log.txt'))
+            for r in torem:
+                os.remove(r)
+    except:
+        print('No GPUs detected on this machine')
+
 
