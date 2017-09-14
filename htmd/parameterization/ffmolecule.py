@@ -4,8 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.molecule.molecule import Molecule
-from htmd.molecule.util import dihedralAngle
-from htmd.molecule.vmdparser import guessAnglesAndDihedrals
+from htmd.molecule.util import dihedralAngle, guessAnglesAndDihedrals
 from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
@@ -74,7 +73,7 @@ class FFMolecule(Molecule):
         if(len(self.bonds)==0):
            print("No bonds found. Guessing them")
            self.bonds =  self._guessBonds()
-        (a, b) = guessAnglesAndDihedrals(self.bonds)
+        (a, b) = guessAnglesAndDihedrals(self.bonds, cyclicdih=True)
         self.natoms = self.serial.shape[0]
         self.angles = a
         self.dihedrals = b
