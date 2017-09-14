@@ -179,7 +179,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt --torsion O1-C1-C2-O2')
+        self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt --torsion C1-C2-O2-H6')
 
     def test_benzamidine_gaff(self):
 
