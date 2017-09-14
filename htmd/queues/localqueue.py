@@ -282,13 +282,6 @@ def run_job(self, gpuid):
     logger.info("Shutting down worker thread")
 
 
-# HACK! Abuse LocalGPUQueue to be LocalCPUQueue
-class LocalCPUQueue(LocalGPUQueue):
-
-    def _getGPUdevices(self):
-        return [1]  # Return 1 GPU device, so we can always run on CPUs
-
-
 if __name__ == "__main__":
     from htmd.home import home
     import os
