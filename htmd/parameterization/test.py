@@ -174,9 +174,18 @@ class TestParameterize(unittest.TestCase):
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
-    def test_glycol_dihed_select_restart(self):
+    def test_glycol_dihed_select_1_restart(self):
 
-        refDir = os.path.join(self.dataDir, 'glycol_dihed_select_restart')
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
+        resDir = tempname()
+        shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
+        self._test(refDir, resDir,
+                   'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt --torsion O1-C1-C2-O2')
+
+    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
+    def test_glycol_dihed_select_2_restart(self):
+
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_select_2_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt --torsion C1-C2-O2-H6')
