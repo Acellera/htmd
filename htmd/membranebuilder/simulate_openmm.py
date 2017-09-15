@@ -1,4 +1,3 @@
-from simtk.openmm import app
 import simtk.openmm as mm
 from sys import stdout
 from simtk import unit

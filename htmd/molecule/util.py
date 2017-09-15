@@ -605,6 +605,48 @@ def dihedralAngle(atom_quad_coords):
 #     """
 
 
+def guessAnglesAndDihedrals(bonds, cyclicdih=False):
+    """
+    Generate a guess of angle and dihedral N-body terms based on a list of bond index pairs.
+    """
+
+    import networkx as nx
+
+    g = nx.Graph()
+    g.add_nodes_from(np.unique(bonds))
+    g.add_edges_from([tuple(b) for b in bonds])
+
+    angles = []
+    for n in g.nodes():
+        neighbors = g.neighbors(n)
+        for e1 in range(len(neighbors)):
+            for e2 in range(e1+1, len(neighbors)):
+                angles.append((neighbors[e1], n, neighbors[e2]))
+
+    angles = sorted([sorted([angle, angle[::-1]])[0] for angle in angles])
+    angles = np.array(angles)
+
+    dihedrals = []
+    for a1 in range(len(angles)):
+        for a2 in range(a1+1, len(angles)):
+            a1a = angles[a1]
+            a2a = angles[a2]
+            a2f = a2a[::-1]  # Flipped a2a. We don't need flipped a1a as it produces the flipped versions of these 4
+            if np.all(a1a[1:] == a2a[:2]) and (cyclicdih or (a1a[0] != a2a[2])):
+                dihedrals.append(list(a1a) + [a2a[2]])
+            if np.all(a1a[1:] == a2f[:2]) and (cyclicdih or (a1a[0] != a2f[2])):
+                dihedrals.append(list(a1a) + [a2f[2]])
+            if np.all(a2a[1:] == a1a[:2]) and (cyclicdih or (a2a[0] != a1a[2])):
+                dihedrals.append(list(a2a) + [a1a[2]])
+            if np.all(a2f[1:] == a1a[:2]) and (cyclicdih or (a2f[0] != a1a[2])):
+                dihedrals.append(list(a2f) + [a1a[2]])
+
+    dihedrals = sorted([sorted([dihedral, dihedral[::-1]])[0] for dihedral in dihedrals])
+    dihedrals = np.array(dihedrals)
+
+    return angles, dihedrals
+
+
 # A test method
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule
@@ -631,4 +673,3 @@ if __name__ == "__main__":
     # rhodopsin = Molecule('1F88')
     # d3r = Molecule('3PBL')
     # alnmol = sequenceStructureAlignment(rhodopsin, d3r)
-

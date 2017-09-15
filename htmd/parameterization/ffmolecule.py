@@ -9,7 +9,7 @@ import numpy as np
 
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.vdw import VDW
-from htmd.molecule.vmdparser import guessAnglesAndDihedrals
+from htmd.molecule.util import dihedralAngle, guessAnglesAndDihedrals
 from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
@@ -46,7 +46,7 @@ class FFMolecule(Molecule):
            self.bonds =  self._guessBonds()
 
         # Guess angles and dihedrals
-        self.angles, self.dihedrals = guessAnglesAndDihedrals(self.bonds)
+        self.angles, self.dihedrals = guessAnglesAndDihedrals(self.bonds, cyclicdih=True)
 
         # Detect equivalent atoms
         equivalents = detectEquivalents(self)
