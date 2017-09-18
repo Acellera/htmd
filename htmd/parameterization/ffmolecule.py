@@ -4,9 +4,8 @@
 # No redistribution in whole or part
 #
 from htmd.molecule.molecule import Molecule
-from htmd.molecule.util import dihedralAngle
 from htmd.molecule.vdw import VDW
-from htmd.molecule.vmdparser import guessAnglesAndDihedrals
+from htmd.molecule.util import dihedralAngle, guessAnglesAndDihedrals
 from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
@@ -52,7 +51,7 @@ class FFMolecule(Molecule):
         if(len(self.bonds)==0):
            print("No bonds found. Guessing them")
            self.bonds =  self._guessBonds()
-        (a, b) = guessAnglesAndDihedrals(self.bonds)
+        (a, b) = guessAnglesAndDihedrals(self.bonds, cyclicdih=True)
         self.natoms = self.serial.shape[0]
         self.angles = a
         self.dihedrals = b
@@ -129,32 +128,29 @@ class FFMolecule(Molecule):
         # This fixes up the atom naming and reside name to be consistent
         # NB this scheme matches what MATCH does. Don't change it
         # Or the naming will be inconsistent with the RTF
-        import re
 
-        hh = dict()
+        sufices = dict()
 
+        print('\nRename atoms:')
         for i in range(len(self.name)):
-            # This fixes the specific case where a name is 3 characters, as X-TOOL seems to make
-            t = self.name[i].upper()
-            if re.match( "^[A-Z][A-Z][A-Z]", t ): 
-               t = t[0]
+            name = self.name[i].upper()
+
+            # This fixes the specific case where a name is 3 or 4 characters, as X-TOOL seems to make
+            if re.match('^[A-Z]{3,4}$', name):
+               name = name[:-2] # Remove the last 2 characters
+
             # Remove any character that isn't alpha
-            t = re.sub('[^A-Z]*', "", t )
-            if t != self.name[i].upper():
-#               print(" Atom #%d renamed from [%s] to [%s]" %(i, self.name[i], t ) )
-               pass
+            name = re.sub('[^A-Z]*', '', name)
 
-            idx = 0
+            sufices[name] = sufices.get(name, 0) + 1
 
-            if not t in hh:
-                hh[t] = idx
+            name += str(sufices[name])
+            print(' %-4s --> %-4s' % (self.name[i], name))
 
-            idx = hh[t] + 1
-            hh[t] = idx
-
-            t += str(idx)
-            self.name[i] = t
+            self.name[i] = name
             self.resname[i] = "MOL"
+
+        print()
 
     def output_directory_name(self):
         return self.theory_name + "-" + self.basis_name + "-" + self.solvent_name 

@@ -24,19 +24,20 @@ class MetricSecondaryStructure(Projection):
 
     Notes
     -----
-    The DSSP assignment codes are:
-       - 'H' : Alpha helix
-       - 'B' : Residue in isolated beta-bridge
-       - 'E' : Extended strand, participates in beta ladder
-       - 'G' : 3-helix (3/10 helix)
-       - 'I' : 5 helix (pi helix)
-       - 'T' : hydrogen bonded turn
-       - 'S' : bend
-       - ' ' : Loops and irregular elements
     The simplified DSSP codes are:
-       - 'H' : Helix. Either of the 'H', 'G', or 'I' codes. Integer code: 2
-       - 'E' : Strand. Either of the 'E', or 'B' codes. Integer code: 1
-       - 'C' : Coil. Either of the 'T', 'S' or ' ' codes. Integer code: 0
+        - 'C' : Coil. Either of the 'T', 'S' or ' ' codes. Integer code: 0
+        - 'E' : Strand. Either of the 'E', or 'B' codes. Integer code: 1
+        - 'H' : Helix. Either of the 'H', 'G', or 'I' codes. Integer code: 2
+
+    The full DSSP assignment codes are:
+        - 'H' : Alpha helix. Integer code: 3
+        - 'B' : Residue in isolated beta-bridge. Integer code: 4
+        - 'E' : Extended strand, participates in beta ladder. Integer code: 5
+        - 'G' : 3-helix (3/10 helix). Integer code: 6
+        - 'I' : 5 helix (pi helix). Integer code: 7
+        - 'T' : hydrogen bonded turn. Integer code: 8
+        - 'S' : bend. Integer code: 9
+        - ' ' : Loops and irregular elements. Integer code: 10
 
     A special 'NA' code will be assigned to each 'residue' in the topology which
     isn't actually a protein residue (does not contain atoms with the names
@@ -105,8 +106,10 @@ class MetricSecondaryStructure(Projection):
         data : np.ndarray
             An array containing the projected data.
         """
-        ca_indices, nco_indices, proline_indices, chain_ids = self._getSelections(mol)
         mol = mol.copy()
+        if len(np.unique(mol.insertion)) > 1:
+            mol.renumberResidues()
+        ca_indices, nco_indices, proline_indices, chain_ids = self._getSelections(mol)
         mol.filter(self.sel, _logger=False)
 
         xyz = np.swapaxes(np.swapaxes(np.atleast_3d(mol.coords), 1, 2), 0, 1)
@@ -126,9 +129,19 @@ class MetricSecondaryStructure(Projection):
         data = data.reshape(mol.numFrames, len(chain_ids))
 
         if self.integer:
-            data[data == 'H'] = 2
-            data[data == 'E'] = 1
-            data[data == 'C'] = 0
+            if self.simplified:
+                data[data == 'H'] = 2
+                data[data == 'E'] = 1
+                data[data == 'C'] = 0
+            else:
+                data[data == 'H'] = 3
+                data[data == 'B'] = 4
+                data[data == 'E'] = 5
+                data[data == 'G'] = 6
+                data[data == 'I'] = 7
+                data[data == 'T'] = 8
+                data[data == 'S'] = 9
+                data[data == ' '] = 10
             data = np.array(data, dtype=np.int32)
         #data[:, np.logical_not(protein_indices)] = 'NA'
 
@@ -147,6 +160,8 @@ class MetricSecondaryStructure(Projection):
         map : :class:`DataFrame <pandas.core.frame.DataFrame>` object
             A DataFrame containing the descriptions of each dimension
         """
+        if len(np.unique(mol.insertion)) > 1:
+            mol.renumberResidues()
         idx = mol.atomselect('{} and name CA'.format(self.sel), indexes=True)
         from pandas import DataFrame
         types = []
