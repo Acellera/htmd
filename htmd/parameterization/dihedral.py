@@ -43,6 +43,9 @@ class DihedralFitting:
         self._target_energies = None
         self._fitted_energies = None
 
+        self._all_target_energies = None
+        self._angle_values_rad = None
+
     @property
     def num_dihedrals(self):
         return len(self.dihedrals)
@@ -150,6 +153,7 @@ class DihedralFitting:
             for coords in rotamer_coords:
                 angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
             self._angle_values.append(np.array(angle_values))
+        self._angle_values_rad = [np.deg2rad(angle_values)[:, :, None] for angle_values in self._angle_values]
 
         # Calculated initial MM energies
         ff = FFEvaluate(self.molecule)
@@ -164,9 +168,10 @@ class DihedralFitting:
         upper_bounds = np.empty_like(lower_bounds)
 
         # Set force constant and phase bounds
-        upper_bounds[:nterms] = 20
+        upper_bounds[:nterms] = 10
         multiplicities = np.arange(1, self.MAX_DIHEDRAL_MULTIPLICITY + 1)
-        upper_bounds[nterms:2*nterms] = 180/np.tile(multiplicities, self.num_dihedrals)
+        lower_bounds[nterms:2*nterms] = -180/np.tile(multiplicities, self.num_dihedrals)
+        upper_bounds[nterms:2*nterms] =  180/np.tile(multiplicities, self.num_dihedrals)
 
         # Set offset bounds
         lower_bounds[-self.num_dihedrals:] = -10
@@ -185,16 +190,16 @@ class DihedralFitting:
         n = np.arange(1, self.MAX_DIHEDRAL_MULTIPLICITY + 1)
         phi0 = np.deg2rad(phi0)
 
-        rms = 0
-        count = 0
+        all_energies = []
         for i in range(self.num_dihedrals):
-            phis = np.deg2rad(self._angle_values[i])[:, :, None]  # rotamers x equivalent dihedral values
+            phis = self._angle_values_rad[i]
             energies = np.sum(k0[i]*(1 + np.cos(n*phis - phi0[i])), axis=(1, 2)) + offset[i]
-            rms += np.sum((energies - self._target_energies[i])**2)
-            count += energies.size
-        rms = np.sqrt(rms/count)
+            all_energies.append(energies)
 
-        return rms
+        all_energies = np.concatenate(all_energies)
+        rmsd = np.sqrt(np.mean((all_energies - self._all_target_energies)**2))
+
+        return rmsd
 
     def _params_to_vector(self, params):
 
@@ -237,23 +242,31 @@ class DihedralFitting:
             energies = ref_energies - np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords])
             energies -= np.min(energies)
             self._target_energies.append(energies)
+        self._all_target_energies = np.concatenate(self._target_energies)
 
         # Create a global optimizer
-        opt = nlopt.opt(nlopt.G_MLSL_LDS, vector.size)
+        opt = nlopt.opt(nlopt.GN_CRS2_LM, vector.size)
         opt.set_min_objective(self._objective)
         lower_bounds, upper_bounds = self._get_bounds()
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
-        opt.set_maxeval(int(1e4)*opt.get_dimension())  # TODO allow to tune this parameter
-        opt.set_population(opt.get_dimension())
-
-        # Create a local suboptimizer
-        local_opt = nlopt.opt(nlopt.LN_BOBYQA, opt.get_dimension())
-        local_opt.set_xtol_rel(1e-6)
-        local_opt.set_initial_step(1e-1)
-        opt.set_local_optimizer(local_opt)
+        neval = 10000*opt.get_dimension()  # TODO allow to tune this parameter
+        opt.set_maxeval(neval)
 
         # Optimize parameters
+        vector = opt.optimize(vector.copy())
+        self.loss = opt.last_optimum_value()
+        assert self._objective(vector, None) == self.loss
+        # TODO check optimizer status
+
+        opt = nlopt.opt(nlopt.LN_BOBYQA, opt.get_dimension())
+        opt.set_min_objective(self._objective)
+        opt.set_lower_bounds(lower_bounds)
+        opt.set_upper_bounds(upper_bounds)
+        opt.set_xtol_rel(1e-4)
+        opt.set_maxeval(neval)
+        opt.set_initial_step(1e-4*(upper_bounds-lower_bounds))
+
         vector = opt.optimize(vector)
         self.loss = opt.last_optimum_value()
         assert self._objective(vector, None) == self.loss
@@ -298,6 +311,7 @@ class DihedralFitting:
         reference_energy = self._reference_energies[idihed] - np.min(self._reference_energies[idihed])
         initial_energy = self._initial_energies[idihed] - np.min(self._initial_energies[idihed])
         fitted_energy = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
+        indices = np.argsort(angle)
 
         plt.figure()
         plt.title(self._names[idihed])
@@ -305,9 +319,9 @@ class DihedralFitting:
         plt.xlim(-180, 180)
         plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
         plt.ylabel('Energy, kcal/mol')
-        plt.plot(angle, reference_energy, 'r-', marker='o', lw=3, label='QM')
-        plt.plot(angle, initial_energy, 'g-', marker='o', label='MM initial')
-        plt.plot(angle, fitted_energy, 'b-', marker='o', label='MM fitted')
+        plt.plot(angle[indices], reference_energy[indices], 'r-', marker='o', lw=3, label='QM')
+        plt.plot(angle[indices], initial_energy[indices], 'g-', marker='o', label='MM initial')
+        plt.plot(angle[indices], fitted_energy[indices], 'b-', marker='o', label='MM fitted')
         plt.legend()
         plt.savefig(os.path.join(self.result_directory, self._names[idihed] + '.svg'))
         plt.close()

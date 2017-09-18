@@ -295,6 +295,8 @@ class FFMolecule(Molecule):
         df.run()
         # TODO explicit parameter update
 
+        print(' RMSD: %s kcal/mol\n' % df.loss)
+
     def duplicateTypeOfAtom(self, atom_index):
         """Duplicate the type of the specified atom"""
 
