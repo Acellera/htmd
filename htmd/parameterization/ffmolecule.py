@@ -9,7 +9,7 @@ from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmd.qm.qmcalculation import Theory, BasisSet, Code, QMCalculation, Execution
 from htmd.progress.progress import ProgressBar
 import re
