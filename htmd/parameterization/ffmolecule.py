@@ -83,12 +83,6 @@ class FFMolecule(Molecule):
 
         self.qm = qm if qm else Psi4()
 
-        self.theory_name = self.qm.theory
-        self.basis_name = self.qm.basis
-        self.basis_name = re.sub('\+', 'plus', self.basis_name)  # Replace '+' with 'plus'
-        self.basis_name = re.sub('\*', 'star', self.basis_name)  # Replace '*' with 'star'
-        self.solvent_name = self.qm.solvent.lower()
-
         if hasattr(self, '_rtf'):
             self.impropers = np.array(self._rtf.impropers)
 
@@ -146,7 +140,14 @@ class FFMolecule(Molecule):
         print()
 
     def output_directory_name(self):
-        return self.theory_name + "-" + self.basis_name + "-" + self.solvent_name 
+
+        basis = self.qm.basis
+        basis = re.sub('\+', 'plus', basis)  # Replace '+' with 'plus'
+        basis = re.sub('\*', 'star', basis)  # Replace '*' with 'star'
+
+        name = self.qm.theory + '-' + basis + '-' + self.qm.solvent
+
+        return name
 
     def minimize(self):
         mindir = os.path.join(self.outdir, "minimize", self.output_directory_name())

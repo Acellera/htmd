@@ -18,11 +18,11 @@ class QMResult:
 
     Attributes
     ----------
-    errorer : bool
+    errored : bool
         If QM failed, it is set to True, overwise False.
     energy: float
         Total QM energy in kcal/mol
-    coords : nunpy.ndarray
+    coords : numpy.ndarray
         Atomic coordinates in Angstrom. The array shape is (number_of_atoms, 3, 1).
     dipole : list
         Dipole moment in Debye. The list has 4 elements corresponding to x, y, z conponents, and the total.
@@ -33,7 +33,7 @@ class QMResult:
     esp_points : numpy.ndarray
         Point coordinates (in Angstrom) where ESP values are computed. The array shape is (number_of_points, 3).
     esp_values : numpy.ndarray
-        ESP values in ???. The array shape is (number_of_points,)
+        ESP values in elementary_charge/Angstrom. The array shape is (number_of_points,)
     """
 
     def __init__(self):
