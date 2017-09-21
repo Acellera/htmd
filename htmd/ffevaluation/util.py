@@ -73,7 +73,7 @@ def dihedralAngle(pos, box):
     return phi, r12, r23, r34, A, B, C, rA, rB, rC, sin_phi, cos_phi
 
 
-@jit('float64[:](float64[:], float64[:])', nopython=True)
+@jit(nopython=True)
 def cross(vec1, vec2):
     """ Calculate the dot product of two 3d vectors. """
     a1, a2, a3 = vec1[0], vec1[1], vec1[2]
@@ -85,6 +85,14 @@ def cross(vec1, vec2):
     return result
 
 
-@jit('float64(float64[:], float64[:])', nopython=True)
+@jit(nopython=True)
 def dot(vec1, vec2):
     return vec1[0] * vec2[0] + vec1[1] * vec2[1] + vec1[2] * vec2[2]
+
+
+@jit(nopython=True)
+def norm(vec):
+    n = 0
+    for i in range(3):
+        n += vec[i] * vec[i]
+    return sqrt(n)

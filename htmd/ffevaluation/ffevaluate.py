@@ -2,7 +2,7 @@ from numba import jit
 import numpy as np
 from math import sqrt, acos, radians, cos, sin, pi
 from scipy import constants as const
-from util import dihedralAngle, wrapBondedDistance, wrapDistance, cross, dot
+from htmd.ffevaluation.util import dihedralAngle, wrapBondedDistance, wrapDistance, cross, dot
 
 
 def _formatEnergies(energies):
