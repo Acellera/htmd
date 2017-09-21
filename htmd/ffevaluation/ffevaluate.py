@@ -1,4 +1,4 @@
-from numba import jit
+from numba import jit, prange
 import numpy as np
 from math import sqrt, acos, radians, cos, sin, pi
 from scipy import constants as const
@@ -151,13 +151,26 @@ def ffevaluate(mol, prm):
     typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda, bondv, ELEC_FACTOR, \
     charge, angles, angle_params, dihedrals, dihedral_params, impropers, improper_params = init(mol, prm)
 
-    import time
-    t = time.time()
     energies, forces, atmnrg = _ffevaluate(coords,
                 box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda, bondv,
                 ELEC_FACTOR, charge, angles, angle_params, dihedrals, dihedral_params, impropers, improper_params)
-    print('Ran in: ', time.time() - t)
 
+    return energies, forces, atmnrg
+
+
+def ffevaluate_parallel(mol, prm):
+    from htmd.parallelprogress import ParallelExecutor, delayed
+
+    args = init(mol, prm)
+
+    aprun = ParallelExecutor(n_jobs=-2)
+    res = aprun(total=mol.numFrames, description='Evaluating energies')(
+        delayed(_ffevaluate)(np.atleast_3d(mol.coords[:, :, f]),
+                             np.atleast_2d(mol.box[:, f]),
+                             *args) for f in range(mol.numFrames))
+    energies = np.hstack([r[0] for r in res])
+    forces = np.concatenate([r[1] for r in res], axis=2)
+    atmnrg = np.concatenate([r[2] for r in res], axis=2)
     return energies, forces, atmnrg
 
 
