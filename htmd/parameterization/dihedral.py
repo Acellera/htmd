@@ -8,6 +8,8 @@ import sys
 import logging
 import numpy as np
 import nlopt
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 

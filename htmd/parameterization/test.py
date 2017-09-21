@@ -8,6 +8,7 @@ import sys
 import shutil
 import unittest
 from subprocess import call
+
 from htmd.home import home
 from htmd.util import tempname
 
@@ -16,11 +17,11 @@ class TestParameterize(unittest.TestCase):
 
     def setUp(self):
 
-        self.maxDiff = None
-        self.dataDir = home(dataDir='test-param')
-
         if os.environ.get('TRAVIS_OS_NAME') == 'osx':
             self.skipTest('Mac does not work!')
+
+        self.maxDiff = None
+        self.dataDir = home(dataDir='test-param')
 
     def _test(self, refDir, resDir, cmd):
 
@@ -127,13 +128,11 @@ class TestParameterize(unittest.TestCase):
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-torsions')
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_h2o2_dihed_fix(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix')
         self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
 
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_fix_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix_restart')
@@ -141,16 +140,13 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
 
-    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
+    @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_opt(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt')
         self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp')
 
-    # TODO find why it fails on Python 3.5
-    @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
+    #@unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
     def test_h2o2_dihed_opt_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt_restart')
@@ -158,14 +154,25 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp')
 
-    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
+    @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
+    def test_ethene_dihed_fix(self):
+
+        refDir = os.path.join(self.dataDir, 'ethene_dihed_fix')
+        self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
+
+    def test_ethene_dihed_fix_restart(self):
+
+        refDir = os.path.join(self.dataDir, 'ethene_dihed_fix')
+        resDir = tempname()
+        shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
+        self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
+
+    @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_glycol_dihed_fix(self):
 
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
         self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
 
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_glycol_dihed_fix_restart(self):
 
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
@@ -173,16 +180,13 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
 
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_glycol_dihed_select_1_restart(self):
 
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir,
-                   'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt --torsion O1-C1-C2-O2')
+        self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt --torsion O1-C1-C2-O2')
 
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_glycol_dihed_select_2_restart(self):
 
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_2_restart')
@@ -190,23 +194,34 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt --torsion C1-C2-O2-H6')
 
+    @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
+    def test_ethanolamine_dihed_fix(self):
+
+        refDir = os.path.join(self.dataDir, 'ethanolamine_dihed_fix')
+        self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
+
+    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    def test_ethanolamine_dihed_fix_restart(self):
+
+        refDir = os.path.join(self.dataDir, 'ethanolamine_dihed_fix_restart')
+        resDir = tempname()
+        shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
+        self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --no-min --no-esp --no-geomopt')
+
     def test_benzamidine_gaff(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_gaff')
-        self._test(refDir, tempname(),
-                   'parameterize -m input.mol2 --charge 1 --forcefield GAFF --no-min --no-esp --no-torsions')
+        self._test(refDir, tempname(), 'parameterize -m input.mol2 --charge 1 --forcefield GAFF --no-min --no-esp --no-torsions')
 
     def test_benzamidine_gaff2(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_gaff2')
-        self._test(refDir, tempname(),
-                   'parameterize -m input.mol2 --charge 1 --forcefield GAFF2 --no-min --no-esp --no-torsions')
+        self._test(refDir, tempname(), 'parameterize -m input.mol2 --charge 1 --forcefield GAFF2 --no-min --no-esp --no-torsions')
 
     def test_benzamidine_cgenff(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_cgenff')
-        self._test(refDir, tempname(),
-                   'parameterize -m input.mol2 --charge 1 --forcefield CGENFF --no-min --no-esp --no-torsions')
+        self._test(refDir, tempname(), 'parameterize -m input.mol2 --charge 1 --forcefield CGENFF --no-min --no-esp --no-torsions')
 
     def test_benzamidine_rtf_prm(self):
 
