@@ -5,6 +5,7 @@
 #
 import os
 import sys
+import logging
 import numpy as np
 import nlopt
 import matplotlib.pyplot as plt
@@ -12,6 +13,8 @@ from sklearn.linear_model import LinearRegression
 
 from htmd.molecule.util import dihedralAngle
 from htmd.parameterization.ffevaluate import FFEvaluate
+
+logger = logging.getLogger(__name__)
 
 
 class DihedralFitting:
@@ -108,7 +111,7 @@ class DihedralFitting:
             valid_results = [result for result in valid_results if (result.energy - qm_min) < 20]
 
             if len(valid_results) < 13:
-                raise RuntimeError("Fewer than 13 valid QM points. Not enough to fit!")
+                raise RuntimeError('Fewer than 13 valid QM points. Not enough to fit!')
 
             all_valid_results.append(valid_results)
 
@@ -169,9 +172,7 @@ class DihedralFitting:
 
         # Set force constant and phase bounds
         upper_bounds[:nterms] = 10
-        multiplicities = np.arange(1, self.MAX_DIHEDRAL_MULTIPLICITY + 1)
-        lower_bounds[nterms:2*nterms] = -180/np.tile(multiplicities, self.num_dihedrals)
-        upper_bounds[nterms:2*nterms] =  180/np.tile(multiplicities, self.num_dihedrals)
+        upper_bounds[nterms:2*nterms] = 360
 
         # Set offset bounds
         lower_bounds[-self.num_dihedrals:] = -10
@@ -221,9 +222,77 @@ class DihedralFitting:
 
         return params
 
-    def _fit(self):
+    def _optimize_CRS2_LM(self, vector):
 
-        # TODO do not modify the molecule
+        # Create a global optimizer
+        opt = nlopt.opt(nlopt.GN_CRS2_LM, vector.size)
+        opt.set_min_objective(self._objective)
+        lower_bounds, upper_bounds = self._get_bounds()
+        opt.set_lower_bounds(lower_bounds)
+        opt.set_upper_bounds(upper_bounds)
+        neval = 10000*opt.get_dimension()  # TODO allow to tune this parameter
+        opt.set_maxeval(neval)
+
+        # Optimize parameters
+        vector = opt.optimize(vector) # TODO check optimizer status
+        self.loss = opt.last_optimum_value()
+        assert self._objective(vector, None) == self.loss
+
+        # Create a lcoal optimizer
+        opt = nlopt.opt(nlopt.LN_BOBYQA, opt.get_dimension())
+        opt.set_min_objective(self._objective)
+        opt.set_lower_bounds(lower_bounds)
+        opt.set_upper_bounds(upper_bounds)
+        opt.set_xtol_rel(1e-3)
+        opt.set_maxeval(neval)
+        opt.set_initial_step(1e-3*(upper_bounds-lower_bounds))
+
+        # Optimize parameters
+        vector = opt.optimize(vector) # TODO check optimizer status
+        self.loss = opt.last_optimum_value()
+        assert self._objective(vector, None) == self.loss
+
+        return vector
+
+    def _optimize_random_search(self, vector):
+        """
+        Naive implementation of random search global optimizer
+        """
+
+        # Create a lcoal optimizer
+        opt = nlopt.opt(nlopt.LN_BOBYQA, vector.size)
+        opt.set_min_objective(self._objective)
+        lower_bounds, upper_bounds = self._get_bounds()
+        opt.set_lower_bounds(lower_bounds)
+        opt.set_upper_bounds(upper_bounds)
+        opt.set_xtol_rel(1e-3)
+        opt.set_maxeval(10000*opt.get_dimension())
+        opt.set_initial_step(1e-3*(upper_bounds - lower_bounds))
+
+        # Optimize the initial vector
+        logger.info('Initial RMSD: %f kcal/mol' % self._objective(vector, None))
+        best_vector = opt.optimize(vector) # TODO check optimizer status
+        best_loss = opt.last_optimum_value()
+        assert self._objective(best_vector, None) == best_loss
+        logger.info('Current RMSD: %f kcal/mol' % best_loss)
+
+        # Naive random search
+        for i in range(opt.get_dimension()): # TODO allow to tune this parameter
+
+            # Get random vector and optimize it
+            random_vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
+            vector = opt.optimize(random_vector) # TODO check optimizer status
+
+            if opt.last_optimum_value() < best_loss:
+                best_loss = opt.last_optimum_value()
+                best_vector = vector
+                logger.info('Current RMSD: %f kcal/mol' % best_loss)
+
+        self.loss = best_loss
+
+        return best_vector
+
+    def _fit(self):
 
         # Save the initial parameters as the best ones
         vector = self._params_to_vector(self.parameters)
@@ -244,33 +313,12 @@ class DihedralFitting:
             self._target_energies.append(energies)
         self._all_target_energies = np.concatenate(self._target_energies)
 
-        # Create a global optimizer
-        opt = nlopt.opt(nlopt.GN_CRS2_LM, vector.size)
-        opt.set_min_objective(self._objective)
-        lower_bounds, upper_bounds = self._get_bounds()
-        opt.set_lower_bounds(lower_bounds)
-        opt.set_upper_bounds(upper_bounds)
-        neval = 10000*opt.get_dimension()  # TODO allow to tune this parameter
-        opt.set_maxeval(neval)
-
-        # Optimize parameters
-        vector = opt.optimize(vector.copy())
-        self.loss = opt.last_optimum_value()
-        assert self._objective(vector, None) == self.loss
-        # TODO check optimizer status
-
-        opt = nlopt.opt(nlopt.LN_BOBYQA, opt.get_dimension())
-        opt.set_min_objective(self._objective)
-        opt.set_lower_bounds(lower_bounds)
-        opt.set_upper_bounds(upper_bounds)
-        opt.set_xtol_rel(1e-4)
-        opt.set_maxeval(neval)
-        opt.set_initial_step(1e-4*(upper_bounds-lower_bounds))
-
-        vector = opt.optimize(vector)
-        self.loss = opt.last_optimum_value()
-        assert self._objective(vector, None) == self.loss
-        # TODO check optimizer status
+        # Optimize the parameters
+        logger.info('Start parameter optimization')
+        #vector = self._optimize_CRS2_LM(vector)  # TODO this should work better, but it doesn't
+        vector = self._optimize_random_search(vector)
+        logger.info('Final RMSD: %f kcal/mol' % self._objective(vector, None))
+        logger.info('Finish parameter optimization')
 
         # Update the target dihedral with the optimized parameters
         self.parameters = self._vector_to_params(vector, self.parameters)
