@@ -55,6 +55,8 @@ def cli_parser():
                         default=None, dest="freezeq")
     parser.add_argument("--no-geomopt", help="Do not perform QM geometry optimisation when fitting torsions (default: "
                                              "%(default)s)", action="store_false", dest="geomopt", default=True)
+    parser.add_argument("--seed", help="Random number generator seed (default: %(default)s)", type=int,
+                        default=20170920, dest="seed")
     return parser
 
 
@@ -70,7 +72,6 @@ def main_parameterize(arguments=None):
     from htmd.qm import Psi4, Gaussian
 
     args = cli_parser().parse_args(args=arguments)
-
 
     def printEnergies(m, filename):
         fener = open(filename, "w")
@@ -188,6 +189,10 @@ VdW      : {VDW_ENERGY}
         if not args.noesp:
             print("\n == Charge fitting ==\n")
 
+            # Set random number generator seed
+            if args.seed:
+                np.random.seed(args.seed)
+
             # Select the atoms that are to have frozen charges in the fit
             fixed_charges = []
             if args.freezeq:
@@ -228,6 +233,10 @@ VdW      : {VDW_ENERGY}
         # Iterative dihedral fitting
         if not args.notorsion:
             print("\n == Torsion fitting ==\n")
+
+            # Set random number generator seed
+            if args.seed:
+                np.random.seed(args.seed)
 
             all_dihedrals = mol.getSoftTorsions()
 
