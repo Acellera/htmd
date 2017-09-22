@@ -51,6 +51,7 @@ class _LocalQueue(SimQueue, ProtocolInterface):
             self._queue = queue.Queue()
 
             devices = self._getdevices()
+            self.memory = self._getmemory()
 
             self._threads = []
             for d in devices:
@@ -227,9 +228,11 @@ class LocalGPUQueue(_LocalQueue):
     ngpu : int, default=None
         Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will
         use the first `ngpu` devices of the machine.
-
     devices : list, default=None
         A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpu`
+    memory : int, default=None
+        The amount of RAM memory available for each job. If None, it will be guessed from total amount of memory and
+        the number of devices
 
 
     .. rubric:: Methods
@@ -249,7 +252,8 @@ class LocalGPUQueue(_LocalQueue):
         self._arg('devices', 'list', 'A list of GPU device indexes on which the queue is allowed to run '
                                      'simulations. Mutually exclusive with `ngpus`', None, val.Number(int, '0POS'),
                   nargs='*')
-        self._arg('memory', 'int', 'The amount of RAM memory available for each job.', self._getmemory(),
+        self._arg('memory', 'int', 'The amount of RAM memory available for each job. If None, it will be guessed from '
+                                   'total amount of memory and the number of devices', None,
                   val.Number(int, '0POS'))
 
     def _getdevices(self):
@@ -310,7 +314,9 @@ class LocalCPUQueue(_LocalQueue):
         A list of file names or globs for the files to copy to datadir
     ncpu : int, default=1
         Number of CPU threads that the queue will use.
-
+    memory : int, default=None
+        The amount of RAM memory available for each job. If None, it will be guessed from total amount of memory and
+        the number of devices
 
     .. rubric:: Methods
     .. autoautosummary:: htmd.queues.localqueue.LocalCPUQueue
@@ -325,7 +331,7 @@ class LocalCPUQueue(_LocalQueue):
         super().__init__()
         self._arg('ncpu', 'int', 'Number of CPU threads that the queue will use. If None it will use the `ncpu` '
                                  'configured for HTMD in htmd.configure()', None, val.Number(int, 'POS'))
-        self._arg('memory', 'int', 'The amount of RAM memory available for each job.', self._getmemory(),
+        self._arg('memory', 'int', 'The amount of RAM memory available for each job.', None,
                   val.Number(int, '0POS'))
 
     def _getdevices(self):

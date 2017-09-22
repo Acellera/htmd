@@ -274,4 +274,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
 
 
 if __name__ == "__main__":
+    # TODO: Create fake binaries for instance creation testing
+    """
     q = LsfQueue()
+    """
