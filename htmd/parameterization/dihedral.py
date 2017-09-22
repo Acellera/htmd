@@ -21,7 +21,26 @@ logger = logging.getLogger(__name__)
 
 class DihedralFitting:
     """
-    Dihedral parameter fitting from QM data
+    Dihedral parameter fitting
+
+    Capabilities
+    ------------
+    - Fit parameters from QM energies
+    - Fit multiple dihedral angles simulatanously
+    - Global parameter optimizer
+
+    Attributes
+    ----------
+    molecule : FFMolecule
+        Molecule object
+    dihedrals : list of lists
+        List of dihedral angles. Each angle is define by 4 atom indices.
+    qm_results : List of QMResult
+        Reference QM results. The number of results has to be the same to the number of dihedrals.
+    result_directory : str
+        The directory to save plots
+    zerod_parameters : bool
+        If set to True, the initial parameter values are set to zeros, else the existing parameters are used as a guess.
     """
 
     MAX_DIHEDRAL_MULTIPLICITY = 6
@@ -53,13 +72,16 @@ class DihedralFitting:
         self._angle_values_rad = None
 
     @property
-    def num_dihedrals(self):
+    def numDihedrals(self):
+        """Number of dihedral angles"""
+
         return len(self.dihedrals)
 
-    def _countUsesOfDihedral(self, dihedral):
+    def _numEquivalentDihedrals(self, dihedral):
         """
-        Return the number of uses of the dihedral specified by the types of the 4 atom indices
+        Number of equivalent dihedral angles to the specificied one.
         """
+        #TODO maybe this should be moved to FFMolecule
 
         types = [self.molecule._rtf.type_by_index[index] for index in dihedral]
 
@@ -81,27 +103,28 @@ class DihedralFitting:
 
     def _makeDihedralUnique(self, dihedral):
         """
-        Create a new type for (arbitrarily) a middle atom of the dihedral, so that the dihedral we are going to modify
-        is unique
+        Duplicate atom types of the dihedral, so its parameters are unique.
         """
         # TODO check symmetry
 
-        # Duplicate the dihedrals types so this modified term is unique
+        # Duplicate the atom types of the dihedral
         for i in range(4):
             if not ("x" in self.molecule._rtf.type_by_index[dihedral[i]]):
                 self.molecule.duplicateTypeOfAtom(dihedral[i])
 
-        number_of_uses, uses = self._countUsesOfDihedral(dihedral)
+        number_of_uses, uses = self._numEquivalentDihedrals(dihedral)
         if number_of_uses > 1:
             print(dihedral)
             print(number_of_uses)
             print(uses)
             raise ValueError("Dihedral term still not unique after duplication")
 
-    def _get_valid_qm_results(self):
+    def _getValidQMResults(self):
+        """
+        Get a set of valid QM results
+        """
 
         all_valid_results = []
-
         for results in self.qm_results:
 
             # Remove failed QM results
@@ -145,7 +168,7 @@ class DihedralFitting:
         self.parameters = sum([self.molecule._prm.dihedralParam(*types) for types in all_types], [])
 
         # Get reference QM energies and rotamer coordinates
-        self._valid_qm_results = self._get_valid_qm_results()
+        self._valid_qm_results = self._getValidQMResults()
         self._reference_energies = []
         self._coords = []
         for results in self._valid_qm_results:
@@ -167,10 +190,13 @@ class DihedralFitting:
         for rotamer_coords in self._coords:
             self._initial_energies.append(np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords]))
 
-    def _get_bounds(self):
+    def _getBounds(self):
+        """
+        Get parameter bounds
+        """
 
-        nterms = self.MAX_DIHEDRAL_MULTIPLICITY*self.num_dihedrals
-        lower_bounds = np.zeros(2*nterms + self.num_dihedrals)
+        nterms = self.MAX_DIHEDRAL_MULTIPLICITY*self.numDihedrals
+        lower_bounds = np.zeros(2 * nterms + self.numDihedrals)
         upper_bounds = np.empty_like(lower_bounds)
 
         # Set force constant and phase bounds
@@ -178,24 +204,24 @@ class DihedralFitting:
         upper_bounds[nterms:2*nterms] = 360
 
         # Set offset bounds
-        lower_bounds[-self.num_dihedrals:] = -10
-        upper_bounds[-self.num_dihedrals:] = 10
+        lower_bounds[-self.numDihedrals:] = -10
+        upper_bounds[-self.numDihedrals:] = 10
 
         return lower_bounds, upper_bounds
 
     def _objective(self, x, _):
         """
-        Evaluate the objective function of the torsion with the input params for each of the phi's poses
+        Objective function for the parameter fitting.
         """
 
-        k0, phi0 = np.reshape(x[:-self.num_dihedrals], (2, -1, self.MAX_DIHEDRAL_MULTIPLICITY))
-        offset = x[-self.num_dihedrals:]
+        k0, phi0 = np.reshape(x[:-self.numDihedrals], (2, -1, self.MAX_DIHEDRAL_MULTIPLICITY))
+        offset = x[-self.numDihedrals:]
 
         n = np.arange(1, self.MAX_DIHEDRAL_MULTIPLICITY + 1)
         phi0 = np.deg2rad(phi0)
 
         all_energies = []
-        for i in range(self.num_dihedrals):
+        for i in range(self.numDihedrals):
             phis = self._angle_values_rad[i]
             energies = np.sum(k0[i]*(1 + np.cos(n*phis - phi0[i])), axis=(1, 2)) + offset[i]
             all_energies.append(energies)
@@ -205,19 +231,25 @@ class DihedralFitting:
 
         return rmsd
 
-    def _params_to_vector(self, params):
+    def _paramsToVector(self, params):
+        """
+        Convert the parameter objects to a vector.
+        """
 
-        assert [param.n for param in params] == list(range(1, self.MAX_DIHEDRAL_MULTIPLICITY+1))*self.num_dihedrals
+        assert [param.n for param in params] == list(range(1, self.MAX_DIHEDRAL_MULTIPLICITY+1))*self.numDihedrals
 
-        vector = [param.k0 for param in params] + [param.phi0 for param in params] + [0]*self.num_dihedrals
+        vector = [param.k0 for param in params] + [param.phi0 for param in params] + [0]*self.numDihedrals
         vector = np.array(vector)
 
         return vector
 
-    def _vector_to_params(self, vector, params):
+    def _vectorToParams(self, vector, params):
+        """
+        Copy results from the vector to the parameter objects.
+        """
 
         nparams = len(params)
-        assert vector.size == 2*nparams + self.num_dihedrals
+        assert vector.size == 2*nparams + self.numDihedrals
 
         for i, param in enumerate(params):
             param.k0 = float(vector[i])
@@ -226,11 +258,14 @@ class DihedralFitting:
         return params
 
     def _optimize_CRS2_LM(self, vector):
+        """
+        Controled random search with local mutations
+        """
 
         # Create a global optimizer
         opt = nlopt.opt(nlopt.GN_CRS2_LM, vector.size)
         opt.set_min_objective(self._objective)
-        lower_bounds, upper_bounds = self._get_bounds()
+        lower_bounds, upper_bounds = self._getBounds()
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
         neval = 10000*opt.get_dimension()  # TODO allow to tune this parameter
@@ -259,13 +294,13 @@ class DihedralFitting:
 
     def _optimize_random_search(self, vector):
         """
-        Naive implementation of random search global optimizer
+        Naive random search
         """
 
         # Create a lcoal optimizer
         opt = nlopt.opt(nlopt.LN_BOBYQA, vector.size)
         opt.set_min_objective(self._objective)
-        lower_bounds, upper_bounds = self._get_bounds()
+        lower_bounds, upper_bounds = self._getBounds()
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
         opt.set_xtol_rel(1e-3)
@@ -298,7 +333,7 @@ class DihedralFitting:
     def _fit(self):
 
         # Save the initial parameters
-        vector = self._params_to_vector(self.parameters)
+        vector = self._paramsToVector(self.parameters)
         if self.zeroed_paramters:
             vector[:] = 0
 
@@ -326,7 +361,7 @@ class DihedralFitting:
         logger.info('Finish parameter optimization')
 
         # Update the target dihedral with the optimized parameters
-        self.parameters = self._vector_to_params(vector, self.parameters)
+        self.parameters = self._vectorToParams(vector, self.parameters)
         self.molecule._prm.updateDihedral(self.parameters)
 
         return self.loss
@@ -360,6 +395,9 @@ class DihedralFitting:
         return self.loss
 
     def plotDihedralEnergies(self, idihed):
+        """
+        Plot conformer energies for a specific dihedral angle, including QM, original and fitted MM energies.
+        """
 
         angle = self._angle_values[idihed][:, 0]
         reference_energy = self._reference_energies[idihed] - np.min(self._reference_energies[idihed])
@@ -381,6 +419,9 @@ class DihedralFitting:
         plt.close()
 
     def plotConformerEnergies(self):
+        """
+        Plot all conformer QM energies versus MM energies with the fitted parameters
+        """
 
         qm_energy = np.concatenate(self._reference_energies)[:, None]
         mm_energy = np.concatenate(self._fitted_energies)[:, None]
