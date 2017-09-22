@@ -5,6 +5,7 @@
 #
 from htmd.qm.psi4 import Psi4
 from htmd.qm.gaussian import Gaussian
+from htmd.qm.fake import FakeQM
 from htmd.qm.base import QMResult
 
-__all__ = ['Psi4', 'Gaussian', 'QMResult']
+__all__ = ['Psi4', 'Gaussian', 'FakeQM', 'QMResult']

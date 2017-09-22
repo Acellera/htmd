@@ -17,7 +17,7 @@ from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
 from htmd.parameterization.dihedral import DihedralFitting
-from htmd.qm import Psi4
+from htmd.qm import Psi4, FakeQM
 
 
 class FFMolecule(Molecule):
@@ -291,6 +291,11 @@ class FFMolecule(Molecule):
         df.qm_results = qm_results
         df.result_directory = os.path.join(self.outdir, 'parameters', self.method.name,
                                            self.output_directory_name(), 'plots')
+
+        # In case of FakeQM, the initial parameters are set to zeros.
+        # It prevents DihedralFitting class from cheating :D
+        if isinstance(self.qm, FakeQM):
+            df.zeroed_paramters = True
 
         df.run()
         # TODO explicit parameter update

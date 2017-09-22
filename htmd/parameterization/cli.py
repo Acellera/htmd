@@ -57,6 +57,11 @@ def cli_parser():
                                              "%(default)s)", action="store_false", dest="geomopt", default=True)
     parser.add_argument("--seed", help="Random number generator seed (default: %(default)s)", type=int,
                         default=20170920, dest="seed")
+
+    # Enable replacement of any real QM class with FakeQM.
+    # This is intedended for debugging only and should be kept hidden.
+    parser.add_argument("--fake-qm", help=argparse.SUPPRESS, action="store_true",dest="fake_qm", default=False)
+
     return parser
 
 
@@ -69,7 +74,7 @@ def main_parameterize(arguments=None):
     from htmd.queues.localqueue import LocalCPUQueue
     from htmd.queues.lsfqueue import LsfQueue
     from htmd.queues.slurmqueue import SlurmQueue
-    from htmd.qm import Psi4, Gaussian
+    from htmd.qm import Psi4, Gaussian, FakeQM
 
     args = cli_parser().parse_args(args=arguments)
 
@@ -121,6 +126,11 @@ VdW      : {VDW_ENERGY}
         qm = Gaussian()
     else:
         raise NotImplementedError
+
+    # This is for debugging only!
+    if args.fake_qm:
+        qm = FakeQM()
+        print('\nWARNING! Using FakeQM!\n')
 
     # Set up the QM object
     qm.theory = args.theory
