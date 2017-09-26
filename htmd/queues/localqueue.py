@@ -3,6 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import os
 from htmd.queues.simqueue import SimQueue
 from protocolinterface import ProtocolInterface, val
 import queue
@@ -284,7 +285,6 @@ def run_job(self, gpuid):
 
 if __name__ == "__main__":
     from htmd.home import home
-    import os
 
     lo = LocalCPUQueue()
     lo.ncpu = 1
