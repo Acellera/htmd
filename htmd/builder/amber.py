@@ -122,7 +122,7 @@ def defaultParam():
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True, atomtypes=None,
-          offlibraries=None):
+          offlibraries=None, gbsa=False, igb=2):
     """ Builds a system for AMBER
 
     Uses tleap to build a system for AMBER. Additionally it allows the user to ionize and add disulfide bridges.
@@ -171,6 +171,11 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         e.g. (('C1', 'C', 'sp2'), ('CI', 'C', 'sp3')). Check `addAtomTypes` in AmberTools docs.
     offlibraries : str or list
         A path or a list of paths to OFF library files. Check `loadOFF` in AmberTools docs.
+    gbsa : bool
+        Modify radii for GBSA implicit water model
+    igb : int
+        GB model. Select: 1 for mbondi, 2 and 5 for mbondi2, 7 for bondi and 8 for mbondi3.
+        Check section 4. The Generalized Born/Surface Area Model of the AMBER manual.
 
     Returns
     -------
@@ -222,6 +227,10 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     for force in ff:
         f.write('source ' + force + '\n')
     f.write('\n')
+
+    if gbsa:
+        gbmodels = {1: 'mbondi', 2: 'mbondi2', 5: 'mbondi2', 7: 'bondi', 8: 'mbondi3'}
+        f.write('set default PBradii {}\n\n'.format(gbmodels[igb]))
 
     # Adding custom atom types
     if atomtypes is not None:
