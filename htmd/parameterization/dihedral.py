@@ -4,8 +4,8 @@
 # No redistribution in whole or part
 #
 import os
-import sys
 import logging
+import unittest
 import numpy as np
 import nlopt
 import matplotlib
@@ -53,7 +53,7 @@ class DihedralFitting:
         self.result_directory = None
         self.zeroed_paramters = False
 
-        self.paramters = None
+        self.parameters = None
         self.loss = None
 
         self._names = None
@@ -77,9 +77,9 @@ class DihedralFitting:
 
         return len(self.dihedrals)
 
-    def _numEquivalentDihedrals(self, dihedral):
+    def _getEquivalentDihedrals(self, dihedral):
         """
-        Number of equivalent dihedral angles to the specificied one.
+        Find equivalent dihedral angles to the specificied one.
         """
         #TODO maybe this should be moved to FFMolecule
 
@@ -99,7 +99,7 @@ class DihedralFitting:
             if groups != dihedral_groups and groups != dihedral_groups[::-1]:
                 unique_uses.append(dihed)
 
-        return len(unique_uses), unique_uses
+        return unique_uses
 
     def _makeDihedralUnique(self, dihedral):
         """
@@ -112,11 +112,11 @@ class DihedralFitting:
             if not ("x" in self.molecule._rtf.type_by_index[dihedral[i]]):
                 self.molecule.duplicateTypeOfAtom(dihedral[i])
 
-        number_of_uses, uses = self._numEquivalentDihedrals(dihedral)
-        if number_of_uses > 1:
+        equivalent_dihedrals = self._getEquivalentDihedrals(dihedral)
+        if len(equivalent_dihedrals) > 1:
             print(dihedral)
-            print(number_of_uses)
-            print(uses)
+            print(len(equivalent_dihedrals))
+            print(equivalent_dihedrals)
             raise ValueError("Dihedral term still not unique after duplication")
 
     def _getValidQMResults(self):
@@ -442,5 +442,107 @@ class DihedralFitting:
         plt.close()
 
 
+class TestDihedralFitting(unittest.TestCase):
+
+    def setUp(self):
+
+        self.df = DihedralFitting()
+
+    def test_numDihedrals(self):
+
+        self.df.dihedrals = [[0, 1, 2, 3]]
+        self.assertEqual(self.df.numDihedrals, 1)
+
+    def test_getEquivalentDihedrals(self):
+
+        from htmd.home import home
+        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+
+        molFile = os.path.join(home('test-param'), 'glycol.mol2')
+        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+
+        self.assertListEqual(self.df._getEquivalentDihedrals([0, 1, 2, 3]), [[0, 1, 2, 3]])
+        self.assertListEqual(self.df._getEquivalentDihedrals([4, 0, 1, 2]), [[4, 0, 1, 2]])
+        self.assertListEqual(self.df._getEquivalentDihedrals([5, 1, 2, 7]), [[5, 1, 2, 7]])
+
+    def test_makeDihedralUnique(self):
+
+        from htmd.home import home
+        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+
+        molFile = os.path.join(home('test-param'), 'glycol.mol2')
+        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
+        self.assertListEqual(types, ['oh', 'c3', 'c3', 'oh', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
+
+        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+        self.df._makeDihedralUnique([0, 1, 2, 3])
+        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
+        self.assertListEqual(types, ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
+
+        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+        self.df._makeDihedralUnique([4, 0, 1, 2])
+        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
+        self.assertListEqual(types, ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'hox0', 'h1', 'h1', 'h1', 'h1', 'hox0'])
+
+        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+        self.df._makeDihedralUnique([5, 1, 2, 7])
+        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
+        self.assertListEqual(types, ['oh', 'c3x0', 'c3x0', 'oh', 'ho', 'h1x0', 'h1x0', 'h1x0', 'h1x0', 'ho'])
+
+    def test_getValidQMResults(self):
+
+        from htmd.qm import QMResult
+
+        results = [QMResult() for _ in range(20)]
+        for result in results:
+            result.energy = 0.
+        self.df.qm_results = [results]
+        self.assertEqual(len(self.df._getValidQMResults()[0]), 20)
+
+        results[1].errored = True
+        results[19].errored = True
+        self.assertEqual(len(self.df._getValidQMResults()[0]), 18)
+
+        results[10].energy = -5
+        results[12].energy = 12
+        results[15].energy = 17
+        self.assertEqual(len(self.df._getValidQMResults()[0]), 17)
+
+    def test_getBounds(self):
+
+        self.df.dihedrals = [[0, 1, 2, 3]]
+        lower_bounds, upper_bounds = self.df._getBounds()
+        self.assertListEqual(list(lower_bounds), [ 0.,  0.,  0.,  0.,  0.,  0.,   0.,   0.,   0.,   0.,   0.,   0., -10.])
+        self.assertListEqual(list(upper_bounds), [10., 10., 10., 10., 10., 10., 360., 360., 360., 360., 360., 360.,  10.])
+
+    def test_paramsToVector(self):
+
+        from htmd.parameterization.ff import TorsPrm
+
+        self.df.dihedrals = [[0, 1, 2, 3]]
+        params = [TorsPrm(['x', 'x', 'x', 'x'], k0=float(i)+10, n=i+1, phi0=float(i)+20) for i in range(6)]
+        vector = self.df._paramsToVector(params)
+        self.assertListEqual(list(vector), [10., 11., 12., 13., 14., 15., 20., 21., 22., 23., 24., 25., 0.])
+
+    def test_vectorToParams(self):
+
+        from htmd.parameterization.ff import TorsPrm
+
+        self.df.dihedrals = [[0, 1, 2, 3]]
+        params = [TorsPrm(['x', 'x', 'x', 'x'], k0=float(i)+10, n=i+1, phi0=float(i)+20) for i in range(6)]
+        vector = np.array([30., 31., 32., 33., 34., 35., 40., 41., 42., 43., 44., 45., 50.])
+        params = self.df._vectorToParams(vector, params)
+
+        self.assertEqual(len(params), 6)
+        for i, param in enumerate(params):
+            self.assertEqual(param.k0, i+30)
+            self.assertEqual(param.n, i+1)
+            self.assertEqual(param.phi0, i+40)
+
+    # Note: the rest methods are tested indirectly via the "parameterize" tests in test.py
+
+
 if __name__ == '__main__':
-    pass
+
+    unittest.main(verbosity=2)
