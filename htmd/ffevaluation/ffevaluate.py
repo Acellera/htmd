@@ -144,24 +144,67 @@ def init(mol, prm):
            charge, angles, angle_params, dihedrals, dihedral_params, impropers, improper_params
 
 
-def ffevaluate(mol, prm):
+def calculateSets(mol, betweensets):
+    setA = np.empty(0, dtype=int)
+    setB = np.empty(0, dtype=int)
+    if betweensets is not None:
+        setA = mol.atomselect(betweensets[0], indexes=True)
+        setB = mol.atomselect(betweensets[1], indexes=True)
+        mol.bonds = np.empty((0, 2), dtype=np.uint32)
+        mol.angles = np.empty((0, 3), dtype=np.uint32)
+        mol.dihedral = np.empty((0, 4), dtype=np.uint32)
+        mol.improper = np.empty((0, 4), dtype=np.uint32)
+    return setA, setB
+
+
+def ffevaluate(mol, prm, betweensets=None):
+    """  Evaluates energies and forces of the forcefield for a given Molecule
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        A Molecule object. Can contain multiple frames.
+    prm : :class:`ParameterSet <parmed.ParameterSet>` object
+        Forcefield parameters.
+    betweensets : tuple of strings
+        Only calculate energies between two sets of atoms given as atomselect strings.
+        Only computes LJ and electrostatics.
+
+    Returns
+    -------
+    energies : np.ndarray
+        A (6, nframes) shaped matrix containing the individual energy components of each simulation frame.
+        Rows correspond to the following energies 0: bond 1: LJ 2: Electrostatic 3: angle 4: dihedral 5: improper
+    forces : np.ndarray
+        A (natoms, 3, nframes) shaped matrix containing the total force on each atom for each simulation frame.
+    atmnrg : np.ndarray
+        A (natoms, 6, nframes) shaped matrix containing the approximate potential energy components of each atom at each
+        simulation frame. The 6 indexes are the same as in the `energies` return argument.
+    """
+    mol = mol.copy()
     coords = mol.coords
     box = mol.box
+    setA, setB = calculateSets(mol, betweensets)
 
     typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda, bondv, ELEC_FACTOR, \
     charge, angles, angle_params, dihedrals, dihedral_params, impropers, improper_params = init(mol, prm)
 
     energies, forces, atmnrg = _ffevaluate(coords,
                 box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda, bondv,
-                ELEC_FACTOR, charge, angles, angle_params, dihedrals, dihedral_params, impropers, improper_params)
+                ELEC_FACTOR, charge, angles, angle_params, dihedrals, dihedral_params, impropers, improper_params, setA,
+                setB)
 
     return energies, forces, atmnrg
 
 
-def ffevaluate_parallel(mol, prm):
+def ffevaluate_parallel(mol, prm, betweensets=None):
     from htmd.parallelprogress import ParallelExecutor, delayed
 
-    args = init(mol, prm)
+    setA, setB = calculateSets(mol, betweensets)
+
+    args = list(init(mol, prm))
+    args.append(setA)
+    args.append(setB)
 
     aprun = ParallelExecutor(n_jobs=-2)
     res = aprun(total=mol.numFrames, description='Evaluating energies')(
@@ -186,9 +229,47 @@ def _ispaired(excl, i, j):
 
 
 @jit(nopython=True)
+def _insets(i, j, set1, set2):
+    nset1 = len(set1)
+    nset2 = len(set2)
+    if nset2 < nset1:
+        tmp = set1
+        set1 = set2
+        set2 = tmp
+        nset1 = len(set1)
+        nset2 = len(set2)
+
+    ifound = 0
+    jfound = 0
+    for k in range(nset1):
+        if set1[k] == i and ifound == 0:
+            ifound = 1
+            break
+        if set1[k] == j:
+            jfound = 1
+            break
+
+    if ifound == 0 and jfound == 0:
+        return False
+
+    for k in range(nset2):
+        if set2[k] == i:
+            ifound = 2
+            break
+        if set2[k] == j:
+            jfound = 2
+            break
+
+    if ifound != 0 and jfound != 0:
+        if ifound != jfound:
+            return True
+    return False
+
+
+@jit(nopython=True)
 def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda,
                 bondv, ELEC_FACTOR, charge, angles, angle_params, dihedrals, dihedral_params, impropers,
-                improper_params):
+                improper_params, set1, set2):
     natoms = coords.shape[0]
     nframes = coords.shape[2]
     nangles = angles.shape[0]
@@ -198,6 +279,7 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
     energies = np.zeros((6, nframes), dtype=np.float64)
     forces = np.zeros((natoms, 3, nframes), dtype=np.float64)
     atmnrg = np.zeros((natoms, 6, nframes), dtype=np.float64)
+    usersets = (len(set1) > 0) | (len(set2) > 0)
 
     # Evaluate pair forces
     for f in range(nframes):
@@ -205,6 +287,10 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
             for j in range(i + 1, natoms):
                 isbonded = _ispaired(bonda, i, j)
                 isexcluded = _ispaired(excl, i, j)
+                insets = _insets(i, j, set1, set2)
+
+                if usersets and not insets:
+                    continue
 
                 if isexcluded and not isbonded:
                     continue
