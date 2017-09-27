@@ -248,7 +248,8 @@ def boundingBox(mol, sel='all'):
     array([[-17.3390007 , -10.43700027,  -1.43900001],
            [ 25.40600014,  27.03800011,  46.46300125]], dtype=float32)
 
-    """
+    """start_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_starts])
+        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_finish])
     coords = mol.get('coords', sel=sel)
     maxc = np.squeeze(np.max(coords, axis=0))
     minc = np.squeeze(np.min(coords, axis=0))
@@ -331,7 +332,7 @@ def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
 
 
 def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10, nalignfragment=1):
-    """ Aligns two structures by their longest sequence alignment
+    """ Aligns two structures by their longests sequences alignment
 
     Parameters
     ----------
@@ -345,6 +346,8 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         The segment of `ref` we want to align to
     maxalignments : int
         The maximum number of alignments we want to produce
+    nalignfragments : int
+        The number of fragments used for the alignment.
 
     Returns
     -------
@@ -434,15 +437,17 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
             refidx += list(refsegidx[reffakeresid == r])
         molidx = []
         for r in molalnresid:
-            molidx += list(molsegidx[molfakeresid == r])
+            molidx += list(molsegidx[molfakeresid == r])        
 
         molboolidx = np.zeros(mol.numAtoms, dtype=bool)
         molboolidx[molidx] = True
         refboolidx = np.zeros(ref.numAtoms, dtype=bool)
         refboolidx[refidx] = True
 
-        logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}-{}'.format(
-            i, len(refalnresid), np.unique(mol.segid[molidx])[0], mol.resid[molidx[0]], mol.resid[molidx[-1]]))
+        start_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_starts])
+        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_finish])
+        logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}'.format(
+            i, len(refalnresid), np.unique(mol.segid[molidx])[0], ', '.join(['{}-{}'.format(s,f) for s, f in zip(start_residues,finish_residues)])  ))
 
         alignedmol = mol.copy()
         alignedmol.align(molboolidx, ref, refboolidx)
