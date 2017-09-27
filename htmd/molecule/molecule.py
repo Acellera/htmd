@@ -719,7 +719,6 @@ class Molecule:
             
 
     def getDihedral(self, atom_quad):
-
         """ Gets a dihedral angle.
 
         Parameters
