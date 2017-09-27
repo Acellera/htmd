@@ -31,7 +31,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     ncpu : int, default=1
         Number of CPUs to use for a single job
     memory : int, default=1000
-        Amount of memory per job (MB)
+        Amount of memory per job (MiB)
     gpumemory : int, default=None
         Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.
     walltime : int, default=None
@@ -67,13 +67,16 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                  'ngpu': 1, 'ncpu': 1, 'memory': 1000, 'walltime': None, 'environment': 'ACEMD_HOME,HTMD_LICENSE_FILE'}
 
     def __init__(self):
-        super().__init__()
+        SimQueue.__init__(self)
+        ProtocolInterface.__init__(self)
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
         self._arg('partition', 'str', 'The queue (partition) to run on',
                   self._defaults[self._defaults['default_partition']], val.String())
         self._arg('priority', 'str', 'Job priority', self._defaults['priority'], val.String())
-        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'], val.Number(int, '0POS'))
-        self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'], val.Number(int, 'POS'))
+        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
+                  val.Number(int, '0POS'))
+        self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'],
+                  val.Number(int, 'POS'))
         self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, 'POS'))
         self._arg('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. '
                                       'Check how to define gpu_mem on SLURM.', None, val.Number(int, '0POS'))
@@ -84,19 +87,18 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._arg('outputstream', 'str', 'Output stream.', 'slurm.%N.%j.out', val.String())
         self._arg('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err'), val.String()  # Maybe change these to job name
         self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
-        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
-        self._arg('nodelist', 'list', 'A list of nodes on which to run every job at the *same time*! Careful! The jobs will be duplicated!', None, val.String(), nargs='*')
-        self._arg('exclude', 'list', 'A list of nodes on which *not* to run the jobs. Use this to select nodes on which to allow the jobs to run on.', None, val.String(), nargs='*')
+        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc',
+                  val.String())
+        self._arg('nodelist', 'list', 'A list of nodes on which to run every job at the *same time*! Careful! The jobs'
+                                      ' will be duplicated!', None, val.String(), nargs='*')
+        self._arg('exclude', 'list', 'A list of nodes on which *not* to run the jobs. Use this to select nodes on '
+                                     'which to allow the jobs to run on.', None, val.String(), nargs='*')
 
         # Find executables
         self._qsubmit = SlurmQueue._find_binary('sbatch')
         self._qinfo = SlurmQueue._find_binary('sinfo')
         self._qcancel = SlurmQueue._find_binary('scancel')
         self._qstatus = SlurmQueue._find_binary('squeue')
-
-        self._sentinel = 'htmd.queues.done'
-        # For synchronous
-        self._dirs = []
 
     @staticmethod
     def _find_binary(binary):
@@ -277,33 +279,33 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))
 
-    def wait(self, sentinel=False):
-        """ Blocks script execution until all queued work completes
+    @property
+    def ncpu(self):
+        return self.__dict__['ncpu']
 
-        Parameters
-        ----------
-        sentinel : bool, default=False
-            If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
-            relies on the filesystem, in particular on the existence of a sentinel file for job completion.
+    @ncpu.setter
+    def ncpu(self, value):
+        self.ncpu = value
 
-        Examples
-        --------
-        >>> SlurmQueue.wait()
-        """
-        from time import sleep
-        import sys
+    @property
+    def ngpu(self):
+        return self.__dict__['ngpu']
 
-        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
-            sys.stdout.flush()
-            sleep(5)
+    @ngpu.setter
+    def ngpu(self, value):
+        self.ngpu = value
+
+    @property
+    def memory(self):
+        return self.__dict__['memory']
+
+    @memory.setter
+    def memory(self, value):
+        self.memory = value
 
 
 if __name__ == "__main__":
+    # TODO: Create fake binaries for instance creation testing
     """
-    s=Slurm( name="testy", partition="gpu")
-    s.submit("test/dhfr1" )
-    ret= s.inprogress( debug=False)
-    print(ret)
-    print(s)
-    pass
+    q = SlurmQueue()
     """

@@ -12,7 +12,7 @@ import os
 from glob import glob
 from htmd.molecule.util import _missingSegID, sequenceID
 import shutil
-from htmd.builder.builder import detectDisulfideBonds
+from htmd.builder.builder import detectDisulfideBonds, BuildError, UnknownResidueError, MissingAngleError, MissingBondError, MissingParameterError, MissingTorsionError, MissingAtomTypeError
 from htmd.builder.builder import _checkMixedSegment, _checkResidueInsertions
 from subprocess import call, check_output, DEVNULL
 from htmd.molecule.molecule import Molecule
@@ -122,7 +122,7 @@ def defaultParam():
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
           saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True, atomtypes=None,
-          offlibraries=None):
+          offlibraries=None, gbsa=False, igb=2):
     """ Builds a system for AMBER
 
     Uses tleap to build a system for AMBER. Additionally it allows the user to ionize and add disulfide bridges.
@@ -171,6 +171,11 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         e.g. (('C1', 'C', 'sp2'), ('CI', 'C', 'sp3')). Check `addAtomTypes` in AmberTools docs.
     offlibraries : str or list
         A path or a list of paths to OFF library files. Check `loadOFF` in AmberTools docs.
+    gbsa : bool
+        Modify radii for GBSA implicit water model
+    igb : int
+        GB model. Select: 1 for mbondi, 2 and 5 for mbondi2, 7 for bondi and 8 for mbondi3.
+        Check section 4. The Generalized Born/Surface Area Model of the AMBER manual.
 
     Returns
     -------
@@ -223,6 +228,10 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         f.write('source ' + force + '\n')
     f.write('\n')
 
+    if gbsa:
+        gbmodels = {1: 'mbondi', 2: 'mbondi2', 5: 'mbondi2', 7: 'bondi', 8: 'mbondi3'}
+        f.write('set default PBradii {}\n\n'.format(gbmodels[igb]))
+
     # Adding custom atom types
     if atomtypes is not None:
         atomtypes = ensurelist(tocheck=atomtypes[0], tomod=atomtypes)
@@ -272,8 +281,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             mol.resname[atoms1] = 'CYX'
             mol.resname[atoms2] = 'CYX'
             # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
-            mol.remove(atoms1 & (mol.name == 'HG'), _logger=False)
-            mol.remove(atoms2 & (mol.name == 'HG'), _logger=False)
+            mol.remove((atoms1 & (mol.name == 'HG')) | (atoms2 & (mol.name == 'HG')), _logger=False)
 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.debug('Writing PDB file for input to tleap.')
@@ -341,7 +349,10 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         except:
             raise NameError('tleap failed at execution')
         f.close()
+        errors = _logParser(logpath)
         os.chdir(currdir)
+        if errors:
+            raise BuildError(errors + ['Check {} for further information on errors in building.'.format(logpath)])
         logger.info('Finished building.')
 
         if os.path.exists(os.path.join(outdir, 'structure.crd')) and \
@@ -350,7 +361,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             molbuilt = Molecule(os.path.join(outdir, 'structure.prmtop'))
             molbuilt.read(os.path.join(outdir, 'structure.crd'))
         else:
-            raise NameError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
+            raise BuildError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
 
         if ionize:
             shutil.move(os.path.join(outdir, 'structure.crd'), os.path.join(outdir, 'structure.noions.crd'))
@@ -630,6 +641,54 @@ def _readcsvdict(filename):
     return resdict
 
 
+def _logParser(fname):
+    import re
+    unknownres_regex = re.compile('Unknown residue:\s+(\w+)')
+    missingparam_regex = re.compile('For atom: (.*) Could not find vdW \(or other\) parameters for type:\s+(\w+)')
+    missingtorsion_regex = re.compile('No torsion terms for\s+(.*)$')
+    missingbond_regex = re.compile('Could not find bond parameter for:\s+(.*)$')
+    missingangle_regex = re.compile('Could not find angle parameter:\s+(.*)$')
+    missingatomtype_regex = re.compile('FATAL:\s+Atom (.*) does not have a type')
+
+    unknownres = []
+    missingparam = []
+    missingtorsion = []
+    missingbond = []
+    missingangle = []
+    missingatomtype = []
+    with open(fname, 'r') as f:
+        for line in f:
+            if unknownres_regex.search(line):
+                unknownres.append(unknownres_regex.findall(line)[0])
+            if missingparam_regex.search(line):
+                missingparam.append(missingparam_regex.findall(line)[0])
+            if missingtorsion_regex.search(line):
+                missingtorsion.append(missingtorsion_regex.findall(line)[0])
+            if missingbond_regex.search(line):
+                missingbond.append(missingbond_regex.findall(line)[0])
+            if missingangle_regex.search(line):
+                missingangle.append(missingangle_regex.findall(line)[0])
+            if missingatomtype_regex.search(line):
+                missingatomtype.append(missingatomtype_regex.findall(line)[0])
+
+    errors = []
+    if len(unknownres):
+        errors.append(UnknownResidueError('Unknown residue(s) {} found in the input structure. '
+                                          'You are either missing a topology definition for the residue or you need to '
+                                          'rename it to the correct residue name'.format(np.unique(unknownres))))
+    if len(missingparam):
+        errors.append(MissingParameterError('Missing parameters for atom {} and type {}'.format(missingparam, missingparam)))
+    if len(missingtorsion):
+        errors.append(MissingTorsionError('Missing torsion terms for {}'.format(missingtorsion)))
+    if len(missingbond):
+        errors.append(MissingBondError('Missing bond parameters for {}'.format(missingbond)))
+    if len(missingangle):
+        errors.append(MissingAngleError('Missing angle parameters for {}'.format(missingangle)))
+    if len(missingatomtype):
+        errors.append(MissingAtomTypeError('Missing atom type for {}'.format(missingatomtype)))
+
+    return errors
+
 if __name__ == '__main__':
     from htmd.molecule.molecule import Molecule, mol_equal
     from htmd.builder.solvate import solvate
@@ -721,6 +780,7 @@ if __name__ == '__main__':
     # folder = home(dataDir='building-protein-ligand')
     # prot = Molecule(os.path.join(folder, 'trypsin.pdb'))
     # prot.filter('protein')
+    # prot.renumberResidues()
     # prot = autoSegment2(prot)
     # prot = proteinPrepare(prot)
     # prot1 = prot
@@ -736,9 +796,12 @@ if __name__ == '__main__':
     # tmpdir1 = tempname()
     # tmpdir2 = tempname()
     # np.random.seed(1)
-    # bmol1 = build(smol1, param=[os.path.join(folder, 'benzamidine.frcmod')], outdir=tmpdir1)
+    # params = amber.defaultParam() + [os.path.join(folder, 'benzamidine.frcmod')]
+    # bmol1 = amber.build(smol1, param=params, outdir=tmpdir1)
     # np.random.seed(1)
-    # bmol2 = build(smol2, topo=[os.path.join(folder, 'benzamidine.prepi')], param=[os.path.join(folder, 'benzamidineprepi.frcmod')], outdir=tmpdir2)
+    # params = amber.defaultParam() + [os.path.join(folder, 'benzamidineprepi.frcmod')]
+    # topos = amber.defaultTopo() + [os.path.join(folder, 'benzamidine.prepi')]
+    # bmol2 = amber.build(smol2, topo=topos, param=params, outdir=tmpdir2)
     # _compareResultFolders(tmpdir1, tmpdir2, 'ben-tryp')
     # shutil.rmtree(tmpdir1)
     # shutil.rmtree(tmpdir2)
