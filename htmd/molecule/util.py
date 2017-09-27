@@ -248,8 +248,7 @@ def boundingBox(mol, sel='all'):
     array([[-17.3390007 , -10.43700027,  -1.43900001],
            [ 25.40600014,  27.03800011,  46.46300125]], dtype=float32)
 
-    """start_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_starts])
-        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_finish])
+    """
     coords = mol.get('coords', sel=sel)
     maxc = np.squeeze(np.max(coords, axis=0))
     minc = np.squeeze(np.min(coords, axis=0))
