@@ -682,10 +682,41 @@ class Molecule:
         >>> mol = tryp.copy()
         >>> mol.rotateBy(rotationMatrix([0, 1, 0], 1.57))
         """
+        if abs(np.linalg.det(M)-1) > 1e-5:
+            logger.warning("Suspicious non-unitary determinant")
         coords = self.get('coords', sel=sel)
         newcoords = coords - center
         newcoords = np.dot(newcoords, np.transpose(M)) + center
         self.set('coords', newcoords, sel=sel)
+
+        
+    def orient(self, sel="all"):
+        """Rotate a molecule so that its main axes are oriented along XYZ.
+
+        The calculation is based on the axes of inertia of the given
+        selection, but masses will be ignored. After the operation,
+        the main axis will be parallel to the Z axis, followed by Y
+        and X (the shortest axis). Only the first frame is oriented.
+
+        Parameters
+        ----------
+        sel : 
+            Atom selection on which the rotation is computed
+        
+        Examples
+        --------
+        >>> mol = tryp.copy()
+        >>> mol.orient("noh")
+        """
+        if self.numFrames != 1:
+            logger.warning("Only the first frame is considered for the orientation")
+        s = self.atomselect(sel)
+        x = self.coords[s,:,0]
+        c = np.cov(x.T)
+        ei = np.linalg.eigh(c)
+        logger.info("Moments of intertia: "+str(ei[0]))
+        self.rotateBy(np.linalg.inv(ei[1]))
+            
 
     def getDihedral(self, atom_quad):
         """ Gets a dihedral angle.
