@@ -180,6 +180,26 @@ def ffevaluate(mol, prm, betweensets=None):
     atmnrg : np.ndarray
         A (natoms, 6, nframes) shaped matrix containing the approximate potential energy components of each atom at each
         simulation frame. The 6 indexes are the same as in the `energies` return argument.
+
+    Examples
+    --------
+    >>> from htmd.ffevaluation.ffevaluate import *
+    >>> from htmd.ffevaluation.test_ffevaluate import fixParameters, drawForce
+    >>> from htmd.ui import *
+    >>> import parmed
+    >>> mol = Molecule('./htmd/data/test-ffevaluate/waterbox/structure.psf')
+    >>> mol.read('./htmd/data/test-ffevaluate/waterbox/output.xtc')
+    >>> prm = parmed.charmm.CharmmParameterSet(fixParameters('./htmd/data/test-ffevaluate/waterbox/parameters.prm'))
+    >>> energies, forces, atmnrg = ffevaluate(mol, prm, betweensets=('resname SOD', 'water'))
+
+    >>> mol.view()
+    >>> for cc, ff in zip(mol.coords[:, :, 0], forces[:, :, 0]):
+    >>>     drawForce(cc, ff)
+
+    Amber style
+    >>> prmtop = parmed.amber.AmberParm('structure.prmtop')
+    >>> prm = parmed.amber.AmberParameterSet.from_structure(prmtop)
+    >>> energies, forces, atmnrg = ffevaluate(mol, prm, betweensets=('resname SOD', 'water'))
     """
     mol = mol.copy()
     coords = mol.coords
