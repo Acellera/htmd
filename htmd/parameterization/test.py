@@ -159,6 +159,16 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'h2o2_full_fake')
         self._test(refDir, tempname(), 'parameterize -m input.mol2 -f GAFF2 --fake-qm')
 
+    @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
+    def test_h2o2_full_fake_restart(self):
+
+        refDir = os.path.join(self.dataDir, 'h2o2_full_fake_restart')
+        resDir = tempname()
+        shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
+        shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
+        shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
+        self._test(refDir, resDir, 'parameterize -m input.mol2 -f GAFF2 --fake-qm')
+
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_ethene_dihed_fix(self):
 

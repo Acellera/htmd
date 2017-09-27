@@ -3,6 +3,9 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import os
+import pickle
+import logging
 import numpy as np
 import nlopt
 from scipy.spatial.distance import cdist
@@ -11,6 +14,8 @@ from htmd.molecule.util import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
 from htmd.parameterization.ffevaluate import FFEvaluate
 
+logger = logging.getLogger(__name__)
+
 
 class FakeQM(QMBase):
     """
@@ -18,6 +23,7 @@ class FakeQM(QMBase):
 
     >>> import os
     >>> import numpy as np
+    >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.molecule.util import dihedralAngle
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
@@ -30,12 +36,15 @@ class FakeQM(QMBase):
     ...
 
     Run a single-point energy and ESP calculation
-    >>> qm = FakeQM()
+    >>> with TemporaryDirectory() as tmpDir:
+    ...     qm = FakeQM()
+    ...     qm.molecule = mol
+    ...     qm.esp_points = np.array([[1., 1., 1.]])
+    ...     qm.directory = tmpDir
+    ...     result = qm.run()[0]
+
     >>> qm # doctest: +ELLIPSIS
     <htmd.qm.fake.FakeQM object at ...>
-    >>> qm.molecule = mol
-    >>> qm.esp_points = np.array([[1., 1., 1.]])
-    >>> result = qm.run()[0]
     >>> result # doctest: +ELLIPSIS
     <htmd.qm.base.QMResult object at ...
     >>> result.errored
@@ -50,21 +59,25 @@ class FakeQM(QMBase):
     89.999544...
 
     Run a minimization
-    >>> qm = FakeQM()
-    >>> qm.molecule = mol
-    >>> qm.optimize = True
-    >>> result = qm.run()[0]
+    >>> with TemporaryDirectory() as tmpDir:
+    ...     qm = FakeQM()
+    ...     qm.molecule = mol
+    ...     qm.optimize = True
+    ...     qm.directory = tmpDir
+    ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
     7.729598...
     >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
     101.44411...
 
     Run a constrained minimization
-    >>> qm = FakeQM()
-    >>> qm.molecule = mol
-    >>> qm.optimize = True
-    >>> qm.restrained_dihedrals = np.array([[2, 0, 1, 3]])
-    >>> result = qm.run()[0]
+    >>> with TemporaryDirectory() as tmpDir:
+    ...     qm = FakeQM()
+    ...     qm.molecule = mol
+    ...     qm.optimize = True
+    ...     qm.restrained_dihedrals = np.array([[2, 0, 1, 3]])
+    ...     qm.directory = tmpDir
+    ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
     7.879684...
     >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
@@ -73,9 +86,11 @@ class FakeQM(QMBase):
 
     # Fake implementations of the abstract methods
     def _command(self): pass
-    def _completed(self): pass
-    def _readOutput(self): pass
-    def _writeInput(self): pass
+    def _writeInput(self, directory, iframe): pass
+    def _readOutput(self, directory): pass
+
+    def _completed(self, directory):
+        return os.path.exists(os.path.join(directory, 'data.pkl'))
 
     def run(self):
 
@@ -85,40 +100,53 @@ class FakeQM(QMBase):
         for iframe in range(self.molecule.numFrames):
             self.molecule.frame = iframe
 
-            result = QMResult()
-            result.errored = False
-            result.coords = self.molecule.coords[:, :, iframe:iframe + 1].copy()
+            directory = os.path.join(self.directory, '%05d' % iframe)
+            os.makedirs(directory, exist_ok=True)
+            pickleFile = os.path.join(directory, 'data.pkl')
 
-            if self.optimize:
-                optimizer = nlopt.opt(nlopt.LN_COBYLA, result.coords.size)
-                optimizer.set_min_objective(lambda x, _: ff.run(x.reshape((-1, 3)))['total'])
-                if self.restrained_dihedrals is not None:
-                    for dihedral in self.restrained_dihedrals:
-                        indices = dihedral.copy()
-                        ref_angle = np.deg2rad(dihedralAngle(self.molecule.coords[indices, :, iframe]))
-                        def constraint(x, _):
-                            coords = x.reshape((-1, 3))
-                            angle = dihedralAngle(coords[indices])
-                            return np.sin(.5*(angle - ref_angle))
-                        optimizer.add_equality_constraint(constraint)
+            if self._completed(directory):
+                with open(pickleFile, 'rb') as fd:
+                    result = pickle.load(fd)
+                logger.info('Loading QM data from %s' % pickleFile)
 
-                optimizer.set_xtol_rel(1e-6)
-                optimizer.set_initial_step(1e-3)
-                result.coords = optimizer.optimize(result.coords.ravel()).reshape((-1, 3, 1))
+            else:
+                result = QMResult()
+                result.errored = False
+                result.coords = self.molecule.coords[:, :, iframe:iframe + 1].copy()
 
-            result.energy = ff.run(result.coords[:, :, 0])['total']
-            result.dipole = self.molecule.getDipole()
+                if self.optimize:
+                    optimizer = nlopt.opt(nlopt.LN_COBYLA, result.coords.size)
+                    optimizer.set_min_objective(lambda x, _: ff.run(x.reshape((-1, 3)))['total'])
+                    if self.restrained_dihedrals is not None:
+                        for dihedral in self.restrained_dihedrals:
+                            indices = dihedral.copy()
+                            ref_angle = np.deg2rad(dihedralAngle(self.molecule.coords[indices, :, iframe]))
+                            def constraint(x, _):
+                                coords = x.reshape((-1, 3))
+                                angle = dihedralAngle(coords[indices])
+                                return np.sin(.5*(angle - ref_angle))
+                            optimizer.add_equality_constraint(constraint)
 
-            if self.optimize:
-                assert optimizer.last_optimum_value() == result.energy # A self-consistency test
+                    optimizer.set_xtol_rel(1e-6)
+                    optimizer.set_initial_step(1e-3)
+                    result.coords = optimizer.optimize(result.coords.ravel()).reshape((-1, 3, 1))
 
-            # Compute ESP values
-            if self.esp_points is not None:
-                assert self.molecule.numFrames == 1
-                result.esp_points = self.esp_points
-                distances = cdist(result.esp_points, result.coords[:, :, 0]) # Angstrom
-                distances *= 0.52917721067  # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
-                result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge) # Hartree/Bohr
+                result.energy = ff.run(result.coords[:, :, 0])['total']
+                result.dipole = self.molecule.getDipole()
+
+                if self.optimize:
+                    assert optimizer.last_optimum_value() == result.energy # A self-consistency test
+
+                # Compute ESP values
+                if self.esp_points is not None:
+                    assert self.molecule.numFrames == 1
+                    result.esp_points = self.esp_points
+                    distances = cdist(result.esp_points, result.coords[:, :, 0]) # Angstrom
+                    distances *= 0.52917721067  # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
+                    result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge) # Hartree/Bohr
+
+                with open(pickleFile, 'wb') as fd:
+                    pickle.dump(result, fd)
 
             results.append(result)
 
