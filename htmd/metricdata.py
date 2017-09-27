@@ -504,7 +504,7 @@ class MetricData:
             if frames[i] == 0 and not allframes:
                 continue
             st = clusters[i]
-            absFrames.append(_sampleCluster(st, stConcat, frames[i], allframes, replacement))
+            absFrames.append(_sampleCluster(st, stConcat, frames[i], replacement))
             if len(absFrames[-1]) == 0:
                 raise NameError('No frames could be sampled from cluster {}. Cluster is empty.'.format(st))
 
