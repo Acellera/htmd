@@ -6,13 +6,20 @@ import numpy as np
 import os
 
 
-def openmm_energy_charmm(prm, psf, coords):
+def openmm_energy_charmm(prm, psf, coords, box=None):
     import parmed
     from simtk import unit
     from simtk import openmm
+    from simtk.openmm import app
 
-    # Create OpenMM
-    system = psf.createSystem(prm)
+    if box is not None:
+        a = unit.Quantity((box[0] * unit.angstrom, 0 * unit.angstrom, 0 * unit.angstrom))
+        b = unit.Quantity((0 * unit.angstrom, box[1] * unit.angstrom, 0 * unit.angstrom))
+        c = unit.Quantity((0 * unit.angstrom, 0 * unit.angstrom, box[2] * unit.angstrom))
+        psf.box_vectors = (a, b, c)
+        system = psf.createSystem(prm, nonbondedMethod=app.CutoffPeriodic)
+    else:
+        system = psf.createSystem(prm)
     integrator = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picoseconds, 2 * unit.femtoseconds)
     platform = openmm.Platform.getPlatformByName('CPU')
     context = openmm.Context(system, integrator, platform)

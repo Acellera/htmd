@@ -219,7 +219,9 @@ def ffevaluate(mol, prm, betweensets=None):
 
 def ffevaluate_parallel(mol, prm, betweensets=None):
     from htmd.parallelprogress import ParallelExecutor, delayed
-
+    mol = mol.copy()
+    coords = mol.coords
+    box = mol.box
     setA, setB = calculateSets(mol, betweensets)
 
     args = list(init(mol, prm))
@@ -228,8 +230,8 @@ def ffevaluate_parallel(mol, prm, betweensets=None):
 
     aprun = ParallelExecutor(n_jobs=-2)
     res = aprun(total=mol.numFrames, description='Evaluating energies')(
-        delayed(_ffevaluate)(np.atleast_3d(mol.coords[:, :, f]),
-                             np.atleast_2d(mol.box[:, f]),
+        delayed(_ffevaluate)(np.atleast_3d(coords[:, :, f]),
+                             box[:, f].reshape(3, 1),
                              *args) for f in range(mol.numFrames))
     energies = np.hstack([r[0] for r in res])
     forces = np.concatenate([r[1] for r in res], axis=2)
