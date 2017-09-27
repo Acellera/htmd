@@ -330,7 +330,7 @@ def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
     outFile.close()
 
 
-def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10):
+def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10, nalignfragment=1):
     """ Aligns two structures by their longest sequence alignment
 
     Parameters
@@ -416,13 +416,19 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         startIndex = np.where(dsigdiff > 0)[0]
         endIndex = np.where(dsigdiff < 0)[0]
         duration = endIndex - startIndex
-        start = startIndex[np.argmax(duration)]
-        finish = endIndex[np.argmax(duration)]
+        duration_sorted = np.sort(duration)[::-1]
+        _list_starts = []
+        _list_finish = []
+        for n in range(nalignfragment):
+            idx = np.where(duration == duration_sorted[n])[0]
+            start = startIndex[idx][0]
+            finish = endIndex[idx][0]
+            _list_starts.append(start)
+            _list_finish.append(finish)
 
         # Get the "resids" of the aligned residues only
-        refalnresid = residref[start:finish]
-        molalnresid = residmol[start:finish]
-
+        refalnresid = np.concatenate([ residref[start:finish] for start, finish in zip(_list_starts,_list_finish)])
+        molalnresid = np.concatenate([ residmol[start:finish] for start, finish in zip(_list_starts, _list_finish) ])
         refidx = []
         for r in refalnresid:
             refidx += list(refsegidx[reffakeresid == r])
@@ -436,7 +442,7 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         refboolidx[refidx] = True
 
         logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}-{}'.format(
-            i, np.max(duration), np.unique(mol.segid[molidx])[0], mol.resid[molidx[0]], mol.resid[molidx[-1]]))
+            i, len(refalnresid), np.unique(mol.segid[molidx])[0], mol.resid[molidx[0]], mol.resid[molidx[-1]]))
 
         alignedmol = mol.copy()
         alignedmol.align(molboolidx, ref, refboolidx)
