@@ -134,8 +134,8 @@ def orient(mol, sel="all"):
 
     Examples
     --------
-    >>> mol = tryp.copy()
-    >>> mol.orient("noh")
+    >>> mol = Molecule("1kdx")
+    >>> mol = orient(mol,"chain B")
 
     """
     if mol.numFrames != 1:
