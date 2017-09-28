@@ -116,6 +116,42 @@ def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
     return np.squeeze(rmsd)
 
 
+def orient(mol, sel="all"):
+    """Rotate a molecule so that its main axes are oriented along XYZ.
+
+    The calculation is based on the axes of inertia of the given
+    selection, but masses will be ignored. After the operation, the
+    main axis will be parallel to the Z axis, followed by Y and X (the
+    shortest axis). Only the first frame is oriented.  The reoriented
+    molecule is returned.
+
+    Parameters
+    ----------
+    mol :
+        The Molecule to be rotated
+    sel : 
+        Atom selection on which the rotation is computed
+
+    Examples
+    --------
+    >>> mol = Molecule("1kdx")
+    >>> mol = orient(mol,"chain B")
+
+    """
+    if mol.numFrames != 1:
+        logger.warning("Only the first frame is considered for the orientation")
+    m = mol.copy()
+    s = m.atomselect(sel)
+    x = m.coords[s,:,0]
+    c = np.cov(x.T)
+    ei = np.linalg.eigh(c)
+    logger.info("Moments of intertia: "+str(ei[0]))
+    ev=ei[1].T
+    if np.linalg.det(ev)<0: ev=-ev # avoid inversions
+    m.rotateBy(ev)
+    return(m)
+
+
 def sequenceID(field, prepend=None):
     """ Array of integers which increments at value change of another array
 

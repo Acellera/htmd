@@ -682,11 +682,14 @@ class Molecule:
         >>> mol = tryp.copy()
         >>> mol.rotateBy(rotationMatrix([0, 1, 0], 1.57))
         """
+        if abs(np.linalg.det(M)-1) > 1e-5:
+            logger.warning("Suspicious non-unitary determinant: {:f}".format(np.linalg.det(M)))
         coords = self.get('coords', sel=sel)
         newcoords = coords - center
         newcoords = np.dot(newcoords, np.transpose(M)) + center
         self.set('coords', newcoords, sel=sel)
 
+        
     def getDihedral(self, atom_quad):
         """ Gets a dihedral angle.
 
