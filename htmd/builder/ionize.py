@@ -10,22 +10,27 @@ from htmd.molecule.util import sequenceID
 import logging
 logger = logging.getLogger(__name__)
 
+# Info about all ions, with charge, name, amber and charmm names (may
+# need residues too). Only the first column is currently used.
+_ions = {
+    'NA': (1, 'sodium', 'Na+', 'SOD'),
+    'MG': (2, 'magnesium', 'Mg2+', 'MG'),
+    'ZN': (2, 'zinc', 'Zn2+', 'ZN'),
+    'K': (1, 'potassium', 'K+', 'POT'),
+    'CS': (1, 'cesium', 'Cs+', 'CES'),
+    'CA': (2, 'calcium', 'Ca2+', 'CAL'),
+    'CL': (-1, 'chloride', 'Cl-', 'CLA')
+}
 
-def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion=None, ff='charmm'):
+
+def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion=None, ff=None):
+    if ff:
+        logger.warning("The ff option is deprecated. Please use standard names (e.g. NA, CL, K).")
+    
     if cation is None:
-        if ff == 'amber':
-            cation = 'Na+'
-        elif ff == 'charmm':
-            cation = 'SOD'
-        else:
-            raise NameError('Invalid forcefield. Choose between ''charmm'' or ''amber''')
+            cation = 'NA'
     if anion is None:
-        if ff == 'amber':
-            anion = 'Cl-'
-        elif ff == 'charmm':
-            anion = 'CLA'
-        else:
-            raise NameError('Invalid forcefield. Choose between ''charmm'' or ''amber''')
+            anion = 'CL'
 
     if saltconc is not None:
         neutralize = False
@@ -102,6 +107,7 @@ def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion
     return anion, cation, _ionGetAtomname(anion), _ionGetAtomname(cation), nanion, ncation
 
 
+# TG I think this is now unnecessary
 def _ionGetAtomname(ion):
     if ion == 'ZN2':
         return 'ZN'
@@ -111,29 +117,11 @@ def _ionGetAtomname(ion):
 
 
 def _ionGetCharge(ion, ff):
-    charmmions = dict()
-    charmmions['SOD'] = (1, 'sodium', 'Na+')
-    charmmions['MG'] = (2, 'magnesium', 'Mg2+')
-    charmmions['POT'] = (1, 'potassium', 'K+')
-    charmmions['CES'] = (1, 'cesium', 'Cs+')
-    charmmions['CAL'] = (2, 'calcium', 'Ca2+')
-    charmmions['ZN2'] = (2, 'zinc', 'Zn2+')
-    charmmions['CLA'] = (-1, 'chloride', 'Cl-')
-
-    amberions = dict()
-    amberions['Na+'] = (1, 'sodium', 'Na+')
-    amberions['Cl-'] = (-1, 'chloride', 'Cl-')
-    amberions['K+'] = (1, 'potassium', 'K+')
-    amberions['Cs+'] = (1, 'cesium', 'Cs+')
-
-    if ff == 'charmm':
-        if ion not in charmmions:
-            raise NameError('Ion ' + ion + ' is not supported in CHARMM. Supported ions are: ' + str(charmmions.keys()))
-        return charmmions[ion][0]
-    elif ff == 'amber':
-        if ion not in amberions:
-            raise NameError('Ion ' + ion + ' is not supported in AMBER. Supported ions are: ' + str(amberions.keys()))
-        return amberions[ion][0]
+    if ff:
+        logger.warning("ff is deprecated")
+    if ion not in _ions:
+        raise NameError("Ion {:s} not in the database")
+    return _ions[ion][0]
 
 
 def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfrom=5, dbetween=5, segname=None):
@@ -141,7 +129,7 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
 
     logger.info('Min distance of ions from molecule: ' + str(dfrom) + 'A')
     logger.info('Min distance between ions: ' + str(dbetween) + 'A')
-    logger.info('Placing ' + str(nanion+ncation) + ' ions.')
+    logger.info('Placing {:d} anions and {:d} cations.'.format(nanion,ncation))
 
     if (nanion + ncation) == 0:
         return newmol
