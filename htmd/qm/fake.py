@@ -66,9 +66,9 @@ class FakeQM(QMBase):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.729598...
+    7.731722...
     >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    101.44411...
+    100.036252...
 
     Run a constrained minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -79,9 +79,9 @@ class FakeQM(QMBase):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.879684...
+    7.870431...
     >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    89.535382...
+    89.999565...
     """
 
     # Fake implementations of the abstract methods
@@ -115,27 +115,28 @@ class FakeQM(QMBase):
                 result.coords = self.molecule.coords[:, :, iframe:iframe + 1].copy()
 
                 if self.optimize:
-                    optimizer = nlopt.opt(nlopt.LN_COBYLA, result.coords.size)
-                    optimizer.set_min_objective(lambda x, _: ff.run(x.reshape((-1, 3)))['total'])
+                    opt = nlopt.opt(nlopt.LN_COBYLA, result.coords.size)
+                    opt.set_min_objective(lambda x, _: ff.run(x.reshape((-1, 3)))['total'])
                     if self.restrained_dihedrals is not None:
                         for dihedral in self.restrained_dihedrals:
                             indices = dihedral.copy()
                             ref_angle = np.deg2rad(dihedralAngle(self.molecule.coords[indices, :, iframe]))
                             def constraint(x, _):
                                 coords = x.reshape((-1, 3))
-                                angle = dihedralAngle(coords[indices])
+                                angle = np.deg2rad(dihedralAngle(coords[indices]))
                                 return np.sin(.5*(angle - ref_angle))
-                            optimizer.add_equality_constraint(constraint)
-
-                    optimizer.set_xtol_rel(1e-6)
-                    optimizer.set_initial_step(1e-3)
-                    result.coords = optimizer.optimize(result.coords.ravel()).reshape((-1, 3, 1))
+                            opt.add_equality_constraint(constraint)
+                    opt.set_xtol_abs(1e-3) # Similar to Psi4 default
+                    opt.set_maxeval(1000*opt.get_dimension())
+                    opt.set_initial_step(1e-3)
+                    result.coords = opt.optimize(result.coords.ravel()).reshape((-1, 3, 1))
+                    logger.info('Optimization status: %d' % opt.last_optimize_result())
 
                 result.energy = ff.run(result.coords[:, :, 0])['total']
                 result.dipole = self.molecule.getDipole()
 
                 if self.optimize:
-                    assert optimizer.last_optimum_value() == result.energy # A self-consistency test
+                    assert opt.last_optimum_value() == result.energy # A self-consistency test
 
                 # Compute ESP values
                 if self.esp_points is not None:
