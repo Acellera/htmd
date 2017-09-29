@@ -212,7 +212,7 @@ def _locateLipidFiles(folder, lipidnames):
     import os
     files = {}
     for m in lipidnames:
-        files[m] = glob(os.path.join(folder, m, '*', '*.pdb'))
+        files[m] = glob(os.path.join(folder, m, '*.pdb'))
         if len(files[m]) == 0:
             raise RuntimeError('Could not locate pdb files for lipid "{}" in folder {}'.format(m, folder))
     return files
