@@ -165,7 +165,10 @@ class QMBase(ABC, ProtocolInterface):
 
         # HACK: don't wait, if there is nothing to wait..
         if len(self.queue._dirs) > 0:
-            self.queue.wait(sentinel=True)
+            if isinstance(self.queue, LocalCPUQueue):
+                self.queue.wait(sentinel=False) # TODO: sentinel is still broken
+            else:
+                self.queue.wait(sentinel=True)
             self.queue.retrieve()
 
         # Read output files
