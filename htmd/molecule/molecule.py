@@ -1086,7 +1086,7 @@ class Molecule:
             self.bonds = self._getBonds()
 
         # Write out PDB and XTC files
-        psf = tempname(suffix=".psf")
+        psf = tempname(suffix=".pdb")
         self.write(psf)
 
         if guessBonds:

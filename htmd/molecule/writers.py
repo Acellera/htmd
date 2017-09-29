@@ -116,34 +116,25 @@ def checkTruncations(mol):
                                                                                                                        f]))
 
 
-def PDBwrite(mol, filename, frame=None):
-    if frame is None:
-        frame = mol.frame
-    frame = ensurelist(frame)
-
-    def format83(f):
-        """Format a single float into a string of width 8, with ideally 3 decimal places of precision. If the number is
-        a little too large, we can gracefully degrade the precision by lopping off some of the decimal places. If it's
-        much too large, we throw a NameError"""
-        if -999.999 < f < 9999.999:
-            return '%8.3f' % f
-        if -9999999 < f < 99999999:
-            return ('%8.3f' % f)[:8]
-        raise NameError('coordinate "%s" could not be represented '
-                        'in a width-8 field' % f)
-
-    def format62(f):
-        if -9.999 < f < 99.999:
-            return '%6.2f' % f
-        if -99999 < f < 999999:
-            return ('%6.2f' % f)[:6]
-        raise NameError('coordinate "%s" could not be represented '
-                        'in a width-6 field' % f)
+def PDBwrite(mol, filename, frames=None):
+    if frames is None:
+        frames = mol.frame
+    frames = ensurelist(frames)
 
     checkTruncations(mol)
-    coords = np.atleast_3d(mol.coords[:, :, frame])
+    coords = np.atleast_3d(mol.coords[:, :, frames])
     numFrames = coords.shape[2]
-    serial = np.arange(1, np.size(coords, 0) + 1)
+
+    serial = np.arange(1, np.size(coords, 0) + 1).astype(object)
+    serial[serial > 99999] = '*****'
+    serial = serial.astype('U5')
+
+    if coords.max() >= 1E8 or coords.min() <= -1E7:
+        raise RuntimeError('Cannot write PDB coordinates with values smaller than -1E7 or larger than 1E8')
+    if mol.occupancy.max() >= 1E6 or mol.occupancy.min() <= -1E5:
+        raise RuntimeError('Cannot write PDB occupancy with values smaller than -1E5 or larger than 1E6')
+    if mol.beta.max() >= 1E6 or mol.beta.min() <= -1E5:
+        raise RuntimeError('Cannot write PDB beta/temperature with values smaller than -1E5 or larger than 1E6')
 
     fh = open(filename, 'w')
     # TODO FIXME  -- should take box from traj frame
@@ -153,28 +144,23 @@ def PDBwrite(mol, filename, frame=None):
         print("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90),
               file=fh)
 
-    for f in frame:
-        print("MODEL    %5d" % (f + 1), file=fh)
+    for f in range(numFrames):
+        print("MODEL    %5d" % (frames[f] + 1), file=fh)
         for i in range(0, len(mol.record)):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
-            if serial[i] < 100000:
-                ser = str(int(serial[i]))
-            else:
-                ser = '*****'
-
             print(
-                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  ".format(
+                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {!s:8}{!s:8}{!s:8}{!s:>6}{!s:>6}      {!s:4.4}{!s:>2.2}  ".format(
                     mol.record[i],
-                    ser, name, mol.altloc[i],
+                    serial[i], name, mol.altloc[i],
                     mol.resname[i], mol.chain[i],
                     mol.resid[i],
                     mol.insertion[i],
-                    format83(mol.coords[i, 0, f]),
-                    format83(mol.coords[i, 1, f]),
-                    format83(mol.coords[i, 2, f]),
-                    format62(mol.occupancy[i]),
-                    format62(mol.beta[i]),
+                    coords[i, 0, f],
+                    coords[i, 1, f],
+                    coords[i, 2, f],
+                    mol.occupancy[i],
+                    mol.beta[i],
                     mol.segid[i],
                     mol.element[i]
                 ), file=fh
