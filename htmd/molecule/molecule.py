@@ -639,8 +639,7 @@ class Molecule:
         vector.shape = [1, 3]  # Forces it to be row vector
 
         s = self.atomselect(sel)
-        for f in range(self.numFrames):
-            self.coords[s, :, f] += vector
+        self.coords[s, :, self.frame] += vector
 
     @_Deprecated('1.3.2', 'htmd.molecule.molecule.Molecule.rotateBy')
     def rotate(self, axis, angle, center=(0, 0, 0), sel=None):
@@ -773,8 +772,8 @@ class Molecule:
         >>> mol.center()
         >>> mol.center([10, 10, 10], 'name CA')
         """
-        coords = self.get('coords', sel=sel)
-        com = np.mean(coords, 0)
+        sel = self.atomselect(sel)
+        com = np.mean(self.coords[sel, :, self.frame], 0)
         self.moveBy(-com)
         self.moveBy(loc)
 
