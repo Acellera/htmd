@@ -628,7 +628,7 @@ def guessAnglesAndDihedrals(bonds, cyclicdih=False):
 
     angles = []
     for n in g.nodes():
-        neighbors = g.neighbors(n)
+        neighbors = list(g.neighbors(n))
         for e1 in range(len(neighbors)):
             for e2 in range(e1+1, len(neighbors)):
                 angles.append((neighbors[e1], n, neighbors[e2]))
