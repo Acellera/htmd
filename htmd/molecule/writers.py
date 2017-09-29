@@ -135,9 +135,9 @@ def PDBwrite(mol, filename, frames=None):
         raise RuntimeError('Cannot write PDB occupancy with values smaller than -1E5 or larger than 1E6')
     if mol.beta.max() >= 1E6 or mol.beta.min() <= -1E5:
         raise RuntimeError('Cannot write PDB beta/temperature with values smaller than -1E5 or larger than 1E6')
-    coords = coords.astype('U8')
-    occupancy = mol.occupancy.astype('U6')
-    beta = mol.beta.astype('U6')
+    coords = np.around(coords.astype(np.float64), decimals=3).astype('U8')
+    occupancy = np.around(mol.occupancy.astype(np.float64), decimals=2).astype('U6')
+    beta = np.around(mol.beta.astype(np.float64), decimals=2).astype('U6')
 
     fh = open(filename, 'w')
     # TODO FIXME  -- should take box from traj frame
