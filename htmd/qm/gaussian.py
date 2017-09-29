@@ -37,8 +37,9 @@ class Gaussian(QMBase):
 
         with open(os.path.join(directory, 'g09.in'), 'w') as f:
 
-            f.write('%nprocshared = {}\n'.format(self._ncpus))
-            f.write('%mem = {} GB\n\n'.format(self._mem))
+            f.write('%nprocshared = {}\n'.format(self.queue.ncpu))
+            memory = int(np.floor(self.queue.memory/1000))
+            f.write('%mem = {} GB\n\n'.format(memory))
 
             if self.theory == 'HF':
                 dispersion = ''

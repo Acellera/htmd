@@ -131,15 +131,6 @@ class QMBase(ABC, ProtocolInterface):
         if self.restrained_dihedrals is not None:
             self._restrained_dihedrals = self.restrained_dihedrals + 1  # Convert to 1-based indices
 
-        # TODO extract from SimQueue object
-        try:
-            self._ncpus = int(os.getenv('NCPUS'))
-        except TypeError:
-            self._ncpus = os.cpu_count()
-
-        # TODO extract from SimQueue object
-        self._mem = 2
-
         # Create directories and write inputs
         self._directories = []
         for iframe in range(self._nframes):

@@ -6,14 +6,10 @@
 import os
 import argparse
 import sys
+import psutil
 
 
 def cli_parser():
-    ncpus = os.cpu_count()
-    try:
-        ncpus = int(os.getenv("NCPUS"))
-    except:
-        pass
 
     parser = argparse.ArgumentParser(description="Acellera Small Molecule Parameterization Tool")
     parser.add_argument("-m", "--mol2", help="Molecule to parameterise, in mol2 format", required=True, type=str,
@@ -29,7 +25,7 @@ def cli_parser():
                         dest="outdir")
     parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default: %(default)s)",
                         default="all", dest="torsion")
-    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=ncpus,
+    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=psutil.cpu_count(),
                         dest="ncpus")
     parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
                         choices=["GAFF", "GAFF2", "CGENFF", "all"], default="all")
@@ -98,6 +94,7 @@ VdW      : {VDW_ENERGY}
     # Create a queue for QM
     if args.exec == 'inline':
         queue = LocalCPUQueue()
+        queue.ncpu = args.ncpus
     elif args.exec == 'Slurm':
         queue = SlurmQueue()
         queue.partition = SlurmQueue._defaults['cpu_partition']
@@ -106,10 +103,6 @@ VdW      : {VDW_ENERGY}
         queue.queue = LsfQueue._defaults['cpu_queue']
     else:
         raise NotImplementedError
-
-    # Communicate the # of CPUs to use to the QM engine via environment variable
-    # TODO this should be set up via a queue
-    os.environ['NCPUS'] = str(args.ncpus)
 
     # Create a QM object
     if args.qmcode == 'Psi4':
