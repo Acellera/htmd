@@ -422,7 +422,6 @@ def MOL2write(mol, filename):
                 assert len(tmp) == 1, 'There should only exist one bond type for atoms {} {}'.format(unique_bonds[i, 0], unique_bonds[i, 1])
                 bt = tmp[0]
             f.write("{:6d} {:4d} {:4d} {}\n".format(i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1, bt))
-        f.write('\n\n')
 
 
 def GROwrite(mol, filename):
