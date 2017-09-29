@@ -364,12 +364,12 @@ def XYZwrite(src, filename):
 
 def MOL2write(mol, filename):
     with open(filename, "w") as f:
-        print("@<TRIPOS>MOLECULE", file=f)
-        print("    MOL", file=f)
+        f.write("@<TRIPOS>MOLECULE\n")
+        f.write("    MOL\n")
         unique_bonds = [list(t) for t in set(map(tuple, [sorted(x) for x in mol.bonds]))]
         unique_bonds = np.array(sorted(unique_bonds, key=lambda x: (x[0], x[1])))
-        print("%5d %5d %5d %5d %5d" % (mol.numAtoms, unique_bonds.shape[0], 0, 0, 0), file=f)
-        print("SMALL\nUSER_CHARGES\n\n", file=f)
+        f.write("%5d %5d %5d %5d %5d\n" % (mol.numAtoms, unique_bonds.shape[0], 0, 0, 0))
+        f.write("SMALL\nUSER_CHARGES\n\n\n")
         '''
         @<TRIPOS>ATOM
         Each data record associated with this RTI consists of a single data line. This
@@ -397,26 +397,31 @@ def MOL2write(mol, filename):
         DSPMOD, TYPECOL, CAP, BACKBONE, DICT, ESSENTIAL, WATER and
         DIRECT.
         '''
-        print("@<TRIPOS>ATOM", file=f)
+        f.write("@<TRIPOS>ATOM\n")
         for i in range(mol.coords.shape[0]):
-            print('{:7d} {:8s} {:9.4f} {:9.4f} {:9.4f} {:8s} '.format(i + 1, mol.name[i], mol.coords[i, 0, mol.frame],
+            f.write('{:7d} {:8s} {:9.4f} {:9.4f} {:9.4f} {:8s} '.format(i + 1, mol.name[i], mol.coords[i, 0, mol.frame],
                                                                       mol.coords[i, 1, mol.frame],
                                                                       mol.coords[i, 2, mol.frame],
                                                                       mol.atomtype[i] if mol.atomtype[i] != ''
-                                                                      else mol.element[i]),  # TODO: implement SYBYL atom types
-                  end='',
-                  file=f)
+                                                                      else mol.element[i])
+                    )
             if isinstance(mol.resid[i], numbers.Integral):
-                print('{:3d} '.format(mol.resid[i]), end='', file=f)
+                f.write('{:3d} '.format(mol.resid[i]))
                 if mol.resname[i] != '':
-                    print('{:4s} '.format(mol.resname[i]), end='', file=f)
+                    f.write('{:4s} '.format(mol.resname[i]))
                     if isinstance(mol.charge[i], numbers.Real):
-                        print('{:12.6f}'.format(mol.charge[i]), end='', file=f)
-            print('', file=f)
-        print("@<TRIPOS>BOND", file=f)
+                        f.write('{:12.6f}'.format(mol.charge[i]))
+            f.write('\n')
+        f.write("@<TRIPOS>BOND\n")
         for i in range(unique_bonds.shape[0]):
-            print("%6d %4d %4d un" % (i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1), file=f)  # TODO: implement SYBYL bond types
-        print("", file=f)
+            bt = 'un'
+            if len(mol.bondtype) > 0:
+                idx = (mol.bonds[:, 0] == unique_bonds[i, 0]) & (mol.bonds[:, 1] == unique_bonds[i, 1])
+                idx |= (mol.bonds[:, 0] == unique_bonds[i, 1]) & (mol.bonds[:, 1] == unique_bonds[i, 0])
+                tmp = np.unique(mol.bondtype[idx])
+                assert len(tmp) == 1, 'There should only exist one bond type for atoms {} {}'.format(unique_bonds[i, 0], unique_bonds[i, 1])
+                bt = tmp[0]
+            f.write("{:6d} {:4d} {:4d} {}\n".format(i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1, bt))
 
 
 def GROwrite(mol, filename):
