@@ -150,7 +150,7 @@ def PDBwrite(mol, filename, frames=None):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
             print(
-                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {!s:8}{!s:8}{!s:8}{!s:>6}{!s:>6}      {!s:4.4}{!s:>2.2}  ".format(
+                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {!s:>8}{!s:>8}{!s:>8}{!s:>6}{!s:>6}      {!s:4.4}{!s:>2.2}  ".format(
                     mol.record[i],
                     serial[i], name, mol.altloc[i],
                     mol.resname[i], mol.chain[i],
