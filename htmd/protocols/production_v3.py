@@ -217,6 +217,7 @@ proc calcforces_endstep { } { }
 
 if __name__ == "__main__":
     import htmd.home
+    from htmd.util import tempname
     md = Production()
     md.temperature = 300
     md.fb_reference = 'protein and name CA'
@@ -225,9 +226,9 @@ if __name__ == "__main__":
     md.acemd.binindex = None  # use different data
     md.fb_box = [-20, 20, -20, 20, 43, 45]
     md.fb_k = 5
-    md.write(htmd.home.home() +'/data/equilibrate', '/tmp/prod')
+    md.write(htmd.home.home() +'/data/equilibrate', tempname())
     md.fb_k = 0
-    md.write(htmd.home.home() +'/data/equilibrate', '/tmp/prod0')
+    md.write(htmd.home.home() +'/data/equilibrate', tempname())
     md.useconstraints = True
     md.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
-    md.write(htmd.home.home() +'/data/equilibrate', '/tmp/prod0cons')
+    md.write(htmd.home.home() +'/data/equilibrate', tempname())
