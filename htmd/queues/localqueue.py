@@ -100,6 +100,9 @@ class _LocalQueue(SimQueue, ProtocolInterface):
     def _createJobScript(self, fname, workdir, runsh, gpudevice=None):
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n\n')
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\n')
             if gpudevice is not None:
                 f.write('export CUDA_VISIBLE_DEVICES={}\n'.format(gpudevice))
             f.write('cd {}\n'.format(os.path.abspath(workdir)))
@@ -392,7 +395,11 @@ if __name__ == "__main__":
 
     folder = os.path.join(home(dataDir='test-localqueue'), 'test_cpu')
     lo.submit([folder] * 2)
-    lo.wait()
+    lo.wait(sentinel=False)
+    lo.retrieve()
+
+    lo.submit([folder] * 2)
+    lo.wait(sentinel=True)
     lo.retrieve()
 
     lo = LocalGPUQueue()
