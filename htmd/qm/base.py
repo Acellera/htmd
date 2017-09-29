@@ -163,8 +163,10 @@ class QMBase(ABC, ProtocolInterface):
 
     def _retrieve(self):
 
-        self.queue.wait()
-        self.queue.retrieve()
+        # HACK: don't wait, if there is nothing to wait..
+        if len(self.queue._dirs) > 0:
+            self.queue.wait(sentinel=True)
+            self.queue.retrieve()
 
         # Read output files
         results = [self._readOutput(directory) for directory in self._directories]
