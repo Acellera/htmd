@@ -144,16 +144,15 @@ def PDBwrite(mol, filename, frames=None):
     box = mol.box
     if box is not None and not np.all(mol.box == 0):
         box = np.atleast_2d(np.atleast_2d(box)[:, mol.frame])
-        print("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90),
-              file=fh)
+        fh.write("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 \n" % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90))
 
     for f in range(numFrames):
-        print("MODEL    %5d" % (frames[f] + 1), file=fh)
+        fh.write("MODEL    %5d\n" % (frames[f] + 1))
         for i in range(0, len(mol.record)):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
-            print(
-                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {!s:>8}{!s:>8}{!s:>8}{!s:>6}{!s:>6}      {!s:4.4}{!s:>2.2}  ".format(
+            fh.write(
+                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {!s:>8}{!s:>8}{!s:>8}{!s:>6}{!s:>6}      {!s:4.4}{!s:>2.2}  \n".format(
                     mol.record[i],
                     serial[i], name, mol.altloc[i],
                     mol.resname[i], mol.chain[i],
@@ -166,11 +165,11 @@ def PDBwrite(mol, filename, frames=None):
                     beta[i],
                     mol.segid[i],
                     mol.element[i]
-                ), file=fh
+                )
             )
             # TODO : convert charges to ints if we ever write them
             if i < len(mol.record) - 1 and mol.segid[i] != mol.segid[i + 1]:
-                print("TER", file=fh)
+                fh.write("TER\n")
 
         if mol.bonds is not None and len(mol.bonds) != 0:
             bondedatoms = np.unique(mol.bonds)
@@ -182,16 +181,17 @@ def PDBwrite(mol, filename, frames=None):
                 partners = partners[partners < 99998] + 1  # Don't print bonds over 99999 as it overflows the field
                 # I need to support multi-line printing of atoms with more than 4 bonds
                 while len(partners) >= 3:  # Write bonds as long as they are more than 3 in fast more
-                    print("CONECT%5d%5d%5d%5d" % (a + 1, partners[0], partners[1], partners[2]), file=fh)
+                    fh.write("CONECT%5d%5d%5d%5d\n" % (a + 1, partners[0], partners[1], partners[2]))
                     partners = partners[3:]
                 if len(partners) > 0:  # Write the rest of the bonds
                     line = "CONECT%5d" % (a + 1)
                     for p in partners:
                         line = "%s%5d" % (line, p)
-                    print(line, file=fh)
+                    fh.write(line)
+                    fh.write('\n')
 
-        print("ENDMDL", file=fh)
-    print("END", file=fh)
+        fh.write("ENDMDL\n")
+    fh.write("END\n")
 
     fh.close()
 
