@@ -18,11 +18,11 @@ class QMResult:
 
     Attributes
     ----------
-    errorer : bool
+    errored : bool
         If QM failed, it is set to True, overwise False.
     energy: float
         Total QM energy in kcal/mol
-    coords : nunpy.ndarray
+    coords : numpy.ndarray
         Atomic coordinates in Angstrom. The array shape is (number_of_atoms, 3, 1).
     dipole : list
         Dipole moment in Debye. The list has 4 elements corresponding to x, y, z conponents, and the total.
@@ -33,7 +33,7 @@ class QMResult:
     esp_points : numpy.ndarray
         Point coordinates (in Angstrom) where ESP values are computed. The array shape is (number_of_points, 3).
     esp_values : numpy.ndarray
-        ESP values in ???. The array shape is (number_of_points,)
+        ESP values in elementary_charge/Angstrom. The array shape is (number_of_points,)
     """
 
     def __init__(self):
@@ -131,15 +131,6 @@ class QMBase(ABC, ProtocolInterface):
         if self.restrained_dihedrals is not None:
             self._restrained_dihedrals = self.restrained_dihedrals + 1  # Convert to 1-based indices
 
-        # TODO extract from SimQueue object
-        try:
-            self._ncpus = int(os.getenv('NCPUS'))
-        except TypeError:
-            self._ncpus = os.cpu_count()
-
-        # TODO extract from SimQueue object
-        self._mem = 2
-
         # Create directories and write inputs
         self._directories = []
         for iframe in range(self._nframes):
@@ -172,8 +163,13 @@ class QMBase(ABC, ProtocolInterface):
 
     def _retrieve(self):
 
-        self.queue.wait()
-        self.queue.retrieve()
+        # HACK: don't wait, if there is nothing to wait..
+        if len(self.queue._dirs) > 0:
+            if isinstance(self.queue, LocalCPUQueue):
+                self.queue.wait(sentinel=False) # TODO: sentinel is still broken
+            else:
+                self.queue.wait(sentinel=True)
+            self.queue.retrieve()
 
         # Read output files
         results = [self._readOutput(directory) for directory in self._directories]

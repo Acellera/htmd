@@ -29,7 +29,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
     ncpu : int, default=1
         Number of CPUs to use for a single job
     memory : int, default=4000
-        Amount of memory per job (MB)
+        Amount of memory per job (MiB)
     walltime : int, default=None
         Job timeout (hour:min or min)
     environment : list of strings, default=None
@@ -54,12 +54,13 @@ class LsfQueue(SimQueue, ProtocolInterface):
                  'memory': 4000, 'walltime': None, 'resources': None, 'environment': None}
 
     def __init__(self):
-        super().__init__()
+        SimQueue.__init__(self)
+        ProtocolInterface.__init__(self)
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
         self._arg('queue', 'str', 'The queue to run on', self._defaults[self._defaults['default_queue']], val.String())
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
                   val.Number(int, '0POS'))
-        self._arg('ncpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ncpu'],
+        self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'],
                   val.Number(int, '0POS'))
         self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, '0POS'))
         self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'], val.Number(int, '0POS'))
@@ -76,10 +77,6 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._qinfo = LsfQueue._find_binary('bqueues')
         self._qcancel = LsfQueue._find_binary('bkill')
         self._qstatus = LsfQueue._find_binary('bjobs')
-
-        self._sentinel = 'htmd.queues.done'
-        # For synchronous
-        self._dirs = []
 
     @staticmethod
     def _find_binary(binary):
@@ -251,32 +248,33 @@ class LsfQueue(SimQueue, ProtocolInterface):
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))
 
-    def wait(self, sentinel=False):
-        """ Blocks script execution until all queued work completes
+    @property
+    def ncpu(self):
+        return self.__dict__['ncpu']
 
-        Parameters
-        ----------
-        sentinel : bool, default=False
-            If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
-            relies on the filesystem, in particular on the existence of a sentinel file for job completion.
+    @ncpu.setter
+    def ncpu(self, value):
+        self.ncpu = value
 
-        Examples
-        --------
-        >>> LsfQueue.wait()
-        """
-        from time import sleep
-        import sys
+    @property
+    def ngpu(self):
+        return self.__dict__['ngpu']
 
-        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
-            sys.stdout.flush()
-            sleep(5)
+    @ngpu.setter
+    def ngpu(self, value):
+        self.ngpu = value
+
+    @property
+    def memory(self):
+        return self.__dict__['memory']
+
+    @memory.setter
+    def memory(self, value):
+        self.memory = value
+
 
 if __name__ == "__main__":
+    # TODO: Create fake binaries for instance creation testing
     """
-    s=Slurm( name="testy", partition="gpu")
-    s.submit("test/dhfr1" )
-    ret= s.inprogress( debug=False)
-    print(ret)
-    print(s)
-    pass
+    q = LsfQueue()
     """

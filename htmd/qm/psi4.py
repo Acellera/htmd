@@ -5,6 +5,7 @@
 #
 import os
 import numpy as np
+from scipy import constants as const
 
 from htmd.qm.base import QMBase, QMResult
 
@@ -30,7 +31,7 @@ class Psi4(QMBase):
         Level of theory. A full list is at Psi4.THEORIES
     basis : str, default = '6-31G*'
         Basis set. A full list is at Psi4.BASIS_SETS
-    correction : str, default = None
+    correction : str, default = 'none'
         Empirical dispersion correction. A full list is at Psi4.CORRECTIONS
     solvent : str, default = 'vacuum'
          Implicit solvent model. A full isit is at Psi4.SOLVENTS
@@ -78,7 +79,7 @@ class Psi4(QMBase):
     >>> result[0].errored
     False
     >>> result[0].energy # doctest: +ELLIPSIS
-    -728.97082622...
+    -728.97083177...
     >>> result[0].mulliken
     [0.0, -0.0]
 
@@ -125,8 +126,8 @@ class Psi4(QMBase):
 
         with open(os.path.join(directory, 'psi4.in'), 'w') as f:
 
-            f.write('set_num_threads( %d )\n' % self._ncpus)
-            f.write('memory %f gb\n\n' % self._mem)
+            f.write('set_num_threads(%d)\n' % self.queue.ncpu)
+            f.write('set_memory(%d)\n\n' % (1024**2*self.queue.memory))
 
             reference = 'r' if self.multiplicity == 1 else 'u'
             reference += 'hf' if self.theory == 'RHF' else 'ks'
@@ -197,7 +198,7 @@ class Psi4(QMBase):
         if os.path.exists(xyzFile):
             with open(xyzFile) as f:
                 result.energy = float(f.readline().split()[1])  # Read the 2nd number on the 1st line
-                result.energy *= 627.509469  # Hartree to kcal
+            result.energy *= const.physical_constants['Hartree energy'][0]/(const.kilo*const.calorie/const.Avogadro) # Hartree to kcal/mol
             result.coords = np.loadtxt(xyzFile, skiprows=2, usecols=(1, 2, 3))
             result.coords = np.atleast_3d(result.coords)  # TODO get rid of this
         else:
@@ -207,7 +208,8 @@ class Psi4(QMBase):
             espFile = os.path.join(directory, 'grid_esp.dat')
             if os.path.exists(espFile):
                 result.esp_points = self.esp_points
-                result.esp_values = np.loadtxt(espFile)/0.529177249  # Bohrs to Angstoms
+                result.esp_values = np.loadtxt(espFile)
+                result.esp_values *= const.angstrom/const.physical_constants['Bohr radius'][0] # 1/Bohr to 1/Angstrom
             else:
                 result.errored = True
 
