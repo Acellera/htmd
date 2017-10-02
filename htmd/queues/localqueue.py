@@ -4,20 +4,24 @@
 # No redistribution in whole or part
 #
 import os
+import numpy as np
 from htmd.queues.simqueue import SimQueue
 from protocolinterface import ProtocolInterface, val
 import queue
 import threading
 from subprocess import check_output
-import os
 from glob import glob as glob
-import abc
+from abc import abstractmethod
 import logging
+import psutil
+from pint import UnitRegistry
 logger = logging.getLogger(__name__)
+
+# TODO: Merge CPU and GPU queue into a single one which manages ncpu and ngpu simultaneously
 
 
 class _LocalQueue(SimQueue, ProtocolInterface):
-    """ Local machine queue system
+    """ Support class for local machine queue systems
 
     Parameters
     ----------
@@ -25,21 +29,19 @@ class _LocalQueue(SimQueue, ProtocolInterface):
         The path in which to store completed trajectories.
     trajext : str, default='xtc'
         Extension of trajectory files. This is needed to copy them to datadir.
+    copy : list, default='*.xtc'
+        A list of file names or globs for the files to copy to datadir
 
-
-    .. rubric:: Methods
-    .. autoautosummary:: htmd.queues.localqueue._LocalQueue
-       :methods:
-    .. rubric:: Attributes
-    .. autoautosummary:: htmd.queues.localqueue._LocalQueue
-       :attributes:
     """
 
     def __init__(self):
-        super().__init__()
+        SimQueue.__init__(self)
+        ProtocolInterface.__init__(self)
         self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
-        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
-        self._arg('copy', 'list', 'A list of file names or globs for the files to copy to datadir', ('*.xtc'), val.String(), nargs='*')
+        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc',
+                  val.String())
+        self._arg('copy', 'list', 'A list of file names or globs for the files to copy to datadir', ('*.xtc', ),
+                  val.String(), nargs='*')
         self._cmdDeprecated('trajext', 'copy')
 
         self._states = dict()
@@ -51,17 +53,56 @@ class _LocalQueue(SimQueue, ProtocolInterface):
             self._queue = queue.Queue()
 
             devices = self._getdevices()
+            self.memory = self._getmemory()
 
             self._threads = []
             for d in devices:
-                t = threading.Thread(target=run_job, args=(self, d))
+                t = threading.Thread(target=self.run_job, args=(d, ))
                 t.daemon = True
                 t.start()
                 self._threads.append(t)
 
+    def run_job(self, gpuid):
+        queue = self._queue
+        while not self._shutdown:
+            path = None
+            try:
+                path = queue.get(timeout=1)
+            except:
+                pass
+
+            if path:
+                if gpuid is None:
+                    logger.info('Running ' + path)
+                else:
+                    logger.info("Running " + path + " on GPU device " + str(gpuid))
+                self._setRunning(path)
+
+                runsh = os.path.join(path, 'run.sh')
+                jobsh = os.path.join(path, 'job.sh')
+                self._createJobScript(jobsh, path, runsh, gpuid)
+
+                try:
+                    ret = check_output(jobsh)
+                    logger.debug(ret)
+                except Exception as e:
+                    logger.info('Error in simulation {}. {}'.format(path, e))
+                    self._setCompleted(path)
+                    queue.task_done()
+                    continue
+
+                logger.info("Completed " + path)
+                self._setCompleted(path)
+                queue.task_done()
+
+        logger.info("Shutting down worker thread")
+
     def _createJobScript(self, fname, workdir, runsh, gpudevice=None):
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n\n')
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\n')
             if gpudevice is not None:
                 f.write('export CUDA_VISIBLE_DEVICES={}\n'.format(gpudevice))
             f.write('cd {}\n'.format(os.path.abspath(workdir)))
@@ -118,7 +159,9 @@ class _LocalQueue(SimQueue, ProtocolInterface):
         """
         self._setupQueue()
 
-        if isinstance(mydirs, str): mydirs = [mydirs]
+        if isinstance(mydirs, str):
+            mydirs = [mydirs]
+        self._dirs.extend(mydirs)
 
         for d in mydirs:
             if not os.path.isdir(d):
@@ -145,12 +188,37 @@ class _LocalQueue(SimQueue, ProtocolInterface):
 
         return output_run + output_queue
 
+    def notcompleted(self):
+        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
+
+        Returns
+        -------
+        total : int
+            Total number of directories which have not completed
+        """
+        total = 0
+        if len(self._dirs) == 0:
+            raise RuntimeError('This method relies on running synchronously.')
+        for i in self._dirs:
+            if not os.path.exists(os.path.join(i, self._sentinel)):
+                total += 1
+        return total
+
     def stop(self):
         self._shutdown = True
 
-    @abc.abstractmethod
+    @abstractmethod
     def _getdevices(self):
-        pass
+        return list()
+
+    def _getmemory(self):
+        ureg = UnitRegistry()
+        total_memory = int(ureg.Quantity(psutil.virtual_memory().total, ureg.byte).to('MiB').magnitude)
+        nr_devices = len(self._getdevices())
+        if nr_devices != 0:
+            return int(total_memory/nr_devices)
+        else:
+            return None
 
 
 class LocalGPUQueue(_LocalQueue):
@@ -163,9 +231,13 @@ class LocalGPUQueue(_LocalQueue):
     copy : list, default='*.xtc'
         A list of file names or globs for the files to copy to datadir
     ngpu : int, default=None
-        Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will use the first `ngpus` devices of the machine.
+        Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will
+        use the first `ngpu` devices of the machine.
     devices : list, default=None
-        A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpus`
+        A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpu`
+    memory : int, default=None
+        The amount of RAM memory available for each job. If None, it will be guessed from total amount of memory and
+        the number of devices
 
 
     .. rubric:: Methods
@@ -180,10 +252,14 @@ class LocalGPUQueue(_LocalQueue):
     def __init__(self):
         super().__init__()
         self._arg('ngpu', 'int', 'Number of GPU devices that the queue will use. Each simulation will be run on '
-                                  'a different GPU. The queue will use the first `ngpus` devices of the machine.',
-                       None, val.Number(int, '0POS'))
+                                 'a different GPU. The queue will use the first `ngpus` devices of the machine.',
+                  None, val.Number(int, '0POS'))
         self._arg('devices', 'list', 'A list of GPU device indexes on which the queue is allowed to run '
-                                     'simulations. Mutually exclusive with `ngpus`', None, val.Number(int, '0POS'), nargs='*')
+                                     'simulations. Mutually exclusive with `ngpus`', None, val.Number(int, '0POS'),
+                  nargs='*')
+        self._arg('memory', 'int', 'The amount of RAM memory available for each job. If None, it will be guessed from '
+                                   'total amount of memory and the number of devices', None,
+                  val.Number(int, '0POS'))
 
     def _getdevices(self):
         ngpu = self.ngpu
@@ -207,6 +283,30 @@ class LocalGPUQueue(_LocalQueue):
             logger.info("Using GPU devices {}".format(','.join(map(str, devices))))
         return devices
 
+    @property
+    def ngpu(self):
+        return self.__dict__['ngpu']
+
+    @ngpu.setter
+    def ngpu(self, value):
+        self.ngpu = value
+
+    @property
+    def ncpu(self):
+        raise NotImplementedError
+
+    @ncpu.setter
+    def ncpu(self, value):
+        raise NotImplementedError
+
+    @property
+    def memory(self):
+        return self.__dict__['memory']
+
+    @memory.setter
+    def memory(self, value):
+        self.memory = value
+
 
 class LocalCPUQueue(_LocalQueue):
     """ Local CPU machine queue system
@@ -217,9 +317,11 @@ class LocalCPUQueue(_LocalQueue):
         The path in which to store completed trajectories.
     copy : list, default='*.xtc'
         A list of file names or globs for the files to copy to datadir
-    ncpu : int, default=None
-        Number of CPU threads that the queue will use. If None it will use the `ncpu` configured for HTMD in htmd.configure()
-
+    ncpu : int
+        Number of CPU threads that the queue will use. By default, it is the total number of cpus.
+    memory : int
+        The amount of RAM memory available (in MiB). By default, it will be calculated from total amount
+        of memory and the number of devices
 
     .. rubric:: Methods
     .. autoautosummary:: htmd.queues.localqueue.LocalCPUQueue
@@ -233,64 +335,72 @@ class LocalCPUQueue(_LocalQueue):
     def __init__(self):
         super().__init__()
         self._arg('ncpu', 'int', 'Number of CPU threads that the queue will use. If None it will use the `ncpu` '
-                                 'configured for HTMD in htmd.configure()', None, val.Number(int, 'POS'))
+                                 'configured for HTMD in htmd.configure()', psutil.cpu_count(), val.Number(int, 'POS'))
+        self._arg('memory', 'int', 'The amount of RAM memory available', self._getmemory(),
+                  val.Number(int, '0POS'))
 
     def _getdevices(self):
-        import multiprocessing
-        ncpu = self.ncpu
-        totalcpus = multiprocessing.cpu_count()
-        if ncpu is None:
-            from htmd.config import _config
-            ncpu = totalcpus + _config['ncpus'] + 1
-        if ncpu > totalcpus:
-            raise RuntimeError('You can only use up to {} threads on this machine'.format(totalcpus))
-        return [None] * ncpu
+        return [None] * self.ncpu
 
+    def _getmemory(self):
 
-def run_job(self, gpuid):
-    queue = self._queue
-    while not self._shutdown:
-        path = None
-        try:
-            path = queue.get(timeout=1)
-        except:
-            pass
+        memory = psutil.virtual_memory().total/1024**2
+        memory *= np.clip(self.ncpu/psutil.cpu_count(), 0, 1)
+        memory = int(np.floor(memory))
 
-        if path:
-            if gpuid is None:
-                logger.info('Running ' + path)
-            else:
-                logger.info("Running " + path + " on GPU device " + str(gpuid))
-            self._setRunning(path)
+        return memory
 
-            runsh = os.path.join(path, 'run.sh')
-            jobsh = os.path.join(path, 'job.sh')
-            self._createJobScript(jobsh, path, runsh, gpuid)
+    @property
+    def ncpu(self):
+        return self.__dict__['ncpu']
 
-            try:
-                ret = check_output(jobsh)
-                logger.debug(ret)
-            except Exception as e:
-                logger.info('Error in simulation {}. {}'.format(path, e))
-                self._setCompleted(path)
-                queue.task_done()
-                continue
+    @ncpu.setter
+    def ncpu(self, value):
+        self.ncpu = value
 
-            logger.info("Completed " + path)
-            self._setCompleted(path)
-            queue.task_done()
+    @property
+    def ngpu(self):
+        raise NotImplementedError
 
-    logger.info("Shutting down worker thread")
+    @ngpu.setter
+    def ngpu(self, value):
+        raise NotImplementedError
+
+    @property
+    def memory(self):
+        return self._getmemory()
+
+    @memory.setter
+    def memory(self, value):
+        raise NotImplementedError
 
 
 if __name__ == "__main__":
     from htmd.home import home
 
     lo = LocalCPUQueue()
+
+    assert lo.ncpu == psutil.cpu_count()
+    assert lo.memory > 1024
+
+    lo.ncpu = 100
+    mem1 = lo.memory
+    assert lo.ncpu == 100
+
     lo.ncpu = 1
+    mem2 = lo.memory
+    assert lo.ncpu == 1
+
+    assert mem1 >= mem2
+
     folder = os.path.join(home(dataDir='test-localqueue'), 'test_cpu')
     lo.submit([folder] * 2)
-    lo.wait()
+    lo.wait(sentinel=False)
+    lo.retrieve()
+
+    lo.submit([folder] * 2)
+    lo.wait(sentinel=True)
+    lo.retrieve()
 
     lo = LocalGPUQueue()
     try:
@@ -304,5 +414,3 @@ if __name__ == "__main__":
                 os.remove(r)
     except:
         print('No GPUs detected on this machine')
-
-

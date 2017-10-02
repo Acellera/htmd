@@ -27,8 +27,6 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         The name of the group of simulations you want to submit. If none is given, a randomly generated string will be used instead.
     datadir : str, default=None
         The directory in which to retrieve your results.
-    requesttype : ('spot', 'ondemand'), str, default='spot'
-        Choose between "spot" or "ondemand"
     verbose : bool, default=False
         Turn verbosity mode on or off.
 
@@ -45,11 +43,11 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
     """
     def __init__(self):
 
-        super().__init__()
+        SimQueue.__init__(self)
+        ProtocolInterface.__init__(self)
         self._arg('groupname', 'str', 'The name of the group of simulations you want to submit. If none is given, '
                                       'a randomly generated string will be used instead.', None, val.String())
         self._arg('datadir', 'str', 'The directory in which to retrieve your results.', None, val.String())
-        self._arg('requesttype', 'str', 'Choose between "spot" or "ondemand"', 'spot', val.String(), valid_values=('spot', 'ondemand'))
         self._arg('verbose', 'bool', 'Turn verbosity mode on or off.', False, val.Boolean())
 
         self._cloud = None
@@ -66,6 +64,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         from acecloud.job import Job
         if isinstance(dirs, str):
             dirs = [dirs, ]
+        self._dirs.extend(dirs)
 
         if self.groupname is None:
             self.groupname = ''.join(
@@ -75,19 +74,17 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         for d in dirs:
             if not os.path.isdir(d):
                 raise FileExistsError('Submit: directory ' + d + ' does not exist.')
-            runsh = os.path.join(d, 'run.sh')
-            if not os.path.exists(runsh):
-                raise FileExistsError("File %s does not exist." % (runsh))
-            if not os.access(runsh, os.X_OK):
-                raise FileExistsError("File %s does not have execution permissions." % (runsh))
+            # runsh = os.path.join(d, 'run.sh')
+            # if not os.path.exists(runsh):
+            #     raise FileExistsError("File %s does not exist." % runsh)
+            # if not os.access(runsh, os.X_OK):
+            #     raise FileExistsError("File %s does not have execution permissions." % runsh)
 
         for d in dirs:
             logger.info("Queueing " + d)
-            runsh = os.path.join(d, 'run.sh')
-            jobsh = os.path.join(d, 'job.sh')
-            self._createJobScript(jobsh, runsh)
             name = os.path.basename(d)
 
+            from acecloud.requesttype import RequestType
             Job(
                 ngpus=1,
                 ncpus=1,
@@ -95,7 +92,8 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 group=self.groupname,
                 name=name,
                 cloud=self._cloud,
-                requesttype=self.requesttype
+                requesttype=RequestType.SPOT,
+                verbose=self.verbose
             )
 
     def inprogress(self):
@@ -106,9 +104,13 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         for j in jj:
             s = j.status()
             if s == Status.RUNNING or s == Status.PENDING:
-                count = count + 1
+                count += 1
 
         return count
+
+    def notcompleted(self):
+        # TODO: implement
+        pass
 
     def retrieve(self):
         if self.datadir is None:
@@ -133,6 +135,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 os.chdir(currdir)
 
     def stop(self):
+        # TODO: This not only stops the job, but also deletes the S3. Not exactly like the stop of other queues
         self._createCloud()
         jj = self._cloud.getJobs(group=self.groupname)
         for j in jj:
@@ -142,9 +145,26 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 logger.warning(e)
                 pass
 
-    def _createJobScript(self, fname, runsh):
-        with open(fname, 'w') as f:
-            f.write('#!/bin/bash\n\n')
-            f.write('{}'.format(runsh))
+    @property
+    def ngpu(self):
+        raise NotImplementedError
 
-        os.chmod(fname, 0o700)
+    @ngpu.setter
+    def ngpu(self, value):
+        raise NotImplementedError
+
+    @property
+    def ncpu(self):
+        raise NotImplementedError
+
+    @ncpu.setter
+    def ncpu(self, value):
+        raise NotImplementedError
+
+    @property
+    def memory(self):
+        raise NotImplementedError
+
+    @memory.setter
+    def memory(self, value):
+        raise NotImplementedError

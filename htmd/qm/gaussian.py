@@ -5,6 +5,7 @@
 #
 import os
 import numpy as np
+from scipy import constants as const
 
 from htmd.qm.base import QMBase, QMResult
 
@@ -36,8 +37,9 @@ class Gaussian(QMBase):
 
         with open(os.path.join(directory, 'g09.in'), 'w') as f:
 
-            f.write('%nprocshared = {}\n'.format(self._ncpus))
-            f.write('%mem = {} GB\n\n'.format(self._mem))
+            f.write('%nprocshared = {}\n'.format(self.queue.ncpu))
+            memory = int(np.floor(self.queue.memory/1000))
+            f.write('%mem = {} GB\n\n'.format(memory))
 
             if self.theory == 'HF':
                 dispersion = ''
@@ -83,7 +85,6 @@ class Gaussian(QMBase):
     def _readOutput(self, directory):
 
         result = QMResult()
-        result.completed = True
 
         with open(os.path.join(directory, 'g09.out')) as f:
             fl = f.readlines()
@@ -147,11 +148,13 @@ class Gaussian(QMBase):
         elif not ('energy' in data) or data['energy'] == 0.:
             result.errored = True
         else:
-            result.energy = data['energy'] * 627.509469  # Hartree to kcal
+            result.energy = data['energy']
+            result.energy *= const.physical_constants['Hartree energy'][0]/(const.kilo*const.calorie/const.Avogadro) # Hartree to kcal/mol
             result.coords = np.atleast_3d(data['coords'])
             if 'gridesp' in data:
                 result.esp_points = np.squeeze(np.asarray(self.esp_points))
-                result.esp_values = data['gridesp'] / 0.529177249  # Bohrs to Angstoms
+                result.esp_values = data['gridesp']
+                result.esp_values *= const.angstrom/const.physical_constants['Bohr radius'][0] # 1/Bohr to 1/Angstrom
             if 'dipole' in data:
                 result.dipole = data['dipole']
             if 'quadrupole' in data:

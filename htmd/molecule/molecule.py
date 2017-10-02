@@ -149,6 +149,7 @@ class Molecule:
         'dihedrals': np.uint32,
         'impropers': np.uint32,
         'atomtype': object,
+        'bondtype': object,
         'masses': np.float32,
         'box': np.float32,
         'boxangles': np.float32
@@ -174,6 +175,7 @@ class Molecule:
         'dihedrals': (0, 4),
         'impropers': (0, 4),
         'atomtype': (0,),
+        'bondtype': (0,),
         'masses': (0,),
         'box': (3, 1),
         'boxangles': (3, 1),
@@ -311,8 +313,10 @@ class Molecule:
                 newbonds += index
                 if len(self.bonds) > 0:
                     self.bonds = np.append(self.bonds, newbonds, axis=0)
+                    self.bondtype = np.append(self.bondtype, mol.bondtype, axis=0)
                 else:
                     self.bonds = newbonds
+                    self.bondtype = mol.bondtype
 
             for k in self._atom_fields:
                 if k == 'serial':
@@ -608,6 +612,8 @@ class Molecule:
         stays = np.invert(remA | remB)
         # Delete bonds between non-existant atoms
         self.bonds = bonds[stays, :]
+        if len(self.bondtype):
+            self.bondtype = self.bondtype[stays]
 
     def _guessBonds(self):
         """ Tries to guess the bonds in the Molecule
@@ -639,8 +645,7 @@ class Molecule:
         vector.shape = [1, 3]  # Forces it to be row vector
 
         s = self.atomselect(sel)
-        for f in range(self.numFrames):
-            self.coords[s, :, f] += vector
+        self.coords[s, :, self.frame] += vector
 
     @_Deprecated('1.3.2', 'htmd.molecule.molecule.Molecule.rotateBy')
     def rotate(self, axis, angle, center=(0, 0, 0), sel=None):
@@ -773,8 +778,8 @@ class Molecule:
         >>> mol.center()
         >>> mol.center([10, 10, 10], 'name CA')
         """
-        coords = self.get('coords', sel=sel)
-        com = np.mean(coords, 0)
+        sel = self.atomselect(sel)
+        com = np.mean(self.coords[sel, :, self.frame], 0)
         self.moveBy(-com)
         self.moveBy(loc)
 

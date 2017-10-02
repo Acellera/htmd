@@ -48,6 +48,7 @@ class Topology:
         self.dihedrals = []
         self.impropers = []
         self.atomtype = []
+        self.bondtype = []
         self.crystalinfo = None
 
         if pandasdata is not None:
@@ -225,6 +226,7 @@ def MOL2read(filename, frame=None, topoloc=None):
             if len(b) < 4:
                 break
             topo.bonds.append([int(b[1]) - 1, int(b[2]) - 1])
+            topo.bondtype.append(b[3])
 
     coords = np.vstack(coords)[:, :, np.newaxis]
     traj = Trajectory(coords=coords)
