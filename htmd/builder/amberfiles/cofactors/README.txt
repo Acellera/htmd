@@ -14,3 +14,5 @@ NAD+: U. Ryde [ Prot. Sci. 4(1995)1124-1132 - "On the role of Glu-68 in alcohol 
 
 NADP: N. Holmberg, U. Ryde, and L. Bulow [ Prot. Engin., 12 (1999) 851-856. -
       "Redesign of the coenzyme specificity in L-lactate dehydrogenase from            Bacillus stearothermophilus using site-directed mutagenesis and media           engineering."]
+
+GDP, GTP: Meagher KL, Redman LT, Carlson HA [ Journal of Computational Chemistry 2003,24,1016 - "Development of polyphosphate parameters for use with the AMBER force field" ]
