@@ -360,7 +360,9 @@ run 0'''
         else:
             raise NotImplementedError
 
-        printEnergies(mol, 'energies.txt')
+        energyFile = os.path.join(paramdir, 'energies.txt')
+        printEnergies(mol, energyFile)
+        logger.info('Write energies file: %s' % energyFile)
 
 if __name__ == "__main__":
 

@@ -71,8 +71,7 @@ class TestParameterize(unittest.TestCase):
                 if file.endswith('prm'):
                     refLines, resLines = refLines[1:], resLines[1:]
 
-                if file.endswith('prm') or file.endswith('frcmod') or \
-                        os.path.relpath(file, start=refDir).startswith('energies'):
+                if file.endswith('prm') or file.endswith('frcmod') or file.endswith('energies.txt'):
                     refFields = [field for line in refLines for field in line.split()]
                     resFields = [field for line in resLines for field in line.split()]
                     for refField, resField in zip(refFields, resFields):
