@@ -6,6 +6,7 @@
 from htmd.queues.simqueue import SimQueue
 from protocolinterface import ProtocolInterface, val
 import queue
+import os
 import threading
 from subprocess import check_output
 from glob import glob as glob
