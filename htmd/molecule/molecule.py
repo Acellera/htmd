@@ -3,8 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from __future__ import print_function
-
 import numpy as np
 from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.wrap import wrap
@@ -195,14 +193,8 @@ class Molecule:
         self._tempreps = Representations(self)
         self.viewname = name
 
-        if filename:
+        if filename is not None:
             self.read(filename, **kwargs)
-            if isinstance(filename, str):
-                self.topoloc = os.path.abspath(filename)
-                if name is None and isinstance(filename, str):
-                    self.viewname = filename
-                    if path.isfile(filename):
-                        self.viewname = path.basename(filename)
 
     @staticmethod
     def _empty(numAtoms, field):
@@ -835,7 +827,6 @@ class Molecule:
             return
 
         from htmd.molecule.readers import Trajectory
-        topo = None
         if append:
             traj = Trajectory(self.coords, self.box, self.boxangles, self.fileloc, self.step, self.time)
         else:
@@ -881,15 +872,13 @@ class Molecule:
                 tr.fileloc = [[fname, j] for j in ff]
                 traj += tr
 
-            if to is not None and topo is None:  # We only use the first topology we read
+            if to is not None:
                 self._parseTopology(to, fname, overwrite=overwrite, _logger=_logger)
-                topo = to
 
         if len(traj.coords) != 0:
             self._parseTraj(traj, skip=skip)
-            
-        if topo:
-            self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
+
+        self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
 
     def _checkCoords(self, traj, reader, f):
         coords = traj.coords[0]
@@ -984,13 +973,15 @@ class Molecule:
                     raise TopologyInconsistencyError(
                         'Different atom information read from topology file {} for field {}'.format(filename, field))
 
-        fnamestr = os.path.splitext(os.path.basename(filename))[0]
-        self.viewname = fnamestr
-        self.fileloc = [[fnamestr, 0]]
-        self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
         self.crystalinfo = topo.crystalinfo
         _ = self._checkInsertions(_logger=_logger)
+
+        if os.path.exists(filename):
+            filename = os.path.abspath(filename)
+        self.topoloc = filename
+        self.fileloc = [[filename, 0]]
+        self.viewname = os.path.basename(filename)
 
     def _checkInsertions(self, _logger=True):
         ins = np.unique([x for x in self.insertion if x != ''])
