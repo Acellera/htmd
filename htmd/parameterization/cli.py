@@ -150,7 +150,7 @@ VdW      : {VDW_ENERGY}
                          qm=qm, outdir=args.outdir)
         print('Detected soft torsions:')
         with open('torsions.txt', 'w') as fh:
-            for dihedral in mol.getSoftTorsions():
+            for dihedral in mol.getRotatableDihedrals():
                 name = "%s-%s-%s-%s" % tuple(mol.name[dihedral])
                 print('\t'+name)
                 fh.write(name+'\n')
@@ -241,7 +241,7 @@ VdW      : {VDW_ENERGY}
             if args.seed:
                 np.random.seed(args.seed)
 
-            all_dihedrals = mol.getSoftTorsions()
+            all_dihedrals = mol.getRotatableDihedrals()
 
             # Choose which dihedrals to fit
             dihedrals = []
@@ -255,7 +255,7 @@ VdW      : {VDW_ENERGY}
                     else:
                         raise ValueError('%s is not recognized as a soft torsion\n' % name)
 
-            mol.fitSoftTorsions(dihedrals, args.geomopt)
+            mol.fitDihedrals(dihedrals, args.geomopt)
 
         printEnergies(mol, 'energies.txt')
 

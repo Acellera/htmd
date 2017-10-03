@@ -50,7 +50,7 @@ class ESP:
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
     >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2) # doctest: +ELLIPSIS
-    <BLANKLINE>
+    Net Charge: 0
     ...
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
@@ -206,7 +206,7 @@ class ESP:
 
     def _map_groups_to_atoms(self, group_charges):
 
-        charges = np.zeros(self.molecule.natoms)
+        charges = np.zeros(self.molecule.numAtoms)
         for atom_group, group_charge in zip(self.molecule._equivalent_atom_groups, group_charges):
             charges[atom_group] = group_charge
 

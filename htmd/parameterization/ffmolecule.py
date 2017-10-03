@@ -6,10 +6,11 @@
 import os
 import re
 import numpy as np
+import logging
 
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.vdw import VDW
-from htmd.molecule.util import dihedralAngle, guessAnglesAndDihedrals
+from htmd.molecule.util import guessAnglesAndDihedrals
 from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
@@ -18,6 +19,8 @@ from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
 from htmd.parameterization.dihedral import DihedralFitting
 from htmd.qm import Psi4, FakeQM
+
+logger = logging.getLogger(__name__)
 
 
 class FFMolecule(Molecule):
@@ -30,32 +33,27 @@ class FFMolecule(Molecule):
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
                  qm=None, outdir="./"):
 
-        self.method = method
-        self.outdir = outdir
-
-        if not filename.endswith(".mol2"):
-            raise ValueError("Input file must be mol2 format")
+        if not filename.endswith('.mol2'):
+            raise ValueError('Molecule file must be in MOL2 format')
 
         super().__init__(filename=filename, name=name)
 
-        self.natoms = self.numAtoms # TODO remove
-
         # Guess bonds
-        if len(self.bonds)==0:
-           print("No bonds found. Guessing them")
-           self.bonds =  self._guessBonds()
+        if len(self.bonds) == 0:
+            logger.warning('No bonds found! Guessing them...')
+            self.bonds = self._guessBonds()
 
         # Guess angles and dihedrals
         self.angles, self.dihedrals = guessAnglesAndDihedrals(self.bonds, cyclicdih=True)
 
         # Detect equivalent atoms
         equivalents = detectEquivalents(self)
-        self._equivalent_atom_groups = equivalents[0]  # list of groups of equivalent atoms
-        self._equivalent_atoms = equivalents[1]  # list of equivalent atoms, indexed by atom
-        self._equivalent_group_by_atom = equivalents[2]  # mapping from atom index to equivalent atom group
+        self._equivalent_atom_groups = equivalents[0]  # List of groups of equivalent atoms
+        self._equivalent_atoms = equivalents[1]  # List of equivalent atoms, indexed by atom
+        self._equivalent_group_by_atom = equivalents[2]  # Mapping from atom index to equivalent atom group
 
-        # Detect rotable dihedrals
-        self._soft_dihedrals = detectSoftDihedrals(self, equivalents)
+        # Detect rotatable dihedrals
+        self._rotatable_dihedrals = detectSoftDihedrals(self, equivalents)
 
         # Set total charge
         if netcharge is None:
@@ -63,33 +61,39 @@ class FFMolecule(Molecule):
         else:
             self.netcharge = int(round(netcharge))
 
-        # Canonicalise the atom naming.
-        self._rename_mol()
+        # Canonicalise the names
+        self._rename()
 
+        # Assign atom types, charges, and initial parameters
+        self.method = method
         if rtf and prm:
             # If the user has specified explicit RTF and PRM files go ahead and load those
             self._rtf = RTF(rtf)
             self._prm = PRM(prm)
+            logger.info('Reading FF parameters from %s and %s' % (rtf, prm))
         elif method == FFTypeMethod.NONE:
-            # Don't assign any atom types
-            pass
+            pass  # Don't assign any atom types
         else:
             # Otherwise make atom types using the specified method
             fftype = FFType(self, method=self.method)
             self._rtf = fftype._rtf
             self._prm = fftype._prm
 
-        self.qm = qm if qm else Psi4()
-
         if hasattr(self, '_rtf'):
+            self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
+            self.charge[:] = [self._rtf.charge_by_name[name] for name in self.name]
             self.impropers = np.array(self._rtf.impropers)
 
         # Set atom masses
+        # TODO: maybe move to molecule
         if self.masses.size == 0:
             if hasattr(self, '_rtf'):
                 self.masses[:] = [self._rtf.mass_by_type[self._rtf.type_by_index[i]] for i in range(self.numAtoms)]
             else:
                 self.masses[:] = [VDW.masses[VDW.elements.index(element)] for element in self.element]
+
+        self.qm = qm if qm else Psi4()
+        self.outdir = outdir
 
         self.report()
 
@@ -111,22 +115,25 @@ class FFMolecule(Molecule):
             print("")
 
         print("Soft torsions:")
-        for i in self._soft_dihedrals:
+        for i in self._rotatable_dihedrals:
             for j in i.atoms:
                 print(" {}".format(self.name[j]), end="")
             print("")
 
-    def _rename_mol(self):
+    def _rename(self):
         """
         This fixes up the atom naming and reside name to be consistent.
         NB this scheme matches what MATCH does.
         Don't change it or the naming will be inconsistent with the RTF.
         """
 
-        sufices = dict()
+        self.segid[:] = 'L'
+        logger.info('Rename segment to %s' % self.segid[0])
+        self.resname[:] = 'MOL'
+        logger.info('Rename residue to %s' % self.resname[0])
 
-        print('\nRename atoms:')
-        for i in range(len(self.name)):
+        sufices = dict()
+        for i in range(self.numAtoms):
             name = self.name[i].upper()
 
             # This fixes the specific case where a name is 3 or 4 characters, as X-TOOL seems to make
@@ -139,12 +146,9 @@ class FFMolecule(Molecule):
             sufices[name] = sufices.get(name, 0) + 1
 
             name += str(sufices[name])
-            print(' %-4s --> %-4s' % (self.name[i], name))
+            logger.info('Rename atom %d: %-4s --> %-4s' % (i, self.name[i], name))
 
             self.name[i] = name
-            self.resname[i] = "MOL"
-
-        print()
 
     def output_directory_name(self):
 
@@ -170,7 +174,7 @@ class FFMolecule(Molecule):
         self.qm.directory = mindir
         results = self.qm.run()
         if results[0].errored:
-            raise RuntimeError("QM Optimization failed")
+            raise RuntimeError('\nQM minimization failed! Check logs at %s\n' % mindir)
 
         # Replace coordinates with the minimized set
         self.coords = results[0].coords
@@ -197,7 +201,7 @@ class FFMolecule(Molecule):
         if os.path.exists(point_file):
             # Load a point file if one exists from a previous job
             esp_points = np.loadtxt(point_file)
-            print("Reusing previously-generated point cloud")
+            logger.info('Reusing ESP grid from %s' % point_file)
         else:
             # Generate ESP points
             esp_points = ESP.generate_points(self)[0]
@@ -210,7 +214,7 @@ class FFMolecule(Molecule):
         self.qm.directory = espDir
         qm_results = self.qm.run()
         if qm_results[0].errored:
-            raise RuntimeError("QM Calculation failed")
+            raise RuntimeError('\nQM calculation failed! Check logs at %s\n' % espDir)
 
         # Safeguard QM code from changing coordinates :)
         assert np.all(np.isclose(self.coords, qm_results[0].coords, atol=1e-6))
@@ -241,11 +245,11 @@ class FFMolecule(Molecule):
 
         return dipole
 
-    def getSoftTorsions(self):
+    def getRotatableDihedrals(self):
 
-        return [dihedral.atoms.copy() for dihedral in self._soft_dihedrals]
+        return [dihedral.atoms.copy() for dihedral in self._rotatable_dihedrals]
 
-    def fitSoftTorsions(self, dihedrals, geomopt=True):
+    def fitDihedrals(self, dihedrals, geomopt=True):
         """
         Dihedrals passed as 4 atom indices
         """
@@ -298,30 +302,28 @@ class FFMolecule(Molecule):
         if isinstance(self.qm, FakeQM):
             df.zeroed_paramters = True
 
+        # Fit dihedral parameters
         df.run()
-        # TODO explicit parameter update
 
-        print(' RMSD: %s kcal/mol\n' % df.loss)
+        # Update atom types
+        self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
 
-    def duplicateTypeOfAtom(self, atom_index):
+    def _duplicateAtomType(self, atom_index):
         """Duplicate the type of the specified atom"""
 
-        # First get the type
+        # Get the type name. If the type is already dubplicated, remove the suffix
         type_ = self._rtf.type_by_index[atom_index]
-
-        # perhaps the type is already a duplicate? if so
-        # remove the duplicated suffix
         type_ = re.sub('x\d+$', '', type_)
 
-        # make the new type name
+        # Create a new atom type name
         i = 0
         while ('%sx%d' % (type_, i)) in self._rtf.types:
             i += 1
         newtype = '%sx%d' % (type_, i)
-        print("Creating new type %s from %s for atom %s" % (newtype, type_, self._rtf.names[atom_index]))
+        logger.info('Create a new atom type %s from %s' % (newtype, type_))
 
+        # Duplicate the type in RTF
         # TODO: move to RTF class
-        # duplicate the type in the fields RTF --
         self._rtf.type_by_index[atom_index] = newtype
         self._rtf.mass_by_type[newtype] = self._rtf.mass_by_type[type_]
         self._rtf.types.append(newtype)
@@ -330,29 +332,23 @@ class FFMolecule(Molecule):
         self._rtf.typeindex_by_type[newtype] = self._rtf.typeindex_by_type[type_] + 1000
         self._rtf.element_by_type[newtype] = self._rtf.element_by_type[type_]
 
-        # Now also reset the type of  any atoms that share equivalency
+        # Rename the atom types of the equivalent atoms
         for index in self._equivalent_atoms[atom_index]:
             if atom_index != index:
-                if "x" in self._rtf.type_by_index[index]:
-                    raise RuntimeError(
-                        "Equivalent atom already has a duplicated type: {} {}".format(index, self._rtf.type_by_index[index]))
+                assert 'x' not in self._rtf.type_by_index[index]
                 self._rtf.type_by_index[index] = newtype
                 self._rtf.type_by_name[self._rtf.names[index]] = newtype
 
-        # the PRM parameters will be automatically duplicated by forcing an ff evaluation
+        # PRM parameters are duplicated during FF evaluation
+        # TODO: move to PRM class
         FFEvaluate(self).run(self.coords[:, :, 0])
 
     def write(self, filename, sel=None, type=None, typemap=None):
 
-        if hasattr(self, "_rtf"):  # Update base Molecule's attributes so write() works correctly
-            self.segid[:] = 'L'
-            self.charge[:] = [self._rtf.charge_by_name[name] for name in self.name]
-            self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
-
-        atomtype_backup = np.copy(self.atomtype)
+        # TODO: remove type mapping
         if typemap:
-            self.atomtype[:] = [typemap[atomtype] for atomtype in self.atomtype]
-
-        super().write(filename, sel=sel, type=type)
-
-        self.atomtype[:] = atomtype_backup
+            mol = self.copy()
+            mol.atomtype[:] = [typemap[atomtype] for atomtype in self.atomtype]
+            mol.write(filename, sel=sel, type=type)
+        else:
+            super().write(filename, sel=sel, type=type)

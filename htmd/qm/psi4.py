@@ -55,7 +55,7 @@ class Psi4(QMBase):
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
     >>> molFile = os.path.join(home('test-qm'), 'H2-0.74.mol2')
     >>> mol = FFMolecule(molFile, method=FFTypeMethod.NONE) # doctest: +ELLIPSIS
-    <BLANKLINE>
+    Net Charge: 0
     ...
 
     Create a Psi4 object

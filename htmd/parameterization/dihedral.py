@@ -110,7 +110,7 @@ class DihedralFitting:
         # Duplicate the atom types of the dihedral
         for i in range(4):
             if not ("x" in self.molecule._rtf.type_by_index[dihedral[i]]):
-                self.molecule.duplicateTypeOfAtom(dihedral[i])
+                self.molecule._duplicateAtomType(dihedral[i])
 
         equivalent_dihedrals = self._getEquivalentDihedrals(dihedral)
         if len(equivalent_dihedrals) > 1:
@@ -154,9 +154,9 @@ class DihedralFitting:
         # Get equivalent dihedral atom indices
         self._equivalent_indices = []
         for idihed, dihedral in enumerate(self.dihedrals):
-            for rotableDihedral in self.molecule._soft_dihedrals:
-                if np.all(rotableDihedral.atoms == dihedral):
-                    self._equivalent_indices.append([dihedral] + rotableDihedral.equivalents)
+            for rotatableDihedral in self.molecule._rotatable_dihedrals:
+                if np.all(rotatableDihedral.atoms == dihedral):
+                    self._equivalent_indices.append([dihedral] + rotatableDihedral.equivalents)
                     break
             else:
                 raise ValueError('%s is not recognized as a rotable dihedral\n' % self._names[idihed])

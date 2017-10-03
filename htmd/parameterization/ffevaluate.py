@@ -63,14 +63,9 @@ class FFEvaluate:
     def __init__(self, molecule):
 
         self.mol = molecule
-        self.natoms = self.mol.natoms
+        self.natoms = self.mol.numAtoms
         self.rtf = self.mol._rtf
         self.prm = self.mol._prm
-
-        # Update the charge model
-        # TODO: FFmolecule should manage its data by itself
-        for i in range(self.natoms):
-            self.mol.charge[i] = self.rtf.charge_by_name[self.mol.name[i]]
 
         # 1-2 and 1-3 exclusion matrix
         self.excl = sp.sparse.lil_matrix((self.natoms, self.natoms))
