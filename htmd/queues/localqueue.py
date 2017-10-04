@@ -101,6 +101,9 @@ class _LocalQueue(SimQueue, ProtocolInterface):
             f.write('#!/bin/bash\n\n')
             if gpudevice is not None:
                 f.write('export CUDA_VISIBLE_DEVICES={}\n'.format(gpudevice))
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\n')
             f.write('cd {}\n'.format(os.path.abspath(workdir)))
             f.write('{}'.format(runsh))
 
