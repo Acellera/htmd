@@ -8,6 +8,7 @@ import numpy as np
 from htmd.queues.simqueue import SimQueue
 from protocolinterface import ProtocolInterface, val
 import queue
+import os
 import threading
 from subprocess import check_output
 from glob import glob as glob
@@ -105,6 +106,9 @@ class _LocalQueue(SimQueue, ProtocolInterface):
             f.write('\n')
             if gpudevice is not None:
                 f.write('export CUDA_VISIBLE_DEVICES={}\n'.format(gpudevice))
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\n')
             f.write('cd {}\n'.format(os.path.abspath(workdir)))
             f.write('{}'.format(runsh))
 
@@ -171,6 +175,16 @@ class _LocalQueue(SimQueue, ProtocolInterface):
         for d in mydirs:
             dirname = os.path.abspath(d)
             logger.info('Queueing ' + dirname)
+
+            # Clean sentinel files , if existent
+            if os.path.exists(os.path.join(d, self._sentinel)):
+                try:
+                    os.remove(os.path.join(d, self._sentinel))
+                except:
+                    logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
+                else:
+                    logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
+
             self._states[dirname] = 'Q'
             self._queue.put(dirname)
 
@@ -336,7 +350,7 @@ class LocalCPUQueue(_LocalQueue):
         super().__init__()
         self._arg('ncpu', 'int', 'Number of CPU threads that the queue will use. If None it will use the `ncpu` '
                                  'configured for HTMD in htmd.configure()', psutil.cpu_count(), val.Number(int, 'POS'))
-        self._arg('memory', 'int', 'The amount of RAM memory available', self._getmemory(),
+        self._arg('memory', 'int', 'The amount of RAM memory available for each job.', self._getmemory(),
                   val.Number(int, '0POS'))
 
     def _getdevices(self):
@@ -368,12 +382,11 @@ class LocalCPUQueue(_LocalQueue):
 
     @property
     def memory(self):
-        return self._getmemory()
+        return self.__dict__['memory']
 
     @memory.setter
     def memory(self, value):
-        raise NotImplementedError
-
+        self.memory = value
 
 if __name__ == "__main__":
     from htmd.home import home
