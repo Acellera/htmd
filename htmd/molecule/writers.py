@@ -147,17 +147,17 @@ def PDBwrite(mol, filename, frames=None):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
             fh.write(
-                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {!s:>8}{!s:>8}{!s:>8}{!s:>6}{!s:>6}      {!s:4.4}{!s:>2.2}  \n".format(
+                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  \n".format(
                     mol.record[i],
                     serial[i], name, mol.altloc[i],
                     mol.resname[i], mol.chain[i],
                     mol.resid[i],
                     mol.insertion[i],
-                    '{:8.3f}'.format(coords[i, 0, f]),
-                    '{:8.3f}'.format(coords[i, 1, f]),
-                    '{:8.3f}'.format(coords[i, 2, f]),
-                    '{:6.2f}'.format(mol.occupancy[i]),
-                    '{:6.2f}'.format(mol.beta[i]),
+                    '{:8.3f}'.format(coords[i, 0, f])[:8],
+                    '{:8.3f}'.format(coords[i, 1, f])[:8],
+                    '{:8.3f}'.format(coords[i, 2, f])[:8],
+                    '{:6.2f}'.format(mol.occupancy[i])[:6],
+                    '{:6.2f}'.format(mol.beta[i])[:6],
                     mol.segid[i],
                     mol.element[i]
                 )
