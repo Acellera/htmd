@@ -62,9 +62,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         self._createCloud()
 
         from acecloud.job import Job
-        if isinstance(dirs, str):
-            dirs = [dirs, ]
-        self._dirs.extend(dirs)
+        dirs = self._submitinit(dirs)
 
         if self.groupname is None:
             self.groupname = ''.join(
@@ -107,10 +105,6 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 count += 1
 
         return count
-
-    def notcompleted(self):
-        # TODO: implement
-        pass
 
     def retrieve(self):
         if self.datadir is None:
