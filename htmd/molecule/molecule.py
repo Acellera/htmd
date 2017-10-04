@@ -1041,7 +1041,7 @@ class Molecule:
                 pass
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
-             viewerhandle=None, gui=False):
+             viewerhandle=None, showlabels=None, gui=False):
         """ Visualizes the molecule in a molecular viewer
 
         Parameters
@@ -1062,6 +1062,11 @@ class Molecule:
             A name to give to the molecule in VMD
         viewerhandle : :class:`VMD <htmd.vmdviewer.VMD>` object, optional
             A specific viewer in which to visualize the molecule. If None it will use the current default viewer.
+        showlabels : str or dict ('selection': str, textsize: float, textcolor: str or int)
+            str: Atomselection string for applying atom labels. The textsize is set to 0.7 and textcolor is set to 'green'
+            dict: {'selection': Atomselection string for applying atom labels,
+                   'textsize':  The textsize of the labels,
+                   'textcolor': The text color}
         """
         from htmd.util import tempname
 
@@ -1094,7 +1099,7 @@ class Molecule:
         if viewer.lower() == 'notebook':
             retval = self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
-            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
+            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds, showlabels)
             #retval = viewerhandle
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
             retval = self._viewNGL(gui=gui)
@@ -1109,7 +1114,8 @@ class Molecule:
         if retval is not None:
             return retval
 
-    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
+    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds, showlabels):
+        
         if name is None:
             name = self.viewname
         if vhandle is None:
@@ -1130,6 +1136,18 @@ class Molecule:
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
         self._tempreps.remove()
+
+        if showlabels is not None:
+            from htmd.home import home as htmdhome
+            from htmd.vmdfunctions.addlabelatoms import addLabelAtoms
+            tcllabel = os.path.join(htmdhome(), 'vmdfunctions', 'addlabelatoms.tcl')
+            if isinstance(showlabels, dict):
+                text = addLabelAtoms(showlabels['selection'], showlabels['textsize'], showlabels['textcolor'])
+            else:
+                text = addLabelAtoms(showlabels)
+            vhandle.send(text)
+            
+
 
     def _viewMDTraj(self, psf, xtc):
         from mdtraj.html import TrajectoryView, TrajectorySliderView, enable_notebook
