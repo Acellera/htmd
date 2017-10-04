@@ -152,9 +152,7 @@ class PBSQueue(SimQueue, ProtocolInterface):
         dist : list
             A list of executable directories.
         """
-        if isinstance(dirs, str):
-            dirs = [dirs, ]
-        self._dirs.extend(dirs)
+        dirs = self._submitinit(dirs)
 
         if self.queue is None:
             self.queue = self._autoQueueName()
@@ -236,22 +234,6 @@ class PBSQueue(SimQueue, ProtocolInterface):
             l = 0  # something odd happened
         return l
 
-    def notcompleted(self):
-        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
-
-        Returns
-        -------
-        total : int
-            Total number of directories which have not completed
-        """
-        total = 0
-        if len(self._dirs) == 0:
-            raise RuntimeError('This method relies on running synchronously.')
-        for i in self._dirs:
-            if not os.path.exists(os.path.join(i, self._sentinel)):
-                total += 1
-        return total
-
     def stop(self):
         """ Cancels all currently running and queued jobs
         """
@@ -264,25 +246,6 @@ class PBSQueue(SimQueue, ProtocolInterface):
             ret = check_output(cmd)
             logger.debug(ret.decode("ascii"))
 
-    def wait(self, sentinel=False):
-        """ Blocks script execution until all queued work completes
-
-        Parameters
-        ----------
-        sentinel : bool, default=False
-            If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
-            relies on the filesystem, in particular on the existence of a sentinel file for job completion.
-
-        Examples
-        --------
-        >>> PBSQueue.wait()
-        """
-        from time import sleep
-        import sys
-
-        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
-            sys.stdout.flush()
-            sleep(5)
 
 
 if __name__ == "__main__":

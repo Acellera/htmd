@@ -163,13 +163,11 @@ class QMBase(ABC, ProtocolInterface):
 
     def _retrieve(self):
 
-        # HACK: don't wait, if there is nothing to wait..
-        if len(self.queue._dirs) > 0:
-            if isinstance(self.queue, LocalCPUQueue):
-                self.queue.wait(sentinel=False) # TODO: sentinel is still broken
-            else:
-                self.queue.wait(sentinel=True)
-            self.queue.retrieve()
+        if isinstance(self.queue, LocalCPUQueue):
+            self.queue.wait(sentinel=False) # TODO: sentinel is still broken
+        else:
+            self.queue.wait(sentinel=True)
+        self.queue.retrieve()
 
         # Read output files
         results = [self._readOutput(directory) for directory in self._directories]
