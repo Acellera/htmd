@@ -116,74 +116,57 @@ def checkTruncations(mol):
                                                                                                                        f]))
 
 
-def PDBwrite(mol, filename, frame=None):
-    if frame is None:
-        frame = mol.frame
-    frame = ensurelist(frame)
-
-    def format83(f):
-        """Format a single float into a string of width 8, with ideally 3 decimal places of precision. If the number is
-        a little too large, we can gracefully degrade the precision by lopping off some of the decimal places. If it's
-        much too large, we throw a NameError"""
-        if -999.999 < f < 9999.999:
-            return '%8.3f' % f
-        if -9999999 < f < 99999999:
-            return ('%8.3f' % f)[:8]
-        raise NameError('coordinate "%s" could not be represented '
-                        'in a width-8 field' % f)
-
-    def format62(f):
-        if -9.999 < f < 99.999:
-            return '%6.2f' % f
-        if -99999 < f < 999999:
-            return ('%6.2f' % f)[:6]
-        raise NameError('coordinate "%s" could not be represented '
-                        'in a width-6 field' % f)
+def PDBwrite(mol, filename, frames=None, writebonds=True):
+    if frames is None:
+        frames = mol.frame
+    frames = ensurelist(frames)
 
     checkTruncations(mol)
-    coords = np.atleast_3d(mol.coords[:, :, frame])
+    coords = np.atleast_3d(mol.coords[:, :, frames])
     numFrames = coords.shape[2]
-    serial = np.arange(1, np.size(coords, 0) + 1)
+
+    serial = np.arange(1, np.size(coords, 0) + 1).astype(object)
+    serial[serial > 99999] = '*****'
+    serial = serial.astype('U5')
+
+    if coords.max() >= 1E8 or coords.min() <= -1E7:
+        raise RuntimeError('Cannot write PDB coordinates with values smaller than -1E7 or larger than 1E8')
+    if mol.occupancy.max() >= 1E6 or mol.occupancy.min() <= -1E5:
+        raise RuntimeError('Cannot write PDB occupancy with values smaller than -1E5 or larger than 1E6')
+    if mol.beta.max() >= 1E6 or mol.beta.min() <= -1E5:
+        raise RuntimeError('Cannot write PDB beta/temperature with values smaller than -1E5 or larger than 1E6')
 
     fh = open(filename, 'w')
-    # TODO FIXME  -- should take box from traj frame
-    box = mol.box
+    box = mol.box[:, frames[0]]
     if box is not None and not np.all(mol.box == 0):
-        box = np.atleast_2d(np.atleast_2d(box)[:, mol.frame])
-        print("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90),
-              file=fh)
+        fh.write("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 \n" % (box[0], box[1], box[2], 90, 90, 90))
 
-    for f in frame:
-        print("MODEL    %5d" % (f + 1), file=fh)
+    for f in range(numFrames):
+        fh.write("MODEL    %5d\n" % (frames[f] + 1))
         for i in range(0, len(mol.record)):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
-            if serial[i] < 100000:
-                ser = str(int(serial[i]))
-            else:
-                ser = '*****'
-
-            print(
-                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  ".format(
+            fh.write(
+                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  \n".format(
                     mol.record[i],
-                    ser, name, mol.altloc[i],
+                    serial[i], name, mol.altloc[i],
                     mol.resname[i], mol.chain[i],
                     mol.resid[i],
                     mol.insertion[i],
-                    format83(mol.coords[i, 0, f]),
-                    format83(mol.coords[i, 1, f]),
-                    format83(mol.coords[i, 2, f]),
-                    format62(mol.occupancy[i]),
-                    format62(mol.beta[i]),
+                    '{:8.3f}'.format(coords[i, 0, f])[:8],
+                    '{:8.3f}'.format(coords[i, 1, f])[:8],
+                    '{:8.3f}'.format(coords[i, 2, f])[:8],
+                    '{:6.2f}'.format(mol.occupancy[i])[:6],
+                    '{:6.2f}'.format(mol.beta[i])[:6],
                     mol.segid[i],
                     mol.element[i]
-                ), file=fh
+                )
             )
             # TODO : convert charges to ints if we ever write them
             if i < len(mol.record) - 1 and mol.segid[i] != mol.segid[i + 1]:
-                print("TER", file=fh)
+                fh.write("TER\n")
 
-        if mol.bonds is not None and len(mol.bonds) != 0:
+        if writebonds and mol.bonds is not None and len(mol.bonds) != 0:
             bondedatoms = np.unique(mol.bonds)
             bondedatoms = bondedatoms[bondedatoms < 99998]  # Don't print bonds over 99999 as it overflows the field
 
@@ -193,16 +176,17 @@ def PDBwrite(mol, filename, frame=None):
                 partners = partners[partners < 99998] + 1  # Don't print bonds over 99999 as it overflows the field
                 # I need to support multi-line printing of atoms with more than 4 bonds
                 while len(partners) >= 3:  # Write bonds as long as they are more than 3 in fast more
-                    print("CONECT%5d%5d%5d%5d" % (a + 1, partners[0], partners[1], partners[2]), file=fh)
+                    fh.write("CONECT%5d%5d%5d%5d\n" % (a + 1, partners[0], partners[1], partners[2]))
                     partners = partners[3:]
                 if len(partners) > 0:  # Write the rest of the bonds
                     line = "CONECT%5d" % (a + 1)
                     for p in partners:
                         line = "%s%5d" % (line, p)
-                    print(line, file=fh)
+                    fh.write(line)
+                    fh.write('\n')
 
-        print("ENDMDL", file=fh)
-    print("END", file=fh)
+        fh.write("ENDMDL\n")
+    fh.write("END\n")
 
     fh.close()
 

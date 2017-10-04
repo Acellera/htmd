@@ -47,7 +47,7 @@ from htmd.util import tempname
 from htmd.util import testDHFR
 from htmd.clustering.kcenters import KCenter
 from htmd.clustering.regular import RegCluster
-from htmd.queues.localqueue import LocalGPUQueue
+from htmd.queues.localqueue import LocalGPUQueue, LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
