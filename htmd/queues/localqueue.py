@@ -147,7 +147,7 @@ class _LocalQueue(SimQueue, ProtocolInterface):
 
         return ret
 
-    def submit(self, mydirs):
+    def submit(self, dirs):
         """ Queue for execution all of the jobs in the passed list of directories
 
         Queues all work units in a given directory list with the options given in the constructor opt.
@@ -163,16 +163,14 @@ class _LocalQueue(SimQueue, ProtocolInterface):
         """
         self._setupQueue()
 
-        if isinstance(mydirs, str):
-            mydirs = [mydirs]
-        self._dirs.extend(mydirs)
+        dirs = self._submitinit(dirs)
 
-        for d in mydirs:
+        for d in dirs:
             if not os.path.isdir(d):
                 raise NameError('Submit: directory ' + d + ' does not exist.')
 
         # if all folders exist, submit
-        for d in mydirs:
+        for d in dirs:
             dirname = os.path.abspath(d)
             logger.info('Queueing ' + dirname)
 
@@ -201,22 +199,6 @@ class _LocalQueue(SimQueue, ProtocolInterface):
         output_queue = sum(x == 'Q' for x in self._states.values())
 
         return output_run + output_queue
-
-    def notcompleted(self):
-        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
-
-        Returns
-        -------
-        total : int
-            Total number of directories which have not completed
-        """
-        total = 0
-        if len(self._dirs) == 0:
-            raise RuntimeError('This method relies on running synchronously.')
-        for i in self._dirs:
-            if not os.path.exists(os.path.join(i, self._sentinel)):
-                total += 1
-        return total
 
     def stop(self):
         self._shutdown = True
