@@ -6,6 +6,7 @@
 from htmd.queues.simqueue import SimQueue
 from protocolinterface import ProtocolInterface, val
 import queue
+import os
 import threading
 from subprocess import check_output
 from glob import glob as glob
@@ -100,6 +101,9 @@ class _LocalQueue(SimQueue, ProtocolInterface):
             f.write('#!/bin/bash\n\n')
             if gpudevice is not None:
                 f.write('export CUDA_VISIBLE_DEVICES={}\n'.format(gpudevice))
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\n')
             f.write('cd {}\n'.format(os.path.abspath(workdir)))
             f.write('{}'.format(runsh))
 
@@ -330,17 +334,14 @@ class LocalCPUQueue(_LocalQueue):
     def __init__(self):
         super().__init__()
         self._arg('ncpu', 'int', 'Number of CPU threads that the queue will use. If None it will use the `ncpu` '
-                                 'configured for HTMD in htmd.configure()', None, val.Number(int, 'POS'))
-        self._arg('memory', 'int', 'The amount of RAM memory available for each job.', None,
+                                 'configured for HTMD in htmd.configure()', psutil.cpu_count(), val.Number(int, 'POS'))
+        self._arg('memory', 'int', 'The amount of RAM memory available for each job.', self._getmemory(),
                   val.Number(int, '0POS'))
 
     def _getdevices(self):
         ncpu = self.ncpu
-        totalcpus = psutil.cpu_count()
-        if ncpu is None:
-            ncpu = totalcpus
-        if ncpu > totalcpus:
-            raise RuntimeError('You can only use up to {} threads on this machine'.format(totalcpus))
+        if ncpu > psutil.cpu_count():
+            raise RuntimeError('You can only use up to {} threads on this machine'.format(psutil.cpu_count()))
         return [None] * ncpu
 
     @property
