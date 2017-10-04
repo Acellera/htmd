@@ -3,6 +3,8 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import os
+import numpy as np
 from htmd.queues.simqueue import SimQueue
 from protocolinterface import ProtocolInterface, val
 import queue
@@ -99,6 +101,9 @@ class _LocalQueue(SimQueue, ProtocolInterface):
     def _createJobScript(self, fname, workdir, runsh, gpudevice=None):
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n\n')
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\n')
             if gpudevice is not None:
                 f.write('export CUDA_VISIBLE_DEVICES={}\n'.format(gpudevice))
             # Trap kill signals to create sentinel file
@@ -308,11 +313,11 @@ class LocalCPUQueue(_LocalQueue):
         The path in which to store completed trajectories.
     copy : list, default='*.xtc'
         A list of file names or globs for the files to copy to datadir
-    ncpu : int, default=1
-        Number of CPU threads that the queue will use.
-    memory : int, default=None
-        The amount of RAM memory available for each job. If None, it will be guessed from total amount of memory and
-        the number of devices
+    ncpu : int
+        Number of CPU threads that the queue will use. By default, it is the total number of cpus.
+    memory : int
+        The amount of RAM memory available (in MiB). By default, it will be calculated from total amount
+        of memory and the number of devices
 
     .. rubric:: Methods
     .. autoautosummary:: htmd.queues.localqueue.LocalCPUQueue
@@ -331,10 +336,15 @@ class LocalCPUQueue(_LocalQueue):
                   val.Number(int, '0POS'))
 
     def _getdevices(self):
-        ncpu = self.ncpu
-        if ncpu > psutil.cpu_count():
-            raise RuntimeError('You can only use up to {} threads on this machine'.format(psutil.cpu_count()))
-        return [None] * ncpu
+        return [None] * self.ncpu
+
+    def _getmemory(self):
+
+        memory = psutil.virtual_memory().total/1024**2
+        memory *= np.clip(self.ncpu/psutil.cpu_count(), 0, 1)
+        memory = int(np.floor(memory))
+
+        return memory
 
     @property
     def ncpu(self):
@@ -362,13 +372,30 @@ class LocalCPUQueue(_LocalQueue):
 
 if __name__ == "__main__":
     from htmd.home import home
-    import os
 
     lo = LocalCPUQueue()
+
+    assert lo.ncpu == psutil.cpu_count()
+    assert lo.memory > 1024
+
+    lo.ncpu = 100
+    mem1 = lo.memory
+    assert lo.ncpu == 100
+
     lo.ncpu = 1
+    mem2 = lo.memory
+    assert lo.ncpu == 1
+
+    assert mem1 >= mem2
+
     folder = os.path.join(home(dataDir='test-localqueue'), 'test_cpu')
     lo.submit([folder] * 2)
-    lo.wait()
+    lo.wait(sentinel=False)
+    lo.retrieve()
+
+    lo.submit([folder] * 2)
+    lo.wait(sentinel=True)
+    lo.retrieve()
 
     lo = LocalGPUQueue()
     try:
