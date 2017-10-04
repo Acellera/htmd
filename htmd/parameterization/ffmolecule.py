@@ -76,6 +76,7 @@ class FFMolecule(Molecule):
         else:
             # Otherwise make atom types using the specified method
             fftype = FFType(self, method=self.method)
+            logger.info('Assigned atom types with %s' % self.method.name)
             self._rtf = fftype._rtf
             self._prm = fftype._prm
 
@@ -355,3 +356,109 @@ class FFMolecule(Molecule):
             mol.write(filename, sel=sel, type=type)
         else:
             super().write(filename, sel=sel, type=type)
+
+    def writeParameters(self, original_molecule=None):
+
+        paramDir = os.path.join(self.outdir, 'parameters', self.method.name, self.output_directory_name())
+        os.makedirs(paramDir, exist_ok=True)
+
+        if self.method == FFTypeMethod.CGenFF_2b6:
+
+            rftFile = os.path.join(paramDir, 'mol.rtf')
+            self._rtf.write(rftFile)  # TODO move to FFMolecule.write
+            logger.info('Write RTF file: %s' % rftFile)
+
+            prmFile = os.path.join(paramDir, 'mol.prm')
+            self._prm.write(prmFile)  # TODO move to FFMolecule.write
+            logger.info('Write PRM file: %s' % prmFile)
+
+            for ext in ('psf', 'xyz', 'coor', 'mol2', 'pdb'):
+                file_ = os.path.join(paramDir, "mol." + ext)
+                self.write(file_)
+                logger.info('Write %s file: %s' % (ext.upper(), file_))
+
+            if original_molecule:
+                molFile = os.path.join(paramDir, 'mol-orig.mol2')
+                original_molecule.write(molFile)
+                logger.info('Write MOL2 file (with original coordinates): %s' % molFile)
+
+            # TODO: remove?
+            f = open(os.path.join(paramDir, "input.namd"), "w")
+            tmp = '''parameters mol.prm
+paraTypeCharmm on
+coordinates mol.pdb
+bincoordinates mol.coor
+temperature 0
+timestep 0
+1-4scaling 1.0
+exclude scaled1-4
+outputname .out
+outputenergies 1
+structure mol.psf
+cutoff 20.
+switching off
+stepsPerCycle 1
+rigidbonds none
+cellBasisVector1 50. 0. 0.
+cellBasisVector2 0. 50. 0.
+cellBasisVector3 0. 0. 50.
+run 0'''
+            print(tmp, file=f)
+            f.close()
+
+        elif self.method in (FFTypeMethod.GAFF, FFTypeMethod.GAFF2):
+
+            # types need to be remapped because Amber FRCMOD format limits the type to characters
+            # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
+            # TODO: get rid of this mapping
+            frcFile = os.path.join(paramDir, 'mol.frcmod')
+            typemap = self._prm.writeFrcmod(self._rtf, frcFile)  # TODO move to FFMolecule.write
+            logger.info('Write FRCMOD file: %s' % frcFile)
+
+            for ext in ('coor', 'mol2', 'pdb'):
+                file_ = os.path.join(paramDir, "mol." + ext)
+                self.write(file_, typemap=typemap)
+                logger.info('Write %s file: %s' % (ext.upper(), file_))
+
+            if original_molecule:
+                molFile = os.path.join(paramDir, 'mol-orig.mol2')
+                original_molecule.write(molFile, typemap=typemap)
+                logger.info('Write MOL2 file (with original coordinates): %s' % molFile)
+
+            tleapFile = os.path.join(paramDir, 'tleap.in')
+            with open(tleapFile, 'w') as file_:
+                file_.write('loadAmberParams mol.frcmod\n')
+                file_.write('A = loadMol2 mol.mol2\n')
+                file_.write('saveAmberParm A structure.prmtop mol.crd\n')
+                file_.write('quit\n')
+            logger.info('Write tleap input file: %s' % tleapFile)
+
+            # TODO: remove?
+            f = open(os.path.join(paramDir, "input.namd"), "w")
+            tmp = '''parmfile structure.prmtop
+amber on
+coordinates mol.pdb
+bincoordinates mol.coor
+temperature 0
+timestep 0
+1-4scaling 0.83333333
+exclude scaled1-4
+outputname .out
+outputenergies 1
+cutoff 20.
+switching off
+stepsPerCycle 1
+rigidbonds none
+cellBasisVector1 50. 0. 0.
+cellBasisVector2 0. 50. 0.
+cellBasisVector3 0. 0. 50.
+run 0'''
+            print(tmp, file=f)
+            f.close()
+
+        else:
+            raise NotImplementedError
+
+
+if __name__ == '__main__':
+    pass
