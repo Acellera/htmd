@@ -136,21 +136,10 @@ def PDBwrite(mol, filename, frames=None):
     if mol.beta.max() >= 1E6 or mol.beta.min() <= -1E5:
         raise RuntimeError('Cannot write PDB beta/temperature with values smaller than -1E5 or larger than 1E6')
 
-    occupancy = []
-    beta = []
-    for i in range(coords.shape[0]):
-        occupancy.append('{:6.2f}'.format(mol.occupancy[i]))
-        beta.append('{:6.2f}'.format(mol.beta[i]))
-    # coords = np.around(coords.astype(np.float64), decimals=3).astype('U8')
-    # occupancy = np.around(mol.occupancy.astype(np.float64), decimals=2).astype('U6')
-    # beta = np.around(mol.beta.astype(np.float64), decimals=2).astype('U6')
-
     fh = open(filename, 'w')
-    # TODO FIXME  -- should take box from traj frame
-    box = mol.box
+    box = mol.box[:, frames[0]]
     if box is not None and not np.all(mol.box == 0):
-        box = np.atleast_2d(np.atleast_2d(box)[:, mol.frame])
-        fh.write("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 \n" % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90))
+        fh.write("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 \n" % (box[0], box[1], box[2], 90, 90, 90))
 
     for f in range(numFrames):
         fh.write("MODEL    %5d\n" % (frames[f] + 1))
@@ -167,8 +156,8 @@ def PDBwrite(mol, filename, frames=None):
                     '{:8.3f}'.format(coords[i, 0, f]),
                     '{:8.3f}'.format(coords[i, 1, f]),
                     '{:8.3f}'.format(coords[i, 2, f]),
-                    occupancy[i],
-                    beta[i],
+                    '{:6.2f}'.format(mol.occupancy[i]),
+                    '{:6.2f}'.format(mol.beta[i]),
                     mol.segid[i],
                     mol.element[i]
                 )
