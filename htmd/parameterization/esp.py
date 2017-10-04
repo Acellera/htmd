@@ -49,9 +49,7 @@ class ESP:
     >>> from htmd.home import home
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2) # doctest: +ELLIPSIS
-    Net Charge: 0
-    ...
+    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4

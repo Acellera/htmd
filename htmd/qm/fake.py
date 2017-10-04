@@ -31,9 +31,7 @@ class FakeQM(QMBase):
 
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2) # doctest: +ELLIPSIS
-    Dihedral 0: 2-0-1-3
-    ...
+    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:

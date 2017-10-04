@@ -28,9 +28,7 @@ class FFEvaluate:
     >>> from htmd.home import home
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
     >>> molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2) # doctest: +ELLIPSIS
-    Dihedral 0: 0-6-12-16
-    ...
+    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
 
     # Create FFEvaluate object of benzamidine
     >>> from htmd.parameterization.ffevaluate import FFEvaluate

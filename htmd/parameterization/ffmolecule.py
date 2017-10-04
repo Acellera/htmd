@@ -95,8 +95,6 @@ class FFMolecule(Molecule):
         self.qm = qm if qm else Psi4()
         self.outdir = outdir
 
-        self.report()
-
     def copy(self):
 
         # HACK! Circumvent 'qm' coping problem
@@ -106,19 +104,24 @@ class FFMolecule(Molecule):
 
         return copy
 
-    def report(self):
-        print("Net Charge: {}".format(self.netcharge))
-        print("Equivalent atom groups:")
-        for i in self._equivalent_atom_groups:
-            for j in i:
-                print(" {}".format(self.name[j]), end="")
-            print("")
+    def printReport(self):
 
-        print("Soft torsions:")
-        for i in self._rotatable_dihedrals:
-            for j in i.atoms:
-                print(" {}".format(self.name[j]), end="")
-            print("")
+        print('\n == Molecule report ==\n')
+
+        print('Total number of atoms: %d' % self.numAtoms)
+        print('Total charge: %d' % self.netcharge)
+
+        print('Equivalent atom groups:')
+        for atom_group in self._equivalent_atom_groups:
+            print('  ' + ', '.join(self.name[atom_group]))
+
+        print('Rotatable dihedral angles:')
+        for dihedral in self._rotatable_dihedrals:
+            print('  ' + '-'.join(self.name[dihedral.atoms]))
+            if dihedral.equivalents:
+                print('    Equivalents:')
+            for equivalent_dihedral in dihedral.equivalents:
+                print('      ' + '-'.join(self.name[equivalent_dihedral]))
 
     def _rename(self):
         """

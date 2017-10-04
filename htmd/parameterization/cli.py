@@ -173,8 +173,12 @@ def main_parameterize(arguments=None):
     for method in methods:
         print(" === Fitting for %s ===\n" % method.name)
 
+        # Create the molecule
         mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
                          qm=qm, outdir=args.outdir)
+        mol.printReport()
+
+        # Copy the molecule to preserve initial coordinates
         mol_orig = mol.copy()
 
         # Update B3LYP to B3LYP-D3
