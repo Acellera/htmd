@@ -116,7 +116,7 @@ def checkTruncations(mol):
                                                                                                                        f]))
 
 
-def PDBwrite(mol, filename, frames=None):
+def PDBwrite(mol, filename, frames=None, writebonds=True):
     if frames is None:
         frames = mol.frame
     frames = ensurelist(frames)
@@ -166,7 +166,7 @@ def PDBwrite(mol, filename, frames=None):
             if i < len(mol.record) - 1 and mol.segid[i] != mol.segid[i + 1]:
                 fh.write("TER\n")
 
-        if mol.bonds is not None and len(mol.bonds) != 0:
+        if writebonds and mol.bonds is not None and len(mol.bonds) != 0:
             bondedatoms = np.unique(mol.bonds)
             bondedatoms = bondedatoms[bondedatoms < 99998]  # Don't print bonds over 99999 as it overflows the field
 

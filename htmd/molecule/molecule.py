@@ -1076,8 +1076,9 @@ class Molecule:
             oldbonds = self.bonds
             self.bonds = self._getBonds()
 
-        # Write out PDB and XTC files
-        psf = tempname(suffix=".pdb")
+        # Write out PSF and XTC files
+        pdb = None
+        psf = tempname(suffix=".psf")
         self.write(psf)
 
         if guessBonds:
@@ -1094,38 +1095,46 @@ class Molecule:
         if viewer.lower() == 'notebook':
             retval = self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
-            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
-            #retval = viewerhandle
+            pdb = tempname(suffix=".pdb")
+            self.write(pdb, writebonds=False)
+            self._viewVMD(psf, pdb, xtc, viewerhandle, name, guessBonds)
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
             retval = self._viewNGL(gui=gui)
         else:
             os.remove(xtc)
             os.remove(psf)
+            if pdb is not None:
+                os.remove(pdb)
             raise ValueError('Unknown viewer.')
 
         # Remove temporary files
         os.remove(xtc)
         os.remove(psf)
+        if pdb is not None:
+            os.remove(pdb)
         if retval is not None:
             return retval
 
-    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
+    def _viewVMD(self, psf, pdb, xtc, vhandle, name, guessbonds):
         if name is None:
             name = self.viewname
         if vhandle is None:
             vhandle = getCurrentViewer()
 
         if guessbonds:
-            vhandle.send("mol new " + psf)
+            vhandle.send("mol new " + pdb)
+            vhandle.send("mol addfile " + psf)
+
         else:
-            vhandle.send("mol new " + psf + " autobonds off")
+            vhandle.send("mol new " + pdb + " autobonds off")
+            vhandle.send("mol addfile " + psf + " autobonds off")
         vhandle.send('animate delete all')
         vhandle.send('mol addfile ' + xtc + ' type xtc waitfor all')
 
         if name is not None:
             vhandle.send('mol rename top "' + name + '"')
         else:
-            vhandle.send('mol rename top "Mol [molinfo top]: psf+xtc"')
+            vhandle.send('mol rename top "Mol [molinfo top]: pdb+psf+xtc"')
 
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
@@ -1199,7 +1208,7 @@ class Molecule:
             centersel = None
         self.coords = wrap(self.coords, self._getBonds(fileBonds, guessBonds), self.box, centersel=centersel)
 
-    def write(self, filename, sel=None, type=None):
+    def write(self, filename, sel=None, type=None, **kwargs):
         """ Writes any of the supported formats (pdb, coor, psf, xtc, xyz, mol2, gro) and any formats supported by MDtraj
 
         Parameters
@@ -1227,7 +1236,7 @@ class Molecule:
         if type in _WRITERS:
             ext = type
         if ext in _WRITERS:
-            _WRITERS[ext](src, filename)
+            _WRITERS[ext](src, filename, **kwargs)
         else:
             raise IOError('Molecule cannot write files with "{}" extension yet. If you need such support please notify '
                           'us on the github htmd issue tracker.'.format(ext))
