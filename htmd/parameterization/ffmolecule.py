@@ -355,32 +355,23 @@ class FFMolecule(Molecule):
             mol.atomtype[:] = [typemap[atomtype] for atomtype in self.atomtype]
             mol.write(filename, sel=sel, type=type)
         else:
-            super().write(filename, sel=sel, type=type)
+            if filename.endswith('.rtf'):
+                self._rtf.write(filename)
+            elif filename.endswith('.prm'):
+                self._prm.write(filename)
+            else:
+                super().write(filename, sel=sel, type=type)
 
     def writeParameters(self, original_molecule=None):
 
         paramDir = os.path.join(self.outdir, 'parameters', self.method.name, self.output_directory_name())
         os.makedirs(paramDir, exist_ok=True)
 
+        typemap = None
+        extensions = ('mol2', 'pdb', 'coor')
+
         if self.method == FFTypeMethod.CGenFF_2b6:
-
-            rftFile = os.path.join(paramDir, 'mol.rtf')
-            self._rtf.write(rftFile)  # TODO move to FFMolecule.write
-            logger.info('Write RTF file: %s' % rftFile)
-
-            prmFile = os.path.join(paramDir, 'mol.prm')
-            self._prm.write(prmFile)  # TODO move to FFMolecule.write
-            logger.info('Write PRM file: %s' % prmFile)
-
-            for ext in ('psf', 'xyz', 'coor', 'mol2', 'pdb'):
-                file_ = os.path.join(paramDir, "mol." + ext)
-                self.write(file_)
-                logger.info('Write %s file: %s' % (ext.upper(), file_))
-
-            if original_molecule:
-                molFile = os.path.join(paramDir, 'mol-orig.mol2')
-                original_molecule.write(molFile)
-                logger.info('Write MOL2 file (with original coordinates): %s' % molFile)
+            extensions += ('psf', 'rtf', 'prm')
 
             # TODO: remove?
             f = open(os.path.join(paramDir, "input.namd"), "w")
@@ -407,23 +398,12 @@ run 0'''
             f.close()
 
         elif self.method in (FFTypeMethod.GAFF, FFTypeMethod.GAFF2):
-
             # types need to be remapped because Amber FRCMOD format limits the type to characters
             # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
             # TODO: get rid of this mapping
             frcFile = os.path.join(paramDir, 'mol.frcmod')
             typemap = self._prm.writeFrcmod(self._rtf, frcFile)  # TODO move to FFMolecule.write
             logger.info('Write FRCMOD file: %s' % frcFile)
-
-            for ext in ('coor', 'mol2', 'pdb'):
-                file_ = os.path.join(paramDir, "mol." + ext)
-                self.write(file_, typemap=typemap)
-                logger.info('Write %s file: %s' % (ext.upper(), file_))
-
-            if original_molecule:
-                molFile = os.path.join(paramDir, 'mol-orig.mol2')
-                original_molecule.write(molFile, typemap=typemap)
-                logger.info('Write MOL2 file (with original coordinates): %s' % molFile)
 
             tleapFile = os.path.join(paramDir, 'tleap.in')
             with open(tleapFile, 'w') as file_:
@@ -459,6 +439,15 @@ run 0'''
         else:
             raise NotImplementedError
 
+        for ext in extensions:
+            file_ = os.path.join(paramDir, "mol." + ext)
+            self.write(file_, typemap=typemap)
+            logger.info('Write %s file: %s' % (ext.upper(), file_))
+
+        if original_molecule:
+            molFile = os.path.join(paramDir, 'mol-orig.mol2')
+            original_molecule.write(molFile, typemap=typemap)
+            logger.info('Write MOL2 file (with original coordinates): %s' % molFile)
 
 if __name__ == '__main__':
     pass
