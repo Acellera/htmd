@@ -10,9 +10,12 @@ import logging
 import psutil
 import numpy as np
 
+from htmd.version import version
 from htmd.queues.localqueue import LocalCPUQueue
-from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.slurmqueue import SlurmQueue
+from htmd.queues.lsfqueue import LsfQueue
+from htmd.queues.pbsqueue import PBSQueue
+from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.qm import Psi4, Gaussian, FakeQM
 from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.parameterization.fftype import FFTypeMethod
@@ -23,52 +26,47 @@ logger = logging.getLogger(__name__)
 
 def getArgumentParser():
 
-    parser = argparse.ArgumentParser(description="Acellera Small Molecule Parameterization Tool")
-    parser.add_argument("-m", "--mol2", help="Molecule to parameterise, in mol2 format", required=True, type=str,
-                        default=None, metavar="<input.mol2>", action="store", dest="mol")
-    parser.add_argument("-l", "--list", "--list-torsions", help="List parameterisable torsions", action="store_true",
-                        default=False,
-                        dest="list")
-    parser.add_argument("-c", "--charge", help="Net charge on molecule (default: sum of the partial charges on the "
-                                               ".mol2 file)", type=int, default=None, action="store", dest="charge")
-    parser.add_argument("--rtf", help="Inital RTF parameters (req --prm)", type=str, default=None, dest="rtf")
-    parser.add_argument("--prm", help="Inital PRM parameters (req --rtf)", type=str, default=None, dest="prm")
-    parser.add_argument("-o", "--outdir", help="Output directory (default: %(default)s)", type=str, default="./",
-                        dest="outdir")
-    parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default: %(default)s)",
-                        default="all", dest="torsion")
-    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=psutil.cpu_count(),
-                        dest="ncpus")
-    parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
-                        choices=["GAFF", "GAFF2", "CGENFF", "all"], default="all")
-    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31G*", "cc-pVDZ"],
-                        default="cc-pVDZ", dest="basis")
-    parser.add_argument("--theory", help="QM Theory (default: %(default)s)", choices=["HF", "B3LYP"],
-                        default="B3LYP", dest="theory")
-    parser.add_argument("--vacuum", help="Perform QM calculations in vacuum (default: %(default)s)",
-                        action="store_false", dest="vacuum",
-                        default=True)
-    parser.add_argument('--no-min', help='Do not perform QM minimisation (default: %(default)s)', action='store_false',
-                        dest='minimize', default=True)
-    parser.add_argument('--no-esp', help='Do not perform QM charge fitting (default: %(default)s)', action='store_false',
-                        dest='fit_charges', default=True)
-    parser.add_argument('--no-dihedrals', '--no-torsions', help='Do not perform dihedral angle fitting (default: %(default)s)',
-                        action='store_false', dest='fit_dihedral', default=True)
-    parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
-                        choices=["local", "LSF", "Slurm"], default="local", dest="exec")
-    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Psi4", "Gaussian"],
-                        default="Psi4", dest="qmcode")
-    parser.add_argument("--freeze-charge", metavar="A1",
-                        help="Freeze the charge of the named atom (default: %(default)s)", action="append",
-                        default=None, dest="freezeq")
-    parser.add_argument("--no-geomopt", help="Do not perform QM geometry optimisation when fitting torsions (default: "
-                                             "%(default)s)", action="store_false", dest="geomopt", default=True)
-    parser.add_argument("--seed", help="Random number generator seed (default: %(default)s)", type=int,
-                        default=20170920, dest="seed")
+    parser = argparse.ArgumentParser(description='Acellera small molecule parameterization tool')
+
+    parser.add_argument('filename', help='Molecule file in MOL2 format')
+    parser.add_argument('-c', '--charge', type=int,
+                        help='Total charge of the molecule (default: sum of partial charges)')
+    parser.add_argument('-l', '--list', action='store_true', help='List parameterisable dihedral angles')
+    parser.add_argument('--rtf-prm', nargs=2, metavar='<filename>', help='CHARMM RTF and PRM files')
+    parser.add_argument('-ff', '--forcefield', default='all', choices=['GAFF', 'GAFF2', 'CGENFF', 'all'],
+                        help='Inital force field guess (default: %(default)s)')  # TODO: multi arguments
+    parser.add_argument('--fix-charge', action='append', default=[], metavar='<atom name>',
+                        help='Fix atomic charge during charge fitting (default: none)')
+    parser.add_argument('-d', '--dihedral', default='all', metavar='A1-A2-A3-A4',
+                        help='Select dihedral angle to parameterize (default: %(default)s)')  # TODO: multi arguments
+    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'], help='QM code (default: %(default)s)')
+    parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP'],
+                        help='QM level of theory (default: %(default)s)')
+    parser.add_argument('--basis', default='cc-pVDZ', choices=['6-31G*', '6-31+G*', 'cc-pVDZ', 'aug-cc-pVDZ'],
+                        help='QM basis set (default: %(default)s)')
+    parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
+                        help='QM environment (default: %(default)s)')
+    parser.add_argument('--no-min', action='store_false', default=True, dest='minimize',
+                        help='Do not perform QM structure minimization')
+    parser.add_argument('--no-esp', action='store_false', default=True, dest='fit_charges',
+                        help='Do not perform QM charge fitting')
+    parser.add_argument('--no-dihed', action='store_false', default=True, dest='fit_dihedral',
+                        help='Do not perform QM scanning of dihedral angles')
+    # TODO: name
+    parser.add_argument('--no-dihed-opt', action='store_false', default=True, dest='optimize_dihedral',
+                        help='Do not perform QM structure optimisation when scanning dihedral angles')
+    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'PBS', 'AceCloud'],
+                        help='QM queue (default: %(default)s)')
+    parser.add_argument('-n', '--ncpus', default=psutil.cpu_count(), type=int,
+                        help='Number of CPU per QM job (default: %(default)s)')
+    parser.add_argument('-o', '--outdir', default='./', help='Output directory (default: %(default)s)')
+    parser.add_argument('--seed', default=20170920, type=int,
+                        help='Random number generator seed (default: %(default)s)')
+    parser.add_argument('--version', action='version', version=version())
 
     # Enable replacement of any real QM class with FakeQM.
     # This is intedended for debugging only and should be kept hidden.
-    parser.add_argument("--fake-qm", help=argparse.SUPPRESS, action="store_true",dest="fake_qm", default=False)
+    parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
 
     return parser
 
@@ -104,27 +102,47 @@ def main_parameterize(arguments=None):
 
     args = getArgumentParser().parse_args(args=arguments)
 
-    filename = args.mol
-    if not os.path.exists(filename):
-        raise ValueError('File %s cannot be found' % filename)
+    if not os.path.exists(args.filename):
+        raise ValueError('File %s cannot be found' % args.filename)
+
+    # Get initial guess methods
+    if args.forcefield == 'CGENFF':
+        methods = [FFTypeMethod.CGenFF_2b6]
+    elif args.forcefield == 'GAFF':
+        methods = [FFTypeMethod.GAFF]
+    elif args.forcefield == 'GAFF2':
+        methods = [FFTypeMethod.GAFF2]
+    elif args.forcefield == 'all':
+        methods = [FFTypeMethod.CGenFF_2b6, FFTypeMethod.GAFF2]
+    else:
+        raise NotImplementedError
+
+    # Get RTF and PRM file names
+    rtf, prm = None, None
+    if args.rtf_prm:
+        rtf, prm = args.rtf_prm
 
     # Create a queue for QM
-    if args.exec == 'local':
+    if args.queue == 'local':
         queue = LocalCPUQueue()
         queue.ncpu = args.ncpus
-    elif args.exec == 'Slurm':
+    elif args.queue == 'Slurm':
         queue = SlurmQueue()
         queue.partition = SlurmQueue._defaults['cpu_partition']
-    elif args.exec == 'LSF':
+    elif args.queue == 'LSF':
         queue = LsfQueue()
         queue.queue = LsfQueue._defaults['cpu_queue']
+    elif args.queue == 'PBS':
+        queue = PBSQueue()  # TODO: configure
+    elif args.queue == 'AceCloud':
+        queue = AceCloudQueue()  # TODO: configure
     else:
         raise NotImplementedError
 
     # Create a QM object
-    if args.qmcode == 'Psi4':
+    if args.code == 'Psi4':
         qm = Psi4()
-    elif args.qmcode == 'Gaussian':
+    elif args.code == 'Gaussian':
         qm = Gaussian()
     else:
         raise NotImplementedError
@@ -137,25 +155,14 @@ def main_parameterize(arguments=None):
     # Set up the QM object
     qm.theory = args.theory
     qm.basis = args.basis
-    qm.solvent = 'vacuum' if args.vacuum else 'PCM'
+    qm.solvent = args.environment
     qm.queue = queue
-
-    if args.forcefield == 'CGENFF':
-        methods = [FFTypeMethod.CGenFF_2b6]
-    elif args.forcefield == 'GAFF':
-        methods = [FFTypeMethod.GAFF]
-    elif args.forcefield == 'GAFF2':
-        methods = [FFTypeMethod.GAFF2]
-    elif args.forcefield == 'all':
-        methods = [FFTypeMethod.CGenFF_2b6, FFTypeMethod.GAFF2]
-    else:
-        raise NotImplementedError
 
     # List rotatable dihedral angles
     if args.list:
-        print(" === Listing rotatable dihedral angles of {} ===\n".format(filename))
-        mol = FFMolecule(filename=filename, method=methods[0], netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                         qm=qm, outdir=args.outdir)
+        print(" === Listing rotatable dihedral angles of {} ===\n".format(args.filename))
+        mol = FFMolecule(args.filename, method=methods[0], netcharge=args.charge, rtf=rtf, prm=prm, qm=qm,
+                         outdir=args.outdir)
         print('Detected soft torsions:')
         with open('torsions.txt', 'w') as fh:
             for dihedral in mol.getRotatableDihedrals():
@@ -169,13 +176,13 @@ def main_parameterize(arguments=None):
     for key, value in vars(args).items():
         print('{:>12s}: {:s}'.format(key, str(value)))
 
-    print('\n === Parameterizing %s ===\n' % filename)
+    print('\n === Parameterizing %s ===\n' % args.filename)
     for method in methods:
         print(" === Fitting for %s ===\n" % method.name)
 
         # Create the molecule
-        mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                         qm=qm, outdir=args.outdir)
+        mol = FFMolecule(args.filename, method=method, netcharge=args.charge, rtf=rtf, prm=prm, qm=qm,
+                         outdir=args.outdir)
         mol.printReport()
 
         # Copy the molecule to preserve initial coordinates
@@ -210,16 +217,15 @@ def main_parameterize(arguments=None):
 
             # Select the atoms with fixed charges
             fixed_atom_indices = []
-            if args.freezeq:
+            for fixed_atom_name in args.fix_charge:
 
-                for fixed_atom_name in args.freezeq:
-                    if fixed_atom_name not in mol.name:
-                        raise ValueError('Atom %s is not found. Check --freeze-charge arguments' % fixed_atom_name)
+                if fixed_atom_name not in mol.name:
+                    raise ValueError('Atom %s is not found. Check --fix-charge arguments' % fixed_atom_name)
 
-                    for aton_index in range(mol.numAtoms):
-                        if mol.name[aton_index] == fixed_atom_name:
-                            fixed_atom_indices.append(aton_index)
-                            logger.info('Charge of atom %s is fixed to %f' % (fixed_atom_name, mol.charge[aton_index]))
+                for aton_index in range(mol.numAtoms):
+                    if mol.name[aton_index] == fixed_atom_name:
+                        fixed_atom_indices.append(aton_index)
+                        logger.info('Charge of atom %s is fixed to %f' % (fixed_atom_name, mol.charge[aton_index]))
 
             # Fit ESP charges
             score, qm_dipole = mol.fitCharges(fixed=fixed_atom_indices)
@@ -245,18 +251,18 @@ def main_parameterize(arguments=None):
 
             # Choose which dihedrals to fit
             dihedrals = []
-            if args.torsion == 'all':
+            if args.dihedral == 'all':
                 dihedrals = all_dihedrals
             else:
                 all_names = ['%s-%s-%s-%s' % tuple(mol.name[dihedral]) for dihedral in all_dihedrals]
-                for name in args.torsion.split(','):
+                for name in args.dihedral.split(','):
                     if name in all_names:
                         dihedrals.append(all_dihedrals[all_names.index(name)])
                     else:
                         raise ValueError('%s is not recognized as a rotatable dihedral angle\n' % name)
 
             # Fit the parameters
-            mol.fitDihedrals(dihedrals, args.geomopt)
+            mol.fitDihedrals(dihedrals, args.optimize_dihedral)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
