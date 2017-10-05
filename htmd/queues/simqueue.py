@@ -12,7 +12,7 @@ class SimQueue(metaclass=ABCMeta):
         super().__init__()
         self._sentinel = 'htmd.queues.done'
         # For synchronous
-        self._dirs = []
+        self._dirs = None
 
     @abstractmethod
     def retrieve(self):
@@ -24,13 +24,16 @@ class SimQueue(metaclass=ABCMeta):
         """ Subclasses need to implement this method """
         pass
 
-    @abstractmethod
-    def inprogress(self):
-        """ Subclasses need to implement this method """
-        pass
+    def _submitinit(self, dirs):
+        if isinstance(dirs, str):
+            dirs = [dirs, ]
+        if self._dirs is None:
+            self._dirs = []
+        self._dirs.extend(dirs)
+        return dirs
 
     @abstractmethod
-    def notcompleted(self):
+    def inprogress(self):
         """ Subclasses need to implement this method """
         pass
 
@@ -53,6 +56,23 @@ class SimQueue(metaclass=ABCMeta):
         while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
             sys.stdout.flush()
             sleep(5)
+
+    def notcompleted(self):
+        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
+
+        Returns
+        -------
+        total : int
+            Total number of directories which have not completed
+        """
+        import os
+        total = 0
+        if self._dirs is None:
+            raise RuntimeError('This method relies on running synchronously.')
+        for i in self._dirs:
+            if not os.path.exists(os.path.join(i, self._sentinel)):
+                total += 1
+        return total
 
     @abstractmethod
     def stop(self):

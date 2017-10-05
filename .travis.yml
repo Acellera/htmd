@@ -30,12 +30,12 @@ install:
   - hash -r
   - conda config --set always_yes yes
   - conda install conda conda-build anaconda anaconda-client requests pytest -y -q # this has to go into the root environment
+  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then conda install gcc_linux-64 gxx_linux-64 -y -q; fi
   - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION
   - source activate travis-env
 
   - conda config --add channels acellera
   - conda config --add channels psi4
-  # - conda install -c acellera toolz=0.8.0 -y -q
   - conda install anaconda-client -y -q
   - conda update --all -y -q
 
@@ -55,9 +55,9 @@ install:
   # If not PR, clone the private htmdlib repo,
   - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then bash -x ./continuous-integration/travis/compile_htmdlib.sh ; fi
 
-  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe
-  - conda build package/htmd-data --no-include-recipe
-  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe
+  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe --no-locking
+  - conda build package/htmd-data --no-include-recipe --no-locking
+  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe --no-locking
 
   - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
   - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
