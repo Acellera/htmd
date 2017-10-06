@@ -366,8 +366,8 @@ def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
     outFile.close()
 
 
-def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10):
-    """ Aligns two structures by their longest sequence alignment
+def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10, nalignfragment=1):
+    """ Aligns two structures by their longests sequences alignment
 
     Parameters
     ----------
@@ -381,6 +381,8 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         The segment of `ref` we want to align to
     maxalignments : int
         The maximum number of alignments we want to produce
+    nalignfragments : int
+        The number of fragments used for the alignment.
 
     Returns
     -------
@@ -452,27 +454,35 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         startIndex = np.where(dsigdiff > 0)[0]
         endIndex = np.where(dsigdiff < 0)[0]
         duration = endIndex - startIndex
-        start = startIndex[np.argmax(duration)]
-        finish = endIndex[np.argmax(duration)]
+        duration_sorted = np.sort(duration)[::-1]
+        _list_starts = []
+        _list_finish = []
+        for n in range(nalignfragment):
+            idx = np.where(duration == duration_sorted[n])[0]
+            start = startIndex[idx][0]
+            finish = endIndex[idx][0]
+            _list_starts.append(start)
+            _list_finish.append(finish)
 
         # Get the "resids" of the aligned residues only
-        refalnresid = residref[start:finish]
-        molalnresid = residmol[start:finish]
-
+        refalnresid = np.concatenate([ residref[start:finish] for start, finish in zip(_list_starts,_list_finish)])
+        molalnresid = np.concatenate([ residmol[start:finish] for start, finish in zip(_list_starts, _list_finish) ])
         refidx = []
         for r in refalnresid:
             refidx += list(refsegidx[reffakeresid == r])
         molidx = []
         for r in molalnresid:
-            molidx += list(molsegidx[molfakeresid == r])
+            molidx += list(molsegidx[molfakeresid == r])        
 
         molboolidx = np.zeros(mol.numAtoms, dtype=bool)
         molboolidx[molidx] = True
         refboolidx = np.zeros(ref.numAtoms, dtype=bool)
         refboolidx[refidx] = True
 
-        logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}-{}'.format(
-            i, np.max(duration), np.unique(mol.segid[molidx])[0], mol.resid[molidx[0]], mol.resid[molidx[-1]]))
+        start_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_starts])
+        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_finish])
+        logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}'.format(
+            i, len(refalnresid), np.unique(mol.segid[molidx])[0], ', '.join(['{}-{}'.format(s,f) for s, f in zip(start_residues,finish_residues)])  ))
 
         alignedmol = mol.copy()
         alignedmol.align(molboolidx, ref, refboolidx)
@@ -654,7 +664,7 @@ def guessAnglesAndDihedrals(bonds, cyclicdih=False):
 
     angles = []
     for n in g.nodes():
-        neighbors = g.neighbors(n)
+        neighbors = list(g.neighbors(n))
         for e1 in range(len(neighbors)):
             for e2 in range(e1+1, len(neighbors)):
                 angles.append((neighbors[e1], n, neighbors[e2]))

@@ -108,7 +108,7 @@ class Acemd(ProtocolInterface):
     _defaultfnames = {'bincoordinates': 'input.coor', 'binvelocities': 'input.vel', 'binindex': 'input.idx',
                       'structure': 'structure.*', 'parameters': 'parameters', 'extendedsystem': 'input.xsc',
                       'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb',
-                      'parmfile': 'structure.prmtop'}
+                      'parmfile': 'parameters'}
 
     def __init__(self, version=2):
         super().__init__()

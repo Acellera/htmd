@@ -171,9 +171,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         dirs : list
             A list of executable directories.
         """
-        if isinstance(dirs, str):
-            dirs = [dirs, ]
-        self._dirs.extend(dirs)
+        dirs = self._submitinit(dirs)
 
         if self.partition is None:
             raise ValueError('The partition needs to be defined.')
@@ -248,22 +246,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         if l < 0:
             l = 0  # something odd happened
         return l
-
-    def notcompleted(self):
-        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
-
-        Returns
-        -------
-        total : int
-            Total number of directories which have not completed
-        """
-        total = 0
-        if len(self._dirs) == 0:
-            raise RuntimeError('This method relies on running synchronously.')
-        for i in self._dirs:
-            if not os.path.exists(os.path.join(i, self._sentinel)):
-                total += 1
-        return total
 
     def stop(self):
         """ Cancels all currently running and queued jobs

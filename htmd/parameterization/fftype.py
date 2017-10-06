@@ -13,6 +13,7 @@ from enum import Enum
 
 
 class FFTypeMethod(Enum):
+    NONE = 0
     CHARMM = 1
     AMBER = 2
     CGenFF_2b6 = 1000
