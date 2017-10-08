@@ -116,6 +116,42 @@ def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
     return np.squeeze(rmsd)
 
 
+def orient(mol, sel="all"):
+    """Rotate a molecule so that its main axes are oriented along XYZ.
+
+    The calculation is based on the axes of inertia of the given
+    selection, but masses will be ignored. After the operation, the
+    main axis will be parallel to the Z axis, followed by Y and X (the
+    shortest axis). Only the first frame is oriented.  The reoriented
+    molecule is returned.
+
+    Parameters
+    ----------
+    mol :
+        The Molecule to be rotated
+    sel : 
+        Atom selection on which the rotation is computed
+
+    Examples
+    --------
+    >>> mol = Molecule("1kdx")
+    >>> mol = orient(mol,"chain B")
+
+    """
+    if mol.numFrames != 1:
+        logger.warning("Only the first frame is considered for the orientation")
+    m = mol.copy()
+    s = m.atomselect(sel)
+    x = m.coords[s,:,0]
+    c = np.cov(x.T)
+    ei = np.linalg.eigh(c)
+    logger.info("Moments of intertia: "+str(ei[0]))
+    ev=ei[1].T
+    if np.linalg.det(ev)<0: ev=-ev # avoid inversions
+    m.rotateBy(ev)
+    return(m)
+
+
 def sequenceID(field, prepend=None):
     """ Array of integers which increments at value change of another array
 
@@ -330,8 +366,8 @@ def writeVoxels(arr, filename, vecMin, vecMax, vecRes):
     outFile.close()
 
 
-def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10):
-    """ Aligns two structures by their longest sequence alignment
+def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments=10, nalignfragment=1):
+    """ Aligns two structures by their longests sequences alignment
 
     Parameters
     ----------
@@ -345,6 +381,8 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         The segment of `ref` we want to align to
     maxalignments : int
         The maximum number of alignments we want to produce
+    nalignfragments : int
+        The number of fragments used for the alignment.
 
     Returns
     -------
@@ -416,27 +454,35 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         startIndex = np.where(dsigdiff > 0)[0]
         endIndex = np.where(dsigdiff < 0)[0]
         duration = endIndex - startIndex
-        start = startIndex[np.argmax(duration)]
-        finish = endIndex[np.argmax(duration)]
+        duration_sorted = np.sort(duration)[::-1]
+        _list_starts = []
+        _list_finish = []
+        for n in range(nalignfragment):
+            idx = np.where(duration == duration_sorted[n])[0]
+            start = startIndex[idx][0]
+            finish = endIndex[idx][0]
+            _list_starts.append(start)
+            _list_finish.append(finish)
 
         # Get the "resids" of the aligned residues only
-        refalnresid = residref[start:finish]
-        molalnresid = residmol[start:finish]
-
+        refalnresid = np.concatenate([ residref[start:finish] for start, finish in zip(_list_starts,_list_finish)])
+        molalnresid = np.concatenate([ residmol[start:finish] for start, finish in zip(_list_starts, _list_finish) ])
         refidx = []
         for r in refalnresid:
             refidx += list(refsegidx[reffakeresid == r])
         molidx = []
         for r in molalnresid:
-            molidx += list(molsegidx[molfakeresid == r])
+            molidx += list(molsegidx[molfakeresid == r])        
 
         molboolidx = np.zeros(mol.numAtoms, dtype=bool)
         molboolidx[molidx] = True
         refboolidx = np.zeros(ref.numAtoms, dtype=bool)
         refboolidx[refidx] = True
 
-        logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}-{}'.format(
-            i, np.max(duration), np.unique(mol.segid[molidx])[0], mol.resid[molidx[0]], mol.resid[molidx[-1]]))
+        start_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_starts])
+        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_finish])
+        logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}'.format(
+            i, len(refalnresid), np.unique(mol.segid[molidx])[0], ', '.join(['{}-{}'.format(s,f) for s, f in zip(start_residues,finish_residues)])  ))
 
         alignedmol = mol.copy()
         alignedmol.align(molboolidx, ref, refboolidx)
@@ -605,6 +651,48 @@ def dihedralAngle(atom_quad_coords):
 #     """
 
 
+def guessAnglesAndDihedrals(bonds, cyclicdih=False):
+    """
+    Generate a guess of angle and dihedral N-body terms based on a list of bond index pairs.
+    """
+
+    import networkx as nx
+
+    g = nx.Graph()
+    g.add_nodes_from(np.unique(bonds))
+    g.add_edges_from([tuple(b) for b in bonds])
+
+    angles = []
+    for n in g.nodes():
+        neighbors = list(g.neighbors(n))
+        for e1 in range(len(neighbors)):
+            for e2 in range(e1+1, len(neighbors)):
+                angles.append((neighbors[e1], n, neighbors[e2]))
+
+    angles = sorted([sorted([angle, angle[::-1]])[0] for angle in angles])
+    angles = np.array(angles)
+
+    dihedrals = []
+    for a1 in range(len(angles)):
+        for a2 in range(a1+1, len(angles)):
+            a1a = angles[a1]
+            a2a = angles[a2]
+            a2f = a2a[::-1]  # Flipped a2a. We don't need flipped a1a as it produces the flipped versions of these 4
+            if np.all(a1a[1:] == a2a[:2]) and (cyclicdih or (a1a[0] != a2a[2])):
+                dihedrals.append(list(a1a) + [a2a[2]])
+            if np.all(a1a[1:] == a2f[:2]) and (cyclicdih or (a1a[0] != a2f[2])):
+                dihedrals.append(list(a1a) + [a2f[2]])
+            if np.all(a2a[1:] == a1a[:2]) and (cyclicdih or (a2a[0] != a1a[2])):
+                dihedrals.append(list(a2a) + [a1a[2]])
+            if np.all(a2f[1:] == a1a[:2]) and (cyclicdih or (a2f[0] != a1a[2])):
+                dihedrals.append(list(a2f) + [a1a[2]])
+
+    dihedrals = sorted([sorted([dihedral, dihedral[::-1]])[0] for dihedral in dihedrals])
+    dihedrals = np.array(dihedrals)
+
+    return angles, dihedrals
+
+
 # A test method
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule
@@ -631,4 +719,3 @@ if __name__ == "__main__":
     # rhodopsin = Molecule('1F88')
     # d3r = Molecule('3PBL')
     # alnmol = sequenceStructureAlignment(rhodopsin, d3r)
-

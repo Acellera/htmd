@@ -3,8 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from __future__ import print_function
-
 import numpy as np
 from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.wrap import wrap
@@ -149,6 +147,7 @@ class Molecule:
         'dihedrals': np.uint32,
         'impropers': np.uint32,
         'atomtype': object,
+        'bondtype': object,
         'masses': np.float32,
         'box': np.float32,
         'boxangles': np.float32
@@ -174,6 +173,7 @@ class Molecule:
         'dihedrals': (0, 4),
         'impropers': (0, 4),
         'atomtype': (0,),
+        'bondtype': (0,),
         'masses': (0,),
         'box': (3, 1),
         'boxangles': (3, 1),
@@ -193,14 +193,8 @@ class Molecule:
         self._tempreps = Representations(self)
         self.viewname = name
 
-        if filename:
+        if filename is not None:
             self.read(filename, **kwargs)
-            if isinstance(filename, str):
-                self.topoloc = os.path.abspath(filename)
-                if name is None and isinstance(filename, str):
-                    self.viewname = filename
-                    if path.isfile(filename):
-                        self.viewname = path.basename(filename)
 
     @staticmethod
     def _empty(numAtoms, field):
@@ -311,8 +305,10 @@ class Molecule:
                 newbonds += index
                 if len(self.bonds) > 0:
                     self.bonds = np.append(self.bonds, newbonds, axis=0)
+                    self.bondtype = np.append(self.bondtype, mol.bondtype, axis=0)
                 else:
                     self.bonds = newbonds
+                    self.bondtype = mol.bondtype
 
             for k in self._atom_fields:
                 if k == 'serial':
@@ -608,6 +604,8 @@ class Molecule:
         stays = np.invert(remA | remB)
         # Delete bonds between non-existant atoms
         self.bonds = bonds[stays, :]
+        if len(self.bondtype):
+            self.bondtype = self.bondtype[stays]
 
     def _guessBonds(self):
         """ Tries to guess the bonds in the Molecule
@@ -639,8 +637,7 @@ class Molecule:
         vector.shape = [1, 3]  # Forces it to be row vector
 
         s = self.atomselect(sel)
-        for f in range(self.numFrames):
-            self.coords[s, :, f] += vector
+        self.coords[s, :, self.frame] += vector
 
     @_Deprecated('1.3.2', 'htmd.molecule.molecule.Molecule.rotateBy')
     def rotate(self, axis, angle, center=(0, 0, 0), sel=None):
@@ -683,11 +680,14 @@ class Molecule:
         >>> mol = tryp.copy()
         >>> mol.rotateBy(rotationMatrix([0, 1, 0], 1.57))
         """
+        if abs(np.linalg.det(M)-1) > 1e-5:
+            logger.warning("Suspicious non-unitary determinant: {:f}".format(np.linalg.det(M)))
         coords = self.get('coords', sel=sel)
         newcoords = coords - center
         newcoords = np.dot(newcoords, np.transpose(M)) + center
         self.set('coords', newcoords, sel=sel)
 
+        
     def getDihedral(self, atom_quad):
         """ Gets a dihedral angle.
 
@@ -773,8 +773,8 @@ class Molecule:
         >>> mol.center()
         >>> mol.center([10, 10, 10], 'name CA')
         """
-        coords = self.get('coords', sel=sel)
-        com = np.mean(coords, 0)
+        sel = self.atomselect(sel)
+        com = np.mean(self.coords[sel, :, self.frame], 0)
         self.moveBy(-com)
         self.moveBy(loc)
 
@@ -830,7 +830,6 @@ class Molecule:
             return
 
         from htmd.molecule.readers import Trajectory
-        topo = None
         if append:
             traj = Trajectory(self.coords, self.box, self.boxangles, self.fileloc, self.step, self.time)
         else:
@@ -876,15 +875,13 @@ class Molecule:
                 tr.fileloc = [[fname, j] for j in ff]
                 traj += tr
 
-            if to is not None and topo is None:  # We only use the first topology we read
+            if to is not None:
                 self._parseTopology(to, fname, overwrite=overwrite, _logger=_logger)
-                topo = to
 
         if len(traj.coords) != 0:
             self._parseTraj(traj, skip=skip)
-            
-        if topo:
-            self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
+
+        self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
 
     def _checkCoords(self, traj, reader, f):
         coords = traj.coords[0]
@@ -979,13 +976,15 @@ class Molecule:
                     raise TopologyInconsistencyError(
                         'Different atom information read from topology file {} for field {}'.format(filename, field))
 
-        fnamestr = os.path.splitext(os.path.basename(filename))[0]
-        self.viewname = fnamestr
-        self.fileloc = [[fnamestr, 0]]
-        self.topoloc = os.path.abspath(filename)
         self.element = self._guessMissingElements()
         self.crystalinfo = topo.crystalinfo
         _ = self._checkInsertions(_logger=_logger)
+
+        if os.path.exists(filename):
+            filename = os.path.abspath(filename)
+        self.topoloc = filename
+        self.fileloc = [[filename, 0]]
+        self.viewname = os.path.basename(filename)
 
     def _checkInsertions(self, _logger=True):
         ins = np.unique([x for x in self.insertion if x != ''])
@@ -1080,7 +1079,8 @@ class Molecule:
             oldbonds = self.bonds
             self.bonds = self._getBonds()
 
-        # Write out PDB and XTC files
+        # Write out PSF and XTC files
+        pdb = None
         psf = tempname(suffix=".psf")
         self.write(psf)
 
@@ -1098,38 +1098,46 @@ class Molecule:
         if viewer.lower() == 'notebook':
             retval = self._viewMDTraj(psf, xtc)
         elif viewer.lower() == 'vmd':
-            self._viewVMD(psf, xtc, viewerhandle, name, guessBonds)
-            #retval = viewerhandle
+            pdb = tempname(suffix=".pdb")
+            self.write(pdb, writebonds=False)
+            self._viewVMD(psf, pdb, xtc, viewerhandle, name, guessBonds)
         elif viewer.lower() == 'ngl' or viewer.lower() == 'webgl':
             retval = self._viewNGL(gui=gui)
         else:
             os.remove(xtc)
             os.remove(psf)
+            if pdb is not None:
+                os.remove(pdb)
             raise ValueError('Unknown viewer.')
 
         # Remove temporary files
         os.remove(xtc)
         os.remove(psf)
+        if pdb is not None:
+            os.remove(pdb)
         if retval is not None:
             return retval
 
-    def _viewVMD(self, psf, xtc, vhandle, name, guessbonds):
+    def _viewVMD(self, psf, pdb, xtc, vhandle, name, guessbonds):
         if name is None:
             name = self.viewname
         if vhandle is None:
             vhandle = getCurrentViewer()
 
         if guessbonds:
-            vhandle.send("mol new " + psf)
+            vhandle.send("mol new " + pdb)
+            vhandle.send("mol addfile " + psf)
+
         else:
-            vhandle.send("mol new " + psf + " autobonds off")
+            vhandle.send("mol new " + pdb + " autobonds off")
+            vhandle.send("mol addfile " + psf + " autobonds off")
         vhandle.send('animate delete all')
         vhandle.send('mol addfile ' + xtc + ' type xtc waitfor all')
 
         if name is not None:
             vhandle.send('mol rename top "' + name + '"')
         else:
-            vhandle.send('mol rename top "Mol [molinfo top]: psf+xtc"')
+            vhandle.send('mol rename top "Mol [molinfo top]: pdb+psf+xtc"')
 
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
@@ -1203,7 +1211,7 @@ class Molecule:
             centersel = None
         self.coords = wrap(self.coords, self._getBonds(fileBonds, guessBonds), self.box, centersel=centersel)
 
-    def write(self, filename, sel=None, type=None):
+    def write(self, filename, sel=None, type=None, **kwargs):
         """ Writes any of the supported formats (pdb, coor, psf, xtc, xyz, mol2, gro) and any formats supported by MDtraj
 
         Parameters
@@ -1231,7 +1239,7 @@ class Molecule:
         if type in _WRITERS:
             ext = type
         if ext in _WRITERS:
-            _WRITERS[ext](src, filename)
+            _WRITERS[ext](src, filename, **kwargs)
         else:
             raise IOError('Molecule cannot write files with "{}" extension yet. If you need such support please notify '
                           'us on the github htmd issue tracker.'.format(ext))

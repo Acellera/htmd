@@ -116,74 +116,59 @@ def checkTruncations(mol):
                                                                                                                        f]))
 
 
-def PDBwrite(mol, filename, frame=None):
-    if frame is None:
-        frame = mol.frame
-    frame = ensurelist(frame)
-
-    def format83(f):
-        """Format a single float into a string of width 8, with ideally 3 decimal places of precision. If the number is
-        a little too large, we can gracefully degrade the precision by lopping off some of the decimal places. If it's
-        much too large, we throw a NameError"""
-        if -999.999 < f < 9999.999:
-            return '%8.3f' % f
-        if -9999999 < f < 99999999:
-            return ('%8.3f' % f)[:8]
-        raise NameError('coordinate "%s" could not be represented '
-                        'in a width-8 field' % f)
-
-    def format62(f):
-        if -9.999 < f < 99.999:
-            return '%6.2f' % f
-        if -99999 < f < 999999:
-            return ('%6.2f' % f)[:6]
-        raise NameError('coordinate "%s" could not be represented '
-                        'in a width-6 field' % f)
+def PDBwrite(mol, filename, frames=None, writebonds=True):
+    if frames is None:
+        frames = mol.frame
+    frames = ensurelist(frames)
 
     checkTruncations(mol)
-    coords = np.atleast_3d(mol.coords[:, :, frame])
+    coords = np.atleast_3d(mol.coords[:, :, frames])
     numFrames = coords.shape[2]
-    serial = np.arange(1, np.size(coords, 0) + 1)
+    nAtoms = coords.shape[0]
+
+    serial = np.arange(1, np.size(coords, 0) + 1).astype(object)
+    serial[serial > 99999] = '*****'
+    serial = serial.astype('U5')
+
+    if nAtoms > 0:
+        if coords.max() >= 1E8 or coords.min() <= -1E7:
+            raise RuntimeError('Cannot write PDB coordinates with values smaller than -1E7 or larger than 1E8')
+        if mol.occupancy.max() >= 1E6 or mol.occupancy.min() <= -1E5:
+            raise RuntimeError('Cannot write PDB occupancy with values smaller than -1E5 or larger than 1E6')
+        if mol.beta.max() >= 1E6 or mol.beta.min() <= -1E5:
+            raise RuntimeError('Cannot write PDB beta/temperature with values smaller than -1E5 or larger than 1E6')
 
     fh = open(filename, 'w')
-    # TODO FIXME  -- should take box from traj frame
-    box = mol.box
+    box = mol.box[:, frames[0]]
     if box is not None and not np.all(mol.box == 0):
-        box = np.atleast_2d(np.atleast_2d(box)[:, mol.frame])
-        print("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 " % (box[0, 0], box[0, 1], box[0, 2], 90, 90, 90),
-              file=fh)
+        fh.write("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 \n" % (box[0], box[1], box[2], 90, 90, 90))
 
-    for f in frame:
-        print("MODEL    %5d" % (f + 1), file=fh)
+    for f in range(numFrames):
+        fh.write("MODEL    %5d\n" % (frames[f] + 1))
         for i in range(0, len(mol.record)):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
-            if serial[i] < 100000:
-                ser = str(int(serial[i]))
-            else:
-                ser = '*****'
-
-            print(
-                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  ".format(
+            fh.write(
+                "{!s:6.6}{!s:>5.5} {}{!s:>1.1}{!s:4.4}{!s:>1.1}{!s:>4.4}{!s:>1.1}   {}{}{}{}{}      {!s:4.4}{!s:>2.2}  \n".format(
                     mol.record[i],
-                    ser, name, mol.altloc[i],
+                    serial[i], name, mol.altloc[i],
                     mol.resname[i], mol.chain[i],
                     mol.resid[i],
                     mol.insertion[i],
-                    format83(mol.coords[i, 0, f]),
-                    format83(mol.coords[i, 1, f]),
-                    format83(mol.coords[i, 2, f]),
-                    format62(mol.occupancy[i]),
-                    format62(mol.beta[i]),
+                    '{:8.3f}'.format(coords[i, 0, f])[:8],
+                    '{:8.3f}'.format(coords[i, 1, f])[:8],
+                    '{:8.3f}'.format(coords[i, 2, f])[:8],
+                    '{:6.2f}'.format(mol.occupancy[i])[:6],
+                    '{:6.2f}'.format(mol.beta[i])[:6],
                     mol.segid[i],
                     mol.element[i]
-                ), file=fh
+                )
             )
             # TODO : convert charges to ints if we ever write them
             if i < len(mol.record) - 1 and mol.segid[i] != mol.segid[i + 1]:
-                print("TER", file=fh)
+                fh.write("TER\n")
 
-        if mol.bonds is not None and len(mol.bonds) != 0:
+        if writebonds and mol.bonds is not None and len(mol.bonds) != 0:
             bondedatoms = np.unique(mol.bonds)
             bondedatoms = bondedatoms[bondedatoms < 99998]  # Don't print bonds over 99999 as it overflows the field
 
@@ -193,16 +178,17 @@ def PDBwrite(mol, filename, frame=None):
                 partners = partners[partners < 99998] + 1  # Don't print bonds over 99999 as it overflows the field
                 # I need to support multi-line printing of atoms with more than 4 bonds
                 while len(partners) >= 3:  # Write bonds as long as they are more than 3 in fast more
-                    print("CONECT%5d%5d%5d%5d" % (a + 1, partners[0], partners[1], partners[2]), file=fh)
+                    fh.write("CONECT%5d%5d%5d%5d\n" % (a + 1, partners[0], partners[1], partners[2]))
                     partners = partners[3:]
                 if len(partners) > 0:  # Write the rest of the bonds
                     line = "CONECT%5d" % (a + 1)
                     for p in partners:
                         line = "%s%5d" % (line, p)
-                    print(line, file=fh)
+                    fh.write(line)
+                    fh.write('\n')
 
-        print("ENDMDL", file=fh)
-    print("END", file=fh)
+        fh.write("ENDMDL\n")
+    fh.write("END\n")
 
     fh.close()
 
@@ -364,12 +350,12 @@ def XYZwrite(src, filename):
 
 def MOL2write(mol, filename):
     with open(filename, "w") as f:
-        print("@<TRIPOS>MOLECULE", file=f)
-        print("    MOL", file=f)
+        f.write("@<TRIPOS>MOLECULE\n")
+        f.write("    MOL\n")
         unique_bonds = [list(t) for t in set(map(tuple, [sorted(x) for x in mol.bonds]))]
         unique_bonds = np.array(sorted(unique_bonds, key=lambda x: (x[0], x[1])))
-        print("%5d %5d %5d %5d %5d" % (mol.numAtoms, unique_bonds.shape[0], 0, 0, 0), file=f)
-        print("SMALL\nUSER_CHARGES\n\n", file=f)
+        f.write("%5d %5d %5d %5d %5d\n" % (mol.numAtoms, unique_bonds.shape[0], 0, 0, 0))
+        f.write("SMALL\nUSER_CHARGES\n\n\n")
         '''
         @<TRIPOS>ATOM
         Each data record associated with this RTI consists of a single data line. This
@@ -397,26 +383,31 @@ def MOL2write(mol, filename):
         DSPMOD, TYPECOL, CAP, BACKBONE, DICT, ESSENTIAL, WATER and
         DIRECT.
         '''
-        print("@<TRIPOS>ATOM", file=f)
+        f.write("@<TRIPOS>ATOM\n")
         for i in range(mol.coords.shape[0]):
-            print('{:7d} {:8s} {:9.4f} {:9.4f} {:9.4f} {:8s} '.format(i + 1, mol.name[i], mol.coords[i, 0, mol.frame],
+            f.write('{:7d} {:8s} {:9.4f} {:9.4f} {:9.4f} {:8s} '.format(i + 1, mol.name[i], mol.coords[i, 0, mol.frame],
                                                                       mol.coords[i, 1, mol.frame],
                                                                       mol.coords[i, 2, mol.frame],
                                                                       mol.atomtype[i] if mol.atomtype[i] != ''
-                                                                      else mol.element[i]),  # TODO: implement SYBYL atom types
-                  end='',
-                  file=f)
+                                                                      else mol.element[i])
+                    )
             if isinstance(mol.resid[i], numbers.Integral):
-                print('{:3d} '.format(mol.resid[i]), end='', file=f)
+                f.write('{:3d} '.format(mol.resid[i]))
                 if mol.resname[i] != '':
-                    print('{:4s} '.format(mol.resname[i]), end='', file=f)
+                    f.write('{:4s} '.format(mol.resname[i]))
                     if isinstance(mol.charge[i], numbers.Real):
-                        print('{:12.6f}'.format(mol.charge[i]), end='', file=f)
-            print('', file=f)
-        print("@<TRIPOS>BOND", file=f)
+                        f.write('{:12.6f}'.format(mol.charge[i]))
+            f.write('\n')
+        f.write("@<TRIPOS>BOND\n")
         for i in range(unique_bonds.shape[0]):
-            print("%6d %4d %4d un" % (i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1), file=f)  # TODO: implement SYBYL bond types
-        print("", file=f)
+            bt = 'un'
+            if len(mol.bondtype) > 0:
+                idx = (mol.bonds[:, 0] == unique_bonds[i, 0]) & (mol.bonds[:, 1] == unique_bonds[i, 1])
+                idx |= (mol.bonds[:, 0] == unique_bonds[i, 1]) & (mol.bonds[:, 1] == unique_bonds[i, 0])
+                tmp = np.unique(mol.bondtype[idx])
+                assert len(tmp) == 1, 'There should only exist one bond type for atoms {} {}'.format(unique_bonds[i, 0], unique_bonds[i, 1])
+                bt = tmp[0]
+            f.write("{:6d} {:4d} {:4d} {}\n".format(i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1, bt))
 
 
 def GROwrite(mol, filename):

@@ -36,7 +36,7 @@ found = {key: False for key in deps}
 for p in packages:
     name = p['name'].lower()
     if name in deps:
-        text += '    - {} {}\n'.format(name, p['version'])
+        text += '    - {} >={}\n'.format(name, p['version'])
         found[name] = True
 
 # Check if all dependencies were found. If not print which and exit with error

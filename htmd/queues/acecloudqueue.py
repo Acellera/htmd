@@ -6,7 +6,7 @@
 
 import os
 from htmd.queues.simqueue import SimQueue
-from protocolinterface import ProtocolInterface
+from protocolinterface import ProtocolInterface, val
 import logging
 import random
 import string
@@ -17,67 +17,148 @@ logging.getLogger("boto3").setLevel(logging.CRITICAL)
 
 
 class AceCloudQueue(SimQueue, ProtocolInterface):
-    def __init__(self, groupname=None):
+    """  Class which handles the acecloud queueing.
+
+    Before using this class you should have set up acecloud already by calling `acecloud --setup` from command line.
+
+    Parameters
+    ----------
+    groupname : str, default=None
+        The name of the group of simulations you want to submit. If none is given, a randomly generated string will be used instead.
+    datadir : str, default=None
+        The directory in which to retrieve your results.
+    verbose : bool, default=False
+        Turn verbosity mode on or off.
+
+    Examples
+    --------
+    >>> ac = AceCloudQueue()
+    >>> ac.groupname = 'mygroup'
+    >>> ac.submit(glob('./mysimfolders/*/'))
+    >>> ac.datadir = './mysimfolders/'  # The directory where the output will be stored. Here we use the same as the input
+    >>> ac.retrieve()
+    >>> ac.inprogress()
+    >>> ac.stop() # Kill all simulations of the group
+
+    """
+    def __init__(self):
+
+        SimQueue.__init__(self)
+        ProtocolInterface.__init__(self)
+        self._arg('groupname', 'str', 'The name of the group of simulations you want to submit. If none is given, '
+                                      'a randomly generated string will be used instead.', None, val.String())
+        self._arg('datadir', 'str', 'The directory in which to retrieve your results.', None, val.String())
+        self._arg('verbose', 'bool', 'Turn verbosity mode on or off.', False, val.Boolean())
+
+        self._cloud = None
+
+    def _createCloud(self):
+        if self._cloud is not None:
+            return
         from acecloud.cloud import Cloud
-        super().__init__()
-        if not groupname:
-            groupname = ''.join(
+        self._cloud = Cloud(verbose=self.verbose)
+
+    def submit(self, dirs):
+        self._createCloud()
+
+        from acecloud.job import Job
+        dirs = self._submitinit(dirs)
+
+        if self.groupname is None:
+            self.groupname = ''.join(
                 random.SystemRandom().choice(string.ascii_uppercase + string.digits + string.ascii_lowercase) for _ in
                 range(8))
 
-        self._groupname = groupname
-        self._cloud = Cloud()
-        self._index = 0
-        self._jobs = []
-
-    def submit(self, dirs):
-        from acecloud.job import Job
-        if isinstance(dirs, str):
-            dirs = [dirs, ]
+        for d in dirs:
+            if not os.path.isdir(d):
+                raise FileExistsError('Submit: directory ' + d + ' does not exist.')
+            # runsh = os.path.join(d, 'run.sh')
+            # if not os.path.exists(runsh):
+            #     raise FileExistsError("File %s does not exist." % runsh)
+            # if not os.access(runsh, os.X_OK):
+            #     raise FileExistsError("File %s does not have execution permissions." % runsh)
 
         for d in dirs:
             logger.info("Queueing " + d)
-            runscript = os.path.abspath(os.path.join(d, "run.sh"))
-            if not os.path.exists(runscript):
-                raise FileExistsError("File %s does not exist." % (runscript))
-            if not os.access(runscript, os.X_OK):
-                raise FileExistsError("File %s does not have execution permissions." % (runscript))
+            name = os.path.basename(d)
 
-            j = Job(
+            from acecloud.requesttype import RequestType
+            Job(
                 ngpus=1,
                 ncpus=1,
                 path=d,
-                group=self._groupname,
-                name="%6d" % (self._index),
-                cloud=self._cloud
+                group=self.groupname,
+                name=name,
+                cloud=self._cloud,
+                requesttype=RequestType.SPOT,
+                verbose=self.verbose
             )
-            self._index = self._index + 1
-            self._jobs.append(j)
 
     def inprogress(self):
+        self._createCloud()
         from acecloud.status import Status
+        jj = self._cloud.getJobs(group=self.groupname)
         count = 0
-        for j in self._jobs:
+        for j in jj:
             s = j.status()
             if s == Status.RUNNING or s == Status.PENDING:
-                count = count + 1
+                count += 1
 
         return count
 
     def retrieve(self):
+        if self.datadir is None:
+            raise RuntimeError('Please set the datadir parameter before retrieving jobs.')
+
+        self._createCloud()
         from acecloud.status import Status
-        for j in self._jobs:
+        jj = self._cloud.getJobs(group=self.groupname)
+        currdir = os.getcwd()
+        for j in jj:
             if j.status() == Status.COMPLETED:
                 try:
+                    outf = os.path.join(self.datadir, j.name)
+                    if not os.path.exists(outf):
+                        os.makedirs(outf)
+                    os.chdir(outf)
                     j.retrieve()
                     j.delete()
-                except:
+                except Exception as e:
+                    logger.warning(e)
                     pass
+                os.chdir(currdir)
 
     def stop(self):
-        for j in self._jobs:
+        # TODO: This not only stops the job, but also deletes the S3. Not exactly like the stop of other queues
+        self._createCloud()
+        jj = self._cloud.getJobs(group=self.groupname)
+        for j in jj:
             try:
-                j.stop()
                 j.delete()
-            except:
+            except Exception as e:
+                logger.warning(e)
                 pass
+
+    @property
+    def ngpu(self):
+        raise NotImplementedError
+
+    @ngpu.setter
+    def ngpu(self, value):
+        raise NotImplementedError
+
+    @property
+    def ncpu(self):
+        raise NotImplementedError
+
+    @ncpu.setter
+    def ncpu(self, value):
+        raise NotImplementedError
+
+    @property
+    def memory(self):
+        raise NotImplementedError
+
+    @memory.setter
+    def memory(self, value):
+        raise NotImplementedError

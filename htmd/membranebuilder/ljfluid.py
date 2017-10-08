@@ -105,7 +105,7 @@ def distributeLipids(boxsize,
         # Add the nonbonded force.
         system.addForce(nb)
 
-        # Add a restrining potential to keep atoms in z=0
+        # Add a restraining potential to keep atoms in z=0
         energy_expression = 'k * (z^2)'
         force = openmm.CustomExternalForce(energy_expression)
         force.addGlobalParameter('k', 10)

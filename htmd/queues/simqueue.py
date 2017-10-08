@@ -3,41 +3,114 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import abc
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 
 
 class SimQueue(metaclass=ABCMeta):
 
-    @abc.abstractmethod
+    def __init__(self):
+        super().__init__()
+        self._sentinel = 'htmd.queues.done'
+        # For synchronous
+        self._dirs = None
+
+    @abstractmethod
     def retrieve(self):
         """ Subclasses need to implement this method """
         pass
 
-    @abc.abstractmethod
+    @abstractmethod
     def submit(self, dirs):
         """ Subclasses need to implement this method """
         pass
 
-    @abc.abstractmethod
+    def _submitinit(self, dirs):
+        if isinstance(dirs, str):
+            dirs = [dirs, ]
+        if self._dirs is None:
+            self._dirs = []
+        self._dirs.extend(dirs)
+        return dirs
+
+    @abstractmethod
     def inprogress(self):
         """ Subclasses need to implement this method """
         pass
 
-    def wait(self):
+    def wait(self, sentinel=False):
         """ Blocks script execution until all queued work completes
+
+        Parameters
+        ----------
+        sentinel : bool, default=False
+            If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
+            relies on the filesystem, in particular on the existence of a sentinel file for job completion.
 
         Examples
         --------
-        >>> queue.wait()
+        >>> self.wait()
         """
         from time import sleep
         import sys
-        while self.inprogress() != 0:
+
+        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
             sys.stdout.flush()
             sleep(5)
 
-    @abc.abstractmethod
+    def notcompleted(self):
+        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
+
+        Returns
+        -------
+        total : int
+            Total number of directories which have not completed
+        """
+        import os
+        total = 0
+        if self._dirs is None:
+            raise RuntimeError('This method relies on running synchronously.')
+        for i in self._dirs:
+            if not os.path.exists(os.path.join(i, self._sentinel)):
+                total += 1
+        return total
+
+    @abstractmethod
     def stop(self):
         """ Subclasses need to implement this method """
+        pass
+
+    @property
+    @abstractmethod
+    def ncpu(self):
+        """ Subclasses need to have this property """
+        pass
+
+    @ncpu.setter
+    @abstractmethod
+    def ncpu(self, value):
+        """ Subclasses need to have this setter """
+        pass
+
+    @property
+    @abstractmethod
+    def ngpu(self):
+        """ Subclasses need to have this property """
+        pass
+
+    @ngpu.setter
+    @abstractmethod
+    def ngpu(self, value):
+        """ Subclasses need to have this setter """
+        pass
+
+    @property
+    @abstractmethod
+    def memory(self):
+        """ Subclasses need to have this property. This property is expected to return a integer in MiB"""
+        pass
+
+    @memory.setter
+    @abstractmethod
+    def memory(self, value):
+        """ Subclasses need to have this setter """
         pass

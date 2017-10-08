@@ -32,6 +32,7 @@ packages = [
     ['conda-forge', 'thermotools'],
     ['bioconda', 'nglview'],
     ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
+    ['rdkit', 'rdkit']
 ]
 
 for channel, package in packages:

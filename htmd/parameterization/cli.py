@@ -6,14 +6,10 @@
 import os
 import argparse
 import sys
+import psutil
 
 
 def cli_parser():
-    ncpus = os.cpu_count()
-    try:
-        ncpus = int(os.getenv("NCPUS"))
-    except:
-        pass
 
     parser = argparse.ArgumentParser(description="Acellera Small Molecule Parameterization Tool")
     parser.add_argument("-m", "--mol2", help="Molecule to parameterise, in mol2 format", required=True, type=str,
@@ -29,13 +25,13 @@ def cli_parser():
                         dest="outdir")
     parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default: %(default)s)",
                         default="all", dest="torsion")
-    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=ncpus,
+    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=psutil.cpu_count(),
                         dest="ncpus")
     parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
                         choices=["GAFF", "GAFF2", "CGENFF", "all"], default="all")
-    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVDZ"],
+    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31G*", "cc-pVDZ"],
                         default="cc-pVDZ", dest="basis")
-    parser.add_argument("--theory", help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
+    parser.add_argument("--theory", help="QM Theory (default: %(default)s)", choices=["HF", "B3LYP"],
                         default="B3LYP", dest="theory")
     parser.add_argument("--vacuum", help="Perform QM calculations in vacuum (default: %(default)s)",
                         action="store_false", dest="vacuum",
@@ -48,8 +44,8 @@ def cli_parser():
                         action="store_true", dest="notorsion", default=False)
     parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
                         choices=["inline", "LSF", "Slurm"], default="inline", dest="exec")
-    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"],
-                        default="PSI4", dest="qmcode")
+    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Psi4", "Gaussian"],
+                        default="Psi4", dest="qmcode")
     parser.add_argument("--freeze-charge", metavar="A1",
                         help="Freeze the charge of the named atom (default: %(default)s)", action="append",
                         default=None, dest="freezeq")
@@ -63,7 +59,10 @@ def main_parameterize(arguments=None):
 
     from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
     from htmd.parameterization.fftype import FFTypeMethod
-    from htmd.qm.qmcalculation import Theory, BasisSet, Execution, Code
+    from htmd.queues.localqueue import LocalCPUQueue
+    from htmd.queues.lsfqueue import LsfQueue
+    from htmd.queues.slurmqueue import SlurmQueue
+    from htmd.qm import Psi4, Gaussian
     import numpy as np
     import math
 
@@ -87,33 +86,37 @@ VdW      : {VDW_ENERGY}
                   file=out)
         fener.close()
 
-    # Communicate the # of CPUs to use to the QM engine via environment variable
-    os.environ['NCPUS'] = str(args.ncpus)
-
     filename = args.mol
     if not os.path.exists(filename):
         print("File {} not found. Please check that the file exists and that the path is correct.".format(filename))
         sys.exit(0)
 
-    if args.qmcode == "Gaussian":
-        code = Code.Gaussian
-    elif args.qmcode == "PSI4":
-        code = Code.PSI4
-    elif args.qmcode == "TeraChem":
-        code = Code.TeraChem
+    # Create a queue for QM
+    if args.exec == 'inline':
+        queue = LocalCPUQueue()
+        queue.ncpu = args.ncpus
+    elif args.exec == 'Slurm':
+        queue = SlurmQueue()
+        queue.partition = SlurmQueue._defaults['cpu_partition']
+    elif args.exec == 'LSF':
+        queue = LsfQueue()
+        queue.queue = LsfQueue._defaults['cpu_queue']
     else:
-        print("Unknown QM code: {}".format(args.qmcode))
-        sys.exit(1)
+        raise NotImplementedError
 
-    if args.exec == "inline":
-        execution = Execution.Inline
-    elif args.exec == "LSF":
-        execution = Execution.LSF
-    elif args.exec == "Slurm":
-        execution = Execution.Slurm
+    # Create a QM object
+    if args.qmcode == 'Psi4':
+        qm = Psi4()
+    elif args.qmcode == 'Gaussian':
+        qm = Gaussian()
     else:
-        print("Unknown execution mode: {}".format(args.exec))
-        sys.exit(1)
+        raise NotImplementedError
+
+    # Set up the QM object
+    qm.theory = args.theory
+    qm.basis = args.basis
+    qm.solvent = 'vacuum' if args.vacuum else 'PCM'
+    qm.queue = queue
 
     if args.forcefield == "CGENFF":
         methods = [FFTypeMethod.CGenFF_2b6]
@@ -127,33 +130,11 @@ VdW      : {VDW_ENERGY}
         print("Unknown initial guess force-field: {}".format(args.forcefield))
         sys.exit(1)
 
-    if args.basis == "6-31g-star":
-        basis = BasisSet._6_31G_star
-    elif args.basis == "cc-pVDZ":
-        basis = BasisSet._cc_pVDZ
-    else:
-        print("Unknown basis {}".format(args.basis))
-        sys.exit(1)
-
-    if args.theory == "RHF":
-        theory = Theory.RHF
-    elif args.theory == "B3LYP":
-        theory = Theory.B3LYP
-    else:
-        print("Unknown theory %s".format(args.theory))
-        sys.exit(1)
-
-    if args.vacuum:
-        solvent = False
-    else:
-        solvent = True
-
     # Just list torsions?
     if args.list:
         print(" === Listing soft torsions of {} ===\n".format(filename))
         mol = FFMolecule(filename=filename, method=methods[0], netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                         basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code,
-                         outdir=args.outdir)
+                         qm=qm, outdir=args.outdir)
         dihedrals = mol.getSoftTorsions()
         print("Detected soft torsions:")
         fh = open("torsions.txt", "w")
@@ -174,8 +155,21 @@ VdW      : {VDW_ENERGY}
         print(" === Fitting for FF %s ===\n" % method.name)
 
         mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                         basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code,
-                         outdir=args.outdir)
+                         qm=qm, outdir=args.outdir)
+
+        # Update B3LYP to B3LYP-D3
+        # TODO: this is silent and not documented stuff
+        if qm.theory == 'B3LYP':
+            qm.correction = 'D3'
+
+        # Update basis sets
+        # TODO: this is silent and not documented stuff
+        if mol.netcharge < 0 and qm.solvent == 'vacuum':
+            if qm.basis == '6-31G*':
+                qm.basis = '6-31+G*'
+            if qm.basis == 'cc-pVDZ':
+                qm.basis = 'aug-cc-pVDZ'
+
         dihedrals = mol.getSoftTorsions()
         mol_orig = mol.copy()
 
