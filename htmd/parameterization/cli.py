@@ -31,14 +31,14 @@ def getArgumentParser():
     parser.add_argument('filename', help='Molecule file in MOL2 format')
     parser.add_argument('-c', '--charge', type=int,
                         help='Total charge of the molecule (default: sum of partial charges)')
-    parser.add_argument('-l', '--list', action='store_true', help='List parameterisable dihedral angles')
+    parser.add_argument('-l', '--list', action='store_true', help='List parameterizable dihedral angles')
     parser.add_argument('--rtf-prm', nargs=2, metavar='<filename>', help='CHARMM RTF and PRM files')
-    parser.add_argument('-ff', '--forcefield', default='all', choices=['GAFF', 'GAFF2', 'CGENFF', 'all'],
-                        help='Inital force field guess (default: %(default)s)')  # TODO: multi arguments
-    parser.add_argument('--fix-charge', action='append', default=[], metavar='<atom name>',
+    parser.add_argument('-ff', '--forcefield', nargs='+', default=['GAFF2'], choices=['GAFF', 'GAFF2', 'CGENFF'],
+                        help='Inital force field guess (default: %(default)s)')
+    parser.add_argument('--fix-charge', nargs='+', default=[], metavar='<atom name>',
                         help='Fix atomic charge during charge fitting (default: none)')
-    parser.add_argument('-d', '--dihedral', default='all', metavar='A1-A2-A3-A4',
-                        help='Select dihedral angle to parameterize (default: %(default)s)')  # TODO: multi arguments
+    parser.add_argument('-d', '--dihedral', nargs='+', default=[], metavar='A1-A2-A3-A4',
+                        help='Select dihedral angle to parameterize (default: all parameterizable dihedral angles)')
     parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'], help='QM code (default: %(default)s)')
     parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP'],
                         help='QM level of theory (default: %(default)s)')
@@ -46,14 +46,12 @@ def getArgumentParser():
                         help='QM basis set (default: %(default)s)')
     parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
                         help='QM environment (default: %(default)s)')
-    parser.add_argument('--no-min', action='store_false', default=True, dest='minimize',
+    parser.add_argument('--no-min', action='store_false', dest='minimize',
                         help='Do not perform QM structure minimization')
-    parser.add_argument('--no-esp', action='store_false', default=True, dest='fit_charges',
-                        help='Do not perform QM charge fitting')
-    parser.add_argument('--no-dihed', action='store_false', default=True, dest='fit_dihedral',
+    parser.add_argument('--no-esp', action='store_false', dest='fit_charges', help='Do not perform QM charge fitting')
+    parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
-    # TODO: name
-    parser.add_argument('--no-dihed-opt', action='store_false', default=True, dest='optimize_dihedral',
+    parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
                         help='Do not perform QM structure optimisation when scanning dihedral angles')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'PBS', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
@@ -105,17 +103,8 @@ def main_parameterize(arguments=None):
     if not os.path.exists(args.filename):
         raise ValueError('File %s cannot be found' % args.filename)
 
-    # Get initial guess methods
-    if args.forcefield == 'CGENFF':
-        methods = [FFTypeMethod.CGenFF_2b6]
-    elif args.forcefield == 'GAFF':
-        methods = [FFTypeMethod.GAFF]
-    elif args.forcefield == 'GAFF2':
-        methods = [FFTypeMethod.GAFF2]
-    elif args.forcefield == 'all':
-        methods = [FFTypeMethod.CGenFF_2b6, FFTypeMethod.GAFF2]
-    else:
-        raise NotImplementedError
+    method_map = {'GAFF': FFTypeMethod.GAFF, 'GAFF2': FFTypeMethod.GAFF2, 'CGENFF': FFTypeMethod.CGenFF_2b6}
+    methods = [method_map[method] for method in args.forcefield]  # TODO: move into FFMolecule
 
     # Get RTF and PRM file names
     rtf, prm = None, None
@@ -166,9 +155,9 @@ def main_parameterize(arguments=None):
         print('Detected soft torsions:')
         with open('torsions.txt', 'w') as fh:
             for dihedral in mol.getRotatableDihedrals():
-                name = '%s-%s-%s-%s' % tuple(mol.name[dihedral])
-                print('\t'+name)
-                fh.write(name+'\n')
+                dihedral_name = '%s-%s-%s-%s' % tuple(mol.name[dihedral])
+                print('\t'+dihedral_name)
+                fh.write(dihedral_name+'\n')
         sys.exit(0)
 
     # Print arguments
@@ -251,15 +240,12 @@ def main_parameterize(arguments=None):
 
             # Choose which dihedrals to fit
             dihedrals = []
-            if args.dihedral == 'all':
-                dihedrals = all_dihedrals
-            else:
-                all_names = ['%s-%s-%s-%s' % tuple(mol.name[dihedral]) for dihedral in all_dihedrals]
-                for name in args.dihedral.split(','):
-                    if name in all_names:
-                        dihedrals.append(all_dihedrals[all_names.index(name)])
-                    else:
-                        raise ValueError('%s is not recognized as a rotatable dihedral angle\n' % name)
+            all_dihedral_names = ['-'.join(mol.name[dihedral]) for dihedral in all_dihedrals]
+            for dihedral_name in args.dihedral:
+                if dihedral_name not in all_dihedral_names:
+                    raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
+                dihedrals.append(all_dihedrals[all_dihedral_names.index(dihedral_name)])
+            dihedrals = dihedrals if len(dihedrals) > 0 else all_dihedrals  # Set default to all dihedral angles
 
             # Fit the parameters
             mol.fitDihedrals(dihedrals, args.optimize_dihedral)

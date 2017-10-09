@@ -95,68 +95,68 @@ class TestParameterize(unittest.TestCase):
     def test_h2o2_gaff2(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_gaff2')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-min --no-esp --no-dihed')
 
     def test_h2o2_outdir(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_outdir')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed -o dir')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-min --no-esp --no-dihed -o dir')
 
     def test_h2o2_min(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_min')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-esp --no-dihed')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-esp --no-dihed')
 
     def test_h2o2_min_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_min_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 --no-esp --no-dihed')
+        self._test(refDir, resDir, 'parameterize input.mol2 --no-esp --no-dihed')
 
     def test_h2o2_esp(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_esp')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-min --no-dihed')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-min --no-dihed')
 
     def test_h2o2_esp_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_esp_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 --no-min --no-dihed')
+        self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-dihed')
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_fix(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     def test_h2o2_dihed_fix_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_opt(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-min --no-esp')
 
     def test_h2o2_dihed_opt_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp')
+        self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp')
 
     @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
     def test_h2o2_full_fake(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_full_fake')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --fake-qm')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --fake-qm')
 
     @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
     def test_h2o2_full_fake_restart(self):
@@ -166,53 +166,60 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 --fake-qm')
+        self._test(refDir, resDir, 'parameterize input.mol2 --fake-qm')
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_ethene_dihed_fix(self):
 
         refDir = os.path.join(self.dataDir, 'ethene_dihed_fix')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     def test_ethene_dihed_fix_restart(self):
 
         refDir = os.path.join(self.dataDir, 'ethene_dihed_fix')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_glycol_dihed_fix(self):
 
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     def test_glycol_dihed_fix_restart(self):
 
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
+
+    def test_glycol_dihed_fix_restart_2(self):
+
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
+        resDir = tempname()
+        shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
+        self._test(refDir, resDir, 'parameterize input.mol2 -d O1-C1-C2-O2 C1-C2-O2-H6 --no-min --no-esp --no-dihed-opt')
 
     def test_glycol_dihed_select_1_restart(self):
 
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 -d O1-C1-C2-O2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, resDir, 'parameterize input.mol2 -d O1-C1-C2-O2 --no-min --no-esp --no-dihed-opt')
 
     def test_glycol_dihed_select_2_restart(self):
 
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_2_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 -d C1-C2-O2-H6 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, resDir, 'parameterize input.mol2 -d C1-C2-O2-H6 --no-min --no-esp --no-dihed-opt')
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_ethanolamine_dihed_fix(self):
 
         refDir = os.path.join(self.dataDir, 'ethanolamine_dihed_fix')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, tempname(), 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_ethanolamine_dihed_fix_restart(self):
@@ -220,7 +227,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'ethanolamine_dihed_fix_restart')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -ff GAFF2 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     def test_benzamidine_gaff(self):
 
@@ -244,14 +251,13 @@ class TestParameterize(unittest.TestCase):
         os.makedirs(resDir)
         shutil.copy(os.path.join(refDir, 'input.rtf'), resDir)
         shutil.copy(os.path.join(refDir, 'input.prm'), resDir)
-        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --rtf-prm input.rtf input.prm --no-min '
-                                   '--no-esp --no-dihed')
+        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --rtf-prm input.rtf input.prm --no-min --no-esp --no-dihed')
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_full(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_full')
-        self._test(refDir, tempname(), 'parameterize input.mol2 -c 1 --basis 6-31G*')
+        self._test(refDir, tempname(), 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF --basis 6-31G*')
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
@@ -262,7 +268,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 --basis 6-31G*')
+        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF --basis 6-31G*')
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_esp_freeze_restart(self):
@@ -271,7 +277,7 @@ class TestParameterize(unittest.TestCase):
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 --fix-charge N2 --basis 6-31G* --no-dihed')
+        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF --fix-charge N2 --basis 6-31G* --no-dihed')
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_dihed_select_restart(self):
@@ -281,7 +287,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 -d C2-C1-C7-N1 --basis 6-31G*')
+        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF -d C2-C1-C7-N1 --basis 6-31G*')
 
 
 if __name__ == '__main__':
