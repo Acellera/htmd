@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 import numpy as np
+from scipy import constants as const
 from scipy.spatial.distance import cdist
 
 from htmd.qm.base import QMBase, QMResult
@@ -67,7 +68,7 @@ class FakeQM(QMBase):
         # Compute ESP values
         if self.esp_points is not None:
             distances = cdist(result.esp_points, result.coords[:, :, 0]) # Angstrom
-            distances *= 0.52917721067  # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
+            distances *= const.physical_constants['Bohr radius'][0]/const.angstrom  # Angstrom --> Bohr
             result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge) # Hartree/Bohr
 
         return [result]

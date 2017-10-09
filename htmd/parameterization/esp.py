@@ -8,6 +8,7 @@ from math import pi as PI
 from math import sqrt, sin, cos, acos
 import numpy as np
 from numpy.random import uniform as rand
+from scipy import constants as const
 from scipy.spatial.distance import cdist
 import nlopt
 import unittest
@@ -23,7 +24,7 @@ class ESP:
     - Generate points
     - Consider equivalent atoms
     - Impose total molecule charge
-    - Impose charge values bounds
+    - Impose boundaries for charge values
     - Charge values can be frozen
 
     The charges are fitting to reproduce ESP at the reference point computed by QM. The fitting is performed with
@@ -247,7 +248,7 @@ class ESP:
         # Compute the reciprocal distances between ESP points and atomic charges
         if self._reciprocal_distances is None:
             distances = cdist(qm_result.esp_points, self.molecule.coords[:, :, 0])
-            distances *= 0.52917721067 # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
+            distances *= const.physical_constants['Bohr radius'][0]/const.angstrom  # Angstrom --> Bohr
             self._reciprocal_distances = np.reciprocal(distances)
 
         charges = self._map_groups_to_atoms(group_charges)
@@ -355,4 +356,5 @@ def load_tests(loader, tests, ignore):
     return tests
 
 if __name__ == '__main__':
-    unittest.main()
+
+    unittest.main(verbosity=2)
