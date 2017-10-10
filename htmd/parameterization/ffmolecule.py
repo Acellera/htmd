@@ -19,6 +19,7 @@ import math
 from math import cos
 import os
 import scipy.optimize as optimize
+from scipy import constants as const
 import numpy as np
 from copy import deepcopy
 
@@ -255,7 +256,7 @@ class FFMolecule(Molecule):
         dipole = np.zeros(4)
         dipole[:3] = np.dot(self.charge, coords)
         dipole[3] = np.linalg.norm(dipole[:3]) # Total dipole moment
-        dipole /= 0.20819434 # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
+        dipole *= 1e11*const.elementary_charge*const.speed_of_light # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
 
         return dipole
 
