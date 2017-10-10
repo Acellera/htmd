@@ -11,15 +11,19 @@ Contents:
 Prepare molecule
 ----------------
 
-The structure of benzamidine can be obtained from PBD database. The structure comes in SDF format, but for
-``parameterize`` it has to be converted to MOL2 format.
+The structure of a molecule has to be in MOL2 format.
+
+.. note::
+
+    The protonation state and charge of the molecule has to be correct.
+
+For benzamidine, it can be downloaded from HTMD repository:
 
 .. code:: bash
 
-    wget https://files.rcsb.org/ligands/view/BEN_ideal.sdf
-    obabel BEN_ideal.sdf -O benzamidine.mol2
+    wget https://raw.githubusercontent.com/Acellera/htmd/master/htmd/data/test-param/benzamidine.mol2
 
-``benzamidine.mol2`` file containes a molecule ready for parameterization.
+``benzamidine.mol2`` file contains a molecule ready for parameterization.
 
 Get command-line options
 -------------------------
@@ -37,43 +41,28 @@ Get command-line options
 Set total charge
 ----------------
 
-Verifying if the small molecule has the correct protonation state and charge is still a user-dependent task. Some
-combinations of a total charge with a given set of atoms may cause the underlying QM software to error due to
-incompatibility of the multiplicity with the total amount of electrons of the system. For example, when taking our
-``ben.mol2``, and leaving the charge as the default one, deduced from the MOL2 charges (a total charge of +1), the tool
-errors as it should:
+The total charge of the molecule is set to a sum of the atomic partial charges from the structure file. If necessary,
+it can be overridden with ``--charge`` flags, i.e. ``--charge -2`` set the total charge of a molecule to -2.
 
-.. code:: bash
+.. warning::
 
-    parameterize benzamidine.mol2 --no-esp --no-dihed --output benzamidine-fail
+    An incorrect combination of the total charge and a protonation state may result into QM code failure.
 
-::
+In case of benzamidine, it is in a protonate state with the total charge of +1. ``benzamidine.mol2`` has correct
+partial charges, so there is no need to use ``--charge 1`` flag.
 
-    RuntimeError: sanity check failed! A multiplicity of 1 with 63 electrons is impossible.
-    Please check your input
-    Running QM Calculations: 100% (1/1) [################################################################################################] eta --:-- -
-    Traceback (most recent call last):
-      File "/home/joao/miniconda3/bin/parameterize", line 6, in <module>
-        sys.exit(htmd.parameterization.cli.main_parameterize())
-      File "/home/joao/maindisk/software/repos/Acellera/htmd/htmd/parameterization/cli.py", line 180, in main_parameterize
-        mol.minimize()
-      File "/home/joao/maindisk/software/repos/Acellera/htmd/htmd/parameterization/ffmolecule.py", line 163, in minimize
-        raise RuntimeError("QM Optimization failed")
-    RuntimeError: QM Optimization failed
-
-This is because that combination is wrong. For that set of atoms, with that protonation of the nitrogens, the total charge
-should be set to 0 (zero). We can use the ``-c`` flag for this:
-
-.. code:: bash
-
+.. comment.. code:: bash
     parameterize -m benzamidine.mol2 --charge 1 --no-esp --no-dihed --output benzamidine-pass
 
+.. comment
 This last command just performs the minization of the small molecule and outputs that minimized structure with the
 CGENFF/GAFF2 parameters. Please note that a combination of total charge and a given set of atoms working on
 ``parameterize`` does not mean that protonation state is the most common or relevant in normal pH conditions.
 
 Choose force field
 ------------------
+
+TODO: finish!
 
 The ``parameterize`` tool has an option to use a given FF as initial guess for the parameters, set by the flag
 ``--forcefield``. By default, it outputs parameters for both CHARMM (through CGENFF) and AMBER (through GAFF2). If one
@@ -84,13 +73,15 @@ initial parameters. This can be done by setting the flags ``--no-min``, ``--no-e
 
 .. code:: bash
 
-    parameterize benzamidine.mol2 --no-min --no-esp --no-dihed --output benzamidine-noqm
+    parameterize benzamidine.mol2 --forcefield GAFF2 CGENFF --no-min --no-esp --no-dihed --output benzamidine-noqm
 
 Inside the output directory ``benzamidine-noqm`` (specified in the flag ``--output``), one can find parameters for each both
 CHARMM and AMBER.
 
 List parameterizable dihedral angles
 ------------------------------------
+
+TODO: finish!
 
 Before doing any parameterization, one can list the soft torsions that the molecule has. This can be easily done by
 using the ``--list`` flag:
@@ -100,25 +91,30 @@ using the ``--list`` flag:
     parameterize benzamidine.mol2 --list
 
 ::
+ === Parameterizable dihedral angles ===
 
-    C2-C1-C7-N1
-    C1-C7-N1-H6
-    C1-C7-N2-H7
+  C1-C7-N1-H8
+  C2-C1-C7-N1
 
-that are 3 sets of 4 atoms describing the 3 detected soft torsions.
+
+.. note::
+
+    Symmetry equivalent dihedral angles are taken into account and are not shown in the list.
 
 Choose QM code
 --------------
 
-By default, ``parameterize`` uses an open-source QM code, PSI4 for doing the QM calculations. If one has access to
-Gaussian, ``parameterize`` supports it and one may change the QM code using the flag ``--qmcode``:
+By default, *Psi4* is used for all QM calculations. QM code can be changed with ``--code`` flag, i.e.
+``--code Gaussian`` switch *Psi4* to *Gaussian 09*.
 
-.. code:: bash
+.. note::
 
-    parameterize benzamidine.mol2 --charge 1 --code Gaussian --output benzamidine-qm-gaussian
+    *Gaussian 09* is not distributed with HTMD. It has to be installed separately.
 
 Choose QM level
 ---------------
+
+TODO: finish!
 
 By default, ``parameterize`` uses settings that account for the most accurate QM settings available in the tool. This
 means using a higher level of theory (B3LYP, can be set through flag ``--theory``), a larger basis set (cc-pVDZ, can be
@@ -162,6 +158,8 @@ always automatically sent to differently named directories, with the format ``<t
 Control QM job execution
 ------------------------
 
+TODO: finish!
+
 Furthermore, by default, the tool runs the QM calculations on the local machine by (``-e`` flag set to inline by
 default), guessing the number of CPUs to use from the maximum available in the local machine (``-n`` flag).
 
@@ -170,7 +168,7 @@ same machine. For this, one may override the number of CPUs to be used by:
 
 .. code:: bash
 
-    parameterize -m benzamidine.mol2 --charge 1 -ncpus 8 --output benzamidine-qm
+    parameterize -m benzamidine.mol2 --charge 1 --ncpus 8 --output benzamidine-qm
 
 for using 8 CPU nodes. Obviously, the less amount of CPUs used, the slower the parameterization will be.
 
@@ -186,7 +184,14 @@ automatically:
 The tool will run locally, which is very computationally inexpensive, and all the computationally expensive QM jobs
 will be sent for the user to the Slurm queue system, in this case.
 
-Restart QM jobs
----------------
+Run and restart QM jobs
+-----------------------
+
+TODO
+
+Find and validate parameters
+----------------------------
+
+``--seed``
 
 TODO

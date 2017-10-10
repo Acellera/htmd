@@ -149,15 +149,16 @@ def main_parameterize(arguments=None):
 
     # List rotatable dihedral angles
     if args.list:
-        print(" === Listing rotatable dihedral angles of {} ===\n".format(args.filename))
+
         mol = FFMolecule(args.filename, method=methods[0], netcharge=args.charge, rtf=rtf, prm=prm, qm=qm,
                          outdir=args.outdir)
-        print('Detected soft torsions:')
+        print('\n === Parameterizable dihedral angles of %s ===\n' % args.filename)
         with open('torsions.txt', 'w') as fh:
             for dihedral in mol.getRotatableDihedrals():
                 dihedral_name = '%s-%s-%s-%s' % tuple(mol.name[dihedral])
-                print('\t'+dihedral_name)
+                print('  '+dihedral_name)
                 fh.write(dihedral_name+'\n')
+        print()
         sys.exit(0)
 
     # Print arguments
