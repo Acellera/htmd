@@ -8,6 +8,7 @@ import pickle
 import logging
 import numpy as np
 import nlopt
+from scipy import constants as const
 from scipy.spatial.distance import cdist
 
 from htmd.molecule.util import dihedralAngle
@@ -142,9 +143,9 @@ class FakeQM(QMBase):
                 if self.esp_points is not None:
                     assert self.molecule.numFrames == 1
                     result.esp_points = self.esp_points
-                    distances = cdist(result.esp_points, result.coords[:, :, 0]) # Angstrom
-                    distances *= 0.52917721067  # Convert Angstrom to a.u. (Bohr) (https://en.wikipedia.org/wiki/Bohr_radius)
-                    result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge) # Hartree/Bohr
+                    distances = cdist(result.esp_points, result.coords[:, :, 0])  # Angstrom
+                    distances *= const.physical_constants['Bohr radius'][0] / const.angstrom  # Angstrom --> Bohr
+                    result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge)  # Hartree/Bohr
 
                 with open(pickleFile, 'wb') as fd:
                     pickle.dump(result, fd)
