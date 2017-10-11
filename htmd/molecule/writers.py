@@ -124,17 +124,19 @@ def PDBwrite(mol, filename, frames=None, writebonds=True):
     checkTruncations(mol)
     coords = np.atleast_3d(mol.coords[:, :, frames])
     numFrames = coords.shape[2]
+    nAtoms = coords.shape[0]
 
     serial = np.arange(1, np.size(coords, 0) + 1).astype(object)
     serial[serial > 99999] = '*****'
     serial = serial.astype('U5')
 
-    if coords.max() >= 1E8 or coords.min() <= -1E7:
-        raise RuntimeError('Cannot write PDB coordinates with values smaller than -1E7 or larger than 1E8')
-    if mol.occupancy.max() >= 1E6 or mol.occupancy.min() <= -1E5:
-        raise RuntimeError('Cannot write PDB occupancy with values smaller than -1E5 or larger than 1E6')
-    if mol.beta.max() >= 1E6 or mol.beta.min() <= -1E5:
-        raise RuntimeError('Cannot write PDB beta/temperature with values smaller than -1E5 or larger than 1E6')
+    if nAtoms > 0:
+        if coords.max() >= 1E8 or coords.min() <= -1E7:
+            raise RuntimeError('Cannot write PDB coordinates with values smaller than -1E7 or larger than 1E8')
+        if mol.occupancy.max() >= 1E6 or mol.occupancy.min() <= -1E5:
+            raise RuntimeError('Cannot write PDB occupancy with values smaller than -1E5 or larger than 1E6')
+        if mol.beta.max() >= 1E6 or mol.beta.min() <= -1E5:
+            raise RuntimeError('Cannot write PDB beta/temperature with values smaller than -1E5 or larger than 1E6')
 
     fh = open(filename, 'w')
     box = mol.box[:, frames[0]]

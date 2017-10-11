@@ -5,8 +5,9 @@
 #
 import os
 import re
-import numpy as np
 import logging
+import numpy as np
+from scipy import constants as const
 
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.vdw import VDW
@@ -245,7 +246,7 @@ class FFMolecule(Molecule):
         dipole = np.zeros(4)
         dipole[:3] = np.dot(self.charge, coords)
         dipole[3] = np.linalg.norm(dipole[:3]) # Total dipole moment
-        dipole /= 0.20819434 # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
+        dipole *= 1e11*const.elementary_charge*const.speed_of_light # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
 
         return dipole
 
