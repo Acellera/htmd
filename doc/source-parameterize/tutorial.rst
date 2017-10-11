@@ -17,7 +17,7 @@ The structure of a molecule has to be in MOL2 format.
 
     The protonation state and charge of the molecule has to be correct.
 
-For benzamidine, it can be downloaded from HTMD repository:
+For benzamidine, it can be downloaded from *HTMD* repository:
 
 .. code:: bash
 
@@ -28,7 +28,7 @@ For benzamidine, it can be downloaded from HTMD repository:
 Get command-line options
 -------------------------
 
-``parameterize`` command line-options can be shown using:
+``parameterize`` command-line options can be shown using:
 
 .. code:: bash
 
@@ -48,43 +48,38 @@ it can be overridden with ``--charge`` flags, i.e. ``--charge -2`` set the total
 
     An incorrect combination of the total charge and a protonation state may result into QM code failure.
 
-In case of benzamidine, it is in a protonate state with the total charge of +1. ``benzamidine.mol2`` has correct
-partial charges, so there is no need to use ``--charge 1`` flag.
-
-.. comment.. code:: bash
-    parameterize -m benzamidine.mol2 --charge 1 --no-esp --no-dihed --output benzamidine-pass
-
-.. comment
-This last command just performs the minization of the small molecule and outputs that minimized structure with the
-CGENFF/GAFF2 parameters. Please note that a combination of total charge and a given set of atoms working on
-``parameterize`` does not mean that protonation state is the most common or relevant in normal pH conditions.
+In case of benzamidine, it is in a protonate state with the total charge of +1. ``benzamidine.mol2`` does not have
+partial atomic charges, so ``--charge 1`` has to be set.
 
 Choose force field
 ------------------
 
-TODO: finish!
+The initial forcefield guess for AMBER
 
-The ``parameterize`` tool has an option to use a given FF as initial guess for the parameters, set by the flag
+TODO: finish!
+``parameterize`` support
+
+
+``parameterize`` has an option to use a given FF as initial guess for the parameters, set by the flag
 ``--forcefield``. By default, it outputs parameters for both CHARMM (through CGENFF) and AMBER (through GAFF2). If one
 wants parameters in the original GAFF, one may use ``--forcefield GAFF``.
 
-The most simple use of ``parameterize``, which does not go through any optimization procedure, is to provide the guessed
-initial parameters. This can be done by setting the flags ``--no-min``, ``--no-esp`` and ``--no-torsions``:
+
+The tool can be used to obtain just GAFF/GAFF2 or CGenFF parameters, i.e. no QM calculation are performed. This can be
+done by setting ``--no-min``, ``--no-esp`` and ``--no-torsions`` flags.
 
 .. code:: bash
 
-    parameterize benzamidine.mol2 --forcefield GAFF2 CGENFF --no-min --no-esp --no-dihed --output benzamidine-noqm
+    parameterize benzamidine.mol2 --charge 1 --forcefield GAFF2 CGENFF --no-min --no-esp --no-dihed --outdir initial
 
-Inside the output directory ``benzamidine-noqm`` (specified in the flag ``--output``), one can find parameters for each both
-CHARMM and AMBER.
+The parameters are written to ``intial`` directory (specified with ``--outdir`` flag):::
+
+
 
 List parameterizable dihedral angles
 ------------------------------------
 
-TODO: finish!
-
-Before doing any parameterization, one can list the soft torsions that the molecule has. This can be easily done by
-using the ``--list`` flag:
+Parametrizable dihedral angles for a given molecule can be listed using ``--list `` flag.
 
 .. code:: bash
 
@@ -105,52 +100,32 @@ Choose QM code
 --------------
 
 By default, *Psi4* is used for all QM calculations. QM code can be changed with ``--code`` flag, i.e.
-``--code Gaussian`` switch *Psi4* to *Gaussian 09*.
+``--code Gaussian`` switches *Psi4* to *Gaussian 09*.
 
 .. note::
 
-    *Gaussian 09* is not distributed with HTMD. It has to be installed separately.
+    *Gaussian 09* is not distributed with *HTMD*. It has to be installed separately.
 
 Choose QM level
 ---------------
 
+The default QM level is the denisty functional theory (DFT) with B3LYP exchange-correlation functional and DFT-D3
+dispersion correction. The level of theory can be changed with ``--theory`` flag, i.e. ``--theory HF`` switches to
+Hartree-Fock metohd.
+
+The default basis sets are ``cc-pVZD``, though for a negatively charged molecule, more diffuse ``aug-cc-pVZD`` are used.
+The basis sets can be changed with ``--basis`` flag, i.e. ``--basis 6-31G*``.
+
+The default QM environment (solvation model) is vacuum. It can be changed with ``--environment`` flag, i.e.
+``--environment PCM`` switches to the polarizable continuum model (PCM).
+
 TODO: finish!
 
-By default, ``parameterize`` uses settings that account for the most accurate QM settings available in the tool. This
-means using a higher level of theory (B3LYP, can be set through flag ``--theory``), a larger basis set (cc-pVDZ, can be
-set through the flag ``--basis``), and a solvation model for the QM calculations (turned on by default, can be
-turned off by using the flag ``--vacuum``). By keeping all of the settings on default, the parameterization of the small
+By default, ``parameterize`` uses settings that account for the most accurate QM settings available in the tool.
+
+By keeping all of the settings on default, the parameterization of the small
 molecule will, however, be more computationally demanding (also depending on its number of atoms, number of soft
 torsions, and on the resources available for the parameterization). One can do one of these parameterization using:
-
-.. code:: bash
-
-    parameterize benzamidine.mol2 --charge 1 --output benzamidine-qm
-
-
-One may one to sacrifice on accuracy to increase the speed of parameterization. This can be done by using the flags
-related with accuracy mentioned in the last section.
-
-One may start by turning off the solvation model, and doing the calculations in vacuum. This can be one of the first
-options if one wants to increase the speed of parameterization:
-
-.. code:: bash
-
-    parameterize ben.mol2 --charge 1 --vacuum --output benzamidine-vacuum
-
-In conjunction with this option (or alone, if one wants to keep the solvation model), one may also choose a smaller
-basis set, 6-31g-star:
-
-.. code:: bash
-
-    parameterize benzamidine.mol2 --charge 1 --vacuum --basis 6-31g-star -o ./param-ben-vacuum-lowbasis
-
-Finally, one may parameterize with the least accuracy possible, but at the highest speed, by lowering the level of theory
-to HF:
-
-.. code:: bash
-
-    parameterize -m ben.mol2 --charge 1 --vacuum --basis 6-31g-star --theory HF -o ./param-ben-fast
 
 Note that the output directories are changed for simplicity. In fact, when changing these three options, the outputs are
 always automatically sent to differently named directories, with the format ``<theory>-<basis-set>-<vacuum/water>``.
@@ -160,17 +135,25 @@ Control QM job execution
 
 TODO: finish!
 
-Furthermore, by default, the tool runs the QM calculations on the local machine by (``-e`` flag set to inline by
-default), guessing the number of CPUs to use from the maximum available in the local machine (``-n`` flag).
+By default, QM calculations are performed on the local machine by using all available CPUs/cores.
+
+(``--queue`` flag set to inline by
+default), guessing the number of CPUs to use from the maximum available in the local machine (``--ncpus`` flag).
 
 One may want to use less resources for a given parameterization, or maybe run two parameterizations in parallel on the
 same machine. For this, one may override the number of CPUs to be used by:
 
 .. code:: bash
 
-    parameterize -m benzamidine.mol2 --charge 1 --ncpus 8 --output benzamidine-qm
+    parameterize benzamidine.mol2 --charge 1 --ncpus 1 --outdir local
+
+.. note::
+
+    Benzamidine parametrization can takes 2-4 hours, depending on your machine.
 
 for using 8 CPU nodes. Obviously, the less amount of CPUs used, the slower the parameterization will be.
+
+The QM calculation can be parallized using one of several queue systems (Slurm, LSF, and PBS).
 
 Alternatively, one may have access for remote resources that are ready to run the QM calculations. The ``parameterize``
 allows the interface with several execution back-ends, such as LSF, Slurm, and AceCloud. If one has a cluster available
@@ -179,19 +162,19 @@ automatically:
 
 .. code:: bash
 
-    parameterize -m benzamindine.mol2 --charge 1 --queue Slurm --output benzamidine-fullqm
+    parameterize benzamidine.mol2 --charge 1 --queue Slurm --outdir slurm
 
 The tool will run locally, which is very computationally inexpensive, and all the computationally expensive QM jobs
 will be sent for the user to the Slurm queue system, in this case.
 
-Run and restart QM jobs
------------------------
+Reuse QM and reparametrize
+--------------------------
 
 TODO
 
+``--seed``
+
 Find and validate parameters
 ----------------------------
-
-``--seed``
 
 TODO
