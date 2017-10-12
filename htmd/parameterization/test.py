@@ -213,7 +213,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
         self._test(refDir, resDir, 'parameterize -m input.mol2 --charge 1 --basis 6-31G*')
 
-    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
+    @unittest.skip('Unstable')
     def test_benzamidine_esp_freeze_restart(self):
 
         refDir = os.path.join(self.dataDir, 'benzamidine_esp_freeze_restart')

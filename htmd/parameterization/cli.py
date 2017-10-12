@@ -195,26 +195,26 @@ VdW      : {VDW_ENERGY}
                     if not found:
                         raise ValueError(" No atom named %s (--freeze-charge)" % i)
 
-            (score, qm_dipole, mm_dipole) = mol.fitCharges(fixed=fixq)
+            # Fit ESP charges
+            score, qm_dipole = mol.fitCharges(fixed=fixq)
 
             rating = "GOOD"
             if score > 1:
                 rating = "CHECK"
             if score > 10:
                 rating = "BAD"
+            print("Charge Chi^2 score : %f : %s\n" % (score, rating))
+            print("QM Dipole   : %f %f %f ; %f" % tuple(qm_dipole))
 
-            print("Charge Chi^2 score : %f : %s" % (score, rating))
-            print("QM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
-            print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
-            d = 0.
-            for i in range(3):
-                x = qm_dipole[i] - mm_dipole[i]
-                d = d + x * x
+            # Compare dipoles
+            mm_dipole = mol.getDipole()
+            score = np.sum((qm_dipole[:3] - mm_dipole[:3])**2)
 
             rating = "GOOD"
             if score > 1:
                 rating = "CHECK"
-            print("Dipole Chi^2 score : %f : %s" % (d, rating))
+            print("MM Dipole   : %f %f %f ; %f" % tuple(mm_dipole))
+            print("Dipole Chi^2 score : %f : %s" % (score, rating))
             print("")
 
         sys.stdout.flush()
@@ -370,6 +370,8 @@ run 0'''
 
 
 if __name__ == "__main__":
-
-    main_parameterize(arguments=['-h'])
+    args=sys.argv[1:] if len(sys.argv)>1 else ['-h']
+    main_parameterize(arguments=args)
     sys.exit(0)
+
+
