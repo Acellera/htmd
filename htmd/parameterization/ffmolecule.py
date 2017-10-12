@@ -37,17 +37,21 @@ class QMFittingSet:
 
 class FFMolecule(Molecule):
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 qm=None, outdir="./"):
+                 qm=None, outdir="./", mol=None):
         # filename -- a mol2 format input geometry
         # rtf, prm -- rtf, prm files
         # method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
         self.method = method
         self.outdir = outdir
 
-        if not (filename.endswith(".mol2")):
+        if filename is not None and not filename.endswith(".mol2"):
             raise ValueError("Input file must be mol2 format")
 
-        super().__init__(filename=filename, name=name)
+        if mol is None:
+            super().__init__(filename=filename, name=name)
+        else:
+            for v in mol.__dict__:
+                self.__dict__[v] = deepcopy(mol.__dict__[v])
 
         if(len(self.bonds)==0):
            print("No bonds found. Guessing them")
