@@ -136,7 +136,7 @@ def _ionGetCharge(ion, ff):
         return amberions[ion][0]
 
 
-def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfrom=5, dbetween=5, segname=None):
+def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nanion, ncation, dfrom=5, dbetween=5, segname=None):
     newmol = mol.copy()
 
     logger.info('Min distance of ions from molecule: ' + str(dfrom) + 'A')
@@ -207,14 +207,14 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
     atom.set('segid', 'I')
 
     for i in range(nanion):
-        atom.set('name', anionatom)
-        atom.set('resname', anion)
+        atom.set('name', anion_name)
+        atom.set('resname', anion_resname)
         atom.set('resid', newmol.resid[-1] + 1)
         atom.coords = waterpos[randidx[i], :]
         newmol.insert(atom, len(newmol.name))
     for i in range(ncation):
-        atom.set('name', cationatom)
-        atom.set('resname', cation)
+        atom.set('name', cation_name)
+        atom.set('resname', cation_resname)
         atom.set('resid', newmol.resid[-1] + 1)
         atom.coords = waterpos[randidx[i+nanion], :]
         newmol.insert(atom, len(newmol.name))
