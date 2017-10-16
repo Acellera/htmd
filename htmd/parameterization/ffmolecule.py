@@ -251,7 +251,7 @@ class FFMolecule(Molecule):
         Dihedrals passed as 4 atom indices
         """
 
-        # Create molecules with romtamers
+        # Create molecules with rotamers
         molecules = []
         for dihedral in dihedrals:
 
@@ -271,7 +271,7 @@ class FFMolecule(Molecule):
 
             molecules.append(mol)
 
-        # Run QM calculation of the romaters
+        # Run QM calculation of the rotamers
         dirname = 'dihedral-opt' if geomopt else 'dihedral-single-point'
         qm_results = []
         for dihedral, molecule in zip(dihedrals, molecules):
@@ -336,7 +336,8 @@ class FFMolecule(Molecule):
             if atom_index != index:
                 if "x" in self._rtf.type_by_index[index]:
                     raise RuntimeError(
-                        "Equivalent atom already has a duplicated type: {} {}".format(index, self._rtf.type_by_index[index]))
+                        "Equivalent atom already has a duplicated type: {} {}".format(index,
+                                                                                      self._rtf.type_by_index[index]))
                 self._rtf.type_by_index[index] = newtype
                 self._rtf.type_by_name[self._rtf.names[index]] = newtype
 
