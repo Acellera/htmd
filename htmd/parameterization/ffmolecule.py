@@ -297,7 +297,7 @@ class FFMolecule(Molecule):
         # In case of FakeQM, the initial parameters are set to zeros.
         # It prevents DihedralFitting class from cheating :D
         if isinstance(self.qm, FakeQM):
-            df.zeroed_paramters = True
+            df.zeroed_parameters = True
 
         df.run()
         # TODO explicit parameter update
