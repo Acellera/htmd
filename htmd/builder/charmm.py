@@ -754,7 +754,7 @@ def split(filename, outdir):
     outprm = os.path.join(outdir, 'par_{}.prm'.format(base))
 
     startrtf = re.compile('^read rtf card', flags=re.IGNORECASE)
-    startprm = re.compile('^read param? card', flags=re.IGNORECASE)
+    startprm = re.compile('^read para(m|me|met|mete|meter)? card', flags=re.IGNORECASE)
     endsection = re.compile('^end', flags=re.IGNORECASE)
 
     rtfsection = 0
