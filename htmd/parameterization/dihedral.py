@@ -85,21 +85,21 @@ class DihedralFitting:
 
         types = [self.molecule._rtf.type_by_index[index] for index in dihedral]
 
-        all_uses = []
+        all_dihedrals = []
         for dihedral_indices in self.molecule.dihedrals:
             dihedral_types = [self.molecule._rtf.type_by_index[index] for index in dihedral_indices]
             if types == dihedral_types or types == dihedral_types[::-1]:
-                all_uses.append(dihedral_indices)
+                all_dihedrals.append(dihedral_indices)
 
         # Now for each of the uses, remove any which are equivalent
-        unique_uses = [dihedral]
+        unique_dihedrals = [dihedral]
         groups = [self.molecule._equivalent_group_by_atom[index] for index in dihedral]
-        for dihed in all_uses:
+        for dihed in all_dihedrals:
             dihedral_groups = [self.molecule._equivalent_group_by_atom[index] for index in dihed]
             if groups != dihedral_groups and groups != dihedral_groups[::-1]:
-                unique_uses.append(dihed)
+                unique_dihedrals.append(dihed)
 
-        return unique_uses
+        return unique_dihedrals
 
     def _makeDihedralUnique(self, dihedral):
         """
