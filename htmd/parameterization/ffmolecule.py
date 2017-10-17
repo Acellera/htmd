@@ -259,7 +259,7 @@ class FFMolecule(Molecule):
         Dihedrals passed as 4 atom indices
         """
 
-        # Create molecules with romtamers
+        # Create molecules with rotamers
         molecules = []
         for dihedral in dihedrals:
 
@@ -279,7 +279,7 @@ class FFMolecule(Molecule):
 
             molecules.append(mol)
 
-        # Run QM calculation of the romaters
+        # Run QM calculation of the rotamers
         dirname = 'dihedral-opt' if geomopt else 'dihedral-single-point'
         qm_results = []
         for dihedral, molecule in zip(dihedrals, molecules):
@@ -305,7 +305,7 @@ class FFMolecule(Molecule):
         # In case of FakeQM, the initial parameters are set to zeros.
         # It prevents DihedralFitting class from cheating :D
         if isinstance(self.qm, FakeQM):
-            df.zeroed_paramters = True
+            df.zeroed_parameters = True
 
         # Fit dihedral parameters
         df.run()

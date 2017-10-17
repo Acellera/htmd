@@ -263,4 +263,5 @@ def main_parameterize(arguments=None):
 
 if __name__ == "__main__":
 
-    main_parameterize(arguments=['-h'])
+    args=sys.argv[1:] if len(sys.argv)>1 else ['-h']
+    main_parameterize(arguments=args)
