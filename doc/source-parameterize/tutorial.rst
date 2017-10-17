@@ -243,10 +243,12 @@ The fitted parameter files are writen to `<outdir>/parameters` directory:::
 The directory contains a folder for each fitted force field (`CGenFF` and `GAFF2`) with structure, topology, and
 parameters files.
 
-The quality of the parameters can be inspected by comparing rotamer energies. Several plots are provided in `plots`
-subdirectory:
+The quality of the parameters can be inspected by comparing rotatomer energies. For convenience, several plots are
+provided in `plots` subdirectory:
 
 .. image:: images/C1-C7-N1-H8.svg
     :align: center
 
-TODO! ``--seed``
+The fitting of dihedral parameters is global optimization problem. In some case, the fitting procedure may fail to find
+the global minimum. This problem can be rectified by changing the random number seed of the optimizer. The seed is set
+with `--seed` flag, i.e. `--seed 12345678`.
