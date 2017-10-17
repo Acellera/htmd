@@ -593,7 +593,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
     else:
         mapserials = np.empty(np.max(serials)+1)
         mapserials[:] = np.NAN
-        mapserials[serials] = list(range(np.max(serials)))
+        mapserials[serials] = list(range(len(serials)))
         for i in range(len(parsedbonds)):
             row = parsedbonds.loc[i].tolist()
             for b in range(1, 5):
