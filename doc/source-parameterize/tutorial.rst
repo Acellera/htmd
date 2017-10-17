@@ -54,27 +54,19 @@ partial atomic charges, so ``--charge 1`` has to be set.
 Choose force field
 ------------------
 
-The initial forcefield guess for AMBER
+The initial parameters for *AMBER* is based on *GAFF* or *GAFF2*, while for *CHARMM* it is *CGenFF*. Be default, the
+parameters are generated for *GAFF2*. It can be changed with ``--forcefield`` flag, i.e. ``--forcefield CGENFF``
+switches to *CGenFF*.
 
-TODO: finish!
-``parameterize`` support
-
-
-``parameterize`` has an option to use a given FF as initial guess for the parameters, set by the flag
-``--forcefield``. By default, it outputs parameters for both CHARMM (through CGENFF) and AMBER (through GAFF2). If one
-wants parameters in the original GAFF, one may use ``--forcefield GAFF``.
-
-
-The tool can be used to obtain just GAFF/GAFF2 or CGenFF parameters, i.e. no QM calculation are performed. This can be
-done by setting ``--no-min``, ``--no-esp`` and ``--no-torsions`` flags.
+The tool can be used to obtain just GAFF, GAFF2 or CGenFF parameters, (without any QM calculations) by setting
+``--no-min``, ``--no-esp`` and ``--no-dihed`` flags:
 
 .. code:: bash
 
-    parameterize benzamidine.mol2 --charge 1 --forcefield GAFF2 CGENFF --no-min --no-esp --no-dihed --outdir initial
+    parameterize benzamidine.mol2 --charge 1 --no-min --no-esp --no-dihed --outdir initial
 
-The parameters are written to ``intial`` directory (specified with ``--outdir`` flag):::
-
-
+The results are written to ``intial/parameters/GAFF2`` directory (the root directory is specified with ``--outdir``
+flag).
 
 List parameterizable dihedral angles
 ------------------------------------
@@ -109,9 +101,9 @@ By default, *Psi4* is used for all QM calculations. QM code can be changed with 
 Choose QM level
 ---------------
 
-The default QM level is the denisty functional theory (DFT) with B3LYP exchange-correlation functional and DFT-D3
+The default QM level is the density functional theory (DFT) with B3LYP exchange-correlation functional and DFT-D3
 dispersion correction. The level of theory can be changed with ``--theory`` flag, i.e. ``--theory HF`` switches to
-Hartree-Fock metohd.
+Hartree-Fock method.
 
 The default basis sets are ``cc-pVZD``, though for a negatively charged molecule, more diffuse ``aug-cc-pVZD`` are used.
 The basis sets can be changed with ``--basis`` flag, i.e. ``--basis 6-31G*``.
@@ -119,62 +111,142 @@ The basis sets can be changed with ``--basis`` flag, i.e. ``--basis 6-31G*``.
 The default QM environment (solvation model) is vacuum. It can be changed with ``--environment`` flag, i.e.
 ``--environment PCM`` switches to the polarizable continuum model (PCM).
 
-TODO: finish!
+Control the execution of QM calculations
+----------------------------------------
 
-By default, ``parameterize`` uses settings that account for the most accurate QM settings available in the tool.
-
-By keeping all of the settings on default, the parameterization of the small
-molecule will, however, be more computationally demanding (also depending on its number of atoms, number of soft
-torsions, and on the resources available for the parameterization). One can do one of these parameterization using:
-
-Note that the output directories are changed for simplicity. In fact, when changing these three options, the outputs are
-always automatically sent to differently named directories, with the format ``<theory>-<basis-set>-<vacuum/water>``.
-
-Control QM job execution
-------------------------
-
-TODO: finish!
-
-By default, QM calculations are performed on the local machine by using all available CPUs/cores.
-
-(``--queue`` flag set to inline by
-default), guessing the number of CPUs to use from the maximum available in the local machine (``--ncpus`` flag).
-
-One may want to use less resources for a given parameterization, or maybe run two parameterizations in parallel on the
-same machine. For this, one may override the number of CPUs to be used by:
-
-.. code:: bash
-
-    parameterize benzamidine.mol2 --charge 1 --ncpus 1 --outdir local
+QM calculations for dihedral parameters fitting may require hundreds of QM calculations. Several queuing system can be
+used pararallize and distribute QM calculations. The system can be chosen with ``--queue`` flag, i.e. ``--queue Slurm``
+switches to use *Slurm*. By default, QM calculations are performed on the local machine
+(``--queue local``).
 
 .. note::
 
-    Benzamidine parametrization can takes 2-4 hours, depending on your machine.
+    A queuing system has to be properly configured for ``parameterize``.
 
-for using 8 CPU nodes. Obviously, the less amount of CPUs used, the slower the parameterization will be.
+In case of ``--queue local``, the number of CPU cores per QM calculation can be set with ``--ncpus`` flag,  i.e.
+``--ncpus 4`` switches to use 4 cores. By default, only 1 core is used per QM calculation, so if a local
+machine has an 8-core CPU, 8 QM calculation are performed simultaneously.
 
-The QM calculation can be parallized using one of several queue systems (Slurm, LSF, and PBS).
+Benzamidine parametrization on local machine:
 
-Alternatively, one may have access for remote resources that are ready to run the QM calculations. The ``parameterize``
-allows the interface with several execution back-ends, such as LSF, Slurm, and AceCloud. If one has a cluster available
-running on Slurm and properly set up, one may use the ``-e`` flag to send the QM calculations to that cluster
-automatically:
+.. code:: bash
+
+    parameterize benzamidine.mol2 --charge 1 --outdir local
+
+.. note::
+
+    Parametrization can takes up to 12 hours depending on your machine.
+
+Benzamidine parametrization with Slurm queuing system:
 
 .. code:: bash
 
     parameterize benzamidine.mol2 --charge 1 --queue Slurm --outdir slurm
 
-The tool will run locally, which is very computationally inexpensive, and all the computationally expensive QM jobs
-will be sent for the user to the Slurm queue system, in this case.
+The computation resources needed for the QM calculation depend on the number of atom and the number of
+parameterizable dihedral angles:::
 
-Reuse QM and reparametrize
---------------------------
+    36 x number of dihedral angles x single QM calculation time
 
-TODO
+Reuse QM and re-parametrize
+---------------------------
 
-``--seed``
+The QM calculation results are save into subdirectories named ``<theory>-<basis-set>-<environment>``:::
+
+        slurm/
+        |-- dihedral-opt
+        |   |-- C1-C7-N1-H8
+        |   |   `-- B3LYP-cc-pVDZ-vacuum
+        |   |       |-- 00000
+        |   |       |   |-- psi4.in
+        |   |       |   |-- psi4.out
+        |   |       |   |-- psi4out.xyz
+        |   |       |   |-- run.sh
+        |   |       |-- 00001
+        |   |       |   |-- psi4.in
+        |   |       |   |-- psi4.out
+        |   |       |   |-- psi4out.xyz
+        |   |       |   `-- run.sh
+        ...
+        |   `-- C2-C1-C7-N1
+        |   |   `-- B3LYP-cc-pVDZ-vacuum
+        |   |       |-- 00000
+        |   |       |   |-- psi4.in
+        |   |       |   |-- psi4.out
+        |   |       |   |-- psi4out.xyz
+        |   |       |   |-- run.sh
+        |   |       |-- 00001
+        |   |       |   |-- psi4.in
+        |   |       |   |-- psi4.out
+        |   |       |   |-- psi4out.xyz
+        |   |       |   `-- run.sh
+        ...
+        |-- esp
+        |   `-- B3LYP-cc-pVDZ-vacuum
+        |       `-- 00000
+        |           |-- grid.dat
+        |           |-- grid_esp.dat
+        |           |-- psi4.in
+        |           |-- psi4.out
+        |           |-- psi4out.xyz
+        |           `-- run.sh
+        `-- minimize
+            `-- B3LYP-cc-pVDZ-vacuum
+                `-- 00000
+                    |-- psi4.in
+                    |-- psi4.out
+                    |-- psi4out.xyz
+                    `-- run.sh
+
+This allows a quick refitting. For example, the previous command ran QM calculations and fitted benzamidine parameters
+for *AMBER*. The parameters for *CHARMM* can be fitted by reusing the calculations:
+
+.. code:: bash
+
+    parameterize benzamidine.mol2 --charge 1 --forcefield CGENFF --outdir slurm
+
+.. note::
+
+    Force field fitting does not use a queuing system, so there is no need to set `--queue`.
 
 Find and validate parameters
 ----------------------------
 
-TODO
+The fitted parameter files are writen to `<outdir>/parameters` directory:::
+
+    slurm/parameters/
+    |-- CGenFF_2b6
+    |   `-- B3LYP-cc-pVDZ-vacuum
+    |       |-- energies.txt
+    |       |-- mol.mol2
+    |       |-- mol.pdb
+    |       |-- mol.prm
+    |       |-- mol.psf
+    |       |-- mol.rtf
+    |       `-- plots
+    |           |-- C1-C7-N1-H8.svg
+    |           |-- C2-C1-C7-N1.svg
+    |           `-- conformer-energies.svg
+    `-- GAFF2
+        `-- B3LYP-cc-pVDZ-vacuum
+            |-- energies.txt
+            |-- mol.coor
+            |-- mol.frcmod
+            |-- mol.mol2
+            |-- mol.pdb
+            |-- plots
+            |   |-- C1-C7-N1-H8.svg
+            |   |-- C2-C1-C7-N1.svg
+            |   `-- conformer-energies.svg
+            `-- tleap.in
+
+The directory contains a folder for each fitted force field (`CGenFF` and `GAFF2`) with structure, topology, and
+parameters files.
+
+The quality of the parameters can be inspected by comparing rotamer energies. Several plots are provided in `plots`
+subdirectory:
+
+.. image:: images/C1-C7-N1-H8.svg
+    :align: center
+
+TODO! ``--seed``

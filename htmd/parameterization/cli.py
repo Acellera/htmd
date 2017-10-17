@@ -55,8 +55,7 @@ def getArgumentParser():
                         help='Do not perform QM structure optimisation when scanning dihedral angles')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'PBS', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
-    parser.add_argument('-n', '--ncpus', default=psutil.cpu_count(), type=int,
-                        help='Number of CPU per QM job (default: %(default)s)')
+    parser.add_argument('-n', '--ncpus', default=1, type=int, help='Number of CPU per QM job (default: %(default)s)')
     parser.add_argument('-o', '--outdir', default='./', help='Output directory (default: %(default)s)')
     parser.add_argument('--seed', default=20170920, type=int,
                         help='Random number generator seed (default: %(default)s)')
