@@ -4,8 +4,8 @@
 # No redistribution in whole or part
 #
 import os
-import argparse
 import sys
+import argparse
 import psutil
 
 
@@ -51,20 +51,28 @@ def cli_parser():
                         default=None, dest="freezeq")
     parser.add_argument("--no-geomopt", help="Do not perform QM geometry optimisation when fitting torsions (default: "
                                              "%(default)s)", action="store_false", dest="geomopt", default=True)
+    parser.add_argument("--seed", help="Random number generator seed (default: %(default)s)", type=int,
+                        default=20170920, dest="seed")
+
+    # Enable replacement of any real QM class with FakeQM.
+    # This is intedended for debugging only and should be kept hidden.
+    parser.add_argument("--fake-qm", help=argparse.SUPPRESS, action="store_true",dest="fake_qm", default=False)
+
     return parser
 
 
 def main_parameterize(arguments=None):
-    args = cli_parser().parse_args(args=arguments)
+
+    import numpy as np
 
     from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
     from htmd.parameterization.fftype import FFTypeMethod
     from htmd.queues.localqueue import LocalCPUQueue
     from htmd.queues.lsfqueue import LsfQueue
     from htmd.queues.slurmqueue import SlurmQueue
-    from htmd.qm import Psi4, Gaussian
-    import numpy as np
-    import math
+    from htmd.qm import Psi4, Gaussian, FakeQM
+
+    args = cli_parser().parse_args(args=arguments)
 
     def printEnergies(m, filename):
         fener = open(filename, "w")
@@ -112,6 +120,11 @@ VdW      : {VDW_ENERGY}
     else:
         raise NotImplementedError
 
+    # This is for debugging only!
+    if args.fake_qm:
+        qm = FakeQM()
+        print('\nWARNING! Using FakeQM!\n')
+
     # Set up the QM object
     qm.theory = args.theory
     qm.basis = args.basis
@@ -135,13 +148,12 @@ VdW      : {VDW_ENERGY}
         print(" === Listing soft torsions of {} ===\n".format(filename))
         mol = FFMolecule(filename=filename, method=methods[0], netcharge=args.charge, rtf=args.rtf, prm=args.prm,
                          qm=qm, outdir=args.outdir)
-        dihedrals = mol.getSoftTorsions()
-        print("Detected soft torsions:")
-        fh = open("torsions.txt", "w")
-        for d in dihedrals:
-            print("\t{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
-            print("{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]), file=fh)
-        fh.close()
+        print('Detected soft torsions:')
+        with open('torsions.txt', 'w') as fh:
+            for dihedral in mol.getSoftTorsions():
+                name = "%s-%s-%s-%s" % tuple(mol.name[dihedral])
+                print('\t'+name)
+                fh.write(name+'\n')
         sys.exit(0)
 
     # Small report
@@ -170,7 +182,6 @@ VdW      : {VDW_ENERGY}
             if qm.basis == 'cc-pVDZ':
                 qm.basis = 'aug-cc-pVDZ'
 
-        dihedrals = mol.getSoftTorsions()
         mol_orig = mol.copy()
 
         if not args.nomin:
@@ -181,8 +192,12 @@ VdW      : {VDW_ENERGY}
         if not args.noesp:
             print("\n == Charge fitting ==\n")
 
+            # Set random number generator seed
+            if args.seed:
+                np.random.seed(args.seed)
+
             # Select the atoms that are to have frozen charges in the fit
-            fixq = []
+            fixed_charges = []
             if args.freezeq:
                 for i in args.freezeq:
                     found = False
@@ -190,13 +205,13 @@ VdW      : {VDW_ENERGY}
                         if mol.name[d] == i:
                             ni = d
                             print("Fixing charge for atom %s to %f" % (i, mol.charge[ni]))
-                            fixq.append(ni)
+                            fixed_charges.append(ni)
                             found = True
                     if not found:
                         raise ValueError(" No atom named %s (--freeze-charge)" % i)
 
             # Fit ESP charges
-            score, qm_dipole = mol.fitCharges(fixed=fixq)
+            score, qm_dipole = mol.fitCharges(fixed=fixed_charges)
 
             rating = "GOOD"
             if score > 1:
@@ -222,80 +237,32 @@ VdW      : {VDW_ENERGY}
         if not args.notorsion:
             print("\n == Torsion fitting ==\n")
 
-            scores = np.ones(len(dihedrals))
-            converged = False
-            iteration = 1
-            ref_mm = dict()
-            while not converged:
-                rets = []
+            # Set random number generator seed
+            if args.seed:
+                np.random.seed(args.seed)
 
-                print("\nIteration %d" % iteration)
+            all_dihedrals = mol.getSoftTorsions()
 
-                last_scores = scores
-                scores = np.zeros(len(dihedrals))
-                idx = 0
-                for d in dihedrals:
-                    name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
-                    if args.torsion == 'all' or name in args.torsion.split(','):
-                        print("\n == Fitting torsion {} ==\n".format(name))
-                        try:
-                            ret = mol.fitSoftTorsion(d, geomopt=args.geomopt)
-                            rets.append(ret)
-                            if iteration == 1:
-                                ref_mm[name] = ret
-                            rating = "GOOD"
-                            if ret.chisq > 10:
-                                rating = "CHECK"
-                            if ret.chisq > 100:
-                                rating = "BAD"
-                            print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
-                            sys.stdout.flush()
-                            scores[idx] = ret.chisq
-                            # Always use the mm_orig from first iteration (unmodified)
-                            ret.mm_original = ref_mm[name].mm_original
-                            phi_original = ref_mm[name].phi
-                            fn = mol.plotTorsionFit(ret, phi_original, show=False)
-                        except Exception as e:
-                            print("Error in fitting")
-                            print(str(e))
-                            raise
-                            scores[idx] = 0.
-                            pass
-                            # print(fn)
-                    idx += 1
-                # print(scores)
-                if iteration > 1:
-                    converged = True
-                    for j in range(len(scores)):
-                        # Check convergence
-                        try:
-                            relerr = (scores[j] - last_scores[j]) / last_scores[j]
-                        except:
-                            relerr = 0.
-                        if math.isnan(relerr):
-                            relerr = 0.
-                        convstr = "- converged"
-                        if math.fabs(relerr) > 1.e-2:
-                            convstr = ""
-                            converged = False
-                        print(" Dihedral %d relative error : %f %s" % (j, relerr, convstr))
+            # Choose which dihedrals to fit
+            dihedrals = []
+            if args.torsion == 'all':
+                dihedrals = all_dihedrals
+            else:
+                all_names = ['%s-%s-%s-%s' % tuple(mol.name[dihedral]) for dihedral in all_dihedrals]
+                for name in args.torsion.split(','):
+                    if name in all_names:
+                        dihedrals.append(all_dihedrals[all_names.index(name)])
+                    else:
+                        raise ValueError('%s is not recognized as a soft torsion\n' % name)
 
-                iteration += 1
-
-            print(" Fitting converged at iteration %d" % (iteration - 1))
-            if len(rets):
-                fit = mol.plotConformerEnergies(rets, show=False)
-                print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
+            mol.fitSoftTorsions(dihedrals, args.geomopt)
 
         printEnergies(mol, 'energies.txt')
 
-        # Output the ff parameters
-        paramdir = os.path.join(args.outdir, "parameters", method.name, mol.output_directory_name())
+        # Output the FF parameters
+        paramdir = os.path.join(args.outdir, 'parameters', method.name, mol.output_directory_name())
+        os.makedirs(paramdir, exist_ok=True)
         print("\n == Output to {} ==\n".format(paramdir))
-        try:
-            os.makedirs(paramdir, exist_ok=True)
-        except:
-            raise OSError('Directory {} could not be created. Check if you have permissions.'.format(paramdir))
 
         if method.name == "CGenFF_2b6":
             try:
@@ -328,6 +295,7 @@ run 0'''
                 f.close()
             except ValueError as e:
                 print("Not writing CHARMM PRM: {}".format(str(e)))
+
         elif method.name == "GAFF" or method.name == "GAFF2":
             try:
                 # types need to be remapped because Amber FRCMOD format limits the type to characters
@@ -366,7 +334,6 @@ run 0'''
                 f.close()
             except ValueError as e:
                 print("Not writing Amber FRCMOD: {}".format(str(e)))
-    sys.exit(0)
 
 
 if __name__ == "__main__":
