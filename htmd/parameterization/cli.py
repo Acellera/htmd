@@ -25,8 +25,8 @@ def cli_parser():
                         dest="outdir")
     parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default: %(default)s)",
                         default="all", dest="torsion")
-    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=psutil.cpu_count(),
-                        dest="ncpus")
+    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)",
+                        default=psutil.cpu_count(), type=int, dest="ncpus")
     parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
                         choices=["GAFF", "GAFF2", "CGENFF", "all"], default="all")
     parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31G*", "cc-pVDZ"],
