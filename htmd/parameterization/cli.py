@@ -7,7 +7,6 @@ import os
 import sys
 import argparse
 import logging
-import psutil
 import numpy as np
 
 from htmd.version import version
@@ -16,7 +15,7 @@ from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
-from htmd.qm import Psi4, Gaussian, FakeQM
+from htmd.qm import Psi4, Gaussian, FakeQM2
 from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.parameterization.fftype import FFTypeMethod
 from htmd.parameterization.ffevaluate import FFEvaluate
@@ -137,7 +136,7 @@ def main_parameterize(arguments=None):
 
     # This is for debugging only!
     if args.fake_qm:
-        qm = FakeQM()
+        qm = FakeQM2()
         logger.warning('Using FakeQM')
 
     # Set up the QM object

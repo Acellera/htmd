@@ -15,10 +15,10 @@ from scipy.spatial.distance import cdist
 import nlopt
 from simtk import unit
 from simtk import openmm
+from simtk.openmm import app
 
 from htmd.molecule.util import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
-from htmd.parameterization.ffmolecule import FFTypeMethod
 from htmd.parameterization.ffevaluate import FFEvaluate
 
 logger = logging.getLogger(__name__)
@@ -226,6 +226,7 @@ class FakeQM2(FakeQM):
 
     def _get_prmtop(self):
 
+        from htmd.parameterization.ffmolecule import FFTypeMethod
         assert self.molecule.method in (FFTypeMethod.GAFF, FFTypeMethod.GAFF2)
 
         with TemporaryDirectory() as tmpDir:
@@ -243,16 +244,16 @@ class FakeQM2(FakeQM):
             with open(os.path.join(tmpDir, 'tleap.out'), 'w') as out:
                 call(('tleap', '-f', 'tleap.inp'), cwd=tmpDir, stdout=out)
 
-            prmtop = openmm.app.AmberPrmtopFile(os.path.join(tmpDir, 'mol.prmtop'))
+            prmtop = app.AmberPrmtopFile(os.path.join(tmpDir, 'mol.prmtop'))
 
         return prmtop
 
     def run(self):
 
         prmtop = self._get_prmtop()
-        simulation = openmm.app.Simulation(prmtop.topology, prmtop.createSystem(),
-                                           openmm.VerletIntegrator(1 * unit.femtosecond),
-                                           openmm.Platform.getPlatformByName('CPU'))
+        simulation = app.Simulation(prmtop.topology, prmtop.createSystem(),
+                                    openmm.VerletIntegrator(1 * unit.femtosecond),
+                                    openmm.Platform.getPlatformByName('CPU'))
         groups = {force.getForceGroup() for force in simulation.context.getSystem().getForces()}
 
         results = []
