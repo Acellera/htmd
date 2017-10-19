@@ -700,6 +700,7 @@ class AmberRTF(RTF):
 
         # Netcharge is 3rd term on 5th line
         cc = int(f[4].split()[2])
+
         ctr = 10
         while f[ctr].strip() != "":
             self.natoms += 1

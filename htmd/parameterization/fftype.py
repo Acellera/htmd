@@ -82,7 +82,6 @@ class FFType:
                 returncode = subprocess.call([antechamber_binary,
                                               '-at', atomtype,
                                               '-nc', str(mol.netcharge),
-                                              '-c', 'gas',
                                               '-fi', 'mol2',
                                               '-i', 'mol.mol2',
                                               '-fo', 'prepi',
