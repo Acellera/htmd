@@ -251,14 +251,29 @@ class FakeQM2(FakeQM):
     def run(self):
 
         prmtop = self._get_prmtop()
-        simulation = app.Simulation(prmtop.topology, prmtop.createSystem(),
+        system = prmtop.createSystem()
+        groups = {force.getForceGroup() for force in system.getForces()}
+
+        if self.optimize:
+            if self.restrained_dihedrals is not None:
+                restraint = openmm.PeriodicTorsionForce()
+                restraint.setForceGroup(max(groups) + 1)
+
+                for dihedral in self.restrained_dihedrals:
+                    restraint.addTorsion(*tuple(map(int, dihedral)), periodicity=1, phase=0,
+                                         k=-1000 * unit.kilocalorie_per_mole)
+
+                system.addForce(restraint)
+
+        simulation = app.Simulation(prmtop.topology, system,
                                     openmm.VerletIntegrator(1 * unit.femtosecond),
                                     openmm.Platform.getPlatformByName('CPU'))
-        groups = {force.getForceGroup() for force in simulation.context.getSystem().getForces()}
 
         results = []
+        molecule_copy = self.molecule.copy()
         for iframe in range(self.molecule.numFrames):
             self.molecule.frame = iframe
+            molecule_copy.frame = iframe
 
             directory = os.path.join(self.directory, '%05d' % iframe)
             os.makedirs(directory, exist_ok=True)
@@ -266,50 +281,43 @@ class FakeQM2(FakeQM):
 
             if self._completed(directory):
                 with open(pickleFile, 'rb') as fd:
-                    result = pickle.load(fd)
+                    results.append(pickle.load(fd))
                 logger.info('Loading QM data from %s' % pickleFile)
+                continue
 
-            else:
-                simulation.context.setPositions(self.molecule.coords[:, :, iframe] * unit.angstrom)
-                if self.optimize:
-                    if self.restrained_dihedrals is not None:
-                        restraints = openmm.PeriodicTorsionForce()
-                        restraints.setForceGroup(max(groups) + 1)
+            simulation.context.setPositions(self.molecule.coords[:, :, iframe] * unit.angstrom)
+            if self.optimize:
+                if self.restrained_dihedrals is not None:
+                    for i, dihedral in enumerate(self.restrained_dihedrals):
+                        ref_angle = dihedralAngle(self.molecule.coords[dihedral, :, iframe])
+                        parameters = restraint.getTorsionParameters(i)
+                        parameters[5] = ref_angle * unit.degree
+                        restraint.setTorsionParameters(i, *parameters)
+                    restraint.updateParametersInContext(simulation.context)
+                simulation.minimizeEnergy(tolerance=0.001 * unit.kilocalorie_per_mole)
+            state = simulation.context.getState(getEnergy=True, getPositions=True, groups=groups)
 
-                        for dihedral in self.restrained_dihedrals:
-                            ref_angle = np.deg2rad(dihedralAngle(self.molecule.coords[dihedral, :, iframe]))
-                            ref_angle += np.pi
-                            ref_angle = np.arctan2(np.sin(ref_angle), np.cos(ref_angle))
-                            restraints.addTorsion(*tuple(map(int, dihedral)), periodicity=1,
-                                                  phase=ref_angle * unit.radian, k=1000 * unit.kilocalorie_per_mole)
+            result = QMResult()
+            result.errored = False
+            result.energy = state.getPotentialEnergy().value_in_unit(unit.kilocalorie_per_mole)
+            result.coords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom).reshape((-1, 3, 1))
+            result.dipole = self.molecule.getDipole()
 
-                        state = simulation.context.getState(getPositions=True)
-                        simulation.context.getSystem().addForce(restraints)
-                        simulation.context.reinitialize()
-                        simulation.context.setState(state)
-
-                    simulation.minimizeEnergy(tolerance=0.001 * unit.kilocalorie_per_mole)
-
-                state = simulation.context.getState(getEnergy=True, getPositions=True, groups=groups)
-
-                result = QMResult()
-                result.errored = False
-                result.energy = state.getPotentialEnergy().value_in_unit(unit.kilocalorie_per_mole)
-                result.coords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom).reshape((-1, 3, 1))
-                result.dipole = self.molecule.getDipole()
-
-                # Compute ESP values
-                if self.esp_points is not None:
-                    assert self.molecule.numFrames == 1
-                    result.esp_points = self.esp_points
-                    distances = cdist(result.esp_points, result.coords[:, :, 0])  # Angstrom
-                    distances *= const.physical_constants['Bohr radius'][0] / const.angstrom  # Angstrom --> Bohr
-                    result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge)  # Hartree/Bohr
-
-                with open(pickleFile, 'wb') as fd:
-                    pickle.dump(result, fd)
+            if self.esp_points is not None:
+                assert self.molecule.numFrames == 1
+                result.esp_points = self.esp_points
+                distances = cdist(result.esp_points, result.coords[:, :, 0])  # Angstrom
+                distances *= const.physical_constants['Bohr radius'][0] / const.angstrom  # Angstrom --> Bohr
+                result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge)  # Hartree/Bohr
 
             results.append(result)
+
+            with open(pickleFile, 'wb') as fd:
+                pickle.dump(result, fd)
+
+            self.molecule.write(os.path.join(directory, 'mol-init.mol2'))  # Write an optimiz
+            molecule_copy.coords[:, :, iframe] = result.coords[:, :, 0]
+            molecule_copy.write(os.path.join(directory, 'mol.mol2'))  # Write an optimiz
 
         return results
 
