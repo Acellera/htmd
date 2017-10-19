@@ -6,6 +6,7 @@
 import os
 import re
 import logging
+from copy import deepcopy
 import numpy as np
 from scipy import constants as const
 
@@ -32,12 +33,16 @@ class FFMolecule(Molecule):
     """
 
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 qm=None, outdir="./"):
+                 qm=None, outdir="./", mol=None):
 
-        if not filename.endswith('.mol2'):
-            raise ValueError('Molecule file must be in MOL2 format')
+        if filename is not None and not filename.endswith('.mol2'):
+            raise ValueError('Input file must be mol2 format')
 
-        super().__init__(filename=filename, name=name)
+        if mol is None:
+            super().__init__(filename=filename, name=name)
+        else:
+            for v in mol.__dict__:
+                self.__dict__[v] = deepcopy(mol.__dict__[v])
 
         # Guess bonds
         if len(self.bonds) == 0:
