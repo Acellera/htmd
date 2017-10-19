@@ -186,7 +186,7 @@ class PRM:
         print("\nDIHE", file=f)
         output = dict()
         for i in self.dihedrals:
-          if(i.improper == False):
+            assert i.improper == False
             name = "%s-%s-%s-%s" % (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]])
             if not (name in output):
                 output[name] = 1
@@ -202,16 +202,11 @@ class PRM:
                 if len(prm) == 0:
                     prm.append(prmx[0])
 
-                for pi in range(len(prm)):
-                    p = prm[pi]
-                    sign = 1
+                for p in prm:
                     scee = 1. / p.e14
                     scnb = 2.
-                    if pi < (len(prm) - 1):
-                        sign = -1
                     print("%2s-%2s-%2s-%2s 1 %12.6f %12.6f %12.6f %12.6f %12.6f" %
-                          (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]], p.k0, p.phi0, sign * p.n, scee,
-                           scnb),
+                          (t[i.types[0]], t[i.types[1]], t[i.types[2]], t[i.types[3]], p.k0, p.phi0, p.n, scee, scnb),
                           file=f)
 
         print("\nIMPR", file=f)

@@ -49,7 +49,7 @@ class Psi4(QMBase):
     Examples
     --------
 
-    Create an object of H2 molecule.
+    Create an object of H2 molecule
     >>> import os
     >>> from htmd.home import home
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
@@ -130,7 +130,7 @@ class Psi4(QMBase):
             f.write('set_memory(%d)\n\n' % (1024**2*self.queue.memory))
 
             reference = 'r' if self.multiplicity == 1 else 'u'
-            reference += 'hf' if self.theory == 'RHF' else 'ks'
+            reference += 'hf' if self.theory == 'HF' else 'ks'
             f.write('set { reference %s }\n' % reference)
             f.write('set { basis %s }\n\n' % self.basis)
 
