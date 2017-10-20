@@ -43,6 +43,12 @@ def _enqueue_output(obj, vmd, queue):
 
 class VMD:
     """ Please do not directly call this class constructor. Use the `viewer` or `getCurrentViewer` function instead.
+
+    Parameters
+    ----------
+    vmd : str
+    host : str
+    dispdev : str
     """
 
     def __init__(self, vmd=None, host=None, dispdev='win'):
@@ -246,6 +252,15 @@ def getVMDpath(vmd=None):
 def getCurrentViewer(dispdev='win'):
     """ Get the handle to the current molecular viewer
 
+    Parameters
+    ----------
+    dispdev : str, ('win', 'text', 'cave', 'caveforms', 'none')
+        Specify the type of graphical display to use. The possible display devices include:
+        win: a standard graphics display window.
+        text: do not provide any graphics display window.
+        cave: use the CAVE virtual environment for display, forms are disabled.
+        caveforms: use the CAVE virtual environment for display and with forms enabled. This is useful with -display machine:0 for remote display of the forms when the CAVE uses the local screen.
+
     Returns
     -------
     viewer : :class:`VMD` object
@@ -289,7 +304,7 @@ def _tempfilename():
 
 
 if __name__ == "__main__":
-    vmd = VMD()
+    vmd = VMD(dispdev='text')
     vmd.send('menu main off')
     vmd.send('menu main on')
     vmd.send('exit')
