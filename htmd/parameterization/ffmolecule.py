@@ -15,11 +15,11 @@ from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
-from htmd.qm.qmcalculation import Theory, BasisSet, Code, QMCalculation, Execution
 from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
 from htmd.parameterization.dihedral import DihedralFitting
 from htmd.qm import Psi4, FakeQM
+from copy import deepcopy
 
 
 class FFMolecule(Molecule):
@@ -30,15 +30,19 @@ class FFMolecule(Molecule):
     """
 
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 qm=None, outdir="./"):
+                 qm=None, outdir="./", mol=None):
 
         self.method = method
         self.outdir = outdir
 
-        if not filename.endswith(".mol2"):
+        if filename is not None and not filename.endswith(".mol2"):
             raise ValueError("Input file must be mol2 format")
 
-        super().__init__(filename=filename, name=name)
+        if mol is None:
+            super().__init__(filename=filename, name=name)
+        else:
+            for v in mol.__dict__:
+                self.__dict__[v] = deepcopy(mol.__dict__[v])
 
         self.natoms = self.numAtoms # TODO remove
 

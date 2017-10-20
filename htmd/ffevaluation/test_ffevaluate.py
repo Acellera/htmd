@@ -183,7 +183,7 @@ if __name__ == '__main__':
             energies, forces, atmnrg = ffevaluate(mol, prm)
             energies = _formatEnergies(energies[:, 0])
             forces = forces[:, :, 0].squeeze()
-            omm_energies, omm_forces = openmm_energy_charmm(prm, psf, coords)
+            omm_energies, omm_forces = openmm_energy(prm, psf, coords)
             ediff = compareEnergies(energies, omm_energies, abstol=abstol)
             print('  ', force, 'Energy diff:', ediff, 'Force diff:', compareForces(forces, omm_forces))
 
@@ -193,7 +193,7 @@ if __name__ == '__main__':
         energies, forces, atmnrg = ffevaluate(mol, prm)
         energies = _formatEnergies(energies[:, 0])
         forces = forces[:, :, 0].squeeze()
-        omm_energies, omm_forces = openmm_energy_charmm(prm, psf, coords)
+        omm_energies, omm_forces = openmm_energy(prm, psf, coords)
         ediff = compareEnergies(energies, omm_energies, abstol=abstol)
         print('All forces. Total energy:', energies['total'], 'Energy diff:', ediff, 'Force diff:', compareForces(forces, omm_forces))
 
