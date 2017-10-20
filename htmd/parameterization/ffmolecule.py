@@ -9,7 +9,7 @@ import numpy as np
 from scipy import constants as const
 
 from htmd.molecule.molecule import Molecule
-from htmd.molecule.vdw import VDW
+from htmd.molecule import vdw
 from htmd.molecule.util import dihedralAngle, guessAnglesAndDihedrals
 from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
@@ -95,7 +95,7 @@ class FFMolecule(Molecule):
             if hasattr(self, '_rtf'):
                 self.masses[:] = [self._rtf.mass_by_type[self._rtf.type_by_index[i]] for i in range(self.numAtoms)]
             else:
-                self.masses[:] = [VDW.masses[VDW.elements.index(element)] for element in self.element]
+                self.masses[:] = [vdw.massByElement(element) for element in self.element]
 
         self.report()
 
