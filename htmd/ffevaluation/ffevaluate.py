@@ -11,8 +11,16 @@ def _formatEnergies(energies):
 
 
 class FFEvaluate:
-    def __init__(self, mol, prm):
-        self._args = init(mol, prm)
+    def __init__(self, mol, prm, betweensets=None, dist_thresh=0):
+        mol = mol.copy()
+        setA, setB = calculateSets(mol, betweensets)
+
+        args = list(init(mol, prm))
+        args.append(setA)
+        args.append(setB)
+        args.append(dist_thresh)
+
+        self._args = args
 
     def run(self, coords, box):
         energies, forces, atmnrg = _ffevaluate(coords, box, *self._args)
@@ -157,7 +165,7 @@ def calculateSets(mol, betweensets):
     return setA, setB
 
 
-def ffevaluate(mol, prm, betweensets=None):
+def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1):
     """  Evaluates energies and forces of the forcefield for a given Molecule
 
     Parameters
@@ -169,6 +177,9 @@ def ffevaluate(mol, prm, betweensets=None):
     betweensets : tuple of strings
         Only calculate energies between two sets of atoms given as atomselect strings.
         Only computes LJ and electrostatics.
+    dist_thresh : float
+        If set to a value != 0 it will only calculate LJ, electrostatics and bond energies for atoms which are closer
+        than the threshold
 
     Returns
     -------
@@ -206,36 +217,24 @@ def ffevaluate(mol, prm, betweensets=None):
     box = mol.box
     setA, setB = calculateSets(mol, betweensets)
 
-    typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda, bondv, ELEC_FACTOR, \
-    charge, angles, angle_params, dihedrals, dihedral_params, impropers, improper_params = init(mol, prm)
-
-    energies, forces, atmnrg = _ffevaluate(coords,
-                box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda, bondv,
-                ELEC_FACTOR, charge, angles, angle_params, dihedrals, dihedral_params, impropers, improper_params, setA,
-                setB)
-
-    return energies, forces, atmnrg
-
-
-def ffevaluate_parallel(mol, prm, betweensets=None):
-    from htmd.parallelprogress import ParallelExecutor, delayed
-    mol = mol.copy()
-    coords = mol.coords
-    box = mol.box
-    setA, setB = calculateSets(mol, betweensets)
-
     args = list(init(mol, prm))
     args.append(setA)
     args.append(setB)
+    args.append(dist_thresh)
 
-    aprun = ParallelExecutor(n_jobs=-2)
-    res = aprun(total=mol.numFrames, description='Evaluating energies')(
-        delayed(_ffevaluate)(np.atleast_3d(coords[:, :, f]),
-                             box[:, f].reshape(3, 1),
-                             *args) for f in range(mol.numFrames))
-    energies = np.hstack([r[0] for r in res])
-    forces = np.concatenate([r[1] for r in res], axis=2)
-    atmnrg = np.concatenate([r[2] for r in res], axis=2)
+    if threads == 1:
+        energies, forces, atmnrg = _ffevaluate(coords, box, *args)
+    else:
+        from htmd.parallelprogress import ParallelExecutor, delayed
+        aprun = ParallelExecutor(n_jobs=threads)
+        res = aprun(total=mol.numFrames, description='Evaluating energies')(
+            delayed(_ffevaluate)(np.atleast_3d(coords[:, :, f]),
+                                 box[:, f].reshape(3, 1),
+                                 *args) for f in range(mol.numFrames))
+        energies = np.hstack([r[0] for r in res])
+        forces = np.concatenate([r[1] for r in res], axis=2)
+        atmnrg = np.concatenate([r[2] for r in res], axis=2)
+
     return energies, forces, atmnrg
 
 
@@ -291,7 +290,7 @@ def _insets(i, j, set1, set2):
 @jit(nopython=True)
 def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda,
                 bondv, ELEC_FACTOR, charge, angles, angle_params, dihedrals, dihedral_params, impropers,
-                improper_params, set1, set2):
+                improper_params, set1, set2, dist_thresh):
     natoms = coords.shape[0]
     nframes = coords.shape[2]
     nangles = angles.shape[0]
@@ -327,6 +326,9 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
                 pot_bo = 0
                 pot_lj = 0
                 pot_el = 0
+
+                if dist_thresh != 0 and dist > dist_thresh:
+                    continue
 
                 if isbonded:
                     pot_bo, force_bo = _evaluate_harmonic_bonds(i, j, bonda, bondv, dist)
