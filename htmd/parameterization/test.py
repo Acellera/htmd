@@ -152,13 +152,13 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
         self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp')
 
-    @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
+    #@unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
     def test_h2o2_full_fake(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_full_fake')
         self._test(refDir, tempname(), 'parameterize input.mol2 --fake-qm')
 
-    @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
+    #@unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
     def test_h2o2_full_fake_restart(self):
 
         refDir = os.path.join(self.dataDir, 'h2o2_full_fake_restart')
