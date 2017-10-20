@@ -20,7 +20,7 @@ class TestParameterize(unittest.TestCase):
 
         self.maxDiff = None
         self.dataDir = home(dataDir='test-param')
-        if os.environ.get('TESTDIR') != '':
+        if os.environ.get('TESTDIR') is not None:
             self.testDir = os.environ['TESTDIR']
         else:
             self.testDir = tempname()
