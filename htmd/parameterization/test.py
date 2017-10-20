@@ -283,7 +283,7 @@ class TestParameterize(unittest.TestCase):
 if __name__ == '__main__':
 
     unittest.main(verbosity=2)
-    
+
     # To copy the new files over use:
     # cd DEST
     # cp -Rf SOURCE/* .

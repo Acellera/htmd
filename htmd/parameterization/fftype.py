@@ -169,10 +169,10 @@ if __name__ == '__main__':
         assert sorted(os.listdir(tmpDir)) == ['mol.pdb', 'mol.prm', 'mol.rtf', 'top_mol.rtf']
 
     with TemporaryDirectory() as tmpDir:
-
         ff = FFType(mol, method=FFTypeMethod.GAFF2, tmpDir=tmpDir)
         assert sorted(os.listdir(tmpDir)) == ['ANTECHAMBER.FRCMOD', 'ANTECHAMBER_AC.AC', 'ANTECHAMBER_AC.AC0',
                                               'ANTECHAMBER_BOND_TYPE.AC', 'ANTECHAMBER_BOND_TYPE.AC0',
+                                              'ANTECHAMBER_GAS.AC', 'ANTECHAMBER_GAS_AT.AC',
                                               'ANTECHAMBER_PREP.AC', 'ANTECHAMBER_PREP.AC0', 'ATOMTYPE.INF',
                                               'NEWPDB.PDB', 'PREP.INF', 'mol.frcmod', 'mol.mol2', 'mol.prepi']
 
