@@ -52,7 +52,7 @@ def getArgumentParser():
                         help='Do not perform QM scanning of dihedral angles')
     parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
                         help='Do not perform QM structure optimisation when scanning dihedral angles')
-    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'PBS', 'AceCloud'],
+    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=1, type=int, help='Number of CPU per QM job (default: %(default)s)')
     parser.add_argument('-o', '--outdir', default='./', help='Output directory (default: %(default)s)')
@@ -258,8 +258,13 @@ def main_parameterize(arguments=None):
         printEnergies(mol, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
+        # Write energy file
+        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.output_directory_name(), 'energies.txt')
+        printEnergies(mol, energyFile)
+        logger.info('Write energy file: %s' % energyFile)
 
+        
 if __name__ == "__main__":
 
-    args=sys.argv[1:] if len(sys.argv)>1 else ['-h']
+    args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
     main_parameterize(arguments=args)

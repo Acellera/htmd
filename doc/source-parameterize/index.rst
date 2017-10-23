@@ -4,7 +4,7 @@ Parameterize
 ``parameterize`` is a tool to obtain force field parameters for new molecules easily and efficiently.
 
 Commonly used AMBER and CHARMM force fields contain parameters for biomolecules (proteins, nucleotides, saccharides,
-lipids, etc), but lack parameters for other biologically relevant molecules (co-factors, drugs, etc).
+lipids, etc.), but lack parameters for other biologically relevant molecules (co-factors, drugs, etc.).
 
 GAFF and CGenFF address this by using empirical rules and pre-computed data sets to derive parameters for arbitrary
 organic molecules. However, these parameters are not guaranteed to be transferable to all possible chemical
@@ -13,7 +13,7 @@ environments.
 ``parameterize`` improves the quality of the parameters by using QM data, i.e. refitting ESP charges and rotatable
 dihedral angle parameters. It fundamentally solves the problem of transferability.
 
-Contents:
+.. rubric:: Contents:
 
 .. toctree::
     :maxdepth: 1
@@ -21,8 +21,7 @@ Contents:
     Method <method>
     Tutorial <tutorial>
 
-Capabilities
-------------
+.. rubric:: Capabilities:
 
 * Supported force fields:
     * AMBER
@@ -43,8 +42,11 @@ Capabilities
     * Parameter fitting to reproduce QM energies
 * QM job execution:
     * Local machine
-    * LSF/PBS/Slum queuing systems
-    * AceCloud (experimental)
+    * LSF/Slurm queuing systems
+
+``parameterize`` comes with HTMD. It takes a MOL2 file, parameterizes it, and outputs force field files in CHARMM and
+AMBER formats. There are many options that are shown in detail below. The structure inside the output directory
+(controlled by the ``--output`` flag) is the following::
 
 .. comment:
 ``parameterize`` comes with HTMD. It takes a MOL2 file, parameterizes it, and outputs force field files in CHARMM and
@@ -62,3 +64,10 @@ the parameterization of the molecule and work as check-points for the different 
 The ``parameters`` is where the relevant outputs are written with following format:
 ``parameters/<force-field>/<theory>-<basis-set>-<vacuum/water>/``. Inside this directory there are the force-field
 parameter files, as well as a ``plots/`` directory, where one can check the optimization carried on by the tool.
+
+Usage
+-----
+.. argparse::
+    :ref: htmd.parameterization.cli.getArgumentParser
+    :prog: parameterize
+    :nodefault:

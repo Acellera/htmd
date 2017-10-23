@@ -659,9 +659,9 @@ class RTF:
         return name
 
     @staticmethod
-    def _guessMass( element ):
-        from htmd.molecule.vdw import VDW
-        return VDW.massByElement(element)
+    def _guessMass(element):
+        from htmd.molecule import vdw
+        return vdw.massByElement(element)
 
 
 class AmberRTF(RTF):

@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.molecule.util import boundingBox
-from htmd.molecule.vdw import VDW, radiusByElement
+from htmd.molecule import vdw
 import numpy as np
 import ctypes
 import htmd.home
@@ -258,9 +258,8 @@ def _getRadii(mol):
         if elem not in mappings:
             raise ValueError('PDBQT element {} does not exist in mappings.'.format(elem))
         elem = mappings[elem]
-
-        if elem in VDW.elements:
-            rad = radiusByElement(elem)
+        if elem in vdw.elements:
+            rad = vdw.radiusByElement(elem)
         else:
             print('Unknown element -', mol.element[a], '- at atom index ', a)
             rad = 1.5

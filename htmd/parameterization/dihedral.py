@@ -127,17 +127,23 @@ class DihedralFitting:
         all_valid_results = []
         for results in self.qm_results:
 
+            dihedral_atomnames = tuple(self.molecule.name[self.dihedrals[self.qm_results.index(results)]])
+
             # Remove failed QM results
             # TODO print removed QM jobs
             valid_results = [result for result in results if not result.errored]
 
             # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
             # TODO print removed QM jobs
-            qm_min = np.min([result.energy for result in valid_results])
-            valid_results = [result for result in valid_results if (result.energy - qm_min) < 20]
+            if valid_results:
+                qm_min = np.min([result.energy for result in valid_results])
+                valid_results = [result for result in valid_results if (result.energy - qm_min) < 20]
+            else:
+                raise RuntimeError('No valid results for dihedral %s-%s-%s-%s' % dihedral_atomnames)
 
             if len(valid_results) < 13:
-                raise RuntimeError('Fewer than 13 valid QM points. Not enough to fit!')
+                raise RuntimeError('Fewer than 13 valid QM points for dihedral %s-%s-%s-%s. Not enough to fit!' %
+                                   dihedral_atomnames)
 
             all_valid_results.append(valid_results)
 
