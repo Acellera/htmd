@@ -32,9 +32,7 @@ class FakeQM(QMBase):
 
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2) # doctest: +ELLIPSIS
-    Dihedral 0: 2-0-1-3
-    ...
+    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
@@ -69,7 +67,7 @@ class FakeQM(QMBase):
     >>> result.energy # doctest: +ELLIPSIS
     7.73172...
     >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    100.0362...
+    100.036...
 
     Run a constrained minimization
     >>> with TemporaryDirectory() as tmpDir:
