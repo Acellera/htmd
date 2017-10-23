@@ -63,7 +63,7 @@ class _LocalQueue(SimQueue, ProtocolInterface):
                 t.start()
                 self._threads.append(t)
 
-    def run_job(self, gpuid):
+    def run_job(self, deviceid):
         queue = self._queue
         while not self._shutdown:
             path = None
@@ -73,15 +73,15 @@ class _LocalQueue(SimQueue, ProtocolInterface):
                 pass
 
             if path:
-                if gpuid is None:
+                if deviceid is None:
                     logger.info('Running ' + path)
                 else:
-                    logger.info("Running " + path + " on GPU device " + str(gpuid))
+                    logger.info("Running " + path + " on device " + str(deviceid))
                 self._setRunning(path)
 
                 runsh = os.path.join(path, 'run.sh')
                 jobsh = os.path.join(path, 'job.sh')
-                self._createJobScript(jobsh, path, runsh, gpuid)
+                self._createJobScript(jobsh, path, runsh, deviceid)
 
                 try:
                     ret = check_output(jobsh)
@@ -313,8 +313,10 @@ class LocalCPUQueue(_LocalQueue):
         The path in which to store completed trajectories.
     copy : list, default='*.xtc'
         A list of file names or globs for the files to copy to datadir
-    ncpu : int
-        Number of CPU threads that the queue will use. By default, it is the total number of cpus.
+    ncpu : int, default=1
+        Number of CPU threads per job that the queue will use.
+    maxcpu : int
+        Number of CPU threads available to this queue. By default, it takes the all the CPU thread of the machine.
     memory : int
         The amount of RAM memory available (in MiB). By default, it will be calculated from total amount
         of memory and the number of devices
@@ -330,13 +332,21 @@ class LocalCPUQueue(_LocalQueue):
 
     def __init__(self):
         super().__init__()
-        self._arg('ncpu', 'int', 'Number of CPU threads that the queue will use. If None it will use the `ncpu` '
-                                 'configured for HTMD in htmd.configure()', psutil.cpu_count(), val.Number(int, 'POS'))
+        self._arg('ncpu', 'int', 'Number of CPU threads per job that the queue will use', 1, val.Number(int, 'POS'))
+        self._arg('maxcpu', 'int', 'Number of CPU threads available to this queue. By default, it takes the all the '
+                                   'CPU thread of the machine.', psutil.cpu_count(), val.Number(int, 'POS'))
         self._arg('memory', 'int', 'The amount of RAM memory available for each job.', self._getmemory(),
                   val.Number(int, '0POS'))
 
     def _getdevices(self):
-        return [None] * self.ncpu
+        if self.ncpu > self.maxcpu:
+            raise ValueError('The ncpu ({}) cannot be greater than the maxcpu ({})'.format(self.ncpu, self.maxcpu))
+        if self.maxcpu > psutil.cpu_count():
+            logger.warning('maxcpu ({}) higher than the total ammount of CPU threads available ({}). '
+                           'Overclocking.'.format(self.maxcpu, psutil.cpu_count()))
+        devices = int(self.maxcpu / self.ncpu)
+        logger.info("Using {} CPU \"devices\" ({} / {})".format(devices, self.maxcpu, self.ncpu))
+        return [None] * devices
 
     def _getmemory(self):
 
