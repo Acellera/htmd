@@ -385,7 +385,7 @@ if __name__ == "__main__":
 
     lo = LocalCPUQueue()
 
-    assert lo.ncpu == psutil.cpu_count()
+    assert lo.ncpu == 1
     assert lo.memory > 1024
 
     lo.ncpu = 100
