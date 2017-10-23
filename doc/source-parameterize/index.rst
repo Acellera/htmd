@@ -48,17 +48,12 @@ dihedral angle parameters. It fundamentally solves the problem of transferabilit
 AMBER formats. There are many options that are shown in detail below. The structure inside the output directory
 (controlled by the ``--output`` flag) is the following::
 
-.. comment:
-``parameterize`` comes with HTMD. It takes a MOL2 file, parameterizes it, and outputs force field files in CHARMM and
-AMBER formats. There are many options that are shown in detail below. The structure inside the output directory
- (controlled by the ``--output`` flag) is the following::
     .
     ├── dihedral-opt
     ├── esp
     ├── minimize
     └── parameters
 
-.. comment:
 The output inside ``dihedral-opt/``, ``esp/``, and ``minimize/`` is related with the QM calculations performed during
 the parameterization of the molecule and work as check-points for the different steps of the parameterization process.
 The ``parameters`` is where the relevant outputs are written with following format:
