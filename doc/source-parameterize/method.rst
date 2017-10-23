@@ -1,10 +1,11 @@
 Method
 ======
 
-A method implemented in ``parameterize`` is inspired by the GAAMP [#]_. A detailed description of our method
+A method implemented in ``parameterize`` is inspired by GAAMP [#]_. A detailed description of our method
 will be published soon [#]_.
 
-General procedure:
+.. rubric:: General procedure
+
 #. Get initial parameters (from GAFF or CGenFF)
 #. Minimize the geometry of molecule with QM
 #. Get atomic charges:
