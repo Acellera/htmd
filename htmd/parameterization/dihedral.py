@@ -214,6 +214,17 @@ class DihedralFitting:
 
         return lower_bounds, upper_bounds
 
+    def _checkVector(self, vector):
+
+        nterms = self.MAX_DIHEDRAL_MULTIPLICITY * self.numDihedrals
+        assert len(vector) == 2 * nterms + self.numDihedrals
+
+        if np.any(vector[:nterms] > 9.99):
+            logger.warning('Range of force constants is insufficient!')
+
+        if np.any(np.absolute(vector[-self.numDihedrals:]) > 9.99):
+            logger.warning('Range of offset parameters is insufficient!')
+
     def _objective(self, x, _):
         """
         Objective function for the parameter fitting.
@@ -362,6 +373,7 @@ class DihedralFitting:
         logger.info('Start parameter optimization')
         # vector = self._optimize_CRS2_LM(vector)  # TODO this should work better, but it doesn't
         vector = self._optimize_random_search(vector)
+        self._checkVector(vector)
         logger.info('Final RMSD: %f kcal/mol' % self._objective(vector, None))
         logger.info('Finished parameter optimization')
 
