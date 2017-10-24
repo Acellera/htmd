@@ -13,8 +13,7 @@ from scipy import constants as const
 from htmd.molecule.molecule import Molecule
 from htmd.molecule import vdw
 from htmd.molecule.util import guessAnglesAndDihedrals
-from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
-from htmd.parameterization.detectequivalents import detectEquivalents
+from htmd.parameterization.detect import detectEquivalents, detectSoftDihedrals
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate

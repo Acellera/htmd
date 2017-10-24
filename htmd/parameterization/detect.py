@@ -3,12 +3,99 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-
 import numpy as np
 import scipy.sparse.csgraph as sp
 
 
+def _my_breadth_first(mol, con, start, depth=1):
+
+    con = con.copy()
+    N = mol.coords.shape[0]
+
+    ret = []
+
+    search = []
+    for j in start:
+        for i in range(N):
+
+            if con[j, i] == 1 and j != i:
+                # con[j,i] = 0
+                con[i, j] = 0
+                if i not in search:
+                    search.append(i)
+    if len(search):
+        ret.append(search)
+        n = _my_breadth_first(mol, con, search, depth + 1)
+        if len(n):
+            for i in n:
+                ret.append(i)
+
+    # top levelreturn. canonicalise the ordering of the elements at each level
+    if depth == 1:
+        rr = []
+        for r in ret:
+            for i in range(len(r)):
+                r[i] = mol.element[r[i]]
+            r.sort()
+            rr.append("!")
+            for i in r:
+                rr.append(i)
+        ret = rr
+    return ret
+
+
+def detectEquivalents(mol):
+
+    bonds = mol.bonds
+    natoms = mol.coords.shape[0]
+
+    # Make a connectivity matrix
+    conn = np.zeros((natoms, natoms), dtype=np.bool)
+    for b in bonds:
+        conn[b[0], b[1]] = True
+        conn[b[1], b[0]] = True
+
+    paths = []
+    uniq_paths = []
+    for b in range(natoms):
+        a = _my_breadth_first(mol, conn, [b])
+        paths.append(a)
+
+    for b in paths:
+        found = False
+        for c in uniq_paths:
+            if c == b:
+                found = True
+                break
+        if not found:
+            uniq_paths.append(b)
+
+    equiv_groups = []
+    for b in uniq_paths:
+        e = []
+        i = 0
+        for c in paths:
+            if b == c:
+                e.append(i)
+            i += 1
+        equiv_groups.append(e)
+
+    equiv_atoms = list(range(natoms))
+    equiv_group_by_atom = list(range(natoms))
+    i = 0
+    for a in equiv_groups:
+        if type(a) == int:
+            a = [a]
+        for b in a:
+            equiv_atoms[b] = a
+            equiv_group_by_atom[b] = i
+        i += 1
+
+    return equiv_groups, equiv_atoms, equiv_group_by_atom
+
+
 class SoftDihedral:
+
     def __init__(self, atoms, left=None, right=None, left_1=None, right_1=None, equiv=None):
         self.atoms = atoms
         if left is None:
@@ -29,12 +116,12 @@ class SoftDihedral:
 
 
 def detectSoftDihedrals(mol, equivalent_atoms):
+
     bonds = mol.bonds
     natoms = mol.coords.shape[0]
-    conn = np.zeros((natoms, natoms), dtype=np.bool)
 
     # Make a connectivity matrix
-    # print(natoms)
+    conn = np.zeros((natoms, natoms), dtype=np.bool)
     for b in bonds:
         conn[b[0], b[1]] = True
         conn[b[1], b[0]] = True
@@ -67,33 +154,19 @@ def detectSoftDihedrals(mol, equivalent_atoms):
 
         left_1 = np.unique(left_1)
         right_1 = np.unique(right_1)
-        #    print("MARK")
-        #    print(len(left_1))
-        #    print(len(right_1))
 
         if not (a2 in left) and not (a1 in right):
             possible_soft.append(SoftDihedral(d, left, right, left_1, right_1, []))
 
     final_soft = []
     e = mol.element
+
     for d in possible_soft:
-#        print("Possible soft")
-#        print(d.atoms)
-#        print(d.left)
-#        print(d.right)
-#        print("%s %s %s" % ( e[left[0]], e[left[1]], e[left[2]] ) )
-#        print("%s %s %s" % ( e[right[0]], e[right[1]], e[right[2]] ) )
         a1 = d.atoms[1]
         a2 = d.atoms[2]
-#        print( "a1 %d %s" % (a1, e[a1]))
-#        print( "a2 %d %s" % (a2, e[a2]))
+
         left = d.left
         right = d.right
-   
-
-        # Exclude trivial dihedrals with just one H atom on a side
-        #   if (len(left) == 1)   and (e[left[0]] =='H') : continue
-        #   if (len(right) == 1)  and (e[right[0]]=='H') : continue
 
         # Exclude methyls
         if len(left) == 3:
@@ -103,6 +176,7 @@ def detectSoftDihedrals(mol, equivalent_atoms):
             if e[a2] == 'C' and e[right[0]] == 'H' and e[right[1]] == 'H' and e[right[2]] == 'H':
                 continue
         found = False
+
         # check to see if the torsional pair of atoms are already included in the list.
         for g in final_soft:
             f = g.atoms
@@ -114,29 +188,18 @@ def detectSoftDihedrals(mol, equivalent_atoms):
                 break
         if not found:
             final_soft.append(d)
-        #  if equivalent_atoms:
-    final_soft = remove_equivalents(mol, final_soft, equivalent_atoms)
 
-    #idx = 0
-    #for t in final_soft:
-    #    print("Dihedral %d: %d-%d-%d-%d" % (idx, t.atoms[0], t.atoms[1], t.atoms[2], t.atoms[3]))
-    #    if len(t.equivalents):
-    #        print(" Has equivalent dihedrals through symmetry: ")
-    #        for s in t.equivalents:
-    #            print(" Dihedral %d-%d-%d-%d" % (s[0], s[1], s[2], s[3]))
-    #    idx += 1
+    final_soft = remove_equivalents(mol, final_soft, equivalent_atoms)
 
     return final_soft
 
 
 def remove_equivalents(mol, soft, equiv):
-    final_soft = []
+
     equivalent_atom_groups = equiv[0]  # list of groups of equivalent atoms
     equivalent_atoms = equiv[1]  # list of equivalent atoms, indexed by atom
     equivalent_group_by_atom = equiv[2]  # mapping from atom index to equivalent atom group
 
-    #  print("MAPPPING")
-    #  print(equivalent_group_by_atom )
     # for each of the soft dihedrals, remove any which are equivalent to others through symmetry
     # compare only the middle two atoms since we care about not duplicating X-A-B-X and X-A'-B'-X
     final_soft = []
@@ -163,24 +226,14 @@ def remove_equivalents(mol, soft, equiv):
             # and the one we've just found -- has more "weight"
             # So that we aren't choosing based on the arbitrary graph traversal ordering
             # Weight is the # of atoms in the left_1 + right_1 groups
-
             already_in_list = final_soft[found]
             candidate = soft[i]
-            #       print(candidate.left_1)
-            #       print(candidate.right_1)
-            if (len(already_in_list.left_1) + len(already_in_list.right_1)) <\
+            if (len(already_in_list.left_1) + len(already_in_list.right_1)) < \
                     (len(candidate.left_1) + len(candidate.right_1)):
                 final_soft.remove(already_in_list)
                 final_soft.append(candidate)
-            #         print("SWAPPING" )
-            #         print( soft[i] )
-            else:
-                #         print("DISCARDING")
-                #        print( soft[i] )
-                pass
+
         else:
-            #       print("ADDING" )
-            #       print( soft[i] )
             final_soft.append(soft[i])
 
     # now for each of the unique soft dihedrals note the dihedrals that also use the same type
@@ -189,7 +242,7 @@ def remove_equivalents(mol, soft, equiv):
         a2 = s.atoms[1]
         a3 = s.atoms[2]
         a4 = s.atoms[3]
-        #    print("LOOKING FOR EQUIVALENTS FOR SOFT DIHEDRAL %d-%d-%d-%d" % ( a1,a2,a3,a4 ) )
+
         h1 = equivalent_group_by_atom[a1]
         h2 = equivalent_group_by_atom[a2]
         h3 = equivalent_group_by_atom[a3]
@@ -200,7 +253,6 @@ def remove_equivalents(mol, soft, equiv):
             b2 = d[1]
             b3 = d[2]
             b4 = d[3]
-            #       print("   CHECKING DIHEDRAL %d-%d-%d-%d" % ( b1,b2,b3,b4))
 
             g1 = equivalent_group_by_atom[b1]
             g2 = equivalent_group_by_atom[b2]
@@ -215,26 +267,14 @@ def remove_equivalents(mol, soft, equiv):
                 found = True
             if found is False:  # d is not the soft dihedral itself
                 found = False
-                #         print( "    CHECKING %d-%d-%d-%d vs %d-%d-%d-%d" %( h1,h2,h3,h4,g1,g2,g3,g4))
                 if h1 == g1 and h2 == g2 and h3 == g3 and h4 == g4:
                     found = True
                 if h4 == g1 and h3 == g2 and h2 == g3 and h1 == g4:
                     found = True
                 if found is True:  # this dihedral shares a type with the soft dihedral
-                    #           print("APPENDING %d %d %d %d" % ( b1,b2,b3,b4 ) )
                     s.equivalents.append([b1, b2, b3, b4])
 
     return final_soft
 
-# if __name__ == "__main__":
-#  m = Molecule( "ethanol.mol2" )
-#  (angles, dihedrals) = guessAnglesAndDihedrals( m.bonds )
-#  
-#  m.angles   = angles
-#  m.dihedrals= dihedrals
-#  sd = detectSoftDihedrals(m)
-#  print("Soft dihedrals to fit:")
-#  for t in sd:
-#    s=t[0]
-#    print("%d-%d-%d-%d" % ( s[0],s[1], s[2], s[3] ) )
-#    print("%s-%s-%s-%s" % ( m.name[s[0]], m.name[s[1]], m.name[s[2]], m.name[s[3]] ))
+if __name__ == '__main__':
+    pass
