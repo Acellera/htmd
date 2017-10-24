@@ -7,7 +7,6 @@ import os
 import sys
 import argparse
 import logging
-import psutil
 import numpy as np
 
 from htmd.version import version
@@ -113,19 +112,22 @@ def main_parameterize(arguments=None):
     # Create a queue for QM
     if args.queue == 'local':
         queue = LocalCPUQueue()
-        queue.ncpu = args.ncpus
     elif args.queue == 'Slurm':
         queue = SlurmQueue()
         queue.partition = SlurmQueue._defaults['cpu_partition']
+        queue.ngpu = 0
     elif args.queue == 'LSF':
         queue = LsfQueue()
         queue.queue = LsfQueue._defaults['cpu_queue']
+        queue.ngpu = 0
     elif args.queue == 'PBS':
         queue = PBSQueue()  # TODO: configure
     elif args.queue == 'AceCloud':
         queue = AceCloudQueue()  # TODO: configure
     else:
         raise NotImplementedError
+    queue.ncpu = args.ncpus
+    #queue.ngpu = 0  # Doesn't work because LocalCPUQueue is complaining!
 
     # Create a QM object
     if args.code == 'Psi4':
