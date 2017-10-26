@@ -51,6 +51,44 @@ def getMolecularTree(graph, source):
     return tree
 
 def detectEquivalentAtoms(molecule):
+    """
+    Detect topologically equivalent atoms.
+
+    Arguments
+    ---------
+    molecule : FFMolecule
+        Molecule object
+
+    Return
+    ------
+    equivalent_groups : list of tuples
+        List of equivalent atom group. Each element is a tuple contain equivalent atom indices.
+    equivalent_atoms : list of tuples
+        List of equivalent atom group for each atom. Each element is a tuple contain equivalent atom indices.
+    equivalent_group_by_atom : list
+        List of equivalent group indices for each atom. The indices corresponds to `equivalent_groups` order.
+
+    Examples
+    --------
+
+    >>> import os
+    >>> from htmd.home import home
+    >>> from htmd.parameterization.ffmolecule import FFMolecule
+    >>> from htmd.parameterization.detect import detectEquivalentAtoms
+
+    Get benzamidine
+    >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
+    >>> mol = FFMolecule(molFile)
+
+    Find the equivalent atoms of bezamidine
+    >>> equivalent_groups, equivalent_atoms, equivalent_group_by_atom = detectEquivalentAtoms(mol)
+    >>> equivalent_groups
+    [(0,), (1, 5), (2, 4), (3,), (6,), (7, 11), (8, 10), (9,), (12, 13), (14, 15, 16, 17)]
+    >>> equivalent_atoms
+    [(0,), (1, 5), (2, 4), (3,), (2, 4), (1, 5), (6,), (7, 11), (8, 10), (9,), (8, 10), (7, 11), (12, 13), (12, 13), (14, 15, 16, 17), (14, 15, 16, 17), (14, 15, 16, 17), (14, 15, 16, 17)]
+    >>> equivalent_group_by_atom
+    [0, 1, 2, 3, 2, 1, 4, 5, 6, 7, 6, 5, 8, 8, 9, 9, 9, 9]
+    """
 
     graph = getMolecularGraph(molecule)
     trees = [getMolecularTree(graph, node) for node in graph.nodes]
@@ -333,6 +371,7 @@ def remove_equivalents(mol, soft, equiv):
 
     return final_soft
 
+
 if __name__ == '__main__':
 
     import os
@@ -358,3 +397,8 @@ if __name__ == '__main__':
     print(eq2[2])
     assert eq[2] == eq2[2]
 
+    import sys
+    import doctest
+
+    if doctest.testmod().failed:
+        sys.exit(1)
