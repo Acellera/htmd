@@ -88,6 +88,19 @@ def detectEquivalentAtoms(molecule):
     [(0,), (1, 5), (2, 4), (3,), (2, 4), (1, 5), (6,), (7, 11), (8, 10), (9,), (8, 10), (7, 11), (12, 13), (12, 13), (14, 15, 16, 17), (14, 15, 16, 17), (14, 15, 16, 17), (14, 15, 16, 17)]
     >>> equivalent_group_by_atom
     [0, 1, 2, 3, 2, 1, 4, 5, 6, 7, 6, 5, 8, 8, 9, 9, 9, 9]
+
+    Get dicarbothioic acid
+    >>> molFile = os.path.join(home('test-param'), 'dicarbothioic_acid.mol2')
+    >>> mol = FFMolecule(molFile)
+
+    Find the equivalent atoms of dicarbothioic acid
+    >>> equivalent_groups, equivalent_atoms, equivalent_group_by_atom = detectEquivalentAtoms(mol)
+    >>> equivalent_groups
+    [(0,), (1,), (2,), (3,), (4,), (5,), (6,), (7,)]
+    >>> equivalent_atoms
+    [(0,), (1,), (2,), (3,), (4,), (5,), (6,), (7,)]
+    >>> equivalent_group_by_atom
+    [0, 1, 2, 3, 4, 5, 6, 7]
     """
 
     graph = getMolecularGraph(molecule)
