@@ -232,7 +232,6 @@ class TestParameterize(unittest.TestCase):
         self._test(refDir, resDir, 'parameterize -m input.mol2 --charge 1 --forcefield CGENFF --no-min --no-esp --no-torsions')
 
     def test_benzamidine_rtf_prm(self):
-
         refDir = os.path.join(self.dataDir, 'benzamidine_rtf_prm')
         resDir = os.path.join(self.testDir, 'benzamidine_rtf_prm')
         os.makedirs(resDir)
