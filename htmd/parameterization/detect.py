@@ -5,7 +5,64 @@
 #
 import numpy as np
 import scipy.sparse.csgraph as sp
+import networkx as nx
 
+def getMolecularGraph(molecule):
+    """
+    Generate a graph from the topology of molecule, i.e the graph nodes represent atoms and  the graph edges represent
+    bonds. Also, the graph nodes store element information.
+    """
+
+    graph = nx.Graph()
+    for i, element in enumerate(molecule.element):
+        graph.add_node(i, element=element)
+    graph.add_edges_from(molecule.bonds)
+
+    return graph
+
+def getMolecularTree(graph, source):
+    """
+    Generate a tree from a molecular graph. The tree starts from source node (atom) and grows along the edges (bonds)
+    unrolling all encountered loops. The tree grows untill all the nodes (atoms) of the graph are included.
+    """
+
+    assert nx.is_connected(graph)
+
+    tree = nx.DiGraph()
+    tree.add_node(0, base=source, element=graph.nodes[source]['element'])
+    current_nodes = list(tree.nodes)
+    base_nodes = {source}
+
+    while True:
+        new_nodes = []
+        neighbor_filter = lambda node: node not in base_nodes
+        for current_node in current_nodes:
+            for neighbor in filter(neighbor_filter, graph.neighbors(tree.nodes[current_node]['base'])):
+                new_node = len(tree.nodes)
+                tree.add_node(new_node, base=neighbor, element=graph.nodes[neighbor]['element'])
+                tree.add_edge(current_node, new_node)
+                new_nodes.append(new_node)
+
+        current_nodes = new_nodes
+        base_nodes = {base for _, base in tree.nodes.data('base')}
+        if base_nodes == set(graph.nodes):
+            break
+
+    return tree
+
+def detectEquivalentAtoms(molecule):
+
+    graph = getMolecularGraph(molecule)
+    trees = [getMolecularTree(graph, node) for node in graph.nodes]
+
+    node_match = lambda node1, node2: node1['element'] == node2['element']
+    isomorphic = lambda tree1, tree2: nx.is_isomorphic(tree1, tree2, node_match=node_match)
+    equivalent_atoms = [tuple([i for i, tree1 in enumerate(trees) if isomorphic(tree1, tree2)]) for tree2 in trees]
+
+    equivalent_groups = sorted(list(set(equivalent_atoms)))
+    equivalent_group_by_atom = [equivalent_groups.index(atoms) for atoms in equivalent_atoms]
+
+    return equivalent_groups, equivalent_atoms, equivalent_group_by_atom
 
 def _my_breadth_first(mol, con, start, depth=1):
 
@@ -277,4 +334,27 @@ def remove_equivalents(mol, soft, equiv):
     return final_soft
 
 if __name__ == '__main__':
-    pass
+
+    import os
+    from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    from htmd.home import home
+
+    molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
+    mol = FFMolecule(molFile)
+
+    eq = detectEquivalents(mol)
+    eq2 = detectEquivalentAtoms(mol)
+
+    print(mol.bonds)
+    print(mol.element)
+
+    print(eq[0])
+    print(eq2[0])
+
+    print(eq[1])
+    print(eq2[1])
+
+    print(eq[2])
+    print(eq2[2])
+    assert eq[2] == eq2[2]
+

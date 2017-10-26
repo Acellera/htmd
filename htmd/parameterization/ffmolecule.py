@@ -13,7 +13,7 @@ from scipy import constants as const
 from htmd.molecule.molecule import Molecule
 from htmd.molecule import vdw
 from htmd.molecule.util import guessAnglesAndDihedrals
-from htmd.parameterization.detect import detectEquivalents, detectSoftDihedrals
+from htmd.parameterization.detect import detectEquivalentAtoms, detectSoftDihedrals
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
@@ -52,7 +52,7 @@ class FFMolecule(Molecule):
         self.angles, self.dihedrals = guessAnglesAndDihedrals(self.bonds, cyclicdih=True)
 
         # Detect equivalent atoms
-        equivalents = detectEquivalents(self)
+        equivalents = detectEquivalentAtoms(self)
         self._equivalent_atom_groups = equivalents[0]  # List of groups of equivalent atoms
         self._equivalent_atoms = equivalents[1]  # List of equivalent atoms, indexed by atom
         self._equivalent_group_by_atom = equivalents[2]  # Mapping from atom index to equivalent atom group
@@ -119,7 +119,7 @@ class FFMolecule(Molecule):
 
         print('Equivalent atom groups:')
         for atom_group in self._equivalent_atom_groups:
-            print('  ' + ', '.join(self.name[atom_group]))
+            print('  ' + ', '.join(self.name[list(atom_group)]))
 
         print('Rotatable dihedral angles:')
         for dihedral in self._rotatable_dihedrals:
