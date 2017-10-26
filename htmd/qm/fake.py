@@ -51,13 +51,13 @@ class FakeQM(QMBase):
     >>> result.errored
     False
     >>> result.energy # doctest: +ELLIPSIS
-    8.510044...
+    8.39480...
     >>> result.esp_points
     array([[ 1.,  1.,  1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
-    array([ 0.373964...])
+    array([ 0.37135...])
     >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    89.999544...
+    89.99954...
 
     Run a minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -67,9 +67,9 @@ class FakeQM(QMBase):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.83781...
+    7.73172...
     >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    100.4997...
+    100.0362...
 
     Run a constrained minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -80,9 +80,9 @@ class FakeQM(QMBase):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.978764...
+    7.870431...
     >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    89.999515...
+    89.99956...
     """
 
     # Fake implementations of the abstract methods
