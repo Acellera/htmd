@@ -3,9 +3,13 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from collections import OrderedDict
 import numpy as np
 import scipy.sparse.csgraph as sp
 import networkx as nx
+
+from htmd.molecule.vdw import elements
+
 
 def getMolecularGraph(molecule):
     """
@@ -15,7 +19,7 @@ def getMolecularGraph(molecule):
 
     graph = nx.Graph()
     for i, element in enumerate(molecule.element):
-        graph.add_node(i, element=element)
+        graph.add_node(i, element=element, number=elements.index(element))
     graph.add_edges_from(molecule.bonds)
 
     return graph
@@ -49,6 +53,15 @@ def getMolecularTree(graph, source):
             break
 
     return tree
+
+def checkIsomorphism(graph1, graph2):
+    """
+    Check if two graphs are isomorphic based on topology and elements
+    """
+
+    return nx.is_isomorphic(graph1, graph2,
+                            node_match = lambda node1, node2: node1['element'] == node2['element'])
+
 
 def detectEquivalentAtoms(molecule):
     """
@@ -106,10 +119,7 @@ def detectEquivalentAtoms(molecule):
     graph = getMolecularGraph(molecule)
     trees = [getMolecularTree(graph, node) for node in graph.nodes]
 
-    node_match = lambda node1, node2: node1['element'] == node2['element']
-    isomorphic = lambda tree1, tree2: nx.is_isomorphic(tree1, tree2, node_match=node_match)
-    equivalent_atoms = [tuple([i for i, tree1 in enumerate(trees) if isomorphic(tree1, tree2)]) for tree2 in trees]
-
+    equivalent_atoms = [tuple([i for i, tree1 in enumerate(trees) if checkIsomorphism(tree1, tree2)]) for tree2 in trees]
     equivalent_groups = sorted(list(set(equivalent_atoms)))
     equivalent_group_by_atom = [equivalent_groups.index(atoms) for atoms in equivalent_atoms]
 
@@ -205,23 +215,141 @@ def detectEquivalents(mol):
 class SoftDihedral:
 
     def __init__(self, atoms, left=None, right=None, left_1=None, right_1=None, equiv=None):
-        self.atoms = atoms
-        if left is None:
-            left = []
-        if right is None:
-            right = []
-        if left_1 is None:
-            left_1 = []
-        if right_1 is None:
-            right_1 = []
-        if equiv is None:
-            equiv = []
-        self.left = left
-        self.right = right
-        self.left_1 = left_1
-        self.right_1 = right_1
-        self.equivalents = equiv
 
+        self.atoms = atoms
+        self.left = [] if left is None else left
+        self.right = [] if right is None else right
+        self.left_1 = [] if left_1 is None else left_1
+        self.right_1 = [] if right_1 is None else right_1
+        self.equivalents = [] if equiv is None else equiv
+
+
+def getMethylGraph():
+
+    methyl = nx.Graph()
+    methyl.add_node(0, element='C')
+    methyl.add_node(1, element='H')
+    methyl.add_node(2, element='H')
+    methyl.add_node(3, element='H')
+    methyl.add_edge(0 ,1)
+    methyl.add_edge(0, 2)
+    methyl.add_edge(0, 3)
+
+    return methyl
+
+def filterCores(core_sides):
+
+    _, sides = core_sides
+
+    if len(sides[0]) == 1 or len(sides[1]) == 1:
+        return False
+
+    methyl = getMethylGraph()
+    if checkIsomorphism(sides[0], methyl) or checkIsomorphism(sides[1], methyl):
+        return False
+
+    return True
+
+def detectParameterizableCores(molecule):
+
+    graph = getMolecularGraph(molecule)
+
+    all_core_sides = []
+    for core in list(nx.bridges(graph)):
+        graph.remove_edge(*core)
+        sides = list(nx.connected_component_subgraphs(graph))
+        graph.add_edge(*core)
+
+        if core[0] in sides[1]:
+            sides = sides[::-1]
+        assert core[0] in sides[0] and core[1] in sides[1]
+
+        all_core_sides.append((core, sides))
+
+    all_core_sides = filter(filterCores, all_core_sides)
+
+    return all_core_sides
+
+def chooseTerminal(centre, sideGraph):
+
+    terminals = list(sideGraph.neighbors(centre))
+
+    # Get a subgraph for each terminal
+    sideGraph = sideGraph.copy()
+    sideGraph.remove_node(centre)
+    subGraphs = list(nx.connected_component_subgraphs(sideGraph))
+    subGraphs = [[subGraph for subGraph in subGraphs if terminal in subGraph.nodes][0] for terminal in terminals]
+
+    # Compute a score for each terminal
+    numberOfAtoms = np.array([len(subGraph.nodes) for subGraph in subGraphs])
+    numberOfProtons = np.array([sum(nx.get_node_attributes(subGraph, 'number').values()) for subGraph in subGraphs])
+    assert max(numberOfProtons) < 1000000 # No monstrous molecules, please!
+    scores = 1000000*numberOfAtoms + numberOfProtons
+
+    terminal = terminals[np.argmax(scores)]
+
+    return terminal
+
+def detectParameterizableDihedrals(molecule):
+    """
+    Detect parameterizable dihedral angles
+
+    Arguments
+    ---------
+    molecule : FFMolecule
+        Molecule object
+
+    Return
+    ------
+    dihedrals : list of list of tuples
+        List of equivalent dihedral angle groups. Each group is a list of equivalent dihedral angles.
+        Each angle is defined as a tuple of four atom indices (0-based).
+
+    Examples
+    --------
+
+    >>> import os
+    >>> from htmd.home import home
+    >>> from htmd.parameterization.ffmolecule import FFMolecule
+    >>> from htmd.parameterization.detect import detectParameterizableDihedrals
+
+    Get benzamidine
+    >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
+    >>> mol = FFMolecule(molFile)
+
+    Find the parameterizable dihedrals of benzamidine
+    >>> detectParameterizableDihedrals(mol)
+    [[(1, 0, 6, 12)], [(0, 6, 12, 16), (0, 6, 13, 14)]]
+
+    Get glycol
+    >>> molFile = os.path.join(home('test-param'), 'glycol.mol2')
+    >>> mol = FFMolecule(molFile)
+
+    Find the parameterizable dihedrals of glycol
+    >>> detectParameterizableDihedrals(mol)
+    [[(2, 1, 0, 4), (1, 2, 3, 9)], [(0, 1, 2, 3)]]
+    """
+
+    # Get pameterizable dihedral angles
+    dihedrals = []
+    for core, sides in detectParameterizableCores(molecule):
+        terminals = [chooseTerminal(centre, side) for centre, side in zip(core, sides)]
+        dihedrals.append((terminals[0], core[0], core[1], terminals[1]))
+
+    # Get equivantence groups for each atom for each dihedral
+    _, _, equivalent_group_by_atom = detectEquivalentAtoms(molecule)
+    dihedral_groups = [tuple([equivalent_group_by_atom[atom] for atom in dihedral]) for dihedral in dihedrals]
+
+    # Group equivalent dihedral angles and reverse them that equivalent atoms are matched
+    equivalent_dihedrals = OrderedDict()
+    for dihedral, groups in zip(dihedrals, dihedral_groups):
+        if groups[::-1] < groups:
+            groups = groups[::-1]
+            dihedral = dihedral[::-1]
+        equivalent_dihedrals[groups] = equivalent_dihedrals.get(groups, []) + [dihedral]
+    equivalent_dihedrals = list(equivalent_dihedrals.values())
+
+    return equivalent_dihedrals
 
 def detectSoftDihedrals(mol, equivalent_atoms):
 
@@ -386,29 +514,6 @@ def remove_equivalents(mol, soft, equiv):
 
 
 if __name__ == '__main__':
-
-    import os
-    from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-    from htmd.home import home
-
-    molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
-    mol = FFMolecule(molFile)
-
-    eq = detectEquivalents(mol)
-    eq2 = detectEquivalentAtoms(mol)
-
-    print(mol.bonds)
-    print(mol.element)
-
-    print(eq[0])
-    print(eq2[0])
-
-    print(eq[1])
-    print(eq2[1])
-
-    print(eq[2])
-    print(eq2[2])
-    assert eq[2] == eq2[2]
 
     import sys
     import doctest
