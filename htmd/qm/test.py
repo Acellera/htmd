@@ -311,6 +311,8 @@ class TestPsi4Slurm(TestBase, unittest.TestCase):
 
     def setUp(self):
 
+        self.skipTest('No Slurm tests')
+
         if 'TRAVIS' in os.environ:
            self.skipTest('No Psi4 Slurm tests on Travis')
 

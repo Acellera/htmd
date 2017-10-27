@@ -32,7 +32,7 @@ class FFMolecule(Molecule):
     """
 
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 qm=None, outdir="./", mol=None):
+                 qm=None, outdir="./", mol=None, acCharges=None):
 
         if filename is not None and not filename.endswith('.mol2'):
             raise ValueError('Input file must be mol2 format')
@@ -80,7 +80,7 @@ class FFMolecule(Molecule):
             pass  # Don't assign any atom types
         else:
             # Otherwise make atom types using the specified method
-            fftype = FFType(self, method=self.method)
+            fftype = FFType(self, method=self.method, acCharges=acCharges)
             logger.info('Assigned atom types with %s' % self.method.name)
             self._rtf = fftype._rtf
             self._prm = fftype._prm

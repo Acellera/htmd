@@ -55,7 +55,8 @@ def getArgumentParser():
                         help='Do not perform QM structure optimisation when scanning dihedral angles')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF'],
                         help='QM queue (default: %(default)s)')
-    parser.add_argument('-n', '--ncpus', default=1, type=int, help='Number of CPU per QM job (default: %(default)s)')
+    parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
+                                                                      'defaults)')
     parser.add_argument('-o', '--outdir', default='./', help='Output directory (default: %(default)s)')
     parser.add_argument('--seed', default=20170920, type=int,
                         help='Random number generator seed (default: %(default)s)')
@@ -113,19 +114,21 @@ def main_parameterize(arguments=None):
     # Create a queue for QM
     if args.queue == 'local':
         queue = LocalCPUQueue()
-        queue.ncpu = args.ncpus
     elif args.queue == 'Slurm':
-        queue = SlurmQueue()
-        queue.partition = SlurmQueue._defaults['cpu_partition']
+        queue = SlurmQueue(_configapp=args.code.lower())
     elif args.queue == 'LSF':
-        queue = LsfQueue()
-        queue.queue = LsfQueue._defaults['cpu_queue']
+        queue = LsfQueue(_configapp=args.code.lower())
     elif args.queue == 'PBS':
         queue = PBSQueue()  # TODO: configure
     elif args.queue == 'AceCloud':
         queue = AceCloudQueue()  # TODO: configure
     else:
         raise NotImplementedError
+
+    # Override default ncpus
+    if args.ncpus:
+        logger.info('Overriding ncpus to {}'.format(args.ncpus))
+        queue.ncpu = args.ncpus
 
     # Create a QM object
     if args.code == 'Psi4':
