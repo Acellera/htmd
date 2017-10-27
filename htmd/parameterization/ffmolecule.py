@@ -30,7 +30,7 @@ class FFMolecule(Molecule):
     """
 
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 qm=None, outdir="./", mol=None):
+                 qm=None, outdir="./", mol=None, acCharges=None):
 
         self.method = method
         self.outdir = outdir
@@ -81,7 +81,7 @@ class FFMolecule(Molecule):
             pass
         else:
             # Otherwise make atom types using the specified method
-            fftype = FFType(self, method=self.method)
+            fftype = FFType(self, method=self.method, acCharges=acCharges)
             self._rtf = fftype._rtf
             self._prm = fftype._prm
 
