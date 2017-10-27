@@ -54,9 +54,7 @@ class Psi4(QMBase):
     >>> from htmd.home import home
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
     >>> molFile = os.path.join(home('test-qm'), 'H2-0.74.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.NONE) # doctest: +ELLIPSIS
-    <BLANKLINE>
-    ...
+    >>> mol = FFMolecule(molFile, method=FFTypeMethod.NONE)
 
     Create a Psi4 object
     >>> from htmd.qm import Psi4
@@ -80,8 +78,8 @@ class Psi4(QMBase):
     False
     >>> result[0].energy # doctest: +ELLIPSIS
     -728.97083177...
-    >>> result[0].mulliken
-    [0.0, -0.0]
+    >>> result[0].mulliken # doctest: +ELLIPSIS
+    [...0.0, ...0.0]
 
     Run the geometry optimization of H2 with BLYP, but change basis to 3-21G.
     NOTE: the `directory` attribut needs to be set to empty or non-existing directory, overwise the previous

@@ -1,20 +1,52 @@
 Parameterize
 ============
 
-Contents:
+``parameterize`` is a tool to obtain force field parameters for new molecules easily and efficiently.
+
+Commonly used AMBER and CHARMM force fields contain parameters for biomolecules (proteins, nucleotides, saccharides,
+lipids, etc.), but lack parameters for other biologically relevant molecules (co-factors, drugs, etc.).
+
+GAFF and CGenFF address this by using empirical rules and pre-computed data sets to derive parameters for arbitrary
+organic molecules. However, these parameters are not guaranteed to be transferable to all possible chemical
+environments.
+
+``parameterize`` improves the quality of the parameters by using QM data, i.e. refitting ESP charges and rotatable
+dihedral angle parameters. It fundamentally solves the problem of transferability.
+
+.. rubric:: Contents:
 
 .. toctree::
     :maxdepth: 1
 
-    Tutorial <parameterize-tutorial>
+    Method <method>
+    Tutorial <tutorial>
 
-Parameterization of small molecules is an important aspect of molecular simulations, especially when dealing with
-molecules which are not readily available by default on CHARMM or AMBER. Even when parameters can be obtained from
-other sources such as CGENFF or GAFF, they are not guaranteed to be fully optimized.
+.. rubric:: Capabilities:
 
-The ``parameterize`` command-line tool comes with HTMD. It takes a MOL2 file, parameterizes it, and outputs force-field
-files in common CHARMM and AMBER formats. There are many options that are shown in detail below. The structure inside
-the output directory (controlled by the ``-o`` flag) is the following::
+* Supported force fields:
+    * AMBER
+    * CHARMM
+* Atom typing and initial parameters:
+    * GAFF and GAFF2 (for AMBER)
+    * CGenFF (for CHARMM)
+* Supported QM codes:
+    * Psi4
+    * Gaussian (experimental)
+* Atomic charges:
+    * Fitted to reproduce the electrostatic potential (ESP) of QM
+    * Selected charges can be fixed during the fitting
+* Dihedral angle parameters:
+    * Automatic rotatable dihedral detection
+    * Automatic identical dihedral detection
+    * Dihedral scanning with and without QM structure optimization
+    * Parameter fitting to reproduce QM energies
+* QM job execution:
+    * Local machine
+    * LSF/Slurm queuing systems
+
+``parameterize`` comes with HTMD. It takes a MOL2 file, parameterizes it, and outputs force field files in CHARMM and
+AMBER formats. There are many options that are shown in detail below. The structure inside the output directory
+(controlled by the ``--output`` flag) is the following::
 
     .
     ├── dihedral-opt
@@ -28,17 +60,9 @@ The ``parameters`` is where the relevant outputs are written with following form
 ``parameters/<force-field>/<theory>-<basis-set>-<vacuum/water>/``. Inside this directory there are the force-field
 parameter files, as well as a ``plots/`` directory, where one can check the optimization carried on by the tool.
 
-The method followed by the ``parameterize`` tool is inspired by the GAAMP method [#]_. A detailed description of our
-method will soon be published [#]_.
-
-.. [#]  L. Huang and B. Roux, Automated Force Field Parameterization for Nonpolarizable and Polarizable
-        Atomic Models Based on Ab Initio Target Data, J. Chem. Theory Comput., 2013, 9 (8), pp 3543–3556.
-        doi: `10.1021/ct4003477 <http://dx.doi.org/10.1021/ct4003477>`_
-.. [#]  M. J. Harvey, J. M. Damas, G. Martínez and G. De Fabritiis, Small Molecule Forcefield Parameterization with
-        HTMD, (manuscript).
-
-------------
-
+Usage
+-----
 .. argparse::
-    :ref: htmd.parameterization.cli.cli_parser
+    :ref: htmd.parameterization.cli.getArgumentParser
     :prog: parameterize
+    :nodefault:

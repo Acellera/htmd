@@ -110,7 +110,7 @@ class DihedralFitting:
         # Duplicate the atom types of the dihedral
         for i in range(4):
             if not ("x" in self.molecule._rtf.type_by_index[dihedral[i]]):
-                self.molecule.duplicateTypeOfAtom(dihedral[i])
+                self.molecule._duplicateAtomType(dihedral[i])
 
         equivalent_dihedrals = self._getEquivalentDihedrals(dihedral)
         if len(equivalent_dihedrals) > 1:
@@ -127,17 +127,26 @@ class DihedralFitting:
         all_valid_results = []
         for results in self.qm_results:
 
+            # TODO: The test with fake QMResult does not work with this, because there is no molecule
+            # dihedral_atomnames = tuple(self.molecule.name[self.dihedrals[self.qm_results.index(results)]])
+
             # Remove failed QM results
             # TODO print removed QM jobs
             valid_results = [result for result in results if not result.errored]
 
             # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
             # TODO print removed QM jobs
-            qm_min = np.min([result.energy for result in valid_results])
-            valid_results = [result for result in valid_results if (result.energy - qm_min) < 20]
+            if valid_results:
+                qm_min = np.min([result.energy for result in valid_results])
+                valid_results = [result for result in valid_results if (result.energy - qm_min) < 20]
+            else:
+                raise RuntimeError('No valid results.')
+                # for dihedral %s-%s-%s-%s' % dihedral_atomnames)
 
             if len(valid_results) < 13:
-                raise RuntimeError('Fewer than 13 valid QM points. Not enough to fit!')
+                raise RuntimeError('Fewer than 13 valid QM points. Not enough to fit.')
+                # for dihedral %s-%s-%s-%s. Not enough to fit!' %
+                #                    dihedral_atomnames)
 
             all_valid_results.append(valid_results)
 
@@ -154,9 +163,9 @@ class DihedralFitting:
         # Get equivalent dihedral atom indices
         self._equivalent_indices = []
         for idihed, dihedral in enumerate(self.dihedrals):
-            for rotableDihedral in self.molecule._soft_dihedrals:
-                if np.all(rotableDihedral.atoms == dihedral):
-                    self._equivalent_indices.append([dihedral] + rotableDihedral.equivalents)
+            for rotatableDihedral in self.molecule._rotatable_dihedrals:
+                if np.all(rotatableDihedral.atoms == dihedral):
+                    self._equivalent_indices.append([dihedral] + rotatableDihedral.equivalents)
                     break
             else:
                 raise ValueError('%s is not recognized as a rotable dihedral\n' % self._names[idihed])
