@@ -78,8 +78,8 @@ class Psi4(QMBase):
     False
     >>> result[0].energy # doctest: +ELLIPSIS
     -728.97083177...
-    >>> result[0].mulliken
-    [0.0, -0.0]
+    >>> result[0].mulliken # doctest: +ELLIPSIS
+    [...0.0, ...0.0]
 
     Run the geometry optimization of H2 with BLYP, but change basis to 3-21G.
     NOTE: the `directory` attribut needs to be set to empty or non-existing directory, overwise the previous

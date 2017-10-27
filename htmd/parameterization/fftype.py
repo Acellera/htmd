@@ -36,12 +36,15 @@ class FFType:
         Molecule to use for the assigment
     method : FFTypeMethod
         Assigment method
+    acCharges : str
+        Optionally assign charges with antechamber. Check `antechamber -L` for available options. Caution: This will
+        overwrite any charges defined in the mol2 file.
     tmpDir: str
         Directory for temporary files. If None, a directory is created and
         deleted automatically.
     """
 
-    def __init__(self, mol, method=FFTypeMethod.CGenFF_2b6, tmpDir=None):
+    def __init__(self, mol, method=FFTypeMethod.CGenFF_2b6, acCharges=None, tmpDir=None):
 
         # Find the executables
         if method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2:
@@ -79,13 +82,16 @@ class FFType:
                     atomtype = "gaff2"
                 else:
                     raise ValueError('method')
-                returncode = subprocess.call([antechamber_binary,
-                                              '-at', atomtype,
-                                              '-nc', str(mol.netcharge),
-                                              '-fi', 'mol2',
-                                              '-i', 'mol.mol2',
-                                              '-fo', 'prepi',
-                                              '-o', 'mol.prepi'], cwd=tmpdir)
+                cmd = [antechamber_binary,
+                       '-at', atomtype,
+                       '-nc', str(mol.netcharge),
+                       '-fi', 'mol2',
+                       '-i', 'mol.mol2',
+                       '-fo', 'prepi',
+                       '-o', 'mol.prepi']
+                if acCharges is not None:
+                    cmd += ['-c', acCharges]
+                returncode = subprocess.call(cmd, cwd=tmpdir)
                 if returncode != 0:
                     raise RuntimeError('"antechamber" failed')
 
@@ -168,7 +174,6 @@ if __name__ == '__main__':
         assert sorted(os.listdir(tmpDir)) == ['mol.pdb', 'mol.prm', 'mol.rtf', 'top_mol.rtf']
 
     with TemporaryDirectory() as tmpDir:
-
         ff = FFType(mol, method=FFTypeMethod.GAFF2, tmpDir=tmpDir)
         assert sorted(os.listdir(tmpDir)) == ['ANTECHAMBER.FRCMOD', 'ANTECHAMBER_AC.AC', 'ANTECHAMBER_AC.AC0',
                                               'ANTECHAMBER_BOND_TYPE.AC', 'ANTECHAMBER_BOND_TYPE.AC0',

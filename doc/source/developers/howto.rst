@@ -24,6 +24,14 @@ contributing is also to fork the Acellera/htmd repository (`<https://github.com/
 develop your feature (rebase often), document it, test it, and when it's ready, open a pull request to the master branch
 (`<https://github.com/Acellera/htmd/compare>`_).
 
+Contributor Agreement
+=====================
+
+To find the contributor agreement for signing, please follow this link
+(`<https://github.com/Acellera/htmd/blob/master/doc/source/developers/contributor_agreement.md>`_). Please add the
+signed document to your PR (inside ``doc/source/developers/signed_agreements/``). We can only accept your PR after you
+have added this file.
+
 List of Features Interesting for HTMD
 =====================================
 

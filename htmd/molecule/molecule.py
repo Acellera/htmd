@@ -463,6 +463,37 @@ class Molecule:
             all1 = all1 + centroidQ
             self.coords[:, :, f] = all1
 
+    def alignBySequence(self, ref, molseg=None, refseg=None, nalignfragment=1, returnAlignments=False, maxalignments=1):
+        """ Aligns the Molecule to a reference Molecule by their longests sequences alignment
+
+        Parameters
+        ----------
+        ref : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+            The reference Molecule to which we want to align
+        molseg : str
+            The segment of this Molecule we want to align
+        refseg : str
+            The segment of `ref` we want to align to
+        nalignfragments : int
+            The number of fragments used for the alignment.
+        returnAlignments : bool
+            Return all alignments as a list of Molecules
+        maxalignments : int
+            The maximum number of alignments we want to produce
+
+        Returns
+        -------
+        mols : list
+            If returnAlignments is True it returns a list of Molecules each containing a different alignment. Otherwise
+            it modifies the current Molecule with the best single alignment.
+        """
+        from htmd.molecule.util import sequenceStructureAlignment
+        aligns = sequenceStructureAlignment(self, ref, molseg, refseg, maxalignments, nalignfragment)
+        if returnAlignments:
+            return aligns
+        else:
+            self = aligns[0]
+
     def append(self, mol, collisions=False, coldist=1.3):
         """ Append a molecule at the end of the current molecule
 

@@ -7,7 +7,8 @@ import os
 import shutil
 import random
 import string
-import numpy as np
+from htmd.config import _config
+import yaml
 from subprocess import check_output, CalledProcessError
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
@@ -63,15 +64,14 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
     """
 
-    _defaults = {'default_partition': 'gpu_partition', 'gpu_partition': None, 'cpu_partition': None, 'priority': None,
-                 'ngpu': 1, 'ncpu': 1, 'memory': 1000, 'walltime': None, 'environment': 'ACEMD_HOME,HTMD_LICENSE_FILE'}
+    _defaults = {'partition': None, 'priority': None, 'ngpu': 1, 'ncpu': 1, 'memory': 1000, 'walltime': None,
+                 'environment': 'ACEMD_HOME,HTMD_LICENSE_FILE'}
 
-    def __init__(self):
+    def __init__(self, _configapp=None):
         SimQueue.__init__(self)
         ProtocolInterface.__init__(self)
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
-        self._arg('partition', 'str', 'The queue (partition) to run on',
-                  self._defaults[self._defaults['default_partition']], val.String())
+        self._arg('partition', 'str', 'The queue (partition) to run on', self._defaults['partition'], val.String())
         self._arg('priority', 'str', 'Job priority', self._defaults['priority'], val.String())
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
                   val.Number(int, '0POS'))
@@ -93,6 +93,36 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                                       ' will be duplicated!', None, val.String(), nargs='*')
         self._arg('exclude', 'list', 'A list of nodes on which *not* to run the jobs. Use this to select nodes on '
                                      'which to allow the jobs to run on.', None, val.String(), nargs='*')
+
+        # Load Slurm configuration profile
+        slurmconfig = _config['slurm']
+        profile = None
+        if _configapp is not None:
+            if slurmconfig is not None:
+                if os.path.isfile(slurmconfig) and slurmconfig.endswith(('.yml', '.yaml')):
+                    try:
+                        with open(slurmconfig, 'r') as f:
+                            profile = yaml.load(f)
+                        logger.info('Loaded Slurm configuration YAML file {}'.format(slurmconfig))
+                    except:
+                        logger.warning('Could not load YAML file {}'.format(slurmconfig))
+                else:
+                    logger.warning('{} does not exist or it is not a YAML file.'.format(slurmconfig))
+                if profile:
+                    try:
+                        properties = profile[_configapp]
+                    except:
+                        raise RuntimeError('There is no profile in {} for configuration '
+                                           'app {}'.format(slurmconfig, _configapp))
+                    for p in properties:
+                        self.__dict__[p] = properties[p]
+                        logger.info('Setting {} to {}'.format(p, properties[p]))
+            else:
+                raise RuntimeError('No Slurm configuration YAML file defined for the configapp')
+        else:
+            if slurmconfig is not None:
+                logger.warning('Slurm configuration YAML file defined without configuration app')
+
 
         # Find executables
         self._qsubmit = SlurmQueue._find_binary('sbatch')
