@@ -129,7 +129,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
             f.write('#BSUB -q {}\n'.format(self.queue))
             f.write('#BSUB -n {}\n'.format(self.ncpu))
             f.write('#BSUB -app {}\n'.format(self.app))
-            f.write('#BSUB -R "rusage[ngpus_excl_p={}]"\n'.format(self.ngpu))
+            if self.ngpu != 0:
+                f.write('#BSUB -R "select[ngpus>0] rusage[ngpus_excl_p={}]"\n'.format(self.ngpu))
             f.write('#BSUB -M {}\n'.format(self.memory))
             f.write('#BSUB -cwd {}\n'.format(workdir))
             f.write('#BSUB -outdir {}\n'.format(workdir))
@@ -139,7 +140,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
                 f.write('#BSUB -W {}\n'.format(self.walltime))
             if self.resources is not None:
                 for resource in self.resources:
-                    f.write('#BSUB -R {}\n'.format(resource))
+                    f.write('#BSUB -R "{}"\n'.format(resource))
             # Trap kill signals to create sentinel file
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\n')
