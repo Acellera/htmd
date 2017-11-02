@@ -124,7 +124,8 @@ class Psi4(QMBase):
 
         with open(os.path.join(directory, 'psi4.in'), 'w') as f:
 
-            f.write('set_num_threads(%d)\n' % self.queue.ncpu)
+            if self.queue.ncpu:     # BOINC manages the cpu number per-host. Alternatively, set it in run.sh
+                f.write('set_num_threads(%d)\n' % self.queue.ncpu)
             f.write('set_memory(%d)\n\n' % (1024**2*self.queue.memory))
 
             reference = 'r' if self.multiplicity == 1 else 'u'
