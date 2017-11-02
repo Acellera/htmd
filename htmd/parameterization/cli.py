@@ -16,6 +16,7 @@ from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
+from htmd.queues.rboincpsi4queue import RBoincPsi4Queue
 from htmd.qm import Psi4, Gaussian, FakeQM
 from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.parameterization.fftype import FFTypeMethod
@@ -122,6 +123,8 @@ def main_parameterize(arguments=None):
         queue = PBSQueue()  # TODO: configure
     elif args.queue == 'AceCloud':
         queue = AceCloudQueue()  # TODO: configure
+    elif args.queue == "RBoinc":
+        queue = RBoincPsi4Queue()
     else:
         raise NotImplementedError
 

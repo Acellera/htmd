@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 
-class RBoincQueue(SimQueue, ProtocolInterface):
+class RBoincPsi4Queue(SimQueue, ProtocolInterface):
     """ Queue system for RBoinc systems (e.g. GPUGRID).
     
     Only supports psi4.
