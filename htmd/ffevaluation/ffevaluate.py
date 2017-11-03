@@ -118,7 +118,13 @@ def init(mol, prm, fromstruct=False):
     e14_atom_list = [[] for _ in range(natoms)]
     e14_value_list = [[] for _ in range(natoms)]
     dihedral_params = [[] for _ in range(mol.dihedrals.shape[0])]
+    alreadyadded = {}
     for idx, dihed in enumerate(mol.dihedrals):
+        # Avoid readding duplicate dihedrals
+        stringrep = ' '.join(map(str, sorted(dihed)))
+        if stringrep in alreadyadded:
+            continue
+        alreadyadded[stringrep] = True
         ty = tuple(uqtypes[typeint[dihed]])
         dihparam = prm.dihedral_types[ty]
         i, j = sorted([dihed[0], dihed[3]])
