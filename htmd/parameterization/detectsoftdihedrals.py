@@ -117,14 +117,15 @@ def detectSoftDihedrals(mol, equivalent_atoms):
         #  if equivalent_atoms:
     final_soft = remove_equivalents(mol, final_soft, equivalent_atoms)
 
-    idx = 0
-    for t in final_soft:
-        print("Dihedral %d: %d-%d-%d-%d" % (idx, t.atoms[0], t.atoms[1], t.atoms[2], t.atoms[3]))
-        if len(t.equivalents):
-            print(" Has equivalent dihedrals through symmetry: ")
-            for s in t.equivalents:
-                print(" Dihedral %d-%d-%d-%d" % (s[0], s[1], s[2], s[3]))
-        idx += 1
+    #idx = 0
+    #for t in final_soft:
+    #    print("Dihedral %d: %d-%d-%d-%d" % (idx, t.atoms[0], t.atoms[1], t.atoms[2], t.atoms[3]))
+    #    if len(t.equivalents):
+    #        print(" Has equivalent dihedrals through symmetry: ")
+    #        for s in t.equivalents:
+    #            print(" Dihedral %d-%d-%d-%d" % (s[0], s[1], s[2], s[3]))
+    #    idx += 1
+
     return final_soft
 
 
