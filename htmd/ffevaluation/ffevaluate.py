@@ -3,6 +3,9 @@ import numpy as np
 from math import sqrt, acos, radians, cos, sin, pi
 from scipy import constants as const
 from htmd.ffevaluation.util import dihedralAngle, wrapBondedDistance, wrapDistance, cross, dot
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _formatEnergies(energies):
@@ -61,6 +64,12 @@ def init(mol, prm):
     impropers = mol.impropers
     angles = mol.angles
     dihedrals = mol.dihedrals
+    if len(impropers) == 0:
+        logger.warning('No impropers are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
+    if len(angles) == 0:
+        logger.warning('No angles are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
+    if len(dihedrals) == 0:
+        logger.warning('No dihedrals are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
 
     uqtypes, typeint = np.unique(mol.atomtype, return_inverse=True)
     sigma = np.zeros(len(uqtypes), dtype=np.float32)

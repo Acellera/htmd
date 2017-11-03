@@ -145,8 +145,9 @@ if __name__ == '__main__':
     from natsort import natsorted
     from htmd.ffevaluation.ffevaluate import _formatEnergies
     from htmd.home import home
-    d = './test-ffevaluate/3ions/'
-    force = 'lennardjones'
+    from htmd.molecule.molecule import Molecule
+    from glob import glob
+    import os
 
     for d in glob(os.path.join(home(dataDir='test-ffevaluate'), '*', '')):
         print('\nRunning test:', d)
