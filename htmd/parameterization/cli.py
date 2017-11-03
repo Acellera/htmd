@@ -261,11 +261,6 @@ def main_parameterize(arguments=None):
         printEnergies(mol, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
-        # Write energy file
-        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.output_directory_name(), 'energies.txt')
-        printEnergies(mol, energyFile)
-        logger.info('Write energy file: %s' % energyFile)
-
         
 if __name__ == "__main__":
 
