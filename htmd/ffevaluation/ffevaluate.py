@@ -58,7 +58,7 @@ def nestedListToArray(nl, dtype, default=1):
 
 
 # TODO: Can be improved with lil sparse arrays
-def init(mol, prm):
+def init(mol, prm, fromstruct=False):
     natoms = mol.numAtoms
     charge = mol.charge.astype(np.float64)
     impropers = mol.impropers
@@ -132,14 +132,25 @@ def init(mol, prm):
             dihedral_params[idx].append(dip.per)
 
     improper_params = np.zeros((mol.impropers.shape[0], 3), dtype=np.float32)
+    from parmed.amber import AmberParameterSet
+    from parmed.charmm import CharmmParameterSet
     for idx, impr in enumerate(mol.impropers):
-        ty = tuple(sorted(uqtypes[typeint[impr]]))  # Parmed sorts improper types
+        if fromstruct:  # If we make prm from struct there is no ordering
+            ty = tuple(uqtypes[typeint[impr]])
+        elif isinstance(prm, AmberParameterSet):  # If prm is read from AMBER parameter file it's sorted 0,1,3 but not 2
+            ty = np.array(uqtypes[typeint[impr]])
+            ty[[0, 1, 3]] = sorted(ty[[0, 1, 3]])
+            ty = tuple(ty)
+        elif isinstance(prm, CharmmParameterSet):  # If prm is read from CHARMM parameter file it's sorted
+            ty = tuple(sorted(uqtypes[typeint[impr]]))
+        else:
+            raise RuntimeError('Not a valid parameterset')
         if ty in prm.improper_types:
             imprparam = prm.improper_types[ty]
             improper_params[idx, :] = [imprparam.psi_k, radians(imprparam.psi_eq), 0]
         elif ty in prm.improper_periodic_types:
             imprparam = prm.improper_periodic_types[ty]
-            improper_params[idx, :] = [imprparam.psi_k, radians(imprparam.phase), imprparam.per]
+            improper_params[idx, :] = [imprparam.phi_k, radians(imprparam.phase), imprparam.per]
         else:
             raise RuntimeError('Could not find parameters for {}'.format(ty))
 
@@ -174,7 +185,7 @@ def calculateSets(mol, betweensets):
     return setA, setB
 
 
-def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1):
+def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1, fromstruct=False):
     """  Evaluates energies and forces of the forcefield for a given Molecule
 
     Parameters
@@ -226,7 +237,7 @@ def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1):
     box = mol.box
     setA, setB = calculateSets(mol, betweensets)
 
-    args = list(init(mol, prm))
+    args = list(init(mol, prm, fromstruct))
     args.append(setA)
     args.append(setB)
     args.append(dist_thresh)
@@ -391,13 +402,13 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
     return energies, forces, atmnrg
 
 
-@jit('UniTuple(float64, 5)(int64, int64, float64[:,:], float32[:], float32[:], float32[:], float32[:], int64[:,:], float32[:,:])', nopython=True)
-def _getSigmaEpsilon(i, j, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v):
+@jit('UniTuple(float64, 5)(int64, int64, int64, int64, float64[:,:], float32[:], float32[:], float32[:], float32[:], int64[:,:], float32[:,:])', nopython=True)
+def _getSigmaEpsilon(i, j, it, jt, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v):
     n14 = s14a.shape[1]
     # Check if NBfix exists for the types and keep the index
     idx_nbfix = -1
     for k in range(nbfix.shape[0]):
-        if (nbfix[k, 0] == i and nbfix[k, 1] == j) or (nbfix[k, 0] == j and nbfix[k, 1] == i):
+        if (nbfix[k, 0] == it and nbfix[k, 1] == jt) or (nbfix[k, 0] == jt and nbfix[k, 1] == it):
             idx_nbfix = k
             break
 
@@ -418,15 +429,15 @@ def _getSigmaEpsilon(i, j, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v
             eps = nbfix[idx_nbfix, 4]
             sig = nbfix[idx_nbfix, 5]
     else:
-        sigmai = sigma[i]
-        sigmaj = sigma[j]
-        epsiloni = epsilon[i]
-        epsilonj = epsilon[j]
+        sigmai = sigma[it]
+        sigmaj = sigma[jt]
+        epsiloni = epsilon[it]
+        epsilonj = epsilon[jt]
         if found14:
-            sigmai = sigma14[i]
-            sigmaj = sigma14[j]
-            epsiloni = epsilon14[i]
-            epsilonj = epsilon14[j]
+            sigmai = sigma14[it]
+            sigmaj = sigma14[jt]
+            epsiloni = epsilon14[it]
+            epsilonj = epsilon14[jt]
         # Lorentz - Berthelot combination rule
         sig = 0.5 * (sigmai + sigmaj)
         eps = sqrt(epsiloni * epsilonj)
@@ -441,7 +452,7 @@ def _getSigmaEpsilon(i, j, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v
 
 @jit('UniTuple(float64, 2)(int64, int64, int64[:], float64[:,:], float32[:], float32[:], float32[:], float32[:], int64[:,:], float32[:,:], float64)', nopython=True)
 def _evaluate_lj(i, j, typeint, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v, dist):
-    sig, eps, A, B, scale = _getSigmaEpsilon(typeint[i], typeint[j], nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v)
+    sig, eps, A, B, scale = _getSigmaEpsilon(i, j, typeint[i], typeint[j], nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v)
 
     # TODO: Do we even want a cutoff?
     # cutoff = 2.5 * sig
@@ -450,8 +461,8 @@ def _evaluate_lj(i, j, typeint, nbfix, sigma, sigma14, epsilon, epsilon14, s14a,
     rinv2 = rinv1 * rinv1
     rinv6 = rinv2 * rinv2 * rinv2
     rinv12 = rinv6 * rinv6
-    pot = (A * rinv12) - (B * rinv6)
-    force = (-12 * A * rinv12 + 6 * B * rinv6) * rinv1 * scale
+    pot = ((A * rinv12) - (B * rinv6)) / scale
+    force = (-12 * A * rinv12 + 6 * B * rinv6) * rinv1 / scale
     return pot, force
 
 
@@ -489,7 +500,7 @@ def _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist):
             scale = e14v[i, e]
             break
 
-    pot = ELEC_FACTOR * scale * charge[i] * charge[j] / dist
+    pot = ELEC_FACTOR * charge[i] * charge[j] / dist / scale
     force = -pot / dist
     return pot, force
 
@@ -555,7 +566,7 @@ def _evaluate_angles(pos, angle_params, box):
 
 @jit(nopython=True)
 def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
-    ntorsions = len(torsionparam) / 3
+    ntorsions = int(len(torsionparam) / 3)
     for i in range(len(torsionparam)):
         if np.isnan(torsionparam[i]):
             ntorsions = i / 3
