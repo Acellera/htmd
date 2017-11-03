@@ -240,6 +240,8 @@ class FFMolecule(Molecule):
         # Update the charges
         self.charge[:] = esp_charges
         self._rtf.updateCharges(esp_charges)
+        for name, charge in zip(self.name, self.charge):
+            logger.info('Set charge %4s: %6.3f' % (name, charge))
 
         return esp_loss, qm_results[0].dipole
 
