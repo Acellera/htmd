@@ -246,13 +246,21 @@ if __name__ == '__main__':
             ediff = compareEnergies(energies, omm_energies, abstol=abstol)
             print('  ', force, 'Energy diff:', ediff, 'Force diff:', compareForces(forces, omm_forces))
 
-        psf = parmed.charmm.CharmmPsfFile(psfFile)
-        prm = parmed.charmm.CharmmParameterSet(*prmFiles)
-        keepForces(prm, psf, mol)
-        energies, forces, atmnrg = ffevaluate(mol, prm)
+        if len(psfFile):
+            struct = parmed.charmm.CharmmPsfFile(psfFile[0])
+            prm = parmed.charmm.CharmmParameterSet(*prmFiles)
+            fromstruct = False
+            keepForces(prm, struct, mol)
+        elif len(prmtopFile):
+            struct = parmed.load_file(prmtopFile[0])
+            prm = parmed.amber.AmberParameterSet().from_structure(struct)
+            fromstruct = True
+            keepForces(prm, struct, mol)
+            keepForcesAmber(struct, mol)
+        energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct)
         energies = _formatEnergies(energies[:, 0])
         forces = forces[:, :, 0].squeeze()
-        omm_energies, omm_forces = openmm_energy(prm, psf, coords)
+        omm_energies, omm_forces = openmm_energy(prm, struct, coords)
         ediff = compareEnergies(energies, omm_energies, abstol=abstol)
         print('All forces. Total energy:', energies['total'], 'Energy diff:', ediff, 'Force diff:', compareForces(forces, omm_forces))
 
