@@ -246,7 +246,29 @@ class PBSQueue(SimQueue, ProtocolInterface):
             ret = check_output(cmd)
             logger.debug(ret.decode("ascii"))
 
+    @property
+    def ncpu(self):
+        return self.__dict__['ncpu']
 
+    @ncpu.setter
+    def ncpu(self, value):
+        self.ncpu = value
+
+    @property
+    def ngpu(self):
+        return self.__dict__['ngpu']
+
+    @ngpu.setter
+    def ngpu(self, value):
+        self.ngpu = value
+
+    @property
+    def memory(self):
+        return self.__dict__['memory']
+
+    @memory.setter
+    def memory(self, value):
+        self.memory = value
 
 if __name__ == "__main__":
     pass
