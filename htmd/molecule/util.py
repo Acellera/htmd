@@ -381,7 +381,7 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         The segment of `ref` we want to align to
     maxalignments : int
         The maximum number of alignments we want to produce
-    nalignfragments : int
+    nalignfragment : int
         The number of fragments used for the alignment.
 
     Returns
@@ -443,7 +443,7 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
     for i in range(min(maxalignments, numaln)):
         refaln = np.array(list(alignments[i][0]))
         molaln = np.array(list(alignments[i][1]))
-
+ 
         # By doing cumsum we calculate how many letters were before the current letter (i.e. residues before current)
         residref = np.cumsum(refaln != '-') - 1  # Start them from 0
         residmol = np.cumsum(molaln != '-') - 1  # Start them from 0
@@ -455,9 +455,12 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         endIndex = np.where(dsigdiff < 0)[0]
         duration = endIndex - startIndex
         duration_sorted = np.sort(duration)[::-1]
+
         _list_starts = []
         _list_finish = []
         for n in range(nalignfragment):
+            if n == len(duration):
+                break
             idx = np.where(duration == duration_sorted[n])[0]
             start = startIndex[idx][0]
             finish = endIndex[idx][0]
@@ -480,7 +483,7 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         refboolidx[refidx] = True
 
         start_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_starts])
-        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_finish])
+        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r-1]]] for r in _list_finish])
         logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}'.format(
             i, len(refalnresid), np.unique(mol.segid[molidx])[0], ', '.join(['{}-{}'.format(s,f) for s, f in zip(start_residues,finish_residues)])  ))
 
