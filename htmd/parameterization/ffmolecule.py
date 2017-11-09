@@ -20,7 +20,7 @@ from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
 from htmd.parameterization.dihedral import DihedralFitting
-from htmd.qm import Psi4, FakeQM
+from htmd.qm import Psi4, FakeQM2
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,10 @@ class FFMolecule(Molecule):
     method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
     """
 
+    _ATOM_TYPE_REG_EX = re.compile('^\S+x\d+$')
+
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
-                 qm=None, outdir="./", mol=None):
+                 qm=None, outdir="./", mol=None, acCharges=None):
 
         if filename is not None and not filename.endswith('.mol2'):
             raise ValueError('Input file must be mol2 format')
@@ -81,7 +83,7 @@ class FFMolecule(Molecule):
             pass  # Don't assign any atom types
         else:
             # Otherwise make atom types using the specified method
-            fftype = FFType(self, method=self.method)
+            fftype = FFType(self, method=self.method, acCharges=acCharges)
             logger.info('Assigned atom types with %s' % self.method.name)
             self._rtf = fftype._rtf
             self._prm = fftype._prm
@@ -90,6 +92,11 @@ class FFMolecule(Molecule):
             self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
             self.charge[:] = [self._rtf.charge_by_name[name] for name in self.name]
             self.impropers = np.array(self._rtf.impropers)
+
+            # Check if atom type names are compatible
+            for type_ in self._rtf.types:
+                if re.match(FFMolecule._ATOM_TYPE_REG_EX, type_):
+                    raise ValueError('Atom type %s is incompatable. It cannot finish with "x" + number!' % type_)
 
         # Set atom masses
         # TODO: maybe move to molecule
@@ -309,7 +316,7 @@ class FFMolecule(Molecule):
 
         # In case of FakeQM, the initial parameters are set to zeros.
         # It prevents DihedralFitting class from cheating :D
-        if isinstance(self.qm, FakeQM):
+        if isinstance(self.qm, FakeQM2):
             df.zeroed_parameters = True
 
         # Fit dihedral parameters
@@ -319,11 +326,17 @@ class FFMolecule(Molecule):
         self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
 
     def _duplicateAtomType(self, atom_index):
-        """Duplicate the type of the specified atom"""
+        """Duplicate the type of the specified atom
 
-        # Get the type name. If the type is already dubplicated, remove the suffix
+           Duplicated types are named: original_name + "x" + number, e.g. ca --> cax0
+        """
+
+        # Get a type name
         type_ = self._rtf.type_by_index[atom_index]
-        type_ = re.sub('x\d+$', '', type_)
+
+        # if the type is already duplicated
+        if re.match(FFMolecule._ATOM_TYPE_REG_EX, type_):
+            return
 
         # Create a new atom type name
         i = 0
@@ -345,7 +358,7 @@ class FFMolecule(Molecule):
         # Rename the atom types of the equivalent atoms
         for index in self._equivalent_atoms[atom_index]:
             if atom_index != index:
-                assert 'x' not in self._rtf.type_by_index[index]
+                assert not re.match(FFMolecule._ATOM_TYPE_REG_EX, self._rtf.type_by_index[index])
                 self._rtf.type_by_index[index] = newtype
                 self._rtf.type_by_name[self._rtf.names[index]] = newtype
 

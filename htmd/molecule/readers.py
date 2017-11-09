@@ -639,6 +639,8 @@ def PRMTOPread(filename, frame=None, topoloc=None):
         uqresnames = []
         residx = []
         bondsidx = []
+        angleidx = []
+        dihedidx = []
         section = None
         for line in f:
             if line.startswith('%FLAG POINTERS'):
@@ -657,6 +659,10 @@ def PRMTOPread(filename, frame=None, topoloc=None):
                 section = 'resstart'
             elif line.startswith('%FLAG BONDS_INC_HYDROGEN') or line.startswith('%FLAG BONDS_WITHOUT_HYDROGEN'):
                 section = 'bonds'
+            elif line.startswith('%FLAG ANGLES_INC_HYDROGEN') or line.startswith('%FLAG ANGLES_WITHOUT_HYDROGEN'):
+                section = 'angles'
+            elif line.startswith('%FLAG DIHEDRALS_INC_HYDROGEN') or line.startswith('%FLAG DIHEDRALS_WITHOUT_HYDROGEN'):
+                section = 'dihedrals'
             elif line.startswith('%FLAG BOX_DIMENSIONS'):
                 section = 'box'
             elif line.startswith('%FLAG AMBER_ATOM_TYPE'):
@@ -693,15 +699,33 @@ def PRMTOPread(filename, frame=None, topoloc=None):
                 fieldlen = 8
                 bondsidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
                              if len(line[i:i + fieldlen].strip()) != 0]
+            elif section == 'angles':
+                fieldlen = 8
+                angleidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                             if len(line[i:i + fieldlen].strip()) != 0]
+            elif section == 'dihedrals':
+                fieldlen = 8
+                dihedidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                             if len(line[i:i + fieldlen].strip()) != 0]
             elif section == 'amberatomtype':
                 fieldlen = 4
                 topo.atomtype += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
                                   if len(line[i:i + fieldlen].strip()) != 0]
 
+
     if len(topo.name) == 0:
         raise FormatError('No atoms read in PRMTOP file. Trying a different reader.')
     # Replicating unique resnames according to their start and end indeces
     residx.append(len(topo.name)+1)
+
+    """
+    NOTE: the atom numbers in the following arrays that describe bonds, angles, and dihedrals are coordinate array 
+    indexes for runtime speed. The true atom number equals the absolute value of the number divided by three, plus one. 
+    In the case of the dihedrals, if the fourth atom is negative, this implies that the dihedral is an improper. If the 
+    third atom is negative, this implies that the end group interations are to be ignored. End group interactions are 
+    ignored, for example, in dihedrals of various ring systems (to prevent double counting of 1-4 interactions) and 
+    in multiterm dihedrals.
+    """
 
     for i in range(len(residx) - 1):
         numresatoms = residx[i+1] - residx[i]
@@ -712,6 +736,18 @@ def PRMTOPread(filename, frame=None, topoloc=None):
     for i in range(0, len(bondsidx), 3):
         topo.bonds.append([int(bondsidx[i] / 3), int(bondsidx[i+1] / 3)])
 
+    # Processing angle quads
+    for i in range(0, len(angleidx), 4):
+        topo.angles.append([int(angleidx[i] / 3), int(angleidx[i + 1] / 3), int(angleidx[i + 2] / 3)])
+
+    # Processing dihedral quints
+    for i in range(0, len(dihedidx), 5):
+        atoms = [int(dihedidx[i] / 3), int(dihedidx[i + 1] / 3), abs(int(dihedidx[i + 2] / 3)), int(dihedidx[i + 3] / 3)]
+        if atoms[3] >= 0:
+            topo.dihedrals.append(atoms)
+        else:
+            atoms[3] = abs(atoms[3])
+            topo.impropers.append(atoms)
     return topo, None
 
 
