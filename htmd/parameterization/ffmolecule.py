@@ -32,6 +32,8 @@ class FFMolecule(Molecule):
     method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
     """
 
+    _ATOM_TYPE_REG_EX = re.compile('^\S+x\d+$')
+
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
                  qm=None, outdir="./", mol=None):
 
@@ -90,6 +92,11 @@ class FFMolecule(Molecule):
             self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
             self.charge[:] = [self._rtf.charge_by_name[name] for name in self.name]
             self.impropers = np.array(self._rtf.impropers)
+
+            # Check if atom type names are compatible
+            for type_ in self._rtf.types:
+                if re.match(FFMolecule._ATOM_TYPE_REG_EX, type_):
+                    raise ValueError('Atom type %s is incompatable. It cannot finish with "x" + number!' % type_)
 
         # Set atom masses
         # TODO: maybe move to molecule
@@ -319,11 +326,17 @@ class FFMolecule(Molecule):
         self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
 
     def _duplicateAtomType(self, atom_index):
-        """Duplicate the type of the specified atom"""
+        """Duplicate the type of the specified atom
 
-        # Get the type name. If the type is already dubplicated, remove the suffix
+           Duplicated types are named: original_name + "x" + number, e.g. ca --> cax0
+        """
+
+        # Get a type name
         type_ = self._rtf.type_by_index[atom_index]
-        type_ = re.sub('x\d+$', '', type_)
+
+        # if the type is already duplicated
+        if re.match(FFMolecule._ATOM_TYPE_REG_EX, type_):
+            return
 
         # Create a new atom type name
         i = 0
@@ -345,7 +358,7 @@ class FFMolecule(Molecule):
         # Rename the atom types of the equivalent atoms
         for index in self._equivalent_atoms[atom_index]:
             if atom_index != index:
-                assert 'x' not in self._rtf.type_by_index[index]
+                assert not re.match(FFMolecule._ATOM_TYPE_REG_EX, self._rtf.type_by_index[index])
                 self._rtf.type_by_index[index] = newtype
                 self._rtf.type_by_name[self._rtf.names[index]] = newtype
 
