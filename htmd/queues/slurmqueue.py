@@ -9,7 +9,7 @@ import random
 import string
 from htmd.config import _config
 import yaml
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, STDOUT, CalledProcessError
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
 import logging
@@ -123,7 +123,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             if slurmconfig is not None:
                 logger.warning('Slurm configuration YAML file defined without configuration app')
 
-
         # Find executables
         self._qsubmit = SlurmQueue._find_binary('sbatch')
         self._qinfo = SlurmQueue._find_binary('sinfo')
@@ -232,10 +231,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)
             try:
-                ret = check_output([self._qsubmit, jobscript])
+                ret = check_output([self._qsubmit, jobscript], stderr=STDOUT, encoding='utf-8')
                 logger.debug(ret)
-            except:
-                raise
+            except CalledProcessError as e:
+                logger.error('The queue submission of {} failed with: "{}"'.format(d, e.output.strip()))
 
     def inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
