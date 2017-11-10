@@ -429,7 +429,7 @@ def SDFwrite(mol, filename):
                 atype = mol.element[i]
             if atype == '':
                 atype = mol.name[i]
-            fh.write('M  V30 {index} {type} {x:9.4f} {y:9.4f} {z:9.4f} {aamap} {charge}-\n'.format(index=i, type=atype, x=coor[i, 0], y=coor[i, 1], z=coor[i, 2], aamap=0, charge=mol.charge[i]))
+            fh.write('M  V30 {index} {type} {x:9.4f} {y:9.4f} {z:9.4f} {aamap} {charge}\n'.format(index=i, type=atype, x=coor[i, 0], y=coor[i, 1], z=coor[i, 2], aamap=0, charge=mol.charge[i]))
         fh.write('M  V30 END ATOM\n')
 
         fh.write('M  V30 BEGIN BOND\n')
