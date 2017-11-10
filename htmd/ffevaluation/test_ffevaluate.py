@@ -197,7 +197,7 @@ if __name__ == '__main__':
     for d in glob(os.path.join(home(dataDir='test-ffevaluate'), '*', '')):
         print('\nRunning test:', d)
         if os.path.basename(os.path.abspath(d)) == 'thrombin-ligand-amber':
-            abstol = 1e-2
+            abstol = 1e-1
         elif os.path.basename(os.path.abspath(d)) == 'waterbox':
             abstol = 1e-3
         else:
