@@ -410,6 +410,41 @@ def MOL2write(mol, filename):
             f.write("{:6d} {:4d} {:4d} {}\n".format(i + 1, unique_bonds[i, 0] + 1, unique_bonds[i, 1] + 1, bt))
 
 
+def SDFwrite(mol, filename):
+    import datetime
+    mol2bonds = {'1': 1, '2': 2, '3': 3, 'ar': 4}
+    with open(filename, 'w') as fh:
+        fh.write('{}\n'.format(mol.viewname))
+        currtime = datetime.datetime.now().strftime('%m%d%y%H%M')
+        fh.write('  HTMD    {}3D  {scaling:10s}{energy:12s}{registry:6s}\n'.format(currtime, scaling='', energy='', registry=''))
+        fh.write('{comments}\n'.format(comments=''))
+        fh.write('  0  0  0     0  0{:12s}999 V3000\n'.format(''))
+        fh.write('M  V30 BEGIN CTAB\n')
+        fh.write('M  V30 COUNTS {na} {nb} {nsg} {n3d} {chiral}\n'.format(na=mol.numAtoms, nb=mol.bonds.shape[0], nsg=0, n3d=0, chiral=0))
+        coor = mol.coords[:, :, mol.frame]
+        fh.write('M  V30 BEGIN ATOM\n')
+        for i in range(mol.numAtoms):
+            atype = mol.atomtype[i]
+            if atype == '':
+                atype = mol.element[i]
+            if atype == '':
+                atype = mol.name[i]
+            fh.write('M  V30 {index} {type} {x:9.4f} {y:9.4f} {z:9.4f} {aamap} {charge}-\n'.format(index=i, type=atype, x=coor[i, 0], y=coor[i, 1], z=coor[i, 2], aamap=0, charge=mol.charge[i]))
+        fh.write('M  V30 END ATOM\n')
+
+        fh.write('M  V30 BEGIN BOND\n')
+        for i in range(mol.bonds.shape[0]):
+
+            if mol.bondtype[i] != '':
+                btype = mol2bonds[mol.bondtype[i].strip()]
+            else:
+                btype = 1
+            fh.write('M  V30 {index} {type} {atom1} {atom2}\n'.format(index=i, type=btype, atom1=mol.bonds[i, 0], atom2=mol.bonds[i, 1]))
+        fh.write('M  V30 END BOND\n')
+        fh.write('M  V30 END CTAB\n')
+        fh.write('M  END\n')
+
+
 def GROwrite(mol, filename):
     import pandas as pd
     from collections import OrderedDict
@@ -472,6 +507,7 @@ def MDTRAJwrite(mol, filename):
 _WRITERS = {'psf': PSFwrite,
             'pdb': PDBwrite,
             'mol2': MOL2write,
+            'sdf': SDFwrite,
             'xyz': XYZwrite,
             'gro': GROwrite,
             'coor': BINCOORwrite,
