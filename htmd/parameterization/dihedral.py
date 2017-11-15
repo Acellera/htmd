@@ -109,8 +109,7 @@ class DihedralFitting:
 
         # Duplicate the atom types of the dihedral
         for i in range(4):
-            if not ("x" in self.molecule._rtf.type_by_index[dihedral[i]]):
-                self.molecule._duplicateAtomType(dihedral[i])
+            self.molecule._duplicateAtomType(dihedral[i])
 
         equivalent_dihedrals = self._getEquivalentDihedrals(dihedral)
         if len(equivalent_dihedrals) > 1:
