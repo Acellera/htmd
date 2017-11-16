@@ -379,6 +379,9 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
                     forces[i, k, f] -= coeff * direction_unitvec[k]
                     forces[j, k, f] += coeff * direction_unitvec[k]
 
+        if usersets:
+            continue  # Don't calculate angles and dihedrals between sets of atoms
+
         # Evaluate angle forces
         for i in range(nangles):
             pot_an, force_an = _evaluate_angles(coords[angles[i, :], :, f], angle_params[i, :], box[:, f])
