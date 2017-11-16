@@ -48,6 +48,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         self._arg('groupname', 'str', 'The name of the group of simulations you want to submit. If none is given, '
                                       'a randomly generated string will be used instead.', None, val.String())
         self._arg('datadir', 'str', 'The directory in which to retrieve your results.', None, val.String())
+        self._arg('instancetype', 'str', 'Instance type', 'g2.2xlarge', val.String(), valid_values=('g2.2xlarge', 'r4.large', 'p2.xlarge'))
         self._arg('verbose', 'bool', 'Turn verbosity mode on or off.', False, val.Boolean())
 
         self._cloud = None
@@ -91,6 +92,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 name=name,
                 cloud=self._cloud,
                 requesttype=RequestType.SPOT,
+                instance_type=self.instancetype,
                 verbose=self.verbose
             )
 
