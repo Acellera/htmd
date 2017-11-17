@@ -160,15 +160,13 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 pass
 
     def _createJobScript(self, fname, workdir, runsh):
-        workdir = os.path.abspath(workdir)
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n')
             f.write('\n')
             # Trap kill signals to create sentinel file
-            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(self._sentinel))
             f.write('\n')
-            f.write('\ncd {}\n'.format(workdir))
-            f.write('{}'.format(runsh))
+            f.write('bash run.sh')
         os.chmod(fname, 0o700)
 
     @property
