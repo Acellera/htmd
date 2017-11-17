@@ -54,6 +54,7 @@ class SimQueue(metaclass=ABCMeta):
         import sys
 
         while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
+            self.retrieve()
             sys.stdout.flush()
             sleep(5)
 
