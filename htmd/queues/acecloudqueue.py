@@ -91,6 +91,12 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 import hashlib
                 name = hashlib.sha256(os.path.abspath(d).encode('utf-8')).hexdigest()[:10]
 
+            runscript = self._getRunScript(d)
+            self._cleanSentinel(d)
+
+            jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
+            self._createJobScript(jobscript, d, runscript)
+
             from acecloud.requesttype import RequestType
             Job(
                 ngpus=1,
@@ -142,7 +148,6 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 pass
             os.chdir(currdir)
 
-
     def stop(self):
         # TODO: This not only stops the job, but also deletes the S3. Not exactly like the stop of other queues
         self._createCloud()
@@ -153,6 +158,18 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
             except Exception as e:
                 logger.warning(e)
                 pass
+
+    def _createJobScript(self, fname, workdir, runsh):
+        workdir = os.path.abspath(workdir)
+        with open(fname, 'w') as f:
+            f.write('#!/bin/bash\n')
+            f.write('\n')
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\n')
+            f.write('\ncd {}\n'.format(workdir))
+            f.write('{}'.format(runsh))
+        os.chmod(fname, 0o700)
 
     @property
     def ncpu(self):

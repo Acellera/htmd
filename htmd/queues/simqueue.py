@@ -4,6 +4,9 @@
 # No redistribution in whole or part
 #
 from abc import ABCMeta, abstractmethod
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SimQueue(metaclass=ABCMeta):
@@ -74,6 +77,25 @@ class SimQueue(metaclass=ABCMeta):
             if not os.path.exists(os.path.join(i, self._sentinel)):
                 total += 1
         return total
+
+    def _cleanSentinel(self, d):
+        import os
+        if os.path.exists(os.path.join(d, self._sentinel)):
+            try:
+                os.remove(os.path.join(d, self._sentinel))
+            except:
+                logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
+            else:
+                logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
+
+    def _getRunScript(self, d):
+        import os
+        runscript = os.path.abspath(os.path.join(d, 'run.sh'))
+        if not os.path.exists(runscript):
+            raise FileExistsError('File {} does not exist.'.format(runscript))
+        if not os.access(runscript, os.X_OK):
+            raise PermissionError('File {} does not have execution permissions.'.format(runscript))
+        return runscript
 
     @abstractmethod
     def stop(self):
