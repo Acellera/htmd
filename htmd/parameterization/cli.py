@@ -97,9 +97,9 @@ VdW      : {VDW_ENERGY}
         file_.write(string)
 
 
-def main_parameterize(*args):
+def main_parameterize(arguments=None):
 
-    args = getArgumentParser().parse_args(args=args)
+    args = getArgumentParser().parse_args(args=arguments)
 
     if not os.path.exists(args.filename):
         raise ValueError('File %s cannot be found' % args.filename)
