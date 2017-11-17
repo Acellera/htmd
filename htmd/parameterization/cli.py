@@ -52,10 +52,12 @@ def getArgumentParser():
                         help='Do not perform QM scanning of dihedral angles')
     parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
                         help='Do not perform QM structure optimisation when scanning dihedral angles')
-    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF'],
+    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
                                                                       'defaults)')
+    parser.add_argument('-m', '--memory', default=None, type=int, help='Maximum amount of memory in MB to use.')
+    parser.add_argument('--groupname', default=None, help=argparse.SUPPRESS)
     parser.add_argument('-o', '--outdir', default='./', help='Output directory (default: %(default)s)')
     parser.add_argument('--seed', default=20170920, type=int,
                         help='Random number generator seed (default: %(default)s)')
@@ -95,9 +97,9 @@ VdW      : {VDW_ENERGY}
         file_.write(string)
 
 
-def main_parameterize(arguments=None):
+def main_parameterize(*args):
 
-    args = getArgumentParser().parse_args(args=arguments)
+    args = getArgumentParser().parse_args(args=args)
 
     if not os.path.exists(args.filename):
         raise ValueError('File %s cannot be found' % args.filename)
@@ -121,6 +123,8 @@ def main_parameterize(arguments=None):
         queue = PBSQueue()  # TODO: configure
     elif args.queue == 'AceCloud':
         queue = AceCloudQueue()  # TODO: configure
+        queue.groupname = args.groupname
+        queue.hashnames = True
     else:
         raise NotImplementedError
 
@@ -128,6 +132,9 @@ def main_parameterize(arguments=None):
     if args.ncpus:
         logger.info('Overriding ncpus to {}'.format(args.ncpus))
         queue.ncpu = args.ncpus
+    if args.memory:
+        logger.info('Overriding memory to {}'.format(args.memory))
+        queue.memory = args.memory
 
     # Create a QM object
     if args.code == 'Psi4':
