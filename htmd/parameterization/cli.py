@@ -222,6 +222,9 @@ def main_parameterize(arguments=None):
             # Fit ESP charges
             _, qm_dipole = mol.fitCharges(fixed=fixed_atom_indices)
 
+            # Copy the new charges to the original molecule
+            mol_orig.charge[:] = mol.charge
+
             # Print dipoles
             logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
             mm_dipole = mol.getDipole()
