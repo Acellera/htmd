@@ -226,15 +226,18 @@ def main_parameterize(arguments=None):
                         logger.info('Charge of atom %s is fixed to %f' % (fixed_atom_name, mol.charge[aton_index]))
 
             # Fit ESP charges
-            score, qm_dipole = mol.fitCharges(fixed=fixed_atom_indices)
+            _, qm_dipole = mol.fitCharges(fixed=fixed_atom_indices)
 
-            # Print results
+            # Copy the new charges to the original molecule
+            mol_orig.charge[:] = mol.charge
+
+            # Print dipoles
+            logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
             mm_dipole = mol.getDipole()
-            score = np.sum((qm_dipole[:3] - mm_dipole[:3])**2)
-            print('Charge fitting score: %f\n' % score)
-            print('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
-            print('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
-            print('Dipole Chi^2 score: %f\n' % score)
+            if np.all(np.isfinite(mm_dipole)):
+                logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
+            else:
+                logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
 
         # Fit dihedral angle parameters
         if args.fit_dihedral:
