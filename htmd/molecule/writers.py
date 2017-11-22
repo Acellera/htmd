@@ -213,28 +213,25 @@ def XTCwrite(mol, filename):
         os.unlink(filename)
 
     lib = xtc_lib()
-    bbox = (ct.c_float * 3)()
     natoms = ct.c_int(coords.shape[0])
-    cstep = ct.c_int()
-    # print(coords.shape)
-    for f in range(coords.shape[2]):
-        cstep = ct.c_int(step[f])
-        ctime = ct.c_float(time[f])  # TODO FIXME
-        # print ( step )
-        # print ( time )
-        bbox[0] = box[0, f] * 0.1
-        bbox[1] = box[1, f] * 0.1
-        bbox[2] = box[2, f] * 0.1
+    nframes = ct.c_int(coords.shape[2])
+    box = box * 0.1
+    step = np.array(step.astype(np.int32))
+    cstep = step.ctypes.data_as(ct.POINTER(ct.c_int))
+    time = np.array(time.astype(np.float32))
+    ctime = time.ctypes.data_as(ct.POINTER(ct.c_float))
+    cbox = box.ctypes.data_as(ct.POINTER(ct.c_float))
 
-        data = coords[:, :, f].astype(np.float32) * 0.1  # Convert from A to nm
-        pos = data.ctypes.data_as(ct.POINTER(ct.c_float))
-        lib['libxtc'].xtc_write(
-            ct.c_char_p(filename.encode("ascii")),
-            natoms,
-            cstep,
-            ctime,
-            pos,
-            bbox)
+    data = coords.astype(np.float32) * 0.1  # Convert from A to nm
+    pos = data.ctypes.data_as(ct.POINTER(ct.c_float))
+    lib['libxtc'].xtc_write(
+        ct.c_char_p(filename.encode("ascii")),
+        natoms,
+        nframes,
+        cstep,
+        ctime,
+        pos,
+        cbox)
 
 
 def BINCOORwrite(mol, filename):
