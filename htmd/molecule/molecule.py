@@ -1845,7 +1845,7 @@ if __name__ == "__main__":
     mol = Molecule('2HBB')
     quad = [124, 125, 132, 133]
     mol.setDihedral(quad, np.deg2rad(-90))
-    angle = mol.getDihedral(mol.coords[quad, :, :])
+    angle = mol.getDihedral(quad)
     assert np.abs(np.deg2rad(-90) - angle) < 1E-3
 
     # Testing updating of bonds, dihedrals and angles after filtering
