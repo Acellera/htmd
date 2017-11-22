@@ -4,7 +4,14 @@ import numpy as np
 
 
 class MetricFluctuation(_MetricCoordinate):
-    """ Creates a MetricFluctuation object that calculates the fluctuation of atom positions in trajectories.
+    """ Creates a MetricFluctuation object that calculates the squared fluctuation of atom positions in trajectories.
+
+    Depending on the `refpos` option the projection either returns the fluctuation from the mean position of the atoms,
+    or from coordinates of reference given in `refmol`. This means it calculates for atom coordinates (x,y,z) and
+    reference coordinates (xr, yr, yz): (xr-x)**2+(yr-y)**2+(zr-z)**2. If `groupsel` is set to `residue` it will
+    calculate the mean of this value over all atoms of the residue.
+    To then get the RMSD you need to compute the square root (of the mean) of the results this projection returns over
+    the desired atoms.
 
     Parameters
     ----------
@@ -30,6 +37,10 @@ class MetricFluctuation(_MetricCoordinate):
     Returns
     -------
     metr : MetricFluctuation object
+
+    Examples
+    --------
+
     """
     def __init__(self, refmol, atomsel, trajalnstr='protein and name CA', refalnstr=None, centerstr='protein', pbc=True, refpos='mean', groupsel=None):
         super().__init__(refmol, atomsel, trajalnstr, refalnstr, centerstr, pbc)

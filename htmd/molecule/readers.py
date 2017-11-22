@@ -129,21 +129,30 @@ class Trajectory:
 
 def XYZread(filename, frame=None, topoloc=None):
     topo = Topology()
-    coords = []
 
+    frames = []
+    firstconf = True
     with open(filename, 'r') as f:
-        natoms = int(f.readline().split()[0])
-        f.readline()
-        for i in range(natoms):
-            s = f.readline().split()
-            topo.record.append('HETATM')
-            topo.serial.append(i + 1)
-            topo.element.append(s[0])
-            topo.name.append(s[0])
-            topo.resname.append('MOL')
-            coords.append(s[1:4])
+        while True:
+            line = f.readline()
+            if line == '':
+                break
+            natoms = int(line.split()[0])
+            f.readline()
+            coords = []
+            for i in range(natoms):
+                s = f.readline().split()
+                if firstconf:
+                    topo.record.append('HETATM')
+                    topo.serial.append(i + 1)
+                    topo.element.append(s[0])
+                    topo.name.append(s[0])
+                    topo.resname.append('MOL')
+                coords.append(s[1:4])
+            frames.append(np.vstack(coords))
+            firstconf = False
 
-    coords = np.vstack(coords)[:, :, np.newaxis]
+    coords = np.stack(frames, axis=2)
     traj = Trajectory(coords=coords)
     return topo, traj
 

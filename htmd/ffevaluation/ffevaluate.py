@@ -64,12 +64,12 @@ def init(mol, prm, fromstruct=False):
     impropers = mol.impropers
     angles = mol.angles
     dihedrals = mol.dihedrals
-    if len(impropers) == 0:
-        logger.warning('No impropers are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
-    if len(angles) == 0:
-        logger.warning('No angles are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
-    if len(dihedrals) == 0:
-        logger.warning('No dihedrals are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
+    # if len(impropers) == 0:
+    #     logger.warning('No impropers are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
+    # if len(angles) == 0:
+    #     logger.warning('No angles are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
+    # if len(dihedrals) == 0:
+    #     logger.warning('No dihedrals are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
 
     uqtypes, typeint = np.unique(mol.atomtype, return_inverse=True)
     sigma = np.zeros(len(uqtypes), dtype=np.float32)
@@ -106,7 +106,8 @@ def init(mol, prm, fromstruct=False):
         bond_params[bond[0]].append(prm.bond_types[types].req)
     angle_params = np.zeros((mol.angles.shape[0], 2), dtype=np.float32)
     for idx, angle in enumerate(mol.angles):
-        excl_list[angle[0]].append(angle[2])
+        first, second = sorted([angle[0], angle[2]])
+        excl_list[first].append(second)
         types = tuple(uqtypes[typeint[angle]])
         angle_params[idx, :] = [prm.angle_types[types].k, radians(prm.angle_types[types].theteq)]
     excl_list = [list(np.unique(x)) for x in excl_list]
@@ -377,6 +378,9 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
                 for k in range(3):
                     forces[i, k, f] -= coeff * direction_unitvec[k]
                     forces[j, k, f] += coeff * direction_unitvec[k]
+
+        if usersets:
+            continue  # Don't calculate angles and dihedrals between sets of atoms
 
         # Evaluate angle forces
         for i in range(nangles):

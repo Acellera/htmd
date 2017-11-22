@@ -191,11 +191,14 @@ if __name__ == '__main__':
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
     from glob import glob
+    import parmed
     import os
 
     for d in glob(os.path.join(home(dataDir='test-ffevaluate'), '*', '')):
         print('\nRunning test:', d)
-        if os.path.basename(os.path.abspath(d)) == 'waterbox':
+        if os.path.basename(os.path.abspath(d)) == 'thrombin-ligand-amber':
+            abstol = 1e-1
+        elif os.path.basename(os.path.abspath(d)) == 'waterbox':
             abstol = 1e-3
         else:
             abstol = 1e-4
