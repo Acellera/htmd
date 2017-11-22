@@ -343,7 +343,7 @@ class Molecule:
         array([   1,    9,   16,   20,   24,   36,   43,   49,   53,   58,...
         """
         sel = self.atomselect(selection, indexes=True)
-        self._removeBonds(sel)
+        self._updateBondsAnglesDihedrals(sel)
         for k in self._atom_fields:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
             if k == 'coords':
@@ -616,27 +616,27 @@ class Molecule:
             raise NameError('Filter can only work with string inputs or boolean arrays')
         return self.remove(np.invert(s), _logger=_logger)
 
-    def _removeBonds(self, idx):
+    def _updateBondsAnglesDihedrals(self, idx):
         """ Renumbers bonds after removing atoms and removes non-existent bonds
 
         Needs to be called before removing atoms!
         """
-        if len(self.bonds) == 0:
+        if len(self.bonds) == 0 and len(self.dihedrals) == 0 and len(self.impropers) == 0 and len(self.angles) == 0:
             return
         map = np.ones(self.numAtoms, dtype=int)
         map[idx] = -1
         map[map == 1] = np.arange(self.numAtoms - len(idx))
-        bonds = np.array(self.bonds,
-                         dtype=np.int32)  # Have to store in temp because bonds is uint and can't accept -1 values
-        bonds[:, 0] = map[self.bonds[:, 0]]
-        bonds[:, 1] = map[self.bonds[:, 1]]
-        remA = bonds[:, 0] == -1
-        remB = bonds[:, 1] == -1
-        stays = np.invert(remA | remB)
-        # Delete bonds between non-existant atoms
-        self.bonds = bonds[stays, :]
-        if len(self.bondtype):
-            self.bondtype = self.bondtype[stays]
+        for field in ('bonds', 'angles', 'dihedrals', 'impropers'):
+            if len(self.__dict__[field]) == 0:
+                continue
+            # Have to store in temp because they can be uint which can't accept -1 values
+            tempdata = np.array(self.__dict__[field], dtype=np.int32)
+            tempdata[:] = map[tempdata[:]]
+            stays = np.invert(np.any(tempdata == -1, axis=1))
+            # Delete bonds/angles/dihedrals between non-existent atoms
+            self.__dict__[field] = tempdata[stays, ...]
+            if field == 'bonds' and len(self.bondtype):
+                self.bondtype = self.bondtype[stays]
 
     def _guessBonds(self):
         """ Tries to guess the bonds in the Molecule
@@ -1845,9 +1845,24 @@ if __name__ == "__main__":
     mol = Molecule('2HBB')
     quad = [124, 125, 132, 133]
     mol.setDihedral(quad, np.deg2rad(-90))
-    angle = dihedralAngle(mol.coords[quad, :, :])
-    assert np.abs(-90 - angle) < 1E-3
+    angle = mol.getDihedral(mol.coords[quad, :, :])
+    assert np.abs(np.deg2rad(-90) - angle) < 1E-3
 
-
-
+    # Testing updating of bonds, dihedrals and angles after filtering
+    mol = Molecule(path.join(home(dataDir='test-molecule'), 'a1e.prmtop'))
+    mol.read(path.join(home(dataDir='test-molecule'), 'a1e.pdb'))
+    _ = mol.filter('not water')
+    bb, bt, di, im, an = np.load(path.join(home(dataDir='test-molecule'), 'updatebondsanglesdihedrals_nowater.npy'))
+    assert np.array_equal(bb, mol.bonds)
+    assert np.array_equal(bt, mol.bondtype)
+    assert np.array_equal(di, mol.dihedrals)
+    assert np.array_equal(im, mol.impropers)
+    assert np.array_equal(an, mol.angles)
+    _ = mol.filter('not index 8 18')
+    bb, bt, di, im, an = np.load(path.join(home(dataDir='test-molecule'), 'updatebondsanglesdihedrals_remove8_18.npy'))
+    assert np.array_equal(bb, mol.bonds)
+    assert np.array_equal(bt, mol.bondtype)
+    assert np.array_equal(di, mol.dihedrals)
+    assert np.array_equal(im, mol.impropers)
+    assert np.array_equal(an, mol.angles)
 
