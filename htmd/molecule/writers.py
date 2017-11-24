@@ -212,25 +212,34 @@ def XTCwrite(mol, filename):
     if os.path.isfile(filename):
         os.unlink(filename)
 
+    box = box.astype(np.float32) * 0.1
+    step = step.astype(np.int32)
+    time = time.astype(np.float32)
+    coords = coords.astype(np.float32) * 0.1  # Convert from A to nm
+    if not box.flags['C_CONTIGUOUS']:
+        box = np.ascontiguousarray(box)
+    if not step.flags['C_CONTIGUOUS']:
+        step = np.ascontiguousarray(step)
+    if not time.flags['C_CONTIGUOUS']:
+        time = np.ascontiguousarray(time)
+    if not coords.flags['C_CONTIGUOUS']:
+        coords = np.ascontiguousarray(coords)
+
     lib = xtc_lib()
     natoms = ct.c_int(coords.shape[0])
     nframes = ct.c_int(coords.shape[2])
-    box = box.copy() * 0.1
-    step = step.astype(np.int32).copy()
+
     cstep = step.ctypes.data_as(ct.POINTER(ct.c_int))
-    time = time.astype(np.float32).copy()
     ctime = time.ctypes.data_as(ct.POINTER(ct.c_float))
     cbox = box.ctypes.data_as(ct.POINTER(ct.c_float))
-
-    data = coords.astype(np.float32).copy() * 0.1  # Convert from A to nm
-    pos = data.ctypes.data_as(ct.POINTER(ct.c_float))
+    ccoords = coords.ctypes.data_as(ct.POINTER(ct.c_float))
     lib['libxtc'].xtc_write(
         ct.c_char_p(filename.encode("ascii")),
         natoms,
         nframes,
         cstep,
         ctime,
-        pos,
+        ccoords,
         cbox)
 
 
