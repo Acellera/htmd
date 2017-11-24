@@ -582,8 +582,6 @@ if __name__ == "__main__":
     metr.set(MetricPlumed2(
         ['d1: DISTANCE ATOMS=2,3',
          'd2: DISTANCE ATOMS=5,6']))
-    data2 = metr.project()
-
 
     # One simulation
     testpath=os.path.join(htmd.home.home(), 'data', '1kdx')

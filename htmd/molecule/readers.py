@@ -1021,8 +1021,8 @@ def MDTRAJread(filename, frame=None, topoloc=None):
     else:
         time = traj.time * 1000  # need to go from picoseconds to femtoseconds
         step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
-    box = traj.unitcell_lengths.T * 10
-    boxangles = traj.unitcell_angles.T
+    box = traj.unitcell_lengths.T.copy() * 10
+    boxangles = traj.unitcell_angles.T.copy()
     return None, Trajectory(coords=coords.copy(), box=box, boxangles=boxangles, step=step, time=time)  # Copying coords needed to fix MDtraj stride
 
 
