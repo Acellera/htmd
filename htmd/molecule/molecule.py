@@ -1392,7 +1392,7 @@ class Molecule:
         if not (isinstance(keep, str) and keep == 'all'):
             self.coords = np.atleast_3d(self.coords[:, :, keep]).copy()  # Copy array. Slices are dangerous with C
             if self.box.shape[1] == numframes:
-                self.box = np.array(np.atleast_2d(self.box[:, keep]))
+                self.box = np.atleast_2d(self.box[:, keep]).copy()
                 if self.box.shape[0] == 1:
                     self.box = self.box.T
             if self.boxangles.shape[1] == numframes:
@@ -1404,7 +1404,7 @@ class Molecule:
             if len(self.time) == numframes:
                 self.time = self.time[keep]
             if len(self.fileloc) == numframes:
-                self.fileloc = [f for i, f in enumerate(self.fileloc) if i in keep]
+                self.fileloc = [self.fileloc[i] for i in keep]
         self.frame = 0  # Reset to 0 since the frames changed indexes
 
     def viewCrystalPacking(self):
