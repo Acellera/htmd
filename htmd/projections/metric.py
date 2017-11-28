@@ -276,14 +276,29 @@ def _calcRef(pieces, fileloc):
 
 
 def _singleMolfile(sims):
-    single = False
-    molfile = []
+    from htmd.molecule.molecule import mol_equal
+    from htmd.util import ensurelist
     if isinstance(sims, Molecule):
-        single = False
-    elif isinstance(sims, np.ndarray) and len(set([x.molfile for x in sims])) == 1:
-        single = True
-        molfile = sims[0].molfile
-    return single, molfile
+        return False, []
+    elif isinstance(sims, np.ndarray):
+        molfiles = []
+        for s in sims:
+            molfiles.append(tuple(ensurelist(s.molfile)))
+
+        uqmolfiles = list(set(molfiles))
+        print(len(uqmolfiles))
+        if len(uqmolfiles) == 0:
+            raise RuntimeError('No molfiles found in simlist')
+        elif len(uqmolfiles) == 1:
+            return True, uqmolfiles[0]
+        elif len(uqmolfiles) > 1:  # If more than one molfile load them and see if they are different Molecules
+            ref = Molecule(uqmolfiles[0], _logger=False)
+            for i in range(1, len(uqmolfiles)):
+                mol = Molecule(uqmolfiles[i], _logger=False)
+                if not mol_equal(ref, mol):
+                    return False, []
+            return True, uqmolfiles[0]
+    return False, []
 
 
 def _projectionGenerator(metric, ncpus):

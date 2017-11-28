@@ -88,7 +88,7 @@ class Sim(object):
     def __eq__(self, other):
         iseq = True
         iseq &= self.simid == other.simid
-        iseq &= self.molfile == other.molfile
+        iseq &= np.all([x == y for x, y in zip(self.molfile, other.molfile)])
         iseq &= self.input == other.input
         iseq &= self.parent == other.parent
         iseq &= len(self.trajectory) == len(other.trajectory)
@@ -405,22 +405,25 @@ def _autoDetectTrajectories(folder):
             return natsort.natsorted(trajectories)
 
 
+from htmd.molecule.readers import _TOPOLOGY_READERS
+__readers = list(_TOPOLOGY_READERS.keys())
+__defaultReaders = ['pdb', 'prmtop', 'psf']
+__otherReaders = list(np.setdiff1d(__readers, __defaultReaders))
+__topotypes =  __defaultReaders + __otherReaders  # Prepending PDB, PSF, PRMTOP so that they are the default
+
 def _autoDetectTopology(folder):
-    from htmd.molecule.readers import _TOPOLOGY_READERS
-    topotypes = ['pdb', 'prmtop', 'psf'] + list(_TOPOLOGY_READERS.keys())  # Prepending PDB, PSF, PRMTOP so that they are the default
-    topo = None
-    for tt in topotypes:
+    topo = {}
+    for tt in __topotypes:
         files = glob(path.join(folder, '*.{}'.format(tt)))
         if len(files) > 0:
             if len(files) > 1:
                 logger.warning('Multiple "{}" files were found in folder {}. '
                                'Picking {} as the topology'.format(tt, folder, files[0]))
-            topo = files[0]
-            break
-    if topo is None:
+            topo[tt] = files[0]
+    if len(topo) == 0:
         raise RuntimeError('No topology file found in folder {}. '
                            'Supported extensions are {}'.format(folder, list(_TOPOLOGY_READERS.keys())))
-    return topo
+    return list(topo.values())
 
 
 def _simName(foldername):
@@ -430,3 +433,34 @@ def _simName(foldername):
     else:
         name = os.path.basename(os.path.dirname(foldername))
     return name
+
+
+if __name__ == '__main__':
+    from htmd.home import home
+    from glob import glob
+    from os.path import join
+    from htmd.projections.metric import _singleMolfile
+
+    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*')))
+    x = sims[0].copy()
+    assert x == sims[0]
+    assert x != sims[1]
+    assert len(sims[0].molfile) == 2
+    assert _singleMolfile(sims)[0]
+
+    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*', 'structure.pdb')))
+    x = sims[0].copy()
+    assert x == sims[0]
+    assert x != sims[1]
+    assert not isinstance(sims[0].molfile, list)
+    assert _singleMolfile(sims)[0]
+
+    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), join(home(dataDir='adaptive'), 'input', 'e1s1_1', 'structure.pdb'))
+    x = sims[0].copy()
+    assert x == sims[0]
+    assert x != sims[1]
+    assert not isinstance(sims[0].molfile, list)
+    assert _singleMolfile(sims)[0]
+
+
+
