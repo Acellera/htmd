@@ -610,7 +610,7 @@ class Molecule:
         """
         s = self.atomselect(sel)
         if np.all(s):  # If all are selected do nothing
-            return
+            return np.array([], dtype=np.int32)
 
         if not isinstance(s, np.ndarray) or s.dtype != bool:
             raise NameError('Filter can only work with string inputs or boolean arrays')
