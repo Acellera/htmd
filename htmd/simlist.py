@@ -371,29 +371,27 @@ def _renameSims(trajectory, simname, outfolder):
 
 
 def _filterTopology(sim, outfolder, filtsel):
+    from htmd.util import ensurelist
     try:
         from htmd.molecule.molecule import Molecule
         mol = Molecule(sim.molfile)
     except IOError as e:
         raise RuntimeError('simFilter: {}. Cannot read topology file {}'.format(e, sim.molfile))
 
-    ext = os.path.splitext(sim.molfile)[1][1:]
-    filttopo = path.join(outfolder, 'filtered.{}'.format(ext))
-    filtpdb = path.join(outfolder, 'filtered.pdb')
+    if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere
+        mol.coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
 
-    if not path.isfile(filttopo):
-        try:
-            mol.write(filttopo, filtsel)
-        except Exception as e:
-            logger.warning('Was not able to write {} due to error: {}'.format(filttopo, e))
+    extensions = ['pdb',]  # Adding pdb to make sure it's always written
+    for m in ensurelist(sim.molfile):
+        extensions.append(os.path.splitext(m)[1][1:])
 
-        if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere
-            mol.coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
-
-        try:
-            mol.write(filtpdb, filtsel)
-        except Exception as e:
-            logger.warning('Was not able to write {} due to error: {}'.format(filtpdb, e))
+    for ext in list(set(extensions)):
+        filttopo = path.join(outfolder, 'filtered.{}'.format(ext))
+        if not path.isfile(filttopo):
+            try:
+                mol.write(filttopo, filtsel)
+            except Exception as e:
+                logger.warning('Filtering was not able to write {} due to error: {}'.format(filttopo, e))
 
 
 def _autoDetectTrajectories(folder):
