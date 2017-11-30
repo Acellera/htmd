@@ -700,6 +700,7 @@ if __name__ == '__main__':
     from htmd.home import home
     from htmd.util import tempname
     import os
+    from os.path import join
     from glob import glob
     import numpy as np
     import filecmp
@@ -721,15 +722,15 @@ if __name__ == '__main__':
         ignore_ftypes = ('.log', '.txt')
         files = []
         deletefiles = []
-        for f in glob(os.path.join(compare, '*')):
+        for f in glob(join(compare, '*')):
             fname = os.path.basename(f)
             if os.path.splitext(f)[1] in ignore_ftypes:
                 continue
             if f.endswith('prmtop'):
-                cutfirstline(f, os.path.join(compare, fname + '.mod'))
-                cutfirstline(os.path.join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
+                cutfirstline(f, join(compare, fname + '.mod'))
+                cutfirstline(join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
                 files.append(os.path.basename(f) + '.mod')
-                deletefiles.append(os.path.join(compare, fname + '.mod'))
+                deletefiles.append(join(compare, fname + '.mod'))
             else:
                 files.append(os.path.basename(f))
 
@@ -757,7 +758,7 @@ if __name__ == '__main__':
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 
-        refdir = home(dataDir=os.path.join('test-amber-build', pid))
+        refdir = home(dataDir=join('test-amber-build', pid))
         _compareResultFolders(refdir, tmpdir, pid)
         shutil.rmtree(tmpdir)
 
@@ -775,9 +776,23 @@ if __name__ == '__main__':
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 
-        refdir = home(dataDir=os.path.join('test-amber-build-nopp', pid))
+        refdir = home(dataDir=join('test-amber-build-nopp', pid))
         _compareResultFolders(refdir, tmpdir, pid)
         shutil.rmtree(tmpdir)
+
+    # Test protein ligand building with parametrized ligand
+    mol = Molecule('3ptb')
+    mol.filter('protein')
+    mol.renumberResidues()
+    lig = Molecule(join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum', 'mol.mol2'))
+    lig.segid[:] = 'L'
+    newmol = Molecule()
+    newmol.append(lig)
+    newmol.append(mol)
+    smol = solvate(newmol)
+    tmpdir = tempname()
+    bmol = build(newmol, outdir=tmpdir, ionize=False)
+    shutil.rmtree(tmpdir)
 
     # # Test protein-ligand building
     # folder = home(dataDir='building-protein-ligand')
