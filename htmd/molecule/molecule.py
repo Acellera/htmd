@@ -1007,6 +1007,10 @@ class Molecule:
                     raise TopologyInconsistencyError(
                         'Different atom information read from topology file {} for field {}'.format(filename, field))
 
+        if len(self.bonds) != 0 and len(topo.bondtype) == 0:
+            self.bondtype = np.empty(self.bonds.shape[0], dtype=Molecule._dtypes['bondtype'])
+            self.bondtype[:] = 'un'
+
         self.element = self._guessMissingElements()
         self.crystalinfo = topo.crystalinfo
         _ = self._checkInsertions(_logger=_logger)
@@ -1865,4 +1869,14 @@ if __name__ == "__main__":
     assert np.array_equal(di, mol.dihedrals)
     assert np.array_equal(im, mol.impropers)
     assert np.array_equal(an, mol.angles)
+
+    # Testing appending of bonds and bondtypes
+    mol = Molecule('3ptb')
+    lig = Molecule(path.join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum', 'mol.mol2'))
+    assert mol.bonds.shape[0] == len(mol.bondtype)  # Checking that Molecule fills in empty bondtypes
+    newmol = Molecule()
+    newmol.append(lig)
+    newmol.append(mol)
+    assert newmol.bonds.shape[0] == (mol.bonds.shape[0] + lig.bonds.shape[0])
+    assert newmol.bonds.shape[0] == len(newmol.bondtype)
 
