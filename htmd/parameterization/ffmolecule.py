@@ -167,7 +167,7 @@ class FFMolecule(Molecule):
 
             self.name[i] = name
 
-    def output_directory_name(self):
+    def qm_method_name(self):
 
         basis = self.qm.basis
         basis = re.sub('\+', 'plus', basis)  # Replace '+' with 'plus'
@@ -181,7 +181,7 @@ class FFMolecule(Molecule):
 
         assert self.numFrames == 1
 
-        mindir = os.path.join(self.outdir, "minimize", self.output_directory_name())
+        mindir = os.path.join(self.outdir, "minimize", self.qm_method_name())
         os.makedirs(mindir, exist_ok=True)
 
         self.qm.molecule = self
@@ -210,7 +210,7 @@ class FFMolecule(Molecule):
     def fitCharges(self, fixed=[]):
 
         # Cereate an ESP directory
-        espDir = os.path.join(self.outdir, "esp", self.output_directory_name() )
+        espDir = os.path.join(self.outdir, "esp", self.qm_method_name())
         os.makedirs(espDir, exist_ok=True)
 
         # Get ESP points
@@ -293,20 +293,35 @@ class FFMolecule(Molecule):
 
             molecules.append(mol)
 
-        # Run QM calculation of the rotamers
-        dirname = 'dihedral-opt' if geomopt else 'dihedral-single-point'
-        qm_results = []
-        for dihedral, molecule in zip(dihedrals, molecules):
-            name = "%s-%s-%s-%s" % tuple(self.name[dihedral])
-            fitdir = os.path.join(self.outdir, dirname, name, self.output_directory_name())
-            os.makedirs(fitdir, exist_ok=True)
+        # Create directories for QM data
+        directories = []
+        dihedral_directory = 'dihedral-opt' if geomopt else 'dihedral-single-point'
+        for dihedral in dihedrals:
+            dihedral_name = '%s-%s-%s-%s' % tuple(self.name[dihedral])
+            directory = os.path.join(self.outdir, dihedral_directory, dihedral_name, self.qm_method_name())
+            os.makedirs(directory, exist_ok=True)
+            directories.append(directory)
 
+        # Setup and submit QM calculations
+        for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
             self.qm.molecule = molecule
             self.qm.esp_points = None
             self.qm.optimize = geomopt
             self.qm.restrained_dihedrals = np.array([dihedral])
-            self.qm.directory = fitdir
-            qm_results.append(self.qm.run())  # TODO submit all jobs at once
+            self.qm.directory = directory
+            self.qm.setup()
+            self.qm.submit()
+
+        # Wait and retrieve QM calculation data
+        qm_results = []
+        for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
+            self.qm.molecule = molecule
+            self.qm.esp_points = None
+            self.qm.optimize = geomopt
+            self.qm.restrained_dihedrals = np.array([dihedral])
+            self.qm.directory = directory
+            self.qm.setup() # QM object is reused, so it has to be properly set up before retrieving.
+            qm_results.append(self.qm.retrieve())
 
         # Fit the dihedral parameters
         df = DihedralFitting()
@@ -314,7 +329,7 @@ class FFMolecule(Molecule):
         df.dihedrals = dihedrals
         df.qm_results = qm_results
         df.result_directory = os.path.join(self.outdir, 'parameters', self.method.name,
-                                           self.output_directory_name(), 'plots')
+                                           self.qm_method_name(), 'plots')
 
         # In case of FakeQM, the initial parameters are set to zeros.
         # It prevents DihedralFitting class from cheating :D
@@ -385,7 +400,7 @@ class FFMolecule(Molecule):
 
     def writeParameters(self, original_molecule=None):
 
-        paramDir = os.path.join(self.outdir, 'parameters', self.method.name, self.output_directory_name())
+        paramDir = os.path.join(self.outdir, 'parameters', self.method.name, self.qm_method_name())
         os.makedirs(paramDir, exist_ok=True)
 
         typemap = None

@@ -267,7 +267,7 @@ def main_parameterize(arguments=None):
         mol.writeParameters(mol_orig)
 
         # Write energy file
-        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.output_directory_name(), 'energies.txt')
+        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.qm_method_name(), 'energies.txt')
         printEnergies(mol, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
