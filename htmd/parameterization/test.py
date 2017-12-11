@@ -14,17 +14,16 @@ from htmd.util import tempname
 
 
 class TestParameterize(unittest.TestCase):
+
     def setUp(self):
         if os.environ.get('TRAVIS_OS_NAME') == 'osx':
             self.skipTest('Mac does not work!')
 
         self.maxDiff = None
         self.dataDir = home(dataDir='test-param')
-        if os.environ.get('TESTDIR') is not None:
-            self.testDir = os.environ['TESTDIR']
-        else:
-            self.testDir = tempname()
-        print('Test dir: {}'.format(self.testDir))
+        self.testDir = os.environ.get('TESTDIR', tempname())
+
+        print('\n') # Just for a better readability
 
     def _test(self, refDir, resDir, cmd):
 
