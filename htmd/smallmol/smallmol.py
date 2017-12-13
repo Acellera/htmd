@@ -2,7 +2,7 @@ import os
 import multiprocessing
 import math
 import numpy as np
-from tqdm import tqdm
+
 
 from rdkit import Chem
 from rdkit import RDConfig
@@ -293,6 +293,7 @@ class SmallMolStack:
     """
 
     def __init__(self, sdf_file, removeHs=True, addHs=True):  # , n_jobs=1
+        from tqdm import tqdm
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=removeHs)
         self.filepath = sdf_file
         print('Reading files...')

@@ -258,7 +258,7 @@ def _getRadii(mol):
         if elem not in mappings:
             raise ValueError('PDBQT element {} does not exist in mappings.'.format(elem))
         elem = mappings[elem]
-        if elem in vdw.elements:
+        if elem in vdw.radiidict:
             rad = vdw.radiusByElement(elem)
         else:
             print('Unknown element -', mol.element[a], '- at atom index ', a)
