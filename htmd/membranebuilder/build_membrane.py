@@ -38,6 +38,16 @@ class _Lipid:
             s += 'mol: {} '.format(id(self.mol))
         return s[:-1]
 def listLipids():
+    """ Lists all available lipids
+
+    Examples
+    --------
+    >>> from htmd.membranebuilder.build_membrane import buildMembrane 
+    >>> build_membrane.listLipids()
+    ---- Lipids list: ...
+
+    """
+
     from htmd.home import home
     import os
     from natsort import natsorted
