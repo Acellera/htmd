@@ -177,11 +177,14 @@ class QMBase(ABC, ProtocolInterface):
             List of QMResult objects (one for each molecule frames).
         """
 
-        if isinstance(self.queue, LocalCPUQueue):
-            self.queue.wait(sentinel=False) # TODO: sentinel is still broken
-        else:
-            self.queue.wait(sentinel=True)
-        self.queue.retrieve()
+        # Wait only if there is something to wait for
+        # TODO: queue object should handle this logic
+        if self.queue._dirs:
+            if isinstance(self.queue, LocalCPUQueue):
+                self.queue.wait(sentinel=False) # TODO: sentinel is still broken
+            else:
+                self.queue.wait(sentinel=True)
+            self.queue.retrieve()
 
         # Read output files
         results = [self._readOutput(directory) for directory in self._directories]
