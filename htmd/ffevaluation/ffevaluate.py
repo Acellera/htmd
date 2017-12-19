@@ -4,6 +4,7 @@ from math import sqrt, acos, radians, cos, sin, pi
 from scipy import constants as const
 from htmd.ffevaluation.util import dihedralAngle, wrapBondedDistance, wrapDistance, cross, dot
 import logging
+from IPython.core.debugger import set_trace
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ def init(mol, prm, fromstruct=False):
         sigma14[i] = prm.atom_types[type].sigma_14
         epsilon14[i] = prm.atom_types[type].epsilon_14
 
-    nbfix = np.zeros((len(prm.nbfix_types), 6), dtype=np.float64)
+    nbfix = np.ones((len(prm.nbfix_types), 6), dtype=np.float64) * -1
     for i, nbf in enumerate(prm.nbfix_types):
         if nbf[0] in uqtypes and nbf[1] in uqtypes:
             idx1 = np.where(uqtypes == nbf[0])[0]
@@ -192,7 +193,7 @@ def calculateSets(mol, betweensets):
     return setA, setB
 
 
-def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1, fromstruct=False):
+def ffevaluate(mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, threads=1, fromstruct=False):
     """  Evaluates energies and forces of the forcefield for a given Molecule
 
     Parameters
@@ -204,9 +205,15 @@ def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1, fromstruct=
     betweensets : tuple of strings
         Only calculate energies between two sets of atoms given as atomselect strings.
         Only computes LJ and electrostatics.
-    dist_thresh : float
+    cutoff : float
         If set to a value != 0 it will only calculate LJ, electrostatics and bond energies for atoms which are closer
         than the threshold
+    rfa : bool
+        Use with `cutoff` to enable the reaction field approximation for scaling of the electrostatics up to the cutoff.
+        Uses the value of `solventDielectric` to model everything beyond the cutoff distance as solvent with uniform
+        dielectric.
+    solventDielectric : float
+        Used together with `cutoff` and `rfa`
 
     Returns
     -------
@@ -247,7 +254,9 @@ def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1, fromstruct=
     args = list(init(mol, prm, fromstruct))
     args.append(setA)
     args.append(setB)
-    args.append(dist_thresh)
+    args.append(cutoff)
+    args.append(rfa)
+    args.append(solventDielectric)
 
     if threads == 1:
         energies, forces, atmnrg = _ffevaluate(coords, box, *args)
@@ -317,7 +326,7 @@ def _insets(i, j, set1, set2):
 @jit(nopython=True)
 def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda,
                 bondv, ELEC_FACTOR, charge, angles, angle_params, dihedrals, dihedral_params, impropers,
-                improper_params, set1, set2, dist_thresh):
+                improper_params, set1, set2, cutoff, rfa, solventDielectric):
     natoms = coords.shape[0]
     nframes = coords.shape[2]
     nangles = angles.shape[0]
@@ -353,8 +362,7 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
                 pot_bo = 0
                 pot_lj = 0
                 pot_el = 0
-
-                if dist_thresh != 0 and dist > dist_thresh:
+                if cutoff != 0 and dist > cutoff:
                     continue
 
                 if isbonded:
@@ -365,7 +373,7 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
                     pot_lj, force_lj = _evaluate_lj(i, j, typeint, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v, dist)
                     energies[1, f] += pot_lj
                     coeff += force_lj
-                    pot_el, force_el = _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist)
+                    pot_el, force_el = _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist, rfa, solventDielectric, cutoff)
                     energies[2, f] += pot_el
                     coeff += force_el
 
@@ -414,6 +422,7 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
 
 @jit('UniTuple(float64, 5)(int64, int64, int64, int64, float64[:,:], float32[:], float32[:], float32[:], float32[:], int64[:,:], float32[:,:])', nopython=True)
 def _getSigmaEpsilon(i, j, it, jt, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v):
+    # i, j atom indexes  it, jt atom types
     n14 = s14a.shape[1]
     # Check if NBfix exists for the types and keep the index
     idx_nbfix = -1
@@ -462,9 +471,8 @@ def _getSigmaEpsilon(i, j, it, jt, nbfix, sigma, sigma14, epsilon, epsilon14, s1
 
 @jit('UniTuple(float64, 2)(int64, int64, int64[:], float64[:,:], float32[:], float32[:], float32[:], float32[:], int64[:,:], float32[:,:], float64)', nopython=True)
 def _evaluate_lj(i, j, typeint, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v, dist):
-    sig, eps, A, B, scale = _getSigmaEpsilon(i, j, typeint[i], typeint[j], nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v)
+    _, _, A, B, scale = _getSigmaEpsilon(i, j, typeint[i], typeint[j], nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v)
 
-    # TODO: Do we even want a cutoff?
     # cutoff = 2.5 * sig
     # if dist < cutoff:
     rinv1 = 1 / dist
@@ -499,8 +507,8 @@ def _evaluate_harmonic_bonds(i, j, bonda, bondv, dist):
     return pot, force
 
 
-@jit('UniTuple(float64, 2)(int64, int64, float64[:], int64[:,:], float32[:,:], float64, float64)', nopython=True)
-def _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist):
+@jit('UniTuple(float64, 2)(int64, int64, float64[:], int64[:,:], float32[:,:], float64, float64, boolean, float64, float64)', nopython=True)
+def _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist, rfa, solventDielectric, cutoff):
     nelec = e14a.shape[1]
     scale = 1
     for e in range(nelec):
@@ -510,8 +518,20 @@ def _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist):
             scale = e14v[i, e]
             break
 
-    pot = ELEC_FACTOR * charge[i] * charge[j] / dist / scale
-    force = -pot / dist
+    if rfa:  # Reaction field approximation for electrostatics with cutoff
+        # http://docs.openmm.org/latest/userguide/theory.html#coulomb-interaction-with-cutoff
+        # Ilario G. Tironi, René Sperb, Paul E. Smith, and Wilfred F. van Gunsteren. A generalized reaction field method
+        # for molecular dynamics simulations. Journal of Chemical Physics, 102(13):5451–5459, 1995.
+        denom = ((2 * solventDielectric) + 1)
+        krf = (1 / cutoff ** 3) * (solventDielectric - 1) / denom
+        crf = (1 / cutoff) * (3 * solventDielectric) / denom
+        common = ELEC_FACTOR * charge[i] * charge[j] / scale
+        dist2 = dist ** 2
+        pot = common * ((1 / dist) + krf * dist2 - crf)
+        force = common * (2 * krf * dist - 1 / dist2)
+    else:
+        pot = ELEC_FACTOR * charge[i] * charge[j] / dist / scale
+        force = -pot / dist
     return pot, force
 
 
