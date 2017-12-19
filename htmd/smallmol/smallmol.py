@@ -3,7 +3,6 @@ import multiprocessing
 import math
 import numpy as np
 
-
 from rdkit import Chem
 from rdkit import RDConfig
 from rdkit import rdBase
@@ -293,11 +292,20 @@ class SmallMolStack:
     """
 
     def __init__(self, sdf_file, removeHs=True, addHs=True):  # , n_jobs=1
-        from tqdm import tqdm
+        from htmd.progress.progress import ProgressBar
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=removeHs)
         self.filepath = sdf_file
         print('Reading files...')
-        self._mols = np.array([SmallMol(x, addHs=addHs) if x is not None else None for x in tqdm(supplier)])
+        p = ProgressBar(len(supplier))
+        mm = []
+        for x in supplier:
+            if x is not None:
+                mm.append(SmallMol(x, addHs=addHs))
+            else:
+                mm.append(None)
+            p.progress()
+        p.stop()
+        self._mols = np.array(mm)
         self.n_invalid = len(self.get_invalid_indexes())
         if self.n_invalid > 0:
             print('We detected {} errors when reading entries in the sdf file. Please'\
