@@ -3,12 +3,16 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import logging
 from collections import OrderedDict
+import itertools
 import numpy as np
 import scipy.sparse.csgraph as sp
 import networkx as nx
 
 from htmd.molecule.vdw import elements
+
+logger = logging.getLogger(__name__)
 
 
 def getMolecularGraph(molecule):
@@ -270,7 +274,7 @@ def detectParameterizableCores(molecule):
 
     return all_core_sides
 
-def chooseTerminal(centre, sideGraph):
+def chooseTerminals(centre, sideGraph):
 
     terminals = list(sideGraph.neighbors(centre))
 
@@ -286,9 +290,25 @@ def chooseTerminal(centre, sideGraph):
     assert max(numberOfProtons) < 1000000 # No monstrous molecules, please!
     scores = 1000000*numberOfAtoms + numberOfProtons
 
-    terminal = terminals[np.argmax(scores)]
+    # Choose the terminals
+    chosen_terminals = []
+    refSubGraph = None
+    for terminal, score, subGraph in zip(terminals, scores, subGraphs):
+        if score < np.max(scores):
+            continue
 
-    return terminal
+        if not chosen_terminals:
+            chosen_terminals.append(terminal)
+            refSubGraph = subGraph
+            continue
+
+        if checkIsomorphism(subGraph, refSubGraph):
+            chosen_terminals.append(terminal)
+        else:
+            logger.warn('Molecular scoring function is not sufficient. '
+                        'Dihedal atom selection depends on the atom order!')
+
+    return chosen_terminals
 
 def detectParameterizableDihedrals(molecule):
     """
@@ -319,7 +339,7 @@ def detectParameterizableDihedrals(molecule):
 
     Find the parameterizable dihedrals of benzamidine
     >>> detectParameterizableDihedrals(mol)
-    [[(1, 0, 6, 12)], [(0, 6, 12, 16), (0, 6, 13, 14)]]
+    [[(1, 0, 6, 12), (1, 0, 6, 13), (5, 0, 6, 12), (5, 0, 6, 13)], [(0, 6, 12, 16), (0, 6, 12, 17), (0, 6, 13, 14), (0, 6, 13, 15)]]
 
     Get glycol
     >>> molFile = os.path.join(home('test-param'), 'glycol.mol2')
@@ -333,8 +353,10 @@ def detectParameterizableDihedrals(molecule):
     # Get pameterizable dihedral angles
     dihedrals = []
     for core, sides in detectParameterizableCores(molecule):
-        terminals = [chooseTerminal(centre, side) for centre, side in zip(core, sides)]
-        dihedrals.append((terminals[0], core[0], core[1], terminals[1]))
+        all_terminals = map(chooseTerminals, core, sides)
+        all_terminals = itertools.product(*all_terminals)
+        new_dihedrals = [(terminals[0], core[0], core[1], terminals[1]) for terminals in all_terminals]
+        dihedrals.extend(new_dihedrals)
 
     # Get equivantence groups for each atom for each dihedral
     _, _, equivalent_group_by_atom = detectEquivalentAtoms(molecule)
