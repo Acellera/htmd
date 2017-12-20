@@ -158,17 +158,17 @@ class DihedralFitting:
             raise ValueError('The number of dihedral and QM result sets has to be the same!')
 
         # Get dihedral names
-        self._names = ['%s-%s-%s-%s' % tuple(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
+        self._names = ['%s-%s-%s-%s' % tuple(self.molecule.name[list(dihedral)]) for dihedral in self.dihedrals]
 
         # Get equivalent dihedral atom indices
         self._equivalent_indices = []
-        for idihed, dihedral in enumerate(self.dihedrals):
-            for rotatableDihedral in self.molecule._rotatable_dihedrals:
-                if np.all(rotatableDihedral.atoms == dihedral):
-                    self._equivalent_indices.append([dihedral] + rotatableDihedral.equivalents)
+        for dihedral, name in zip(self.dihedrals, self._names):
+            for equivlantet_diherals in self.molecule._parameterizable_dihedrals:
+                if equivlantet_diherals[0] == dihedral:
+                    self._equivalent_indices.append(equivlantet_diherals)
                     break
             else:
-                raise ValueError('%s is not recognized as a rotable dihedral\n' % self._names[idihed])
+                raise ValueError('%s is not recognized as a parameterizable dihedral\n' % name)
 
         # Get dihedral parameters
         for dihedral in self.dihedrals:

@@ -39,7 +39,7 @@ class Sample:
         t.write(ftraj)
         m = FFMolecule(filename=mol, rtf=rtf, prm=prm)
         m.read(ftraj)
-        torsions = m.getRotatableDihedrals()
+        torsions = m.getParameterizableDihedrals()
         # For each torsion
         for i in range(len(torsions)):
             # Create title
