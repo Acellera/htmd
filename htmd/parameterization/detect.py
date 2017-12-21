@@ -281,28 +281,28 @@ def chooseTerminals(centre, sideGraph):
     # Get a subgraph for each terminal
     sideGraph = sideGraph.copy()
     sideGraph.remove_node(centre)
-    subGraphs = list(nx.connected_component_subgraphs(sideGraph))
-    subGraphs = [[subGraph for subGraph in subGraphs if terminal in subGraph.nodes][0] for terminal in terminals]
+    terminalGraphs = list(nx.connected_component_subgraphs(sideGraph))
+    terminalGraphs = [[terminalGraph for terminalGraph in terminalGraphs if terminal in terminalGraph.nodes][0] for terminal in terminals]
 
     # Compute a score for each terminal
-    numberOfAtoms = np.array([len(subGraph.nodes) for subGraph in subGraphs])
-    numberOfProtons = np.array([sum(nx.get_node_attributes(subGraph, 'number').values()) for subGraph in subGraphs])
+    numberOfAtoms = np.array([len(terminalGraph.nodes) for terminalGraph in terminalGraphs])
+    numberOfProtons = np.array([sum(nx.get_node_attributes(terminalGraph, 'number').values()) for terminalGraph in terminalGraphs])
     assert max(numberOfProtons) < 1000000 # No monstrous molecules, please!
     scores = 1000000*numberOfAtoms + numberOfProtons
 
     # Choose the terminals
     chosen_terminals = []
-    refSubGraph = None
-    for terminal, score, subGraph in zip(terminals, scores, subGraphs):
+    refTerminalGraph = None
+    for terminal, score, terminalGraph in zip(terminals, scores, terminalGraphs):
         if score < np.max(scores):
             continue
 
         if not chosen_terminals:
             chosen_terminals.append(terminal)
-            refSubGraph = subGraph
+            refTerminalGraph = terminalGraph
             continue
 
-        if checkIsomorphism(subGraph, refSubGraph):
+        if checkIsomorphism(terminalGraph, refTerminalGraph):
             chosen_terminals.append(terminal)
         else:
             logger.warn('Molecular scoring function is not sufficient. '
