@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 def getMolecularGraph(molecule):
     """
-    Generate a graph from the topology of molecule, i.e the graph nodes represent atoms and  the graph edges represent
-    bonds. Also, the graph nodes store element information.
+    Generate a graph from the topology of molecule
+
+    The graph nodes represent atoms and the graph edges represent bonds. Also, the graph nodes store element
+    information.
     """
 
     graph = nx.Graph()
@@ -29,8 +31,10 @@ def getMolecularGraph(molecule):
 
 def getMolecularTree(graph, source):
     """
-    Generate a tree from a molecular graph. The tree starts from source node (atom) and grows along the edges (bonds)
-    unrolling all encountered loops. The tree grows untill all the nodes (atoms) of the graph are included.
+    Generate a tree from a molecular graph
+
+    The tree starts from source node (atom) and grows along the edges (bonds) unrolling all encountered loops.
+    The tree grows until all the nodes (atoms) of the graph are included.
     """
 
     assert nx.is_connected(graph)
@@ -59,11 +63,10 @@ def getMolecularTree(graph, source):
 
 def checkIsomorphism(graph1, graph2):
     """
-    Check if two graphs are isomorphic based on topology and elements
+    Check if two molecular graphs are isomorphic based on topology (bonds) and elements.
     """
 
-    return nx.is_isomorphic(graph1, graph2,
-                            node_match = lambda node1, node2: node1['element'] == node2['element'])
+    return nx.is_isomorphic(graph1, graph2, node_match = lambda node1, node2: node1['element'] == node2['element'])
 
 
 def detectEquivalentAtoms(molecule):
@@ -119,16 +122,20 @@ def detectEquivalentAtoms(molecule):
     [0, 1, 2, 3, 4, 5, 6, 7]
     """
 
+    # Generate a molecular tree for each atom
     graph = getMolecularGraph(molecule)
     trees = [getMolecularTree(graph, node) for node in graph.nodes]
 
     equivalent_atoms = [tuple([i for i, tree1 in enumerate(trees) if checkIsomorphism(tree1, tree2)]) for tree2 in trees]
     equivalent_groups = sorted(list(set(equivalent_atoms)))
-    equivalent_group_by_atom = [equivalent_groups.index(atoms) for atoms in equivalent_atoms]
+    equivalent_group_by_atom = list(map(equivalent_groups.index, equivalent_atoms))
 
     return equivalent_groups, equivalent_atoms, equivalent_group_by_atom
 
 def getMethylGraph():
+    """
+    Generate a molecular graph for methyl group
+    """
 
     methyl = nx.Graph()
     methyl.add_node(0, element='C')
@@ -142,39 +149,61 @@ def getMethylGraph():
     return methyl
 
 def filterCores(core_sides):
+    """
+    Filter irrelevant dihedral angle cores (central atom pairs)
+    """
 
-    _, sides = core_sides
-
-    if len(sides[0]) == 1 or len(sides[1]) == 1:
-        return False
-
+    _, sideGraphs = core_sides
     methyl = getMethylGraph()
-    if checkIsomorphism(sides[0], methyl) or checkIsomorphism(sides[1], methyl):
+
+    # Check if a side graph is a methyl group
+    if checkIsomorphism(sideGraphs[0], methyl) or checkIsomorphism(sideGraphs[1], methyl):
         return False
 
     return True
 
 def detectParameterizableCores(molecule):
+    """
+    Detect parametrizable dihedral angle cores (central atom pairs)
+
+    The cores are detected by looking for bridges (bonds with divide the molecule into two parts) in a molecular graph.
+    Terminal cores are skipped.
+    """
 
     graph = getMolecularGraph(molecule)
 
     all_core_sides = []
     for core in list(nx.bridges(graph)):
+
+        # Get side graphs of the core
         graph.remove_edge(*core)
-        sides = list(nx.connected_component_subgraphs(graph))
+        sideGraphs = list(nx.connected_component_subgraphs(graph))
         graph.add_edge(*core)
 
-        if core[0] in sides[1]:
-            sides = sides[::-1]
-        assert core[0] in sides[0] and core[1] in sides[1]
+        # Skip terminal bridges, which cannot for dihedral angles
+        if len(sideGraphs[0]) == 1 or len(sideGraphs[1]) == 1:
+            continue
 
-        all_core_sides.append((core, sides))
+        # Swap the side graphs to match the order of the core
+        if core[0] in sideGraphs[1]:
+            sideGraphs = sideGraphs[::-1]
+        assert core[0] in sideGraphs[0] and core[1] in sideGraphs[1]
 
+        all_core_sides.append((core, sideGraphs))
+
+    # Filer cores
     all_core_sides = filter(filterCores, all_core_sides)
 
     return all_core_sides
 
 def chooseTerminals(centre, sideGraph):
+    """
+    Choose dihedal angle terminals (outer atoms)
+
+    The terminals are chosen by:
+    1. Largest number of atoms
+    2. Largest molecular mass
+    """
 
     terminals = list(sideGraph.neighbors(centre))
 
@@ -277,21 +306,25 @@ def detectParameterizableDihedrals(molecule):
     # Get pameterizable dihedral angles
     dihedrals = []
     for core, sides in detectParameterizableCores(molecule):
+
+        # Choose the best terminals for each side
         all_terminals = map(chooseTerminals, core, sides)
+
+        # Generate all terminal combinations
         all_terminals = itertools.product(*all_terminals)
-        new_dihedrals = [(terminals[0], core[0], core[1], terminals[1]) for terminals in all_terminals]
+
+        # Generate new dihedral angles
+        new_dihedrals = [(terminals[0], *core, terminals[1]) for terminals in all_terminals]
         dihedrals.extend(new_dihedrals)
 
-    # Get equivantence groups for each atom for each dihedral
+    # Get equivalent groups for each atom for each dihedral
     _, _, equivalent_group_by_atom = detectEquivalentAtoms(molecule)
     dihedral_groups = [tuple([equivalent_group_by_atom[atom] for atom in dihedral]) for dihedral in dihedrals]
 
     # Group equivalent dihedral angles and reverse them that equivalent atoms are matched
     equivalent_dihedrals = OrderedDict()
     for dihedral, groups in zip(dihedrals, dihedral_groups):
-        if groups[::-1] < groups:
-            groups = groups[::-1]
-            dihedral = dihedral[::-1]
+        dihedral, groups = (dihedral[::-1], groups[::-1]) if groups[::-1] < groups else (dihedral, groups)
         equivalent_dihedrals[groups] = equivalent_dihedrals.get(groups, []) + [dihedral]
     equivalent_dihedrals = list(equivalent_dihedrals.values())
 
