@@ -333,21 +333,29 @@ def detectParameterizableDihedrals(molecule):
     >>> from htmd.parameterization.ffmolecule import FFMolecule
     >>> from htmd.parameterization.detect import detectParameterizableDihedrals
 
-    Get benzamidine
-    >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
-    >>> mol = FFMolecule(molFile)
-
-    Find the parameterizable dihedrals of benzamidine
-    >>> detectParameterizableDihedrals(mol)
-    [[(1, 0, 6, 12), (1, 0, 6, 13), (5, 0, 6, 12), (5, 0, 6, 13)], [(0, 6, 12, 16), (0, 6, 12, 17), (0, 6, 13, 14), (0, 6, 13, 15)]]
-
-    Get glycol
+    Find the parameterizable dihedrals of glycol
     >>> molFile = os.path.join(home('test-param'), 'glycol.mol2')
     >>> mol = FFMolecule(molFile)
-
-    Find the parameterizable dihedrals of glycol
     >>> detectParameterizableDihedrals(mol)
     [[(2, 1, 0, 4), (1, 2, 3, 9)], [(0, 1, 2, 3)]]
+
+    Find the parameterizable dihedrals of chlorethene
+    >>> molFile = os.path.join(home('test-param'), 'chlorethene_1.mol2')
+    >>> mol = FFMolecule(molFile)
+    >>> detectParameterizableDihedrals(mol)
+    [[(2, 1, 0, 4), (2, 1, 0, 5)]]
+
+    Find the parameterizable dihedrals of chlorethene (with spaped atoms)
+    >>> molFile = os.path.join(home('test-param'), 'chlorethene_2.mol2')
+    >>> mol = FFMolecule(molFile)
+    >>> detectParameterizableDihedrals(mol)
+    [[(3, 1, 0, 4), (3, 1, 0, 5)]]
+
+    Find the parameterizable dihedrals of benzamidine
+    >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
+    >>> mol = FFMolecule(molFile)
+    >>> detectParameterizableDihedrals(mol)
+    [[(1, 0, 6, 12), (1, 0, 6, 13), (5, 0, 6, 12), (5, 0, 6, 13)], [(0, 6, 12, 16), (0, 6, 12, 17), (0, 6, 13, 14), (0, 6, 13, 15)]]
     """
 
     # Get pameterizable dihedral angles
