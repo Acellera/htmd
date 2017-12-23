@@ -53,7 +53,6 @@ class RBoincPsi4Queue(SimQueue, ProtocolInterface):
         SimQueue.__init__(self)
         ProtocolInterface.__init__(self)
 
-        self._arg('jobname', 'str', 'Job name (RBoinc group)', None, val.String())
         self._arg('priority', 'str', 'Job priority', self._defaults['priority'], val.String())
         self._arg('url', 'str', 'RBoinc contact URL', self._defaults['url'], val.String())
         self._arg('app', 'str', 'RBoinc application ID', self._defaults['app'], val.String())
@@ -155,21 +154,6 @@ class RBoincPsi4Queue(SimQueue, ProtocolInterface):
         ret = check_output(cmd)
         logger.debug(ret.decode("ascii"))
 
-    @property
-    def ncpu(self):
-        return self.__dict__['ncpu']
-
-    @ncpu.setter
-    def ncpu(self, value):
-        self.ncpu = value
-
-    @property
-    def ngpu(self):
-        return self.__dict__['ngpu']
-
-    @ngpu.setter
-    def ngpu(self, value):
-        self.ngpu = value
 
     @property
     def memory(self):
