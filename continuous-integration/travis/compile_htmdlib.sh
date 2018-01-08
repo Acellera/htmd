@@ -11,7 +11,7 @@ git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/A
 # If clone is successful
 if [ "$?" == "0" ]; then
     # Check if we're on stable or latest, and choose the appropriate htmdlib branch
-    export TAG_DESCRIBE=$(git --git-dir=htmd/.git describe)
+    export TAG_DESCRIBE=$(git describe)
     export MINOR=$(echo $TAG_DESCRIBE | sed 's/[\.-]/ /g'  | awk '{print $2}')
     echo "$MINOR" | egrep -qe "[02468]$"
     if [ "$?" == "0" ]; then
