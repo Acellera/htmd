@@ -16,10 +16,10 @@ if [ "$?" == "0" ]; then
     echo "$MINOR" | egrep -qe "[02468]$"
     if [ "$?" == "0" ]; then
         echo "Checking out stable version of HTMDLIB"
-        git --git-dir=htmdlib/.git checkout -f stable
+        git --git-dir=htmdlib/.git --work-tree=htmdlib checkout stable
     else
         echo "Checking out latest version of HTMDLIB"
-        git --git-dir=htmdlib/.git checkout -f master
+        git --git-dir=htmdlib/.git --work-tree=htmdlib checkout master
     fi
     # Remove compiled DSOs present in the repo
     rm htmd/lib/*/*.so
