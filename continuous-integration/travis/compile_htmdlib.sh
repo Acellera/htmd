@@ -6,7 +6,7 @@
 #
 
 # Attempt to clone (needs these environment variables to be set in Travis; they are not available on PRs due to security reasons)
-git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 1
+git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 100
 
 # If clone is successful
 if [ "$?" == "0" ]; then
