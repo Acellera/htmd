@@ -6,7 +6,7 @@
 #
 
 # Attempt to clone (needs these environment variables to be set in Travis; they are not available on PRs due to security reasons)
-git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib --depth 100
+git clone https://$GITHUB_HTMDLIB_USERNAME:$GITHUB_HTMDLIB_PASSWORD@github.com/Acellera/htmdlib
 
 # If clone is successful
 if [ "$?" == "0" ]; then
@@ -16,10 +16,10 @@ if [ "$?" == "0" ]; then
     echo "$MINOR" | egrep -qe "[02468]$"
     if [ "$?" == "0" ]; then
         echo "Checking out stable version of HTMDLIB"
-        git --git-dir=htmdlib/.git checkout stable
+        git --git-dir=htmdlib/.git checkout -f stable
     else
         echo "Checking out latest version of HTMDLIB"
-        git --git-dir=htmdlib/.git checkout master
+        git --git-dir=htmdlib/.git checkout -f master
     fi
     # Remove compiled DSOs present in the repo
     rm htmd/lib/*/*.so
