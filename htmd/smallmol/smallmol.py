@@ -292,19 +292,16 @@ class SmallMolStack:
     """
 
     def __init__(self, sdf_file, removeHs=True, addHs=True):  # , n_jobs=1
-        from htmd.progress.progress import ProgressBar
+        from tqdm import tqdm
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=removeHs)
         self.filepath = sdf_file
         print('Reading files...')
-        p = ProgressBar(len(supplier))
         mm = []
-        for x in supplier:
+        for x in tqdm(supplier):
             if x is not None:
                 mm.append(SmallMol(x, addHs=addHs))
             else:
                 mm.append(None)
-            p.progress()
-        p.stop()
         self._mols = np.array(mm)
         self.n_invalid = len(self.get_invalid_indexes())
         if self.n_invalid > 0:

@@ -522,7 +522,7 @@ class Model(object):
         # This loop really iterates over states. sampleStates returns an array of arrays
         # Removed ncpus because it was giving errors on some systems.
         aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
-        mols = aprun(total=len(relframes), description='Getting state Molecules')\
+        mols = aprun(total=len(relframes), desc='Getting state Molecules')\
             (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist) for rel in relframes)
         return np.array(mols, dtype=object)
 

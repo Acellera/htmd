@@ -263,7 +263,7 @@ def ffevaluate(mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectri
     else:
         from htmd.parallelprogress import ParallelExecutor, delayed
         aprun = ParallelExecutor(n_jobs=threads)
-        res = aprun(total=mol.numFrames, description='Evaluating energies')(
+        res = aprun(total=mol.numFrames, desc='Evaluating energies')(
             delayed(_ffevaluate)(np.atleast_3d(coords[:, :, f]),
                                  box[:, f].reshape(3, 1),
                                  *args) for f in range(mol.numFrames))

@@ -82,7 +82,5 @@ try:
 except:
     print("HTMD: Logging setup failed")
 
-import progress_reporter.bar.gui as __gui  # Disabling pyemma progress widgets
-__gui.ipython_notebook_session = False
 
 
