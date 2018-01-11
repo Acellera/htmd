@@ -25,7 +25,6 @@ print("GLU 50 has atoms... ",np.sum(prep.atomselect("resid 60 and chain A")))
 
 d[toChange]
 d.loc[toChange, "forced_protonation"] = "GLU"
-# or, faster -- d.set_value(toChange,"forced_protonation","ASH")
 
 # prepdata.reprepare()
 
@@ -52,7 +51,6 @@ print("GLU 50 has atoms... ",np.sum(prep.atomselect("resid 60 and chain A")))
 
 d[toChange]
 d.loc[toChange, "forced_protonation"] = "GLU"
-# or, faster -- d.set_value(toChange,"forced_protonation","ASH")
 
 prepdata.reprepare()
 

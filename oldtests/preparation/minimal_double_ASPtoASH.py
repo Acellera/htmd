@@ -22,7 +22,6 @@ toChange = (d.resid == int(52)) & (d.chain == str("A"))
 print(d.values[51])
 d[toChange]
 d.loc[toChange, "forced_protonation"] = "ASH"
-# or, faster -- d.set_value(toChange,"forced_protonation","ASH")
 
 #I do a reprepare before the proper reprepare
 reprep, reprepdata = prepdata.reprepare()
