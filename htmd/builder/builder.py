@@ -540,7 +540,7 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
     megamemb :
         A big membrane Molecule
     """
-    from htmd.progress.progress import ProgressBar
+    from tqdm import tqdm
     memb = memb.copy()
     memb.resid = sequenceID((memb.resid, memb.insertion, memb.chain, memb.segid))
 
@@ -555,7 +555,7 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
     from htmd.molecule.molecule import Molecule
     megamemb = Molecule()
-    bar = ProgressBar(xreps * yreps, description='Replicating Membrane')
+    bar = tqdm(total=xreps * yreps, desc='Replicating Membrane')
     k = 0
     for x in range(xreps):
         for y in range(yreps):
@@ -573,8 +573,8 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
             megamemb.append(tmpmemb)
             k += 1
-            bar.progress()
-    bar.stop()
+            bar.update(1)
+    bar.close()
 
     # Membranes don't tile perfectly. Need to remove waters that clash with lipids of other tiles
     # Some clashes will still occur between periodic images however

@@ -5,7 +5,6 @@
 #
 import numpy as np
 from scipy.spatial.distance import cdist
-from htmd.progress.progress import ProgressBar
 from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
 import logging
 logger = logging.getLogger(__name__)
@@ -77,7 +76,6 @@ class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
         dist = self._dist(self.cluster_centers_, data)
         countCluster = 1
 
-        # p = ProgressBar(self.n_clusters, description='KCenters clustering')
         while len(self.cluster_centers_) < self.n_clusters:
             if np.max(dist) == 0:
                 break
@@ -97,8 +95,6 @@ class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
             dist[switchIdx] = newdist[switchIdx]
 
             countCluster += 1
-            # p.progress()
-        # p.stop()
 
         # update clusterSize
         self.clusterSize = np.bincount(self.labels_)

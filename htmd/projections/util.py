@@ -6,7 +6,6 @@
 import numpy as np
 import logging
 import htmd.molecule.molecule
-import htmd.progress.progress
 
 logger = logging.getLogger(__name__)
 
@@ -258,16 +257,16 @@ def convertProjectionToDataFrame(md):
     """
 
     import pandas as pd
+    from tqdm import trange
 
     nTrajs = md.numTrajectories
     if nTrajs == 0:
         raise Exception("MetricData does not contain any trajectory")
 
-    bar = htmd.progress.progress.ProgressBar(nTrajs, description="Converting {:d} trajectories".format(nTrajs))
     dflist = []
 
     curf=0
-    for tr in range(nTrajs):
+    for tr in trange(nTrajs, desc='Converting {:d} trajectories'.format(nTrajs)):
         df0 = pd.DataFrame(md.trajectories[tr].projection)
         nf = len(df0)
         nfl = curf+np.array(range(nf))
@@ -280,7 +279,6 @@ def convertProjectionToDataFrame(md):
         df0.insert(4, 'PieceFrame', [x.frame for x in nfs])
         dflist.append(df0)
         curf += nf
-        bar.progress()
 
     df = pd.concat(dflist)
 
@@ -309,6 +307,7 @@ def readSimlistIndices(prj, selector):
         A molecule containing the frames selected.
 
     """
+    from tqdm import tqdm
     idx = [i for i, x in enumerate(selector) if x]
     frs = prj.abs2sim(idx)
     nf = len(frs)
@@ -319,12 +318,10 @@ def readSimlistIndices(prj, selector):
 
     tset = set()
     i = 0
-    bar = htmd.progress.progress.ProgressBar(nf, description="Reading {:d} frames".format(nf))
 
-    for i, f in enumerate(frs):
+    for i, f in tqdm(enumerate(frs), desc="Reading {:d} frames".format(nf)):
         tn = f.sim.trajectory[f.piece]
         tset.add(tn)
-        bar.progress()
         # print("Read frame {:d} from trajectory {:s}, frame {:d}".format(i, tn, f.frame))
         mol.read(filename=tn,
                  frames=f.frame,
