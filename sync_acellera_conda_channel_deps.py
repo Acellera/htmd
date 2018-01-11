@@ -32,6 +32,7 @@ packages = [
     ['bioconda', 'nglview'],
     ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
     ['rdkit', 'rdkit'],
+    ['rdkit', 'boost'],
     ['conda-forge', 'nlopt'],
     ['conda-forge', 'periodictable']
 ]
