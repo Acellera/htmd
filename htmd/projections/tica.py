@@ -8,7 +8,6 @@ import numpy as np
 import random
 from htmd.util import _getNcpus
 from htmd.projections.metric import Metric, _projectionGenerator
-from htmd.progress.progress import ProgressBar
 from htmd.units import convert as unitconvert
 from joblib import Parallel, delayed
 import logging
@@ -58,6 +57,7 @@ class TICA(object):
 
     def __init__(self, data, lag, units='frames', dimensions=None):
         from pyemma.coordinates.transform.tica import TICA as TICApyemma
+        from tqdm import tqdm
 
         self.data = data
         self.dimensions = dimensions
@@ -68,7 +68,7 @@ class TICA(object):
             self.tic = TICApyemma(lag)
             metr = data
 
-            p = ProgressBar(len(metr.simulations))
+            pbar = tqdm(total=len(metr.simulations))
             for proj in _projectionGenerator(metr, _getNcpus()):
                 for pro in proj:
                     if pro is None:
@@ -77,8 +77,8 @@ class TICA(object):
                         self.tic.partial_fit(pro[0])
                     else:  # Sub-select dimensions for fitting
                         self.tic.partial_fit(pro[0][:, self.dimensions])
-                p.progress(len(proj))
-            p.stop()
+                pbar.update(len(proj))
+            pbar.close()
         else:  # In-memory TICA
             lag = unitconvert(units, 'frames', lag, data.fstep)
             if lag == 0:
@@ -111,6 +111,7 @@ class TICA(object):
         >>> tica = TICA(data,20)
         >>> dataTica = tica.project(5)
         """
+        from tqdm import tqdm
         if ndim is not None:
             self.tic.set_params(dim=ndim)
 
@@ -123,9 +124,9 @@ class TICA(object):
             fstep = None
 
             metr = self.data
-            p = ProgressBar(len(metr.simulations))
             k = -1
             droppedsims = []
+            pbar = tqdm(total=len(metr.simulations))
             for projecteddata in _projectionGenerator(metr, _getNcpus()):
                 for pro in projecteddata:
                     k += 1
@@ -142,8 +143,8 @@ class TICA(object):
                     refs.append(pro[1])
                     if fstep is None:
                         fstep = pro[2]
-                p.progress(len(projecteddata))
-            p.stop()
+                pbar.update(len(projecteddata))
+            pbar.close()
 
             simlist = self.data.simulations
             simlist = np.delete(simlist, droppedsims)

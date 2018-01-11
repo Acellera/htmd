@@ -67,21 +67,16 @@ class GWPCA(object):
         >>> dataproj = gw.project(5)
         """
         from sklearn.decomposition import IncrementalPCA
-        from htmd.progress.progress import ProgressBar
+        from tqdm import tqdm
 
         pca = IncrementalPCA(n_components=ndim, batch_size=10000)
-        p = ProgressBar(self.data.numTrajectories)
-        for t in self.data.trajectories:
+        for t in tqdm(self.data.trajectories):
             pca.partial_fit(t.projection * self.weights)
-            p.progress()
-        p.stop()
+
 
         projdata = self.data.copy()
-        p = ProgressBar(self.data.numTrajectories)
-        for i, t in enumerate(self.data.trajectories):
+        for i, t in enumerate(tqdm(self.data.trajectories)):
             projdata.trajectories[i].projection = pca.transform(t.projection * self.weights)
-            p.progress()
-        p.stop()
 
         # projdataconc = pca.fit_transform(self.weighedconcat)
         # projdata.dat = projdata.deconcatenate(projdataconc)

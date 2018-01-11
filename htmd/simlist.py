@@ -189,13 +189,11 @@ def simlist(datafolders, topologies, inputfolders=None):
 
     keys = natsort.natsorted(datanames.keys())
     i = 0
-    from htmd.progress.progress import ProgressBar
-    bar = ProgressBar(len(keys), description='Creating simlist')
-    for k in keys:
+    from tqdm import tqdm
+    for k in tqdm(keys, desc='Creating simlist'):
         trajectories = _autoDetectTrajectories(datanames[k])
 
         if not trajectories:
-            bar.progress()
             continue
 
         if len(topologies) > 1:
@@ -217,8 +215,6 @@ def simlist(datafolders, topologies, inputfolders=None):
         numframes = [_readNumFrames(f) for f in trajectories]
         sims.append(Sim(simid=i, parent=None, input=inputf, trajectory=trajectories, molfile=molfile, numframes=numframes))
         i += 1
-        bar.progress()
-    bar.stop()
     logger.debug('Finished listing of simulations.')
     return np.array(sims, dtype=object)
 
@@ -259,7 +255,7 @@ def simfilter(sims, outfolder, filtersel):
     from htmd.config import _config
     from htmd.parallelprogress import ParallelExecutor, delayed
     aprun = ParallelExecutor(n_jobs=_config['ncpus'])
-    filtsims = aprun(total=len(sims), description='Filtering trajectories')(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
+    filtsims = aprun(total=len(sims), desc='Filtering trajectories')(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
 
     logger.debug('Finished filtering of simulations')
     return np.array(filtsims)

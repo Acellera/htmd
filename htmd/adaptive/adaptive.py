@@ -200,7 +200,7 @@ class AdaptiveBase(ProtocolInterface):
         from htmd.parallelprogress import ParallelExecutor
         from htmd.config import _config
         aprun = ParallelExecutor(n_jobs=_config['ncpus'])
-        aprun(total=len(simsframes), description='Writing inputs')(
+        aprun(total=len(simsframes), desc='Writing inputs')(
             delayed(_writeInputsFunction)(i, f, epoch, self.inputpath, self.coorname) for i, f in enumerate(simsframes))
 
     @abc.abstractmethod
