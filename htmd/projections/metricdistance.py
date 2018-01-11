@@ -304,6 +304,12 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
     -------
     cm : np.ndarray
         The input vector converted into a 2D numpy array
+
+    Examples
+    --------
+    >>> reconstructContactMap(contacts, mapping)
+    To use it with distances instead of contacts pass ones as the concat vector
+    >>> reconstructContactMap(np.ones(dists.shape, dtype=bool), mapping, colors=dists)
     """
 
     from copy import deepcopy

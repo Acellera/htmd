@@ -6,7 +6,6 @@
 import os
 from htmd.molecule.molecule import Molecule
 import numpy as np
-from htmd.progress.progress import ProgressBar
 import sys
 import logging
 logger = logging.getLogger(__name__)
@@ -71,6 +70,8 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
     >>> smol = solvate(mol, pad=10)
     >>> smol = solvate(mol, minmax=[[-20, -20, -20],[20, 20, 20]])
     """
+    from tqdm import tqdm
+
     mol = mol.copy()
     if mol.numFrames > 1:
         logger.warning('Multiple frames in Molecule. Solvate keeps only frame 0 and discards the rest.')
@@ -148,7 +149,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
     minx = minmol[0] - buffer; miny = minmol[1] - buffer; minz = minmol[2] - buffer
     maxx = maxmol[0] + buffer; maxy = maxmol[1] + buffer; maxz = maxmol[2] + buffer
 
-    bar = ProgressBar(nx*ny*nz, description='Solvating')
+    bar = tqdm(total=nx*ny*nz, desc='Solvating')
     waterboxes = np.empty(numsegs, dtype=object)
     n = preexist
     w = 0
@@ -200,8 +201,8 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
                 #waterboxes[w].write('wat' + str(w) + '.pdb')
                 n += 1
                 w += 1
-                bar.progress()
-    bar.stop()
+                bar.update(1)
+    bar.close()
 
     waters = 0
     for i in range(numsegs):
