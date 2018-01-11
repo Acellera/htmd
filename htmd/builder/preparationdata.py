@@ -65,7 +65,7 @@ class PreparationData:
         Detailed information returned by propKa 3.1.
     """
 
-    # Important- all must be listed or "set_value" will silently ignore them
+    # Important- all must be listed or "PreparationData.at[]=..." will silently ignore them
     _columns = ['resname', 'resid', 'insertion', 'chain',
                 'pKa', 'protonation', 'flipped', 'patches',
                 'buried', 'z', 'membraneExposed', 'forced_protonation', 'default_protonation',
@@ -127,7 +127,7 @@ class PreparationData:
     def _set(self, residue, key, val, append=False):
         pos = self._findRes(residue.name, residue.resSeq, residue.iCode, residue.chainID)
         if not append:
-            self.data.set_value(pos, key, val)
+            self.data.at[pos, key] = val
         else:
             try:
                 ov = self.data.iloc[pos][key]
@@ -135,7 +135,7 @@ class PreparationData:
                     ov = list()
             except:
                 ov = list()
-            self.data.set_value(pos, key, ov + [val])
+            self.data.at[pos, key] = ov + [val]
 
     # residue is e.g. pdb2pqr.src.aa.ILE
     def _setProtonationState(self, residue, state):
@@ -169,15 +169,15 @@ class PreparationData:
                 icode = "L"
                 # forceAppend = True
             pos = self._findRes(resname, resid, icode, chain)
-            self.data.set_value(pos, 'pKa', grp.pka_value)
-            self.data.set_value(pos, 'buried', grp.buried * 100.0)
-            self.data.set_value(pos, 'z', grp.atom.z)
-            self.data.set_value(pos, 'pka_group_id', i)
-            self.data.set_value(pos, 'pka_residue_type', grp.residue_type)
-            self.data.set_value(pos, 'pka_type', grp.type)
-            self.data.set_value(pos, 'pka_charge', grp.charge)
-            self.data.set_value(pos, 'pka_atom_name', grp.atom.name)
-            self.data.set_value(pos, 'pka_atom_sybyl_type', grp.atom.sybyl_type)
+            self.data.at[pos, 'pKa'] = grp.pka_value
+            self.data.at[pos, 'buried'] = grp.buried * 100.0
+            self.data.at[pos, 'z'] = grp.atom.z
+            self.data.at[pos, 'pka_group_id'] = i
+            self.data.at[pos, 'pka_residue_type'] = grp.residue_type
+            self.data.at[pos, 'pka_type'] = grp.type
+            self.data.at[pos, 'pka_charge'] = grp.charge
+            self.data.at[pos, 'pka_atom_name'] = grp.atom.name
+            self.data.at[pos, 'pka_atom_sybyl_type'] = grp.atom.sybyl_type
 
     def _setMembraneExposureAndWarn(self, thickness, maxBuried=75.0):
         self.thickness = thickness
@@ -686,7 +686,8 @@ if __name__ == "__main__":
     import doctest
     doctest.testmod()
 
-    if len(sys.argv) > 1 and sys.argv[0] == 'long-test':
+    if len(sys.argv) > 1 and sys.argv[1] == 'long-test':
+        print('LONG TEST')
         m = Molecule("3ptb")
         mp, dp = proteinPrepare(m, returnDetails=True)
         hb = dp.findHbonds()
