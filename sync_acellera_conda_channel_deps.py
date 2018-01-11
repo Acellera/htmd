@@ -27,7 +27,6 @@ packages = [
     ['conda-forge', 'msmtools'],
     ['openbabel', 'openbabel'],
     ['omnia', 'pint'],
-    ['conda-forge', 'progress_reporter'],
     ['conda-forge', 'pyemma'],
     ['conda-forge', 'thermotools'],
     ['bioconda', 'nglview'],
