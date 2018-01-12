@@ -6,27 +6,42 @@ import numpy as np
 import os
 
 
-def openmm_energy(prm, structure, coords, box=None):
+def disableDispersionCorrection(system):
+    # According to openMM:
+    # The long range dispersion correction is primarily useful when running simulations at constant pressure, since it
+    # produces a more accurate variation in system energy with respect to volume.
+    # So I will disable it to avoid implementing it for now in ffevaluate
+    from simtk.openmm import NonbondedForce
+    for f in system.getForces():
+        if isinstance(f, NonbondedForce):
+            f.setUseDispersionCorrection(False)
+
+def openmm_energy(prm, structure, coords, box=None, cutoff=None):
     import parmed
     from simtk import unit
     from simtk import openmm
     from simtk.openmm import app
     from parmed.amber import AmberParm
 
-    if box is not None:
+    if box is not None and not np.all(box == 0):
+        if cutoff is None:
+            raise RuntimeError('You need to provide a cutoff when passing a box')
         a = unit.Quantity((box[0] * unit.angstrom, 0 * unit.angstrom, 0 * unit.angstrom))
         b = unit.Quantity((0 * unit.angstrom, box[1] * unit.angstrom, 0 * unit.angstrom))
         c = unit.Quantity((0 * unit.angstrom, 0 * unit.angstrom, box[2] * unit.angstrom))
         structure.box_vectors = (a, b, c)
         if isinstance(structure, AmberParm):
-            system = structure.createSystem(nonbondedMethod=app.CutoffPeriodic)
+            system = structure.createSystem(nonbondedMethod=app.CutoffPeriodic, nonbondedCutoff=cutoff*unit.angstrom)
         else:
-            system = structure.createSystem(prm, nonbondedMethod=app.CutoffPeriodic)
+            system = structure.createSystem(prm, nonbondedMethod=app.CutoffPeriodic, nonbondedCutoff=cutoff*unit.angstrom)
+        system.setDefaultPeriodicBoxVectors(a, b, c)
     else:
         if isinstance(structure, AmberParm):
             system = structure.createSystem()
         else:
             system = structure.createSystem(prm)
+
+    disableDispersionCorrection(system)
     integrator = openmm.LangevinIntegrator(300 * unit.kelvin, 1 / unit.picoseconds, 2 * unit.femtoseconds)
     platform = openmm.Platform.getPlatformByName('CPU')
     context = openmm.Context(system, integrator, platform)
@@ -80,6 +95,7 @@ def keepForces(prm, psf, mol, forces=('angle', 'bond', 'dihedral', 'lennardjones
         if verbose: print('Disabling LJ forces')
         for type in prm.atom_types:
             prm.atom_types[type].epsilon = prm.atom_types[type].epsilon_14 = 0
+            prm.atom_types[type].sigma = prm.atom_types[type].sigma_14 = 0
             prm.atom_types[type].nbfix = {}
         prm.nbfix_types = OrderedDict()
     if 'electrostatic' not in forces:
@@ -205,7 +221,7 @@ if __name__ == '__main__':
 
         prmtopFile = glob(os.path.join(d, '*.prmtop'))
         psfFile = glob(os.path.join(d, '*.psf'))
-        pdbFile = glob(os.path.join(d, '*.pdb'))[0]
+        pdbFile = glob(os.path.join(d, '*.pdb'))
         xtcFile = glob(os.path.join(d, '*.xtc'))
         if len(glob(os.path.join(d, '*.prm'))):
             prmFiles = [fixParameters(glob(os.path.join(d, '*.prm'))[0]), ]
@@ -221,11 +237,17 @@ if __name__ == '__main__':
             mol = Molecule(prmtopFile[0])
         if len(xtcFile):
             mol.read(natsorted(xtcFile))
+        elif len(pdbFile):
+            mol.read(pdbFile[0])
         else:
-            mol.read(pdbFile)
+            raise RuntimeError('No PDB or XTC')
         coords = mol.coords
         coords = coords[:, :, 0].squeeze()
-        mol.box[:] = 0
+        rfa = False
+        cutoff = 0
+        if not np.all(mol.box == 0):
+            cutoff = np.min(mol.box) / 2 - 0.01
+            rfa = True
 
         chargebackup = mol.charge.copy()
         for force in ('angle', 'bond', 'dihedral', 'lennardjones', 'electrostatic'):
@@ -242,10 +264,10 @@ if __name__ == '__main__':
                 keepForces(prm, struct, mol, forces=force)
                 keepForcesAmber(struct, mol, forces=force)
 
-            energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct)
+            energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa)
             energies = _formatEnergies(energies[:, 0])
             forces = forces[:, :, 0].squeeze()
-            omm_energies, omm_forces = openmm_energy(prm, struct, coords)
+            omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)
             ediff = compareEnergies(energies, omm_energies, abstol=abstol)
             print('  ', force, 'Energy diff:', ediff, 'Force diff:', compareForces(forces, omm_forces))
 
@@ -260,10 +282,10 @@ if __name__ == '__main__':
             fromstruct = True
             keepForces(prm, struct, mol)
             keepForcesAmber(struct, mol)
-        energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct)
+        energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa)
         energies = _formatEnergies(energies[:, 0])
         forces = forces[:, :, 0].squeeze()
-        omm_energies, omm_forces = openmm_energy(prm, struct, coords)
+        omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)
         ediff = compareEnergies(energies, omm_energies, abstol=abstol)
         print('All forces. Total energy:', energies['total'], 'Energy diff:', ediff, 'Force diff:', compareForces(forces, omm_forces))
 

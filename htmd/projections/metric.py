@@ -145,7 +145,7 @@ class Metric:
         logger.debug('Metric: Starting projection of trajectories.')
         from htmd.config import _config
         aprun = ParallelExecutor(n_jobs=_config['ncpus'])
-        results = aprun(total=numSim, description='Projecting trajectories')(delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
+        results = aprun(total=numSim, desc='Projecting trajectories')(delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
 
         metrics = np.empty(numSim, dtype=object)
         ref = np.empty(numSim, dtype=object)
@@ -286,7 +286,7 @@ def _singleMolfile(sims):
             molfiles.append(tuple(ensurelist(s.molfile)))
 
         uqmolfiles = list(set(molfiles))
-        print(len(uqmolfiles))
+
         if len(uqmolfiles) == 0:
             raise RuntimeError('No molfiles found in simlist')
         elif len(uqmolfiles) == 1:
@@ -295,7 +295,7 @@ def _singleMolfile(sims):
             ref = Molecule(uqmolfiles[0], _logger=False)
             for i in range(1, len(uqmolfiles)):
                 mol = Molecule(uqmolfiles[i], _logger=False)
-                if not mol_equal(ref, mol):
+                if not mol_equal(ref, mol, exceptFields=['coords']):
                     return False, []
             return True, uqmolfiles[0]
     return False, []

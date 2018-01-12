@@ -237,7 +237,7 @@ class Molecule:
 
     @frame.setter
     def frame(self, value):
-        if value < 0 or value >= self.numFrames:
+        if value < 0 or ((self.numFrames != 0) and (value >= self.numFrames)):
             raise NameError("Frame index out of range. Molecule contains {} frame(s). Frames are 0-indexed.".format(self.numFrames))
         self._frame = value
 
@@ -442,26 +442,14 @@ class Molecule:
             refsel = sel
         if frames is None:
             frames = range(self.numFrames)
+        frames = np.array(frames)
         # if not isinstance(refmol, Molecule):
         # raise NameError('Reference molecule has to be a Molecule object')
         sel = self.atomselect(sel)
         refsel = refmol.atomselect(refsel)
         if (type(sel[0]) == bool) and (np.sum(sel) != np.sum(refsel)):
             raise NameError('Cannot align molecules. The two selections produced different number of atoms')
-        for f in frames:
-            P = self.coords[sel, :, f]
-            Q = refmol.coords[refsel, :, refmol.frame]
-            all1 = self.coords[:, :, f]
-            (rot, tmp) = _pp_measure_fit(P, Q)
-            # Translating mol to 0,0,0
-            centroidP = np.mean(P, 0)
-            centroidQ = np.mean(Q, 0)
-            all1 = all1 - centroidP
-            # Rotating mol
-            all1 = np.dot(all1, np.transpose(rot))
-            # Translating to centroid of refmol
-            all1 = all1 + centroidQ
-            self.coords[:, :, f] = all1
+        self.coords = _pp_align(self.coords, refmol.coords, sel, refsel, frames, refmol.frame)
 
     def alignBySequence(self, ref, molseg=None, refseg=None, nalignfragment=1, returnAlignments=False, maxalignments=1):
         """ Aligns the Molecule to a reference Molecule by their longests sequences alignment
@@ -1570,9 +1558,12 @@ class Molecule:
         return rep
 
 
-def mol_equal(mol1, mol2):
+def mol_equal(mol1, mol2, checkFields=Molecule._atom_fields, exceptFields=None):
     difffields = []
-    for field in Molecule._atom_fields:
+    checkFields = list(checkFields)
+    if exceptFields is not None:
+        checkFields = np.setdiff1d(checkFields, exceptFields)
+    for field in checkFields:
         if not np.array_equal(mol1.__dict__[field], mol2.__dict__[field]):
             difffields += [field]
 
@@ -1600,37 +1591,60 @@ def _getResidueIndexesByAtom(mol, idx):
         torem[seqid == r] = True
     return torem, len(allres)
 
+from numba import jit
 
+
+@jit('Tuple((float32[:, :], float64))(float32[:, :], float32[:, :])', nopython=True, nogil=True)
 def _pp_measure_fit(P, Q):
     """
+    WARNING: ASSUMES CENTERED COORDINATES!!!!
+
     PP_MEASURE_FIT - molecule alignment function.
     For documentation see http://en.wikipedia.org/wiki/Kabsch_algorithm
     the Kabsch algorithm is a method for calculating the optimal
     rotation matrix that minimizes the RMSD (root mean squared deviation)
     between two paired sets of points
     """
-    centroidP = np.mean(P, 0)
-    centroidQ = np.mean(Q, 0)
-
-    # Centering them on 0,0,0
-    # Can also be done with translation matrix if it's faster
-    P = P - centroidP
-    Q = Q - centroidQ
-
-    covariance = np.dot(np.transpose(P), Q)
+    covariance = np.dot(P.T, Q)
 
     (V, S, W) = np.linalg.svd(covariance)  # Matlab svd returns the W transposed compared to numpy.svd
-    W = np.transpose(W)
+    W = W.T
 
-    E0 = np.sum(np.sum(P * P)) + np.sum(np.sum(Q * Q))
+    E0 = np.sum(P * P) + np.sum(Q * Q)
     RMSD = E0 - (2 * np.sum(S.ravel()))
-    RMSD = np.sqrt(np.abs(RMSD / np.size(P, 0)))
+    RMSD = np.sqrt(np.abs(RMSD / P.shape[0]))
 
     d = np.sign(np.linalg.det(W) * np.linalg.det(V))
-    z = np.eye(3)
+    z = np.eye(3).astype(P.dtype)
     z[2, 2] = d
-    U = np.dot(np.dot(W, z), np.transpose(V))
+    U = np.dot(np.dot(W, z), V.T)
     return U, RMSD
+
+
+@jit('float32[:, :, :](float32[:, :, :], float32[:, :, :], boolean[:], boolean[:], int64[:], int64)', nopython=True,
+     nogil=True)
+def _pp_align(coords, refcoords, sel, refsel, frames, refframe):
+    newcoords = np.zeros(coords.shape, dtype=coords.dtype)
+    for f in frames:
+        P = coords[sel, :, f]
+        Q = refcoords[refsel, :, refframe]
+        all1 = coords[:, :, f]
+
+        centroidP = np.zeros(3, dtype=P.dtype)
+        centroidQ = np.zeros(3, dtype=Q.dtype)
+        for i in range(3):
+            centroidP[i] = np.mean(P[:, i])
+            centroidQ[i] = np.mean(Q[:, i])
+
+        (rot, tmp) = _pp_measure_fit(P - centroidP, Q - centroidQ)
+
+        all1 = all1 - centroidP
+        # Rotating mol
+        all1 = np.dot(all1, rot.T)
+        # Translating to centroid of refmol
+        all1 = all1 + centroidQ
+        newcoords[:, :, f] = all1
+    return newcoords
 
 
 class Representations:
