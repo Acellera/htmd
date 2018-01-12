@@ -286,7 +286,7 @@ def _singleMolfile(sims):
             molfiles.append(tuple(ensurelist(s.molfile)))
 
         uqmolfiles = list(set(molfiles))
-        print(len(uqmolfiles))
+
         if len(uqmolfiles) == 0:
             raise RuntimeError('No molfiles found in simlist')
         elif len(uqmolfiles) == 1:
@@ -295,7 +295,7 @@ def _singleMolfile(sims):
             ref = Molecule(uqmolfiles[0], _logger=False)
             for i in range(1, len(uqmolfiles)):
                 mol = Molecule(uqmolfiles[i], _logger=False)
-                if not mol_equal(ref, mol):
+                if not mol_equal(ref, mol, exceptFields=['coords']):
                     return False, []
             return True, uqmolfiles[0]
     return False, []
