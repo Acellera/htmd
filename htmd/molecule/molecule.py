@@ -68,7 +68,7 @@ class Molecule:
 
     Parameters
     ----------
-    filename : str
+    filename : str or list of str
             Optionally load a PDB file from the specified file. If there's no file and the value is four characters long
             assume it is a PDB accession code and try to download from the RCSB web server.
     name : str
