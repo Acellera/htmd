@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 import os
+import logging
 from math import pi as PI
 from math import sqrt, sin, cos, acos
 import numpy as np
@@ -14,6 +15,9 @@ import nlopt
 import unittest
 
 from htmd.molecule.vdw import radiusByElement
+
+logger = logging.getLogger(__name__)
+
 
 class ESP:
     """
@@ -264,6 +268,7 @@ class ESP:
         results : dict
             Dictionary with the fitted charges and fitting loss value
         """
+        logger.info('Start charge optimization')
 
         # Get charge bounds
         lower_bounds, upper_bounds = self._get_bounds()
@@ -283,6 +288,9 @@ class ESP:
         # TODO: check optimizer status
         charges = self._map_groups_to_atoms(group_charges)
         loss = self._compute_objective(group_charges, None)
+        logger.info('Final RMSD: %f au' % loss)
+
+        logger.info('Finish charge optimization')
 
         return {'charges': charges, 'loss': loss}
 
