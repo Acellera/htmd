@@ -36,17 +36,12 @@ def test_tutorials(testfolder, tutorials=('ligand-binding-analysis', 'protein-fo
 
 
 def format_script(script, outdir, name):
-    # 1. Need to remove the * imports. Python doesn't allow * imports in functions
-    # 2. Wrap it all in a test function for pytest
-    # 3. Indent everything one tab to be inside the function
-    import htmd.ui
-    htmdimports = [x for x in htmd.ui.__dict__.keys() if not x.startswith('_')]
+    # 1. Wrap it all in a test function for pytest
+    # 2. Indent everything one tab to be inside the function
 
     splitt = script.split('\n')
-    lines = ['def test_{}():\n'.format(name.replace('-', '_')),
-             '\tfrom htmd import {}\n'.format(', '.join(htmdimports)),
-             '\timport matplotlib\n',
-             '\tmatplotlib.use("Agg")\n',
+    lines = ['from htmd.ui import *\n',
+             'def test_{}():\n'.format(name.replace('-', '_')),
              '\tgetCurrentViewer(dispdev="text")\n',
              '\tnp.random.seed(0)\n',
              '\timport os\n',
