@@ -37,7 +37,28 @@ class _Lipid:
         if self.mol is not None:
             s += 'mol: {} '.format(id(self.mol))
         return s[:-1]
+def listLipids():
+    """ Lists all available lipids
 
+    Examples
+    --------
+    >>> from htmd.membranebuilder.build_membrane import buildMembrane 
+    >>> build_membrane.listLipids()
+    ---- Lipids list: ...
+
+    """
+
+    from htmd.home import home
+    import os
+    from natsort import natsorted
+
+    membranebuilderhome = os.path.join( home(), 'membranebuilder', 'lipids', '' )
+    lipids = natsorted(glob( os.path.join(membranebuilderhome, '*')))
+    print('---- Lipids list: ' + membranebuilderhome + ' ----')
+    for l in lipids:
+        l = os.path.basename(l)
+        print('- ', l)
+        
 
 # def findNonClashingConformation(othermols, molname, resid, p, layer, positions, bilayerbuffer=0, thresh=2):
 #     from scipy.spatial.distance import cdist
