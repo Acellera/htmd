@@ -232,16 +232,21 @@ class MoietyFragmenter:
 
         return fgs_merged
 
-    def depictFGs(self, fgs, filename=None, ipython=False):
+    def depictFGs(self, fgs, filename=None, ipython=False, optimize=False):
         from rdkit.Chem.Draw import IPythonConsole
         from rdkit.Chem.Draw import MolToImage
         from rdkit.Chem.Draw import rdMolDraw2D
         from IPython.display import SVG
+        from rdkit.Chem.AllChem import EmbedMolecule
 
         drawer = rdMolDraw2D.MolDraw2DSVG(400, 200)
         
         highlightAtoms = [a for fg in fgs for a in fg.AtomsIdx ] + [a for fg in fgs for a in fg.EnviromentsIdx ]
         highlightColors = { a : self._colors[i%len(self._colors)] for i in range(len(fgs)) for a in fgs[i].AtomsIdx }
+
+        if optimize:
+            EmbedMolecule(self._mol._mol)
+        
 
         drawer.DrawMolecule(self._mol._mol, highlightAtoms=highlightAtoms, highlightBonds=[], highlightAtomColors=highlightColors)
         
@@ -272,6 +277,8 @@ class Moiety:
         self.atoms = atoms
         self.bonds = self._getBonds(atoms)
         self.enviroments = []
+
+        self.name = None
         
     def _getBonds(self, atoms):
         atoms_idx = [ a.GetIdx() for a in atoms]
@@ -352,11 +359,71 @@ class Moiety:
         # Doubt: hydrogens on alkene. Useful for cys/trans. I prefer clean it
         hydrogens = [ atom for a in  atoms for atom in a.GetNeighbors() if atom.GetSymbol() == 'H' if atom.GetIdx() not in hydrogens_alkene]
         self.atoms = self.atoms + [ h for h in hydrogens if not self._hasAtomIdx(h.GetIdx()) ]
-        self.bonds = self._getBonds(self.atoms) 
+        self.bonds = self._getBonds(self.atoms)
+
+        self.name = self._getName() 
+
+    def _getName(self):
+        from collections import Counter
+
+        elements = self.get_elements()
+        atoms = self.Atoms
+        bonds = self.Bonds
+
+        print("Naming")
+        print(">>> ", Counter(elements))
+
+        
 
     def _getEnvironments(self):
         carbons = [atom for a in self.Atoms for atom in a.GetNeighbors() if atom.GetSymbol() == 'C']
         carbons_env = [c for c in carbons if c.GetIdx() not in self.AtomsIdx]
         
         self.enviroments = carbons_env
+
+    def get_elements(self):
+        elements = [ atom.GetSymbol() for atom in self.Atoms ]
+        return elements
                    
+
+    def depict(self, filename=None, ipython=False):
+        from rdkit.Chem.Draw import IPythonConsole
+        from rdkit.Chem.Draw import MolToImage
+        from rdkit.Chem.Draw import rdMolDraw2D
+        from rdkit.Chem.AllChem import EmbedMolecule
+        from IPython.display import SVG
+        from rdkit.Chem import RWMol, MolFromSmiles, Atom, BondType
+
+        _ = MolFromSmiles('C')
+        rmol = RWMol(_)
+
+        dict_old_new_idx = {}
+        for n, a in enumerate(self.atoms):
+            old_idx = a.GetIdx()
+            rmol.AddAtom(a)
+            dict_old_new_idx[old_idx] = n + 1
+
+        for b in self.Bonds:
+            rmol.AddBond(dict_old_new_idx[b.GetBeginAtomIdx()], dict_old_new_idx[b.GetEndAtomIdx()], b.GetBondType())
+        
+        rmol.RemoveAtom(0)
+
+        EmbedMolecule(rmol)
+
+        drawer = rdMolDraw2D.MolDraw2DSVG(400, 200)
+        
+        drawer.DrawMolecule(rmol)
+        
+        drawer.FinishDrawing()
+        svg = drawer.GetDrawingText()
+
+        if filename != None:
+            f = open(filename, 'w')
+            f.write(svg)
+            f.close()
+        
+        if ipython:
+            svg = svg.replace('svg:', '')
+            return SVG(svg)
+        else:
+            return None
