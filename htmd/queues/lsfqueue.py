@@ -8,7 +8,7 @@ import shutil
 import random
 import string
 import numpy as np
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, STDOUT, CalledProcessError
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
 from htmd.config import _config
@@ -210,10 +210,10 @@ class LsfQueue(SimQueue, ProtocolInterface):
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)
             try:
-                ret = check_output(self._qsubmit + " < " + jobscript, shell=True)
+                ret = check_output(self._qsubmit + " < " + jobscript, stderr=STDOUT, shell=True, encoding='utf-8')
                 logger.debug(ret)
-            except:
-                raise
+            except CalledProcessError as e:
+                logger.error('The queue submission of {} failed with: "{}"'.format(d, e.output.strip()))
 
     def inprogress(self):
         """ Returns the sum of the number of running and queued workunits of the specific group in the engine.
