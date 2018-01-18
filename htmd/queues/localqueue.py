@@ -117,7 +117,7 @@ class _LocalQueue(SimQueue, ProtocolInterface):
                 datadir = os.path.abspath(self.datadir)
                 try:
                     os.mkdir(datadir)
-                except OSError:
+                except FileExistsError:
                     pass
                 simname = os.path.basename(os.path.normpath(workdir))
                 # create directory for new file
