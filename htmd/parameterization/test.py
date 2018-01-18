@@ -14,17 +14,16 @@ from htmd.util import tempname
 
 
 class TestParameterize(unittest.TestCase):
+
     def setUp(self):
         if os.environ.get('TRAVIS_OS_NAME') == 'osx':
             self.skipTest('Mac does not work!')
 
         self.maxDiff = None
         self.dataDir = home(dataDir='test-param')
-        if os.environ.get('TESTDIR') is not None:
-            self.testDir = os.environ['TESTDIR']
-        else:
-            self.testDir = tempname()
-        print('Test dir: {}'.format(self.testDir))
+        self.testDir = os.environ.get('TESTDIR', tempname())
+
+        print('\n') # Just for a better readability
 
     def _test(self, refDir, resDir, cmd):
 
@@ -247,9 +246,10 @@ class TestParameterize(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_benzamidine_full(self):
+        assert 'HTMD_CONFIG' in os.environ, '"HTMD_CONFIG" environment variable has to be set'
         refDir = os.path.join(self.dataDir, 'benzamidine_full')
         resDir = os.path.join(self.testDir, 'benzamidine_full')
-        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF --basis 6-31G*')
+        self._test(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF --basis 6-31G* -q Slurm')
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
