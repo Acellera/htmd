@@ -115,10 +115,7 @@ class _LocalQueue(SimQueue, ProtocolInterface):
             # Move completed trajectories
             if self.datadir is not None:
                 datadir = os.path.abspath(self.datadir)
-                try:
-                    os.mkdir(datadir)
-                except FileExistsError:
-                    pass
+                os.makedirs(datadir, exist_ok=True)
                 simname = os.path.basename(os.path.normpath(workdir))
                 # create directory for new file
                 odir = os.path.join(datadir, simname)
