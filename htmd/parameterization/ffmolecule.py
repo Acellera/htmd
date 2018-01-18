@@ -297,7 +297,7 @@ class FFMolecule(Molecule):
         directories = []
         dihedral_directory = 'dihedral-opt' if geomopt else 'dihedral-single-point'
         for dihedral in dihedrals:
-            dihedral_name = '%s-%s-%s-%s' % tuple(self.name[dihedral])
+            dihedral_name = '-'.join(self.name[dihedral])
             directory = os.path.join(self.outdir, dihedral_directory, dihedral_name, self.qm_method_name())
             os.makedirs(directory, exist_ok=True)
             directories.append(directory)
