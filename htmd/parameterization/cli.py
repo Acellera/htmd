@@ -162,8 +162,8 @@ def main_parameterize(arguments=None):
                          outdir=args.outdir)
         print('\n === Parameterizable dihedral angles of %s ===\n' % args.filename)
         with open('torsions.txt', 'w') as fh:
-            for dihedral in mol.getRotatableDihedrals():
-                dihedral_name = '-'.join(mol.name[dihedral])
+            for dihedral in mol.getParameterizableDihedrals():
+                dihedral_name = '-'.join(mol.name[list(dihedral)])
                 print('  '+dihedral_name)
                 fh.write(dihedral_name+'\n')
         print()

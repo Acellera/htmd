@@ -154,7 +154,7 @@ class DihedralFitting:
             raise ValueError('The number of dihedral and QM result sets has to be the same!')
 
         # Get dihedral names
-        self._names = ['-'.join(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
+        self._names = ['-'.join(self.molecule.name[list(dihedral)]) for dihedral in self.dihedrals]
 
         # Get equivalent dihedral atom indices
         self._equivalent_indices = []
