@@ -8,8 +8,7 @@ from collections import OrderedDict
 import itertools
 import numpy as np
 import networkx as nx
-
-from htmd.molecule.vdw import elements
+from periodictable import elements
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ def getMolecularGraph(molecule):
 
     graph = nx.Graph()
     for i, element in enumerate(molecule.element):
-        graph.add_node(i, element=element, number=elements.index(element))
+        graph.add_node(i, element=element, number=elements.symbol(element).number)
     graph.add_edges_from(molecule.bonds)
 
     return graph
@@ -91,7 +90,9 @@ def detectEquivalentAtoms(molecule):
     --------
 
     >>> import os
-    >>> from htmd.home import home
+    >>> from htmd.home import home #doctest:+ELLIPSIS
+    <BLANKLINE>
+    ...
     >>> from htmd.parameterization.ffmolecule import FFMolecule
     >>> from htmd.parameterization.detect import detectEquivalentAtoms
 
