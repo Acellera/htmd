@@ -8,7 +8,6 @@ from htmd.projections.metric import Metric
 from htmd.molecule.molecule import Molecule
 from joblib import Parallel, delayed
 from sklearn.metrics import mutual_info_score
-from htmd.progress.progress import ProgressBar
 import numpy as np
 import pandas as pd
 
@@ -88,7 +87,7 @@ class MutualInformation:
         microcat = self.model.micro_ofcluster[stconcat]
 
         aprun = ParallelExecutor(n_jobs=_config['ncpus'])
-        res = aprun(total=numchi, description='Calculating MI')(delayed(self._parallelAll)(numchi, dih1, 4, self.model.micronum, self.bindihcat, microcat, statdist) for dih1 in range(numchi))
+        res = aprun(total=numchi, desc='Calculating MI')(delayed(self._parallelAll)(numchi, dih1, 4, self.model.micronum, self.bindihcat, microcat, statdist) for dih1 in range(numchi))
         MI_all = np.zeros((len(self.resids), len(self.resids)))
         for r in res:
             dihcounts = r[0]

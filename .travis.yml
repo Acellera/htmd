@@ -2,6 +2,10 @@
 
 # Set MAKENOARCH=1 to the one combination which will make and release noarch packages. It's used in conda upload.
 
+sudo: required
+dist: trusty
+group: deprecated-2017Q4
+
 matrix:
   include:
     - os: linux
@@ -10,15 +14,20 @@ matrix:
     - os: linux
       language: generic
       env: TRAVIS_PYTHON_VERSION=3.5 OSNAME=Linux
-    - os: osx
-      language: generic
-      env: TRAVIS_PYTHON_VERSION=3.6 OSNAME=Darwin
-      before_install:
-        - brew update
-        - brew install gcc
+# TODO: Uncomment when MacOS comes back (travis-ci/travis-ci#9075)
+#    - os: osx
+#      language: generic
+#      env: TRAVIS_PYTHON_VERSION=3.6 OSNAME=Darwin
+#      before_install:
+#        - brew update
+#        - brew cask uninstall oclint
+#        - brew install gcc
 
 
 install:
+  # Make sure stdout is in blocking mode. Otherwise builds will fail due to large writes to stdout
+  # See https://github.com/travis-ci/travis-ci/issues/4704. If this gets fixed, this line can also be removed.
+  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then python3 -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'; fi
   - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
   - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
 
@@ -33,6 +42,7 @@ install:
   - conda install conda conda-build anaconda anaconda-client requests pytest -y -q # this has to go into the root environment
   - if [ "$TRAVIS_OS_NAME" == "linux" ]; then conda install gcc_linux-64 gxx_linux-64 -y -q; fi
   - conda create -q -n travis-env python=$TRAVIS_PYTHON_VERSION
+  - echo "python $TRAVIS_PYTHON_VERSION*" > $HOME/miniconda/envs/travis-env/conda-meta/pinned
   - source activate travis-env
 
   - conda config --add channels acellera
@@ -50,7 +60,10 @@ install:
   - export BUILD_NUMBER=0
 
   # Install the Conda dependencies HTMD needs
+  - df -h
   - conda install --file package/htmd-deps/DEPENDENCIES -y
+  # Cleaning to reduce amount of space used on disk
+  - conda clean --all -y
   - python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
   # If not PR, clone the private htmdlib repo,
@@ -63,13 +76,13 @@ install:
   - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
   - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
   - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y -q
+  # Cleaning to reduce amount of space used on disk
+  - conda clean --all -y
 
 script:
   - export HTMD_NONINTERACTIVE=1
   - python htmd/tests/run_inline_file_tests.py
   - htmd/tests/run_other_tests.sh
-
-after_success:
-  # If not PR, on Acellera/htmd and tagged build, do anaconda upload tasks
-  - if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./continuous-integration/travis/conda_upload.sh; bash -x ./continuous-integration/travis/conda_build_upload_meta.sh ; fi
+  # If build did not fail, if it is not PR, it's on Acellera/htmd and a tagged build, do anaconda upload tasks
+  - if [ "$TRAVIS_TEST_RESULT" == "0" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./continuous-integration/travis/conda_upload.sh; bash -x ./continuous-integration/travis/conda_build_upload_meta.sh ; fi
 

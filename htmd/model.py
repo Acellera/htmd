@@ -522,7 +522,7 @@ class Model(object):
         # This loop really iterates over states. sampleStates returns an array of arrays
         # Removed ncpus because it was giving errors on some systems.
         aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
-        mols = aprun(total=len(relframes), description='Getting state Molecules')\
+        mols = aprun(total=len(relframes), desc='Getting state Molecules')\
             (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist) for rel in relframes)
         return np.array(mols, dtype=object)
 
@@ -822,7 +822,7 @@ class Model(object):
 
         return Model(newdata)
 
-    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None):
+    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, plot=True, save=None):
         """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
         Parameters
@@ -839,6 +839,10 @@ class Model(object):
             Marker size for states.
         cmap :
             Matplotlib colormap.
+        plot : bool
+            If the method should display the plot of implied timescales
+        save : str
+            Path of the file in which to save the figure
         """
         self._integrityCheck(postmsm=True)
         from matplotlib import pylab as plt
@@ -865,7 +869,10 @@ class Model(object):
             ax.legend(prop={'size': 8})
             #self.data._setColorbar(f, y, 'Macrostates')
         #f.show() Raises warnings in notebooks
-        plt.show()
+        if save is not None:
+            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+        if plot:
+            plt.show()
 
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:

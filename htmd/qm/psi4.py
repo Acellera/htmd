@@ -166,7 +166,7 @@ class Psi4(QMBase):
             # Enable a dynamic optimization algorithm selection to converge problematic cases:
             # http://www.psicode.org/psi4manual/master/optking.html#dealing-with-problematic-optimizations
             if self.optimize:
-                f.write('set optking { dynamic_level = 1 }\n\n')
+                f.write('set optking { dynamic_level = 1 \n geom_maxiter = 250\n print_trajectory_xyz_file = True }\n\n')
 
             theory_correction = 'SCF' if self.theory == 'HF' else self.theory
             theory_correction += '' if self.correction == 'none' else '-%s' % self.correction

@@ -7,7 +7,6 @@ import os
 import sys
 import argparse
 import logging
-import psutil
 import numpy as np
 
 from htmd.version import version
@@ -16,7 +15,7 @@ from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
-from htmd.qm import Psi4, Gaussian, FakeQM
+from htmd.qm import Psi4, Gaussian, FakeQM2
 from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.parameterization.fftype import FFTypeMethod
 from htmd.parameterization.ffevaluate import FFEvaluate
@@ -53,10 +52,12 @@ def getArgumentParser():
                         help='Do not perform QM scanning of dihedral angles')
     parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
                         help='Do not perform QM structure optimisation when scanning dihedral angles')
-    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF'],
+    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
                                                                       'defaults)')
+    parser.add_argument('-m', '--memory', default=None, type=int, help='Maximum amount of memory in MB to use.')
+    parser.add_argument('--groupname', default=None, help=argparse.SUPPRESS)
     parser.add_argument('-o', '--outdir', default='./', help='Output directory (default: %(default)s)')
     parser.add_argument('--seed', default=20170920, type=int,
                         help='Random number generator seed (default: %(default)s)')
@@ -122,6 +123,8 @@ def main_parameterize(arguments=None):
         queue = PBSQueue()  # TODO: configure
     elif args.queue == 'AceCloud':
         queue = AceCloudQueue()  # TODO: configure
+        queue.groupname = args.groupname
+        queue.hashnames = True
     else:
         raise NotImplementedError
 
@@ -129,6 +132,9 @@ def main_parameterize(arguments=None):
     if args.ncpus:
         logger.info('Overriding ncpus to {}'.format(args.ncpus))
         queue.ncpu = args.ncpus
+    if args.memory:
+        logger.info('Overriding memory to {}'.format(args.memory))
+        queue.memory = args.memory
 
     # Create a QM object
     if args.code == 'Psi4':
@@ -140,7 +146,7 @@ def main_parameterize(arguments=None):
 
     # This is for debugging only!
     if args.fake_qm:
-        qm = FakeQM()
+        qm = FakeQM2()
         logger.warning('Using FakeQM')
 
     # Set up the QM object
@@ -156,8 +162,8 @@ def main_parameterize(arguments=None):
                          outdir=args.outdir)
         print('\n === Parameterizable dihedral angles of %s ===\n' % args.filename)
         with open('torsions.txt', 'w') as fh:
-            for dihedral in mol.getParameterizableDihedrals():
-                dihedral_name = '%s-%s-%s-%s' % tuple(mol.name[list(dihedral)])
+            for dihedral in mol.getRotatableDihedrals():
+                dihedral_name = '-'.join(mol.name[dihedral])
                 print('  '+dihedral_name)
                 fh.write(dihedral_name+'\n')
         print()
@@ -220,15 +226,18 @@ def main_parameterize(arguments=None):
                         logger.info('Charge of atom %s is fixed to %f' % (fixed_atom_name, mol.charge[aton_index]))
 
             # Fit ESP charges
-            score, qm_dipole = mol.fitCharges(fixed=fixed_atom_indices)
+            _, qm_dipole = mol.fitCharges(fixed=fixed_atom_indices)
 
-            # Print results
+            # Copy the new charges to the original molecule
+            mol_orig.charge[:] = mol.charge
+
+            # Print dipoles
+            logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
             mm_dipole = mol.getDipole()
-            score = np.sum((qm_dipole[:3] - mm_dipole[:3])**2)
-            print('Charge fitting score: %f\n' % score)
-            print('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
-            print('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
-            print('Dipole Chi^2 score: %f\n' % score)
+            if np.all(np.isfinite(mm_dipole)):
+                logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
+            else:
+                logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
 
         # Fit dihedral angle parameters
         if args.fit_dihedral:
@@ -258,11 +267,11 @@ def main_parameterize(arguments=None):
         mol.writeParameters(mol_orig)
 
         # Write energy file
-        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.output_directory_name(), 'energies.txt')
+        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.qm_method_name(), 'energies.txt')
         printEnergies(mol, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
-
+        
 if __name__ == "__main__":
 
     args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']

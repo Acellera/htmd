@@ -213,21 +213,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             if self.jobname is None:
                 self.jobname = self._autoJobName(d)
 
-            runscript = os.path.abspath(os.path.join(d, 'run.sh'))
-
-            # Clean sentinel files , if existent
-            if os.path.exists(os.path.join(d, self._sentinel)):
-                try:
-                    os.remove(os.path.join(d, self._sentinel))
-                except:
-                    logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
-                else:
-                    logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
-
-            if not os.path.exists(runscript):
-                raise FileExistsError('File {} does not exist.'.format(runscript))
-            if not os.access(runscript, os.X_OK):
-                raise PermissionError('File {} does not have execution permissions.'.format(runscript))
+            runscript = self._getRunScript(d)
+            self._cleanSentinel(d)
 
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)

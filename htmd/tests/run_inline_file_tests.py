@@ -15,8 +15,13 @@ except ImportError:
 
 excludedfolders = ('./oldtests', './htmd/tests', './doc', './htmdlib', './package', './continuous-integration',
                    './tutorials')
-excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_acellera_conda_channel_deps.py',
-                 'makerelease.py')
+# TODO: Remove this if when issue #532 is solved
+if os.environ.get('TRAVIS_OS_NAME') == 'osx':
+    excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_acellera_conda_channel_deps.py',
+                     'makerelease.py', 'smallmol.py')
+else:
+    excludedfiles = ('__init__.py', 'license_headers.py', 'setup.py', 'sync_acellera_conda_channel_deps.py',
+                     'makerelease.py')
 
 
 def excluded(name, exclusionlist):

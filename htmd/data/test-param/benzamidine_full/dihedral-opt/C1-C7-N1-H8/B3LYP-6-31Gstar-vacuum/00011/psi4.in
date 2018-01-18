@@ -1,47 +1,48 @@
-set {
-	reference rks
-	basis 6-31G*
-}
+set_num_threads(1)
+set_memory(3145728000)
 
-
-set_num_threads( 8 )
-memory 2 gb
+set { reference rks }
+set { basis 6-31G* }
 
 molecule MOL {
-1 1
-
-C	 -0.656959	 1.194247	 -1.116396
-C	 0.017501	 2.429620	 -1.120939
-C	 -0.612572	 3.559801	 -0.609646
-C	 -1.905592	 3.464065	 -0.086043
-C	 -2.576382	 2.237214	 -0.075895
-C	 -1.960247	 1.101984	 -0.592955
-C	 -0.000000	 -0.000000	 -1.658508
-H	 1.004904	 2.517409	 -1.565423
-H	 -0.100463	 4.516317	 -0.628444
-H	 -2.391816	 4.347942	 0.315181
-H	 -3.574372	 2.163952	 0.343846
-H	 -2.468418	 0.143029	 -0.543924
-N	 -0.712589	 -0.905950	 -2.322235
-N	 1.307109	 -0.174792	 -1.485369
-H	 1.822932	 -0.932498	 -1.917313
-H	 1.815550	 0.423583	 -0.847624
-H	 -1.377189	 -1.485970	 -1.827091
-H	 -0.673431	 -1.006470	 -3.329771
-
-	symmetry c1
-}
-set optking { dynamic_level = 1 }
-set optking {
-	frozen_dihedral = ("
-		1 7 13 17
-	")
+    1 1
+    noreorient
+    nocom
+    symmetry c1
+    C    0.000000   0.000000  -0.177864
+    C    0.036678   1.219374   0.524165
+    C    0.031764   1.213119   1.915444
+    C   -0.000000  -0.000000   2.610107
+    C   -0.031764  -1.213119   1.915444
+    C   -0.036677  -1.219374   0.524165
+    C    0.000000  -0.000000  -1.644734
+    H    0.018170   2.164705  -0.010853
+    H    0.042402   2.152895   2.457886
+    H   -0.000000  -0.000000   3.695756
+    H   -0.042402  -2.152895   2.457886
+    H   -0.018170  -2.164705  -0.010853
+    N   -0.712590  -0.905950  -2.308460
+    N    0.712590   0.905950  -2.308461
+    H    0.673432   1.006469  -3.315997
+    H    1.377190   1.485970  -1.813317
+    H   -0.427399  -1.876455  -2.300040
+    H   -1.581647  -0.684646  -2.780191
 }
 
-ee,wfn = optimize('b3lyp-d3', return_wfn=True)
-oeprop( wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
-f=open( 'psi4out.xyz', 'w' )
-f.write( "18  " )
-f.write( str(ee) + "\n" )
-f.write( MOL.save_string_xyz() )
-f.close()
+set optking { frozen_dihedral = (" 1 7 13 17 ") }
+
+set optking { dynamic_level = 1 
+ geom_maxiter = 250
+ print_trajectory_xyz_file = True }
+
+energy, wfn = optimize('B3LYP-D3', return_wfn=True)
+
+import os
+os.chdir(os.environ['HTMD_PSI4_WORKDIR'])
+
+oeprop(wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
+
+with open('psi4out.xyz', 'w') as f:
+    f.write('18 ' )
+    f.write('%.12f\n' % energy)
+    f.write(MOL.save_string_xyz())

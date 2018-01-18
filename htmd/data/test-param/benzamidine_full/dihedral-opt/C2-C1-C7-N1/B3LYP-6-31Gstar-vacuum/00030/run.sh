@@ -1,3 +1,4 @@
 #!/bin/sh
-/home/raimis/opt/miniconda3/envs/htmd/bin/psi4 -i psi4.in -o psi4.out 2>&1
 
+export HTMD_PSI4_WORKDIR=$(pwd)
+psi4 -i psi4.in -o psi4.out &> psi4.log

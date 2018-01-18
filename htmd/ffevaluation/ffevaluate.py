@@ -3,6 +3,10 @@ import numpy as np
 from math import sqrt, acos, radians, cos, sin, pi
 from scipy import constants as const
 from htmd.ffevaluation.util import dihedralAngle, wrapBondedDistance, wrapDistance, cross, dot
+import logging
+from IPython.core.debugger import set_trace
+
+logger = logging.getLogger(__name__)
 
 
 def _formatEnergies(energies):
@@ -55,12 +59,18 @@ def nestedListToArray(nl, dtype, default=1):
 
 
 # TODO: Can be improved with lil sparse arrays
-def init(mol, prm):
+def init(mol, prm, fromstruct=False):
     natoms = mol.numAtoms
     charge = mol.charge.astype(np.float64)
     impropers = mol.impropers
     angles = mol.angles
     dihedrals = mol.dihedrals
+    # if len(impropers) == 0:
+    #     logger.warning('No impropers are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
+    # if len(angles) == 0:
+    #     logger.warning('No angles are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
+    # if len(dihedrals) == 0:
+    #     logger.warning('No dihedrals are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
 
     uqtypes, typeint = np.unique(mol.atomtype, return_inverse=True)
     sigma = np.zeros(len(uqtypes), dtype=np.float32)
@@ -73,7 +83,7 @@ def init(mol, prm):
         sigma14[i] = prm.atom_types[type].sigma_14
         epsilon14[i] = prm.atom_types[type].epsilon_14
 
-    nbfix = np.zeros((len(prm.nbfix_types), 6), dtype=np.float64)
+    nbfix = np.ones((len(prm.nbfix_types), 6), dtype=np.float64) * -1
     for i, nbf in enumerate(prm.nbfix_types):
         if nbf[0] in uqtypes and nbf[1] in uqtypes:
             idx1 = np.where(uqtypes == nbf[0])[0]
@@ -97,7 +107,8 @@ def init(mol, prm):
         bond_params[bond[0]].append(prm.bond_types[types].req)
     angle_params = np.zeros((mol.angles.shape[0], 2), dtype=np.float32)
     for idx, angle in enumerate(mol.angles):
-        excl_list[angle[0]].append(angle[2])
+        first, second = sorted([angle[0], angle[2]])
+        excl_list[first].append(second)
         types = tuple(uqtypes[typeint[angle]])
         angle_params[idx, :] = [prm.angle_types[types].k, radians(prm.angle_types[types].theteq)]
     excl_list = [list(np.unique(x)) for x in excl_list]
@@ -109,7 +120,13 @@ def init(mol, prm):
     e14_atom_list = [[] for _ in range(natoms)]
     e14_value_list = [[] for _ in range(natoms)]
     dihedral_params = [[] for _ in range(mol.dihedrals.shape[0])]
+    alreadyadded = {}
     for idx, dihed in enumerate(mol.dihedrals):
+        # Avoid readding duplicate dihedrals
+        stringrep = ' '.join(map(str, sorted(dihed)))
+        if stringrep in alreadyadded:
+            continue
+        alreadyadded[stringrep] = True
         ty = tuple(uqtypes[typeint[dihed]])
         dihparam = prm.dihedral_types[ty]
         i, j = sorted([dihed[0], dihed[3]])
@@ -123,14 +140,25 @@ def init(mol, prm):
             dihedral_params[idx].append(dip.per)
 
     improper_params = np.zeros((mol.impropers.shape[0], 3), dtype=np.float32)
+    from parmed.amber import AmberParameterSet
+    from parmed.charmm import CharmmParameterSet
     for idx, impr in enumerate(mol.impropers):
-        ty = tuple(sorted(uqtypes[typeint[impr]]))  # Parmed sorts improper types
+        if fromstruct:  # If we make prm from struct there is no ordering
+            ty = tuple(uqtypes[typeint[impr]])
+        elif isinstance(prm, AmberParameterSet):  # If prm is read from AMBER parameter file it's sorted 0,1,3 but not 2
+            ty = np.array(uqtypes[typeint[impr]])
+            ty[[0, 1, 3]] = sorted(ty[[0, 1, 3]])
+            ty = tuple(ty)
+        elif isinstance(prm, CharmmParameterSet):  # If prm is read from CHARMM parameter file it's sorted
+            ty = tuple(sorted(uqtypes[typeint[impr]]))
+        else:
+            raise RuntimeError('Not a valid parameterset')
         if ty in prm.improper_types:
             imprparam = prm.improper_types[ty]
             improper_params[idx, :] = [imprparam.psi_k, radians(imprparam.psi_eq), 0]
         elif ty in prm.improper_periodic_types:
             imprparam = prm.improper_periodic_types[ty]
-            improper_params[idx, :] = [imprparam.psi_k, radians(imprparam.phase), imprparam.per]
+            improper_params[idx, :] = [imprparam.phi_k, radians(imprparam.phase), imprparam.per]
         else:
             raise RuntimeError('Could not find parameters for {}'.format(ty))
 
@@ -165,7 +193,7 @@ def calculateSets(mol, betweensets):
     return setA, setB
 
 
-def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1):
+def ffevaluate(mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, threads=1, fromstruct=False):
     """  Evaluates energies and forces of the forcefield for a given Molecule
 
     Parameters
@@ -177,9 +205,15 @@ def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1):
     betweensets : tuple of strings
         Only calculate energies between two sets of atoms given as atomselect strings.
         Only computes LJ and electrostatics.
-    dist_thresh : float
+    cutoff : float
         If set to a value != 0 it will only calculate LJ, electrostatics and bond energies for atoms which are closer
         than the threshold
+    rfa : bool
+        Use with `cutoff` to enable the reaction field approximation for scaling of the electrostatics up to the cutoff.
+        Uses the value of `solventDielectric` to model everything beyond the cutoff distance as solvent with uniform
+        dielectric.
+    solventDielectric : float
+        Used together with `cutoff` and `rfa`
 
     Returns
     -------
@@ -217,17 +251,19 @@ def ffevaluate(mol, prm, betweensets=None, dist_thresh=0, threads=1):
     box = mol.box
     setA, setB = calculateSets(mol, betweensets)
 
-    args = list(init(mol, prm))
+    args = list(init(mol, prm, fromstruct))
     args.append(setA)
     args.append(setB)
-    args.append(dist_thresh)
+    args.append(cutoff)
+    args.append(rfa)
+    args.append(solventDielectric)
 
     if threads == 1:
         energies, forces, atmnrg = _ffevaluate(coords, box, *args)
     else:
         from htmd.parallelprogress import ParallelExecutor, delayed
         aprun = ParallelExecutor(n_jobs=threads)
-        res = aprun(total=mol.numFrames, description='Evaluating energies')(
+        res = aprun(total=mol.numFrames, desc='Evaluating energies')(
             delayed(_ffevaluate)(np.atleast_3d(coords[:, :, f]),
                                  box[:, f].reshape(3, 1),
                                  *args) for f in range(mol.numFrames))
@@ -290,7 +326,7 @@ def _insets(i, j, set1, set2):
 @jit(nopython=True)
 def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, e14a, s14v, e14v, bonda,
                 bondv, ELEC_FACTOR, charge, angles, angle_params, dihedrals, dihedral_params, impropers,
-                improper_params, set1, set2, dist_thresh):
+                improper_params, set1, set2, cutoff, rfa, solventDielectric):
     natoms = coords.shape[0]
     nframes = coords.shape[2]
     nangles = angles.shape[0]
@@ -326,8 +362,7 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
                 pot_bo = 0
                 pot_lj = 0
                 pot_el = 0
-
-                if dist_thresh != 0 and dist > dist_thresh:
+                if cutoff != 0 and dist > cutoff:
                     continue
 
                 if isbonded:
@@ -338,7 +373,7 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
                     pot_lj, force_lj = _evaluate_lj(i, j, typeint, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v, dist)
                     energies[1, f] += pot_lj
                     coeff += force_lj
-                    pot_el, force_el = _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist)
+                    pot_el, force_el = _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist, rfa, solventDielectric, cutoff)
                     energies[2, f] += pot_el
                     coeff += force_el
 
@@ -351,6 +386,9 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
                 for k in range(3):
                     forces[i, k, f] -= coeff * direction_unitvec[k]
                     forces[j, k, f] += coeff * direction_unitvec[k]
+
+        if usersets:
+            continue  # Don't calculate angles and dihedrals between sets of atoms
 
         # Evaluate angle forces
         for i in range(nangles):
@@ -382,13 +420,14 @@ def _ffevaluate(coords, box, typeint, excl, nbfix, sigma, sigma14, epsilon, epsi
     return energies, forces, atmnrg
 
 
-@jit('UniTuple(float64, 5)(int64, int64, float64[:,:], float32[:], float32[:], float32[:], float32[:], int64[:,:], float32[:,:])', nopython=True)
-def _getSigmaEpsilon(i, j, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v):
+@jit('UniTuple(float64, 5)(int64, int64, int64, int64, float64[:,:], float32[:], float32[:], float32[:], float32[:], int64[:,:], float32[:,:])', nopython=True)
+def _getSigmaEpsilon(i, j, it, jt, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v):
+    # i, j atom indexes  it, jt atom types
     n14 = s14a.shape[1]
     # Check if NBfix exists for the types and keep the index
     idx_nbfix = -1
     for k in range(nbfix.shape[0]):
-        if (nbfix[k, 0] == i and nbfix[k, 1] == j) or (nbfix[k, 0] == j and nbfix[k, 1] == i):
+        if (nbfix[k, 0] == it and nbfix[k, 1] == jt) or (nbfix[k, 0] == jt and nbfix[k, 1] == it):
             idx_nbfix = k
             break
 
@@ -409,15 +448,15 @@ def _getSigmaEpsilon(i, j, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v
             eps = nbfix[idx_nbfix, 4]
             sig = nbfix[idx_nbfix, 5]
     else:
-        sigmai = sigma[i]
-        sigmaj = sigma[j]
-        epsiloni = epsilon[i]
-        epsilonj = epsilon[j]
+        sigmai = sigma[it]
+        sigmaj = sigma[jt]
+        epsiloni = epsilon[it]
+        epsilonj = epsilon[jt]
         if found14:
-            sigmai = sigma14[i]
-            sigmaj = sigma14[j]
-            epsiloni = epsilon14[i]
-            epsilonj = epsilon14[j]
+            sigmai = sigma14[it]
+            sigmaj = sigma14[jt]
+            epsiloni = epsilon14[it]
+            epsilonj = epsilon14[jt]
         # Lorentz - Berthelot combination rule
         sig = 0.5 * (sigmai + sigmaj)
         eps = sqrt(epsiloni * epsilonj)
@@ -432,17 +471,16 @@ def _getSigmaEpsilon(i, j, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v
 
 @jit('UniTuple(float64, 2)(int64, int64, int64[:], float64[:,:], float32[:], float32[:], float32[:], float32[:], int64[:,:], float32[:,:], float64)', nopython=True)
 def _evaluate_lj(i, j, typeint, nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v, dist):
-    sig, eps, A, B, scale = _getSigmaEpsilon(typeint[i], typeint[j], nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v)
+    _, _, A, B, scale = _getSigmaEpsilon(i, j, typeint[i], typeint[j], nbfix, sigma, sigma14, epsilon, epsilon14, s14a, s14v)
 
-    # TODO: Do we even want a cutoff?
     # cutoff = 2.5 * sig
     # if dist < cutoff:
     rinv1 = 1 / dist
     rinv2 = rinv1 * rinv1
     rinv6 = rinv2 * rinv2 * rinv2
     rinv12 = rinv6 * rinv6
-    pot = (A * rinv12) - (B * rinv6)
-    force = (-12 * A * rinv12 + 6 * B * rinv6) * rinv1 * scale
+    pot = ((A * rinv12) - (B * rinv6)) / scale
+    force = (-12 * A * rinv12 + 6 * B * rinv6) * rinv1 / scale
     return pot, force
 
 
@@ -469,8 +507,8 @@ def _evaluate_harmonic_bonds(i, j, bonda, bondv, dist):
     return pot, force
 
 
-@jit('UniTuple(float64, 2)(int64, int64, float64[:], int64[:,:], float32[:,:], float64, float64)', nopython=True)
-def _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist):
+@jit('UniTuple(float64, 2)(int64, int64, float64[:], int64[:,:], float32[:,:], float64, float64, boolean, float64, float64)', nopython=True)
+def _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist, rfa, solventDielectric, cutoff):
     nelec = e14a.shape[1]
     scale = 1
     for e in range(nelec):
@@ -480,8 +518,20 @@ def _evaluate_elec(i, j, charge, e14a, e14v, ELEC_FACTOR, dist):
             scale = e14v[i, e]
             break
 
-    pot = ELEC_FACTOR * scale * charge[i] * charge[j] / dist
-    force = -pot / dist
+    if rfa:  # Reaction field approximation for electrostatics with cutoff
+        # http://docs.openmm.org/latest/userguide/theory.html#coulomb-interaction-with-cutoff
+        # Ilario G. Tironi, René Sperb, Paul E. Smith, and Wilfred F. van Gunsteren. A generalized reaction field method
+        # for molecular dynamics simulations. Journal of Chemical Physics, 102(13):5451–5459, 1995.
+        denom = ((2 * solventDielectric) + 1)
+        krf = (1 / cutoff ** 3) * (solventDielectric - 1) / denom
+        crf = (1 / cutoff) * (3 * solventDielectric) / denom
+        common = ELEC_FACTOR * charge[i] * charge[j] / scale
+        dist2 = dist ** 2
+        pot = common * ((1 / dist) + krf * dist2 - crf)
+        force = common * (2 * krf * dist - 1 / dist2)
+    else:
+        pot = ELEC_FACTOR * charge[i] * charge[j] / dist / scale
+        force = -pot / dist
     return pot, force
 
 
@@ -546,7 +596,7 @@ def _evaluate_angles(pos, angle_params, box):
 
 @jit(nopython=True)
 def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
-    ntorsions = len(torsionparam) / 3
+    ntorsions = int(len(torsionparam) / 3)
     for i in range(len(torsionparam)):
         if np.isnan(torsionparam[i]):
             ntorsions = i / 3

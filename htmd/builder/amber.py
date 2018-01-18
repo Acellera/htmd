@@ -18,6 +18,7 @@ from subprocess import call, check_output, DEVNULL
 from htmd.molecule.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist
+from natsort import natsorted
 import logging
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ def listFiles():
     leaprc.ff14SB.redq
     ...
     """
+    from os.path import join
     tleap = shutil.which("tleap", mode=os.X_OK)
     if not tleap:
         raise FileNotFoundError('tleap not found. You should either have AmberTools or ambermini installed '
@@ -49,51 +51,52 @@ def listFiles():
     amberhome = os.path.normpath(os.path.join(os.path.dirname(tleap), '../'))
 
     # Original AMBER FFs
-    amberdir = os.path.join(amberhome, 'dat', 'leap', 'cmd')
-    ffs = sorted([f for f in os.listdir(amberdir) if os.path.isfile(os.path.join(amberdir, f))], key=str.lower)
-    print('---- Forcefield files list: ' + os.path.join(amberdir, '') + ' ----')
-    for f in ffs:
-        print(f)
+    ffdir = join(amberhome, 'dat', 'leap', 'cmd')
+    ffs = glob(join(ffdir, '*'))
+    print('---- Forcefield files list: ' + join(ffdir, '') + ' ----')
+    for f in sorted(ffs, key=str.lower):
+        if os.path.isdir(f):
+            continue
+        print(f.replace(join(ffdir, ''), ''))
 
-    oldffdir = os.path.join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
-    ffs = sorted([os.path.join('oldff', f) for f in os.listdir(oldffdir) if os.path.isfile(os.path.join(oldffdir, f))], key=str.lower)
-    print('---- OLD Forcefield files list: ' + os.path.join(amberdir, '') + ' ----')
-    for f in ffs:
-        print(f)
+    oldffdir = join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
+    ffs = glob(join(oldffdir, '*'))
+    print('---- OLD Forcefield files list: ' + join(ffdir, '') + ' ----')
+    for f in sorted(ffs, key=str.lower):
+        print(f.replace(join(ffdir, ''), ''))
+
+    topodir = os.path.join(amberhome, 'dat', 'leap', 'prep')
+    topos = glob(join(topodir, '*'))
+    print('---- Topology files list: ' + join(topodir, '') + ' ----')
+    for f in sorted(topos, key=str.lower):
+        if os.path.isdir(f):
+            continue
+        print(f.replace(join(topodir, ''), ''))
 
     # FRCMOD files
     frcmoddir = os.path.join(amberhome, 'dat', 'leap', 'parm')
-    ffs = sorted([f for f in os.listdir(frcmoddir) if os.path.isfile(os.path.join(frcmoddir, f)) and f.startswith('frcmod')], key=str.lower)
-    print('---- Parameter files list: ' + os.path.join(frcmoddir, '') + ' ----')
-    for f in ffs:
-        print(os.path.basename(f))
+    ffs = glob(join(frcmoddir, 'frcmod.*'))
+    print('---- Parameter files list: ' + join(frcmoddir, '') + ' ----')
+    for f in sorted(ffs, key=str.lower):
+        print(f.replace(join(frcmoddir, ''), ''))
 
     # Extra AMBER FFs on HTMD
     htmdamberdir = os.path.abspath(os.path.join(home(), 'builder', 'amberfiles', ''))
-    extraffs = sorted([os.path.join(f, os.path.basename(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')[0]))
-                for f in os.listdir(htmdamberdir) if os.path.isdir(os.path.join(htmdamberdir, f))
-                and len(glob(os.path.join(htmdamberdir, f) + '/leaprc.*')) == 1], key=str.lower)
-    print('---- Extra forcefield files list: ' + os.path.join(htmdamberdir, '') + ' ----')
-    for f in extraffs:
-        print(f)
+    extraffs = glob(join(htmdamberdir, '*', 'leaprc.*'))
+    print('---- Extra forcefield files list: ' + join(htmdamberdir, '') + ' ----')
+    for f in sorted(extraffs, key=str.lower):
+        print(f.replace(join(htmdamberdir, ''), ''))
 
     # Extra AMBER FFs on HTMD (*.frcmod, *.in) @cuzzo87
-    extratopos = [f +  '/' + os.path.basename(glob(os.path.join(htmdamberdir, f) + '/*.in')[0])
-               for f in os.listdir(htmdamberdir) if os.path.isdir(os.path.join(htmdamberdir, f))  
-               and len(glob(os.path.join(htmdamberdir, f) + '/*.in')) == 1  ]
-    
-    print('---- Extra *.in files list: ' + os.path.join(htmdamberdir, '') + ' ----')
-    for f in extratopos:
-        print(f)
+    extratopos = glob(join(htmdamberdir, '*', '*.in'))
+    print('---- Extra topology files list: ' + join(htmdamberdir, '') + ' ----')
+    for f in sorted(extratopos, key=str.lower):
+        print(f.replace(join(htmdamberdir, ''), ''))
 
-    extraparams = [ f + '/' + os.path.basename( os.path.join(htmdamberdir, f) + fparam )
-               for f in os.listdir(htmdamberdir) 
-               for fparam in glob(os.path.join(htmdamberdir, f) + '/*.frcmod' )
-                ]
-    
-    print('---- Extra *.in files list: ' + os.path.join(htmdamberdir, '') + ' ----')
-    for f in extraparams:
-        print(f)
+    extraparams = glob(join(htmdamberdir, '*', '*.frcmod'))
+    print('---- Extra parameter files list: ' + join(htmdamberdir, '') + ' ----')
+    for f in sorted(extraparams, key=str.lower):
+        print(f.replace(join(htmdamberdir, ''), ''))
 
 
 def defaultFf():
@@ -136,7 +139,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available forcefield files.
         Default: :func:`amber.defaultFf <htmd.builder.amber.defaultFf>`
     topo : list of str
-        A list of topology `prepi` files.
+        A list of topology `prepi/prep/in` files.
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available topology files.
         Default: :func:`amber.defaultTopo <htmd.builder.amber.defaultTopo>`
     param : list of str
@@ -697,6 +700,7 @@ if __name__ == '__main__':
     from htmd.home import home
     from htmd.util import tempname
     import os
+    from os.path import join
     from glob import glob
     import numpy as np
     import filecmp
@@ -718,15 +722,15 @@ if __name__ == '__main__':
         ignore_ftypes = ('.log', '.txt')
         files = []
         deletefiles = []
-        for f in glob(os.path.join(compare, '*')):
+        for f in glob(join(compare, '*')):
             fname = os.path.basename(f)
             if os.path.splitext(f)[1] in ignore_ftypes:
                 continue
             if f.endswith('prmtop'):
-                cutfirstline(f, os.path.join(compare, fname + '.mod'))
-                cutfirstline(os.path.join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
+                cutfirstline(f, join(compare, fname + '.mod'))
+                cutfirstline(join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
                 files.append(os.path.basename(f) + '.mod')
-                deletefiles.append(os.path.join(compare, fname + '.mod'))
+                deletefiles.append(join(compare, fname + '.mod'))
             else:
                 files.append(os.path.basename(f))
 
@@ -754,7 +758,7 @@ if __name__ == '__main__':
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 
-        refdir = home(dataDir=os.path.join('test-amber-build', pid))
+        refdir = home(dataDir=join('test-amber-build', pid))
         _compareResultFolders(refdir, tmpdir, pid)
         shutil.rmtree(tmpdir)
 
@@ -772,9 +776,23 @@ if __name__ == '__main__':
         tmpdir = tempname()
         bmol = build(smol, ff=ffs, outdir=tmpdir)
 
-        refdir = home(dataDir=os.path.join('test-amber-build-nopp', pid))
+        refdir = home(dataDir=join('test-amber-build-nopp', pid))
         _compareResultFolders(refdir, tmpdir, pid)
         shutil.rmtree(tmpdir)
+
+    # Test protein ligand building with parametrized ligand
+    mol = Molecule('3ptb')
+    mol.filter('protein')
+    mol.renumberResidues()
+    lig = Molecule(join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum', 'mol.mol2'))
+    lig.segid[:] = 'L'
+    newmol = Molecule()
+    newmol.append(lig)
+    newmol.append(mol)
+    smol = solvate(newmol)
+    tmpdir = tempname()
+    bmol = build(newmol, outdir=tmpdir, ionize=False)
+    shutil.rmtree(tmpdir)
 
     # # Test protein-ligand building
     # folder = home(dataDir='building-protein-ligand')

@@ -48,7 +48,13 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         self._arg('groupname', 'str', 'The name of the group of simulations you want to submit. If none is given, '
                                       'a randomly generated string will be used instead.', None, val.String())
         self._arg('datadir', 'str', 'The directory in which to retrieve your results.', None, val.String())
+        self._arg('instancetype', 'str', 'Instance type', 'g2.2xlarge', val.String(), valid_values=('g2.2xlarge', 'r4.large', 'p2.xlarge'))
+        self._arg('hashnames', 'bool', 'If True, each job will have a name created from the hash of its directory '
+                                       'instead of using the directory name.', False, val.Boolean())
         self._arg('verbose', 'bool', 'Turn verbosity mode on or off.', False, val.Boolean())
+        self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', 0, val.Number(int, '0POS'))
+        self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', 1, val.Number(int, '0POS'))
+        self._arg('memory', 'int', 'Amount of memory per job (MB)', 8000, val.Number(int, '0POS'))
 
         self._cloud = None
 
@@ -81,6 +87,15 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         for d in dirs:
             logger.info("Queueing " + d)
             name = os.path.basename(d)
+            if self.hashnames:
+                import hashlib
+                name = hashlib.sha256(os.path.abspath(d).encode('utf-8')).hexdigest()[:10]
+
+            runscript = self._getRunScript(d)
+            self._cleanSentinel(d)
+
+            jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
+            self._createJobScript(jobscript, d, runscript)
 
             from acecloud.requesttype import RequestType
             Job(
@@ -91,6 +106,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 name=name,
                 cloud=self._cloud,
                 requesttype=RequestType.SPOT,
+                instance_type=self.instancetype,
                 verbose=self.verbose
             )
 
@@ -107,26 +123,30 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         return count
 
     def retrieve(self):
-        if self.datadir is None:
-            raise RuntimeError('Please set the datadir parameter before retrieving jobs.')
-
         self._createCloud()
-        from acecloud.status import Status
+        from acecloud.status import Status, CloudError
         jj = self._cloud.getJobs(group=self.groupname)
         currdir = os.getcwd()
         for j in jj:
-            if j.status() == Status.COMPLETED:
-                try:
-                    outf = os.path.join(self.datadir, j.name)
-                    if not os.path.exists(outf):
-                        os.makedirs(outf)
-                    os.chdir(outf)
-                    j.retrieve()
+            if self.datadir is not None:
+                outf = os.path.join(self.datadir, j.name)
+            else:
+                outf = j.path
+            if not os.path.exists(outf):
+                os.makedirs(outf)
+            os.chdir(outf)
+            try:
+                if j.status() == Status.COMPLETED:
+                    j.retrieve(directory=outf)  # Duplicate code to avoid race condition with slow retrieve
                     j.delete()
-                except Exception as e:
-                    logger.warning(e)
-                    pass
-                os.chdir(currdir)
+                else:
+                    j.retrieve(directory=outf)
+            except CloudError as e:
+                pass
+            except Exception as e:
+                logger.warning(e)
+                pass
+            os.chdir(currdir)
 
     def stop(self):
         # TODO: This not only stops the job, but also deletes the S3. Not exactly like the stop of other queues
@@ -139,26 +159,36 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 logger.warning(e)
                 pass
 
-    @property
-    def ngpu(self):
-        raise NotImplementedError
-
-    @ngpu.setter
-    def ngpu(self, value):
-        raise NotImplementedError
+    def _createJobScript(self, fname, workdir, runsh):
+        with open(fname, 'w') as f:
+            f.write('#!/bin/bash\n')
+            f.write('\n')
+            # Trap kill signals to create sentinel file
+            f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(self._sentinel))
+            f.write('\n')
+            f.write('bash run.sh')
+        os.chmod(fname, 0o700)
 
     @property
     def ncpu(self):
-        raise NotImplementedError
+        return self.__dict__['ncpu']
 
     @ncpu.setter
     def ncpu(self, value):
-        raise NotImplementedError
+        self.ncpu = value
+
+    @property
+    def ngpu(self):
+        return self.__dict__['ngpu']
+
+    @ngpu.setter
+    def ngpu(self, value):
+        self.ngpu = value
 
     @property
     def memory(self):
-        raise NotImplementedError
+        return self.__dict__['memory']
 
     @memory.setter
     def memory(self, value):
-        raise NotImplementedError
+        self.memory = value

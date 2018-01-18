@@ -19,7 +19,7 @@ from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
 from htmd.parameterization.dihedral import DihedralFitting
-from htmd.qm import Psi4, FakeQM
+from htmd.qm import Psi4, FakeQM2
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,8 @@ class FFMolecule(Molecule):
     rtf, prm -- rtf, prm files
     method  -- if rtf, prm == None, guess atom types according to this method ( of enum FFTypeMethod )
     """
+
+    _ATOM_TYPE_REG_EX = re.compile('^\S+x\d+$')
 
     def __init__(self, filename=None, name=None, rtf=None, prm=None, netcharge=None, method=FFTypeMethod.CGenFF_2b6,
                  qm=None, outdir="./", mol=None, acCharges=None):
@@ -89,6 +91,11 @@ class FFMolecule(Molecule):
             self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
             self.charge[:] = [self._rtf.charge_by_name[name] for name in self.name]
             self.impropers = np.array(self._rtf.impropers)
+
+            # Check if atom type names are compatible
+            for type_ in self._rtf.types:
+                if re.match(FFMolecule._ATOM_TYPE_REG_EX, type_):
+                    raise ValueError('Atom type %s is incompatable. It cannot finish with "x" + number!' % type_)
 
         # Set atom masses
         # TODO: maybe move to molecule
@@ -160,7 +167,7 @@ class FFMolecule(Molecule):
 
             self.name[i] = name
 
-    def output_directory_name(self):
+    def qm_method_name(self):
 
         basis = self.qm.basis
         basis = re.sub('\+', 'plus', basis)  # Replace '+' with 'plus'
@@ -174,7 +181,7 @@ class FFMolecule(Molecule):
 
         assert self.numFrames == 1
 
-        mindir = os.path.join(self.outdir, "minimize", self.output_directory_name())
+        mindir = os.path.join(self.outdir, "minimize", self.qm_method_name())
         os.makedirs(mindir, exist_ok=True)
 
         self.qm.molecule = self
@@ -203,7 +210,7 @@ class FFMolecule(Molecule):
     def fitCharges(self, fixed=[]):
 
         # Cereate an ESP directory
-        espDir = os.path.join(self.outdir, "esp", self.output_directory_name() )
+        espDir = os.path.join(self.outdir, "esp", self.qm_method_name())
         os.makedirs(espDir, exist_ok=True)
 
         # Get ESP points
@@ -240,6 +247,8 @@ class FFMolecule(Molecule):
         # Update the charges
         self.charge[:] = esp_charges
         self._rtf.updateCharges(esp_charges)
+        for name, charge in zip(self.name, self.charge):
+            logger.info('Set charge %4s: %6.3f' % (name, charge))
 
         return esp_loss, qm_results[0].dipole
 
@@ -284,20 +293,35 @@ class FFMolecule(Molecule):
 
             molecules.append(mol)
 
-        # Run QM calculation of the rotamers
-        dirname = 'dihedral-opt' if geomopt else 'dihedral-single-point'
-        qm_results = []
-        for dihedral, molecule in zip(dihedrals, molecules):
-            name = "%s-%s-%s-%s" % tuple(self.name[list(dihedral)])
-            fitdir = os.path.join(self.outdir, dirname, name, self.output_directory_name())
-            os.makedirs(fitdir, exist_ok=True)
+        # Create directories for QM data
+        directories = []
+        dihedral_directory = 'dihedral-opt' if geomopt else 'dihedral-single-point'
+        for dihedral in dihedrals:
+            dihedral_name = '-'.join(self.name[dihedral])
+            directory = os.path.join(self.outdir, dihedral_directory, dihedral_name, self.qm_method_name())
+            os.makedirs(directory, exist_ok=True)
+            directories.append(directory)
 
+        # Setup and submit QM calculations
+        for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
             self.qm.molecule = molecule
             self.qm.esp_points = None
             self.qm.optimize = geomopt
             self.qm.restrained_dihedrals = np.array([dihedral])
-            self.qm.directory = fitdir
-            qm_results.append(self.qm.run())  # TODO submit all jobs at once
+            self.qm.directory = directory
+            self.qm.setup()
+            self.qm.submit()
+
+        # Wait and retrieve QM calculation data
+        qm_results = []
+        for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
+            self.qm.molecule = molecule
+            self.qm.esp_points = None
+            self.qm.optimize = geomopt
+            self.qm.restrained_dihedrals = np.array([dihedral])
+            self.qm.directory = directory
+            self.qm.setup() # QM object is reused, so it has to be properly set up before retrieving.
+            qm_results.append(self.qm.retrieve())
 
         # Fit the dihedral parameters
         df = DihedralFitting()
@@ -305,11 +329,11 @@ class FFMolecule(Molecule):
         df.dihedrals = dihedrals
         df.qm_results = qm_results
         df.result_directory = os.path.join(self.outdir, 'parameters', self.method.name,
-                                           self.output_directory_name(), 'plots')
+                                           self.qm_method_name(), 'plots')
 
         # In case of FakeQM, the initial parameters are set to zeros.
         # It prevents DihedralFitting class from cheating :D
-        if isinstance(self.qm, FakeQM):
+        if isinstance(self.qm, FakeQM2):
             df.zeroed_parameters = True
 
         # Fit dihedral parameters
@@ -319,11 +343,17 @@ class FFMolecule(Molecule):
         self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
 
     def _duplicateAtomType(self, atom_index):
-        """Duplicate the type of the specified atom"""
+        """Duplicate the type of the specified atom
 
-        # Get the type name. If the type is already dubplicated, remove the suffix
+           Duplicated types are named: original_name + "x" + number, e.g. ca --> cax0
+        """
+
+        # Get a type name
         type_ = self._rtf.type_by_index[atom_index]
-        type_ = re.sub('x\d+$', '', type_)
+
+        # if the type is already duplicated
+        if re.match(FFMolecule._ATOM_TYPE_REG_EX, type_):
+            return
 
         # Create a new atom type name
         i = 0
@@ -345,7 +375,7 @@ class FFMolecule(Molecule):
         # Rename the atom types of the equivalent atoms
         for index in self._equivalent_atoms[atom_index]:
             if atom_index != index:
-                assert 'x' not in self._rtf.type_by_index[index]
+                assert not re.match(FFMolecule._ATOM_TYPE_REG_EX, self._rtf.type_by_index[index])
                 self._rtf.type_by_index[index] = newtype
                 self._rtf.type_by_name[self._rtf.names[index]] = newtype
 
@@ -370,7 +400,7 @@ class FFMolecule(Molecule):
 
     def writeParameters(self, original_molecule=None):
 
-        paramDir = os.path.join(self.outdir, 'parameters', self.method.name, self.output_directory_name())
+        paramDir = os.path.join(self.outdir, 'parameters', self.method.name, self.qm_method_name())
         os.makedirs(paramDir, exist_ok=True)
 
         typemap = None

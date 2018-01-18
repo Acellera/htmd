@@ -174,14 +174,8 @@ class _LocalQueue(SimQueue, ProtocolInterface):
             dirname = os.path.abspath(d)
             logger.info('Queueing ' + dirname)
 
-            # Clean sentinel files , if existent
-            if os.path.exists(os.path.join(d, self._sentinel)):
-                try:
-                    os.remove(os.path.join(d, self._sentinel))
-                except:
-                    logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
-                else:
-                    logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
+            runscript = self._getRunScript(d)
+            self._cleanSentinel(d)
 
             self._states[dirname] = 'Q'
             self._queue.put(dirname)

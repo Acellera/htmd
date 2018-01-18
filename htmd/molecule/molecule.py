@@ -237,7 +237,7 @@ class Molecule:
 
     @frame.setter
     def frame(self, value):
-        if value < 0 or value >= self.numFrames:
+        if value < 0 or ((self.numFrames != 0) and (value >= self.numFrames)):
             raise NameError("Frame index out of range. Molecule contains {} frame(s). Frames are 0-indexed.".format(self.numFrames))
         self._frame = value
 
@@ -343,7 +343,7 @@ class Molecule:
         array([   1,    9,   16,   20,   24,   36,   43,   49,   53,   58,...
         """
         sel = self.atomselect(selection, indexes=True)
-        self._removeBonds(sel)
+        self._updateBondsAnglesDihedrals(sel)
         for k in self._atom_fields:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
             if k == 'coords':
@@ -442,26 +442,14 @@ class Molecule:
             refsel = sel
         if frames is None:
             frames = range(self.numFrames)
+        frames = np.array(frames)
         # if not isinstance(refmol, Molecule):
         # raise NameError('Reference molecule has to be a Molecule object')
         sel = self.atomselect(sel)
         refsel = refmol.atomselect(refsel)
         if (type(sel[0]) == bool) and (np.sum(sel) != np.sum(refsel)):
             raise NameError('Cannot align molecules. The two selections produced different number of atoms')
-        for f in frames:
-            P = self.coords[sel, :, f]
-            Q = refmol.coords[refsel, :, refmol.frame]
-            all1 = self.coords[:, :, f]
-            (rot, tmp) = _pp_measure_fit(P, Q)
-            # Translating mol to 0,0,0
-            centroidP = np.mean(P, 0)
-            centroidQ = np.mean(Q, 0)
-            all1 = all1 - centroidP
-            # Rotating mol
-            all1 = np.dot(all1, np.transpose(rot))
-            # Translating to centroid of refmol
-            all1 = all1 + centroidQ
-            self.coords[:, :, f] = all1
+        self.coords = _pp_align(self.coords, refmol.coords, sel, refsel, frames, refmol.frame)
 
     def alignBySequence(self, ref, molseg=None, refseg=None, nalignfragment=1, returnAlignments=False, maxalignments=1):
         """ Aligns the Molecule to a reference Molecule by their longests sequences alignment
@@ -610,33 +598,33 @@ class Molecule:
         """
         s = self.atomselect(sel)
         if np.all(s):  # If all are selected do nothing
-            return
+            return np.array([], dtype=np.int32)
 
         if not isinstance(s, np.ndarray) or s.dtype != bool:
             raise NameError('Filter can only work with string inputs or boolean arrays')
         return self.remove(np.invert(s), _logger=_logger)
 
-    def _removeBonds(self, idx):
+    def _updateBondsAnglesDihedrals(self, idx):
         """ Renumbers bonds after removing atoms and removes non-existent bonds
 
         Needs to be called before removing atoms!
         """
-        if len(self.bonds) == 0:
+        if len(self.bonds) == 0 and len(self.dihedrals) == 0 and len(self.impropers) == 0 and len(self.angles) == 0:
             return
         map = np.ones(self.numAtoms, dtype=int)
         map[idx] = -1
         map[map == 1] = np.arange(self.numAtoms - len(idx))
-        bonds = np.array(self.bonds,
-                         dtype=np.int32)  # Have to store in temp because bonds is uint and can't accept -1 values
-        bonds[:, 0] = map[self.bonds[:, 0]]
-        bonds[:, 1] = map[self.bonds[:, 1]]
-        remA = bonds[:, 0] == -1
-        remB = bonds[:, 1] == -1
-        stays = np.invert(remA | remB)
-        # Delete bonds between non-existant atoms
-        self.bonds = bonds[stays, :]
-        if len(self.bondtype):
-            self.bondtype = self.bondtype[stays]
+        for field in ('bonds', 'angles', 'dihedrals', 'impropers'):
+            if len(self.__dict__[field]) == 0:
+                continue
+            # Have to store in temp because they can be uint which can't accept -1 values
+            tempdata = np.array(self.__dict__[field], dtype=np.int32)
+            tempdata[:] = map[tempdata[:]]
+            stays = np.invert(np.any(tempdata == -1, axis=1))
+            # Delete bonds/angles/dihedrals between non-existent atoms
+            self.__dict__[field] = tempdata[stays, ...]
+            if field == 'bonds' and len(self.bondtype):
+                self.bondtype = self.bondtype[stays]
 
     def _guessBonds(self):
         """ Tries to guess the bonds in the Molecule
@@ -1006,6 +994,10 @@ class Molecule:
                 if not np.array_equal(self.__dict__[field], newfielddata):
                     raise TopologyInconsistencyError(
                         'Different atom information read from topology file {} for field {}'.format(filename, field))
+
+        if len(self.bonds) != 0 and len(topo.bondtype) == 0:
+            self.bondtype = np.empty(self.bonds.shape[0], dtype=Molecule._dtypes['bondtype'])
+            self.bondtype[:] = 'un'
 
         self.element = self._guessMissingElements()
         self.crystalinfo = topo.crystalinfo
@@ -1392,7 +1384,7 @@ class Molecule:
         if not (isinstance(keep, str) and keep == 'all'):
             self.coords = np.atleast_3d(self.coords[:, :, keep]).copy()  # Copy array. Slices are dangerous with C
             if self.box.shape[1] == numframes:
-                self.box = np.array(np.atleast_2d(self.box[:, keep]))
+                self.box = np.atleast_2d(self.box[:, keep]).copy()
                 if self.box.shape[0] == 1:
                     self.box = self.box.T
             if self.boxangles.shape[1] == numframes:
@@ -1404,7 +1396,7 @@ class Molecule:
             if len(self.time) == numframes:
                 self.time = self.time[keep]
             if len(self.fileloc) == numframes:
-                self.fileloc = [f for i, f in enumerate(self.fileloc) if i in keep]
+                self.fileloc = [self.fileloc[i] for i in keep]
         self.frame = 0  # Reset to 0 since the frames changed indexes
 
     def viewCrystalPacking(self):
@@ -1566,9 +1558,12 @@ class Molecule:
         return rep
 
 
-def mol_equal(mol1, mol2):
+def mol_equal(mol1, mol2, checkFields=Molecule._atom_fields, exceptFields=None):
     difffields = []
-    for field in Molecule._atom_fields:
+    checkFields = list(checkFields)
+    if exceptFields is not None:
+        checkFields = np.setdiff1d(checkFields, exceptFields)
+    for field in checkFields:
         if not np.array_equal(mol1.__dict__[field], mol2.__dict__[field]):
             difffields += [field]
 
@@ -1596,37 +1591,60 @@ def _getResidueIndexesByAtom(mol, idx):
         torem[seqid == r] = True
     return torem, len(allres)
 
+from numba import jit
 
+
+@jit('Tuple((float32[:, :], float64))(float32[:, :], float32[:, :])', nopython=True, nogil=True)
 def _pp_measure_fit(P, Q):
     """
+    WARNING: ASSUMES CENTERED COORDINATES!!!!
+
     PP_MEASURE_FIT - molecule alignment function.
     For documentation see http://en.wikipedia.org/wiki/Kabsch_algorithm
     the Kabsch algorithm is a method for calculating the optimal
     rotation matrix that minimizes the RMSD (root mean squared deviation)
     between two paired sets of points
     """
-    centroidP = np.mean(P, 0)
-    centroidQ = np.mean(Q, 0)
-
-    # Centering them on 0,0,0
-    # Can also be done with translation matrix if it's faster
-    P = P - centroidP
-    Q = Q - centroidQ
-
-    covariance = np.dot(np.transpose(P), Q)
+    covariance = np.dot(P.T, Q)
 
     (V, S, W) = np.linalg.svd(covariance)  # Matlab svd returns the W transposed compared to numpy.svd
-    W = np.transpose(W)
+    W = W.T
 
-    E0 = np.sum(np.sum(P * P)) + np.sum(np.sum(Q * Q))
+    E0 = np.sum(P * P) + np.sum(Q * Q)
     RMSD = E0 - (2 * np.sum(S.ravel()))
-    RMSD = np.sqrt(np.abs(RMSD / np.size(P, 0)))
+    RMSD = np.sqrt(np.abs(RMSD / P.shape[0]))
 
     d = np.sign(np.linalg.det(W) * np.linalg.det(V))
-    z = np.eye(3)
+    z = np.eye(3).astype(P.dtype)
     z[2, 2] = d
-    U = np.dot(np.dot(W, z), np.transpose(V))
+    U = np.dot(np.dot(W, z), V.T)
     return U, RMSD
+
+
+@jit('float32[:, :, :](float32[:, :, :], float32[:, :, :], boolean[:], boolean[:], int64[:], int64)', nopython=True,
+     nogil=True)
+def _pp_align(coords, refcoords, sel, refsel, frames, refframe):
+    newcoords = np.zeros(coords.shape, dtype=coords.dtype)
+    for f in frames:
+        P = coords[sel, :, f]
+        Q = refcoords[refsel, :, refframe]
+        all1 = coords[:, :, f]
+
+        centroidP = np.zeros(3, dtype=P.dtype)
+        centroidQ = np.zeros(3, dtype=Q.dtype)
+        for i in range(3):
+            centroidP[i] = np.mean(P[:, i])
+            centroidQ[i] = np.mean(Q[:, i])
+
+        (rot, tmp) = _pp_measure_fit(P - centroidP, Q - centroidQ)
+
+        all1 = all1 - centroidP
+        # Rotating mol
+        all1 = np.dot(all1, rot.T)
+        # Translating to centroid of refmol
+        all1 = all1 + centroidQ
+        newcoords[:, :, f] = all1
+    return newcoords
 
 
 class Representations:
@@ -1845,9 +1863,34 @@ if __name__ == "__main__":
     mol = Molecule('2HBB')
     quad = [124, 125, 132, 133]
     mol.setDihedral(quad, np.deg2rad(-90))
-    angle = dihedralAngle(mol.coords[quad, :, :])
-    assert np.abs(-90 - angle) < 1E-3
+    angle = mol.getDihedral(quad)
+    assert np.abs(np.deg2rad(-90) - angle) < 1E-3
 
+    # Testing updating of bonds, dihedrals and angles after filtering
+    mol = Molecule(path.join(home(dataDir='test-molecule'), 'a1e.prmtop'))
+    mol.read(path.join(home(dataDir='test-molecule'), 'a1e.pdb'))
+    _ = mol.filter('not water')
+    bb, bt, di, im, an = np.load(path.join(home(dataDir='test-molecule'), 'updatebondsanglesdihedrals_nowater.npy'))
+    assert np.array_equal(bb, mol.bonds)
+    assert np.array_equal(bt, mol.bondtype)
+    assert np.array_equal(di, mol.dihedrals)
+    assert np.array_equal(im, mol.impropers)
+    assert np.array_equal(an, mol.angles)
+    _ = mol.filter('not index 8 18')
+    bb, bt, di, im, an = np.load(path.join(home(dataDir='test-molecule'), 'updatebondsanglesdihedrals_remove8_18.npy'))
+    assert np.array_equal(bb, mol.bonds)
+    assert np.array_equal(bt, mol.bondtype)
+    assert np.array_equal(di, mol.dihedrals)
+    assert np.array_equal(im, mol.impropers)
+    assert np.array_equal(an, mol.angles)
 
-
+    # Testing appending of bonds and bondtypes
+    mol = Molecule('3ptb')
+    lig = Molecule(path.join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum', 'mol.mol2'))
+    assert mol.bonds.shape[0] == len(mol.bondtype)  # Checking that Molecule fills in empty bondtypes
+    newmol = Molecule()
+    newmol.append(lig)
+    newmol.append(mol)
+    assert newmol.bonds.shape[0] == (mol.bonds.shape[0] + lig.bonds.shape[0])
+    assert newmol.bonds.shape[0] == len(newmol.bondtype)
 
