@@ -109,7 +109,10 @@ class QMBase(ABC, ProtocolInterface):
     def _readOutput(self, directory):
         pass
 
-    def _setup(self):
+    def setup(self):
+        """
+        Setup QM calculations for all the frames of the molecule
+        """
 
         # Set up the molecule
         # TODO remove molecule coping!
@@ -155,19 +158,33 @@ class QMBase(ABC, ProtocolInterface):
                     f.write('#!/bin/sh\n\n%s\n' % self._command)
                 os.chmod(script, 0o700)
 
-    def _submit(self):
+    def submit(self):
+        """
+        Submit QM calculations for all the frames of the molecule
+        """
 
         for directory in self._directories:
             if not self._completed(directory):
                 self.queue.submit(directory)
 
-    def _retrieve(self):
+    def retrieve(self):
+        """
+        Retrieve QM calculation results for all the frames of the molecule
 
-        if isinstance(self.queue, LocalCPUQueue):
-            self.queue.wait(sentinel=False) # TODO: sentinel is still broken
-        else:
-            self.queue.wait(sentinel=True)
-        self.queue.retrieve()
+        Return
+        ------
+        results : list
+            List of QMResult objects (one for each molecule frames).
+        """
+
+        # Wait only if there is something to wait for
+        # TODO: queue object should handle this logic
+        if self.queue._dirs:
+            if isinstance(self.queue, LocalCPUQueue):
+                self.queue.wait(sentinel=False) # TODO: sentinel is still broken
+            else:
+                self.queue.wait(sentinel=True)
+            self.queue.retrieve()
 
         # Read output files
         results = [self._readOutput(directory) for directory in self._directories]
@@ -176,10 +193,20 @@ class QMBase(ABC, ProtocolInterface):
 
     def run(self):
         """
-        Run a QM calculation on all the frames of the molecule and return results.
+        Run QM calculations for all the frames of the molecule and return results.
 
         The method generates input files according to the attributes, submits jobs to the selected queue,
         waits for the calculations to finish, and retrieves the results.
+
+        Example
+        -------
+
+        >>> result = qm.run()
+
+        It is equivalent to:
+        >>> qm.setup()
+        >>> qm.submit()
+        >>> result = qm.retrieve()
 
         Return
         ------
@@ -187,9 +214,9 @@ class QMBase(ABC, ProtocolInterface):
             List of QMResult objects (one for each molecule frames).
         """
 
-        self._setup()
-        self._submit()
-        return self._retrieve()
+        self.setup()
+        self.submit()
+        return self.retrieve()
 
 
 if __name__ == '__main__':

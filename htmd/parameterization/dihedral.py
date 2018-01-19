@@ -140,12 +140,9 @@ class DihedralFitting:
                 valid_results = [result for result in valid_results if (result.energy - qm_min) < 20]
             else:
                 raise RuntimeError('No valid results.')
-                # for dihedral %s-%s-%s-%s' % dihedral_atomnames)
 
             if len(valid_results) < 13:
                 raise RuntimeError('Fewer than 13 valid QM points. Not enough to fit.')
-                # for dihedral %s-%s-%s-%s. Not enough to fit!' %
-                #                    dihedral_atomnames)
 
             all_valid_results.append(valid_results)
 
@@ -157,7 +154,7 @@ class DihedralFitting:
             raise ValueError('The number of dihedral and QM result sets has to be the same!')
 
         # Get dihedral names
-        self._names = ['%s-%s-%s-%s' % tuple(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
+        self._names = ['-'.join(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
 
         # Get equivalent dihedral atom indices
         self._equivalent_indices = []

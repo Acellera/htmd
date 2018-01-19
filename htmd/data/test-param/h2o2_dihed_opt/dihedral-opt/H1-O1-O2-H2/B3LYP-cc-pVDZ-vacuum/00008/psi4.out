@@ -18,72 +18,73 @@
     -----------------------------------------------------------------------
 
 
-    Psi4 started on: Friday, 11 August 2017 02:04PM
+    Psi4 started on: Tuesday, 12 December 2017 12:38PM
 
-    Process ID:   7142
-    PSIDATADIR: /home/raimis/opt/miniconda3/envs/htmd/share/psi4
+    Process ID:   4250
+    PSIDATADIR: /shared/raimis/opt/miniconda/envs/htmd/share/psi4
     Memory:     500.0 MiB
     Threads:    1
     
   ==> Input File <==
 
 --------------------------------------------------------------------------
-set {
-	reference rks
-	basis cc-pvdz
-}
+set_num_threads(1)
+set_memory(4203741184)
 
-
-set_num_threads( 8 )
-memory 2 gb
+set { reference rks }
+set { basis cc-pVDZ }
 
 molecule MOL {
-0 1
-
-O	 1.014300	 -0.002300	 0.060500
-O	 2.462400	 -0.107500	 -0.002400
-H	 0.888784	 -0.628421	 0.798890
-H	 2.655500	 0.713700	 0.488700
-
-	symmetry c1
-}
-set optking { dynamic_level = 1 }
-set optking {
-	frozen_dihedral = ("
-		3 1 2 4
-	")
+    0 1
+    noreorient
+    nocom
+    symmetry c1
+    O    1.014300  -0.002300   0.060500
+    O    2.462400  -0.107500  -0.002400
+    H    0.821200  -0.823600  -0.430600
+    H    2.587909  -0.461729   0.898492
 }
 
-ee,wfn = optimize('b3lyp-d3', return_wfn=True)
-oeprop( wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
-f=open( 'psi4out.xyz', 'w' )
-f.write( "4  " )
-f.write( str(ee) + "\n" )
-f.write( MOL.save_string_xyz() )
-f.close()
+set optking { frozen_dihedral = (" 3 1 2 4 ") }
+
+set optking { dynamic_level = 1 
+ geom_maxiter = 250
+ print_trajectory_xyz_file = True }
+
+energy, wfn = optimize('B3LYP-D3', return_wfn=True)
+
+import os
+os.chdir(os.environ['HTMD_PSI4_WORKDIR'])
+
+oeprop(wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
+
+with open('psi4out.xyz', 'w') as f:
+    f.write('4 ' )
+    f.write('%.12f\n' % energy)
+    f.write(MOL.save_string_xyz())
 --------------------------------------------------------------------------
-  Threads set to 8 by Python driver.
+  Threads set to 1 by Python driver.
 
-  Memory set to   1.863 GiB by Python driver.
+  Memory set to   3.915 GiB by Python driver.
 gradient() will perform analytic gradient computation.
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:06 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:38:42 2017
 
    => Loading Basis Set <=
 
     Name: CC-PVDZ
     Role: ORBITAL
     Keyword: BASIS
-    atoms 1-2 entry O          line   190 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
-    atoms 3-4 entry H          line    20 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 1-2 entry O          line   190 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 3-4 entry H          line    20 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
 
 
          ---------------------------------------------------------
                                    SCF
             by Justin Turney, Rob Parrish, and Andy Simmonett
                               RKS Reference
-                        8 Threads,   1907 MiB Core
+                        1 Threads,   4009 MiB Core
          ---------------------------------------------------------
 
   ==> Geometry <==
@@ -95,16 +96,16 @@ gradient() will perform analytic gradient computation.
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.726052996234     0.046818417048    -0.004988562963    15.994914619560
-           O          0.722047003766    -0.058381582952    -0.067888562963    15.994914619560
-           H         -0.851568996234    -0.579302582952     0.733401437037     1.007825032070
-           H          0.915147003766     0.762818417048     0.423211437037     1.007825032070
+           O          1.014300000000    -0.002300000000     0.060500000000    15.994914619560
+           O          2.462400000000    -0.107500000000    -0.002400000000    15.994914619560
+           H          0.821200000000    -0.823600000000    -0.430600000000     1.007825032070
+           H          2.587909000000    -0.461729000000     0.898492000000     1.007825032070
 
   Running in c1 symmetry.
 
-  Rotational constants: A =      9.58903  B =      0.88097  C =      0.86806 [cm^-1]
-  Rotational constants: A = 287471.97522  B =  26410.72664  C =  26023.90581 [MHz]
-  Nuclear repulsion =   36.812601504694591
+  Rotational constants: A =      9.58813  B =      0.13819  C =      0.13787 [cm^-1]
+  Rotational constants: A = 287445.04905  B =   4142.78992  C =   4133.15615 [MHz]
+  Nuclear repulsion =   36.812603435330864
 
   Charge       = 0
   Multiplicity = 1
@@ -176,8 +177,8 @@ gradient() will perform analytic gradient computation.
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88316
-    Total Blocks     =             89
-    Max Points       =           4962
+    Total Blocks     =             90
+    Max Points       =           4509
     Max Functions    =             38
 
    => -D3ZERO: Empirical Dispersion <=
@@ -195,8 +196,8 @@ gradient() will perform analytic gradient computation.
     Name: (CC-PVDZ AUX)
     Role: JKFIT
     Keyword: DF_BASIS_SCF
-    atoms 1-2 entry O          line   220 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
-    atoms 3-4 entry H          line    50 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 1-2 entry O          line   220 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 3-4 entry H          line    50 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
 
   ==> Pre-Iterations <==
 
@@ -215,9 +216,9 @@ gradient() will perform analytic gradient computation.
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Algorithm:                Core
     Integral Cache:           NONE
     Schwarz Cutoff:          1E-12
@@ -233,7 +234,7 @@ gradient() will perform analytic gradient computation.
     Spherical Harmonics?: true
     Max angular momentum: 3
 
-  Minimum eigenvalue in the overlap matrix is 2.5745878643E-02.
+  Minimum eigenvalue in the overlap matrix is 2.5745939570E-02.
   Using Symmetric Orthogonalization.
 
   SCF Guess: Superposition of Atomic Densities via on-the-fly atomic UHF.
@@ -242,17 +243,17 @@ gradient() will perform analytic gradient computation.
 
                            Total Energy        Delta E     RMS |[F,P]|
 
-   @DF-RKS iter   0:  -151.72282051405668   -1.51723e+02   1.06462e-01 
-   @DF-RKS iter   1:  -151.52487338334720    1.97947e-01   9.92242e-03 
-   @DF-RKS iter   2:  -151.53529148569851   -1.04181e-02   9.61695e-03 DIIS
-   @DF-RKS iter   3:  -151.54861468367466   -1.33232e-02   2.58295e-03 DIIS
-   @DF-RKS iter   4:  -151.54943776068023   -8.23077e-04   8.04685e-04 DIIS
-   @DF-RKS iter   5:  -151.54950535032418   -6.75896e-05   4.09243e-04 DIIS
-   @DF-RKS iter   6:  -151.54952873726032   -2.33869e-05   1.71040e-05 DIIS
-   @DF-RKS iter   7:  -151.54952881148512   -7.42248e-08   2.52369e-06 DIIS
-   @DF-RKS iter   8:  -151.54952881471169   -3.22657e-09   4.03498e-07 DIIS
-   @DF-RKS iter   9:  -151.54952881476333   -5.16422e-11   6.01977e-08 DIIS
-   @DF-RKS iter  10:  -151.54952881476547   -2.13163e-12   6.31331e-09 DIIS
+   @DF-RKS iter   0:  -151.61208420723199   -1.51612e+02   4.66531e-02 
+   @DF-RKS iter   1:  -151.50917228883031    1.02912e-01   8.33145e-03 
+   @DF-RKS iter   2:  -151.50584312522605    3.32916e-03   9.01991e-03 DIIS
+   @DF-RKS iter   3:  -151.54917852509695   -4.33354e-02   8.32291e-04 DIIS
+   @DF-RKS iter   4:  -151.54944638510324   -2.67860e-04   3.95980e-04 DIIS
+   @DF-RKS iter   5:  -151.54951595834217   -6.95732e-05   1.55613e-04 DIIS
+   @DF-RKS iter   6:  -151.54952859695140   -1.26386e-05   5.81107e-06 DIIS
+   @DF-RKS iter   7:  -151.54952861926725   -2.23158e-08   1.18148e-06 DIIS
+   @DF-RKS iter   8:  -151.54952862022526   -9.58011e-10   1.02551e-07 DIIS
+   @DF-RKS iter   9:  -151.54952862024422   -1.89573e-11   3.72420e-08 DIIS
+   @DF-RKS iter  10:  -151.54952862024521   -9.94760e-13   2.37456e-09 DIIS
 
   ==> Post-Iterations <==
 
@@ -262,21 +263,21 @@ gradient() will perform analytic gradient computation.
     Doubly Occupied:                                                      
 
        1A    -19.189037     2A    -19.188996     3A     -1.113881  
-       4A     -0.886610     5A     -0.520974     6A     -0.479937  
-       7A     -0.417443     8A     -0.299329     9A     -0.281760  
+       4A     -0.886610     5A     -0.520976     6A     -0.479935  
+       7A     -0.417443     8A     -0.299326     9A     -0.281763  
 
     Virtual:                                                              
 
-      10A      0.023996    11A      0.046350    12A      0.104626  
-      13A      0.573380    14A      0.581408    15A      0.849245  
-      16A      0.872329    17A      0.910616    18A      0.929917  
-      19A      1.011895    20A      1.053847    21A      1.229485  
-      22A      1.247582    23A      1.379661    24A      1.399202  
-      25A      1.686308    26A      1.702656    27A      2.067385  
-      28A      2.078754    29A      2.410467    30A      2.483681  
-      31A      2.519663    32A      2.867790    33A      2.924473  
-      34A      3.061329    35A      3.117845    36A      3.473217  
-      37A      3.548658    38A      3.822745  
+      10A      0.023996    11A      0.046349    12A      0.104626  
+      13A      0.573380    14A      0.581408    15A      0.849246  
+      16A      0.872329    17A      0.910619    18A      0.929914  
+      19A      1.011895    20A      1.053846    21A      1.229491  
+      22A      1.247578    23A      1.379655    24A      1.399203  
+      25A      1.686308    26A      1.702654    27A      2.067384  
+      28A      2.078754    29A      2.410468    30A      2.483691  
+      31A      2.519655    32A      2.867788    33A      2.924475  
+      34A      3.061333    35A      3.117841    36A      3.473214  
+      37A      3.548662    38A      3.822744  
 
     Final Occupation by Irrep:
               A 
@@ -284,18 +285,18 @@ gradient() will perform analytic gradient computation.
 
   Energy converged.
 
-  @DF-RKS Final Energy:  -151.54952881476547
+  @DF-RKS Final Energy:  -151.54952862024521
 
    => Energetics <=
 
-    Nuclear Repulsion Energy =             36.8126015046945909
-    One-Electron Energy =                -281.5843056232639583
-    Two-Electron Energy =                 107.6842723167158056
-    DFT Exchange-Correlation Energy =     -14.4618064429119055
+    Nuclear Repulsion Energy =             36.8126034353308640
+    One-Electron Energy =                -281.5843059492992779
+    Two-Electron Energy =                 107.6842708673721347
+    DFT Exchange-Correlation Energy =     -14.4618064036489145
     Empirical Dispersion Energy =          -0.0002905700000000
     PCM Polarization Energy =               0.0000000000000000
     EFP Energy =                            0.0000000000000000
-    Total Energy =                       -151.5495288147654662
+    Total Energy =                       -151.5495286202452121
 
 
 
@@ -304,30 +305,30 @@ Properties will be evaluated at   0.000000,   0.000000,   0.000000 Bohr
 Properties computed using the SCF density matrix
 
   Nuclear Dipole Moment: (a.u.)
-     X:     0.0596      Y:     0.1720      Z:     1.0839
+     X:    59.0024      Y:    -4.0889      Z:     1.7625
 
   Electronic Dipole Moment: (a.u.)
-     X:    -0.0144      Y:    -0.0416      Z:    -0.2623
+     X:   -59.0475      Y:     3.3032      Z:    -1.4886
 
   Dipole Moment: (a.u.)
-     X:     0.0452      Y:     0.1304      Z:     0.8217     Total:     0.8332
+     X:    -0.0452      Y:    -0.7856      Z:     0.2739     Total:     0.8332
 
   Dipole Moment: (Debye)
-     X:     0.1148      Y:     0.3314      Z:     2.0885     Total:     2.1178
+     X:    -0.1148      Y:    -1.9968      Z:     0.6962     Total:     2.1178
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:11 2017
+*** tstop() called on computer06 at Tue Dec 12 12:38:48 2017
 Module time:
-	user time   =      19.47 seconds =       0.32 minutes
-	system time =       0.63 seconds =       0.01 minutes
-	total time  =          5 seconds =       0.08 minutes
+	user time   =       5.26 seconds =       0.09 minutes
+	system time =       0.06 seconds =       0.00 minutes
+	total time  =          6 seconds =       0.10 minutes
 Total time:
-	user time   =      19.47 seconds =       0.32 minutes
-	system time =       0.63 seconds =       0.01 minutes
-	total time  =          5 seconds =       0.08 minutes
+	user time   =       5.26 seconds =       0.09 minutes
+	system time =       0.06 seconds =       0.00 minutes
+	total time  =          6 seconds =       0.10 minutes
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:11 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:38:48 2017
 
 
          ------------------------------------------------------------
@@ -345,12 +346,12 @@ Total time:
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.726052996234     0.046818417048    -0.004988562963    15.994914619560
-           O          0.722047003766    -0.058381582952    -0.067888562963    15.994914619560
-           H         -0.851568996234    -0.579302582952     0.733401437037     1.007825032070
-           H          0.915147003766     0.762818417048     0.423211437037     1.007825032070
+           O          1.014300000000    -0.002300000000     0.060500000000    15.994914619560
+           O          2.462400000000    -0.107500000000    -0.002400000000    15.994914619560
+           H          0.821200000000    -0.823600000000    -0.430600000000     1.007825032070
+           H          2.587909000000    -0.461729000000     0.898492000000     1.007825032070
 
-  Nuclear repulsion =   36.812601504694591
+  Nuclear repulsion =   36.812603435330864
 
   ==> Basis Set <==
 
@@ -368,9 +369,9 @@ Total time:
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Schwarz Cutoff:          0E+00
     Fitting Condition:       1E-12
 
@@ -427,29 +428,29 @@ Total time:
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88316
-    Total Blocks     =             89
-    Max Points       =           4962
+    Total Blocks     =             90
+    Max Points       =           4509
     Max Functions    =             38
 
 
   -Total Gradient:
      Atom            X                  Y                   Z
     ------   -----------------  -----------------  -----------------
-       1        0.000076884190     0.009559612308    -0.005404753188
-       2       -0.000479011396    -0.010692732886    -0.002107048317
-       3        0.008963185025    -0.001099030478     0.003566040051
-       4       -0.008560869415     0.002232889892     0.003950508089
+       1        0.000491725665     0.006983124504     0.008460527075
+       2       -0.000069157883     0.000208288845    -0.010906721126
+       3        0.008548145329    -0.004601716812    -0.000136256747
+       4       -0.008971045627    -0.002594238859     0.002584019449
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:13 2017
+*** tstop() called on computer06 at Tue Dec 12 12:38:50 2017
 Module time:
-	user time   =       4.99 seconds =       0.08 minutes
-	system time =       0.22 seconds =       0.00 minutes
+	user time   =       1.22 seconds =       0.02 minutes
+	system time =       0.02 seconds =       0.00 minutes
 	total time  =          2 seconds =       0.03 minutes
 Total time:
-	user time   =      24.53 seconds =       0.41 minutes
-	system time =       0.86 seconds =       0.01 minutes
-	total time  =          7 seconds =       0.12 minutes
+	user time   =       6.48 seconds =       0.11 minutes
+	system time =       0.09 seconds =       0.00 minutes
+	total time  =          8 seconds =       0.13 minutes
 
 			-----------------------------------------
 			 OPTKING 2.0: for geometry optimizations 
@@ -469,34 +470,34 @@ Total time:
 	Frozen dihedral atom list: 
 	     3     1     2     4
 	---Fragment 1 Geometry and Gradient---
-	 O          -1.3720413208        0.0884739862       -0.0094270178
-	 O           1.3644710922       -0.1103252030       -0.1282907916
-	 H          -1.6092321861       -1.0947232299        1.3859278615
-	 H           1.7293772084        1.4415178973        0.7997537123
-	             0.0000768842        0.0095596123       -0.0054047532
-	            -0.0004790114       -0.0106927329       -0.0021070483
-	             0.0089631850       -0.0010990305        0.0035660401
-	            -0.0085608694        0.0022328899        0.0039505081
+	 O           1.9167492166       -0.0043463701        0.1143284310
+	 O           4.6532616296       -0.2031455593       -0.0045353427
+	 H           1.5518431003       -1.5563784430       -0.8137160728
+	 H           4.8904392668       -0.8725413576        1.6979038126
+	             0.0004917257        0.0069831245        0.0084605271
+	            -0.0000691579        0.0002082888       -0.0109067211
+	             0.0085481453       -0.0046017168       -0.0001362567
+	            -0.0089710456       -0.0025942389        0.0025840194
 
 	Previous optimization step data not found.  Starting new optimization.
 
 	---Fragment 1 Intrafragment Coordinates---
 	 - Coordinate -           - BOHR/RAD -       - ANG/DEG -
 	 R(1,2)           =         2.746297	       1.453278
-	 R(1,3)           =         1.844785	       0.976218
-	 R(2,4)           =         1.844625	       0.976133
-	 B(1,2,4)         =         1.685490	      96.571484
-	 B(2,1,3)         =         1.685472	      96.570458
-	*D(3,1,2,4)       =        -1.745329	    -100.000003
+	 R(1,3)           =         1.844784	       0.976217
+	 R(2,4)           =         1.844625	       0.976134
+	 B(1,2,4)         =         1.685491	      96.571509
+	 B(2,1,3)         =         1.685473	      96.570488
+	*D(3,1,2,4)       =        -1.745277	     -99.996980
 
-	Current energy   :      -151.5495288148
+	Current energy   :      -151.5495286202
 
 	Generating empirical Hessian (Schlegel '84) for each fragment.
 	Taking RFO optimization step.
 	Going to follow RFO solution 1.
 	Using RFO vector 1.
 	Norm of target step-size    0.14794
-	Projected energy change by RFO approximation:        -0.0024893209
+	Projected energy change by RFO approximation:        -0.0042427749
 
 	Back-transformation to cartesian coordinates...
 	Successfully converged to displaced geometry.
@@ -509,11 +510,11 @@ Total time:
 	   Coordinate                Previous        Force       Change         New 
 	   ----------                --------       ------       ------       ------
 	    1 R(1,2)          =      1.453278     0.069808     0.011741     1.465019
-	    2 R(1,3)          =      0.976218    -0.018517    -0.002266     0.973952
-	    3 R(2,4)          =      0.976133    -0.017880    -0.002187     0.973946
-	    4 B(1,2,4)        =     96.571484     0.001287     5.901381   102.472865
-	    5 B(2,1,3)        =     96.570458     0.001288     5.903450   102.473908
-	    6 *D(3,1,2,4)     =   -100.000003     0.000000     0.000000  -100.000003
+	    2 R(1,3)          =      0.976217    -0.018512    -0.002265     0.973952
+	    3 R(2,4)          =      0.976134    -0.017883    -0.002187     0.973946
+	    4 B(1,2,4)        =     96.571509     0.001287     5.901496   102.473005
+	    5 B(2,1,3)        =     96.570488     0.001288     5.903550   102.474037
+	    6 *D(3,1,2,4)     =    -99.996980     0.000000     0.000000   -99.996980
 	 ---------------------------------------------------------------------------
 	Successfully symmetrized geometry.
 
@@ -526,16 +527,16 @@ Total time:
   --------------------------------------------------------------------------------------------- ~
     Convergence Criteria    1.00e-06 *    3.00e-04 *             o    1.20e-03 *             o  ~
   --------------------------------------------------------------------------------------------- ~
-      1    -151.54952881   -1.52e+02      1.69e-02      1.04e-02 o    1.03e-01      6.02e-02 o  ~
+      1    -151.54952862   -1.52e+02      1.69e-02      1.04e-02 o    1.03e-01      6.02e-02 o  ~
   ---------------------------------------------------------------------------------------------
 
 	Writing optimization data to binary file.
 	Structure for next step:
 	Cartesian Geometry (in Angstrom)
-	    O    -0.7330063940   0.0134312699   0.0068360216
-	    O     0.7296538510  -0.0231314980  -0.0677895384
-	    H    -0.9220100737  -0.6049115235   0.7351993418
-	    H     0.9849346317   0.7865644198   0.4094899231
+	    O     1.0066900505  -0.0191051653   0.0294749685
+	    O     2.4693530380  -0.1021001547   0.0325710306
+	    H     0.7514131575  -0.8227170612  -0.4579930441
+	    H     2.6583527540  -0.4512066187   0.9219390451
 			--------------------------
 			 OPTKING Finished Execution 
 			--------------------------
@@ -546,30 +547,30 @@ Total time:
 
     Geometry (in Angstrom), charge = 0, multiplicity = 1:
 
-    O           -0.733294386012     0.012610225293     0.001580980286
-    O            0.729365859034    -0.023952542637    -0.073044579691
-    H           -0.922298065683    -0.605732568057     0.729944300565
-    H            0.984646639685     0.785743375224     0.404234881852
+    O            1.006690050494    -0.019105165321     0.029474968467
+    O            2.469353037992    -0.102100154719     0.032571030556
+    H            0.751413157498    -0.822717061214    -0.457993044132
+    H            2.658352754016    -0.451206618746     0.921939045109
 
 gradient() will perform analytic gradient computation.
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:13 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:38:50 2017
 
    => Loading Basis Set <=
 
     Name: CC-PVDZ
     Role: ORBITAL
     Keyword: BASIS
-    atoms 1-2 entry O          line   190 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
-    atoms 3-4 entry H          line    20 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 1-2 entry O          line   190 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 3-4 entry H          line    20 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
 
 
          ---------------------------------------------------------
                                    SCF
             by Justin Turney, Rob Parrish, and Andy Simmonett
                               RKS Reference
-                        8 Threads,   1907 MiB Core
+                        1 Threads,   4009 MiB Core
          ---------------------------------------------------------
 
   ==> Geometry <==
@@ -581,16 +582,16 @@ gradient() will perform analytic gradient computation.
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.733294386012     0.012610225293     0.001580980286    15.994914619560
-           O          0.729365859034    -0.023952542637    -0.073044579691    15.994914619560
-           H         -0.922298065683    -0.605732568057     0.729944300565     1.007825032070
-           H          0.984646639685     0.785743375224     0.404234881852     1.007825032070
+           O          1.006690050494    -0.019105165321     0.029474968467    15.994914619560
+           O          2.469353037992    -0.102100154719     0.032571030556    15.994914619560
+           H          0.751413157498    -0.822717061214    -0.457993044132     1.007825032070
+           H          2.658352754016    -0.451206618746     0.921939045109     1.007825032070
 
   Running in c1 symmetry.
 
-  Rotational constants: A =     10.08449  B =      0.85261  C =      0.84177 [cm^-1]
-  Rotational constants: A = 302325.42169  B =  25560.68987  C =  25235.67419 [MHz]
-  Nuclear repulsion =   36.427742071456599
+  Rotational constants: A =      9.81110  B =      0.13752  C =      0.13718 [cm^-1]
+  Rotational constants: A = 294129.36975  B =   4122.76329  C =   4112.68576 [MHz]
+  Nuclear repulsion =   36.427739003907313
 
   Charge       = 0
   Multiplicity = 1
@@ -662,8 +663,8 @@ gradient() will perform analytic gradient computation.
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88328
-    Total Blocks     =             87
-    Max Points       =           4975
+    Total Blocks     =             89
+    Max Points       =           4969
     Max Functions    =             38
 
    => -D3ZERO: Empirical Dispersion <=
@@ -681,8 +682,8 @@ gradient() will perform analytic gradient computation.
     Name: (CC-PVDZ AUX)
     Role: JKFIT
     Keyword: DF_BASIS_SCF
-    atoms 1-2 entry O          line   220 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
-    atoms 3-4 entry H          line    50 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 1-2 entry O          line   220 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 3-4 entry H          line    50 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
 
   Reading orbitals from file 180, no projection.
 
@@ -703,9 +704,9 @@ gradient() will perform analytic gradient computation.
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Algorithm:                Core
     Integral Cache:           NONE
     Schwarz Cutoff:          1E-12
@@ -721,7 +722,7 @@ gradient() will perform analytic gradient computation.
     Spherical Harmonics?: true
     Max angular momentum: 3
 
-  Minimum eigenvalue in the overlap matrix is 2.6651277294E-02.
+  Minimum eigenvalue in the overlap matrix is 2.6651327465E-02.
   Using Symmetric Orthogonalization.
 
   SCF Guess: Orbitals guess was supplied from a previous computation.
@@ -730,16 +731,16 @@ gradient() will perform analytic gradient computation.
 
                            Total Energy        Delta E     RMS |[F,P]|
 
-   @DF-RKS iter   0:  -151.55120240184490   -1.51551e+02   3.88846e-03 
-   @DF-RKS iter   1:  -151.55021091328820    9.91489e-04   4.32282e-04 
-   @DF-RKS iter   2:  -151.55028651489675   -7.56016e-05   2.00317e-04 DIIS
-   @DF-RKS iter   3:  -151.55029806149133   -1.15466e-05   2.43503e-05 DIIS
-   @DF-RKS iter   4:  -151.55029845296190   -3.91471e-07   1.12678e-05 DIIS
-   @DF-RKS iter   5:  -151.55029847438806   -2.14262e-08   6.25560e-06 DIIS
-   @DF-RKS iter   6:  -151.55029848351930   -9.13124e-09   2.63984e-06 DIIS
-   @DF-RKS iter   7:  -151.55029848512962   -1.61032e-09   5.75132e-07 DIIS
-   @DF-RKS iter   8:  -151.55029848520007   -7.04574e-11   3.99685e-08 DIIS
-   @DF-RKS iter   9:  -151.55029848520044   -3.69482e-13   5.58094e-09 DIIS
+   @DF-RKS iter   0:  -151.55120207977566   -1.51551e+02   1.99478e-03 
+   @DF-RKS iter   1:  -151.55021075910560    9.91321e-04   3.43552e-04 
+   @DF-RKS iter   2:  -151.55028636472179   -7.56056e-05   1.41649e-04 DIIS
+   @DF-RKS iter   3:  -151.55029791192655   -1.15472e-05   1.76632e-05 DIIS
+   @DF-RKS iter   4:  -151.55029830355230   -3.91626e-07   7.05446e-06 DIIS
+   @DF-RKS iter   5:  -151.55029832488776   -2.13355e-08   4.40266e-06 DIIS
+   @DF-RKS iter   6:  -151.55029833392740   -9.03964e-09   1.76186e-06 DIIS
+   @DF-RKS iter   7:  -151.55029833552990   -1.60250e-09   3.62603e-07 DIIS
+   @DF-RKS iter   8:  -151.55029833560098   -7.10827e-11   2.05058e-08 DIIS
+   @DF-RKS iter   9:  -151.55029833560124   -2.55795e-13   3.62140e-09 DIIS
 
   ==> Post-Iterations <==
 
@@ -749,21 +750,21 @@ gradient() will perform analytic gradient computation.
     Doubly Occupied:                                                      
 
        1A    -19.189056     2A    -19.189019     3A     -1.102474  
-       4A     -0.893024     5A     -0.530516     6A     -0.468420  
-       7A     -0.408801     8A     -0.297596     9A     -0.282712  
+       4A     -0.893024     5A     -0.530517     6A     -0.468418  
+       7A     -0.408801     8A     -0.297594     9A     -0.282715  
 
     Virtual:                                                              
 
-      10A      0.012038    11A      0.049845    12A      0.106981  
-      13A      0.571258    14A      0.581069    15A      0.850737  
-      16A      0.871166    17A      0.926483    18A      0.950771  
-      19A      1.014074    20A      1.044791    21A      1.236443  
-      22A      1.259029    23A      1.400204    24A      1.402196  
-      25A      1.641829    26A      1.719363    27A      2.073558  
-      28A      2.080592    29A      2.401445    30A      2.461466  
-      31A      2.504217    32A      2.861608    33A      2.930926  
-      34A      3.066963    35A      3.114996    36A      3.494681  
-      37A      3.555518    38A      3.787164  
+      10A      0.012038    11A      0.049844    12A      0.106982  
+      13A      0.571257    14A      0.581070    15A      0.850737  
+      16A      0.871166    17A      0.926486    18A      0.950770  
+      19A      1.014074    20A      1.044789    21A      1.236445  
+      22A      1.259028    23A      1.400200    24A      1.402198  
+      25A      1.641829    26A      1.719361    27A      2.073558  
+      28A      2.080592    29A      2.401446    30A      2.461474  
+      31A      2.504208    32A      2.861606    33A      2.930927  
+      34A      3.066968    35A      3.114992    36A      3.494678  
+      37A      3.555521    38A      3.787162  
 
     Final Occupation by Irrep:
               A 
@@ -771,18 +772,18 @@ gradient() will perform analytic gradient computation.
 
   Energy converged.
 
-  @DF-RKS Final Energy:  -151.55029848520044
+  @DF-RKS Final Energy:  -151.55029833560124
 
    => Energetics <=
 
-    Nuclear Repulsion Energy =             36.4277420714565991
-    One-Electron Energy =                -280.8530248155321942
-    Two-Electron Energy =                 107.3304044299733988
-    DFT Exchange-Correlation Energy =     -14.4550327210982363
+    Nuclear Repulsion Energy =             36.4277390039073126
+    One-Electron Energy =                -280.8530163798025114
+    Two-Electron Energy =                 107.3303989927062787
+    DFT Exchange-Correlation Energy =     -14.4550325024123012
     Empirical Dispersion Energy =          -0.0003874500000000
     PCM Polarization Energy =               0.0000000000000000
     EFP Energy =                            0.0000000000000000
-    Total Energy =                       -151.5502984852004147
+    Total Energy =                       -151.5502983356012408
 
 
 
@@ -791,30 +792,30 @@ Properties will be evaluated at   0.000000,   0.000000,   0.000000 Bohr
 Properties computed using the SCF density matrix
 
   Nuclear Dipole Moment: (a.u.)
-     X:     0.0584      Y:     0.1687      Z:     1.0629
+     X:    58.9937      Y:    -4.2397      Z:     1.8147
 
   Electronic Dipole Moment: (a.u.)
-     X:    -0.0133      Y:    -0.0385      Z:    -0.2424
+     X:   -59.0388      Y:     3.4552      Z:    -1.5412
 
   Dipole Moment: (a.u.)
-     X:     0.0451      Y:     0.1302      Z:     0.8205     Total:     0.8320
+     X:    -0.0451      Y:    -0.7845      Z:     0.2735     Total:     0.8320
 
   Dipole Moment: (Debye)
-     X:     0.1147      Y:     0.3310      Z:     2.0855     Total:     2.1147
+     X:    -0.1146      Y:    -1.9939      Z:     0.6952     Total:     2.1148
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:17 2017
+*** tstop() called on computer06 at Tue Dec 12 12:38:55 2017
 Module time:
-	user time   =      14.76 seconds =       0.25 minutes
-	system time =       0.48 seconds =       0.01 minutes
-	total time  =          4 seconds =       0.07 minutes
+	user time   =       4.59 seconds =       0.08 minutes
+	system time =       0.05 seconds =       0.00 minutes
+	total time  =          5 seconds =       0.08 minutes
 Total time:
-	user time   =      39.54 seconds =       0.66 minutes
-	system time =       1.35 seconds =       0.02 minutes
-	total time  =         11 seconds =       0.18 minutes
+	user time   =      11.09 seconds =       0.18 minutes
+	system time =       0.14 seconds =       0.00 minutes
+	total time  =         13 seconds =       0.22 minutes
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:17 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:38:55 2017
 
 
          ------------------------------------------------------------
@@ -832,12 +833,12 @@ Total time:
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.733294386012     0.012610225293     0.001580980286    15.994914619560
-           O          0.729365859034    -0.023952542637    -0.073044579691    15.994914619560
-           H         -0.922298065683    -0.605732568057     0.729944300565     1.007825032070
-           H          0.984646639685     0.785743375224     0.404234881852     1.007825032070
+           O          1.006690050494    -0.019105165321     0.029474968467    15.994914619560
+           O          2.469353037992    -0.102100154719     0.032571030556    15.994914619560
+           H          0.751413157498    -0.822717061214    -0.457993044132     1.007825032070
+           H          2.658352754016    -0.451206618746     0.921939045109     1.007825032070
 
-  Nuclear repulsion =   36.427742071456599
+  Nuclear repulsion =   36.427739003907313
 
   ==> Basis Set <==
 
@@ -855,9 +856,9 @@ Total time:
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Schwarz Cutoff:          0E+00
     Fitting Condition:       1E-12
 
@@ -914,29 +915,29 @@ Total time:
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88328
-    Total Blocks     =             87
-    Max Points       =           4975
+    Total Blocks     =             89
+    Max Points       =           4969
     Max Functions    =             38
 
 
   -Total Gradient:
      Atom            X                  Y                   Z
     ------   -----------------  -----------------  -----------------
-       1       -0.008354886912    -0.006853096217     0.001890017378
-       2        0.008394646482     0.006962769772    -0.001222269944
-       3       -0.004366842261     0.002234595100    -0.000455574093
-       4        0.004327198834    -0.002343933646    -0.000210093489
+       1       -0.008391793237    -0.002215492284    -0.006709549177
+       2        0.008358040545     0.001577649007     0.006935753526
+       3       -0.004330335656     0.001290031292     0.001963356325
+       4        0.004363975953    -0.000654171526    -0.002188864021
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:19 2017
+*** tstop() called on computer06 at Tue Dec 12 12:38:56 2017
 Module time:
-	user time   =       5.30 seconds =       0.09 minutes
-	system time =       0.21 seconds =       0.00 minutes
-	total time  =          2 seconds =       0.03 minutes
+	user time   =       1.18 seconds =       0.02 minutes
+	system time =       0.01 seconds =       0.00 minutes
+	total time  =          1 seconds =       0.02 minutes
 Total time:
-	user time   =      44.89 seconds =       0.75 minutes
-	system time =       1.57 seconds =       0.03 minutes
-	total time  =         13 seconds =       0.22 minutes
+	user time   =      12.27 seconds =       0.20 minutes
+	system time =       0.15 seconds =       0.00 minutes
+	total time  =         14 seconds =       0.23 minutes
 
 			-----------------------------------------
 			 OPTKING 2.0: for geometry optimizations 
@@ -946,29 +947,31 @@ Total time:
 
 	Previous internal coordinate definitions found.
 	---Fragment 1 Geometry and Gradient---
-	 O          -1.3857255643        0.0238298723        0.0029876198
-	 O           1.3783017243       -0.0452637458       -0.1380342511
-	 H          -1.7428907570       -1.1446686634        1.3793948203
-	 H           1.8607124867        1.4848397899        0.7638932201
-	            -0.0083548869       -0.0068530962        0.0018900174
-	             0.0083946465        0.0069627698       -0.0012222699
-	            -0.0043668423        0.0022345951       -0.0004555741
-	             0.0043271988       -0.0023439336       -0.0002100935
+	 O           1.9023684961       -0.0361035302        0.0556996182
+	 O           4.6664009672       -0.1929413305        0.0615503276
+	 H           1.4199650803       -1.5547099305       -0.8654814242
+	 H           5.0235586697       -0.8526569388        1.7422123065
+	            -0.0083917932       -0.0022154923       -0.0067095492
+	             0.0083580405        0.0015776490        0.0069357535
+	            -0.0043303357        0.0012900313        0.0019633563
+	             0.0043639760       -0.0006541715       -0.0021888640
 
 	---Fragment 1 Intrafragment Coordinates---
 	 - Coordinate -           - BOHR/RAD -       - ANG/DEG -
 	 R(1,2)           =         2.768485	       1.465019
 	 R(1,3)           =         1.840503	       0.973952
 	 R(2,4)           =         1.840492	       0.973946
-	 B(1,2,4)         =         1.788489	     102.472865
-	 B(2,1,3)         =         1.788507	     102.473908
-	*D(3,1,2,4)       =        -1.745329	    -100.000003
+	 B(1,2,4)         =         1.788491	     102.473005
+	 B(2,1,3)         =         1.788509	     102.474037
+	*D(3,1,2,4)       =        -1.745277	     -99.996980
 
-	Current energy   :      -151.5502984852
+	Current energy   :      -151.5502983356
 
 	Energy change for the previous step:
-		Projected    :        -0.0024893209
-		Actual       :        -0.0007696704
+		Projected    :        -0.0042427749
+		Actual       :        -0.0007697154
+	Energy ratio indicates iffy step: Trust radius decreased to 1.250e-01.
+
 
 	Performing BFGS update.
 	Previous computed or guess Hessian on step 1.
@@ -977,7 +980,7 @@ Total time:
 	Going to follow RFO solution 1.
 	Using RFO vector 1.
 	Norm of target step-size    0.04937
-	Projected energy change by RFO approximation:        -0.0003069299
+	Projected energy change by RFO approximation:        -0.0003068851
 
 	Back-transformation to cartesian coordinates...
 	Successfully converged to displaced geometry.
@@ -989,12 +992,12 @@ Total time:
 	 ---------------------------------------------------------------------------
 	   Coordinate                Previous        Force       Change         New 
 	   ----------                --------       ------       ------       ------
-	    1 R(1,2)          =      1.465019    -0.104288    -0.011079     1.453940
-	    2 R(1,3)          =      0.973952     0.007512     0.000544     0.974497
-	    3 R(2,4)          =      0.973946     0.007556     0.000549     0.974496
-	    4 B(1,2,4)        =    102.472865    -0.000658    -1.812172   100.660693
-	    5 B(2,1,3)        =    102.473908    -0.000658    -1.812923   100.660985
-	    6 *D(3,1,2,4)     =   -100.000003     0.000000    -0.000000  -100.000003
+	    1 R(1,2)          =      1.465019    -0.104290    -0.011079     1.453940
+	    2 R(1,3)          =      0.973952     0.007512     0.000545     0.974497
+	    3 R(2,4)          =      0.973946     0.007557     0.000550     0.974496
+	    4 B(1,2,4)        =    102.473005    -0.000658    -1.812166   100.660839
+	    5 B(2,1,3)        =    102.474037    -0.000658    -1.812909   100.661128
+	    6 *D(3,1,2,4)     =    -99.996980     0.000000     0.000000   -99.996980
 	 ---------------------------------------------------------------------------
 	Successfully symmetrized geometry.
 
@@ -1007,16 +1010,16 @@ Total time:
   ---------------------------------------------------------------------------------------------
     Convergence Criteria    1.00e-06 *    3.00e-04 *             o    1.20e-03 *             o
   ---------------------------------------------------------------------------------------------
-      2    -151.55029849   -7.70e-04      1.27e-02      7.20e-03 o    3.16e-02      2.02e-02 o  ~
+      2    -151.55029834   -7.70e-04      1.27e-02      7.21e-03 o    3.16e-02      2.02e-02 o  ~
   ---------------------------------------------------------------------------------------------
 
 	Writing optimization data to binary file.
 	Structure for next step:
 	Cartesian Geometry (in Angstrom)
-	    O    -0.7275968846   0.0236293098  -0.0026710544
-	    O     0.7234285761  -0.0356491121  -0.0730488387
-	    H    -0.8980729367  -0.5966287712   0.7293549292
-	    H     0.9606612922   0.7773170634   0.4090805469
+	    O     1.0126217804  -0.0135646351   0.0397743944
+	    O     2.4636496133  -0.1035709226   0.0208506496
+	    H     0.7754046338  -0.8229963309  -0.4482756380
+	    H     2.6341329725  -0.4549971114   0.9136425940
 			--------------------------
 			 OPTKING Finished Execution 
 			--------------------------
@@ -1027,30 +1030,30 @@ Total time:
 
     Geometry (in Angstrom), charge = 0, multiplicity = 1:
 
-    O           -0.727491206687     0.023927894855    -0.000795196288
-    O            0.723534253959    -0.035350527065    -0.071172980548
-    H           -0.897967258831    -0.596330186154     0.731230787365
-    H            0.960766970109     0.777615648517     0.410956405048
+    O            1.012621780386    -0.013564635119     0.039774394379
+    O            2.463649613333    -0.103570922578     0.020850649602
+    H            0.775404633794    -0.822996330859    -0.448275638023
+    H            2.634132972487    -0.454997111444     0.913642594042
 
 gradient() will perform analytic gradient computation.
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:19 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:38:56 2017
 
    => Loading Basis Set <=
 
     Name: CC-PVDZ
     Role: ORBITAL
     Keyword: BASIS
-    atoms 1-2 entry O          line   190 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
-    atoms 3-4 entry H          line    20 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 1-2 entry O          line   190 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 3-4 entry H          line    20 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
 
 
          ---------------------------------------------------------
                                    SCF
             by Justin Turney, Rob Parrish, and Andy Simmonett
                               RKS Reference
-                        8 Threads,   1907 MiB Core
+                        1 Threads,   4009 MiB Core
          ---------------------------------------------------------
 
   ==> Geometry <==
@@ -1062,16 +1065,16 @@ gradient() will perform analytic gradient computation.
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.727491206687     0.023927894855    -0.000795196288    15.994914619560
-           O          0.723534253959    -0.035350527065    -0.071172980548    15.994914619560
-           H         -0.897967258831    -0.596330186154     0.731230787365     1.007825032070
-           H          0.960766970109     0.777615648517     0.410956405048     1.007825032070
+           O          1.012621780386    -0.013564635119     0.039774394379    15.994914619560
+           O          2.463649613333    -0.103570922578     0.020850649602    15.994914619560
+           H          0.775404633794    -0.822996330859    -0.448275638023     1.007825032070
+           H          2.634132972487    -0.454997111444     0.913642594042     1.007825032070
 
   Running in c1 symmetry.
 
-  Rotational constants: A =      9.91040  B =      0.86957  C =      0.85789 [cm^-1]
-  Rotational constants: A = 297106.38079  B =  26069.09346  C =  25718.95217 [MHz]
-  Nuclear repulsion =   36.678676768483633
+  Rotational constants: A =      9.78281  B =      0.13793  C =      0.13761 [cm^-1]
+  Rotational constants: A = 293281.25779  B =   4134.99834  C =   4125.36167 [MHz]
+  Nuclear repulsion =   36.678677774046555
 
   Charge       = 0
   Multiplicity = 1
@@ -1143,8 +1146,8 @@ gradient() will perform analytic gradient computation.
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88324
-    Total Blocks     =             87
-    Max Points       =           4978
+    Total Blocks     =             90
+    Max Points       =           4983
     Max Functions    =             38
 
    => -D3ZERO: Empirical Dispersion <=
@@ -1162,8 +1165,8 @@ gradient() will perform analytic gradient computation.
     Name: (CC-PVDZ AUX)
     Role: JKFIT
     Keyword: DF_BASIS_SCF
-    atoms 1-2 entry O          line   220 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
-    atoms 3-4 entry H          line    50 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 1-2 entry O          line   220 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 3-4 entry H          line    50 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
 
   Reading orbitals from file 180, no projection.
 
@@ -1184,9 +1187,9 @@ gradient() will perform analytic gradient computation.
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Algorithm:                Core
     Integral Cache:           NONE
     Schwarz Cutoff:          1E-12
@@ -1202,7 +1205,7 @@ gradient() will perform analytic gradient computation.
     Spherical Harmonics?: true
     Max angular momentum: 3
 
-  Minimum eigenvalue in the overlap matrix is 2.5922589228E-02.
+  Minimum eigenvalue in the overlap matrix is 2.5922631511E-02.
   Using Symmetric Orthogonalization.
 
   SCF Guess: Orbitals guess was supplied from a previous computation.
@@ -1211,16 +1214,15 @@ gradient() will perform analytic gradient computation.
 
                            Total Energy        Delta E     RMS |[F,P]|
 
-   @DF-RKS iter   0:  -151.55445838348246   -1.51554e+02   1.28674e-03 
-   @DF-RKS iter   1:  -151.55071897698960    3.73941e-03   2.64256e-04 
-   @DF-RKS iter   2:  -151.55073450836829   -1.55314e-05   1.67630e-04 DIIS
-   @DF-RKS iter   3:  -151.55073857422005   -4.06585e-06   2.59464e-05 DIIS
-   @DF-RKS iter   4:  -151.55073867133686   -9.71168e-08   8.99945e-06 DIIS
-   @DF-RKS iter   5:  -151.55073869903646   -2.76996e-08   8.51874e-07 DIIS
-   @DF-RKS iter   6:  -151.55073869915086   -1.14397e-10   5.09900e-07 DIIS
-   @DF-RKS iter   7:  -151.55073869920417   -5.33191e-11   1.77386e-07 DIIS
-   @DF-RKS iter   8:  -151.55073869921281   -8.64020e-12   1.03070e-08 DIIS
-   @DF-RKS iter   9:  -151.55073869921290   -8.52651e-14   1.23380e-09 DIIS
+   @DF-RKS iter   0:  -151.55445830261877   -1.51554e+02   8.08445e-04 
+   @DF-RKS iter   1:  -151.55071882197123    3.73948e-03   1.86863e-04 
+   @DF-RKS iter   2:  -151.55073435412947   -1.55322e-05   9.01928e-05 DIIS
+   @DF-RKS iter   3:  -151.55073842025851   -4.06613e-06   1.33110e-05 DIIS
+   @DF-RKS iter   4:  -151.55073851738697   -9.71285e-08   6.36349e-06 DIIS
+   @DF-RKS iter   5:  -151.55073854508629   -2.76993e-08   4.36184e-07 DIIS
+   @DF-RKS iter   6:  -151.55073854520174   -1.15449e-10   3.37748e-07 DIIS
+   @DF-RKS iter   7:  -151.55073854525398   -5.22391e-11   1.26066e-07 DIIS
+   @DF-RKS iter   8:  -151.55073854526256   -8.58336e-12   5.29033e-09 DIIS
 
   ==> Post-Iterations <==
 
@@ -1230,21 +1232,21 @@ gradient() will perform analytic gradient computation.
     Doubly Occupied:                                                      
 
        1A    -19.188588     2A    -19.188549     3A     -1.108829  
-       4A     -0.889824     5A     -0.528986     6A     -0.472790  
-       7A     -0.412391     8A     -0.297551     9A     -0.281617  
+       4A     -0.889824     5A     -0.528988     6A     -0.472789  
+       7A     -0.412391     8A     -0.297549     9A     -0.281620  
 
     Virtual:                                                              
 
-      10A      0.019851    11A      0.048795    12A      0.107554  
-      13A      0.572538    14A      0.581881    15A      0.850426  
-      16A      0.872284    17A      0.919313    18A      0.943896  
-      19A      1.013534    20A      1.047353    21A      1.232522  
-      22A      1.254705    23A      1.394473    24A      1.403043  
-      25A      1.659929    26A      1.711121    27A      2.075312  
-      28A      2.081994    29A      2.408530    30A      2.461626  
-      31A      2.503033    32A      2.862092    33A      2.931218  
-      34A      3.074436    35A      3.126069    36A      3.487777  
-      37A      3.551674    38A      3.806968  
+      10A      0.019851    11A      0.048794    12A      0.107554  
+      13A      0.572538    14A      0.581881    15A      0.850427  
+      16A      0.872284    17A      0.919316    18A      0.943895  
+      19A      1.013534    20A      1.047350    21A      1.232526  
+      22A      1.254703    23A      1.394468    24A      1.403045  
+      25A      1.659928    26A      1.711120    27A      2.075312  
+      28A      2.081993    29A      2.408531    30A      2.461634  
+      31A      2.503024    32A      2.862089    33A      2.931220  
+      34A      3.074441    35A      3.126065    36A      3.487774  
+      37A      3.551678    38A      3.806967  
 
     Final Occupation by Irrep:
               A 
@@ -1252,18 +1254,18 @@ gradient() will perform analytic gradient computation.
 
   Energy converged.
 
-  @DF-RKS Final Energy:  -151.55073869921290
+  @DF-RKS Final Energy:  -151.55073854526256
 
    => Energetics <=
 
-    Nuclear Repulsion Energy =             36.6786767684836335
-    One-Electron Energy =                -281.3376250671803405
-    Two-Electron Energy =                 107.5684938403796167
-    DFT Exchange-Correlation Energy =     -14.4599321008958075
-    Empirical Dispersion Energy =          -0.0003521400000000
+    Nuclear Repulsion Energy =             36.6786777740465553
+    One-Electron Energy =                -281.3376248798714414
+    Two-Electron Energy =                 107.5684926490446003
+    DFT Exchange-Correlation Energy =     -14.4599319584822918
+    Empirical Dispersion Energy =          -0.0003521300000000
     PCM Polarization Energy =               0.0000000000000000
     EFP Energy =                            0.0000000000000000
-    Total Energy =                       -151.5507386992128716
+    Total Energy =                       -151.5507385452625897
 
 
 
@@ -1272,30 +1274,30 @@ Properties will be evaluated at   0.000000,   0.000000,   0.000000 Bohr
 Properties computed using the SCF density matrix
 
   Nuclear Dipole Moment: (a.u.)
-     X:     0.0589      Y:     0.1699      Z:     1.0704
+     X:    58.9967      Y:    -4.1859      Z:     1.7959
 
   Electronic Dipole Moment: (a.u.)
-     X:    -0.0137      Y:    -0.0395      Z:    -0.2491
+     X:   -59.0418      Y:     3.4007      Z:    -1.5222
 
   Dipole Moment: (a.u.)
-     X:     0.0452      Y:     0.1304      Z:     0.8213     Total:     0.8328
+     X:    -0.0451      Y:    -0.7852      Z:     0.2738     Total:     0.8328
 
   Dipole Moment: (Debye)
-     X:     0.1148      Y:     0.3313      Z:     2.0875     Total:     2.1167
+     X:    -0.1147      Y:    -1.9958      Z:     0.6959     Total:     2.1168
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:24 2017
+*** tstop() called on computer06 at Tue Dec 12 12:39:00 2017
 Module time:
-	user time   =      15.84 seconds =       0.26 minutes
-	system time =       0.55 seconds =       0.01 minutes
-	total time  =          5 seconds =       0.08 minutes
+	user time   =       4.17 seconds =       0.07 minutes
+	system time =       0.03 seconds =       0.00 minutes
+	total time  =          4 seconds =       0.07 minutes
 Total time:
-	user time   =      60.80 seconds =       1.01 minutes
-	system time =       2.12 seconds =       0.04 minutes
+	user time   =      16.46 seconds =       0.27 minutes
+	system time =       0.20 seconds =       0.00 minutes
 	total time  =         18 seconds =       0.30 minutes
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:24 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:39:00 2017
 
 
          ------------------------------------------------------------
@@ -1313,12 +1315,12 @@ Total time:
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.727491206687     0.023927894855    -0.000795196288    15.994914619560
-           O          0.723534253959    -0.035350527065    -0.071172980548    15.994914619560
-           H         -0.897967258831    -0.596330186154     0.731230787365     1.007825032070
-           H          0.960766970109     0.777615648517     0.410956405048     1.007825032070
+           O          1.012621780386    -0.013564635119     0.039774394379    15.994914619560
+           O          2.463649613333    -0.103570922578     0.020850649602    15.994914619560
+           H          0.775404633794    -0.822996330859    -0.448275638023     1.007825032070
+           H          2.634132972487    -0.454997111444     0.913642594042     1.007825032070
 
-  Nuclear repulsion =   36.678676768483633
+  Nuclear repulsion =   36.678677774046555
 
   ==> Basis Set <==
 
@@ -1336,9 +1338,9 @@ Total time:
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Schwarz Cutoff:          0E+00
     Fitting Condition:       1E-12
 
@@ -1395,29 +1397,29 @@ Total time:
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88324
-    Total Blocks     =             87
-    Max Points       =           4978
+    Total Blocks     =             90
+    Max Points       =           4983
     Max Functions    =             38
 
 
   -Total Gradient:
      Atom            X                  Y                   Z
     ------   -----------------  -----------------  -----------------
-       1       -0.002690464088    -0.001332324075    -0.000837627142
-       2        0.002563172811     0.000963366106    -0.001490817139
-       3        0.000063681226     0.001160316378     0.001010578075
-       4        0.000063713740    -0.000791055641     0.001319764578
+       1       -0.002562593701     0.000857763059    -0.001553890759
+       2        0.002691299346     0.001368806246     0.000778209034
+       3       -0.000064447665    -0.000789134450     0.001321254477
+       4       -0.000064363250    -0.001439253660    -0.000544937095
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:25 2017
+*** tstop() called on computer06 at Tue Dec 12 12:39:02 2017
 Module time:
-	user time   =       5.06 seconds =       0.08 minutes
-	system time =       0.19 seconds =       0.00 minutes
-	total time  =          1 seconds =       0.02 minutes
+	user time   =       1.14 seconds =       0.02 minutes
+	system time =       0.01 seconds =       0.00 minutes
+	total time  =          2 seconds =       0.03 minutes
 Total time:
-	user time   =      65.91 seconds =       1.10 minutes
-	system time =       2.32 seconds =       0.04 minutes
-	total time  =         19 seconds =       0.32 minutes
+	user time   =      17.60 seconds =       0.29 minutes
+	system time =       0.22 seconds =       0.00 minutes
+	total time  =         20 seconds =       0.33 minutes
 
 			-----------------------------------------
 			 OPTKING 2.0: for geometry optimizations 
@@ -1427,30 +1429,30 @@ Total time:
 
 	Previous internal coordinate definitions found.
 	---Fragment 1 Geometry and Gradient---
-	 O          -1.3747591447        0.0452171682       -0.0015027032
-	 O           1.3672815877       -0.0668028148       -0.1344974413
-	 H          -1.6969121955       -1.1269007366        1.3818259281
-	 H           1.8155864510        1.4694806123        0.7765950581
-	            -0.0026904641       -0.0013323241       -0.0008376271
-	             0.0025631728        0.0009633661       -0.0014908171
-	             0.0000636812        0.0011603164        0.0010105781
-	             0.0000637137       -0.0007910556        0.0013197646
+	 O           1.9135778411       -0.0256334455        0.0751627125
+	 O           4.6556230566       -0.1957206790        0.0394020174
+	 H           1.4653024000       -1.5552376737       -0.8471181879
+	 H           4.9777899156       -0.8598199319        1.7265342861
+	            -0.0025625937        0.0008577631       -0.0015538908
+	             0.0026912993        0.0013688062        0.0007782090
+	            -0.0000644477       -0.0007891345        0.0013212545
+	            -0.0000643632       -0.0014392537       -0.0005449371
 
 	---Fragment 1 Intrafragment Coordinates---
 	 - Coordinate -           - BOHR/RAD -       - ANG/DEG -
-	 R(1,2)           =         2.747549	       1.453940
-	 R(1,3)           =         1.841532	       0.974497
-	 R(2,4)           =         1.841530	       0.974496
-	 B(1,2,4)         =         1.756861	     100.660693
-	 B(2,1,3)         =         1.756866	     100.660985
-	*D(3,1,2,4)       =        -1.745329	    -100.000003
+	 R(1,2)           =         2.747548	       1.453940
+	 R(1,3)           =         1.841533	       0.974497
+	 R(2,4)           =         1.841531	       0.974496
+	 B(1,2,4)         =         1.756863	     100.660839
+	 B(2,1,3)         =         1.756868	     100.661128
+	*D(3,1,2,4)       =        -1.745277	     -99.996980
 
-	Current energy   :      -151.5507386992
+	Current energy   :      -151.5507385453
 
 	Energy change for the previous step:
-		Projected    :        -0.0003069299
-		Actual       :        -0.0004402140
-	Energy ratio indicates good step: Trust radius increased to 1.000e+00.
+		Projected    :        -0.0003068851
+		Actual       :        -0.0004402097
+	Energy ratio indicates good step: Trust radius increased to 3.750e-01.
 
 
 	Performing BFGS update.
@@ -1460,7 +1462,7 @@ Total time:
 	Going to follow RFO solution 1.
 	Using RFO vector 1.
 	Norm of target step-size    0.00761
-	Projected energy change by RFO approximation:        -0.0000236958
+	Projected energy change by RFO approximation:        -0.0000236986
 
 	Back-transformation to cartesian coordinates...
 	Successfully converged to displaced geometry.
@@ -1472,12 +1474,12 @@ Total time:
 	 ---------------------------------------------------------------------------
 	   Coordinate                Previous        Force       Change         New 
 	   ----------                --------       ------       ------       ------
-	    1 R(1,2)          =      1.453940    -0.021622    -0.003752     1.450188
+	    1 R(1,2)          =      1.453940    -0.021623    -0.003752     1.450188
 	    2 R(1,3)          =      0.974497    -0.000066    -0.000062     0.974435
-	    3 R(2,4)          =      0.974496    -0.000058    -0.000058     0.974437
-	    4 B(1,2,4)        =    100.660693    -0.000005     0.111971   100.772664
-	    5 B(2,1,3)        =    100.660985    -0.000005     0.111628   100.772612
-	    6 *D(3,1,2,4)     =   -100.000003     0.000000     0.000000  -100.000003
+	    3 R(2,4)          =      0.974496    -0.000058    -0.000058     0.974438
+	    4 B(1,2,4)        =    100.660839    -0.000005     0.111978   100.772817
+	    5 B(2,1,3)        =    100.661128    -0.000005     0.111638   100.772766
+	    6 *D(3,1,2,4)     =    -99.996980     0.000000     0.000000   -99.996980
 	 ---------------------------------------------------------------------------
 	Successfully symmetrized geometry.
 
@@ -1490,16 +1492,16 @@ Total time:
   ---------------------------------------------------------------------------------------------
     Convergence Criteria    1.00e-06 *    3.00e-04 *             o    1.20e-03 *             o
   ---------------------------------------------------------------------------------------------
-      3    -151.55073870   -4.40e-04      2.62e-03      1.07e-03 o    7.09e-03      3.11e-03 o  ~
+      3    -151.55073855   -4.40e-04      2.62e-03      1.07e-03 o    7.09e-03      3.11e-03 o  ~
   ---------------------------------------------------------------------------------------------
 
 	Writing optimization data to binary file.
 	Structure for next step:
 	Cartesian Geometry (in Angstrom)
-	    O    -0.7256167891   0.0237680328  -0.0007389119
-	    O     0.7216714081  -0.0351503771  -0.0709673958
-	    H    -0.8978425462  -0.5961730637   0.7310639672
-	    H     0.9606306858   0.7774182382   0.4108613561
+	    O     1.0144819990  -0.0138398145   0.0396937936
+	    O     2.4617722412  -0.1035460612   0.0210172064
+	    H     0.7755437427  -0.8228178451  -0.4481458518
+	    H     2.6340110171  -0.4549252792   0.9134268518
 			--------------------------
 			 OPTKING Finished Execution 
 			--------------------------
@@ -1510,30 +1512,30 @@ Total time:
 
     Geometry (in Angstrom), charge = 0, multiplicity = 1:
 
-    O           -0.725621889067     0.023750276882    -0.000854324382
-    O            0.721666308147    -0.035168133023    -0.071082808249
-    H           -0.897847646109    -0.596190819588     0.730948554686
-    H            0.960625585818     0.777400482284     0.410745943665
+    O            1.014481999013    -0.013839814495     0.039693793601
+    O            2.461772241192    -0.103546061153     0.021017206380
+    H            0.775543742679    -0.822817845110    -0.448145851822
+    H            2.634011017116    -0.454925279241     0.913426851841
 
 gradient() will perform analytic gradient computation.
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:25 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:39:02 2017
 
    => Loading Basis Set <=
 
     Name: CC-PVDZ
     Role: ORBITAL
     Keyword: BASIS
-    atoms 1-2 entry O          line   190 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
-    atoms 3-4 entry H          line    20 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 1-2 entry O          line   190 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 3-4 entry H          line    20 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
 
 
          ---------------------------------------------------------
                                    SCF
             by Justin Turney, Rob Parrish, and Andy Simmonett
                               RKS Reference
-                        8 Threads,   1907 MiB Core
+                        1 Threads,   4009 MiB Core
          ---------------------------------------------------------
 
   ==> Geometry <==
@@ -1545,16 +1547,16 @@ gradient() will perform analytic gradient computation.
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.725621889067     0.023750276882    -0.000854324382    15.994914619560
-           O          0.721666308147    -0.035168133023    -0.071082808249    15.994914619560
-           H         -0.897847646109    -0.596190819588     0.730948554686     1.007825032070
-           H          0.960625585818     0.777400482284     0.410745943665     1.007825032070
+           O          1.014481999013    -0.013839814495     0.039693793601    15.994914619560
+           O          2.461772241192    -0.103546061153     0.021017206380    15.994914619560
+           H          0.775543742679    -0.822817845110    -0.448145851822     1.007825032070
+           H          2.634011017116    -0.454925279241     0.913426851841     1.007825032070
 
   Running in c1 symmetry.
 
-  Rotational constants: A =      9.92185  B =      0.87351  C =      0.86176 [cm^-1]
-  Rotational constants: A = 297449.61938  B =  26187.17222  C =  25834.83076 [MHz]
-  Nuclear repulsion =   36.743867666164441
+  Rotational constants: A =      9.79127  B =      0.13803  C =      0.13771 [cm^-1]
+  Rotational constants: A = 293535.01848  B =   4137.97672  C =   4128.33511 [MHz]
+  Nuclear repulsion =   36.743872228687700
 
   Charge       = 0
   Multiplicity = 1
@@ -1626,7 +1628,7 @@ gradient() will perform analytic gradient computation.
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88324
-    Total Blocks     =             88
+    Total Blocks     =             90
     Max Points       =           4981
     Max Functions    =             38
 
@@ -1645,8 +1647,8 @@ gradient() will perform analytic gradient computation.
     Name: (CC-PVDZ AUX)
     Role: JKFIT
     Keyword: DF_BASIS_SCF
-    atoms 1-2 entry O          line   220 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
-    atoms 3-4 entry H          line    50 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 1-2 entry O          line   220 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 3-4 entry H          line    50 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
 
   Reading orbitals from file 180, no projection.
 
@@ -1667,9 +1669,9 @@ gradient() will perform analytic gradient computation.
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Algorithm:                Core
     Integral Cache:           NONE
     Schwarz Cutoff:          1E-12
@@ -1685,7 +1687,7 @@ gradient() will perform analytic gradient computation.
     Spherical Harmonics?: true
     Max angular momentum: 3
 
-  Minimum eigenvalue in the overlap matrix is 2.5729525496E-02.
+  Minimum eigenvalue in the overlap matrix is 2.5729556406E-02.
   Using Symmetric Orthogonalization.
 
   SCF Guess: Orbitals guess was supplied from a previous computation.
@@ -1694,14 +1696,14 @@ gradient() will perform analytic gradient computation.
 
                            Total Energy        Delta E     RMS |[F,P]|
 
-   @DF-RKS iter   0:  -151.55262213950851   -1.51553e+02   3.62081e-04 
-   @DF-RKS iter   1:  -151.55074941062139    1.87273e-03   7.52535e-05 
-   @DF-RKS iter   2:  -151.55075014663711   -7.36016e-07   3.08476e-05 DIIS
-   @DF-RKS iter   3:  -151.55075038984398   -2.43207e-07   6.08710e-06 DIIS
-   @DF-RKS iter   4:  -151.55075039650140   -6.65742e-09   8.94016e-07 DIIS
-   @DF-RKS iter   5:  -151.55075039662873   -1.27329e-10   1.39158e-07 DIIS
-   @DF-RKS iter   6:  -151.55075039662938   -6.53699e-13   1.20088e-07 DIIS
-   @DF-RKS iter   7:  -151.55075039663296   -3.58114e-12   9.87430e-09 DIIS
+   @DF-RKS iter   0:  -151.55262208499047   -1.51553e+02   2.03485e-04 
+   @DF-RKS iter   1:  -151.55074926777090    1.87282e-03   4.56797e-05 
+   @DF-RKS iter   2:  -151.55075000387129   -7.36100e-07   2.29331e-05 DIIS
+   @DF-RKS iter   3:  -151.55075024710473   -2.43233e-07   3.56044e-06 DIIS
+   @DF-RKS iter   4:  -151.55075025376229   -6.65756e-09   4.58606e-07 DIIS
+   @DF-RKS iter   5:  -151.55075025388987   -1.27585e-10   8.67288e-08 DIIS
+   @DF-RKS iter   6:  -151.55075025389041   -5.40012e-13   8.21687e-08 DIIS
+   @DF-RKS iter   7:  -151.55075025389394   -3.52429e-12   5.82191e-09 DIIS
 
   ==> Post-Iterations <==
 
@@ -1711,21 +1713,21 @@ gradient() will perform analytic gradient computation.
     Doubly Occupied:                                                      
 
        1A    -19.188321     2A    -19.188282     3A     -1.110228  
-       4A     -0.889221     5A     -0.529921     6A     -0.473037  
-       7A     -0.412751     8A     -0.297128     9A     -0.281169  
+       4A     -0.889221     5A     -0.529923     6A     -0.473035  
+       7A     -0.412752     8A     -0.297125     9A     -0.281171  
 
     Virtual:                                                              
 
-      10A      0.021684    11A      0.048850    12A      0.108340  
+      10A      0.021683    11A      0.048849    12A      0.108341  
       13A      0.572631    14A      0.581983    15A      0.850430  
-      16A      0.872718    17A      0.918766    18A      0.943860  
-      19A      1.013677    20A      1.047009    21A      1.232520  
-      22A      1.254610    23A      1.394752    24A      1.403507  
-      25A      1.660958    26A      1.711529    27A      2.076627  
-      28A      2.082446    29A      2.411019    30A      2.459692  
-      31A      2.500959    32A      2.861101    33A      2.931870  
-      34A      3.078766    35A      3.130019    36A      3.488717  
-      37A      3.551543    38A      3.810189  
+      16A      0.872718    17A      0.918769    18A      0.943859  
+      19A      1.013676    20A      1.047006    21A      1.232523  
+      22A      1.254608    23A      1.394747    24A      1.403509  
+      25A      1.660958    26A      1.711528    27A      2.076626  
+      28A      2.082445    29A      2.411021    30A      2.459700  
+      31A      2.500950    32A      2.861099    33A      2.931872  
+      34A      3.078771    35A      3.130015    36A      3.488715  
+      37A      3.551547    38A      3.810188  
 
     Final Occupation by Irrep:
               A 
@@ -1733,18 +1735,18 @@ gradient() will perform analytic gradient computation.
 
   Energy converged.
 
-  @DF-RKS Final Energy:  -151.55075039663296
+  @DF-RKS Final Energy:  -151.55075025389394
 
    => Energetics <=
 
-    Nuclear Repulsion Energy =             36.7438676661644408
-    One-Electron Energy =                -281.4652480491447477
-    Two-Electron Energy =                 107.6323138932702363
-    DFT Exchange-Correlation Energy =     -14.4613334169229368
+    Nuclear Repulsion Energy =             36.7438722286876995
+    One-Electron Energy =                -281.4652546396850994
+    Two-Electron Energy =                 107.6323159674291929
+    DFT Exchange-Correlation Energy =     -14.4613333203257461
     Empirical Dispersion Energy =          -0.0003504900000000
     PCM Polarization Energy =               0.0000000000000000
     EFP Energy =                            0.0000000000000000
-    Total Energy =                       -151.5507503966329921
+    Total Energy =                       -151.5507502538939093
 
 
 
@@ -1753,30 +1755,30 @@ Properties will be evaluated at   0.000000,   0.000000,   0.000000 Bohr
 Properties computed using the SCF density matrix
 
   Nuclear Dipole Moment: (a.u.)
-     X:     0.0588      Y:     0.1698      Z:     1.0700
+     X:    58.9965      Y:    -4.1892      Z:     1.7971
 
   Electronic Dipole Moment: (a.u.)
-     X:    -0.0137      Y:    -0.0395      Z:    -0.2489
+     X:   -59.0416      Y:     3.4042      Z:    -1.5234
 
   Dipole Moment: (a.u.)
-     X:     0.0451      Y:     0.1303      Z:     0.8211     Total:     0.8326
+     X:    -0.0451      Y:    -0.7850      Z:     0.2737     Total:     0.8326
 
   Dipole Moment: (Debye)
-     X:     0.1148      Y:     0.3312      Z:     2.0870     Total:     2.1162
+     X:    -0.1147      Y:    -1.9954      Z:     0.6957     Total:     2.1163
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:29 2017
+*** tstop() called on computer06 at Tue Dec 12 12:39:06 2017
 Module time:
-	user time   =      12.83 seconds =       0.21 minutes
-	system time =       0.46 seconds =       0.01 minutes
+	user time   =       4.12 seconds =       0.07 minutes
+	system time =       0.10 seconds =       0.00 minutes
 	total time  =          4 seconds =       0.07 minutes
 Total time:
-	user time   =      78.88 seconds =       1.31 minutes
-	system time =       2.78 seconds =       0.05 minutes
-	total time  =         23 seconds =       0.38 minutes
+	user time   =      21.75 seconds =       0.36 minutes
+	system time =       0.32 seconds =       0.01 minutes
+	total time  =         24 seconds =       0.40 minutes
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:29 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:39:06 2017
 
 
          ------------------------------------------------------------
@@ -1794,12 +1796,12 @@ Total time:
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.725621889067     0.023750276882    -0.000854324382    15.994914619560
-           O          0.721666308147    -0.035168133023    -0.071082808249    15.994914619560
-           H         -0.897847646109    -0.596190819588     0.730948554686     1.007825032070
-           H          0.960625585818     0.777400482284     0.410745943665     1.007825032070
+           O          1.014481999013    -0.013839814495     0.039693793601    15.994914619560
+           O          2.461772241192    -0.103546061153     0.021017206380    15.994914619560
+           H          0.775543742679    -0.822817845110    -0.448145851822     1.007825032070
+           H          2.634011017116    -0.454925279241     0.913426851841     1.007825032070
 
-  Nuclear repulsion =   36.743867666164441
+  Nuclear repulsion =   36.743872228687700
 
   ==> Basis Set <==
 
@@ -1817,9 +1819,9 @@ Total time:
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Schwarz Cutoff:          0E+00
     Fitting Condition:       1E-12
 
@@ -1876,7 +1878,7 @@ Total time:
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88324
-    Total Blocks     =             88
+    Total Blocks     =             90
     Max Points       =           4981
     Max Functions    =             38
 
@@ -1884,21 +1886,21 @@ Total time:
   -Total Gradient:
      Atom            X                  Y                   Z
     ------   -----------------  -----------------  -----------------
-       1       -0.000819892127    -0.001408694388    -0.000888187481
-       2        0.000695619093     0.001049958110    -0.001362913211
-       3        0.000083550957     0.001172941568     0.000967069482
-       4        0.000040827721    -0.000813893762     0.001285989633
+       1       -0.000696195268     0.000702446610    -0.001571188880
+       2        0.000819471641     0.001449964559     0.000819238649
+       3       -0.000040269611    -0.000746361255     0.001326748775
+       4       -0.000083116610    -0.001407925525    -0.000574143883
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:31 2017
+*** tstop() called on computer06 at Tue Dec 12 12:39:08 2017
 Module time:
-	user time   =       6.10 seconds =       0.10 minutes
-	system time =       0.26 seconds =       0.00 minutes
+	user time   =       1.14 seconds =       0.02 minutes
+	system time =       0.01 seconds =       0.00 minutes
 	total time  =          2 seconds =       0.03 minutes
 Total time:
-	user time   =      85.08 seconds =       1.42 minutes
-	system time =       3.05 seconds =       0.05 minutes
-	total time  =         25 seconds =       0.42 minutes
+	user time   =      22.90 seconds =       0.38 minutes
+	system time =       0.33 seconds =       0.01 minutes
+	total time  =         26 seconds =       0.43 minutes
 
 			-----------------------------------------
 			 OPTKING 2.0: for geometry optimizations 
@@ -1908,29 +1910,29 @@ Total time:
 
 	Previous internal coordinate definitions found.
 	---Fragment 1 Geometry and Gradient---
-	 O          -1.3712266464        0.0448815189       -0.0016144391
-	 O           1.3637516817       -0.0664581400       -0.1343270403
-	 H          -1.6966861602       -1.1266373720        1.3812925856
-	 H           1.8153192734        1.4690740071        0.7761973437
-	            -0.0008198921       -0.0014086944       -0.0008881875
-	             0.0006956191        0.0010499581       -0.0013629132
-	             0.0000835510        0.0011729416        0.0009670695
-	             0.0000408277       -0.0008138938        0.0012859896
+	 O           1.9170931449       -0.0261534591        0.0750103991
+	 O           4.6520753374       -0.1956736977        0.0397167641
+	 H           1.4655652777       -1.5549003845       -0.8468729275
+	 H           4.9775594534       -0.8596841887        1.7261265924
+	            -0.0006961953        0.0007024466       -0.0015711889
+	             0.0008194716        0.0014499646        0.0008192386
+	            -0.0000402696       -0.0007463613        0.0013267488
+	            -0.0000831166       -0.0014079255       -0.0005741439
 
 	---Fragment 1 Intrafragment Coordinates---
 	 - Coordinate -           - BOHR/RAD -       - ANG/DEG -
-	 R(1,2)           =         2.740459	       1.450188
+	 R(1,2)           =         2.740458	       1.450188
 	 R(1,3)           =         1.841416	       0.974435
-	 R(2,4)           =         1.841420	       0.974437
-	 B(1,2,4)         =         1.758815	     100.772664
-	 B(2,1,3)         =         1.758814	     100.772612
-	*D(3,1,2,4)       =        -1.745329	    -100.000003
+	 R(2,4)           =         1.841420	       0.974438
+	 B(1,2,4)         =         1.758817	     100.772817
+	 B(2,1,3)         =         1.758817	     100.772766
+	*D(3,1,2,4)       =        -1.745277	     -99.996980
 
-	Current energy   :      -151.5507503966
+	Current energy   :      -151.5507502539
 
 	Energy change for the previous step:
-		Projected    :        -0.0000236958
-		Actual       :        -0.0000116974
+		Projected    :        -0.0000236986
+		Actual       :        -0.0000117086
 
 	Performing BFGS update.
 	Previous computed or guess Hessian on step 1.
@@ -1939,7 +1941,7 @@ Total time:
 	Going to follow RFO solution 1.
 	Using RFO vector 1.
 	Norm of target step-size    0.00287
-	Projected energy change by RFO approximation:        -0.0000013980
+	Projected energy change by RFO approximation:        -0.0000024203
 
 	Back-transformation to cartesian coordinates...
 	Successfully converged to displaced geometry.
@@ -1953,10 +1955,10 @@ Total time:
 	   ----------                --------       ------       ------       ------
 	    1 R(1,2)          =      1.450188    -0.006018    -0.001451     1.448737
 	    2 R(1,3)          =      0.974435     0.000297     0.000028     0.974463
-	    3 R(2,4)          =      0.974437     0.000281     0.000026     0.974463
-	    4 B(1,2,4)        =    100.772664    -0.000003     0.033635   100.806299
-	    5 B(2,1,3)        =    100.772612    -0.000003     0.033696   100.806308
-	    6 *D(3,1,2,4)     =   -100.000003    -0.000000     0.000000  -100.000003
+	    3 R(2,4)          =      0.974438     0.000281     0.000026     0.974463
+	    4 B(1,2,4)        =    100.772817    -0.000003     0.033636   100.806453
+	    5 B(2,1,3)        =    100.772766    -0.000003     0.033696   100.806462
+	    6 *D(3,1,2,4)     =    -99.996980    -0.000000     0.000000   -99.996980
 	 ---------------------------------------------------------------------------
 	Successfully symmetrized geometry.
 
@@ -1969,16 +1971,16 @@ Total time:
   ---------------------------------------------------------------------------------------------
     Convergence Criteria    1.00e-06 *    3.00e-04 *             o    1.20e-03 *             o
   ---------------------------------------------------------------------------------------------
-      4    -151.55075040   -1.17e-05      7.30e-04      3.00e-04 o    2.74e-03      1.17e-03 o  ~
+      4    -151.55075025   -1.17e-05      7.30e-04      3.00e-04 o    2.74e-03      1.17e-03 o  ~
   ---------------------------------------------------------------------------------------------
 
 	Writing optimization data to binary file.
 	Structure for next step:
 	Cartesian Geometry (in Angstrom)
-	    O    -0.7248952325   0.0237478282  -0.0008675744
-	    O     0.7209432245  -0.0351568728  -0.0710183954
-	    H    -0.8977118147  -0.5961111279   0.7309023591
-	    H     0.9604861815   0.7773119790   0.4107409764
+	    O     1.0152058579  -0.0139015702   0.0397149674
+	    O     2.4610463055  -0.1035331807   0.0210137880
+	    H     0.7756823747  -0.8227723273  -0.4480706919
+	    H     2.6338744618  -0.4549219218   0.9133339366
 			--------------------------
 			 OPTKING Finished Execution 
 			--------------------------
@@ -1989,30 +1991,30 @@ Total time:
 
     Geometry (in Angstrom), charge = 0, multiplicity = 1:
 
-    O           -0.724896807189     0.023743944759    -0.000890123171
-    O            0.720941649838    -0.035160756303    -0.071040944185
-    H           -0.897713389417    -0.596115011387     0.730879810365
-    H            0.960484606778     0.777308095561     0.410718427661
+    O            1.015205857945    -0.013901570200     0.039714967386
+    O            2.461046305512    -0.103533180669     0.021013787961
+    H            0.775682374699    -0.822772327299    -0.448070691923
+    H            2.633874461845    -0.454921921832     0.913333936576
 
 gradient() will perform analytic gradient computation.
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:31 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:39:08 2017
 
    => Loading Basis Set <=
 
     Name: CC-PVDZ
     Role: ORBITAL
     Keyword: BASIS
-    atoms 1-2 entry O          line   190 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
-    atoms 3-4 entry H          line    20 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 1-2 entry O          line   190 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
+    atoms 3-4 entry H          line    20 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz.gbs 
 
 
          ---------------------------------------------------------
                                    SCF
             by Justin Turney, Rob Parrish, and Andy Simmonett
                               RKS Reference
-                        8 Threads,   1907 MiB Core
+                        1 Threads,   4009 MiB Core
          ---------------------------------------------------------
 
   ==> Geometry <==
@@ -2024,16 +2026,16 @@ gradient() will perform analytic gradient computation.
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.724896807189     0.023743944759    -0.000890123171    15.994914619560
-           O          0.720941649838    -0.035160756303    -0.071040944185    15.994914619560
-           H         -0.897713389417    -0.596115011387     0.730879810365     1.007825032070
-           H          0.960484606778     0.777308095561     0.410718427661     1.007825032070
+           O          1.015205857945    -0.013901570200     0.039714967386    15.994914619560
+           O          2.461046305512    -0.103533180669     0.021013787961    15.994914619560
+           H          0.775682374699    -0.822772327299    -0.448070691923     1.007825032070
+           H          2.633874461845    -0.454921921832     0.913333936576     1.007825032070
 
   Running in c1 symmetry.
 
-  Rotational constants: A =      9.92448  B =      0.87506  C =      0.86328 [cm^-1]
-  Rotational constants: A = 297528.57120  B =  26233.65816  C =  25880.34885 [MHz]
-  Nuclear repulsion =   36.768953741677983
+  Rotational constants: A =      9.79341  B =      0.13807  C =      0.13775 [cm^-1]
+  Rotational constants: A = 293598.91108  B =   4139.13655  C =   4129.49406 [MHz]
+  Nuclear repulsion =   36.768959003314706
 
   Charge       = 0
   Multiplicity = 1
@@ -2105,8 +2107,8 @@ gradient() will perform analytic gradient computation.
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88324
-    Total Blocks     =             87
-    Max Points       =           4981
+    Total Blocks     =             90
+    Max Points       =           4983
     Max Functions    =             38
 
    => -D3ZERO: Empirical Dispersion <=
@@ -2124,8 +2126,8 @@ gradient() will perform analytic gradient computation.
     Name: (CC-PVDZ AUX)
     Role: JKFIT
     Keyword: DF_BASIS_SCF
-    atoms 1-2 entry O          line   220 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
-    atoms 3-4 entry H          line    50 file /home/raimis/opt/miniconda3/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 1-2 entry O          line   220 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
+    atoms 3-4 entry H          line    50 file /shared/raimis/opt/miniconda/envs/htmd/share/psi4/basis/cc-pvdz-jkfit.gbs 
 
   Reading orbitals from file 180, no projection.
 
@@ -2146,9 +2148,9 @@ gradient() will perform analytic gradient computation.
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Algorithm:                Core
     Integral Cache:           NONE
     Schwarz Cutoff:          1E-12
@@ -2164,7 +2166,7 @@ gradient() will perform analytic gradient computation.
     Spherical Harmonics?: true
     Max angular momentum: 3
 
-  Minimum eigenvalue in the overlap matrix is 2.5655102413E-02.
+  Minimum eigenvalue in the overlap matrix is 2.5655131086E-02.
   Using Symmetric Orthogonalization.
 
   SCF Guess: Orbitals guess was supplied from a previous computation.
@@ -2173,14 +2175,14 @@ gradient() will perform analytic gradient computation.
 
                            Total Energy        Delta E     RMS |[F,P]|
 
-   @DF-RKS iter   0:  -151.55141967504559   -1.51551e+02   1.35142e-04 
-   @DF-RKS iter   1:  -151.55075118189532    6.68493e-04   3.48387e-05 
-   @DF-RKS iter   2:  -151.55075129577563   -1.13880e-07   1.73087e-05 DIIS
-   @DF-RKS iter   3:  -151.55075133247263   -3.66970e-08   1.40414e-06 DIIS
-   @DF-RKS iter   4:  -151.55075133317311   -7.00481e-10   3.52398e-07 DIIS
-   @DF-RKS iter   5:  -151.55075133319212   -1.90141e-11   5.67496e-08 DIIS
-   @DF-RKS iter   6:  -151.55075133319241   -2.84217e-13   4.45876e-08 DIIS
-   @DF-RKS iter   7:  -151.55075133319278   -3.69482e-13   2.81211e-09 DIIS
+   @DF-RKS iter   0:  -151.55141955043246   -1.51551e+02   7.90464e-05 
+   @DF-RKS iter   1:  -151.55075103920660    6.68511e-04   1.78724e-05 
+   @DF-RKS iter   2:  -151.55075115309305   -1.13886e-07   8.87946e-06 DIIS
+   @DF-RKS iter   3:  -151.55075118979218   -3.66991e-08   1.16152e-06 DIIS
+   @DF-RKS iter   4:  -151.55075119049292   -7.00737e-10   1.80748e-07 DIIS
+   @DF-RKS iter   5:  -151.55075119051185   -1.89289e-11   3.53273e-08 DIIS
+   @DF-RKS iter   6:  -151.55075119051219   -3.41061e-13   3.05965e-08 DIIS
+   @DF-RKS iter   7:  -151.55075119051273   -5.40012e-13   1.52125e-09 DIIS
 
   ==> Post-Iterations <==
 
@@ -2190,21 +2192,21 @@ gradient() will perform analytic gradient computation.
     Doubly Occupied:                                                      
 
        1A    -19.188222     2A    -19.188183     3A     -1.110774  
-       4A     -0.888964     5A     -0.530254     6A     -0.473146  
-       7A     -0.412901     8A     -0.296964     9A     -0.280991  
+       4A     -0.888964     5A     -0.530256     6A     -0.473144  
+       7A     -0.412902     8A     -0.296962     9A     -0.280994  
 
     Virtual:                                                              
 
-      10A      0.022397    11A      0.048855    12A      0.108637  
-      13A      0.572635    14A      0.581993    15A      0.850428  
-      16A      0.872885    17A      0.918530    18A      0.943816  
-      19A      1.013733    20A      1.046886    21A      1.232496  
-      22A      1.254553    23A      1.394827    24A      1.403677  
-      25A      1.661397    26A      1.711663    27A      2.077041  
-      28A      2.082519    29A      2.411996    30A      2.458977  
-      31A      2.500160    32A      2.860682    33A      2.932074  
-      34A      3.080408    35A      3.131521    36A      3.489002  
-      37A      3.551438    38A      3.811448  
+      10A      0.022397    11A      0.048854    12A      0.108638  
+      13A      0.572635    14A      0.581993    15A      0.850429  
+      16A      0.872885    17A      0.918533    18A      0.943814  
+      19A      1.013732    20A      1.046884    21A      1.232500  
+      22A      1.254551    23A      1.394822    24A      1.403679  
+      25A      1.661397    26A      1.711662    27A      2.077041  
+      28A      2.082518    29A      2.411998    30A      2.458985  
+      31A      2.500151    32A      2.860680    33A      2.932076  
+      34A      3.080413    35A      3.131517    36A      3.488999  
+      37A      3.551441    38A      3.811447  
 
     Final Occupation by Irrep:
               A 
@@ -2212,18 +2214,18 @@ gradient() will perform analytic gradient computation.
 
   Energy converged.
 
-  @DF-RKS Final Energy:  -151.55075133319278
+  @DF-RKS Final Energy:  -151.55075119051273
 
    => Energetics <=
 
-    Nuclear Repulsion Energy =             36.7689537416779828
-    One-Electron Energy =                -281.5144025832832995
-    Two-Electron Energy =                 107.6568961864659997
-    DFT Exchange-Correlation Energy =     -14.4618489180534375
+    Nuclear Repulsion Energy =             36.7689590033147056
+    One-Electron Energy =                -281.5144105337541305
+    Two-Electron Energy =                 107.6568989354323946
+    DFT Exchange-Correlation Energy =     -14.4618488355056680
     Empirical Dispersion Energy =          -0.0003497600000000
     PCM Polarization Energy =               0.0000000000000000
     EFP Energy =                            0.0000000000000000
-    Total Energy =                       -151.5507513331927782
+    Total Energy =                       -151.5507511905126989
 
 
 
@@ -2232,30 +2234,30 @@ Properties will be evaluated at   0.000000,   0.000000,   0.000000 Bohr
 Properties computed using the SCF density matrix
 
   Nuclear Dipole Moment: (a.u.)
-     X:     0.0588      Y:     0.1698      Z:     1.0699
+     X:    58.9964      Y:    -4.1898      Z:     1.7973
 
   Electronic Dipole Moment: (a.u.)
-     X:    -0.0137      Y:    -0.0395      Z:    -0.2489
+     X:   -59.0416      Y:     3.4049      Z:    -1.5236
 
   Dipole Moment: (a.u.)
-     X:     0.0451      Y:     0.1303      Z:     0.8210     Total:     0.8325
+     X:    -0.0451      Y:    -0.7850      Z:     0.2737     Total:     0.8325
 
   Dipole Moment: (Debye)
-     X:     0.1147      Y:     0.3312      Z:     2.0868     Total:     2.1160
+     X:    -0.1147      Y:    -1.9952      Z:     0.6956     Total:     2.1161
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:34 2017
+*** tstop() called on computer06 at Tue Dec 12 12:39:12 2017
 Module time:
-	user time   =      13.30 seconds =       0.22 minutes
-	system time =       0.43 seconds =       0.01 minutes
-	total time  =          3 seconds =       0.05 minutes
+	user time   =       3.87 seconds =       0.06 minutes
+	system time =       0.03 seconds =       0.00 minutes
+	total time  =          4 seconds =       0.07 minutes
 Total time:
-	user time   =      98.52 seconds =       1.64 minutes
-	system time =       3.49 seconds =       0.06 minutes
-	total time  =         28 seconds =       0.47 minutes
+	user time   =      26.78 seconds =       0.45 minutes
+	system time =       0.37 seconds =       0.01 minutes
+	total time  =         30 seconds =       0.50 minutes
 
-*** tstart() called on computer03
-*** at Fri Aug 11 14:04:34 2017
+*** tstart() called on computer06
+*** at Tue Dec 12 12:39:12 2017
 
 
          ------------------------------------------------------------
@@ -2273,12 +2275,12 @@ Total time:
 
        Center              X                  Y                   Z               Mass       
     ------------   -----------------  -----------------  -----------------  -----------------
-           O         -0.724896807189     0.023743944759    -0.000890123171    15.994914619560
-           O          0.720941649838    -0.035160756303    -0.071040944185    15.994914619560
-           H         -0.897713389417    -0.596115011387     0.730879810365     1.007825032070
-           H          0.960484606778     0.777308095561     0.410718427661     1.007825032070
+           O          1.015205857945    -0.013901570200     0.039714967386    15.994914619560
+           O          2.461046305512    -0.103533180669     0.021013787961    15.994914619560
+           H          0.775682374699    -0.822772327299    -0.448070691923     1.007825032070
+           H          2.633874461845    -0.454921921832     0.913333936576     1.007825032070
 
-  Nuclear repulsion =   36.768953741677983
+  Nuclear repulsion =   36.768959003314706
 
   ==> Basis Set <==
 
@@ -2296,9 +2298,9 @@ Total time:
     J tasked:                  Yes
     K tasked:                  Yes
     wK tasked:                  No
-    OpenMP threads:              8
-    Integrals threads:           8
-    Memory (MB):              1430
+    OpenMP threads:              1
+    Integrals threads:           1
+    Memory (MB):              3006
     Schwarz Cutoff:          0E+00
     Fitting Condition:       1E-12
 
@@ -2355,29 +2357,29 @@ Total time:
     Radial Points    =             75
     Spherical Points =            302
     Total Points     =          88324
-    Total Blocks     =             87
-    Max Points       =           4981
+    Total Blocks     =             90
+    Max Points       =           4983
     Max Functions    =             38
 
 
   -Total Gradient:
      Atom            X                  Y                   Z
     ------   -----------------  -----------------  -----------------
-       1       -0.000074494941    -0.001383624590    -0.000952416014
-       2       -0.000051346855     0.001020270973    -0.001335443623
-       3        0.000104414656     0.001144462861     0.000989759170
-       4        0.000021535688    -0.000780794453     0.001300082321
+       1        0.000051279784     0.000693564022    -0.001531208581
+       2        0.000074441181     0.001494161467     0.000768204072
+       3       -0.000021467030    -0.000775764122     0.001303454412
+       4       -0.000104363466    -0.001413859427    -0.000539787885
 
 
-*** tstop() called on computer03 at Fri Aug 11 14:04:36 2017
+*** tstop() called on computer06 at Tue Dec 12 12:39:13 2017
 Module time:
-	user time   =       5.32 seconds =       0.09 minutes
-	system time =       0.23 seconds =       0.00 minutes
-	total time  =          2 seconds =       0.03 minutes
+	user time   =       1.27 seconds =       0.02 minutes
+	system time =       0.03 seconds =       0.00 minutes
+	total time  =          1 seconds =       0.02 minutes
 Total time:
-	user time   =     103.89 seconds =       1.73 minutes
-	system time =       3.72 seconds =       0.06 minutes
-	total time  =         30 seconds =       0.50 minutes
+	user time   =      28.05 seconds =       0.47 minutes
+	system time =       0.41 seconds =       0.01 minutes
+	total time  =         31 seconds =       0.52 minutes
 
 			-----------------------------------------
 			 OPTKING 2.0: for geometry optimizations 
@@ -2387,28 +2389,28 @@ Total time:
 
 	Previous internal coordinate definitions found.
 	---Fragment 1 Geometry and Gradient---
-	 O          -1.3698564402        0.0448695529       -0.0016820890
-	 O           1.3623822760       -0.0664442000       -0.1342479287
-	 H          -1.6964324518       -1.1264941152        1.3811626776
-	 H           1.8150528617        1.4688994215        0.7761453460
-	            -0.0000744949       -0.0013836246       -0.0009524160
-	            -0.0000513469        0.0010202710       -0.0013354436
-	             0.0001044147        0.0011444629        0.0009897592
-	             0.0000215357       -0.0007807945        0.0013000823
+	 O           1.9184610400       -0.0262701605        0.0750504117
+	 O           4.6507035178       -0.1956493571        0.0397103043
+	 H           1.4658272543       -1.5548143683       -0.8467308959
+	 H           4.9773014013       -0.8596778441        1.7259510080
+	             0.0000512798        0.0006935640       -0.0015312086
+	             0.0000744412        0.0014941615        0.0007682041
+	            -0.0000214670       -0.0007757641        0.0013034544
+	            -0.0001043635       -0.0014138594       -0.0005397879
 
 	---Fragment 1 Intrafragment Coordinates---
 	 - Coordinate -           - BOHR/RAD -       - ANG/DEG -
-	 R(1,2)           =         2.737717	       1.448737
+	 R(1,2)           =         2.737716	       1.448737
 	 R(1,3)           =         1.841468	       0.974463
 	 R(2,4)           =         1.841469	       0.974463
-	 B(1,2,4)         =         1.759402	     100.806299
-	 B(2,1,3)         =         1.759402	     100.806308
-	*D(3,1,2,4)       =        -1.745329	    -100.000003
+	 B(1,2,4)         =         1.759405	     100.806453
+	 B(2,1,3)         =         1.759405	     100.806462
+	*D(3,1,2,4)       =        -1.745277	     -99.996980
 
-	Current energy   :      -151.5507513332
+	Current energy   :      -151.5507511905
 
 	Energy change for the previous step:
-		Projected    :        -0.0000013980
+		Projected    :        -0.0000024203
 		Actual       :        -0.0000009366
 
 	Performing BFGS update.
@@ -2418,7 +2420,7 @@ Total time:
 	Going to follow RFO solution 1.
 	Using RFO vector 1.
 	Norm of target step-size    0.00012
-	Projected energy change by RFO approximation:        -0.0000000064
+	Projected energy change by RFO approximation:        -0.0000000065
 
 	Back-transformation to cartesian coordinates...
 	Successfully converged to displaced geometry.
@@ -2431,11 +2433,11 @@ Total time:
 	   Coordinate                Previous        Force       Change         New 
 	   ----------                --------       ------       ------       ------
 	    1 R(1,2)          =      1.448737     0.000300     0.000056     1.448793
-	    2 R(1,3)          =      0.974463     0.000038     0.000005     0.974468
+	    2 R(1,3)          =      0.974463     0.000037     0.000005     0.974468
 	    3 R(2,4)          =      0.974463     0.000035     0.000005     0.974468
-	    4 B(1,2,4)        =    100.806299     0.000001     0.001775   100.808074
-	    5 B(2,1,3)        =    100.806308     0.000001     0.001759   100.808068
-	    6 *D(3,1,2,4)     =   -100.000003     0.000000     0.000000  -100.000003
+	    4 B(1,2,4)        =    100.806453     0.000001     0.001775   100.808227
+	    5 B(2,1,3)        =    100.806462     0.000001     0.001759   100.808221
+	    6 *D(3,1,2,4)     =    -99.996980     0.000000     0.000000   -99.996980
 	 ---------------------------------------------------------------------------
 	Successfully symmetrized geometry.
 
@@ -2448,7 +2450,7 @@ Total time:
   ---------------------------------------------------------------------------------------------
     Convergence Criteria    1.00e-06 *    3.00e-04 *             o    1.20e-03 *             o
   ---------------------------------------------------------------------------------------------
-      5    -151.55075133   -9.37e-07 *    3.65e-05 *    1.72e-05 o    1.06e-04 *    4.71e-05 o  ~
+      5    -151.55075119   -9.37e-07 *    3.65e-05 *    1.72e-05 o    1.06e-04 *    4.71e-05 o  ~
   ---------------------------------------------------------------------------------------------
 
 
@@ -2460,21 +2462,21 @@ Total time:
   --------------------------------------------------------------------------------------------------------------- ~
    Step         Total Energy             Delta E       MAX Force       RMS Force        MAX Disp        RMS Disp  ~
   --------------------------------------------------------------------------------------------------------------- ~
-      1    -151.549528814765   -151.549528814765      0.01692034      0.01043996      0.10303464      0.06021146  ~
-      2    -151.550298485200     -0.000769670435      0.01265831      0.00720499      0.03164147      0.02017422  ~
-      3    -151.550738699213     -0.000440214012      0.00262440      0.00107199      0.00708961      0.00310653  ~
-      4    -151.550750396633     -0.000011697420      0.00073048      0.00029963      0.00274229      0.00117017  ~
-      5    -151.550751333193     -0.000000936560      0.00003646      0.00001719      0.00010595      0.00004712  ~
+      1    -151.549528620245   -151.549528620245      0.01692064      0.01044012      0.10303638      0.06021252  ~
+      2    -151.550298335601     -0.000769715356      0.01265853      0.00720503      0.03164124      0.02017422  ~
+      3    -151.550738545263     -0.000440209661      0.00262453      0.00107204      0.00709003      0.00310672  ~
+      4    -151.550750253894     -0.000011708631      0.00073049      0.00029964      0.00274237      0.00117020  ~
+      5    -151.550751190513     -0.000000936619      0.00003646      0.00001719      0.00010597      0.00004713  ~
   --------------------------------------------------------------------------------------------------------------- ~
 
 	Writing optimization data to binary file.
-	Final energy is   -151.5507513331928
+	Final energy is   -151.5507511905127
 	Final (previous) structure:
 	Cartesian Geometry (in Angstrom)
-	    O    -0.7248968072   0.0237439448  -0.0008901232
-	    O     0.7209416498  -0.0351607563  -0.0710409442
-	    H    -0.8977133894  -0.5961150114   0.7308798104
-	    H     0.9604846068   0.7773080956   0.4107184277
+	    O     1.0152058579  -0.0139015702   0.0397149674
+	    O     2.4610463055  -0.1035331807   0.0210137880
+	    H     0.7756823747  -0.8227723273  -0.4480706919
+	    H     2.6338744618  -0.4549219218   0.9133339366
 	Saving final (previous) structure.
 			--------------------------
 			 OPTKING Finished Execution 
@@ -2486,10 +2488,10 @@ Total time:
 
     Geometry (in Angstrom), charge = 0, multiplicity = 1:
 
-    O           -0.724896807189     0.023743944759    -0.000890123171
-    O            0.720941649838    -0.035160756303    -0.071040944185
-    H           -0.897713389417    -0.596115011387     0.730879810365
-    H            0.960484606778     0.777308095561     0.410718427661
+    O            1.015205857945    -0.013901570200     0.039714967386
+    O            2.461046305512    -0.103533180669     0.021013787961
+    H            0.775682374699    -0.822772327299    -0.448070691923
+    H            2.633874461845    -0.454921921832     0.913333936576
 
 	Cleaning optimization helper files.
 
@@ -2499,24 +2501,24 @@ Properties will be evaluated at   0.000000,   0.000000,   0.000000 Bohr
 Properties computed using the  density matrix
 
   Nuclear Dipole Moment: (a.u.)
-     X:     0.0588      Y:     0.1698      Z:     1.0699
+     X:    58.9964      Y:    -4.1898      Z:     1.7973
 
   Electronic Dipole Moment: (a.u.)
-     X:    -0.0137      Y:    -0.0395      Z:    -0.2489
+     X:   -59.0416      Y:     3.4049      Z:    -1.5236
 
   Dipole Moment: (a.u.)
-     X:     0.0451      Y:     0.1303      Z:     0.8210     Total:     0.8325
+     X:    -0.0451      Y:    -0.7850      Z:     0.2737     Total:     0.8325
 
   Dipole Moment: (Debye)
-     X:     0.1147      Y:     0.3312      Z:     2.0868     Total:     2.1160
+     X:    -0.1147      Y:    -1.9952      Z:     0.6956     Total:     2.1161
 
   Quadrupole Moment: (Debye Ang)
-    XX:   -10.7619     YY:   -10.0203     ZZ:   -10.6560
-    XY:     2.5888     XZ:    -0.4085     YZ:    -0.2532
+    XX:   -11.1602     YY:   -10.3531     ZZ:    -9.8927
+    XY:    -2.5882     XZ:     3.6768     YZ:    -0.0241
 
   Traceless Quadrupole Moment: (Debye Ang)
-    XX:    -0.2825     YY:     0.4591     ZZ:    -0.1766
-    XY:     2.5888     XZ:    -0.4085     YZ:    -0.2532
+    XX:    -0.6915     YY:     0.1155     ZZ:     0.5760
+    XY:    -2.5882     XZ:     3.6768     YZ:    -0.0241
 
   Mulliken Charges: (a.u.)
    Center  Symbol    Alpha    Beta     Spin     Total

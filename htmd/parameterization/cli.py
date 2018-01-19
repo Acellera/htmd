@@ -163,7 +163,7 @@ def main_parameterize(arguments=None):
         print('\n === Parameterizable dihedral angles of %s ===\n' % args.filename)
         with open('torsions.txt', 'w') as fh:
             for dihedral in mol.getRotatableDihedrals():
-                dihedral_name = '%s-%s-%s-%s' % tuple(mol.name[dihedral])
+                dihedral_name = '-'.join(mol.name[dihedral])
                 print('  '+dihedral_name)
                 fh.write(dihedral_name+'\n')
         print()
@@ -267,7 +267,7 @@ def main_parameterize(arguments=None):
         mol.writeParameters(mol_orig)
 
         # Write energy file
-        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.output_directory_name(), 'energies.txt')
+        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.qm_method_name(), 'energies.txt')
         printEnergies(mol, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
