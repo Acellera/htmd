@@ -228,7 +228,7 @@ class PRM:
         print("\nNONB", file=f)
         # Have to iterate over the types in use, which include cloned types, an map them back
         # to original type (which has the same vdw params), because a copy of a copy won't be in self.nonbonded.
-        for atom_type in set(rtf.types):
+        for atom_type in rtf.types:
             original_atom_type = re.sub('x[0123456789]$', '', atom_type)
             for nonbonded in self.nonbonded:
                 if nonbonded.types[0] == original_atom_type:
