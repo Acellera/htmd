@@ -278,11 +278,14 @@ class Moiety:
         self.bonds = self._getBonds(atoms)
         self.enviroments = []
 
+        self.bondsenvironments = []
+
         self.name = None
+        self.subcategory = None
         
-    def _getBonds(self, atoms):
+    def _getBonds(self, atoms, exclude=None):
         atoms_idx = [ a.GetIdx() for a in atoms]
-        bonds_found = []
+        bonds_found = [] if exclude == None else [(b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in exclude ]
         Bonds = []
         for a in atoms:
             bonds = a.GetBonds()
@@ -318,6 +321,14 @@ class Moiety:
     @property
     def BondsIdx(self):
         return [bond.GetIdx() for bond in self.bonds]
+
+    @property
+    def BondsEnvironments(self):
+        return self.bondsenvironments
+
+    @property
+    def BondsEnvironmentsIdx(self):
+        return [b.GetIdx() for bond in self.bondsenvironments]
 
 
     def _hasAtomIdx(self, atomidx):
@@ -369,17 +380,82 @@ class Moiety:
         elements = self.get_elements()
         atoms = self.Atoms
         bonds = self.Bonds
+        counts_atoms = Counter(elements) 
 
-        print("Naming")
-        print(">>> ", Counter(elements))
+        # print("Naming")
+        # print(">>> ", counts_atoms)
 
+        atoms =  self.get_elements()
+        if set(['O', 'N', 'S']) < set(atoms):
+            # print("Moiety with S, N, O")
+            name, subcategory = self._getNameSNO()
+
+    def _getNameSNO(self):
+
+        # sulfunamide
+        name, subcategory = ('sulfunamide', self._getSubcategory('N')) if self._isSulfunamide() else (None, None)
+
+        return name, subcategory
+
+    def _isSulfunamide(self):
+        from collections import Counter 
+        _ref = [ ('N', SINGLE),  ('O', DOUBLE), ('O', DOUBLE),  ]
         
+        elements = self.get_elements()
+        atoms = self.Atoms
+        bonds = self.Bonds
+        enviroments = self.Enviroments
+        bondsenvironments = self.BondsEnvironments
+        counts_atoms = Counter(elements)
+
+        if counts_atoms['O'] != 2 or counts_atoms['N'] != 1 or counts_atoms['S'] != 1:
+            return False
+        
+        atom_sulfur = atoms[elements.index('S')]
+        atoms_n, bonds_n = self._getNeighbors(atom_sulfur)
+        
+        atoms_bonds_pair = list(zip(atoms_n, bonds_n))
+
+        return Counter(atoms_bonds_pair) == Counter(_ref)
+        
+
+    def _getSubcategory(self, atom):
+        print("DAJE")
+
+    def _getNeighbors(self, atom):
+        import itertools
+        atom_idx = atom.GetIdx()
+        atoms_bonded = [ a for a in atom.GetNeighbors() ]
+        atomIdx_bonded = [ a.GetIdx() for a in atoms_bonded ]
+        atomsElement_bonded = [ a.GetSymbol() for a in atoms_bonded]
+
+        atoms_pair = list(itertools.product([atom_idx], atomIdx_bonded))
+        atoms_pair = [ sorted( list(p) ) for p in atoms_pair ] 
+        
+        _atoms = []
+        _bonds = []
+        for b in self.Bonds:
+            atomsIdx_inBond = sorted([b.GetBeginAtom().GetIdx(), b.GetEndAtom().GetIdx()])
+            if atomsIdx_inBond in atoms_pair:
+                _other_atomIdx = [aIdx for aIdx in atomsIdx_inBond if aIdx != atom_idx][0]
+                _idx = atomIdx_bonded.index(_other_atomIdx)
+                _other_atom = atomsElement_bonded[_idx]
+                _atoms.append(_other_atom)
+                _bonds.append(b.GetBondType())
+
+        return _atoms, _bonds        
+
+
+
+
+
 
     def _getEnvironments(self):
         carbons = [atom for a in self.Atoms for atom in a.GetNeighbors() if atom.GetSymbol() == 'C']
         carbons_env = [c for c in carbons if c.GetIdx() not in self.AtomsIdx]
         
         self.enviroments = carbons_env
+        self.bondsenvironments = self._getBonds(self.enviroments + self.atoms, exclude=self.Bonds)
 
     def get_elements(self):
         elements = [ atom.GetSymbol() for atom in self.Atoms ]
@@ -392,24 +468,36 @@ class Moiety:
         from rdkit.Chem.Draw import rdMolDraw2D
         from rdkit.Chem.AllChem import EmbedMolecule
         from IPython.display import SVG
-        from rdkit.Chem import RWMol, MolFromSmiles, Atom, BondType
+        from rdkit.Chem import RWMol, MolFromSmiles, Atom, BondType, ChiralType
 
         _ = MolFromSmiles('C')
         rmol = RWMol(_)
 
         dict_old_new_idx = {}
-        for n, a in enumerate(self.atoms):
+        n = 1
+        for  a in self.atoms:
             old_idx = a.GetIdx()
             rmol.AddAtom(a)
-            dict_old_new_idx[old_idx] = n + 1
+            dict_old_new_idx[old_idx] = n 
+            n+=1
+        
+        for a in self.enviroments:
+            old_idx = a.GetIdx()
+            a.SetChiralTag(ChiralType.CHI_UNSPECIFIED)
+            a.SetIsAromatic(0)
+            rmol.AddAtom(a)
+            dict_old_new_idx[old_idx] = n 
+            n+=1
 
         for b in self.Bonds:
+             rmol.AddBond(dict_old_new_idx[b.GetBeginAtomIdx()], dict_old_new_idx[b.GetEndAtomIdx()], b.GetBondType())
+        for b in self.bondsenvironments:
             rmol.AddBond(dict_old_new_idx[b.GetBeginAtomIdx()], dict_old_new_idx[b.GetEndAtomIdx()], b.GetBondType())
         
         rmol.RemoveAtom(0)
 
+        
         EmbedMolecule(rmol)
-
         drawer = rdMolDraw2D.MolDraw2DSVG(400, 200)
         
         drawer.DrawMolecule(rmol)
