@@ -11,6 +11,9 @@ from rdkit.Chem import ChemicalFeatures
 from htmd.molecule.voxeldescriptors import _getGridDescriptors, _getGridCenters
 from htmd.smallmol.util import get_rotationMatrix, rotate
 from copy import deepcopy
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 rdBase.DisableLog('rdApp.error')
@@ -293,6 +296,9 @@ class SmallMolStack:
 
     def __init__(self, sdf_file, removeHs=True, addHs=True):  # , n_jobs=1
         from tqdm import tqdm
+        if addHs and not removeHs:
+            raise AttributeError('To add hydrogens with the addHs option please also enable the removeHs option.')
+        
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=removeHs)
         self.filepath = sdf_file
         print('Reading files...')
