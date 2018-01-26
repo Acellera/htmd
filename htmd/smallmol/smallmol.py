@@ -298,12 +298,11 @@ class SmallMolStack:
         from tqdm import tqdm
         if addHs and not removeHs:
             raise AttributeError('To add hydrogens with the addHs option please also enable the removeHs option.')
-        
+
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=removeHs)
         self.filepath = sdf_file
-        print('Reading files...')
         mm = []
-        for x in tqdm(supplier):
+        for x in supplier:
             if x is not None:
                 mm.append(SmallMol(x, addHs=addHs))
             else:
