@@ -125,6 +125,8 @@ class FFType:
 
                 # Read the results
                 self._rtf = RTF(os.path.join(tmpdir, 'mol.rtf'))
+                # HACK: MATCH output atom time to RTF file in a random order
+                self._rtf.types = sorted(self._rtf.types)
                 self._prm = PRM(os.path.join(tmpdir, 'mol.prm'))
 
             else:
