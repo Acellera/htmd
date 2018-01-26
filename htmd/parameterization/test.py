@@ -64,13 +64,8 @@ class TestParameterize(unittest.TestCase):
                 with open(refFile) as ref, open(resFile) as res:
                     refLines, resLines = ref.readlines(), res.readlines()
 
-                # HACK! FRCMOD file lines are swapped randomly, so first sort them and compare.
-                #       Also the first line with the version is removed
-                if file.endswith('frcmod') or file.endswith('rtf'):
-                    refLines, resLines = sorted(refLines[1:]), sorted(resLines[1:])
-
                 # Removes first line with the version
-                if file.endswith('prm'):
+                if file.endswith('frcmod') or file.endswith('rtf') or file.endswith('prm'):
                     refLines, resLines = refLines[1:], resLines[1:]
 
                 if file.endswith('prm') or file.endswith('frcmod') or file.endswith('energies.txt'):
