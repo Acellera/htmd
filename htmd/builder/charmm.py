@@ -747,14 +747,14 @@ def split(filename, outdir):
     filename : str
         Stream file name
     """
-    regex = re.compile('^toppar_(\w+)\.str$')
+    regex = re.compile('^(toppar_)?(.*)\.str$')
     base = os.path.basename(os.path.normpath(filename))
-    base = regex.findall(base)[0]
+    base = regex.findall(base)[0][1]
     outrtf = os.path.join(outdir, 'top_{}.rtf'.format(base))
     outprm = os.path.join(outdir, 'par_{}.prm'.format(base))
 
     startrtf = re.compile('^read rtf card', flags=re.IGNORECASE)
-    startprm = re.compile('^read param? card', flags=re.IGNORECASE)
+    startprm = re.compile('^read para\w* card', flags=re.IGNORECASE)
     endsection = re.compile('^end', flags=re.IGNORECASE)
 
     rtfsection = 0

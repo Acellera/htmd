@@ -273,6 +273,50 @@ class VMDIsosurface(VMDGraphicObject):
         vmd.send('mol delete htmd_graphics_mol({:d})'.format(self.n))
 
 
+class VMDLabels(VMDGraphicObject):
+    count = 0
+    def __init__(self, mol, selection, molid='top', textsize=0.5, textcolor='green'):
+        """ Displays labels on atoms in VMD.
+
+        Examples
+        --------
+        >>> from htmd.ui import *
+        >>> from htmd.vmdgraphics import *
+        >>> mol = Molecule('3ptb')
+        >>> mol.view()
+        >>> x = VMDLabels(mol, 'resid 40')
+        >>> y = VMDLabels(mol, 'resid 50')
+        >>> y.delete()
+        >>> x.delete()
+        """
+        # TODO: After deleting labels it breaks. Better don't delete or fix the code
+        super().__init__(None)
+        print(VMDLabels.count)
+        idx = mol.atomselect(selection, indexes=True)
+        cmd = '''label textsize {s}
+color Labels Atoms {c}
+set molnum [molinfo {molid}]
+set i {start}
+foreach n [list {idx}] {{
+    label add Atoms $molnum/$n
+    label textformat Atoms $i {{%a}}
+    incr i
+}}'''.format(s=textsize, c=textcolor, sel=selection, molid=molid, idx=' '.join(map(str, idx)), start=VMDLabels.count)
+        self.labelidx = list(range(VMDLabels.count, VMDLabels.count+len(idx)))
+        VMDLabels.count += len(idx)
+        vmd = getCurrentViewer()
+        vmd.send(cmd)
+        # print(cmd)
+
+    def delete(self):
+        vmd = getCurrentViewer()
+        for i in self.labelidx[::-1]:
+            vmd.send('label delete Atoms {}'.format(i))
+            VMDLabels.count -= 1
+
+
+
+
 if __name__ == "__main__":
     """
     from htmd import *

@@ -85,7 +85,7 @@ class LocalGPUQueue(App):
 
         Parameters
         ----------
-        mydirs : list of str
+        mydirs : list of str, str
             A list or ndarray of directory paths
 
         Examples
