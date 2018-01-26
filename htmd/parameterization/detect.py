@@ -6,7 +6,6 @@
 import logging
 from collections import OrderedDict
 import itertools
-import numpy as np
 import networkx as nx
 from periodictable import elements
 
@@ -215,16 +214,15 @@ def chooseTerminals(centre, sideGraph):
     terminalGraphs = [[terminalGraph for terminalGraph in terminalGraphs if terminal in terminalGraph.nodes][0] for terminal in terminals]
 
     # Compute a score for each terminal
-    numberOfAtoms = np.array([len(terminalGraph.nodes) for terminalGraph in terminalGraphs])
-    numberOfProtons = np.array([sum(nx.get_node_attributes(terminalGraph, 'number').values()) for terminalGraph in terminalGraphs])
-    assert max(numberOfProtons) < 1000000 # No monstrous molecules, please!
-    scores = 1000000*numberOfAtoms + numberOfProtons
+    numberOfAtoms = [len(terminalGraph.nodes) for terminalGraph in terminalGraphs]
+    numberOfProtons = [sum(nx.get_node_attributes(terminalGraph, 'number').values()) for terminalGraph in terminalGraphs]
+    scores = list(zip(numberOfAtoms, numberOfProtons))
 
     # Choose the terminals
     chosen_terminals = []
     refTerminalGraph = None
     for terminal, score, terminalGraph in zip(terminals, scores, terminalGraphs):
-        if score < np.max(scores):
+        if score < max(scores):
             continue
 
         if not chosen_terminals:
