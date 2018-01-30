@@ -88,9 +88,7 @@ def detectEquivalentAtoms(molecule):
     --------
 
     >>> import os
-    >>> from htmd.home import home #doctest:+ELLIPSIS
-    <BLANKLINE>
-    ...
+    >>> from htmd.home import home
     >>> from htmd.parameterization.ffmolecule import FFMolecule
     >>> from htmd.parameterization.detect import detectEquivalentAtoms
 
