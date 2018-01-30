@@ -9,6 +9,7 @@ import argparse
 import logging
 import numpy as np
 
+import htmd.ui
 from htmd.version import version
 from htmd.queues.localqueue import LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue

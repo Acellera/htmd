@@ -182,8 +182,7 @@ def detectParameterizableCores(graph):
             continue
 
         # Swap the side graphs to match the order of the core
-        if core[0] in sideGraphs[1]:
-            sideGraphs = sideGraphs[::-1]
+        sideGraphs = sideGraphs[::-1] if core[0] in sideGraphs[1] else sideGraphs
         assert core[0] in sideGraphs[0] and core[1] in sideGraphs[1]
 
         all_core_sides.append((core, sideGraphs))
