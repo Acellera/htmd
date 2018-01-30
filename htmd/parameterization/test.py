@@ -186,7 +186,7 @@ class TestParameterize(unittest.TestCase):
 
     def test_glycol_dihed_fix_restart_2(self):
 
-        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart_2')
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart_2')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._test(refDir, resDir, 'parameterize input.mol2 -d C2-C1-O1-H1 O1-C1-C2-O2 --no-min --no-esp --no-dihed-opt')
