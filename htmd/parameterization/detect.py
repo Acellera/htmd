@@ -66,7 +66,6 @@ def checkIsomorphism(graph1, graph2):
 
     return nx.is_isomorphic(graph1, graph2, node_match = lambda node1, node2: node1['element'] == node2['element'])
 
-
 def detectEquivalentAtoms(molecule):
     """
     Detect topologically equivalent atoms.
@@ -162,15 +161,13 @@ def filterCores(core_sides):
 
     return True
 
-def detectParameterizableCores(molecule):
+def detectParameterizableCores(graph):
     """
     Detect parametrizable dihedral angle cores (central atom pairs)
 
     The cores are detected by looking for bridges (bonds with divide the molecule into two parts) in a molecular graph.
     Terminal cores are skipped.
     """
-
-    graph = getMolecularGraph(molecule)
 
     all_core_sides = []
     for core in list(nx.bridges(graph)):
@@ -180,7 +177,7 @@ def detectParameterizableCores(molecule):
         sideGraphs = list(nx.connected_component_subgraphs(graph))
         graph.add_edge(*core)
 
-        # Skip terminal bridges, which cannot for dihedral angles
+        # Skip terminal bridges, which cannot form dihedral angles
         if len(sideGraphs[0]) == 1 or len(sideGraphs[1]) == 1:
             continue
 
@@ -196,13 +193,27 @@ def detectParameterizableCores(molecule):
 
     return all_core_sides
 
-def chooseTerminals(centre, sideGraph):
+def weighted_closeness_centrality(graph, node, weight=None):
+    '''
+    Weighted closeness centrality
+
+    Identical to networkx.closeness_centrality, except the shorted path lengths are weighted by a node attribute.
+    '''
+
+    lengths = nx.shortest_path_length(graph, source=node)
+    del lengths[node]
+    weights = {node_: graph.nodes[node_][weight] for node_ in lengths} if weight else {node_: 1 for node_ in lengths}
+    centrality = sum(weights.values())/sum([lengths[node_]*weights[node_] for node_ in lengths])
+
+    return centrality
+
+def chooseTerminals(graph, centre, sideGraph):
     """
-    Choose dihedal angle terminals (outer atoms)
+    Choose dihedral angle terminals (outer atoms)
 
     The terminals are chosen by:
-    1. Largest number of atoms
-    2. Largest molecular mass
+    1. Largest closeness centrality
+    2. Largest atomic number weighted closeness centrality
     """
 
     terminals = list(sideGraph.neighbors(centre))
@@ -214,9 +225,9 @@ def chooseTerminals(centre, sideGraph):
     terminalGraphs = [[terminalGraph for terminalGraph in terminalGraphs if terminal in terminalGraph.nodes][0] for terminal in terminals]
 
     # Compute a score for each terminal
-    numberOfAtoms = [len(terminalGraph.nodes) for terminalGraph in terminalGraphs]
-    numberOfProtons = [sum(nx.get_node_attributes(terminalGraph, 'number').values()) for terminalGraph in terminalGraphs]
-    scores = list(zip(numberOfAtoms, numberOfProtons))
+    centralities = [nx.closeness_centrality(graph, terminal) for terminal in terminals]
+    weightedCentralities = [weighted_closeness_centrality(graph, terminal, weight='number') for terminal in terminals]
+    scores = list(zip(centralities, weightedCentralities))
 
     # Choose the terminals
     chosen_terminals = []
@@ -234,7 +245,8 @@ def chooseTerminals(centre, sideGraph):
             chosen_terminals.append(terminal)
         else:
             logger.warn('Molecular scoring function is not sufficient. '
-                        'Dihedal atom selection depends on the atom order!')
+                        'Dihedal selection depends on the atom order! '
+                        'Redundant dihedrals might be present!')
 
     return chosen_terminals
 
@@ -300,14 +312,29 @@ def detectParameterizableDihedrals(molecule):
     >>> mol = FFMolecule(molFile)
     >>> detectParameterizableDihedrals(mol)
     [[(3, 1, 0, 6)], [(0, 1, 3, 5)], [(1, 3, 5, 7)]]
+
+    Find the parameterizable dihedrals of 2-hydroxypyridine
+    >>> molFile = os.path.join(home('test-param'), '2-hydroxypyridine.mol2')
+    >>> mol = FFMolecule(molFile)
+    >>> detectParameterizableDihedrals(mol)
+    [[(6, 1, 0, 7)]]
+
+    Find the parameterizable dihedrals of fluorchlorcyclopronol
+    >>> molFile = os.path.join(home('test-param'), 'fluorchlorcyclopronol.mol2')
+    >>> mol = FFMolecule(molFile)
+    >>> detectParameterizableDihedrals(mol)
+    [[(2, 4, 5, 9)]]
     """
 
-    # Get pameterizable dihedral angles
+    # Get a molecular graph
+    graph = getMolecularGraph(molecule)
+
+    # Get parameterizable dihedral angles
     dihedrals = []
-    for core, sides in detectParameterizableCores(molecule):
+    for core, sides in detectParameterizableCores(graph):
 
         # Choose the best terminals for each side
-        all_terminals = map(chooseTerminals, core, sides)
+        all_terminals = [chooseTerminals(graph, centre, side) for centre, side in zip(core, sides)]
 
         # Generate all terminal combinations
         all_terminals = itertools.product(*all_terminals)
