@@ -176,10 +176,16 @@ class Psi4(QMBase):
             if self.optimize:
                 f.write('set optking { dynamic_level = 1 \n geom_maxiter = 250\n print_trajectory_xyz_file = True }\n\n')
 
-            theory_correction = 'SCF' if self.theory == 'HF' else self.theory
-            theory_correction += '' if self.correction == 'none' else '-%s' % self.correction
             function = 'optimize' if self.optimize else 'energy'
-            f.write('energy, wfn = %s(\'%s\', return_wfn=True)\n\n' % (function, theory_correction))
+            # TODO: wB97 and friends require special set-up. It should be fixed in Psi4 1.2.
+            if self.theory in ('wB97', 'wB97X', 'wB97X-D'):
+                f.write('set { scf_type direct }\n') # DF is not implemented for wB97 and friends
+                f.write('energy, wfn = %s(\'%s\', return_wfn=True)\n\n' % (function, self.theory))
+                #f.write('energy, wfn = %s(\'SCF\', dft_functional=\'%s\', return_wfn=True)\n\n' % (function, self.theory))
+            else:
+                theory = 'SCF' if self.theory == 'HF' else self.theory
+                theory += '' if self.correction == 'none' else '-%s' % self.correction
+                f.write('energy, wfn = %s(\'%s\', return_wfn=True)\n\n' % (function, theory))
 
             # Psi4 changes directory then PCM is used, so we need to return
             f.write('import os\n')

@@ -59,7 +59,7 @@ class QMBase(ABC, ProtocolInterface):
     Abstract base class to set up and run QM calculations
     """
 
-    THEORIES = ('HF', 'BLYP', 'PBE', 'B3LYP', 'PBE0', 'B2PLYP')
+    THEORIES = ('HF', 'BLYP', 'PBE', 'B3LYP', 'PBE0', 'B2PLYP', 'wB97', 'wB97X', 'wB97X-D')
     CORRECTIONS = ('none', 'D', 'D3')
     BASIS_SETS = ('3-21G',
                   '6-31G',  '6-31G*',  '6-31G**',  '6-31+G',  '6-31+G*',  '6-31+G**',  '6-31++G',  '6-31++G*',  '6-31++G**',
