@@ -45,7 +45,7 @@ def getArgumentParser():
     parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'], help='QM code (default: %(default)s)')
     parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP'],
                         help='QM level of theory (default: %(default)s)')
-    parser.add_argument('--basis', default='cc-pVDZ', choices=['6-31G*', '6-31+G*', 'cc-pVDZ', 'aug-cc-pVDZ'],
+    parser.add_argument('--basis', default='cc-pVDZ', choices=['6-31G*', '6-31+G*', '6-311G**', '6-311++G**', 'cc-pVDZ', 'aug-cc-pVDZ'],
                         help='QM basis set (default: %(default)s)')
     parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
                         help='QM environment (default: %(default)s)')
@@ -234,6 +234,8 @@ def main_parameterize(arguments=None):
         if netcharge < 0 and qm.solvent == 'vacuum':
             if qm.basis == '6-31G*':
                 qm.basis = '6-31+G*'
+            if qm.basis == '6-311G**':
+                qm.basis = '6-311++G**'
             if qm.basis == 'cc-pVDZ':
                 qm.basis = 'aug-cc-pVDZ'
             logger.info('Changing basis sets to %s' % qm.basis)
