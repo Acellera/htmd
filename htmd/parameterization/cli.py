@@ -128,6 +128,7 @@ def main_parameterize(arguments=None):
         queue.hashnames = True
     else:
         raise NotImplementedError
+    queue.environment = 'PATH,LD_LIBRARY_PATH' # Use Psi4 from an active conda environment
 
     # Override default ncpus
     if args.ncpus:
