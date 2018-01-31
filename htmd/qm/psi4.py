@@ -128,7 +128,7 @@ class Psi4(QMBase):
         with open(os.path.join(directory, 'psi4.in'), 'w') as f:
 
             f.write('set_num_threads(%d)\n' % self.queue.ncpu)
-            f.write('set_memory(%d)\n\n' % (1024**2*self.queue.memory))
+            f.write('set_memory(\'{} MB\')\n\n'.format(self.queue.memory))
 
             reference = 'r' if self.multiplicity == 1 else 'u'
             reference += 'hf' if self.theory == 'HF' else 'ks'
