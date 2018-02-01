@@ -9,6 +9,7 @@ import logging
 from copy import deepcopy
 import numpy as np
 from scipy import constants as const
+import periodictable
 
 from htmd.molecule.molecule import Molecule
 from htmd.molecule import vdw
@@ -136,6 +137,41 @@ class FFMolecule(Molecule):
                 print('    Equivalents:')
             for equivalent_dihedral in dihedral.equivalents:
                 print('      ' + '-'.join(self.name[equivalent_dihedral]))
+
+    @staticmethod
+    def guessElementFromName(name):
+        '''
+        Guess element from an atom name
+
+        >>> from htmd.parameterization.ffmolecule import FFMolecule
+        >>> FFMolecule.guessElementFromName('C')
+        'C'
+        >>> FFMolecule.guessElementFromName('C1')
+        'C'
+        >>> FFMolecule.guessElementFromName('C42')
+        'C'
+        >>> FFMolecule.guessElementFromName('C7S')
+        'C'
+        >>> FFMolecule.guessElementFromName('HN1')
+        'H'
+        >>> FFMolecule.guessElementFromName('CL')
+        'Cl'
+        >>> FFMolecule.guessElementFromName('CA1')
+        'Ca'
+        '''
+
+        symbol = name.capitalize()
+
+        while symbol:
+            try:
+                element = periodictable.elements.symbol(symbol)
+            except ValueError:
+                symbol = symbol[:-1]
+            else:
+                return element.symbol
+
+        raise ValueError('Cannot guess element from atom name: {}'.format(name))
+
 
     def _rename(self):
         """
@@ -486,4 +522,9 @@ run 0'''
             logger.info('Write MOL2 file (with original coordinates): %s' % molFile)
 
 if __name__ == '__main__':
-    pass
+
+    import sys
+    import doctest
+
+    if doctest.testmod().failed:
+        sys.exit(1)
