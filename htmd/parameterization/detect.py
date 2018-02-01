@@ -145,20 +145,6 @@ def getMethylGraph():
 
     return methyl
 
-def filterCores(core_sides):
-    """
-    Filter irrelevant dihedral angle cores (central atom pairs)
-    """
-
-    _, sideGraphs = core_sides
-    methyl = getMethylGraph()
-
-    # Check if a side graph is a methyl group
-    if checkIsomorphism(sideGraphs[0], methyl) or checkIsomorphism(sideGraphs[1], methyl):
-        return False
-
-    return True
-
 def detectParameterizableCores(graph):
     """
     Detect parametrizable dihedral angle cores (central atom pairs)
@@ -166,6 +152,8 @@ def detectParameterizableCores(graph):
     The cores are detected by looking for bridges (bonds with divide the molecule into two parts) in a molecular graph.
     Terminal cores are skipped.
     """
+
+    methyl = getMethylGraph()
 
     all_core_sides = []
     for core in list(nx.bridges(graph)):
@@ -183,10 +171,11 @@ def detectParameterizableCores(graph):
         sideGraphs = sideGraphs[::-1] if core[0] in sideGraphs[1] else sideGraphs
         assert core[0] in sideGraphs[0] and core[1] in sideGraphs[1]
 
-        all_core_sides.append((core, sideGraphs))
+        # Skip if a side graph is a methyl group
+        if checkIsomorphism(sideGraphs[0], methyl) or checkIsomorphism(sideGraphs[1], methyl):
+            continue
 
-    # Filer cores
-    all_core_sides = filter(filterCores, all_core_sides)
+        all_core_sides.append((core, sideGraphs))
 
     return all_core_sides
 
