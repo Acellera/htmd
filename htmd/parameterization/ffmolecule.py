@@ -185,22 +185,14 @@ class FFMolecule(Molecule):
         self.resname[:] = 'MOL'
         logger.info('Rename residue to %s' % self.resname[0])
 
-        sufices = dict()
+        sufices = {}
         for i in range(self.numAtoms):
-            name = self.name[i].upper()
-
-            # This fixes the specific case where a name is 3 or 4 characters, as X-TOOL seems to make
-            if re.match('^[A-Z]{3,4}$', name):
-               name = name[:-2] # Remove the last 2 characters
-
-            # Remove any character that isn't alpha
-            name = re.sub('[^A-Z]*', '', name)
+            name = self.guessElementFromName(self.name[i]).upper()
 
             sufices[name] = sufices.get(name, 0) + 1
-
             name += str(sufices[name])
-            logger.info('Rename atom %d: %-4s --> %-4s' % (i, self.name[i], name))
 
+            logger.info('Rename atom %d: %-4s --> %-4s' % (i, self.name[i], name))
             self.name[i] = name
 
     def qm_method_name(self):
