@@ -8,7 +8,7 @@ from rdkit import RDConfig
 from rdkit import rdBase
 from rdkit.Chem import ChemicalFeatures
 
-from htmd.molecule.voxeldescriptors import _getGridDescriptors, _getGridCenters
+from htmd.molecule.voxeldescriptors import _getOccupancyC, _getGridCenters
 from htmd.smallmol.util import get_rotationMatrix, rotate
 from copy import deepcopy
 import logging
@@ -240,8 +240,8 @@ class SmallMol:
         else:
             centers2D = SmallMol.array_cache[(size, resolution)] + center
 
-        voxels = _getGridDescriptors(coords.astype(np.float32), centers2D,
-                                       multisigmas).reshape(size, size, size, 8).astype(dtype)
+        voxels = _getOccupancyC(coords.astype(np.float32), centers2D,
+                                multisigmas).reshape(size, size, size, 8).astype(dtype)
         return voxels
 
     def get_name(self):
