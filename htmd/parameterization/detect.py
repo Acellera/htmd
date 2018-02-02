@@ -72,7 +72,7 @@ def detectEquivalentAtoms(molecule):
 
     Arguments
     ---------
-    molecule : FFMolecule
+    molecule : :class:`FFMolecule <htmd.parameterization.ffmolecule.FFMolecule>`
         Molecule object
 
     Return
@@ -248,7 +248,7 @@ def detectParameterizableDihedrals(molecule):
 
     Arguments
     ---------
-    molecule : FFMolecule
+    molecule : :class:`FFMolecule <htmd.parameterization.ffmolecule.FFMolecule>`
         Molecule object
 
     Return
