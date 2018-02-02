@@ -130,6 +130,9 @@ class Psi4(QMBase):
             f.write('set_num_threads(%d)\n' % self.queue.ncpu)
             f.write('set_memory(\'{} MB\')\n\n'.format(self.queue.memory))
 
+            # Use more conservative memory estimate, otherwise Psi4 exceeds the memory limit of a queuing system
+            f.write('set { scf_mem_safety_factor 0.7 }\n\n')
+
             reference = 'r' if self.multiplicity == 1 else 'u'
             reference += 'hf' if self.theory == 'HF' else 'ks'
             f.write('set { reference %s }\n' % reference)
