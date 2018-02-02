@@ -175,6 +175,12 @@ def detectParameterizableCores(graph):
         if checkIsomorphism(sideGraphs[0], methyl) or checkIsomorphism(sideGraphs[1], methyl):
             continue
 
+        # Skip if core contains C with sp hybridization
+        if graph.nodes[core[0]]['element'] == 'C' and graph.degree(core[0]) == 2:
+            continue
+        if graph.nodes[core[1]]['element'] == 'C' and graph.degree(core[1]) == 2:
+            continue
+
         all_core_sides.append((core, sideGraphs))
 
     return all_core_sides
@@ -290,6 +296,14 @@ def detectParameterizableDihedrals(molecule):
     >>> mol = FFMolecule(molFile)
     >>> detectParameterizableDihedrals(mol)
     [[(3, 1, 0, 4), (3, 1, 0, 5)]]
+
+    # Check if triple bonds are skipped
+
+    Find the parameterizable dihedrals of 4-hexinenitrile
+    >>> molFile = os.path.join(home('test-param'), '4-hexinenitrile.mol2')
+    >>> mol = FFMolecule(molFile)
+    >>> detectParameterizableDihedrals(mol)
+    [[(2, 3, 4, 5)]]
 
     # Check the scoring function
 
