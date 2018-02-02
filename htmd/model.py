@@ -409,13 +409,15 @@ class Model(object):
             relFrames.append(self.data.abs2rel(absFrames[-1]))
         return absFrames, relFrames
 
-    def eqDistribution(self, plot=True):
+    def eqDistribution(self, plot=True, save=None):
         """ Obtain and plot the equilibrium probabilities of each macrostate
 
         Parameters
         ----------
         plot : bool, optional, default=True
-            Disable plotting of the probabilities by setting it to False
+            Disable plotting of the equilibrium distribution by setting it to False
+        save : str
+            Path of the file in which to save the figure
 
         Returns
         -------
@@ -437,14 +439,16 @@ class Model(object):
             # macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
             macroeq[i] = np.sum(self.msm.metastable_memberships[:, macroindexes[i]] * self.msm.stationary_distribution)
 
+        from matplotlib import pylab as plt
+        plt.figure()
+        plt.bar(range(self.macronum), macroeq)
+        plt.ylabel('Equilibrium probability')
+        plt.xlabel('Macrostates')
+        plt.xticks(np.arange(0.4, self.macronum+0.4, 1), range(self.macronum))
+
+        if save is not None:
+            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
         if plot:
-            from matplotlib import pylab as plt
-            plt.ion()
-            plt.figure()
-            plt.bar(range(self.macronum), macroeq)
-            plt.ylabel('Equilibrium probability')
-            plt.xlabel('Macrostates')
-            plt.xticks(np.arange(0.4, self.macronum+0.4, 1), range(self.macronum))
             plt.show()
         return macroeq
 
@@ -822,7 +826,7 @@ class Model(object):
 
         return Model(newdata)
 
-    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, plot=True, save=None):
+    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, plot=True, save=None, data=None):
         """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
         Parameters
@@ -840,35 +844,48 @@ class Model(object):
         cmap :
             Matplotlib colormap.
         plot : bool
-            If the method should display the plot of implied timescales
+            If the method should display the plot of the FES
         save : str
             Path of the file in which to save the figure
+        data : :class:`MetricData` object
+            Optionally you can pass a different MetricData object than the one used to build the model. For example
+            if the user wants to build a model on distances but wants to plot the FES on top of RMSD values. The
+            MetricData object needs to have the same simlist as the Model.
         """
         self._integrityCheck(postmsm=True)
         from matplotlib import pylab as plt
+        from htmd.kinetics import Kinetics
+
+        if data is None:
+            data = self.data
+            microcenters = self.data.Centers[self.cluster_ofmicro, :]
+        else:
+            if self.data.simlist != data.simlist or self.data.numFrames != data.numFrames:
+                raise RuntimeError('The data argument you provided uses a different simlist than the Model.')
+            microcenters = np.vstack(getStateStatistic(self, data, range(self.micronum), statetype='micro'))
+
         if cmap is None:
             cmap = plt.cm.jet
-        if self.data.description is not None:
-            xlabel = self.data.description.description[dimX]
+        if data.description is not None:
+            xlabel = data.description.description[dimX]
         else:
             xlabel = 'Dimension {}'.format(dimX)
-        if self.data.description is not None:
-            ylabel = self.data.description.description[dimY]
+        if data.description is not None:
+            ylabel = data.description.description[dimY]
         else:
             ylabel = 'Dimension {}'.format(dimY)
         title = 'Free energy surface'
-        micros = self.data.Centers[self.cluster_ofmicro, :]
-        energy = -0.0019872041 * temperature * np.log(self.msm.stationary_distribution)
-        f, ax, cf = self.data._contourPlot(micros[:, dimX], micros[:, dimY], energy, cmap=cmap, xlabel=xlabel, ylabel=ylabel, title=title)
-        self.data._setColorbar(f, cf, 'kcal/mol', scientific=False)
+
+        energy = -Kinetics._kB * temperature * np.log(self.msm.stationary_distribution)
+        f, ax, cf = data._contourPlot(microcenters[:, dimX], microcenters[:, dimY], energy, cmap=cmap, xlabel=xlabel, ylabel=ylabel, title=title)
+        data._setColorbar(f, cf, 'kcal/mol', scientific=False)
         if states:
             colors = cmap(np.linspace(0, 1, self.macronum))
             for m in range(self.macronum):
-                macromicro = micros[self.macro_ofmicro == m, :]
-                y = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, c=colors[m], label='Macro {}'.format(m), edgecolors='none')
+                macromicro = microcenters[self.macro_ofmicro == m, :]
+                _ = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, c=colors[m], label='Macro {}'.format(m), edgecolors='none')
             ax.legend(prop={'size': 8})
-            #self.data._setColorbar(f, y, 'Macrostates')
-        #f.show() Raises warnings in notebooks
+
         if save is not None:
             plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
         if plot:
@@ -930,8 +947,8 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
 
     Returns
     -------
-    statistic : np.ndarray
-        A array which contains in each element the desired statistic of a specific state specifies in `states`
+    statistic : list
+        A list which contains in each element the desired statistic of a specific state specifies in `states`
 
     Examples
     --------

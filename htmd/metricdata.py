@@ -805,7 +805,7 @@ class MetricData:
         else:
             f.colorbar(mappable, label=label)
 
-    def plotCounts(self, dimX, dimY, resolution=100, logplot=False):
+    def plotCounts(self, dimX, dimY, resolution=100, logplot=False, plot=True, save=None):
         """ Plots a histogram of counts on any two given dimensions.
 
         Parameters
@@ -818,6 +818,10 @@ class MetricData:
             Resolution of bincount grid.
         logplot : bool
             Set True to plot the logarithm of counts.
+        plot : bool
+            If the method should display the plot
+        save : str
+            Path of the file in which to save the figure
         """
         from matplotlib import pylab as plt
         dc = np.concatenate(self.dat)
@@ -833,10 +837,13 @@ class MetricData:
 
         f, ax, cf = self._contourPlot(dc[:, dimX], dc[:, dimY], resolution=resolution, xlabel=xlabel, ylabel=ylabel, title=title, logplot=logplot)
         self._setColorbar(f, cf, 'Counts')
-        # f.show() Raises warnings in notebooks
-        plt.show()
 
-    def plotClusters(self, dimX, dimY, resolution=100, s=4, c=None, cmap=None, logplot=False):
+        if save is not None:
+            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+        if plot:
+            plt.show()
+
+    def plotClusters(self, dimX, dimY, resolution=100, s=4, c=None, cmap=None, logplot=False, plot=True, save=None, data=None):
         """ Plot a scatter-plot of the locations of the clusters on top of the count histogram.
 
         Parameters
@@ -855,10 +862,28 @@ class MetricData:
             Matplotlib colormap for the scatter plot.
         logplot : bool
             Set True to plot the logarithm of counts.
+        plot : bool
+            If the method should display the plot
+        save : str
+            Path of the file in which to save the figure
+        data : :class:`MetricData` object
+            Optionally you can pass a different MetricData object than the one used for clustering. For example
+            if the user wants to cluster on distances but wants to plot the centers on top of RMSD values. The new
+            MetricData object needs to have the same simlist as this object.
         """
         if self.Centers is None:
             raise RuntimeError('Data has not been clustered yet. Cannot plot clusters.')
         from matplotlib import pylab as plt
+
+        if data is None:
+            data = self
+            centers = self.Centers
+        else:
+            from htmd.model import getStateStatistic
+            if self.simlist != data.simlist or self.numFrames != data.numFrames:
+                raise RuntimeError('The data argument you provided uses a different simlist than this object.')
+            centers = np.vstack(getStateStatistic(self, data, range(self.K), statetype='cluster'))
+
         if cmap is None:
             cmap = plt.cm.jet
         if self.description is not None:
@@ -870,14 +895,16 @@ class MetricData:
         else:
             ylabel = 'Dimension {}'.format(dimY)
         title = 'Clusters plotted onto counts histogram'
-        dc = np.concatenate(self.dat)
-        cent = self.Centers
+        dc = np.concatenate(data.dat)
         f, ax, cf = self._contourPlot(dc[:, dimX], dc[:, dimY], resolution=resolution, xlabel=xlabel, ylabel=ylabel, title=title, logplot=logplot)
-        y = ax.scatter(cent[:, dimX], cent[:, dimY], s=s, c=c, cmap=cmap, linewidths=0, marker='o')
+        y = ax.scatter(centers[:, dimX], centers[:, dimY], s=s, c=c, cmap=cmap, linewidths=0, marker='o')
         if c is not None:
             self._setColorbar(f, y, 'Cluster groups')
-        # f.show() Raises warnings in notebooks
-        plt.show()
+
+        if save is not None:
+            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+        if plot:
+            plt.show()
 
     def __repr__(self):
         return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
