@@ -408,10 +408,10 @@ if __name__ == '__main__':
     centers = centers[::10, :].copy()
 
     res_C = _getOccupancyC(coords, centers, sigmas)
-    res_cuda = _getOccupancyCUDA(coords, centers, sigmas, 5)
+    # res_cuda = _getOccupancyCUDA(coords, centers, sigmas, 5)
     res_numba = _getOccupancyNUMBA(coords, centers, sigmas, 5)
 
-    assert np.abs(res_C - res_cuda).max() < 1e-4
+    # assert np.abs(res_C - res_cuda).max() < 1e-4
     assert np.abs(res_C - res_numba).max() < 1e-4
 
 
