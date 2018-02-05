@@ -245,7 +245,7 @@ class TestBase:
 
         quad = [2, 0, 1, 3]
         angle = np.rad2deg(dihedralAngle(self.h2o2_90.coords[quad, :, 0]))
-        self.assertAlmostEqual(89.999544881803772, angle)
+        self.assertAlmostEqual(89.999544881803772, angle, places=5)
 
         with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
             self.qm.molecule = self.h2o2_90
@@ -257,7 +257,7 @@ class TestBase:
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
             angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
-            self.assertAlmostEqual(89.999541178019271, angle)
+            self.assertAlmostEqual(89.999541178019271, angle, places=5)
 
         with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
             self.qm.restrained_dihedrals = None

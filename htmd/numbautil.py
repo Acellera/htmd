@@ -65,15 +65,6 @@ def dihedralAngleFull(pos, box=None):
     box: np.ndarray
         The size of the periodic box
     """
-    '''
-    http://en.wikipedia.org/wiki/Dihedral_angle#Methods_of_computation
-    https://www.cs.unc.edu/cms/publications/dissertations/hoffman_doug.pdf
-    http://www.cs.umb.edu/~nurith/cs612/hw4_2012.pdf
-
-    Ua = (A2 - A1) x (A3 - A1)
-    Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
-    angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
-    '''
     if pos.shape[0] != 4 or pos.shape[1] != 3:
         raise RuntimeError('dihedralAngles requires a 4x3 sized coordinate matrix as input.')
     if box is None:

@@ -86,7 +86,7 @@ class FakeQM(QMBase):
     >>> result.energy # doctest: +ELLIPSIS
     7.870431...
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
-    89.99956...
+    89.9995...
     """
 
     # Fake implementations of the abstract methods
@@ -198,7 +198,7 @@ class FakeQM2(FakeQM):
     >>> result.esp_values # doctest: +ELLIPSIS
     array([ 0.371352...])
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
-    89.999542...
+    89.99954...
 
     Run a minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -223,7 +223,7 @@ class FakeQM2(FakeQM):
     >>> result.energy # doctest: +ELLIPSIS
     7.866173...
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
-    90.079159...
+    90.07915...
     """
 
     def _get_prmtop(self):
