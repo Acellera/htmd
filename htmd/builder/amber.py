@@ -23,6 +23,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _findTleap():
+    tleap = shutil.which("tleap", mode=os.X_OK)
+    if not tleap:
+        raise FileNotFoundError('tleap not found. You should either have AmberTools or ambermini installed '
+                                '(to install ambermini do: conda install ambermini -c acellera)')
+    if os.path.islink(tleap):
+        if os.path.isabs(os.readlink(tleap)):
+            tleap = os.readlink(tleap)
+        else:
+            tleap = os.path.join(os.path.dirname(tleap), os.readlink(tleap))
+    return tleap
+
 def listFiles():
     """ Lists all available AMBER forcefield files
 
@@ -38,15 +50,7 @@ def listFiles():
     ...
     """
     from os.path import join
-    tleap = shutil.which("tleap", mode=os.X_OK)
-    if not tleap:
-        raise FileNotFoundError('tleap not found. You should either have AmberTools or ambermini installed '
-                                '(to install ambermini do: conda install ambermini -c acellera)')
-    if os.path.islink(tleap):
-        if os.path.isabs(os.readlink(tleap)):
-            tleap = os.readlink(tleap)
-        else:
-            tleap = os.path.join(os.path.dirname(tleap), os.readlink(tleap))
+    tleap = _findTleap()
 
     amberhome = os.path.normpath(os.path.join(os.path.dirname(tleap), '../'))
 
@@ -99,6 +103,38 @@ def listFiles():
         print(f.replace(join(htmdamberdir, ''), ''))
 
 
+def _locateFile(fname, type, tleap):
+    amberhome = os.path.normpath(os.path.join(os.path.dirname(tleap), '../'))
+    htmdamberdir = os.path.abspath(os.path.join(home(), 'builder', 'amberfiles', ''))
+    if type == 'topo':
+        topodir = os.path.join(amberhome, 'dat', 'leap', 'prep')
+        foundfile = glob(os.path.join(topodir, fname))
+        if len(foundfile) != 0:
+            return foundfile[0]
+        foundfile = glob(os.path.join(htmdamberdir, fname))
+        if len(foundfile) != 0:
+            return foundfile[0]
+        logger.warning('Was not able to find topology file {}'.format(fname))
+    elif type == 'param':
+        parmdir = os.path.join(amberhome, 'dat', 'leap', 'parm')
+        foundfile = glob(os.path.join(parmdir, fname))
+        if len(foundfile) != 0:
+            return foundfile[0]
+        foundfile = glob(os.path.join(htmdamberdir, fname))
+        if len(foundfile) != 0:
+            return foundfile[0]
+        logger.warning('Was not able to find parameter file {}'.format(fname))
+    elif type == 'ff':
+        ffdir = os.path.join(amberhome, 'dat', 'leap', 'cmd')
+        foundfile = glob(os.path.join(ffdir, fname))
+        if len(foundfile) != 0:
+            return foundfile[0]
+        foundfile = glob(os.path.join(htmdamberdir, fname))
+        if len(foundfile) != 0:
+            return foundfile[0]
+        logger.warning('Was not able to find forcefield file {}'.format(fname))
+
+
 def defaultFf():
     """ Returns the default leaprc forcefield files used by amber.build """
     return ['leaprc.lipid14', os.path.join('oldff', 'leaprc.ff14SB'), 'leaprc.gaff']
@@ -124,7 +160,7 @@ def defaultParam():
 
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, tleap='tleap', execute=True, atomtypes=None,
+          saltanion=None, saltcation=None, disulfide=None, tleap=None, execute=True, atomtypes=None,
           offlibraries=None, gbsa=False, igb=2):
     """ Builds a system for AMBER
 
@@ -199,8 +235,12 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     mol = mol.copy()
     _removeProteinBonds(mol)
 
-    if shutil.which(tleap) is None:
-        raise NameError('Could not find executable: `{}` in the PATH. Cannot build for AMBER.'.format(tleap))
+    if tleap is None:
+        tleap = _findTleap()
+    else:
+        if shutil.which(tleap) is None:
+            raise NameError('Could not find executable: `{}` in the PATH. Cannot build for AMBER.'.format(tleap))
+
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
     _cleanOutDir(outdir)
@@ -227,8 +267,15 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     # Printing out the forcefields
     if isinstance(ff, str):
         ff = [ff]
-    for force in ff:
-        f.write('source ' + force + '\n')
+    for i, force in enumerate(ff):
+        if os.path.isfile(force):
+            f.write('source {}\n'.format(force))
+        else: # Search amber directories for the file
+            p = _locateFile(force, 'ff', tleap)
+            if p is not None:
+                newname = 'ff{}_{}'.format(i, os.path.basename(force))
+                shutil.copy(p, os.path.join(outdir, newname))
+                f.write('source {}\n'.format(newname))
     f.write('\n')
 
     if gbsa:
@@ -254,20 +301,28 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     # Loading frcmod parameters
     f.write('# Loading parameter files\n')
-    for p in param:
-        try:
-            shutil.copy(p, outdir)
-            f.write('loadamberparams ' + os.path.basename(p) + '\n')
-        except:
-            f.write('loadamberparams ' + p + '\n')
-            logger.info("File {:s} not found, assuming its present on the standard Amber location".format(p))
+    for i, p in enumerate(param):
+        if os.path.isfile(p):
+            f.write('loadamberparams {}\n'.format(p))
+        else: # Search amber directories for the file
+            p = _locateFile(p, 'param', tleap)
+            if p is not None:
+                newname = 'param{}_{}'.format(i, os.path.basename(p))
+                shutil.copy(p, os.path.join(outdir, newname))
+                f.write('loadamberparams {}\n'.format(newname))
     f.write('\n')
 
     # Loading prepi topologies
     f.write('# Loading prepi topologies\n')
-    for t in topo:
-        shutil.copy(t, outdir)
-        f.write('loadamberprep ' + os.path.basename(t) + '\n')
+    for i, t in enumerate(topo):
+        if os.path.isfile(t):
+            f.write('loadamberprep {}\n'.format(t))
+        else: # Search amber directories for the file
+            t = _locateFile(t, 'topo', tleap)
+            if t is not None:
+                newname = 'topo{}_{}'.format(i, os.path.basename(t))
+                shutil.copy(t, os.path.join(outdir, newname))
+                f.write('loadamberprep {}\n'.format(newname))
     f.write('\n')
 
     # Detect disulfide bridges if not defined by user
