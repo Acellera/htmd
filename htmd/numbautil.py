@@ -23,7 +23,6 @@ def wrapBondedDistance(d, box):
     return d
 
 
-@jit(nopython=True)
 def dihedralAngle(pos, box=None):
     """ Calculates a dihedral angle.
 
@@ -39,7 +38,18 @@ def dihedralAngle(pos, box=None):
     angle: float
         The angle in radians
     """
+    if pos.ndim == 3 and pos.shape[2] > 1:
+        if box is None:
+            box = np.zeros((3, pos.shape[2]), dtype=pos.dtype)
+        return dihedralAngleFrames(pos, box)
     return dihedralAngleFull(pos, box)
+
+@jit(nopython=True)
+def dihedralAngleFrames(pos, box):
+    res = np.zeros(pos.shape[2], dtype=pos.dtype)
+    for f in range(pos.shape[2]):
+        res[f] = dihedralAngleFull(pos[:, :, f], box[:, f])[0]
+    return res
 
 @jit(nopython=True)
 def dihedralAngleFull(pos, box=None):
@@ -61,7 +71,6 @@ def dihedralAngleFull(pos, box=None):
     Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
     angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
     '''
-    pos = pos.squeeze()
     if pos.shape[0] != 4 or pos.shape[1] != 3:
         raise RuntimeError('dihedralAngles requires a 4x3 sized coordinate matrix as input.')
     if box is None:
