@@ -93,11 +93,13 @@ class FakeQM(QMBase):
     def _command(self): pass
     def _writeInput(self, directory, iframe): pass
     def _readOutput(self, directory): pass
+    def setup(self): pass
+    def submit(self): pass
 
     def _completed(self, directory):
         return os.path.exists(os.path.join(directory, 'data.pkl'))
 
-    def run(self):
+    def retrieve(self):
 
         ff = FFEvaluate(self.molecule)
 
@@ -248,7 +250,7 @@ class FakeQM2(FakeQM):
 
         return prmtop
 
-    def run(self):
+    def retrieve(self):
 
         prmtop = self._get_prmtop()
         system = prmtop.createSystem()

@@ -118,7 +118,10 @@ class Psi4(QMBase):
         return 'export HTMD_PSI4_WORKDIR=$(pwd)\npsi4 -i psi4.in -o psi4.out &> psi4.log'
 
     def _completed(self, directory):
-        return os.path.exists(os.path.join(directory, 'psi4.out'))
+        # Abuse "timer.dat" to detect if a Psi4 job has completed.
+        # "timer.dat" is written up on completion (successful or failed),
+        # but it will be missing a job has benn killed or crashed due to a machine problems.
+        return os.path.exists(os.path.join(directory, 'timer.dat'))
 
     def _writeInput(self, directory, iframe):
 
