@@ -9,6 +9,7 @@ import logging
 from copy import deepcopy
 import numpy as np
 from scipy import constants as const
+import periodictable
 
 from htmd.molecule.molecule import Molecule
 from htmd.molecule import vdw
@@ -137,6 +138,41 @@ class FFMolecule(Molecule):
             for equivalent_dihedral in dihedral.equivalents:
                 print('      ' + '-'.join(self.name[equivalent_dihedral]))
 
+    @staticmethod
+    def guessElementFromName(name):
+        '''
+        Guess element from an atom name
+
+        >>> from htmd.parameterization.ffmolecule import FFMolecule
+        >>> FFMolecule.guessElementFromName('C')
+        'C'
+        >>> FFMolecule.guessElementFromName('C1')
+        'C'
+        >>> FFMolecule.guessElementFromName('C42')
+        'C'
+        >>> FFMolecule.guessElementFromName('C7S')
+        'C'
+        >>> FFMolecule.guessElementFromName('HN1')
+        'H'
+        >>> FFMolecule.guessElementFromName('CL')
+        'Cl'
+        >>> FFMolecule.guessElementFromName('CA1')
+        'Ca'
+        '''
+
+        symbol = name.capitalize()
+
+        while symbol:
+            try:
+                element = periodictable.elements.symbol(symbol)
+            except ValueError:
+                symbol = symbol[:-1]
+            else:
+                return element.symbol
+
+        raise ValueError('Cannot guess element from atom name: {}'.format(name))
+
+
     def _rename(self):
         """
         This fixes up the atom naming and reside name to be consistent.
@@ -149,22 +185,14 @@ class FFMolecule(Molecule):
         self.resname[:] = 'MOL'
         logger.info('Rename residue to %s' % self.resname[0])
 
-        sufices = dict()
+        sufices = {}
         for i in range(self.numAtoms):
-            name = self.name[i].upper()
-
-            # This fixes the specific case where a name is 3 or 4 characters, as X-TOOL seems to make
-            if re.match('^[A-Z]{3,4}$', name):
-               name = name[:-2] # Remove the last 2 characters
-
-            # Remove any character that isn't alpha
-            name = re.sub('[^A-Z]*', '', name)
+            name = self.guessElementFromName(self.name[i]).upper()
 
             sufices[name] = sufices.get(name, 0) + 1
-
             name += str(sufices[name])
-            logger.info('Rename atom %d: %-4s --> %-4s' % (i, self.name[i], name))
 
+            logger.info('Rename atom %d: %-4s --> %-4s' % (i, self.name[i], name))
             self.name[i] = name
 
     def qm_method_name(self):
@@ -486,4 +514,9 @@ run 0'''
             logger.info('Write MOL2 file (with original coordinates): %s' % molFile)
 
 if __name__ == '__main__':
-    pass
+
+    import sys
+    import doctest
+
+    if doctest.testmod().failed:
+        sys.exit(1)

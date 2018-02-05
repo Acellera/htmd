@@ -9,6 +9,9 @@ import numpy as np
 import ctypes
 import htmd.home
 import os
+from numba import cuda, jit
+import numba
+from math import sqrt, exp
 
 _order = ('hydrophobic', 'aromatic', 'hbond_acceptor', 'hbond_donor', 'positive_ionizable',
           'negative_ionizable', 'metal', 'occupancies')
@@ -16,7 +19,7 @@ libdir = htmd.home.home(libDir=True)
 occupancylib = ctypes.cdll.LoadLibrary(os.path.join(libdir, "occupancy_ext.so"))
 
 
-def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0, channels=None):
+def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0, channels=None, method='C'):
     """ Calculate descriptors of atom properties for voxels in a grid bounding the Molecule object.
 
     Constructs a bounding box around Molecule with some buffer space. Then it computes
@@ -52,6 +55,8 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0, channels=N
     N : np.ndarray
         Is returned only when no user centers are passed. It corresponds to the number of centers in each of the x,y,z
         dimensions
+    method : str
+        Voxel descriptors can be calculated either with our C implementation or CUDA or NUMBA implementations.
 
     Examples
     --------
@@ -81,17 +86,23 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0, channels=N
 
         # Calculate grid centers
         centers = _getGridCenters(bbm, N, voxelsize)
-        centers2D = centers.reshape(np.prod(N), 3)
+        centers = centers.reshape(np.prod(N), 3)
     else:
-        centers2D = usercenters
+        centers = usercenters
 
     # Calculate features
-    features = _getGridDescriptors(mol, centers2D, channels)
+    if method.upper() == 'C':
+        features = _getOccupancyC(mol.coords[:, :, mol.frame], centers, channels)
+    elif method.upper() == 'CUDA':
+        features = _getOccupancyCUDA(mol.coords[:, :, mol.frame], centers, channels)
+    elif method.upper() == 'NUMBA':
+        features = _getOccupancyNUMBA(mol.coords[:, :, mol.frame], centers, channels)
+
 
     if N is None:
-        return features, centers2D
+        return features, centers
     else:
-        return features, centers2D, N
+        return features, centers, N
 
 
 def getPointDescriptors(mol, point, size, resolution=1):
@@ -279,28 +290,13 @@ def _getGridCenters(llc, N, resolution):
     return centers
 
 
-def _getGridDescriptors(mol, centers, channelsigmas):
-    """ Calls the C code to calculate the voxels values for each property.
-
-    Parameters
-    ----------
-    mol
-    llc
-    N
-    channelsigmas
-    resolution
-
-    Returns
-    -------
-    occupancies
-    centers
-    """
+def _getOccupancyC(coords, centers, channelsigmas):
+    """ Calls the C code to calculate the voxels values for each property."""
     centers = centers.astype(np.float64)
     channelsigmas = channelsigmas.astype(np.float64)
 
     nchannels = channelsigmas.shape[1]
     occus = np.zeros((centers.shape[0], nchannels))
-    coords = np.squeeze(mol.coords[:, :, 0])
 
     occupancylib.descriptor_ext(centers.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                        coords.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
@@ -310,6 +306,86 @@ def _getGridDescriptors(mol, centers, channelsigmas):
                        ctypes.c_int(coords.shape[0]),  # n of atoms
                        ctypes.c_int(nchannels))  # n of channels
     return occus
+
+
+@jit('float64[:,:](float32[:,:], float64[:,:], float64[:,:], float64)', nopython=True)
+def _getOccupancyNUMBA(coords, centers, channelsigmas, trunc):
+    ncenters = centers.shape[0]
+    natoms = coords.shape[0]
+    nchannels = channelsigmas.shape[1]
+    trunc = trunc * trunc  # Since we calculate the d**2 we need to get trunc**2
+    occus = np.zeros((ncenters, nchannels))
+    for a in range(natoms):
+        coo = coords[a, :]
+        atomsigmas = channelsigmas[a, :]
+
+        for c in range(ncenters):
+            cent = centers[c, :]
+            d = np.zeros(3)
+            d[0] = coo[0] - cent[0]
+            d[1] = coo[1] - cent[1]
+            d[2] = coo[2] - cent[2]
+            d2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2]
+            if d2 < trunc:
+                d1 = 1 / sqrt(d2)
+                for h in range(nchannels):
+                    if atomsigmas[h] == 0:
+                        continue
+                    x = atomsigmas[h] * d1
+                    x3 = x * x * x
+                    x12 = x3 * x3 * x3 * x3
+                    value = 1 - exp(-x12)
+                    occus[c, h] = max(occus[c, h], value)
+    return occus
+
+
+def _getOccupancyCUDA(coords, centers, channelsigmas, trunc, device=0):
+    cuda.select_device(device)
+    occus = np.zeros((centers.shape[0], channelsigmas.shape[1]))
+    threadsperblock = 1024
+    natomblocks = int(np.ceil(coords.shape[0] / threadsperblock))
+    blockspergrid = (centers.shape[0], natomblocks)
+
+    centers = cuda.to_device(centers)
+    coords = cuda.to_device(coords)
+    channelsigmas = cuda.to_device(channelsigmas)
+    _getOccupancyCUDAkernel[blockspergrid, threadsperblock](occus, coords, centers, channelsigmas, trunc * trunc)
+
+    return occus
+
+@cuda.jit
+def _getOccupancyCUDAkernel(occus, coords, centers, channelsigmas, trunc):
+    centeridx = cuda.blockIdx.x
+    blockidx = cuda.blockIdx.y
+    atomidx = (cuda.threadIdx.x + (cuda.blockDim.x * blockidx))
+
+    if atomidx >= coords.shape[0] or centeridx >= centers.shape[0]:
+        return
+
+    # TODO: Can remove this. Barely any speedup
+    centcoor = cuda.shared.array(shape=(3), dtype=numba.float32)
+    centcoor[0] = centers[centeridx, 0]
+    centcoor[1] = centers[centeridx, 1]
+    centcoor[2] = centers[centeridx, 2]
+    cuda.syncthreads()
+
+    dx = coords[atomidx, 0] - centcoor[0]
+    dy = coords[atomidx, 1] - centcoor[1]
+    dz = coords[atomidx, 2] - centcoor[2]
+    d2 = dx * dx + dy * dy + dz * dz
+    if d2 >= trunc:
+        return
+
+    d1 = 1 / sqrt(d2)
+    for h in range(channelsigmas.shape[1]):
+        if channelsigmas[atomidx, h] == 0:
+            continue
+        x = channelsigmas[atomidx, h] * d1
+        value = 1 - exp(-(x ** 12))
+        cuda.atomic.max(occus, (centeridx, h), value)
+
+
+
 
 if __name__ == '__main__':
     from htmd.molecule.molecule import Molecule
@@ -323,3 +399,23 @@ if __name__ == '__main__':
     refCent = np.load(os.path.join(testf, '3PTB_center.npy'))
     assert np.allclose(resOcc, refOcc)
     assert np.allclose(resCent, refCent)
+
+    import numpy as np
+    from htmd.molecule.voxeldescriptors import _getOccupancyC, _getOccupancyCUDA
+    centers = np.load(os.path.join(testf, '3PTB_centers_inp.npy'))
+    coords = np.load(os.path.join(testf, '3PTB_coords_inp.npy'))
+    sigmas = np.load(os.path.join(testf, '3PTB_channels_inp.npy'))
+    centers = centers[::10, :].copy()
+
+    res_C = _getOccupancyC(coords, centers, sigmas)
+    # res_cuda = _getOccupancyCUDA(coords, centers, sigmas, 5)
+    res_numba = _getOccupancyNUMBA(coords, centers, sigmas, 5)
+
+    # assert np.abs(res_C - res_cuda).max() < 1e-4
+    assert np.abs(res_C - res_numba).max() < 1e-4
+
+
+
+
+
+
