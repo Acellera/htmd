@@ -42,7 +42,10 @@ def dihedralAngle(pos, box=None):
         if box is None:
             box = np.zeros((3, pos.shape[2]), dtype=pos.dtype)
         return dihedralAngleFrames(pos, box)
-    return dihedralAngleFull(pos, box)
+    else:
+        if box is not None:
+            box = box.squeeze()
+        return dihedralAngleFull(pos.squeeze(), box)[0]
 
 @jit(nopython=True)
 def dihedralAngleFrames(pos, box):
