@@ -61,6 +61,7 @@ def dihedralAngleFull(pos, box=None):
     Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
     angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
     '''
+    pos = pos.squeeze()
     if pos.shape[0] != 4 or pos.shape[1] != 3:
         raise RuntimeError('dihedralAngles requires a 4x3 sized coordinate matrix as input.')
     if box is None:
