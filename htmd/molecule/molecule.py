@@ -724,8 +724,8 @@ class Molecule:
         --------
         >>> mol.getDihedral([0, 5, 8, 12])
         """
-        from htmd.molecule.util import dihedralAngle
-        return np.deg2rad(dihedralAngle(self.coords[atom_quad, :, self.frame]))
+        from htmd.numbautil import dihedralAngle
+        return dihedralAngle(self.coords[atom_quad, :, self.frame])
 
     def setDihedral(self, atom_quad, radians, bonds=None):
         """ Sets the angle of a dihedral.
@@ -749,7 +749,7 @@ class Molecule:
         >>> mol.setDihedral([18, 20, 24, 30], -1.8, bonds=bonds)
         """
         import scipy.sparse.csgraph as sp
-        from htmd.molecule.util import dihedralAngle
+        from htmd.numbautil import dihedralAngle
         if bonds is None:
             bonds = self._getBonds()
 
@@ -772,7 +772,7 @@ class Molecule:
         quad_coords = self.coords[atom_quad, :, self.frame]
         rotax = quad_coords[2] - quad_coords[1]
         rotax /= np.linalg.norm(rotax)
-        rads = np.deg2rad(dihedralAngle(quad_coords))
+        rads = dihedralAngle(quad_coords)
         M = rotationMatrix(rotax, radians-rads)
         self.rotateBy(M, center=self.coords[atom_quad[1], :, self.frame], sel=right)
 
@@ -1859,7 +1859,6 @@ if __name__ == "__main__":
     m.write(tmp, 'name CA')
 
     # Testing dihedral setting
-    from htmd.molecule.util import dihedralAngle
     mol = Molecule('2HBB')
     quad = [124, 125, 132, 133]
     mol.setDihedral(quad, np.deg2rad(-90))

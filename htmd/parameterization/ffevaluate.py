@@ -6,7 +6,7 @@
 import numpy as np
 import scipy as sp
 from scipy import constants as const
-from htmd.molecule.util import dihedralAngle
+from htmd.numbautil import dihedralAngle
 
 
 class FFEvaluate:
@@ -176,7 +176,7 @@ class FFEvaluate:
     @staticmethod
     def _evaluateTorsion(coords, torsions):
 
-        phi = np.deg2rad(dihedralAngle(coords))
+        phi = dihedralAngle(coords)
 
         energy = 0.
         for torsion in torsions:

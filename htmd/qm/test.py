@@ -15,7 +15,7 @@ from htmd.queues.localqueue import LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-from htmd.molecule.util import dihedralAngle
+from htmd.numbautil import dihedralAngle
 
 
 # For H2 0.74 A with HF and 3-21G basis
@@ -244,7 +244,7 @@ class TestBase:
     def test_restrained_dihedrals(self):
 
         quad = [2, 0, 1, 3]
-        angle = dihedralAngle(self.h2o2_90.coords[quad, :, 0])
+        angle = np.rad2deg(dihedralAngle(self.h2o2_90.coords[quad, :, 0]))
         self.assertAlmostEqual(89.999544881803772, angle)
 
         with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
@@ -256,7 +256,7 @@ class TestBase:
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
-            angle = dihedralAngle(result.coords[quad, :, 0])
+            angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
             self.assertAlmostEqual(89.999541178019271, angle)
 
         with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
@@ -264,7 +264,7 @@ class TestBase:
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
-            angle = dihedralAngle(result.coords[quad, :, 0])
+            angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
             self.assertAlmostEqual(179.51690845119924, angle, places=3) # Unstable results
 
     def test_directory(self):

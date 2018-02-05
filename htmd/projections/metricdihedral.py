@@ -618,11 +618,11 @@ class MetricDihedral(Projection):
         return Dihedral.dihedralsToIndexes(mol, dihedrals, protatoms)
 
     def _calcDihedralAngles(self, mol, dihedrals, sincos=True):
-        from htmd.molecule.util import dihedralAngle
+        from htmd.numbautil import dihedralAngle
         metric = np.zeros((np.size(mol.coords, 2), len(dihedrals)))
 
         for i, dih in enumerate(dihedrals):
-            metric[:, i] = dihedralAngle(mol.coords[dih, :, :])
+            metric[:, i] = np.rad2deg(dihedralAngle(mol.coords[dih, :, :]))
 
         if sincos:
             sc_metric = np.zeros((np.size(metric, 0), np.size(metric, 1) * 2))
