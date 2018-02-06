@@ -759,7 +759,7 @@ if __name__ == '__main__':
     # if failure_count != 0:
     #     raise Exception('Doctests failed')
 
-    def cutfirstline(infile, outfile):
+    def _cutfirstline(infile, outfile):
         # Cut out the first line of prmtop which has a build date in it
         with open(infile, 'r') as fin:
             data = fin.read().splitlines(True)
@@ -776,8 +776,8 @@ if __name__ == '__main__':
             if os.path.splitext(f)[1] in ignore_ftypes:
                 continue
             if f.endswith('prmtop'):
-                cutfirstline(f, join(compare, fname + '.mod'))
-                cutfirstline(join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
+                _cutfirstline(f, join(compare, fname + '.mod'))
+                _cutfirstline(join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
                 files.append(os.path.basename(f) + '.mod')
                 deletefiles.append(join(compare, fname + '.mod'))
             else:
