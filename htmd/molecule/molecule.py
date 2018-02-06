@@ -609,6 +609,8 @@ class Molecule:
 
         Needs to be called before removing atoms!
         """
+        if len(idx) == 0:
+            return
         if len(self.bonds) == 0 and len(self.dihedrals) == 0 and len(self.impropers) == 0 and len(self.angles) == 0:
             return
         map = np.ones(self.numAtoms, dtype=int)
@@ -625,6 +627,29 @@ class Molecule:
             self.__dict__[field] = tempdata[stays, ...]
             if field == 'bonds' and len(self.bondtype):
                 self.bondtype = self.bondtype[stays]
+
+    def deleteBonds(self, sel, inter=True):
+        """ Deletes all bonds that contain atoms in sel or between atoms in sel.
+
+        Parameters
+        ----------
+        sel : str
+            Atomselection string including atoms whose bonds should be deleted.
+        inter : bool
+            When True it will delete also bonds between atoms in sel with bonds to atoms outside of sel.
+            When False it will only delete bonds between atoms in sel.
+        """
+        sel = self.atomselect(sel, indexes=True)
+        if len(sel) == 0:  # If none are selected do nothing
+            return
+        if inter:
+            todel = np.in1d(self.bonds[:, 0], sel) | np.in1d(self.bonds[:, 1], sel)
+        else:
+            todel = np.in1d(self.bonds[:, 0], sel) & np.in1d(self.bonds[:, 1], sel)
+        idx = np.where(todel)[0]
+        self.bonds = np.delete(self.bonds, idx, axis=0)
+        self.bondtype = np.delete(self.bondtype, idx)
+
 
     def _guessBonds(self):
         """ Tries to guess the bonds in the Molecule
