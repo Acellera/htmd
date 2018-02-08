@@ -96,7 +96,7 @@ def getVoxelDescriptors(mol, usercenters=None, voxelsize=1, buffer=0, channels=N
     elif method.upper() == 'CUDA':
         features = _getOccupancyCUDA(mol.coords[:, :, mol.frame], centers, channels)
     elif method.upper() == 'NUMBA':
-        features = _getOccupancyNUMBA(mol.coords[:, :, mol.frame], centers, channels)
+        features = _getOccupancyNUMBA(mol.coords[:, :, mol.frame], centers, channels, 5)
 
 
     if N is None:
@@ -339,7 +339,7 @@ def _getOccupancyNUMBA(coords, centers, channelsigmas, trunc):
     return occus
 
 
-def _getOccupancyCUDA(coords, centers, channelsigmas, trunc, device=0):
+def _getOccupancyCUDA(coords, centers, channelsigmas, trunc=5, device=0):
     cuda.select_device(device)
     occus = np.zeros((centers.shape[0], channelsigmas.shape[1]))
     threadsperblock = 1024
