@@ -13,6 +13,133 @@ from htmd.home import home
 from htmd.util import tempname
 
 
+def _loadFiles(folder1, folder2):
+    import parmed
+    from htmd.molecule.molecule import Molecule, mol_equal
+    mol1 = Molecule(os.path.join(folder1, 'mol.mol2'))
+    mol2 = Molecule(os.path.join(folder2, 'mol.mol2'))
+    assert mol_equal(mol1, mol2)
+
+    if os.path.exists(os.path.join(folder1, 'mol.frcmod')) and \
+        os.path.exists(os.path.join(folder2, 'mol.frcmod')):
+        prm1 = parmed.load_file(os.path.join(folder1, 'mol.frcmod'))
+        prm2 = parmed.load_file(os.path.join(folder2, 'mol.frcmod'))
+    elif os.path.exists(os.path.join(folder1, 'mol.prm')) and \
+        os.path.exists(os.path.join(folder1, 'mol.rtf')) and \
+        os.path.exists(os.path.join(folder2, 'mol.prm')) and \
+        os.path.exists(os.path.join(folder2, 'mol.rtf')):
+        prm1 = parmed.charmm.CharmmParameterSet(os.path.join(folder1, 'mol.rtf'), os.path.join(folder1, 'mol.prm'))
+        prm2 = parmed.charmm.CharmmParameterSet(os.path.join(folder2, 'mol.rtf'), os.path.join(folder2, 'mol.prm'))
+    else:
+        raise RuntimeError('Could not find frcmod or prm/rtf combination in folders {} {}'.format(folder1, folder2))
+    return mol1, prm1, prm2
+
+def _compareDihedralEnergies(mol, prm1, prm2, argdihedrals):
+    from htmd.molecule.util import guessAnglesAndDihedrals
+    from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
+    from htmd.parameterization.detectequivalents import detectEquivalents
+    from htmd.ffevaluation.ffevaluate import ffevaluate
+    import numpy as np
+
+    # Guess bonds
+    if len(mol.bonds) == 0:
+        print('No bonds found! Guessing them...')
+        bonds = mol._guessBonds()
+        mol.bonds = bonds.copy()
+
+    # Guess angles and dihedrals
+    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds, cyclicdih=True)
+
+    equivalents = detectEquivalents(mol)
+    all_dihedrals = [x.atoms for x in detectSoftDihedrals(mol, equivalents)]
+
+    def dihedralName(mol, dih):
+        return '-'.join(mol.name[dih])
+
+    # Choose which dihedrals to fit
+    dihedrals = []
+    all_dihedral_names = [dihedralName(mol, dihedral) for dihedral in all_dihedrals]
+    for dihedral_name in argdihedrals:
+        if dihedral_name not in all_dihedral_names:
+            raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
+        dihedrals.append(all_dihedrals[all_dihedral_names.index(dihedral_name)])
+    dihedrals = dihedrals if len(dihedrals) > 0 else all_dihedrals  # Set default to all dihedral angles
+
+    # Calculate energies
+    data = []
+    for dihedral in dihedrals:
+        nrotamers = 36  # Number of rotamers for each dihedral to compute
+
+        # Create a copy of molecule with "nrotamers" frames
+        evalmol = mol.copy()
+        while evalmol.numFrames < nrotamers:
+            evalmol.appendFrames(mol)
+        assert evalmol.numFrames == nrotamers
+
+        # Set rotamer coordinates
+        angles = np.linspace(-np.pi, np.pi, num=nrotamers, endpoint=False)
+        for frame, angle in enumerate(angles):
+            evalmol.frame = frame
+            evalmol.setDihedral(dihedral, angle, bonds=evalmol.bonds)
+
+        nrg1, _, _ = ffevaluate(evalmol, prm1)
+        nrg2, _, _ = ffevaluate(evalmol, prm2)
+        totnorm_nrg1 = nrg1.sum(axis=0) - np.min(nrg1.sum(axis=0))
+        totnorm_nrg2 = nrg2.sum(axis=0) - np.min(nrg2.sum(axis=0))
+        rmse = np.sqrt(np.mean((totnorm_nrg1 - totnorm_nrg2) ** 2))
+        data.append((dihedralName(mol, dihedral), rmse, np.max(totnorm_nrg1 - totnorm_nrg2)))
+        print('Dihedral {} has an RMSE(kcal/mol): {} maxDiff(kcal/mol): {}'.format(*data[-1]))
+    return data
+
+
+def _parameterCompare(folder1, folder2, fields=('atom_types', 'bond_types', 'angle_types', 'improper_types', 'improper_periodic_types'), dihedrals=()):
+    def myerror(msg):
+        raise RuntimeError('Difference found in {} and {}. {}'.format(folder1, folder2, msg))
+
+    def samekeys(d1, d2):
+        for k1, k2 in zip(d1.keys(), d2.keys()):
+            if k1 != k2:
+                return False
+        return True
+
+    def comparevalues(val1, val2):
+        if isinstance(val1, tuple) or isinstance(val1, list):
+            same = True
+            for v1, v2 in zip(val1, val2):
+                same &= comparevalues(v1, v2)
+            return same
+        if isinstance(val1, dict):
+            same = True
+            if not samekeys(val1, val2):
+                return False
+            for v1, v2 in zip(val1.keys(), val2.keys()):
+                same &= comparevalues(val1[v1], val2[v2])
+            return same
+        else:
+            return val1 == val2
+
+    def compareOrderedDict(name, od1, od2):
+        if len(od1) != len(od2):
+            myerror('Different number of {}'.format(name))
+        for t1, t2 in zip(od1, od2):
+            if t1 != t2:
+                myerror('Different "{}" detected.'.format(name))
+            for field in od1[t1].__dict__:
+                same = comparevalues(od1[t1].__dict__[field], od2[t2].__dict__[field])
+                if not same:
+                    myerror('Different values for "{}" "{}" and field "{}"'.format(name, t1, field))
+
+    mol, prm1, prm2 = _loadFiles(folder1, folder2)
+
+    if not samekeys(prm1.__dict__, prm2.__dict__):
+        myerror('Different number of fields')
+
+    for f in fields:
+        compareOrderedDict(f, prm1.__dict__[f], prm2.__dict__[f])
+
+    return _compareDihedralEnergies(mol, prm1, prm2, dihedrals)
+
+
 class TestParameterize(unittest.TestCase):
 
     def setUp(self):
