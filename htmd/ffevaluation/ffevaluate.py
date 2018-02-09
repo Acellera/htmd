@@ -599,7 +599,7 @@ def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
     ntorsions = int(len(torsionparam) / 3)
     for i in range(len(torsionparam)):
         if np.isnan(torsionparam[i]):
-            ntorsions = i / 3
+            ntorsions = int(i / 3)
             break
     pot = 0
     force = np.zeros((4, 3), dtype=np.float64)
