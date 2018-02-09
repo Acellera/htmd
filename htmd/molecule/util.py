@@ -556,62 +556,6 @@ def rcsbFindLigands(pdbid):
     return ligands
 
 
-def dihedralAngle(atom_quad_coords):
-    """ Calculates a dihedral angle.
-    
-    Parameters
-    ----------
-    atom_quad_coords: np.ndarray
-        An array of 4x3 size where each row are the coordinates of an atom defining the dihedral angle
-
-    Returns
-    -------
-    angle: float
-        The angle in degrees
-    """
-    '''
-    http://en.wikipedia.org/wiki/Dihedral_angle#Methods_of_computation
-    https://www.cs.unc.edu/cms/publications/dissertations/hoffman_doug.pdf
-    http://www.cs.umb.edu/~nurith/cs612/hw4_2012.pdf
-
-    Ua = (A2 - A1) x (A3 - A1)
-    Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
-    angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
-    '''
-    if atom_quad_coords.ndim == 1:
-        raise RuntimeError('dihedralAngles requires a 4x3 sized matrix as input.')
-    if atom_quad_coords.ndim == 2:
-        atom_quad_coords = atom_quad_coords[:, :, np.newaxis]
-
-    def _inner(A, B):
-        return np.sum(A * B, 1)
-
-    A10 = np.transpose(atom_quad_coords[1] - atom_quad_coords[0])
-    A21 = np.transpose(atom_quad_coords[2] - atom_quad_coords[1])
-    A32 = np.transpose(atom_quad_coords[3] - atom_quad_coords[2])
-    Ua = np.cross(A10, A21)
-    Ub = np.cross(A21, A32)
-    if np.any(np.sum(Ua == 0, 1) == 3) or np.any(np.sum(Ub == 0, 1) == 3):
-        raise ZeroDivisionError('Two dihedral planes are exactly parallel or antiparallel. '
-                                'There is probably something broken in the simulation.')
-    x = np.squeeze(_inner(Ua, Ub)) / (np.squeeze(np.linalg.norm(Ua, axis=1)) * np.squeeze(np.linalg.norm(Ub, axis=1)))
-
-    # Fix machine precision errors (I hope at least that's what I'm doing...)
-    if isinstance(x, np.ndarray):
-        x[x > 1] = 1
-        x[x < -1] = -1
-    elif x > 1:
-        x = 1
-    elif x < -1:
-        x = -1
-
-    signV = np.squeeze(np.sign(_inner(Ua, A32)))
-    signV[signV == 0] = 1  # Angle sign is 0. Maybe I should handle this better...
-
-    return (np.arccos(x) * 180. / np.pi) * signV
-
-
-
 # def drawCube(mi, ma, viewer=None):
 #     from htmd.vmdviewer import getCurrentViewer
 #     if viewer is None:

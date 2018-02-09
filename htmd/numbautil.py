@@ -23,8 +23,53 @@ def wrapBondedDistance(d, box):
     return d
 
 
+def dihedralAngle(pos, box=None):
+    """ Calculates a dihedral angle.
+
+    Parameters
+    ----------
+    pos: np.ndarray
+        An array of 4x3 size where each row are the coordinates of an atom defining the dihedral angle
+    box: np.ndarray
+        The size of the periodic box
+
+    Returns
+    -------
+    angle: float
+        The angle in radians
+    """
+    if pos.ndim == 3 and pos.shape[2] > 1:
+        if box is None:
+            box = np.zeros((3, pos.shape[2]), dtype=pos.dtype)
+        return dihedralAngleFrames(pos, box)
+    else:
+        if box is not None:
+            box = box.squeeze()
+        return dihedralAngleFull(pos.squeeze(), box)[0]
+
 @jit(nopython=True)
-def dihedralAngle(pos, box):
+def dihedralAngleFrames(pos, box):
+    res = np.zeros(pos.shape[2], dtype=pos.dtype)
+    for f in range(pos.shape[2]):
+        res[f] = dihedralAngleFull(pos[:, :, f], box[:, f])[0]
+    return res
+
+@jit(nopython=True)
+def dihedralAngleFull(pos, box=None):
+    """ Calculates a dihedral angle.
+
+    Parameters
+    ----------
+    pos: np.ndarray
+        An array of 4x3 size where each row are the coordinates of an atom defining the dihedral angle
+    box: np.ndarray
+        The size of the periodic box
+    """
+    if pos.shape[0] != 4 or pos.shape[1] != 3:
+        raise RuntimeError('dihedralAngles requires a 4x3 sized coordinate matrix as input.')
+    if box is None:
+        box = np.zeros(3, dtype=pos.dtype)
+
     r12 = np.zeros(3)
     r23 = np.zeros(3)
     r34 = np.zeros(3)

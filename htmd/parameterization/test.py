@@ -188,12 +188,12 @@ class TestParameterize(unittest.TestCase):
             _parameterCompare(folder1, folder2, prm1, prm2, dihedrals=dihedrals)
             res = _compareDihedralEnergies(mol, prm1, prm2, dihedrals)
             for r in res:
-                if r[1] != 0:
+                if r[1] > 0.02: # RMSE threshold in kcal/mol
                     self.fail('Dihedral {} gave different energy than in the test with kcal/mol RMSE {} and max error {}'.format(r[0], r[1], r[2]))
 
     def _testFiles(self, refDir, resDir):
         filestotest = []
-        excluded = ('minimize', 'esp', 'dihedral', '.coor', '.svg')
+        excluded = ('minimize', 'esp', 'dihedral', '.coor', '.svg', '.frcmod', '.prm', '.rtf')
         for root, _, files in os.walk(refDir, followlinks=True):
             for file in files:
                 flag = False
@@ -218,11 +218,7 @@ class TestParameterize(unittest.TestCase):
                 with open(refFile) as ref, open(resFile) as res:
                     refLines, resLines = ref.readlines(), res.readlines()
 
-                # Removes first line with the version
-                if file.endswith('frcmod') or file.endswith('rtf') or file.endswith('prm'):
-                    refLines, resLines = refLines[1:], resLines[1:]
-
-                if file.endswith('prm') or file.endswith('frcmod') or file.endswith('energies.txt'):
+                if file.endswith('energies.txt'):
                     refFields = [field for line in refLines for field in line.split()]
                     resFields = [field for line in resLines for field in line.split()]
                     for refField, resField in zip(refFields, resFields):

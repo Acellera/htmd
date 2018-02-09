@@ -618,11 +618,11 @@ class MetricDihedral(Projection):
         return Dihedral.dihedralsToIndexes(mol, dihedrals, protatoms)
 
     def _calcDihedralAngles(self, mol, dihedrals, sincos=True):
-        from htmd.molecule.util import dihedralAngle
+        from htmd.numbautil import dihedralAngle
         metric = np.zeros((np.size(mol.coords, 2), len(dihedrals)))
 
         for i, dih in enumerate(dihedrals):
-            metric[:, i] = dihedralAngle(mol.coords[dih, :, :])
+            metric[:, i] = np.rad2deg(dihedralAngle(mol.coords[dih, :, :]))
 
         if sincos:
             sc_metric = np.zeros((np.size(metric, 0), np.size(metric, 1) * 2))
@@ -674,11 +674,11 @@ if __name__ == "__main__":
     metr = MetricDihedral(protsel='protein')
     data = metr.project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', 'ref.npy'))
-    assert np.allclose(data, dataref, atol=1e-05), 'Diherdals calculation gave different results from reference'
+    assert np.allclose(data, dataref, atol=1e-03), 'Diherdals calculation gave different results from reference'
 
     mol = Molecule('5MAT')
     mol.filter('not insertion A and not altloc A B')
     mol = autoSegment(mol)
     data = MetricDihedral().project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', '5mat.npy'))
-    assert np.allclose(data, dataref, atol=1e-05), 'Diherdals calculation gave different results from reference'
+    assert np.allclose(data, dataref, atol=1e-03), 'Diherdals calculation gave different results from reference'
