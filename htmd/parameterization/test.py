@@ -86,8 +86,14 @@ def _compareDihedralEnergies(mol, prm1, prm2, argdihedrals):
         nrg2, _, _ = ffevaluate(evalmol, prm2)
         totnorm_nrg1 = nrg1.sum(axis=0) - np.min(nrg1.sum(axis=0))
         totnorm_nrg2 = nrg2.sum(axis=0) - np.min(nrg2.sum(axis=0))
+        # from matplotlib import pylab as plt
+        # plt.figure()
+        # plt.plot(range(36), totnorm_nrg1)
+        # plt.plot(range(36), totnorm_nrg2)
+        # plt.legend(['nr1', 'nr2'])
+        # plt.show()
         rmse = np.sqrt(np.mean((totnorm_nrg1 - totnorm_nrg2) ** 2))
-        data.append((dihedralName(mol, dihedral), rmse, np.max(totnorm_nrg1 - totnorm_nrg2)))
+        data.append((dihedralName(mol, dihedral), rmse, np.max(np.abs(totnorm_nrg1 - totnorm_nrg2))))
         print('Dihedral {} has an RMSE(kcal/mol): {} maxDiff(kcal/mol): {}'.format(*data[-1]))
     return data
 
