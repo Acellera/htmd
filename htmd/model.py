@@ -860,7 +860,8 @@ class Model(object):
             data = self.data
             microcenters = self.data.Centers[self.cluster_ofmicro, :]
         else:
-            if self.data.simlist != data.simlist or self.data.numFrames != data.numFrames:
+
+            if self.data.numFrames != data.numFrames or ~np.all([s1 == s2 for s1, s2 in zip(self.data.simlist, data.simlist)]):
                 raise RuntimeError('The data argument you provided uses a different simlist than the Model.')
             microcenters = np.vstack(getStateStatistic(self, data, range(self.micronum), statetype='micro'))
 
