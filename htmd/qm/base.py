@@ -68,7 +68,7 @@ class QMBase(ABC, ProtocolInterface):
         super().__init__()
 
         self._arg('molecule', ':class: `htmd.parameterization.ffmolecule.FFMolecule`', 'Molecule',
-                  validator=val.Object(FFMolecule), required=True)
+                  default=None, validator=val.Object(FFMolecule), required=True)
         self._arg('multiplicity', 'int', 'Multiplicity of the molecule',
                   default=1, validator=val.Number(int, 'POS'))
         self._arg('theory', 'str', 'Level of theory',
