@@ -20,6 +20,8 @@ class FFEvaluate:
 
         if isinstance(mol, FFMolecule):
             prm = prmToParmed(mol, mol._rtf, mol._prm)
+            mol = mol.copy()
+            mol.atomtype = np.array([mol._rtf.type_by_index[i] for i in range(mol.numAtoms)])
         elif prm is None:
             raise RuntimeError('You need to either provide a FFMolecule object or a Molecule and parmed parameter object.')
 
