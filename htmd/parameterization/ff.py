@@ -85,7 +85,7 @@ def prmToParmed(mol, myrtf, myprm):
         dihedral = myprm.dihedralParam(*at)
         dihlist = DihedralTypeList()
         for dih in dihedral:
-            dihtype = DihedralType(dih.k0, dih.n, dih.phi0, dih.e14)
+            dihtype = DihedralType(dih.k0, dih.n, dih.phi0, 1 / dih.e14)
             dihlist.append(dihtype)
         if at in params.dihedral_types and dihlist != params.dihedral_types[at]:
             raise RuntimeError('Already defined dihedral type with different parameters')
