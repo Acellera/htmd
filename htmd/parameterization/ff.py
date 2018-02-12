@@ -50,6 +50,12 @@ def prmToParmed(mol, myrtf, myprm):
     from parmed.topologyobjects import AtomType, BondType, AngleType, DihedralType, ImproperType, NoUreyBradley, DihedralTypeList
     from periodictable import elements
 
+    def getType(idx):
+        types = []
+        for i in idx:
+            types.append(myrtf.type_by_index[i])
+        return tuple(types)
+
     params = ParameterSet()
     for at in myrtf.types:
         nb = myprm.nbParam(at)
@@ -63,7 +69,8 @@ def prmToParmed(mol, myrtf, myprm):
     # from IPython.core.debugger import set_trace
     # set_trace()
     for b in mol.bonds:
-        at = tuple(mol.atomtype[b])
+        # at = tuple(mol.atomtype[b])
+        at = getType(b)
         bond = myprm.bondParam(*at)
         bt = BondType(bond.k0, bond.r0)
         if at in params.bond_types and bt != params.bond_types[at]:
@@ -72,7 +79,8 @@ def prmToParmed(mol, myrtf, myprm):
         params.bond_types[tuple(reversed(at))] = bt
 
     for a in mol.angles:
-        at = tuple(mol.atomtype[a])
+        # at = tuple(mol.atomtype[a])
+        at = getType(a)
         angle = myprm.angleParam(*at)
         angt = AngleType(angle.k0, angle.theta0)
         if at in params.angle_types and angt != params.angle_types[at]:
@@ -83,7 +91,8 @@ def prmToParmed(mol, myrtf, myprm):
         params.urey_bradley_types[tuple(reversed(at))] = NoUreyBradley
 
     for d in mol.dihedrals:
-        at = tuple(mol.atomtype[d])
+        # at = tuple(mol.atomtype[d])
+        at = getType(d)
         dihedral = myprm.dihedralParam(*at)
         dihlist = DihedralTypeList()
         for dih in dihedral:
@@ -95,14 +104,21 @@ def prmToParmed(mol, myrtf, myprm):
         params.dihedral_types[tuple(reversed(at))] = dihlist
 
     for i in mol.impropers:
-        at = tuple(mol.atomtype[i])
+        # at = tuple(mol.atomtype[i])
+        at = getType(i)
         improper = myprm.improperParam(*at)
         assert len(improper) == 1
         improper = improper[0]
-        imptype = ImproperType(improper.k0, improper.phi0)
-        if at in params.improper_types and imptype != params.improper_types[at]:
-            raise RuntimeError('Already defined improper type with different parameters')
-        params.improper_types[at] = imptype
+        if improper.n > 0:
+            imptype = DihedralType(improper.k0, improper.n, improper.phi0, 1 / improper.e14)
+            if at in params.improper_periodic_types and imptype != params.improper_periodic_types[at]:
+                raise RuntimeError('Already defined periodic improper type with different parameters')
+            params.improper_periodic_types[at] = imptype
+        else:
+            imptype = ImproperType(improper.k0, improper.phi0)
+            if at in params.improper_types and imptype != params.improper_types[at]:
+                raise RuntimeError('Already defined improper type with different parameters')
+            params.improper_types[at] = imptype
 
     return params
 
