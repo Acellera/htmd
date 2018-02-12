@@ -16,30 +16,10 @@ def _formatEnergies(energies):
 class FFEvaluate:
     def __init__(self, mol, prm=None, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, fromstruct=False):
         from htmd.parameterization.ffmolecule import FFMolecule
-        from htmd.molecule.molecule import Molecule
+        from htmd.parameterization.ff import prmToParmed
+
         if isinstance(mol, FFMolecule):
-            # from IPython.core.debugger import set_trace
-            # set_trace()
-            tmpmol = mol.copy()
-            import parmed
-            from htmd.util import tempname
-            import os
-
-            frcmod = tempname(suffix='.frcmod')
-            typemap = tmpmol._prm.writeFrcmod(mol._rtf, frcmod)
-            prm = parmed.load_file(frcmod)
-            os.remove(frcmod)
-
-            dihtemp = tmpmol.dihedrals.copy()
-            angtemp = tmpmol.angles.copy()
-
-            mol2f = tempname(suffix='.mol2')
-            tmpmol.write(mol2f, typemap=typemap)
-            mol = Molecule(mol2f)
-            os.remove(mol2f)
-
-            mol.dihedrals = dihtemp
-            mol.angles = angtemp
+            prm = prmToParmed(mol, mol._rtf, mol._prm)
         elif prm is None:
             raise RuntimeError('You need to either provide a FFMolecule object or a Molecule and parmed parameter object.')
 
@@ -179,6 +159,7 @@ def init(mol, prm, fromstruct=False):
     improper_params = np.zeros((mol.impropers.shape[0], 3), dtype=np.float32)
     from parmed.amber import AmberParameterSet
     from parmed.charmm import CharmmParameterSet
+    from parmed.parameters import ParameterSet
     for idx, impr in enumerate(mol.impropers):
         if fromstruct:  # If we make prm from struct there is no ordering
             ty = tuple(uqtypes[typeint[impr]])
@@ -188,6 +169,8 @@ def init(mol, prm, fromstruct=False):
             ty = tuple(ty)
         elif isinstance(prm, CharmmParameterSet):  # If prm is read from CHARMM parameter file it's sorted
             ty = tuple(sorted(uqtypes[typeint[impr]]))
+        elif isinstance(prm, ParameterSet):
+            ty = tuple(uqtypes[typeint[impr]])
         else:
             raise RuntimeError('Not a valid parameterset')
         if ty in prm.improper_types:
