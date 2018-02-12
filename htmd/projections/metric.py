@@ -33,7 +33,7 @@ class Metric:
     Examples
     --------
     >>> metr = Metric(sims)  # doctest: +SKIP
-    >>> metr.projection(MetricSelfDistance('protein and name CA', metric='contacts'))  # doctest: +SKIP
+    >>> metr.set(MetricSelfDistance('protein and name CA', metric='contacts'))  # doctest: +SKIP
     >>> data = metr.project()  # doctest: +SKIP
     >>>
     >>> # Or define your own function which accepts as first argument a Molecule object. Further arguments are passed as

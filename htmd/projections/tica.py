@@ -213,7 +213,7 @@ if __name__ == '__main__':
 
     sims = simlist(glob(join(testfolder, '*', '')), join(testfolder, 'filtered.pdb'))
     met = Metric(sims[0:2])
-    met.projection(MetricSelfDistance('protein and name CA'))
+    met.set(MetricSelfDistance('protein and name CA'))
     data = met.project()
     data.fstep = 0.1
 
