@@ -880,7 +880,7 @@ class MetricData:
             centers = self.Centers
         else:
             from htmd.model import getStateStatistic
-            if self.simlist != data.simlist or self.numFrames != data.numFrames:
+            if self.numFrames != data.numFrames or ~np.all([s1 == s2 for s1, s2 in zip(self.data.simlist, data.simlist)]):
                 raise RuntimeError('The data argument you provided uses a different simlist than this object.')
             centers = np.vstack(getStateStatistic(self, data, range(self.K), statetype='cluster'))
 

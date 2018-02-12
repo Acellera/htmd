@@ -196,18 +196,22 @@ class PRM:
                 # Prune prms that are zero
                 prm=list()
                 for pi in range(len(prmx)):
-                    p = prmx[pi]
-                    if p.k0 != 0.: prm.append(p)
+                    dih = prmx[pi]
+                    if dih.k0 != 0.: prm.append(dih)
                 # HACK: leave at least one dihedral, even if the force constant is 0,
                 #       otherwise "tleap" is not happy!
                 if len(prm) == 0:
                     prm.append(prmx[0])
 
-                for p in prm:
-                    scee = 1. / p.e14
+                for p, dih in enumerate(prm):
+                    scee = 1. / dih.e14
                     scnb = 2.
+                    if p == len(prm)-1:
+                        per = dih.n
+                    else:
+                        per = -dih.n  # All terms of the same dihedral except the last one should be negative. http://ambermd.org/formats.html#frcmod
                     print("%2s-%2s-%2s-%2s 1 %12.6f %12.6f %12.6f %12.6f %12.6f" %
-                          (atom_type_map[i.types[0]], atom_type_map[i.types[1]], atom_type_map[i.types[2]], atom_type_map[i.types[3]], p.k0, p.phi0, p.n, scee, scnb),
+                          (atom_type_map[i.types[0]], atom_type_map[i.types[1]], atom_type_map[i.types[2]], atom_type_map[i.types[3]], dih.k0, dih.phi0, per, scee, scnb),
                           file=f)
 
         print("\nIMPR", file=f)

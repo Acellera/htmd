@@ -174,6 +174,7 @@ class Acemd3(ProtocolInterface):
         self._arg('minimize', 'int', 'The number of energy minimization steps to perform before commencing dynamics.', None, val.Number(int, '0POS'))
         self._arg('run', 'str', 'The length of simulation ro run. May be specified as a number of steps or as a time if one of the suffices "us", "ns", "ps", "fs" is used.', None, val.String())
         self._arg('celldimension', 'str', 'The dimensions of the unit cell in Angstrom. Note that the unit cell must be cuboid. Overrides any dimension given in the "coordinates" PDB.', None, val.String())
+        self._arg('implicit', 'str', 'Set to True to enable implicit solvent simulations in AMBER.', None, val.String())
 
         # Files
         self._arg('bincoordinates', 'str', 'Optional initial system geometry in NAMD BINCOOR format. If specified, overrides "coordinates"', None, val.String())
