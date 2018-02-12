@@ -55,7 +55,7 @@ def prmToParmed(mol, myrtf, myprm):
         nb = myprm.nbParam(at)
         atomicnum = elements.__dict__[myrtf.element_by_type[at]].number
         atom_type = AtomType(at, None, myrtf.mass_by_type[at], atomicnum)
-        atom_type.set_lj_params(nb.emin, nb.rmin, nb.emin_14, nb.rmin_14)
+        atom_type.set_lj_params(nb.emin, nb.rmin / 2, nb.emin_14, nb.rmin_14 / 2)
         params.atom_types[at] = atom_type
 
     # from IPython.core.debugger import set_trace
