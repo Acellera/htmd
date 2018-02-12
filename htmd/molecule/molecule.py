@@ -13,7 +13,6 @@ from copy import deepcopy
 from os import path
 import logging
 import os
-from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -682,30 +681,6 @@ class Molecule:
 
         s = self.atomselect(sel)
         self.coords[s, :, self.frame] += vector
-
-    @_Deprecated('1.3.2', 'htmd.molecule.molecule.Molecule.rotateBy')
-    def rotate(self, axis, angle, center=(0, 0, 0), sel=None):
-        """
-        Rotate atoms around an axis for a given angle in radians.
-
-        Parameters
-        ----------
-        axis : 3dim vector
-            Axis of rotation
-        angle : float
-            Angle of rotation in radians
-        center : list
-            The rotation center
-        sel :
-            Atomselection for atoms to rotate
-
-        Examples
-        --------
-        >>> mol=tryp.copy()
-        >>> mol.rotate([0, 1, 0], 1.57)
-        """
-        M = rotationMatrix(axis, angle)
-        self.rotateBy(M, center=center, sel=sel)
 
     def rotateBy(self, M, center=(0, 0, 0), sel='all'):
         """ Rotate a selection of atoms by a given rotation around a center

@@ -14,7 +14,6 @@ from htmd.projections.projection import Projection
 from joblib import Parallel, delayed
 from htmd.parallelprogress import ParallelExecutor
 import logging
-from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
@@ -61,10 +60,6 @@ class Metric:
         self.skip = skip
         self.projectionlist = []
         self.metricdata = metricdata
-
-    @_Deprecated('1.3.2', 'htmd.projections.metric.Metric.set')
-    def projection(self, metric):
-        self.projectionlist.append(metric)
 
     def set(self, projection):
         """ Sets the projection to be applied to the simulations.
