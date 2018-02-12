@@ -14,19 +14,57 @@ def _formatEnergies(energies):
 
 
 class FFEvaluate:
-    def __init__(self, mol, prm, betweensets=None, dist_thresh=0):
+    def __init__(self, mol, prm=None, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, fromstruct=False):
+        from htmd.parameterization.ffmolecule import FFMolecule
+        from htmd.molecule.molecule import Molecule
+        if isinstance(mol, FFMolecule):
+            # from IPython.core.debugger import set_trace
+            # set_trace()
+            tmpmol = mol.copy()
+            import parmed
+            from htmd.util import tempname
+            import os
+
+            frcmod = tempname(suffix='.frcmod')
+            typemap = tmpmol._prm.writeFrcmod(mol._rtf, frcmod)
+            prm = parmed.load_file(frcmod)
+            os.remove(frcmod)
+
+            dihtemp = tmpmol.dihedrals.copy()
+            angtemp = tmpmol.angles.copy()
+
+            mol2f = tempname(suffix='.mol2')
+            tmpmol.write(mol2f, typemap=typemap)
+            mol = Molecule(mol2f)
+            os.remove(mol2f)
+
+            mol.dihedrals = dihtemp
+            mol.angles = angtemp
+        elif prm is None:
+            raise RuntimeError('You need to either provide a FFMolecule object or a Molecule and parmed parameter object.')
+
+        # from IPython.core.debugger import set_trace
+        # set_trace()
         mol = mol.copy()
         setA, setB = calculateSets(mol, betweensets)
 
-        args = list(init(mol, prm))
+        args = list(init(mol, prm, fromstruct))
         args.append(setA)
         args.append(setB)
-        args.append(dist_thresh)
-
+        args.append(cutoff)
+        args.append(rfa)
+        args.append(solventDielectric)
         self._args = args
 
-    def run(self, coords, box):
-        energies, forces, atmnrg = _ffevaluate(coords, box, *self._args)
+    def run(self, coords, box=None):
+        if coords.ndim == 2:
+            coords = coords[:, :, np.newaxis].copy()
+
+        if box is None:
+            box = np.zeros((3, coords.shape[2]), dtype=np.float32)
+        # from IPython.core.debugger import set_trace
+        # set_trace()
+        energies, forces, atmnrg = _ffevaluate(coords, box.astype(np.float32), *self._args)
         return _formatEnergies(energies[:, 0].squeeze())
 
 

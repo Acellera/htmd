@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 from htmd.numbautil import dihedralAngle
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 
 logger = logging.getLogger(__name__)
 

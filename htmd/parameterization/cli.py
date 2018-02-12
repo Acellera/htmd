@@ -18,7 +18,7 @@ from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.qm import Psi4, Gaussian, FakeQM2
 from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.parameterization.fftype import FFTypeMethod
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 
 logger = logging.getLogger(__name__)
 

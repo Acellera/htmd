@@ -19,7 +19,7 @@ from simtk.openmm import app
 
 from htmd.numbautil import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 
 logger = logging.getLogger(__name__)
 
@@ -325,6 +325,23 @@ class FakeQM2(FakeQM):
 
 
 if __name__ == '__main__':
+    import os
+    import numpy as np
+    from tempfile import TemporaryDirectory
+    from htmd.home import home
+    from htmd.numbautil import dihedralAngle
+    from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    from htmd.qm.fake import FakeQM
+
+    molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
+    mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+
+    with TemporaryDirectory() as tmpDir:
+        qm = FakeQM()
+        qm.molecule = mol
+        qm.esp_points = np.array([[1., 1., 1.]])
+        qm.directory = tmpDir
+        result = qm.run()[0]
 
     import sys
     import doctest

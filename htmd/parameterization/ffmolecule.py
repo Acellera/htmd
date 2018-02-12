@@ -18,7 +18,7 @@ from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
 from htmd.parameterization.dihedral import DihedralFitting
 from htmd.qm import Psi4, FakeQM2
