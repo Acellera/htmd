@@ -46,7 +46,7 @@ class FFEvaluate:
             box = np.zeros((3, coords.shape[2]), dtype=np.float32)
         # from IPython.core.debugger import set_trace
         # set_trace()
-        energies, forces, atmnrg = _ffevaluate(coords, box.astype(np.float32), *self._args)
+        energies, forces, atmnrg = _ffevaluate(coords.astype(np.float32), box.astype(np.float32), *self._args)
         return _formatEnergies(energies[:, 0].squeeze())
 
 
