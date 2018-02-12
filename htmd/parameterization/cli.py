@@ -71,14 +71,12 @@ def getArgumentParser():
 
 
 def printEnergies(molecule, filename):
-    from htmd.parameterization.ffevaluate import FFEvaluate as FFEvaluate1
     from htmd.ffevaluation.ffevaluate import FFEvaluate
     assert molecule.numFrames == 1
-    energies1 = FFEvaluate1(molecule).run(molecule.coords[:, :, 0])
     energies = FFEvaluate(molecule).run(molecule.coords[:, :, 0])
 
     string = '''
-== Diagnostic Energies {test}==
+== Diagnostic Energies ==
 
 Bond     : {BOND_ENERGY}
 Angle    : {ANGLE_ENERGY}
@@ -87,24 +85,7 @@ Improper : {IMPROPER_ENERGY}
 Electro  : {ELEC_ENERGY}
 VdW      : {VDW_ENERGY}
 
-'''.format(test=1,BOND_ENERGY=energies1['bond'],
-           ANGLE_ENERGY=energies1['angle'],
-           DIHEDRAL_ENERGY=energies1['dihedral'],
-           IMPROPER_ENERGY=energies1['improper'],
-           ELEC_ENERGY=energies1['elec'],
-           VDW_ENERGY=energies1['vdw'])
-
-    string += '''
-== Diagnostic Energies {test}==
-
-Bond     : {BOND_ENERGY}
-Angle    : {ANGLE_ENERGY}
-Dihedral : {DIHEDRAL_ENERGY}
-Improper : {IMPROPER_ENERGY}
-Electro  : {ELEC_ENERGY}
-VdW      : {VDW_ENERGY}
-
-'''.format(test=2, BOND_ENERGY=energies['bond'],
+'''.format(BOND_ENERGY=energies['bond'],
            ANGLE_ENERGY=energies['angle'],
            DIHEDRAL_ENERGY=energies['dihedral'],
            IMPROPER_ENERGY=energies['improper'],
