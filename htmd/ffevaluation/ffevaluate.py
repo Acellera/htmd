@@ -1,10 +1,9 @@
-from numba import jit, prange
-import numpy as np
-from math import sqrt, acos, radians, cos, sin, pi
-from scipy import constants as const
-from htmd.ffevaluation.util import dihedralAngle, wrapBondedDistance, wrapDistance, cross, dot
 import logging
-from IPython.core.debugger import set_trace
+from math import sqrt, acos, radians, cos, sin, pi
+import numpy as np
+from htmd.numbautil import dihedralAngleFull, wrapBondedDistance, wrapDistance, cross, dot
+from numba import jit
+from scipy import constants as const
 
 logger = logging.getLogger(__name__)
 
@@ -603,7 +602,7 @@ def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
             break
     pot = 0
     force = np.zeros((4, 3), dtype=np.float64)
-    phi, r12, r23, r34, A, B, C, rA, rB, rC, sin_phi, cos_phi = dihedralAngle(pos, box)
+    phi, r12, r23, r34, A, B, C, rA, rB, rC, sin_phi, cos_phi = dihedralAngleFull(pos, box)
     # phi = dihedralAngle(pos, box)
     coef = 0
 

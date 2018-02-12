@@ -13,7 +13,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-from htmd.molecule.util import dihedralAngle
+from htmd.numbautil import dihedralAngle
 from htmd.parameterization.ffevaluate import FFEvaluate
 
 logger = logging.getLogger(__name__)
@@ -185,7 +185,7 @@ class DihedralFitting:
         for rotamer_coords, equivalent_indices in zip(self._coords, self._equivalent_indices):
             angle_values = []
             for coords in rotamer_coords:
-                angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
+                angle_values.append([np.rad2deg(dihedralAngle(coords[indices, :, 0])) for indices in equivalent_indices])
             self._angle_values.append(np.array(angle_values))
         self._angle_values_rad = [np.deg2rad(angle_values)[:, :, None] for angle_values in self._angle_values]
 
