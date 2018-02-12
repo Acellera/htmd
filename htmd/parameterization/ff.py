@@ -63,7 +63,7 @@ def prmToParmed(mol, myrtf, myprm):
     for b in mol.bonds:
         at = tuple(mol.atomtype[b])
         bond = myprm.bondParam(*at)
-        bt = BondType(bond.r0, bond.k0)
+        bt = BondType(bond.k0, bond.r0)
         if at in params.bond_types and bt != params.bond_types[at]:
             raise RuntimeError('Already defined bond type with different parameters')
         params.bond_types[at] = bt
