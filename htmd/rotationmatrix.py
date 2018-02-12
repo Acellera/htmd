@@ -6,7 +6,6 @@
 import numpy as np
 from math import cos, sqrt, sin
 import logging
-from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
@@ -53,11 +52,6 @@ def rotationMatrix(axis, theta):
     return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
                      [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
-
-
-@_Deprecated('1.0.13', 'htmd.rotationmatrix.rotationMatrix')
-def rotationmatrix(axis, theta):
-    return rotationMatrix(axis, theta)
 
 
 if __name__ == '__main__':
