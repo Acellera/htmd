@@ -18,7 +18,7 @@ from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.qm import Psi4, Gaussian, FakeQM2
 from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.parameterization.fftype import FFTypeMethod
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def getArgumentParser():
 
 
 def printEnergies(molecule, filename):
-
+    from htmd.ffevaluation.ffevaluate import FFEvaluate
     assert molecule.numFrames == 1
     energies = FFEvaluate(molecule).run(molecule.coords[:, :, 0])
 
