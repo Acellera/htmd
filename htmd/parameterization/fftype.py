@@ -9,7 +9,13 @@ import subprocess
 import os
 from tempfile import TemporaryDirectory
 from htmd.parameterization.ff import RTF, PRM, AmberRTF, AmberPRM
+from htmd.parameterization.readers import readPREPI, readRTF
 from enum import Enum
+import numpy as np
+import parmed
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FFTypeMethod(Enum):
@@ -19,6 +25,126 @@ class FFTypeMethod(Enum):
     CGenFF_2b6 = 1000
     GAFF = 1001
     GAFF2 = 1002
+
+
+# def addParmedResidue(prm, names, elements, atomtypes, charges, impropers):
+#     from parmed.modeller.residue import ResidueTemplate
+#     from parmed.topologyobjects import Atom
+#     import periodictable
+#
+#     class ResidueTemplateExt(ResidueTemplate):
+#         def __init__(self):
+#             super().__init__()
+#             self.impropers = None
+#
+#     restemp = ResidueTemplateExt()
+#     restemp.name = 'MOL'
+#     restemp.impropers = impropers
+#     for i in range(len(elements)):
+#         atomicnum = periodictable.elements.__dict__[elements[i]].number
+#         atom = Atom(name=names[i], type=atomtypes[i], number=i, charge=charges[i], atomic_number=atomicnum)
+#         restemp.add_atom(atom)
+#     prm.residues['MOL'] = restemp
+
+
+def fftype(mol, rtfFile=None, prmFile=None, method=FFTypeMethod.CGenFF_2b6, acCharges=None, tmpDir=None, netcharge=None):
+    if netcharge is None:
+        netcharge = np.sum(mol.charge)
+    netcharge = int(round(netcharge))
+
+    if rtfFile and prmFile:
+        logger.info('Reading FF parameters from {} and {}'.format(rtfFile, prmFile))
+        prm = parmed.charmm.CharmmParameterSet(rtfFile, prmFile)
+        names, elements, atomtypes, charges, masses, impropers = readRTF(rtfFile)
+        # addParmedResidue(prm, names, elements, atomtypes, charges, impropers)
+    else:
+        logger.info('Assigned atom types with {}'.format(method.name))
+        # Find the executables
+        if method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2:
+            antechamber_binary = shutil.which("antechamber")
+            if not antechamber_binary:
+                raise RuntimeError("antechamber executable not found")
+            parmchk2_binary = shutil.which("parmchk2")
+            if not parmchk2_binary:
+                raise RuntimeError("parmchk2 executable not found")
+        elif method == FFTypeMethod.CGenFF_2b6:
+            match_binary = shutil.which("match-typer")
+            if not match_binary:
+                raise RuntimeError("match-typer executable not found")
+        else:
+            raise ValueError('method')
+
+        # Create a temporary directory
+        with TemporaryDirectory() as tmpdir:
+            # HACK to keep the files
+            tmpdir = tmpdir if tmpDir is None else tmpDir
+
+            if method == FFTypeMethod.GAFF or method == FFTypeMethod.GAFF2:
+                # Write the molecule to a file
+                mol.write(os.path.join(tmpdir, 'mol.mol2'))
+
+                # Run antechamber
+                if method == FFTypeMethod.GAFF:
+                    atomtype = "gaff"
+                elif method == FFTypeMethod.GAFF2:
+                    atomtype = "gaff2"
+                else:
+                    raise ValueError('method')
+                cmd = [antechamber_binary,
+                       '-at', atomtype,
+                       '-nc', str(netcharge),
+                       '-fi', 'mol2',
+                       '-i', 'mol.mol2',
+                       '-fo', 'prepi',
+                       '-o', 'mol.prepi']
+                if acCharges is not None:
+                    cmd += ['-c', acCharges]
+                returncode = subprocess.call(cmd, cwd=tmpdir)
+                if returncode != 0:
+                    raise RuntimeError('"antechamber" failed')
+
+                # Run parmchk2
+                returncode = subprocess.call([parmchk2_binary,
+                                              '-f', 'prepi',
+                                              '-i', 'mol.prepi',
+                                              '-o', 'mol.frcmod',
+                                              '-a', 'Y'], cwd=tmpdir)
+                if returncode != 0:
+                    raise RuntimeError('"parmchk2" failed')
+
+                # Read the results
+                prm = parmed.amber.AmberParameterSet(os.path.join(tmpdir, 'mol.frcmod'))
+                names, elements, atomtypes, charges, masses, impropers = readPREPI(mol, os.path.join(tmpdir, 'mol.prepi'))
+                # addParmedResidue(prm, names, elements, atomtypes, charges, impropers)
+            elif method == FFTypeMethod.CGenFF_2b6:
+
+                # Write the molecule to a file
+                mol.write(os.path.join(tmpdir, 'mol.pdb'))
+
+                # Run match-type
+                returncode = subprocess.call([match_binary,
+                                              '-charge', str(netcharge),
+                                              '-forcefield', 'top_all36_cgenff_new',
+                                              'mol.pdb'], cwd=tmpdir)
+                if returncode != 0:
+                    raise RuntimeError('"match-typer" failed')
+
+                prm = parmed.charmm.CharmmParameterSet(os.path.join(tmpdir, 'mol.rtf'), os.path.join(tmpdir, 'mol.prm'))
+                names, elements, atomtypes, charges, masses, impropers = readRTF(os.path.join(tmpdir, 'mol.rtf'))
+                # addParmedResidue(prm, names, elements, atomtypes, charges, impropers)
+            else:
+                raise ValueError('Invalide method {}'.format(method))
+
+    # Substituting values from the read-in topology
+    mol.name = names
+    mol.element = elements
+    mol.atomtype = atomtypes
+    mol.charge = charges
+    mol.impropers = impropers
+    if len(mol.masses) == 0:
+        mol.masses = masses
+
+    return prm, mol
 
 
 class FFType:
