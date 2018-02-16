@@ -201,16 +201,40 @@ class ESP:
 
         self._reciprocal_distances = None
 
+        self._equivalent_atom_groups = None
+        self._equivalent_group_by_atom = None
+        self._netcharge = None
+
+    @property
+    def equivalent_atom_groups(self):
+        if self._equivalent_atom_groups is not None:
+            return self._equivalent_atom_groups
+        else:
+            return self.molecule._equivalent_atom_groups
+
+    @property
+    def equivalent_group_by_atom(self):
+        if self._equivalent_group_by_atom is not None:
+            return self._equivalent_group_by_atom
+        else:
+            return self.molecule._equivalent_group_by_atom
+
+    @property
+    def netcharge(self):
+        if self._netcharge is not None:
+            return self._netcharge
+        else:
+            return self.molecule.netcharge
+
     @property
     def ngroups(self):
         """Number of charge groups"""
-
-        return len(self.molecule._equivalent_atom_groups)
+        return len(self.equivalent_atom_groups)
 
     def _map_groups_to_atoms(self, group_charges):
 
         charges = np.zeros(self.molecule.numAtoms)
-        for atom_group, group_charge in zip(self.molecule._equivalent_atom_groups, group_charges):
+        for atom_group, group_charge in zip(self.equivalent_atom_groups, group_charges):
             charges[atom_group] = group_charge
 
         return charges
@@ -218,7 +242,7 @@ class ESP:
     def _compute_constraint(self, group_charges, _):
 
         charges = self._map_groups_to_atoms(group_charges)
-        constraint = np.sum(charges) - self.molecule.netcharge
+        constraint = np.sum(charges) - self.netcharge
 
         return constraint
 
@@ -230,14 +254,14 @@ class ESP:
 
         # If the restraint relates to an H, set the lower bound to 0
         for i in range(self.ngroups):
-            if 'H' == self.molecule.element[self.molecule._equivalent_atom_groups[i][0]]:
+            if 'H' == self.molecule.element[self.equivalent_atom_groups[i][0]]:
                 lower_bounds[i] = 0.001
 
         # Fix the charges of the specified atoms to those already set in the
         # charge array. Note this also fixes the charges of the atoms in the
         # same equivalency group.
         for atom in self.fixed:
-            group = self.molecule._equivalent_group_by_atom[atom]
+            group = self.equivalent_group_by_atom[atom]
             lower_bounds[group] = self.molecule.charge[atom]
             upper_bounds[group] = self.molecule.charge[atom]
 

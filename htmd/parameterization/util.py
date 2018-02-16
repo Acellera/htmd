@@ -223,7 +223,7 @@ def minimize(mol, qm, outdir):
     return mol
 
 
-def fitCharges(mol, qm, outdir, fixed=()):
+def fitCharges(mol, qm, equivalents, outdir, fixed=()):
     from htmd.parameterization.esp import ESP
 
     # Create an ESP directory
@@ -258,6 +258,8 @@ def fitCharges(mol, qm, outdir, fixed=()):
     esp.molecule = mol
     esp.qm_results = qm_results
     esp.fixed = fixed
+    esp._equivalent_atom_groups = equivalents[0]
+    esp._equivalent_group_by_atom = equivalents[2]
     esp_result = esp.run()
     esp_charges, esp_loss = esp_result['charges'], esp_result['loss']
 
@@ -271,7 +273,7 @@ def fitCharges(mol, qm, outdir, fixed=()):
     return mol, esp_loss, esp_charges, qm_results[0].dipole
 
 
-def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, geomopt=True):
+def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, equivalents, outdir, geomopt=True):
     """
     Dihedrals passed as 4 atom indices
     """
@@ -327,6 +329,10 @@ def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, geomopt=True):
 
     # Fit the dihedral parameters
     df = DihedralFitting()
+    df.parmedMode = True
+    df._prm = prm
+    df._equivalent_group_by_atom = equivalents[2]
+    df._rotatable_dihedrals = all_dihedrals
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
@@ -344,3 +350,8 @@ def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, geomopt=True):
 
     # # Update atom types
     # self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
+
+def updateDihedral(prm, newparams):
+    for p in newparams:
+        prm.dihedral_types[p.types].phi_k = p.k0
+        prm.dihedral_types[p.types].phase = p.phi0

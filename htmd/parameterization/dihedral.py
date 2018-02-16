@@ -15,6 +15,7 @@ from sklearn.linear_model import LinearRegression
 
 from htmd.numbautil import dihedralAngle
 from htmd.ffevaluation.ffevaluate import FFEvaluate
+from htmd.parameterization.util import updateDihedral
 
 logger = logging.getLogger(__name__)
 
@@ -71,31 +72,81 @@ class DihedralFitting:
         self._all_target_energies = None
         self._angle_values_rad = None
 
+        self.parmedMode = False
+        self._prm = None
+        self._equivalent_group_by_atom = None
+        self._rotatable_dihedrals = None
+
     @property
     def numDihedrals(self):
         """Number of dihedral angles"""
-
         return len(self.dihedrals)
+
+    @property
+    def type_by_index(self):
+        if self.parmedMode:
+            return self.molecule.atomtype
+        else:
+            return self.molecule._rtf.type_by_index
+
+    def updateDihedral(self, parameters):
+        if self.parmedMode:
+            updateDihedral(self._prm, parameters)
+        else:
+            self.molecule._prm.updateDihedral(parameters)
+
+    def getParameters(self):
+        all_types = [tuple([self.type_by_index[index] for index in dihedral]) for dihedral in self.dihedrals]
+        if self.parmedMode:
+            class Crap:
+                def __init__(self, types, n, k0, phi0):
+                    self.types = types
+                    self.n = n
+                    self.k0 = k0
+                    self.phi0 = phi0
+            tmp = []
+            for types in all_types:
+                val = self._prm.dihedral_types[types]
+                tmp.append(Crap(types, val.phi_k, val.per, val.phase))
+            return sum(tmp, [])
+        else:
+            return sum([self.molecule._prm.dihedralParam(*types) for types in all_types], [])
+
+
+    @property
+    def equivalent_group_by_atom(self):
+        if self._equivalent_group_by_atom is not None:
+            return self._equivalent_group_by_atom
+        else:
+            return self.molecule._equivalent_group_by_atom
+
+    @property
+    def rotatable_dihedrals(self):
+        if self.parmedMode:
+            return self._rotatable_dihedrals
+        else:
+            return self.molecule._rotatable_dihedrals
+
 
     def _getEquivalentDihedrals(self, dihedral):
         """
-        Find equivalent dihedral angles to the specificied one.
+        Find equivalent dihedral angles to the specified one.
         """
         #TODO maybe this should be moved to FFMolecule
 
-        types = [self.molecule._rtf.type_by_index[index] for index in dihedral]
+        types = [self.type_by_index[index] for index in dihedral]
 
         all_dihedrals = []
         for dihedral_indices in self.molecule.dihedrals:
-            dihedral_types = [self.molecule._rtf.type_by_index[index] for index in dihedral_indices]
+            dihedral_types = [self.type_by_index[index] for index in dihedral_indices]
             if types == dihedral_types or types == dihedral_types[::-1]:
                 all_dihedrals.append(dihedral_indices)
 
         # Now for each of the uses, remove any which are equivalent
         unique_dihedrals = [dihedral]
-        groups = [self.molecule._equivalent_group_by_atom[index] for index in dihedral]
+        groups = [self.equivalent_group_by_atom[index] for index in dihedral]
         for dihed in all_dihedrals:
-            dihedral_groups = [self.molecule._equivalent_group_by_atom[index] for index in dihed]
+            dihedral_groups = [self.equivalent_group_by_atom[index] for index in dihed]
             if groups != dihedral_groups and groups != dihedral_groups[::-1]:
                 unique_dihedrals.append(dihed)
 
@@ -159,7 +210,7 @@ class DihedralFitting:
         # Get equivalent dihedral atom indices
         self._equivalent_indices = []
         for idihed, dihedral in enumerate(self.dihedrals):
-            for rotatableDihedral in self.molecule._rotatable_dihedrals:
+            for rotatableDihedral in self.rotatable_dihedrals:
                 if np.all(rotatableDihedral.atoms == dihedral):
                     self._equivalent_indices.append([dihedral] + rotatableDihedral.equivalents)
                     break
@@ -167,10 +218,11 @@ class DihedralFitting:
                 raise ValueError('%s is not recognized as a rotable dihedral\n' % self._names[idihed])
 
         # Get dihedral parameters
-        for dihedral in self.dihedrals:
-            self._makeDihedralUnique(dihedral)
-        all_types = [tuple([self.molecule._rtf.type_by_index[index] for index in dihedral]) for dihedral in self.dihedrals]
-        self.parameters = sum([self.molecule._prm.dihedralParam(*types) for types in all_types], [])
+        if not self.parmedMode:
+            for dihedral in self.dihedrals:
+                self._makeDihedralUnique(dihedral)
+        all_types = [tuple([self.type_by_index[index] for index in dihedral]) for dihedral in self.dihedrals]
+        self.parameters = self.getParameters()
 
         # Get reference QM energies and rotamer coordinates
         self._valid_qm_results = self._getValidQMResults()
@@ -240,7 +292,6 @@ class DihedralFitting:
         """
         Convert the parameter objects to a vector.
         """
-
         assert [param.n for param in params] == list(range(1, self.MAX_DIHEDRAL_MULTIPLICITY+1)) * self.numDihedrals
 
         vector = [param.k0 for param in params] + [param.phi0 for param in params] + [0] * self.numDihedrals
@@ -347,7 +398,7 @@ class DihedralFitting:
         # the QM potential and this modified MM potential
         for param in self.parameters:
             param.k0 = 0
-        self.molecule._prm.updateDihedral(self.parameters)
+        self.updateDihedral(self.parameters)
 
         # Now evaluate the FF without the dihedral being fitted
         self._target_energies = []
@@ -367,7 +418,7 @@ class DihedralFitting:
 
         # Update the target dihedral with the optimized parameters
         self.parameters = self._vectorToParams(vector, self.parameters)
-        self.molecule._prm.updateDihedral(self.parameters)
+        self.updateDihedral(self.parameters)
 
         return self.loss
 
@@ -477,22 +528,22 @@ class TestDihedralFitting(unittest.TestCase):
 
         molFile = os.path.join(home('test-param'), 'glycol.mol2')
         self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
+        types = [self.df.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
         self.assertListEqual(types, ['oh', 'c3', 'c3', 'oh', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
 
         self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
         self.df._makeDihedralUnique([0, 1, 2, 3])
-        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
+        types = [self.df.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
         self.assertListEqual(types, ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
 
         self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
         self.df._makeDihedralUnique([4, 0, 1, 2])
-        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
+        types = [self.df.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
         self.assertListEqual(types, ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'hox0', 'h1', 'h1', 'h1', 'h1', 'hox0'])
 
         self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
         self.df._makeDihedralUnique([5, 1, 2, 7])
-        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
+        types = [self.df.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
         self.assertListEqual(types, ['oh', 'c3x0', 'c3x0', 'oh', 'ho', 'h1x0', 'h1x0', 'h1x0', 'h1x0', 'ho'])
 
     def test_getValidQMResults(self):

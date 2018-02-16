@@ -156,16 +156,11 @@ def main_parameterize(arguments=None):
         qm = FakeQM2()
         logger.warning('Using FakeQM')
 
-    # Set up the QM object
-    qm.theory = args.theory
-    qm.basis = args.basis
-    qm.solvent = args.environment
-    qm.queue = queue
-
     # Get rotatable dihedral angles
     mol = Molecule(args.filename)
     mol = canonicalizeAtomNames(mol)
     mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    netcharge = args.charge if args.charge is not None else int(round(np.sum(mol.charge)))
 
     if args.list:
         print('\n === Parameterizable dihedral angles of {} ===\n'.format(args.filename))
@@ -175,6 +170,13 @@ def main_parameterize(arguments=None):
                 fh.write(dihname+'\n')
         print()
         sys.exit(0)
+
+    # Set up the QM object
+    qm.theory = args.theory
+    qm.basis = args.basis
+    qm.solvent = args.environment
+    qm.queue = queue
+    qm.netcharge = netcharge
 
     # Select which dihedrals to fit
     fit_dihedrals = [all_dihedrals[dih].atoms for dih in all_dihedrals]
