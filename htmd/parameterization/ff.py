@@ -45,6 +45,85 @@ class NBPrm:
         self.rmin_14 = rmin_14
 
 
+def prmToParmed(mol, myrtf, myprm):
+    from parmed.parameters import ParameterSet
+    from parmed.topologyobjects import AtomType, BondType, AngleType, DihedralType, ImproperType, NoUreyBradley, DihedralTypeList
+    from periodictable import elements
+
+    def getType(idx):
+        types = []
+        for i in idx:
+            types.append(myrtf.type_by_index[i])
+        return tuple(types)
+
+    params = ParameterSet()
+    for at in myrtf.types:
+        nb = myprm.nbParam(at)
+        atomicnum = elements.__dict__[myrtf.element_by_type[at]].number
+        atom_type = AtomType(at, None, myrtf.mass_by_type[at], atomicnum)
+        rmin14 = nb.rmin_14 if nb.rmin_14 is not None else nb.rmin
+        emin14 = nb.emin_14 if nb.emin_14 is not None else nb.emin
+        atom_type.set_lj_params(nb.emin, nb.rmin / 2, emin14, rmin14 / 2) # /2 because parmed stored rmin / 2
+        params.atom_types[at] = atom_type
+
+    # from IPython.core.debugger import set_trace
+    # set_trace()
+    for b in mol.bonds:
+        # at = tuple(mol.atomtype[b])
+        at = getType(b)
+        bond = myprm.bondParam(*at)
+        bt = BondType(bond.k0, bond.r0)
+        if at in params.bond_types and bt != params.bond_types[at]:
+            raise RuntimeError('Already defined bond type with different parameters')
+        params.bond_types[at] = bt
+        params.bond_types[tuple(reversed(at))] = bt
+
+    for a in mol.angles:
+        # at = tuple(mol.atomtype[a])
+        at = getType(a)
+        angle = myprm.angleParam(*at)
+        angt = AngleType(angle.k0, angle.theta0)
+        if at in params.angle_types and angt != params.angle_types[at]:
+            raise RuntimeError('Already defined angle type with different parameters')
+        params.angle_types[at] = angt
+        params.angle_types[tuple(reversed(at))] = angt
+        params.urey_bradley_types[at] = NoUreyBradley
+        params.urey_bradley_types[tuple(reversed(at))] = NoUreyBradley
+
+    for d in mol.dihedrals:
+        # at = tuple(mol.atomtype[d])
+        at = getType(d)
+        dihedral = myprm.dihedralParam(*at)
+        dihlist = DihedralTypeList()
+        for dih in dihedral:
+            dihtype = DihedralType(dih.k0, dih.n, dih.phi0, 1 / dih.e14)
+            dihlist.append(dihtype)
+        if at in params.dihedral_types and dihlist != params.dihedral_types[at]:
+            raise RuntimeError('Already defined dihedral type with different parameters')
+        params.dihedral_types[at] = dihlist
+        params.dihedral_types[tuple(reversed(at))] = dihlist
+
+    for i in mol.impropers:
+        # at = tuple(mol.atomtype[i])
+        at = getType(i)
+        improper = myprm.improperParam(*at)
+        assert len(improper) == 1
+        improper = improper[0]
+        if improper.n > 0:
+            imptype = DihedralType(improper.k0, improper.n, improper.phi0, 1 / improper.e14)
+            if at in params.improper_periodic_types and imptype != params.improper_periodic_types[at]:
+                raise RuntimeError('Already defined periodic improper type with different parameters')
+            params.improper_periodic_types[at] = imptype
+        else:
+            imptype = ImproperType(improper.k0, improper.phi0)
+            if at in params.improper_types and imptype != params.improper_types[at]:
+                raise RuntimeError('Already defined improper type with different parameters')
+            params.improper_types[at] = imptype
+
+    return params
+
+
+
 class PRM:
     def __init__(self, filename):
         f = open(filename, "r")
@@ -242,6 +321,23 @@ class PRM:
         f.close()
 
         return atom_type_map
+
+    def nbParam(self, n):
+        p = None
+        for b in self.nonbonded:
+            if b.types[0] == n:
+                p = b
+
+        if (not p) and ("x" in n):
+            xn1 = re.sub("x[0123456789]$", "", n)
+            for b in self.nonbonded:
+                if b.types[0] == xn1:
+                    p = b
+
+        if not p:
+            raise ValueError("Could not find nb parameters for %s" % (p))
+
+        return p
 
     def vdwParam(self, n1, n2, s14):
         p1 = None

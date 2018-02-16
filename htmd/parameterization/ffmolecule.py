@@ -18,7 +18,7 @@ from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
 from htmd.parameterization.detectequivalents import detectEquivalents
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
 from htmd.parameterization.dihedral import DihedralFitting
 from htmd.qm import Psi4, FakeQM2
@@ -92,7 +92,9 @@ class FFMolecule(Molecule):
         if hasattr(self, '_rtf'):
             self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
             self.charge[:] = [self._rtf.charge_by_name[name] for name in self.name]
-            self.impropers = np.array(self._rtf.impropers)
+            self.impropers = np.array(self._rtf.impropers).astype(np.uint32)
+            if self.impropers.ndim == 1:
+                self.impropers = self.impropers[:, np.newaxis]
 
             # Check if atom type names are compatible
             for type_ in self._rtf.types:
