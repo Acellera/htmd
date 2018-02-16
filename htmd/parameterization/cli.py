@@ -17,8 +17,12 @@ from htmd.queues.pbsqueue import PBSQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.qm import Psi4, Gaussian, FakeQM2
 from htmd.parameterization.ffmolecule import FFMolecule
-from htmd.parameterization.fftype import FFTypeMethod
-from htmd.ffevaluation.ffevaluate import FFEvaluate
+from htmd.parameterization.fftype import FFTypeMethod, fftype
+from htmd.molecule.molecule import Molecule
+from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, inventNewDihedralTypes, \
+    minimize, getFixedChargeAtomIndices, fitCharges, fitDihedrals
+from parmed.parameters import ParameterSet
+import parmed
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +112,9 @@ def main_parameterize(arguments=None):
     methods = [method_map[method] for method in args.forcefield]  # TODO: move into FFMolecule
 
     # Get RTF and PRM file names
-    rtf, prm = None, None
+    rtfFile, prmFile = None, None
     if args.rtf_prm:
-        rtf, prm = args.rtf_prm
+        rtfFile, prmFile = args.rtf_prm
 
     # Create a queue for QM
     if args.queue == 'local':
@@ -158,19 +162,28 @@ def main_parameterize(arguments=None):
     qm.solvent = args.environment
     qm.queue = queue
 
-    # List rotatable dihedral angles
-    if args.list:
+    # Get rotatable dihedral angles
+    mol = Molecule(args.filename)
+    mol = canonicalizeAtomNames(mol)
+    mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
-        mol = FFMolecule(args.filename, method=methods[0], netcharge=args.charge, rtf=rtf, prm=prm, qm=qm,
-                         outdir=args.outdir)
-        print('\n === Parameterizable dihedral angles of %s ===\n' % args.filename)
+    if args.list:
+        print('\n === Parameterizable dihedral angles of {} ===\n'.format(args.filename))
         with open('torsions.txt', 'w') as fh:
-            for dihedral in mol.getRotatableDihedrals():
-                dihedral_name = '-'.join(mol.name[dihedral])
-                print('  '+dihedral_name)
-                fh.write(dihedral_name+'\n')
+            for dihname in all_dihedrals:
+                print('  {}'.format(dihname))
+                fh.write(dihname+'\n')
         print()
         sys.exit(0)
+
+    # Select which dihedrals to fit
+    fit_dihedrals = [all_dihedrals[dih].atoms for dih in all_dihedrals]
+    if len(args.dihedral) > 0:
+        fit_dihedrals = []
+        for dihedral_name in args.dihedral:
+            if dihedral_name not in all_dihedrals:
+                raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
+            fit_dihedrals.append(all_dihedrals[dihedral_name].atoms)
 
     # Print arguments
     print('\n === Arguments ===\n')
@@ -182,12 +195,14 @@ def main_parameterize(arguments=None):
         print(" === Fitting for %s ===\n" % method.name)
 
         # Create the molecule
-        mol = FFMolecule(args.filename, method=method, netcharge=args.charge, rtf=rtf, prm=prm, qm=qm,
+        molFF = FFMolecule(args.filename, method=method, netcharge=args.charge, rtf=rtfFile, prm=prmFile, qm=qm,
                          outdir=args.outdir)
-        mol.printReport()
+        molFF.printReport()
+
+        # parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
 
         # Copy the molecule to preserve initial coordinates
-        mol_orig = mol.copy()
+        mol_orig = molFF.copy()
 
         # Update B3LYP to B3LYP-D3
         # TODO: this is silent and not documented stuff
@@ -196,17 +211,23 @@ def main_parameterize(arguments=None):
 
         # Update basis sets
         # TODO: this is silent and not documented stuff
-        if mol.netcharge < 0 and qm.solvent == 'vacuum':
+        if molFF.netcharge < 0 and qm.solvent == 'vacuum':
             if qm.basis == '6-31G*':
                 qm.basis = '6-31+G*'
             if qm.basis == 'cc-pVDZ':
                 qm.basis = 'aug-cc-pVDZ'
             logger.info('Changing basis sets to %s' % qm.basis)
 
+        # # Invent new atom types for dihedral atoms
+        # for dih in fit_dihedrals:
+        #     # TODO: Should return copies of mol and parameters, instead of modifying in-place
+        #     inventNewDihedralTypes(mol, parameters, equivalents, dih)
+
         # Minimize molecule
         if args.minimize:
             print('\n == Minimizing ==\n')
-            mol.minimize()
+            molFF.minimize()
+            # mol = minimize(mol, qm, args.outdir)
 
         # Fit ESP charges
         if args.fit_charges:
@@ -217,26 +238,19 @@ def main_parameterize(arguments=None):
                 np.random.seed(args.seed)
 
             # Select the atoms with fixed charges
-            fixed_atom_indices = []
-            for fixed_atom_name in args.fix_charge:
-
-                if fixed_atom_name not in mol.name:
-                    raise ValueError('Atom %s is not found. Check --fix-charge arguments' % fixed_atom_name)
-
-                for aton_index in range(mol.numAtoms):
-                    if mol.name[aton_index] == fixed_atom_name:
-                        fixed_atom_indices.append(aton_index)
-                        logger.info('Charge of atom %s is fixed to %f' % (fixed_atom_name, mol.charge[aton_index]))
+            fixed_atom_indices = getFixedChargeAtomIndices(molFF, args.fix_charge)
 
             # Fit ESP charges
-            _, qm_dipole = mol.fitCharges(fixed=fixed_atom_indices)
+            _, qm_dipole = molFF.fitCharges(fixed=fixed_atom_indices)
+            # mol, _, esp_charges, qm_dipole = fitCharges(mol, qm, args.outdir, fixed=fixed_atom_indices)
+            # mol_orig.charge[:] = esp_charges
 
             # Copy the new charges to the original molecule
-            mol_orig.charge[:] = mol.charge
+            mol_orig.charge[:] = molFF.charge
 
             # Print dipoles
             logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
-            mm_dipole = mol.getDipole()
+            mm_dipole = molFF.getDipole()
             if np.all(np.isfinite(mm_dipole)):
                 logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
             else:
@@ -250,28 +264,17 @@ def main_parameterize(arguments=None):
             if args.seed:
                 np.random.seed(args.seed)
 
-            # Get all rotatable dihedrals
-            all_dihedrals = mol.getRotatableDihedrals()
-
-            # Choose which dihedrals to fit
-            dihedrals = []
-            all_dihedral_names = ['-'.join(mol.name[dihedral]) for dihedral in all_dihedrals]
-            for dihedral_name in args.dihedral:
-                if dihedral_name not in all_dihedral_names:
-                    raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
-                dihedrals.append(all_dihedrals[all_dihedral_names.index(dihedral_name)])
-            dihedrals = dihedrals if len(dihedrals) > 0 else all_dihedrals  # Set default to all dihedral angles
-
             # Fit the parameters
-            mol.fitDihedrals(dihedrals, args.optimize_dihedral)
+            molFF.fitDihedrals(fit_dihedrals, args.optimize_dihedral)
+            # fitDihedrals(mol, qm, method, prm, fit_dihedrals, args.outdir)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
-        mol.writeParameters(mol_orig)
+        molFF.writeParameters(mol_orig)
 
         # Write energy file
-        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.qm_method_name(), 'energies.txt')
-        printEnergies(mol, energyFile)
+        energyFile = os.path.join(molFF.outdir, 'parameters', method.name, molFF.qm_method_name(), 'energies.txt')
+        printEnergies(molFF, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
         

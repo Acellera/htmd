@@ -21,6 +21,7 @@ from htmd.parameterization.ff import RTF, PRM
 from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmd.parameterization.esp import ESP
 from htmd.parameterization.dihedral import DihedralFitting
+from htmd.parameterization.util import canonicalizeAtomNames
 from htmd.qm import Psi4, FakeQM2
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ class FFMolecule(Molecule):
             self.netcharge = int(round(netcharge))
 
         # Canonicalise the names
-        self._rename()
+        canonicalizeAtomNames(self, inplace=True)
 
         # Assign atom types, charges, and initial parameters
         self.method = method
@@ -140,62 +141,6 @@ class FFMolecule(Molecule):
             for equivalent_dihedral in dihedral.equivalents:
                 print('      ' + '-'.join(self.name[equivalent_dihedral]))
 
-    @staticmethod
-    def guessElementFromName(name):
-        '''
-        Guess element from an atom name
-
-        >>> from htmd.parameterization.ffmolecule import FFMolecule
-        >>> FFMolecule.guessElementFromName('C')
-        'C'
-        >>> FFMolecule.guessElementFromName('C1')
-        'C'
-        >>> FFMolecule.guessElementFromName('C42')
-        'C'
-        >>> FFMolecule.guessElementFromName('C7S')
-        'C'
-        >>> FFMolecule.guessElementFromName('HN1')
-        'H'
-        >>> FFMolecule.guessElementFromName('CL')
-        'Cl'
-        >>> FFMolecule.guessElementFromName('CA1')
-        'Ca'
-        '''
-
-        symbol = name.capitalize()
-
-        while symbol:
-            try:
-                element = periodictable.elements.symbol(symbol)
-            except ValueError:
-                symbol = symbol[:-1]
-            else:
-                return element.symbol
-
-        raise ValueError('Cannot guess element from atom name: {}'.format(name))
-
-
-    def _rename(self):
-        """
-        This fixes up the atom naming and reside name to be consistent.
-        NB this scheme matches what MATCH does.
-        Don't change it or the naming will be inconsistent with the RTF.
-        """
-
-        self.segid[:] = 'L'
-        logger.info('Rename segment to %s' % self.segid[0])
-        self.resname[:] = 'MOL'
-        logger.info('Rename residue to %s' % self.resname[0])
-
-        sufices = {}
-        for i in range(self.numAtoms):
-            name = self.guessElementFromName(self.name[i]).upper()
-
-            sufices[name] = sufices.get(name, 0) + 1
-            name += str(sufices[name])
-
-            logger.info('Rename atom %d: %-4s --> %-4s' % (i, self.name[i], name))
-            self.name[i] = name
 
     def qm_method_name(self):
 
@@ -293,10 +238,6 @@ class FFMolecule(Molecule):
         dipole *= 1e11*const.elementary_charge*const.speed_of_light # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
 
         return dipole
-
-    def getRotatableDihedrals(self):
-
-        return [dihedral.atoms.copy() for dihedral in self._rotatable_dihedrals]
 
     def fitDihedrals(self, dihedrals, geomopt=True):
         """
