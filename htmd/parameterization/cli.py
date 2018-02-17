@@ -20,7 +20,7 @@ from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.parameterization.fftype import FFTypeMethod, fftype
 from htmd.molecule.molecule import Molecule
 from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, inventNewDihedralTypes, \
-    minimize, getFixedChargeAtomIndices, fitCharges, fitDihedrals
+    minimize, getFixedChargeAtomIndices, fitCharges, fitDihedrals, createMultitermDihedralTypes
 from parmed.parameters import ParameterSet
 import parmed
 
@@ -201,7 +201,7 @@ def main_parameterize(arguments=None):
                          outdir=args.outdir)
         molFF.printReport()
 
-        # parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
 
         # Copy the molecule to preserve initial coordinates
         mol_orig = molFF.copy()
@@ -220,16 +220,17 @@ def main_parameterize(arguments=None):
                 qm.basis = 'aug-cc-pVDZ'
             logger.info('Changing basis sets to %s' % qm.basis)
 
-        # # Invent new atom types for dihedral atoms
-        # for dih in fit_dihedrals:
-        #     # TODO: Should return copies of mol and parameters, instead of modifying in-place
-        #     inventNewDihedralTypes(mol, parameters, equivalents, dih)
+        # Invent new atom types for dihedral atoms
+        for dih in fit_dihedrals:
+            # TODO: Should return copies of mol and parameters, instead of modifying in-place
+            inventNewDihedralTypes(mol, parameters, equivalents, dih)
+        createMultitermDihedralTypes(parameters)
 
         # Minimize molecule
         if args.minimize:
             print('\n == Minimizing ==\n')
             molFF.minimize()
-            # mol = minimize(mol, qm, args.outdir)
+            mol = minimize(mol, qm, args.outdir)
 
         # Fit ESP charges
         if args.fit_charges:
@@ -244,7 +245,7 @@ def main_parameterize(arguments=None):
 
             # Fit ESP charges
             _, qm_dipole = molFF.fitCharges(fixed=fixed_atom_indices)
-            # mol, _, esp_charges, qm_dipole = fitCharges(mol, qm, args.outdir, fixed=fixed_atom_indices)
+            mol, _, esp_charges, qm_dipole = fitCharges(mol, qm, equivalents, netcharge, '/tmp/testparam/stefan/', fixed=fixed_atom_indices)
             # mol_orig.charge[:] = esp_charges
 
             # Copy the new charges to the original molecule
@@ -268,7 +269,7 @@ def main_parameterize(arguments=None):
 
             # Fit the parameters
             molFF.fitDihedrals(fit_dihedrals, args.optimize_dihedral)
-            # fitDihedrals(mol, qm, method, prm, fit_dihedrals, args.outdir)
+            fitDihedrals(mol, qm, method, parameters, all_dihedrals, fit_dihedrals, args.outdir, geomopt=args.optimize_dihedral)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')

@@ -274,11 +274,11 @@ def fitCharges(mol, qm, equivalents, netcharge, outdir, fixed=()):
     return mol, esp_loss, esp_charges, qm_results[0].dipole
 
 
-def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, equivalents, outdir, geomopt=True):
+def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt=True):
     """
     Dihedrals passed as 4 atom indices
     """
-    from htmd.parameterization.dihedral import DihedralFitting
+    from htmd.parameterization.dihedral2 import DihedralFitting2
     from htmd.qm import FakeQM2
 
     # Create molecules with rotamers
@@ -329,11 +329,10 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, equivalents, ou
         qm_results.append(qm.retrieve())
 
     # Fit the dihedral parameters
-    df = DihedralFitting()
+    df = DihedralFitting2()
     df.parmedMode = True
-    df._prm = prm
-    df._equivalent_group_by_atom = equivalents[2]
-    df._rotatable_dihedrals = all_dihedrals
+    df.parameters = prm
+    df._rotatable_dihedrals = [all_dihedrals[key] for key in all_dihedrals]
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
@@ -356,3 +355,20 @@ def updateDihedral(prm, newparams):
     for p in newparams:
         prm.dihedral_types[p.types].phi_k = p.k0
         prm.dihedral_types[p.types].phase = p.phi0
+
+def createMultitermDihedralTypes(parameters, nterms=6, scee=1.2, scnb=2):
+    from parmed.topologyobjects import DihedralTypeList, DihedralType
+
+    for key, val in parameters.dihedral_types.items():
+        dihlist = DihedralTypeList()
+        for i in range(1, nterms+1):
+            found = False
+            for d in val: # Check if this term already exists in the parameters.
+                if d.per == i:
+                    dihlist.append(d)
+                    found = True
+                    break
+            if not found: # Else create an unparametrized term
+                dihtype = DihedralType(0, i, 0, scee=1.2, scnb=2)
+                dihlist.append(dihtype)
+        parameters.dihedral_types[key] = dihlist
