@@ -34,7 +34,7 @@ def mapAtomTypesParameterSet(prm, typemap):
 
     for f in ('bond_types', 'angle_types', 'dihedral_types', 'improper_types', 'improper_periodic_types'):
         for key in prm.__dict__[f]:
-            newkey = np.array(key)
+            newkey = np.array(key, dtype=object)
             newkey = tuple(np.vectorize(typemap.get)(newkey))
             newprm.__dict__[f][newkey] = copy(prm.__dict__[f][key])
 

@@ -94,7 +94,7 @@ def _duplicateParameters(oldtype, newtype, prm, fields=('bond_types', 'angle_typ
         toadd = []
         for key in prm.__dict__[f]:
             if oldtype in key:
-                newkey = np.array(key)
+                newkey = np.array(key, dtype=object)
                 newkey[newkey == oldtype] = newtype
                 toadd.append([tuple(newkey), copy(prm.__dict__[f][key])])
 
@@ -223,7 +223,7 @@ def minimize(mol, qm, outdir):
     return mol
 
 
-def fitCharges(mol, qm, equivalents, outdir, fixed=()):
+def fitCharges(mol, qm, equivalents, netcharge, outdir, fixed=()):
     from htmd.parameterization.esp import ESP
 
     # Create an ESP directory
@@ -260,6 +260,7 @@ def fitCharges(mol, qm, equivalents, outdir, fixed=()):
     esp.fixed = fixed
     esp._equivalent_atom_groups = equivalents[0]
     esp._equivalent_group_by_atom = equivalents[2]
+    esp._netcharge = netcharge
     esp_result = esp.run()
     esp_charges, esp_loss = esp_result['charges'], esp_result['loss']
 
