@@ -154,7 +154,6 @@ class DihedralFitting2:
         self._initial_energies = []
         for rotamer_coords in self._coords:
             self._initial_energies.append(np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords]))
-        print('Initial energies2', self._initial_energies)
 
     def _getBounds(self):
         """

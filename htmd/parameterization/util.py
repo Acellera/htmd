@@ -89,6 +89,97 @@ def guessElementFromName(name):
     raise ValueError('Cannot guess element from atom name: {}'.format(name))
 
 
+def getImproper(type, parameters):
+    from itertools import permutations
+    type = np.array(type)
+    perms = np.array([x for x in list(permutations((0, 1, 2, 3))) if x[2] == 2])
+    for p in perms:
+        if tuple(type[p]) in parameters.improper_types:
+            return parameters.improper_types[tuple(type[p])], 'improper_types'
+        elif tuple(type[p]) in parameters.improper_periodic_types:
+            return parameters.improper_periodic_types[tuple(type[p])], 'improper_periodic_types'
+    raise RuntimeError('Could not find improper parameters for key {}'.format(type))
+
+
+def recreateParameters(mol, originaltypes, parameters):
+    from copy import deepcopy, copy
+    from itertools import permutations
+    from parmed.parameters import ParameterSet
+
+    newparams = ParameterSet()
+    uqtypes = np.unique(mol.atomtype)
+
+    for type in uqtypes:
+        newparams.atom_types[type] = copy(parameters.atom_types[originaltypes[type]])
+
+    for idx in mol.bonds:
+        newkey = tuple(mol.atomtype[idx])
+        oldkey = tuple(np.vectorize(originaltypes.get)(newkey))
+        newparams.bond_types[newkey] = copy(parameters.bond_types[oldkey])
+
+    for idx in mol.angles:
+        newkey = tuple(mol.atomtype[idx])
+        oldkey = tuple(np.vectorize(originaltypes.get)(newkey))
+        newparams.angle_types[newkey] = copy(parameters.angle_types[oldkey])
+
+    for idx in mol.dihedrals:
+        newkey = tuple(mol.atomtype[idx])
+        oldkey = tuple(np.vectorize(originaltypes.get)(newkey))
+        newparams.dihedral_types[newkey] = copy(parameters.dihedral_types[oldkey])
+
+    for idx in mol.impropers:
+        newkey = tuple(mol.atomtype[idx])
+        oldkey = np.vectorize(originaltypes.get)(newkey)
+        oldval, field = getImproper(oldkey, parameters)
+        newparams.__dict__[field][newkey] = copy(oldval)
+
+    return newparams
+
+
+
+def inventAtomTypes(mol, fit_dihedrals, equivalents):
+    """
+    Duplicate atom types of the dihedral, so its parameters are unique.
+    """
+    # TODO check symmetry
+
+    mol = mol.copy()
+
+    alltypes = list(mol.atomtype)
+    originaltype = {type: type for type in np.unique(mol.atomtype)}
+
+    # Duplicate the atom types of the dihedral
+    for dih in fit_dihedrals:
+        for d in dih:
+            oldtype = mol.atomtype[d]
+            # if the type is already duplicated
+            if re.match(_ATOM_TYPE_REG_EX, oldtype):
+                continue
+            # Create a new atom type name
+            i = 0
+            while ('{}x{}'.format(oldtype, i)) in alltypes:
+                i += 1
+            newtype = '{}x{}'.format(oldtype, i)
+            alltypes.append(newtype)
+            originaltype[newtype] = oldtype
+
+            mol.atomtype[d] = newtype
+            # Rename the atom types of the equivalent atoms
+            for index in equivalents[1][d]:
+                if index != d:
+                    assert not re.match(_ATOM_TYPE_REG_EX, mol.atomtype[index])
+                    mol.atomtype[index] = newtype
+
+        equivalent_dihedrals = _getEquivalentDihedrals(mol, equivalents, np.array(dih))
+        if len(equivalent_dihedrals) > 1:
+            print(dih)
+            print(len(equivalent_dihedrals))
+            print(equivalent_dihedrals)
+            raise ValueError("Dihedral term still not unique after duplication")
+
+    return mol, originaltype
+
+
 def _duplicateParameters(oldtype, newtype, prm, fields=('bond_types', 'angle_types', 'dihedral_types', 'improper_types', 'improper_periodic_types')):
     for f in fields:
         toadd = []
@@ -358,6 +449,9 @@ def updateDihedral(prm, newparams):
 
 def createMultitermDihedralTypes(parameters, nterms=6, scee=1.2, scnb=2):
     from parmed.topologyobjects import DihedralTypeList, DihedralType
+    from copy import deepcopy
+
+    parameters = deepcopy(parameters)
 
     for key, val in parameters.dihedral_types.items():
         dihlist = DihedralTypeList()
@@ -372,3 +466,24 @@ def createMultitermDihedralTypes(parameters, nterms=6, scee=1.2, scnb=2):
                 dihtype = DihedralType(0, i, 0, scee=1.2, scnb=2)
                 dihlist.append(dihtype)
         parameters.dihedral_types[key] = dihlist
+
+    return parameters
+
+
+def centreOfMass(mol):
+    return np.dot(mol.masses, mol.coords[:, :, mol.frame]) / np.sum(mol.masses)
+
+
+def getDipole(mol):
+    """Calculate the dipole moment (in Debyes) of the molecule"""
+    from scipy import constants as const
+
+    coords = mol.coords[:, :, mol.frame] - centreOfMass(mol)
+
+    dipole = np.zeros(4)
+    dipole[:3] = np.dot(mol.charge, coords)
+    dipole[3] = np.linalg.norm(dipole[:3]) # Total dipole moment
+    dipole *= 1e11*const.elementary_charge*const.speed_of_light # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
+
+    return dipole
+
