@@ -33,7 +33,7 @@ class FakeQM(QMBase):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
 
     Create a molecule
@@ -227,15 +227,17 @@ class FakeQM2(FakeQM):
     """
 
     def _get_prmtop(self):
-
-        from htmd.parameterization.ffmolecule import FFTypeMethod
-        assert self.molecule.method in (FFTypeMethod.GAFF, FFTypeMethod.GAFF2)
+        from htmd.parameterization.writers import writeFRCMOD, getAtomTypeMapping
+        from htmd.parameterization.fftype import FFTypeMethod
 
         with TemporaryDirectory() as tmpDir:
             frcFile = os.path.join(tmpDir, 'mol.frcmod')
-            typemap = self.molecule._prm.writeFrcmod(self.molecule._rtf, frcFile)  # TODO move to FFMolecule.write
+            mapping = getAtomTypeMapping(self._parameters)
+            writeFRCMOD(self.molecule, self._parameters, frcFile, typemap=mapping)
+            mol2 = self.molecule.copy()
+            mol2.atomtype[:] = np.vectorize(mapping.get)(mol2.atomtype)
             molFile = os.path.join(tmpDir, 'mol.mol2')
-            self.molecule.write(molFile, typemap=typemap)
+            mol2.write(molFile)
 
             with open(os.path.join(tmpDir, 'tleap.inp'), 'w') as file:
                 file.writelines(('loadAmberParams %s\n' % frcFile,
@@ -303,7 +305,8 @@ class FakeQM2(FakeQM):
             result.errored = False
             result.energy = state.getPotentialEnergy().value_in_unit(unit.kilocalorie_per_mole)
             result.coords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom).reshape((-1, 3, 1))
-            result.dipole = self.molecule.getDipole()
+            from htmd.parameterization.util import getDipole
+            result.dipole = getDipole(self.molecule)
 
             if self.esp_points is not None:
                 assert self.molecule.numFrames == 1

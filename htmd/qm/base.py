@@ -62,14 +62,12 @@ class QMBase(ABC, ProtocolInterface):
     SOLVENTS = ('vacuum', 'PCM')
 
     def __init__(self):
-
-        from htmd.parameterization.ffmolecule import FFMolecule
         from htmd.molecule.molecule import Molecule
 
         super().__init__()
 
-        self._arg('molecule', ':class: `htmd.parameterization.ffmolecule.FFMolecule`', 'Molecule',
-                  default=None, validator=val.Object((FFMolecule, Molecule)), required=True)
+        self._arg('molecule', ':class: `htmd.molecule.molecule.Molecule`', 'Molecule',
+                  default=None, validator=val.Object(Molecule), required=True)
         self._arg('netcharge', 'int', 'Net charge', default=None, validator=val.Number(int, 'ANY'), required=True)
         self._arg('multiplicity', 'int', 'Multiplicity of the molecule',
                   default=1, validator=val.Number(int, 'POS'))
