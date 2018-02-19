@@ -7,9 +7,6 @@ import os
 logger = logging.getLogger(__name__)
 
 
-_ATOM_TYPE_REG_EX = re.compile('^\S+x\d+$')
-
-
 def getEquivalentsAndDihedrals(mol):
     from htmd.molecule.util import guessAnglesAndDihedrals
     from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
@@ -89,187 +86,22 @@ def guessElementFromName(name):
     raise ValueError('Cannot guess element from atom name: {}'.format(name))
 
 
-def getImproper(type, parameters):
-    from itertools import permutations
-    type = np.array(type)
-    perms = np.array([x for x in list(permutations((0, 1, 2, 3))) if x[2] == 2])
-    for p in perms:
-        if tuple(type[p]) in parameters.improper_types:
-            return parameters.improper_types[tuple(type[p])], 'improper_types'
-        elif tuple(type[p]) in parameters.improper_periodic_types:
-            return parameters.improper_periodic_types[tuple(type[p])], 'improper_periodic_types'
-    raise RuntimeError('Could not find improper parameters for key {}'.format(type))
+def centreOfMass(mol):
+    return np.dot(mol.masses, mol.coords[:, :, mol.frame]) / np.sum(mol.masses)
 
 
-def recreateParameters(mol, originaltypes, parameters):
-    from copy import copy
-    from parmed.parameters import ParameterSet
+def getDipole(mol):
+    """Calculate the dipole moment (in Debyes) of the molecule"""
+    from scipy import constants as const
 
-    newparams = ParameterSet()
-    uqtypes = np.unique(mol.atomtype)
+    coords = mol.coords[:, :, mol.frame] - centreOfMass(mol)
 
-    for type in uqtypes:
-        newparams.atom_types[type] = copy(parameters.atom_types[originaltypes[type]])
-        if type != originaltypes[type]:
-            newparams.atom_types[type].number = newparams.atom_types[type].number + 900 # add a big offset so it doesn't collide with real charm types
+    dipole = np.zeros(4)
+    dipole[:3] = np.dot(mol.charge, coords)
+    dipole[3] = np.linalg.norm(dipole[:3]) # Total dipole moment
+    dipole *= 1e11*const.elementary_charge*const.speed_of_light # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
 
-    for idx in mol.bonds:
-        newkey = tuple(mol.atomtype[idx])
-        oldkey = tuple(np.vectorize(originaltypes.get)(newkey))
-        newparams.bond_types[newkey] = copy(parameters.bond_types[oldkey])
-
-    for idx in mol.angles:
-        newkey = tuple(mol.atomtype[idx])
-        oldkey = tuple(np.vectorize(originaltypes.get)(newkey))
-        newparams.angle_types[newkey] = copy(parameters.angle_types[oldkey])
-
-    for idx in mol.dihedrals:
-        newkey = tuple(mol.atomtype[idx])
-        oldkey = tuple(np.vectorize(originaltypes.get)(newkey))
-        newparams.dihedral_types[newkey] = copy(parameters.dihedral_types[oldkey])
-
-    for idx in mol.impropers:
-        newkey = tuple(mol.atomtype[idx])
-        oldkey = np.vectorize(originaltypes.get)(newkey)
-        oldval, field = getImproper(oldkey, parameters)
-        newparams.__dict__[field][newkey] = copy(oldval)
-
-    return newparams
-
-
-
-def inventAtomTypes(mol, fit_dihedrals, equivalents):
-    """
-    Duplicate atom types of the dihedral, so its parameters are unique.
-    """
-    # TODO check symmetry
-
-    mol = mol.copy()
-
-    alltypes = list(mol.atomtype)
-    originaltype = {type: type for type in np.unique(mol.atomtype)}
-
-    # Duplicate the atom types of the dihedral
-    for dih in fit_dihedrals:
-        for d in dih:
-            oldtype = mol.atomtype[d]
-            # if the type is already duplicated
-            if re.match(_ATOM_TYPE_REG_EX, oldtype):
-                continue
-            # Create a new atom type name
-            i = 0
-            while ('{}x{}'.format(oldtype, i)) in alltypes:
-                i += 1
-            newtype = '{}x{}'.format(oldtype, i)
-            alltypes.append(newtype)
-            originaltype[newtype] = oldtype
-
-            mol.atomtype[d] = newtype
-            # Rename the atom types of the equivalent atoms
-            for index in equivalents[1][d]:
-                if index != d:
-                    assert not re.match(_ATOM_TYPE_REG_EX, mol.atomtype[index])
-                    mol.atomtype[index] = newtype
-
-        equivalent_dihedrals = _getEquivalentDihedrals(mol, equivalents, np.array(dih))
-        if len(equivalent_dihedrals) > 1:
-            print(dih)
-            print(len(equivalent_dihedrals))
-            print(equivalent_dihedrals)
-            raise ValueError("Dihedral term still not unique after duplication")
-
-    return mol, originaltype
-
-
-def _duplicateParameters(oldtype, newtype, prm, fields=('bond_types', 'angle_types', 'dihedral_types', 'improper_types', 'improper_periodic_types')):
-    for f in fields:
-        toadd = []
-        for key in prm.__dict__[f]:
-            if oldtype in key:
-                newkey = np.array(key, dtype=object)
-                newkey[newkey == oldtype] = newtype
-                toadd.append([tuple(newkey), copy(prm.__dict__[f][key])])
-
-        for ta in toadd:
-            prm.__dict__[f][ta[0]] = ta[1]
-
-
-def _duplicateAtomType(mol, prm, equivalents, atom_index):
-    """Duplicate the type of the specified atom
-
-       Duplicated types are named: original_name + "x" + number, e.g. ca --> cax0
-    """
-    _equivalent_atoms = equivalents[1]
-
-    # Get a type name
-    oldtype = mol.atomtype[atom_index]
-
-    # if the type is already duplicated
-    if re.match(_ATOM_TYPE_REG_EX, oldtype):
-        return
-
-    # Create a new atom type name
-    i = 0
-    while ('{}x{}'.format(oldtype, i)) in prm.atom_types:
-        i += 1
-    newtype = '{}x{}'.format(oldtype, i)
-    logger.info('Create a new atom type %s from %s' % (newtype, oldtype))
-
-    mol.atomtype[atom_index] = newtype
-
-    # Duplicate the atom type
-    prm.atom_types[newtype] = copy(prm.atom_types[oldtype])
-
-    # Duplicate all the parameters
-    _duplicateParameters(oldtype, newtype, prm)
-
-    # Rename the atom types of the equivalent atoms
-    for index in _equivalent_atoms[atom_index]:
-        if atom_index != index:
-            assert not re.match(_ATOM_TYPE_REG_EX, mol.atomtype[index])
-            mol.atomtype[index] = newtype
-
-
-def inventNewDihedralTypes(mol, prm, equivalents, dihedral):
-    """
-    Duplicate atom types of the dihedral, so its parameters are unique.
-    """
-    # TODO check symmetry
-
-    # Duplicate the atom types of the dihedral
-    for i in range(4):
-        _duplicateAtomType(mol, prm, equivalents, dihedral[i])
-
-    equivalent_dihedrals = _getEquivalentDihedrals(mol, equivalents, np.array(dihedral))
-    if len(equivalent_dihedrals) > 1:
-        print(dihedral)
-        print(len(equivalent_dihedrals))
-        print(equivalent_dihedrals)
-        raise ValueError("Dihedral term still not unique after duplication")
-
-
-def _getEquivalentDihedrals(mol, equivalents, dihedral):
-    """
-    Find equivalent dihedral angles to the specificied one.
-    """
-    equivalent_group_by_atom = equivalents[2]
-    types = mol.atomtype[dihedral]
-
-    same_type_dihedrals = []
-    for dihedral_indices in mol.dihedrals:
-        dihedral_types = mol.atomtype[dihedral_indices]
-        if np.all(types == dihedral_types) or np.all(types == dihedral_types[::-1]):
-            same_type_dihedrals.append(dihedral_indices)
-
-    # Now for each of the uses, remove any which are equivalent
-    unique_dihedrals = [dihedral]
-    groups = [equivalent_group_by_atom[index] for index in dihedral]
-    for dihed in same_type_dihedrals:
-        dihedral_groups = [equivalent_group_by_atom[index] for index in dihed]
-        if groups != dihedral_groups and groups != dihedral_groups[::-1]:
-            unique_dihedrals.append(dihed)
-
-    return unique_dihedrals
+    return dipole
 
 
 def _qm_method_name(qm):
@@ -370,7 +202,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     """
     Dihedrals passed as 4 atom indices
     """
-    from htmd.parameterization.dihedral2 import DihedralFitting2
+    from htmd.parameterization.dihedral import DihedralFitting
     from htmd.qm import FakeQM2
 
     # Create molecules with rotamers
@@ -421,7 +253,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
         qm_results.append(qm.retrieve())
 
     # Fit the dihedral parameters
-    df = DihedralFitting2()
+    df = DihedralFitting()
     df.parmedMode = True
     df.parameters = prm
     df._rotatable_dihedrals = [all_dihedrals[key] for key in all_dihedrals]
@@ -442,49 +274,4 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
 
     # # Update atom types
     # self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
-
-def updateDihedral(prm, newparams):
-    for p in newparams:
-        prm.dihedral_types[p.types].phi_k = p.k0
-        prm.dihedral_types[p.types].phase = p.phi0
-
-def createMultitermDihedralTypes(parameters, nterms=6, scee=1.2, scnb=2):
-    from parmed.topologyobjects import DihedralTypeList, DihedralType
-    from copy import deepcopy
-
-    parameters = deepcopy(parameters)
-
-    for key, val in parameters.dihedral_types.items():
-        dihlist = DihedralTypeList()
-        for i in range(1, nterms+1):
-            found = False
-            for d in val: # Check if this term already exists in the parameters.
-                if d.per == i:
-                    dihlist.append(d)
-                    found = True
-                    break
-            if not found: # Else create an unparametrized term
-                dihtype = DihedralType(0, i, 0, scee=1.2, scnb=2)
-                dihlist.append(dihtype)
-        parameters.dihedral_types[key] = dihlist
-
-    return parameters
-
-
-def centreOfMass(mol):
-    return np.dot(mol.masses, mol.coords[:, :, mol.frame]) / np.sum(mol.masses)
-
-
-def getDipole(mol):
-    """Calculate the dipole moment (in Debyes) of the molecule"""
-    from scipy import constants as const
-
-    coords = mol.coords[:, :, mol.frame] - centreOfMass(mol)
-
-    dipole = np.zeros(4)
-    dipole[:3] = np.dot(mol.charge, coords)
-    dipole[3] = np.linalg.norm(dipole[:3]) # Total dipole moment
-    dipole *= 1e11*const.elementary_charge*const.speed_of_light # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
-
-    return dipole
 

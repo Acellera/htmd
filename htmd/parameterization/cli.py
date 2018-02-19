@@ -16,12 +16,12 @@ from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.qm import Psi4, Gaussian, FakeQM2
-from htmd.parameterization.ffmolecule import FFMolecule
 from htmd.parameterization.fftype import FFTypeMethod, fftype
 from htmd.molecule.molecule import Molecule
-from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, inventAtomTypes, \
-    minimize, getFixedChargeAtomIndices, fitCharges, fitDihedrals, createMultitermDihedralTypes, getDipole, \
-    _qm_method_name, recreateParameters, inventNewDihedralTypes
+from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, \
+    minimize, getFixedChargeAtomIndices, fitCharges, fitDihedrals, getDipole, \
+    _qm_method_name
+from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
 from htmd.parameterization.writers import writeParameters
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,7 @@ def main_parameterize(arguments=None):
         raise ValueError('File %s cannot be found' % args.filename)
 
     method_map = {'GAFF': FFTypeMethod.GAFF, 'GAFF2': FFTypeMethod.GAFF2, 'CGENFF': FFTypeMethod.CGenFF_2b6}
-    methods = [method_map[method] for method in args.forcefield]  # TODO: move into FFMolecule
+    methods = [method_map[method] for method in args.forcefield]
 
     # Get RTF and PRM file names
     rtfFile, prmFile = None, None
@@ -215,14 +215,11 @@ def main_parameterize(arguments=None):
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in methods:
         print(" === Fitting for %s ===\n" % method.name)
-
-        # Create the molecule
-        # molFF = FFMolecule(args.filename, method=method, netcharge=args.charge, rtf=rtfFile, prm=prmFile, qm=qm,
-        #                  outdir=args.outdir)
-        # molFF.printReport()
         printReport(mol, netcharge, equivalents, all_dihedrals)
 
         parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+        if isinstance(qm, FakeQM2):
+            qm._parameters = parameters
 
         # Copy the molecule to preserve initial coordinates
         # mol_orig = molFF.copy()
@@ -286,6 +283,8 @@ def main_parameterize(arguments=None):
             mol, originaltypes = inventAtomTypes(mol, fit_dihedrals, equivalents)
             parameters = recreateParameters(mol, originaltypes, parameters)
             parameters = createMultitermDihedralTypes(parameters)
+            if isinstance(qm, FakeQM2):
+                qm._parameters = parameters
 
             # Fit the parameters
             # molFF.fitDihedrals(fit_dihedrals, args.optimize_dihedral)

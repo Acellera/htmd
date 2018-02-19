@@ -14,19 +14,7 @@ def _formatEnergies(energies):
 
 
 class FFEvaluate:
-    def __init__(self, mol, prm=None, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, fromstruct=False):
-        from htmd.parameterization.ffmolecule import FFMolecule
-        from htmd.parameterization.ff import prmToParmed
-
-        if isinstance(mol, FFMolecule):
-            prm = prmToParmed(mol, mol._rtf, mol._prm)
-            mol = mol.copy()
-            mol.atomtype = np.array([mol._rtf.type_by_index[i] for i in range(mol.numAtoms)])
-        elif prm is None:
-            raise RuntimeError('You need to either provide a FFMolecule object or a Molecule and parmed parameter object.')
-
-        # from IPython.core.debugger import set_trace
-        # set_trace()
+    def __init__(self, mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, fromstruct=False):
         mol = mol.copy()
         setA, setB = calculateSets(mol, betweensets)
 

@@ -1,6 +1,6 @@
 import numpy as np
 import re
-from htmd.parameterization.util import _ATOM_TYPE_REG_EX
+from htmd.parameterization.parameterset import _ATOM_TYPE_REG_EX
 
 
 def _guessElement(name):

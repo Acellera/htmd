@@ -15,12 +15,11 @@ from sklearn.linear_model import LinearRegression
 
 from htmd.numbautil import dihedralAngle
 from htmd.ffevaluation.ffevaluate import FFEvaluate
-from htmd.parameterization.util import updateDihedral
 
 logger = logging.getLogger(__name__)
 
 
-class DihedralFitting2:
+class DihedralFitting:
     """
     Dihedral parameter fitting
 
@@ -413,7 +412,7 @@ class TestDihedralFitting(unittest.TestCase):
 
     def setUp(self):
 
-        self.df = DihedralFitting2()
+        self.df = DihedralFitting()
 
     def test_numDihedrals(self):
 
@@ -484,17 +483,12 @@ class TestDihedralFitting(unittest.TestCase):
         self.assertListEqual(list(upper_bounds), [10., 10., 10., 10., 10., 10., 360., 360., 360., 360., 360., 360.,  10.])
 
     def test_paramsToVector(self):
-
-        from htmd.parameterization.ff import TorsPrm
-
         self.df.dihedrals = [[0, 1, 2, 3]]
         params = [TorsPrm(['x', 'x', 'x', 'x'], k0=float(i)+10, n=i+1, phi0=float(i)+20) for i in range(6)]
         vector = self.df._paramsToVector(params)
         self.assertListEqual(list(vector), [10., 11., 12., 13., 14., 15., 20., 21., 22., 23., 24., 25., 0.])
 
     def test_vectorToParams(self):
-
-        from htmd.parameterization.ff import TorsPrm
 
         self.df.dihedrals = [[0, 1, 2, 3]]
         params = [TorsPrm(['x', 'x', 'x', 'x'], k0=float(i)+10, n=i+1, phi0=float(i)+20) for i in range(6)]
