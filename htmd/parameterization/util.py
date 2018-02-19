@@ -102,8 +102,7 @@ def getImproper(type, parameters):
 
 
 def recreateParameters(mol, originaltypes, parameters):
-    from copy import deepcopy, copy
-    from itertools import permutations
+    from copy import copy
     from parmed.parameters import ParameterSet
 
     newparams = ParameterSet()
@@ -111,6 +110,8 @@ def recreateParameters(mol, originaltypes, parameters):
 
     for type in uqtypes:
         newparams.atom_types[type] = copy(parameters.atom_types[originaltypes[type]])
+        if type != originaltypes[type]:
+            newparams.atom_types[type].number = newparams.atom_types[type] + 900 # add a big offset so it doesn't collide with real charm types
 
     for idx in mol.bonds:
         newkey = tuple(mol.atomtype[idx])

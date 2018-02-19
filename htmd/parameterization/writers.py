@@ -249,10 +249,8 @@ def writeRTF(mol, parameters, netcharge, filename):
     print("* Charmm RTF built by HTMD parameterize version {}".format(htmdversion()), file=f)
     print("* ", file=f)
     print("  22     0", file=f)
-    typeindex = 4000
     for type, val in parameters.atom_types.items():
-        print("MASS %5d %s %8.5f %s" % (typeindex, type, val.mass, periodictable.elements[val.atomic_number]), file=f)
-        typeindex += 1
+        print("MASS %5d %s %8.5f %s" % (val.number, type, val.mass, periodictable.elements[val.atomic_number]), file=f)
     print("\nAUTO ANGLES DIHE\n", file=f)
     print("RESI  MOL %8.5f" % netcharge, file=f)
     print("GROUP", file=f)
