@@ -10,6 +10,9 @@ from abc import ABC, abstractmethod
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
 from htmd.queues.localqueue import LocalCPUQueue
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class QMResult:
@@ -120,6 +123,9 @@ class QMBase(ABC, ProtocolInterface):
         self._nframes = self._molecule.coords.shape[2]
         self._natoms = self._molecule.coords.shape[0]
         self._charge = self.netcharge
+        if self.netcharge is None:
+            self._charge = int(round(self._molecule.charge.sum()))
+            logger.info('No netcharge specified for QM. Estimating it from Molecule.charge as {}'.format(self._charge))
 
         # Set up ESP points
         if self.esp_points is not None:

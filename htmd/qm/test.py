@@ -14,7 +14,8 @@ from htmd.qm import Psi4, Gaussian
 from htmd.queues.localqueue import LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
-from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+from htmd.parameterization.fftype import fftype, FFTypeMethod
+from htmd.molecule.molecule import Molecule
 from htmd.numbautil import dihedralAngle
 
 
@@ -106,13 +107,13 @@ class TestBase:
     def setUp(self):
 
         self.h2_074_file = os.path.join(home('test-qm'), 'H2-0.74.mol2')
-        self.h2_074 = FFMolecule(self.h2_074_file, method=FFTypeMethod.NONE)
+        self.h2_074 = Molecule(self.h2_074_file)
 
         molFile = os.path.join(home('test-qm'), 'H2-1.00.mol2')
-        self.h2_100 = FFMolecule(molFile, method=FFTypeMethod.NONE)
+        self.h2_100 = Molecule(molFile)
 
         molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-        self.h2o2_90 = FFMolecule(molFile, method=FFTypeMethod.NONE)
+        self.h2o2_90 = Molecule(molFile)
 
     def test_type(self):
 
@@ -139,7 +140,8 @@ class TestBase:
 
         for charge, multiplicity in ((-1, 2), (0, 1), (0, 3), (1, 2)):
             with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
-                self.qm.molecule = FFMolecule(self.h2_074_file, netcharge=charge, method=FFTypeMethod.NONE)
+                self.qm.molecule = Molecule(self.h2_074_file)
+                self.qm.netcharge = charge
                 self.qm.multiplicity = multiplicity
                 self.qm.theory = 'HF'
                 self.qm.basis = '3-21G'

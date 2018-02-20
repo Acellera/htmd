@@ -44,13 +44,11 @@ class FakeQM(QMBase):
     >>> mol = canonicalizeAtomNames(mol)
     >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
     >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-    >>> netcharge = int(round(np.sum(mol.charge)))
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
-    ...     qm.netcharge = netcharge
     ...     qm._parameters = parameters
     ...     qm.esp_points = np.array([[1., 1., 1.]])
     ...     qm.directory = tmpDir
@@ -75,7 +73,6 @@ class FakeQM(QMBase):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
-    ...     qm.netcharge = netcharge
     ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.directory = tmpDir
@@ -89,7 +86,6 @@ class FakeQM(QMBase):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
-    ...     qm.netcharge = netcharge
     ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.restrained_dihedrals = np.array([[2, 0, 1, 3]])
@@ -198,14 +194,12 @@ class FakeQM2(FakeQM):
     >>> mol = canonicalizeAtomNames(mol)
     >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
     >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-    >>> netcharge = int(round(np.sum(mol.charge)))
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
     ...     qm.esp_points = np.array([[1., 1., 1.]])
-    ...     qm.netcharge = netcharge
     ...     qm._parameters = parameters
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
@@ -229,7 +223,6 @@ class FakeQM2(FakeQM):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
-    ...     qm.netcharge = netcharge
     ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.directory = tmpDir
@@ -243,7 +236,6 @@ class FakeQM2(FakeQM):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
-    ...     qm.netcharge = netcharge
     ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.restrained_dihedrals = np.array([[2, 0, 1, 3]])
@@ -372,12 +364,10 @@ if __name__ == '__main__':
     mol = canonicalizeAtomNames(mol)
     parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
     mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-    netcharge = int(round(np.sum(mol.charge)))
 
     with TemporaryDirectory() as tmpDir:
         qm = FakeQM()
         qm.molecule = mol
-        qm.netcharge = netcharge
         qm._parameters = parameters
         qm.esp_points = np.array([[1., 1., 1.]])
         qm.directory = tmpDir

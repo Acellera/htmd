@@ -69,7 +69,6 @@ class ESP:
     >>> qm.molecule = mol
     >>> qm.esp_points = ESP.generate_points(mol)[0]
     >>> qm.directory = mkdtemp()
-    >>> qm.netcharge = netcharge
     >>> qm_results = qm.run()
     >>> qm_results[0].errored
     False

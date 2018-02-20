@@ -59,7 +59,6 @@ class Psi4(QMBase):
     >>> mol = Molecule(molFile)
     >>> mol = canonicalizeAtomNames(mol)
     >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-    >>> netcharge = int(round(np.sum(mol.charge)))
 
     Create a Psi4 object
     >>> from htmd.qm import Psi4
@@ -73,7 +72,6 @@ class Psi4(QMBase):
     ...     qm.molecule = mol
     ...     qm.theory = 'BLYP'
     ...     qm.basis = 'cc-pVDZ'
-    ...     qm.netcharge = netcharge
     ...     qm.directory = tmp
     ...     result = qm.run()
 
