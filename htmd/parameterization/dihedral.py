@@ -419,43 +419,6 @@ class TestDihedralFitting(unittest.TestCase):
         self.df.dihedrals = [[0, 1, 2, 3]]
         self.assertEqual(self.df.numDihedrals, 1)
 
-    def test_getEquivalentDihedrals(self):
-
-        from htmd.home import home
-        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-
-        molFile = os.path.join(home('test-param'), 'glycol.mol2')
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-
-        self.assertListEqual(self.df._getEquivalentDihedrals([0, 1, 2, 3]), [[0, 1, 2, 3]])
-        self.assertListEqual(self.df._getEquivalentDihedrals([4, 0, 1, 2]), [[4, 0, 1, 2]])
-        self.assertListEqual(self.df._getEquivalentDihedrals([5, 1, 2, 7]), [[5, 1, 2, 7]])
-
-    def test_makeDihedralUnique(self):
-
-        from htmd.home import home
-        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-
-        molFile = os.path.join(home('test-param'), 'glycol.mol2')
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        types = [self.df.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
-        self.assertListEqual(types, ['oh', 'c3', 'c3', 'oh', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
-
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        self.df._makeDihedralUnique([0, 1, 2, 3])
-        types = [self.df.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
-        self.assertListEqual(types, ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
-
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        self.df._makeDihedralUnique([4, 0, 1, 2])
-        types = [self.df.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
-        self.assertListEqual(types, ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'hox0', 'h1', 'h1', 'h1', 'h1', 'hox0'])
-
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        self.df._makeDihedralUnique([5, 1, 2, 7])
-        types = [self.df.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
-        self.assertListEqual(types, ['oh', 'c3x0', 'c3x0', 'oh', 'ho', 'h1x0', 'h1x0', 'h1x0', 'h1x0', 'ho'])
-
     def test_getValidQMResults(self):
 
         from htmd.qm import QMResult

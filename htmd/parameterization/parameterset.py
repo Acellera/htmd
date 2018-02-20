@@ -148,3 +148,46 @@ def _getEquivalentDihedrals(mol, equivalents, dihedral):
             unique_dihedrals.append(dihed)
 
     return unique_dihedrals
+
+
+import unittest
+import os
+class Test(unittest.TestCase):
+
+    def setUp(self):
+        from htmd.home import home
+        from htmd.parameterization.fftype import FFTypeMethod, fftype
+        from htmd.parameterization.util import canonicalizeAtomNames, getEquivalentsAndDihedrals
+        from htmd.molecule.molecule import Molecule
+
+        molFile = os.path.join(home('test-param'), 'glycol.mol2')
+        mol = Molecule(molFile)
+        mol = canonicalizeAtomNames(mol)
+        mol, self.equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+        _, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+        self.mol = mol
+
+    def test_getEquivalentDihedrals(self):
+        self.assertListEqual(_getEquivalentDihedrals(self.mol, self.equivalents, [0, 1, 2, 3]), [[0, 1, 2, 3]])
+        self.assertListEqual(_getEquivalentDihedrals(self.mol, self.equivalents, [4, 0, 1, 2]), [[4, 0, 1, 2]])
+        self.assertListEqual(_getEquivalentDihedrals(self.mol, self.equivalents, [5, 1, 2, 7]), [[5, 1, 2, 7]])
+
+    def test_inventAtomTypes(self):
+        self.assertListEqual(self.mol.atomtype.tolist(), ['oh', 'c3', 'c3', 'oh', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
+
+        mol = self.mol.copy()
+        mol, _ = inventAtomTypes(mol, [[0, 1, 2, 3],], self.equivalents)
+        self.assertListEqual(mol.atomtype.tolist(), ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
+
+        mol = self.mol.copy()
+        mol, _ = inventAtomTypes(mol, [[4, 0, 1, 2],], self.equivalents)
+        self.assertListEqual(mol.atomtype.tolist(), ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'hox0', 'h1', 'h1', 'h1', 'h1', 'hox0'])
+
+        mol = self.mol.copy()
+        mol, _ = inventAtomTypes(mol, [[5, 1, 2, 7],], self.equivalents)
+        self.assertListEqual(mol.atomtype.tolist(), ['oh', 'c3x0', 'c3x0', 'oh', 'ho', 'h1x0', 'h1x0', 'h1x0', 'h1x0', 'ho'])
+
+
+if __name__ == '__main__':
+
+    unittest.main(verbosity=2)
