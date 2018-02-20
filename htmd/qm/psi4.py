@@ -52,9 +52,14 @@ class Psi4(QMBase):
     Create an object of H2 molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.util import canonicalizeAtomNames, getEquivalentsAndDihedrals
+    >>> from htmd.molecule.molecule import Molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2-0.74.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.NONE)
+    >>> mol = Molecule(molFile)
+    >>> mol = canonicalizeAtomNames(mol)
+    >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    >>> netcharge = int(round(np.sum(mol.charge)))
 
     Create a Psi4 object
     >>> from htmd.qm import Psi4
@@ -68,6 +73,7 @@ class Psi4(QMBase):
     ...     qm.molecule = mol
     ...     qm.theory = 'BLYP'
     ...     qm.basis = 'cc-pVDZ'
+    ...     qm.netcharge = netcharge
     ...     qm.directory = tmp
     ...     result = qm.run()
 
