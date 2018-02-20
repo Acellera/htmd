@@ -287,14 +287,14 @@ class DihedralFitting:
 
         return best_vector
 
-    def _updateDihedrals(self, parameters, keys, vector):
+    def _vectorToParams(self, parameters, keys, vector):
         nparams = len(keys) * self.MAX_DIHEDRAL_MULTIPLICITY
         assert vector.size == 2 * nparams + self.numDihedrals
 
         for i, k in enumerate(keys):
             for j, t in enumerate(parameters.dihedral_types[k]):
-                t.phi_k = vector[i*6+j]
-                t.phase = vector[i*6+j+nparams]
+                t.phi_k = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j]
+                t.phase = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j+nparams]
 
     def _fit(self):
         from copy import deepcopy
@@ -328,7 +328,7 @@ class DihedralFitting:
         logger.info('Finished parameter optimization')
 
         # Update the target dihedral with the optimized parameters
-        self._updateDihedrals(self.parameters, self.fitdihkeys, vector)
+        self._vectorToParams(self.parameters, self.fitdihkeys, vector)
 
         return self.loss
 
