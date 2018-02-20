@@ -133,6 +133,7 @@ if __name__ == '__main__':
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
     from htmd.parameterization.writers import writeRTF, writePRM, writeFRCMOD
+    from htmd.parameterization.util import canonicalizeAtomNames, getEquivalentsAndDihedrals
 
     # BUG: MATCH does not work on Mac!
     if 'TRAVIS_OS_NAME' in os.environ:
@@ -142,6 +143,8 @@ if __name__ == '__main__':
     molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
     refDir = home(dataDir='test-fftype/benzamidine')
     mol = Molecule(molFile)
+    mol = canonicalizeAtomNames(mol)
+    mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
     with TemporaryDirectory() as tmpDir:
 
