@@ -33,17 +33,25 @@ class FakeQM(QMBase):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
+    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
 
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+    >>> mol = Molecule(molFile)
+    >>> mol = canonicalizeAtomNames(mol)
+    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    >>> netcharge = int(round(np.sum(mol.charge)))
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
+    ...     qm.netcharge = netcharge
+    ...     qm._parameters = parameters
     ...     qm.esp_points = np.array([[1., 1., 1.]])
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
@@ -67,6 +75,8 @@ class FakeQM(QMBase):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
+    ...     qm.netcharge = netcharge
+    ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
@@ -79,6 +89,8 @@ class FakeQM(QMBase):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
+    ...     qm.netcharge = netcharge
+    ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.restrained_dihedrals = np.array([[2, 0, 1, 3]])
     ...     qm.directory = tmpDir
@@ -96,12 +108,16 @@ class FakeQM(QMBase):
     def setup(self): pass
     def submit(self): pass
 
+    def __init__(self):
+        super().__init__()
+        self._parameters = None
+
     def _completed(self, directory):
         return os.path.exists(os.path.join(directory, 'data.pkl'))
 
     def retrieve(self):
 
-        ff = FFEvaluate(self.molecule)
+        ff = FFEvaluate(self.molecule, self._parameters)
 
         results = []
         for iframe in range(self.molecule.numFrames):
@@ -140,7 +156,8 @@ class FakeQM(QMBase):
                     logger.info('Optimization status: %d' % opt.last_optimize_result())
 
                 result.energy = ff.run(result.coords[:, :, 0])['total']
-                result.dipole = self.molecule.getDipole()
+                from htmd.parameterization.util import getDipole
+                result.dipole = getDipole(self.molecule)
 
                 if self.optimize:
                     assert opt.last_optimum_value() == result.energy # A self-consistency test
@@ -170,18 +187,26 @@ class FakeQM2(FakeQM):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
+    >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM2
 
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+    >>> mol = Molecule(molFile)
+    >>> mol = canonicalizeAtomNames(mol)
+    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    >>> netcharge = int(round(np.sum(mol.charge)))
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
     ...     qm.esp_points = np.array([[1., 1., 1.]])
+    ...     qm.netcharge = netcharge
+    ...     qm._parameters = parameters
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
 
@@ -204,6 +229,8 @@ class FakeQM2(FakeQM):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
+    ...     qm.netcharge = netcharge
+    ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
@@ -216,6 +243,8 @@ class FakeQM2(FakeQM):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
+    ...     qm.netcharge = netcharge
+    ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.restrained_dihedrals = np.array([[2, 0, 1, 3]])
     ...     qm.directory = tmpDir
@@ -333,15 +362,23 @@ if __name__ == '__main__':
     from tempfile import TemporaryDirectory
     from htmd.home import home
     from htmd.numbautil import dihedralAngle
-    from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    from htmd.parameterization.fftype import fftype, FFTypeMethod
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
+    from htmd.molecule.molecule import Molecule
     from htmd.qm.fake import FakeQM
 
     molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-    mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+    mol = Molecule(molFile)
+    mol = canonicalizeAtomNames(mol)
+    parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    netcharge = int(round(np.sum(mol.charge)))
 
     with TemporaryDirectory() as tmpDir:
         qm = FakeQM()
         qm.molecule = mol
+        qm.netcharge = netcharge
+        qm._parameters = parameters
         qm.esp_points = np.array([[1., 1., 1.]])
         qm.directory = tmpDir
         result = qm.run()[0]
