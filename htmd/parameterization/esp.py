@@ -52,9 +52,15 @@ class ESP:
     Load water molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
+    >>> from htmd.molecule.molecule import Molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+    >>> mol = Molecule(molFile)
+    >>> mol = canonicalizeAtomNames(mol)
+    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    >>> netcharge = int(round(np.sum(mol.charge)))
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4
@@ -63,6 +69,7 @@ class ESP:
     >>> qm.molecule = mol
     >>> qm.esp_points = ESP.generate_points(mol)[0]
     >>> qm.directory = mkdtemp()
+    >>> qm.netcharge = netcharge
     >>> qm_results = qm.run()
     >>> qm_results[0].errored
     False
@@ -75,7 +82,10 @@ class ESP:
 
     Set up and run charge fitting
     >>> esp.molecule = mol
+    >>> esp.netcharge = netcharge
     >>> esp.qm_results = qm_results
+    >>> esp.equivalent_atom_groups = equivalents[0]
+    >>> esp.equivalent_group_by_atom = equivalents[2]
     >>> esp_results = esp.run()
 
     ESP charges for water molecule
@@ -201,30 +211,9 @@ class ESP:
 
         self._reciprocal_distances = None
 
-        self._equivalent_atom_groups = None
-        self._equivalent_group_by_atom = None
-        self._netcharge = None
-
-    @property
-    def equivalent_atom_groups(self):
-        if self._equivalent_atom_groups is not None:
-            return self._equivalent_atom_groups
-        else:
-            return self.molecule._equivalent_atom_groups
-
-    @property
-    def equivalent_group_by_atom(self):
-        if self._equivalent_group_by_atom is not None:
-            return self._equivalent_group_by_atom
-        else:
-            return self.molecule._equivalent_group_by_atom
-
-    @property
-    def netcharge(self):
-        if self._netcharge is not None:
-            return self._netcharge
-        else:
-            return self.molecule.netcharge
+        self.equivalent_atom_groups = None
+        self.equivalent_group_by_atom = None
+        self.netcharge = None
 
     @property
     def ngroups(self):
@@ -322,17 +311,24 @@ class ESP:
 class TestESP(unittest.TestCase):
 
     def setUp(self):
-
         from htmd.home import home
-        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+        from htmd.parameterization.fftype import FFTypeMethod, fftype
+        from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
+        from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'H2O2.mol2')
-        self.mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+        mol = Molecule(molFile)
+        mol = canonicalizeAtomNames(mol)
+        mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+        _, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+        self.mol = mol
         self.esp = ESP()
         self.esp.molecule = self.mol
+        self.esp.equivalent_atom_groups = equivalents[0]
+        self.esp.equivalent_group_by_atom = equivalents[2]
+        self.esp.netcharge = int(round(np.sum(mol.charge)))
 
     def test_ngroups(self):
-
         self.assertEqual(self.esp.ngroups, 2)
 
     def test_mapping(self):

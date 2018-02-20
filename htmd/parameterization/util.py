@@ -182,9 +182,9 @@ def fitCharges(mol, qm, equivalents, netcharge, outdir, fixed=()):
     esp.molecule = mol
     esp.qm_results = qm_results
     esp.fixed = fixed
-    esp._equivalent_atom_groups = equivalents[0]
-    esp._equivalent_group_by_atom = equivalents[2]
-    esp._netcharge = netcharge
+    esp.equivalent_atom_groups = equivalents[0]
+    esp.equivalent_group_by_atom = equivalents[2]
+    esp.netcharge = netcharge
     esp_result = esp.run()
     esp_charges, esp_loss = esp_result['charges'], esp_result['loss']
 
