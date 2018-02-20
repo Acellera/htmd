@@ -176,15 +176,15 @@ class Test(unittest.TestCase):
         self.assertListEqual(self.mol.atomtype.tolist(), ['oh', 'c3', 'c3', 'oh', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
 
         mol = self.mol.copy()
-        mol, _ = inventAtomTypes(mol, [[0, 1, 2, 3],], self.equivalents)
+        mol, _ = inventAtomTypes(mol, [[0, 1, 2, 3]], self.equivalents)
         self.assertListEqual(mol.atomtype.tolist(), ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
 
         mol = self.mol.copy()
-        mol, _ = inventAtomTypes(mol, [[4, 0, 1, 2],], self.equivalents)
+        mol, _ = inventAtomTypes(mol, [[4, 0, 1, 2]], self.equivalents)
         self.assertListEqual(mol.atomtype.tolist(), ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'hox0', 'h1', 'h1', 'h1', 'h1', 'hox0'])
 
         mol = self.mol.copy()
-        mol, _ = inventAtomTypes(mol, [[5, 1, 2, 7],], self.equivalents)
+        mol, _ = inventAtomTypes(mol, [[5, 1, 2, 7]], self.equivalents)
         self.assertListEqual(mol.atomtype.tolist(), ['oh', 'c3x0', 'c3x0', 'oh', 'ho', 'h1x0', 'h1x0', 'h1x0', 'h1x0', 'ho'])
 
 

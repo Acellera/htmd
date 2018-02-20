@@ -411,16 +411,13 @@ class DihedralFitting:
 class TestDihedralFitting(unittest.TestCase):
 
     def setUp(self):
-
         self.df = DihedralFitting()
 
     def test_numDihedrals(self):
-
         self.df.dihedrals = [[0, 1, 2, 3]]
         self.assertEqual(self.df.numDihedrals, 1)
 
     def test_getValidQMResults(self):
-
         from htmd.qm import QMResult
 
         results = [QMResult() for _ in range(20)]
@@ -439,30 +436,11 @@ class TestDihedralFitting(unittest.TestCase):
         self.assertEqual(len(self.df._getValidQMResults()[0]), 17)
 
     def test_getBounds(self):
-
         self.df.dihedrals = [[0, 1, 2, 3]]
         lower_bounds, upper_bounds = self.df._getBounds()
         self.assertListEqual(list(lower_bounds), [0.,  0.,  0.,  0.,  0.,  0.,   0.,   0.,   0.,   0.,   0.,   0., -10.])
         self.assertListEqual(list(upper_bounds), [10., 10., 10., 10., 10., 10., 360., 360., 360., 360., 360., 360.,  10.])
 
-    def test_paramsToVector(self):
-        self.df.dihedrals = [[0, 1, 2, 3]]
-        params = [TorsPrm(['x', 'x', 'x', 'x'], k0=float(i)+10, n=i+1, phi0=float(i)+20) for i in range(6)]
-        vector = self.df._paramsToVector(params)
-        self.assertListEqual(list(vector), [10., 11., 12., 13., 14., 15., 20., 21., 22., 23., 24., 25., 0.])
-
-    def test_vectorToParams(self):
-
-        self.df.dihedrals = [[0, 1, 2, 3]]
-        params = [TorsPrm(['x', 'x', 'x', 'x'], k0=float(i)+10, n=i+1, phi0=float(i)+20) for i in range(6)]
-        vector = np.array([30., 31., 32., 33., 34., 35., 40., 41., 42., 43., 44., 45., 50.])
-        params = self.df._vectorToParams(vector, params)
-
-        self.assertEqual(len(params), 6)
-        for i, param in enumerate(params):
-            self.assertEqual(param.k0, i+30)
-            self.assertEqual(param.n, i+1)
-            self.assertEqual(param.phi0, i+40)
 
     # Note: the rest methods are tested indirectly via the "parameterize" tests in test.py
 
