@@ -7,6 +7,7 @@ import os
 import sys
 import shutil
 import unittest
+import numpy as np
 from subprocess import call
 
 from htmd.home import home
@@ -192,25 +193,22 @@ class TestParameterize(unittest.TestCase):
                     self.fail('Dihedral {} gave different energy than in the test with kcal/mol RMSE {} and max error {}'.format(r[0], r[1], r[2]))
 
     def _testFiles(self, refDir, resDir):
-        filestotest = []
-        excluded = ('minimize', 'esp', 'dihedral', '.coor', '.svg', '.frcmod', '.prm', '.rtf')
+
+        testFiles = []
+        exclusions = ('minimize', 'esp', 'dihedral', '.coor', '.svg')
         for root, _, files in os.walk(refDir, followlinks=True):
             for file in files:
-                flag = False
                 relFile = os.path.relpath(os.path.join(root, file), start=refDir)
-                for exc in excluded:
-                    if relFile.startswith(exc) or relFile.endswith(exc):
-                        flag = True
-                if not flag:
-                    filestotest.append(os.path.join(root, file))
+                if any([relFile.startswith(exclusion) or relFile.endswith(exclusion) for exclusion in exclusions]):
+                    continue
+                testFiles.append(os.path.join(root, file))
 
         print('Compared files:')
-        for file in filestotest:
+        for file in testFiles:
             relFile = os.path.relpath(file, start=refDir)
-            print('  %s' % relFile)
-
             refFile = os.path.join(refDir, relFile)
             resFile = os.path.join(resDir, relFile)
+            print('  %s' % relFile)
 
             with self.subTest(refFile=refFile):
                 self.assertTrue(os.path.exists(resFile))
@@ -218,19 +216,20 @@ class TestParameterize(unittest.TestCase):
                 with open(refFile) as ref, open(resFile) as res:
                     refLines, resLines = ref.readlines(), res.readlines()
 
-                if file.endswith('energies.txt'):
-                    refFields = [field for line in refLines for field in line.split()]
-                    resFields = [field for line in resLines for field in line.split()]
-                    for refField, resField in zip(refFields, resFields):
-                        with self.subTest():
-                            try:
-                                refFloat = float(refField)
-                                resFloat = float(resField)
-                                self.assertAlmostEqual(refFloat, resFloat, places=4, msg=refFile)
-                            except ValueError:
-                                self.assertEqual(refField, resField, msg=refFile)
-                else:
-                    self.assertListEqual(refLines, resLines, msg=refFile)
+                # Removes first line with the version
+                if file.endswith('frcmod') or file.endswith('rtf') or file.endswith('prm'):
+                    refLines, resLines = refLines[1:], resLines[1:]
+
+                refFields = [field for line in refLines for field in line.split()]
+                resFields = [field for line in resLines for field in line.split()]
+                for refField, resField in zip(refFields, resFields):
+                    try:
+                        if np.isclose(float(refField), float(resField), rtol=0, atol=1e-5):
+                            continue
+                    except ValueError:
+                        if refField == resField:
+                            continue
+                    self.assertListEqual(refLines, resLines) # If there is a mismatch, print a diff of all file
 
         print('')
 
