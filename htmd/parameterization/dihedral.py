@@ -399,7 +399,7 @@ class DihedralFitting:
 
         return self.loss
 
-    def plotDihedralEnergies(self, idihed):
+    def plotDihedralEnergies(self, idihed, write_data=True):
         """
         Plot conformer energies for a specific dihedral angle, including QM, original and fitted MM energies.
         """
@@ -409,6 +409,14 @@ class DihedralFitting:
         initial_energy = self._initial_energies[idihed] - np.min(self._initial_energies[idihed])
         fitted_energy = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
         indices = np.argsort(angle)
+
+        path =  os.path.join(self.result_directory, self._names[idihed])
+
+        if write_data:
+            header = 'angle  QM_ref   MM_init  MM_fit'
+            data = np.column_stack((angle[indices], reference_energy[indices], initial_energy[indices],
+                                    fitted_energy[indices]))
+            np.savetxt(path + '.dat', data, fmt='%8.3f', header=header)
 
         plt.figure()
         plt.title(self._names[idihed])
@@ -420,10 +428,10 @@ class DihedralFitting:
         plt.plot(angle[indices], initial_energy[indices], 'g-', marker='o', label='MM initial')
         plt.plot(angle[indices], fitted_energy[indices], 'b-', marker='o', label='MM fitted')
         plt.legend()
-        plt.savefig(os.path.join(self.result_directory, self._names[idihed] + '.svg'))
+        plt.savefig(path + '.svg')
         plt.close()
 
-    def plotConformerEnergies(self):
+    def plotConformerEnergies(self, write_data=True):
         """
         Plot all conformer QM energies versus MM energies with the fitted parameters
         """
@@ -437,13 +445,20 @@ class DihedralFitting:
         regression.fit(qm_energy, mm_energy)
         prediction = regression.predict(qm_energy)
 
+        path =  os.path.join(self.result_directory, 'conformer-energies')
+
+        if write_data:
+            header = 'QM     MM'
+            data = np.column_stack((qm_energy, mm_energy))
+            np.savetxt(path + '.dat', data, fmt='%8.3f', header=header)
+
         plt.figure()
         plt.title('Conformer Energies MM vs QM')
         plt.xlabel('QM energy, kcal/mol')
         plt.ylabel('MM energy, kcal/mol')
         plt.plot(qm_energy, mm_energy, 'ko')
         plt.plot(qm_energy, prediction, 'r-', lw=2)
-        plt.savefig(os.path.join(self.result_directory, 'conformer-energies.svg'))
+        plt.savefig(path + '.svg')
         plt.close()
 
 
