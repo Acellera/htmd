@@ -414,10 +414,10 @@ class DihedralFitting:
 
         if write_data:
             fmtsz = 8
-            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['angle', 'QM_ref', 'MM_init', 'MM_fit'])
+            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# angle', 'QM_ref', 'MM_init', 'MM_fit'])
             data = np.column_stack((angle[indices], reference_energy[indices], initial_energy[indices],
                                     fitted_energy[indices]))
-            np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header)
+            np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
 
         plt.figure()
         plt.title(self._names[idihed])
@@ -450,9 +450,9 @@ class DihedralFitting:
 
         if write_data:
             fmtsz = 8
-            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['QM', 'MM'])
+            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# QM', 'MM'])
             data = np.column_stack((qm_energy, mm_energy))
-            np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header)
+            np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
 
         plt.figure()
         plt.title('Conformer Energies MM vs QM')
