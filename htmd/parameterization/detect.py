@@ -12,7 +12,7 @@ from periodictable import elements
 logger = logging.getLogger(__name__)
 
 
-def getMolecularGraph(molecule):
+def _getMolecularGraph(molecule):
     """
     Generate a graph from the topology of molecule
 
@@ -27,7 +27,7 @@ def getMolecularGraph(molecule):
 
     return graph
 
-def getMolecularTree(graph, source):
+def _getMolecularTree(graph, source):
     """
     Generate a tree from a molecular graph
 
@@ -59,7 +59,7 @@ def getMolecularTree(graph, source):
 
     return tree
 
-def checkIsomorphism(graph1, graph2):
+def _checkIsomorphism(graph1, graph2):
     """
     Check if two molecular graphs are isomorphic based on topology (bonds) and elements.
     """
@@ -120,16 +120,16 @@ def detectEquivalentAtoms(molecule):
     """
 
     # Generate a molecular tree for each atom
-    graph = getMolecularGraph(molecule)
-    trees = [getMolecularTree(graph, node) for node in graph.nodes]
+    graph = _getMolecularGraph(molecule)
+    trees = [_getMolecularTree(graph, node) for node in graph.nodes]
 
-    equivalent_atoms = [tuple([i for i, tree1 in enumerate(trees) if checkIsomorphism(tree1, tree2)]) for tree2 in trees]
+    equivalent_atoms = [tuple([i for i, tree1 in enumerate(trees) if _checkIsomorphism(tree1, tree2)]) for tree2 in trees]
     equivalent_groups = sorted(list(set(equivalent_atoms)))
     equivalent_group_by_atom = list(map(equivalent_groups.index, equivalent_atoms))
 
     return equivalent_groups, equivalent_atoms, equivalent_group_by_atom
 
-def getMethylGraph():
+def _getMethylGraph():
     """
     Generate a molecular graph for methyl group
     """
@@ -149,11 +149,11 @@ def detectParameterizableCores(graph):
     """
     Detect parametrizable dihedral angle cores (central atom pairs)
 
-    The cores are detected by looking for bridges (bonds with divide the molecule into two parts) in a molecular graph.
+    The cores are detected by looking for bridges (bonds which divide the molecule into two parts) in a molecular graph.
     Terminal cores are skipped.
     """
 
-    methyl = getMethylGraph()
+    methyl = _getMethylGraph()
 
     all_core_sides = []
     for core in list(nx.bridges(graph)):
@@ -172,7 +172,7 @@ def detectParameterizableCores(graph):
         assert core[0] in sideGraphs[0] and core[1] in sideGraphs[1]
 
         # Skip if a side graph is a methyl group
-        if checkIsomorphism(sideGraphs[0], methyl) or checkIsomorphism(sideGraphs[1], methyl):
+        if _checkIsomorphism(sideGraphs[0], methyl) or _checkIsomorphism(sideGraphs[1], methyl):
             continue
 
         # Skip if core contains C with sp hybridization
@@ -185,7 +185,7 @@ def detectParameterizableCores(graph):
 
     return all_core_sides
 
-def weighted_closeness_centrality(graph, node, weight=None):
+def _weighted_closeness_centrality(graph, node, weight=None):
     '''
     Weighted closeness centrality
 
@@ -199,7 +199,7 @@ def weighted_closeness_centrality(graph, node, weight=None):
 
     return centrality
 
-def chooseTerminals(graph, centre, sideGraph):
+def _chooseTerminals(graph, centre, sideGraph):
     """
     Choose dihedral angle terminals (outer atoms)
 
@@ -213,12 +213,12 @@ def chooseTerminals(graph, centre, sideGraph):
     # Get a subgraph for each terminal
     sideGraph = sideGraph.copy()
     sideGraph.remove_node(centre)
-    terminalGraphs = list(nx.connected_component_subgraphs(sideGraph))
-    terminalGraphs = [[terminalGraph for terminalGraph in terminalGraphs if terminal in terminalGraph.nodes][0] for terminal in terminals]
+    terminalGraphs = itertools.product(terminals, nx.connected_component_subgraphs(sideGraph))
+    terminalGraphs = [terminalGraph for terminal, terminalGraph in terminalGraphs if terminal in terminalGraph]
 
     # Compute a score for each terminal
     centralities = [nx.closeness_centrality(graph, terminal) for terminal in terminals]
-    weightedCentralities = [weighted_closeness_centrality(graph, terminal, weight='number') for terminal in terminals]
+    weightedCentralities = [_weighted_closeness_centrality(graph, terminal, weight='number') for terminal in terminals]
     scores = list(zip(centralities, weightedCentralities))
 
     # Choose the terminals
@@ -233,7 +233,7 @@ def chooseTerminals(graph, centre, sideGraph):
             refTerminalGraph = terminalGraph
             continue
 
-        if checkIsomorphism(terminalGraph, refTerminalGraph):
+        if _checkIsomorphism(terminalGraph, refTerminalGraph):
             chosen_terminals.append(terminal)
         else:
             logger.warn('Molecular scoring function is not sufficient. '
@@ -327,14 +327,14 @@ def detectParameterizableDihedrals(molecule):
     """
 
     # Get a molecular graph
-    graph = getMolecularGraph(molecule)
+    graph = _getMolecularGraph(molecule)
 
     # Get parameterizable dihedral angles
     dihedrals = []
     for core, sides in detectParameterizableCores(graph):
 
         # Choose the best terminals for each side
-        all_terminals = [chooseTerminals(graph, centre, side) for centre, side in zip(core, sides)]
+        all_terminals = [_chooseTerminals(graph, centre, side) for centre, side in zip(core, sides)]
 
         # Generate all terminal combinations
         all_terminals = itertools.product(*all_terminals)
