@@ -94,7 +94,7 @@ class SmallMol:
 
         _mol = None
         if isinstance(mol, Chem.Mol):
-            mol = _mol
+            _mol = mol
 
         elif isinstance(mol, str):
             if os.path.isfile(mol):
