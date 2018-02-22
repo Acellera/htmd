@@ -13,7 +13,6 @@ from copy import deepcopy
 from os import path
 import logging
 import os
-from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -609,6 +608,8 @@ class Molecule:
 
         Needs to be called before removing atoms!
         """
+        if len(idx) == 0:
+            return
         if len(self.bonds) == 0 and len(self.dihedrals) == 0 and len(self.impropers) == 0 and len(self.angles) == 0:
             return
         map = np.ones(self.numAtoms, dtype=int)
@@ -625,6 +626,29 @@ class Molecule:
             self.__dict__[field] = tempdata[stays, ...]
             if field == 'bonds' and len(self.bondtype):
                 self.bondtype = self.bondtype[stays]
+
+    def deleteBonds(self, sel, inter=True):
+        """ Deletes all bonds that contain atoms in sel or between atoms in sel.
+
+        Parameters
+        ----------
+        sel : str
+            Atomselection string including atoms whose bonds should be deleted.
+        inter : bool
+            When True it will delete also bonds between atoms in sel with bonds to atoms outside of sel.
+            When False it will only delete bonds between atoms in sel.
+        """
+        sel = self.atomselect(sel, indexes=True)
+        if len(sel) == 0:  # If none are selected do nothing
+            return
+        if inter:
+            todel = np.in1d(self.bonds[:, 0], sel) | np.in1d(self.bonds[:, 1], sel)
+        else:
+            todel = np.in1d(self.bonds[:, 0], sel) & np.in1d(self.bonds[:, 1], sel)
+        idx = np.where(todel)[0]
+        self.bonds = np.delete(self.bonds, idx, axis=0)
+        self.bondtype = np.delete(self.bondtype, idx)
+
 
     def _guessBonds(self):
         """ Tries to guess the bonds in the Molecule
@@ -657,30 +681,6 @@ class Molecule:
 
         s = self.atomselect(sel)
         self.coords[s, :, self.frame] += vector
-
-    @_Deprecated('1.3.2', 'htmd.molecule.molecule.Molecule.rotateBy')
-    def rotate(self, axis, angle, center=(0, 0, 0), sel=None):
-        """
-        Rotate atoms around an axis for a given angle in radians.
-
-        Parameters
-        ----------
-        axis : 3dim vector
-            Axis of rotation
-        angle : float
-            Angle of rotation in radians
-        center : list
-            The rotation center
-        sel :
-            Atomselection for atoms to rotate
-
-        Examples
-        --------
-        >>> mol=tryp.copy()
-        >>> mol.rotate([0, 1, 0], 1.57)
-        """
-        M = rotationMatrix(axis, angle)
-        self.rotateBy(M, center=center, sel=sel)
 
     def rotateBy(self, M, center=(0, 0, 0), sel='all'):
         """ Rotate a selection of atoms by a given rotation around a center
@@ -724,8 +724,8 @@ class Molecule:
         --------
         >>> mol.getDihedral([0, 5, 8, 12])
         """
-        from htmd.molecule.util import dihedralAngle
-        return np.deg2rad(dihedralAngle(self.coords[atom_quad, :, self.frame]))
+        from htmd.numbautil import dihedralAngle
+        return dihedralAngle(self.coords[atom_quad, :, self.frame])
 
     def setDihedral(self, atom_quad, radians, bonds=None):
         """ Sets the angle of a dihedral.
@@ -749,7 +749,7 @@ class Molecule:
         >>> mol.setDihedral([18, 20, 24, 30], -1.8, bonds=bonds)
         """
         import scipy.sparse.csgraph as sp
-        from htmd.molecule.util import dihedralAngle
+        from htmd.numbautil import dihedralAngle
         if bonds is None:
             bonds = self._getBonds()
 
@@ -772,7 +772,7 @@ class Molecule:
         quad_coords = self.coords[atom_quad, :, self.frame]
         rotax = quad_coords[2] - quad_coords[1]
         rotax /= np.linalg.norm(rotax)
-        rads = np.deg2rad(dihedralAngle(quad_coords))
+        rads = dihedralAngle(quad_coords)
         M = rotationMatrix(rotax, radians-rads)
         self.rotateBy(M, center=self.coords[atom_quad[1], :, self.frame], sel=right)
 
@@ -1859,7 +1859,6 @@ if __name__ == "__main__":
     m.write(tmp, 'name CA')
 
     # Testing dihedral setting
-    from htmd.molecule.util import dihedralAngle
     mol = Molecule('2HBB')
     quad = [124, 125, 132, 133]
     mol.setDihedral(quad, np.deg2rad(-90))

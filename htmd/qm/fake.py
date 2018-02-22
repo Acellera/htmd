@@ -17,7 +17,7 @@ from simtk import unit
 from simtk import openmm
 from simtk.openmm import app
 
-from htmd.molecule.util import dihedralAngle
+from htmd.numbautil import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
 from htmd.parameterization.ffevaluate import FFEvaluate
 
@@ -32,7 +32,7 @@ class FakeQM(QMBase):
     >>> import numpy as np
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
-    >>> from htmd.molecule.util import dihedralAngle
+    >>> from htmd.numbautil import dihedralAngle
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
     >>> from htmd.qm.fake import FakeQM
 
@@ -60,8 +60,8 @@ class FakeQM(QMBase):
     array([[ 1.,  1.,  1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
     array([ 0.37135...])
-    >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    89.99954...
+    >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
+    89.99...
 
     Run a minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -71,9 +71,9 @@ class FakeQM(QMBase):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.73172...
-    >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    100.036...
+    7.737...
+    >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
+    98.82...
 
     Run a constrained minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -84,9 +84,9 @@ class FakeQM(QMBase):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.870431...
-    >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    89.99956...
+    7.868...
+    >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
+    89.99...
     """
 
     # Fake implementations of the abstract methods
@@ -127,10 +127,10 @@ class FakeQM(QMBase):
                     if self.restrained_dihedrals is not None:
                         for dihedral in self.restrained_dihedrals:
                             indices = dihedral.copy()
-                            ref_angle = np.deg2rad(dihedralAngle(self.molecule.coords[indices, :, iframe]))
+                            ref_angle = dihedralAngle(self.molecule.coords[indices, :, iframe])
                             def constraint(x, _):
                                 coords = x.reshape((-1, 3))
-                                angle = np.deg2rad(dihedralAngle(coords[indices]))
+                                angle = dihedralAngle(coords[indices])
                                 return np.sin(.5*(angle - ref_angle))
                             opt.add_equality_constraint(constraint)
                     opt.set_xtol_abs(1e-3) # Similar to Psi4 default
@@ -169,7 +169,7 @@ class FakeQM2(FakeQM):
     >>> import numpy as np
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
-    >>> from htmd.molecule.util import dihedralAngle
+    >>> from htmd.numbautil import dihedralAngle
     >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
     >>> from htmd.qm.fake import FakeQM2
 
@@ -197,8 +197,8 @@ class FakeQM2(FakeQM):
     array([[ 1.,  1.,  1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
     array([ 0.371352...])
-    >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    89.999542...
+    >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
+    89.99954...
 
     Run a minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -209,7 +209,7 @@ class FakeQM2(FakeQM):
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
     7.72959...
-    >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
+    >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     101.444...
 
     Run a constrained minimization
@@ -222,8 +222,8 @@ class FakeQM2(FakeQM):
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
     7.866173...
-    >>> dihedralAngle(result.coords[[2, 0, 1, 3], :, 0]) # doctest: +ELLIPSIS
-    90.079159...
+    >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
+    90.07915...
     """
 
     def _get_prmtop(self):
@@ -291,7 +291,7 @@ class FakeQM2(FakeQM):
             if self.optimize:
                 if self.restrained_dihedrals is not None:
                     for i, dihedral in enumerate(self.restrained_dihedrals):
-                        ref_angle = dihedralAngle(self.molecule.coords[dihedral, :, iframe])
+                        ref_angle = np.rad2deg(dihedralAngle(self.molecule.coords[dihedral, :, iframe]))
                         parameters = restraint.getTorsionParameters(i)
                         parameters[5] = ref_angle * unit.degree
                         restraint.setTorsionParameters(i, *parameters)

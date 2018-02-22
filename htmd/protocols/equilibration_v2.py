@@ -473,6 +473,39 @@ if __name__ == "__main__":
     from htmd.util import tempname
     import filecmp
     from glob import glob
+    from os.path import join
+
+    def _cutfirstline(infile, outfile):
+        # Cut out the first line of prmtop which has a build date in it
+        with open(infile, 'r') as fin:
+            data = fin.read().splitlines(True)
+        with open(outfile, 'w') as fout:
+            fout.writelines(data[1:])
+
+
+    def _compareResultFolders(compare, tmpdir, pid):
+        ignore_ftypes = ('.log', '.txt')
+        files = []
+        deletefiles = []
+        for f in glob(join(compare, '*')):
+            fname = os.path.basename(f)
+            if os.path.splitext(f)[1] in ignore_ftypes:
+                continue
+            if f.endswith('prmtop'):
+                _cutfirstline(f, join(compare, fname + '.mod'))
+                _cutfirstline(join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
+                files.append(os.path.basename(f) + '.mod')
+                deletefiles.append(join(compare, fname + '.mod'))
+            else:
+                files.append(os.path.basename(f))
+
+        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
+        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+            raise RuntimeError(
+                'Different results produced by amber.build for test {} between {} and {} in files {}.'.format(pid, compare, tmpdir, mismatch))
+
+        for f in deletefiles:
+            os.remove(f)
 
     pdbid = '3PTB'
     eq = Equilibration()
@@ -490,11 +523,12 @@ if __name__ == "__main__":
     # Compare with reference
     refdir = home(dataDir=os.path.join('test-equilibration', pdbid, 'prerun'))
     files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
-    match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
+    # match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
+    _compareResultFolders(refdir, tmpdir, '3PTB')
 
-    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-            raise RuntimeError('Different results produced by Equilibration.write for '
-                               'test {} between {} and {} in files {}.'.format(pdbid, refdir, tmpdir, mismatch))
+    # if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+    #         raise RuntimeError('Different results produced by Equilibration.write for '
+    #                            'test {} between {} and {} in files {}.'.format(pdbid, refdir, tmpdir, mismatch))
 
     # from htmd.protocols.production_v5 import ProductionAcemd3, GroupRestraint, AtomRestraint
     r = list()

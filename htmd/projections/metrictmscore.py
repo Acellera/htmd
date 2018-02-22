@@ -111,7 +111,7 @@ if __name__ == "__main__":
     ref = Molecule(path.join(dd, 'generators', '1', 'structure.pdb'))
 
     metr2 = Metric(fsims)
-    metr2.projection(MetricTMscore(ref, 'protein and name CA'))
+    metr2.set(MetricTMscore(ref, 'protein and name CA'))
     data2 = metr2.project()
 
     assert data2.trajectories[0].projection.shape == (6, 1)

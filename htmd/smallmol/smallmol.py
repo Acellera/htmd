@@ -8,7 +8,7 @@ from rdkit import RDConfig
 from rdkit import rdBase
 from rdkit.Chem import ChemicalFeatures
 
-from htmd.molecule.voxeldescriptors import _getGridDescriptors, _getGridCenters
+from htmd.molecule.voxeldescriptors import _getOccupancyC, _getGridCenters
 from htmd.smallmol.util import get_rotationMatrix, rotate
 from copy import deepcopy
 import logging
@@ -240,8 +240,8 @@ class SmallMol:
         else:
             centers2D = SmallMol.array_cache[(size, resolution)] + center
 
-        voxels = _getGridDescriptors(coords.astype(np.float32), centers2D,
-                                       multisigmas).reshape(size, size, size, 8).astype(dtype)
+        voxels = _getOccupancyC(coords.astype(np.float32), centers2D,
+                                multisigmas).reshape(size, size, size, 8).astype(dtype)
         return voxels
 
     def get_name(self):
@@ -298,12 +298,11 @@ class SmallMolStack:
         from tqdm import tqdm
         if addHs and not removeHs:
             raise AttributeError('To add hydrogens with the addHs option please also enable the removeHs option.')
-        
+
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=removeHs)
         self.filepath = sdf_file
-        print('Reading files...')
         mm = []
-        for x in tqdm(supplier):
+        for x in supplier:
             if x is not None:
                 mm.append(SmallMol(x, addHs=addHs))
             else:

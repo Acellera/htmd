@@ -13,7 +13,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-from htmd.molecule.util import dihedralAngle
+from htmd.numbautil import dihedralAngle
 from htmd.parameterization.ffevaluate import FFEvaluate
 
 logger = logging.getLogger(__name__)
@@ -185,7 +185,7 @@ class DihedralFitting:
         for rotamer_coords, equivalent_indices in zip(self._coords, self._equivalent_indices):
             angle_values = []
             for coords in rotamer_coords:
-                angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
+                angle_values.append([np.rad2deg(dihedralAngle(coords[indices, :, 0])) for indices in equivalent_indices])
             self._angle_values.append(np.array(angle_values))
         self._angle_values_rad = [np.deg2rad(angle_values)[:, :, None] for angle_values in self._angle_values]
 
@@ -399,7 +399,7 @@ class DihedralFitting:
 
         return self.loss
 
-    def plotDihedralEnergies(self, idihed):
+    def plotDihedralEnergies(self, idihed, write_data=True):
         """
         Plot conformer energies for a specific dihedral angle, including QM, original and fitted MM energies.
         """
@@ -409,6 +409,15 @@ class DihedralFitting:
         initial_energy = self._initial_energies[idihed] - np.min(self._initial_energies[idihed])
         fitted_energy = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
         indices = np.argsort(angle)
+
+        path = os.path.join(self.result_directory, self._names[idihed])
+
+        if write_data:
+            fmtsz = 8
+            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# angle', 'QM_ref', 'MM_init', 'MM_fit'])
+            data = np.column_stack((angle[indices], reference_energy[indices], initial_energy[indices],
+                                    fitted_energy[indices]))
+            np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
 
         plt.figure()
         plt.title(self._names[idihed])
@@ -420,10 +429,10 @@ class DihedralFitting:
         plt.plot(angle[indices], initial_energy[indices], 'g-', marker='o', label='MM initial')
         plt.plot(angle[indices], fitted_energy[indices], 'b-', marker='o', label='MM fitted')
         plt.legend()
-        plt.savefig(os.path.join(self.result_directory, self._names[idihed] + '.svg'))
+        plt.savefig(path + '.svg')
         plt.close()
 
-    def plotConformerEnergies(self):
+    def plotConformerEnergies(self, write_data=True):
         """
         Plot all conformer QM energies versus MM energies with the fitted parameters
         """
@@ -437,13 +446,21 @@ class DihedralFitting:
         regression.fit(qm_energy, mm_energy)
         prediction = regression.predict(qm_energy)
 
+        path = os.path.join(self.result_directory, 'conformer-energies')
+
+        if write_data:
+            fmtsz = 8
+            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# QM', 'MM'])
+            data = np.column_stack((qm_energy, mm_energy))
+            np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
+
         plt.figure()
         plt.title('Conformer Energies MM vs QM')
         plt.xlabel('QM energy, kcal/mol')
         plt.ylabel('MM energy, kcal/mol')
         plt.plot(qm_energy, mm_energy, 'ko')
         plt.plot(qm_energy, prediction, 'r-', lw=2)
-        plt.savefig(os.path.join(self.result_directory, 'conformer-energies.svg'))
+        plt.savefig(path + '.svg')
         plt.close()
 
 
