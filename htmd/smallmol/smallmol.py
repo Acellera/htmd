@@ -114,6 +114,17 @@ class SmallMol:
 
         return _mol
 
+    def copy(self):
+        """
+        Create a copy of the molecule object
+
+        Returns
+        -------
+        newsmallmol : :class:`SmallMol`
+            A copy of the object
+        """
+        return deepcopy(self)
+
     def get_coords(self):
         """
         Returns molecule coordinates.
