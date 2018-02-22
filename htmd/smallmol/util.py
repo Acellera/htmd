@@ -109,3 +109,86 @@ def InputToOutput(input_file, input_format, output_format):
     _.WriteFile(_mol, outfile)
 
     return outfile
+
+
+def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=False, highlightAtoms=None):
+    from rdkit.Chem import RemoveHs
+    from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule
+    from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D
+    from IPython.display import SVG
+    from copy import deepcopy
+    from os.path import splitext
+
+    _highlight_colors = [(1.00,0.50,0.00), (0.00,0.50,1.00), (0.00,1.00,0.50),
+                         (1.00,0.00,0.50), (0.50,0.00,1.00), (0.50,1.00,0.00),
+                         (1.00,0.00,0.25), (0.00,0.25,1.00), (0.25,1.00,0.00)]
+
+    if sketch and optimize:
+        raise ValueError('Impossible to use optmization in  2D sketch representation')
+
+    if optimizemode not in ['std', 'mmff']:
+        raise ValueError('Optimization mode {} not understood. Can be "std" or  "ff"'.format(optimizemode))
+
+    if not isinstance(highlightAtoms, list):
+        raise ValueError('highlightAtoms should be a list of atom idx or a list of atom idx list ')
+
+    _mol = deepcopy(mol)
+
+    # 2D representation. Set z coords to 0
+    if sketch:
+        Compute2DCoords(_mol)
+    # Clean representation without hydrogens
+    if removeHs:
+        _mol = RemoveHs(_mol)
+
+    # init the drawer object
+    drawer = rdMolDraw2D.MolDraw2DSVG(400, 200)
+    # get the drawer options
+    opts = drawer.drawOptions()
+
+    # add atomlabels
+    if atomlabels:
+        for i in range(_mol.GetNumAtoms()):
+            opts.atomLabels[i] = _mol.GetAtomWithIdx(i).GetSymbol() + str(i)
+
+
+    # activate 3D coords optimization
+    if optimize:
+        if optimizemode == 'std':
+            EmbedMolecule(_mol)
+        elif optimizemode == 'mmff':
+            MMFFOptimizeMolecule(_mol)
+
+    # draw molecule
+    sel_atoms = []
+    sel_colors = {}
+    # highlight atoms
+    if highlightAtoms is not None:
+        if isinstance(highlightAtoms[0], list ):
+            sel_atoms = [aIdx for subset in highlightAtoms for aIdx in subset]
+            sel_colors = {aIdx: _highlight_colors[n%len(_highlight_colors)] for n, subset in enumerate(highlightAtoms) for aIdx in subset}
+        else:
+            sel_atoms = highlightAtoms
+            sel_colors = { aIdx:_highlight_colors[0] for aIdx in sel_atoms }
+
+    drawer.DrawMolecule(_mol, highlightAtoms=sel_atoms, highlightBonds=[], highlightAtomColors=sel_colors)
+
+    drawer.FinishDrawing()
+
+    # svg object
+    svg = drawer.GetDrawingText()
+
+    # activate saving into a file
+    if filename != None:
+        ext = splitext(filename)[-1]
+        filename = filename if ext != '' else filename + '.svg'
+        f = open(filename, 'w')
+        f.write(svg)
+        f.close()
+
+    # activate jupiter-notebook rendering
+    if ipython:
+        svg = svg.replace('svg:', '')
+        return SVG(svg)
+    else:
+        return None

@@ -9,7 +9,7 @@ from rdkit import rdBase
 from rdkit.Chem import ChemicalFeatures
 
 from htmd.molecule.voxeldescriptors import _getOccupancyC, _getGridCenters
-from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput
+from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput, _depictMol
 from copy import deepcopy
 import logging
 
@@ -342,6 +342,38 @@ class SmallMol:
         for a in self._mol.GetAtoms():
             charges.append(a.GetFormalCharge())
         return np.array(charges)
+
+
+    def depict(self, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=False, highlightAtoms=None):
+        """
+        Depicts the molecules. It is possible to save it into an svg file and also generates a jupiter-notebook rendering
+
+        Parameters
+        ----------
+        sketch: bool
+            Set to True for 2D depiction
+        filename: str
+            Set the filename for the svg file
+        ipython: bool
+            Set to True to return the jupiter-notebook rendering
+        optimize: bool
+            Set to True to optimize the conformation. Works only with 3D.
+        optimizemode: ['std', 'mmff'], default='std'
+            Set the optimization mode for 3D conformation
+        removeHs: bool, default=True
+            Set to True to hide hydrogens in the depiction
+        atomlabels: bool
+            Set to True to show the atom labels
+        highlightAtoms: list
+            List of atom to highligh. It can be also a list of atom list, in this case different colors will be used
+
+        Returns
+        -------
+            ipython_svg: SVG object if ipython is set to True
+
+        """
+        return  _depictMol(self._mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
+
 
 
 class SmallMolStack:
