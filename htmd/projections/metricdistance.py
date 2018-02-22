@@ -11,6 +11,69 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class AtomGroup:
+    def __init__(self, sel, mode):
+        """ Manually construct an AtomGroup object by passing the atomselection of all atoms of the group
+
+        Parameters
+        ----------
+        sel : str
+            Atomselection string for the atom group
+        mode: ['min', 'max', 'cm', gc']
+            'min' will produce the minimum distance of this group to other atoms/groups, 'max' the maximum
+            'cm' will produce the distance of the center of masses of this group to other atoms/groups
+            'gc' will produce the distance of the geometric centers of this group to other atoms/groups
+        """
+        self.sel = sel
+        self.mode = mode
+
+    @staticmethod
+    def getGroupsByResidue(mol, sel, mode='min'):
+        """ Groups all atoms in `sel` by their corresponding residue and returns these groups.
+
+        Parameters
+        ----------
+        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+            A Molecule object on which to apply the selection
+        sel : str
+            The atom selection
+        mode: ['min', 'max', 'cm', gc']
+            'min' will produce the minimum distance of this group to other atoms/groups, 'max' the maximum
+            'cm' will produce the distance of the center of masses of this group to other atoms/groups
+            'gc' will produce the distance of the geometric centers of this group to other atoms/groups
+
+        Returns
+        -------
+        ag : list
+            A list of :class:`AtomGroup` objects, one for each residue
+
+        Examples
+        --------
+        >>> mol = Molecule('3PTB')
+        >>> res = AtomGroup.getGroupsByResidue(mol, 'chain A')
+        >>> res = AtomGroup.getGroupsByResidue(mol, 'residue 40 43 56')
+        """
+        idx = mol.atomselect(sel, indexes=True)
+        resids = mol.resid[idx]
+        chains = mol.chain[idx]
+        segids = mol.segid[idx]
+        uqid = list({x for x in list(zip(resids, chains, segids))})
+        ag = []
+        for uq in sorted(uqid):
+            ag.append(AtomGroup('resid {} and chain {} and segid {}'.format(uq[0], uq[1], uq[2]), mode))
+        return ag
+
+    def groupToIndexes(self, mol):
+        return mol.atomselect(self.sel, indexes=True)
+
+    def __str__(self):
+        descr = 'AtomGroup sel: "{}" mode: {}'.format(self.sel, self.mode)
+        return descr
+
+    def __repr__(self):
+        return self.__str__()
+
+
 class MetricDistance(Projection):
     """ Creates a MetricDistance object
 
