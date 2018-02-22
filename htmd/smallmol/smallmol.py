@@ -9,7 +9,7 @@ from rdkit import rdBase
 from rdkit.Chem import ChemicalFeatures
 
 from htmd.molecule.voxeldescriptors import _getOccupancyC, _getGridCenters
-from htmd.smallmol.util import get_rotationMatrix, rotate
+from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput
 from copy import deepcopy
 import logging
 
@@ -43,7 +43,7 @@ class SmallMol:
     fdefName = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
     factory = ChemicalFeatures.BuildFeatureFactory(fdefName)
 
-    def __init__(self, mol, ignore_errors=False, addHs=True):
+    def __init__(self, mol, ignore_errors=False, force_reading=False, addHs=True):
         """
         Initializes small molecule object
 
@@ -53,36 +53,66 @@ class SmallMol:
             (i) Rdkit molecule or (ii) Location of molecule file (".pdb"/".mol2") or (iii) a smile string.
         ignore_errors: bool
             If True errors will not be raised.
+        force_reading: bool
+            If the mol provided is not accepted, the molecule will be initially converted into sdf
+        addHs: bool
+            The hydrogens will be reassigned
         """
 
-        #  Determine how to load molecule
-        # Process as Rdkit molecule
-        if isinstance(mol, Chem.Mol):
-            self._mol = mol
-        elif mol is None and not ignore_errors:
-            self._mol = mol
-
-        # Process as string
-        elif isinstance(mol, str):
-            name_sufix = os.path.splitext(mol)[-1]
-            if name_sufix == ".mol2":
-                self._mol = Chem.MolFromMol2File(mol)
-            elif name_sufix == ".pdb":
-                self._mol = Chem.MolFromPDBFile(mol)
-
-            # We assume any string is a valid smile
-            # TODO: validate the strings
+        # load the input and store the rdkit Mol obj
+        self._mol = self._initializeMolObj(mol, force_reading)
+        if not ignore_errors and self._mol == None:
+            if not force_reading:
+                raise ValueError("Unkown '{}' provided. Not a valid mol2,pdb,smile, rdkitMol obj. Try by setting the force_reading option as True.".format(mol))
             else:
-                self._mol = Chem.MolFromSmiles(mol)
-
-        # Don't feed garbage!
-        else:
-            raise ValueError("Unkown file type: '{}'.".format(type(mol)))
+                raise ValueError("Unkown '{}' provided. Not a valid mol2,pdb,smile, rdkitMol obj.".format(mol))
 
         # Add hydrogens
         if addHs:
             self._mol = Chem.RemoveHs(self._mol)
             self._mol = Chem.AddHs(self._mol, addCoords=True)
+
+    def _initializeMolObj(self, mol, force_reading):
+        """
+        Read the input and it try to convert it into a rdkit Molecule obj
+
+        Parameters
+        ----------
+        mol: str or rdkit Molecule object
+            i) rdkit Molecule Object ii) The path to the pdb/mol2 to load iii) The smile string
+        force_reading: bool
+           If the mol provided is not accepted, the molecule will be initially converted into sdf
+
+        Returns
+        -------
+        _mol: rdkit Molecule object
+
+        """
+
+        _mol = None
+        if isinstance(mol, Chem.Mol):
+            mol = _mol
+
+        elif isinstance(mol, str):
+            if os.path.isfile(mol):
+                name_suffix = os.path.splitext(mol)[-1]
+                if name_suffix == ".mol2":
+                    _mol = Chem.MolFromMol2File(mol)
+                elif name_suffix == ".pdb":
+                    _mol = Chem.MolFromPDBFile(mol)
+
+                if _mol == None and force_reading:
+                    logger.warning('Reading {} with force_reading procedure'.format(mol))
+                    sdf = InputToOutput(mol, name_suffix, 'sdf')
+                    _mol = Chem.SDMolSupplier(sdf)[0]
+                    os.remove(sdf)
+
+            # assuming is a smile
+            # TODO validate it. Implement smarts recognition
+            else:
+                _mol = Chem.MolFromSmiles(mol)
+
+        return _mol
 
     def get_coords(self):
         """

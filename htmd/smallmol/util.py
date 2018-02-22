@@ -74,3 +74,38 @@ def drawIsoSurface(values3d, resolution=1., plot_center=None, viewer=None):
     writeVoxels(values3d, outf, mincoor, maxcoor, rescoor)
     viewer.send('mol new {} type cube first 0 last -1 step 1 waitfor 1 volsets {{0 }}'.format(outf))
     viewer.send('mol modstyle 0 top Isosurface 0.75 0 2 0 1 1')
+
+def InputToOutput(input_file, input_format, output_format):
+    """
+    Converts the file from the input format to the output format specified. It uses the openbabel features
+
+    Parameters
+    ----------
+    input_file: str
+        The path of the input file to convert
+    input_format: str
+        The input file format
+    output_format: str
+        The output file format
+
+    Returns
+    -------
+    outfile: str
+        The output file generated
+    """
+
+    import openbabel
+    import tempfile
+    input_format = input_format[1:] if input_format.startswith('.') else input_format
+
+    file = tempfile.NamedTemporaryFile(delete=True, suffix='.' + output_format)
+    file.close()
+    outfile = file.name
+
+    _ = openbabel.OBConversion()
+    _.SetInAndOutFormats(input_format, output_format)
+    _mol = openbabel.OBMol()
+    _.ReadFile(_mol, input_file)
+    _.WriteFile(_mol, outfile)
+
+    return outfile
