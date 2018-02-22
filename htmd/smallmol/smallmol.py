@@ -67,6 +67,9 @@ class SmallMol:
             else:
                 raise ValueError("Unkown '{}' provided. Not a valid mol2,pdb,smile, rdkitMol obj.".format(mol))
 
+        if not self._mol.HasProp('_Name'):
+            self.set_name()
+
         # Add hydrogens
         if addHs:
             self._mol = Chem.RemoveHs(self._mol)
@@ -287,6 +290,17 @@ class SmallMol:
 
     def get_name(self):
         return self._mol.GetProp('_Name')
+
+    def set_name(self, name='UNK'):
+        """
+        Set the property '_Name' into the rdkit Mol object
+
+        Parameters
+        ----------
+        name: str
+            The molecule name
+        """
+        self._mol.SetProp('_Name', name)
 
     def get_natoms(self):
         return self._mol.GetNumAtoms()
