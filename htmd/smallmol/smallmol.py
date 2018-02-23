@@ -134,6 +134,73 @@ class SmallMol:
         """
         return self._mol
 
+    def get_element(self, atom):
+        """
+        Returns the element of the atom. The rkdit.Chem.rdchem.Atom or the index can be passed
+
+        Parameters
+        ----------
+        atom: int or rdkit.Chem.rdchem.Atom
+            The atom you want to retrieve the element
+
+        Returns
+        -------
+        element: str
+            The element of the atom
+        """
+        from rdkit.Chem.rdchem import Atom
+
+        if isinstance(atom, int):
+            _mol = self.get_mol()
+            atom = _mol.GetAtomWithIdx(atom)
+        if not isinstance(atom, Atom):
+            raise ValueError('type {} not valid. Should be "int" or "rdkit.Chem.rdchem.Atom"'.format(type(atom)))
+        element = atom.GetSymbol()
+        return element
+
+    def get_atom(self, sel, returnAll=False):
+        """
+        Return the rdkit.Chem.rdchem.Atom of the sel. The sel can be the idx of the atom or the element. If returnAll
+        is set to True, all the incindences all returned as list
+
+        Parameters
+        ----------
+        sel: int or str
+            The selector can be the element or the atom index
+        returnAll: bool
+            Set to True if you want all the incidences. In this case a list will be returned
+
+        Returns
+        -------
+        atoms: rdkit.Chem.rdchem.Atom or list
+            A single or a list of rdkit.Chem.rdchem.Atom based on the returnAll value
+        """
+
+        _mol = self.get_mol()
+        if isinstance(sel, int):
+            atoms = [_mol.GetAtomWithIdx(sel)]
+
+        elif isinstance(sel, str):
+            atoms = [ a for a in self.get_atoms() if self.get_element(a) == sel]
+        else:
+            raise ValueError('type {} not valid. Should be "int" or "str"'.format(type(sel)))
+
+        if len(atoms) == 0:
+            return None
+
+        if not returnAll:
+            return atoms[0]
+        else:
+            return atoms
+
+    def get_atoms(self):
+        """
+        Retuns all the rdkit.Chem.rdchem.Atom present in the molecule
+        """
+
+        _mol = self.get_mol()
+        return _mol.GetAtoms()
+
     def get_coords(self):
         """
         Returns molecule coordinates.
