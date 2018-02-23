@@ -1075,9 +1075,10 @@ class Molecule:
         sel : str
             Atomselection string for a representation.
         style : str
-            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
+            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node55.html>`__.
         color : str or int
-            Coloring mode or color ID. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
+            Coloring mode (str) or ColorID (int).
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node85.html>`__.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
         viewer : str ('vmd', 'webgl')
@@ -1665,11 +1666,10 @@ class Representations:
         sel : str
             Atom selection for the given representation (i.e. which part of the molecule to show)
         style : str
-            Representation visual style (e.g. lines, NewCartoon, VdW, etc.). See more
-            `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
-        color : str
-            Color style (e.g. secondary structure) or ID (a number) See more
-            `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
+            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node55.html>`__.
+        color : str or int
+            Coloring mode (str) or ColorID (int).
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node85.html>`__.
         """
         self.replist.append(_Representation(sel, style, color))
 
@@ -1757,11 +1757,10 @@ class _Representation:
     sel : str
         Atom selection for the given representation.
     style : str
-        Representation visual style.
-    color : str
-        Color style.
-    colorid: int
-        Color ID, if `color` was set to 'colorID'.
+        Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node55.html>`__.
+    color : str or int
+        Coloring mode (str) or ColorID (int).
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node85.html>`__.
 
     Examples
     --------
