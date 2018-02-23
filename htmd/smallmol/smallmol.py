@@ -9,7 +9,7 @@ from rdkit import rdBase
 from rdkit.Chem import ChemicalFeatures
 
 from htmd.molecule.voxeldescriptors import _getOccupancyC, _getGridCenters
-from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput, _depictMol
+from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput, _depictMol, depictMultipleMols
 from copy import deepcopy
 import logging
 
@@ -350,7 +350,8 @@ class SmallMol:
         return np.array(charges)
 
 
-    def depict(self, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=False, highlightAtoms=None):
+    def depict(self, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True,
+                     atomlabels=False, highlightAtoms=None):
         """
         Depicts the molecules. It is possible to save it into an svg file and also generates a jupiter-notebook rendering
 
@@ -378,7 +379,8 @@ class SmallMol:
             ipython_svg: SVG object if ipython is set to True
 
         """
-        return  _depictMol(self._mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
+        _mol = self.get_mol()
+        return  _depictMol(_mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
 
 
 
@@ -487,6 +489,62 @@ class SmallMolStack:
             pool.close()
         else:
             raise ValueError("n_jobs needs to be a positive integer!")
+
+    def depict(self, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std',
+               removeHs=True,  legends=None, highlightAtoms=None, mols_perrow=3):
+
+        """
+        Depicts the molecules into a grid. It is possible to save it into an svg file and also generates a
+        jupiter-notebook rendering
+
+        Parameters
+        ----------
+        sketch: bool
+            Set to True for 2D depiction
+        filename: str
+            Set the filename for the svg file
+        ipython: bool
+            Set to True to return the jupiter-notebook rendering
+        optimize: bool
+            Set to True to optimize the conformation. Works only with 3D.
+        optimizemode: ['std', 'mmff'], default='std'
+            Set the optimization mode for 3D conformation
+        removeHs: bool, default=True
+            Set to True to hide hydrogens in the depiction
+        legends: str
+            The name to used for each molecule. Can be 'names':the name of themselves; or 'items': a incremental id
+        highlightAtoms: list
+            A List of atom to highligh for each molecule. It can be also a list of atom list, in this case different
+            colors will be used
+        mols_perrow: int
+            The number of molecules to depict per row of the grid
+
+        Returns
+        -------
+            ipython_svg: SVG object if ipython is set to True
+
+        """
+
+        if legends is not None and legends not in ['names', 'items']:
+
+            raise ValueError('The "legends" should be "names" or "items"')
+
+        legends_list = []
+        if legends == 'names':
+            legends_list = [ _m.get_name() for _m in self._mols ]
+        elif legends == 'items':
+            legends_list = [ str(n+1) for n in range(len(self._mols))]
+
+        _mols = [ _m.get_mol() for _m in self._mols ]
+
+        if highlightAtoms is not None:
+            if len(highlightAtoms) != len(_mols):
+                raise ValueError('The highlightAtoms {} should have the same length of the mols {}'.format(len(highlightAtoms), len(_mols)))
+
+
+        return depictMultipleMols(_mols, sketch, filename, ipython, optimize, optimizemode,
+                                removeHs, legends_list, highlightAtoms, mols_perrow)
+
 
 
 if __name__ == '__main__':
