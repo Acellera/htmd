@@ -36,8 +36,7 @@ def _loadFiles(folder1, folder2):
 
 def _compareDihedralEnergies(mol, prm1, prm2, argdihedrals):
     from htmd.molecule.util import guessAnglesAndDihedrals
-    from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
-    from htmd.parameterization.detectequivalents import detectEquivalents
+    from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
     from htmd.ffevaluation.ffevaluate import ffevaluate
     import numpy as np
 
@@ -50,8 +49,8 @@ def _compareDihedralEnergies(mol, prm1, prm2, argdihedrals):
     # Guess angles and dihedrals
     mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds, cyclicdih=True)
 
-    equivalents = detectEquivalents(mol)
-    all_dihedrals = [x.atoms for x in detectSoftDihedrals(mol, equivalents)]
+    equivalents = detectEquivalentAtoms(mol)
+    all_dihedrals = [x.atoms for x in detectParameterizableDihedrals(mol)]
 
     def dihedralName(mol, dih):
         return '-'.join(mol.name[dih])

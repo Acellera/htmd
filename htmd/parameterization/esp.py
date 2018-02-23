@@ -223,7 +223,7 @@ class ESP:
 
         charges = np.zeros(self.molecule.numAtoms)
         for atom_group, group_charge in zip(self.equivalent_atom_groups, group_charges):
-            charges[atom_group] = group_charge
+            charges[list(atom_group)] = group_charge
 
         return charges
 

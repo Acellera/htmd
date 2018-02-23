@@ -9,8 +9,7 @@ logger = logging.getLogger(__name__)
 
 def getEquivalentsAndDihedrals(mol):
     from htmd.molecule.util import guessAnglesAndDihedrals
-    from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
-    from htmd.parameterization.detectequivalents import detectEquivalents
+    from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
 
     mol = mol.copy()
 
@@ -20,9 +19,9 @@ def getEquivalentsAndDihedrals(mol):
         mol.bonds = mol._guessBonds()
 
     mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds, cyclicdih=True)
-    equivalents = detectEquivalents(mol)
-    all_dihedrals = detectSoftDihedrals(mol, equivalents)
-    return mol, equivalents, {'-'.join(mol.name[dihedral.atoms]): dihedral for dihedral in all_dihedrals}
+    equivalents = detectEquivalentAtoms(mol)
+    all_dihedrals = detectParameterizableDihedrals(mol)
+    return mol, equivalents, {'-'.join(mol.name[dihedral]): dihedral for dihedral in all_dihedrals}
 
 
 def canonicalizeAtomNames(mol, inplace=False):
