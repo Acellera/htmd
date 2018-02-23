@@ -2,6 +2,10 @@ from math import cos, sqrt, sin
 import numpy as np
 
 
+_highlight_colors = [(1.00,0.50,0.00), (0.00,0.50,1.00), (0.00,1.00,0.50),
+                     (1.00,0.00,0.50), (0.50,0.00,1.00), (0.50,1.00,0.00),
+                     (1.00,0.00,0.25), (0.00,0.25,1.00), (0.25,1.00,0.00)]
+
 def get_rotationMatrix(axis, theta):
     """ Generates a rotation matrix given an axis and radians
     Return the rotation matrix associated with counterclockwise rotation about
@@ -114,14 +118,10 @@ def InputToOutput(input_file, input_format, output_format):
 def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=False, highlightAtoms=None):
     from rdkit.Chem import RemoveHs
     from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule
-    from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D
+    from rdkit.Chem.Draw import rdMolDraw2D
     from IPython.display import SVG
     from copy import deepcopy
     from os.path import splitext
-
-    _highlight_colors = [(1.00,0.50,0.00), (0.00,0.50,1.00), (0.00,1.00,0.50),
-                         (1.00,0.00,0.50), (0.50,0.00,1.00), (0.50,1.00,0.00),
-                         (1.00,0.00,0.25), (0.00,0.25,1.00), (0.25,1.00,0.00)]
 
     if sketch and optimize:
         raise ValueError('Impossible to use optmization in  2D sketch representation')
@@ -129,7 +129,7 @@ def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, 
     if optimizemode not in ['std', 'mmff']:
         raise ValueError('Optimization mode {} not understood. Can be "std" or  "ff"'.format(optimizemode))
 
-    if not isinstance(highlightAtoms, list):
+    if highlightAtoms is not None and not isinstance(highlightAtoms, list):
         raise ValueError('highlightAtoms should be a list of atom idx or a list of atom idx list ')
 
     _mol = deepcopy(mol)
@@ -189,6 +189,61 @@ def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, 
     # activate jupiter-notebook rendering
     if ipython:
         svg = svg.replace('svg:', '')
+        return SVG(svg)
+    else:
+        return None
+
+def depictMultipleMols(mols_list, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std',
+                       removeHs=True,  legends=None, highlightAtoms=None, mols_perrow=3):
+
+    from rdkit.Chem import RemoveHs
+    from rdkit.Chem.Draw import MolsToGridImage
+    from rdkit.Chem.AllChem import Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule
+    from copy import deepcopy
+    from IPython.display import SVG
+    from os.path import splitext
+
+    if sketch and optimize:
+        raise ValueError('Impossible to use optmization in  2D sketch representation')
+
+    _mols = [ deepcopy(m) for m in mols_list ]
+
+    if sketch:
+        for _m in _mols: Compute2DCoords(_m)
+
+    if removeHs:
+        _mols = [ RemoveHs(_m) for _m in _mols ]
+
+    # activate 3D coords optimization
+    if optimize:
+        if optimizemode == 'std':
+            for _m in _mols: EmbedMolecule(_m)
+        elif optimizemode == 'mmff':
+            for _m in _mols: MMFFOptimizeMolecule(_m)
+
+
+    sel_atoms = []
+    sel_colors = []
+    if highlightAtoms is not None:
+        if isinstance(highlightAtoms[0][0], list):
+            sel_atoms = [ [a for a in subset] for mol_set in highlightAtoms for subset in mol_set ]
+            sel_colors = [ {aIdx:_highlight_colors[n%len(_highlight_colors)] for aIdx in subset } for mol_set in highlightAtoms for n, subset in enumerate(mol_set)  ]
+        else:
+            sel_atoms = highlightAtoms
+            sel_colors = [ {aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms ]
+
+
+    svg = MolsToGridImage(_mols, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
+                          legends=legends, molsPerRow=mols_perrow, useSVG=True)
+
+    if filename:
+        ext = splitext(filename)[-1]
+        filename = filename if ext != '' else filename + '.svg'
+        f = open(filename, 'w')
+        f.write(svg)
+        f.close()
+
+    if ipython:
         return SVG(svg)
     else:
         return None
