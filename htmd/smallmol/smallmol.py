@@ -128,6 +128,12 @@ class SmallMol:
         """
         return deepcopy(self)
 
+    def get_mol(self):
+        """
+        Returns the rdkit Molecule object
+        """
+        return self._mol
+
     def get_coords(self):
         """
         Returns molecule coordinates.
