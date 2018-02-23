@@ -101,7 +101,7 @@ VdW      : {VDW_ENERGY}
         file_.write(string)
 
 
-def printReport(mol, netcharge, equivalents, rotatable_dihedrals):
+def printReport(mol, netcharge, equivalents, all_dihedrals):
 
     print('\n == Molecule report ==\n')
 
@@ -112,13 +112,14 @@ def printReport(mol, netcharge, equivalents, rotatable_dihedrals):
     for atom_group in equivalents[0]:
         print('  ' + ', '.join(mol.name[atom_group]))
 
-    print('Rotatable dihedral angles:')
-    for dihname in rotatable_dihedrals:
-        print('  ' + dihname)
-        if rotatable_dihedrals[dihname].equivalents:
+    print('Parameterizable dihedral angles:')
+    for equivalent_dihedrals in all_dihedrals:
+        dihedral, equivalent_dihedrals = equivalent_dihedrals[0], equivalent_dihedrals[1:]
+        print('  ' + '-'.join(mol.name[list(dihedral)]))
+        if equivalent_dihedrals:
             print('    Equivalents:')
-        for equivalent_dihedral in rotatable_dihedrals[dihname].equivalents:
-            print('      ' + '-'.join(mol.name[equivalent_dihedral]))
+            for dihedral in equivalent_dihedrals:
+                print('      ' + '-'.join(mol.name[list(dihedral)]))
 
 
 def main_parameterize(arguments=None):
@@ -185,7 +186,8 @@ def main_parameterize(arguments=None):
     if args.list:
         print('\n === Parameterizable dihedral angles of {} ===\n'.format(args.filename))
         with open('torsions.txt', 'w') as fh:
-            for dihname in all_dihedrals:
+            for dih in all_dihedrals:
+                dihname = '-'.join(list(dih[0]))
                 print('  {}'.format(dihname))
                 fh.write(dihname+'\n')
         print()
@@ -199,13 +201,14 @@ def main_parameterize(arguments=None):
     qm.netcharge = netcharge
 
     # Select which dihedrals to fit
-    fit_dihedrals = [all_dihedrals[dih].atoms for dih in all_dihedrals]
+    fit_dihedrals = [dih[0] for dih in all_dihedrals]
     if len(args.dihedral) > 0:
+        all_dihedral_names = ['-'.join(mol.name[list(dihedral)]) for dihedral in all_dihedrals]
         fit_dihedrals = []
         for dihedral_name in args.dihedral:
-            if dihedral_name not in all_dihedrals:
+            if dihedral_name not in all_dihedral_names:
                 raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
-            fit_dihedrals.append(all_dihedrals[dihedral_name].atoms)
+            fit_dihedrals.append(all_dihedrals[all_dihedral_names.index(dihedral_name)][0])
 
     # Print arguments
     print('\n === Arguments ===\n')

@@ -123,8 +123,8 @@ class DihedralFitting:
         self._equivalent_indices = []
         for idihed, dihedral in enumerate(self.dihedrals):
             for rotatableDihedral in self._rotatable_dihedrals:
-                if np.all(rotatableDihedral.atoms == dihedral):
-                    self._equivalent_indices.append([dihedral] + rotatableDihedral.equivalents)
+                if np.all(rotatableDihedral[0] == dihedral):
+                    self._equivalent_indices.append(rotatableDihedral)
                     break
             else:
                 raise ValueError('%s is not recognized as a parameterizable dihedral\n' % self._names[idihed])
