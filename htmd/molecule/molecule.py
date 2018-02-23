@@ -1118,9 +1118,7 @@ class Molecule:
         if viewer is None:
             from htmd.config import _config
             viewer = _config['viewer']
-        if viewer.lower() == 'notebook':
-            retval = self._viewMDTraj(psf, xtc)
-        elif viewer.lower() == 'vmd':
+        if viewer.lower() == 'vmd':
             pdb = tempname(suffix=".pdb")
             self.write(pdb, writebonds=False)
             self._viewVMD(psf, pdb, xtc, viewerhandle, name, guessBonds)
@@ -1165,18 +1163,6 @@ class Molecule:
         self._tempreps.append(self.reps)
         self._tempreps._repsVMD(vhandle)
         self._tempreps.remove()
-
-    def _viewMDTraj(self, psf, xtc):
-        from mdtraj.html import TrajectoryView, TrajectorySliderView, enable_notebook
-        import mdtraj
-        enable_notebook()
-
-        t = mdtraj.load(xtc, top=psf)
-        if self.numFrames > 1:
-            widget = TrajectorySliderView(t)
-        else:
-            widget = TrajectoryView(t)
-        return widget
 
     def _viewNGL(self, gui=False):
         from nglview import HTMDTrajectory
