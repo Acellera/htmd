@@ -9,6 +9,7 @@ import argparse
 import logging
 import numpy as np
 
+import htmd.ui
 from htmd.version import version
 from htmd.queues.localqueue import LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
@@ -165,8 +166,8 @@ def main_parameterize(arguments=None):
                          outdir=args.outdir)
         print('\n === Parameterizable dihedral angles of %s ===\n' % args.filename)
         with open('torsions.txt', 'w') as fh:
-            for dihedral in mol.getRotatableDihedrals():
-                dihedral_name = '-'.join(mol.name[dihedral])
+            for dihedral in mol.getParameterizableDihedrals():
+                dihedral_name = '-'.join(mol.name[list(dihedral)])
                 print('  '+dihedral_name)
                 fh.write(dihedral_name+'\n')
         print()
@@ -251,14 +252,14 @@ def main_parameterize(arguments=None):
                 np.random.seed(args.seed)
 
             # Get all rotatable dihedrals
-            all_dihedrals = mol.getRotatableDihedrals()
+            all_dihedrals = mol.getParameterizableDihedrals()
 
             # Choose which dihedrals to fit
             dihedrals = []
-            all_dihedral_names = ['-'.join(mol.name[dihedral]) for dihedral in all_dihedrals]
+            all_dihedral_names = ['-'.join(mol.name[list(dihedral)]) for dihedral in all_dihedrals]
             for dihedral_name in args.dihedral:
                 if dihedral_name not in all_dihedral_names:
-                    raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
+                    raise ValueError('%s is not recognized as a parameterizable dihedral angle' % dihedral_name)
                 dihedrals.append(all_dihedrals[all_dihedral_names.index(dihedral_name)])
             dihedrals = dihedrals if len(dihedrals) > 0 else all_dihedrals  # Set default to all dihedral angles
 

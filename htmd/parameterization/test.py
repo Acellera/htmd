@@ -157,7 +157,7 @@ class TestParameterize(unittest.TestCase):
         self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     def test_ethene_dihed_fix_restart(self):
-        refDir = os.path.join(self.dataDir, 'ethene_dihed_fix')
+        refDir = os.path.join(self.dataDir, 'ethene_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'ethene_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
@@ -169,16 +169,16 @@ class TestParameterize(unittest.TestCase):
         self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     def test_glycol_dihed_fix_restart(self):
-        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._test(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
 
     def test_glycol_dihed_fix_restart_2(self):
-        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart_2')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -d O1-C1-C2-O2 C1-C2-O2-H6 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, resDir, 'parameterize input.mol2 -d C2-C1-O1-H1 O1-C1-C2-O2 --no-min --no-esp --no-dihed-opt')
 
     def test_glycol_dihed_select_1_restart(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
@@ -190,7 +190,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_2_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_select_2_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._test(refDir, resDir, 'parameterize input.mol2 -d C1-C2-O2-H6 --no-min --no-esp --no-dihed-opt')
+        self._test(refDir, resDir, 'parameterize input.mol2 -d C2-C1-O1-H1 --no-min --no-esp --no-dihed-opt')
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_ethanolamine_dihed_fix(self):

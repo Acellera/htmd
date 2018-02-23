@@ -14,8 +14,7 @@ import periodictable
 from htmd.molecule.molecule import Molecule
 from htmd.molecule import vdw
 from htmd.molecule.util import guessAnglesAndDihedrals
-from htmd.parameterization.detectsoftdihedrals import detectSoftDihedrals
-from htmd.parameterization.detectequivalents import detectEquivalents
+from htmd.parameterization.detect import detectEquivalentAtoms, detectParameterizableDihedrals
 from htmd.parameterization.fftype import FFTypeMethod, FFType
 from htmd.parameterization.ff import RTF, PRM
 from htmd.parameterization.ffevaluate import FFEvaluate
@@ -56,13 +55,13 @@ class FFMolecule(Molecule):
         self.angles, self.dihedrals = guessAnglesAndDihedrals(self.bonds, cyclicdih=True)
 
         # Detect equivalent atoms
-        equivalents = detectEquivalents(self)
+        equivalents = detectEquivalentAtoms(self)
         self._equivalent_atom_groups = equivalents[0]  # List of groups of equivalent atoms
         self._equivalent_atoms = equivalents[1]  # List of equivalent atoms, indexed by atom
         self._equivalent_group_by_atom = equivalents[2]  # Mapping from atom index to equivalent atom group
 
-        # Detect rotatable dihedrals
-        self._rotatable_dihedrals = detectSoftDihedrals(self, equivalents)
+        # Detect parametrizable dihedrals
+        self._parameterizable_dihedrals = detectParameterizableDihedrals(self)
 
         # Set total charge
         if netcharge is None:
@@ -128,15 +127,16 @@ class FFMolecule(Molecule):
 
         print('Equivalent atom groups:')
         for atom_group in self._equivalent_atom_groups:
-            print('  ' + ', '.join(self.name[atom_group]))
+            print('  ' + ', '.join(self.name[list(atom_group)]))
 
-        print('Rotatable dihedral angles:')
-        for dihedral in self._rotatable_dihedrals:
-            print('  ' + '-'.join(self.name[dihedral.atoms]))
-            if dihedral.equivalents:
+        print('Parameterizable dihedral angles:')
+        for equivalent_dihedrals in self._parameterizable_dihedrals:
+            dihedral, equivalent_dihedrals = equivalent_dihedrals[0], equivalent_dihedrals[1:]
+            print('  ' + '-'.join(self.name[list(dihedral)]))
+            if equivalent_dihedrals:
                 print('    Equivalents:')
-            for equivalent_dihedral in dihedral.equivalents:
-                print('      ' + '-'.join(self.name[equivalent_dihedral]))
+                for dihedral in equivalent_dihedrals:
+                    print('      ' + '-'.join(self.name[list(dihedral)]))
 
     @staticmethod
     def guessElementFromName(name):
@@ -292,9 +292,9 @@ class FFMolecule(Molecule):
 
         return dipole
 
-    def getRotatableDihedrals(self):
+    def getParameterizableDihedrals(self):
 
-        return [dihedral.atoms.copy() for dihedral in self._rotatable_dihedrals]
+        return [equivalent_dihedrals[0] for equivalent_dihedrals in self._parameterizable_dihedrals]
 
     def fitDihedrals(self, dihedrals, geomopt=True):
         """
@@ -325,7 +325,7 @@ class FFMolecule(Molecule):
         directories = []
         dihedral_directory = 'dihedral-opt' if geomopt else 'dihedral-single-point'
         for dihedral in dihedrals:
-            dihedral_name = '-'.join(self.name[dihedral])
+            dihedral_name = '-'.join(self.name[list(dihedral)])
             directory = os.path.join(self.outdir, dihedral_directory, dihedral_name, self.qm_method_name())
             os.makedirs(directory, exist_ok=True)
             directories.append(directory)
