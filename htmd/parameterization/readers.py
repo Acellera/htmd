@@ -77,7 +77,7 @@ def readRTF(filename):
 
     names = np.array(names, dtype=object)
     type_by_index = np.array(type_by_index, dtype=object)
-    element_by_idx = np.array([element_by_type[t] for t in type_by_index], dtype=object)
+    element_by_idx = np.array([element_by_type[t].lower().capitalize() for t in type_by_index], dtype=object)
     charge_by_idx = np.array([charge_by_name[n] for n in names], dtype=np.float32)
     mass_by_idx = np.array([mass_by_type[t] for t in type_by_index], dtype=np.float32)
 
