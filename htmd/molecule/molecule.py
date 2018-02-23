@@ -797,7 +797,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', _logger=True):
+    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', guess=None, _logger=True):
         """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
         mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
@@ -901,6 +901,17 @@ class Molecule:
             self._parseTraj(traj, skip=skip)
 
         self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
+
+        if guess is not None:
+            if 'bonds' in guess:
+                self.bonds = self._guessBonds()
+            if 'dihedrals' in guess or 'angles' in guess:
+                from htmd.molecule.util import guessAnglesAndDihedrals
+                angles, dihedrals = guessAnglesAndDihedrals(self.bonds)
+                if 'angles' in guess:
+                    self.angles = angles
+                if 'dihedrals' in guess:
+                    self.dihedrals = dihedrals
 
     def _checkCoords(self, traj, reader, f):
         coords = traj.coords[0]
