@@ -40,8 +40,6 @@ def rotate(coords, rotMat, center=(0,0,0)):
         The rotation matrix
     center : list
         The rotation center
-    sel :
-        Atomselection for atoms to rotate
     """
 
     newcoords = coords - center
