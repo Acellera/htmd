@@ -189,6 +189,40 @@ class SmallMol:
         """
         return self._mol
 
+    def get_neighbours(self, atom, returnAsIdx=False):
+        """
+        Returns the atom neighbours of the atom passed. If returnAsIdx is set as True, the idx of the atoms are returned
+        otherwise the rdkit Atom objects
+
+        Parameters
+        ----------
+        atom: int or rdkit.Chem.rdchem.Atom
+            The atom as index or rdkit Atom object
+        returnAsIdx: bool
+            Set as True if you want to retrieve the neighbours as atom indexes
+
+        Returns
+        -------
+        neighbours: list
+            List of atom neighbours. If returnAsIdx set as True: list of atom indexes, otherwise list of rdkit Atom objs
+        """
+
+        from rdkit.Chem.rdchem import Atom
+
+        if isinstance(atom, int):
+            _mol = self.get_mol()
+            atom = _mol.GetAtomWithIdx(atom)
+
+        if not isinstance(atom, Atom):
+            raise ValueError('type {} not valid. Should be "int" or "rdkit.Chem.rdchem.Atom"'.format(type(atom)))
+
+        neighbours = atom.GetNeighbors()
+
+        if returnAsIdx:
+            return [ a.GetIdx() for a in neighbours ]
+
+        return  neighbours
+
     def get_element(self, atom):
         """
         Returns the element of the atom. The rkdit.Chem.rdchem.Atom or the index can be passed
