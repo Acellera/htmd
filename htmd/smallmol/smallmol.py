@@ -7,6 +7,7 @@ from rdkit import Chem
 from rdkit import RDConfig
 from rdkit import rdBase
 from rdkit.Chem import ChemicalFeatures
+from rdkit.Chem.rdchem import ChiralType
 
 from htmd.molecule.voxeldescriptors import _getOccupancyC, _getGridCenters
 from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput, _depictMol, depictMultipleMols
@@ -25,6 +26,8 @@ atom_mapping = {"Hydrophobe": 0,
                 "PosIonizable": 4,
                 "NegIonizable": 5}
 
+_chiral_type = {ChiralType.CHI_TETRAHEDRAL_CW:'S',
+                ChiralType.CHI_TETRAHEDRAL_CCW:'R'}
 
 # multiprocess does not play well with class methods.
 def unwrap_self(arg, **kwarg):
@@ -127,6 +130,58 @@ class SmallMol:
             A copy of the object
         """
         return deepcopy(self)
+
+    def _chiralType(self, atom):
+        """
+        Returns the chiral type of the passed atom. Can be R, S or None.
+
+        Parameters
+        ----------
+        atom: rdkit.Chem.rdchem.Atom
+            The rdkit atom object
+
+        Returns
+        -------
+        chiral: str
+            The chiral type 'R' or 'S'. None is returned if the atom is not a chiral one
+        """
+        chiral = atom.GetChiralTag()
+
+        if chiral in _chiral_type.keys():
+            return _chiral_type[chiral]
+        else:
+            return None
+
+
+    def isChiral(self, returnDetails=False):
+        """
+        Returns if the molecule has at least one chiral atom. If returnDetails is set as True, a list of tuples with the
+        atom idx and chiral type is returned.
+
+        Parameters
+        ----------
+        returnDetails: bool (default=False)
+            Set as True to return the chiral atoms and their chiral types
+
+        Returns
+        -------
+        ischiral: bool
+            True if the atom has at least a chiral atom
+        details: list
+            A list of tuple with the chiral atoms and their types
+        """
+
+        stereocenters = [ (a.GetIdx(), self._chiralType(a)) for a in self.get_atoms() if self._chiralType(a) is not None]
+
+        if len(stereocenters) == 0:
+            return False
+
+        if returnDetails:
+            return True, stereocenters
+        return True
+
+
+
 
     def get_mol(self):
         """
