@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import os
 import numpy as np
 from htmd.queues.simqueue import SimQueue
 from protocolinterface import ProtocolInterface, val
@@ -209,9 +208,35 @@ class _LocalQueue(SimQueue, ProtocolInterface):
         else:
             return None
 
+    @property
+    def ngpu(self):
+        return NotImplementedError
+
+    @ngpu.setter
+    def ngpu(self, value):
+        raise NotImplementedError
+
+    @property
+    def ncpu(self):
+        return NotImplementedError
+
+    @ncpu.setter
+    def ncpu(self, value):
+        raise NotImplementedError
+
+    @property
+    def memory(self):
+        return NotImplementedError
+
+    @memory.setter
+    def memory(self, value):
+        raise NotImplementedError
+
 
 class LocalGPUQueue(_LocalQueue):
     """ Local machine queue system
+
+    The CUDA_VISIBLE_DEVICES environment variable is taken into account when determining the devices to use.
 
     Parameters
     ----------
@@ -221,7 +246,7 @@ class LocalGPUQueue(_LocalQueue):
         A list of file names or globs for the files to copy to datadir
     ngpu : int, default=None
         Number of GPU devices that the queue will use. Each simulation will be run on a different GPU. The queue will
-        use the first `ngpu` devices of the machine.
+        use the first `ngpu` devices of the machine. Mutually exclusive with `devices`.
     devices : list, default=None
         A list of GPU device indexes on which the queue is allowed to run simulations. Mutually exclusive with `ngpu`
     memory : int, default=None
@@ -257,6 +282,7 @@ class LocalGPUQueue(_LocalQueue):
             raise ValueError('Parameters `ngpu` and `devices` are mutually exclusive.')
 
         if ngpu is None and devices is None:
+            logger.info('Trying to determine all GPU devices')
             try:
                 check_output("nvidia-smi -L", shell=True)
                 devices = range(int(check_output("nvidia-smi -L | wc -l", shell=True).decode("ascii")))
@@ -266,10 +292,16 @@ class LocalGPUQueue(_LocalQueue):
             devices = range(ngpu)
 
         if devices is None:
-            raise NameError("Could not determine which GPUs to use. "
-                            "Specify the GPUs with the `ngpu=` or `devices=` parameters")
+            raise NameError('Could not determine which GPUs to use. Specify the GPUs with the `ngpu` or `devices` '
+                            'parameters')
         else:
-            logger.info("Using GPU devices {}".format(','.join(map(str, devices))))
+            visible_devices_str = os.getenv('CUDA_VISIBLE_DEVICES')
+            if visible_devices_str is not None:
+                visible_devices = visible_devices_str.split(',')
+                logger.info('GPU devices requested: {}'.format(','.join(map(str, devices))))
+                logger.info('GPU devices visible: {}'.format(','.join(map(str, visible_devices))))
+                devices = list(np.intersect1d(devices, visible_devices))
+            logger.info('Using GPU devices {}'.format(','.join(map(str, devices))))
         return devices
 
     @property
