@@ -180,9 +180,6 @@ class SmallMol:
             return True, stereocenters
         return True
 
-
-
-
     def get_mol(self):
         """
         Returns the rdkit Molecule object
@@ -294,8 +291,9 @@ class SmallMol:
         """
         Returns molecule coordinates.
         """
-        n_atoms = self._mol.GetNumAtoms()
-        conformer = self._mol.GetConformer()
+        n_atoms = self.get_natoms()
+        _mol = self.get_mol()
+        conformer = _mol.GetConformer()
         coords = [[corobj.x, corobj.y, corobj.z] for corobj in [conformer.GetAtomPosition(i) for i in range(n_atoms)]]
         return np.array(coords, dtype=np.float32)
 
@@ -303,7 +301,7 @@ class SmallMol:
         """
         Returns molecule elements.
         """
-        return np.array([atom.GetSymbol() for atom in self._mol.GetAtoms()])
+        return np.array([self.get_element(atom) for atom in self.get_atoms()])
 
     def _get_atom_types(self):
         """
@@ -318,9 +316,10 @@ class SmallMol:
             6. Metal (empty)
             7. Occupancy (No hydrogens)
         """
-        n_atoms = self._mol.GetNumAtoms()
+        n_atoms = self.get_natoms()
+        _mol = self.get_mol()
 
-        feats = SmallMol.factory.GetFeaturesForMol(self._mol)
+        feats = SmallMol.factory.GetFeaturesForMol(_mol)
         properties = np.zeros((n_atoms, 8), dtype=bool)
 
         for feat in feats:
@@ -350,7 +349,7 @@ class SmallMol:
         return coords.mean(axis=0).astype(np.float32)
 
     def generate_conformers(self, savefolder, savename="molecule_conformers", filetype="pdb",
-                            savefolder_exist_ok=False, num_confs=400):
+                            savefolder_exist_ok=False, num_confs=400, merge=False, optimizemode='mmff'):
         """
         Generates ligand conformer and saves the results to a folder.
 
@@ -360,33 +359,58 @@ class SmallMol:
         savefolder: str
             Path to directory where the results will be saved
         savename: str
-           Name of the generated files. example filename: <savename>_1.pdb
+           Name of the generated files. example filename: <savename>_1 or <savename>_merged if merge set as True
         filetype: str
-           must be 'pdb' or 'mol2'
+           must be 'pdb' or 'sdf'
         savefolder_exist_ok: bool
            if false returns an error if savefolder already exsits
         Nconformers: int
            Number of conforer to generate.
+        optimizemode: str, (default='mmff')
+            The optimizemode to use. Can be  'uff', 'mmff'
+        merge: bool
+            If set as True a unique file is created
 
         """
-        from rdkit.Chem import AllChem
+        from rdkit.Chem.AllChem import UFFOptimizeMolecule, MMFFOptimizeMolecule, EmbedMultipleConfs
         os.makedirs(savefolder, exist_ok=savefolder_exist_ok)
 
-        mol = deepcopy(self._mol)
+        _mol = self.get_mol()
+        mol = deepcopy(_mol)
         mol = Chem.AddHs(mol)
-        ids = AllChem.EmbedMultipleConfs(mol, numConfs=num_confs, pruneRmsThresh=1., maxAttempts=10000)
-        for id in ids:
-            AllChem.UFFOptimizeMolecule(mol, confId=id)
-        for index, id in enumerate(ids):
-            if filetype == "pdb":
-                chemwrite = Chem.PDBWriter
-            elif filetype == "sdf":
-                chemwrite = Chem.SDWriter
-            else:
-                raise ValueError("Unknown file format. Cannot save to format '{}'".format(filetype))
-            writer = chemwrite(os.path.join(savefolder, '{}_{}.{}'.format(savename, index + 1, filetype)))
-            writer.write(mol, confId=id)
 
+        # generating conformations
+        ids = EmbedMultipleConfs(mol, numConfs=num_confs, pruneRmsThresh=1., maxAttempts=10000)
+
+        if optimizemode not in ['uff', 'mmff']:
+            raise ValueError('Unknown optimizemode. Should be  "uff", "mmff"')
+
+        # optimizing conformations depends on the optimizemode passed
+        for id in ids:
+            if optimizemode == 'mmff':
+                MMFFOptimizeMolecule(mol, confId=id)
+            elif optimizemode == 'uff':
+                UFFOptimizeMolecule(mol, confId=id)
+
+        # Init the Writer depends on the filetype passed
+        if filetype == 'pdb':
+            chemwrite = Chem.PDBWriter
+        elif filetype == "sdf":
+            chemwrite = Chem.SDWriter
+        else:
+            raise ValueError("Unknown file format. Cannot save to format '{}'".format(filetype))
+
+        # If merge is set as True a unique file is generated
+        if merge:
+            fname = os.path.join(savefolder, '{}_merge.{}'.format(savename, filetype))
+            writer = chemwrite(fname)
+
+        for index, id in enumerate(ids):
+            # If merge is set as False a file is created for each conformer
+            if not merge:
+                fname  = os.path.join(savefolder, '{}_{}.{}'.format(savename, index + 1, filetype))
+                writer = chemwrite(fname)
+            writer.write(mol, confId=id)
 
     def get_voxels(self, center=None, size=24, resolution=1., rotation=None,
                    displacement=None, dtype=np.float32):
