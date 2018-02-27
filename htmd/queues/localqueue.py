@@ -292,8 +292,8 @@ class LocalGPUQueue(_LocalQueue):
             devices = range(ngpu)
 
         if devices is None:
-            raise NameError('Could not determine which GPUs to use. Specify the GPUs with the `ngpu` or `devices` '
-                            'parameters')
+            raise RuntimeError('Could not determine which GPUs to use. Specify the GPUs with the `ngpu` or `devices` '
+                               'parameters')
         else:
             visible_devices_str = os.getenv('CUDA_VISIBLE_DEVICES')
             if visible_devices_str is not None:
