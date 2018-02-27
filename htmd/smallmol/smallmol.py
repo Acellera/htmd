@@ -489,9 +489,28 @@ class SmallMol:
         self._mol.SetProp('_Name', name)
 
     def get_natoms(self):
-        return self._mol.GetNumAtoms()
+        """
+        Returns the number of atoms in the molecule
+        """
+        _mol = self.get_mol()
+        return _mol.GetNumAtoms()
 
-    def to_molecule(self):
+    def to_molecule(self, formalcharges=False):
+        """
+        Return the htmd.molecule.molecule.Molecule from the rdkit.Molecule
+
+        Parameters
+        ----------
+        formalcharges: bool
+            Set as True if you want formal charges instead of partial ones
+
+        Returns
+        -------
+        mol: htmd.molecule.molecule.Molecule
+         The htmd Molecule object
+
+        """
+
         from htmd.molecule.molecule import Molecule
         coords = self.get_coords()
         elements = self.get_elements()
@@ -501,7 +520,7 @@ class SmallMol:
         mol.resid[:] = 1
         mol.name[:] = elements
         mol.element[:] = elements
-        mol.charge[:] = self.get_charges()
+        mol.charge[:] = self.get_charges(formal=formalcharges)
         mol.coords[:, :, 0] = coords
         mol.viewname = self.get_name()
         mol.bonds, mol.bondtype = self.get_bonds()
@@ -523,10 +542,31 @@ class SmallMol:
                 bondtypes.append('ar')
         return np.vstack(bonds), np.array(bondtypes)
 
-    def get_charges(self):
+    def get_charges(self, formal=False):
+        """
+        Return the charges of the atoms in the molecules.
+
+        Paramters
+        ---------
+        formal: bool
+            Set as True for the formal charges, otherwise the partial ones are retrieved
+
+        Returns
+        -------
+        charges: numpy.array
+            An array with the atom charges of the molecule
+
+        """
+
         charges = []
-        for a in self._mol.GetAtoms():
-            charges.append(a.GetFormalCharge())
+        atoms = self.get_atoms()
+        for a in atoms:
+            if formal:
+                charges.append(a.GetFormalCharge())
+            else:
+                props = a.GetPropsAsDict()
+                charge = props['_TriposPartialCharge'] if '_TriposPartialCharge' in props.keys() else 0.000
+                charges.append(charge)
         return np.array(charges)
 
 
