@@ -117,7 +117,7 @@ def InputToOutput(input_file, input_format, output_format):
 
 def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=False, highlightAtoms=None):
     from rdkit.Chem import RemoveHs
-    from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule
+    from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
     from rdkit.Chem.Draw import rdMolDraw2D
     from IPython.display import SVG
     from copy import deepcopy
@@ -155,7 +155,7 @@ def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, 
     # activate 3D coords optimization
     if optimize:
         if optimizemode == 'std':
-            EmbedMolecule(_mol)
+            EmbedMolecule(_mol, ETKDG())
         elif optimizemode == 'mmff':
             MMFFOptimizeMolecule(_mol)
 
@@ -198,7 +198,7 @@ def depictMultipleMols(mols_list, sketch=False, filename=None, ipython=False, op
 
     from rdkit.Chem import RemoveHs
     from rdkit.Chem.Draw import MolsToGridImage
-    from rdkit.Chem.AllChem import Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule
+    from rdkit.Chem.AllChem import Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
     from copy import deepcopy
     from IPython.display import SVG
     from os.path import splitext
@@ -219,7 +219,7 @@ def depictMultipleMols(mols_list, sketch=False, filename=None, ipython=False, op
         if optimizemode == 'std':
             for _m in _mols: EmbedMolecule(_m)
         elif optimizemode == 'mmff':
-            for _m in _mols: MMFFOptimizeMolecule(_m)
+            for _m in _mols: MMFFOptimizeMolecule(_m, ETKDG())
 
 
     sel_atoms = []
