@@ -152,6 +152,148 @@ class SmallMol:
         else:
             return None
 
+    def _set_prop(self, key, value, obj):
+        """
+        Set the value of a property. Common for atom and molecule
+
+        Parameters
+        ----------
+        key: str
+            The property key
+        value: str,bool,int,float
+            The property value
+        obj: The rdkit.Chem.Mol or rdkit.Chem.rdchem.Atom
+            The rdkit molecule or the rdkit atom object
+
+        """
+
+        if isinstance(value, bool):
+            addprop = obj.SetBoolProp
+
+        if isinstance(value, float):
+            addprop = obj.SetDoubleProp
+
+        elif isinstance(value, int):
+            addprop = obj.SetIntProp
+
+        elif isinstance(value, str):
+            addprop = obj.SetProp
+
+        addprop(key, value)
+
+    def setProp(self, key, value, overwrite=False):
+        """
+        Set a molecule property. By default the overwrite options is disabled
+
+        Parameters
+        ----------
+        key: str
+            The key identifying the property
+        value: str,bool,float,int
+            The value of the property
+        overwrite: bool
+            Set as True to enable property overwriting
+
+        """
+
+        if not isinstance(key, str):
+            raise ValueError('Wrong type {} for key.  Should be {} '.format(type(key), type('string')))
+
+        _props = self.listProps()
+        if not overwrite and key in _props:
+            raise ValueError('The key passed {} already exists. Set "overwrite" as True to overwrite an existing key'.format(key))
+
+        _mol = self.get_mol()
+
+        self._set_prop(key, value, _mol)
+
+
+    def setPropAtom(self, atom,  key, value, overwrite=False):
+        """
+        Set an atom property. By default the overwrite options is disabled
+
+        Parameters
+        ----------
+        key: str
+            The key identifying the property
+        value: str,bool,float,int
+            The value of the property
+        overwrite: bool
+            Set as True to enable property overwriting
+
+        """
+
+        if not isinstance(key, str):
+            raise ValueError('Wrong type {} for key.  Should be {} '.format(type(key), type('string')))
+
+        _props = self.listPropsAtom()
+        if not overwrite and key in _props:
+            raise ValueError('The key passed {} already exists. Set "overwrite" as True to overwrite an existing key'.format(key))
+
+        self._set_prop(key, value, atom)
+
+    def getPropAtom(self, atom, key):
+        """
+        Returns the atom property for the atom and key passed
+
+        Parameters
+        ----------
+        atom: rdkit.Chem.rdhem.Atom
+            The rdkit Atom object
+        key: str
+            The property key
+
+        Returns
+        -------
+        prop:
+            The property
+        """
+
+        if key not in self.listPropsAtom():
+            raise KeyError('The property "{}" was not found '.format(key))
+
+        prop = atom.GetPropsAsDict()[key]
+
+        return prop
+
+    def getProp(self, key):
+        """
+        Returns the molecule property for the key passed
+
+        Parameters
+        ----------
+        key: str
+            The property key
+
+        Returns
+        -------
+        prop:
+            The property
+        """
+
+        if key not in self.listProps():
+            raise KeyError('The property "{}" was not found '.format(key))
+
+        _mol = self.get_mol()
+        prop = _mol.GetPropsAsDict()[key]
+        return  prop
+
+    def listProps(self):
+        """
+        Returns a list of the molecule properties
+        """
+        _mol = self.get_mol()
+
+        return list(_mol.GetPropsAsDict().keys())
+
+    def listPropsAtom(self):
+        """
+        Returns a list of the atom properties
+        """
+        # get the first atom.
+        _atom = self.get_atom(0)
+
+        return list(_atom.GetPropsAsDict().keys())
 
     def isChiral(self, returnDetails=False):
         """
