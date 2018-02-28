@@ -26,8 +26,8 @@ atom_mapping = {"Hydrophobe": 0,
                 "PosIonizable": 4,
                 "NegIonizable": 5}
 
-_chiral_type = {ChiralType.CHI_TETRAHEDRAL_CW:'S',
-                ChiralType.CHI_TETRAHEDRAL_CCW:'R'}
+_chiral_type = {ChiralType.CHI_TETRAHEDRAL_CW:'clockwise',
+                ChiralType.CHI_TETRAHEDRAL_CCW:'anitclockwise'}
 
 # multiprocess does not play well with class methods.
 def unwrap_self(arg, **kwarg):
@@ -46,7 +46,7 @@ class SmallMol:
     fdefName = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
     factory = ChemicalFeatures.BuildFeatureFactory(fdefName)
 
-    def __init__(self, mol, ignore_errors=False, force_reading=False, addHs=True):
+    def __init__(self, mol, ignore_errors=False, force_reading=False, fixHs=True, removeHs=False):
         """
         Initializes small molecule object
 
@@ -58,8 +58,10 @@ class SmallMol:
             If True errors will not be raised.
         force_reading: bool
             If the mol provided is not accepted, the molecule will be initially converted into sdf
-        addHs: bool
-            The hydrogens will be reassigned
+        fixHs: bool
+            The missing hydrogens are assigned, the others are correctly assinged into the graph of the molecule
+        removeHs: bool
+            Set as True to remove the hydrogens
         """
 
         # load the input and store the rdkit Mol obj
@@ -70,13 +72,22 @@ class SmallMol:
             else:
                 raise ValueError("Unkown '{}' provided. Not a valid mol2,pdb,smile, rdkitMol obj.".format(mol))
 
+        if removeHs:
+            self._mol = Chem.RemoveHs(self._mol)
+
+        if fixHs:
+            self._mol = Chem.AddHs(self._mol, addCoords=True)
+
+        #### STORE INFO INSIDE MOL and ATOMS
+        # molecule name
         if not self._mol.HasProp('_Name'):
             self.set_name()
 
-        # Add hydrogens
-        if addHs:
-            self._mol = Chem.RemoveHs(self._mol)
-            self._mol = Chem.AddHs(self._mol, addCoords=True)
+        # set initial SmallMol atom charges
+        self._initCharges()
+
+        # atom parameters when generated
+        self._initParameters()
 
     def _initializeMolObj(self, mol, force_reading):
         """
@@ -103,14 +114,14 @@ class SmallMol:
             if os.path.isfile(mol):
                 name_suffix = os.path.splitext(mol)[-1]
                 if name_suffix == ".mol2":
-                    _mol = Chem.MolFromMol2File(mol)
+                    _mol = Chem.MolFromMol2File(mol, removeHs=False)
                 elif name_suffix == ".pdb":
-                    _mol = Chem.MolFromPDBFile(mol)
-
+                    _mol = Chem.MolFromPDBFile(mol, removeHs=False)
                 if _mol == None and force_reading:
                     logger.warning('Reading {} with force_reading procedure'.format(mol))
                     sdf = InputToOutput(mol, name_suffix, 'sdf')
-                    _mol = Chem.SDMolSupplier(sdf)[0]
+                    _mol = Chem.SDMolSupplier(sdf, removeHs=False)[0]
+
                     os.remove(sdf)
 
             # assuming is a smile
@@ -119,6 +130,55 @@ class SmallMol:
                 _mol = Chem.MolFromSmiles(mol)
 
         return _mol
+
+    def _initParameters(self):
+        """
+        Store inside the atom several properties that can be used for future purposed. See atom idx in case of
+        fragmentation
+        """
+        _atoms = self.get_atoms()
+
+        for a in _atoms:
+            chiral_tag = a.GetChiralTag()
+            atom_idx = a.GetIdx()
+            self.setPropAtom(a, '_SmallMolChiralTag', chiral_tag)
+            self.setPropAtom(a, '_SmallMolAtomIdx', atom_idx)
+
+    def _initCharges(self):
+        """
+        Initialize the atom property "_SmallMolCharge". If the atoms already have it or one of the following
+        ('_TriposPartialCharge', '_GasteigerCharge'), it will use these charges
+
+        """
+
+        # init charges property. If Tripos or Gaesteiger than these charges are set otherwise all are 0
+        _PossibleChargeTypes = ['_SmallMolCharge', '_TriposPartialCharge', '_GasteigerCharge']
+
+        #init for the first atom
+        _atom = self.get_atom(0)
+        _FoundChargeTypes = self.listPropsAtom(_atom)
+
+        matched = set(_PossibleChargeTypes) & set(_FoundChargeTypes)
+
+        returnWarning = False
+
+        if len(matched) == 0:
+            for a in self.get_atoms():
+                self.setPropAtom(a, '_SmallMolCharge', 0.000)
+        else:
+            # for loop of possible to get key than use it
+            k = [k for k in _PossibleChargeTypes if k in matched][0]
+            if k != '_SmallMolCharge':
+                for a in self.get_atoms():
+                    try:
+                        self.setPropAtom(a, '_SmallMolCharge', self.getPropAtom(a, k))
+                    except:
+                        self.setPropAtom(a, '_SmallMolCharge', 0.000)
+                        returnWarning = True
+
+        if returnWarning:
+            logger.warning('Found atoms without a charge. The "_SmallMolCharge" for these atoms are set to 0.0.')
+
 
     def copy(self):
         """
@@ -145,10 +205,11 @@ class SmallMol:
         chiral: str
             The chiral type 'R' or 'S'. None is returned if the atom is not a chiral one
         """
+
         chiral = atom.GetChiralTag()
 
         if chiral in _chiral_type.keys():
-            return _chiral_type[chiral]
+            return self.getPropAtom(atom, '_CIPCode')
         else:
             return None
 
@@ -226,7 +287,7 @@ class SmallMol:
         if not isinstance(key, str):
             raise ValueError('Wrong type {} for key.  Should be {} '.format(type(key), type('string')))
 
-        _props = self.listPropsAtom()
+        _props = list(atom.GetPropsAsDict().keys())
         if not overwrite and key in _props:
             raise ValueError('The key passed {} already exists. Set "overwrite" as True to overwrite an existing key'.format(key))
 
@@ -249,7 +310,7 @@ class SmallMol:
             The property
         """
 
-        if key not in self.listPropsAtom():
+        if key not in self.listPropsAtom(atom):
             raise KeyError('The property "{}" was not found '.format(key))
 
         prop = atom.GetPropsAsDict()[key]
@@ -286,14 +347,12 @@ class SmallMol:
 
         return list(_mol.GetPropsAsDict().keys())
 
-    def listPropsAtom(self):
+    def listPropsAtom(self, atom):
         """
         Returns a list of the atom properties
         """
-        # get the first atom.
-        _atom = self.get_atom(0)
 
-        return list(_atom.GetPropsAsDict().keys())
+        return list(atom.GetPropsAsDict().keys())
 
     def isChiral(self, returnDetails=False):
         """
