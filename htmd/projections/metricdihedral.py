@@ -79,7 +79,8 @@ class Dihedral:
         dihedrals : list
             A single dihedral or a list of Dihedral objects
         sel : str
-            An atomselection to restrict the application of the selections.
+            Atom selection string to restrict the application of the selections.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Returns
         -------
@@ -168,7 +169,8 @@ class Dihedral:
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         sel : str
-            An atomselection string to restrict the atoms for which to calculate dihedrals (i.e. only one of many chains)
+            Atom selection string to restrict the atoms for which to calculate dihedrals (e.g. only one of many chains).
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         dih : tuple
             A tuple of the dihedral types we want to calculate (phi, psi, omega, chi1, chi2, chi3, chi4, chi5)
 
@@ -521,8 +523,8 @@ class MetricDihedral(Projection):
     sincos : bool, optional
         Set to True to return the dihedral angles as their sine and cosine components. Makes them periodic.
     protsel : str, optional
-        Atomselection for the protein segment for which to calculate dihedral angles. Resids should be unique within
-        that segment.
+        Atom selection string for the protein segment for which to calculate dihedral angles. Resids should be unique
+        within that segment. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Examples
     --------

@@ -18,11 +18,14 @@ class MetricTMscore(Projection):
     refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The reference Molecule to which we want to calculate the TMscore.
     trajtmstr : str
-        Atomselection for the trajectories from which to calculate the TMscore
+        Atom selection string for the trajectories from which to calculate the TMscore.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     reftmstr : str, optional
-        Atomselection for the reference structure from which to calculate the TMscore. If None, it defaults to `trajrmsdstr`
+        Atom selection string for the reference structure from which to calculate the TMscore. If None, it defaults to
+        `trajrmsdstr`. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     centerstr : str, optional
-        Atomselection around which to center the wrapping of the trajectories.
+        Atom selection string around which to center the wrapping of the trajectories.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     """
     def __init__(self, refmol, trajtmstr, reftmstr=None):
         if reftmstr is None:

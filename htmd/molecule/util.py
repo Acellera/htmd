@@ -129,8 +129,9 @@ def orient(mol, sel="all"):
     ----------
     mol :
         The Molecule to be rotated
-    sel : 
-        Atom selection on which the rotation is computed
+    sel : str
+        Atom selection string on which the rotation is computed.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Examples
     --------
@@ -235,7 +236,7 @@ def _missingSegID(mol):
             raise NameError('Atoms [' + str(idx[0]) + ',' + str(idx[1]) + ',...,' + str(idx[-1]) + '] do not have segid defined.')
 
 
-def maxDistance(mol, sel='all', origin=[0, 0, 0]):
+def maxDistance(mol, sel='all', origin=None):
     """ Calculates the max distance of a set of atoms from an origin
 
     Parameters
@@ -243,7 +244,8 @@ def maxDistance(mol, sel='all', origin=[0, 0, 0]):
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The molecule containing the atoms
     sel : str
-        Atomselection for atoms for which to calculate distances
+        Atom selection string for atoms for which to calculate distances.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     origin : list
         The origin x,y,z coordinates
 
@@ -258,6 +260,8 @@ def maxDistance(mol, sel='all', origin=[0, 0, 0]):
     >>> print(round(y,2))
     48.39
     """
+    if origin is None:
+        origin = [0, 0, 0]
     coors = mol.get('coords', sel=sel)
     dists = cdist(np.atleast_2d(coors), np.atleast_2d(origin))
     return np.max(dists)
@@ -271,7 +275,7 @@ def boundingBox(mol, sel='all'):
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The molecule containing the atoms
     sel : str
-        An Atomselection string of atoms.
+        Atom selection string of atoms. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Returns
     -------

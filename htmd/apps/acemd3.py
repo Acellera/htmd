@@ -41,7 +41,8 @@ class GroupRestraint(_Restraint):
         Parameters
         ----------
         selection : str
-            Atomselection containing the atoms on whose center of mass the restraints will be applied
+            Atom selection string of the atoms on whose center of mass the restraints will be applied.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         width : float
             The width of the flat-bottom potential box in Angstrom
         constraints : list of tuples
@@ -65,7 +66,8 @@ class AtomRestraint(_Restraint):
         Parameters
         ----------
         selection : str
-            Atomselection containing the atoms on whose center of mass the restraints will be applied
+            Atom selection string of the atoms on whose center of mass the restraints will be applied.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         width : float
             The width of the flat-bottom potential box in Angstrom
         constraints : list of tuples
