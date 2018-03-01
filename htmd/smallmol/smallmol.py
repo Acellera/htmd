@@ -976,25 +976,61 @@ class SmallMolStack:
     Collection of objects of class SmallMol.
     """
 
-    def __init__(self, sdf_file, removeHs=True, addHs=True):  # , n_jobs=1
+    def __init__(self, sdf_file=None, removeHs=False, fixHs=True):  # , n_jobs=1
         from tqdm import tqdm
-        if addHs and not removeHs:
-            raise AttributeError('To add hydrogens with the addHs option please also enable the removeHs option.')
 
-        supplier = Chem.SDMolSupplier(sdf_file, removeHs=removeHs)
-        self.filepath = sdf_file
-        mm = []
-        for x in supplier:
-            if x is not None:
-                mm.append(SmallMol(x, addHs=addHs))
+        self._sdffile = sdf_file if  self._isSdfFile(sdf_file) else None
+
+        self._mols = None
+
+        if sdf_file != None:
+            self._mols = self._initializeMolObjs(sdf_file, removeHs, fixHs)
+
+    def _isSdfFile(self, sdf_file):
+
+        if sdf_file == None: return None
+
+        if not os.path.isfile(sdf_file):
+            raise FileNotFoundError('The sdf file {} does not exist'.format(sdf_file))
+
+        sdf_ext = os.path.splitext(sdf_file)[-1]
+        if sdf_ext != '.sdf':
+            raise TypeError('The file extension {} is not valid. Should be .sdf'.format(sdf_ext))
+
+        return True
+
+    def _initializeMolObjs(self, sdf_file, removeHs, fixHs):
+        from tqdm import tqdm
+        supplier = Chem.SDMolSupplier(sdf_file, removeHs=False)
+        mols = []
+        for i, mol in enumerate(tqdm(supplier)):
+            if mol is not None:
+                mols.append(SmallMol(mol, removeHs=removeHs, fixHs=fixHs))
             else:
-                mm.append(None)
-        self._mols = np.array(mm)
-        self.n_invalid = len(self.get_invalid_indexes())
-        if self.n_invalid > 0:
-            print('We detected {} errors when reading entries in the sdf file. Please'\
-                  ' run SmallMol.get_invalid_indexes() and remove them accordingly from'\
-                  ' SmallMol._mols as they can not be featurized.'.format(self.n_invalid))
+                mols.append(None)
+
+        mols = mols
+
+        invalid_mols = self._get_invalid_indexes(mols)
+
+        if len(invalid_mols) != 0:
+            logger.warning('The following entries could not be loaded: {}. Use clean_invalids to remove them from the '
+                           'pool'.format(invalid_mols))
+
+        return np.array(mols)
+
+    def clean_invalids(self):
+        _mols = self.get_mols()
+
+
+        self._mols =  [ m for m in _mols if m is not None]
+
+    def get_mols(self):
+
+        return self._mols
+
+    def get_nmols(self):
+        return len(self._mols)
 
     def vox_fun(mol):
         return None
@@ -1005,23 +1041,24 @@ class SmallMolStack:
     def __getitem__(self, item):
         return self._mols[item]
 
-    def get_invalid_indexes(self):
+    def _get_invalid_indexes(self, mols):
         """
         Returns indexes of invalid molecules
         """
-        return [i for i, mol in enumerate(self._mols) if mol is None]
-
-    def remove_invalid_indexes(self):
-        self._mols = [m for m in self._mols if m is not None]
+        return [i for i, mol in enumerate(mols) if mol is None]
 
     def __iter__(self):
-        for smallmol in self._mols:
+
+        _mols = self.get_mols()
+        for smallmol in _mols:
             yield smallmol
 
     def __str__(self):
+        _mols = self.get_mols()
+
         return ('Stack of Small molecules.'
                 '\n\tContains {} Molecules.'
-                '\n\tSource file: "{}".').format(len(self._mols), self.filepath)
+                '\n\tSource file: "{}".').format(len(_mols), self._sdffile)
 
     def voxel_generator(self, batch_size=32, center=None, boxsize=24, resolution=1., n_jobs=1):
         """
@@ -1122,7 +1159,7 @@ class SmallMolStack:
         elif legends == 'items':
             legends_list = [ str(n+1) for n in range(len(self._mols))]
 
-        _mols = [ _m.get_mol() for _m in self._mols ]
+        _mols = [ _m.get_mol() for _m in self.get_mols() ]
 
         if highlightAtoms is not None:
             if len(highlightAtoms) != len(_mols):
