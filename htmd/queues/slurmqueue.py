@@ -162,8 +162,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#SBATCH --workdir={}\n'.format(workdir))
             f.write('#SBATCH --output={}\n'.format(self.outputstream))
             f.write('#SBATCH --error={}\n'.format(self.errorstream))
-            if self.environment is not None:
-                f.write('#SBATCH --export={}\n'.format(self.environment))
+            if self.envvars is not None:
+                f.write('#SBATCH --export={}\n'.format(self.envvars))
             if self.walltime is not None:
                 f.write('#SBATCH --time={}\n'.format(self.walltime))
             if self.mailtype is not None and self.mailuser is not None:
