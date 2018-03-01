@@ -133,8 +133,8 @@ class SmallMol:
 
     def _initParameters(self):
         """
-        Store inside the atom several properties that can be used for future purposed. See atom idx in case of
-        fragmentation
+        Stores several properties inside the rdkit atom object that can be used for future purposed. See atom idx in
+        case of fragmentation
         """
         _atoms = self.get_atoms()
 
@@ -488,19 +488,35 @@ class SmallMol:
         _mol = self.get_mol()
         return _mol.GetAtoms()
 
-    def get_coords(self):
+    def get_coords(self, id=0):
         """
-        Returns molecule coordinates.
+        Returns molecule coordinates of the conformer id passed.
+
+        Parameters
+        ----------
+        id: int
+            The id of the conformer
+
+        Returns
+        -------
+        coords: numpy.array
+            A numpy array of the coords for the conformer
+
         """
         n_atoms = self.get_natoms()
-        _mol = self.get_mol()
-        conformer = _mol.GetConformer()
+
+        conformer = self.get_conformers()[id]
         coords = [[corobj.x, corobj.y, corobj.z] for corobj in [conformer.GetAtomPosition(i) for i in range(n_atoms)]]
         return np.array(coords, dtype=np.float32)
 
     def get_elements(self):
         """
         Returns molecule elements.
+
+        Returns
+        -------
+        elements: numpy.array
+            A numpy array with elements of the molecule atoms
         """
         return np.array([self.get_element(atom) for atom in self.get_atoms()])
 
@@ -549,32 +565,25 @@ class SmallMol:
             coords = self.get_coords()
         return coords.mean(axis=0).astype(np.float32)
 
-    def generate_conformers(self, savefolder, savename="molecule_conformers", filetype="pdb",
-                            savefolder_exist_ok=False, num_confs=400, merge=False, optimizemode='mmff'):
+    def generate_conformers(self, num_confs=400,  optimizemode='mmff', append=True):
         """
         Generates ligand conformer and saves the results to a folder.
 
 
         Parameters
         ----------
-        savefolder: str
-            Path to directory where the results will be saved
-        savename: str
-           Name of the generated files. example filename: <savename>_1 or <savename>_merged if merge set as True
-        filetype: str
-           must be 'pdb' or 'sdf'
-        savefolder_exist_ok: bool
-           if false returns an error if savefolder already exsits
-        Nconformers: int
-           Number of conforer to generate.
+        num_confs: int
+           Number of conformers to generate.
         optimizemode: str, (default='mmff')
             The optimizemode to use. Can be  'uff', 'mmff'
-        merge: bool
-            If set as True a unique file is created
+        append: bool
+            If set as False the current conformers are deleted, excepted for the first one.
 
         """
         from rdkit.Chem.AllChem import UFFOptimizeMolecule, MMFFOptimizeMolecule, EmbedMultipleConfs
-        os.makedirs(savefolder, exist_ok=savefolder_exist_ok)
+
+        if not append:
+            self.remove_conformers()
 
         _mol = self.get_mol()
         mol = deepcopy(_mol)
@@ -585,33 +594,14 @@ class SmallMol:
 
         if optimizemode not in ['uff', 'mmff']:
             raise ValueError('Unknown optimizemode. Should be  "uff", "mmff"')
-
         # optimizing conformations depends on the optimizemode passed
         for id in ids:
             if optimizemode == 'mmff':
                 MMFFOptimizeMolecule(mol, confId=id)
             elif optimizemode == 'uff':
                 UFFOptimizeMolecule(mol, confId=id)
-
-        # Init the Writer depends on the filetype passed
-        if filetype == 'pdb':
-            chemwrite = Chem.PDBWriter
-        elif filetype == "sdf":
-            chemwrite = Chem.SDWriter
-        else:
-            raise ValueError("Unknown file format. Cannot save to format '{}'".format(filetype))
-
-        # If merge is set as True a unique file is generated
-        if merge:
-            fname = os.path.join(savefolder, '{}_merge.{}'.format(savename, filetype))
-            writer = chemwrite(fname)
-
-        for index, id in enumerate(ids):
-            # If merge is set as False a file is created for each conformer
-            if not merge:
-                fname  = os.path.join(savefolder, '{}_{}.{}'.format(savename, index + 1, filetype))
-                writer = chemwrite(fname)
-            writer.write(mol, confId=id)
+            conf = mol.GetConformer(id)
+            _mol.AddConformer(conf, id+1)
 
     def get_voxels(self, center=None, size=24, resolution=1., rotation=None,
                    displacement=None, dtype=np.float32):
@@ -676,6 +666,16 @@ class SmallMol:
         return voxels
 
     def get_name(self):
+        """
+        Returns the molecule name
+
+        Returns
+        -------
+        name: str
+            The molecule name
+
+        """
+
         return self._mol.GetProp('_Name')
 
     def set_name(self, name='UNK'):
@@ -692,11 +692,132 @@ class SmallMol:
     def get_natoms(self):
         """
         Returns the number of atoms in the molecule
+
+        Returns
+        -------
+        natoms: int
+            The number of atoms in the molecule
+
         """
         _mol = self.get_mol()
         return _mol.GetNumAtoms()
 
-    def to_molecule(self, formalcharges=False):
+    def get_nconformers(self):
+        """
+        Returns the number of conformers in the rdkit molecule object
+
+        Returns
+        -------
+        nconfs: int
+            The number of conformers in the molecule
+        """
+        _mol = self.get_mol()
+        _nConformers = _mol.GetNumConformers()
+
+        return _nConformers
+
+    def get_conformers(self, ids=None):
+        """
+        Returns the conformer of the molecule depends on the id passed. If id is equal to -1, all the conformers are
+        returned
+
+        Parameters
+        ----------
+        ids: list (default=None)
+            The list of ids for the molecule conformers to return. If None all the conformers are returned
+
+        Returns
+        -------
+        _conformer: list of rdkit.Chem.rdchem.Conformer
+            The conformer
+        """
+        _mol = self.get_mol()
+        _conformers = list(_mol.GetConformers())
+        _nConformers = len(_conformers)
+
+        if ids == None:
+            return _conformers
+
+        if  max(ids) >= _nConformers:
+            raise IndexError("The ids list contains conformers ids {} that do not exist. Available conformers: {}".format(ids, _nConformers))
+
+        return [_conformers[id] for id in ids]
+
+    def write_conformers(self, savefolder='conformations', savename="molConf", filetype="sdf", savefolder_exist_ok=False,
+                         merge=False, ids=None):
+        """
+        Writes conformers in one or multiple files in 'pdb' or 'sdf' file formats.
+
+        Paramters
+        ---------
+        savefolder: str (default='conformations')
+            The name of the folder where to write the files
+        savename: str (default='molConf')
+            The basename of the output file
+        filetype: str ('sdf', 'pdb') (default='sdf')
+        savefolder_exist_ok: bool (default=False)
+            Set as True to overwrite the output folder
+        merge: bool (default=False)
+            Set as True to save in a unique file
+        ids: list (default=None)
+            A list of the conformer ids to save. If None, all are written
+
+        """
+
+        os.makedirs(savefolder, exist_ok=savefolder_exist_ok)
+
+        if ids is None:
+            ids = range(self.get_nconformers())
+        elif not isinstance(ids, list):
+            raise ValueError("The ids argument should be a list of conformer ids")
+
+        _mol = self.get_mol()
+
+        # Init the Writer depends on the filetype passed
+        if filetype == 'pdb':
+            chemwrite = Chem.PDBWriter
+        elif filetype == "sdf":
+            chemwrite = Chem.SDWriter
+        else:
+            raise ValueError("Unknown file format. Cannot save to format '{}'".format(filetype))
+
+        # If merge is set as True a unique file is generated
+        if merge:
+            fname = os.path.join(savefolder, '{}_merge.{}'.format(savename, filetype))
+            writer = chemwrite(fname)
+
+        for id in ids:
+            # If merge is set as False a file is created for each conformer
+            if not merge:
+                _id = self.get_conformers()[id].GetId()
+                fname = os.path.join(savefolder, '{}_{}.{}'.format(savename, _id, filetype))
+                writer = chemwrite(fname)
+            writer.write(_mol, confId=_id)
+
+    def remove_conformers(self, ids=None):
+        """
+        Deletes the conformers passed
+
+        Parameters
+        ----------
+        ids: list (default=None)
+            The list of conformer id to delete. If None, all are removed except the first one
+        """
+        _mol = self.get_mol()
+
+        _conformers = self.get_conformers(ids)
+
+        if ids is None:
+            _conformers = _conformers[1:]
+        elif not isinstance(ids, list):
+            raise TypeError("The ids argument should be list of confermer ids")
+
+        _conformerIDs = [c.GetId() for c in _conformers]
+
+        for id in _conformerIDs:
+            _mol.RemoveConformer(id)
+
+    def to_molecule(self, formalcharges=False, ids=None):
         """
         Return the htmd.molecule.molecule.Molecule from the rdkit.Molecule
 
@@ -704,6 +825,8 @@ class SmallMol:
         ----------
         formalcharges: bool
             Set as True if you want formal charges instead of partial ones
+        ids: list
+            The list of conformer ids to store in the htmd Molecule object
 
         Returns
         -------
@@ -711,23 +834,51 @@ class SmallMol:
          The htmd Molecule object
 
         """
-
         from htmd.molecule.molecule import Molecule
-        coords = self.get_coords()
-        elements = self.get_elements()
-        mol = Molecule()
-        mol.empty(self.get_natoms())
-        mol.resname[:] = self.get_name()[:3]
-        mol.resid[:] = 1
-        mol.name[:] = elements
-        mol.element[:] = elements
-        mol.charge[:] = self.get_charges(formal=formalcharges)
-        mol.coords[:, :, 0] = coords
-        mol.viewname = self.get_name()
-        mol.bonds, mol.bondtype = self.get_bonds()
-        return mol
+        class NoConformerError(Exception):
+            pass
+
+        _mol = self.get_mol()
+        _nConformers = self.get_nconformers()
+        if _nConformers == 0:
+            raise NoConformerError("No Conformers are found in the molecule. Generate at least one confomer.")
+
+        if ids == None:
+            ids = list(range(_nConformers))
+
+        elif not isinstance(ids, list):
+            raise ValueError('The argument ids should be a list of confomer ids')
+
+        molHtmd = None
+        for n in ids:
+            coords = self.get_coords(id=n)
+            elements = self.get_elements()
+            mol = Molecule()
+            mol.empty(self.get_natoms())
+            mol.resname[:] = self.get_name()[:3]
+            mol.resid[:] = 1
+            mol.name[:] = elements
+            mol.element[:] = elements
+            mol.charge[:] = self.get_charges(formal=formalcharges)
+            mol.coords[:, :, 0] = coords
+            mol.viewname = self.get_name()
+            mol.bonds, mol.bondtype = self.get_bonds()
+            if molHtmd == None:
+                molHtmd = mol
+            else:
+                molHtmd.appendFrames(mol)
+        return molHtmd
 
     def get_bonds(self):
+        """
+        Returns the rdkit bonds object and their type as two np.array
+
+        Returns
+        -------
+        bonds, bondstype: numpy.array, numpy.array
+         An array of rdkit bonds objects and an array with their types
+        """
+
         from rdkit.Chem import rdchem
         bonds = []
         bondtypes = []
