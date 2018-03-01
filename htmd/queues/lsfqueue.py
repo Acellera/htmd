@@ -7,7 +7,6 @@ import os
 import shutil
 import random
 import string
-import numpy as np
 from subprocess import check_output, CalledProcessError
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
@@ -36,8 +35,10 @@ class LsfQueue(SimQueue, ProtocolInterface):
         Amount of memory per job (MiB)
     walltime : int, default=None
         Job timeout (hour:min or min)
-    environment : list of strings, default=None
-        Things to run before the job (sourcing envs).
+    envvars : str, default='ACEMD_HOME'
+        Envvars to propagate from submission node to the running node (comma-separated)
+    prerun : list of strings, default=None
+        Shell commands to execute on the running node before the job (e.g. loading modules)
     resources : list of strings, default=None
         Resources of the queue
     outputstream : str, default='slurm.%N.%j.out'
@@ -47,7 +48,6 @@ class LsfQueue(SimQueue, ProtocolInterface):
 
     Examples
     --------
-    >>> from htmd import *
     >>> s = LsfQueue()
     >>> s.jobname = 'simulation1'
     >>> s.queue = 'multiscale'
@@ -55,7 +55,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
     """
 
     _defaults = {'queue': None, 'app': None, 'gpu_queue': None, 'cpu_queue': None, 'ngpu': 1, 'ncpu': 1,
-                 'memory': 4000, 'walltime': None, 'resources': None, 'environment': None}
+                 'memory': 4000, 'walltime': None, 'resources': None, 'envvars': 'ACEMD_HOME', 'prerun': None}
 
     def __init__(self, _configapp=None):
         SimQueue.__init__(self)
@@ -68,14 +68,19 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'],
                   val.Number(int, '0POS'))
         self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, '0POS'))
-        self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'], val.Number(int, '0POS'))
+        self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'],
+                  val.Number(int, '0POS'))
         self._arg('resources', 'list', 'Resources of the queue', self._defaults['resources'], val.String(), nargs='*')
-        self._arg('environment', 'list', 'Things to run before the job (sourcing envs).', self._defaults['environment'],
-                  val.String(), nargs='*')
+        self._cmdDeprecated('environment', 'prerun')
         self._arg('outputstream', 'str', 'Output stream.', 'lsf.%J.out', val.String())
         self._arg('errorstream', 'str', 'Error stream.', 'lsf.%J.err', val.String())
         self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
-        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
+        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc',
+                  val.String())
+        self._arg('envvars', 'str', 'Envvars to propagate from submission node to the running node (comma-separated)',
+                  self._defaults['envvars'], val.String())
+        self._arg('prerun', 'list', 'Shell commands to execute on the running node before the job (e.g. '
+                                    'loading modules)', self._defaults['prerun'], val.String(), nargs='*')
 
         # Load LSF configuration profile
         lsfconfig = _config['lsf']
@@ -137,6 +142,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
             f.write('#BSUB -outdir {}\n'.format(workdir))
             f.write('#BSUB -o {}\n'.format(self.outputstream))
             f.write('#BSUB -e {}\n'.format(self.errorstream))
+            if self.envvars is not None:
+                f.write('#BSUB --env {}\n'.format(self.envvars))
             if self.walltime is not None:
                 f.write('#BSUB -W {}\n'.format(self.walltime))
             if self.resources is not None:
@@ -145,8 +152,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
             # Trap kill signals to create sentinel file
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\n')
-            if self.environment is not None:
-                for call in self.environment:
+            if self.prerun is not None:
+                for call in self.prerun:
                     f.write('{}\n'.format(call))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
