@@ -923,7 +923,7 @@ class SmallMol:
 
 
     def depict(self, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True,
-                     atomlabels=False, highlightAtoms=None):
+                     atomlabels=None, highlightAtoms=None):
         """
         Depicts the molecules. It is possible to save it into an svg file and also generates a jupiter-notebook rendering
 
@@ -941,8 +941,9 @@ class SmallMol:
             Set the optimization mode for 3D conformation
         removeHs: bool, default=True
             Set to True to hide hydrogens in the depiction
-        atomlabels: bool
-            Set to True to show the atom labels
+        atomlabels: str
+            Accept any combinations of the following pararemters as unique string '%a%i%c%*' a:atom name, i:atom index,
+            c:atom formal charge (+/-), *:chiral (* if atom is chiral)
         highlightAtoms: list
             List of atom to highligh. It can be also a list of atom list, in this case different colors will be used
 
@@ -952,6 +953,20 @@ class SmallMol:
 
         """
         _mol = self.get_mol()
+
+        _labelsFunc = ['a', 'i', 'c', '*']
+
+        if atomlabels is not None:
+            labels = atomlabels.split('%')[1:]
+            names = self.get_elements().tolist()
+            indexes = [ self.getPropAtom(a, '_SmallMolAtomIdx') for a in self.get_atoms() ]
+            charges = ['+' if c > 0 else "-" if c < 0 else "" for c in  self.get_charges(formal=True).tolist() ]
+            chirals = ["" if self._chiralType(a) is None else "*" for a in self.get_atoms() ]
+            values = [names, indexes, charges, chirals]
+            idxs = [ _labelsFunc.index(l) for l in labels]
+            labels_required = [values[i] for i in idxs]
+            atomlabels = ["".join([str(i) for i in a]) for a in list(zip(*labels_required))]
+
         return  _depictMol(_mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
 
 

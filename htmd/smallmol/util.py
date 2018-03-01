@@ -147,9 +147,10 @@ def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, 
     opts = drawer.drawOptions()
 
     # add atomlabels
-    if atomlabels:
-        for i in range(_mol.GetNumAtoms()):
-            opts.atomLabels[i] = _mol.GetAtomWithIdx(i).GetSymbol() + str(i)
+    if atomlabels is not None:
+        for n, a in enumerate(_mol.GetAtoms()):
+            _atomIdx = a.GetPropsAsDict()['_SmallMolAtomIdx']
+            opts.atomLabels[n] = atomlabels[_atomIdx]
 
 
     # activate 3D coords optimization
