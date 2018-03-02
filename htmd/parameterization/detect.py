@@ -274,7 +274,7 @@ def detectParameterizableDihedrals(molecule):
     >>> molFile = os.path.join(home('test-param'), 'glycol.mol2')
     >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
-    [[(2, 1, 0, 4), (1, 2, 3, 9)], [(0, 1, 2, 3)]]
+    [[(0, 1, 2, 3)], [(1, 2, 3, 9), (2, 1, 0, 4)]]
 
     Find the parameterizable dihedrals of ethanolamine
     >>> molFile = os.path.join(home('test-param'), 'ethanolamine.mol2')
@@ -282,13 +282,13 @@ def detectParameterizableDihedrals(molecule):
     >>> mol = canonicalizeAtomNames(mol)
     >>> prm, mol = fftype(mol, method=FFTypeMethod.GAFF2) # Does not work with CGenFF
     >>> detectParameterizableDihedrals(mol)
-    [[(2, 1, 0, 4)], [(0, 1, 2, 3)], [(1, 2, 3, 9), (1, 2, 3, 10)]]
+    [[(0, 1, 2, 3)], [(1, 2, 3, 9), (1, 2, 3, 10)], [(2, 1, 0, 4)]]
 
     Find the parameterizable dihedrals of benzamidine
     >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
     >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
-    [[(1, 0, 6, 12), (1, 0, 6, 13), (5, 0, 6, 12), (5, 0, 6, 13)], [(0, 6, 12, 16), (0, 6, 12, 17), (0, 6, 13, 14), (0, 6, 13, 15)]]
+    [[(0, 6, 12, 16), (0, 6, 12, 17), (0, 6, 13, 14), (0, 6, 13, 15)], [(1, 0, 6, 12), (1, 0, 6, 13), (5, 0, 6, 12), (5, 0, 6, 13)]]
 
     # Check if the atom swapping does not affect results
 
@@ -322,7 +322,7 @@ def detectParameterizableDihedrals(molecule):
     >>> molFile = os.path.join(home('test-param'), 'dicarbothioic_acid.mol2')
     >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
-    [[(3, 1, 0, 6)], [(0, 1, 3, 5)], [(1, 3, 5, 7)]]
+    [[(0, 1, 3, 5)], [(1, 3, 5, 7)], [(3, 1, 0, 6)]]
 
     Find the parameterizable dihedrals of 2-hydroxypyridine
     >>> molFile = os.path.join(home('test-param'), '2-hydroxypyridine.mol2')
@@ -362,8 +362,8 @@ def detectParameterizableDihedrals(molecule):
     equivalent_dihedrals = OrderedDict()
     for dihedral, groups in zip(dihedrals, dihedral_groups):
         dihedral, groups = (dihedral[::-1], groups[::-1]) if groups[::-1] < groups else (dihedral, groups)
-        equivalent_dihedrals[groups] = equivalent_dihedrals.get(groups, []) + [dihedral]
-    equivalent_dihedrals = equivalent_dihedrals.values()
+        equivalent_dihedrals[groups] = sorted(equivalent_dihedrals.get(groups, []) + [dihedral])
+    equivalent_dihedrals = sorted(equivalent_dihedrals.values())
     # print(equivalent_dihedrals)
     return equivalent_dihedrals
 
