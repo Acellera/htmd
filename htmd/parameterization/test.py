@@ -34,69 +34,6 @@ def _loadFiles(folder1, folder2):
         raise RuntimeError('Could not find frcmod or prm/rtf combination in folders {} {}'.format(folder1, folder2))
     return mol1, prm1, prm2
 
-def _compareDihedralEnergies(mol, prm1, prm2, argdihedrals):
-    from htmd.molecule.util import guessAnglesAndDihedrals
-    from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
-    from htmd.ffevaluation.ffevaluate import ffevaluate
-    import numpy as np
-
-    # Guess bonds
-    if len(mol.bonds) == 0:
-        print('No bonds found! Guessing them...')
-        bonds = mol._guessBonds()
-        mol.bonds = bonds.copy()
-
-    # Guess angles and dihedrals
-    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds, cyclicdih=True)
-
-    equivalents = detectEquivalentAtoms(mol)
-    all_dihedrals = [x.atoms for x in detectParameterizableDihedrals(mol)]
-
-    def dihedralName(mol, dih):
-        return '-'.join(mol.name[dih])
-
-    # Choose which dihedrals to fit
-    dihedrals = []
-    all_dihedral_names = [dihedralName(mol, dihedral) for dihedral in all_dihedrals]
-    for dihedral_name in argdihedrals:
-        if dihedral_name not in all_dihedral_names:
-            raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
-        dihedrals.append(all_dihedrals[all_dihedral_names.index(dihedral_name)])
-    dihedrals = dihedrals if len(dihedrals) > 0 else all_dihedrals  # Set default to all dihedral angles
-
-    # Calculate energies
-    data = []
-    for dihedral in dihedrals:
-        nrotamers = 36  # Number of rotamers for each dihedral to compute
-
-        # Create a copy of molecule with "nrotamers" frames
-        evalmol = mol.copy()
-        while evalmol.numFrames < nrotamers:
-            evalmol.appendFrames(mol)
-        assert evalmol.numFrames == nrotamers
-
-        # Set rotamer coordinates
-        angles = np.linspace(-np.pi, np.pi, num=nrotamers, endpoint=False)
-        for frame, angle in enumerate(angles):
-            evalmol.frame = frame
-            evalmol.setDihedral(dihedral, angle, bonds=evalmol.bonds)
-
-        nrg1, _, _ = ffevaluate(evalmol, prm1)
-        nrg2, _, _ = ffevaluate(evalmol, prm2)
-        totnorm_nrg1 = nrg1.sum(axis=0) - np.min(nrg1.sum(axis=0))
-        totnorm_nrg2 = nrg2.sum(axis=0) - np.min(nrg2.sum(axis=0))
-        # from matplotlib import pylab as plt
-        # plt.figure()
-        # plt.plot(range(36), totnorm_nrg1)
-        # plt.plot(range(36), totnorm_nrg2)
-        # plt.legend(['nr1', 'nr2'])
-        # plt.show()
-        rmse = np.sqrt(np.mean((totnorm_nrg1 - totnorm_nrg2) ** 2))
-        data.append((dihedralName(mol, dihedral), rmse, np.max(np.abs(totnorm_nrg1 - totnorm_nrg2))))
-        print('Dihedral {} has an RMSE(kcal/mol): {} maxDiff(kcal/mol): {}'.format(*data[-1]))
-    return data
-
-
 def _parameterCompare(folder1, folder2, prm1, prm2, fields=('atom_types', 'bond_types', 'angle_types', 'improper_types', 'improper_periodic_types'), dihedrals=()):
     def myerror(msg):
         raise RuntimeError('Difference found in {} and {}. {}'.format(folder1, folder2, msg))
@@ -185,10 +122,6 @@ class TestParameterize(unittest.TestCase):
             folder2 = os.path.join(resDir, f)
             mol, prm1, prm2 = _loadFiles(folder1, folder2)
             _parameterCompare(folder1, folder2, prm1, prm2, dihedrals=dihedrals)
-            res = _compareDihedralEnergies(mol, prm1, prm2, dihedrals)
-            for r in res:
-                if r[1] > 0.02: # RMSE threshold in kcal/mol
-                    self.fail('Dihedral {} gave different energy than in the test with kcal/mol RMSE {} and max error {}'.format(r[0], r[1], r[2]))
 
     def _testFiles(self, refDir, resDir):
         filestotest = []

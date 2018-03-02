@@ -94,8 +94,8 @@ def getDipole(mol):
     from scipy import constants as const
 
     if mol.masses.sum() == 0:
-        logger.warning('No masses found in Molecule. Calculating dipole using geometric center instead.')
-        coords = mol.coords[:, :, mol.frame] - np.mean(mol.coords[:, :, mol.frame], axis=0)
+        logger.warning('No masses found in Molecule. Cannot calculate dipole.')
+        return np.zeros(4)
     else:
         coords = mol.coords[:, :, mol.frame] - centreOfMass(mol)
 
