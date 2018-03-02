@@ -59,7 +59,7 @@ class ESP:
     >>> mol = Molecule(molFile)
     >>> mol = canonicalizeAtomNames(mol)
     >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
-    >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    >>> mol, equivalents, _ = getEquivalentsAndDihedrals(mol)
     >>> netcharge = int(round(np.sum(mol.charge)))
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP

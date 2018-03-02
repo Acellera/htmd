@@ -361,7 +361,7 @@ def detectParameterizableDihedrals(molecule):
         dihedral, groups = (dihedral[::-1], groups[::-1]) if groups[::-1] < groups else (dihedral, groups)
         equivalent_dihedrals[groups] = equivalent_dihedrals.get(groups, []) + [dihedral]
     equivalent_dihedrals = equivalent_dihedrals.values()
-    print(equivalent_dihedrals)
+    # print(equivalent_dihedrals)
     return equivalent_dihedrals
 
 

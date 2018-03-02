@@ -93,7 +93,11 @@ def getDipole(mol):
     """Calculate the dipole moment (in Debyes) of the molecule"""
     from scipy import constants as const
 
-    coords = mol.coords[:, :, mol.frame] - centreOfMass(mol)
+    if mol.masses.sum() == 0:
+        logger.warning('No masses found in Molecule. Calculating dipole using geometric center instead.')
+        coords = mol.coords[:, :, mol.frame] - np.mean(mol.coords[:, :, mol.frame], axis=0)
+    else:
+        coords = mol.coords[:, :, mol.frame] - centreOfMass(mol)
 
     dipole = np.zeros(4)
     dipole[:3] = np.dot(mol.charge, coords)
