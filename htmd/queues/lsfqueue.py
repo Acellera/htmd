@@ -23,8 +23,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
     ----------
     jobname : str, default=None
         Job name (identifier)
-    queue : str, default=None
-        The queue to run on
+    queue : str or list of str, default=None
+        The queue or list of queues to run on. If list, it attempts to submit the job to the first queue listed
     app : str, default=None
         The application profile
     ngpu : int, default=1
@@ -61,7 +61,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
         SimQueue.__init__(self)
         ProtocolInterface.__init__(self)
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
-        self._arg('queue', 'str', 'The queue to run on', self._defaults['queue'], val.String())
+        self._arg('queue', 'str', 'The queue or list of queues to run on. If list, it attempts to submit the job to '
+                                  'the first queue listed', self._defaults['queue'], val.String(), nargs='*')
         self._arg('app', 'str', 'The application profile', self._defaults['app'], val.String())
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
                   val.Number(int, '0POS'))
@@ -126,12 +127,13 @@ class LsfQueue(SimQueue, ProtocolInterface):
         return ret
 
     def _createJobScript(self, fname, workdir, runsh):
+        from htmd.util import ensurelist
         workdir = os.path.abspath(workdir)
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n')
             f.write('#\n')
             f.write('#BSUB -J {}\n'.format(self.jobname))
-            f.write('#BSUB -q {}\n'.format(self.queue))
+            f.write('#BSUB -q "{}"\n'.format(' '.join(ensurelist(self.queue))))
             f.write('#BSUB -n {}\n'.format(self.ncpu))
             if self.app is not None:
                 f.write('#BSUB -app {}\n'.format(self.app))
