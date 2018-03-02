@@ -145,6 +145,9 @@ def _getMethylGraph():
 
     return methyl
 
+def connected_component_subgraphs(graph):
+    return (graph.subgraph(c).copy() for c in nx.connected_components(graph))
+
 def detectParameterizableCores(graph):
     """
     Detect parametrizable dihedral angle cores (central atom pairs)
@@ -160,7 +163,7 @@ def detectParameterizableCores(graph):
 
         # Get side graphs of the core
         graph.remove_edge(*core)
-        sideGraphs = list(nx.connected_component_subgraphs(graph))
+        sideGraphs = list(connected_component_subgraphs(graph))
         graph.add_edge(*core)
 
         # Skip terminal bridges, which cannot form dihedral angles
@@ -213,7 +216,7 @@ def _chooseTerminals(graph, centre, sideGraph):
     # Get a subgraph for each terminal
     sideGraph = sideGraph.copy()
     sideGraph.remove_node(centre)
-    terminalGraphs = itertools.product(terminals, nx.connected_component_subgraphs(sideGraph))
+    terminalGraphs = itertools.product(terminals, connected_component_subgraphs(sideGraph))
     terminalGraphs = [terminalGraph for terminal, terminalGraph in terminalGraphs if terminal in terminalGraph]
 
     # Compute a score for each terminal
