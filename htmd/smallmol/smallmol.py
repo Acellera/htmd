@@ -419,7 +419,11 @@ class SmallMol:
         if returnAsIdx:
             return [ a.GetIdx() for a in neighbours ]
 
-        return  neighbours
+        return neighbours
+
+    @property
+    def element(self):
+        return self.get_elements()
 
     def get_element(self, atom):
         """
@@ -982,9 +986,10 @@ class SmallMolStack:
         self._sdffile = sdf_file if  self._isSdfFile(sdf_file) else None
 
         self._mols = None
+        self.fields = None
 
         if sdf_file != None:
-            self._mols = self._initializeMolObjs(sdf_file, removeHs, fixHs)
+            self._mols, self.fields = self._initializeMolObjs(sdf_file, removeHs, fixHs)
 
     def _isSdfFile(self, sdf_file):
 
@@ -1001,15 +1006,23 @@ class SmallMolStack:
 
     def _initializeMolObjs(self, sdf_file, removeHs, fixHs):
         from tqdm import tqdm
+        from htmd.parallelprogress import ParallelExecutor, delayed
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=False)
-        mols = []
-        for i, mol in enumerate(tqdm(supplier)):
-            if mol is not None:
-                mols.append(SmallMol(mol, removeHs=removeHs, fixHs=fixHs))
-            else:
-                mols.append(None)
+        #nummols = len(supplier)
+        #aprun = ParallelExecutor(n_jobs=-1)
+        #mols = aprun(total=nummols, desc='Loading Molecules')(
+                               # delayed(SmallMol)(supplier[i], False, False, True, removeHs) for i in range(nummols))
 
-        mols = mols
+
+        mols = []
+
+        for i, mol in enumerate(tqdm(supplier)):
+             if mol is not None:
+                 mols.append(SmallMol(mol, removeHs=removeHs, fixHs=fixHs))
+
+             else:
+                 mols.append(None)
+
 
         invalid_mols = self._get_invalid_indexes(mols)
 
@@ -1017,20 +1030,94 @@ class SmallMolStack:
             logger.warning('The following entries could not be loaded: {}. Use clean_invalids to remove them from the '
                            'pool'.format(invalid_mols))
 
-        return np.array(mols)
+        ref_for_field = None
+        for m in mols:
+            if m is not None:
+                ref_for_field = m
+                break
+        fields = ref_for_field.listProps()
+
+        return np.array(mols), fields
 
     def clean_invalids(self):
         _mols = self.get_mols()
 
+        ids = [n for n, m in enumerate(_mols) if m == None]
 
-        self._mols =  [ m for m in _mols if m is not None]
+        self._mols =  np.array(np.delete(_mols, ids))
 
-    def get_mols(self):
-
-        return self._mols
-
-    def get_nmols(self):
+    @property
+    def numMols(self):
         return len(self._mols)
+
+    def get_mols(self, ids=None):
+
+        if ids == None:
+            return self._mols
+        if not isinstance(ids, list):
+            raise TypeError("The argument ids {} should be list".format(type(ids)))
+
+        _mols = np.array(self._mols)
+
+        return _mols[ids]
+
+    def write_sdf(self, sdf_name, fields=None):
+        from rdkit.Chem import SDWriter
+
+        writer = SDWriter(sdf_name)
+        if fields is not None:
+            if not isinstance(fields, list):
+                raise TypeError("The fields argument {} should be a list".format(type(fields)))
+            writer.SetProps(fields)
+
+        for m in self._mols:
+            writer.write(m._mol)
+
+    def appendSmallLib(self, smallLib):
+        ### sdf_file ???
+
+        for sm in smallLib._mols:
+            self.appendSmallMol(sm)
+
+    def appendSmallMol(self, smallmol, strictField=False, strictDirection=1):
+        #### check fields and in case as zero ?  the same for the ones present?
+        class NoSameField(Exception):
+            pass
+
+        if strictDirection  not in [1,2]:
+            raise  ValueError("The strictDirections should be 1 (add fields into new mol) or 2 (add fields also in the"
+                              "database mols)")
+        tmp_fields = smallmol.listProps()
+
+        if strictField:
+            areSameField = set(self.fields) == set(tmp_fields)
+            if not areSameField:
+                raise NoSameField("The fields of the new molecule does not match the current database. Set strictField "
+                                  "as False to skip this error")
+
+        if strictDirection >= 1:
+            old_fields = set(self.fields) - set(tmp_fields)
+            for f in old_fields:
+                smallmol.setProp(f, np.nan, True)
+        if strictDirection == 2:
+            new_field = set(tmp_fields) - set(self.fields)
+            self.fields = self.fields + list(new_field)
+            for f in new_field:
+                for m in self._mols:
+                    m.setProp(f, np.nan, True)
+
+        self._mols = np.append(self._mols, smallmol)
+        #self._mols.append(smallmol)
+
+    def removeMols(self, ids):
+
+        if not isinstance(ids, list):
+            raise TypeError('The argument ids {} is not valid. Should be list'.format(type(ids)))
+        _oldNumMols = self.numMols
+        self._mols = np.delete(self._mols, ids)
+
+        logger.warning("[num mols before deleting: {}]. The molecules {} were removed, now the number of "
+                    "molecules are {} ".format(_oldNumMols, ids, self.numMols))
 
     def vox_fun(mol):
         return None
@@ -1114,7 +1201,7 @@ class SmallMolStack:
         else:
             raise ValueError("n_jobs needs to be a positive integer!")
 
-    def depict(self, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std',
+    def depict(self, ids=None, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std',
                removeHs=True,  legends=None, highlightAtoms=None, mols_perrow=3):
 
         """
@@ -1159,7 +1246,11 @@ class SmallMolStack:
         elif legends == 'items':
             legends_list = [ str(n+1) for n in range(len(self._mols))]
 
-        _mols = [ _m.get_mol() for _m in self.get_mols() ]
+
+        if ids is None:
+            _mols = [ _m.get_mol() for _m in self.get_mols() ]
+        else:
+            _mols = [ _m.get_mol() for _m in self.get_mols(ids)]
 
         if highlightAtoms is not None:
             if len(highlightAtoms) != len(_mols):
