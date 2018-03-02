@@ -17,10 +17,12 @@ class MetricDistance(Projection):
     Parameters
     ----------
     sel1 : str
-        Atomselection for the first set of atoms
+        Atom selection string for the first set of atoms.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     sel2 : str
-        Atomselection for the second set of atoms. If sel1 != sel2 it will calculate inter-set distances.
-        If sel1 == sel2, it will calculate intra-set distances
+        Atom selection string for the second set of atoms. If sel1 != sel2, it will calculate inter-set distances.
+        If sel1 == sel2, it will calculate intra-set distances.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     groupsel1 : ['all','residue'], optional
         Group all atoms in `sel1` to the single minimum distance. Alternatively can calculate the minimum distance of a
         residue containing the atoms in sel1.
@@ -183,17 +185,19 @@ class MetricDistance(Projection):
 
 
 class MetricSelfDistance(MetricDistance):
-    def __init__(self, sel, groupsel=None,  metric='distances', threshold=8, pbc=True, truncate=None):
+    def __init__(self, sel, groupsel=None, metric='distances', threshold=8, pbc=True, truncate=None):
         """ Creates a MetricSelfDistance object
 
         Parameters
         ----------
         sel : str
-            Atomselection for the first set of atoms
+            Atom selection string for which to calculate the self distance.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         groupsel : ['all','residue'], optional
-            Group all atoms in `sel1` to the single minimum distance. Alternatively can calculate the minimum distance of a residue containing the atoms in sel1.
+            Group all atoms in `sel` to the single minimum distance. Alternatively can calculate the minimum distance
+            of a residue containing the atoms in `sel`.
         metric : ['distances','contacts'], optional
-            Set to 'concacts' to calculate contacts instead of distances
+            Set to 'contacts' to calculate contacts instead of distances
         threshold : float, optional
             The threshold under which a distance is considered in contact
         pbc : bool, optional

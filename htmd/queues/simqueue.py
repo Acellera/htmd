@@ -8,6 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class RetrieveError(Exception):
     def __init__(self, value):
         self.value = value
