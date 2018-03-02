@@ -110,7 +110,7 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 
     print('Equivalent atom groups:')
     for atom_group in equivalents[0]:
-        print('  ' + ', '.join(mol.name[atom_group]))
+        print('  ' + ', '.join(mol.name[list(atom_group)]))
 
     print('Parameterizable dihedral angles:')
     for equivalent_dihedrals in all_dihedrals:
@@ -187,7 +187,7 @@ def main_parameterize(arguments=None):
         print('\n === Parameterizable dihedral angles of {} ===\n'.format(args.filename))
         with open('torsions.txt', 'w') as fh:
             for dih in all_dihedrals:
-                dihname = '-'.join(list(dih[0]))
+                dihname = '-'.join(mol.name[list(dih[0])])
                 print('  {}'.format(dihname))
                 fh.write(dihname+'\n')
         print()
@@ -201,14 +201,14 @@ def main_parameterize(arguments=None):
     qm.netcharge = netcharge
 
     # Select which dihedrals to fit
-    fit_dihedrals = [dih[0] for dih in all_dihedrals]
+    fit_dihedrals = [list(dih[0]) for dih in all_dihedrals]
     if len(args.dihedral) > 0:
-        all_dihedral_names = ['-'.join(mol.name[list(dihedral)]) for dihedral in all_dihedrals]
+        all_dihedral_names = ['-'.join(mol.name[list(dihedral[0])]) for dihedral in all_dihedrals]
         fit_dihedrals = []
         for dihedral_name in args.dihedral:
             if dihedral_name not in all_dihedral_names:
                 raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
-            fit_dihedrals.append(all_dihedrals[all_dihedral_names.index(dihedral_name)][0])
+            fit_dihedrals.append(list(all_dihedrals[all_dihedral_names.index(dihedral_name)][0]))
 
     # Print arguments
     print('\n === Arguments ===\n')

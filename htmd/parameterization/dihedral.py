@@ -122,11 +122,13 @@ class DihedralFitting:
         # Get equivalent dihedral atom indices
         self._equivalent_indices = []
         for idihed, dihedral in enumerate(self.dihedrals):
+            found = False
             for rotatableDihedral in self._rotatable_dihedrals:
-                if np.all(rotatableDihedral[0] == dihedral):
+                if np.all(list(rotatableDihedral[0]) == dihedral):
                     self._equivalent_indices.append(rotatableDihedral)
+                    found = True
                     break
-            else:
+            if not found:
                 raise ValueError('%s is not recognized as a parameterizable dihedral\n' % self._names[idihed])
 
         # Get reference QM energies and rotamer coordinates
