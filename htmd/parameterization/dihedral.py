@@ -458,6 +458,41 @@ class TestDihedralFitting(unittest.TestCase):
         self.assertListEqual(list(lower_bounds), [0.,  0.,  0.,  0.,  0.,  0.,   0.,   0.,   0.,   0.,   0.,   0., -10.])
         self.assertListEqual(list(upper_bounds), [10., 10., 10., 10., 10., 10., 360., 360., 360., 360., 360., 360.,  10.])
 
+    def test_paramsToVector(self):
+        from parmed.parameters import ParameterSet
+        from parmed.topologyobjects import DihedralTypeList, DihedralType
+
+        params = ParameterSet()
+        dihlist = DihedralTypeList()
+        for i in range(6):
+            dihtype = DihedralType(float(i)+10, i+1, float(i)+20)
+            dihlist.append(dihtype)
+        params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
+
+        self.df.dihedrals = [(0, 0, 0, 0),]
+        vector = self.df._paramsToVector(params, [('x', 'x', 'x', 'x'),])
+        self.assertListEqual(list(vector), [10., 11., 12., 13., 14., 15., 20., 21., 22., 23., 24., 25., 0.])
+
+    def test_vectorToParams(self):
+        from parmed.parameters import ParameterSet
+        from parmed.topologyobjects import DihedralTypeList, DihedralType
+
+        params = ParameterSet()
+        dihlist = DihedralTypeList()
+        for i in range(6):
+            dihtype = DihedralType(float(i)+10, i+1, float(i)+20)
+            dihlist.append(dihtype)
+        params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
+
+        self.df.dihedrals = [[0, 1, 2, 3]]
+        vector = np.array([30., 31., 32., 33., 34., 35., 40., 41., 42., 43., 44., 45., 50.])
+        self.df._vectorToParams(params, [('x', 'x', 'x', 'x'),], vector)
+
+        self.assertEqual(len(params.dihedral_types[('x', 'x', 'x', 'x')]), 6)
+        for i, param in enumerate(params.dihedral_types[('x', 'x', 'x', 'x')]):
+            self.assertEqual(param.phi_k, i+30)
+            self.assertEqual(param.per, i+1)
+            self.assertEqual(param.phase, i+40)
 
     # Note: the rest methods are tested indirectly via the "parameterize" tests in test.py
 
