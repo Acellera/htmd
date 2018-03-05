@@ -52,15 +52,11 @@ class ESP:
     Load water molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
-    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
+    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals
     >>> from htmd.molecule.molecule import Molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
-    >>> mol = canonicalizeAtomNames(mol)
-    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
     >>> mol, equivalents, _ = getEquivalentsAndDihedrals(mol)
-    >>> netcharge = int(round(np.sum(mol.charge)))
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4
@@ -81,7 +77,7 @@ class ESP:
 
     Set up and run charge fitting
     >>> esp.molecule = mol
-    >>> esp.netcharge = netcharge
+    >>> esp.netcharge = int(round(np.sum(mol.charge)))
     >>> esp.qm_results = qm_results
     >>> esp.equivalent_atom_groups = equivalents[0]
     >>> esp.equivalent_group_by_atom = equivalents[2]
@@ -311,15 +307,12 @@ class TestESP(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.parameterization.fftype import FFTypeMethod, fftype
-        from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
+        from htmd.parameterization.util import getEquivalentsAndDihedrals
         from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'H2O2.mol2')
         mol = Molecule(molFile)
-        mol = canonicalizeAtomNames(mol)
         mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-        _, mol = fftype(mol, method=FFTypeMethod.GAFF2)
         self.mol = mol
         self.esp = ESP()
         self.esp.molecule = self.mol
