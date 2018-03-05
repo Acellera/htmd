@@ -27,6 +27,40 @@ class FFTypeMethod(Enum):
 
 
 def fftype(mol, rtfFile=None, prmFile=None, method=FFTypeMethod.CGenFF_2b6, acCharges=None, tmpDir=None, netcharge=None):
+    """
+    Function to assign atom types and force field parameters for a given molecule.
+
+    The assigment can be done:
+      1. For CHARMM CGenFF_2b6 with MATCH (method = FFTypeMethod.CGenFF_2b6);
+      2. For AMBER GAFF with antechamber (method = FFTypeMethod.GAFF);
+      3. For AMBER GAFF2 with antechamber (method = FFTypeMethod.GAFF2);
+
+    Parameters
+    ----------
+    mol : FFMolecule
+        Molecule to use for the assigment
+    rtfFile : str
+        Path to a RTF file from which to read the topology
+    prmFile : str
+        Path to a PRM file from which to read the parameters
+    method : FFTypeMethod
+        Assigment method
+    acCharges : str
+        Optionally assign charges with antechamber. Check `antechamber -L` for available options. Caution: This will
+        overwrite any charges defined in the mol2 file.
+    tmpDir: str
+        Directory for temporary files. If None, a directory is created and
+        deleted automatically.
+    netcharge : float
+        The net charge of the molecule.
+
+    Returns
+    -------
+    prm : :class:`ParameterSet<parmed.parameters.ParameterSet>` object
+        Returns a parmed ParameterSet object with the parameters.
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The modified Molecule object with the matching atom types for the ParameterSet
+    """
     if netcharge is None:
         netcharge = np.sum(mol.charge)
     netcharge = int(round(netcharge))
