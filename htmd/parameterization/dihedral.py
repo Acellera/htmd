@@ -54,7 +54,6 @@ class DihedralFitting:
         self.zeroed_parameters = False
 
         self.parameters = None
-        self.fitdihkeys = None
         self.loss = None
 
         self._names = None
@@ -72,9 +71,8 @@ class DihedralFitting:
         self._all_target_energies = None
         self._angle_values_rad = None
 
-        self.parmedMode = False
-        self._prm = None
-        self._rotatable_dihedrals = None
+        self._parameterizable_dihedrals = None
+        self._parameterizable_dihedral_atomtypes = None
 
     @property
     def numDihedrals(self):
@@ -123,9 +121,9 @@ class DihedralFitting:
         self._equivalent_indices = []
         for idihed, dihedral in enumerate(self.dihedrals):
             found = False
-            for rotatableDihedral in self._rotatable_dihedrals:
-                if np.all(list(rotatableDihedral[0]) == dihedral):
-                    self._equivalent_indices.append(rotatableDihedral)
+            for parameterizableDihedral in self._parameterizable_dihedrals:
+                if np.all(list(parameterizableDihedral[0]) == dihedral):
+                    self._equivalent_indices.append(parameterizableDihedral)
                     found = True
                     break
             if not found:
@@ -148,7 +146,7 @@ class DihedralFitting:
             self._angle_values.append(np.array(angle_values))
         self._angle_values_rad = [np.deg2rad(angle_values)[:, :, None] for angle_values in self._angle_values]
 
-        self.fitdihkeys = [tuple(self.molecule.atomtype[idx]) for idx in self.dihedrals]
+        self._parameterizable_dihedral_atomtypes = [tuple(self.molecule.atomtype[idx]) for idx in self.dihedrals]
 
         # Calculated initial MM energies
         ff = FFEvaluate(self.molecule, self.parameters)
@@ -197,16 +195,16 @@ class DihedralFitting:
 
         return rmsd
 
-    def _paramsToVector(self, params, keys):
+    def _paramsToVector(self, params, dihedral_atomtypes):
         """
         Convert the parameter objects to a vector.
         """
         vector = []
-        for k in keys:
+        for k in dihedral_atomtypes:
             assert len(params.dihedral_types[k]) == self.MAX_DIHEDRAL_MULTIPLICITY
             for term in params.dihedral_types[k]:
                 vector.append(term.phi_k)
-        for k in keys:
+        for k in dihedral_atomtypes:
             for term in params.dihedral_types[k]:
                 vector.append(term.phase)
         for i in range(self.numDihedrals):
@@ -289,11 +287,11 @@ class DihedralFitting:
 
         return best_vector
 
-    def _vectorToParams(self, parameters, keys, vector):
-        nparams = len(keys) * self.MAX_DIHEDRAL_MULTIPLICITY
+    def _vectorToParams(self, parameters, dihedral_atomtypes, vector):
+        nparams = len(dihedral_atomtypes) * self.MAX_DIHEDRAL_MULTIPLICITY
         assert vector.size == 2 * nparams + self.numDihedrals
 
-        for i, k in enumerate(keys):
+        for i, k in enumerate(dihedral_atomtypes):
             for j, t in enumerate(parameters.dihedral_types[k]):
                 t.phi_k = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j]
                 t.phase = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j+nparams]
@@ -302,14 +300,14 @@ class DihedralFitting:
         from copy import deepcopy
 
         # Save the initial parameters
-        vector = self._paramsToVector(self.parameters, self.fitdihkeys)
+        vector = self._paramsToVector(self.parameters, self._parameterizable_dihedral_atomtypes)
         if self.zeroed_parameters:
             vector[:] = 0
 
         # Evaluate the MM potential with this dihedral zeroed out
         # The objective function will try to fit to the delta between
         # the QM potential and this modified MM potential
-        for key in self.fitdihkeys:
+        for key in self._parameterizable_dihedral_atomtypes:
             for term in self.parameters.dihedral_types[key]:
                 term.phi_k = 0
 
@@ -330,7 +328,7 @@ class DihedralFitting:
         logger.info('Finished parameter optimization')
 
         # Update the target dihedral with the optimized parameters
-        self._vectorToParams(self.parameters, self.fitdihkeys, vector)
+        self._vectorToParams(self.parameters, self._parameterizable_dihedral_atomtypes, vector)
 
         return self.loss
 
