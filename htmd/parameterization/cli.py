@@ -129,9 +129,6 @@ def main_parameterize(arguments=None):
     else:
         raise NotImplementedError
 
-    if hasattr(queue, 'environment'): # TODO: LocalCPUQueue does not have it
-        queue.environment = 'PATH,LD_LIBRARY_PATH,PSI_SCRATCH' # Use Psi4 from an active conda environment
-
     # Override default ncpus
     if args.ncpus:
         logger.info('Overriding ncpus to {}'.format(args.ncpus))
