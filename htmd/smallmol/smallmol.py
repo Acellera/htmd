@@ -909,7 +909,7 @@ class SmallMolStack:
 
         self._sdffile = sdf_file if  self._isSdfFile(sdf_file) else None
 
-        self._mols = None
+        self._mols = np.array([])
         self.fields = None
 
         if sdf_file != None:
