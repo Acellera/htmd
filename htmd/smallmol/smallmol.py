@@ -46,6 +46,44 @@ class SmallMol:
     fdefName = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
     factory = ChemicalFeatures.BuildFeatureFactory(fdefName)
 
+    ### Fields
+    _atom_fields = ['idx', 'atomname', 'charge','formalcharge', 'element',  'chiral',
+                    'neighbors', 'bondtypes']
+
+    _mol_fields = ['ligname', 'totalcharge', '_mol']
+
+    # field types
+    _atom_dtypes = {'idx': np.int,
+                    'atomname': object,
+                    'charge': np.float32,
+                    'formalcharge': np.int,
+                    'element': object,
+                    'chiral': object,
+                    'neighbors': object,
+                    'bondtypes': object
+                    }
+
+    _mol_dtypes = {'_mol': object,
+                    'ligname': object,
+                   'totalcharge': np.int
+                   }
+
+    # field shapes
+    _atom_dims = {'idx': (0,),
+                  'atomname': (0,),
+                  'charge': (0,),
+                  'formalcharge': (0,),
+                  'element': (0,),
+                  'chiral': (0,),
+                  'neighbors': (0,),
+                  'bondtypes': (0,)
+                    }
+
+    _mol_dims = {'_mol': (0,),
+                 'ligname': (0,),
+                 'totalcharge': (0,)
+                   }
+
     def __init__(self, mol, ignore_errors=False, force_reading=False, fixHs=True, removeHs=False):
         """
         Initializes small molecule object
@@ -53,7 +91,8 @@ class SmallMol:
         Parameters
         ----------
         mol: rdkit Molecule object or string
-            (i) Rdkit molecule or (ii) Location of molecule file (".pdb"/".mol2") or (iii) a smile string.
+            (i) Rdkit molecule or (ii) Location of molecule file (".pdb"/".mol2") or (iii) a smile string or iv) another
+            SmallMol object
         ignore_errors: bool
             If True errors will not be raised.
         force_reading: bool
@@ -64,8 +103,14 @@ class SmallMol:
             Set as True to remove the hydrogens
         """
 
+        # init the __dict__ with the fields
+        for field in self._atom_dtypes:
+            self.__dict__[field] = np.empty( self._atom_dims[field], dtype=self._atom_dtypes[field] )
+        for field in self._mol_dtypes:
+            self.__dict__[field] = None
+
         # load the input and store the rdkit Mol obj
-        self._mol = self._initializeMolObj(mol, force_reading)
+        self._mol, smallMol = self._initializeMolObj(mol, force_reading)
         if not ignore_errors and self._mol == None:
             if not force_reading:
                 raise ValueError("Unkown '{}' provided. Not a valid mol2,pdb,smile, rdkitMol obj. Try by setting the force_reading option as True.".format(mol))
@@ -78,16 +123,8 @@ class SmallMol:
         if fixHs:
             self._mol = Chem.AddHs(self._mol, addCoords=True)
 
-        #### STORE INFO INSIDE MOL and ATOMS
-        # molecule name
-        if not self._mol.HasProp('_Name'):
-            self.set_name()
-
-        # set initial SmallMol atom charges
-        self._initCharges()
-
-        # atom parameters when generated
-        self._initParameters()
+        # fill the molecule and atom properties
+        self._readMol(smallMol)
 
     def _initializeMolObj(self, mol, force_reading):
         """
@@ -96,17 +133,23 @@ class SmallMol:
         Parameters
         ----------
         mol: str or rdkit Molecule object
-            i) rdkit Molecule Object ii) The path to the pdb/mol2 to load iii) The smile string
+            i) rdkit Molecule Object ii) The path to the pdb/mol2 to load iii) The smile string iv) SmallMOl object
         force_reading: bool
            If the mol provided is not accepted, the molecule will be initially converted into sdf
 
         Returns
         -------
-        _mol: rdkit Molecule object
-
+        _mol: rdkit.Chem.Molecule object
+            The rdkit molecule
+        smallMol: htmd.smallmol.smallmol.SmallMol
+            The smallMol object if SmallMol was passed
         """
-
         _mol = None
+        smallMol = None
+        if isinstance(mol, SmallMol):
+            _mol = mol._mol
+            smallMol = mol
+
         if isinstance(mol, Chem.Mol):
             _mol = mol
 
@@ -129,56 +172,66 @@ class SmallMol:
             else:
                 _mol = Chem.MolFromSmiles(mol)
 
-        return _mol
+        return _mol, smallMol
 
-    def _initParameters(self):
+    def _readMol(self, smallMol):
         """
-        Stores several properties inside the rdkit atom object that can be used for future purposed. See atom idx in
-        case of fragmentation
-        """
-        _atoms = self.get_atoms()
+        Set up the parameters of SmallMol object.
 
-        for a in _atoms:
-            chiral_tag = a.GetChiralTag()
-            atom_idx = a.GetIdx()
-            self.setPropAtom(a, '_SmallMolChiralTag', chiral_tag)
-            self.setPropAtom(a, '_SmallMolAtomIdx', atom_idx)
-
-    def _initCharges(self):
-        """
-        Initialize the atom property "_SmallMolCharge". If the atoms already have it or one of the following
-        ('_TriposPartialCharge', '_GasteigerCharge'), it will use these charges
-
+        Parameters
+        ----------
+        smallMol: htmd.smallmol.smallmol.SmallMol or None
+             If is not None the parameters are taken from this object
         """
 
-        # init charges property. If Tripos or Gaesteiger than these charges are set otherwise all are 0
-        _PossibleChargeTypes = ['_SmallMolCharge', '_TriposPartialCharge', '_GasteigerCharge']
+        idxs = []
+        atomnames = []
+        charges = []
+        formalcharges = []
+        elements = []
+        chirals =  []
+        neighbors = []
+        bondtypes = []
 
-        #init for the first atom
-        _atom = self.get_atom(0)
-        _FoundChargeTypes = self.listPropsAtom(_atom)
+        _mol = self._mol
 
-        matched = set(_PossibleChargeTypes) & set(_FoundChargeTypes)
+        if smallMol is not None:
+            for f, v in smallMol.__dict__.items():
+                self.__dict__[f] = v
+            return
 
-        returnWarning = False
+        for a in self.getAtoms():
+            i = a.GetIdx()
+            e = a.GetSymbol()
+            idxs.append(i)
+            atomnames.append('{}{}'.format(e,i))
+            if a.HasProp('_TriposPartialCharge'):
+                charges.append(a.GetPropsAsDict()['_TriposPartialCharge'])
+            else:
+                charges.append(0.000)
+            formalcharges.append(a.GetFormalCharge())
+            elements.append(e)
+            if a.HasProp('_CIPCode'):
+                chirals.append(a.GetPropsAsDict()['_CIPCode'])
+            else:
+                chirals.append('')
+            neighbors.append( [na.GetIdx() for na in a.GetNeighbors()] )
+            bondtypes.append( [ b.GetBondType() for b in a.GetBonds()] )
 
-        if len(matched) == 0:
-            for a in self.get_atoms():
-                self.setPropAtom(a, '_SmallMolCharge', 0.000)
+        if _mol.HasProp('_Name'):
+            self.__dict__['ligname'] = _mol.GetProp('_Name')
         else:
-            # for loop of possible to get key than use it
-            k = [k for k in _PossibleChargeTypes if k in matched][0]
-            if k != '_SmallMolCharge':
-                for a in self.get_atoms():
-                    try:
-                        self.setPropAtom(a, '_SmallMolCharge', self.getPropAtom(a, k))
-                    except:
-                        self.setPropAtom(a, '_SmallMolCharge', 0.000)
-                        returnWarning = True
+            self.__dict__['ligname'] = 'UNK'
 
-        if returnWarning:
-            logger.warning('Found atoms without a charge. The "_SmallMolCharge" for these atoms are set to 0.0.')
-
+        self.__dict__['totalcharge'] = sum(formalcharges)
+        self.__dict__['idx'] = np.array(idxs)
+        self.__dict__['atomname'] = np.array(atomnames)
+        self.__dict__['charge'] = np.array(charges )
+        self.__dict__['formalcharge'] = np.array(formalcharges)
+        self.__dict__['element'] = np.array(elements)
+        self.__dict__['chiral'] = np.array(chirals)
+        self.__dict__['neighbors'] = np.array(neighbors)
+        self.__dict__['bondtypes'] = np.array(bondtypes)
 
     def copy(self):
         """
@@ -191,168 +244,153 @@ class SmallMol:
         """
         return deepcopy(self)
 
-    def _chiralType(self, atom):
+    @property
+    def listProps(self):
         """
-        Returns the chiral type of the passed atom. Can be R, S or None.
-
-        Parameters
-        ----------
-        atom: rdkit.Chem.rdchem.Atom
-            The rdkit atom object
+        The list of properties of the moleule
 
         Returns
         -------
-        chiral: str
-            The chiral type 'R' or 'S'. None is returned if the atom is not a chiral one
+        fields: list
+            The list of properties
         """
+        _fields = list(self._mol_fields)
 
-        chiral = atom.GetChiralTag()
+        return _fields
 
-        if chiral in _chiral_type.keys():
-            return self.getPropAtom(atom, '_CIPCode')
-        else:
-            return None
-
-    def _set_prop(self, key, value, obj):
+    @property
+    def listPropsAtoms(self):
         """
-        Set the value of a property. Common for atom and molecule
+        The list of properties of the atoms
 
-        Parameters
-        ----------
-        key: str
-            The property key
-        value: str,bool,int,float
-            The property value
-        obj: The rdkit.Chem.Mol or rdkit.Chem.rdchem.Atom
-            The rdkit molecule or the rdkit atom object
-
+        Returns
+        -------
+        fields: list
+            The list of properties
         """
-
-        if isinstance(value, bool):
-            addprop = obj.SetBoolProp
-
-        if isinstance(value, float):
-            addprop = obj.SetDoubleProp
-
-        elif isinstance(value, int):
-            addprop = obj.SetIntProp
-
-        elif isinstance(value, str):
-            addprop = obj.SetProp
-
-        addprop(key, value)
+        _fields = list(self._atom_fields)
+        return _fields
 
     def setProp(self, key, value, overwrite=False):
         """
-        Set a molecule property. By default the overwrite options is disabled
+        Sets the property value based on the key
 
         Parameters
         ----------
         key: str
-            The key identifying the property
-        value: str,bool,float,int
+            The name of the property to set
+        value: int, str, float, object
             The value of the property
         overwrite: bool
-            Set as True to enable property overwriting
+            If set as True the property will be overwritten if already exist
 
         """
 
         if not isinstance(key, str):
-            raise ValueError('Wrong type {} for key.  Should be {} '.format(type(key), type('string')))
+             raise ValueError('Wrong type {} for key.  Should be {} '.format(type(key), type('string')))
 
-        _props = self.listProps()
+        _props = self.listProps
+
         if not overwrite and key in _props:
             raise ValueError('The key passed {} already exists. Set "overwrite" as True to overwrite an existing key'.format(key))
 
-        _mol = self.get_mol()
+        self._mol_fields.append(key)
+        self.__dict__[key] = value
 
-        self._set_prop(key, value, _mol)
-
-
-    def setPropAtom(self, atom,  key, value, overwrite=False):
+    def setPropsAtoms(self, key, values, aIdxs=None):
         """
-        Set an atom property. By default the overwrite options is disabled
+        Sets the property for one or more atoms
 
         Parameters
         ----------
         key: str
-            The key identifying the property
-        value: str,bool,float,int
-            The value of the property
-        overwrite: bool
-            Set as True to enable property overwriting
-
+            The name of the property to set
+        values: list
+            The list of the values for the property
+        aIdxs: list
+            The list of the atom index to which set up the values
         """
+        class ValuesLengthErrors(Exception):
+            pass
 
         if not isinstance(key, str):
-            raise ValueError('Wrong type {} for key.  Should be {} '.format(type(key), type('string')))
+             raise ValueError('Wrong type {} for key.  Should be {} '.format(type(key), type('string')))
 
-        _props = list(atom.GetPropsAsDict().keys())
-        if not overwrite and key in _props:
-            raise ValueError('The key passed {} already exists. Set "overwrite" as True to overwrite an existing key'.format(key))
+        if aIdxs is None and len(values) != self.numAtoms:
+            raise ValuesLengthErrors('The number of values passed {} do not match '
+                                     'the number of atoms {}'.format(len(values), self.numAtoms))
 
-        self._set_prop(key, value, atom)
+        if aIdxs is not None and len(aIdxs) != len(values):
+            raise ValuesLengthErrors('The number of values passed {} do not match '
+                                     'the number of idxs {}'.format(len(values), len(aIdxs)))
 
-    def getPropAtom(self, atom, key):
-        """
-        Returns the atom property for the atom and key passed
+        _props = self.listPropsAtoms
 
-        Parameters
-        ----------
-        atom: rdkit.Chem.rdhem.Atom
-            The rdkit Atom object
-        key: str
-            The property key
+        # creation of new property. Requires the creation of a new array
+        if key not in _props:
+            tmp_array = np.array([None]*self.numAtoms)
+            self.__dict__[key] = tmp_array
 
-        Returns
-        -------
-        prop:
-            The property
-        """
-
-        if key not in self.listPropsAtom(atom):
-            raise KeyError('The property "{}" was not found '.format(key))
-
-        prop = atom.GetPropsAsDict()[key]
-
-        return prop
+        self.__dict__[key][aIdxs] = values
 
     def getProp(self, key):
         """
-        Returns the molecule property for the key passed
+        Returns the  molecule or the atoms property of the key passed
 
         Parameters
         ----------
         key: str
-            The property key
+            The name of the property to retrieve
 
         Returns
         -------
-        prop:
-            The property
+        value: str, int, float, object
+            The value of the property
+        """
+        if key not in self.listProps:
+            raise KeyError('The property passed {} does not exist'.format(key))
+
+        _value = self.__dict__[key]
+
+        return _value
+
+    def get(self, sel, returnField):
+        """
+        Returns the property for the atom specified with the selection. The selection is another atom property
+
+        Parameters
+        ----------
+        sel: str
+            The selection string like: element H C; idx 1 2 3; formalcharge 1
+        returnField: str
+            The field of the atom to return
+
+        Returns
+        -------
+        values: np.array
+            The array of values for the property
         """
 
-        if key not in self.listProps():
-            raise KeyError('The property "{}" was not found '.format(key))
+        key = sel.split()[0]
+        selector = sel.split()[1:]
 
-        _mol = self.get_mol()
-        prop = _mol.GetPropsAsDict()[key]
-        return  prop
+        if key not in self.listPropsAtoms:
+            raise KeyError('The property passed {} does not exist'.format(key))
+        if len(selector) == 0:
+            raise ValueError('No selection was provided')
 
-    def listProps(self):
-        """
-        Returns a list of the molecule properties
-        """
-        _mol = self.get_mol()
+        _arrayFrom = self.__dict__[key]
+        if returnField == 'atomobject':
+            _arrayTo = self.getAtoms()
+        else:
+            _arrayTo = self.__dict__[returnField]
 
-        return list(_mol.GetPropsAsDict().keys())
+        _dtype = self._atom_dtypes[key]
+        if _dtype is not object:
+            selector = [ _dtype(s) for s in selector ]
+        idxs = np.concatenate([ np.where( _arrayFrom == s )[0] for s in selector ])
 
-    def listPropsAtom(self, atom):
-        """
-        Returns a list of the atom properties
-        """
-
-        return list(atom.GetPropsAsDict().keys())
+        return _arrayTo[idxs]
 
     def isChiral(self, returnDetails=False):
         """
@@ -372,22 +410,24 @@ class SmallMol:
             A list of tuple with the chiral atoms and their types
         """
 
-        stereocenters = [ (a.GetIdx(), self._chiralType(a)) for a in self.get_atoms() if self._chiralType(a) is not None]
+        _chirals = self.chiral
 
-        if len(stereocenters) == 0:
+        idxs = np.where(_chirals != '')[0]
+        if len(idxs) == 0:
             return False
-
         if returnDetails:
-            return True, stereocenters
+            idxs =  idxs.astype(str)
+            idxs_str = ' '.join(idxs)
+            atomnames = self.getPropAtom('idx {}'.format(idxs_str), 'atomname')
+            chirals = self.getPropAtom('idx {}'.format(idxs_str), 'chiral')
+
+            _details = [(a, c) for a, c in zip(atomnames, chirals)]
+
+            return True, _details
+
         return True
 
-    def get_mol(self):
-        """
-        Returns the rdkit Molecule object
-        """
-        return self._mol
-
-    def get_neighbours(self, atom, returnAsIdx=False):
+    def getNeighbours(self, atom, returnAsIdx=False):
         """
         Returns the atom neighbours of the atom passed. If returnAsIdx is set as True, the idx of the atoms are returned
         otherwise the rdkit Atom objects
@@ -421,78 +461,15 @@ class SmallMol:
 
         return neighbours
 
-    @property
-    def element(self):
-        return self.get_elements()
-
-    def get_element(self, atom):
-        """
-        Returns the element of the atom. The rkdit.Chem.rdchem.Atom or the index can be passed
-
-        Parameters
-        ----------
-        atom: int or rdkit.Chem.rdchem.Atom
-            The atom you want to retrieve the element
-
-        Returns
-        -------
-        element: str
-            The element of the atom
-        """
-        from rdkit.Chem.rdchem import Atom
-
-        if isinstance(atom, int):
-            _mol = self.get_mol()
-            atom = _mol.GetAtomWithIdx(atom)
-        if not isinstance(atom, Atom):
-            raise ValueError('type {} not valid. Should be "int" or "rdkit.Chem.rdchem.Atom"'.format(type(atom)))
-        element = atom.GetSymbol()
-        return element
-
-    def get_atom(self, sel, returnAll=False):
-        """
-        Return the rdkit.Chem.rdchem.Atom of the sel. The sel can be the idx of the atom or the element. If returnAll
-        is set to True, all the incindences all returned as list
-
-        Parameters
-        ----------
-        sel: int or str
-            The selector can be the element or the atom index
-        returnAll: bool
-            Set to True if you want all the incidences. In this case a list will be returned
-
-        Returns
-        -------
-        atoms: rdkit.Chem.rdchem.Atom or list
-            A single or a list of rdkit.Chem.rdchem.Atom based on the returnAll value
-        """
-
-        _mol = self.get_mol()
-        if isinstance(sel, int):
-            atoms = [_mol.GetAtomWithIdx(sel)]
-
-        elif isinstance(sel, str):
-            atoms = [ a for a in self.get_atoms() if self.get_element(a) == sel]
-        else:
-            raise ValueError('type {} not valid. Should be "int" or "str"'.format(type(sel)))
-
-        if len(atoms) == 0:
-            return None
-
-        if not returnAll:
-            return atoms[0]
-        else:
-            return atoms
-
-    def get_atoms(self):
+    def getAtoms(self):
         """
         Retuns all the rdkit.Chem.rdchem.Atom present in the molecule
         """
 
-        _mol = self.get_mol()
-        return _mol.GetAtoms()
+        _mol = self._mol
+        return np.array([a for a in _mol.GetAtoms()])
 
-    def get_coords(self, id=0):
+    def getCoords(self, confId=0):
         """
         Returns molecule coordinates of the conformer id passed.
 
@@ -507,24 +484,13 @@ class SmallMol:
             A numpy array of the coords for the conformer
 
         """
-        n_atoms = self.get_natoms()
+        n_atoms = self.numAtoms
 
-        conformer = self.get_conformers()[id]
+        conformer = self.getConformers([confId])[0]
         coords = [[corobj.x, corobj.y, corobj.z] for corobj in [conformer.GetAtomPosition(i) for i in range(n_atoms)]]
         return np.array(coords, dtype=np.float32)
 
-    def get_elements(self):
-        """
-        Returns molecule elements.
-
-        Returns
-        -------
-        elements: numpy.array
-            A numpy array with elements of the molecule atoms
-        """
-        return np.array([self.get_element(atom) for atom in self.get_atoms()])
-
-    def _get_atom_types(self):
+    def _getAtomTypes(self):
         """
         Returns ndarray of shape (n_atoms x n_properties) molecule atom types,
         according to the following definitions and order:
@@ -537,8 +503,8 @@ class SmallMol:
             6. Metal (empty)
             7. Occupancy (No hydrogens)
         """
-        n_atoms = self.get_natoms()
-        _mol = self.get_mol()
+        n_atoms = self.numAtoms
+        _mol = self._mol
 
         feats = SmallMol.factory.GetFeaturesForMol(_mol)
         properties = np.zeros((n_atoms, 8), dtype=bool)
@@ -550,26 +516,26 @@ class SmallMol:
             properties[feat.GetAtomIds(), atom_mapping[fam]] = 1
 
         # Occupancy, ignoring hydrogens.
-        properties[:, 7] = self.get_elements() != 'H'
+        properties[:, 7] = self.element != 'H'
         return properties
 
-    def _get_channel_radii(self):
+    def _getChannelRadii(self):
         """
         Multiplies atom types by each atom vdW radius.
         """
         from htmd.molecule.vdw import radiidict
-        radii = np.vectorize(radiidict.__getitem__)(self.get_elements()) * self._get_atom_types().T
+        radii = np.vectorize(radiidict.__getitem__)(self.element) * self._getAtomTypes().T
         return radii.T.copy()
 
-    def get_center(self, coords=None):
+    def getCenter(self, confId=0, coords=None):
         """
         Returns geometrical center of molecule.
         """
         if coords is None:
-            coords = self.get_coords()
+            coords = self.getCoords([confId])
         return coords.mean(axis=0).astype(np.float32)
 
-    def generate_conformers(self, num_confs=400,  optimizemode='mmff', append=True):
+    def generateConformers(self, num_confs=400,  optimizemode='mmff', align=True, append=True):
         """
         Generates ligand conformer and saves the results to a folder.
 
@@ -585,11 +551,12 @@ class SmallMol:
 
         """
         from rdkit.Chem.AllChem import UFFOptimizeMolecule, MMFFOptimizeMolecule, EmbedMultipleConfs
+        from rdkit.Chem.rdMolAlign import AlignMolConformers
 
         if not append:
-            self.remove_conformers()
+            self.removeConformers()
 
-        _mol = self.get_mol()
+        _mol = self._mol
         mol = deepcopy(_mol)
         mol = Chem.AddHs(mol)
 
@@ -607,8 +574,12 @@ class SmallMol:
             conf = mol.GetConformer(id)
             _mol.AddConformer(conf, id+1)
 
-    def get_voxels(self, center=None, size=24, resolution=1., rotation=None,
-                   displacement=None, dtype=np.float32):
+        if align:
+            AlignMolConformers(_mol)
+
+
+    def getVoxels(self, center=None, size=24, resolution=1., rotation=None,
+                   displacement=None, dtype=np.float32, confId=0):
         """
         Computes molecule voxelization.
 
@@ -634,8 +605,8 @@ class SmallMol:
         voxels: array-like
             Computed descriptors.
         """
-        coords = self.get_coords()
-        lig_center = self.get_center(coords=coords)
+        coords = self.getCoords([confId])
+        lig_center = self.getCenter(coords=coords)
 
         if center is None:
             center = lig_center
@@ -653,7 +624,7 @@ class SmallMol:
         if displacement is not None:
             coords += np.asarray(displacement)
 
-        multisigmas = self._get_channel_radii()
+        multisigmas = self._getChannelRadii()
         if (size, resolution) not in SmallMol.array_cache:
             N = [size, size, size]
             bbm = (np.zeros(3) - float(size * resolution / 2))
@@ -669,31 +640,8 @@ class SmallMol:
                                 multisigmas).reshape(size, size, size, 8).astype(dtype)
         return voxels
 
-    def get_name(self):
-        """
-        Returns the molecule name
-
-        Returns
-        -------
-        name: str
-            The molecule name
-
-        """
-
-        return self._mol.GetProp('_Name')
-
-    def set_name(self, name='UNK'):
-        """
-        Set the property '_Name' into the rdkit Mol object
-
-        Parameters
-        ----------
-        name: str
-            The molecule name
-        """
-        self._mol.SetProp('_Name', name)
-
-    def get_natoms(self):
+    @property
+    def numAtoms(self):
         """
         Returns the number of atoms in the molecule
 
@@ -703,10 +651,11 @@ class SmallMol:
             The number of atoms in the molecule
 
         """
-        _mol = self.get_mol()
+        _mol = self._mol
         return _mol.GetNumAtoms()
 
-    def get_nconformers(self):
+    @property
+    def numConformers(self):
         """
         Returns the number of conformers in the rdkit molecule object
 
@@ -715,12 +664,12 @@ class SmallMol:
         nconfs: int
             The number of conformers in the molecule
         """
-        _mol = self.get_mol()
+        _mol = self._mol
         _nConformers = _mol.GetNumConformers()
 
         return _nConformers
 
-    def get_conformers(self, ids=None):
+    def getConformers(self, ids=None):
         """
         Returns the conformer of the molecule depends on the id passed. If id is equal to -1, all the conformers are
         returned
@@ -735,7 +684,7 @@ class SmallMol:
         _conformer: list of rdkit.Chem.rdchem.Conformer
             The conformer
         """
-        _mol = self.get_mol()
+        _mol = self._mol
         _conformers = list(_mol.GetConformers())
         _nConformers = len(_conformers)
 
@@ -747,7 +696,7 @@ class SmallMol:
 
         return [_conformers[id] for id in ids]
 
-    def write_conformers(self, savefolder='conformations', savename="molConf", filetype="sdf", savefolder_exist_ok=False,
+    def writeConformers(self, savefolder='conformations', savename="molConf", filetype="sdf", savefolder_exist_ok=False,
                          merge=False, ids=None):
         """
         Writes conformers in one or multiple files in 'pdb' or 'sdf' file formats.
@@ -771,7 +720,7 @@ class SmallMol:
         os.makedirs(savefolder, exist_ok=savefolder_exist_ok)
 
         if ids is None:
-            ids = range(self.get_nconformers())
+            ids = range(self.numConformers)
         elif not isinstance(ids, list):
             raise ValueError("The ids argument should be a list of conformer ids")
 
@@ -793,12 +742,12 @@ class SmallMol:
         for id in ids:
             # If merge is set as False a file is created for each conformer
             if not merge:
-                _id = self.get_conformers()[id].GetId()
+                _id = self.getConformers()[id].GetId()
                 fname = os.path.join(savefolder, '{}_{}.{}'.format(savename, _id, filetype))
                 writer = chemwrite(fname)
             writer.write(_mol, confId=_id)
 
-    def remove_conformers(self, ids=None):
+    def removeConformers(self, ids=None):
         """
         Deletes the conformers passed
 
@@ -807,9 +756,9 @@ class SmallMol:
         ids: list (default=None)
             The list of conformer id to delete. If None, all are removed except the first one
         """
-        _mol = self.get_mol()
+        _mol = self._mol
 
-        _conformers = self.get_conformers(ids)
+        _conformers = self.getConformers(ids)
 
         if ids is None:
             _conformers = _conformers[1:]
@@ -821,7 +770,7 @@ class SmallMol:
         for id in _conformerIDs:
             _mol.RemoveConformer(id)
 
-    def to_molecule(self, formalcharges=False, ids=None):
+    def toMolecule(self, formalcharges=False, ids=None):
         """
         Return the htmd.molecule.molecule.Molecule from the rdkit.Molecule
 
@@ -842,8 +791,8 @@ class SmallMol:
         class NoConformerError(Exception):
             pass
 
-        _mol = self.get_mol()
-        _nConformers = self.get_nconformers()
+        _mol = self._mol
+        _nConformers = self.numConformers
         if _nConformers == 0:
             raise NoConformerError("No Conformers are found in the molecule. Generate at least one confomer.")
 
@@ -855,25 +804,28 @@ class SmallMol:
 
         molHtmd = None
         for n in ids:
-            coords = self.get_coords(id=n)
-            elements = self.get_elements()
+            coords = self.getCoords(confId=n)
+            elements = self.element
             mol = Molecule()
-            mol.empty(self.get_natoms())
-            mol.resname[:] = self.get_name()[:3]
+            mol.empty(self.numAtoms)
+            mol.resname[:] = self.getProp('ligname')[:3]
             mol.resid[:] = 1
             mol.name[:] = elements
             mol.element[:] = elements
-            mol.charge[:] = self.get_charges(formal=formalcharges)
+            if formalcharges:
+                mol.charge[:] = self.charge
+            else:
+                mol.charge[:] = self.formalcharge
             mol.coords[:, :, 0] = coords
-            mol.viewname = self.get_name()
-            mol.bonds, mol.bondtype = self.get_bonds()
+            mol.viewname = self.getProp('ligname')
+            mol.bonds, mol.bondtype = self.getBonds()
             if molHtmd == None:
                 molHtmd = mol
             else:
                 molHtmd.appendFrames(mol)
         return molHtmd
 
-    def get_bonds(self):
+    def getBonds(self):
         """
         Returns the rdkit bonds object and their type as two np.array
 
@@ -897,34 +849,6 @@ class SmallMol:
             elif bo.GetBondType() == rdchem.BondType.AROMATIC:
                 bondtypes.append('ar')
         return np.vstack(bonds), np.array(bondtypes)
-
-    def get_charges(self, formal=False):
-        """
-        Return the charges of the atoms in the molecules.
-
-        Paramters
-        ---------
-        formal: bool
-            Set as True for the formal charges, otherwise the partial ones are retrieved
-
-        Returns
-        -------
-        charges: numpy.array
-            An array with the atom charges of the molecule
-
-        """
-
-        charges = []
-        atoms = self.get_atoms()
-        for a in atoms:
-            if formal:
-                charges.append(a.GetFormalCharge())
-            else:
-                props = a.GetPropsAsDict()
-                charge = props['_TriposPartialCharge'] if '_TriposPartialCharge' in props.keys() else 0.000
-                charges.append(charge)
-        return np.array(charges)
-
 
     def depict(self, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True,
                      atomlabels=None, highlightAtoms=None):
@@ -956,22 +880,22 @@ class SmallMol:
             ipython_svg: SVG object if ipython is set to True
 
         """
-        _mol = self.get_mol()
+        _mol = self._mol
 
         _labelsFunc = ['a', 'i', 'c', '*']
 
         if atomlabels is not None:
             labels = atomlabels.split('%')[1:]
-            names = self.get_elements().tolist()
-            indexes = [ self.getPropAtom(a, '_SmallMolAtomIdx') for a in self.get_atoms() ]
-            charges = ['+' if c > 0 else "-" if c < 0 else "" for c in  self.get_charges(formal=True).tolist() ]
-            chirals = ["" if self._chiralType(a) is None else "*" for a in self.get_atoms() ]
+            names = self.element.tolist()
+            indexes = self.idx
+            charges = ['+' if c > 0 else "-" if c < 0 else "" for c in  self.formalcharge.tolist() ]
+            chirals = ["" if a == ""  else "*" for a in self.chiral ]
             values = [names, indexes, charges, chirals]
             idxs = [ _labelsFunc.index(l) for l in labels]
             labels_required = [values[i] for i in idxs]
             atomlabels = ["".join([str(i) for i in a]) for a in list(zip(*labels_required))]
 
-        return  _depictMol(_mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
+        return _depictMol(_mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
 
 
 
@@ -1008,10 +932,10 @@ class SmallMolStack:
         from tqdm import tqdm
         from htmd.parallelprogress import ParallelExecutor, delayed
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=False)
-        #nummols = len(supplier)
-        #aprun = ParallelExecutor(n_jobs=-1)
-        #mols = aprun(total=nummols, desc='Loading Molecules')(
-                               # delayed(SmallMol)(supplier[i], False, False, True, removeHs) for i in range(nummols))
+        # nummols = len(supplier)
+        # aprun = ParallelExecutor(n_jobs=-1)
+        # mols = aprun(total=nummols, desc='Loading Molecules')(
+        #                         delayed(SmallMol)(supplier[i], False, False, True, removeHs) for i in range(nummols))
 
 
         mols = []

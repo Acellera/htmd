@@ -115,6 +115,15 @@ def InputToOutput(input_file, input_format, output_format):
     return outfile
 
 
+def convertToString(arr):
+
+    if isinstance(arr, list):
+        arr_str = " ".join([str(i) for i in arr])
+    else:
+        arr_str = " ".join([ str(i) for i in arr[0] ])
+
+    return arr_str
+
 def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=False, highlightAtoms=None):
     from rdkit.Chem import RemoveHs
     from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
@@ -149,9 +158,8 @@ def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, 
     # add atomlabels
     if atomlabels is not None:
         for n, a in enumerate(_mol.GetAtoms()):
-            _atomIdx = a.GetPropsAsDict()['_SmallMolAtomIdx']
+            _atomIdx = a.GetIdx()
             opts.atomLabels[n] = atomlabels[_atomIdx]
-
 
     # activate 3D coords optimization
     if optimize:
