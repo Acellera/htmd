@@ -20,6 +20,7 @@ from simtk.openmm import app
 from htmd.numbautil import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
 from htmd.ffevaluation.ffevaluate import FFEvaluate
+from htmd.parameterization.util import getDipole
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,6 @@ class FakeQM(QMBase):
                     logger.info('Optimization status: %d' % opt.last_optimize_result())
 
                 result.energy = ff.run(result.coords[:, :, 0])['total']
-                from htmd.parameterization.util import getDipole
                 result.dipole = getDipole(self.molecule)
 
                 if self.optimize:
@@ -326,7 +326,6 @@ class FakeQM2(FakeQM):
             result.errored = False
             result.energy = state.getPotentialEnergy().value_in_unit(unit.kilocalorie_per_mole)
             result.coords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom).reshape((-1, 3, 1))
-            from htmd.parameterization.util import getDipole
             result.dipole = getDipole(self.molecule)
 
             if self.esp_points is not None:
@@ -349,30 +348,6 @@ class FakeQM2(FakeQM):
 
 
 if __name__ == '__main__':
-    import os
-    import numpy as np
-    from tempfile import TemporaryDirectory
-    from htmd.home import home
-    from htmd.numbautil import dihedralAngle
-    from htmd.parameterization.fftype import fftype, FFTypeMethod
-    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
-    from htmd.molecule.molecule import Molecule
-    from htmd.qm.fake import FakeQM
-
-    molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-    mol = Molecule(molFile)
-    mol = canonicalizeAtomNames(mol)
-    parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
-    mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-
-    with TemporaryDirectory() as tmpDir:
-        qm = FakeQM()
-        qm.molecule = mol
-        qm._parameters = parameters
-        qm.esp_points = np.array([[1., 1., 1.]])
-        qm.directory = tmpDir
-        result = qm.run()[0]
-
     import sys
     import doctest
 
