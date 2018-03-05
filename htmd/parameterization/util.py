@@ -259,7 +259,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     df = DihedralFitting()
     df.parmedMode = True
     df.parameters = prm
-    df._rotatable_dihedrals = all_dihedrals
+    df._parameterizable_dihedrals = all_dihedrals
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
