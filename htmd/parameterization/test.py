@@ -423,48 +423,4 @@ class TestParameterize(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # # MANUAL TESTS FOR DEBUGGING!
-    # import os
-    # from htmd.home import home
-    # from htmd.qm.fake import FakeQM2
-    # from htmd.queues.localqueue import LocalCPUQueue
-    # from htmd.parameterization.ffmolecule import FFMolecule
-    # from htmd.parameterization.cli import printEnergies
-    # from htmd.parameterization.fftype import FFTypeMethod
-    #
-    # qm = FakeQM2()
-    # qm.theory = 'B3LYP'
-    # qm.basis = 'cc-pVDZ'
-    # qm.solvent = 'vacuum'
-    # qm.queue = LocalCPUQueue()
-    # method = FFTypeMethod.GAFF2
-    #
-    # dataDir = home(dataDir='test-param')
-    # refDir = os.path.join(dataDir, 'h2o2_full_fake')
-    #
-    # mol = FFMolecule(os.path.join(refDir, 'input.mol2'), method=method, netcharge=0, qm=qm, outdir='/tmp/teststef/')
-    # mol_orig = mol.copy()
-    # mol.minimize()
-    # _, qm_dipole = mol.fitCharges(fixed=[])
-    # all_dihedrals = mol.getRotatableDihedrals()
-    # mol.fitDihedrals(all_dihedrals, True)
-    # mol.writeParameters(mol_orig)
-    # printEnergies(mol, '/tmp/teststef/energies.txt')
-    #
-    #
-    # refDir = os.path.join(dataDir, 'benzamidine_gaff2')
-    # mol = FFMolecule(os.path.join(refDir, 'input.mol2'), method=method, netcharge=1, qm=qm, outdir='/tmp/teststef/')
-    # mol_orig = mol.copy()
-    # mol.writeParameters(mol_orig)
-    # from IPython.core.debugger import set_trace
-    # set_trace()
-    # printEnergies(mol, '/tmp/teststef/energies.txt')
-
-    # import pytest
-    # pytest.main(__name__)
     unittest.main(verbosity=2)
-
-    # To copy the new files over use:
-    # cd DEST
-    # cp -Rf SOURCE/* .
-    # find -type l -exec bash -c 'cp -Rf "SOURCE/$0"/* "$0"' {} \;
