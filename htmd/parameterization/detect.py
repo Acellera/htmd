@@ -146,7 +146,7 @@ def _getMethylGraph():
     return methyl
 
 def connected_component_subgraphs(graph):
-    return (graph.subgraph(c).copy() for c in nx.connected_components(graph))
+    return (graph.subgraph(component).copy() for component in nx.connected_components(graph))
 
 def detectParameterizableCores(graph):
     """
@@ -266,7 +266,6 @@ def detectParameterizableDihedrals(molecule):
     >>> import os
     >>> from htmd.home import home
     >>> from htmd.molecule.molecule import Molecule
-    >>> from htmd.parameterization.fftype import FFTypeMethod, fftype
     >>> from htmd.parameterization.detect import detectParameterizableDihedrals
     >>> from htmd.parameterization.util import canonicalizeAtomNames
 
@@ -279,8 +278,6 @@ def detectParameterizableDihedrals(molecule):
     Find the parameterizable dihedrals of ethanolamine
     >>> molFile = os.path.join(home('test-param'), 'ethanolamine.mol2')
     >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
-    >>> mol = canonicalizeAtomNames(mol)
-    >>> prm, mol = fftype(mol, method=FFTypeMethod.GAFF2) # Does not work with CGenFF
     >>> detectParameterizableDihedrals(mol)
     [[(0, 1, 2, 3)], [(1, 2, 3, 9), (1, 2, 3, 10)], [(2, 1, 0, 4)]]
 
@@ -295,16 +292,12 @@ def detectParameterizableDihedrals(molecule):
     Find the parameterizable dihedrals of chlorethene
     >>> molFile = os.path.join(home('test-param'), 'chlorethene_1.mol2')
     >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
-    >>> mol = canonicalizeAtomNames(mol)
-    >>> prm, mol = fftype(mol, method=FFTypeMethod.CGenFF_2b6)
     >>> detectParameterizableDihedrals(mol)
     [[(2, 1, 0, 4), (2, 1, 0, 5)]]
 
     Find the parameterizable dihedrals of chlorethene (with swapped atoms)
     >>> molFile = os.path.join(home('test-param'), 'chlorethene_2.mol2')
     >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
-    >>> mol = canonicalizeAtomNames(mol)
-    >>> prm, mol = fftype(mol, method=FFTypeMethod.CGenFF_2b6)
     >>> detectParameterizableDihedrals(mol)
     [[(3, 1, 0, 4), (3, 1, 0, 5)]]
 
