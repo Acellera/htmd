@@ -24,7 +24,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
     jobname : str, default=None
         Job name (identifier)
     queue : str or list of str, default=None
-        The queue or list of queues to run on. If list, it attempts to submit the job to the first queue listed
+        The queue or list of queues to run on. If list, it attempts to submit the job to the first queue listed. If that
+        queue cannot be used, the next queue listed is considered and this process is repeated.
     app : str, default=None
         The application profile
     ngpu : int, default=1
