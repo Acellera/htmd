@@ -71,7 +71,6 @@ class QMBase(ABC, ProtocolInterface):
 
         self._arg('molecule', ':class: `htmd.molecule.molecule.Molecule`', 'Molecule',
                   default=None, validator=val.Object(Molecule), required=True)
-        self._arg('netcharge', 'int', 'Net charge', default=None, validator=val.Number(int, 'ANY'), required=True)
         self._arg('multiplicity', 'int', 'Multiplicity of the molecule',
                   default=1, validator=val.Number(int, 'POS'))
         self._arg('theory', 'str', 'Level of theory',
@@ -122,10 +121,7 @@ class QMBase(ABC, ProtocolInterface):
         self._molecule = self.molecule.copy()
         self._nframes = self._molecule.coords.shape[2]
         self._natoms = self._molecule.coords.shape[0]
-        self._charge = self.netcharge
-        if self.netcharge is None:
-            self._charge = int(round(self._molecule.charge.sum()))
-            logger.info('No netcharge specified for QM. Estimating it from Molecule.charge as {}'.format(self._charge))
+        self._charge = int(round(self._molecule.charge.sum()))
 
         # Set up ESP points
         if self.esp_points is not None:
