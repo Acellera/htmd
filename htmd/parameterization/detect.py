@@ -27,6 +27,7 @@ def _getMolecularGraph(molecule):
 
     return graph
 
+
 def _getMolecularTree(graph, source):
     """
     Generate a tree from a molecular graph
@@ -59,12 +60,14 @@ def _getMolecularTree(graph, source):
 
     return tree
 
+
 def _checkIsomorphism(graph1, graph2):
     """
     Check if two molecular graphs are isomorphic based on topology (bonds) and elements.
     """
 
-    return nx.is_isomorphic(graph1, graph2, node_match = lambda node1, node2: node1['element'] == node2['element'])
+    return nx.is_isomorphic(graph1, graph2, node_match=lambda node1, node2: node1['element'] == node2['element'])
+
 
 def detectEquivalentAtoms(molecule):
     """
@@ -129,6 +132,7 @@ def detectEquivalentAtoms(molecule):
 
     return equivalent_groups, equivalent_atoms, equivalent_group_by_atom
 
+
 def _getMethylGraph():
     """
     Generate a molecular graph for methyl group
@@ -139,11 +143,12 @@ def _getMethylGraph():
     methyl.add_node(1, element='H')
     methyl.add_node(2, element='H')
     methyl.add_node(3, element='H')
-    methyl.add_edge(0 ,1)
+    methyl.add_edge(0, 1)
     methyl.add_edge(0, 2)
     methyl.add_edge(0, 3)
 
     return methyl
+
 
 def detectParameterizableCores(graph):
     """
@@ -185,12 +190,13 @@ def detectParameterizableCores(graph):
 
     return all_core_sides
 
+
 def _weighted_closeness_centrality(graph, node, weight=None):
-    '''
+    """
     Weighted closeness centrality
 
     Identical to networkx.closeness_centrality, except the shorted path lengths are weighted by a node attribute.
-    '''
+    """
 
     lengths = nx.shortest_path_length(graph, source=node)
     del lengths[node]
@@ -198,6 +204,7 @@ def _weighted_closeness_centrality(graph, node, weight=None):
     centrality = sum(weights.values())/sum([lengths[node_]*weights[node_] for node_ in lengths])
 
     return centrality
+
 
 def _chooseTerminals(graph, centre, sideGraph):
     """
@@ -241,6 +248,7 @@ def _chooseTerminals(graph, centre, sideGraph):
                         'Redundant dihedrals might be present!')
 
     return chosen_terminals
+
 
 def detectParameterizableDihedrals(molecule):
     """
@@ -361,6 +369,10 @@ if __name__ == '__main__':
 
     import sys
     import doctest
+
+    # Prevent HTMD importing inside doctest to fail if importing gives text output
+    from htmd.home import home
+    home()
 
     if doctest.testmod().failed:
         sys.exit(1)
