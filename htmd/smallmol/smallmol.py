@@ -120,6 +120,8 @@ class SmallMol:
         removeHs: bool
             Set as True to remove the hydrogens
         """
+        self.mol_fields = self._mol_fields.copy()
+        self.atom_fields = self._atom_fields.copy()
 
         # init the __dict__ with the fields
         for field in self._atom_dtypes:
@@ -244,6 +246,9 @@ class SmallMol:
         else:
             self.__dict__['ligname'] = 'UNK'
 
+        for k, v in _mol.GetPropsAsDict().items():
+            self.setProp(k,v, overwrite=True)
+
         self.__dict__['totalcharge'] = sum(formalcharges)
         self.__dict__['idx'] = np.array(idxs)
         self.__dict__['atomname'] = np.array(atomnames)
@@ -276,7 +281,7 @@ class SmallMol:
         fields: list
             The list of properties
         """
-        _fields = list(self._mol_fields)
+        _fields = list(self.mol_fields)
 
         return _fields
 
@@ -290,7 +295,7 @@ class SmallMol:
         fields: list
             The list of properties
         """
-        _fields = list(self._atom_fields)
+        _fields = list(self.atom_fields)
         return _fields
 
     def setProp(self, key, value, overwrite=False):
@@ -316,7 +321,7 @@ class SmallMol:
         if not overwrite and key in _props:
             raise ValueError('The key passed {} already exists. Set "overwrite" as True to overwrite an existing key'.format(key))
 
-        self._mol_fields.append(key)
+        self.mol_fields.append(key)
         self.__dict__[key] = value
 
     def setPropsAtoms(self, key, values, aIdxs=None):
@@ -353,6 +358,7 @@ class SmallMol:
             tmp_array = np.array([None]*self.numAtoms)
             self.__dict__[key] = tmp_array
 
+        self.atom_fields.append(key)
         self.__dict__[key][aIdxs] = values
 
     def getProp(self, key):
@@ -504,6 +510,9 @@ class SmallMol:
         return neighbours
 
     def foundBondBetween(self, sel1, sel2, bondtype=None):
+
+        _bondtypes_reversed = { v:k for k, v in _bondtypes.items()}
+
         atomIdx_sel1 = self.get(sel1, 'idx')
         atomIdx_sel2 = self.get(sel2, 'idx')
 
@@ -514,12 +523,15 @@ class SmallMol:
         for aIdx, neighbors_set, btype_set in zip(atomIdx_sel1, neighbors_sel1, bondtypes_sel1):
             for neighbor, btype in zip(neighbors_set, btype_set):
                 if neighbor in atomIdx_sel2:
-                    if bondtype is not None and _bondtypes[bondtype] == btype:
-                        founds.append((aIdx, neighbor))
+                    btype_str = _bondtypes_reversed[btype]
+                    if bondtype is not None and _bondtypes[bondtype.upper()] == btype:
+                        founds.append([(aIdx, neighbor), btype_str])
                     elif bondtype == None:
-                        founds.append((aIdx, neighbor))
+                        founds.append( [(aIdx, neighbor), btype_str]  )
+        if len(founds) != 0:
+            return True, founds
 
-        return founds
+        return False
 
 
 
@@ -959,23 +971,19 @@ class SmallMol:
 
         return _depictMol(_mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
 
-
-
-class SmallMolStack:
+class SmallMolLib:
     """
     Collection of objects of class SmallMol.
     """
 
     def __init__(self, sdf_file=None, removeHs=False, fixHs=True):  # , n_jobs=1
-        from tqdm import tqdm
-
         self._sdffile = sdf_file if  self._isSdfFile(sdf_file) else None
 
         self._mols = np.array([])
-        self.fields = None
+        self.fields = []
 
         if sdf_file != None:
-            self._mols, self.fields = self._initializeMolObjs(sdf_file, removeHs, fixHs)
+            self._initializeMolObjs(sdf_file, removeHs, fixHs)
 
     def _isSdfFile(self, sdf_file):
 
@@ -992,62 +1000,34 @@ class SmallMolStack:
 
     def _initializeMolObjs(self, sdf_file, removeHs, fixHs):
         from tqdm import tqdm
-        from htmd.parallelprogress import ParallelExecutor, delayed
         supplier = Chem.SDMolSupplier(sdf_file, removeHs=False)
-        # nummols = len(supplier)
-        # aprun = ParallelExecutor(n_jobs=-1)
-        # mols = aprun(total=nummols, desc='Loading Molecules')(
-        #                         delayed(SmallMol)(supplier[i], False, False, True, removeHs) for i in range(nummols))
-
-
-        mols = []
+        mols_failed = []
 
         for i, mol in enumerate(tqdm(supplier)):
-             if mol is not None:
-                 mols.append(SmallMol(mol, removeHs=removeHs, fixHs=fixHs))
+            if mol is not None:
+                m = SmallMol(mol, removeHs=removeHs, fixHs=fixHs)
+                self.appendSmallMol(m, strictDirection=2)
+            else:
+                mols_failed.append(i)
 
-             else:
-                 mols.append(None)
-
-
-        invalid_mols = self._get_invalid_indexes(mols)
-
-        if len(invalid_mols) != 0:
-            logger.warning('The following entries could not be loaded: {}. Use clean_invalids to remove them from the '
-                           'pool'.format(invalid_mols))
-
-        ref_for_field = None
-        for m in mols:
-            if m is not None:
-                ref_for_field = m
-                break
-        fields = ref_for_field.listProps()
-
-        return np.array(mols), fields
-
-    def clean_invalids(self):
-        _mols = self.get_mols()
-
-        ids = [n for n, m in enumerate(_mols) if m == None]
-
-        self._mols =  np.array(np.delete(_mols, ids))
+        if len(mols_failed) != 0:
+            logger.warning('The following entries were skipped beacause could not be loaded: {}.'.format(mols_failed))
 
     @property
     def numMols(self):
         return len(self._mols)
 
-    def get_mols(self, ids=None):
+    def getMols(self, ids=None):
 
         if ids == None:
             return self._mols
         if not isinstance(ids, list):
             raise TypeError("The argument ids {} should be list".format(type(ids)))
-
         _mols = np.array(self._mols)
 
         return _mols[ids]
 
-    def write_sdf(self, sdf_name, fields=None):
+    def writeSdf(self, sdf_name, fields=None):
         from rdkit.Chem import SDWriter
 
         writer = SDWriter(sdf_name)
@@ -1059,11 +1039,12 @@ class SmallMolStack:
         for m in self._mols:
             writer.write(m._mol)
 
-    def appendSmallLib(self, smallLib):
-        ### sdf_file ???
+    def appendSmallLib(self, smallLib, strictField=False, strictDirection=1):
+        ### sdf_file should i store it???
+        from tqdm import tqdm
 
-        for sm in smallLib._mols:
-            self.appendSmallMol(sm)
+        for sm in tqdm(smallLib._mols):
+            self.appendSmallMol(sm, strictField, strictDirection)
 
     def appendSmallMol(self, smallmol, strictField=False, strictDirection=1):
         #### check fields and in case as zero ?  the same for the ones present?
@@ -1073,7 +1054,7 @@ class SmallMolStack:
         if strictDirection  not in [1,2]:
             raise  ValueError("The strictDirections should be 1 (add fields into new mol) or 2 (add fields also in the"
                               "database mols)")
-        tmp_fields = smallmol.listProps()
+        tmp_fields = smallmol.listProps
 
         if strictField:
             areSameField = set(self.fields) == set(tmp_fields)
@@ -1105,7 +1086,39 @@ class SmallMolStack:
         logger.warning("[num mols before deleting: {}]. The molecules {} were removed, now the number of "
                     "molecules are {} ".format(_oldNumMols, ids, self.numMols))
 
-    def vox_fun(mol):
+    def toDataFrame(self, fields=None, molAsImage=True, sketch=True):
+        from rdkit.Chem import PandasTools
+        from rdkit.Chem.AllChem import Compute2DCoords
+        import pandas as pd
+
+        if fields is not None:
+            if not isinstance(fields, list):
+                raise TypeError('The argument fields passed {} should be a list '.format(type(fields)))
+        else:
+            firstFields = ['ligname', '_mol', 'totalcharge'] if molAsImage else ['ligname', 'totalcharge']
+            fields = firstFields + list(set(self.fields) - set(firstFields))
+
+        records = []
+        indexes = []
+        for i, m in enumerate(self._mols):
+            row = dict((f, m.getProp(f))  for f in fields)
+            if sketch:
+                mm = deepcopy(m._mol)
+                Compute2DCoords(mm)
+                row['_mol'] = mm
+            records.append(row)
+            indexes.append(i)
+
+        df = pd.DataFrame(records, columns=fields, index=indexes)
+        if molAsImage:
+            Chem.PandasTools.ChangeMoleculeRendering(df)
+        return df
+
+    def copy(self):
+
+        return deepcopy(self)
+
+    def voxFun(mol):
         return None
 
     def __len__(self):
@@ -1113,12 +1126,6 @@ class SmallMolStack:
 
     def __getitem__(self, item):
         return self._mols[item]
-
-    def _get_invalid_indexes(self, mols):
-        """
-        Returns indexes of invalid molecules
-        """
-        return [i for i, mol in enumerate(mols) if mol is None]
 
     def __iter__(self):
 
@@ -1247,6 +1254,8 @@ class SmallMolStack:
                                 removeHs, legends_list, highlightAtoms, mols_perrow)
 
 
+
+SmallMolStack = SmallMolLib
 
 if __name__ == '__main__':
     pass
