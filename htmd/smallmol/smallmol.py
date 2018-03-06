@@ -8,9 +8,12 @@ from rdkit import RDConfig
 from rdkit import rdBase
 from rdkit.Chem import ChemicalFeatures
 from rdkit.Chem.rdchem import ChiralType
+from rdkit.Chem.rdchem import HybridizationType
+from rdkit.Chem.rdchem import BondType
+
 
 from htmd.molecule.voxeldescriptors import _getOccupancyC, _getGridCenters
-from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput, _depictMol, depictMultipleMols
+from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput, _depictMol, depictMultipleMols, convertToString
 from copy import deepcopy
 import logging
 
@@ -28,6 +31,19 @@ atom_mapping = {"Hydrophobe": 0,
 
 _chiral_type = {ChiralType.CHI_TETRAHEDRAL_CW:'clockwise',
                 ChiralType.CHI_TETRAHEDRAL_CCW:'anitclockwise'}
+
+
+_heteroatoms = ['N', 'O', 'F', 'P', 'S', 'Cl', 'Br', 'I']
+_halogens = ['F', 'Cl', 'Br', 'I']
+
+_hybridizations = {'S': HybridizationType.S,
+                   'SP': HybridizationType.SP,
+                   'SP2': HybridizationType.SP2,
+                   'SP3': HybridizationType.SP3}
+
+_bondtypes = {'SINGLE': BondType.SINGLE,
+              'DOUBLE': BondType.DOUBLE,
+               'TRIPLE': BondType.TRIPLE}
 
 # multiprocess does not play well with class methods.
 def unwrap_self(arg, **kwarg):
@@ -47,7 +63,7 @@ class SmallMol:
     factory = ChemicalFeatures.BuildFeatureFactory(fdefName)
 
     ### Fields
-    _atom_fields = ['idx', 'atomname', 'charge','formalcharge', 'element',  'chiral',
+    _atom_fields = ['idx', 'atomname', 'charge','formalcharge', 'element',  'chiral', 'hybridization',
                     'neighbors', 'bondtypes']
 
     _mol_fields = ['ligname', 'totalcharge', '_mol']
@@ -59,6 +75,7 @@ class SmallMol:
                     'formalcharge': np.int,
                     'element': object,
                     'chiral': object,
+                    'hybridization': object,
                     'neighbors': object,
                     'bondtypes': object
                     }
@@ -76,7 +93,8 @@ class SmallMol:
                   'element': (0,),
                   'chiral': (0,),
                   'neighbors': (0,),
-                  'bondtypes': (0,)
+                  'bondtypes': (0,),
+                  'hybridization': (0,)
                     }
 
     _mol_dims = {'_mol': (0,),
@@ -190,6 +208,7 @@ class SmallMol:
         formalcharges = []
         elements = []
         chirals =  []
+        hybridizations = []
         neighbors = []
         bondtypes = []
 
@@ -205,18 +224,20 @@ class SmallMol:
             e = a.GetSymbol()
             idxs.append(i)
             atomnames.append('{}{}'.format(e,i))
+            formalcharges.append(a.GetFormalCharge())
+            elements.append(e)
+            hybridizations.append(a.GetHybridization())
+            neighbors.append([na.GetIdx() for na in a.GetNeighbors()])
+            bondtypes.append([b.GetBondType() for b in a.GetBonds()])
             if a.HasProp('_TriposPartialCharge'):
                 charges.append(a.GetPropsAsDict()['_TriposPartialCharge'])
             else:
                 charges.append(0.000)
-            formalcharges.append(a.GetFormalCharge())
-            elements.append(e)
             if a.HasProp('_CIPCode'):
                 chirals.append(a.GetPropsAsDict()['_CIPCode'])
             else:
                 chirals.append('')
-            neighbors.append( [na.GetIdx() for na in a.GetNeighbors()] )
-            bondtypes.append( [ b.GetBondType() for b in a.GetBonds()] )
+
 
         if _mol.HasProp('_Name'):
             self.__dict__['ligname'] = _mol.GetProp('_Name')
@@ -230,6 +251,7 @@ class SmallMol:
         self.__dict__['formalcharge'] = np.array(formalcharges)
         self.__dict__['element'] = np.array(elements)
         self.__dict__['chiral'] = np.array(chirals)
+        self.__dict__['hybridization'] = np.array(hybridizations, dtype=object)
         self.__dict__['neighbors'] = np.array(neighbors)
         self.__dict__['bondtypes'] = np.array(bondtypes)
 
@@ -379,6 +401,9 @@ class SmallMol:
         if len(selector) == 0:
             raise ValueError('No selection was provided')
 
+        if key == 'hybridization':
+            selector = [_hybridizations[s.upper()] for s in selector]
+
         _arrayFrom = self.__dict__[key]
         if returnField == 'atomobject':
             _arrayTo = self.getAtoms()
@@ -389,8 +414,25 @@ class SmallMol:
         if _dtype is not object:
             selector = [ _dtype(s) for s in selector ]
         idxs = np.concatenate([ np.where( _arrayFrom == s )[0] for s in selector ])
+        idxs = np.sort(idxs)
 
         return _arrayTo[idxs]
+
+    @property
+    def hetoroAtoms(self):
+        sel_str = convertToString(_heteroatoms)
+
+        atom_idxs = self.get('element {}'.format(sel_str), 'idx')
+
+        return atom_idxs
+
+    @property
+    def halogenAtoms(self):
+        sel_str = convertToString(_halogens)
+
+        atom_idxs = self.get('element {}'.format(sel_str), 'idx')
+
+        return atom_idxs
 
     def isChiral(self, returnDetails=False):
         """
@@ -460,6 +502,26 @@ class SmallMol:
             return [ a.GetIdx() for a in neighbours ]
 
         return neighbours
+
+    def foundBondBetween(self, sel1, sel2, bondtype=None):
+        atomIdx_sel1 = self.get(sel1, 'idx')
+        atomIdx_sel2 = self.get(sel2, 'idx')
+
+        neighbors_sel1 = self.get(sel1, 'neighbors')
+        bondtypes_sel1 = self.get(sel1, 'bondtypes')
+
+        founds = []
+        for aIdx, neighbors_set, btype_set in zip(atomIdx_sel1, neighbors_sel1, bondtypes_sel1):
+            for neighbor, btype in zip(neighbors_set, btype_set):
+                if neighbor in atomIdx_sel2:
+                    if bondtype is not None and _bondtypes[bondtype] == btype:
+                        founds.append((aIdx, neighbor))
+                    elif bondtype == None:
+                        founds.append((aIdx, neighbor))
+
+        return founds
+
+
 
     def getAtoms(self):
         """
