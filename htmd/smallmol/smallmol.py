@@ -64,7 +64,7 @@ class SmallMol:
 
     ### Fields
     _atom_fields = ['idx', 'atomname', 'charge','formalcharge', 'element',  'chiral', 'hybridization',
-                    'neighbors', 'bondtypes']
+                    'neighbors', 'bondtypes', 'coords']
 
     _mol_fields = ['ligname', 'totalcharge', '_mol']
 
@@ -77,7 +77,8 @@ class SmallMol:
                     'chiral': object,
                     'hybridization': object,
                     'neighbors': object,
-                    'bondtypes': object
+                    'bondtypes': object,
+                    'coords': np.float32
                     }
 
     _mol_dtypes = {'_mol': object,
@@ -94,7 +95,8 @@ class SmallMol:
                   'chiral': (0,),
                   'neighbors': (0,),
                   'bondtypes': (0,),
-                  'hybridization': (0,)
+                  'hybridization': (0,),
+                  'coords': (0, 3, 1)
                     }
 
     _mol_dims = {'_mol': (0,),
@@ -221,7 +223,7 @@ class SmallMol:
                 self.__dict__[f] = v
             return
 
-        for a in self.getAtoms():
+        for a in _mol.GetAtoms():
             i = a.GetIdx()
             e = a.GetSymbol()
             idxs.append(i)
@@ -239,6 +241,10 @@ class SmallMol:
                 chirals.append(a.GetPropsAsDict()['_CIPCode'])
             else:
                 chirals.append('')
+
+        if _mol.GetNumConformers() != 0:
+            coords = _mol.GetConformer(0).GetPositions()
+            self.__dict__['coords'] =  coords[:,:,np.newaxis]
 
 
         if _mol.HasProp('_Name'):
@@ -382,7 +388,7 @@ class SmallMol:
 
         return _value
 
-    def get(self, sel, returnField):
+    def get(self, sel, returnField, invert=False):
         """
         Returns the property for the atom specified with the selection. The selection is another atom property
 
@@ -420,12 +426,14 @@ class SmallMol:
         if _dtype is not object:
             selector = [ _dtype(s) for s in selector ]
         idxs = np.concatenate([ np.where( _arrayFrom == s )[0] for s in selector ])
+        if invert:
+            idxs = np.array([ i for i in self.idx if i not in idxs ])
         idxs = np.sort(idxs)
 
         return _arrayTo[idxs]
 
     @property
-    def hetoroAtoms(self):
+    def heteroAtoms(self):
         sel_str = convertToString(_heteroatoms)
 
         atom_idxs = self.get('element {}'.format(sel_str), 'idx')
@@ -475,40 +483,6 @@ class SmallMol:
 
         return True
 
-    def getNeighbours(self, atom, returnAsIdx=False):
-        """
-        Returns the atom neighbours of the atom passed. If returnAsIdx is set as True, the idx of the atoms are returned
-        otherwise the rdkit Atom objects
-
-        Parameters
-        ----------
-        atom: int or rdkit.Chem.rdchem.Atom
-            The atom as index or rdkit Atom object
-        returnAsIdx: bool
-            Set as True if you want to retrieve the neighbours as atom indexes
-
-        Returns
-        -------
-        neighbours: list
-            List of atom neighbours. If returnAsIdx set as True: list of atom indexes, otherwise list of rdkit Atom objs
-        """
-
-        from rdkit.Chem.rdchem import Atom
-
-        if isinstance(atom, int):
-            _mol = self.get_mol()
-            atom = _mol.GetAtomWithIdx(atom)
-
-        if not isinstance(atom, Atom):
-            raise ValueError('type {} not valid. Should be "int" or "rdkit.Chem.rdchem.Atom"'.format(type(atom)))
-
-        neighbours = atom.GetNeighbors()
-
-        if returnAsIdx:
-            return [ a.GetIdx() for a in neighbours ]
-
-        return neighbours
-
     def foundBondBetween(self, sel1, sel2, bondtype=None):
 
         _bondtypes_reversed = { v:k for k, v in _bondtypes.items()}
@@ -533,14 +507,13 @@ class SmallMol:
 
         return False
 
-
-
     def getAtoms(self):
         """
         Retuns all the rdkit.Chem.rdchem.Atom present in the molecule
         """
 
-        _mol = self._mol
+        #_mol = self._mol
+        _mol = self.toRdkitMol()
         return np.array([a for a in _mol.GetAtoms()])
 
     def getCoords(self, confId=0):
@@ -558,11 +531,14 @@ class SmallMol:
             A numpy array of the coords for the conformer
 
         """
-        n_atoms = self.numAtoms
+        # n_atoms = self.numAtoms
+        #
+        # conformer = self.getConformers([confId])[0]
+        # coords = [[corobj.x, corobj.y, corobj.z] for corobj in [conformer.GetAtomPosition(i) for i in range(n_atoms)]]
+        # return np.array(coords, dtype=np.float32)
+        coords = self.coords[:,:,confId]
 
-        conformer = self.getConformers([confId])[0]
-        coords = [[corobj.x, corobj.y, corobj.z] for corobj in [conformer.GetAtomPosition(i) for i in range(n_atoms)]]
-        return np.array(coords, dtype=np.float32)
+        return coords
 
     def _getAtomTypes(self):
         """
@@ -578,7 +554,7 @@ class SmallMol:
             7. Occupancy (No hydrogens)
         """
         n_atoms = self.numAtoms
-        _mol = self._mol
+        _mol = self.toRdkitMol()
 
         feats = SmallMol.factory.GetFeaturesForMol(_mol)
         properties = np.zeros((n_atoms, 8), dtype=bool)
@@ -606,7 +582,7 @@ class SmallMol:
         Returns geometrical center of molecule.
         """
         if coords is None:
-            coords = self.getCoords([confId])
+            coords = self.getCoords(confId)
         return coords.mean(axis=0).astype(np.float32)
 
     def generateConformers(self, num_confs=400,  optimizemode='mmff', align=True, append=True):
@@ -630,13 +606,16 @@ class SmallMol:
         if not append:
             self.removeConformers()
 
-        _mol = self._mol
+        #_mol = self._mol
+        _mol = self.toRdkitMol()
         mol = deepcopy(_mol)
         mol = Chem.AddHs(mol)
+        if self.numConformers != 0:
+            conf = self.getConformers([0])[0]
+            mol.AddConformer(conf, 0)
 
         # generating conformations
-        ids = EmbedMultipleConfs(mol, numConfs=num_confs, pruneRmsThresh=1., maxAttempts=10000)
-
+        ids = EmbedMultipleConfs(mol, clearConfs=False,numConfs=num_confs, pruneRmsThresh=1., maxAttempts=10000)
         if optimizemode not in ['uff', 'mmff']:
             raise ValueError('Unknown optimizemode. Should be  "uff", "mmff"')
         # optimizing conformations depends on the optimizemode passed
@@ -645,11 +624,19 @@ class SmallMol:
                 MMFFOptimizeMolecule(mol, confId=id)
             elif optimizemode == 'uff':
                 UFFOptimizeMolecule(mol, confId=id)
-            conf = mol.GetConformer(id)
-            _mol.AddConformer(conf, id+1)
+            #conf = mol.GetConformer(id)
+            #_mol.AddConformer(conf, id+1)
 
         if align:
-            AlignMolConformers(_mol)
+            AlignMolConformers(mol)
+            #AlignMolConformers(_mol)
+
+#        print(list(ids))
+        for i in ids:
+            conf = mol.GetConformer(i)
+            coords = conf.GetPositions()
+            coords = coords[:,:,np.newaxis]
+            self.coords = np.concatenate((self.coords, coords), axis=2).astype(np.float32)
 
 
     def getVoxels(self, center=None, size=24, resolution=1., rotation=None,
@@ -679,7 +666,7 @@ class SmallMol:
         voxels: array-like
             Computed descriptors.
         """
-        coords = self.getCoords([confId])
+        coords = self.getCoords(confId)
         lig_center = self.getCenter(coords=coords)
 
         if center is None:
@@ -725,8 +712,9 @@ class SmallMol:
             The number of atoms in the molecule
 
         """
-        _mol = self._mol
-        return _mol.GetNumAtoms()
+        #_mol = self._mol
+        return self.element.shape[0]
+        #return _mol.GetNumAtoms()
 
     @property
     def numConformers(self):
@@ -738,10 +726,23 @@ class SmallMol:
         nconfs: int
             The number of conformers in the molecule
         """
-        _mol = self._mol
-        _nConformers = _mol.GetNumConformers()
+        #_mol = self._mol
+        #_nConformers = _mol.GetNumConformers()
+        _nConformers = self.coords.shape[-1]
 
         return _nConformers
+
+    def _getConformer(self, id):
+        from rdkit.Chem import Conformer
+        from rdkit.Geometry.rdGeometry import Point3D
+        conf = Conformer()
+
+        atoms_coords = self.getCoords(id)
+        for n, coord in enumerate(atoms_coords):
+            p = Point3D(*coord.tolist())
+            conf.SetAtomPosition(n, p)
+
+        return conf
 
     def getConformers(self, ids=None):
         """
@@ -758,17 +759,18 @@ class SmallMol:
         _conformer: list of rdkit.Chem.rdchem.Conformer
             The conformer
         """
-        _mol = self._mol
-        _conformers = list(_mol.GetConformers())
-        _nConformers = len(_conformers)
+        #_mol = self._mol
+        #_conformers = list(_mol.GetConformers())
+        #_nConformers = len(_conformers)
+        _nConformers = self.coords.shape[-1]
 
         if ids == None:
-            return _conformers
+            return [ self._getConformer(i) for i in range(_nConformers) ]
 
         if  max(ids) >= _nConformers:
             raise IndexError("The ids list contains conformers ids {} that do not exist. Available conformers: {}".format(ids, _nConformers))
 
-        return [_conformers[id] for id in ids]
+        return [self._getConformer(id) for id in ids]
 
     def writeConformers(self, savefolder='conformations', savename="molConf", filetype="sdf", savefolder_exist_ok=False,
                          merge=False, ids=None):
@@ -798,7 +800,7 @@ class SmallMol:
         elif not isinstance(ids, list):
             raise ValueError("The ids argument should be a list of conformer ids")
 
-        _mol = self.get_mol()
+        _mol = self.toRdkitMol(includeConformer=True)
 
         # Init the Writer depends on the filetype passed
         if filetype == 'pdb':
@@ -816,10 +818,10 @@ class SmallMol:
         for id in ids:
             # If merge is set as False a file is created for each conformer
             if not merge:
-                _id = self.getConformers()[id].GetId()
-                fname = os.path.join(savefolder, '{}_{}.{}'.format(savename, _id, filetype))
+
+                fname = os.path.join(savefolder, '{}_{}.{}'.format(savename, id, filetype))
                 writer = chemwrite(fname)
-            writer.write(_mol, confId=_id)
+            writer.write(_mol, confId=id)
 
     def removeConformers(self, ids=None):
         """
@@ -830,19 +832,61 @@ class SmallMol:
         ids: list (default=None)
             The list of conformer id to delete. If None, all are removed except the first one
         """
-        _mol = self._mol
+        # _mol = self._mol
+        #
+        # _conformers = self.getConformers(ids)
+        #
+        # if ids is None:
+        #     _conformers = _conformers[1:]
+        # elif not isinstance(ids, list):
+        #     raise TypeError("The ids argument should be list of confermer ids")
+        #
+        # _conformerIDs = [c.GetId() for c in _conformers]
+        #
+        # for id in _conformerIDs:
+        #     _mol.RemoveConformer(id)
 
-        _conformers = self.getConformers(ids)
+        _nConformers = self.numConformers
 
         if ids is None:
-            _conformers = _conformers[1:]
+            ids = np.arange(_nConformers)
         elif not isinstance(ids, list):
             raise TypeError("The ids argument should be list of confermer ids")
 
-        _conformerIDs = [c.GetId() for c in _conformers]
+        self.coords = np.delete(self.coords, ids, axis=2)
 
-        for id in _conformerIDs:
-            _mol.RemoveConformer(id)
+
+    def toRdkitMol(self, includeConformer=False):
+        from rdkit.Chem import RWMol
+        from rdkit.Chem import Atom
+
+        rw = RWMol()
+
+        # add atoms
+        for element, formalcharge, chiral in zip(self.element, self.formalcharge, self.chiral):
+            a = Atom(element)
+            a.SetFormalCharge(int(formalcharge))
+            if chiral != '':
+                a.SetProp('_CIPCode', chiral)
+            rw.AddAtom(a)
+
+        # add bonds
+        for aIdx, (idxs, bonds) in enumerate(zip(self.neighbors, self.bondtypes)):
+            for n, bt in zip(idxs, bonds):
+                try:
+                    rw.AddBond(aIdx, n, bt)
+                except:
+                    pass
+
+        mol = rw.GetMol()
+        #Chem.SanitizeMol(mol)
+
+        if includeConformer:
+            for id, conf in enumerate(self.getConformers()):
+                conf.SetId(id)
+                mol.AddConformer(conf)
+        Chem.SanitizeMol(mol)
+        return mol
 
     def toMolecule(self, formalcharges=False, ids=None):
         """
@@ -865,10 +909,11 @@ class SmallMol:
         class NoConformerError(Exception):
             pass
 
-        _mol = self._mol
+        #_mol = self._mol
+        _mol = self.toRdkitMol(includeConformer=True)
         _nConformers = self.numConformers
         if _nConformers == 0:
-            raise NoConformerError("No Conformers are found in the molecule. Generate at least one confomer.")
+            raise NoConformerError("No Conformers are found in the molecule. Generate at least one conformer.")
 
         if ids == None:
             ids = list(range(_nConformers))
@@ -912,7 +957,8 @@ class SmallMol:
         from rdkit.Chem import rdchem
         bonds = []
         bondtypes = []
-        for bo in self._mol.GetBonds():
+        _mol = self.toRdkitMol()
+        for bo in _mol.GetBonds():#self._mol.GetBonds():
             bonds.append([bo.GetBeginAtomIdx(), bo.GetEndAtomIdx()])
             if bo.GetBondType() == rdchem.BondType.SINGLE:
                 bondtypes.append('1')
@@ -954,7 +1000,8 @@ class SmallMol:
             ipython_svg: SVG object if ipython is set to True
 
         """
-        _mol = self._mol
+        #_mol = self._mol
+        _mol = self.toRdkitMol()
 
         _labelsFunc = ['a', 'i', 'c', '*']
 
@@ -1129,12 +1176,12 @@ class SmallMolLib:
 
     def __iter__(self):
 
-        _mols = self.get_mols()
+        _mols = self._mols
         for smallmol in _mols:
             yield smallmol
 
     def __str__(self):
-        _mols = self.get_mols()
+        _mols = self._mols()
 
         return ('Stack of Small molecules.'
                 '\n\tContains {} Molecules.'
@@ -1235,15 +1282,15 @@ class SmallMolLib:
 
         legends_list = []
         if legends == 'names':
-            legends_list = [ _m.get_name() for _m in self._mols ]
+            legends_list = [ _m.getProp('ligname') for _m in self._mols ]
         elif legends == 'items':
             legends_list = [ str(n+1) for n in range(len(self._mols))]
 
 
         if ids is None:
-            _mols = [ _m.get_mol() for _m in self.get_mols() ]
+            _mols = [ _m.toRdkitMol() for _m in self._mols ]
         else:
-            _mols = [ _m.get_mol() for _m in self.get_mols(ids)]
+            _mols = [ _m.toRdkitMol for _m in self.getMols(ids)]
 
         if highlightAtoms is not None:
             if len(highlightAtoms) != len(_mols):

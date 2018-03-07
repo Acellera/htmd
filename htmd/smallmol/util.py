@@ -119,12 +119,14 @@ def convertToString(arr):
 
     if isinstance(arr, list):
         arr_str = " ".join([str(i) for i in arr])
+    elif isinstance(arr, tuple):
+        arr_str = " ".join([str(i) for i in arr])
     else:
         arr_str = " ".join([ str(i) for i in arr[0] ])
 
     return arr_str
 
-def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=False, highlightAtoms=None):
+def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=None, highlightAtoms=None):
     from rdkit.Chem import RemoveHs
     from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
     from rdkit.Chem.Draw import rdMolDraw2D
