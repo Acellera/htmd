@@ -25,7 +25,8 @@ _ions = {
 
 def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion=None, ff=None):
     if ff:
-        logger.warning("The ff option is deprecated. Please use standard names (e.g. NA, CL, K).")
+        logger.warning('The ff option is no longer needed and is deprecated. '
+                       'Please use standard names (e.g. NA, CL, K) for `cation` and `anion` arguments.')
     
     if cation is None:
             cation = 'NA'
@@ -35,8 +36,8 @@ def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion
     if saltconc is not None:
         neutralize = False
 
-    cationcharge = _ionGetCharge(cation, ff)
-    anioncharge = _ionGetCharge(anion, ff)
+    cationcharge = _ionGetCharge(cation)
+    anioncharge = _ionGetCharge(anion)
 
     roundnetcharge = int(np.round(netcharge))
     done = False
@@ -104,23 +105,12 @@ def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion
     logger.info('Adding {} anions + {} cations for neutralizing and {} ions for the given salt concentration.'.format(nanion, ncation, (cationstoich + anionstoich) * num))
     ncation += cationstoich * num
     nanion += anionstoich * num
-    return anion, cation, _ionGetAtomname(anion), _ionGetAtomname(cation), nanion, ncation
+    return anion, cation, anion, cation, nanion, ncation
 
 
-# TG I think this is now unnecessary
-def _ionGetAtomname(ion):
-    if ion == 'ZN2':
-        return 'ZN'
-    if ion == 'CD2':
-        return 'CD'
-    return ion
-
-
-def _ionGetCharge(ion, ff):
-    if ff:
-        logger.warning("ff is deprecated")
+def _ionGetCharge(ion):
     if ion not in _ions:
-        raise NameError("Ion {:s} not in the database")
+        raise NameError('Ion {:s} not in the database'.format(ion))
     return _ions[ion][0]
 
 
