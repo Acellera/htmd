@@ -25,8 +25,8 @@ def createProductGraph(G, H, tolerance, fields):
             pair2 = newnodes[np2]
             if not G.has_edge(pair1[0], pair2[0]) or not H.has_edge(pair1[1], pair2[1]):
                 continue
-            dist1 = G.edge[pair1[0]][pair2[0]]['distance']
-            dist2 = H.edge[pair1[1]][pair2[1]]['distance']
+            dist1 = G.edges[pair1[0], pair2[0]]['distance']
+            dist2 = H.edges[pair1[1], pair2[1]]['distance']
             if abs(dist1 - dist2) < tolerance:
                 Gprod.add_edge(newnodes[np1], newnodes[np2])
     return Gprod
@@ -71,13 +71,14 @@ def makeMolGraph(mol, sel, fields):
 
     g = nx.Graph()
     for i in sel:
-        g.add_node(i, {f: mol.__dict__[f][i] for f in fields})
+        props = {f: mol.__dict__[f][i] for f in fields}
+        g.add_node(i, **props)
 
     distances = squareform(pdist(mol.coords[sel, :, mol.frame]))
-    nodes = g.nodes()
+    nodes = list(g.nodes())
     for i in range(len(g)):
         for j in range(i+1, len(g)):
-            g.add_edge(nodes[i], nodes[j], {'distance': distances[i, j]})
+            g.add_edge(nodes[i], nodes[j], distance=distances[i, j])
 
     return g
 
@@ -92,17 +93,24 @@ def maximalSubstructureAlignment(mol1, mol2, sel1='all', sel2='all', fields=('el
     mol2 : :class:`Molecule`
         The second molecule which will be rotated and translated to align on mol1
     sel1 : str
-        An atomselection string of the atoms of mol1 to align
+        Atom selection string of the atoms of `mol1` to align.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     sel2 : str
-        An atomselection string of the atoms of mol2 to align
+        Atom selection string of the atoms of `mol2` to align.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     fields : tuple
         A tuple of the fields that are used to match atoms
     tolerance : float
         How different can distances be between to atom pairs for them to match in the product graph
     visualize : bool
         If set to True it will visualize the alignment
-    """
 
+    Returns
+    -------
+    newmol : :class:`Molecule`
+        A copy of mol2 aligned on mol1
+    """
+    mol2 = mol2.copy()
     g1 = makeMolGraph(mol1, sel1, fields)
     g2 = makeMolGraph(mol2, sel2, fields)
 
@@ -119,3 +127,5 @@ def maximalSubstructureAlignment(mol1, mol2, sel1='all', sel2='all', fields=('el
 
         mol2.view(sel='index {}'.format(' '.join(map(str, matchnodes2))), style='CPK', hold=True)
         mol2.view(sel='all', style='Lines')
+
+    return mol2

@@ -88,7 +88,7 @@ class Sim(object):
     def __eq__(self, other):
         iseq = True
         iseq &= self.simid == other.simid
-        iseq &= self.molfile == other.molfile
+        iseq &= np.all([x == y for x, y in zip(self.molfile, other.molfile)])
         iseq &= self.input == other.input
         iseq &= self.parent == other.parent
         iseq &= len(self.trajectory) == len(other.trajectory)
@@ -189,13 +189,11 @@ def simlist(datafolders, topologies, inputfolders=None):
 
     keys = natsort.natsorted(datanames.keys())
     i = 0
-    from htmd.progress.progress import ProgressBar
-    bar = ProgressBar(len(keys), description='Creating simlist')
-    for k in keys:
+    from tqdm import tqdm
+    for k in tqdm(keys, desc='Creating simlist'):
         trajectories = _autoDetectTrajectories(datanames[k])
 
         if not trajectories:
-            bar.progress()
             continue
 
         if len(topologies) > 1:
@@ -217,8 +215,6 @@ def simlist(datafolders, topologies, inputfolders=None):
         numframes = [_readNumFrames(f) for f in trajectories]
         sims.append(Sim(simid=i, parent=None, input=inputf, trajectory=trajectories, molfile=molfile, numframes=numframes))
         i += 1
-        bar.progress()
-    bar.stop()
     logger.debug('Finished listing of simulations.')
     return np.array(sims, dtype=object)
 
@@ -233,10 +229,11 @@ def simfilter(sims, outfolder, filtersel):
     ----------
     sims : list
         A simulation list produced by the `simList` function
-    outFolder : str
+    outfolder : str
         The folder in which to write the modified trajectories
-    filterSel : str
-        An atomselection string describing the atoms we want to keep
+    filtersel : str
+        Atom selection string describing the atoms we want to keep.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Returns
     -------
@@ -259,7 +256,7 @@ def simfilter(sims, outfolder, filtersel):
     from htmd.config import _config
     from htmd.parallelprogress import ParallelExecutor, delayed
     aprun = ParallelExecutor(n_jobs=_config['ncpus'])
-    filtsims = aprun(total=len(sims), description='Filtering trajectories')(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
+    filtsims = aprun(total=len(sims), desc='Filtering trajectories')(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
 
     logger.debug('Finished filtering of simulations')
     return np.array(filtsims)
@@ -371,29 +368,27 @@ def _renameSims(trajectory, simname, outfolder):
 
 
 def _filterTopology(sim, outfolder, filtsel):
+    from htmd.util import ensurelist
     try:
         from htmd.molecule.molecule import Molecule
         mol = Molecule(sim.molfile)
     except IOError as e:
         raise RuntimeError('simFilter: {}. Cannot read topology file {}'.format(e, sim.molfile))
 
-    ext = os.path.splitext(sim.molfile)[1][1:]
-    filttopo = path.join(outfolder, 'filtered.{}'.format(ext))
-    filtpdb = path.join(outfolder, 'filtered.pdb')
+    if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere
+        mol.coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
 
-    if not path.isfile(filttopo):
-        try:
-            mol.write(filttopo, filtsel)
-        except Exception as e:
-            logger.warning('Was not able to write {} due to error: {}'.format(filttopo, e))
+    extensions = ['pdb',]  # Adding pdb to make sure it's always written
+    for m in ensurelist(sim.molfile):
+        extensions.append(os.path.splitext(m)[1][1:])
 
-        if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere
-            mol.coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
-
-        try:
-            mol.write(filtpdb, filtsel)
-        except Exception as e:
-            logger.warning('Was not able to write {} due to error: {}'.format(filtpdb, e))
+    for ext in list(set(extensions)):
+        filttopo = path.join(outfolder, 'filtered.{}'.format(ext))
+        if not path.isfile(filttopo):
+            try:
+                mol.write(filttopo, filtsel)
+            except Exception as e:
+                logger.warning('Filtering was not able to write {} due to error: {}'.format(filttopo, e))
 
 
 def _autoDetectTrajectories(folder):
@@ -405,22 +400,25 @@ def _autoDetectTrajectories(folder):
             return natsort.natsorted(trajectories)
 
 
+from htmd.molecule.readers import _TOPOLOGY_READERS
+__readers = list(_TOPOLOGY_READERS.keys())
+__defaultReaders = ['pdb', 'prmtop', 'psf']
+__otherReaders = list(np.setdiff1d(__readers, __defaultReaders))
+__topotypes =  __defaultReaders + __otherReaders  # Prepending PDB, PSF, PRMTOP so that they are the default
+
 def _autoDetectTopology(folder):
-    from htmd.molecule.readers import _TOPOLOGY_READERS
-    topotypes = ['pdb', 'prmtop', 'psf'] + list(_TOPOLOGY_READERS.keys())  # Prepending PDB, PSF, PRMTOP so that they are the default
-    topo = None
-    for tt in topotypes:
+    topo = {}
+    for tt in __topotypes:
         files = glob(path.join(folder, '*.{}'.format(tt)))
         if len(files) > 0:
             if len(files) > 1:
                 logger.warning('Multiple "{}" files were found in folder {}. '
                                'Picking {} as the topology'.format(tt, folder, files[0]))
-            topo = files[0]
-            break
-    if topo is None:
+            topo[tt] = files[0]
+    if len(topo) == 0:
         raise RuntimeError('No topology file found in folder {}. '
                            'Supported extensions are {}'.format(folder, list(_TOPOLOGY_READERS.keys())))
-    return topo
+    return list(topo.values())
 
 
 def _simName(foldername):
@@ -430,3 +428,34 @@ def _simName(foldername):
     else:
         name = os.path.basename(os.path.dirname(foldername))
     return name
+
+
+if __name__ == '__main__':
+    from htmd.home import home
+    from glob import glob
+    from os.path import join
+    from htmd.projections.metric import _singleMolfile
+
+    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*')))
+    x = sims[0].copy()
+    assert x == sims[0]
+    assert x != sims[1]
+    assert len(sims[0].molfile) == 2
+    assert _singleMolfile(sims)[0]
+
+    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*', 'structure.pdb')))
+    x = sims[0].copy()
+    assert x == sims[0]
+    assert x != sims[1]
+    assert not isinstance(sims[0].molfile, list)
+    assert _singleMolfile(sims)[0]
+
+    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), join(home(dataDir='adaptive'), 'input', 'e1s1_1', 'structure.pdb'))
+    x = sims[0].copy()
+    assert x == sims[0]
+    assert x != sims[1]
+    assert not isinstance(sims[0].molfile, list)
+    assert _singleMolfile(sims)[0]
+
+
+

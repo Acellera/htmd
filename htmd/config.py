@@ -7,12 +7,17 @@ import os
 
 _config = {'viewer': 'VMD',
            'ncpus': -2,
-           'configfile': os.getenv('HTMD_CONFIG') if os.getenv('HTMD_CONFIG') else None}
+           'configfile': os.getenv('HTMD_CONFIG') if os.getenv('HTMD_CONFIG') else None,
+           'lsf': None,
+           'slurm': None
+           }
 
 
 def config(viewer=_config['viewer'],
            ncpus=_config['ncpus'],
-           configfile=_config['configfile']):
+           configfile=_config['configfile'],
+           lsf=_config['lsf'],
+           slurm=_config['slurm']):
     """
     Function to change HTMD configuration variables.
 
@@ -24,7 +29,13 @@ def config(viewer=_config['viewer'],
         Defines the number of cpus available for several HTMD operations
     configfile : str
         Defines the HTMD configuration file that is called at the beginning of importing
+    lsf : str
+        Defines a YAML file that can contain default profile configurations for an LsfQueue
+    slurm : str
+        Defines a YAML file that can contain default profile configurations for an SlurmQueue
     """
     _config['viewer'] = viewer
     _config['ncpus'] = ncpus
     _config['configfile'] = configfile
+    _config['lsf'] = lsf
+    _config['slurm'] = slurm

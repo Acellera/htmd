@@ -7,10 +7,11 @@ import os
 import shutil
 import random
 import string
-import numpy as np
 from subprocess import check_output, CalledProcessError
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
+from htmd.config import _config
+import yaml
 import logging
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,11 @@ class LsfQueue(SimQueue, ProtocolInterface):
     ----------
     jobname : str, default=None
         Job name (identifier)
-    queue : str, default=None
-        The queue to run on
+    queue : str or list of str, default=None
+        The queue or list of queues to run on. If list, it attempts to submit the job to the first queue listed. If that
+        queue cannot be used, the next queue listed is considered and this process is repeated.
+    app : str, default=None
+        The application profile
     ngpu : int, default=1
         Number of GPUs to use for a single job
     ncpu : int, default=1
@@ -32,8 +36,10 @@ class LsfQueue(SimQueue, ProtocolInterface):
         Amount of memory per job (MiB)
     walltime : int, default=None
         Job timeout (hour:min or min)
-    environment : list of strings, default=None
-        Things to run before the job (sourcing envs).
+    envvars : str, default='ACEMD_HOME'
+        Envvars to propagate from submission node to the running node (comma-separated)
+    prerun : list of strings, default=None
+        Shell commands to execute on the running node before the job (e.g. loading modules)
     resources : list of strings, default=None
         Resources of the queue
     outputstream : str, default='slurm.%N.%j.out'
@@ -43,34 +49,69 @@ class LsfQueue(SimQueue, ProtocolInterface):
 
     Examples
     --------
-    >>> from htmd import *
     >>> s = LsfQueue()
     >>> s.jobname = 'simulation1'
     >>> s.queue = 'multiscale'
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
     """
 
-    _defaults = {'default_queue': 'gpu_queue', 'gpu_queue': None, 'cpu_queue': None, 'ngpu': 1, 'ncpu': 1,
-                 'memory': 4000, 'walltime': None, 'resources': None, 'environment': None}
+    _defaults = {'queue': None, 'app': None, 'gpu_queue': None, 'cpu_queue': None, 'ngpu': 1, 'ncpu': 1,
+                 'memory': 4000, 'walltime': None, 'resources': None, 'envvars': 'ACEMD_HOME', 'prerun': None}
 
-    def __init__(self):
+    def __init__(self, _configapp=None):
         SimQueue.__init__(self)
         ProtocolInterface.__init__(self)
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
-        self._arg('queue', 'str', 'The queue to run on', self._defaults[self._defaults['default_queue']], val.String())
+        self._arg('queue', 'str', 'The queue or list of queues to run on. If list, it attempts to submit the job to '
+                                  'the first queue listed', self._defaults['queue'], val.String(), nargs='*')
+        self._arg('app', 'str', 'The application profile', self._defaults['app'], val.String())
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
                   val.Number(int, '0POS'))
         self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'],
                   val.Number(int, '0POS'))
         self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, '0POS'))
-        self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'], val.Number(int, '0POS'))
+        self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'],
+                  val.Number(int, '0POS'))
         self._arg('resources', 'list', 'Resources of the queue', self._defaults['resources'], val.String(), nargs='*')
-        self._arg('environment', 'list', 'Things to run before the job (sourcing envs).', self._defaults['environment'],
-                  val.String(), nargs='*')
+        self._cmdDeprecated('environment', 'prerun')
         self._arg('outputstream', 'str', 'Output stream.', 'lsf.%J.out', val.String())
         self._arg('errorstream', 'str', 'Error stream.', 'lsf.%J.err', val.String())
         self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
-        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc', val.String())
+        self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc',
+                  val.String())
+        self._arg('envvars', 'str', 'Envvars to propagate from submission node to the running node (comma-separated)',
+                  self._defaults['envvars'], val.String())
+        self._arg('prerun', 'list', 'Shell commands to execute on the running node before the job (e.g. '
+                                    'loading modules)', self._defaults['prerun'], val.String(), nargs='*')
+
+        # Load LSF configuration profile
+        lsfconfig = _config['lsf']
+        profile = None
+        if _configapp is not None:
+            if lsfconfig is not None:
+                if os.path.isfile(lsfconfig) and lsfconfig.endswith(('.yml', '.yaml')):
+                    try:
+                        with open(lsfconfig, 'r') as f:
+                            profile = yaml.load(f)
+                        logger.info('Loaded LSF configuration YAML file {}'.format(lsfconfig))
+                    except:
+                        logger.warning('Could not load YAML file {}'.format(lsfconfig))
+                else:
+                    logger.warning('{} does not exist or it is not a YAML file.'.format(lsfconfig))
+                if profile:
+                    try:
+                        properties = profile[_configapp]
+                    except:
+                        raise RuntimeError('There is no profile in {} for configuration '
+                                           'app {}'.format(lsfconfig, _configapp))
+                    for p in properties:
+                        self.__dict__[p] = properties[p]
+                        logger.info('Setting {} to {}'.format(p, properties[p]))
+            else:
+                raise RuntimeError('No LSF configuration YAML file defined for the configapp')
+        else:
+            if lsfconfig is not None:
+                logger.warning('LSF configuration YAML file defined without configuration app')
 
         # Find executables
         self._qsubmit = LsfQueue._find_binary('bsub')
@@ -87,29 +128,35 @@ class LsfQueue(SimQueue, ProtocolInterface):
         return ret
 
     def _createJobScript(self, fname, workdir, runsh):
+        from htmd.util import ensurelist
         workdir = os.path.abspath(workdir)
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n')
             f.write('#\n')
             f.write('#BSUB -J {}\n'.format(self.jobname))
-            f.write('#BSUB -q {}\n'.format(self.queue))
+            f.write('#BSUB -q "{}"\n'.format(' '.join(ensurelist(self.queue))))
             f.write('#BSUB -n {}\n'.format(self.ncpu))
-            f.write('#BSUB -R "rusage[ngpus_excl_p={}]"\n'.format(self.ngpu))
+            if self.app is not None:
+                f.write('#BSUB -app {}\n'.format(self.app))
+            if self.ngpu != 0:
+                f.write('#BSUB -R "select[ngpus>0] rusage[ngpus_excl_p={}]"\n'.format(self.ngpu))
             f.write('#BSUB -M {}\n'.format(self.memory))
             f.write('#BSUB -cwd {}\n'.format(workdir))
             f.write('#BSUB -outdir {}\n'.format(workdir))
             f.write('#BSUB -o {}\n'.format(self.outputstream))
             f.write('#BSUB -e {}\n'.format(self.errorstream))
+            if self.envvars is not None:
+                f.write('#BSUB --env {}\n'.format(self.envvars))
             if self.walltime is not None:
                 f.write('#BSUB -W {}\n'.format(self.walltime))
             if self.resources is not None:
                 for resource in self.resources:
-                    f.write('#BSUB -R {}\n'.format(resource))
+                    f.write('#BSUB -R "{}"\n'.format(resource))
             # Trap kill signals to create sentinel file
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\n')
-            if self.environment is not None:
-                for call in self.environment:
+            if self.prerun is not None:
+                for call in self.prerun:
                     f.write('{}\n'.format(call))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
@@ -142,9 +189,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         dirs : list
             A list of executable directories.
         """
-        if isinstance(dirs, str):
-            dirs = [dirs, ]
-        self._dirs.extend(dirs)
+        dirs = self._submitinit(dirs)
 
         if self.queue is None:
             raise ValueError('The queue needs to be defined.')
@@ -156,21 +201,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
             if self.jobname is None:
                 self.jobname = self._autoJobName(d)
 
-            runscript = os.path.abspath(os.path.join(d, 'run.sh'))
-
-            # Clean sentinel files , if existent
-            if os.path.exists(os.path.join(d, self._sentinel)):
-                try:
-                    os.remove(os.path.join(d, self._sentinel))
-                except:
-                    logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
-                else:
-                    logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
-
-            if not os.path.exists(runscript):
-                raise FileExistsError('File {} does not exist.'.format(runscript))
-            if not os.access(runscript, os.X_OK):
-                raise PermissionError('File {} does not have execution permissions.'.format(runscript))
+            runscript = self._getRunScript(d)
+            self._cleanSentinel(d)
 
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)
@@ -219,22 +251,6 @@ class LsfQueue(SimQueue, ProtocolInterface):
         if l < 0:
             l = 0  # something odd happened
         return l
-
-    def notcompleted(self):
-        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
-
-        Returns
-        -------
-        total : int
-            Total number of directories which have not completed
-        """
-        total = 0
-        if len(self._dirs) == 0:
-            raise RuntimeError('This method relies on running synchronously.')
-        for i in self._dirs:
-            if not os.path.exists(os.path.join(i, self._sentinel)):
-                total += 1
-        return total
 
     def stop(self):
         """ Cancels all currently running and queued jobs

@@ -4,75 +4,79 @@
 # No redistribution in whole or part
 #
 import os
-import argparse
 import sys
+import argparse
+import logging
+import numpy as np
+
+import htmd.ui
+from htmd.version import version
+from htmd.queues.localqueue import LocalCPUQueue
+from htmd.queues.slurmqueue import SlurmQueue
+from htmd.queues.lsfqueue import LsfQueue
+from htmd.queues.pbsqueue import PBSQueue
+from htmd.queues.acecloudqueue import AceCloudQueue
+from htmd.qm import Psi4, Gaussian, FakeQM2
+from htmd.parameterization.ffmolecule import FFMolecule
+from htmd.parameterization.fftype import FFTypeMethod
+from htmd.parameterization.ffevaluate import FFEvaluate
+
+logger = logging.getLogger(__name__)
 
 
-def cli_parser():
-    ncpus = os.cpu_count()
-    try:
-        ncpus = int(os.getenv("NCPUS"))
-    except:
-        pass
+def getArgumentParser():
 
-    parser = argparse.ArgumentParser(description="Acellera Small Molecule Parameterization Tool")
-    parser.add_argument("-m", "--mol2", help="Molecule to parameterise, in mol2 format", required=True, type=str,
-                        default=None, metavar="<input.mol2>", action="store", dest="mol")
-    parser.add_argument("-l", "--list", "--list-torsions", help="List parameterisable torsions", action="store_true",
-                        default=False,
-                        dest="list")
-    parser.add_argument("-c", "--charge", help="Net charge on molecule (default: sum of the partial charges on the "
-                                               ".mol2 file)", type=int, default=None, action="store", dest="charge")
-    parser.add_argument("--rtf", help="Inital RTF parameters (req --prm)", type=str, default=None, dest="rtf")
-    parser.add_argument("--prm", help="Inital PRM parameters (req --rtf)", type=str, default=None, dest="prm")
-    parser.add_argument("-o", "--outdir", help="Output directory (default: %(default)s)", type=str, default="./",
-                        dest="outdir")
-    parser.add_argument("-t", "--torsion", metavar="A1-A2-A3-A4", help="Torsion to parameterise (default: %(default)s)",
-                        default="all", dest="torsion")
-    parser.add_argument("-n", "--ncpus", help="Number of CPUs to use (default: %(default)s)", default=ncpus,
-                        dest="ncpus")
-    parser.add_argument("-f", "--forcefield", help="Inital FF guess to use (default: %(default)s)",
-                        choices=["GAFF", "GAFF2", "CGENFF", "all"], default="all")
-    parser.add_argument("-b", "--basis", help="QM Basis Set (default: %(default)s)", choices=["6-31g-star", "cc-pVDZ"],
-                        default="cc-pVDZ", dest="basis")
-    parser.add_argument("--theory", help="QM Theory (default: %(default)s)", choices=["RHF", "B3LYP"],
-                        default="B3LYP", dest="theory")
-    parser.add_argument("--vacuum", help="Perform QM calculations in vacuum (default: %(default)s)",
-                        action="store_false", dest="vacuum",
-                        default=True)
-    parser.add_argument("--no-min", help="Do not perform QM minimisation (default: %(default)s)", action="store_true",
-                        dest="nomin", default=False)
-    parser.add_argument("--no-esp", help="Do not perform QM charge fitting (default: %(default)s)", action="store_true",
-                        dest="noesp", default=False)
-    parser.add_argument("--no-torsions", help="Do not perform torsion fitting (default: %(default)s)",
-                        action="store_true", dest="notorsion", default=False)
-    parser.add_argument("-e", "--exec", help="Mode of execution for the QM calculations (default: %(default)s)",
-                        choices=["inline", "LSF", "Slurm"], default="inline", dest="exec")
-    parser.add_argument("--qmcode", help="QM code (default: %(default)s)", choices=["Gaussian", "PSI4", "TeraChem"],
-                        default="PSI4", dest="qmcode")
-    parser.add_argument("--freeze-charge", metavar="A1",
-                        help="Freeze the charge of the named atom (default: %(default)s)", action="append",
-                        default=None, dest="freezeq")
-    parser.add_argument("--no-geomopt", help="Do not perform QM geometry optimisation when fitting torsions (default: "
-                                             "%(default)s)", action="store_false", dest="geomopt", default=True)
+    parser = argparse.ArgumentParser(description='Acellera small molecule parameterization tool')
+
+    parser.add_argument('filename', help='Molecule file in MOL2 format')
+    parser.add_argument('-c', '--charge', type=int,
+                        help='Total charge of the molecule (default: sum of partial charges)')
+    parser.add_argument('-l', '--list', action='store_true', help='List parameterizable dihedral angles')
+    parser.add_argument('--rtf-prm', nargs=2, metavar='<filename>', help='CHARMM RTF and PRM files')
+    parser.add_argument('-ff', '--forcefield', nargs='+', default=['GAFF2'], choices=['GAFF', 'GAFF2', 'CGENFF'],
+                        help='Inital force field guess (default: %(default)s)')
+    parser.add_argument('--fix-charge', nargs='+', default=[], metavar='<atom name>',
+                        help='Fix atomic charge during charge fitting (default: none)')
+    parser.add_argument('-d', '--dihedral', nargs='+', default=[], metavar='A1-A2-A3-A4',
+                        help='Select dihedral angle to parameterize (default: all parameterizable dihedral angles)')
+    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'], help='QM code (default: %(default)s)')
+    parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP'],
+                        help='QM level of theory (default: %(default)s)')
+    parser.add_argument('--basis', default='cc-pVDZ', choices=['6-31G*', '6-31+G*', 'cc-pVDZ', 'aug-cc-pVDZ'],
+                        help='QM basis set (default: %(default)s)')
+    parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
+                        help='QM environment (default: %(default)s)')
+    parser.add_argument('--no-min', action='store_false', dest='minimize',
+                        help='Do not perform QM structure minimization')
+    parser.add_argument('--no-esp', action='store_false', dest='fit_charges', help='Do not perform QM charge fitting')
+    parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
+                        help='Do not perform QM scanning of dihedral angles')
+    parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
+                        help='Do not perform QM structure optimisation when scanning dihedral angles')
+    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
+                        help='QM queue (default: %(default)s)')
+    parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
+                                                                      'defaults)')
+    parser.add_argument('-m', '--memory', default=None, type=int, help='Maximum amount of memory in MB to use.')
+    parser.add_argument('--groupname', default=None, help=argparse.SUPPRESS)
+    parser.add_argument('-o', '--outdir', default='./', help='Output directory (default: %(default)s)')
+    parser.add_argument('--seed', default=20170920, type=int,
+                        help='Random number generator seed (default: %(default)s)')
+    parser.add_argument('--version', action='version', version=version())
+
+    # Enable replacement of any real QM class with FakeQM.
+    # This is intedended for debugging only and should be kept hidden.
+    parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
+
     return parser
 
 
-def main_parameterize(arguments=None):
-    args = cli_parser().parse_args(args=arguments)
+def printEnergies(molecule, filename):
 
-    from htmd.parameterization.ffmolecule import FFMolecule, FFEvaluate
-    from htmd.parameterization.fftype import FFTypeMethod
-    from htmd.qm.qmcalculation import Theory, BasisSet, Execution, Code
-    import numpy as np
-    import math
+    assert molecule.numFrames == 1
+    energies = FFEvaluate(molecule).run(molecule.coords[:, :, 0])
 
-    def printEnergies(m, filename):
-        fener = open(filename, "w")
-        ffe = FFEvaluate(m)
-        energies = ffe.run(m.coords[:, :, 0])
-        for out in sys.stdout, fener:
-            print('''
+    string = '''
 == Diagnostic Energies ==
 
 Bond     : {BOND_ENERGY}
@@ -82,300 +86,194 @@ Improper : {IMPROPER_ENERGY}
 Electro  : {ELEC_ENERGY}
 VdW      : {VDW_ENERGY}
 
-'''.format(BOND_ENERGY=energies['bond'], ANGLE_ENERGY=energies['angle'], DIHEDRAL_ENERGY=energies['dihedral'],
-           IMPROPER_ENERGY=energies['improper'], ELEC_ENERGY=energies['elec'], VDW_ENERGY=energies['vdw']),
-                  file=out)
-        fener.close()
+'''.format(BOND_ENERGY=energies['bond'],
+           ANGLE_ENERGY=energies['angle'],
+           DIHEDRAL_ENERGY=energies['dihedral'],
+           IMPROPER_ENERGY=energies['improper'],
+           ELEC_ENERGY=energies['elec'],
+           VDW_ENERGY=energies['vdw'])
 
-    # Communicate the # of CPUs to use to the QM engine via environment variable
-    os.environ['NCPUS'] = str(args.ncpus)
+    sys.stdout.write(string)
+    with open(filename, 'w') as file_:
+        file_.write(string)
 
-    filename = args.mol
-    if not os.path.exists(filename):
-        print("File {} not found. Please check that the file exists and that the path is correct.".format(filename))
-        sys.exit(0)
 
-    if args.qmcode == "Gaussian":
-        code = Code.Gaussian
-    elif args.qmcode == "PSI4":
-        code = Code.PSI4
-    elif args.qmcode == "TeraChem":
-        code = Code.TeraChem
+def main_parameterize(arguments=None):
+
+    args = getArgumentParser().parse_args(args=arguments)
+
+    if not os.path.exists(args.filename):
+        raise ValueError('File %s cannot be found' % args.filename)
+
+    method_map = {'GAFF': FFTypeMethod.GAFF, 'GAFF2': FFTypeMethod.GAFF2, 'CGENFF': FFTypeMethod.CGenFF_2b6}
+    methods = [method_map[method] for method in args.forcefield]  # TODO: move into FFMolecule
+
+    # Get RTF and PRM file names
+    rtf, prm = None, None
+    if args.rtf_prm:
+        rtf, prm = args.rtf_prm
+
+    # Create a queue for QM
+    if args.queue == 'local':
+        queue = LocalCPUQueue()
+    elif args.queue == 'Slurm':
+        queue = SlurmQueue(_configapp=args.code.lower())
+    elif args.queue == 'LSF':
+        queue = LsfQueue(_configapp=args.code.lower())
+    elif args.queue == 'PBS':
+        queue = PBSQueue()  # TODO: configure
+    elif args.queue == 'AceCloud':
+        queue = AceCloudQueue()  # TODO: configure
+        queue.groupname = args.groupname
+        queue.hashnames = True
     else:
-        print("Unknown QM code: {}".format(args.qmcode))
-        sys.exit(1)
+        raise NotImplementedError
 
-    if args.exec == "inline":
-        execution = Execution.Inline
-    elif args.exec == "LSF":
-        execution = Execution.LSF
-    elif args.exec == "Slurm":
-        execution = Execution.Slurm
+    # Override default ncpus
+    if args.ncpus:
+        logger.info('Overriding ncpus to {}'.format(args.ncpus))
+        queue.ncpu = args.ncpus
+    if args.memory:
+        logger.info('Overriding memory to {}'.format(args.memory))
+        queue.memory = args.memory
+
+    # Create a QM object
+    if args.code == 'Psi4':
+        qm = Psi4()
+    elif args.code == 'Gaussian':
+        qm = Gaussian()
     else:
-        print("Unknown execution mode: {}".format(args.exec))
-        sys.exit(1)
+        raise NotImplementedError
 
-    if args.forcefield == "CGENFF":
-        methods = [FFTypeMethod.CGenFF_2b6]
-    elif args.forcefield == "GAFF":
-        methods = [FFTypeMethod.GAFF]
-    elif args.forcefield == "GAFF2":
-        methods = [FFTypeMethod.GAFF2]
-    elif args.forcefield == "all":
-        methods = [FFTypeMethod.CGenFF_2b6, FFTypeMethod.GAFF2]
-    else:
-        print("Unknown initial guess force-field: {}".format(args.forcefield))
-        sys.exit(1)
+    # This is for debugging only!
+    if args.fake_qm:
+        qm = FakeQM2()
+        logger.warning('Using FakeQM')
 
-    if args.basis == "6-31g-star":
-        basis = BasisSet._6_31G_star
-    elif args.basis == "cc-pVDZ":
-        basis = BasisSet._cc_pVDZ
-    else:
-        print("Unknown basis {}".format(args.basis))
-        sys.exit(1)
+    # Set up the QM object
+    qm.theory = args.theory
+    qm.basis = args.basis
+    qm.solvent = args.environment
+    qm.queue = queue
 
-    if args.theory == "RHF":
-        theory = Theory.RHF
-    elif args.theory == "B3LYP":
-        theory = Theory.B3LYP
-    else:
-        print("Unknown theory %s".format(args.theory))
-        sys.exit(1)
-
-    if args.vacuum:
-        solvent = False
-    else:
-        solvent = True
-
-    # Just list torsions?
+    # List rotatable dihedral angles
     if args.list:
-        print(" === Listing soft torsions of {} ===\n".format(filename))
-        mol = FFMolecule(filename=filename, method=methods[0], netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                         basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code,
+
+        mol = FFMolecule(args.filename, method=methods[0], netcharge=args.charge, rtf=rtf, prm=prm, qm=qm,
                          outdir=args.outdir)
-        dihedrals = mol.getSoftTorsions()
-        print("Detected soft torsions:")
-        fh = open("torsions.txt", "w")
-        for d in dihedrals:
-            print("\t{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]))
-            print("{}-{}-{}-{}".format(mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]]), file=fh)
-        fh.close()
+        print('\n === Parameterizable dihedral angles of %s ===\n' % args.filename)
+        with open('torsions.txt', 'w') as fh:
+            for dihedral in mol.getParameterizableDihedrals():
+                dihedral_name = '-'.join(mol.name[list(dihedral)])
+                print('  '+dihedral_name)
+                fh.write(dihedral_name+'\n')
+        print()
         sys.exit(0)
 
-    # Small report
-    print(" === List of arguments used ===\n")
-    for i in vars(args):
-        print('{:>10s}:  {:<10s}'.format(i, str(vars(args)[i])))
+    # Print arguments
+    print('\n === Arguments ===\n')
+    for key, value in vars(args).items():
+        print('{:>12s}: {:s}'.format(key, str(value)))
 
-    print("\n === Parameterizing {} ===\n".format(filename))
+    print('\n === Parameterizing %s ===\n' % args.filename)
     for method in methods:
-        sys.stdout.flush()
-        print(" === Fitting for FF %s ===\n" % method.name)
+        print(" === Fitting for %s ===\n" % method.name)
 
-        mol = FFMolecule(filename=filename, method=method, netcharge=args.charge, rtf=args.rtf, prm=args.prm,
-                         basis=basis, theory=theory, solvent=solvent, execution=execution, qmcode=code,
+        # Create the molecule
+        mol = FFMolecule(args.filename, method=method, netcharge=args.charge, rtf=rtf, prm=prm, qm=qm,
                          outdir=args.outdir)
-        dihedrals = mol.getSoftTorsions()
+        mol.printReport()
+
+        # Copy the molecule to preserve initial coordinates
         mol_orig = mol.copy()
 
-        if not args.nomin:
-            print("\n == Minimizing ==\n")
+        # Update B3LYP to B3LYP-D3
+        # TODO: this is silent and not documented stuff
+        if qm.theory == 'B3LYP':
+            qm.correction = 'D3'
+
+        # Update basis sets
+        # TODO: this is silent and not documented stuff
+        if mol.netcharge < 0 and qm.solvent == 'vacuum':
+            if qm.basis == '6-31G*':
+                qm.basis = '6-31+G*'
+            if qm.basis == 'cc-pVDZ':
+                qm.basis = 'aug-cc-pVDZ'
+            logger.info('Changing basis sets to %s' % qm.basis)
+
+        # Minimize molecule
+        if args.minimize:
+            print('\n == Minimizing ==\n')
             mol.minimize()
 
-        sys.stdout.flush()
-        if not args.noesp:
-            print("\n == Charge fitting ==\n")
+        # Fit ESP charges
+        if args.fit_charges:
+            print('\n == Fitting ESP charges ==\n')
 
-            # Select the atoms that are to have frozen charges in the fit
-            fixq = []
-            if args.freezeq:
-                for i in args.freezeq:
-                    found = False
-                    for d in range(len(mol.name)):
-                        if mol.name[d] == i:
-                            ni = d
-                            print("Fixing charge for atom %s to %f" % (i, mol.charge[ni]))
-                            fixq.append(ni)
-                            found = True
-                    if not found:
-                        raise ValueError(" No atom named %s (--freeze-charge)" % i)
+            # Set random number generator seed
+            if args.seed:
+                np.random.seed(args.seed)
 
-            (score, qm_dipole, mm_dipole) = mol.fitCharges(fixed=fixq)
+            # Select the atoms with fixed charges
+            fixed_atom_indices = []
+            for fixed_atom_name in args.fix_charge:
 
-            rating = "GOOD"
-            if score > 1:
-                rating = "CHECK"
-            if score > 10:
-                rating = "BAD"
+                if fixed_atom_name not in mol.name:
+                    raise ValueError('Atom %s is not found. Check --fix-charge arguments' % fixed_atom_name)
 
-            print("Charge Chi^2 score : %f : %s" % (score, rating))
-            print("QM Dipole   : %f %f %f ; %f" % (qm_dipole[0], qm_dipole[1], qm_dipole[2], qm_dipole[3]))
-            print("MM Dipole   : %f %f %f ; %f" % (mm_dipole[0], mm_dipole[1], mm_dipole[2], mm_dipole[3]))
-            d = 0.
-            for i in range(3):
-                x = qm_dipole[i] - mm_dipole[i]
-                d = d + x * x
+                for aton_index in range(mol.numAtoms):
+                    if mol.name[aton_index] == fixed_atom_name:
+                        fixed_atom_indices.append(aton_index)
+                        logger.info('Charge of atom %s is fixed to %f' % (fixed_atom_name, mol.charge[aton_index]))
 
-            rating = "GOOD"
-            if score > 1:
-                rating = "CHECK"
-            print("Dipole Chi^2 score : %f : %s" % (d, rating))
-            print("")
+            # Fit ESP charges
+            _, qm_dipole = mol.fitCharges(fixed=fixed_atom_indices)
 
-        sys.stdout.flush()
-        # Iterative dihedral fitting
-        if not args.notorsion:
-            print("\n == Torsion fitting ==\n")
+            # Copy the new charges to the original molecule
+            mol_orig.charge[:] = mol.charge
 
-            scores = np.ones(len(dihedrals))
-            converged = False
-            iteration = 1
-            ref_mm = dict()
-            while not converged:
-                rets = []
+            # Print dipoles
+            logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
+            mm_dipole = mol.getDipole()
+            if np.all(np.isfinite(mm_dipole)):
+                logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
+            else:
+                logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
 
-                print("\nIteration %d" % iteration)
+        # Fit dihedral angle parameters
+        if args.fit_dihedral:
+            print('\n == Fitting dihedral angle parameters ==\n')
 
-                last_scores = scores
-                scores = np.zeros(len(dihedrals))
-                idx = 0
-                for d in dihedrals:
-                    name = "%s-%s-%s-%s" % (mol.name[d[0]], mol.name[d[1]], mol.name[d[2]], mol.name[d[3]])
-                    if args.torsion == 'all' or name in args.torsion.split(','):
-                        print("\n == Fitting torsion {} ==\n".format(name))
-                        try:
-                            ret = mol.fitSoftTorsion(d, geomopt=args.geomopt)
-                            rets.append(ret)
-                            if iteration == 1:
-                                ref_mm[name] = ret
-                            rating = "GOOD"
-                            if ret.chisq > 10:
-                                rating = "CHECK"
-                            if ret.chisq > 100:
-                                rating = "BAD"
-                            print("Torsion %s Chi^2 score : %f : %s" % (name, ret.chisq, rating))
-                            sys.stdout.flush()
-                            scores[idx] = ret.chisq
-                            # Always use the mm_orig from first iteration (unmodified)
-                            ret.mm_original = ref_mm[name].mm_original
-                            phi_original = ref_mm[name].phi
-                            fn = mol.plotTorsionFit(ret, phi_original, show=False)
-                        except Exception as e:
-                            print("Error in fitting")
-                            print(str(e))
-                            raise
-                            scores[idx] = 0.
-                            pass
-                            # print(fn)
-                    idx += 1
-                # print(scores)
-                if iteration > 1:
-                    converged = True
-                    for j in range(len(scores)):
-                        # Check convergence
-                        try:
-                            relerr = (scores[j] - last_scores[j]) / last_scores[j]
-                        except:
-                            relerr = 0.
-                        if math.isnan(relerr):
-                            relerr = 0.
-                        convstr = "- converged"
-                        if math.fabs(relerr) > 1.e-2:
-                            convstr = ""
-                            converged = False
-                        print(" Dihedral %d relative error : %f %s" % (j, relerr, convstr))
+            # Set random number generator seed
+            if args.seed:
+                np.random.seed(args.seed)
 
-                iteration += 1
+            # Get all rotatable dihedrals
+            all_dihedrals = mol.getParameterizableDihedrals()
 
-            print(" Fitting converged at iteration %d" % (iteration - 1))
-            if len(rets):
-                fit = mol.plotConformerEnergies(rets, show=False)
-                print("\n Fit of conformer energies: RMS %f Variance %f" % (fit[0], fit[1]))
+            # Choose which dihedrals to fit
+            dihedrals = []
+            all_dihedral_names = ['-'.join(mol.name[list(dihedral)]) for dihedral in all_dihedrals]
+            for dihedral_name in args.dihedral:
+                if dihedral_name not in all_dihedral_names:
+                    raise ValueError('%s is not recognized as a parameterizable dihedral angle' % dihedral_name)
+                dihedrals.append(all_dihedrals[all_dihedral_names.index(dihedral_name)])
+            dihedrals = dihedrals if len(dihedrals) > 0 else all_dihedrals  # Set default to all dihedral angles
 
-        printEnergies(mol, 'energies.txt')
+            # Fit the parameters
+            mol.fitDihedrals(dihedrals, args.optimize_dihedral)
 
-        # Output the ff parameters
-        paramdir = os.path.join(args.outdir, "parameters", method.name, mol.output_directory_name())
-        print("\n == Output to {} ==\n".format(paramdir))
-        try:
-            os.makedirs(paramdir, exist_ok=True)
-        except:
-            raise OSError('Directory {} could not be created. Check if you have permissions.'.format(paramdir))
+        # Output the FF parameters
+        print('\n == Writing results ==\n')
+        mol.writeParameters(mol_orig)
 
-        if method.name == "CGenFF_2b6":
-            try:
-                mol._rtf.write(os.path.join(paramdir, "mol.rtf"))
-                mol._prm.write(os.path.join(paramdir, "mol.prm"))
-                for ext in ['psf', 'xyz', 'coor', 'mol2', 'pdb']:
-                    mol.write(os.path.join(paramdir, "mol." + ext))
-                mol_orig.write(os.path.join(paramdir, "mol-orig.mol2"))
-                f = open(os.path.join(paramdir, "input.namd"), "w")
-                tmp = '''parameters mol.prm
-paraTypeCharmm on
-coordinates mol.pdb
-bincoordinates mol.coor
-temperature 0
-timestep 0
-1-4scaling 1.0
-exclude scaled1-4
-outputname .out
-outputenergies 1
-structure mol.psf
-cutoff 20.
-switching off
-stepsPerCycle 1
-rigidbonds none
-cellBasisVector1 50. 0. 0.
-cellBasisVector2 0. 50. 0.
-cellBasisVector3 0. 0. 50.
-run 0'''
-                print(tmp, file=f)
-                f.close()
-            except ValueError as e:
-                print("Not writing CHARMM PRM: {}".format(str(e)))
-        elif method.name == "GAFF" or method.name == "GAFF2":
-            try:
-                # types need to be remapped because Amber FRCMOD format limits the type to characters
-                # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
-                typemap = mol._prm.writeFrcmod(mol._rtf, os.path.join(paramdir, "mol.frcmod"))
-                for ext in ['coor', 'mol2', 'pdb']:
-                    mol.write(os.path.join(paramdir, "mol." + ext), typemap=typemap)
-                mol_orig.write(os.path.join(paramdir, "mol-orig.mol2"), typemap=typemap)
-                f = open(os.path.join(paramdir, "tleap.in"), "w")
-                tmp = '''loadAmberParams mol.frcmod
-A = loadMol2 mol.mol2
-saveAmberParm A structure.prmtop mol.crd
-quit'''
-                print(tmp, file=f)
-                f.close()
-                f = open(os.path.join(paramdir, "input.namd"), "w")
-                tmp = '''parmfile structure.prmtop
-amber on
-coordinates mol.pdb
-bincoordinates mol.coor
-temperature 0
-timestep 0
-1-4scaling 0.83333333
-exclude scaled1-4
-outputname .out
-outputenergies 1
-cutoff 20.
-switching off
-stepsPerCycle 1
-rigidbonds none
-cellBasisVector1 50. 0. 0.
-cellBasisVector2 0. 50. 0.
-cellBasisVector3 0. 0. 50.
-run 0'''
-                print(tmp, file=f)
-                f.close()
-            except ValueError as e:
-                print("Not writing Amber FRCMOD: {}".format(str(e)))
-    sys.exit(0)
+        # Write energy file
+        energyFile = os.path.join(mol.outdir, 'parameters', method.name, mol.qm_method_name(), 'energies.txt')
+        printEnergies(mol, energyFile)
+        logger.info('Write energy file: %s' % energyFile)
 
-
+        
 if __name__ == "__main__":
 
-    main_parameterize(arguments=['-h'])
-    sys.exit(0)
+    args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
+    main_parameterize(arguments=args)

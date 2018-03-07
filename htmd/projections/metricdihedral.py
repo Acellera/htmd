@@ -79,7 +79,8 @@ class Dihedral:
         dihedrals : list
             A single dihedral or a list of Dihedral objects
         sel : str
-            An atomselection to restrict the application of the selections.
+            Atom selection string to restrict the application of the selections.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Returns
         -------
@@ -168,7 +169,8 @@ class Dihedral:
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         sel : str
-            An atomselection string to restrict the atoms for which to calculate dihedrals (i.e. only one of many chains)
+            Atom selection string to restrict the atoms for which to calculate dihedrals (e.g. only one of many chains).
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         dih : tuple
             A tuple of the dihedral types we want to calculate (phi, psi, omega, chi1, chi2, chi3, chi4, chi5)
 
@@ -388,7 +390,7 @@ class Dihedral:
         """
         chi2std = ('CA', 'CB', 'CG', 'CD')
         chi2 = {'ARG': chi2std, 'ASN': ('CA', 'CB', 'CG', 'OD1'), 'ASP': ('CA', 'CB', 'CG', 'OD1'), 'GLN': chi2std,
-                'GLU': chi2std, 'HIS': ('CA', 'CB', 'CG', 'ND1'), 'ILE': ('CA', 'CB', 'CG1', 'CD'),
+                'GLU': chi2std, 'HIS': ('CA', 'CB', 'CG', 'ND1'), 'ILE': ('CA', 'CB', 'CG1', 'CD1'),
                 'LEU': ('CA', 'CB', 'CG', 'CD1'), 'LYS': chi2std,
                 'MET': ('CA', 'CB', 'CG', 'SD'), 'PHE': ('CA', 'CB', 'CG', 'CD1'), 'PRO': chi2std,
                 'TRP': ('CA', 'CB', 'CG', 'CD1'), 'TYR': ('CA', 'CB', 'CG', 'CD1')}
@@ -521,8 +523,8 @@ class MetricDihedral(Projection):
     sincos : bool, optional
         Set to True to return the dihedral angles as their sine and cosine components. Makes them periodic.
     protsel : str, optional
-        Atomselection for the protein segment for which to calculate dihedral angles. Resids should be unique within
-        that segment.
+        Atom selection string for the protein segment for which to calculate dihedral angles. Resids should be unique
+        within that segment. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Examples
     --------
@@ -618,11 +620,11 @@ class MetricDihedral(Projection):
         return Dihedral.dihedralsToIndexes(mol, dihedrals, protatoms)
 
     def _calcDihedralAngles(self, mol, dihedrals, sincos=True):
-        from htmd.molecule.util import dihedralAngle
+        from htmd.numbautil import dihedralAngle
         metric = np.zeros((np.size(mol.coords, 2), len(dihedrals)))
 
         for i, dih in enumerate(dihedrals):
-            metric[:, i] = dihedralAngle(mol.coords[dih, :, :])
+            metric[:, i] = np.rad2deg(dihedralAngle(mol.coords[dih, :, :]))
 
         if sincos:
             sc_metric = np.zeros((np.size(metric, 0), np.size(metric, 1) * 2))
@@ -674,11 +676,11 @@ if __name__ == "__main__":
     metr = MetricDihedral(protsel='protein')
     data = metr.project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', 'ref.npy'))
-    assert np.allclose(data, dataref, atol=1e-05), 'Diherdals calculation gave different results from reference'
+    assert np.allclose(data, dataref, atol=1e-03), 'Diherdals calculation gave different results from reference'
 
     mol = Molecule('5MAT')
     mol.filter('not insertion A and not altloc A B')
     mol = autoSegment(mol)
     data = MetricDihedral().project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', '5mat.npy'))
-    assert np.allclose(data, dataref, atol=1e-05), 'Diherdals calculation gave different results from reference'
+    assert np.allclose(data, dataref, atol=1e-03), 'Diherdals calculation gave different results from reference'

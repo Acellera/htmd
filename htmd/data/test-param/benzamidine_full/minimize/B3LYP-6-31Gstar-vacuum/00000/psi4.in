@@ -1,0 +1,46 @@
+set_num_threads(1)
+set_memory(3145728000)
+
+set { reference rks }
+set { basis 6-31G* }
+
+molecule MOL {
+    1 1
+    noreorient
+    nocom
+    symmetry c1
+    C    0.000000   0.000000  -0.170000
+    C    0.007000   1.210000   0.523000
+    C    0.000000   1.205000   1.904000
+    C    0.000000   0.000000   2.592000
+    C    0.000000  -1.205000   1.904000
+    C   -0.007000  -1.210000   0.523000
+    C    0.000000   0.000000  -1.643000
+    H   -0.019000   2.146000  -0.006000
+    H   -0.011000   2.134000   2.442000
+    H    0.000000   0.000000   3.666000
+    H    0.011000  -2.134000   2.442000
+    H    0.019000  -2.146000  -0.006000
+    N   -0.741000  -0.864000  -2.296000
+    N    0.741000   0.864000  -2.296000
+    H    0.721000   0.947000  -3.291000
+    H    1.404000   1.427000  -1.808000
+    H   -1.404000  -1.427000  -1.808000
+    H   -0.721000  -0.947000  -3.291000
+}
+
+set optking { dynamic_level = 1 
+ geom_maxiter = 250
+ print_trajectory_xyz_file = True }
+
+energy, wfn = optimize('B3LYP-D3', return_wfn=True)
+
+import os
+os.chdir(os.environ['HTMD_PSI4_WORKDIR'])
+
+oeprop(wfn, 'DIPOLE', 'QUADRUPOLE', 'MULLIKEN_CHARGES')
+
+with open('psi4out.xyz', 'w') as f:
+    f.write('18 ' )
+    f.write('%.12f\n' % energy)
+    f.write(MOL.save_string_xyz())

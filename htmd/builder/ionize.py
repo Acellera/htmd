@@ -124,7 +124,40 @@ def _ionGetCharge(ion, ff):
     return _ions[ion][0]
 
 
-def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfrom=5, dbetween=5, segname=None):
+def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nanion, ncation, dfrom=5, dbetween=5, segname=None):
+    """Place a given number of negative and positive ions in the solvent.
+
+    Replaces water molecules al long as they respect the given distance criteria.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The Molecule object
+    anion_resname : str
+        Resname of the added anions
+    cation_resname : str
+        Resname of the added cations
+    anion_name : str
+        Name of the added anions
+    cation_name : str
+        Name of the added cations
+    nanion : int
+        Number of anions to add
+    ncation : int
+        Number of cations to add
+    dfrom : float
+        Min distance of ions from molecule
+    dbetween : float
+        Min distance between ions
+    segname : str
+        Segment name to add
+        
+    Returns
+    -------
+    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The molecule with the ions added
+    """
+
     newmol = mol.copy()
 
     logger.info('Min distance of ions from molecule: ' + str(dfrom) + 'A')
@@ -195,14 +228,14 @@ def ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation, dfro
     atom.set('segid', 'I')
 
     for i in range(nanion):
-        atom.set('name', anionatom)
-        atom.set('resname', anion)
+        atom.set('name', anion_name)
+        atom.set('resname', anion_resname)
         atom.set('resid', newmol.resid[-1] + 1)
         atom.coords = waterpos[randidx[i], :]
         newmol.insert(atom, len(newmol.name))
     for i in range(ncation):
-        atom.set('name', cationatom)
-        atom.set('resname', cation)
+        atom.set('name', cation_name)
+        atom.set('resname', cation_resname)
         atom.set('resid', newmol.resid[-1] + 1)
         atom.coords = waterpos[randidx[i+nanion], :]
         newmol.insert(atom, len(newmol.name))

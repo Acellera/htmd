@@ -16,7 +16,8 @@ class MetricSecondaryStructure(Projection):
     Parameters
     ----------
     sel : str
-        The atomselection for the protein
+        Atom selection string for the protein.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     simplified: bool
         Uses the simplified 3-letter code
     integer : bool

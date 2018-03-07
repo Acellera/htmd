@@ -129,21 +129,30 @@ class Trajectory:
 
 def XYZread(filename, frame=None, topoloc=None):
     topo = Topology()
-    coords = []
 
+    frames = []
+    firstconf = True
     with open(filename, 'r') as f:
-        natoms = int(f.readline().split()[0])
-        f.readline()
-        for i in range(natoms):
-            s = f.readline().split()
-            topo.record.append('HETATM')
-            topo.serial.append(i + 1)
-            topo.element.append(s[0])
-            topo.name.append(s[0])
-            topo.resname.append('MOL')
-            coords.append(s[1:4])
+        while True:
+            line = f.readline()
+            if line == '':
+                break
+            natoms = int(line.split()[0])
+            f.readline()
+            coords = []
+            for i in range(natoms):
+                s = f.readline().split()
+                if firstconf:
+                    topo.record.append('HETATM')
+                    topo.serial.append(i + 1)
+                    topo.element.append(s[0])
+                    topo.name.append(s[0])
+                    topo.resname.append('MOL')
+                coords.append(s[1:4])
+            frames.append(np.vstack(coords))
+            firstconf = False
 
-    coords = np.vstack(coords)[:, :, np.newaxis]
+    coords = np.stack(frames, axis=2)
     traj = Trajectory(coords=coords)
     return topo, traj
 
@@ -184,7 +193,10 @@ def GJFread(filename, frame=None, topoloc=None):
 
 
 def MOL2read(filename, frame=None, topoloc=None):
-    import re
+    from periodictable import elements
+    element_objs = list(elements._element.values())[1:]
+    element_symbols = [e.symbol for e in element_objs]
+    assert len(element_symbols) == 118
 
     topo = Topology()
     coords = []
@@ -220,6 +232,13 @@ def MOL2read(filename, frame=None, topoloc=None):
                 topo.resname.append(s[7][:3])
                 if len(s) > 8:
                     topo.charge.append(float(s[8]))
+        element = s[5].split('.')[0]
+        if element in element_symbols:
+            topo.element.append(element)
+        else:
+            logger.warning('Element of atom ID {} could not be automatically guessed from its '
+                           'MOL2 atomtype ({}).'.format(int(s[0]), s[5]))
+            topo.element.append('')
     if bond:
         for i in range(bond, len(l)):
             b = l[i].split()
@@ -593,7 +612,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
     else:
         mapserials = np.empty(np.max(serials)+1)
         mapserials[:] = np.NAN
-        mapserials[serials] = list(range(np.max(serials)))
+        mapserials[serials] = list(range(len(serials)))
         for i in range(len(parsedbonds)):
             row = parsedbonds.loc[i].tolist()
             for b in range(1, 5):
@@ -629,6 +648,8 @@ def PRMTOPread(filename, frame=None, topoloc=None):
         uqresnames = []
         residx = []
         bondsidx = []
+        angleidx = []
+        dihedidx = []
         section = None
         for line in f:
             if line.startswith('%FLAG POINTERS'):
@@ -647,6 +668,10 @@ def PRMTOPread(filename, frame=None, topoloc=None):
                 section = 'resstart'
             elif line.startswith('%FLAG BONDS_INC_HYDROGEN') or line.startswith('%FLAG BONDS_WITHOUT_HYDROGEN'):
                 section = 'bonds'
+            elif line.startswith('%FLAG ANGLES_INC_HYDROGEN') or line.startswith('%FLAG ANGLES_WITHOUT_HYDROGEN'):
+                section = 'angles'
+            elif line.startswith('%FLAG DIHEDRALS_INC_HYDROGEN') or line.startswith('%FLAG DIHEDRALS_WITHOUT_HYDROGEN'):
+                section = 'dihedrals'
             elif line.startswith('%FLAG BOX_DIMENSIONS'):
                 section = 'box'
             elif line.startswith('%FLAG AMBER_ATOM_TYPE'):
@@ -683,15 +708,33 @@ def PRMTOPread(filename, frame=None, topoloc=None):
                 fieldlen = 8
                 bondsidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
                              if len(line[i:i + fieldlen].strip()) != 0]
+            elif section == 'angles':
+                fieldlen = 8
+                angleidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                             if len(line[i:i + fieldlen].strip()) != 0]
+            elif section == 'dihedrals':
+                fieldlen = 8
+                dihedidx += [int(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
+                             if len(line[i:i + fieldlen].strip()) != 0]
             elif section == 'amberatomtype':
                 fieldlen = 4
                 topo.atomtype += [line[i:i + fieldlen].strip() for i in range(0, len(line), fieldlen)
                                   if len(line[i:i + fieldlen].strip()) != 0]
 
+
     if len(topo.name) == 0:
         raise FormatError('No atoms read in PRMTOP file. Trying a different reader.')
     # Replicating unique resnames according to their start and end indeces
     residx.append(len(topo.name)+1)
+
+    """
+    NOTE: the atom numbers in the following arrays that describe bonds, angles, and dihedrals are coordinate array 
+    indexes for runtime speed. The true atom number equals the absolute value of the number divided by three, plus one. 
+    In the case of the dihedrals, if the fourth atom is negative, this implies that the dihedral is an improper. If the 
+    third atom is negative, this implies that the end group interations are to be ignored. End group interactions are 
+    ignored, for example, in dihedrals of various ring systems (to prevent double counting of 1-4 interactions) and 
+    in multiterm dihedrals.
+    """
 
     for i in range(len(residx) - 1):
         numresatoms = residx[i+1] - residx[i]
@@ -702,6 +745,18 @@ def PRMTOPread(filename, frame=None, topoloc=None):
     for i in range(0, len(bondsidx), 3):
         topo.bonds.append([int(bondsidx[i] / 3), int(bondsidx[i+1] / 3)])
 
+    # Processing angle quads
+    for i in range(0, len(angleidx), 4):
+        topo.angles.append([int(angleidx[i] / 3), int(angleidx[i + 1] / 3), int(angleidx[i + 2] / 3)])
+
+    # Processing dihedral quints
+    for i in range(0, len(dihedidx), 5):
+        atoms = [int(dihedidx[i] / 3), int(dihedidx[i + 1] / 3), abs(int(dihedidx[i + 2] / 3)), int(dihedidx[i + 3] / 3)]
+        if atoms[3] >= 0:
+            topo.dihedrals.append(atoms)
+        else:
+            atoms[3] = abs(atoms[3])
+            topo.impropers.append(atoms)
     return topo, None
 
 
@@ -966,8 +1021,16 @@ def MDTRAJread(filename, frame=None, topoloc=None):
     else:
         time = traj.time * 1000  # need to go from picoseconds to femtoseconds
         step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
-    box = traj.unitcell_lengths.T * 10
-    boxangles = traj.unitcell_angles.T
+
+    if traj.unitcell_lengths is None:
+        box = None
+    else:
+        box = traj.unitcell_lengths.T.copy() * 10
+
+    if traj.unitcell_angles is None:
+        boxangles = None
+    else:
+        boxangles = traj.unitcell_angles.T.copy()
     return None, Trajectory(coords=coords.copy(), box=box, boxangles=boxangles, step=step, time=time)  # Copying coords needed to fix MDtraj stride
 
 

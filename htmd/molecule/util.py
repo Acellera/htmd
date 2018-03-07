@@ -116,6 +116,43 @@ def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
     return np.squeeze(rmsd)
 
 
+def orient(mol, sel="all"):
+    """Rotate a molecule so that its main axes are oriented along XYZ.
+
+    The calculation is based on the axes of inertia of the given
+    selection, but masses will be ignored. After the operation, the
+    main axis will be parallel to the Z axis, followed by Y and X (the
+    shortest axis). Only the first frame is oriented.  The reoriented
+    molecule is returned.
+
+    Parameters
+    ----------
+    mol :
+        The Molecule to be rotated
+    sel : str
+        Atom selection string on which the rotation is computed.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
+
+    Examples
+    --------
+    >>> mol = Molecule("1kdx")
+    >>> mol = orient(mol,"chain B")
+
+    """
+    if mol.numFrames != 1:
+        logger.warning("Only the first frame is considered for the orientation")
+    m = mol.copy()
+    s = m.atomselect(sel)
+    x = m.coords[s,:,0]
+    c = np.cov(x.T)
+    ei = np.linalg.eigh(c)
+    logger.info("Moments of intertia: "+str(ei[0]))
+    ev=ei[1].T
+    if np.linalg.det(ev)<0: ev=-ev # avoid inversions
+    m.rotateBy(ev)
+    return(m)
+
+
 def sequenceID(field, prepend=None):
     """ Array of integers which increments at value change of another array
 
@@ -199,7 +236,7 @@ def _missingSegID(mol):
             raise NameError('Atoms [' + str(idx[0]) + ',' + str(idx[1]) + ',...,' + str(idx[-1]) + '] do not have segid defined.')
 
 
-def maxDistance(mol, sel='all', origin=[0, 0, 0]):
+def maxDistance(mol, sel='all', origin=None):
     """ Calculates the max distance of a set of atoms from an origin
 
     Parameters
@@ -207,7 +244,8 @@ def maxDistance(mol, sel='all', origin=[0, 0, 0]):
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The molecule containing the atoms
     sel : str
-        Atomselection for atoms for which to calculate distances
+        Atom selection string for atoms for which to calculate distances.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     origin : list
         The origin x,y,z coordinates
 
@@ -222,6 +260,8 @@ def maxDistance(mol, sel='all', origin=[0, 0, 0]):
     >>> print(round(y,2))
     48.39
     """
+    if origin is None:
+        origin = [0, 0, 0]
     coors = mol.get('coords', sel=sel)
     dists = cdist(np.atleast_2d(coors), np.atleast_2d(origin))
     return np.max(dists)
@@ -235,7 +275,7 @@ def boundingBox(mol, sel='all'):
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The molecule containing the atoms
     sel : str
-        An Atomselection string of atoms.
+        Atom selection string of atoms. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Returns
     -------
@@ -345,7 +385,7 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         The segment of `ref` we want to align to
     maxalignments : int
         The maximum number of alignments we want to produce
-    nalignfragments : int
+    nalignfragment : int
         The number of fragments used for the alignment.
 
     Returns
@@ -407,7 +447,7 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
     for i in range(min(maxalignments, numaln)):
         refaln = np.array(list(alignments[i][0]))
         molaln = np.array(list(alignments[i][1]))
-
+ 
         # By doing cumsum we calculate how many letters were before the current letter (i.e. residues before current)
         residref = np.cumsum(refaln != '-') - 1  # Start them from 0
         residmol = np.cumsum(molaln != '-') - 1  # Start them from 0
@@ -419,9 +459,12 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         endIndex = np.where(dsigdiff < 0)[0]
         duration = endIndex - startIndex
         duration_sorted = np.sort(duration)[::-1]
+
         _list_starts = []
         _list_finish = []
         for n in range(nalignfragment):
+            if n == len(duration):
+                break
             idx = np.where(duration == duration_sorted[n])[0]
             start = startIndex[idx][0]
             finish = endIndex[idx][0]
@@ -444,7 +487,7 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
         refboolidx[refidx] = True
 
         start_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_starts])
-        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_finish])
+        finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r-1]]] for r in _list_finish])
         logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}'.format(
             i, len(refalnresid), np.unique(mol.segid[molidx])[0], ', '.join(['{}-{}'.format(s,f) for s, f in zip(start_residues,finish_residues)])  ))
 
@@ -515,62 +558,6 @@ def rcsbFindLigands(pdbid):
                 name = td[0].find_all('a')[0].text.strip()
                 ligands.append(name)
     return ligands
-
-
-def dihedralAngle(atom_quad_coords):
-    """ Calculates a dihedral angle.
-    
-    Parameters
-    ----------
-    atom_quad_coords: np.ndarray
-        An array of 4x3 size where each row are the coordinates of an atom defining the dihedral angle
-
-    Returns
-    -------
-    angle: float
-        The angle in degrees
-    """
-    '''
-    http://en.wikipedia.org/wiki/Dihedral_angle#Methods_of_computation
-    https://www.cs.unc.edu/cms/publications/dissertations/hoffman_doug.pdf
-    http://www.cs.umb.edu/~nurith/cs612/hw4_2012.pdf
-
-    Ua = (A2 - A1) x (A3 - A1)
-    Ub = (B2 - B1) x (B3 - B1) = (A3 - A2) x (A4 - A2)
-    angle = arccos((Ua * Ub) / (norm(Ua) * norm(Ub)))
-    '''
-    if atom_quad_coords.ndim == 1:
-        raise RuntimeError('dihedralAngles requires a 4x3 sized matrix as input.')
-    if atom_quad_coords.ndim == 2:
-        atom_quad_coords = atom_quad_coords[:, :, np.newaxis]
-
-    def _inner(A, B):
-        return np.sum(A * B, 1)
-
-    A10 = np.transpose(atom_quad_coords[1] - atom_quad_coords[0])
-    A21 = np.transpose(atom_quad_coords[2] - atom_quad_coords[1])
-    A32 = np.transpose(atom_quad_coords[3] - atom_quad_coords[2])
-    Ua = np.cross(A10, A21)
-    Ub = np.cross(A21, A32)
-    if np.any(np.sum(Ua == 0, 1) == 3) or np.any(np.sum(Ub == 0, 1) == 3):
-        raise ZeroDivisionError('Two dihedral planes are exactly parallel or antiparallel. '
-                                'There is probably something broken in the simulation.')
-    x = np.squeeze(_inner(Ua, Ub)) / (np.squeeze(np.linalg.norm(Ua, axis=1)) * np.squeeze(np.linalg.norm(Ub, axis=1)))
-
-    # Fix machine precision errors (I hope at least that's what I'm doing...)
-    if isinstance(x, np.ndarray):
-        x[x > 1] = 1
-        x[x < -1] = -1
-    elif x > 1:
-        x = 1
-    elif x < -1:
-        x = -1
-
-    signV = np.squeeze(np.sign(_inner(Ua, A32)))
-    signV[signV == 0] = 1  # Angle sign is 0. Maybe I should handle this better...
-
-    return (np.arccos(x) * 180. / np.pi) * signV
-
 
 
 # def drawCube(mi, ma, viewer=None):

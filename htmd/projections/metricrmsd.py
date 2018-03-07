@@ -18,15 +18,21 @@ class MetricRmsd(Projection):
     refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The reference Molecule to which we want to calculate the RMSD.
     trajrmsdstr : str
-        Atomselection for the trajectories from which to calculate the RMSD
+        Atom selection string for the trajectories from which to calculate the RMSD.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     trajalnstr : str, optional
-        Atomselection for the trajectories from which to align to the reference structure. If None, it defaults to the same as `trajrmsdstr`.
+        Atom selection string for the trajectories from which to align to the reference structure.
+        If None, it defaults to the same as `trajrmsdstr`.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     refrmsdstr : str, optional
-        Atomselection for the reference structure from which to calculate the RMSD. If None, it defaults to `trajrmsdstr`
+        Atom selection string for the reference structure from which to calculate the RMSD. If None, it defaults to
+        `trajrmsdstr`. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     refalnstr : str, optional
-        Atomselection for the reference structure from which to align to the trajectories. If None, it defaults to `trajalnstr`
+        Atom selection string for the reference structure from which to align to the trajectories. If None, it defaults
+        to `trajalnstr`. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     centerstr : str, optional
-        Atomselection around which to center the wrapping of the trajectories.
+        Atom selection string around which to center the wrapping of the trajectories.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     pbc : bool, optional
         Enable or disable simulation wrapping.
     """
@@ -151,7 +157,7 @@ if __name__ == "__main__":
     ref = Molecule(dd+"/generators/1/structure.pdb")
 
     metr2 = Metric(fsims)
-    metr2.projection(MetricRmsd(ref, 'protein and name CA'))
+    metr2.set(MetricRmsd(ref, 'protein and name CA'))
     data2 = metr2.project()
 
     assert data2.trajectories[0].projection.shape == (6,1)

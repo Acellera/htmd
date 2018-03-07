@@ -12,7 +12,7 @@ from os import makedirs
 import shutil
 from shutil import copytree, ignore_patterns
 import numpy as np
-from htmd.apps.app import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
+from htmd.queues.simqueue import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
 from joblib import Parallel, delayed
 from htmd.simlist import _simName
 from htmd.molecule.molecule import Molecule
@@ -26,9 +26,8 @@ _IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.
 class AdaptiveBase(ProtocolInterface):
     def __init__(self):
         super().__init__()
-        from htmd.apps.app import App
         from htmd.queues.simqueue import SimQueue
-        self._arg('app', ':class:`SimQueue <htmd.queues.simqueue.SimQueue>` object', 'A SimQueue class object used to retrieve and submit simulations', None, val.Object((App, SimQueue)))
+        self._arg('app', ':class:`SimQueue <htmd.queues.simqueue.SimQueue>` object', 'A SimQueue class object used to retrieve and submit simulations', None, val.Object((SimQueue,)))
         self._arg('project', 'str', 'The name of the project', 'adaptive', val.String())
         self._arg('nmin', 'int', 'Minimum number of running simulations', 1, val.Number(int, 'POS'))
         self._arg('nmax', 'int', 'Maximum number of running simulations', 1, val.Number(int, 'POS'))
@@ -200,7 +199,7 @@ class AdaptiveBase(ProtocolInterface):
         from htmd.parallelprogress import ParallelExecutor
         from htmd.config import _config
         aprun = ParallelExecutor(n_jobs=_config['ncpus'])
-        aprun(total=len(simsframes), description='Writing inputs')(
+        aprun(total=len(simsframes), desc='Writing inputs')(
             delayed(_writeInputsFunction)(i, f, epoch, self.inputpath, self.coorname) for i, f in enumerate(simsframes))
 
     @abc.abstractmethod

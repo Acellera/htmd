@@ -4,20 +4,31 @@ import numpy as np
 
 
 class MetricFluctuation(_MetricCoordinate):
-    """ Creates a MetricFluctuation object that calculates the fluctuation of atom positions in trajectories.
+    """ Creates a MetricFluctuation object that calculates the squared fluctuation of atom positions in trajectories.
+
+    Depending on the `refpos` option the projection either returns the fluctuation from the mean position of the atoms,
+    or from coordinates of reference given in `refmol`. This means it calculates for atom coordinates (x,y,z) and
+    reference coordinates (xr, yr, yz): (xr-x)**2+(yr-y)**2+(zr-z)**2. If `groupsel` is set to `residue` it will
+    calculate the mean of this value over all atoms of the residue.
+    To then get the RMSD you need to compute the square root (of the mean) of the results this projection returns over
+    the desired atoms.
 
     Parameters
     ----------
     refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The reference Molecule to which we will align.
     atomsel : str
-        Atomselection for the atoms whose fluctuations we want to calculate.
+        Atom selection string for the atoms whose fluctuations we want to calculate.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     trajalnstr : str, optional
-        Atomselection for the trajectories from which to align to the reference structure.
+        Atom selection string for the trajectories from which to align to the reference structure.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     refalnstr : str, optional
-        Atomselection for `refmol` from which to align to the reference structure. If None, it defaults to the same as `trajalnstr`.
+        Atom selection string for `refmol` from which to align to the reference structure. If None, it defaults to the
+        same as `trajalnstr`. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     centerstr : str, optional
-        Atomselection around which to wrap the simulation.
+        Atom selection string around which to wrap the simulation.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     pbc : bool
         Enable or disable coordinate wrapping based on periodic boundary conditions.
     refpos : str
@@ -30,6 +41,10 @@ class MetricFluctuation(_MetricCoordinate):
     Returns
     -------
     metr : MetricFluctuation object
+
+    Examples
+    --------
+
     """
     def __init__(self, refmol, atomsel, trajalnstr='protein and name CA', refalnstr=None, centerstr='protein', pbc=True, refpos='mean', groupsel=None):
         super().__init__(refmol, atomsel, trajalnstr, refalnstr, centerstr, pbc)

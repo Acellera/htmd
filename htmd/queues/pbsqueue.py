@@ -152,9 +152,7 @@ class PBSQueue(SimQueue, ProtocolInterface):
         dist : list
             A list of executable directories.
         """
-        if isinstance(dirs, str):
-            dirs = [dirs, ]
-        self._dirs.extend(dirs)
+        dirs = self._submitinit(dirs)
 
         if self.queue is None:
             self.queue = self._autoQueueName()
@@ -166,21 +164,8 @@ class PBSQueue(SimQueue, ProtocolInterface):
             if self.jobname is None:
                 self.jobname = self._autoJobName(d)
 
-            runscript = os.path.abspath(os.path.join(d, 'run.sh'))
-
-            # Clean sentinel files , if existent
-            if os.path.exists(os.path.join(d, self._sentinel)):
-                try:
-                    os.remove(os.path.join(d, self._sentinel))
-                except:
-                    logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
-                else:
-                    logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
-
-            if not os.path.exists(runscript):
-                raise FileExistsError('File {} does not exist.'.format(runscript))
-            if not os.access(runscript, os.X_OK):
-                raise PermissionError('File {} does not have execution permissions.'.format(runscript))
+            runscript = self._getRunScript(d)
+            self._cleanSentinel(d)
 
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
             self._createJobScript(jobscript, d, runscript)
@@ -236,22 +221,6 @@ class PBSQueue(SimQueue, ProtocolInterface):
             l = 0  # something odd happened
         return l
 
-    def notcompleted(self):
-        """Returns the sum of the number of job directories which do not have the sentinel file for completion.
-
-        Returns
-        -------
-        total : int
-            Total number of directories which have not completed
-        """
-        total = 0
-        if len(self._dirs) == 0:
-            raise RuntimeError('This method relies on running synchronously.')
-        for i in self._dirs:
-            if not os.path.exists(os.path.join(i, self._sentinel)):
-                total += 1
-        return total
-
     def stop(self):
         """ Cancels all currently running and queued jobs
         """
@@ -264,26 +233,29 @@ class PBSQueue(SimQueue, ProtocolInterface):
             ret = check_output(cmd)
             logger.debug(ret.decode("ascii"))
 
-    def wait(self, sentinel=False):
-        """ Blocks script execution until all queued work completes
+    @property
+    def ncpu(self):
+        return self.__dict__['ncpu']
 
-        Parameters
-        ----------
-        sentinel : bool, default=False
-            If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
-            relies on the filesystem, in particular on the existence of a sentinel file for job completion.
+    @ncpu.setter
+    def ncpu(self, value):
+        self.ncpu = value
 
-        Examples
-        --------
-        >>> PBSQueue.wait()
-        """
-        from time import sleep
-        import sys
+    @property
+    def ngpu(self):
+        return self.__dict__['ngpu']
 
-        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
-            sys.stdout.flush()
-            sleep(5)
+    @ngpu.setter
+    def ngpu(self, value):
+        self.ngpu = value
 
+    @property
+    def memory(self):
+        return self.__dict__['memory']
+
+    @memory.setter
+    def memory(self, value):
+        self.memory = value
 
 if __name__ == "__main__":
     pass

@@ -27,11 +27,14 @@ packages = [
     ['conda-forge', 'msmtools'],
     ['openbabel', 'openbabel'],
     ['omnia', 'pint'],
-    ['conda-forge', 'progress_reporter'],
     ['conda-forge', 'pyemma'],
     ['conda-forge', 'thermotools'],
     ['bioconda', 'nglview'],
     ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
+    ['rdkit', 'rdkit'],
+    ['rdkit', 'boost'],
+    ['conda-forge', 'nlopt'],
+    ['conda-forge', 'periodictable']
 ]
 
 for channel, package in packages:
