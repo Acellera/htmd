@@ -126,31 +126,13 @@ def convertToString(arr):
 
     return arr_str
 
-def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=None, highlightAtoms=None):
-    from rdkit.Chem import RemoveHs
-    from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
+def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtoms=None):
+    from os.path import splitext
     from rdkit.Chem.Draw import rdMolDraw2D
     from IPython.display import SVG
-    from copy import deepcopy
-    from os.path import splitext
-
-    if sketch and optimize:
-        raise ValueError('Impossible to use optmization in  2D sketch representation')
-
-    if optimizemode not in ['std', 'mmff']:
-        raise ValueError('Optimization mode {} not understood. Can be "std" or  "ff"'.format(optimizemode))
 
     if highlightAtoms is not None and not isinstance(highlightAtoms, list):
         raise ValueError('highlightAtoms should be a list of atom idx or a list of atom idx list ')
-
-    _mol = deepcopy(mol)
-
-    # 2D representation. Set z coords to 0
-    if sketch:
-        Compute2DCoords(_mol)
-    # Clean representation without hydrogens
-    if removeHs:
-        _mol = RemoveHs(_mol)
 
     # init the drawer object
     drawer = rdMolDraw2D.MolDraw2DSVG(400, 200)
@@ -159,16 +141,8 @@ def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, 
 
     # add atomlabels
     if atomlabels is not None:
-        for n, a in enumerate(_mol.GetAtoms()):
-            _atomIdx = a.GetIdx()
-            opts.atomLabels[n] = atomlabels[_atomIdx]
-
-    # activate 3D coords optimization
-    if optimize:
-        if optimizemode == 'std':
-            EmbedMolecule(_mol, ETKDG())
-        elif optimizemode == 'mmff':
-            MMFFOptimizeMolecule(_mol)
+        for n, a in enumerate(atomlabels):
+            opts.atomLabels[n] = a
 
     # draw molecule
     sel_atoms = []
@@ -182,7 +156,7 @@ def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, 
             sel_atoms = highlightAtoms
             sel_colors = { aIdx:_highlight_colors[0] for aIdx in sel_atoms }
 
-    drawer.DrawMolecule(_mol, highlightAtoms=sel_atoms, highlightBonds=[], highlightAtomColors=sel_colors)
+    drawer.DrawMolecule(mol, highlightAtoms=sel_atoms, highlightBonds=[], highlightAtomColors=sel_colors)
 
     drawer.FinishDrawing()
 
@@ -204,34 +178,89 @@ def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, 
     else:
         return None
 
-def depictMultipleMols(mols_list, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std',
-                       removeHs=True,  legends=None, highlightAtoms=None, mols_perrow=3):
 
-    from rdkit.Chem import RemoveHs
+# def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=None, highlightAtoms=None):
+#     from rdkit.Chem import RemoveHs
+#     from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
+#     from rdkit.Chem.Draw import rdMolDraw2D
+#     from IPython.display import SVG
+#     from copy import deepcopy
+#     from os.path import splitext
+#
+#     if sketch and optimize:
+#         raise ValueError('Impossible to use optmization in  2D sketch representation')
+#
+#     if optimizemode not in ['std', 'mmff']:
+#         raise ValueError('Optimization mode {} not understood. Can be "std" or  "ff"'.format(optimizemode))
+#
+#     if highlightAtoms is not None and not isinstance(highlightAtoms, list):
+#         raise ValueError('highlightAtoms should be a list of atom idx or a list of atom idx list ')
+#
+#     _mol = deepcopy(mol)
+#
+#     # 2D representation. Set z coords to 0
+#     if sketch:
+#         Compute2DCoords(_mol)
+#     # Clean representation without hydrogens
+#     if removeHs:
+#         _mol = RemoveHs(_mol)
+#
+#     # init the drawer object
+#     drawer = rdMolDraw2D.MolDraw2DSVG(400, 200)
+#     # get the drawer options
+#     opts = drawer.drawOptions()
+#
+#     # add atomlabels
+#     if atomlabels is not None:
+#         for n, a in enumerate(_mol.GetAtoms()):
+#             _atomIdx = a.GetIdx()
+#             opts.atomLabels[n] = atomlabels[_atomIdx]
+#
+#     # activate 3D coords optimization
+#     if optimize:
+#         if optimizemode == 'std':
+#             EmbedMolecule(_mol, ETKDG())
+#         elif optimizemode == 'mmff':
+#             MMFFOptimizeMolecule(_mol)
+#
+#     # draw molecule
+#     sel_atoms = []
+#     sel_colors = {}
+#     # highlight atoms
+#     if highlightAtoms is not None:
+#         if isinstance(highlightAtoms[0], list ):
+#             sel_atoms = [aIdx for subset in highlightAtoms for aIdx in subset]
+#             sel_colors = {aIdx: _highlight_colors[n%len(_highlight_colors)] for n, subset in enumerate(highlightAtoms) for aIdx in subset}
+#         else:
+#             sel_atoms = highlightAtoms
+#             sel_colors = { aIdx:_highlight_colors[0] for aIdx in sel_atoms }
+#
+#     drawer.DrawMolecule(_mol, highlightAtoms=sel_atoms, highlightBonds=[], highlightAtomColors=sel_colors)
+#
+#     drawer.FinishDrawing()
+#
+#     # svg object
+#     svg = drawer.GetDrawingText()
+#
+#     # activate saving into a file
+#     if filename != None:
+#         ext = splitext(filename)[-1]
+#         filename = filename if ext != '' else filename + '.svg'
+#         f = open(filename, 'w')
+#         f.write(svg)
+#         f.close()
+#
+#     # activate jupiter-notebook rendering
+#     if ipython:
+#         svg = svg.replace('svg:', '')
+#         return SVG(svg)
+#     else:
+#         return None
+
+def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, highlightAtoms=None, mols_perrow=3):
     from rdkit.Chem.Draw import MolsToGridImage
-    from rdkit.Chem.AllChem import Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
-    from copy import deepcopy
     from IPython.display import SVG
     from os.path import splitext
-
-    if sketch and optimize:
-        raise ValueError('Impossible to use optmization in  2D sketch representation')
-
-    _mols = [ deepcopy(m) for m in mols_list ]
-
-    if sketch:
-        for _m in _mols: Compute2DCoords(_m)
-
-    if removeHs:
-        _mols = [ RemoveHs(_m) for _m in _mols ]
-
-    # activate 3D coords optimization
-    if optimize:
-        if optimizemode == 'std':
-            for _m in _mols: EmbedMolecule(_m)
-        elif optimizemode == 'mmff':
-            for _m in _mols: MMFFOptimizeMolecule(_m, ETKDG())
-
 
     sel_atoms = []
     sel_colors = []
@@ -243,9 +272,8 @@ def depictMultipleMols(mols_list, sketch=False, filename=None, ipython=False, op
             sel_atoms = highlightAtoms
             sel_colors = [ {aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms ]
 
-
-    svg = MolsToGridImage(_mols, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
-                          legends=legends, molsPerRow=mols_perrow, useSVG=True)
+    svg = MolsToGridImage(mols_list, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
+                                                                legends=legends, molsPerRow=mols_perrow, useSVG=True)
 
     if filename:
         ext = splitext(filename)[-1]
@@ -258,3 +286,58 @@ def depictMultipleMols(mols_list, sketch=False, filename=None, ipython=False, op
         return SVG(svg)
     else:
         return None
+
+# def depictMultipleMols(mols_list, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std',
+#                        removeHs=True,  legends=None, highlightAtoms=None, mols_perrow=3):
+#
+#     from rdkit.Chem import RemoveHs
+#     from rdkit.Chem.Draw import MolsToGridImage
+#     from rdkit.Chem.AllChem import Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
+#     from copy import deepcopy
+#     from IPython.display import SVG
+#     from os.path import splitext
+#
+#     if sketch and optimize:
+#         raise ValueError('Impossible to use optmization in  2D sketch representation')
+#
+#     _mols = [ deepcopy(m) for m in mols_list ]
+#
+#     if sketch:
+#         for _m in _mols: Compute2DCoords(_m)
+#
+#     if removeHs:
+#         _mols = [ RemoveHs(_m) for _m in _mols ]
+#
+#     # activate 3D coords optimization
+#     if optimize:
+#         if optimizemode == 'std':
+#             for _m in _mols: EmbedMolecule(_m)
+#         elif optimizemode == 'mmff':
+#             for _m in _mols: MMFFOptimizeMolecule(_m, ETKDG())
+#
+#
+#     sel_atoms = []
+#     sel_colors = []
+#     if highlightAtoms is not None:
+#         if isinstance(highlightAtoms[0][0], list):
+#             sel_atoms = [ [a for a in subset] for mol_set in highlightAtoms for subset in mol_set ]
+#             sel_colors = [ {aIdx:_highlight_colors[n%len(_highlight_colors)] for aIdx in subset } for mol_set in highlightAtoms for n, subset in enumerate(mol_set)  ]
+#         else:
+#             sel_atoms = highlightAtoms
+#             sel_colors = [ {aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms ]
+#
+#
+#     svg = MolsToGridImage(_mols, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
+#                           legends=legends, molsPerRow=mols_perrow, useSVG=True)
+#
+#     if filename:
+#         ext = splitext(filename)[-1]
+#         filename = filename if ext != '' else filename + '.svg'
+#         f = open(filename, 'w')
+#         f.write(svg)
+#         f.close()
+#
+#     if ipython:
+#         return SVG(svg)
+#     else:
+#         return None

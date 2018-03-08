@@ -13,7 +13,7 @@ from rdkit.Chem.rdchem import BondType
 
 
 from htmd.molecule.voxeldescriptors import _getOccupancyC, _getGridCenters
-from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput, _depictMol, depictMultipleMols, convertToString
+from htmd.smallmol.util import get_rotationMatrix, rotate, InputToOutput, _depictMol, depictMultipleMols, convertToString, _highlight_colors
 from copy import deepcopy
 import logging
 
@@ -1000,23 +1000,54 @@ class SmallMol:
             ipython_svg: SVG object if ipython is set to True
 
         """
+        from rdkit import Chem
+        from rdkit.Chem.AllChem import Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
+
+        if sketch and optimize:
+            raise ValueError('Impossible to use optmization in  2D sketch representation')
+
+        if optimizemode not in ['std', 'mmff']:
+            raise ValueError('Optimization mode {} not understood. Can be "std" or  "ff"'.format(optimizemode))
+
         #_mol = self._mol
-        _mol = self.toRdkitMol()
+        _mol = self.toRdkitMol(includeConformer=True)
+
+        elements = self.element
+        indexes = self.idx
+        formalcharges = self.formalcharge
+        chirals = self.chiral
+
+        if sketch:
+            Compute2DCoords(_mol)
+
+        if removeHs:
+            _mol = Chem.RemoveHs(_mol)
+            elements = self.get('element H', 'element', invert=True)
+            indexes = self.get('element H', 'idx', invert=True)
+            formalcharges = self.get('element H', 'formalcharge', invert=True)
+            chirals = self.get('element H', 'chiral', invert=True)
 
         _labelsFunc = ['a', 'i', 'c', '*']
 
         if atomlabels is not None:
             labels = atomlabels.split('%')[1:]
-            names = self.element.tolist()
-            indexes = self.idx
-            charges = ['+' if c > 0 else "-" if c < 0 else "" for c in  self.formalcharge.tolist() ]
-            chirals = ["" if a == ""  else "*" for a in self.chiral ]
-            values = [names, indexes, charges, chirals]
+            formalcharges = ['' if c == 0 else "+" if c == 1 else "-" for c in formalcharges ]
+            chirals = ['' if c == '' else '*'  for c in chirals ]
+            values = [elements, indexes, formalcharges, chirals]
+
             idxs = [ _labelsFunc.index(l) for l in labels]
             labels_required = [values[i] for i in idxs]
             atomlabels = ["".join([str(i) for i in a]) for a in list(zip(*labels_required))]
 
-        return _depictMol(_mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
+        if optimize:
+            if optimizemode == 'std':
+                EmbedMolecule(_mol, ETKDG())
+            elif optimizemode == 'mmff':
+                MMFFOptimizeMolecule(_mol)
+
+
+        return _depictMol(_mol, filename=filename, ipython=ipython,  atomlabels=atomlabels, highlightAtoms=highlightAtoms)
+        #return _depictMol(_mol, sketch, filename, ipython, optimize, optimizemode, removeHs, atomlabels, highlightAtoms)
 
 class SmallMolLib:
     """
@@ -1275,30 +1306,50 @@ class SmallMolLib:
             ipython_svg: SVG object if ipython is set to True
 
         """
+        from rdkit.Chem.AllChem import Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
+        from rdkit.Chem import RemoveHs
+
+        if sketch and optimize:
+            raise ValueError('Impossible to use optmization in  2D sketch representation')
 
         if legends is not None and legends not in ['names', 'items']:
-
             raise ValueError('The "legends" should be "names" or "items"')
-
-        legends_list = []
-        if legends == 'names':
-            legends_list = [ _m.getProp('ligname') for _m in self._mols ]
-        elif legends == 'items':
-            legends_list = [ str(n+1) for n in range(len(self._mols))]
-
-
-        if ids is None:
-            _mols = [ _m.toRdkitMol() for _m in self._mols ]
-        else:
-            _mols = [ _m.toRdkitMol for _m in self.getMols(ids)]
 
         if highlightAtoms is not None:
             if len(highlightAtoms) != len(_mols):
                 raise ValueError('The highlightAtoms {} should have the same length of the mols {}'.format(len(highlightAtoms), len(_mols)))
 
+        _smallmols = self.getMols(ids)
 
-        return depictMultipleMols(_mols, sketch, filename, ipython, optimize, optimizemode,
-                                removeHs, legends_list, highlightAtoms, mols_perrow)
+        if ids is None:
+            _mols = [ _m.toRdkitMol() for _m in self._mols ]
+        else:
+            _mols = [ _m.toRdkitMol() for _m in self.getMols(ids)]
+
+        if sketch:
+            for _m in _mols: Compute2DCoords(_m)
+
+        if removeHs:
+            _mols = [ RemoveHs(_m) for _m in _mols ]
+
+        # activate 3D coords optimization
+        if optimize:
+            if optimizemode == 'std':
+                for _m in _mols: EmbedMolecule(_m)
+            elif optimizemode == 'mmff':
+                for _m in _mols: MMFFOptimizeMolecule(_m, ETKDG())
+
+        legends_list = []
+        if legends == 'names':
+            legends_list = [ _m.getProp('ligname') for _m in _smallmols ]
+        elif legends == 'items':
+            legends_list = [ str(n+1) for n in range(len(_smallmols))]
+
+        return depictMultipleMols(_mols, ipython=ipython, legends=legends, highlightAtoms=highlightAtoms,
+                                            mols_perrow=mols_perrow)
+
+        # return depictMultipleMols(_mols, sketch, filename, ipython, optimize, optimizemode,
+                            #    removeHs, legends_list, highlightAtoms, mols_perrow)
 
 
 
