@@ -54,6 +54,7 @@ class SmallMol:
     """
     SmallMol class using RDkit for featurization.
     """
+
     array_cache = {(16, 1.): _getGridCenters(np.array([-8] * 3),
                                                [16, 16, 16], 1.).reshape(16**3, 3),
                    (24, 1.): _getGridCenters(np.array([-12] * 3),
@@ -122,6 +123,7 @@ class SmallMol:
         removeHs: bool
             Set as True to remove the hydrogens
         """
+
         self.mol_fields = self._mol_fields.copy()
         self.atom_fields = self._atom_fields.copy()
 
@@ -215,6 +217,7 @@ class SmallMol:
         hybridizations = []
         neighbors = []
         bondtypes = []
+        impliciths = []
 
         _mol = self._mol
 
@@ -233,6 +236,7 @@ class SmallMol:
             hybridizations.append(a.GetHybridization())
             neighbors.append([na.GetIdx() for na in a.GetNeighbors()])
             bondtypes.append([b.GetBondType() for b in a.GetBonds()])
+            impliciths.append(a.GetNumImplicitHs())
             if a.HasProp('_TriposPartialCharge'):
                 charges.append(a.GetPropsAsDict()['_TriposPartialCharge'])
             else:
@@ -265,6 +269,7 @@ class SmallMol:
         self.__dict__['hybridization'] = np.array(hybridizations, dtype=object)
         self.__dict__['neighbors'] = np.array(neighbors)
         self.__dict__['bondtypes'] = np.array(bondtypes)
+        self.__dict__['implicitHs'] = np.array(impliciths)
 
     def copy(self):
         """
@@ -823,6 +828,44 @@ class SmallMol:
                 writer = chemwrite(fname)
             writer.write(_mol, confId=id)
 
+    # working aonly for hydrogens
+    def _removeAtoms(self, ids):
+        if len(ids) == 0:
+            return
+
+        atom_toKeep = np.delete(self.idx, ids)
+        atom_mapRenumbering = {idx:n for n, idx in enumerate(atom_toKeep)}
+
+        self.__dict__['idx'] = np.array( list(atom_mapRenumbering.values()) )
+        self.__dict__['element'] = np.delete(self.element, ids)
+        self.__dict__['atomname'] = np.array([ '{}{}'.format(e, i) for e, i in zip(self.element, self.idx) ])
+        self.__dict__['charge'] = np.delete(self.charge, ids)
+        self.__dict__['formalcharge'] = np.delete(self.formalcharge, ids)
+        self.__dict__['chiral'] = np.delete(self.chiral, ids)
+        self.__dict__['hybridization'] = np.delete(self.hybridization, ids)
+        self.__dict__['coords'] = np.delete(self.coords, ids, axis=0 )
+
+        ids_forimplicitHs = np.unique(np.concatenate(self.neighbors[ids]))
+        self.implicitHs[ids_forimplicitHs] +=1
+
+        tmp_neighbors = np.delete(self.neighbors, ids)
+        tmp_bondtypes = np.delete(self.bondtypes, ids)
+        new_neighbors = []
+        new_bondtypes = []
+
+        for n_set, bt_set in zip(tmp_neighbors, tmp_bondtypes):
+            new_n_set = []
+            new_bt_set = []
+            for n, bt in zip(n_set, bt_set):
+                if n not in ids:
+                    new_n_set.append(n)
+                    new_bt_set.append(bt)
+            new_neighbors.append(new_n_set)
+            new_bondtypes.append(new_bt_set)
+        self.__dict__['neighbors'] = np.array(new_neighbors)
+        self.__dict__['bondtypes'] = np.array(new_bondtypes)
+
+
     def removeConformers(self, ids=None):
         """
         Deletes the conformers passed
@@ -863,9 +906,10 @@ class SmallMol:
         rw = RWMol()
 
         # add atoms
-        for element, formalcharge, chiral in zip(self.element, self.formalcharge, self.chiral):
+        for element, formalcharge, chiral, h in zip(self.element, self.formalcharge, self.chiral, self.implicitHs):
             a = Atom(element)
             a.SetFormalCharge(int(formalcharge))
+            a.SetNumExplicitHs(int(h))
             if chiral != '':
                 a.SetProp('_CIPCode', chiral)
             rw.AddAtom(a)
@@ -885,7 +929,10 @@ class SmallMol:
             for id, conf in enumerate(self.getConformers()):
                 conf.SetId(id)
                 mol.AddConformer(conf)
+        #try:
         Chem.SanitizeMol(mol)
+        #except:
+        #    Chem.SanitizeMol(mol, sanitizeOps=Chem.rdmolops.SanitizeFlags.SANITIZE_ALL^Chem.rdmolops.SanitizeFlags.SANITIZE_KEKULIZE)
         return mol
 
     def toMolecule(self, formalcharges=False, ids=None):
@@ -1140,6 +1187,7 @@ class SmallMolLib:
                 raise NoSameField("The fields of the new molecule does not match the current database. Set strictField "
                                   "as False to skip this error")
 
+        ### slow down??
         if strictDirection >= 1:
             old_fields = set(self.fields) - set(tmp_fields)
             for f in old_fields:
@@ -1315,9 +1363,7 @@ class SmallMolLib:
         if legends is not None and legends not in ['names', 'items']:
             raise ValueError('The "legends" should be "names" or "items"')
 
-        if highlightAtoms is not None:
-            if len(highlightAtoms) != len(_mols):
-                raise ValueError('The highlightAtoms {} should have the same length of the mols {}'.format(len(highlightAtoms), len(_mols)))
+
 
         _smallmols = self.getMols(ids)
 
@@ -1325,6 +1371,10 @@ class SmallMolLib:
             _mols = [ _m.toRdkitMol() for _m in self._mols ]
         else:
             _mols = [ _m.toRdkitMol() for _m in self.getMols(ids)]
+
+        if highlightAtoms is not None:
+            if len(highlightAtoms) != len(_mols):
+                raise ValueError('The highlightAtoms {} should have the same length of the mols {}'.format(len(highlightAtoms), len(_mols)))
 
         if sketch:
             for _m in _mols: Compute2DCoords(_m)
@@ -1346,7 +1396,7 @@ class SmallMolLib:
             legends_list = [ str(n+1) for n in range(len(_smallmols))]
 
         return depictMultipleMols(_mols, ipython=ipython, legends=legends, highlightAtoms=highlightAtoms,
-                                            mols_perrow=mols_perrow)
+                                         filename=filename, mols_perrow=mols_perrow)
 
         # return depictMultipleMols(_mols, sketch, filename, ipython, optimize, optimizemode,
                             #    removeHs, legends_list, highlightAtoms, mols_perrow)
