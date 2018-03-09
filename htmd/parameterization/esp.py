@@ -202,18 +202,18 @@ class ESP:
 
         self._reciprocal_distances = None
 
-        self.equivalent_atom_groups = None
-        self.equivalent_group_by_atom = None
+        self._equivalent_atom_groups = None
+        self._equivalent_group_by_atom = None
 
     @property
     def ngroups(self):
         """Number of charge groups"""
-        return len(self.equivalent_atom_groups)
+        return len(self._equivalent_atom_groups)
 
     def _map_groups_to_atoms(self, group_charges):
 
         charges = np.zeros(self.molecule.numAtoms)
-        for atom_group, group_charge in zip(self.equivalent_atom_groups, group_charges):
+        for atom_group, group_charge in zip(self._equivalent_atom_groups, group_charges):
             charges[list(atom_group)] = group_charge
 
         return charges
@@ -233,14 +233,14 @@ class ESP:
 
         # If the restraint relates to an H, set the lower bound to 0
         for i in range(self.ngroups):
-            if 'H' == self.molecule.element[self.equivalent_atom_groups[i][0]]:
+            if 'H' == self.molecule.element[self._equivalent_atom_groups[i][0]]:
                 lower_bounds[i] = 0.001
 
         # Fix the charges of the specified atoms to those already set in the
         # charge array. Note this also fixes the charges of the atoms in the
         # same equivalency group.
         for atom in self.fixed:
-            group = self.equivalent_group_by_atom[atom]
+            group = self._equivalent_group_by_atom[atom]
             lower_bounds[group] = self.molecule.charge[atom]
             upper_bounds[group] = self.molecule.charge[atom]
 
@@ -275,8 +275,8 @@ class ESP:
 
         equivalents = detectEquivalentAtoms(self.molecule)
 
-        self.equivalent_atom_groups = equivalents[0]
-        self.equivalent_group_by_atom = equivalents[2]
+        self._equivalent_atom_groups = equivalents[0]
+        self._equivalent_group_by_atom = equivalents[2]
 
         for result in self.qm_results:
             assert int(np.round(self.molecule.charge.sum())) == result.charge
@@ -322,8 +322,8 @@ class TestESP(unittest.TestCase):
 
         # Precalculating here for the tests
         equivalents = detectEquivalentAtoms(self.esp.molecule)
-        self.esp.equivalent_atom_groups = equivalents[0]
-        self.esp.equivalent_group_by_atom = equivalents[2]
+        self.esp._equivalent_atom_groups = equivalents[0]
+        self.esp._equivalent_group_by_atom = equivalents[2]
 
     def test_ngroups(self):
         self.assertEqual(self.esp.ngroups, 2)
