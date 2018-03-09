@@ -198,6 +198,7 @@ def main_parameterize(arguments=None):
     qm.basis = args.basis
     qm.solvent = args.environment
     qm.queue = queue
+    qm.charge = netcharge
 
     # Select which dihedrals to fit
     parameterizable_dihedrals = [list(dih[0]) for dih in all_dihedrals]

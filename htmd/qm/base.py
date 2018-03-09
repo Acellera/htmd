@@ -37,6 +37,8 @@ class QMResult:
         Point coordinates (in Angstrom) where ESP values are computed. The array shape is (number_of_points, 3).
     esp_values : numpy.ndarray
         ESP values in elementary_charge/Angstrom. The array shape is (number_of_points,)
+    charge : int
+        The total charge of the molecule in electron charges.
     """
 
     def __init__(self):
@@ -49,6 +51,7 @@ class QMResult:
         self.mulliken = None
         self.esp_points = None
         self.esp_values = None
+        self.charge = None
 
 
 class QMBase(ABC, ProtocolInterface):
@@ -71,6 +74,8 @@ class QMBase(ABC, ProtocolInterface):
 
         self._arg('molecule', ':class: `htmd.molecule.molecule.Molecule`', 'Molecule',
                   default=None, validator=val.Object(Molecule), required=True)
+        self._arg('charge', 'int', 'Charge of the molecule in electron charges', default=None,
+                  validator=val.Number(int, 'ANY'), required=True)
         self._arg('multiplicity', 'int', 'Multiplicity of the molecule',
                   default=1, validator=val.Number(int, 'POS'))
         self._arg('theory', 'str', 'Level of theory',
@@ -121,7 +126,8 @@ class QMBase(ABC, ProtocolInterface):
         self._molecule = self.molecule.copy()
         self._nframes = self._molecule.coords.shape[2]
         self._natoms = self._molecule.coords.shape[0]
-        self._charge = int(round(self._molecule.charge.sum()))
+        if self.charge is None:
+            self.charge = int(round(self._molecule.charge.sum()))
 
         # Set up ESP points
         if self.esp_points is not None:
@@ -190,6 +196,8 @@ class QMBase(ABC, ProtocolInterface):
 
         # Read output files
         results = [self._readOutput(directory) for directory in self._directories]
+        for res in results:
+            res.charge = self.charge
 
         return results
 

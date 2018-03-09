@@ -156,7 +156,7 @@ class Psi4(QMBase):
 
             # Write the molecule
             f.write('molecule MOL {\n' )
-            f.write('    %d %d\n' % (self._charge, self.multiplicity))
+            f.write('    %d %d\n' % (self.charge, self.multiplicity))
             f.write('    noreorient\n')
             f.write('    nocom\n')
             f.write('    symmetry c1\n')

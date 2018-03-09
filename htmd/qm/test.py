@@ -144,6 +144,7 @@ class TestBase:
                 self.qm.theory = 'HF'
                 self.qm.basis = '3-21G'
                 self.qm.directory = tmpDir
+                self.qm.charge = charge
                 result = self.qm.run()[0]
                 self.assertFalse(result.errored, msg=(charge, multiplicity))
                 self.assertAlmostEqual(REF_CHARGE_MULTIPLICITY_ENERGIES[charge][multiplicity],
