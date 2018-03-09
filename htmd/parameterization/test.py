@@ -305,7 +305,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
         resDir = tempname()
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        dihedrals = ['O1-C1-C2-O2', 'C1-C2-O2-H6']
+        dihedrals = ['O1-C1-C2-O2', 'C1-C2-O2-H1']
         self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --no-min --no-esp --no-dihed-opt'.format(' '.join(dihedrals)))
         self._testParametrizationEnergies(refDir, resDir, dihedrals=dihedrals)
         self._testFiles(refDir, resDir)
@@ -323,7 +323,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_2_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_select_2_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        dihedrals = ['C1-C2-O2-H6',]
+        dihedrals = ['C1-C2-O2-H1',]
         self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --no-min --no-esp --no-dihed-opt'.format(' '.join(dihedrals)))
         self._testParametrizationEnergies(refDir, resDir, dihedrals=dihedrals)
         self._testFiles(refDir, resDir)
