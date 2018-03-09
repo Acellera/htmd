@@ -135,12 +135,6 @@ def writeFRCMOD(mol, parameters, filename, typemap=None):
     f.close()
 
 
-# def writeFRCMOD(parameters, typemap, outfile):
-#     from htmd.version import version as htmdversion
-#     renamedparams = mapAtomTypesParameterSet(parameters, typemap)
-#     parmed.amber.AmberParameterSet.write(renamedparams, outfile, title='FRCMOD built by HTMD parameterize version {}'.format(htmdversion()))
-
-
 def writePRM(mol, parameters, filename):
     from htmd.version import version as htmdversion
 

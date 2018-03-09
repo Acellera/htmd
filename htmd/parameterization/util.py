@@ -191,7 +191,6 @@ def fitCharges(mol, qm, outdir, fixed=()):
     # Update the charges
     mol = mol.copy()
     mol.charge[:] = esp_charges
-    # self._rtf.updateCharges(esp_charges)
     for name, charge in zip(mol.name, mol.charge):
         logger.info('Set charge {}: {:6.3f}'.format(name, charge))
 
@@ -270,8 +269,6 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     # Fit dihedral parameters
     df.run()
 
-    return prm  # TODO: Don't allow it to modify prm in place. Or make a copy before
+    return prm
 
-    # # Update atom types
-    # self.atomtype[:] = [self._rtf.type_by_name[name] for name in self.name]
 
