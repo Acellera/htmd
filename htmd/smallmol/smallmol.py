@@ -65,7 +65,7 @@ class SmallMol:
 
     ### Fields
     _atom_fields = ['idx', 'atomname', 'charge','formalcharge', 'element',  'chiral', 'hybridization',
-                    'neighbors', 'bondtypes', 'coords']
+                    'neighbors', 'bondtypes', 'coords', 'expliciths']
 
     _mol_fields = ['ligname', 'totalcharge', '_mol']
 
@@ -79,7 +79,8 @@ class SmallMol:
                     'hybridization': object,
                     'neighbors': object,
                     'bondtypes': object,
-                    'coords': np.float32
+                    'coords': np.float32,
+                    'expliciths': np.int
                     }
 
     _mol_dtypes = {'_mol': object,
@@ -97,7 +98,8 @@ class SmallMol:
                   'neighbors': (0,),
                   'bondtypes': (0,),
                   'hybridization': (0,),
-                  'coords': (0, 3, 1)
+                  'coords': (0, 3, 1),
+                  'expliciths':(0,)
                     }
 
     _mol_dims = {'_mol': (0,),
@@ -217,7 +219,7 @@ class SmallMol:
         hybridizations = []
         neighbors = []
         bondtypes = []
-        impliciths = []
+        expliciths = []
 
         _mol = self._mol
 
@@ -236,7 +238,7 @@ class SmallMol:
             hybridizations.append(a.GetHybridization())
             neighbors.append([na.GetIdx() for na in a.GetNeighbors()])
             bondtypes.append([b.GetBondType() for b in a.GetBonds()])
-            impliciths.append(a.GetNumImplicitHs())
+            expliciths.append(a.GetNumExplicitHs())
             if a.HasProp('_TriposPartialCharge'):
                 charges.append(a.GetPropsAsDict()['_TriposPartialCharge'])
             else:
@@ -269,7 +271,7 @@ class SmallMol:
         self.__dict__['hybridization'] = np.array(hybridizations, dtype=object)
         self.__dict__['neighbors'] = np.array(neighbors)
         self.__dict__['bondtypes'] = np.array(bondtypes)
-        self.__dict__['implicitHs'] = np.array(impliciths)
+        self.__dict__['expliciths'] = np.array(expliciths)
 
     def copy(self):
         """
@@ -828,6 +830,26 @@ class SmallMol:
                 writer = chemwrite(fname)
             writer.write(_mol, confId=id)
 
+    def _addAtoms(self, elements):
+        """
+        elements: list of {'element':'H', 'attachTo':atomIdx, 'bondType':idx/rdkittype,
+                           'hybrizidation':idx/rdkithybrid, 'formalcharge':int, 'chiral':''}
+        """
+
+        for e in elements:
+            self.__dict__['idx'] = np.append(self.idx, self.numAtoms+1)
+            self.__dict__['element'] = np.append(self.element, e['element'])
+            self.__dict__['atomname'] = np.append(self.atomname, '{}{}'.format(e['element'], self.numAtoms) )
+            self.__dict__['charge'] = np.append(self.charge, 0.000)
+            self.__dict__['formalcharge'] = np.append(self.formalcharge, e['formalcharge'])
+            self.__dict__['chiral'] = np.append(self.chiral, e['chiral'])
+            self.__dict__['hybridization'] = np.append(self.hybridization, e['hybridization'])
+            #self.__dict__['coords'] = np.concatenate(self.coords, ids, axis=0)
+            self.__dict__['neighbors'] = np.array(self.neighbors.tolist() + [[e['attachTo']]])
+            self.neighbors[e['attachTo']].append(self.numAtoms)
+            self.__dict__['bondtypes'] = np.array(self.bondtypes.tolist() + [[e['bondType']]])
+            self.bondtypes[e['attachTo']].append(e['bondType'])
+
     # working aonly for hydrogens
     def _removeAtoms(self, ids):
         if len(ids) == 0:
@@ -845,8 +867,11 @@ class SmallMol:
         self.__dict__['hybridization'] = np.delete(self.hybridization, ids)
         self.__dict__['coords'] = np.delete(self.coords, ids, axis=0 )
 
-        ids_forimplicitHs = np.unique(np.concatenate(self.neighbors[ids]))
-        self.implicitHs[ids_forimplicitHs] +=1
+
+        incr = np.bincount( np.concatenate(self.neighbors[ids]) )
+        ids_forexpliciths = np.arange(incr.shape[0])
+        self.expliciths[ids_forexpliciths] += incr
+        self.__dict__['expliciths'] = np.delete(self.expliciths, ids)
 
         tmp_neighbors = np.delete(self.neighbors, ids)
         tmp_bondtypes = np.delete(self.bondtypes, ids)
@@ -858,6 +883,8 @@ class SmallMol:
             new_bt_set = []
             for n, bt in zip(n_set, bt_set):
                 if n not in ids:
+                    if n in atom_mapRenumbering:
+                        n = atom_mapRenumbering[n]
                     new_n_set.append(n)
                     new_bt_set.append(bt)
             new_neighbors.append(new_n_set)
@@ -899,14 +926,14 @@ class SmallMol:
         self.coords = np.delete(self.coords, ids, axis=2)
 
 
-    def toRdkitMol(self, includeConformer=False):
+    def toRdkitMol(self, includeConformer=False, _debug=False):
         from rdkit.Chem import RWMol
         from rdkit.Chem import Atom
 
         rw = RWMol()
 
         # add atoms
-        for element, formalcharge, chiral, h in zip(self.element, self.formalcharge, self.chiral, self.implicitHs):
+        for element, formalcharge, chiral, h in zip(self.element, self.formalcharge, self.chiral, self.expliciths):
             a = Atom(element)
             a.SetFormalCharge(int(formalcharge))
             a.SetNumExplicitHs(int(h))
@@ -929,6 +956,9 @@ class SmallMol:
             for id, conf in enumerate(self.getConformers()):
                 conf.SetId(id)
                 mol.AddConformer(conf)
+
+        if _debug:
+            return mol
         #try:
         Chem.SanitizeMol(mol)
         #except:
