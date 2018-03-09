@@ -8,6 +8,7 @@ import sys
 import shutil
 import unittest
 from subprocess import call
+import numpy as np
 
 from htmd.home import home
 from htmd.util import tempname
