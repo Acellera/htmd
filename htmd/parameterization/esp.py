@@ -77,7 +77,6 @@ class ESP:
 
     Set up and run charge fitting
     >>> esp.molecule = mol
-    >>> esp.netcharge = int(round(np.sum(mol.charge)))
     >>> esp.qm_results = qm_results
     >>> esp.equivalent_atom_groups = equivalents[0]
     >>> esp.equivalent_group_by_atom = equivalents[2]
@@ -208,7 +207,6 @@ class ESP:
 
         self.equivalent_atom_groups = None
         self.equivalent_group_by_atom = None
-        self.netcharge = None
 
     @property
     def ngroups(self):
@@ -226,7 +224,7 @@ class ESP:
     def _compute_constraint(self, group_charges, _):
 
         charges = self._map_groups_to_atoms(group_charges)
-        constraint = np.sum(charges) - self.netcharge
+        constraint = np.sum(charges) - int(np.round(self.molecule.charge.sum()))
 
         return constraint
 
@@ -278,6 +276,9 @@ class ESP:
         """
         logger.info('Start charge optimization')
 
+        for result in self.qm_results:
+            assert int(np.round(self.molecule.charge.sum())) == result.charge
+
         # Get charge bounds
         lower_bounds, upper_bounds = self._get_bounds()
 
@@ -318,7 +319,6 @@ class TestESP(unittest.TestCase):
         self.esp.molecule = self.mol
         self.esp.equivalent_atom_groups = equivalents[0]
         self.esp.equivalent_group_by_atom = equivalents[2]
-        self.esp.netcharge = int(round(np.sum(mol.charge)))
 
     def test_ngroups(self):
         self.assertEqual(self.esp.ngroups, 2)
