@@ -323,6 +323,7 @@ class FakeQM2(FakeQM):
             state = simulation.context.getState(getEnergy=True, getPositions=True, groups=groups)
 
             result = QMResult()
+            result.charge = self.charge
             result.errored = False
             result.energy = state.getPotentialEnergy().value_in_unit(unit.kilocalorie_per_mole)
             result.coords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom).reshape((-1, 3, 1))
