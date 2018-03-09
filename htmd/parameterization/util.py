@@ -150,7 +150,7 @@ def minimize(mol, qm, outdir):
     return mol
 
 
-def fitCharges(mol, qm, equivalents, netcharge, outdir, fixed=()):
+def fitCharges(mol, qm, equivalents, outdir, fixed=()):
     from htmd.parameterization.esp import ESP
 
     # Create an ESP directory
@@ -187,7 +187,6 @@ def fitCharges(mol, qm, equivalents, netcharge, outdir, fixed=()):
     esp.fixed = fixed
     esp.equivalent_atom_groups = equivalents[0]
     esp.equivalent_group_by_atom = equivalents[2]
-    esp.netcharge = netcharge
     esp_result = esp.run()
     esp_charges, esp_loss = esp_result['charges'], esp_result['loss']
 

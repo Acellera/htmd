@@ -258,7 +258,7 @@ def main_parameterize(arguments=None):
             fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
 
             # Fit ESP charges
-            mol, _, esp_charges, qm_dipole = fitCharges(mol, qm, equivalents, netcharge, args.outdir, fixed=fixed_atom_indices)
+            mol, _, esp_charges, qm_dipole = fitCharges(mol, qm, equivalents, args.outdir, fixed=fixed_atom_indices)
 
             # Print dipoles
             logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
