@@ -18,7 +18,7 @@ def getEquivalentsAndDihedrals(mol):
         logger.warning('No bonds found! Guessing them...')
         mol.bonds = mol._guessBonds()
 
-    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds, cyclicdih=True)
+    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
     equivalents = detectEquivalentAtoms(mol)
     all_dihedrals = detectParameterizableDihedrals(mol)
     return mol, equivalents, all_dihedrals
@@ -150,7 +150,7 @@ def minimize(mol, qm, outdir):
     return mol
 
 
-def fitCharges(mol, qm, equivalents, outdir, fixed=()):
+def fitCharges(mol, qm, outdir, fixed=()):
     from htmd.parameterization.esp import ESP
 
     # Create an ESP directory
@@ -185,8 +185,6 @@ def fitCharges(mol, qm, equivalents, outdir, fixed=()):
     esp.molecule = mol
     esp.qm_results = qm_results
     esp.fixed = fixed
-    esp.equivalent_atom_groups = equivalents[0]
-    esp.equivalent_group_by_atom = equivalents[2]
     esp_result = esp.run()
     esp_charges, esp_loss = esp_result['charges'], esp_result['loss']
 

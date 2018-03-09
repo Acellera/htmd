@@ -11,6 +11,7 @@ import numpy as np
 from numpy.random import uniform as rand
 from scipy import constants as const
 from scipy.spatial.distance import cdist
+from htmd.parameterization.detect import detectEquivalentAtoms
 import nlopt
 import unittest
 
@@ -52,11 +53,9 @@ class ESP:
     Load water molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals
     >>> from htmd.molecule.molecule import Molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
-    >>> mol = Molecule(molFile)
-    >>> mol, equivalents, _ = getEquivalentsAndDihedrals(mol)
+    >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4
@@ -78,8 +77,6 @@ class ESP:
     Set up and run charge fitting
     >>> esp.molecule = mol
     >>> esp.qm_results = qm_results
-    >>> esp.equivalent_atom_groups = equivalents[0]
-    >>> esp.equivalent_group_by_atom = equivalents[2]
     >>> esp_results = esp.run()
 
     ESP charges for water molecule
@@ -276,6 +273,11 @@ class ESP:
         """
         logger.info('Start charge optimization')
 
+        equivalents = detectEquivalentAtoms(self.molecule)
+
+        self.equivalent_atom_groups = equivalents[0]
+        self.equivalent_group_by_atom = equivalents[2]
+
         for result in self.qm_results:
             assert int(np.round(self.molecule.charge.sum())) == result.charge
 
@@ -312,11 +314,14 @@ class TestESP(unittest.TestCase):
         from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'H2O2.mol2')
-        mol = Molecule(molFile)
+        mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
         mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
         self.mol = mol
         self.esp = ESP()
         self.esp.molecule = self.mol
+
+        # Precalculating here for the tests
+        equivalents = detectEquivalentAtoms(self.esp.molecule)
         self.esp.equivalent_atom_groups = equivalents[0]
         self.esp.equivalent_group_by_atom = equivalents[2]
 
