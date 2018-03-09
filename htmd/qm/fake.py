@@ -19,7 +19,8 @@ from simtk.openmm import app
 
 from htmd.numbautil import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
+from htmd.parameterization.util import getDipole
 
 logger = logging.getLogger(__name__)
 
@@ -33,17 +34,23 @@ class FakeQM(QMBase):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
+    >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
 
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+    >>> mol = Molecule(molFile)
+    >>> mol = canonicalizeAtomNames(mol)
+    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
+    ...     qm._parameters = parameters
     ...     qm.esp_points = np.array([[1., 1., 1.]])
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
@@ -67,24 +74,26 @@ class FakeQM(QMBase):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
+    ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.737...
+    7.730...
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
-    98.82...
+    100.37...
 
     Run a constrained minimization
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM()
     ...     qm.molecule = mol
+    ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.restrained_dihedrals = np.array([[2, 0, 1, 3]])
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.868...
+    7.870...
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     89.99...
     """
@@ -96,12 +105,16 @@ class FakeQM(QMBase):
     def setup(self): pass
     def submit(self): pass
 
+    def __init__(self):
+        super().__init__()
+        self._parameters = None
+
     def _completed(self, directory):
         return os.path.exists(os.path.join(directory, 'data.pkl'))
 
     def retrieve(self):
 
-        ff = FFEvaluate(self.molecule)
+        ff = FFEvaluate(self.molecule, self._parameters)
 
         results = []
         for iframe in range(self.molecule.numFrames):
@@ -140,7 +153,7 @@ class FakeQM(QMBase):
                     logger.info('Optimization status: %d' % opt.last_optimize_result())
 
                 result.energy = ff.run(result.coords[:, :, 0])['total']
-                result.dipole = self.molecule.getDipole()
+                result.dipole = getDipole(self.molecule)
 
                 if self.optimize:
                     assert opt.last_optimum_value() == result.energy # A self-consistency test
@@ -170,18 +183,23 @@ class FakeQM2(FakeQM):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.util import canonicalizeAtomNames
+    >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM2
 
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+    >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
+    >>> mol = canonicalizeAtomNames(mol)
+    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
     ...     qm.esp_points = np.array([[1., 1., 1.]])
+    ...     qm._parameters = parameters
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
 
@@ -204,6 +222,7 @@ class FakeQM2(FakeQM):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
+    ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
@@ -216,6 +235,7 @@ class FakeQM2(FakeQM):
     >>> with TemporaryDirectory() as tmpDir:
     ...     qm = FakeQM2()
     ...     qm.molecule = mol
+    ...     qm._parameters = parameters
     ...     qm.optimize = True
     ...     qm.restrained_dihedrals = np.array([[2, 0, 1, 3]])
     ...     qm.directory = tmpDir
@@ -227,15 +247,17 @@ class FakeQM2(FakeQM):
     """
 
     def _get_prmtop(self):
-
-        from htmd.parameterization.ffmolecule import FFTypeMethod
-        assert self.molecule.method in (FFTypeMethod.GAFF, FFTypeMethod.GAFF2)
+        from htmd.parameterization.writers import writeFRCMOD, getAtomTypeMapping
+        from htmd.parameterization.fftype import FFTypeMethod
 
         with TemporaryDirectory() as tmpDir:
             frcFile = os.path.join(tmpDir, 'mol.frcmod')
-            typemap = self.molecule._prm.writeFrcmod(self.molecule._rtf, frcFile)  # TODO move to FFMolecule.write
+            mapping = getAtomTypeMapping(self._parameters)
+            writeFRCMOD(self.molecule, self._parameters, frcFile, typemap=mapping)
+            mol2 = self.molecule.copy()
+            mol2.atomtype[:] = np.vectorize(mapping.get)(mol2.atomtype)
             molFile = os.path.join(tmpDir, 'mol.mol2')
-            self.molecule.write(molFile, typemap=typemap)
+            mol2.write(molFile)
 
             with open(os.path.join(tmpDir, 'tleap.inp'), 'w') as file:
                 file.writelines(('loadAmberParams %s\n' % frcFile,
@@ -300,10 +322,11 @@ class FakeQM2(FakeQM):
             state = simulation.context.getState(getEnergy=True, getPositions=True, groups=groups)
 
             result = QMResult()
+            result.charge = self.charge
             result.errored = False
             result.energy = state.getPotentialEnergy().value_in_unit(unit.kilocalorie_per_mole)
             result.coords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom).reshape((-1, 3, 1))
-            result.dipole = self.molecule.getDipole()
+            result.dipole = getDipole(self.molecule)
 
             if self.esp_points is not None:
                 assert self.molecule.numFrames == 1
@@ -325,7 +348,6 @@ class FakeQM2(FakeQM):
 
 
 if __name__ == '__main__':
-
     import sys
     import doctest
 

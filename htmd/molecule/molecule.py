@@ -807,7 +807,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', _logger=True):
+    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', guess=None, guessNE=None, _logger=True):
         """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
         mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
@@ -829,6 +829,10 @@ class Molecule:
             A list of the existing fields in Molecule that we wish to overwrite when reading this file.
         keepaltloc : str
             Set to any string to only keep that specific altloc. Set to 'all' if you want to keep all alternative atom positions.
+        guess : list of str
+            Properties of the molecule to guess. Can be any combination of ('bonds', 'angles', 'dihedrals')
+        guessNE : list of str
+            Properties of the molecule to guess if it's Non-Existent. Can be any combination of ('bonds', 'angles', 'dihedrals')
         """
         from htmd.simlist import Sim, Frame
         from htmd.molecule.readers import _MDTRAJ_TRAJECTORY_EXTS, _ALL_READERS, FormatError, _TRAJECTORY_READERS
@@ -911,6 +915,21 @@ class Molecule:
             self._parseTraj(traj, skip=skip)
 
         self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
+
+        if guess is not None or guessNE is not None:
+            if guess is not None:
+                guess = ensurelist(guess)
+            if guessNE is not None:
+                guessNE = ensurelist(guessNE)
+            if 'bonds' in guess or ('bonds' in guessNE and len(self.bonds) == 0):
+                self.bonds = self._guessBonds()
+            if 'dihedrals' in guess or 'angles' in guess:
+                from htmd.molecule.util import guessAnglesAndDihedrals
+                angles, dihedrals = guessAnglesAndDihedrals(self.bonds)
+                if 'angles' in guess or ('angles' in guessNE and len(self.angles) == 0):
+                    self.angles = angles
+                if 'dihedrals' in guess or ('dihedrals' in guessNE and len(self.dihedrals) == 0):
+                    self.dihedrals = dihedrals
 
     def _checkCoords(self, traj, reader, f):
         coords = traj.coords[0]

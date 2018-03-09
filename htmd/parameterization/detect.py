@@ -72,7 +72,7 @@ def detectEquivalentAtoms(molecule):
 
     Arguments
     ---------
-    molecule : :class:`FFMolecule <htmd.parameterization.ffmolecule.FFMolecule>`
+    molecule : :class:`Molecule <htmd.molecule.molecule.Molecule>`
         Molecule object
 
     Return
@@ -89,12 +89,12 @@ def detectEquivalentAtoms(molecule):
 
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.ffmolecule import FFMolecule
+    >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.parameterization.detect import detectEquivalentAtoms
 
     Get benzamidine
     >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile)
 
     Find the equivalent atoms of bezamidine
     >>> equivalent_groups, equivalent_atoms, equivalent_group_by_atom = detectEquivalentAtoms(mol)
@@ -107,7 +107,7 @@ def detectEquivalentAtoms(molecule):
 
     Get dicarbothioic acid
     >>> molFile = os.path.join(home('test-param'), 'dicarbothioic_acid.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile)
 
     Find the equivalent atoms of dicarbothioic acid
     >>> equivalent_groups, equivalent_atoms, equivalent_group_by_atom = detectEquivalentAtoms(mol)
@@ -145,6 +145,9 @@ def _getMethylGraph():
 
     return methyl
 
+def connected_component_subgraphs(graph):
+    return (graph.subgraph(component).copy() for component in nx.connected_components(graph))
+
 def detectParameterizableCores(graph):
     """
     Detect parametrizable dihedral angle cores (central atom pairs)
@@ -160,7 +163,7 @@ def detectParameterizableCores(graph):
 
         # Get side graphs of the core
         graph.remove_edge(*core)
-        sideGraphs = list(nx.connected_component_subgraphs(graph))
+        sideGraphs = list(connected_component_subgraphs(graph))
         graph.add_edge(*core)
 
         # Skip terminal bridges, which cannot form dihedral angles
@@ -213,7 +216,7 @@ def _chooseTerminals(graph, centre, sideGraph):
     # Get a subgraph for each terminal
     sideGraph = sideGraph.copy()
     sideGraph.remove_node(centre)
-    terminalGraphs = itertools.product(terminals, nx.connected_component_subgraphs(sideGraph))
+    terminalGraphs = itertools.product(terminals, connected_component_subgraphs(sideGraph))
     terminalGraphs = [terminalGraph for terminal, terminalGraph in terminalGraphs if terminal in terminalGraph]
 
     # Compute a score for each terminal
@@ -248,7 +251,7 @@ def detectParameterizableDihedrals(molecule):
 
     Arguments
     ---------
-    molecule : :class:`FFMolecule <htmd.parameterization.ffmolecule.FFMolecule>`
+    molecule : :class:`Molecule <htmd.molecule.molecule.Molecule>`
         Molecule object
 
     Return
@@ -262,38 +265,39 @@ def detectParameterizableDihedrals(molecule):
 
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.parameterization.detect import detectParameterizableDihedrals
+    >>> from htmd.parameterization.util import canonicalizeAtomNames
 
     Find the parameterizable dihedrals of glycol
     >>> molFile = os.path.join(home('test-param'), 'glycol.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
-    [[(2, 1, 0, 4), (1, 2, 3, 9)], [(0, 1, 2, 3)]]
+    [[(0, 1, 2, 3)], [(1, 2, 3, 9), (2, 1, 0, 4)]]
 
     Find the parameterizable dihedrals of ethanolamine
     >>> molFile = os.path.join(home('test-param'), 'ethanolamine.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2) # Does not work with CGenFF
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
-    [[(2, 1, 0, 4)], [(0, 1, 2, 3)], [(1, 2, 3, 9), (1, 2, 3, 10)]]
+    [[(0, 1, 2, 3)], [(1, 2, 3, 9), (1, 2, 3, 10)], [(2, 1, 0, 4)]]
 
     Find the parameterizable dihedrals of benzamidine
     >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
-    [[(1, 0, 6, 12), (1, 0, 6, 13), (5, 0, 6, 12), (5, 0, 6, 13)], [(0, 6, 12, 16), (0, 6, 12, 17), (0, 6, 13, 14), (0, 6, 13, 15)]]
+    [[(0, 6, 12, 16), (0, 6, 12, 17), (0, 6, 13, 14), (0, 6, 13, 15)], [(1, 0, 6, 12), (1, 0, 6, 13), (5, 0, 6, 12), (5, 0, 6, 13)]]
 
     # Check if the atom swapping does not affect results
 
     Find the parameterizable dihedrals of chlorethene
     >>> molFile = os.path.join(home('test-param'), 'chlorethene_1.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
     [[(2, 1, 0, 4), (2, 1, 0, 5)]]
 
     Find the parameterizable dihedrals of chlorethene (with swapped atoms)
     >>> molFile = os.path.join(home('test-param'), 'chlorethene_2.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
     [[(3, 1, 0, 4), (3, 1, 0, 5)]]
 
@@ -301,7 +305,7 @@ def detectParameterizableDihedrals(molecule):
 
     Find the parameterizable dihedrals of 4-hexinenitrile
     >>> molFile = os.path.join(home('test-param'), '4-hexinenitrile.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
     [[(2, 3, 4, 5)]]
 
@@ -309,19 +313,19 @@ def detectParameterizableDihedrals(molecule):
 
     Find the parameterizable dihedrals of dicarbothioic acid
     >>> molFile = os.path.join(home('test-param'), 'dicarbothioic_acid.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
-    [[(3, 1, 0, 6)], [(0, 1, 3, 5)], [(1, 3, 5, 7)]]
+    [[(0, 1, 3, 5)], [(1, 3, 5, 7)], [(3, 1, 0, 6)]]
 
     Find the parameterizable dihedrals of 2-hydroxypyridine
     >>> molFile = os.path.join(home('test-param'), '2-hydroxypyridine.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
     [[(6, 1, 0, 7)]]
 
     Find the parameterizable dihedrals of fluorchlorcyclopronol
     >>> molFile = os.path.join(home('test-param'), 'fluorchlorcyclopronol.mol2')
-    >>> mol = FFMolecule(molFile)
+    >>> mol = Molecule(molFile, guess=('bonds', 'angles', 'dihedrals'))
     >>> detectParameterizableDihedrals(mol)
     [[(2, 4, 5, 9)]]
     """
@@ -351,9 +355,8 @@ def detectParameterizableDihedrals(molecule):
     equivalent_dihedrals = OrderedDict()
     for dihedral, groups in zip(dihedrals, dihedral_groups):
         dihedral, groups = (dihedral[::-1], groups[::-1]) if groups[::-1] < groups else (dihedral, groups)
-        equivalent_dihedrals[groups] = equivalent_dihedrals.get(groups, []) + [dihedral]
-    equivalent_dihedrals = list(equivalent_dihedrals.values())
-
+        equivalent_dihedrals[groups] = sorted(equivalent_dihedrals.get(groups, []) + [dihedral])
+    equivalent_dihedrals = sorted(equivalent_dihedrals.values())
     return equivalent_dihedrals
 
 

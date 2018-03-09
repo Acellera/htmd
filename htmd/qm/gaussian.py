@@ -67,7 +67,7 @@ class Gaussian(QMBase):
             line += '\n\n'
             f.write(line)
 
-            f.write('Mol\n%d %d\n' % (self._charge, self.multiplicity))
+            f.write('Mol\n%d %d\n' % (self.charge, self.multiplicity))
             elements = self._molecule.element
             coords = self._molecule.coords[:, :, iframe]
             for element, coord in zip(elements, coords):
