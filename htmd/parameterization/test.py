@@ -23,40 +23,33 @@ class TestParameterize(unittest.TestCase):
         self.dataDir = home(dataDir='test-param')
         self.testDir = os.environ.get('TESTDIR', tempname())
 
-        print('\n') # Just for a better readability
-
-    def _execute(self, refDir, resDir, cmd):
-        if not os.path.exists(resDir):
-            os.makedirs(resDir)
+    def _execute(self, refDir, resDir, command):
+        os.makedirs(resDir, exist_ok=True)
 
         molFile = os.path.join(refDir, 'input.mol2')
-        if os.path.exists(molFile):
-            shutil.copy(molFile, resDir)
+        self.assertTrue(os.path.exists(molFile))
+        shutil.copy(molFile, resDir)
 
-        arguments = cmd.split()
-        returncode = call(arguments, cwd=resDir)
+        print('') # Just for a better readability
+        returncode = call(command.split(), cwd=resDir)
         self.assertEqual(returncode, 0)
 
     def _testFiles(self, refDir, resDir):
-        filestotest = []
-        excluded = ('minimize', 'esp', 'dihedral', '.coor', '.svg')
+        testFiles = []
+        exclusions = ('minimize', 'esp', 'dihedral', '.coor', '.svg')
         for root, _, files in os.walk(refDir, followlinks=True):
             for file in files:
-                flag = False
                 relFile = os.path.relpath(os.path.join(root, file), start=refDir)
-                for exc in excluded:
-                    if relFile.startswith(exc) or relFile.endswith(exc):
-                        flag = True
-                if not flag:
-                    filestotest.append(os.path.join(root, file))
+                if any([relFile.startswith(exclusion) or relFile.endswith(exclusion) for exclusion in exclusions]):
+                    continue
+                testFiles.append(os.path.join(root, file))
 
         print('Compared files:')
-        for file in filestotest:
+        for file in testFiles:
             relFile = os.path.relpath(file, start=refDir)
-            print('  %s' % relFile)
-
             refFile = os.path.join(refDir, relFile)
             resFile = os.path.join(resDir, relFile)
+            print('  %s' % relFile)
 
             with self.subTest(refFile=refFile):
                 self.assertTrue(os.path.exists(resFile))
@@ -64,19 +57,20 @@ class TestParameterize(unittest.TestCase):
                 with open(refFile) as ref, open(resFile) as res:
                     refLines, resLines = ref.readlines(), res.readlines()
 
-                if file.endswith('energies.txt'):
-                    refFields = [field for line in refLines for field in line.split()]
-                    resFields = [field for line in resLines for field in line.split()]
-                    for refField, resField in zip(refFields, resFields):
-                        with self.subTest():
-                            try:
-                                refFloat = float(refField)
-                                resFloat = float(resField)
-                                self.assertAlmostEqual(refFloat, resFloat, places=4, msg=refFile)
-                            except ValueError:
-                                self.assertEqual(refField, resField, msg=refFile)
-                else:
-                    self.assertListEqual(refLines, resLines, msg=refFile)
+                # Removes first line with the version
+                if file.endswith('frcmod') or file.endswith('rtf') or file.endswith('prm'):
+                    refLines, resLines = refLines[1:], resLines[1:]
+
+                refFields = [field for line in refLines for field in line.split()]
+                resFields = [field for line in resLines for field in line.split()]
+                for refField, resField in zip(refFields, resFields):
+                    try:
+                        if np.isclose(float(refField), float(resField), rtol=0, atol=1e-5):
+                            continue
+                    except ValueError:
+                        if refField == resField:
+                            continue
+                    self.assertListEqual(refLines, resLines) # If there is a mismatch, print a diff of all file
 
         print('')
 
@@ -177,7 +171,7 @@ class TestParameterize(unittest.TestCase):
         self._testFiles(refDir, resDir)
 
     def test_ethene_dihed_fix_restart(self):
-        refDir = os.path.join(self.dataDir, 'ethene_dihed_fix')
+        refDir = os.path.join(self.dataDir, 'ethene_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'ethene_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._execute(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
@@ -191,16 +185,15 @@ class TestParameterize(unittest.TestCase):
         self._testFiles(refDir, resDir)
 
     def test_glycol_dihed_fix_restart(self):
-        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._execute(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
         self._testFiles(refDir, resDir)
 
     def test_glycol_dihed_fix_restart_2(self):
-
-        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix')
-        resDir = tempname()
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
+        resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart_2')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['O1-C1-C2-O2', 'C1-C2-O2-H6']
         self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --no-min --no-esp --no-dihed-opt'.format(' '.join(dihedrals)))
@@ -258,7 +251,7 @@ class TestParameterize(unittest.TestCase):
     def test_benzamidine_rtf_prm(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_rtf_prm')
         resDir = os.path.join(self.testDir, 'benzamidine_rtf_prm')
-        os.makedirs(resDir)
+        os.makedirs(resDir, exist_ok=True)
         shutil.copy(os.path.join(refDir, 'input.rtf'), resDir)
         shutil.copy(os.path.join(refDir, 'input.prm'), resDir)
         self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --rtf-prm input.rtf input.prm --no-min --no-esp --no-dihed')
@@ -275,7 +268,6 @@ class TestParameterize(unittest.TestCase):
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_full_restart(self):
-
         refDir = os.path.join(self.dataDir, 'benzamidine_full_restart')
         resDir = os.path.join(self.testDir, 'benzamidine_full_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
@@ -286,7 +278,6 @@ class TestParameterize(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_esp_freeze_restart(self):
-
         refDir = os.path.join(self.dataDir, 'benzamidine_esp_freeze_restart')
         resDir = os.path.join(self.testDir, 'benzamidine_esp_freeze_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
@@ -296,7 +287,6 @@ class TestParameterize(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_dihed_select_restart(self):
-
         refDir = os.path.join(self.dataDir, 'benzamidine_dihed_select_restart')
         resDir = os.path.join(self.testDir, 'benzamidine_dihed_select_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
