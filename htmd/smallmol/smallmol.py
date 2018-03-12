@@ -643,7 +643,12 @@ class SmallMol:
             conf = mol.GetConformer(i)
             coords = conf.GetPositions()
             coords = coords[:,:,np.newaxis]
-            self.coords = np.concatenate((self.coords, coords), axis=2).astype(np.float32)
+            if self.coords.shape[0] == 0:
+
+                self.coords = coords
+            else:
+                
+                self.coords = np.concatenate((self.coords, coords), axis=2).astype(np.float32)
 
 
     def getVoxels(self, center=None, size=24, resolution=1., rotation=None,
@@ -837,7 +842,7 @@ class SmallMol:
         """
 
         for e in elements:
-            self.__dict__['idx'] = np.append(self.idx, self.numAtoms+1)
+            self.__dict__['idx'] = np.append(self.idx, self.numAtoms)
             self.__dict__['element'] = np.append(self.element, e['element'])
             self.__dict__['atomname'] = np.append(self.atomname, '{}{}'.format(e['element'], self.numAtoms) )
             self.__dict__['charge'] = np.append(self.charge, 0.000)
