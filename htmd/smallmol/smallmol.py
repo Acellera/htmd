@@ -481,8 +481,8 @@ class SmallMol:
         if returnDetails:
             idxs =  idxs.astype(str)
             idxs_str = ' '.join(idxs)
-            atomnames = self.getPropAtom('idx {}'.format(idxs_str), 'atomname')
-            chirals = self.getPropAtom('idx {}'.format(idxs_str), 'chiral')
+            atomnames = self.get('idx {}'.format(idxs_str), 'atomname')
+            chirals = self.get('idx {}'.format(idxs_str), 'chiral')
 
             _details = [(a, c) for a, c in zip(atomnames, chirals)]
 
@@ -840,8 +840,11 @@ class SmallMol:
         elements: list of {'element':'H', 'attachTo':atomIdx, 'bondType':idx/rdkittype,
                            'hybrizidation':idx/rdkithybrid, 'formalcharge':int, 'chiral':''}
         """
-
+        _mol_ref = self.copy()
+        constraints = self.idx
         for e in elements:
+            self.expliciths[e['attachTo']] -= 1
+
             self.__dict__['idx'] = np.append(self.idx, self.numAtoms)
             self.__dict__['element'] = np.append(self.element, e['element'])
             self.__dict__['atomname'] = np.append(self.atomname, '{}{}'.format(e['element'], self.numAtoms) )
@@ -849,11 +852,16 @@ class SmallMol:
             self.__dict__['formalcharge'] = np.append(self.formalcharge, e['formalcharge'])
             self.__dict__['chiral'] = np.append(self.chiral, e['chiral'])
             self.__dict__['hybridization'] = np.append(self.hybridization, e['hybridization'])
-            #self.__dict__['coords'] = np.concatenate(self.coords, ids, axis=0)
+            coords = np.array([0,0,0])
+            coords = coords.reshape(1,3,1)
+            self.__dict__['coords'] = np.concatenate((self.coords, coords), axis=0)
             self.__dict__['neighbors'] = np.array(self.neighbors.tolist() + [[e['attachTo']]])
             self.neighbors[e['attachTo']].append(self.numAtoms)
             self.__dict__['bondtypes'] = np.array(self.bondtypes.tolist() + [[e['bondType']]])
             self.bondtypes[e['attachTo']].append(e['bondType'])
+            self.__dict__['expliciths'] = np.append(self.expliciths, 0)
+
+        self._alignMol(_mol_ref, constraints=constraints)
 
     # working aonly for hydrogens
     def _removeAtoms(self, ids):
@@ -897,6 +905,26 @@ class SmallMol:
         self.__dict__['neighbors'] = np.array(new_neighbors)
         self.__dict__['bondtypes'] = np.array(new_bondtypes)
 
+    def _alignMol(self, smallmolref, constraints):
+
+        from rdkit.Chem.AllChem import  EmbedMolecule
+        from rdkit.Chem import  rdMolAlign
+
+        _refmol = smallmolref.toRdkitMol(includeConformer=True)
+        _refconf = smallmolref.getConformers()[0]
+
+        _mol = self.toRdkitMol(includeConformer=True)
+
+        _constraintsMap = {int(n):_refconf.GetAtomPosition(int(n)) for n in constraints }
+        EmbedMolecule(_mol, coordMap=_constraintsMap)
+
+        pyO3A = rdMolAlign.GetO3A(_mol, _refmol)
+        pyO3A.Align()
+
+        new_coords = _mol.GetConformer().GetPositions()
+        new_coords = new_coords[:, :, np.newaxis]
+
+        self.coords = new_coords
 
     def removeConformers(self, ids=None):
         """
@@ -938,12 +966,20 @@ class SmallMol:
         rw = RWMol()
 
         # add atoms
-        for element, formalcharge, chiral, h in zip(self.element, self.formalcharge, self.chiral, self.expliciths):
+        # print(self.element, len(self.element))
+        # print(self.formalcharge, len(self.formalcharge))
+        # print(self.chiral, len(self.chiral))
+        # print(self.expliciths, len(self.expliciths))
+        for n, (element, formalcharge, chiral, h) in enumerate(zip(self.element, self.formalcharge, self.chiral, self.expliciths)):
             a = Atom(element)
             a.SetFormalCharge(int(formalcharge))
             a.SetNumExplicitHs(int(h))
+            a.SetNoImplicit(1)
             if chiral != '':
                 a.SetProp('_CIPCode', chiral)
+            #print(element, h)
+            # print('>> ', n)
+            # print(a, element)
             rw.AddAtom(a)
 
         # add bonds
