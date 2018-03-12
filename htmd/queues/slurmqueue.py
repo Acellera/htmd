@@ -23,8 +23,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     ----------
     jobname : str, default=None
         Job name (identifier)
-    partition : str, default=None
-        The queue (partition) to run on
+    partition : str or list of str, default=None
+        The queue (partition) or list of queues to run on. If list, the one offering earliest initiation will be used.
     priority : str, default='gpu_priority'
         Job priority
     ngpu : int, default=1
@@ -34,7 +34,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     memory : int, default=1000
         Amount of memory per job (MiB)
     gpumemory : int, default=None
-        Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.
+        Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on
+        SLURM.
     walltime : int, default=None
         Job timeout (s)
     envvars : str, default='ACEMD_HOME,HTMD_LICENSE_FILE'
@@ -72,7 +73,9 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         SimQueue.__init__(self)
         ProtocolInterface.__init__(self)
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
-        self._arg('partition', 'str', 'The queue (partition) to run on', self._defaults['partition'], val.String())
+        self._arg('partition', 'str', 'The queue (partition) or list of queues to run on. If list, the one offering '
+                                      'earliest initiation will be used.',
+                  self._defaults['partition'], val.String(), nargs='*')
         self._arg('priority', 'str', 'Job priority', self._defaults['priority'], val.String())
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
                   val.Number(int, '0POS'))
@@ -150,7 +153,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#!/bin/bash\n')
             f.write('#\n')
             f.write('#SBATCH --job-name={}\n'.format(self.jobname))
-            f.write('#SBATCH --partition={}\n'.format(self.partition))
+            f.write('#SBATCH --partition={}\n'.format(','.join(ensurelist(self.partition))))
             if self.ngpu != 0:
                 f.write('#SBATCH --gres=gpu:{}'.format(self.ngpu))
                 if self.gpumemory is not None:
