@@ -545,10 +545,14 @@ if __name__ == '__main__':
     mol.box = np.ones((3, 2), dtype=np.float32) * 15
     mol.step = np.arange(2)
     mol.time = np.arange(2) * 1E5
+    mol.fileloc = [mol.fileloc[0], mol.fileloc[0]]
 
     for ext in _WRITERS:
         tmp = tempname(suffix='.'+ext)
-        mol.write(tmp)
+        if ext == 'mol2':
+            mol.write(tmp, sel='resid 1')
+        else:
+            mol.write(tmp)
         print('Can write {} files'.format(ext))
 
 
