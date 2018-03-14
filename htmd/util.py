@@ -61,7 +61,8 @@ def diffMolecules(mol1, mol2, sel=None):
     mol2 : Molecule
         second structure to compare
     sel: str
-        compare after filtering with the given atomselection
+        compare only after filtering to this Atom selection string.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Returns
     -------
@@ -112,7 +113,8 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object
     sel : str
-        Atom selection to be output.
+        Atom selection string for what to be outputted.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     onlyAtom : bool
         Only return ATOM/HETATM records (default True)
 

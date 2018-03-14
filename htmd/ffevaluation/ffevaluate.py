@@ -14,18 +14,22 @@ def _formatEnergies(energies):
 
 
 class FFEvaluate:
-    def __init__(self, mol, prm, betweensets=None, dist_thresh=0):
+    def __init__(self, mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, fromstruct=False):
         mol = mol.copy()
         setA, setB = calculateSets(mol, betweensets)
 
-        args = list(init(mol, prm))
+        args = list(init(mol, prm, fromstruct))
         args.append(setA)
         args.append(setB)
-        args.append(dist_thresh)
-
+        args.append(cutoff)
+        args.append(rfa)
+        args.append(solventDielectric)
         self._args = args
 
-    def run(self, coords, box):
+    def run(self, coords, box=None):
+        if coords.ndim == 2:
+            coords = coords[:, :, np.newaxis].copy()
+
         if box is None:
             box = np.zeros((3, coords.shape[2]), dtype=np.float32)
         # from IPython.core.debugger import set_trace
@@ -145,6 +149,7 @@ def init(mol, prm, fromstruct=False):
     improper_params = np.zeros((mol.impropers.shape[0], 3), dtype=np.float32)
     from parmed.amber import AmberParameterSet
     from parmed.charmm import CharmmParameterSet
+    from parmed.parameters import ParameterSet
     for idx, impr in enumerate(mol.impropers):
         if fromstruct:  # If we make prm from struct there is no ordering
             ty = tuple(uqtypes[typeint[impr]])
@@ -154,6 +159,8 @@ def init(mol, prm, fromstruct=False):
             ty = tuple(ty)
         elif isinstance(prm, CharmmParameterSet):  # If prm is read from CHARMM parameter file it's sorted
             ty = tuple(sorted(uqtypes[typeint[impr]]))
+        elif isinstance(prm, ParameterSet):
+            ty = tuple(uqtypes[typeint[impr]])
         else:
             raise RuntimeError('Not a valid parameterset')
         if ty in prm.improper_types:

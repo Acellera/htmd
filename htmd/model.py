@@ -469,9 +469,11 @@ class Model(object):
         statetype : ['macro','micro','cluster'], optional
             The type of state to visualize
         wrapsel : str, optional, default='protein'
-            A selection to use for wrapping
+            Atom selection string to use for wrapping.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         alignsel : str, optional, default='name CA'
-            A selection used for aligning all frames. Set to None to disable aligning
+            Atom selection string used for aligning all frames. Set to None to disable aligning.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         alignmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A reference molecule onto which to align all others
         samplemode : ['weighted','random'], optional, default='weighted'
@@ -543,7 +545,8 @@ class Model(object):
         protein : bool, optional
             Set to True to enable pure protein system visualization
         ligand : str, optional
-            Atomselection string for the ligand
+            Atom selection string for the ligand.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         viewer : :class:`VMD <htmd.vmdviewer.VMD>` object, optional
             A viewer in which to visualize the states
         mols : ndarray, optional
@@ -551,9 +554,11 @@ class Model(object):
         numsamples : int
             Number of samples (conformations) for each state.
         wrapsel : str, optional, default='protein'
-            A selection to use for wrapping
+            Atom selection string to use for wrapping.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         alignsel : str, optional, default='name CA'
-            A selection used for aligning all frames
+            Atom selection string used for aligning all frames. See to None to disable aligning.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for visualizing the states.
 

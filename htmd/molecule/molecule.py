@@ -102,7 +102,7 @@ class Molecule:
     masses : np.ndarray
         Masses read from prmtop or psf files.
     frame : int
-        The current frame. Atomselections and get commands will be calculated on this frame.
+        The current frame. atomselection and get commands will be calculated on this frame.
     fileloc : list
         The location of the files used to read this Molecule
     time : list
@@ -328,7 +328,8 @@ class Molecule:
         Parameters
         ----------
         selection : str
-            Atomselection string selecting the atoms we want to remove
+            Atom selection string of the atoms we want to remove.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Returns
         -------
@@ -359,7 +360,8 @@ class Molecule:
         field : str
             The PDB field we want to get
         sel : str
-            Atom selection string selecting which atoms we want to get the field from. Default all.
+            Atom selection string for which atoms we want to get the field from. Default all.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Returns
         ------
@@ -394,13 +396,14 @@ class Molecule:
 
         Parameters
         ----------
-        field     : str
-                    Which field of the Molecule to set
-        value     : string or integer
-                    All atoms that match the atom selection will have the PDB field `field` set to this scalar value
-                     (Or 3-vector if setting the coordinates)
-        sel       : str
-                    Atom selection string
+        field : str
+            The field of the Molecule to set
+        value : string or integer
+            All atoms that match the atom selection will have the PDB field `field` set to this scalar value
+            (or 3-vector if setting the coordinates)
+        sel : str
+            Atom selection string for atom which to set.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Examples
         --------
@@ -421,11 +424,14 @@ class Molecule:
         Parameters
         ----------
         sel : str
-            Atom selection string
+            Atom selection string for aligning.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         refmol : :class:`Molecule`, optional
-            Optionally pass a reference Molecule on which to align. If none is given it will align on the first frame of the same Molecule
+            Optionally pass a reference Molecule on which to align. If None is given, it will align on the first frame
+            of the same Molecule
         refsel : str, optional
-            An atom selection for the reference Molecule if one is given. Default: same as `sel`
+            Atom selection for the `refmol` if one is given. Default: same as `sel`.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         frames : list or range
             A list of frames which to align. By default it will align all frames of the Molecule
 
@@ -533,7 +539,7 @@ class Molecule:
         Parameters
         ----------
         sel : str
-            Text selection, e.g. 'name CA'. See VMD atomselect for documentation.
+            Atom selection string. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         indexes : bool
             If True returns the indexes instead of a bitmap
         strict: bool
@@ -583,12 +589,12 @@ class Molecule:
         return deepcopy(self)
 
     def filter(self, sel, _logger=True):
-        """Removes all atoms not included in the atomselection
+        """Removes all atoms not included in the selection
 
         Parameters
         ----------
         sel: str
-            Atom selection text
+            Atom selection string. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Examples
         --------
@@ -633,7 +639,8 @@ class Molecule:
         Parameters
         ----------
         sel : str
-            Atomselection string including atoms whose bonds should be deleted.
+            Atom selection string of atoms whose bonds will be deleted.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         inter : bool
             When True it will delete also bonds between atoms in sel with bonds to atoms outside of sel.
             When False it will only delete bonds between atoms in sel.
@@ -667,7 +674,8 @@ class Molecule:
         vector: list
             3D coordinates to add to the Molecule coordinates
         sel: str
-            Atomselection of atoms which we want to move
+            Atom selection string of atoms which we want to move.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Examples
         --------
@@ -691,8 +699,9 @@ class Molecule:
             The rotation matrix
         center : list
             The rotation center
-        sel :
-            Atomselection for atoms to rotate
+        sel : str
+            Atom selection string for atoms to rotate.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Examples
         --------
@@ -784,7 +793,8 @@ class Molecule:
         loc : list, optional
             The location to which to move the geometric center
         sel : str
-            An Atomselection string of the atoms whose geometric center we want to center on the `loc` position
+            Atom selection string of the atoms whose geometric center we want to center on the `loc` position.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Examples
         --------
@@ -797,7 +807,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', _logger=True):
+    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', guess=None, guessNE=None, _logger=True):
         """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
         mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
@@ -819,6 +829,10 @@ class Molecule:
             A list of the existing fields in Molecule that we wish to overwrite when reading this file.
         keepaltloc : str
             Set to any string to only keep that specific altloc. Set to 'all' if you want to keep all alternative atom positions.
+        guess : list of str
+            Properties of the molecule to guess. Can be any combination of ('bonds', 'angles', 'dihedrals')
+        guessNE : list of str
+            Properties of the molecule to guess if it's Non-Existent. Can be any combination of ('bonds', 'angles', 'dihedrals')
         """
         from htmd.simlist import Sim, Frame
         from htmd.molecule.readers import _MDTRAJ_TRAJECTORY_EXTS, _ALL_READERS, FormatError, _TRAJECTORY_READERS
@@ -901,6 +915,21 @@ class Molecule:
             self._parseTraj(traj, skip=skip)
 
         self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
+
+        if guess is not None or guessNE is not None:
+            if guess is not None:
+                guess = ensurelist(guess)
+            if guessNE is not None:
+                guessNE = ensurelist(guessNE)
+            if 'bonds' in guess or ('bonds' in guessNE and len(self.bonds) == 0):
+                self.bonds = self._guessBonds()
+            if 'dihedrals' in guess or 'angles' in guess:
+                from htmd.molecule.util import guessAnglesAndDihedrals
+                angles, dihedrals = guessAnglesAndDihedrals(self.bonds)
+                if 'angles' in guess or ('angles' in guessNE and len(self.angles) == 0):
+                    self.angles = angles
+                if 'dihedrals' in guess or ('dihedrals' in guessNE and len(self.dihedrals) == 0):
+                    self.dihedrals = dihedrals
 
     def _checkCoords(self, traj, reader, f):
         coords = traj.coords[0]
@@ -1073,11 +1102,13 @@ class Molecule:
         Parameters
         ----------
         sel : str
-            Atomselection string for a representation.
+            Atom selection string for the representation.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         style : str
-            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
+            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node55.html>`__.
         color : str or int
-            Coloring mode or color ID. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
+            Coloring mode (str) or ColorID (int).
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node85.html>`__.
         guessBonds : bool
             Allow VMD to guess bonds for the molecule
         viewer : str ('vmd', 'webgl')
@@ -1118,9 +1149,7 @@ class Molecule:
         if viewer is None:
             from htmd.config import _config
             viewer = _config['viewer']
-        if viewer.lower() == 'notebook':
-            retval = self._viewMDTraj(psf, xtc)
-        elif viewer.lower() == 'vmd':
+        if viewer.lower() == 'vmd':
             pdb = tempname(suffix=".pdb")
             self.write(pdb, writebonds=False)
             self._viewVMD(psf, pdb, xtc, viewerhandle, name, guessBonds)
@@ -1166,18 +1195,6 @@ class Molecule:
         self._tempreps._repsVMD(vhandle)
         self._tempreps.remove()
 
-    def _viewMDTraj(self, psf, xtc):
-        from mdtraj.html import TrajectoryView, TrajectorySliderView, enable_notebook
-        import mdtraj
-        enable_notebook()
-
-        t = mdtraj.load(xtc, top=psf)
-        if self.numFrames > 1:
-            widget = TrajectorySliderView(t)
-        else:
-            widget = TrajectoryView(t)
-        return widget
-
     def _viewNGL(self, gui=False):
         from nglview import HTMDTrajectory
         import nglview
@@ -1195,7 +1212,8 @@ class Molecule:
         Parameters
         ----------
         sel : str
-            Atomselection for the residue we want to mutate. The selection needs to include all atoms of the residue.
+            Atom selection string for the residue we want to mutate. The selection needs to include all atoms of the
+            residue. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         newres : str
             The name of the new residue
 
@@ -1219,7 +1237,8 @@ class Molecule:
         Parameters
         ----------
         wrapsel : str
-            Selection of atoms on which to center the wrapping box
+            Atom selection string of atoms on which to center the wrapping box.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
         Examples
         --------
@@ -1242,7 +1261,8 @@ class Molecule:
         filename : str
             The filename of the file we want to write to disk
         sel : str, optional
-            The atomselections of the atoms we want to write. If None it will write all atoms
+            Atom selection string of the atoms we want to write. If None, it will write all atoms.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         type : str, optional
             The filetype we want to write. By default, detected from the file extension
         """
@@ -1677,13 +1697,13 @@ class Representations:
         Parameters
         ----------
         sel : str
-            Atom selection for the given representation (i.e. which part of the molecule to show)
+            Atom selection string for the representation.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         style : str
-            Representation visual style (e.g. lines, NewCartoon, VdW, etc.). See more
-            `here <http://www.ks.uiuc.edu/Research/vmd/current/ug/node55.html>`__.
-        color : str
-            Color style (e.g. secondary structure) or ID (a number) See more
-            `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.3/ug/node120.html>`__.
+            Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node55.html>`__.
+        color : str or int
+            Coloring mode (str) or ColorID (int).
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node85.html>`__.
         """
         self.replist.append(_Representation(sel, style, color))
 
@@ -1769,13 +1789,13 @@ class _Representation:
     Parameters
     ----------
     sel : str
-        Atom selection for the given representation.
+        Atom selection for the representation.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     style : str
-        Representation visual style.
-    color : str
-        Color style.
-    colorid: int
-        Color ID, if `color` was set to 'colorID'.
+        Representation style. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node55.html>`__.
+    color : str or int
+        Coloring mode (str) or ColorID (int).
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node85.html>`__.
 
     Examples
     --------

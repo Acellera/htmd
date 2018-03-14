@@ -23,8 +23,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     ----------
     jobname : str, default=None
         Job name (identifier)
-    partition : str, default=None
-        The queue (partition) to run on
+    partition : str or list of str, default=None
+        The queue (partition) or list of queues to run on. If list, the one offering earliest initiation will be used.
     priority : str, default='gpu_priority'
         Job priority
     ngpu : int, default=1
@@ -34,11 +34,14 @@ class SlurmQueue(SimQueue, ProtocolInterface):
     memory : int, default=1000
         Amount of memory per job (MiB)
     gpumemory : int, default=None
-        Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on SLURM.
+        Only run on GPUs with at least this much memory. Needs special setup of SLURM. Check how to define gpu_mem on
+        SLURM.
     walltime : int, default=None
         Job timeout (s)
-    environment : str, default='ACEMD_HOME,HTMD_LICENSE_FILE'
-        Envvars to propagate to the job.
+    envvars : str, default='ACEMD_HOME,HTMD_LICENSE_FILE'
+        Envvars to propagate from submission node to the running node (comma-separated)
+    prerun : list of strings, default=None
+        Shell commands to execute on the running node before the job (e.g. loading modules).
     mailtype : str, default=None
         When to send emails. Separate options with commas like 'END,FAIL'.
     mailuser : str, default=None
@@ -58,20 +61,21 @@ class SlurmQueue(SimQueue, ProtocolInterface):
 
     Examples
     --------
-    >>> from htmd import *
     >>> s = SlurmQueue()
     >>> s.partition = 'multiscale'
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
     """
 
     _defaults = {'partition': None, 'priority': None, 'ngpu': 1, 'ncpu': 1, 'memory': 1000, 'walltime': None,
-                 'environment': 'ACEMD_HOME,HTMD_LICENSE_FILE'}
+                 'envvars': 'ACEMD_HOME,HTMD_LICENSE_FILE', 'prerun': None}
 
     def __init__(self, _configapp=None):
         SimQueue.__init__(self)
         ProtocolInterface.__init__(self)
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
-        self._arg('partition', 'str', 'The queue (partition) to run on', self._defaults['partition'], val.String())
+        self._arg('partition', 'str', 'The queue (partition) or list of queues to run on. If list, the one offering '
+                                      'earliest initiation will be used.',
+                  self._defaults['partition'], val.String(), nargs='*')
         self._arg('priority', 'str', 'Job priority', self._defaults['priority'], val.String())
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
                   val.Number(int, '0POS'))
@@ -81,11 +85,12 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._arg('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. '
                                       'Check how to define gpu_mem on SLURM.', None, val.Number(int, '0POS'))
         self._arg('walltime', 'int', 'Job timeout (s)', self._defaults['walltime'], val.Number(int, 'POS'))
-        self._arg('environment', 'str', 'Envvars to propagate to the job.', self._defaults['environment'], val.String())
-        self._arg('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None, val.String())
+        self._cmdDeprecated('environment', 'envvars')
+        self._arg('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None,
+                  val.String())
         self._arg('mailuser', 'str', 'User email address.', None, val.String())
         self._arg('outputstream', 'str', 'Output stream.', 'slurm.%N.%j.out', val.String())
-        self._arg('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err'), val.String()  # Maybe change these to job name
+        self._arg('errorstream', 'str', 'Error stream.', 'slurm.%N.%j.err'), val.String()
         self._arg('datadir', 'str', 'The path in which to store completed trajectories.', None, val.String())
         self._arg('trajext', 'str', 'Extension of trajectory files. This is needed to copy them to datadir.', 'xtc',
                   val.String())
@@ -93,6 +98,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                                       ' will be duplicated!', None, val.String(), nargs='*')
         self._arg('exclude', 'list', 'A list of nodes on which *not* to run the jobs. Use this to select nodes on '
                                      'which to allow the jobs to run on.', None, val.String(), nargs='*')
+        self._arg('envvars', 'str', 'Envvars to propagate from submission node to the running node (comma-separated)',
+                  self._defaults['envvars'], val.String())
+        self._arg('prerun', 'list', 'Shell commands to execute on the running node before the job (e.g. '
+                                    'loading modules)', self._defaults['prerun'], val.String(), nargs='*')
 
         # Load Slurm configuration profile
         slurmconfig = _config['slurm']
@@ -123,7 +132,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             if slurmconfig is not None:
                 logger.warning('Slurm configuration YAML file defined without configuration app')
 
-
         # Find executables
         self._qsubmit = SlurmQueue._find_binary('sbatch')
         self._qinfo = SlurmQueue._find_binary('sinfo')
@@ -145,7 +153,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#!/bin/bash\n')
             f.write('#\n')
             f.write('#SBATCH --job-name={}\n'.format(self.jobname))
-            f.write('#SBATCH --partition={}\n'.format(self.partition))
+            f.write('#SBATCH --partition={}\n'.format(','.join(ensurelist(self.partition))))
             if self.ngpu != 0:
                 f.write('#SBATCH --gres=gpu:{}'.format(self.ngpu))
                 if self.gpumemory is not None:
@@ -157,8 +165,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('#SBATCH --workdir={}\n'.format(workdir))
             f.write('#SBATCH --output={}\n'.format(self.outputstream))
             f.write('#SBATCH --error={}\n'.format(self.errorstream))
-            if self.environment is not None:
-                f.write('#SBATCH --export={}\n'.format(self.environment))
+            if self.envvars is not None:
+                f.write('#SBATCH --export={}\n'.format(self.envvars))
             if self.walltime is not None:
                 f.write('#SBATCH --time={}\n'.format(self.walltime))
             if self.mailtype is not None and self.mailuser is not None:
@@ -170,6 +178,10 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 f.write('#SBATCH --exclude={}\n'.format(','.join(ensurelist(self.exclude))))
             # Trap kill signals to create sentinel file
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
+            f.write('\n')
+            if self.prerun is not None:
+                for call in self.prerun:
+                    f.write('{}\n'.format(call))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
 

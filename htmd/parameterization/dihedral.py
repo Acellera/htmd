@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 from htmd.numbautil import dihedralAngle
-from htmd.parameterization.ffevaluate import FFEvaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 
 logger = logging.getLogger(__name__)
 
@@ -71,52 +71,13 @@ class DihedralFitting:
         self._all_target_energies = None
         self._angle_values_rad = None
 
+        self._parameterizable_dihedrals = None
+        self._parameterizable_dihedral_atomtypes = None
+
     @property
     def numDihedrals(self):
         """Number of dihedral angles"""
-
         return len(self.dihedrals)
-
-    def _getEquivalentDihedrals(self, dihedral):
-        """
-        Find equivalent dihedral angles to the specificied one.
-        """
-        #TODO maybe this should be moved to FFMolecule
-
-        types = [self.molecule._rtf.type_by_index[index] for index in dihedral]
-
-        all_dihedrals = []
-        for dihedral_indices in self.molecule.dihedrals:
-            dihedral_types = [self.molecule._rtf.type_by_index[index] for index in dihedral_indices]
-            if types == dihedral_types or types == dihedral_types[::-1]:
-                all_dihedrals.append(dihedral_indices)
-
-        # Now for each of the uses, remove any which are equivalent
-        unique_dihedrals = [dihedral]
-        groups = [self.molecule._equivalent_group_by_atom[index] for index in dihedral]
-        for dihed in all_dihedrals:
-            dihedral_groups = [self.molecule._equivalent_group_by_atom[index] for index in dihed]
-            if groups != dihedral_groups and groups != dihedral_groups[::-1]:
-                unique_dihedrals.append(dihed)
-
-        return unique_dihedrals
-
-    def _makeDihedralUnique(self, dihedral):
-        """
-        Duplicate atom types of the dihedral, so its parameters are unique.
-        """
-        # TODO check symmetry
-
-        # Duplicate the atom types of the dihedral
-        for i in range(4):
-            self.molecule._duplicateAtomType(dihedral[i])
-
-        equivalent_dihedrals = self._getEquivalentDihedrals(dihedral)
-        if len(equivalent_dihedrals) > 1:
-            print(dihedral)
-            print(len(equivalent_dihedrals))
-            print(equivalent_dihedrals)
-            raise ValueError("Dihedral term still not unique after duplication")
 
     def _getValidQMResults(self):
         """
@@ -154,23 +115,19 @@ class DihedralFitting:
             raise ValueError('The number of dihedral and QM result sets has to be the same!')
 
         # Get dihedral names
-        self._names = ['-'.join(self.molecule.name[list(dihedral)]) for dihedral in self.dihedrals]
+        self._names = ['-'.join(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
 
         # Get equivalent dihedral atom indices
         self._equivalent_indices = []
-        for dihedral, name in zip(self.dihedrals, self._names):
-            for equivlantet_diherals in self.molecule._parameterizable_dihedrals:
-                if equivlantet_diherals[0] == dihedral:
-                    self._equivalent_indices.append(equivlantet_diherals)
+        for idihed, dihedral in enumerate(self.dihedrals):
+            found = False
+            for parameterizableDihedral in self._parameterizable_dihedrals:
+                if np.all(list(parameterizableDihedral[0]) == dihedral):
+                    self._equivalent_indices.append(parameterizableDihedral)
+                    found = True
                     break
-            else:
-                raise ValueError('%s is not recognized as a parameterizable dihedral\n' % name)
-
-        # Get dihedral parameters
-        for dihedral in self.dihedrals:
-            self._makeDihedralUnique(dihedral)
-        all_types = [tuple([self.molecule._rtf.type_by_index[index] for index in dihedral]) for dihedral in self.dihedrals]
-        self.parameters = sum([self.molecule._prm.dihedralParam(*types) for types in all_types], [])
+            if not found:
+                raise ValueError('%s is not recognized as a parameterizable dihedral\n' % self._names[idihed])
 
         # Get reference QM energies and rotamer coordinates
         self._valid_qm_results = self._getValidQMResults()
@@ -189,8 +146,10 @@ class DihedralFitting:
             self._angle_values.append(np.array(angle_values))
         self._angle_values_rad = [np.deg2rad(angle_values)[:, :, None] for angle_values in self._angle_values]
 
+        self._parameterizable_dihedral_atomtypes = [tuple(self.molecule.atomtype[idx]) for idx in self.dihedrals]
+
         # Calculated initial MM energies
-        ff = FFEvaluate(self.molecule)
+        ff = FFEvaluate(self.molecule, self.parameters)
         self._initial_energies = []
         for rotamer_coords in self._coords:
             self._initial_energies.append(np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords]))
@@ -236,31 +195,24 @@ class DihedralFitting:
 
         return rmsd
 
-    def _paramsToVector(self, params):
+    def _paramsToVector(self, params, dihedral_atomtypes):
         """
         Convert the parameter objects to a vector.
         """
+        vector = []
+        for k in dihedral_atomtypes:
+            assert len(params.dihedral_types[k]) == self.MAX_DIHEDRAL_MULTIPLICITY
+            for term in params.dihedral_types[k]:
+                vector.append(term.phi_k)
+        for k in dihedral_atomtypes:
+            for term in params.dihedral_types[k]:
+                vector.append(term.phase)
+        for i in range(self.numDihedrals):
+            vector.append(0)  # The offset
 
-        assert [param.n for param in params] == list(range(1, self.MAX_DIHEDRAL_MULTIPLICITY+1)) * self.numDihedrals
-
-        vector = [param.k0 for param in params] + [param.phi0 for param in params] + [0] * self.numDihedrals
         vector = np.array(vector)
 
         return vector
-
-    def _vectorToParams(self, vector, params):
-        """
-        Copy results from the vector to the parameter objects.
-        """
-
-        nparams = len(params)
-        assert vector.size == 2 * nparams + self.numDihedrals
-
-        for i, param in enumerate(params):
-            param.k0 = float(vector[i])
-            param.phi0 = float(vector[i + nparams])
-
-        return params
 
     def _optimize_CRS2_LM(self, vector):
         """
@@ -335,23 +287,33 @@ class DihedralFitting:
 
         return best_vector
 
+    def _vectorToParams(self, parameters, dihedral_atomtypes, vector):
+        nparams = len(dihedral_atomtypes) * self.MAX_DIHEDRAL_MULTIPLICITY
+        assert vector.size == 2 * nparams + self.numDihedrals
+
+        for i, k in enumerate(dihedral_atomtypes):
+            for j, t in enumerate(parameters.dihedral_types[k]):
+                t.phi_k = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j]
+                t.phase = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j+nparams]
+
     def _fit(self):
+        from copy import deepcopy
 
         # Save the initial parameters
-        vector = self._paramsToVector(self.parameters)
+        vector = self._paramsToVector(self.parameters, self._parameterizable_dihedral_atomtypes)
         if self.zeroed_parameters:
             vector[:] = 0
 
         # Evaluate the MM potential with this dihedral zeroed out
         # The objective function will try to fit to the delta between
         # the QM potential and this modified MM potential
-        for param in self.parameters:
-            param.k0 = 0
-        self.molecule._prm.updateDihedral(self.parameters)
+        for key in self._parameterizable_dihedral_atomtypes:
+            for term in self.parameters.dihedral_types[key]:
+                term.phi_k = 0
 
         # Now evaluate the FF without the dihedral being fitted
         self._target_energies = []
-        ff = FFEvaluate(self.molecule)
+        ff = FFEvaluate(self.molecule, self.parameters)
         for rotamer_coords, ref_energies in zip(self._coords, self._reference_energies):
             energies = ref_energies - np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords])
             energies -= np.min(energies)
@@ -366,8 +328,7 @@ class DihedralFitting:
         logger.info('Finished parameter optimization')
 
         # Update the target dihedral with the optimized parameters
-        self.parameters = self._vectorToParams(vector, self.parameters)
-        self.molecule._prm.updateDihedral(self.parameters)
+        self._vectorToParams(self.parameters, self._parameterizable_dihedral_atomtypes, vector)
 
         return self.loss
 
@@ -375,7 +336,7 @@ class DihedralFitting:
 
         # Evaluate the fitted energies
         self._fitted_energies = []
-        ffeval = FFEvaluate(self.molecule)
+        ffeval = FFEvaluate(self.molecule, self.parameters)
         for rotamer_coords in self._coords:
             self._fitted_energies.append(np.array([ffeval.run(coords[:, :, 0])['total'] for coords in rotamer_coords]))
 
@@ -467,53 +428,13 @@ class DihedralFitting:
 class TestDihedralFitting(unittest.TestCase):
 
     def setUp(self):
-
         self.df = DihedralFitting()
 
     def test_numDihedrals(self):
-
         self.df.dihedrals = [[0, 1, 2, 3]]
         self.assertEqual(self.df.numDihedrals, 1)
 
-    def test_getEquivalentDihedrals(self):
-
-        from htmd.home import home
-        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-
-        molFile = os.path.join(home('test-param'), 'glycol.mol2')
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-
-        self.assertListEqual(self.df._getEquivalentDihedrals([0, 1, 2, 3]), [[0, 1, 2, 3]])
-        self.assertListEqual(self.df._getEquivalentDihedrals([4, 0, 1, 2]), [[4, 0, 1, 2]])
-        self.assertListEqual(self.df._getEquivalentDihedrals([5, 1, 2, 7]), [[5, 1, 2, 7]])
-
-    def test_makeDihedralUnique(self):
-
-        from htmd.home import home
-        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
-
-        molFile = os.path.join(home('test-param'), 'glycol.mol2')
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
-        self.assertListEqual(types, ['oh', 'c3', 'c3', 'oh', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
-
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        self.df._makeDihedralUnique([0, 1, 2, 3])
-        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
-        self.assertListEqual(types, ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
-
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        self.df._makeDihedralUnique([4, 0, 1, 2])
-        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
-        self.assertListEqual(types, ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'hox0', 'h1', 'h1', 'h1', 'h1', 'hox0'])
-
-        self.df.molecule = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
-        self.df._makeDihedralUnique([5, 1, 2, 7])
-        types = [self.df.molecule._rtf.type_by_index[i] for i in range(self.df.molecule.numAtoms)]
-        self.assertListEqual(types, ['oh', 'c3x0', 'c3x0', 'oh', 'ho', 'h1x0', 'h1x0', 'h1x0', 'h1x0', 'ho'])
-
     def test_getValidQMResults(self):
-
         from htmd.qm import QMResult
 
         results = [QMResult() for _ in range(20)]
@@ -532,35 +453,46 @@ class TestDihedralFitting(unittest.TestCase):
         self.assertEqual(len(self.df._getValidQMResults()[0]), 17)
 
     def test_getBounds(self):
-
         self.df.dihedrals = [[0, 1, 2, 3]]
         lower_bounds, upper_bounds = self.df._getBounds()
         self.assertListEqual(list(lower_bounds), [0.,  0.,  0.,  0.,  0.,  0.,   0.,   0.,   0.,   0.,   0.,   0., -10.])
         self.assertListEqual(list(upper_bounds), [10., 10., 10., 10., 10., 10., 360., 360., 360., 360., 360., 360.,  10.])
 
     def test_paramsToVector(self):
+        from parmed.parameters import ParameterSet
+        from parmed.topologyobjects import DihedralTypeList, DihedralType
 
-        from htmd.parameterization.ff import TorsPrm
+        params = ParameterSet()
+        dihlist = DihedralTypeList()
+        for i in range(6):
+            dihtype = DihedralType(float(i)+10, i+1, float(i)+20)
+            dihlist.append(dihtype)
+        params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
 
-        self.df.dihedrals = [[0, 1, 2, 3]]
-        params = [TorsPrm(['x', 'x', 'x', 'x'], k0=float(i)+10, n=i+1, phi0=float(i)+20) for i in range(6)]
-        vector = self.df._paramsToVector(params)
+        self.df.dihedrals = [(0, 0, 0, 0),]
+        vector = self.df._paramsToVector(params, [('x', 'x', 'x', 'x'),])
         self.assertListEqual(list(vector), [10., 11., 12., 13., 14., 15., 20., 21., 22., 23., 24., 25., 0.])
 
     def test_vectorToParams(self):
+        from parmed.parameters import ParameterSet
+        from parmed.topologyobjects import DihedralTypeList, DihedralType
 
-        from htmd.parameterization.ff import TorsPrm
+        params = ParameterSet()
+        dihlist = DihedralTypeList()
+        for i in range(6):
+            dihtype = DihedralType(float(i)+10, i+1, float(i)+20)
+            dihlist.append(dihtype)
+        params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
 
         self.df.dihedrals = [[0, 1, 2, 3]]
-        params = [TorsPrm(['x', 'x', 'x', 'x'], k0=float(i)+10, n=i+1, phi0=float(i)+20) for i in range(6)]
         vector = np.array([30., 31., 32., 33., 34., 35., 40., 41., 42., 43., 44., 45., 50.])
-        params = self.df._vectorToParams(vector, params)
+        self.df._vectorToParams(params, [('x', 'x', 'x', 'x'),], vector)
 
-        self.assertEqual(len(params), 6)
-        for i, param in enumerate(params):
-            self.assertEqual(param.k0, i+30)
-            self.assertEqual(param.n, i+1)
-            self.assertEqual(param.phi0, i+40)
+        self.assertEqual(len(params.dihedral_types[('x', 'x', 'x', 'x')]), 6)
+        for i, param in enumerate(params.dihedral_types[('x', 'x', 'x', 'x')]):
+            self.assertEqual(param.phi_k, i+30)
+            self.assertEqual(param.per, i+1)
+            self.assertEqual(param.phase, i+40)
 
     # Note: the rest methods are tested indirectly via the "parameterize" tests in test.py
 

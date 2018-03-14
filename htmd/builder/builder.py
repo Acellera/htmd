@@ -238,7 +238,8 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object
     sel : str
-        Atom selection on which to check for gaps.
+        Atom selection string on which to check for gaps.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     basename : str
         The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
     spatial : bool
@@ -325,7 +326,8 @@ def autoSegment2(mol, sel='(protein or resname ACE NME)', basename='P', fields=(
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object
     sel : str
-        Atom selection on which to check for gaps.
+        Atom selection string on which to check for gaps.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     basename : str
         The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
     fields : tuple of strings
@@ -464,9 +466,11 @@ def removeAtomsInHull(mol1, mol2, hullsel, removesel):
     mol2 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         Molecule which contains the atoms which we check if they are within the hull
     hullsel : str
-        Atomselection for atoms in mol1 from which to calculate the convex hull.
+        Atom selection string for atoms in mol1 from which to calculate the convex hull.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     removesel : str
-        Atomselection for atoms in mol2 from which to remove the ones which are within the hull
+        Atom selection string for atoms in mol2 from which to remove the ones which are within the hull.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Returns
     -------

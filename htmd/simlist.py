@@ -229,10 +229,11 @@ def simfilter(sims, outfolder, filtersel):
     ----------
     sims : list
         A simulation list produced by the `simList` function
-    outFolder : str
+    outfolder : str
         The folder in which to write the modified trajectories
-    filterSel : str
-        An atomselection string describing the atoms we want to keep
+    filtersel : str
+        Atom selection string describing the atoms we want to keep.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Returns
     -------

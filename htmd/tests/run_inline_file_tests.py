@@ -5,9 +5,10 @@
 #
 import fnmatch
 import os
-from subprocess import call, check_output
+from subprocess import run
 import sys
 import time
+
 try:
     from htmd.home import home
 except ImportError:
@@ -53,6 +54,13 @@ for root, dirnames, filenames in os.walk(home()):
 # Avoid network communication at each import
 os.environ['HTMD_NONINTERACTIVE'] = '1'
 
+# Getting python executable
+pythonexe = sys.executable
+if not pythonexe:
+    raise RuntimeError('Python executable not found.')
+else:
+    print('Using python executable: {}'.format(pythonexe))
+
 # Running py files
 failed = []
 times = []
@@ -62,13 +70,14 @@ for f in filestotest:
     t = time.time()
     print(' ************************  Running "{}"  ************************'.format(f))
     if f.endswith('amber.py') or f.endswith('charmm.py') or f.endswith('preparation.py'):
-        out = call('export PYTHONHASHSEED=1; python {}'.format(f), shell=True)
+        process = run('export PYTHONHASHSEED=1; {} {}'.format(pythonexe, f), shell=True)
     else:
-        out = call('python {}'.format(f), shell=True)
+        process = run('{} {}'.format(pythonexe, f), shell=True)
     finishtime = time.time() - t
-    print(' ************************  Result : {} Time : {} ************************'.format(out, finishtime))
+    print(' ************************  Result : {} Time : {} ************************'.format(process.returncode,
+                                                                                             finishtime))
     times.append([f, finishtime])
-    if out != 0:
+    if process.returncode != 0:
         failed.append(f)
 
 for p in sorted(times, key=lambda x: x[1]):
