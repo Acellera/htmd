@@ -358,6 +358,8 @@ def MOL2write(mol, filename):
     uqresname = np.unique(mol.resname)
     if len(uqresname) > 1:
         raise RuntimeError('MOL2 file can only be written for a single residue. We detected {} resnames in the Molecule.'.format(len(uqresname)))
+    if len(uqresname[0]) == 0:
+        raise RuntimeError('MOL2 file can only be written if a resname is defined for the Molecule. Currently the resname is empty.')
 
     with open(filename, "w") as f:
         f.write("@<TRIPOS>MOLECULE\n")
