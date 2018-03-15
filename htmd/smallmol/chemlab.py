@@ -181,7 +181,7 @@ def _mcsClustering(mol1, rdkit_mols):
     from rdkit.Chem import rdFMCS
 
     MCS_row = []
-    for mol2 in rdkit_mols:
+    for mol2 in tqdm(rdkit_mols):
         sum_numHeavyAtoms = mol1.GetNumHeavyAtoms() + mol2.GetNumHeavyAtoms()
         mcsHeavyAtoms = rdFMCS.FindMCS([mol1, mol2], ringMatchesRingOnly=True, completeRingsOnly=True, timeout=5)
         mcsNumHeavyAtoms = float(Chem.MolFromSmarts(mcsHeavyAtoms.smartsString).GetNumHeavyAtoms())
