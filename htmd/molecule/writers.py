@@ -355,15 +355,9 @@ def XYZwrite(src, filename):
 
 
 def MOL2write(mol, filename):
-    uqresname = np.unique(mol.resname)
-    if len(uqresname) > 1:
-        raise RuntimeError('MOL2 file can only be written for a single residue. We detected {} resnames in the Molecule.'.format(len(uqresname)))
-    if len(uqresname[0]) == 0:
-        raise RuntimeError('MOL2 file can only be written if a resname is defined for the Molecule. Currently the resname is empty.')
-
     with open(filename, "w") as f:
         f.write("@<TRIPOS>MOLECULE\n")
-        f.write("    {}\n".format(uqresname[0]))
+        f.write("    MOL\n")
         unique_bonds = [list(t) for t in set(map(tuple, [sorted(x) for x in mol.bonds]))]
         unique_bonds = np.array(sorted(unique_bonds, key=lambda x: (x[0], x[1])))
         f.write("%5d %5d %5d %5d %5d\n" % (mol.numAtoms, unique_bonds.shape[0], 0, 0, 0))
@@ -545,14 +539,10 @@ if __name__ == '__main__':
     mol.box = np.ones((3, 2), dtype=np.float32) * 15
     mol.step = np.arange(2)
     mol.time = np.arange(2) * 1E5
-    mol.fileloc = [mol.fileloc[0], mol.fileloc[0]]
 
     for ext in _WRITERS:
         tmp = tempname(suffix='.'+ext)
-        if ext == 'mol2':
-            mol.write(tmp, sel='resid 1')
-        else:
-            mol.write(tmp)
+        mol.write(tmp)
         print('Can write {} files'.format(ext))
 
 
