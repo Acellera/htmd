@@ -39,7 +39,7 @@ packages = [
 
 # Package arguments
 
-allpackages = [i[1] for i in packages]
+allpackages = [p[1] for p in packages]
 packagestoupdate = list(intersect1d(sys.argv[1:], allpackages)) if sys.argv[1:] else allpackages
 
 # Do the sync
