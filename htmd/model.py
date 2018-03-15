@@ -573,7 +573,7 @@ class Model(object):
         from htmd.config import _config
         self._integrityCheck(postmsm=(statetype != 'cluster'))
 
-        if _config['viewer'].lower() == 'ngl':
+        if _config['viewer'].lower() == 'ngl' or _config['viewer'].lower() == 'webgl':
             return self._viewStatesNGL(states, statetype, protein, ligand, mols, numsamples, gui=gui)
 
         if viewer is None:
