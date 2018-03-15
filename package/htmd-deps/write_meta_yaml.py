@@ -36,10 +36,11 @@ packages = check_output(['conda', 'list', '--json']).decode('utf8')
 packages = json.loads(packages)
 
 # Find the version of each dependency and add them to the meta.yaml file
-found = {dep['name']: False for dep in deps}
+depnames = [dep['name'] for dep in deps]
+found = dict(zip(depnames, [False] * len(depnames)))
 for p in packages:
     name = p['name'].lower()
-    if name in [dep['name'] for dep in deps]:
+    if name in depnames:
         dep = next(dep for dep in deps if dep['name'] == name)
         if 'version' not in dep:
             text += '    - {} >={}\n'.format(name, p['version'])
