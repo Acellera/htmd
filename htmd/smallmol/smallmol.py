@@ -32,6 +32,7 @@ atom_mapping = {"Hydrophobe": 0,
 _chiral_type = {ChiralType.CHI_TETRAHEDRAL_CW:'clockwise',
                 ChiralType.CHI_TETRAHEDRAL_CCW:'anitclockwise'}
 
+_chiral_type_Dict = ChiralType.values
 
 _heteroatoms = ['N', 'O', 'F', 'P', 'S', 'Cl', 'Br', 'I']
 _halogens = ['F', 'Cl', 'Br', 'I']
@@ -65,7 +66,7 @@ class SmallMol:
 
     ### Fields
     _atom_fields = ['idx', 'atomname', 'charge','formalcharge', 'element',  'chiral', 'hybridization',
-                    'neighbors', 'bondtypes', 'coords', 'expliciths']
+                    'neighbors', 'bondtypes', 'coords', 'expliciths', '_chiraltags']
 
     _mol_fields = ['ligname', 'totalcharge', '_mol']
 
@@ -80,7 +81,8 @@ class SmallMol:
                     'neighbors': object,
                     'bondtypes': object,
                     'coords': np.float32,
-                    'expliciths': np.int
+                    'expliciths': np.int,
+                    '_chiraltags': object
                     }
 
     _mol_dtypes = {'_mol': object,
@@ -99,7 +101,8 @@ class SmallMol:
                   'bondtypes': (0,),
                   'hybridization': (0,),
                   'coords': (0, 3, 1),
-                  'expliciths':(0,)
+                  'expliciths':(0,),
+                  '_chiraltags':(0,)
                     }
 
     _mol_dims = {'_mol': (0,),
@@ -220,6 +223,7 @@ class SmallMol:
         neighbors = []
         bondtypes = []
         expliciths = []
+        chiraltags = []
 
         _mol = self._mol
 
@@ -231,6 +235,7 @@ class SmallMol:
         for a in _mol.GetAtoms():
             i = a.GetIdx()
             e = a.GetSymbol()
+            chiraltags.append(a.GetChiralTag())
             idxs.append(i)
             atomnames.append('{}{}'.format(e,i))
             formalcharges.append(a.GetFormalCharge())
@@ -247,11 +252,6 @@ class SmallMol:
                 chirals.append(a.GetPropsAsDict()['_CIPCode'])
             else:
                 chirals.append('')
-
-        if _mol.GetNumConformers() != 0:
-            coords = _mol.GetConformer(0).GetPositions()
-            self.__dict__['coords'] =  coords[:,:,np.newaxis]
-
 
         if _mol.HasProp('_Name'):
             self.__dict__['ligname'] = _mol.GetProp('_Name')
@@ -272,6 +272,13 @@ class SmallMol:
         self.__dict__['neighbors'] = np.array(neighbors)
         self.__dict__['bondtypes'] = np.array(bondtypes)
         self.__dict__['expliciths'] = np.array(expliciths)
+        self.__dict__['_chiraltags'] = np.array(chiraltags)
+
+        if _mol.GetNumConformers() != 0:
+            coords = _mol.GetConformer(0).GetPositions()
+            self.__dict__['coords'] =  coords[:,:,np.newaxis]
+        else:
+            self.__dict__['coords'] = np.zeros((self.numAtoms,3,1))
 
     def copy(self):
         """
@@ -843,11 +850,13 @@ class SmallMol:
         _mol_ref = self.copy()
         constraints = self.idx
         for e in elements:
-            self.expliciths[e['attachTo']] -= 1
+            if self.expliciths[e['attachTo']] != 0:
+                self.expliciths[e['attachTo']] -= 1
+            n_atom = self.numAtoms
 
-            self.__dict__['idx'] = np.append(self.idx, self.numAtoms)
+            self.__dict__['idx'] = np.append(self.idx, n_atom)
             self.__dict__['element'] = np.append(self.element, e['element'])
-            self.__dict__['atomname'] = np.append(self.atomname, '{}{}'.format(e['element'], self.numAtoms) )
+            self.__dict__['atomname'] = np.append(self.atomname, '{}{}'.format(e['element'], n_atom) )
             self.__dict__['charge'] = np.append(self.charge, 0.000)
             self.__dict__['formalcharge'] = np.append(self.formalcharge, e['formalcharge'])
             self.__dict__['chiral'] = np.append(self.chiral, e['chiral'])
@@ -856,10 +865,11 @@ class SmallMol:
             coords = coords.reshape(1,3,1)
             self.__dict__['coords'] = np.concatenate((self.coords, coords), axis=0)
             self.__dict__['neighbors'] = np.array(self.neighbors.tolist() + [[e['attachTo']]])
-            self.neighbors[e['attachTo']].append(self.numAtoms)
+            self.neighbors[e['attachTo']].append(n_atom)
             self.__dict__['bondtypes'] = np.array(self.bondtypes.tolist() + [[e['bondType']]])
             self.bondtypes[e['attachTo']].append(e['bondType'])
             self.__dict__['expliciths'] = np.append(self.expliciths, 0)
+            self.__dict__['_chiraltags'] = np.append(self._chiraltags, 0)
 
         self._alignMol(_mol_ref, constraints=constraints)
 
@@ -885,6 +895,7 @@ class SmallMol:
         ids_forexpliciths = np.arange(incr.shape[0])
         self.expliciths[ids_forexpliciths] += incr
         self.__dict__['expliciths'] = np.delete(self.expliciths, ids)
+        self.__dict__['_chiraltags'] = np.delete(self._chiraltags, ids)
 
         tmp_neighbors = np.delete(self.neighbors, ids)
         tmp_bondtypes = np.delete(self.bondtypes, ids)
@@ -908,6 +919,7 @@ class SmallMol:
     def _alignMol(self, smallmolref, constraints):
 
         from rdkit.Chem.AllChem import  EmbedMolecule
+        from rdkit.Chem.AllChem import UFFGetMoleculeForceField
         from rdkit.Chem import  rdMolAlign
 
         _refmol = smallmolref.toRdkitMol(includeConformer=True)
@@ -915,12 +927,15 @@ class SmallMol:
 
         _mol = self.toRdkitMol(includeConformer=True)
 
-        _constraintsMap = {int(n):_refconf.GetAtomPosition(int(n)) for n in constraints }
-        EmbedMolecule(_mol, coordMap=_constraintsMap)
+        ff = UFFGetMoleculeForceField(_mol)
+        for idx in constraints:
+            ff.AddFixedPoint(int(idx))
+        ff.Minimize()
+        #_constraintsMap = {int(n):_refconf.GetAtomPosition(int(n)) for n in constraints }
+        #print(EmbedMolecule(_mol, coordMap=_constraintsMap, numZeroFail=10))
 
         pyO3A = rdMolAlign.GetO3A(_mol, _refmol)
         pyO3A.Align()
-
         new_coords = _mol.GetConformer().GetPositions()
         new_coords = new_coords[:, :, np.newaxis]
 
@@ -958,6 +973,27 @@ class SmallMol:
 
         self.coords = np.delete(self.coords, ids, axis=2)
 
+    def invertChirality(self, atom):
+        #TODO now is idx
+        # atom --> idx.  atomname
+        _chiral = self.chiral[atom]
+        _chiraltag = self._chiraltags[atom]
+
+        if _chiral == 'R':
+            self.chiral[atom] = 'S'
+        elif _chiral == 'S':
+            self.chiral[atom] = 'R'
+
+        if _chiraltag == 1:
+            _chiraltag = _chiraltag + 1
+        else:
+            _chiraltag = _chiraltag - 1
+
+        self._chiraltags[atom] = _chiraltag
+
+
+
+
 
     def toRdkitMol(self, includeConformer=False, _debug=False):
         from rdkit.Chem import RWMol
@@ -970,16 +1006,21 @@ class SmallMol:
         # print(self.formalcharge, len(self.formalcharge))
         # print(self.chiral, len(self.chiral))
         # print(self.expliciths, len(self.expliciths))
-        for n, (element, formalcharge, chiral, h) in enumerate(zip(self.element, self.formalcharge, self.chiral, self.expliciths)):
-            a = Atom(element)
-            a.SetFormalCharge(int(formalcharge))
-            a.SetNumExplicitHs(int(h))
+        #for n, (element, formalcharge, chiral, h) in enumerate(zip(self.element, self.formalcharge, self.chiral, self.expliciths)):
+        for n in range(self.numAtoms):
+
+        #    print(n, h)
+            a = Atom(self.element[n])
+            a.SetFormalCharge(int(self.formalcharge[n]))
+            a.SetNumExplicitHs(int(self.expliciths[n]))
             a.SetNoImplicit(1)
-            if chiral != '':
-                a.SetProp('_CIPCode', chiral)
+            if self.chiral[n] != '':
+                a.SetProp('_CIPCode', self.chiral[n])
+            chiral_type = _chiral_type_Dict[self._chiraltags[n]]
+            a.SetChiralTag(chiral_type)
             #print(element, h)
-            # print('>> ', n)
-            # print(a, element)
+           # print('>> ', n)
+            #print(a, element)
             rw.AddAtom(a)
 
         # add bonds
@@ -1466,7 +1507,7 @@ class SmallMolLib:
         elif legends == 'items':
             legends_list = [ str(n+1) for n in range(len(_smallmols))]
 
-        return depictMultipleMols(_mols, ipython=ipython, legends=legends, highlightAtoms=highlightAtoms,
+        return depictMultipleMols(_mols, ipython=ipython, legends=legends_list, highlightAtoms=highlightAtoms,
                                          filename=filename, mols_perrow=mols_perrow)
 
         # return depictMultipleMols(_mols, sketch, filename, ipython, optimize, optimizemode,
