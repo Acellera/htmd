@@ -6,8 +6,9 @@
 #
 
 import os
+import sys
+from numpy import intersect1d
 from subprocess import call
-
 from binstar_client.utils import get_server_api
 
 api = get_server_api()
@@ -30,14 +31,22 @@ packages = [
     ['conda-forge', 'pyemma'],
     ['conda-forge', 'thermotools'],
     ['bioconda', 'nglview'],
-    ['omnia', 'nglview'],  # Adding both omnia and bioconda nglview because they provide different builds
     ['rdkit', 'rdkit'],
     ['rdkit', 'boost'],
     ['conda-forge', 'nlopt'],
     ['conda-forge', 'periodictable']
 ]
 
+# Package arguments
+
+allpackages = [p[1] for p in packages]
+packagestoupdate = list(intersect1d(sys.argv[1:], allpackages)) if sys.argv[1:] else allpackages
+
+# Do the sync
+
 for channel, package in packages:
+    if package not in packagestoupdate:
+        continue
     remote = api.package(channel, package)
     try:
         acellera = api.package('acellera', package)
