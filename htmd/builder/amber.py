@@ -9,6 +9,7 @@ from __future__ import print_function
 from htmd.home import home
 import numpy as np
 import os
+from os.path import join
 from glob import glob
 from htmd.molecule.util import _missingSegID, sequenceID
 import shutil
@@ -223,7 +224,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     Example
     -------
-    >>> from htmd.ui import *
+    >>> from htmd.ui import *  # doctest: +SKIP
     >>> mol = Molecule("3PTB")
     >>> molbuilt = amber.build(mol, outdir='/tmp/build')  # doctest: +SKIP
     >>> # More complex example
@@ -267,14 +268,13 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     if isinstance(ff, str):
         ff = [ff]
     for i, force in enumerate(ff):
-        if os.path.isfile(force):
-            f.write('source {}\n'.format(force))
-        else: # Search amber directories for the file
-            p = _locateFile(force, 'ff', tleap)
-            if p is not None:
-                newname = 'ff{}_{}'.format(i, os.path.basename(force))
-                shutil.copy(p, os.path.join(outdir, newname))
-                f.write('source {}\n'.format(newname))
+        if not os.path.isfile(force):
+            force = _locateFile(force, 'ff', tleap)
+            if force is None:
+                continue
+        newname = 'ff{}_{}'.format(i, os.path.basename(force))
+        shutil.copy(force, os.path.join(outdir, newname))
+        f.write('source {}\n'.format(newname))
     f.write('\n')
 
     if gbsa:
@@ -293,35 +293,36 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     # Loading OFF libraries
     if offlibraries is not None:
-        if not isinstance(offlibraries, list) and not isinstance(offlibraries, tuple):
-            offlibraries = [offlibraries, ]
+        offlibraries = ensurelist(offlibraries)
         for off in offlibraries:
-            f.write('loadoff {}\n\n'.format(off))
+            if not os.path.isfile(off):
+                raise RuntimeError('Could not find off-library in location {}'.format(off))
+            newname = 'offlib{}_{}'.format(i, os.path.basename(off))
+            shutil.copy(off, os.path.join(outdir, newname))
+            f.write('loadoff {}\n'.format(newname))
 
     # Loading frcmod parameters
     f.write('# Loading parameter files\n')
     for i, p in enumerate(param):
-        if os.path.isfile(p):
-            f.write('loadamberparams {}\n'.format(p))
-        else: # Search amber directories for the file
+        if not os.path.isfile(p):
             p = _locateFile(p, 'param', tleap)
-            if p is not None:
-                newname = 'param{}_{}'.format(i, os.path.basename(p))
-                shutil.copy(p, os.path.join(outdir, newname))
-                f.write('loadamberparams {}\n'.format(newname))
+            if p is None:
+                continue
+        newname = 'param{}_{}'.format(i, os.path.basename(p))
+        shutil.copy(p, os.path.join(outdir, newname))
+        f.write('loadamberparams {}\n'.format(newname))
     f.write('\n')
 
     # Loading prepi topologies
     f.write('# Loading prepi topologies\n')
     for i, t in enumerate(topo):
-        if os.path.isfile(t):
-            f.write('loadamberprep {}\n'.format(t))
-        else: # Search amber directories for the file
+        if not os.path.isfile(t):
             t = _locateFile(t, 'topo', tleap)
-            if t is not None:
-                newname = 'topo{}_{}'.format(i, os.path.basename(t))
-                shutil.copy(t, os.path.join(outdir, newname))
-                f.write('loadamberprep {}\n'.format(newname))
+            if t is None:
+                continue
+        newname = 'topo{}_{}'.format(i, os.path.basename(t))
+        shutil.copy(t, os.path.join(outdir, newname))
+        f.write('loadamberprep {}\n'.format(newname))
     f.write('\n')
 
     # Detect disulfide bridges if not defined by user
@@ -742,33 +743,35 @@ def _logParser(fname):
 
     return errors
 
-if __name__ == '__main__':
-    from htmd.molecule.molecule import Molecule, mol_equal
-    from htmd.builder.solvate import solvate
-    from htmd.builder.preparation import proteinPrepare
-    from htmd.builder.builder import autoSegment2
-    from htmd.home import home
-    from htmd.util import tempname
-    import os
-    from os.path import join
-    from glob import glob
-    import numpy as np
-    import filecmp
-    import doctest
 
-    failure_count, _ = doctest.testmod()
-    # if failure_count != 0:
-    #     raise Exception('Doctests failed')
+import unittest
+class TestAmberBuild(unittest.TestCase):
+    currentResult = None  # holds last result object passed to run method
 
-    def _cutfirstline(infile, outfile):
-        # Cut out the first line of prmtop which has a build date in it
-        with open(infile, 'r') as fin:
-            data = fin.read().splitlines(True)
-        with open(outfile, 'w') as fout:
-            fout.writelines(data[1:])
+    def setUp(self):
+        from htmd.util import tempname
+        self.testDir = os.environ.get('TESTDIR', tempname())
+        print('Running tests in {}'.format(self.testDir))
 
+    def run(self, result=None):
+        self.currentResult = result # remember result for use in tearDown
+        unittest.TestCase.run(self, result) # call superclass run method
 
+    # def tearDown(self):
+    #     if self.currentResult.wasSuccessful():
+    #         shutil.rmtree(self.testDir)
+
+    @staticmethod
     def _compareResultFolders(compare, tmpdir, pid):
+        import filecmp
+
+        def _cutfirstline(infile, outfile):
+            # Cut out the first line of prmtop which has a build date in it
+            with open(infile, 'r') as fin:
+                data = fin.read().splitlines(True)
+            with open(outfile, 'w') as fout:
+                fout.writelines(data[1:])
+
         ignore_ftypes = ('.log', '.txt')
         files = []
         deletefiles = []
@@ -792,85 +795,114 @@ if __name__ == '__main__':
         for f in deletefiles:
             os.remove(f)
 
-    # Test with proteinPrepare
-    pdbids = ['3PTB']
-    # pdbids = ['3PTB', '1A25', '1GZM']  # '1U5U' out because it has AR0 (no parameters)
-    for pid in pdbids:
-        np.random.seed(1)
-        mol = Molecule(pid)
-        mol.filter('protein')
-        if mol._checkInsertions():
-            mol.renumberResidues()
-        mol = proteinPrepare(mol)
-        mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
-        smol = solvate(mol)
-        ffs = defaultFf()
-        tmpdir = tempname()
-        bmol = build(smol, ff=ffs, outdir=tmpdir)
+    def testWithProteinPrepare(self):
+        from htmd.builder.preparation import proteinPrepare
+        from htmd.builder.solvate import solvate
+        # Test with proteinPrepare
+        pdbids = ['3PTB']
+        # pdbids = ['3PTB', '1A25', '1GZM']  # '1U5U' out because it has AR0 (no parameters)
+        for pid in pdbids:
+            np.random.seed(1)
+            mol = Molecule(pid)
+            mol.filter('protein')
+            if mol._checkInsertions():
+                mol.renumberResidues()
+            mol = proteinPrepare(mol)
+            mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+            smol = solvate(mol)
+            ffs = defaultFf()
+            tmpdir = os.path.join(self.testDir, 'withProtPrep', pid)
+            _ = build(smol, ff=ffs, outdir=tmpdir)
 
-        refdir = home(dataDir=join('test-amber-build', pid))
-        _compareResultFolders(refdir, tmpdir, pid)
-        shutil.rmtree(tmpdir)
+            refdir = home(dataDir=join('test-amber-build', 'pp', pid))
+            TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
-    # Test without proteinPrepare
-    pdbids = ['3PTB']
-    # pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
-    for pid in pdbids:
-        np.random.seed(1)
-        mol = Molecule(pid)
-        mol.filter('protein')
-        if mol._checkInsertions():
-            mol.renumberResidues()
-        smol = solvate(mol)
-        ffs = defaultFf()
-        tmpdir = tempname()
-        bmol = build(smol, ff=ffs, outdir=tmpdir)
+    def testWithoutProteinPrepare(self):
+        from htmd.builder.solvate import solvate
+        # Test without proteinPrepare
+        pdbids = ['3PTB']
+        # pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+        for pid in pdbids:
+            np.random.seed(1)
+            mol = Molecule(pid)
+            mol.filter('protein')
+            if mol._checkInsertions():
+                mol.renumberResidues()
+            smol = solvate(mol)
+            ffs = defaultFf()
+            tmpdir = os.path.join(self.testDir, 'withoutProtPrep', pid)
+            _ = build(smol, ff=ffs, outdir=tmpdir)
 
-        refdir = home(dataDir=join('test-amber-build-nopp', pid))
-        _compareResultFolders(refdir, tmpdir, pid)
-        shutil.rmtree(tmpdir)
+            refdir = home(dataDir=join('test-amber-build', 'nopp', pid))
+            TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
-    # Test protein ligand building with parametrized ligand
-    mol = Molecule('3ptb')
-    mol.filter('protein')
-    mol.renumberResidues()
-    lig = Molecule(join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum', 'mol.mol2'))
-    lig.segid[:] = 'L'
-    newmol = Molecule()
-    newmol.append(lig)
-    newmol.append(mol)
-    smol = solvate(newmol)
-    tmpdir = tempname()
-    bmol = build(newmol, outdir=tmpdir, ionize=False)
-    shutil.rmtree(tmpdir)
+    def testProteinLigand(self):
+        from htmd.builder.solvate import solvate
+        from htmd.parameterization.fftype import fftype, FFTypeMethod
+        from htmd.parameterization.writers import writeFRCMOD
+        from htmd.parameterization.util import canonicalizeAtomNames
 
-    # # Test protein-ligand building
-    # folder = home(dataDir='building-protein-ligand')
-    # prot = Molecule(os.path.join(folder, 'trypsin.pdb'))
-    # prot.filter('protein')
-    # prot.renumberResidues()
-    # prot = autoSegment2(prot)
-    # prot = proteinPrepare(prot)
-    # prot1 = prot
-    # prot2 = prot.copy()
-    # lig1 = Molecule(os.path.join(folder, 'benzamidine.mol2'))
-    # lig1.set('segid', 'L')
-    # lig2 = Molecule(os.path.join(folder, 'benzamidine.pdb'))
-    # lig2.set('segid', 'L')
-    # prot1.append(lig1)
-    # prot2.append(lig2)
-    # smol1 = solvate(prot1)
-    # smol2 = solvate(prot2)
-    # tmpdir1 = tempname()
-    # tmpdir2 = tempname()
-    # np.random.seed(1)
-    # params = amber.defaultParam() + [os.path.join(folder, 'benzamidine.frcmod')]
-    # bmol1 = amber.build(smol1, param=params, outdir=tmpdir1)
-    # np.random.seed(1)
-    # params = amber.defaultParam() + [os.path.join(folder, 'benzamidineprepi.frcmod')]
-    # topos = amber.defaultTopo() + [os.path.join(folder, 'benzamidine.prepi')]
-    # bmol2 = amber.build(smol2, topo=topos, param=params, outdir=tmpdir2)
-    # _compareResultFolders(tmpdir1, tmpdir2, 'ben-tryp')
-    # shutil.rmtree(tmpdir1)
-    # shutil.rmtree(tmpdir2)
+        # Test protein ligand building with parametrized ligand
+        refdir = home(dataDir=join('test-amber-build', 'protLig'))
+        tmpdir = os.path.join(self.testDir, 'protLig')
+        os.makedirs(tmpdir)
+
+        mol = Molecule(join(refdir, '3ptb_mod.pdb'))
+        lig = Molecule(join(refdir, 'benzamidine.pdb'), guess=('bonds', 'angles', 'dihedrals'))
+        # lig = canonicalizeAtomNames(lig)
+        prm, lig = fftype(lig, method=FFTypeMethod.GAFF2)
+        writeFRCMOD(lig, prm, join(tmpdir, 'mol.frcmod'))
+        lig.segid[:] = 'L'
+
+        # params =
+        newmol = Molecule()
+        newmol.append(lig)
+        newmol.append(mol)
+        smol = solvate(newmol)
+
+        params = defaultParam() + [join(tmpdir, 'mol.frcmod'),]
+
+        _ = build(smol, outdir=tmpdir, param=params, ionize=False)
+
+        # # Test protein-ligand building
+        # folder = home(dataDir='building-protein-ligand')
+        # prot = Molecule(os.path.join(folder, 'trypsin.pdb'))
+        # prot.filter('protein')
+        # prot.renumberResidues()
+        # prot = autoSegment2(prot)
+        # prot = proteinPrepare(prot)
+        # prot1 = prot
+        # prot2 = prot.copy()
+        # lig1 = Molecule(os.path.join(folder, 'benzamidine.mol2'))
+        # lig1.set('segid', 'L')
+        # lig2 = Molecule(os.path.join(folder, 'benzamidine.pdb'))
+        # lig2.set('segid', 'L')
+        # prot1.append(lig1)
+        # prot2.append(lig2)
+        # smol1 = solvate(prot1)
+        # smol2 = solvate(prot2)
+        # tmpdir1 = tempname()
+        # tmpdir2 = tempname()
+        # np.random.seed(1)
+        # params = amber.defaultParam() + [os.path.join(folder, 'benzamidine.frcmod')]
+        # bmol1 = amber.build(smol1, param=params, outdir=tmpdir1)
+        # np.random.seed(1)
+        # params = amber.defaultParam() + [os.path.join(folder, 'benzamidineprepi.frcmod')]
+        # topos = amber.defaultTopo() + [os.path.join(folder, 'benzamidine.prepi')]
+        # bmol2 = amber.build(smol2, topo=topos, param=params, outdir=tmpdir2)
+        # _compareResultFolders(tmpdir1, tmpdir2, 'ben-tryp')
+        # shutil.rmtree(tmpdir1)
+        # shutil.rmtree(tmpdir2)
+
+
+if __name__ == '__main__':
+    import doctest
+    import unittest
+
+    failure_count, _ = doctest.testmod()
+    unittest.main(verbosity=2)
+    # if failure_count != 0:
+    #     raise Exception('Doctests failed')
+
+
 

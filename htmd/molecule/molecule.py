@@ -923,6 +923,7 @@ class Molecule:
                 guessNE = ensurelist(guessNE)
             if 'bonds' in guess or ('bonds' in guessNE and len(self.bonds) == 0):
                 self.bonds = self._guessBonds()
+                self.bondtype = np.array(['un'] * self.bonds.shape[0], dtype=Molecule._dtypes['bondtype'])
             if 'dihedrals' in guess or 'angles' in guess:
                 from htmd.molecule.util import guessAnglesAndDihedrals
                 angles, dihedrals = guessAnglesAndDihedrals(self.bonds)
