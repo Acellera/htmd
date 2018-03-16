@@ -762,7 +762,7 @@ class TestAmberBuild(unittest.TestCase):
             shutil.rmtree(self.testDir)
 
     @staticmethod
-    def _compareResultFolders(compare, tmpdir, pid):
+    def _compareResultFolders(compare, tmpdir, pid, ignore_ftypes = ('.log', '.txt', '.frcmod')):
         import filecmp
 
         def _cutfirstline(infile, outfile):
@@ -772,7 +772,6 @@ class TestAmberBuild(unittest.TestCase):
             with open(outfile, 'w') as fout:
                 fout.writelines(data[1:])
 
-        ignore_ftypes = ('.log', '.txt')
         files = []
         deletefiles = []
         for f in glob(join(compare, '*')):
