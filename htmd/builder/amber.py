@@ -757,9 +757,9 @@ class TestAmberBuild(unittest.TestCase):
         self.currentResult = result # remember result for use in tearDown
         unittest.TestCase.run(self, result) # call superclass run method
 
-    # def tearDown(self):
-    #     if self.currentResult.wasSuccessful():
-    #         shutil.rmtree(self.testDir)
+    def tearDown(self):
+        if self.currentResult.wasSuccessful():
+            shutil.rmtree(self.testDir)
 
     @staticmethod
     def _compareResultFolders(compare, tmpdir, pid):
@@ -840,7 +840,6 @@ class TestAmberBuild(unittest.TestCase):
         from htmd.builder.solvate import solvate
         from htmd.parameterization.fftype import fftype, FFTypeMethod
         from htmd.parameterization.writers import writeFRCMOD
-        from htmd.parameterization.util import canonicalizeAtomNames
 
         # Test protein ligand building with parametrized ligand
         refdir = home(dataDir=join('test-amber-build', 'protLig'))
@@ -849,7 +848,6 @@ class TestAmberBuild(unittest.TestCase):
 
         mol = Molecule(join(refdir, '3ptb_mod.pdb'))
         lig = Molecule(join(refdir, 'benzamidine.pdb'), guess=('bonds', 'angles', 'dihedrals'))
-        # lig = canonicalizeAtomNames(lig)
         prm, lig = fftype(lig, method=FFTypeMethod.GAFF2)
         writeFRCMOD(lig, prm, join(tmpdir, 'mol.frcmod'))
         lig.segid[:] = 'L'
@@ -863,6 +861,9 @@ class TestAmberBuild(unittest.TestCase):
         params = defaultParam() + [join(tmpdir, 'mol.frcmod'),]
 
         _ = build(smol, outdir=tmpdir, param=params, ionize=False)
+
+        refdir = home(dataDir=join('test-amber-build', 'protLig', 'results'))
+        TestAmberBuild._compareResultFolders(refdir, tmpdir, '3PTB')
 
         # # Test protein-ligand building
         # folder = home(dataDir='building-protein-ligand')
