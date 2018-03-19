@@ -34,6 +34,8 @@ class FFEvaluate:
             box = np.zeros((3, coords.shape[2]), dtype=np.float32)
         # from IPython.core.debugger import set_trace
         # set_trace()
+        assert box.shape[0] == 3 and box.shape[1] == coords.shape[2], 'Box dimensions have to be (3, numFrames), your Molecule has box of shape {}'.format(box.shape)
+
         energies, forces, atmnrg = _ffevaluate(coords.astype(np.float32), box.astype(np.float32), *self._args)
         return _formatEnergies(energies[:, 0].squeeze())
 
@@ -256,9 +258,11 @@ def ffevaluate(mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectri
     >>> prm = parmed.amber.AmberParameterSet.from_structure(prmtop)
     >>> energies, forces, atmnrg = ffevaluate(mol, prm, betweensets=('resname SOD', 'water'))
     """
+    assert mol.box.shape[0] == 3 and mol.box.shape[1] == mol.coords.shape[2], 'Box dimensions have to be (3, numFrames), your Molecule has box of shape {}'.format(mol.box.shape)
+
     mol = mol.copy()
-    coords = mol.coords
-    box = mol.box
+    coords = mol.coords.astype(np.float32)
+    box = mol.box.astype(np.float32)
     setA, setB = calculateSets(mol, betweensets)
 
     args = list(init(mol, prm, fromstruct))
