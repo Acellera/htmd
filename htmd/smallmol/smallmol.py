@@ -998,6 +998,8 @@ class SmallMol:
     def toRdkitMol(self, includeConformer=False, _debug=False):
         from rdkit.Chem import RWMol
         from rdkit.Chem import Atom
+        from htmd.smallmol.chemlab.builder import _hybridizations_IdxToType
+        from htmd.smallmol.chemlab.builder import _bondtypes_IdxToType
 
         rw = RWMol()
 
@@ -1018,15 +1020,22 @@ class SmallMol:
                 a.SetProp('_CIPCode', self.chiral[n])
             chiral_type = _chiral_type_Dict[self._chiraltags[n]]
             a.SetChiralTag(chiral_type)
-            #print(element, h)
-           # print('>> ', n)
-            #print(a, element)
+            # TODO normalize this behaviour
+
+            if isinstance(self.hybridization[n], HybridizationType):
+                a.SetHybridization(self.hybridization[n])
+            else:
+                hyb = _hybridizations_IdxToType[self.hybridization[n]]
+                a.SetHybridization(hyb)
+
             rw.AddAtom(a)
 
         # add bonds
         for aIdx, (idxs, bonds) in enumerate(zip(self.neighbors, self.bondtypes)):
             for n, bt in zip(idxs, bonds):
                 try:
+                    if isinstance(bt, int):
+                        bt = _bondtypes_IdxToType[bt]
                     rw.AddBond(aIdx, n, bt)
                 except:
                     pass
