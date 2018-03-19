@@ -155,7 +155,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method=FFTypeMethod.CGenFF_2b6, acCh
     mol.atomtype = atomtypes
     mol.charge = charges
     mol.impropers = impropers
-    if len(mol.masses) == 0:
+    if np.sum(mol.masses) == 0:
         mol.masses = masses
 
     return prm, mol
