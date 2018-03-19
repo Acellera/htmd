@@ -4,6 +4,7 @@ import numpy as np
 from htmd.numbautil import dihedralAngleFull, wrapBondedDistance, wrapDistance, cross, dot
 from numba import jit
 from scipy import constants as const
+from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -26,19 +27,26 @@ class FFEvaluate:
         args.append(solventDielectric)
         self._args = args
 
+    @_Deprecated('1.11.11', 'getEnergies')
     def run(self, coords, box=None):
+        return self.getEnergies(coords, box)
+
+    def getEnergies(self, coords, box=None):
+        energies, _, _ = self.calculate(coords, box)
+        return _formatEnergies(energies[:, 0].squeeze())
+
+    def calculate(self, coords, box):
         if coords.ndim == 2:
             coords = coords[:, :, np.newaxis].copy()
 
         if box is None:
             box = np.zeros((3, coords.shape[2]), dtype=np.float32)
-        # from IPython.core.debugger import set_trace
-        # set_trace()
+
         if box.shape[0] != 3 or box.shape[1] != coords.shape[2]:
             raise ValueError('Box dimensions have to be (3, numFrames), your Molecule has box of shape {}'.format(box.shape))
 
         energies, forces, atmnrg = _ffevaluate(coords.astype(np.float32), box.astype(np.float32), *self._args)
-        return _formatEnergies(energies[:, 0].squeeze())
+        return energies, forces, atmnrg
 
 
 def nestedListToArray(nl, dtype, default=1):

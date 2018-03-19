@@ -136,7 +136,7 @@ class FakeQM(QMBase):
 
                 if self.optimize:
                     opt = nlopt.opt(nlopt.LN_COBYLA, result.coords.size)
-                    opt.set_min_objective(lambda x, _: ff.run(x.reshape((-1, 3)))['total'])
+                    opt.set_min_objective(lambda x, _: ff.getEnergies(x.reshape((-1, 3)))['total'])
                     if self.restrained_dihedrals is not None:
                         for dihedral in self.restrained_dihedrals:
                             indices = dihedral.copy()
@@ -152,7 +152,7 @@ class FakeQM(QMBase):
                     result.coords = opt.optimize(result.coords.ravel()).reshape((-1, 3, 1))
                     logger.info('Optimization status: %d' % opt.last_optimize_result())
 
-                result.energy = ff.run(result.coords[:, :, 0])['total']
+                result.energy = ff.getEnergies(result.coords[:, :, 0])['total']
                 result.dipole = getDipole(self.molecule)
 
                 if self.optimize:
