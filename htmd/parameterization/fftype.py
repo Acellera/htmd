@@ -149,6 +149,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method=FFTypeMethod.CGenFF_2b6, acCh
                 raise ValueError('Invalide method {}'.format(method))
 
     # Substituting values from the read-in topology
+    mol = mol.copy()
     mol.name = names
     mol.element = elements
     mol.atomtype = atomtypes
