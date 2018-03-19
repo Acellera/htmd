@@ -35,7 +35,7 @@ class FFEvaluate:
         energies, _, _ = self.calculate(coords, box)
         return _formatEnergies(energies[:, 0].squeeze())
 
-    def calculate(self, coords, box):
+    def calculate(self, coords, box=None):
         if coords.ndim == 2:
             coords = coords[:, :, np.newaxis].copy()
 
