@@ -450,6 +450,8 @@ class Model(object):
             plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
         if plot:
             plt.show()
+        else:
+            plt.close()
         return macroeq
 
     def _coarseP(self):
