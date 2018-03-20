@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -10,7 +10,7 @@ import difflib
 from itertools import tee
 
 # Do not use the triple quote block, as the script can back-fire and remove part of this string
-license_header = ('# (c) 2015-2017 Acellera Ltd http://www.acellera.com\n'
+license_header = ('# (c) 2015-2018 Acellera Ltd http://www.acellera.com\n'
                   '# All Rights Reserved\n'
                   '# Distributed under HTMD Software License Agreement\n'
                   '# No redistribution in whole or part\n'
@@ -22,7 +22,7 @@ license_header = ('# (c) 2015-2017 Acellera Ltd http://www.acellera.com\n'
 # IT IS ADVISED TO CHECK THOSE DELTAS BEFORE WRITING DIRECTLY ON THE REPO (./)
 outdir = './test_license_headers'
 # outdir = './'
-exclusions = ['./test_license_headers', './htmdlib']
+exclusions = ['./test_license_headers', './htmdlib', './htmd/data']
 
 for root, dirs, files in os.walk('.'):
     for i, fname in enumerate([os.path.join(root, file) for file in files if not any(exclusion in root for exclusion in exclusions)]):
