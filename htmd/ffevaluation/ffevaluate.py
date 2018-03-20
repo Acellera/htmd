@@ -9,12 +9,25 @@ from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
-def _formatEnergies(energies):
-    return {'angle': energies[3], 'bond': energies[0], 'dihedral': energies[4], 'elec': energies[2],
-            'improper': energies[5], 'vdw': energies[1], 'total': energies.sum()}
-
-
 class FFEvaluate:
+    @staticmethod
+    def formatEnergies(energies):
+        """ Formats the energies into a dictionary.
+
+        Parameters
+        ----------
+        energies : np.ndarray
+            An energy array returned by `calculate`
+
+        Returns
+        -------
+        energiesdict : dict
+            A dictionary containing the energies
+        """
+        energies = energies.squeeze()
+        return {'angle': energies[3], 'bond': energies[0], 'dihedral': energies[4], 'elec': energies[2],
+                'improper': energies[5], 'vdw': energies[1], 'total': energies.sum(axis=0)}
+
     def __init__(self, mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, fromstruct=False):
         """  Evaluates energies and forces of the forcefield for a given Molecule
 
@@ -73,13 +86,32 @@ class FFEvaluate:
         args.append(solventDielectric)
         self._args = args
 
-    @_Deprecated('1.11.11', 'getEnergies')
+    @_Deprecated('1.11.11', 'calculateEnergies')
     def run(self, coords, box=None):
-        return self.getEnergies(coords, box)
+        return self.calculateEnergies(coords, box)
 
-    def getEnergies(self, coords, box=None):
+    def calculateEnergies(self, coords, box=None, formatted=True):
+        """ Utility method which calls `calculate` to calculate energies and returns them.
+
+        Parameters
+        ----------
+        coords : np.ndarray
+            A (natoms, 3, nframes) shaped coordinates array.
+        box : np.ndarray
+            A (3, nframes) shaped periodic box dimensions array.
+        formatted : bool
+            If True it will return a dictionary of the energies. If False it returns an array of energies as described in
+            calculate.
+
+        Returns
+        -------
+        energies : dict or np.ndarray
+            The energies as a dictionary or np.array depending on option `formatted`
+        """
         energies, _, _ = self.calculate(coords, box)
-        return _formatEnergies(energies[:, 0].squeeze())
+        if formatted:
+            energies = self.formatEnergies(energies)
+        return energies
 
     def calculate(self, coords, box=None):
         """ Calculates energies, forces and individual atom energies for given coordinates and periodic box.
