@@ -20,6 +20,11 @@ class PeriodicTable:
 
         return valence - normbondvalence
 
+    def getRadiusBond(self, element):
+        pT = self.PeriodicaTable
+
+        return pT.GetRb0(element)
+
 
     def getMissingValence(self, atomidx, smallmol):
         pT = self.PeriodicaTable

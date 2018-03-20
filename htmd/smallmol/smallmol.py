@@ -1026,7 +1026,9 @@ class SmallMol:
                 a.SetHybridization(self.hybridization[n])
             else:
                 hyb = _hybridizations_IdxToType[self.hybridization[n]]
+
                 a.SetHybridization(hyb)
+
 
             rw.AddAtom(a)
 
@@ -1036,8 +1038,14 @@ class SmallMol:
                 try:
                     if isinstance(bt, int):
                         bt = _bondtypes_IdxToType[bt]
+                    elif isinstance(bt, np.int64):
+
+                        bt = _bondtypes_IdxToType[int(bt)]
+                        n = int(n)
+
                     rw.AddBond(aIdx, n, bt)
                 except:
+
                     pass
 
         mol = rw.GetMol()
