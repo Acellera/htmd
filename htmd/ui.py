@@ -47,6 +47,7 @@ from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
 from htmd.builder.loopmodeler import loopModeller
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.config import config

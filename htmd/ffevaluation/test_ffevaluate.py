@@ -1,5 +1,5 @@
 from htmd.molecule.molecule import Molecule
-from htmd.ffevaluation.ffevaluate import ffevaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 import parmed
 from glob import glob
 import numpy as np
@@ -264,7 +264,7 @@ if __name__ == '__main__':
                 keepForces(prm, struct, mol, forces=force)
                 keepForcesAmber(struct, mol, forces=force)
 
-            energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa)
+            energies, forces, atmnrg = FFEvaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa).calculate(mol.coords, mol.box)
             energies = _formatEnergies(energies[:, 0])
             forces = forces[:, :, 0].squeeze()
             omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)
@@ -282,7 +282,7 @@ if __name__ == '__main__':
             fromstruct = True
             keepForces(prm, struct, mol)
             keepForcesAmber(struct, mol)
-        energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa)
+        energies, forces, atmnrg = FFEvaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa).calculate(mol.coords, mol.box)
         energies = _formatEnergies(energies[:, 0])
         forces = forces[:, :, 0].squeeze()
         omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)
