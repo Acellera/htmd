@@ -77,7 +77,7 @@ def getArgumentParser():
 def printEnergies(molecule, parameters, filename):
     from htmd.ffevaluation.ffevaluate import FFEvaluate
     assert molecule.numFrames == 1
-    energies = FFEvaluate(molecule, parameters).run(molecule.coords[:, :, 0])
+    energies = FFEvaluate(molecule, parameters).calculateEnergies(molecule.coords[:, :, 0])
 
     string = '''
 == Diagnostic Energies ==

@@ -152,7 +152,7 @@ class DihedralFitting:
         ff = FFEvaluate(self.molecule, self.parameters)
         self._initial_energies = []
         for rotamer_coords in self._coords:
-            self._initial_energies.append(np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords]))
+            self._initial_energies.append(np.array([ff.calculateEnergies(coords[:, :, 0])['total'] for coords in rotamer_coords]))
 
     def _getBounds(self):
         """
@@ -315,7 +315,7 @@ class DihedralFitting:
         self._target_energies = []
         ff = FFEvaluate(self.molecule, self.parameters)
         for rotamer_coords, ref_energies in zip(self._coords, self._reference_energies):
-            energies = ref_energies - np.array([ff.run(coords[:, :, 0])['total'] for coords in rotamer_coords])
+            energies = ref_energies - np.array([ff.calculateEnergies(coords[:, :, 0])['total'] for coords in rotamer_coords])
             energies -= np.min(energies)
             self._target_energies.append(energies)
         self._all_target_energies = np.concatenate(self._target_energies)
@@ -338,7 +338,7 @@ class DihedralFitting:
         self._fitted_energies = []
         ffeval = FFEvaluate(self.molecule, self.parameters)
         for rotamer_coords in self._coords:
-            self._fitted_energies.append(np.array([ffeval.run(coords[:, :, 0])['total'] for coords in rotamer_coords]))
+            self._fitted_energies.append(np.array([ffeval.calculateEnergies(coords[:, :, 0])['total'] for coords in rotamer_coords]))
 
         # TODO make the self-consistency test numerically robust
         #reference_energies = np.concatenate([energies - np.mean(energies) for energies in self._reference_energies])
