@@ -275,24 +275,58 @@ def normalizeVector(v):
     return v / l
 
 def getPerpendicular(v):
+    V = np.array([0,0,0])
     if v[0] != 0:
         if v[1] != 0:
-            V = np.array([v[1], -v[0], 0])
+            V[0] = v[1]
+            V[1] = -v[0]
         elif v[2] != 0:
-            V = np.array( [v[2], v[1], -v[0]] )
+            V[2] = -v[0]
+            V[0] = v[2]
         else:
-            V = np.array([ v[0], 1, v[2] ])
+            V[1] = 1
     elif v[1] != 0:
         if v[2] != 0:
-            V = np.array( [v[0], v[2], -v[1]] )
+            V[2] = -v[1]
+            V[1] = v[2]
         else:
-            V = np.array( [1, v[1], v[2]] )
-    elif v[2] != 0:
-        V = np.array( [1, v[1], v[2]] )
+            V[0] = 1
+    elif v[2] !=0:
+        V[0] = 1
+    # if v[0] != 0:
+    #     if v[1] != 0:
+    #         V = np.array([v[1], -v[0], v[2]])
+    #     elif v[2] != 0:
+    #         V = np.array( [v[2], v[1], -v[0]] )
+    #     else:
+    #         V = np.array([ v[0], 1, v[2] ])
+    # elif v[1] != 0:
+    #     if v[2] != 0:
+    #         V = np.array( [v[0], v[2], -v[1]] )
+    #     else:
+    #         V = np.array( [1, v[1], v[2]] )
+    # elif v[2] != 0:
+    #     V = np.array( [1, v[1], v[2]] )
 
     return V
 
 def getRotationMatrix(axis, theta, deg=False):
+    if deg:
+        theta = math.radians(theta)
+
+    c, s = math.cos(theta), math.sin(theta)
+
+    t = 1 - c
+    X = axis[0]
+    Y = axis[1]
+    Z = axis[2]
+
+    return np.array([ [t*X*X+c, t*X*Y-s*Z, t*X*Z+s*Y],
+                      [t*X*Y+s*Z, t*Y*Y+c, t*Y*Z-s*X],
+                      [t*X*Z-s*Y, t*Y*Z+s*X, t*Z*Z+c] ])
+
+
+def getRotationMatrix2(axis, theta, deg=False):
     """
     Return the rotation matrix associated with counterclockwise rotation about
     the given axis by theta radians.
