@@ -17,18 +17,37 @@ _bondtypes_IdxToType = BondType.values
 
 class Builder:
 
-    def __init__(self, smallmol=None):
+    def __init__(self, smallmol=None, checkInitialConformer=True):
 
         self.smallmol = smallmol
         self.periodictable = PeriodicTable()
 
+        if checkInitialConformer and smallmol is not None:
+            self._prepareConformer()
 
-    def loadMol(self, smallmol):
+
+    def loadMol(self, smallmol, checkInitialConformer=True):
 
         if not isinstance(smallmol, SmallMol):
             raise ValueError('The argument tyep {} is not accepted. Only SmallMol object. '.format(smallmol))
 
         self.smallmol = smallmol.copy()
+
+        if checkInitialConformer:
+            self._prepareConformer()
+
+    def _prepareConformer(self):
+        from rdkit.Chem import AllChem
+
+        sm = self.smallmol
+        mol = sm.toRdkitMol(includeConformer=True)
+
+        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+
+        conf = mol.GetConformer(0)
+        coords = conf.GetPositions()
+        coords = coords[:, :, np.newaxis]
+        sm.coords = coords
 
 
     def addHydrogens(self, onlyExplicit=False):
@@ -42,12 +61,15 @@ class Builder:
             heavy_sel = ' '.join(_heavy_atoms)
 
         atomidxs = sm.get('element {}'.format(heavy_sel), 'idx')
+        # testing
+        formalcharges = sm.get('element {}'.format(heavy_sel), 'formalcharge')
 
-        missing_atoms = np.array([pT.getMissingValence(aId, sm) for aId in atomidxs])
+        # testing : add formalcharges part
+        missing_atoms = np.array([pT.getMissingValence(aId, sm, fch) for aId, fch in zip(atomidxs, formalcharges)])
         ids = np.where(missing_atoms > 0)
         heavyToFill = atomidxs[ids]
         numHydrogens = missing_atoms[ids]
-
+        print("missing hydrogens: ", numHydrogens)
         h_atoms = []
 
         for n_h, a in zip(numHydrogens, heavyToFill):
@@ -84,7 +106,9 @@ class Builder:
         #debug
         c = 1
         for a in atoms:
+
             n_atom = sm.numAtoms
+           # print('placing {} to {}'.format(n_atom, a['attachTo']))
             sm.__dict__['idx'] = np.append(sm.idx, n_atom)
             sm.__dict__['element'] = np.append(sm.element, a['element'])
             sm.__dict__['atomname'] = np.append(sm.atomname, '{}{}'.format(a['element'], n_atom))
@@ -119,8 +143,8 @@ class Builder:
             sm.__dict__['coords'][n_atom]  = self._getAtomCoords(n_atom, a['attachTo'])
 
             #### REMOVE IT ( For debugging)
-            #if c == 3: break
-
+            #if c == 7: break
+          #  print()
             c += 1
 
     def _getAtomCoords(self, atomIdx, attachToIdx):
@@ -134,6 +158,9 @@ class Builder:
         heavy_neighbors = sm.neighbors[attachToIdx]
         heavy_neighbors_num = len(heavy_neighbors)
         bondLength = pT.getRadiusBond(heavy_element) + pT.getRadiusBond(atom_element)
+
+      #  print(heavy_neighbors)
+      #  print(heavy_hybridization)
 #
         dirVect = np.array([0,0,0])
         if heavy_neighbors_num == 1:
@@ -144,42 +171,73 @@ class Builder:
                 heavy_hybridization = _hybridizations_IdxToType[heavy_hybridization]
             else:
                 heavy_hybridization = heavy_hybridization
+
+            nbr = self._filterNeighbors(attachToIdx, atomIdx)[0]
+            nbr_coords = sm.coords[nbr].reshape(3)
+            nbrVect = nbr_coords - heavy_coords
+    #       print('neighbor vector: ', nbrVect)
+
+            nbrVect = normalizeVector(nbrVect)
+            nbrVect = -nbrVect
+            #print('neighbor normalized and inversed: ', nbrVect)
+
+            perpVect = getPerpendicular(nbrVect)
+            #              print('perp: ', perpVect)
+            perpVect = normalizeVector(perpVect)
+            #             print('perp norm: ',perpVect)
+
             if heavy_hybridization == HybridizationType.SP3:
-                print('sp3 procedure')
-                nbr = self._filterNeighbors(attachToIdx, atomIdx)[0]
-                nbr_coords = sm.coords[nbr].reshape(3)
-                nbrVect = nbr_coords - heavy_coords
-
-                nbrVect = normalizeVector(nbrVect)
-                nbrVect = -nbrVect
-
-                perpVect = getPerpendicular(nbrVect)
-                perpVect = normalizeVector(perpVect)
-
+               # print('sp3 procedure')
                 rot_matrix = getRotationMatrix(perpVect, (180-109.471), deg=True)
-
                 dirVect = np.dot(rot_matrix, nbrVect)
+
+            elif heavy_hybridization == HybridizationType.SP2:
+              #  print('sp2 procedure')
+
+                nbr_neighbors = sm.neighbors[nbr]
+                nbr_neighbors_num = len(nbr_neighbors)
+
+               # print("nbr neighbors: ", nbr_neighbors_num)
+
+                if nbr_neighbors_num > 1:
+
+                    nbr2 = [n for n in sm.neighbors[nbr] if n != attachToIdx][0]
+                    idx = sm.neighbors[nbr].index(nbr2)
+                    nbr2_nbr_btype = sm.bondtypes[nbr][idx]
+                    nbr2_nbr_btype = _bondtypes_IdxToType[nbr2_nbr_btype]
+                    if nbr2_nbr_btype in [BondType.AROMATIC, BondType.DOUBLE]:
+                       # print('taking into account another atom')
+                        nbr2_coords = sm.coords[nbr2].reshape(3)
+                        nbr2Vect = nbr2_coords - nbr_coords
+                        nbr2Vect = normalizeVector(nbr2Vect)
+                        perpVect = np.cross(nbr2Vect, nbrVect)
+                        perpVect = normalizeVector(perpVect)
+
+                rot_matrix = getRotationMatrix(perpVect, 60, deg=True)
+                dirVect = np.dot(rot_matrix, nbrVect)
+
+
+
 
         elif heavy_neighbors_num == 3:
             if isinstance(heavy_hybridization, int):
                 heavy_hybridization = _hybridizations_IdxToType[heavy_hybridization]
             else:
                 heavy_hybridization = heavy_hybridization
+            nbrs = self._filterNeighbors(attachToIdx, atomIdx)
+            nbr1, nbr2 = nbrs
+            nbr1_coords, nbr2_coords = sm.coords[nbr1].reshape(3), sm.coords[nbr2].reshape(3)
+            nbr1Vect = heavy_coords - nbr1_coords
+            nbr2Vect = heavy_coords - nbr2_coords
+
+            nbr1Vect = normalizeVector(nbr1Vect)
+            nbr2Vect = normalizeVector(nbr2Vect)
+
+            dirVect = nbr1Vect + nbr2Vect
+            dirVect = normalizeVector(dirVect)
 
             if heavy_hybridization == HybridizationType.SP3:
-                print('second attachment sp3 procedure')
-                nbrs = self._filterNeighbors(attachToIdx, atomIdx)
-                nbr1, nbr2 = nbrs
-                nbr1_coords, nbr2_coords= sm.coords[nbr1].reshape(3), sm.coords[nbr2].reshape(3)
-                nbr1Vect = heavy_coords -  nbr1_coords
-                nbr2Vect = heavy_coords -  nbr2_coords
-
-                nbr1Vect = normalizeVector(nbr1Vect)
-                nbr2Vect = normalizeVector(nbr2Vect)
-
-                dirVect = nbr1Vect + nbr2Vect
-                dirVect = normalizeVector(dirVect)
-
+                #print('second attachment sp3 procedure')
                 nbrPerp = np.cross(nbr1Vect, nbr2Vect)
 
                 rotAxis = np.cross(nbrPerp, dirVect)
@@ -189,8 +247,9 @@ class Builder:
 
                 dirVect = np.dot(rot_matrix, dirVect)
 
+
         elif heavy_neighbors_num == 4:
-            print('last attachment sp3 procedure')
+          #  print('last attachment sp3 procedure')
             nbrs = self._filterNeighbors(attachToIdx, atomIdx)
             nbr1, nbr2, nbr3 = nbrs
 
@@ -249,66 +308,53 @@ class Builder:
         self._fixAtomNumber(atom_mapper)
 
     def _fixAtomNumber(self, atom_mapper):
-        #TODO
-        # atomname --> element, idx
+
         sm = self.smallmol
 
         for i, idx in enumerate(sm.idx):
             sm.idx[i] = atom_mapper[idx]
 
+        for i, el in zip(sm.idx, sm.element):
+            sm.atomname[i] = ''.join([el, str(i)])
+
         for n_set in sm.neighbors:
             for i, n in enumerate(n_set):
                 n_set[i] = atom_mapper[n]
 
-
-
     def getSmallMol(self):
         return self.smallmol
-
 
 def normalizeVector(v):
     from math import sqrt
     l = sqrt(v[0] ** 2 + v[1] ** 2. + v[2] ** 2)
 
     if l == 0:
+        print('warning normalized vector goes to 0')
         return np.array([0,0,0])
     return v / l
 
 def getPerpendicular(v):
-    V = np.array([0,0,0])
-    if v[0] != 0:
-        if v[1] != 0:
-            V[0] = v[1]
-            V[1] = -v[0]
-        elif v[2] != 0:
-            V[2] = -v[0]
-            V[0] = v[2]
+    V = [0,0,0]
+    X, Y, Z = v[0], v[1], v[2]
+    if X != 0:
+        if Y != 0:
+            V[0] = Y
+            V[1] = -X
+        elif Z != 0:
+            V[2] = -X
+            V[0] = Z
         else:
             V[1] = 1
-    elif v[1] != 0:
-        if v[2] != 0:
-            V[2] = -v[1]
-            V[1] = v[2]
+    elif Y != 0:
+        if Z != 0:
+            V[2] = -Y
+            V[1] = Z
         else:
             V[0] = 1
-    elif v[2] !=0:
+    elif Z !=0:
         V[0] = 1
-    # if v[0] != 0:
-    #     if v[1] != 0:
-    #         V = np.array([v[1], -v[0], v[2]])
-    #     elif v[2] != 0:
-    #         V = np.array( [v[2], v[1], -v[0]] )
-    #     else:
-    #         V = np.array([ v[0], 1, v[2] ])
-    # elif v[1] != 0:
-    #     if v[2] != 0:
-    #         V = np.array( [v[0], v[2], -v[1]] )
-    #     else:
-    #         V = np.array( [1, v[1], v[2]] )
-    # elif v[2] != 0:
-    #     V = np.array( [1, v[1], v[2]] )
 
-    return V
+    return np.array(V)
 
 def getRotationMatrix(axis, theta, deg=False):
     if deg:

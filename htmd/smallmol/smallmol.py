@@ -1014,7 +1014,7 @@ class SmallMol:
         #    print(n, h)
             a = Atom(self.element[n])
             a.SetFormalCharge(int(self.formalcharge[n]))
-            a.SetNumExplicitHs(int(self.expliciths[n]))
+            #a.SetNumExplicitHs(int(self.expliciths[n]))
             a.SetNoImplicit(1)
             if self.chiral[n] != '':
                 a.SetProp('_CIPCode', self.chiral[n])
