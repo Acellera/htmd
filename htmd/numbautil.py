@@ -1,3 +1,8 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 import numpy as np
 from numba import jit
 from math import sqrt, atan2
