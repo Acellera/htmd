@@ -172,7 +172,7 @@ class Builder:
                 new_bonds = sm.bondtypes.tolist()
                 new_bonds[a['attachTo']].append(a['bondtype'])
                 sm.bondtypes = np.array(new_bonds)
-                
+
             else:
                 sm.neighbors[a['attachTo']].append(n_atom)
                 sm.bondtypes[a['attachTo']].append(a['bondtype'])
