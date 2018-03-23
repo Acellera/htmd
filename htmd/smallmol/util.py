@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 import os
-from math import cos, sqrt, sin
+import math
 import numpy as np
 from htmd.molecule.voxeldescriptors import _getGridCenters
 from rdkit.Chem import ChemicalFeatures
@@ -44,9 +44,9 @@ def get_rotationMatrix(axis, theta):
 
     axis = np.asarray(axis)
     theta = np.asarray(theta)
-    axis = axis / sqrt(np.dot(axis, axis))
-    a = cos(theta / 2)
-    b, c, d = -axis * sin(theta / 2)
+    axis = axis / math.sqrt(np.dot(axis, axis))
+    a = math.cos(theta / 2)
+    b, c, d = -axis * math.sin(theta / 2)
     aa, bb, cc, dd = a * a, b * b, c * c, d * d
     bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
     return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
@@ -55,6 +55,23 @@ def get_rotationMatrix(axis, theta):
 
 
 def _getRotationMatrix(axis, theta, deg=False):
+    """
+    Rotational matrix used by Builder
+    axis: np.array
+        The axis of rotation
+    theta: float
+        The angle of the rotation
+    deg: bool
+        If True, the angle is considered in degree and will be converted into radians
+        Default: False
+
+    Returns
+    -------
+    rotmatrix: np.array
+        The rotational matrix
+    """
+    # Development note: I will test the above rotationl matrix. If same behaviour this one will be deprecated
+
     if deg:
         theta = math.radians(theta)
 
@@ -70,6 +87,19 @@ def _getRotationMatrix(axis, theta, deg=False):
                       [t*X*Z-s*Y, t*Y*Z+s*X, t*Z*Z+c] ])
 
 def _normalizeVector(v):
+    """
+    Returns the normalize vector
+
+    Parameters
+    ----------
+    v: np.array
+        The vector to normalize
+
+    Returns
+    -------
+    V: np.array
+        The normalized vector
+    """
     from math import sqrt
     l = sqrt(v[0] ** 2 + v[1] ** 2. + v[2] ** 2)
 
@@ -79,6 +109,19 @@ def _normalizeVector(v):
     return v / l
 
 def _getPerpendicular(v):
+    """
+    Returns a perpendicular vector
+
+    Parameters
+    ----------
+    v: np.array
+        The vector you want a perpendicular one
+
+    Returns
+    -------
+    V:  np.array
+        The perpendicular vector
+    """
     V = [0,0,0]
     X, Y, Z = v[0], v[1], v[2]
     if X != 0:
@@ -111,6 +154,7 @@ def rotate(coords, rotMat, center=(0,0,0)):
         The rotation matrix
     center : list
         The rotation center
+        Default: [0,0,0]
     """
 
     newcoords = coords - center
@@ -231,6 +275,32 @@ def convertToString(arr):
     return arr_str
 
 def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtoms=None):
+    """
+    Returns the image or the ipython rendering.
+
+    Parameters
+    ----------
+    mol: rdkit.Chem.rdchem.Mol
+        The rdkit molecule to depict
+    filename: str
+        The filename of the image
+        Default: None
+    ipython: bool
+        If True, the SVG rendering for jupiter-nootebook are returned
+        Default: False
+    atomlabels: list
+        List of the label to use for each atom
+        Default: None
+    highlightAtoms: list
+        List of atom index to highlight. Can be also list of list for different selection-colors
+        Default: None
+
+    Returns
+    -------
+    svg: SVG
+        If ipython set as True, the SVG rendering is returned
+
+    """
     from os.path import splitext
     from rdkit.Chem.Draw import rdMolDraw2D
     from IPython.display import SVG
@@ -282,86 +352,36 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
     else:
         return None
 
-
-# def _depictMol(mol, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True, atomlabels=None, highlightAtoms=None):
-#     from rdkit.Chem import RemoveHs
-#     from rdkit.Chem.AllChem import  Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
-#     from rdkit.Chem.Draw import rdMolDraw2D
-#     from IPython.display import SVG
-#     from copy import deepcopy
-#     from os.path import splitext
-#
-#     if sketch and optimize:
-#         raise ValueError('Impossible to use optmization in  2D sketch representation')
-#
-#     if optimizemode not in ['std', 'mmff']:
-#         raise ValueError('Optimization mode {} not understood. Can be "std" or  "ff"'.format(optimizemode))
-#
-#     if highlightAtoms is not None and not isinstance(highlightAtoms, list):
-#         raise ValueError('highlightAtoms should be a list of atom idx or a list of atom idx list ')
-#
-#     _mol = deepcopy(mol)
-#
-#     # 2D representation. Set z coords to 0
-#     if sketch:
-#         Compute2DCoords(_mol)
-#     # Clean representation without hydrogens
-#     if removeHs:
-#         _mol = RemoveHs(_mol)
-#
-#     # init the drawer object
-#     drawer = rdMolDraw2D.MolDraw2DSVG(400, 200)
-#     # get the drawer options
-#     opts = drawer.drawOptions()
-#
-#     # add atomlabels
-#     if atomlabels is not None:
-#         for n, a in enumerate(_mol.GetAtoms()):
-#             _atomIdx = a.GetIdx()
-#             opts.atomLabels[n] = atomlabels[_atomIdx]
-#
-#     # activate 3D coords optimization
-#     if optimize:
-#         if optimizemode == 'std':
-#             EmbedMolecule(_mol, ETKDG())
-#         elif optimizemode == 'mmff':
-#             MMFFOptimizeMolecule(_mol)
-#
-#     # draw molecule
-#     sel_atoms = []
-#     sel_colors = {}
-#     # highlight atoms
-#     if highlightAtoms is not None:
-#         if isinstance(highlightAtoms[0], list ):
-#             sel_atoms = [aIdx for subset in highlightAtoms for aIdx in subset]
-#             sel_colors = {aIdx: _highlight_colors[n%len(_highlight_colors)] for n, subset in enumerate(highlightAtoms) for aIdx in subset}
-#         else:
-#             sel_atoms = highlightAtoms
-#             sel_colors = { aIdx:_highlight_colors[0] for aIdx in sel_atoms }
-#
-#     drawer.DrawMolecule(_mol, highlightAtoms=sel_atoms, highlightBonds=[], highlightAtomColors=sel_colors)
-#
-#     drawer.FinishDrawing()
-#
-#     # svg object
-#     svg = drawer.GetDrawingText()
-#
-#     # activate saving into a file
-#     if filename != None:
-#         ext = splitext(filename)[-1]
-#         filename = filename if ext != '' else filename + '.svg'
-#         f = open(filename, 'w')
-#         f.write(svg)
-#         f.close()
-#
-#     # activate jupiter-notebook rendering
-#     if ipython:
-#         svg = svg.replace('svg:', '')
-#         return SVG(svg)
-#     else:
-#         return None
-
 def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, highlightAtoms=None, mols_perrow=3):
+    """
+        Returns the image or the ipython rendering.
+
+        Parameters
+        ----------
+        mols_list: list
+            The list of the rdkit molecules to depict
+        filename: str
+            The filename of the image
+            Default: None
+        ipython: bool
+            If True, the SVG rendering for jupiter-nootebook are returned
+            Default: False
+        legends: list
+            List of titles subfigure for each molecule
+            Default: None
+        highlightAtoms: list
+            List of list of atom index to highlight.
+            Default: None
+        mols_perrow: int
+            The number of subfigures per row
+            Default: 3
+
+        Returns
+        -------
+        svg: SVG
+            If ipython set as True, the SVG rendering is returned
+
+        """
     from rdkit.Chem.Draw import MolsToGridImage
     from IPython.display import SVG
     from os.path import splitext
@@ -390,58 +410,3 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
         return SVG(svg)
     else:
         return None
-
-# def depictMultipleMols(mols_list, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std',
-#                        removeHs=True,  legends=None, highlightAtoms=None, mols_perrow=3):
-#
-#     from rdkit.Chem import RemoveHs
-#     from rdkit.Chem.Draw import MolsToGridImage
-#     from rdkit.Chem.AllChem import Compute2DCoords, EmbedMolecule, MMFFOptimizeMolecule, ETKDG
-#     from copy import deepcopy
-#     from IPython.display import SVG
-#     from os.path import splitext
-#
-#     if sketch and optimize:
-#         raise ValueError('Impossible to use optmization in  2D sketch representation')
-#
-#     _mols = [ deepcopy(m) for m in mols_list ]
-#
-#     if sketch:
-#         for _m in _mols: Compute2DCoords(_m)
-#
-#     if removeHs:
-#         _mols = [ RemoveHs(_m) for _m in _mols ]
-#
-#     # activate 3D coords optimization
-#     if optimize:
-#         if optimizemode == 'std':
-#             for _m in _mols: EmbedMolecule(_m)
-#         elif optimizemode == 'mmff':
-#             for _m in _mols: MMFFOptimizeMolecule(_m, ETKDG())
-#
-#
-#     sel_atoms = []
-#     sel_colors = []
-#     if highlightAtoms is not None:
-#         if isinstance(highlightAtoms[0][0], list):
-#             sel_atoms = [ [a for a in subset] for mol_set in highlightAtoms for subset in mol_set ]
-#             sel_colors = [ {aIdx:_highlight_colors[n%len(_highlight_colors)] for aIdx in subset } for mol_set in highlightAtoms for n, subset in enumerate(mol_set)  ]
-#         else:
-#             sel_atoms = highlightAtoms
-#             sel_colors = [ {aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms ]
-#
-#
-#     svg = MolsToGridImage(_mols, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
-#                           legends=legends, molsPerRow=mols_perrow, useSVG=True)
-#
-#     if filename:
-#         ext = splitext(filename)[-1]
-#         filename = filename if ext != '' else filename + '.svg'
-#         f = open(filename, 'w')
-#         f.write(svg)
-#         f.close()
-#
-#     if ipython:
-#         return SVG(svg)
-#     else:
-#         return None

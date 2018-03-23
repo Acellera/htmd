@@ -44,22 +44,80 @@ _atoms = {'H': [ 'H', 0, 0, '', 1, 1],
         }
 
 class PeriodicTable:
+    """
+    Class that manages all the chemical information about atoms based on the atom. It exposes the rdkit PeriodicTable
+    functionalities.
+    """
 
     def __init__(self):
         self.PeriodicaTable = GetPeriodicTable()
 
     def _evaluateMissingAtoms(self, valence, btypes):
+        """
+        Returns the difference bewtween the current valence computed and the expected one.
+
+        Parameters
+        ----------
+        valence: int
+            The valence of the atom
+        btypes: list
+            A list of the bondtypes connected to the atom
+
+        Returns
+        -------
+        missatoms: int
+            The number of atoms that miss for completing the atom valence
+
+        """
         normbondvalence = sum([ 1.5 if int(b) == 12 else int(b) for b in btypes  ])
 
-        return int(valence - normbondvalence)
+        missatoms = int(valence - normbondvalence)
+
+        return missatoms
 
     def getRadiusBond(self, element):
-        pT = self.PeriodicaTable
+        """
+        Returns the atom radius when bonded
 
-        return pT.GetRb0(element)
+        Parameters
+        ----------
+        element: str
+            The element of the atom
+
+        Returns
+        -------
+        bradius: float
+            The radius of the bond when bonded
+
+        """
+
+        pT = self.PeriodicaTable
+        bradius = pT.GetRb0(element)
+
+        return bradius
 
 
     def getMissingValence(self, atomidx, smallmol, formalcharge=0):
+        """
+        Returns the number of missing atom to complete the atom valence based on the types of bonds and formalcharge
+
+        Parameters
+        ----------
+        atomidx: int
+            The index of the atom
+        smallmol: htmd.smallmol.smallmol.SmallMol
+            The SmallMol object
+        formalcharge: int
+            The formalcharge of the atom
+            Default: 0
+
+        Returns
+        -------
+        missingatoms: int
+            The number of atom that are missing for completing the valence
+        """
+
+
         pT = self.PeriodicaTable
 
         element = smallmol.element[atomidx]
@@ -67,21 +125,54 @@ class PeriodicTable:
         #steric_number = len(smallmol.neighbors[atomidx])
 
         valences = list(pT.GetValenceList(element))
-        print(valences)
+
+        # Some atoms can have multiple valid valences (like S, P). For them I should predict the most reliable one.
+        # At the moment not implemented. I will raise an error now.
         if len(valences) == 1:
             valence = valences[0]
         else:
-            #TODO
-            pass
+            class Notmplemented(Exception):
+                pass
+            raise Notmplemented('The missing valence is not implemented for atom with more than one valid valence')
 
         missingatoms = self._evaluateMissingAtoms(valence,  btypes)
 
-        return missingatoms + formalcharge
+        missingatoms = missingatoms + formalcharge
+
+        return missingatoms
+
 
     def getAtom(self, element, attachTo=None, coords=None ):
+        """
+        Returns a dictionary with all the information necessary to create a new atom by using htmd.smallmol.chemlab.Builder
+
+        Parameters
+        ----------
+        element: str
+            The element of the atom
+        attachTo: int
+            The index of the atom you want the new atom will be bonded to
+            Default: None
+        coords:
+            The coordinates of the new atom
+            Default: None
+
+        Returns
+        -------
+        atom_data: dict
+            The atom data
+
+        Example
+        -------
+        >>> PT.getAtom('H')
+        {'attachTo': '', 'bondtype': 1, 'charge': 0, 'chiral': '', 'coords': array([[[0],[0],[0]]]), 'element': 'H',
+        'formalcharge': 0, 'hybridization': 1}
+        """
+
+        if element not in _atoms:
+            raise ValueError('The element {} is not available'.format(element))
 
         keys = ['element', 'charge','formalcharge', 'chiral', 'hybridization', 'bondtype']
-
 
         coords = coords if coords is not None else np.array([0,0,0])
         coords = {'coords': coords.reshape(1,3,1)}
