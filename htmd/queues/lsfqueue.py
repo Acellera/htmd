@@ -21,31 +21,40 @@ class LsfQueue(SimQueue, ProtocolInterface):
 
     Parameters
     ----------
+    version : [9, 10], int, default=9
+        LSF major version
     jobname : str, default=None
         Job name (identifier)
-    queue : str or list of str, default=None
-        The queue or list of queues to run on. If list, it attempts to submit the job to the first queue listed. If that
-        queue cannot be used, the next queue listed is considered and this process is repeated.
+    queue : list, default=None
+        The queue or list of queues to run on. If list, it attempts to submit the job to the first queue listed
     app : str, default=None
         The application profile
     ngpu : int, default=1
         Number of GPUs to use for a single job
+    gpu_options : dict, default=None
+        Number of GPUs to use for a single job(dict format: {['mode': ['shared', 'exclusive_process'],]['mps': ['yes',
+        'no'],]['j_exclusive': ['yes', 'no']]})
     ncpu : int, default=1
         Number of CPUs to use for a single job
     memory : int, default=4000
         Amount of memory per job (MiB)
     walltime : int, default=None
         Job timeout (hour:min or min)
+    resources : list, default=None
+        Resources of the queue
+    outputstream : str, default='lsf.%J.out'
+        Output stream.
+    errorstream : str, default='lsf.%J.err'
+        Error stream.
+    datadir : str, default=None
+        The path in which to store completed trajectories.
+    trajext : str, default='xtc'
+        Extension of trajectory files. This is needed to copy them to datadir.
     envvars : str, default='ACEMD_HOME'
         Envvars to propagate from submission node to the running node (comma-separated)
-    prerun : list of strings, default=None
+    prerun : list, default=None
         Shell commands to execute on the running node before the job (e.g. loading modules)
-    resources : list of strings, default=None
-        Resources of the queue
-    outputstream : str, default='slurm.%N.%j.out'
-        Output stream.
-    errorstream : str, default='slurm.%N.%j.err'
-        Error stream.
+
 
     Examples
     --------
@@ -55,21 +64,29 @@ class LsfQueue(SimQueue, ProtocolInterface):
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script
     """
 
-    _defaults = {'queue': None, 'app': None, 'gpu_queue': None, 'cpu_queue': None, 'ngpu': 1, 'ncpu': 1,
-                 'memory': 4000, 'walltime': None, 'resources': None, 'envvars': 'ACEMD_HOME', 'prerun': None}
+    _defaults = {'version': 9, 'queue': None, 'app': None, 'gpu_queue': None, 'cpu_queue': None,
+                 'ngpu': 1, 'gpu_options': None, 'ncpu': 1, 'memory': 4000, 'walltime': None, 'resources': None,
+                 'envvars': 'ACEMD_HOME', 'prerun': None}
 
     def __init__(self, _configapp=None):
         SimQueue.__init__(self)
         ProtocolInterface.__init__(self)
+        self._arg('version', 'int', 'LSF major version', self._defaults['version'], valid_values=[9, 10])
         self._arg('jobname', 'str', 'Job name (identifier)', None, val.String())
-        self._arg('queue', 'str', 'The queue or list of queues to run on. If list, it attempts to submit the job to '
-                                  'the first queue listed', self._defaults['queue'], val.String(), nargs='*')
+        self._arg('queue', 'list', 'The queue or list of queues to run on. If list, it attempts to submit the job to '
+                                   'the first queue listed', self._defaults['queue'], val.String(), nargs='*')
         self._arg('app', 'str', 'The application profile', self._defaults['app'], val.String())
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
                   val.Number(int, '0POS'))
+        self._arg('gpu_options', 'dict', 'Number of GPUs to use for a single job', self._defaults['gpu_options'],
+                  val.Dictionary(key_type=str, valid_keys=['mode', 'mps', 'j_exclusive'], val_type=str,
+                                 valid_vals={'mode': ['shared', 'exclusive_process'],
+                                             'mps': ['yes', 'no'], 'j_exclusive': ['yes', 'no']}
+                                 )
+                  )
         self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'],
                   val.Number(int, '0POS'))
-        self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, '0POS'))
+        self._arg('memory', 'int', 'Amount of memory per job (MiB)', self._defaults['memory'], val.Number(int, '0POS'))
         self._arg('walltime', 'int', 'Job timeout (hour:min or min)', self._defaults['walltime'],
                   val.Number(int, '0POS'))
         self._arg('resources', 'list', 'Resources of the queue', self._defaults['resources'], val.String(), nargs='*')
@@ -139,7 +156,20 @@ class LsfQueue(SimQueue, ProtocolInterface):
             if self.app is not None:
                 f.write('#BSUB -app {}\n'.format(self.app))
             if self.ngpu != 0:
-                f.write('#BSUB -R "select[ngpus>0] rusage[ngpus_excl_p={}]"\n'.format(self.ngpu))
+                if self.version == 9:
+                    if self.gpu_options is not None:
+                        logger.warning('gpu_options argument was set while it is not needed for LSF version 9')
+                    f.write('#BSUB -R "select[ngpus>0] rusage[ngpus_excl_p={}]"\n'.format(self.ngpu))
+                elif self.version == 10:
+                    if not self.gpu_options:
+                        self.gpu_options = {'mode': 'shared', 'mps': 'no', 'j_exclusive': 'no'}
+                    gpu_requirements = list()
+                    gpu_requirements.append('num={}'.format(self.ngpu))
+                    for i in self.gpu_options:
+                        gpu_requirements.append('{}={}'.format(i, self.gpu_options[i]))
+                    f.write('#BSUB -gpu "{}"\n'.format(':'.join(gpu_requirements)))
+                else:
+                    raise AttributeError('Version not supported')
             f.write('#BSUB -M {}\n'.format(self.memory))
             f.write('#BSUB -cwd {}\n'.format(workdir))
             f.write('#BSUB -outdir {}\n'.format(workdir))
