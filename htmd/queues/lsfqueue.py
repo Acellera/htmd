@@ -79,9 +79,10 @@ class LsfQueue(SimQueue, ProtocolInterface):
         self._arg('ngpu', 'int', 'Number of GPUs to use for a single job', self._defaults['ngpu'],
                   val.Number(int, '0POS'))
         self._arg('gpu_options', 'dict', 'Number of GPUs to use for a single job', self._defaults['gpu_options'],
-                  val.Dictionary(key_type=str, valid_keys=['mode', 'mps', 'j_exclusive'], val_type=str,
-                                 valid_vals={'mode': ['shared', 'exclusive_process'],
-                                             'mps': ['yes', 'no'], 'j_exclusive': ['yes', 'no']}
+                  val.Dictionary(key_type=str, valid_keys=['mode', 'mps', 'j_exclusive'],
+                                 value_type={'mode': str, 'mps': str, 'j_exclusive': str},
+                                 valid_values={'mode': ['shared', 'exclusive_process'],
+                                               'mps': ['yes', 'no'], 'j_exclusive': ['yes', 'no']}
                                  )
                   )
         self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'],
