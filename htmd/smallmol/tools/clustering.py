@@ -4,20 +4,56 @@ import logging
 from htmd.smallmol.util import  convertToString
 from tqdm import tqdm
 from htmd.parallelprogress import ParallelExecutor, delayed
+from htmd.smallmol.chemlab.builder import Builder
 
 logger = logging.getLogger(__name__)
 
 def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=False):
+    """
+    Returns the maximum common substructure and two list of lists. The first one contains for each molecules the atom
+    indexes that are part of the MCS, the second list contains the indexes that are not part of the MCS.
+
+    Parameters
+    ----------
+    smallmol_list: list
+        The list of SmallMol objects
+    removeHs: bool
+        If True, the atom the hydrogens where not considered
+        Default: True
+    returnAtomIdxs: bool
+        If True, the lists of the atom indexes are returned
+        Default: False
+
+    Returns
+    -------
+    mcs_mol: rdkit.Chem.rdchem.Mol
+        The MCS molecule
+    atom_mcs_list: list
+        A list of lists containing the atom indexes that are part of the MCS
+    atom_no_mcs_list: list
+        A list of lists containing the atom indexes that are not part of the MCS
+    """
     from rdkit.Chem import rdFMCS
 
     smallmol_list = [sm.copy() for sm in smallmol_list]
-
     if  removeHs:
+        tmp_smallmol_list = []
         for sm in smallmol_list:
-            sm._removeAtoms(sm.get('element H', 'idx'))
+            B = Builder(sm)
+            B.removeHydrogens()
+            sm = B.getSmallMol()
+            tmp_smallmol_list.append(sm)
+        smallmol_list = tmp_smallmol_list
 
-    rdkitMols_list = [ sm.toRdkitMol() for sm in smallmol_list]
-
+    #rdkitMols_list = [ sm.toRdkitMol() for sm in smallmol_list]
+    rdkitMols_list = []
+    wrong = []
+    for n, sm in enumerate(smallmol_list):
+        try:
+            rdkitMols_list.append(sm.toRdkitMol())
+        except:
+            wrong.append(n)
+    print('{} problematic molecules. Indexes: {}'.format(len(wrong), wrong))
     mcs = rdFMCS.FindMCS(rdkitMols_list)
 
     logger.info('MCS found a substructure of {} atoms and {} bonds'.format(mcs.numAtoms, mcs.numBonds))
@@ -33,8 +69,8 @@ def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=Fa
         match = m.GetSubstructMatch(mcs_mol)
         sel_str = convertToString(match)
 
-        atoms_mcs = sm.get('idx {}'.format(sel_str), 'idx')
-        atoms_no_mcs = sm.get('idx {}'.format(sel_str), 'idx', invert=True)
+        atoms_mcs = sm.get('idx', 'idx {}'.format(sel_str))
+        atoms_no_mcs = sm.get('idx', 'idx {}'.format(sel_str),  invert=True)
 
         atoms_mcs_list.append(atoms_mcs.tolist())
         atoms_no_mcs_list.append(atoms_no_mcs.tolist())
@@ -42,7 +78,36 @@ def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=Fa
     return mcs_mol, atoms_mcs_list, atoms_no_mcs_list
 
 def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, removeHs=True ):
-    from sklearn.cluster import DBSCAN  # clusterizzatore
+    """
+    Rreturn the SmallMol objects grouped in the cluster. It can also return the details of the clusters computed.
+
+    Parameters
+    ----------
+    smallmol_list: list
+        The list of htmd.smallmol.smallmol.SmallMol objects
+    method: str
+        The cluster methods. Can be  ['maccs', 'pathFingerprints', 'atomsFingerprints', 'torsionsFingerprints',
+        'circularFingerprints', 'shape', 'mcs']
+    distThresholds: float
+        The disance cutoff for the clusters
+        Default: 0.2
+    returnDetails: bool
+        If True, the cluster details are also returned
+        Default: True
+    removeHs: bool
+        If True, the hydrogens are not considered
+        Default: True
+
+    Returns
+    -------
+    clusters: list
+        List of lists, That contains the SmallMol objects grouped based on the cluster belongings
+    details: list
+        A list with all the cluster details
+    """
+
+
+    from sklearn.cluster import DBSCAN
 
     import sys
     this_module = sys.modules[__name__]
@@ -56,10 +121,25 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
     smallmol_list = np.array([sm.copy() for sm in smallmol_list])
 
     if removeHs:
+        tmp_smallmol_list = []
         for sm in smallmol_list:
-            sm._removeAtoms(sm.get('element H', 'idx'))
+            B = Builder(sm)
+            B.removeHydrogens()
+            sm = B.getSmallMol()
+            tmp_smallmol_list.append(sm)
+            #sm._removeAtoms(sm.get('element H', 'idx'))
 
-    rdkitMols_list = [sm.toRdkitMol(includeConformer=True) for sm in smallmol_list]
+        smallmol_list = np.array(tmp_smallmol_list)
+
+    #rdkitMols_list = [sm.toRdkitMol(includeConformer=True) for sm in smallmol_list]
+    rdkitMols_list = []
+    wrong = []
+    for n, sm in enumerate(smallmol_list):
+        try:
+            rdkitMols_list.append(sm.toRdkitMol(includeConformer=True))
+        except:
+            wrong.append(n)
+    print('{} problematic molecules. Indexes: {}'.format(len(wrong), wrong))
 
     clustmethod = getattr(this_module, '_{}Clustering'.format(method))
 
@@ -102,6 +182,19 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
 
 
 def _maccsClustering( rdkit_mols):
+    """
+    Returns the tanimoto distance matrix based on maccs method
+
+    Parameters
+    ----------
+    rdkit_mols: list
+        The list of rdkit.Chem.rdchem.Mol objects
+
+    Returns
+    -------
+    tanimotomatrix: np.array
+        The numpy array containing the tanimoto matrix
+    """
     from rdkit.Chem import MACCSkeys  # calcola MACCS keys
 
     fps = []
@@ -116,6 +209,19 @@ def _maccsClustering( rdkit_mols):
     return np.array(tanimoto_matrix)
 
 def _pathFingerprintsClustering(rdkit_mols):
+    """
+        Returns the tanimoto distance matrix based on fingerprints method
+
+        Parameters
+        ----------
+        rdkit_mols: list
+            The list of rdkit.Chem.rdchem.Mol objects
+
+        Returns
+        -------
+        tanimotomatrix: np.array
+            The numpy array containing the tanimoto matrix
+        """
     from rdkit.Chem.Fingerprints import FingerprintMols  # calcola path fingerprints
 
     fps = [ ]
@@ -129,6 +235,19 @@ def _pathFingerprintsClustering(rdkit_mols):
     return np.array(tanimoto_matrix)
 
 def _atomsFingerprintsClustering(rdkit_mols):
+    """
+        Returns the dice distance matrix based on atomsfingerprints method
+
+        Parameters
+        ----------
+        rdkit_mols: list
+            The list of rdkit.Chem.rdchem.Mol objects
+
+        Returns
+        -------
+        dicematrix: np.array
+            The numpy array containing the dice matrix
+        """
     from rdkit.Chem.AtomPairs import Pairs  # Atom pairs
 
     fps = []
@@ -142,6 +261,19 @@ def _atomsFingerprintsClustering(rdkit_mols):
     return np.array(dice_matrix)
 
 def _torsionsFingerprintsClustering(rdkit_mols):
+    """
+        Returns the dice distance matrix based on torsionsfingerprints method
+
+        Parameters
+        ----------
+        rdkit_mols: list
+            The list of rdkit.Chem.rdchem.Mol objects
+
+        Returns
+        -------
+        dicematrix: np.array
+            The numpy array containing the dice matrix
+        """
     from rdkit.Chem.AtomPairs import Torsions  # Topological Torsions
 
     fps = [ ]
@@ -155,6 +287,23 @@ def _torsionsFingerprintsClustering(rdkit_mols):
     return np.array(dice_matrix)
 
 def _circularFingerprintsClustering(rdkit_mols, radius=2):
+    """
+        Returns the dice distance matrix based on circularfingerprints method
+
+        Parameters
+        ----------
+        rdkit_mols: list
+            The list of rdkit.Chem.rdchem.Mol objects
+
+        radius: int
+            The radius of the MorganCircularFingerprint
+            Default: 2
+
+        Returns
+        -------
+        dicematrix: np.array
+            The numpy array containing the dice matrix
+        """
     from rdkit.Chem import AllChem  # calcola circular fingerprints
 
     fps = []
@@ -168,6 +317,21 @@ def _circularFingerprintsClustering(rdkit_mols, radius=2):
     return np.array(dice_matrix)
 
 def _shapeClustering(mol1, rdkit_mols):
+    """
+        Returns the tanimoto row based on shape method
+
+        Parameters
+        ----------
+        mol1: rdkit.Chem.rdchem.Mol
+            The reference molecule
+        rdkit_mols: list
+            The list of rdkit.Chem.rdchem.Mol objects
+
+        Returns
+        -------
+        tanimotorow: np.array
+            The numpy array containing the tanimoto row
+        """
     from rdkit.Chem import rdMolAlign, rdShapeHelpers
     tanimoto_shape_row = []
     for mol2 in rdkit_mols:
@@ -178,6 +342,21 @@ def _shapeClustering(mol1, rdkit_mols):
     return tanimoto_shape_row
 
 def _mcsClustering(mol1, rdkit_mols):
+    """
+       Returns the weight distance baased on mcs method
+
+       Parameters
+       ----------
+       mol1: rdkit.Chem.rdchem.Mol
+           The reference molecule
+       rdkit_mols: list
+           The list of rdkit.Chem.rdchem.Mol objects
+
+       Returns
+       -------
+       distancerow: np.array
+           The numpy array containing the distance row
+           """
     from rdkit.Chem import rdFMCS
 
     MCS_row = []
@@ -191,6 +370,22 @@ def _mcsClustering(mol1, rdkit_mols):
     return MCS_row
 
 def TanimotoDistances(fp1, fps):
+    """
+    Returns the tanimoto row based on fingeprints passed
+
+    Parameters
+    ----------
+    fp1: rdkit fingerprint
+        The rdkit fingerprint computed used as reference
+    fps: list
+        The list of the rdkit fingerprint computed
+
+    Returns
+    -------
+    tanimotorow: list
+        A list with the tanimoto row similarities
+    """
+
     from rdkit import DataStructs  # fingerprint similarity
 
     tanimoto_row = []
@@ -202,6 +397,21 @@ def TanimotoDistances(fp1, fps):
 
 
 def DiceDistances(fp1, fps):
+    """
+        Returns the dice row based on fingeprints passed
+
+        Parameters
+        ----------
+        fp1: rdkit fingerprint
+            The rdkit fingerprint computed used as reference
+        fps: list
+            The list of the rdkit fingerprint computed
+
+        Returns
+        -------
+        dicerow: list
+            A list with the dice row similarities
+        """
     from rdkit import DataStructs  # fingerprint similarity
 
     dice_row = []
