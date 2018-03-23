@@ -4,11 +4,17 @@
 # No redistribution in whole or part
 #
 from htmd.version import version as _version
-import os
+import os.path
 from htmd.config import _config
+import htmd.home
+import logging.config
 
 __version__ = _version()
 
+try:
+    logging.config.fileConfig(os.path.join(htmd.home.home(), 'logging.ini'), disable_existing_loggers=False)
+except:
+    print("HTMD: Logging setup failed")
 
 if _config['configfile']:
     if not os.path.isfile(_config['configfile']):
