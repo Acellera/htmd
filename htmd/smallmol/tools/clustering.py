@@ -8,7 +8,6 @@ from htmd.smallmol.chemlab.builder import Builder
 
 logger = logging.getLogger(__name__)
 
-
 def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=False):
     """
     Returns the maximum common substructure and two list of lists. The first one contains for each molecules the atom
@@ -20,8 +19,10 @@ def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=Fa
         The list of SmallMol objects
     removeHs: bool
         If True, the atom the hydrogens where not considered
+        Default: True
     returnAtomIdxs: bool
         If True, the lists of the atom indexes are returned
+        Default: False
 
     Returns
     -------
@@ -35,7 +36,7 @@ def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=Fa
     from rdkit.Chem import rdFMCS
 
     smallmol_list = [sm.copy() for sm in smallmol_list]
-    if removeHs:
+    if  removeHs:
         tmp_smallmol_list = []
         for sm in smallmol_list:
             B = Builder(sm)
@@ -44,7 +45,7 @@ def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=Fa
             tmp_smallmol_list.append(sm)
         smallmol_list = tmp_smallmol_list
 
-    # rdkitMols_list = [ sm.toRdkitMol() for sm in smallmol_list]
+    #rdkitMols_list = [ sm.toRdkitMol() for sm in smallmol_list]
     rdkitMols_list = []
     wrong = []
     for n, sm in enumerate(smallmol_list):
@@ -76,8 +77,7 @@ def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=Fa
 
     return mcs_mol, atoms_mcs_list, atoms_no_mcs_list
 
-
-def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, removeHs=True):
+def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, removeHs=True ):
     """
     Rreturn the SmallMol objects grouped in the cluster. It can also return the details of the clusters computed.
 
@@ -90,10 +90,13 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
         'circularFingerprints', 'shape', 'mcs']
     distThresholds: float
         The disance cutoff for the clusters
+        Default: 0.2
     returnDetails: bool
         If True, the cluster details are also returned
+        Default: True
     removeHs: bool
         If True, the hydrogens are not considered
+        Default: True
 
     Returns
     -------
@@ -102,6 +105,7 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
     details: list
         A list with all the cluster details
     """
+
 
     from sklearn.cluster import DBSCAN
 
@@ -112,8 +116,7 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
                 'circularFingerprints', 'shape', 'mcs']
 
     if method not in _methods:
-        raise ValueError('The method provided {} does not exists. The ones available are the '
-                         'following: {}'.format(method, _methods))
+        raise ValueError('The method provided {} does not exists. The ones available are the following: {}'.format(method, _methods))
 
     smallmol_list = np.array([sm.copy() for sm in smallmol_list])
 
@@ -124,11 +127,11 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
             B.removeHydrogens()
             sm = B.getSmallMol()
             tmp_smallmol_list.append(sm)
-            # sm._removeAtoms(sm.get('element H', 'idx'))
+            #sm._removeAtoms(sm.get('element H', 'idx'))
 
         smallmol_list = np.array(tmp_smallmol_list)
 
-    # rdkitMols_list = [sm.toRdkitMol(includeConformer=True) for sm in smallmol_list]
+    #rdkitMols_list = [sm.toRdkitMol(includeConformer=True) for sm in smallmol_list]
     rdkitMols_list = []
     wrong = []
     for n, sm in enumerate(smallmol_list):
@@ -145,13 +148,13 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
 
     else:
         aprun = ParallelExecutor(n_jobs=-1)  # _config['ncpus'])
-        matrix = aprun(total=len(rdkitMols_list),
-                       desc='{} Distance'.format(method)
-                       )(delayed(clustmethod)(mol1, rdkitMols_list) for mol1 in rdkitMols_list)
+        matrix = aprun(total=len(rdkitMols_list), desc='{} Distance'.format(method)) \
+                            (delayed(clustmethod)(mol1, rdkitMols_list) for mol1 in rdkitMols_list)
 
         matrix = np.array(matrix)
 
-    db = DBSCAN(eps=distThresholds, min_samples=0, metric='precomputed').fit(matrix)
+
+    db = DBSCAN(eps=distThresholds, min_samples=0, metric='precomputed' ).fit(matrix)
 
     labels = db.labels_
 
@@ -166,13 +169,16 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
         clusters_idx[n_cl] = idxs
         clusters_smallmols[n_cl] = smallmol_list[idxs]
 
+
     if returnDetails:
-        details = {'numClusters': n_clusters,
-                   'populations': populations,
-                   'clusters': clusters_idx}
+        details = {'numClusters':n_clusters,
+                   'populations':populations,
+                   'clusters':clusters_idx}
         return clusters_smallmols, details
 
     return clusters_smallmols
+
+
 
 
 def _maccsClustering( rdkit_mols):
@@ -193,13 +199,14 @@ def _maccsClustering( rdkit_mols):
 
     fps = []
     for m in tqdm(rdkit_mols):
-        fps.append(MACCSkeys.GenMACCSKeys(m))
+       fps.append(MACCSkeys.GenMACCSKeys(m))
 
     aprun = ParallelExecutor(n_jobs=-1)  # _config['ncpus'])
-    tanimoto_matrix = aprun(total=len(fps), desc='MACCS Distance')(delayed(TanimotoDistances)(fp1, fps) for fp1 in fps)
+    tanimoto_matrix = aprun(total=len(fps), desc='MACCS Distance') \
+            (delayed(TanimotoDistances)(fp1, fps) for fp1 in fps)
+
 
     return np.array(tanimoto_matrix)
-
 
 def _pathFingerprintsClustering(rdkit_mols):
     """
@@ -217,17 +224,15 @@ def _pathFingerprintsClustering(rdkit_mols):
         """
     from rdkit.Chem.Fingerprints import FingerprintMols  # calcola path fingerprints
 
-    fps = list()
+    fps = [ ]
     for m in tqdm(rdkit_mols):
         fps.append(FingerprintMols.FingerprintMol(m))
 
     aprun = ParallelExecutor(n_jobs=-1)  # _config['ncpus'])
-    tanimoto_matrix = aprun(total=len(fps),
-                            desc='PathFingerprints Distance'
-                            )(delayed(TanimotoDistances)(fp1, fps) for fp1 in fps)
+    tanimoto_matrix = aprun(total=len(fps), desc='PathFingerprints Distance') \
+        (delayed(TanimotoDistances)(fp1, fps) for fp1 in fps)
 
     return np.array(tanimoto_matrix)
-
 
 def _atomsFingerprintsClustering(rdkit_mols):
     """
@@ -250,12 +255,10 @@ def _atomsFingerprintsClustering(rdkit_mols):
         fps.append(Pairs.GetAtomPairFingerprint(m))
 
     aprun = ParallelExecutor(n_jobs=-1)  # _config['ncpus'])
-    dice_matrix = aprun(total=len(fps),
-                        desc='AtomsFingerprints Distance'
-                        )(delayed(DiceDistances)(fp1, fps) for fp1 in fps)
+    dice_matrix = aprun(total=len(fps), desc='AtomsFingerprints Distance') \
+        (delayed(DiceDistances)(fp1, fps) for fp1 in fps)
 
     return np.array(dice_matrix)
-
 
 def _torsionsFingerprintsClustering(rdkit_mols):
     """
@@ -273,17 +276,15 @@ def _torsionsFingerprintsClustering(rdkit_mols):
         """
     from rdkit.Chem.AtomPairs import Torsions  # Topological Torsions
 
-    fps = list()
+    fps = [ ]
     for m in tqdm(rdkit_mols):
         fps.append(Torsions.GetHashedTopologicalTorsionFingerprint(m))
 
     aprun = ParallelExecutor(n_jobs=-1)  # _config['ncpus'])
-    dice_matrix = aprun(total=len(fps),
-                        desc='TorsionsFingerprints Distance'
-                        )(delayed(DiceDistances)(fp1, fps) for fp1 in fps)
+    dice_matrix = aprun(total=len(fps), desc='TorsionsFingerprints Distance') \
+        (delayed(DiceDistances)(fp1, fps) for fp1 in fps)
 
     return np.array(dice_matrix)
-
 
 def _circularFingerprintsClustering(rdkit_mols, radius=2):
     """
@@ -296,6 +297,7 @@ def _circularFingerprintsClustering(rdkit_mols, radius=2):
 
         radius: int
             The radius of the MorganCircularFingerprint
+            Default: 2
 
         Returns
         -------
@@ -304,17 +306,15 @@ def _circularFingerprintsClustering(rdkit_mols, radius=2):
         """
     from rdkit.Chem import AllChem  # calcola circular fingerprints
 
-    fps = list()
+    fps = []
     for m in rdkit_mols:
         fps.append(AllChem.GetMorganFingerprint(m, radius))
 
     aprun = ParallelExecutor(n_jobs=-1)  # _config['ncpus'])
-    dice_matrix = aprun(total=len(fps),
-                        desc='CircularFingerprints Distance'
-                        )(delayed(DiceDistances)(fp1, fps) for fp1 in fps)
+    dice_matrix = aprun(total=len(fps), desc='CircularFingerprints Distance') \
+        (delayed(DiceDistances)(fp1, fps) for fp1 in fps)
 
     return np.array(dice_matrix)
-
 
 def _shapeClustering(mol1, rdkit_mols):
     """
@@ -341,7 +341,6 @@ def _shapeClustering(mol1, rdkit_mols):
         tanimoto_shape_row.append(tani_shape)
     return tanimoto_shape_row
 
-
 def _mcsClustering(mol1, rdkit_mols):
     """
        Returns the weight distance baased on mcs method
@@ -360,7 +359,7 @@ def _mcsClustering(mol1, rdkit_mols):
            """
     from rdkit.Chem import rdFMCS
 
-    MCS_row = list()
+    MCS_row = []
     for mol2 in tqdm(rdkit_mols):
         sum_numHeavyAtoms = mol1.GetNumHeavyAtoms() + mol2.GetNumHeavyAtoms()
         mcsHeavyAtoms = rdFMCS.FindMCS([mol1, mol2], ringMatchesRingOnly=True, completeRingsOnly=True, timeout=5)
@@ -369,7 +368,6 @@ def _mcsClustering(mol1, rdkit_mols):
         MCS_row.append(distance)
 
     return MCS_row
-
 
 def TanimotoDistances(fp1, fps):
     """

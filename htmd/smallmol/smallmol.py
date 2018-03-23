@@ -357,6 +357,7 @@ class SmallMol:
             The value of the property
         overwrite: bool
             If True, the property will be overwritten if already exist
+            Default: False
 
         Example
         -------
@@ -393,6 +394,7 @@ class SmallMol:
             The list of the values for the property
         aIdxs: list
             The list of the atom index to which set up the values
+            Default: None
 
         Example
         -------
@@ -458,8 +460,10 @@ class SmallMol:
             The selection string. atom field name followed by spaced values for that field
         convertType: bool
             If True, and where possible the returnField is converted in rdkit object
+            Default: True
         invert: bool
             If True, the selection is inverted
+            Default: False
 
         Returns
         -------
@@ -537,6 +541,7 @@ class SmallMol:
         ----------
         returnDetails: bool
             If True, returns the chiral atoms and their chiral types
+            Default: False
 
         Returns
         -------
@@ -583,6 +588,7 @@ class SmallMol:
             The selection for the second set of atoms
         bondtype: str or int
             The bondtype as index or string
+            Default: None
 
         Returns
         -------
@@ -632,6 +638,7 @@ class SmallMol:
         ----------
         id: int
             The id of the conformer
+            Default: 0
 
         Returns
         -------
@@ -690,8 +697,15 @@ class SmallMol:
         ----------
         confId: int
             The conformer
+<<<<<<< HEAD
         coords: np.array
             The coords for which you want the center
+=======
+            Default: 0
+        coords: np.array
+            The coords for which you want the center
+            Default: None
+>>>>>>> Complete the docstring and the examples
         """
         if coords is None:
             coords = self.getCoords(confId)
@@ -705,12 +719,20 @@ class SmallMol:
         ----------
         num_confs: int
            Number of conformers to generate.
+<<<<<<< HEAD
         optimizemode: str
+=======
+           Default: 400
+        optimizemode: str, (default='mmff')
+>>>>>>> Complete the docstring and the examples
             The optimizemode to use. Can be  'uff', 'mmff'
+            Default: 'mmff'
         align: bool
             If True, the conformer are aligned to the first one
+            Default: True
         append: bool
             If False, the current conformers are deleted
+            Default: True
 
         """
         from rdkit.Chem.AllChem import UFFOptimizeMolecule, MMFFOptimizeMolecule, EmbedMultipleConfs
@@ -857,6 +879,7 @@ class SmallMol:
         ----------
         ids: list
             The list of ids for the molecule conformers to return. If None all the conformers are returned
+            Default: None
 
         Returns
         -------
@@ -883,16 +906,30 @@ class SmallMol:
         ---------
         savefolder: str
             The name of the folder where to write the files
+<<<<<<< HEAD
         savename: str
+=======
+            Default: 'conformations'
+        savename: str (default='molConf')
+>>>>>>> Complete the docstring and the examples
             The basename of the conformer file
+            Default: 'molConf'
         filetype: str ('sdf', 'pdb')
             The filetype of the output
+<<<<<<< HEAD
         savefolder_exist_ok: bool
+=======
+            Default: 'sdf'
+        savefolder_exist_ok: bool (default=False)
+>>>>>>> Complete the docstring and the examples
             Set as True to overwrite the output folder
+            Default: False
         merge: bool
             Set as True to save in a unique file
+            Default: False
         ids: list
             A list of the conformer ids to save. If None, all are written
+            Default: None
 
         Example
         -------
@@ -948,6 +985,7 @@ class SmallMol:
         ----------
         ids: list
             The list of conformer id to delete. If None, all are removed except the first one
+            Default: None
         """
 
         _nConformers = self.numConformers
@@ -996,6 +1034,7 @@ class SmallMol:
         ---------
         includeConformer: bool
             If True, also the conformers coordinates are returned
+            Default: False
 
         Returns
         -------
@@ -1056,9 +1095,15 @@ class SmallMol:
         Parameters
         ----------
         formalcharges: bool
+<<<<<<< HEAD
             If True,the formal charges are used instead of partial ones
+=======
+            If True,the forrmal charges are used instead of partial ones
+            Default: False
+>>>>>>> Complete the docstring and the examples
         ids: list
             The list of conformer ids to store in the htmd Molecule object- If None, all are returned
+            Default: None
 
         Returns
         -------
@@ -1139,21 +1184,35 @@ class SmallMol:
         ----------
         sketch: bool
             Set to True for 2D depiction
+            Default: False
         filename: str
             Set the filename for the svg file
+            Default: None
         ipython: bool
             Set to True to return the jupiter-notebook rendering
+            Default: False
         optimize: bool
             Set to True to optimize the conformation. Works only with 3D.
+<<<<<<< HEAD
         optimizemode: ['std', 'mmff']
             Set the optimization mode for 3D conformation
         removeHs: bool
+=======
+            Default: False
+        optimizemode: ['std', 'mmff'], default='std'
+            Set the optimization mode for 3D conformation
+            Default: 'mmff'
+        removeHs: bool, default=True
+>>>>>>> Complete the docstring and the examples
             Set to True to hide hydrogens in the depiction
+            Default: True
         atomlabels: str
             Accept any combinations of the following pararemters as unique string '%a%i%c%*' a:atom name, i:atom index,
             c:atom formal charge (+/-), *:chiral (* if atom is chiral)
+            Default: None
         highlightAtoms: list
             List of atom to highlight. It can be also a list of atom list, in this case different colors will be used
+            Default: None
 
         Returns
         -------
@@ -1161,12 +1220,21 @@ class SmallMol:
 
         Example
         -------
+<<<<<<< HEAD
         >>> sm.depict(ipython=True, optimize=True, optimizemode='std')  # doctest: +SKIP
         >>> sm.depict(ipython=True, sketch=True)  # doctest: +SKIP
         >>> sm.depict(ipython=True, sketch=True)  # doctest: +SKIP
         >>> sm.depict(ipython=True, sketch=True, atomlabels="%a%i%c")  # doctest: +SKIP
         >>> ids = np.intersect1d(sm.get('idx', 'hybridization SP2'), sm.get('idx', 'element C'))  # doctest: +SKIP
         >>> sm.depict(ipython=True, sketch=True,highlightAtoms=ids.tolist(), removeHs=False)  # doctest: +SKIP
+=======
+        >>> sm.depict(ipython=True, optimize=True, optimizemode='std')
+        >>> sm.depict(ipython=True, sketch=True)
+        >>> sm.depict(ipython=True, sketch=True)
+        >>> sm.depict(ipython=True, sketch=True, atomlabels="%a%i%c")
+        >>> ids = np.intersect1d( sm.get('idx', 'hybridization SP2'),  sm.get('idx', 'element C'))
+        >>> sm.depict(ipython=True, sketch=True,highlightAtoms=ids.tolist(), removeHs=False)
+>>>>>>> Complete the docstring and the examples
 
         """
         from rdkit import Chem
@@ -1259,6 +1327,7 @@ class SmallMolLib:
     ----------
     sdf_file: str
         The sdf file path
+<<<<<<< HEAD
     removeHs: bool
         If True, the hydrogens of the molecules will be removed
     fixHs: bool
@@ -1269,6 +1338,20 @@ class SmallMolLib:
     >>> import os
     >>> from htmd.home import home
     >>> lib = SmallMolLib(os.path.join(home(dataDir='test-smallmol'), 'fda_drugs_light.sdf'))
+=======
+        Default: None
+    removeHs: bool
+        If True, the hydrogens of the molecules will be removed
+        Default: False
+    fixHs: bool
+        If True, the hydrogens are added and optimized
+        Default: True
+
+    Example
+    -------
+    >>> lib = SmallMolLib('htmd/data/test-smallmol/fda_drugs_light.sdf')
+    100/100 [00:00<00:00, 546.10it/s]
+>>>>>>> Complete the docstring and the examples
     >>> lib.numMols
     100
 
