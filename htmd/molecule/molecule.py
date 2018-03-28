@@ -1606,15 +1606,22 @@ class UniqueAtomID:
                                'following fields {}'.format(key, UniqueAtomID._fields))
 
     @staticmethod
-    def fromMolecule(mol, sel):
+    def fromMolecule(mol, sel=None, idx=None):
+        if (sel is not None and idx is not None) or (sel is None and idx is None):
+            raise RuntimeError('Only one of sel or idx arguments can be used.')
+
         self = UniqueAtomID()
-        atom = mol.atomselect(sel, indexes=True)
+        if sel is not None:
+            atom = mol.atomselect(sel, indexes=True)
+        elif idx is not None:
+            atom = np.array([idx,])
+
         if len(atom) > 1:
             raise RuntimeError('Your atomselection returned more than one atom')
         if len(atom) == 0:
             raise RuntimeError('Your atomselection didn\'t match any atom')
         for f in UniqueAtomID._fields:
-            setattr(self, f, getattr(mol, f)[atom])
+            setattr(self, f, getattr(mol, f)[atom][0])
         return self
 
     def selectAtom(self, mol, indexes=True):
@@ -1626,6 +1633,23 @@ class UniqueAtomID:
             return np.where(sel)[0][0]
         else:
             return sel
+
+    def __eq__(self, other):
+        iseq = True
+        for f in UniqueAtomID._fields:
+            iseq &= getattr(self, f) == getattr(other, f)
+        return iseq
+
+    def __str__(self):
+        fieldvs = []
+        for f in UniqueAtomID._fields:
+            fieldvs.append('{}: {}'.format(f, getattr(self, f)))
+        return 'UniqueAtomID<{}>'.format(', '.join(fieldvs))
+
+    def __repr__(self):
+        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
+               + self.__str__()
+
 
 class UniqueResidueID:
     _fields = ('resname', 'chain', 'resid', 'insertion', 'segid')
@@ -1654,19 +1678,26 @@ class UniqueResidueID:
                                'following fields {}'.format(key, UniqueResidueID._fields))
 
     @staticmethod
-    def fromMolecule(mol, sel):
+    def fromMolecule(mol, sel=None, idx=None):
+        if (sel is not None and idx is not None) or (sel is None and idx is None):
+            raise RuntimeError('Only one of sel or idx arguments can be used.')
+
         self = UniqueResidueID()
-        atoms = mol.atomselect(sel, indexes=True)
-        if len(atoms) == 0:
-            raise RuntimeError('Your atomselection didn\'t match any residue')
+        if sel is not None:
+            atoms = mol.atomselect(sel, indexes=True)
+            if len(atoms) == 0:
+                raise RuntimeError('Your atomselection didn\'t match any residue')
+        elif idx is not None:
+            atoms = idx
+
         for f in UniqueResidueID._fields:
             vals = np.unique(getattr(mol, f)[atoms])
             if len(vals) != 1:
                 raise RuntimeError('The atomselection gave more than one value: {} in field {} of mol'.format(vals, f))
-            setattr(self, f, vals)
+            setattr(self, f, vals[0])
         return self
 
-    def selectAtom(self, mol, indexes=True):
+    def selectAtoms(self, mol, indexes=True):
         sel = np.ones(mol.numAtoms, dtype=bool)
         for f in UniqueResidueID._fields:
             sel &= getattr(mol, f) == getattr(self, f)
@@ -1676,6 +1707,21 @@ class UniqueResidueID:
         else:
             return sel
 
+    def __eq__(self, other):
+        iseq = True
+        for f in UniqueResidueID._fields:
+            iseq &= getattr(self, f) == getattr(other, f)
+        return iseq
+
+    def __str__(self):
+        fieldvs = []
+        for f in UniqueResidueID._fields:
+            fieldvs.append('{}: {}'.format(f, getattr(self, f)))
+        return 'UniqueResidueID<{}>'.format(', '.join(fieldvs))
+
+    def __repr__(self):
+        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
+               + self.__str__()
 
 
 def mol_equal(mol1, mol2, checkFields=Molecule._atom_fields, exceptFields=None):
@@ -2004,13 +2050,21 @@ class TestMolecule(TestCase):
         assert uqid.selectAtom(mol) == 24
         mol.remove('resid 19')
         assert uqid.selectAtom(mol) == 20
+        a1 = UniqueAtomID.fromMolecule(mol, 'resid 20 and name CA')
+        a2 = UniqueAtomID.fromMolecule(mol, idx=20)
+        assert a1 == a2
 
     def test_uniqueResidueID(self):
         mol = Molecule('3ptb')
         uqid = UniqueResidueID.fromMolecule(mol, 'resid 20')
-        assert np.array_equal(uqid.selectAtom(mol), np.array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]))
+        assert np.array_equal(uqid.selectAtoms(mol), np.array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]))
         mol.remove('resid 19')
-        assert np.array_equal(uqid.selectAtom(mol), np.array([19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]))
+        assert np.array_equal(uqid.selectAtoms(mol), np.array([19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]))
+        r1 = UniqueResidueID.fromMolecule(mol, 'resid 20 and name CA')
+        r2 = UniqueResidueID.fromMolecule(mol, 'resid 20 and name CB')
+        r3 = UniqueResidueID.fromMolecule(mol, 'resid 21 and name CA')
+        assert r1 == r2
+        assert r2 != r3
 
 
 if __name__ == "__main__":
