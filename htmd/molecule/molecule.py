@@ -1579,6 +1579,105 @@ class Molecule:
         return rep
 
 
+class UniqueAtomID:
+    _fields = ('name', 'altloc', 'resname', 'chain', 'resid', 'insertion', 'segid')
+    def __init__(self, **kwargs):
+        """ Unique atom identifier
+
+        Parameters
+        ----------
+        kwargs
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> uqid = UniqueAtomID.fromMolecule(mol, 'resid 20 and name CA')
+        >>> uqid.selectAtom(mol)
+        24
+        >>> _ = mol.remove('resid 19')
+        >>> uqid.selectAtom(mol)
+        20
+        """
+        for key in kwargs:
+            if key in UniqueAtomID._fields:
+                setattr(self, key, kwargs[key])
+            else:
+                raise KeyError('Invalid key {}. The constructor only supports the '
+                               'following fields {}'.format(key, UniqueAtomID._fields))
+
+    @staticmethod
+    def fromMolecule(mol, sel):
+        self = UniqueAtomID()
+        atom = mol.atomselect(sel, indexes=True)
+        if len(atom) > 1:
+            raise RuntimeError('Your atomselection returned more than one atom')
+        if len(atom) == 0:
+            raise RuntimeError('Your atomselection didn\'t match any atom')
+        for f in UniqueAtomID._fields:
+            setattr(self, f, getattr(mol, f)[atom])
+        return self
+
+    def selectAtom(self, mol, indexes=True):
+        sel = np.ones(mol.numAtoms, dtype=bool)
+        for f in UniqueAtomID._fields:
+            sel &= getattr(mol, f) == getattr(self, f)
+
+        if indexes:
+            return np.where(sel)[0][0]
+        else:
+            return sel
+
+class UniqueResidueID:
+    _fields = ('resname', 'chain', 'resid', 'insertion', 'segid')
+    def __init__(self, **kwargs):
+        """ Unique residue identifier
+
+        Parameters
+        ----------
+        kwargs
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> uqid = UniqueResidueID.fromMolecule(mol, 'resid 20')
+        >>> uqid.selectAtom(mol)
+        array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34])
+        >>> _ = mol.remove('resid 19')
+        >>> uqid.selectAtom(mol)
+        array([19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30])
+        """
+        for key in kwargs:
+            if key in UniqueAtomID._fields:
+                setattr(self, key, kwargs[key])
+            else:
+                raise KeyError('Invalid key {}. The constructor only supports the '
+                               'following fields {}'.format(key, UniqueResidueID._fields))
+
+    @staticmethod
+    def fromMolecule(mol, sel):
+        self = UniqueResidueID()
+        atoms = mol.atomselect(sel, indexes=True)
+        if len(atoms) == 0:
+            raise RuntimeError('Your atomselection didn\'t match any residue')
+        for f in UniqueResidueID._fields:
+            vals = np.unique(getattr(mol, f)[atoms])
+            if len(vals) != 1:
+                raise RuntimeError('The atomselection gave more than one value: {} in field {} of mol'.format(vals, f))
+            setattr(self, f, vals)
+        return self
+
+    def selectAtom(self, mol, indexes=True):
+        sel = np.ones(mol.numAtoms, dtype=bool)
+        for f in UniqueResidueID._fields:
+            sel &= getattr(mol, f) == getattr(self, f)
+
+        if indexes:
+            return np.where(sel)[0]
+        else:
+            return sel
+
+
+
 def mol_equal(mol1, mol2, checkFields=Molecule._atom_fields, exceptFields=None):
     difffields = []
     checkFields = list(checkFields)
@@ -1820,97 +1919,113 @@ class _Representation:
             self.color = 'Name'
 
 
+from unittest import TestCase
+class TestMolecule(TestCase):
+    def test_trajReadingAppending(self):
+        from htmd.home import home
+
+        # Testing trajectory reading and appending
+        ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
+        xtcfile = path.join(home(dataDir='metricdistance'), 'traj.xtc')
+        ref.read(xtcfile)
+        assert ref.coords.shape == (4507, 3, 200)
+        ref.read(xtcfile, append=True)
+        assert ref.coords.shape == (4507, 3, 400)
+        ref.read([xtcfile, xtcfile, xtcfile])
+        assert ref.coords.shape == (4507, 3, 600)
+
+    def test_guessBonds(self):
+        from htmd.home import home
+
+        # Checking bonds
+        ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
+        ref.read(path.join(home(dataDir='metricdistance'), 'traj.xtc'))
+        ref.coords = np.atleast_3d(ref.coords[:, :, 0])
+        len1 = len(ref._guessBonds())
+        ref.coords = np.array(ref.coords, dtype=np.float32)
+        len3 = len(ref._guessBonds())
+        assert len1 == 4562
+        assert len3 == 4562
+
+    def test_setDihedral(self):
+        # Testing dihedral setting
+        mol = Molecule('2HBB')
+        quad = [124, 125, 132, 133]
+        mol.setDihedral(quad, np.deg2rad(-90))
+        angle = mol.getDihedral(quad)
+        assert np.abs(np.deg2rad(-90) - angle) < 1E-3
+
+    def test_updateBondsAnglesDihedrals(self):
+        from htmd.home import home
+
+        # Testing updating of bonds, dihedrals and angles after filtering
+        mol = Molecule(path.join(home(dataDir='test-molecule'), 'a1e.prmtop'))
+        mol.read(path.join(home(dataDir='test-molecule'), 'a1e.pdb'))
+        _ = mol.filter('not water')
+        bb, bt, di, im, an = np.load(path.join(home(dataDir='test-molecule'), 'updatebondsanglesdihedrals_nowater.npy'))
+        assert np.array_equal(bb, mol.bonds)
+        assert np.array_equal(bt, mol.bondtype)
+        assert np.array_equal(di, mol.dihedrals)
+        assert np.array_equal(im, mol.impropers)
+        assert np.array_equal(an, mol.angles)
+        _ = mol.filter('not index 8 18')
+        bb, bt, di, im, an = np.load(
+            path.join(home(dataDir='test-molecule'), 'updatebondsanglesdihedrals_remove8_18.npy'))
+        assert np.array_equal(bb, mol.bonds)
+        assert np.array_equal(bt, mol.bondtype)
+        assert np.array_equal(di, mol.dihedrals)
+        assert np.array_equal(im, mol.impropers)
+        assert np.array_equal(an, mol.angles)
+
+    def test_appendingBondsBondtypes(self):
+        from htmd.home import home
+
+        # Testing appending of bonds and bondtypes
+        mol = Molecule('3ptb')
+        lig = Molecule(
+            path.join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum',
+                      'mol.mol2'))
+        assert mol.bonds.shape[0] == len(mol.bondtype)  # Checking that Molecule fills in empty bondtypes
+        newmol = Molecule()
+        newmol.append(lig)
+        newmol.append(mol)
+        assert newmol.bonds.shape[0] == (mol.bonds.shape[0] + lig.bonds.shape[0])
+        assert newmol.bonds.shape[0] == len(newmol.bondtype)
+
+    def test_mdtrajWriter(self):
+        # Testing MDtraj writer
+        m = Molecule('3PTB')
+        tmp = tempname(suffix='.h5')
+        m.write(tmp, 'name CA')
+
+    def test_uniqueAtomID(self):
+        mol = Molecule('3ptb')
+        uqid = UniqueAtomID.fromMolecule(mol, 'resid 20 and name CA')
+        assert uqid.selectAtom(mol) == 24
+        mol.remove('resid 19')
+        assert uqid.selectAtom(mol) == 20
+
+    def test_uniqueResidueID(self):
+        mol = Molecule('3ptb')
+        uqid = UniqueResidueID.fromMolecule(mol, 'resid 20')
+        assert np.array_equal(uqid.selectAtom(mol), np.array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]))
+        mol.remove('resid 19')
+        assert np.array_equal(uqid.selectAtom(mol), np.array([19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]))
+
+
 if __name__ == "__main__":
     # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
-    from htmd.home import home
+    import unittest
 
     m = Molecule('3PTB')
     doctest.testmod(extraglobs={'tryp': m.copy()})
 
-    # Oddly, if these are moved before doctests, 1. extraglobs don't work; and 2. test failures are not printed. May
-    # have to do with the vmd console?
-    a = m.get('resid', sel='resname TRP')
-    a = m.get('coords')
-    print(a.ndim)
-    m.moveBy([1, 1, 1])
-    m.align('name CA')
-    m = Molecule('2OV5')
-    m.filter('protein or water')
+    unittest.main(verbosity=2)
 
-    # # Testing atomselect
-    # for pdb in ["1gmi.pdb", "1hod.pdb", "1w7b.pdb", "1zec.pdb", "2dhi.pdb", "2lzp.pdb", "2x72.pdb"]:
-    #     print(pdb)
-    #     m = Molecule(os.path.join(home(), 'data', 'test-atomselect', pdb))
-    #     for v in ["P", "P1", "P2", "P3", "P4"]:
-    #         s = m.atomselect("segid " + v + " and not protein", indexes=True)
-    #         if len(s):
-    #             print(v)
-    #             print(s)
-    #             print(m.name[s])
-    #             print(m.resname[s])
-    # print('done')
 
-    # Testing trajectory reading and appending
-    ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
-    xtcfile = path.join(home(dataDir='metricdistance'), 'traj.xtc')
-    ref.read(xtcfile)
-    assert ref.coords.shape == (4507, 3, 200)
-    ref.read(xtcfile, append=True)
-    assert ref.coords.shape == (4507, 3, 400)
-    ref.read([xtcfile, xtcfile, xtcfile])
-    assert ref.coords.shape == (4507, 3, 600)
 
-    # Checking bonds
-    ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
-    ref.read(path.join(home(dataDir='metricdistance'), 'traj.xtc'))
-    ref.coords = np.atleast_3d(ref.coords[:, :, 0])
-    len1 = len(ref._guessBonds())
-    ref.coords = np.array(ref.coords, dtype=np.float32)
-    len3 = len(ref._guessBonds())
-    print(len1)
-    print(len3)
-    assert len1 == 4562
-    assert len3 == 4562
 
-    # Testing MDtraj writer
-    m = Molecule('3PTB')
-    tmp = tempname(suffix='.h5')
-    m.write(tmp, 'name CA')
 
-    # Testing dihedral setting
-    mol = Molecule('2HBB')
-    quad = [124, 125, 132, 133]
-    mol.setDihedral(quad, np.deg2rad(-90))
-    angle = mol.getDihedral(quad)
-    assert np.abs(np.deg2rad(-90) - angle) < 1E-3
-
-    # Testing updating of bonds, dihedrals and angles after filtering
-    mol = Molecule(path.join(home(dataDir='test-molecule'), 'a1e.prmtop'))
-    mol.read(path.join(home(dataDir='test-molecule'), 'a1e.pdb'))
-    _ = mol.filter('not water')
-    bb, bt, di, im, an = np.load(path.join(home(dataDir='test-molecule'), 'updatebondsanglesdihedrals_nowater.npy'))
-    assert np.array_equal(bb, mol.bonds)
-    assert np.array_equal(bt, mol.bondtype)
-    assert np.array_equal(di, mol.dihedrals)
-    assert np.array_equal(im, mol.impropers)
-    assert np.array_equal(an, mol.angles)
-    _ = mol.filter('not index 8 18')
-    bb, bt, di, im, an = np.load(path.join(home(dataDir='test-molecule'), 'updatebondsanglesdihedrals_remove8_18.npy'))
-    assert np.array_equal(bb, mol.bonds)
-    assert np.array_equal(bt, mol.bondtype)
-    assert np.array_equal(di, mol.dihedrals)
-    assert np.array_equal(im, mol.impropers)
-    assert np.array_equal(an, mol.angles)
-
-    # Testing appending of bonds and bondtypes
-    mol = Molecule('3ptb')
-    lig = Molecule(path.join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum', 'mol.mol2'))
-    assert mol.bonds.shape[0] == len(mol.bondtype)  # Checking that Molecule fills in empty bondtypes
-    newmol = Molecule()
-    newmol.append(lig)
-    newmol.append(mol)
-    assert newmol.bonds.shape[0] == (mol.bonds.shape[0] + lig.bonds.shape[0])
-    assert newmol.bonds.shape[0] == len(newmol.bondtype)
 
