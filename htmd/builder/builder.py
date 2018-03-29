@@ -88,6 +88,8 @@ class MissingAtomTypeError(Exception):
         return repr(self.value)
 
 
+from htmd.decorators import _Deprecated
+@_Deprecated('1.12.0', '<Read builder documentation on argument `disulfide`>')
 class DisulfideBridge(object):
     def __init__(self, segid1, resid1, segid2, resid2):
         if not isinstance(segid1, str) or not isinstance(segid2, str):
@@ -155,6 +157,15 @@ def embed(mol1, mol2, gap=1.3):
     return mol2
 
 
+def convertDisulfide(mol, disu):
+    from htmd.molecule.molecule import UniqueResidueID
+    newdisu = []
+    for d in disu:
+        if not isinstance(d[0], str) or not isinstance(d[1], str):
+            raise RuntimeError('All disulfide selections should be strings')
+        newdisu.append([UniqueResidueID.fromMolecule(mol, d[0]), UniqueResidueID.fromMolecule(mol, d[1])])
+    return newdisu
+
 def detectDisulfideBonds(mol, thresh=3):
     """ Automatically detects disulfide bonds in a molecule
 
@@ -171,33 +182,23 @@ def detectDisulfideBonds(mol, thresh=3):
         A list of :class:`DisulfideBridge <htmd.builder.builder.DisulfideBridge>` objects
     """
     from scipy.spatial.distance import pdist, squareform
-    from scipy.sparse.csgraph import connected_components
-    import pandas as pd
+    from htmd.molecule.molecule import UniqueResidueID
     disubonds = []
 
     # Find all SG atoms belonging to resnames starting with CY
     idx = np.where([(rn[0:2] == 'CY') and (n == 'SG') for rn, n in zip(mol.resname, mol.name)])[0] # 'resname "CY.*" and name SG'
     if len(idx) == 0:
-            return disubonds
+        return disubonds
 
-    # Used only for displaying nice messages
-    if mol.chain is None:
-        chains = [''] * len(idx)
-    else:
-        chains = mol.chain[idx]
-    segids = mol.segid[idx]
-    resids = mol.resid[idx]
-    serials = mol.serial[idx]
-    resnames = mol.resname[idx]
-    if np.any([len(s) == 0 for s in segids]):
+    if np.any([len(s) == 0 for s in mol.segid[idx]]):
         raise RuntimeError('Cannot detect disulfide bonds without segment names defined.')
 
-    # Check that there is only one SG atom in the same resid/segid combo
-    df = pd.DataFrame({'segids': segids, 'resids': resids, 'indexes': idx})
-    groups = df.groupby(['resids','segids']).groups
-    for k in groups:
-        if len(df['indexes'][groups[k]].tolist()) != 1:
-            raise RuntimeError('Multiple SG atoms detected in segment {} resid {}. Can\'t guess disulfide bridges.'.format(k[1], k[0]))
+    residues = [UniqueResidueID.fromMolecule(mol, idx=i) for i in idx]
+    for r1 in range(len(residues)):
+        for r2 in range(r1+1, len(residues)):
+            if residues[r1] == residues[r2]:
+                raise RuntimeError('Multiple SG atoms detected in the same residue {}. '
+                                   'Can\'t guess disulfide bridges.'.format(residues[r1]))
 
     sd = squareform(pdist(mol.coords[idx, :, mol.frame]))
     sd[np.diag_indices(sd.shape[0])] = thresh+1  # Set the diagonal over threshold
@@ -206,25 +207,22 @@ def detectDisulfideBonds(mol, thresh=3):
 
     numbonds = np.sum(close, axis=0)
     if np.any(numbonds > 1):
-        pairs = [(s, r) for r, s in zip(resids[np.where(numbonds > 1)[0]], segids[np.where(numbonds > 1)[0]])]
-        raise RuntimeError('SG atoms with (segid, resid) pairs {} have multiple possible bonds. Cannot guess disulfide bonds. Please specify them manually.'.format(pairs))
+        rows, cols = np.where(numbonds > 1)
+        pairs = [(str(residues[r]), str(residues[c])) for r, c in zip(rows, cols)]
+        raise RuntimeError('SG atoms between pairs {} have multiple possible bonds. Cannot guess disulfide bonds. Please specify them manually.'.format(pairs))
 
     uniquerowcols = list(set([tuple(sorted((r, c))) for r, c in zip(rows, cols)]))
     for rc in uniquerowcols:
-        disubonds.append(DisulfideBridge(segids[rc[0]], resids[rc[0]], segids[rc[1]], resids[rc[1]]))
-        msg = 'Bond between A: [serial {0} resid {1} resname {2} chain {3} segid {4}]\n' \
-              '             B: [serial {5} resid {6} resname {7} chain {8} segid {9}]\n'.format(
-            serials[rc[0]], resids[rc[0]], resnames[rc[0]], chains[rc[0]], segids[rc[0]],
-            serials[rc[1]], resids[rc[1]], resnames[rc[1]], chains[rc[1]], segids[rc[1]]
-        )
+        disubonds.append([residues[rc[0]], residues[rc[1]]])
+        msg = 'Bond between A: {}\n' \
+              '             B: {}\n'.format(residues[rc[0]], residues[rc[1]])
         print(msg)
-        #logger.info(msg)
 
     if len(disubonds) == 1:
         logger.info('One disulfide bond was added')
     else:
         logger.info('{} disulfide bonds were added'.format(len(disubonds)))
-    return sorted(disubonds, key=lambda x: x.resid1)
+    return sorted(disubonds, key=lambda x: x[0].resid)
 
 
 def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, field="segid"):
@@ -436,15 +434,6 @@ def _checkMixedSegment(mol):
     if len(intersection) != 0:
         logger.warning('Segments {} contain both protein and non-protein atoms. '
                        'Please assign separate segments to them or the build procedure might fail.'.format(intersection))
-
-
-def _checkResidueInsertions(mol):
-    ins = np.unique([x for x in mol.insertion if x != ''])
-    if len(ins) > 0:
-        raise ResidueInsertionError('Residue insertions "{}" were detected in input molecule and are not supported for'
-                                    ' building. Please use mol.renumberResidues() on your protein '
-                                    'Molecule.'.format(' '.join(ins)))
-    pass
 
 
 def removeLipidsInProtein(prot, memb, lipidsel='lipids'):
