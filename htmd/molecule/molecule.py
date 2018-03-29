@@ -8,7 +8,7 @@ from htmd.molecule.vmdparser import guessbonds, vmdselection
 from htmd.molecule.wrap import wrap
 from htmd.rotationmatrix import rotationMatrix
 from htmd.vmdviewer import getCurrentViewer
-from htmd.util import tempname
+from htmd.util import tempname, ensurelist
 from copy import deepcopy
 from os import path
 import logging
@@ -1627,8 +1627,10 @@ class UniqueAtomID:
     def selectAtom(self, mol, indexes=True, ignore=None):
         sel = np.ones(mol.numAtoms, dtype=bool)
         for f in UniqueAtomID._fields:
-            if ignore is not None and f in ignore:
-                continue
+            if ignore is not None:
+                ignore = ensurelist(ignore)
+                if f in ignore:
+                    continue
             sel &= getattr(mol, f) == getattr(self, f)
 
         if indexes:
@@ -1702,8 +1704,10 @@ class UniqueResidueID:
     def selectAtoms(self, mol, indexes=True, ignore=None):
         sel = np.ones(mol.numAtoms, dtype=bool)
         for f in UniqueResidueID._fields:
-            if ignore is not None and f in ignore:
-                continue
+            if ignore is not None:
+                ignore = ensurelist(ignore)
+                if f in ignore:
+                    continue
             sel &= getattr(mol, f) == getattr(self, f)
 
         if indexes:
