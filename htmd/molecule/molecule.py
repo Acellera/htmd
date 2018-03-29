@@ -1624,9 +1624,11 @@ class UniqueAtomID:
             setattr(self, f, getattr(mol, f)[atom][0])
         return self
 
-    def selectAtom(self, mol, indexes=True):
+    def selectAtom(self, mol, indexes=True, ignore=None):
         sel = np.ones(mol.numAtoms, dtype=bool)
         for f in UniqueAtomID._fields:
+            if ignore is not None and f in ignore:
+                continue
             sel &= getattr(mol, f) == getattr(self, f)
 
         if indexes:
@@ -1697,9 +1699,11 @@ class UniqueResidueID:
             setattr(self, f, vals[0])
         return self
 
-    def selectAtoms(self, mol, indexes=True):
+    def selectAtoms(self, mol, indexes=True, ignore=None):
         sel = np.ones(mol.numAtoms, dtype=bool)
         for f in UniqueResidueID._fields:
+            if ignore is not None and f in ignore:
+                continue
             sel &= getattr(mol, f) == getattr(self, f)
 
         if indexes:
