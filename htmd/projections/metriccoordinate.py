@@ -14,11 +14,11 @@ class MetricCoordinate(Projection):
 
     Parameters
     ----------
-    refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        The reference Molecule to which we will align.
     atomsel : str
         Atom selection string for the atoms whose coordinates we want to calculate.
         See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
+    refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        The reference Molecule to which we will align.
     trajalnstr : str, optional
         Atom selection string for the trajectories from which to align to the reference structure.
         See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
@@ -35,11 +35,25 @@ class MetricCoordinate(Projection):
     -------
     metr : MetricCoordinate object
     """
-    def __init__(self, refmol, atomsel, trajalnstr='protein and name CA', refalnstr=None, centerstr='protein', pbc=True):
-        if refalnstr is None:
-            refalnstr = trajalnstr
-        self._refmol = refmol
-        self._refalnsel = self._refmol.atomselect(refalnstr)
+    def __init__(self, atomsel, refmol=None, trajalnstr='protein and name CA', refalnstr=None, centerstr='protein', pbc=True):
+        from htmd.molecule.molecule import Molecule
+        if isinstance(atomsel, Molecule) and (refmol is None or isinstance(refmol, str)):
+            logger.warning('The order of arguments in MetricCoordinate has changed since 1.12.0. Please look at the updated documentation of the class.')
+            tmp = refmol
+            refmol = atomsel
+            atomsel = tmp
+            
+        if atomsel is None:
+            raise ValueError('Atom selection cannot be None')
+
+        self._refmol = None
+        self._refalnsel = None
+        if refmol is not None:
+            if refalnstr is None:
+                refalnstr = trajalnstr
+            self._refmol = refmol
+            self._refalnsel = self._refmol.atomselect(refalnstr)
+
         self._trajalnsel = trajalnstr
         self._centersel = centerstr
         self._atomsel = atomsel
@@ -49,7 +63,8 @@ class MetricCoordinate(Projection):
         self.pbc = pbc
 
     def _precalculate(self, mol):
-        self._pc_trajalnsel = mol.atomselect(self._trajalnsel)
+        if self._trajalnsel is not None:
+            self._pc_trajalnsel = mol.atomselect(self._trajalnsel)
         self._pc_atomsel = mol.atomselect(self._atomsel)
         self._pc_centersel = mol.atomselect(self._centersel)
 
@@ -71,22 +86,22 @@ class MetricCoordinate(Projection):
         mol = mol.copy()
         if self.pbc:
             mol.wrap(self._centersel)
-        mol.align(trajalnsel, refmol=self._refmol, refsel=self._refalnsel)
+
+        if trajalnsel is not None and self._refmol is not None:
+            mol.align(trajalnsel, refmol=self._refmol, refsel=self._refalnsel)
 
         coords = np.concatenate((mol.coords[atomsel, 0, :], mol.coords[atomsel, 1, :], mol.coords[atomsel, 2, :]))
         return np.transpose(coords)  # I need to permute the dimensions here to put frames on the first
 
     def _getSelections(self, mol):
-        if self._pc_trajalnsel is not None and self._pc_atomsel is not None and self._pc_centersel is not None:
-            trajalnsel = self._pc_trajalnsel
-            atomsel = self._pc_atomsel
-            centersel = self._pc_centersel
-        else:
-            trajalnsel = mol.atomselect(self._trajalnsel)
-            atomsel = mol.atomselect(self._atomsel)
-            centersel = mol.atomselect(self._centersel)
-        if np.sum(trajalnsel) == 0:
-            raise NameError('Alignment selection resulted in 0 atoms.')
+        trajalnsel = None
+        if self._trajalnsel is not None:
+            trajalnsel = self._pc_trajalnsel if self._pc_trajalnsel is not None else mol.atomselect(self._trajalnsel)
+            if np.sum(trajalnsel) == 0:
+                raise NameError('Alignment selection resulted in 0 atoms.')
+
+        atomsel = self._pc_atomsel if self._pc_atomsel is not None else mol.atomselect(self._atomsel)
+        centersel = self._pc_centersel if self._pc_centersel is not None else mol.atomselect(self._centersel)
         if np.sum(atomsel) == 0:
             raise NameError('Atom selection resulted in 0 atoms.')
         if np.sum(centersel) == 0:
