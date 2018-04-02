@@ -98,14 +98,14 @@ class MetricCoordinate(Projection):
         if self._trajalnsel is not None:
             trajalnsel = self._pc_trajalnsel if self._pc_trajalnsel is not None else mol.atomselect(self._trajalnsel)
             if np.sum(trajalnsel) == 0:
-                raise NameError('Alignment selection resulted in 0 atoms.')
+                raise RuntimeError('Alignment selection resulted in 0 atoms.')
 
         atomsel = self._pc_atomsel if self._pc_atomsel is not None else mol.atomselect(self._atomsel)
         centersel = self._pc_centersel if self._pc_centersel is not None else mol.atomselect(self._centersel)
         if np.sum(atomsel) == 0:
-            raise NameError('Atom selection resulted in 0 atoms.')
+            raise RuntimeError('Atom selection resulted in 0 atoms.')
         if np.sum(centersel) == 0:
-            raise NameError('Centering selection resulted in 0 atoms.')
+            raise RuntimeError('Centering selection resulted in 0 atoms.')
         return trajalnsel, atomsel, centersel
 
     def getMapping(self, mol):
