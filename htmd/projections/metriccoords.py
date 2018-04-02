@@ -15,8 +15,6 @@ class MetricCoords(Projection):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object, optional
-        The  Molecule on which to apply the selections.
     atomsel : str
         Atom selection string for the atoms whose coordinates we want to calculate.
         See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
@@ -36,7 +34,7 @@ class MetricCoords(Projection):
     -------
     metr : MetricCoords object
     """
-    def __init__(self, mol, atomsel, refmol=None, alignsel=None, refsel=None, pbccentersel=None):
+    def __init__(self, atomsel, refmol=None, alignsel=None, refsel=None, pbccentersel=None):
         self._atomsel = atomsel
         self._refmol = refmol
         self._refsel = refsel
@@ -46,8 +44,7 @@ class MetricCoords(Projection):
         self._atoms = None
         self._centers = None
         self._refatoms = None 
-        #Compute them
-        self._computeSelections(mol)
+        
 
     def project(self, mol):
         """ Project molecule.
@@ -62,6 +59,9 @@ class MetricCoords(Projection):
         data : np.ndarray
             An array containing the projected data.
         """
+        #Compute them
+        if self._align is None:
+            self._computeSelections(mol)
 
         mol = mol.copy() #internal temp copy
         if self._pbccentersel is not None:
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
     ref = mol.copy()
     ref.coords = np.atleast_3d(ref.coords[:, :, 0])
-    metr = MetricCoords(mol, 'protein and name CA',refmol=ref,alignsel='protein and name CA',refsel='protein and name CA',pbccentersel='protein')
+    metr = MetricCoords('protein and name CA',refmol=ref,alignsel='protein and name CA',refsel='protein and name CA',pbccentersel='protein')
     data = metr.project(mol)
 
     lastcoors = np.array([6.79283285,   5.55226946,   4.49387407,   2.94484425,
