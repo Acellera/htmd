@@ -42,7 +42,7 @@ class MetricCoordinate(Projection):
             tmp = refmol
             refmol = atomsel
             atomsel = tmp
-            
+
         if atomsel is None:
             raise ValueError('Atom selection cannot be None')
 
@@ -135,20 +135,48 @@ class MetricCoordinate(Projection):
         return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
 
-if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
-    from htmd.home import home
-    from os import path
-    mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
-    mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
-    ref = mol.copy()
-    ref.coords = np.atleast_3d(ref.coords[:, :, 0])
-    metr = MetricCoordinate(ref, 'protein and name CA')
-    data = metr.project(mol)
+import unittest
 
-    lastcoors = np.array([6.79283285,   5.55226946,   4.49387407,   2.94484425,
-                          5.36937141,   3.18590879,   5.75874281,   5.48864174,
-                          1.69625032,   1.58790839,   0.57877392,  -2.66498065,
-                          -3.70919156,  -3.33702421,  -5.38465405,  -8.43286991,
-                          -8.15859032,  -7.85062265, -10.92551327, -13.70733166], dtype=np.float32)
-    assert np.all(np.abs(data[-1, -20:] - lastcoors) < 0.001), 'Coordinates calculation is broken'
+class TestMetricCoordinate(unittest.TestCase):
+
+    def test_project(self):
+        from htmd.molecule.molecule import Molecule
+        from htmd.home import home
+        from os import path
+        mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
+        mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
+        ref = mol.copy()
+        ref.coords = np.atleast_3d(ref.coords[:, :, 0])
+        metr = MetricCoordinate('protein and name CA')
+        data = metr.project(mol)
+
+        lastcoors = np.array([-24.77000237, -27.76000023, -30.44000244, -33.65000153,
+                              -33.40999985, -36.32000351, -36.02000427, -36.38000107,
+                              -39.61000061, -41.01000214, -43.80000305, -45.56000137,
+                              -45.36000061, -47.13000488, -49.54000473, -50.6000061 ,
+                              -50.11000061, -52.15999985, -55.1400032 , -55.73000336], dtype=np.float32)
+        assert np.all(np.abs(data[-1, -20:] - lastcoors) < 0.001), 'Coordinates calculation is broken'
+
+    def test_project_align(self):
+        from htmd.molecule.molecule import Molecule
+        from htmd.home import home
+        from os import path
+        mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
+        mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
+        ref = mol.copy()
+        ref.coords = np.atleast_3d(ref.coords[:, :, 0])
+        metr = MetricCoordinate('protein and name CA', ref)
+        data = metr.project(mol)
+
+        lastcoors = np.array([6.79283285, 5.55226946, 4.49387407, 2.94484425,
+                              5.36937141, 3.18590879, 5.75874281, 5.48864174,
+                              1.69625032, 1.58790839, 0.57877392, -2.66498065,
+                              -3.70919156, -3.33702421, -5.38465405, -8.43286991,
+                              -8.15859032, -7.85062265, -10.92551327, -13.70733166], dtype=np.float32)
+        assert np.all(np.abs(data[-1, -20:] - lastcoors) < 0.001), 'Coordinates calculation is broken'
+
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
+
