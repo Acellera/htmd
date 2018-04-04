@@ -4,7 +4,7 @@ import multiprocessing
 import math
 import numpy as np
 from rdkit import Chem
-from htmd.smallmol.util import get_rotationMatrix, rotate, inputToOutput, _depictMol, depictMultipleMols
+from htmd.smallmol.util import get_rotationMatrix, rotate, openbabelConvert, _depictMol, depictMultipleMols
 from htmd.smallmol.chemlab.periodictable import _hybridizations_IdxToType, _bondtypes_IdxToType,  _hybridizations_StringToType, _bondtypes_StringToType
 import logging
 logger = logging.getLogger(__name__)
@@ -30,16 +30,12 @@ class SmallMol:
         SmallMol object
     ignore_errors: bool
         If True, errors will not be raised.
-        Default: False
     force_reading: bool
         If True, and the mol provided is not accepted, the molecule will be initially converted into sdf
-        Default: False
     fixHs: bool
         If True, the missing hydrogens are assigned, the others are correctly assinged into the graph of the molecule
-        Default: True
     removeHs: bool
         If True, remove the hydrogens
-        Default: False
 
     Examples
     --------
@@ -202,7 +198,7 @@ class SmallMol:
             The number of conformers in the molecule
         """
         # getting the number of conformers from the shape of coords array
-        _nConformers = self.coords.shape[-1]
+        _nConformers = self.coords.shape[2]
         return _nConformers
 
     def _initializeMolObj(self, mol, force_reading):
@@ -244,7 +240,7 @@ class SmallMol:
                 # if the file failed to be loaded and 'force_reading' = True, file convert to sdf and than loaded
                 if _mol == None and force_reading:
                     logger.warning('Reading {} with force_reading procedure'.format(mol))
-                    sdf = inputToOutput(mol, name_suffix, 'sdf')
+                    sdf = openbabelConvert(mol, name_suffix, 'sdf')
                     _mol = Chem.SDMolSupplier(sdf, removeHs=False)[0]
 
                     os.remove(sdf)
@@ -357,7 +353,6 @@ class SmallMol:
             The value of the property
         overwrite: bool
             If True, the property will be overwritten if already exist
-            Default: False
 
         Example
         -------
@@ -393,7 +388,6 @@ class SmallMol:
             The list of the values for the property
         aIdxs: list
             The list of the atom index to which set up the values
-            Default: None
 
         Example
         -------
@@ -402,18 +396,18 @@ class SmallMol:
         array(['a', None, 'b', 'c', None, 'a', None, None, None, None, None, None,
        None, None, None, None, None, None], dtype=object)
         """
-        class ValuesLengthErrors(Exception):
+        class ValueLengthErrors(Exception):
             pass
 
         if not isinstance(key, str):
              raise ValueError('Wrong type {} for key.  Should be {} '.format(type(key), type('string')))
 
         if aIdxs is None and len(values) != self.numAtoms:
-            raise ValuesLengthErrors('The number of values passed {} do not match '
+            raise ValueLengthErrors('The number of values passed {} do not match '
                                      'the number of atoms {}'.format(len(values), self.numAtoms))
 
         if aIdxs is not None and len(aIdxs) != len(values):
-            raise ValuesLengthErrors('The number of values passed {} do not match '
+            raise ValueLengthErrors('The number of values passed {} do not match '
                                      'the number of idxs {}'.format(len(values), len(aIdxs)))
 
         _props = self.listPropsAtoms
@@ -459,10 +453,8 @@ class SmallMol:
             The selection string. atom field name followed by spaced values for that field
         convertType: bool
             If True, and where possible the returnField is converted in rdkit object
-            Default: True
         invert: bool
             If True, the selection is inverted
-            Default: False
 
         Returns
         -------
@@ -531,9 +523,8 @@ class SmallMol:
 
         Parameters
         ----------
-        returnDetails: bool (default=False)
+        returnDetails: bool
             If True, returns the chiral atoms and their chiral types
-            Default: False
 
         Returns
         -------
@@ -574,7 +565,7 @@ class SmallMol:
 
         Parameters
         ----------
-        returnDetails: bool (default=False)
+        returnDetails: bool
             If True, returns the chiral atoms and their chiral types
 
         Returns
@@ -585,7 +576,6 @@ class SmallMol:
             The selection for the second set of atoms
         bondtype: str or int
             The bondtype as index or string
-            Default: None
 
         Returns
         -------
@@ -636,7 +626,6 @@ class SmallMol:
         ----------
         id: int
             The id of the conformer
-            Default: 0
 
         Returns
         -------
@@ -695,10 +684,8 @@ class SmallMol:
         ----------
         confId: int
             The conformer
-            Default: 0
         coords: np.array
             The coords for which you want the center
-            Default: None
         """
         if coords is None:
             coords = self.getCoords(confId)
@@ -712,16 +699,12 @@ class SmallMol:
         ----------
         num_confs: int
            Number of conformers to generate.
-           Default: 400
-        optimizemode: str, (default='mmff')
+        optimizemode: str
             The optimizemode to use. Can be  'uff', 'mmff'
-            Default: 'mmff'
         align: bool
             If True, the conformer are aligned to the first one
-            Default: True
         append: bool
             If False, the current conformers are deleted
-            Default: True
 
         """
         from rdkit.Chem.AllChem import UFFOptimizeMolecule, MMFFOptimizeMolecule, EmbedMultipleConfs
@@ -867,9 +850,8 @@ class SmallMol:
 
         Parameters
         ----------
-        ids: list (default=None)
+        ids: list
             The list of ids for the molecule conformers to return. If None all the conformers are returned
-            Default: None
 
         Returns
         -------
@@ -893,24 +875,18 @@ class SmallMol:
 
         Paramters
         ---------
-        savefolder: str (default='conformations')
+        savefolder: str
             The name of the folder where to write the files
-            Default: 'conformations'
-        savename: str (default='molConf')
+        savename: str
             The basename of the conformer file
-            Default: 'molConf'
         filetype: str ('sdf', 'pdb')
             The filetype of the output
-            Default: 'sdf'
-        savefolder_exist_ok: bool (default=False)
+        savefolder_exist_ok: bool
             Set as True to overwrite the output folder
-            Default: False
         merge: bool
             Set as True to save in a unique file
-            Default: False
         ids: list
             A list of the conformer ids to save. If None, all are written
-            Default: None
 
         Example
         -------
@@ -959,9 +935,8 @@ class SmallMol:
 
         Parameters
         ----------
-        ids: list (default=None)
+        ids: list
             The list of conformer id to delete. If None, all are removed except the first one
-            Default: None
         """
 
         _nConformers = self.numConformers
@@ -969,7 +944,7 @@ class SmallMol:
         if ids is None:
             ids = np.arange(_nConformers)
         elif not isinstance(ids, list):
-            raise TypeError("The ids argument should be list of confermer ids")
+            raise TypeError("The ids argument should be list of conformer ids")
 
         self.coords = np.delete(self.coords, ids, axis=2)
 
@@ -1010,7 +985,6 @@ class SmallMol:
         ---------
         includeConformer: bool
             If True, also the conformers coordinates are returned
-            Default: False
 
         Returns
         -------
@@ -1072,10 +1046,8 @@ class SmallMol:
         ----------
         formalcharges: bool
             If True,the forrmal charges are used instead of partial ones
-            Default: False
         ids: list
             The list of conformer ids to store in the htmd Molecule object- If None, all are returned
-            Default: None
 
         Returns
         -------
@@ -1155,29 +1127,21 @@ class SmallMol:
         ----------
         sketch: bool
             Set to True for 2D depiction
-            Default: False
         filename: str
             Set the filename for the svg file
-            Default: None
         ipython: bool
             Set to True to return the jupiter-notebook rendering
-            Default: False
         optimize: bool
             Set to True to optimize the conformation. Works only with 3D.
-            Default: False
-        optimizemode: ['std', 'mmff'], default='std'
+        optimizemode: ['std', 'mmff']
             Set the optimization mode for 3D conformation
-            Default: 'mmff'
-        removeHs: bool, default=True
+        removeHs: bool
             Set to True to hide hydrogens in the depiction
-            Default: True
         atomlabels: str
             Accept any combinations of the following pararemters as unique string '%a%i%c%*' a:atom name, i:atom index,
             c:atom formal charge (+/-), *:chiral (* if atom is chiral)
-            Default: None
         highlightAtoms: list
             List of atom to highlight. It can be also a list of atom list, in this case different colors will be used
-            Default: None
 
         Returns
         -------
@@ -1282,13 +1246,10 @@ class SmallMolLib:
     ----------
     sdf_file: str
         The sdf file path
-        Default: None
     removeHs: bool
         If True, the hydrogens of the molecules will be removed
-        Default: False
     fixHs: bool
         If True, the hydrogens are added and optimized
-        Default: True
 
     Example
     -------
@@ -1381,7 +1342,6 @@ class SmallMolLib:
         ----------
         ids: list
             The index list of the molecules to return
-            Default: None
 
         Returns
         -------
@@ -1413,7 +1373,6 @@ class SmallMolLib:
             The ouput sdf filename
         fields: list
             A list of the fields to write. If None all are saved
-            Default: None
         """
 
         from rdkit.Chem import SDWriter
@@ -1437,11 +1396,9 @@ class SmallMolLib:
             The new SmallMolLib to merge
         strictField: bool
             If True, the new SmallMolLib can be merged only if they have exactly the same fields
-            Default: False
         strictDirection: int
             The valid options are 1 or 2 only. With 1 only the fields of the current SmallMolLib are added to the new one.
             With 2 also the fields of the new SmallMolLib are added into the current one.
-            Default: 1
 
         """
 
@@ -1461,11 +1418,9 @@ class SmallMolLib:
             The SmallMol object to add
         strictField: bool
             If True, the new SmallMolLib can be merged only if they have exactly the same fields
-            Default: False
         strictDirection: int
             The valid options are 1 or 2 only. With 1 only the fields of the current SmallMolLib are added to the new one.
             With 2 also the fields of the new SmallMolLib are added into the current one.
-            Default: 1
         """
 
         #### check fields and in case as zero ?  the same for the ones present?
@@ -1525,13 +1480,10 @@ class SmallMolLib:
         ----------
         fields: list
             The list of fields to convert into a pandas DataFrame column
-            Default: None
         molAsImage: bool
             If True, the rdkit.Chem.rdchem.Mol is converted into an image
-            Default: False
         sketch: bool
             If True, the molecule are rendered to be 2D
-            Default: True
 
         Returns
         -------
@@ -1658,35 +1610,25 @@ class SmallMolLib:
         ----------
         ids: list
             The index of the molecules to depict
-            Default: None
         sketch: bool
             Set to True for 2D depiction
-            Default: False
         filename: str
             Set the filename for the svg file
-            Default: None
         ipython: bool
             Set to True to return the jupiter-notebook rendering
-            Default: False
         optimize: bool
             Set to True to optimize the conformation. Works only with 3D.
-            Default: False
-        optimizemode: ['std', 'mmff'], default='std'
+        optimizemode: ['std', 'mmff']
             Set the optimization mode for 3D conformation
-            Default: 'mmff'
         removeHs: bool
             Set to True to hide hydrogens in the depiction
-            Default: True
         legends: str
             The name to used for each molecule. Can be 'names':the name of themselves; or 'items': a incremental id
-            Default: None
         highlightAtoms: list
             A List of atom to highligh for each molecule. It can be also a list of atom list, in this case different
             colors will be used
-            Default: None
         mols_perrow: int
             The number of molecules to depict per row of the grid
-            Default: 3
 
         Returns
         -------

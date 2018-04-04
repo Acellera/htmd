@@ -58,7 +58,6 @@ def _getRotationMatrix(axis, theta, deg=False):
         The angle of the rotation
     deg: bool
         If True, the angle is considered in degree and will be converted into radians
-        Default: False
 
     Returns
     -------
@@ -149,7 +148,6 @@ def rotate(coords, rotMat, center=(0,0,0)):
         The rotation matrix
     center : list
         The rotation center
-        Default: [0,0,0]
     """
 
     newcoords = coords - center
@@ -222,7 +220,7 @@ def alignMol(smallmol, refmol):
 
     return sm_new
 
-def inputToOutput(input_file, input_format, output_format):
+def openbabelConvert(input_file, input_format, output_format):
     """
     Converts the file from the input format to the output format specified. It uses the openbabel features
 
@@ -279,16 +277,12 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
         The rdkit molecule to depict
     filename: str
         The filename of the image
-        Default: None
     ipython: bool
         If True, the SVG rendering for jupiter-nootebook are returned
-        Default: False
     atomlabels: list
         List of the label to use for each atom
-        Default: None
     highlightAtoms: list
         List of atom index to highlight. Can be also list of list for different selection-colors
-        Default: None
 
     Returns
     -------
@@ -357,19 +351,14 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
             The list of the rdkit molecules to depict
         filename: str
             The filename of the image
-            Default: None
         ipython: bool
             If True, the SVG rendering for jupiter-nootebook are returned
-            Default: False
         legends: list
             List of titles subfigure for each molecule
-            Default: None
         highlightAtoms: list
             List of list of atom index to highlight.
-            Default: None
         mols_perrow: int
             The number of subfigures per row
-            Default: 3
 
         Returns
         -------

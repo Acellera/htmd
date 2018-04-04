@@ -12,10 +12,8 @@ class Builder:
     ----------
     smallmol: htmd.smallmol.smallmol.SmallMol
         The SmallMol object
-        Default: None
     checkInitialConformer: bool
         If True, a conformation is generated if None are found. (designed espcially for smiles)
-        Default: True
 
     Example
     -------
@@ -39,7 +37,6 @@ class Builder:
         if checkInitialConformer and smallmol is not None:
             self._prepareConformer()
 
-
     def loadMol(self, smallmol, checkInitialConformer=True):
         """
         Loads the SmallMol object. The additional argument checkInitialConformer ensure that one valid conformer exists
@@ -50,7 +47,6 @@ class Builder:
             The SmallMol object
         checkInitialConformer: bool
             If True, a conformer is generated if only not valid are found in the smallmol object
-            Default: True
         """
 
         if not isinstance(smallmol, SmallMol):
@@ -78,7 +74,6 @@ class Builder:
         coords = coords[:, :, np.newaxis]
         sm.coords = coords
 
-
     def addHydrogens(self, onlyExplicit=False):
         """
         Adds the hydrogens to fill up the valence of the atoms. With onlyExplicit is possible to add only the polar ones
@@ -87,7 +82,6 @@ class Builder:
         ----------
         onlyExplicit: bool
             If True, only the polar hydrogens will be added
-            Default: False
         """
 
         pT = self.periodictable
@@ -102,7 +96,7 @@ class Builder:
         atomidxs = sm.get( 'idx', 'element {}'.format(heavy_sel))
         formalcharges = sm.get('formalcharge', 'element {}'.format(heavy_sel))
 
-        missing_atoms = np.array([pT.getMissingValence(aId, sm, fch) for aId, fch in zip(atomidxs, formalcharges)])
+        missing_atoms = np.array([pT.getMissingValence(sm, aId, fch) for aId, fch in zip(atomidxs, formalcharges)])
         ids = np.where(missing_atoms > 0)
         heavyToFill = atomidxs[ids]
         numHydrogens = missing_atoms[ids]
@@ -116,19 +110,16 @@ class Builder:
 
         self._addAtoms(h_atoms)
 
-
     def removeHydrogens(self, removePolars=True, removeNonPolars=True):
         """
-        Removes the hydrogens. Is it possible to choose the type of hydrogens to remove: polar and not polar
+        Removes the hydrogens. It is possible to choose the type of hydrogens to remove: polar and not polar
 
         Parameters
         ----------
         removePolars: bool
             If True, the polar hydrogens will be removed
-            Default: True
         removeNonPolars: bool
             If True, the non polar hydrogens will be removed
-            Default: True
         """
 
         ## TODO
@@ -142,11 +133,12 @@ class Builder:
         hydrogensNonPolarIdx = hydrogensIdx[np.where(neighbors == 'C')]
 
 
-        hydrogensIdx = np.array([],dtype=np.int)
+        hydrogensIdx = []
         if removePolars:
-            hydrogensIdx = np.append( hydrogensIdx, hydrogensPolarIdx)
+            hydrogensIdx.extend(hydrogensPolarIdx.tolist())
         if removeNonPolars:
-            hydrogensIdx = np.append(hydrogensIdx, hydrogensNonPolarIdx)
+            hydrogensIdx.extend(hydrogensNonPolarIdx.tolist())
+        hydrogensIdx = np.array(hydrogensIdx, dtype=np.uint32)
 
         self._removeAtoms(hydrogensIdx)
 
@@ -166,34 +158,34 @@ class Builder:
         for a in atoms:
             n_atom = sm.numAtoms
            # print('placing {} to {}'.format(n_atom, a['attachTo']))
-            sm.__dict__['idx'] = np.append(sm.idx, n_atom)
-            sm.__dict__['element'] = np.append(sm.element, a['element'])
-            sm.__dict__['atomname'] = np.append(sm.atomname, '{}{}'.format(a['element'], n_atom))
-            sm.__dict__['charge'] = np.append(sm.charge, a['charge'])
-            sm.__dict__['formalcharge'] = np.append(sm.formalcharge, a['formalcharge'])
-            sm.__dict__['chiral'] = np.append(sm.chiral, a['chiral'])
-            sm.__dict__['hybridization'] = np.append(sm.hybridization, _hybridizations_IdxToType[a['hybridization']])
-            sm.__dict__['coords'] = np.concatenate((sm.coords, a['coords']), axis=0)
-            sm.__dict__['neighbors'] = np.array(sm.neighbors.tolist() + [[a['attachTo']]])
-            sm.__dict__['bondtypes'] = np.array(sm.bondtypes.tolist() + [[a['bondtype']]])
+            sm.idx = np.append(sm.idx, n_atom)
+            sm.element = np.append(sm.element, a['element'])
+            sm.atomname = np.append(sm.atomname, '{}{}'.format(a['element'], n_atom))
+            sm.charge = np.append(sm.charge, a['charge'])
+            sm.formalcharge = np.append(sm.formalcharge, a['formalcharge'])
+            sm.chiral = np.append(sm.chiral, a['chiral'])
+            sm.hybridization = np.append(sm.hybridization, _hybridizations_IdxToType[a['hybridization']])
+            sm.coords = np.concatenate((sm.coords, a['coords']), axis=0)
+            sm.neighbors = np.array(sm.neighbors.tolist() + [[a['attachTo']]])
+            sm.bondtypes = np.array(sm.bondtypes.tolist() + [[a['bondtype']]])
             if isinstance(sm.neighbors[a['attachTo']], np.ndarray):
                 new_neighbors = sm.neighbors.tolist()
                 new_neighbors[a['attachTo']].append(n_atom)
-                sm.__dict__['neighbors'] = np.array(new_neighbors)
+                sm.neighbors = np.array(new_neighbors)
                 new_bonds = sm.bondtypes.tolist()
                 new_bonds[a['attachTo']].append(a['bondtype'])
-                sm.__dict__['bondtypes'] = np.array(new_bonds)
+                sm.bondtypes = np.array(new_bonds)
                 
             else:
                 sm.neighbors[a['attachTo']].append(n_atom)
                 sm.bondtypes[a['attachTo']].append(a['bondtype'])
 
             #TODO based on chiral
-            sm.__dict__['_chiraltags'] = np.append(sm._chiraltags, 0)
+            sm._chiraltags = np.append(sm._chiraltags, 0)
             # Development note: removed assignement explicitHs
 
             # coords
-            sm.__dict__['coords'][n_atom]  = self._getAtomCoords(n_atom, a['attachTo'])
+            sm.coords[n_atom]  = self._getAtomCoords(n_atom, a['attachTo'])
 
             #c += 1
 
@@ -225,7 +217,7 @@ class Builder:
         heavy_hybridization = sm.hybridization[attachToIdx]
         heavy_neighbors = sm.neighbors[attachToIdx]
         heavy_neighbors_num = len(heavy_neighbors)
-        bondLength = pT.getRadiusBond(heavy_element) + pT.getRadiusBond(atom_element)
+        bondLength = pT.getBondRadius(heavy_element) + pT.getBondRadius(atom_element)
 
         dirVect = np.array([0,0,0])
         if heavy_neighbors_num == 1:
@@ -244,6 +236,8 @@ class Builder:
             perpVect = _normalizeVector(perpVect)
 
             if heavy_hybridization == 4:
+                # the rotation of 180 - 109.471 comes from the tetrahedral geometry of the VSEPR theory.
+                # I did not directly write 70.529, just to keep track of the 109.471 value that is clear for a chemist
                 rot_matrix = _getRotationMatrix(perpVect, (180-109.471), deg=True)
                 dirVect = np.dot(rot_matrix, nbrVect)
 
@@ -355,7 +349,7 @@ class Builder:
 
         new_neighbors = []
         new_bondstype = []
-        for n_set, b_set in zip(sm.__dict__['neighbors'], sm.__dict__['bondtypes']):
+        for n_set, b_set in zip(sm.neighbors, sm.bondtypes):
             new_n_set = []
             new_b_set = []
             for n, b in zip(n_set, b_set):
@@ -364,10 +358,10 @@ class Builder:
                     new_b_set.append(b)
             new_neighbors.append(new_n_set)
             new_bondstype.append(new_b_set)
-        sm.__dict__['neighbors'] = np.array(new_neighbors)
-        sm.__dict__['bondtypes'] = np.array(new_bondstype)
+        sm.neighbors = np.array(new_neighbors)
+        sm.bondtypes = np.array(new_bondstype)
 
-        atom_mapper = { hIdx:n for n, hIdx in enumerate(sm.__dict__['idx']) }
+        atom_mapper = { hIdx:n for n, hIdx in enumerate(sm.idx) }
 
         self._fixAtomNumber(atom_mapper)
 
@@ -380,7 +374,6 @@ class Builder:
         atom_mapper: dict
             A dictionary of the old index: new index
         """
-
 
         sm = self.smallmol
 
