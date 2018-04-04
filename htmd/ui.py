@@ -52,7 +52,6 @@ from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.config import config
-import logging.config
 
 # -------- Shortcuts ---------
 import os
@@ -73,10 +72,7 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
 
 # from matplotlib import pylab as plt
 # ----------------------------
-try:
-    logging.config.fileConfig(os.path.join(htmd.home.home(), 'logging.ini'), disable_existing_loggers=False)
-except:
-    print("HTMD: Logging setup failed")
+
 
 
 
