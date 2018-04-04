@@ -164,7 +164,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
                     f.write('#BSUB -R "select[ngpus>0] rusage[ngpus_excl_p={}]"\n'.format(self.ngpu))
                 elif self.version == 10:
                     if not self.gpu_options:
-                        self.gpu_options = {'mode': 'shared', 'mps': 'no', 'j_exclusive': 'no'}
+                        self.gpu_options = {'mode': 'exclusive_process'}
                     gpu_requirements = list()
                     gpu_requirements.append('num={}'.format(self.ngpu))
                     for i in self.gpu_options:
