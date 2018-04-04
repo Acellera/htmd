@@ -75,7 +75,7 @@ class PeriodicTable:
 
         return missatoms
 
-    def getRadiusBond(self, element):
+    def getBondRadius(self, element):
         """
         Returns the atom radius when bonded
 
@@ -96,20 +96,18 @@ class PeriodicTable:
 
         return bradius
 
-
-    def getMissingValence(self, atomidx, smallmol, formalcharge=0):
+    def getMissingValence(self, smallmol, atomidx, formalcharge=0):
         """
         Returns the number of missing atom to complete the atom valence based on the types of bonds and formalcharge
 
         Parameters
         ----------
-        atomidx: int
-            The index of the atom
         smallmol: htmd.smallmol.smallmol.SmallMol
             The SmallMol object
+        atomidx: int
+            The index of the atom
         formalcharge: int
             The formalcharge of the atom
-            Default: 0
 
         Returns
         -------
@@ -152,10 +150,8 @@ class PeriodicTable:
             The element of the atom
         attachTo: int
             The index of the atom you want the new atom will be bonded to
-            Default: None
         coords:
             The coordinates of the new atom
-            Default: None
 
         Returns
         -------

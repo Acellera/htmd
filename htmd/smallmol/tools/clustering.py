@@ -19,10 +19,8 @@ def getMaximumCommonSubstructure(smallmol_list, removeHs=True, returnAtomIdxs=Fa
         The list of SmallMol objects
     removeHs: bool
         If True, the atom the hydrogens where not considered
-        Default: True
     returnAtomIdxs: bool
         If True, the lists of the atom indexes are returned
-        Default: False
 
     Returns
     -------
@@ -90,13 +88,10 @@ def cluster(smallmol_list, method, distThresholds=0.2, returnDetails=True, remov
         'circularFingerprints', 'shape', 'mcs']
     distThresholds: float
         The disance cutoff for the clusters
-        Default: 0.2
     returnDetails: bool
         If True, the cluster details are also returned
-        Default: True
     removeHs: bool
         If True, the hydrogens are not considered
-        Default: True
 
     Returns
     -------
@@ -297,7 +292,6 @@ def _circularFingerprintsClustering(rdkit_mols, radius=2):
 
         radius: int
             The radius of the MorganCircularFingerprint
-            Default: 2
 
         Returns
         -------
