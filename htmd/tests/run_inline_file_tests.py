@@ -5,7 +5,7 @@
 #
 import fnmatch
 import os
-from subprocess import run
+from subprocess import Popen, PIPE, STDOUT
 import sys
 import time
 
@@ -70,9 +70,17 @@ for f in filestotest:
     t = time.time()
     print(' ************************  Running "{}"  ************************'.format(f))
     if f.endswith('amber.py') or f.endswith('charmm.py') or f.endswith('preparation.py'):
-        process = run('export PYTHONHASHSEED=1; {} {}'.format(pythonexe, f), shell=True)
+        process = Popen('export PYTHONHASHSEED=1; {} {}'.format(pythonexe, f), shell=True, stdout=PIPE, stderr=STDOUT,
+                        universal_newlines=True)
     else:
-        process = run('{} {}'.format(pythonexe, f), shell=True)
+        process = Popen('{} {}'.format(pythonexe, f), shell=True, stdout=PIPE, stderr=STDOUT,
+                        universal_newlines=True)
+    while True:
+        out = process.stdout.readline()
+        print(out.strip())
+        if len(out) == 0:
+            break
+    process.wait()
     finishtime = time.time() - t
     print(' ************************  Result : {} Time : {} ************************'.format(process.returncode,
                                                                                              finishtime))
