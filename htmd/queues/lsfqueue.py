@@ -32,8 +32,8 @@ class LsfQueue(SimQueue, ProtocolInterface):
     ngpu : int, default=1
         Number of GPUs to use for a single job
     gpu_options : dict, default=None
-        Number of GPUs to use for a single job(dict format: {['mode': ['shared', 'exclusive_process'],]['mps': ['yes',
-        'no'],]['j_exclusive': ['yes', 'no']]})
+        Number of GPUs to use for a single job (valid dict entries: {'mode': <'shared' or 'exclusive_process'>}, {'mps':
+        <'yes' or 'no'>}, {'j_exclusive': <'yes' or 'no'>})
     ncpu : int, default=1
         Number of CPUs to use for a single job
     memory : int, default=4000
@@ -54,6 +54,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
         Envvars to propagate from submission node to the running node (comma-separated)
     prerun : list, default=None
         Shell commands to execute on the running node before the job (e.g. loading modules)
+
 
 
     Examples
