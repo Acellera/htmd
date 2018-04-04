@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -80,12 +80,12 @@ if __name__ == "__main__":
                          dd + '/generators/1/structure.pdb')
 
     metr2 = Metric(fsims)
-    metr2.projection(htmd.projections.metricnull.MetricNull(2))
+    metr2.set(htmd.projections.metricnull.MetricNull(2))
     data2 = metr2.project()
     assert data2.trajectories[0].projection.shape == (6, 2)
 
     metr1 = Metric(fsims)
-    metr1.projection(htmd.projections.metricnull.MetricNull(1))
+    metr1.set(htmd.projections.metricnull.MetricNull(1))
     data1 = metr1.project()
     assert data1.trajectories[0].projection.shape == (6, 1)
 

@@ -1,3 +1,8 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 from math import cos, sqrt, sin
 import numpy as np
 
@@ -40,8 +45,6 @@ def rotate(coords, rotMat, center=(0,0,0)):
         The rotation matrix
     center : list
         The rotation center
-    sel :
-        Atomselection for atoms to rotate
     """
 
     newcoords = coords - center

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -126,11 +126,12 @@ class VMD:
 
         Parameters
         ----------
-        mode : ['protein','ligand']
-            If set to 'protein' it will show a single conformation of the protein with sequence coloring
-            If set to 'ligand' it will show all ligands in the specified `color` and the protein in teal
+        mode : str ('protein', 'ligand')
+            If set to 'protein', it will show a single conformation of the protein with sequence coloring
+            If set to 'ligand', it will show all ligands in the specified `color` and the protein in teal
         sel : str
-            Atomselection for the ligand
+            Atom selection string for the ligand mode.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         color : int
             Color for the ligand. Use color numbers of VMD
         """

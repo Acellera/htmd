@@ -1,3 +1,8 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 import networkx as nx
 import numpy as np
 
@@ -93,9 +98,11 @@ def maximalSubstructureAlignment(mol1, mol2, sel1='all', sel2='all', fields=('el
     mol2 : :class:`Molecule`
         The second molecule which will be rotated and translated to align on mol1
     sel1 : str
-        An atomselection string of the atoms of mol1 to align
+        Atom selection string of the atoms of `mol1` to align.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     sel2 : str
-        An atomselection string of the atoms of mol2 to align
+        Atom selection string of the atoms of `mol2` to align.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     fields : tuple
         A tuple of the fields that are used to match atoms
     tolerance : float

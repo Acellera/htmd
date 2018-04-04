@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -9,7 +9,6 @@ from htmd.molecule.util import sequenceID
 import numpy as np
 import logging
 import string
-from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -228,11 +227,6 @@ def detectDisulfideBonds(mol, thresh=3):
     return sorted(disubonds, key=lambda x: x.resid1)
 
 
-@_Deprecated('1.0.8', 'htmd.builder.builder.autoSegment')
-def segmentgaps(mol, sel='all', basename='P', spatial=True, spatialgap=4):
-    return autoSegment(mol, sel=sel, basename=basename, spatial=spatial, spatialgap=spatialgap)
-
-
 def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, field="segid"):
     """ Detects resid gaps in a selection and assigns incrementing segid to each fragment
 
@@ -244,7 +238,8 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object
     sel : str
-        Atom selection on which to check for gaps.
+        Atom selection string on which to check for gaps.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     basename : str
         The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
     spatial : bool
@@ -331,7 +326,8 @@ def autoSegment2(mol, sel='(protein or resname ACE NME)', basename='P', fields=(
     mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The Molecule object
     sel : str
-        Atom selection on which to check for gaps.
+        Atom selection string on which to check for gaps.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     basename : str
         The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
     fields : tuple of strings
@@ -470,9 +466,11 @@ def removeAtomsInHull(mol1, mol2, hullsel, removesel):
     mol2 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         Molecule which contains the atoms which we check if they are within the hull
     hullsel : str
-        Atomselection for atoms in mol1 from which to calculate the convex hull.
+        Atom selection string for atoms in mol1 from which to calculate the convex hull.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     removesel : str
-        Atomselection for atoms in mol2 from which to remove the ones which are within the hull
+        Atom selection string for atoms in mol2 from which to remove the ones which are within the hull.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Returns
     -------

@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -18,15 +18,20 @@ class MetricSphericalCoordinate(Projection):
     refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
         The reference Molecule to which we will align.
     targetcom : str
-        The atom selection from which to calculate the target center of mass.
+        Atom selection string from which to calculate the target center of mass.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     refcom : str
-        The atom selection from which to calculate the reference center of mass.
+        Atom selection string from which to calculate the reference center of mass.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     trajalnstr : str, optional
-        Atomselection for the trajectories from which to align to the reference structure.
+        Atom selection string for the trajectories from which to align to the reference structure.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     refalnstr : str, optional
-        Atomselection for `refmol` from which to align to the reference structure. If None, it defaults to the same as `trajalnstr`.
+        Atom selection string for `refmol` from which to align to the reference structure. If None, it defaults to the
+        same as `trajalnstr`. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     centerstr : str, optional
-        Atomselection around which to wrap the simulation.
+        Atom selection string around which to wrap the simulation.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     pbc : bool
         Enable or disable coordinate wrapping based on periodic boundary conditions.
 

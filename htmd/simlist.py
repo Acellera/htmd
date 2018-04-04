@@ -3,7 +3,7 @@ HTMD can handle a large amount of simulations.
 Simulation lists allow to create a simple list containing all relevant information about the simulations to later
 perform any type of analysis.
 """
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -229,10 +229,11 @@ def simfilter(sims, outfolder, filtersel):
     ----------
     sims : list
         A simulation list produced by the `simList` function
-    outFolder : str
+    outfolder : str
         The folder in which to write the modified trajectories
-    filterSel : str
-        An atomselection string describing the atoms we want to keep
+    filtersel : str
+        Atom selection string describing the atoms we want to keep.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
 
     Returns
     -------

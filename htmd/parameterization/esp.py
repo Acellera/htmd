@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -11,6 +11,7 @@ import numpy as np
 from numpy.random import uniform as rand
 from scipy import constants as const
 from scipy.spatial.distance import cdist
+from htmd.parameterization.detect import detectEquivalentAtoms
 import nlopt
 import unittest
 
@@ -52,9 +53,9 @@ class ESP:
     Load water molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.molecule.molecule import Molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+    >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4
@@ -201,24 +202,26 @@ class ESP:
 
         self._reciprocal_distances = None
 
+        self._equivalent_atom_groups = None
+        self._equivalent_group_by_atom = None
+
     @property
     def ngroups(self):
         """Number of charge groups"""
-
-        return len(self.molecule._equivalent_atom_groups)
+        return len(self._equivalent_atom_groups)
 
     def _map_groups_to_atoms(self, group_charges):
 
         charges = np.zeros(self.molecule.numAtoms)
-        for atom_group, group_charge in zip(self.molecule._equivalent_atom_groups, group_charges):
-            charges[atom_group] = group_charge
+        for atom_group, group_charge in zip(self._equivalent_atom_groups, group_charges):
+            charges[list(atom_group)] = group_charge
 
         return charges
 
     def _compute_constraint(self, group_charges, _):
 
         charges = self._map_groups_to_atoms(group_charges)
-        constraint = np.sum(charges) - self.molecule.netcharge
+        constraint = np.sum(charges) - int(np.round(self.molecule.charge.sum()))
 
         return constraint
 
@@ -230,14 +233,14 @@ class ESP:
 
         # If the restraint relates to an H, set the lower bound to 0
         for i in range(self.ngroups):
-            if 'H' == self.molecule.element[self.molecule._equivalent_atom_groups[i][0]]:
+            if 'H' == self.molecule.element[self._equivalent_atom_groups[i][0]]:
                 lower_bounds[i] = 0.001
 
         # Fix the charges of the specified atoms to those already set in the
         # charge array. Note this also fixes the charges of the atoms in the
         # same equivalency group.
         for atom in self.fixed:
-            group = self.molecule._equivalent_group_by_atom[atom]
+            group = self._equivalent_group_by_atom[atom]
             lower_bounds[group] = self.molecule.charge[atom]
             upper_bounds[group] = self.molecule.charge[atom]
 
@@ -270,6 +273,14 @@ class ESP:
         """
         logger.info('Start charge optimization')
 
+        equivalents = detectEquivalentAtoms(self.molecule)
+
+        self._equivalent_atom_groups = equivalents[0]
+        self._equivalent_group_by_atom = equivalents[2]
+
+        for result in self.qm_results:
+            assert int(np.round(self.molecule.charge.sum())) == result.charge
+
         # Get charge bounds
         lower_bounds, upper_bounds = self._get_bounds()
 
@@ -298,17 +309,23 @@ class ESP:
 class TestESP(unittest.TestCase):
 
     def setUp(self):
-
         from htmd.home import home
-        from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+        from htmd.parameterization.util import getEquivalentsAndDihedrals
+        from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'H2O2.mol2')
-        self.mol = FFMolecule(molFile, method=FFTypeMethod.GAFF2)
+        mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
+        mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+        self.mol = mol
         self.esp = ESP()
         self.esp.molecule = self.mol
 
-    def test_ngroups(self):
+        # Precalculating here for the tests
+        equivalents = detectEquivalentAtoms(self.esp.molecule)
+        self.esp._equivalent_atom_groups = equivalents[0]
+        self.esp._equivalent_group_by_atom = equivalents[2]
 
+    def test_ngroups(self):
         self.assertEqual(self.esp.ngroups, 2)
 
     def test_mapping(self):

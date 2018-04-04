@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -18,7 +18,8 @@ class MetricSasa(Projection):
     Parameters
     ----------
     sel : str
-        Atomselection for atoms or residues for which to calculate the SASA
+        Atom selection string for atoms or residues for which to calculate the SASA.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     probeRadius : float
         The radius of the probe, in Angstrom.
     numSpherePoints : int
@@ -124,7 +125,6 @@ class MetricSasa(Projection):
 
 if __name__ == '__name__':
     from htmd.molecule.molecule import Molecule
-    from htmd.projections.metricsasa import MetricSasa
     from htmd.home import home
     from os import path
     import numpy as np

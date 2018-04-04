@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -213,7 +213,7 @@ if __name__ == '__main__':
 
     sims = simlist(glob(join(testfolder, '*', '')), join(testfolder, 'filtered.pdb'))
     met = Metric(sims[0:2])
-    met.projection(MetricSelfDistance('protein and name CA'))
+    met.set(MetricSelfDistance('protein and name CA'))
     data = met.project()
     data.fstep = 0.1
 

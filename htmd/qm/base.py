@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -10,6 +10,9 @@ from abc import ABC, abstractmethod
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
 from htmd.queues.localqueue import LocalCPUQueue
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class QMResult:
@@ -34,6 +37,8 @@ class QMResult:
         Point coordinates (in Angstrom) where ESP values are computed. The array shape is (number_of_points, 3).
     esp_values : numpy.ndarray
         ESP values in elementary_charge/Angstrom. The array shape is (number_of_points,)
+    charge : int
+        The total charge of the molecule in electron charges.
     """
 
     def __init__(self):
@@ -46,6 +51,7 @@ class QMResult:
         self.mulliken = None
         self.esp_points = None
         self.esp_values = None
+        self.charge = None
 
 
 class QMBase(ABC, ProtocolInterface):
@@ -62,13 +68,14 @@ class QMBase(ABC, ProtocolInterface):
     SOLVENTS = ('vacuum', 'PCM')
 
     def __init__(self):
-
-        from htmd.parameterization.ffmolecule import FFMolecule
+        from htmd.molecule.molecule import Molecule
 
         super().__init__()
 
-        self._arg('molecule', ':class: `htmd.parameterization.ffmolecule.FFMolecule`', 'Molecule',
-                  default=None, validator=val.Object(FFMolecule), required=True)
+        self._arg('molecule', ':class: `htmd.molecule.molecule.Molecule`', 'Molecule',
+                  default=None, validator=val.Object(Molecule), required=True)
+        self._arg('charge', 'int', 'Charge of the molecule in electron charges', default=None,
+                  validator=val.Number(int, 'ANY'), required=True)
         self._arg('multiplicity', 'int', 'Multiplicity of the molecule',
                   default=1, validator=val.Number(int, 'POS'))
         self._arg('theory', 'str', 'Level of theory',
@@ -119,7 +126,8 @@ class QMBase(ABC, ProtocolInterface):
         self._molecule = self.molecule.copy()
         self._nframes = self._molecule.coords.shape[2]
         self._natoms = self._molecule.coords.shape[0]
-        self._charge = self._molecule.netcharge
+        if self.charge is None:
+            self.charge = int(round(self._molecule.charge.sum()))
 
         # Set up ESP points
         if self.esp_points is not None:
@@ -188,6 +196,8 @@ class QMBase(ABC, ProtocolInterface):
 
         # Read output files
         results = [self._readOutput(directory) for directory in self._directories]
+        for res in results:
+            res.charge = self.charge
 
         return results
 

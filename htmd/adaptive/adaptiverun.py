@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -56,7 +56,8 @@ class AdaptiveMD(AdaptiveBase):
     filter : bool, default=True
         Enable or disable filtering of trajectories.
     filtersel : str, default='not water'
-        Filtering atom selection
+        Atom selection string for filtering.
+        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     filteredpath : str, default='filtered'
         The directory in which the filtered simulations will be stored
     projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None

@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -518,7 +518,7 @@ if __name__ == "__main__":
     eq.fb_box = [-20, 20, -20, 20, 43, 45]
     eq.fb_k = 5
     tmpdir = tempname()
-    eq.write(home(dataDir=os.path.join('test-amber-build', pdbid)), tmpdir)
+    eq.write(home(dataDir=os.path.join('test-amber-build', 'pp', pdbid)), tmpdir)
 
     # Compare with reference
     refdir = home(dataDir=os.path.join('test-equilibration', pdbid, 'prerun'))

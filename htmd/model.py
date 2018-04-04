@@ -7,7 +7,7 @@ References
 ----------
 .. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
 """
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -439,17 +439,19 @@ class Model(object):
             # macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
             macroeq[i] = np.sum(self.msm.metastable_memberships[:, macroindexes[i]] * self.msm.stationary_distribution)
 
-        from matplotlib import pylab as plt
-        plt.figure()
-        plt.bar(range(self.macronum), macroeq)
-        plt.ylabel('Equilibrium probability')
-        plt.xlabel('Macrostates')
-        plt.xticks(np.arange(0.4, self.macronum+0.4, 1), range(self.macronum))
+        if plot or (save is not None):
+            from matplotlib import pylab as plt
+            plt.ion()
+            plt.figure()
+            plt.bar(range(self.macronum), macroeq)
+            plt.ylabel('Equilibrium probability')
+            plt.xlabel('Macrostates')
+            plt.xticks(np.arange(0.4, self.macronum+0.4, 1), range(self.macronum))
+            if save is not None:
+                plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+            if plot:
+                plt.show()
 
-        if save is not None:
-            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
-        if plot:
-            plt.show()
         return macroeq
 
     def _coarseP(self):
@@ -469,9 +471,11 @@ class Model(object):
         statetype : ['macro','micro','cluster'], optional
             The type of state to visualize
         wrapsel : str, optional, default='protein'
-            A selection to use for wrapping
+            Atom selection string to use for wrapping.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         alignsel : str, optional, default='name CA'
-            A selection used for aligning all frames. Set to None to disable aligning
+            Atom selection string used for aligning all frames. Set to None to disable aligning.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         alignmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A reference molecule onto which to align all others
         samplemode : ['weighted','random'], optional, default='weighted'
@@ -543,7 +547,8 @@ class Model(object):
         protein : bool, optional
             Set to True to enable pure protein system visualization
         ligand : str, optional
-            Atomselection string for the ligand
+            Atom selection string for the ligand.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         viewer : :class:`VMD <htmd.vmdviewer.VMD>` object, optional
             A viewer in which to visualize the states
         mols : ndarray, optional
@@ -551,9 +556,11 @@ class Model(object):
         numsamples : int
             Number of samples (conformations) for each state.
         wrapsel : str, optional, default='protein'
-            A selection to use for wrapping
+            Atom selection string to use for wrapping.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         alignsel : str, optional, default='name CA'
-            A selection used for aligning all frames
+            Atom selection string used for aligning all frames. See to None to disable aligning.
+            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for visualizing the states.
 
@@ -568,7 +575,7 @@ class Model(object):
         from htmd.config import _config
         self._integrityCheck(postmsm=(statetype != 'cluster'))
 
-        if _config['viewer'].lower() == 'ngl':
+        if _config['viewer'].lower() == 'ngl' or _config['viewer'].lower() == 'webgl':
             return self._viewStatesNGL(states, statetype, protein, ligand, mols, numsamples, gui=gui)
 
         if viewer is None:

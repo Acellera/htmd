@@ -1,33 +1,155 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 import logging
 from math import sqrt, acos, radians, cos, sin, pi
 import numpy as np
 from htmd.numbautil import dihedralAngleFull, wrapBondedDistance, wrapDistance, cross, dot
 from numba import jit
 from scipy import constants as const
+from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
 
-def _formatEnergies(energies):
-    return {'angle': energies[3], 'bond': energies[0], 'dihedral': energies[4], 'elec': energies[2],
-            'improper': energies[5], 'vdw': energies[1], 'total': energies.sum()}
-
-
 class FFEvaluate:
-    def __init__(self, mol, prm, betweensets=None, dist_thresh=0):
+    @staticmethod
+    def formatEnergies(energies):
+        """ Formats the energies into a dictionary.
+
+        Parameters
+        ----------
+        energies : np.ndarray
+            An energy array returned by `calculate`
+
+        Returns
+        -------
+        energiesdict : dict
+            A dictionary containing the energies
+        """
+        energies = energies.squeeze()
+        return {'angle': energies[3], 'bond': energies[0], 'dihedral': energies[4], 'elec': energies[2],
+                'improper': energies[5], 'vdw': energies[1], 'total': energies.sum(axis=0)}
+
+    def __init__(self, mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, fromstruct=False):
+        """  Evaluates energies and forces of the forcefield for a given Molecule
+
+        Parameters
+        ----------
+        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+            A Molecule object. Can contain multiple frames.
+        prm : :class:`ParameterSet <parmed.ParameterSet>` object
+            Forcefield parameters.
+        betweensets : tuple of strings
+            Only calculate energies between two sets of atoms given as atomselect strings.
+            Only computes LJ and electrostatics.
+        cutoff : float
+            If set to a value != 0 it will only calculate LJ, electrostatics and bond energies for atoms which are closer
+            than the threshold
+        rfa : bool
+            Use with `cutoff` to enable the reaction field approximation for scaling of the electrostatics up to the cutoff.
+            Uses the value of `solventDielectric` to model everything beyond the cutoff distance as solvent with uniform
+            dielectric.
+        solventDielectric : float
+            Used together with `cutoff` and `rfa`
+        fromstruct : bool
+            If the parameters were derived from a parmed Structure set to True. This option will be removed in the future
+            as it will be unnecessary.
+
+        Examples
+        --------
+        >>> from htmd.ffevaluation.test_ffevaluate import fixParameters, drawForce
+        >>> from htmd.ui import *
+        >>> import parmed
+        >>> mol = Molecule('./htmd/data/test-ffevaluate/waterbox/structure.psf')
+        >>> mol.read('./htmd/data/test-ffevaluate/waterbox/output.xtc')
+        >>> prm = parmed.charmm.CharmmParameterSet(fixParameters('./htmd/data/test-ffevaluate/waterbox/parameters.prm'))
+        >>> ffev = FFEvaluate(mol, prm, betweensets=('resname SOD', 'water'))
+        >>> energies, forces, atmnrg = ffev.calculate(mol.coords)
+
+        You can visualize the force vectors in VMD
+        >>> mol.view()
+        >>> for cc, ff in zip(mol.coords[:, :, 0], forces[:, :, 0]):
+        >>>     drawForce(cc, ff)
+
+        Amber style
+        >>> prmtop = parmed.amber.AmberParm('structure.prmtop')
+        >>> prm = parmed.amber.AmberParameterSet.from_structure(prmtop)
+        >>> ffev = FFEvaluate(mol, prm, betweensets=('resname SOD', 'water'), fromstruct=True)
+        >>> energies, forces, atmnrg = ffev.calculate(mol.coords)
+        """
         mol = mol.copy()
         setA, setB = calculateSets(mol, betweensets)
 
-        args = list(init(mol, prm))
+        args = list(init(mol, prm, fromstruct))
         args.append(setA)
         args.append(setB)
-        args.append(dist_thresh)
-
+        args.append(cutoff)
+        args.append(rfa)
+        args.append(solventDielectric)
         self._args = args
 
-    def run(self, coords, box):
-        energies, forces, atmnrg = _ffevaluate(coords, box, *self._args)
-        return _formatEnergies(energies[:, 0].squeeze())
+    @_Deprecated('1.11.11', 'calculateEnergies')
+    def run(self, coords, box=None):
+        return self.calculateEnergies(coords, box)
+
+    def calculateEnergies(self, coords, box=None, formatted=True):
+        """ Utility method which calls `calculate` to calculate energies and returns them.
+
+        Parameters
+        ----------
+        coords : np.ndarray
+            A (natoms, 3, nframes) shaped coordinates array.
+        box : np.ndarray
+            A (3, nframes) shaped periodic box dimensions array.
+        formatted : bool
+            If True it will return a dictionary of the energies. If False it returns an array of energies as described in
+            calculate.
+
+        Returns
+        -------
+        energies : dict or np.ndarray
+            The energies as a dictionary or np.array depending on option `formatted`
+        """
+        energies, _, _ = self.calculate(coords, box)
+        if formatted:
+            energies = self.formatEnergies(energies)
+        return energies
+
+    def calculate(self, coords, box=None):
+        """ Calculates energies, forces and individual atom energies for given coordinates and periodic box.
+
+        Parameters
+        ----------
+        coords : np.ndarray
+            A (natoms, 3, nframes) shaped coordinates array.
+        box : np.ndarray
+            A (3, nframes) shaped periodic box dimensions array.
+
+        Returns
+        -------
+        energies : np.ndarray
+            A (6, nframes) shaped matrix containing the individual energy components of each simulation frame.
+            Rows correspond to the following energies 0: bond 1: LJ 2: Electrostatic 3: angle 4: dihedral 5: improper
+        forces : np.ndarray
+            A (natoms, 3, nframes) shaped matrix containing the total force on each atom for each simulation frame.
+        atmnrg : np.ndarray
+            A (natoms, 6, nframes) shaped matrix containing the approximate potential energy components of each atom at each
+            simulation frame. The 6 indexes are the same as in the `energies` return argument.
+        """
+        if coords.ndim == 2:
+            coords = coords[:, :, np.newaxis].copy()
+
+        if box is None:
+            box = np.zeros((3, coords.shape[2]), dtype=np.float32)
+
+        if box.shape[0] != 3 or box.shape[1] != coords.shape[2]:
+            raise ValueError('Box dimensions have to be (3, numFrames), your Molecule has box of shape {}'.format(box.shape))
+
+        energies, forces, atmnrg = _ffevaluate(coords.astype(np.float32), box.astype(np.float32), *self._args)
+        return energies, forces, atmnrg
 
 
 def nestedListToArray(nl, dtype, default=1):
@@ -141,6 +263,7 @@ def init(mol, prm, fromstruct=False):
     improper_params = np.zeros((mol.impropers.shape[0], 3), dtype=np.float32)
     from parmed.amber import AmberParameterSet
     from parmed.charmm import CharmmParameterSet
+    from parmed.parameters import ParameterSet
     for idx, impr in enumerate(mol.impropers):
         if fromstruct:  # If we make prm from struct there is no ordering
             ty = tuple(uqtypes[typeint[impr]])
@@ -150,6 +273,8 @@ def init(mol, prm, fromstruct=False):
             ty = tuple(ty)
         elif isinstance(prm, CharmmParameterSet):  # If prm is read from CHARMM parameter file it's sorted
             ty = tuple(sorted(uqtypes[typeint[impr]]))
+        elif isinstance(prm, ParameterSet):
+            ty = tuple(uqtypes[typeint[impr]])
         else:
             raise RuntimeError('Not a valid parameterset')
         if ty in prm.improper_types:
@@ -190,87 +315,6 @@ def calculateSets(mol, betweensets):
         mol.dihedral = np.empty((0, 4), dtype=np.uint32)
         mol.improper = np.empty((0, 4), dtype=np.uint32)
     return setA, setB
-
-
-def ffevaluate(mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, threads=1, fromstruct=False):
-    """  Evaluates energies and forces of the forcefield for a given Molecule
-
-    Parameters
-    ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        A Molecule object. Can contain multiple frames.
-    prm : :class:`ParameterSet <parmed.ParameterSet>` object
-        Forcefield parameters.
-    betweensets : tuple of strings
-        Only calculate energies between two sets of atoms given as atomselect strings.
-        Only computes LJ and electrostatics.
-    cutoff : float
-        If set to a value != 0 it will only calculate LJ, electrostatics and bond energies for atoms which are closer
-        than the threshold
-    rfa : bool
-        Use with `cutoff` to enable the reaction field approximation for scaling of the electrostatics up to the cutoff.
-        Uses the value of `solventDielectric` to model everything beyond the cutoff distance as solvent with uniform
-        dielectric.
-    solventDielectric : float
-        Used together with `cutoff` and `rfa`
-
-    Returns
-    -------
-    energies : np.ndarray
-        A (6, nframes) shaped matrix containing the individual energy components of each simulation frame.
-        Rows correspond to the following energies 0: bond 1: LJ 2: Electrostatic 3: angle 4: dihedral 5: improper
-    forces : np.ndarray
-        A (natoms, 3, nframes) shaped matrix containing the total force on each atom for each simulation frame.
-    atmnrg : np.ndarray
-        A (natoms, 6, nframes) shaped matrix containing the approximate potential energy components of each atom at each
-        simulation frame. The 6 indexes are the same as in the `energies` return argument.
-
-    Examples
-    --------
-    >>> from htmd.ffevaluation.ffevaluate import *
-    >>> from htmd.ffevaluation.test_ffevaluate import fixParameters, drawForce
-    >>> from htmd.ui import *
-    >>> import parmed
-    >>> mol = Molecule('./htmd/data/test-ffevaluate/waterbox/structure.psf')
-    >>> mol.read('./htmd/data/test-ffevaluate/waterbox/output.xtc')
-    >>> prm = parmed.charmm.CharmmParameterSet(fixParameters('./htmd/data/test-ffevaluate/waterbox/parameters.prm'))
-    >>> energies, forces, atmnrg = ffevaluate(mol, prm, betweensets=('resname SOD', 'water'))
-
-    >>> mol.view()
-    >>> for cc, ff in zip(mol.coords[:, :, 0], forces[:, :, 0]):
-    >>>     drawForce(cc, ff)
-
-    Amber style
-    >>> prmtop = parmed.amber.AmberParm('structure.prmtop')
-    >>> prm = parmed.amber.AmberParameterSet.from_structure(prmtop)
-    >>> energies, forces, atmnrg = ffevaluate(mol, prm, betweensets=('resname SOD', 'water'))
-    """
-    mol = mol.copy()
-    coords = mol.coords
-    box = mol.box
-    setA, setB = calculateSets(mol, betweensets)
-
-    args = list(init(mol, prm, fromstruct))
-    args.append(setA)
-    args.append(setB)
-    args.append(cutoff)
-    args.append(rfa)
-    args.append(solventDielectric)
-
-    if threads == 1:
-        energies, forces, atmnrg = _ffevaluate(coords, box, *args)
-    else:
-        from htmd.parallelprogress import ParallelExecutor, delayed
-        aprun = ParallelExecutor(n_jobs=threads)
-        res = aprun(total=mol.numFrames, desc='Evaluating energies')(
-            delayed(_ffevaluate)(np.atleast_3d(coords[:, :, f]),
-                                 box[:, f].reshape(3, 1),
-                                 *args) for f in range(mol.numFrames))
-        energies = np.hstack([r[0] for r in res])
-        forces = np.concatenate([r[1] for r in res], axis=2)
-        atmnrg = np.concatenate([r[2] for r in res], axis=2)
-
-    return energies, forces, atmnrg
 
 
 @jit('boolean(int64[:, :], int64, int64)', nopython=True)

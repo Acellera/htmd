@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -316,11 +316,13 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
                 shutil.move(f, path.join(outdir, 'pre-ionize'))
             totalcharge = np.sum(molbuilt.charge)
             nwater = np.sum(molbuilt.atomselect('water and noh'))
-            anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc, ff='charmm', anion=saltanion, cation=saltcation)
+            anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc,
+                                                                            anion=saltanion, cation=saltcation)
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
-            return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False, caps=caps,
-                         execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches, noregen=noregen, psfgen=psfgen, _clean=False)
+            return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False,
+                         caps=caps, execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches,
+                         noregen=noregen, psfgen=psfgen, _clean=False)
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
     return molbuilt
@@ -896,7 +898,7 @@ if __name__ == '__main__':
         compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
 
-        shutil.rmtree(tmpdir)
+        # shutil.rmtree(tmpdir)
 
     from htmd.ui import *
     import doctest

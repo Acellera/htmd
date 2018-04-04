@@ -2,6 +2,18 @@
 Changelog
 #########
 
+1.12.0 (stable) - 2018/03/22
+============================
+
+**Main new features (relative to 1.10.0):**
+
+- Improved User Guide: tutorials updated, new refactored projections tutorial available
+- Compability with NGLview 1.0 visualization
+- Support for multiple queues in Slurm and LSF
+- Improvements in MOL2 reading and writing
+- Introduced Membrane Builder
+- Parameterization tooling gradual improvements
+
 1.10.0 (stable) - 2017/10/25
 ============================
 

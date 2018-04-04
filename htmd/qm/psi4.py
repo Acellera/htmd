@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -52,9 +52,11 @@ class Psi4(QMBase):
     Create an object of H2 molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.ffmolecule import FFMolecule, FFTypeMethod
+    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals
+    >>> from htmd.molecule.molecule import Molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2-0.74.mol2')
-    >>> mol = FFMolecule(molFile, method=FFTypeMethod.NONE)
+    >>> mol = Molecule(molFile)
+    >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
     Create a Psi4 object
     >>> from htmd.qm import Psi4
@@ -154,7 +156,7 @@ class Psi4(QMBase):
 
             # Write the molecule
             f.write('molecule MOL {\n' )
-            f.write('    %d %d\n' % (self._charge, self.multiplicity))
+            f.write('    %d %d\n' % (self.charge, self.multiplicity))
             f.write('    noreorient\n')
             f.write('    nocom\n')
             f.write('    symmetry c1\n')
