@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -149,12 +149,13 @@ def fftype(mol, rtfFile=None, prmFile=None, method=FFTypeMethod.CGenFF_2b6, acCh
                 raise ValueError('Invalide method {}'.format(method))
 
     # Substituting values from the read-in topology
+    mol = mol.copy()
     mol.name = names
     mol.element = elements
     mol.atomtype = atomtypes
     mol.charge = charges
     mol.impropers = impropers
-    if len(mol.masses) == 0:
+    if np.sum(mol.masses) == 0:
         mol.masses = masses
 
     return prm, mol

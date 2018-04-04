@@ -12,7 +12,7 @@ How to Contribute Fixes
 =======================
 
 If you have found a bug in HTMD, the correct way to fix it is to fork the Acellera/htmd repository
-(`<https://github.com/Acellera/htmd#fork-destination-box>`_), switch to the branch corresponding to the latest stable
+(`<https://github.com/Acellera/htmd/fork>`_), switch to the branch corresponding to the latest stable
 release, fix the bug, test the fix, and open a pull request (`<https://github.com/Acellera/htmd/compare>`_).
 
 How to Contribute New Features
@@ -20,7 +20,7 @@ How to Contribute New Features
 
 If you'd like to develop for HTMD and contribute new features, it would be best to contact us through the issues
 (`<https://github.com/Acellera/htmd/issues>`_), so we can better advice you on your contribution. The process of
-contributing is also to fork the Acellera/htmd repository (`<https://github.com/Acellera/htmd#fork-destination-box>`_),
+contributing is also to fork the Acellera/htmd repository (`<https://github.com/Acellera/htmd/fork>`_),
 develop your feature (rebase often), document it, test it, and when it's ready, open a pull request to the master branch
 (`<https://github.com/Acellera/htmd/compare>`_).
 

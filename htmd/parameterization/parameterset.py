@@ -11,7 +11,7 @@ def getParameter(type, parameterfield):
     type = tuple(reversed(type))
     if type in parameterfield:
         return parameterfield[type]
-    print(parameterfield[type])  # Throw the correct error
+    raise RuntimeError('Could not find parameters for key {}'.format(type))
 
 
 def getImproperParameter(type, parameters):
@@ -118,10 +118,8 @@ def inventAtomTypes(mol, fit_dihedrals, equivalents):
 
         equivalent_dihedrals = _getEquivalentDihedrals(mol, equivalents, np.array(dih))
         if len(equivalent_dihedrals) > 1:
-            print(dih)
-            print(len(equivalent_dihedrals))
-            print(equivalent_dihedrals)
-            raise ValueError("Dihedral term still not unique after duplication")
+            raise ValueError("Dihedral term still not unique after duplication. Dihedral {} has {} equivalent "
+                             "dihedrals: {}".format(dih, len(equivalent_dihedrals), equivalent_dihedrals))
 
     return mol, originaltype
 

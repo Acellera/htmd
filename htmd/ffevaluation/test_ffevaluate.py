@@ -1,5 +1,10 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 from htmd.molecule.molecule import Molecule
-from htmd.ffevaluation.ffevaluate import ffevaluate
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 import parmed
 from glob import glob
 import numpy as np
@@ -203,7 +208,6 @@ def fixParameters(parameterfile):
 
 if __name__ == '__main__':
     from natsort import natsorted
-    from htmd.ffevaluation.ffevaluate import _formatEnergies
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
     from glob import glob
@@ -264,8 +268,8 @@ if __name__ == '__main__':
                 keepForces(prm, struct, mol, forces=force)
                 keepForcesAmber(struct, mol, forces=force)
 
-            energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa)
-            energies = _formatEnergies(energies[:, 0])
+            energies, forces, atmnrg = FFEvaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa).calculate(mol.coords, mol.box)
+            energies = FFEvaluate.formatEnergies(energies[:, 0])
             forces = forces[:, :, 0].squeeze()
             omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)
             ediff = compareEnergies(energies, omm_energies, abstol=abstol)
@@ -282,8 +286,8 @@ if __name__ == '__main__':
             fromstruct = True
             keepForces(prm, struct, mol)
             keepForcesAmber(struct, mol)
-        energies, forces, atmnrg = ffevaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa)
-        energies = _formatEnergies(energies[:, 0])
+        energies, forces, atmnrg = FFEvaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa).calculate(mol.coords, mol.box)
+        energies = FFEvaluate.formatEnergies(energies[:, 0])
         forces = forces[:, :, 0].squeeze()
         omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)
         ediff = compareEnergies(energies, omm_energies, abstol=abstol)

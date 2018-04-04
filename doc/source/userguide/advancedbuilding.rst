@@ -44,7 +44,7 @@ Histidine residues can have three different protonations states even at pH 7, th
 residue is particularly critical. This residue can be protonated at either delta (most common; HSD/HID), epsilon (very
 common also; HSE/HIE) or at both nitrogens (special situations and low pH; HSP/HIP).
 
-.. image:: http://docs.htmd.org/img/histidines.png
+.. image:: http://pub.htmd.org/tutorials/advancedbuilding/histidines.png
 
 The best way to determine how histidine should be protonated is to look at the the structure. Typically, a histidine
 residue is protonated if it is close enough to an electron donor (e.g. a glutamic acid), thus creating a hydrogen bond.
