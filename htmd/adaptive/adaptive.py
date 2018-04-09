@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel', '.done')
 
 
-class AdaptiveBase(ProtocolInterface):
+class AdaptiveBase(ProtocolInterface, metaclass=abc.ABCMeta):
     def __init__(self):
         super().__init__()
         from htmd.queues.simqueue import SimQueue
@@ -233,13 +233,8 @@ def _writeInputsFunction(i, f, epoch, inputpath, coorname):
     copytree(currSim.input, newDir, symlinks=False, ignore=ignore_patterns('*.coor', '*.rst', '*.out', *_IGNORE_EXTENSIONS))
 
     # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
-    from htmd.molecule.readers import _MDTRAJ_TRAJECTORY_EXTS
-    import os
-    if os.path.splitext(traj)[1].split('.')[1].lower() in _MDTRAJ_TRAJECTORY_EXTS:
-        # MDtraj trajectory. Unfortunately we need to read the topology to read the trajectory.
-        mol = Molecule(currSim.molfile)
-    else:
-        mol = Molecule()
+
+    mol = Molecule(currSim.molfile)  # Always read the mol file, otherwise it does not work if we need to save a PDB as coorname
     mol.read(traj)
     mol.dropFrames(keep=frameNum)  # Making sure only specific frame to write is kept
     mol.write(path.join(newDir, coorname))
