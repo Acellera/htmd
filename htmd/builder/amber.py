@@ -19,7 +19,7 @@ from subprocess import call, check_output, DEVNULL
 from htmd.molecule.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist
-from unittest import TestCase
+import unittest
 
 import logging
 logger = logging.getLogger(__name__)
@@ -763,7 +763,7 @@ def _logParser(fname):
     return errors
 
 
-class TestAmberBuild(TestCase):
+class TestAmberBuild(unittest.TestCase):
     currentResult = None  # holds last result object passed to run method
 
     def setUp(self):
