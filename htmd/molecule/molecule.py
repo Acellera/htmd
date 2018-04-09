@@ -1710,6 +1710,10 @@ class UniqueResidueID:
                     continue
             sel &= getattr(mol, f) == getattr(self, f)
 
+        if sum(sel) == 0:
+            raise RuntimeError('The atoms corresponding to {} are no longer present in your '
+                               'Molecule'.format(self.__str__()))
+
         if indexes:
             return np.where(sel)[0]
         else:
