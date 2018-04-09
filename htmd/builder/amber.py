@@ -19,7 +19,8 @@ from subprocess import call, check_output, DEVNULL
 from htmd.molecule.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist
-from natsort import natsorted
+from unittest import TestCase
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -762,8 +763,7 @@ def _logParser(fname):
     return errors
 
 
-import unittest
-class TestAmberBuild(unittest.TestCase):
+class TestAmberBuild(TestCase):
     currentResult = None  # holds last result object passed to run method
 
     def setUp(self):
@@ -772,8 +772,8 @@ class TestAmberBuild(unittest.TestCase):
         print('Running tests in {}'.format(self.testDir))
 
     def run(self, result=None):
-        self.currentResult = result # remember result for use in tearDown
-        unittest.TestCase.run(self, result) # call superclass run method
+        self.currentResult = result  # remember result for use in tearDown
+        unittest.TestCase.run(self, result)  # call superclass run method
 
     def tearDown(self):
         pass
@@ -781,7 +781,7 @@ class TestAmberBuild(unittest.TestCase):
         #     shutil.rmtree(self.testDir)
 
     @staticmethod
-    def _compareResultFolders(compare, tmpdir, pid, ignore_ftypes = ('.log', '.txt', '.frcmod')):
+    def _compareResultFolders(compare, tmpdir, pid, ignore_ftypes=('.log', '.txt', '.frcmod')):
         import filecmp
 
         def _cutfirstline(infile, outfile):
@@ -912,7 +912,7 @@ class TestAmberBuild(unittest.TestCase):
     def test_customDisulfideBonds(self):
         from htmd.builder.solvate import solvate
         # Test without proteinPrepare
-        pdbids = ['1GZM',]
+        pdbids = ['1GZM', ]
         for pid in pdbids:
             np.random.seed(1)
             mol = Molecule(pid)

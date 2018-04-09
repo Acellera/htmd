@@ -9,6 +9,7 @@ from htmd.molecule.util import sequenceID
 import numpy as np
 import logging
 import string
+from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,6 @@ class MissingAtomTypeError(Exception):
         return repr(self.value)
 
 
-from htmd.decorators import _Deprecated
 @_Deprecated('1.12.0', '<Read builder documentation on argument `disulfide`>')
 class DisulfideBridge(object):
     def __init__(self, segid1, resid1, segid2, resid2):
@@ -166,6 +166,7 @@ def convertDisulfide(mol, disu):
         newdisu.append([UniqueResidueID.fromMolecule(mol, d[0]), UniqueResidueID.fromMolecule(mol, d[1])])
     return newdisu
 
+
 def detectDisulfideBonds(mol, thresh=3):
     """ Automatically detects disulfide bonds in a molecule
 
@@ -209,13 +210,14 @@ def detectDisulfideBonds(mol, thresh=3):
     if np.any(numbonds > 1):
         rows, cols = np.where(numbonds > 1)
         pairs = [(str(residues[r]), str(residues[c])) for r, c in zip(rows, cols)]
-        raise RuntimeError('SG atoms between pairs {} have multiple possible bonds. Cannot guess disulfide bonds. Please specify them manually.'.format(pairs))
+        raise RuntimeError('Sulphur atoms between pairs {} have multiple possible bonds. Cannot guess disulfide bonds. '
+                           'Please specify them manually.'.format(pairs))
 
     uniquerowcols = list(set([tuple(sorted((r, c))) for r, c in zip(rows, cols)]))
     for rc in uniquerowcols:
         disubonds.append([residues[rc[0]], residues[rc[1]]])
-        msg = 'Bond between A: {}\n' \
-              '             B: {}\n'.format(residues[rc[0]], residues[rc[1]])
+        msg = 'Disulfide Bond between: {}\n' \
+              '                   and: {}\n'.format(residues[rc[0]], residues[rc[1]])
         print(msg)
 
     if len(disubonds) == 1:

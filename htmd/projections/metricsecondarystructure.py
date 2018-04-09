@@ -198,13 +198,13 @@ def _ssmap(sschar):
 if __name__ == "__main__":
     from htmd.molecule.molecule import Molecule
     import numpy as np
-    mol = Molecule('2HBB')  #NTL9
+    mol = Molecule('2HBB')  # NTL9
     mol.filter('protein')
     metr = MetricSecondaryStructure()
     data = metr.project(mol)
     ref = np.array([[0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0,
-        2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 0]], dtype=np.int32)
+                     2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 2, 2, 2, 2,
+                     2, 2, 2, 2, 2, 2, 0]], dtype=np.int32)
     assert np.array_equal(data, ref), 'MetricSecondaryStructure assertion failed'
     metr = MetricSecondaryStructure('resid 5 to 49')
     data = metr.project(mol)

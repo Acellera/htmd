@@ -13,6 +13,7 @@ from copy import deepcopy
 from os import path
 import logging
 import os
+from unittest import TestCase
 
 logger = logging.getLogger(__name__)
 
@@ -656,7 +657,6 @@ class Molecule:
         self.bonds = np.delete(self.bonds, idx, axis=0)
         self.bondtype = np.delete(self.bondtype, idx)
 
-
     def _guessBonds(self):
         """ Tries to guess the bonds in the Molecule
 
@@ -715,7 +715,6 @@ class Molecule:
         newcoords = np.dot(newcoords, np.transpose(M)) + center
         self.set('coords', newcoords, sel=sel)
 
-        
     def getDihedral(self, atom_quad):
         """ Gets a dihedral angle.
 
@@ -1573,6 +1572,7 @@ class Molecule:
 
 class UniqueAtomID:
     _fields = ('name', 'altloc', 'resname', 'chain', 'resid', 'insertion', 'segid')
+
     def __init__(self, **kwargs):
         """ Unique atom identifier
 
@@ -1595,18 +1595,18 @@ class UniqueAtomID:
                 setattr(self, key, kwargs[key])
             else:
                 raise KeyError('Invalid key {}. The constructor only supports the '
-                               'following fields {}'.format(key, UniqueAtomID._fields))
+                               'following fields: {}'.format(key, UniqueAtomID._fields))
 
     @staticmethod
     def fromMolecule(mol, sel=None, idx=None):
         if (sel is not None and idx is not None) or (sel is None and idx is None):
-            raise RuntimeError('Only one of sel or idx arguments can be used.')
+            raise RuntimeError('Either sel or idx arguments must be used (and not both).')
 
         self = UniqueAtomID()
         if sel is not None:
             atom = mol.atomselect(sel, indexes=True)
         elif idx is not None:
-            atom = np.array([idx,])
+            atom = np.array([idx, ])
 
         if len(atom) > 1:
             raise RuntimeError('Your atomselection returned more than one atom')
@@ -1625,6 +1625,12 @@ class UniqueAtomID:
                     continue
             sel &= getattr(mol, f) == getattr(self, f)
 
+        if sum(sel) > 1:
+            raise RuntimeError('The atom corresponding to {} is no longer unique in your '
+                               'Molecule: {}'.format(self.__str__(), np.where(sel)[0]))
+        if sum(sel) == 0:
+            raise RuntimeError('The atom corresponding to {} is no longer present in your '
+                               'Molecule'.format(self.__str__()))
         if indexes:
             return np.where(sel)[0][0]
         else:
@@ -1633,13 +1639,14 @@ class UniqueAtomID:
     def __eq__(self, other):
         iseq = True
         for f in UniqueAtomID._fields:
-            iseq &= getattr(self, f) == getattr(other, f)
+            iseq &= getattr(self, f, None) == getattr(other, f, None)
         return iseq
 
     def __str__(self):
         fieldvs = []
         for f in UniqueAtomID._fields:
-            fieldvs.append('{}: {}'.format(f, getattr(self, f)))
+            v = getattr(self, f, None)
+            fieldvs.append('{}: {}'.format(f, '\'{}\''.format(v) if isinstance(v, str) else v))
         return 'UniqueAtomID<{}>'.format(', '.join(fieldvs))
 
     def __repr__(self):
@@ -1649,6 +1656,7 @@ class UniqueAtomID:
 
 class UniqueResidueID:
     _fields = ('resname', 'chain', 'resid', 'insertion', 'segid')
+
     def __init__(self, **kwargs):
         """ Unique residue identifier
 
@@ -1671,7 +1679,7 @@ class UniqueResidueID:
                 setattr(self, key, kwargs[key])
             else:
                 raise KeyError('Invalid key {}. The constructor only supports the '
-                               'following fields {}'.format(key, UniqueResidueID._fields))
+                               'following fields: {}'.format(key, UniqueResidueID._fields))
 
     @staticmethod
     def fromMolecule(mol, sel=None, idx=None):
@@ -1710,13 +1718,14 @@ class UniqueResidueID:
     def __eq__(self, other):
         iseq = True
         for f in UniqueResidueID._fields:
-            iseq &= getattr(self, f) == getattr(other, f)
+            iseq &= getattr(self, f, None) == getattr(other, f, None)
         return iseq
 
     def __str__(self):
         fieldvs = []
         for f in UniqueResidueID._fields:
-            fieldvs.append('{}: {}'.format(f, getattr(self, f)))
+            v = getattr(self, f, None)
+            fieldvs.append('{}: {}'.format(f, '\'{}\''.format(v) if isinstance(v, str) else v))
         return 'UniqueResidueID<{}>'.format(', '.join(fieldvs))
 
     def __repr__(self):
@@ -1965,7 +1974,6 @@ class _Representation:
             self.color = 'Name'
 
 
-from unittest import TestCase
 class TestMolecule(TestCase):
     def test_trajReadingAppending(self):
         from htmd.home import home
@@ -2068,7 +2076,7 @@ class TestMolecule(TestCase):
 
 
 if __name__ == "__main__":
-    # Unfotunately, tests affect each other because only a shallow copy is done before each test, so
+    # Unfortunately, tests affect each other because only a shallow copy is done before each test, so
     # I do a 'copy' before each.
     import doctest
     import unittest

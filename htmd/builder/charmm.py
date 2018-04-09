@@ -21,11 +21,11 @@ from htmd.builder.builder import _checkMixedSegment, UnknownResidueError, BuildE
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
 from glob import glob
+from unittest import TestCase
 
 
 import logging
 logger = logging.getLogger(__name__)
-
 
 
 def listFiles():
@@ -882,8 +882,7 @@ def _checkFailedAtoms(mol):
                         'Check log file for more details.'.format(idx))
 
 
-import unittest
-class TestCharmmBuild(unittest.TestCase):
+class TestCharmmBuild(TestCase):
     def test_build(self):
         from htmd.molecule.molecule import Molecule
         from htmd.builder.solvate import solvate
@@ -978,7 +977,7 @@ class TestCharmmBuild(unittest.TestCase):
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
         params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
 
-        smol.insertion[smol.resid == 42] = 'A'  # Adding an insertion to test that disulfide bridges with insertions work
+        smol.insertion[smol.resid == 42] = 'A'  # Adding an insertion to test that disulfide bonds with insertions work
         tmpdir = tempname()
         _ = build(smol, topo=topos, param=params, outdir=tmpdir)
         compareDir = home(dataDir=os.path.join('test-charmm-build', '3PTB_insertion'))
