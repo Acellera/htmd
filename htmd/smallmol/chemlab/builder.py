@@ -133,12 +133,11 @@ class Builder:
         hydrogensNonPolarIdx = hydrogensIdx[np.where(neighbors == 'C')]
 
 
-        hydrogensIdx = []
+        hydrogensIdx = np.array([], dtype=int)
         if removePolars:
-            hydrogensIdx.extend(hydrogensPolarIdx.tolist())
+            hydrogensIdx = np.hstack((hydrogensIdx, hydrogensPolarIdx))
         if removeNonPolars:
-            hydrogensIdx.extend(hydrogensNonPolarIdx.tolist())
-        hydrogensIdx = np.array(hydrogensIdx, dtype=np.uint32)
+            hydrogensIdx = np.hstack((hydrogensIdx, hydrogensNonPolarIdx))
 
         self._removeAtoms(hydrogensIdx)
 
@@ -185,11 +184,11 @@ class Builder:
             # Development note: removed assignement explicitHs
 
             # coords
-            sm.coords[n_atom]  = self._getAtomCoords(n_atom, a['attachTo'])
+            sm.coords[n_atom] = self._computeAtomCoords(n_atom, a['attachTo'])
 
             #c += 1
 
-    def _getAtomCoords(self, atomIdx, attachToIdx):
+    def _computeAtomCoords(self, atomIdx, attachToIdx):
         """
         Retruns the coordinates of the new atom based on the VSEPR theory.
 
