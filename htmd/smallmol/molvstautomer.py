@@ -1,3 +1,9 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
+
 # -*- coding: utf-8 -*-
 """
 ### STEFAN: Taken from MolVS commit: https://github.com/mcs07/MolVS/commit/701c2d6f508fa8faf563eb257f25e30952653f4a

@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -621,7 +621,7 @@ def guessAnglesAndDihedrals(bonds, cyclicdih=False):
                 angles.append((neighbors[e1], n, neighbors[e2]))
 
     angles = sorted([sorted([angle, angle[::-1]])[0] for angle in angles])
-    angles = np.array(angles)
+    angles = np.array(angles, dtype=np.uint32)
 
     dihedrals = []
     for a1 in range(len(angles)):
@@ -639,34 +639,48 @@ def guessAnglesAndDihedrals(bonds, cyclicdih=False):
                 dihedrals.append(list(a2f) + [a1a[2]])
 
     dihedrals = sorted([sorted([dihedral, dihedral[::-1]])[0] for dihedral in dihedrals])
-    dihedrals = np.array(dihedrals)
+    dihedrals = np.array(dihedrals, dtype=np.uint32)
+
+    if len(dihedrals) == 0:
+        dihedrals = np.zeros((0, 4), dtype=np.uint32)
+    if len(angles) == 0:
+        angles = np.zeros((0, 3), dtype=np.uint32)
 
     return angles, dihedrals
 
 
-# A test method
+from unittest import TestCase
+
+class TestUtils(TestCase):
+    def test_guessAnglesDihedrals(self):
+        from htmd.home import home
+        from htmd.molecule.molecule import Molecule
+
+        mol = Molecule(os.path.join(home(dataDir='test-molecule-utils'), 'NH4.pdb'))
+        angles, dihedrals = guessAnglesAndDihedrals(mol.bonds)
+
+        self.assertTrue(angles.dtype == np.uint32, 'Returned wrong dtype for angles')
+        self.assertTrue(dihedrals.dtype == np.uint32, 'Returned wrong dtype for dihedrals')
+        self.assertTrue(np.all(angles.shape == (6, 3)), 'Returned wrong number of angles')
+        self.assertTrue(np.all(dihedrals.shape == (0, 4)), 'Returned wrong number of dihedrals')
+
+    def test_tmscore(self):
+        from htmd.molecule.molecule import Molecule
+        expectedTMscore = np.array([0.21418524, 0.2367377, 0.23433833, 0.21362964, 0.20935164,
+                                    0.20279461, 0.27012895, 0.22675238, 0.21230793, 0.2372011])
+        expectedRMSD = np.array([3.70322128, 3.43637027, 3.188193, 3.84455877, 3.53053882,
+                                 3.46781854, 2.93777629, 2.97978692, 2.70792428, 2.63051318])
+
+        mol = Molecule(os.path.join(home(dataDir='tmscore'), 'filtered.pdb'))
+        mol.read(os.path.join(home(dataDir='tmscore'), 'traj.xtc'))
+        ref = Molecule(os.path.join(home(dataDir='tmscore'), 'ntl9_2hbb.pdb'))
+        tmscore, rmsd = molTMscore(mol, ref, mol.atomselect('protein'), ref.atomselect('protein'))
+
+        self.assertTrue(np.allclose(tmscore, expectedTMscore))
+        self.assertTrue(np.allclose(rmsd, expectedRMSD))
+
+
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
-    from htmd.home import home
-    import numpy as np
-    from os import path
-    import doctest
-    #doctest.testmod(extraglobs={"mol" : Molecule("3PTB")})
+    import unittest
 
-    expectedTMscore = np.array([ 0.21418524,  0.2367377 ,  0.23433833,  0.21362964,  0.20935164,
-        0.20279461,  0.27012895,  0.22675238,  0.21230793,  0.2372011 ])
-    expectedRMSD = np.array([ 3.70322128,  3.43637027,  3.188193  ,  3.84455877,  3.53053882,
-        3.46781854,  2.93777629,  2.97978692,  2.70792428,  2.63051318])
-
-    mol = Molecule(path.join(home(), 'data', 'tmscore', 'filtered.pdb'))
-    mol.read(path.join(home(), 'data', 'tmscore', 'traj.xtc'))
-    ref = Molecule(path.join(home(), 'data', 'tmscore', 'ntl9_2hbb.pdb'))
-    tmscore, rmsd = molTMscore(mol, ref, mol.atomselect('protein'), ref.atomselect('protein'))
-
-    assert np.allclose(tmscore, expectedTMscore)
-    assert np.allclose(rmsd, expectedRMSD)
-
-    #
-    # rhodopsin = Molecule('1F88')
-    # d3r = Molecule('3PBL')
-    # alnmol = sequenceStructureAlignment(rhodopsin, d3r)
+    unittest.main(verbosity=2)

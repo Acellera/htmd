@@ -7,7 +7,7 @@ References
 ----------
 .. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
 """
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -439,17 +439,19 @@ class Model(object):
             # macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
             macroeq[i] = np.sum(self.msm.metastable_memberships[:, macroindexes[i]] * self.msm.stationary_distribution)
 
-        from matplotlib import pylab as plt
-        plt.figure()
-        plt.bar(range(self.macronum), macroeq)
-        plt.ylabel('Equilibrium probability')
-        plt.xlabel('Macrostates')
-        plt.xticks(np.arange(0.4, self.macronum+0.4, 1), range(self.macronum))
+        if plot or (save is not None):
+            from matplotlib import pylab as plt
+            plt.ion()
+            plt.figure()
+            plt.bar(range(self.macronum), macroeq)
+            plt.ylabel('Equilibrium probability')
+            plt.xlabel('Macrostates')
+            plt.xticks(np.arange(0.4, self.macronum+0.4, 1), range(self.macronum))
+            if save is not None:
+                plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+            if plot:
+                plt.show()
 
-        if save is not None:
-            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
-        if plot:
-            plt.show()
         return macroeq
 
     def _coarseP(self):

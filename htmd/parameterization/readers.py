@@ -1,6 +1,9 @@
 import numpy as np
 import re
 from htmd.parameterization.parameterset import _ATOM_TYPE_REG_EX
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _guessElement(name):
@@ -65,7 +68,7 @@ def readRTF(filename):
         name = names[idx]
         if atype not in element_by_type:
             element_by_type[atype] = _guessElement(name)
-            print("Guessing element %s for atom %s type %s" % (element_by_type[atype], name, atype))
+            logger.info("Guessing element %s for atom %s type %s" % (element_by_type[atype], name, atype))
         if atype not in mass_by_type:
             mass_by_type[atype] = _guessMass(element_by_type[atype])
 

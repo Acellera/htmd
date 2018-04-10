@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -77,7 +77,7 @@ def getArgumentParser():
 def printEnergies(molecule, parameters, filename):
     from htmd.ffevaluation.ffevaluate import FFEvaluate
     assert molecule.numFrames == 1
-    energies = FFEvaluate(molecule, parameters).run(molecule.coords[:, :, 0])
+    energies = FFEvaluate(molecule, parameters).calculateEnergies(molecule.coords[:, :, 0])
 
     string = '''
 == Diagnostic Energies ==

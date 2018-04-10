@@ -1,4 +1,4 @@
-# (c) 2015-2017 Acellera Ltd http://www.acellera.com
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -11,6 +11,7 @@ from htmd.metricdata import MetricData
 from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance, reconstructContactMap
 from htmd.projections.metricrmsd import MetricRmsd
 from htmd.projections.metricfluctuation import MetricFluctuation
+from htmd.projections.metriccoords import MetricCoords
 from htmd.projections.metriccoordinate import MetricCoordinate
 from htmd.projections.metricdihedral import MetricDihedral, Dihedral
 from htmd.projections.metricshell import MetricShell
@@ -47,10 +48,10 @@ from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
 from htmd.builder.loopmodeler import loopModeller
+from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.config import config
-import logging.config
 
 # -------- Shortcuts ---------
 import os
@@ -71,10 +72,7 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
 
 # from matplotlib import pylab as plt
 # ----------------------------
-try:
-    logging.config.fileConfig(os.path.join(htmd.home.home(), 'logging.ini'), disable_existing_loggers=False)
-except:
-    print("HTMD: Logging setup failed")
+
 
 
 
