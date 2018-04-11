@@ -398,6 +398,8 @@ def _printAliases(f):
         pdbalias residue CA CAL
         pdbalias atom CA CA CAL
         pdbalias residue ZN ZN2
+        pdbalias residue FE2 Fe2p
+        pdbalias atom Fe2p FE Fe2p 
 
         # Other aliases
         pdbalias atom LYS 1HZ HZ1
