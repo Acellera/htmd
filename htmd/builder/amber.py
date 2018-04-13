@@ -326,37 +326,39 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         f.write('loadamberprep {}\n'.format(newname))
     f.write('\n')
 
-    # TODO: Remove this once we deprecate the class
-    from htmd.builder.builder import DisulfideBridge
-    from htmd.molecule.molecule import UniqueResidueID
-    if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0], DisulfideBridge):
-        newdisu = []
-        for d in disulfide:
-            r1 = UniqueResidueID.fromMolecule(mol, 'resid {} and segname {}'.format(d.resid1, d.segid1))
-            r2 = UniqueResidueID.fromMolecule(mol, 'resid {} and segname {}'.format(d.resid2, d.segid2))
-            newdisu.append([r1, r2])
-        disulfide = newdisu
-    # TODO: Remove up to here ----------------------
-
-    if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0][0], str):
-        disulfide = convertDisulfide(mol, disulfide)
-
     # Detect disulfide bridges if not defined by user
     if not ionize:
+        # TODO: Remove this once we deprecate the class
+        from htmd.builder.builder import DisulfideBridge
+        from htmd.molecule.molecule import UniqueResidueID
+        if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0], DisulfideBridge):
+            newdisu = []
+            for d in disulfide:
+                r1 = UniqueResidueID.fromMolecule(mol, 'resid {} and segname {}'.format(d.resid1, d.segid1))
+                r2 = UniqueResidueID.fromMolecule(mol, 'resid {} and segname {}'.format(d.resid2, d.segid2))
+                newdisu.append([r1, r2])
+            disulfide = newdisu
+        # TODO: Remove up to here ----------------------
+
+        if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0][0], str):
+            disulfide = convertDisulfide(mol, disulfide)
+
         if disulfide is None:
             logger.info('Detecting disulfide bonds.')
             disulfide = detectDisulfideBonds(mol)
 
         # Fix structure to match the disulfide patching
         if len(disulfide) != 0:
+            torem = np.zeros(mol.numAtoms, dtype=bool)
             for d in disulfide:
                 # Rename the residues to CYX if there is a disulfide bond
-                atoms1 = d[0].selectAtoms(mol, ignore='resname', indexes=False)
-                atoms2 = d[1].selectAtoms(mol, ignore='resname', indexes=False)
+                atoms1 = d[0].selectAtoms(mol, indexes=False)
+                atoms2 = d[1].selectAtoms(mol, indexes=False)
                 mol.resname[atoms1] = 'CYX'
                 mol.resname[atoms2] = 'CYX'
                 # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
-                mol.remove((atoms1 & (mol.name == 'HG')) | (atoms2 & (mol.name == 'HG')), _logger=False)
+                torem |= (atoms1 & (mol.name == 'HG')) | (atoms2 & (mol.name == 'HG'))
+            mol.remove(torem, _logger=False)
 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.debug('Writing PDB file for input to tleap.')
@@ -908,7 +910,6 @@ class TestAmberBuild(unittest.TestCase):
         # shutil.rmtree(tmpdir1)
         # shutil.rmtree(tmpdir2)
 
-    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_customDisulfideBonds(self):
         from htmd.builder.solvate import solvate
         # Test without proteinPrepare
