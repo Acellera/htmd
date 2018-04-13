@@ -168,12 +168,12 @@ class Metric:
                            'If it looks wrong, you can modify it by manually '
                            'setting the MetricData.fstep property.'.format(', '.join(map(str,uqfsteps)), data.fstep))
         else:
-            logger.info('Frame step {}ns was read from the trajectories. If it looks wrong, redefine it by manually '
-                        'setting the MetricData.fstep property.'.format(data.fstep))
-
-        if data.fstep == 0:
-            logger.warning('A fstep of 0 was read from the trajectories. Please manually set the MetricData.fstep'
-                           ' property, otherwise calculations in Model and Kinetics classes can fail.')
+            if data.fstep == 0:
+                logger.warning('A fstep of 0 was read from the trajectories. Please manually set the MetricData.fstep'
+                               ' property, otherwise calculations in Model and Kinetics classes can fail.')
+            else:
+                logger.info('Frame step {}ns was read from the trajectories. If it looks wrong, redefine it by manually '
+                            'setting the MetricData.fstep property.'.format(data.fstep))
 
         return data
 
