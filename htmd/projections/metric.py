@@ -171,6 +171,10 @@ class Metric:
             logger.info('Frame step {}ns was read from the trajectories. If it looks wrong, redefine it by manually '
                         'setting the MetricData.fstep property.'.format(data.fstep))
 
+        if data.fstep == 0:
+            logger.warning('A fstep of 0 was read from the trajectories. Please manually set the MetricData.fstep'
+                           ' property, otherwise calculations in Model and Kinetics classes can fail.')
+
         return data
 
     def _projectSingle(self, index):
