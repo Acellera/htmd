@@ -326,7 +326,26 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         f.write('loadamberprep {}\n'.format(newname))
     f.write('\n')
 
-    # Detect disulfide bridges if not defined by user
+    f.write('# Loading the system\n')
+    f.write('mol = loadpdb input.pdb\n\n')
+
+    if np.sum(mol.atomtype != '') != 0:
+        logger.debug('Writing mol2 files for input to tleap.')
+        segs = np.unique(mol.segid[mol.atomtype != ''])
+        combstr = 'mol = combine {mol'
+        for s in segs:
+            name = 'segment{}'.format(s)
+            mol2name = os.path.join(outdir, '{}.mol2'.format(name))
+            mol.write(mol2name, (mol.atomtype != '') & (mol.segid == s))
+            if not os.path.isfile(mol2name):
+                raise NameError('Could not write a mol2 file out of the given Molecule.')
+            f.write('# Loading the rest of the system\n')
+            f.write('{} = loadmol2 {}.mol2\n\n'.format(name, name))
+            combstr += ' {}'.format(name)
+        combstr += '}\n\n'
+        f.write(combstr)
+
+    # Write patches for disulfide bonds (only after ionizing)
     if not ionize:
         # TODO: Remove this once we deprecate the class
         from htmd.builder.builder import DisulfideBridge
@@ -350,6 +369,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         # Fix structure to match the disulfide patching
         if len(disulfide) != 0:
             torem = np.zeros(mol.numAtoms, dtype=bool)
+            f.write('# Adding disulfide bonds\n')
             for d in disulfide:
                 # Rename the residues to CYX if there is a disulfide bond
                 atoms1 = d[0].selectAtoms(mol, indexes=False)
@@ -358,52 +378,28 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
                 mol.resname[atoms2] = 'CYX'
                 # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
                 torem |= (atoms1 & (mol.name == 'HG')) | (atoms2 & (mol.name == 'HG'))
+                # Convert to stupid amber residue numbering
+                uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0]
+                uqres1 = int(np.unique(uqseqid[atoms1]))
+                uqres2 = int(np.unique(uqseqid[atoms2]))
+                f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
+            f.write('\n')
             mol.remove(torem, _logger=False)
+
+    f.write('# Writing out the results\n')
+    f.write('saveamberparm mol ' + prefix + '.prmtop ' + prefix + '.crd\n')
+    f.write('quit')
+    f.close()
 
     # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
     logger.debug('Writing PDB file for input to tleap.')
     pdbname = os.path.join(outdir, 'input.pdb')
 
     # mol2 files have atomtype, here we only write parts not coming from mol2
+    # We need to write the input.pdb at the end since we modify the resname for disulfide bridges in mol
     mol.write(pdbname, mol.atomtype == '')
     if not os.path.isfile(pdbname):
         raise NameError('Could not write a PDB file out of the given Molecule.')
-    f.write('# Loading the system\n')
-    f.write('mol = loadpdb input.pdb\n\n')
-
-    if np.sum(mol.atomtype != '') != 0:
-        logger.debug('Writing mol2 files for input to tleap.')
-        segs = np.unique(mol.segid[mol.atomtype != ''])
-        combstr = 'mol = combine {mol'
-        for s in segs:
-            name = 'segment{}'.format(s)
-            mol2name = os.path.join(outdir, '{}.mol2'.format(name))
-            mol.write(mol2name, (mol.atomtype != '') & (mol.segid == s))
-            if not os.path.isfile(mol2name):
-                raise NameError('Could not write a mol2 file out of the given Molecule.')
-            f.write('# Loading the rest of the system\n')
-            f.write('{} = loadmol2 {}.mol2\n\n'.format(name, name))
-            combstr += ' {}'.format(name)
-        combstr += '}\n\n'
-        f.write(combstr)
-
-    # Write patches for disulfide bonds (only after ionizing)
-    if not ionize and len(disulfide) != 0:
-        f.write('# Adding disulfide bonds\n')
-        for d in disulfide:
-            atoms1 = d[0].selectAtoms(mol, ignore='resname')
-            atoms2 = d[1].selectAtoms(mol, ignore='resname')
-            # Convert to stupid amber residue numbering
-            uqseqid = sequenceID((mol.resid, mol.insertion, mol.segid)) + mol.resid[0]
-            uqres1 = int(np.unique(uqseqid[atoms1]))
-            uqres2 = int(np.unique(uqseqid[atoms2]))
-            f.write('bond mol.{}.SG mol.{}.SG\n'.format(uqres1, uqres2))
-        f.write('\n')
-
-    f.write('# Writing out the results\n')
-    f.write('saveamberparm mol ' + prefix + '.prmtop ' + prefix + '.crd\n')
-    f.write('quit')
-    f.close()
 
     molbuilt = None
     if execute:
