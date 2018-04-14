@@ -150,9 +150,9 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
 
     newmol = mol.copy()
 
-    logger.info('Min distance of ions from molecule: ' + str(dfrom) + 'A')
-    logger.info('Min distance between ions: ' + str(dbetween) + 'A')
-    logger.info('Placing {:d} anions and {:d} cations.'.format(nanion,ncation))
+    logger.debug('Min distance of ions from molecule: ' + str(dfrom) + 'A')
+    logger.debug('Min distance between ions: ' + str(dbetween) + 'A')
+    logger.debug('Placing {:d} anions and {:d} cations.'.format(nanion,ncation))
 
     if (nanion + ncation) == 0:
         return newmol
