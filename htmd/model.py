@@ -82,6 +82,8 @@ class Model(object):
         self._integrityCheck(markov=True)
 
         lag = unitconvert(units, 'frames', lag, fstep=self.data.fstep)
+        if lag == 0:
+            raise RuntimeError('A lag time of 0 frames cannot be used to build a model. This could be caused by 0 in your MetricData.fstep.')
 
         self.lag = lag
         self.msm = msm.estimate_markov_model(self.data.St.tolist(), self.lag, sparse=sparse)
@@ -259,6 +261,8 @@ class Model(object):
             lags = self._defaultLags()
         else:
             lags = unitconvert(units, 'frames', lags, fstep=self.data.fstep).tolist()
+            if np.all(lags == 0):
+                raise RuntimeError('A lag time of 0 frames cannot be used to plot Timescales. This could be caused by 0 in your MetricData.fstep.')
 
         if nits is None:
             nits = np.min((self.data.K, 20))
@@ -270,7 +274,10 @@ class Model(object):
             plt.ion()
             plt.figure()
             try:
-                mplt.plot_implied_timescales(its, dt=self.data.fstep, units='ns')
+                if self.data.fstep == 0:
+                    mplt.plot_implied_timescales(its)
+                else:
+                    mplt.plot_implied_timescales(its, dt=self.data.fstep, units='ns')
             except ValueError as ve:
                 plt.close()
                 raise ValueError('{} This is probably caused by badly set fstep in the data ({}). '.format(ve, self.data.fstep) +
