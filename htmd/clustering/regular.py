@@ -68,7 +68,7 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
             self.radius = estClust.distance.max()
             logger.info("Estimated radius = {}".format(self.radius))
 
-        from pyemma.coordinates.clustering.regspace import RegularSpaceClustering
+        from htmd.pyemma.coordinates.clustering.regspace import RegularSpaceClustering
         self._reg = RegularSpaceClustering(dmin=self.radius)
         self.labels_ = self._reg.fit_transform(data).flatten()
 

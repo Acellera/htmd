@@ -78,7 +78,7 @@ class Model(object):
         >>> model = Model(data)
         >>> model.markovModel(150, 4)  # 150 frames lag, 4 macrostates
         """
-        import pyemma.msm as msm
+        import htmd.pyemma.msm as msm
         self._integrityCheck(markov=True)
 
         lag = unitconvert(units, 'frames', lag, fstep=self.data.fstep)
@@ -252,8 +252,8 @@ class Model(object):
         >>> model.plotTimescales()
         >>> model.plotTimescales(lags=list(range(1,100,5)))
         """
-        import pyemma.plots as mplt
-        import pyemma.msm as msm
+        import htmd.pyemma.plots as mplt
+        import htmd.pyemma.msm as msm
         self._integrityCheck()
         if lags is None:
             lags = self._defaultLags()
@@ -309,7 +309,7 @@ class Model(object):
         if isinstance(lags, np.ndarray):
             lags = lags.astype(int)
 
-        import pyemma.msm as msm
+        import htmd.pyemma.msm as msm
         itime = msm.its(self.data.St.tolist(), lags=lags, nits=2).get_timescales()
 
         for i in range(1, np.size(itime, 0)):
@@ -740,7 +740,7 @@ class Model(object):
 
         """
         from copy import deepcopy
-        from pyemma.plots import plot_cktest
+        from htmd.pyemma.plots import plot_cktest
         msm = deepcopy(self.msm)
         ck = msm.cktest(self.macronum)
         plot_cktest(ck)
