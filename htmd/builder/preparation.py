@@ -453,7 +453,7 @@ if __name__ == "__main__":
 
 """
     # Code to regenerate reference files. Run with PYTHONHASHSEED=1
-    from htmd import *
+    from htmd.ui import *
     pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
     for p in pdbids:
         preparedInputDir = home(dataDir=os.path.join('test-proteinprepare', p))

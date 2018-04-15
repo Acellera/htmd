@@ -120,7 +120,7 @@ The power of adaptive sampling is accessible on HTMD through the :class:`~htmd.a
 
 .. code:: python
 
-    from htmd import *
+    from htmd.ui import *
     app = LocalGPUQueue()
     app.datadir = './data'
     md = AdaptiveMD()
