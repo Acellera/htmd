@@ -150,18 +150,17 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
 
     newmol = mol.copy()
 
-    logger.info('Min distance of ions from molecule: ' + str(dfrom) + 'A')
-    logger.info('Min distance between ions: ' + str(dbetween) + 'A')
-    logger.info('Placing {:d} anions and {:d} cations.'.format(nanion,ncation))
+    logger.debug('Min distance of ions from molecule: ' + str(dfrom) + 'A')
+    logger.debug('Min distance between ions: ' + str(dbetween) + 'A')
+    logger.debug('Placing {:d} anions and {:d} cations.'.format(nanion,ncation))
 
     if (nanion + ncation) == 0:
         return newmol
 
-    segname = _getSegname(newmol, segname)
     nions = nanion + ncation
 
-    betabackup = newmol.beta
-    newmol.set('beta', sequenceID((newmol.resid, newmol.segid)))
+    betabackup = newmol.beta.copy()
+    newmol.set('beta', sequenceID((newmol.resid, newmol.insertion, newmol.segid)))
 
     # Find water oxygens to replace with ions
     ntries = 0
@@ -231,9 +230,7 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
         newmol.insert(atom, len(newmol.name))
 
     # Restoring the original betas
-    sel = np.ones(len(betabackup) + nions, dtype=bool)
-    sel[len(betabackup)::] = False
-    newmol.set('beta', betabackup, sel=sel)
+    newmol.beta[:len(betabackup)] = betabackup
     return newmol
 
 
