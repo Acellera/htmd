@@ -50,7 +50,7 @@ class PBSQueue(SimQueue, ProtocolInterface):
 
     Examples
     --------
-    >>> from htmd import *
+    >>> from htmd.ui import *
     >>> s = PBSQueue()
     >>> s.queue = 'multiscale'
     >>> s.submit('/my/runnable/folder/')  # Folder containing a run.sh bash script

@@ -148,7 +148,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     Example
     -------
-    >>> from htmd import *
+    >>> from htmd.ui import *
     >>> mol = Molecule("3PTB")
     >>> mol.filter("not resname BEN")
     >>> mol.renumberResidues()

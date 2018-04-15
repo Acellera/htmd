@@ -319,7 +319,7 @@ foreach n [list {idx}] {{
 
 if __name__ == "__main__":
     """
-    from htmd import *
+    from htmd.ui import *
     import htmd.vmdgraphics
 
     m=Molecule("3PTB")

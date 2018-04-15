@@ -27,7 +27,7 @@ HTMD code:
 .. code:: python
 
     import htmd
-    from htmd import *
+    from htmd.ui import *
 
 Furthermore, from ``from <module> import *`` should _never_ be used, as it pollutes the namespace and can shadow same-name
 functionalities. Try as much as possible to only import the function/class you specifically need instead of importing an
