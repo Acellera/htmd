@@ -12,6 +12,7 @@ import yaml
 from subprocess import check_output, CalledProcessError
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
+from htmd.util import ensurelist
 import logging
 logger = logging.getLogger(__name__)
 
@@ -147,7 +148,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         return ret
 
     def _createJobScript(self, fname, workdir, runsh):
-        from htmd.util import ensurelist
         workdir = os.path.abspath(workdir)
         with open(fname, 'w') as f:
             f.write('#!/bin/bash\n')
@@ -251,7 +251,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         if self.jobname is None:
             raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
-        cmd = [self._qstatus, '-n', self.jobname, '-u', user, '-p', self.partition]
+        cmd = [self._qstatus, '-n', self.jobname, '-u', user, '-p', ','.join(ensurelist(self.partition))]
         logger.debug(cmd)
 
         # This command randomly fails so I need to allow it to repeat or it crashes adaptive
@@ -285,10 +285,11 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         if self.jobname is None:
             raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
-        cmd = [self._qcancel, '-n', self.jobname, '-u', user, '-p', self.partition]
-        logger.debug(cmd)
-        ret = check_output(cmd)
-        logger.debug(ret.decode("ascii"))
+        for q in ensurelist(self.partition):
+            cmd = [self._qcancel, '-n', self.jobname, '-u', user, '-p', q]
+            logger.debug(cmd)
+            ret = check_output(cmd)
+            logger.debug(ret.decode("ascii"))
 
     @property
     def ncpu(self):
