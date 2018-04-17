@@ -13,21 +13,30 @@ logger = logging.getLogger(__name__)
 
 
 class _Restraint:
-    def __init__(self, contype, selection, width, constraints, axes='xyz'):
+    def __init__(self, contype, selection, width, constraints, axes='xyz', fbcentre=None, fbcentresel=None):
         self.type = contype
         self.selection = selection
         self.width = width
         self.constraints = constraints
         self.axes = axes
+        self.fbcentre = None
+        self.fbcentresel = None
 
     def format(self, maxwidth=None):
+        # {atom,group}Restraint "[atom selection]" fbcentre "[fb centre coor]" fbcentresel "[fb centre selection]" axes {xyz} width [l] setpoints [k@t]
         if maxwidth is None:
             res = '{type}Restraint '.format(type=self.type)
         else:
             res = '{type: <{maxwidth}}\t'.format(type=self.type+'Restraint', maxwidth=maxwidth)
-        res += '"{sel}" axes {axes} width {width} setpoints'.format(sel=self.selection,
+
+        if self.fbcentre is not None:
+            res += 'fbcentre "{}" '.format(self.fbcentre)
+        if self.fbcentresel is not None:
+            res += 'fbcentresel "{}" '.format(self.fbcentresel)
+
+        res += '"{sel}" axes {axes} width "{width}" setpoints'.format(sel=self.selection,
                                                                     axes=self.axes,
-                                                                    width=self.width)
+                                                                    width=' '.join(map(str, self.width)))
         for p in self.constraints:
             res += ' {con}@{time}'.format(con=p[0], time=p[1])
         return res
@@ -37,7 +46,7 @@ class _Restraint:
 
 
 class GroupRestraint(_Restraint):
-    def __init__(self, selection, width, constraints, axes='xyz'):
+    def __init__(self, selection, width, constraints, fbcentre=None, fbcentresel=None, axes='xyz'):
         """ A restraint applied on the center of mass of a group of atoms.
 
         Parameters
@@ -45,7 +54,7 @@ class GroupRestraint(_Restraint):
         selection : str
             Atom selection string of the atoms on whose center of mass the restraints will be applied.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-        width : float
+        width : float or list of floats
             The width of the flat-bottom potential box in Angstrom
         constraints : list of tuples
             A list of contraint/time pairs indicating which value the constraints should have at each point in time.
@@ -53,12 +62,16 @@ class GroupRestraint(_Restraint):
             "us", "ns", "ps", "fs" is used.
         axes : str
             The axes on which to apply the potential.
+        fbcentre : list of floats
+            You can set an explicit center for the FB potential using a list of xyz coordinates.
+        fbcentresel : str
+            You can select atoms whose center of mass will be used as the center of the FB potential.
 
         Examples
         --------
         >>> gr = GroupRestraint('resname MOL', 10, [(20, '10ns'), (10, '20ns'), (0, '30ns')])
         """
-        super().__init__('group', selection, width, constraints, axes)
+        super().__init__('group', selection, width, constraints, axes, fbcentre=fbcentre, fbcentresel=fbcentresel)
 
 
 class AtomRestraint(_Restraint):
@@ -70,7 +83,7 @@ class AtomRestraint(_Restraint):
         selection : str
             Atom selection string of the atoms on whose center of mass the restraints will be applied.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-        width : float
+        width : float or list of floats
             The width of the flat-bottom potential box in Angstrom
         constraints : list of tuples
             A list of contraint/time pairs indicating which value the constraints should have at each point in time.
