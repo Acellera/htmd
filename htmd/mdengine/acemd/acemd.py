@@ -7,6 +7,9 @@ import os
 import numpy as np
 from protocolinterface import ProtocolInterface, val
 from htmd.util import ensurelist
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class _Restraint:
@@ -229,6 +232,7 @@ class Acemd(ProtocolInterface):
 
 
         if version == 2:
+            logger.warning('The default Acemd engine for HTMD has changed to Acemd3. You can keep on using Acemd2 but will not be able to use new features introduced in Acemd3')
             # ACEMD2 Options
             self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None, val.Number(float, '0POS'))
             self._arg('restart', 'str', 'Restart simulation.', None, val.String(), valid_values=('on', 'off'))
