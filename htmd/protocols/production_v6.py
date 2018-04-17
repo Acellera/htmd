@@ -8,7 +8,7 @@ from htmd.molecule.molecule import Molecule
 from htmd.protocols.oldprotocolinterface import TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 from htmd.protocols.oldprotocolinterface import ProtocolInterface as OldProtocolInterface
 from protocolinterface import ProtocolInterface, val
-from htmd.apps.acemd_v2 import Acemd
+from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
 import os
 import numpy as np
 import logging
@@ -22,7 +22,7 @@ class Production(OldProtocolInterface):
         atom constraints for the production run.
 
         An Acemd class object is stored in the Production object which can be used to modify futher options.
-        For documentation on further options see :class:`Acemd <htmd.apps.acemd_v2.Acemd>`
+        For documentation on further options see :class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>`
 
         Parameters
         ----------
@@ -70,7 +70,7 @@ class Production(OldProtocolInterface):
                                              'applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.', {})
         self._cmdBoolean('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False)
 
-        self.acemd = Acemd()
+        self.acemd = Acemd(version=2)
         #self.acemd.binindex='input.idx'
         self.acemd.binindex = None
         self.acemd.binvelocities = None
@@ -271,7 +271,6 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
-from htmd.apps.acemd3 import Acemd3, _Restraint, GroupRestraint, AtomRestraint
 class ProductionAcemd3(ProtocolInterface):
     ''' Production protocol v5 for Acemd 3
 
@@ -303,7 +302,7 @@ class ProductionAcemd3(ProtocolInterface):
         self._arg('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False, val.Boolean())
         self._arg('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False, val.Boolean())
 
-        self.acemd = Acemd3()
+        self.acemd = Acemd(version=3)
         self.acemd.binvelocities = None
         self.acemd.bincoordinates = 'output.coor'
         self.acemd.extendedsystem='output.xsc'
