@@ -94,7 +94,7 @@ class Trajectory:
             if step is None:
                 self.step = [np.arange(nframes, dtype=int)]
             if time is None:
-                self.time = [np.arange(nframes) * 1E5]  # Default is 0.1ns in femtoseconds = 100.000 fs
+                self.time = [np.zeros(nframes, dtype=np.float32)]
         if box is not None:
             self.box = [box]
         if boxangles is not None:
@@ -917,8 +917,7 @@ def XTCread(filename, frame=None, topoloc=None):
     if len(step) != nframes or np.sum(step) == 0:
         step = np.arange(nframes)
     if len(time) != nframes or np.sum(time) == 0:
-        logger.warning('No time information read from {}. Defaulting to 0.1ns framestep.'.format(filename))
-        time = np.arange(nframes) * 1E5  # Default is 0.1ns in femtoseconds = 100.000 fs
+        time = np.zeros(nframes, dtype=np.float32)
     return None, Trajectory(coords=coords, box=box, boxangles=boxangles, step=step, time=time)
 
 
@@ -1015,12 +1014,8 @@ def MDTRAJread(filename, frame=None, topoloc=None):
     import mdtraj as md
     traj = md.load(filename, top=topoloc)
     coords = np.swapaxes(np.swapaxes(traj.xyz, 0, 1), 1, 2) * 10
-    if traj.timestep == 1:
-        time = np.zeros(traj.time.shape, dtype=traj.time.dtype)
-        step = np.zeros(traj.time.shape, dtype=traj.time.dtype)
-    else:
-        time = traj.time * 1000  # need to go from picoseconds to femtoseconds
-        step = time / 25  # DO NOT TRUST THIS. I just guess that there are 25 simulation steps in each picosecond
+    step = traj.time / traj.timestep
+    time = traj.time * 1000  # need to go from picoseconds to femtoseconds
 
     if traj.unitcell_lengths is None:
         box = None

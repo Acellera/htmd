@@ -31,7 +31,7 @@ class MutualInformation:
         Examples
         --------
         >>> from htmd.mutualinformation import MutualInformation
-        >>> from htmd import *
+        >>> from htmd.ui import *
         >>>
         >>> sims = simlist(glob('./filtered/*/'), './filtered/filtered.pdb')
         >>> mol = Molecule('./filtered/filtered.pdb')

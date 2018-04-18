@@ -201,7 +201,7 @@ def check_ipython_profile():
     prefix = os.path.join(prefix, "00-htmd.py")
     if not os.path.exists(prefix):
         f = open(prefix, "w")
-        f.write("from htmd import *\n")
+        f.write("from htmd.ui import *\n")
         f.close()
 
 

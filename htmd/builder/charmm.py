@@ -16,16 +16,16 @@ from subprocess import call
 from htmd.home import home
 from htmd.molecule.molecule import Molecule
 from htmd.molecule.util import _missingChain, _missingSegID
-from htmd.builder.builder import detectDisulfideBonds
-from htmd.builder.builder import _checkMixedSegment, _checkResidueInsertions, UnknownResidueError, BuildError
+from htmd.builder.builder import detectDisulfideBonds, convertDisulfide
+from htmd.builder.builder import _checkMixedSegment, UnknownResidueError, BuildError
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.vmdviewer import getVMDpath
 from glob import glob
+from unittest import TestCase
 
 
 import logging
 logger = logging.getLogger(__name__)
-
 
 
 def listFiles():
@@ -129,8 +129,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         The anion type. Please use only CHARMM ion atom names.
     saltcation : {'SOD', 'MG', 'POT', 'CES', 'CAL', 'ZN2'}
         The cation type. Please use only CHARMM ion atom names.
-    disulfide : list of :class:`DisulfideBridge <htmd.builder.builder.DisulfideBridge>` objects
-        If None it will guess disulfide bonds. Otherwise provide a list of `DisulfideBridge` objects.
+    disulfide : list of pairs of atomselection strings
+        If None it will guess disulfide bonds. Otherwise provide a list pairs of atomselection strings for each pair of
+        residues forming the disulfide bridge.
     patches : list of str
         Any further patches the user wants to apply
     noregen : list of str
@@ -148,24 +149,22 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     Example
     -------
-    >>> from htmd import *
+    >>> from htmd.ui import *
     >>> mol = Molecule("3PTB")
     >>> mol.filter("not resname BEN")
-    >>> mol.renumberResidues()
     >>> molbuilt = charmm.build(mol, outdir='/tmp/build', ionize=False)  # doctest: +ELLIPSIS
     Bond between A: [serial 185 resid 42 resname CYS chain A segid 0]
                  B: [serial 298 resid 58 resname CYS chain A segid 0]...
     >>> # More complex example
     >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf', 'top/top_water_ions.rtf']
     >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm', 'par/par_water_ions.prm']
-    >>> disu = [DisulfideBridge('P', 157, 'P', 13), DisulfideBridge('K', 1, 'K', 25)]
+    >>> disu = [['segid P and resid 157', 'segid P and resid 13'], ['segid K and resid 1', 'segid K and resid 25']]
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
     """
 
     mol = mol.copy()
     _missingSegID(mol)
     _checkMixedSegment(mol)
-    _checkResidueInsertions(mol)
     if psfgen is None:
         psfgen = shutil.which('psfgen', mode=os.X_OK)
         if not psfgen:
@@ -251,12 +250,29 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         f.write('coordpdb ' + path.join('segments', pdbname) + ' ' + seg + '\n\n')
 
     # Printing out patches for the disulfide bridges
+    # TODO: Remove this once we deprecate the class
+    from htmd.builder.builder import DisulfideBridge
+    from htmd.molecule.molecule import UniqueResidueID
+    if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0], DisulfideBridge):
+        newdisu = []
+        for d in disulfide:
+            r1 = UniqueResidueID.fromMolecule(mol, 'resid {} and segname {}'.format(d.resid1, d.segid1))
+            r2 = UniqueResidueID.fromMolecule(mol, 'resid {} and segname {}'.format(d.resid2, d.segid2))
+            newdisu.append([r1, r2])
+        disulfide = newdisu
+    # TODO: Remove up to here ----------------------
+
+    if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0][0], str):
+        disulfide = convertDisulfide(mol, disulfide)
+
     if disulfide is None:
         disulfide = detectDisulfideBonds(mol)
 
     if len(disulfide) != 0:
         for d in disulfide:
-            f.write('patch DISU {}:{} {}:{}\n'.format(d.segid1, d.resid1, d.segid2, d.resid2))
+            str0 = '{}:{}{}'.format(d[0].segid, d[0].resid, d[0].insertion)
+            str1 = '{}:{}{}'.format(d[1].segid, d[1].resid, d[1].insertion)
+            f.write('patch DISU {} {}\n'.format(str0, str1))
         f.write('\n')
 
     noregenpatches = [p for p in allpatches if p.split()[1] in noregen]
@@ -866,39 +882,110 @@ def _checkFailedAtoms(mol):
                         'Check log file for more details.'.format(idx))
 
 
-if __name__ == '__main__':
-    from htmd.molecule.molecule import Molecule
-    from htmd.builder.solvate import solvate
-    from htmd.home import home
-    from htmd.util import tempname, assertSameAsReferenceDir
-    from htmd.builder.preparation import proteinPrepare
-    import os
-    from glob import glob
-    import numpy as np
+class TestCharmmBuild(TestCase):
+    def test_build(self):
+        from htmd.molecule.molecule import Molecule
+        from htmd.builder.solvate import solvate
+        from htmd.home import home
+        from htmd.util import tempname, assertSameAsReferenceDir
+        import os
+        import numpy as np
 
-    # Use pre-prepared files so we can tell whether the error is in prepare or in build
-    # Inputs are reference outputs of proteinprepare.
-    preparedInputDir = home(dataDir='test-proteinprepare')
+        # Use pre-prepared files so we can tell whether the error is in prepare or in build
+        # Inputs are reference outputs of proteinprepare.
+        preparedInputDir = home(dataDir='test-proteinprepare')
 
-    pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
-    for pdb in pdbids:
+        pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+        for pdb in pdbids:
+            with self.subTest(pdb=pdb):
+                print('Building {}'.format(pdb))
+                inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
+                mol = Molecule(inFile)
+                mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+
+                np.random.seed(1)  # Needed for ions
+                smol = solvate(mol)
+                topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
+                params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+                tmpdir = tempname()
+                _ = build(smol, topo=topos, param=params, outdir=tmpdir)
+
+                compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
+                assertSameAsReferenceDir(compareDir, tmpdir)
+
+                # shutil.rmtree(tmpdir)
+
+    def test_customDisulfideBonds(self):
+        from htmd.molecule.molecule import Molecule
+        from htmd.builder.solvate import solvate
+        from htmd.home import home
+        from htmd.util import tempname, assertSameAsReferenceDir
+        import os
+        import numpy as np
+
+        # Use pre-prepared files so we can tell whether the error is in prepare or in build
+        # Inputs are reference outputs of proteinprepare.
+        preparedInputDir = home(dataDir='test-proteinprepare')
+
+        pdb = '1GZM'
         inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
         mol = Molecule(inFile)
         mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
-        if mol._checkInsertions():
-            mol.renumberResidues()
 
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
         params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+        disu = [['segid 1 and resid 110', 'segid 1 and resid 187'], ['segid 0 and resid 110', 'segid 0 and resid 187']]
         tmpdir = tempname()
-        bmol = build(smol, topo=topos, param=params, outdir=tmpdir)
+        _ = build(smol, topo=topos, param=params, outdir=tmpdir, disulfide=disu)
 
         compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
 
-        # shutil.rmtree(tmpdir)
+        # TODO: Remove this after deprecation
+        from htmd.builder.builder import DisulfideBridge
+        np.random.seed(1)  # Needed for ions
+        disu = [DisulfideBridge('1', 110, '1', 187), DisulfideBridge('0', 110, '0', 187)]
+        tmpdir = tempname()
+        _ = build(smol, topo=topos, param=params, outdir=tmpdir, disulfide=disu)
+        compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
+        assertSameAsReferenceDir(compareDir, tmpdir)
+        # TODO: Remove up to here -----------
+
+    def test_disulfideWithInsertion(self):
+        from htmd.molecule.molecule import Molecule
+        from htmd.builder.solvate import solvate
+        from htmd.home import home
+        from htmd.util import tempname, assertSameAsReferenceDir
+        import os
+        import numpy as np
+
+        # Use pre-prepared files so we can tell whether the error is in prepare or in build
+        # Inputs are reference outputs of proteinprepare.
+        preparedInputDir = home(dataDir='test-proteinprepare')
+
+        pdb = '3PTB'
+
+        print('Building {}'.format(pdb))
+        inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
+        mol = Molecule(inFile)
+        mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+
+        np.random.seed(1)  # Needed for ions
+        smol = solvate(mol)
+        topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
+        params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+
+        smol.insertion[smol.resid == 42] = 'A'  # Adding an insertion to test that disulfide bonds with insertions work
+        tmpdir = tempname()
+        _ = build(smol, topo=topos, param=params, outdir=tmpdir)
+        compareDir = home(dataDir=os.path.join('test-charmm-build', '3PTB_insertion'))
+        assertSameAsReferenceDir(compareDir, tmpdir)
+
+if __name__ == '__main__':
+    import unittest
+    unittest.main()
 
     from htmd.ui import *
     import doctest
