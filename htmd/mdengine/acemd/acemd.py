@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 class _Restraint:
-    def __init__(self, contype, selection, width, constraints, axes='xyz', fbcentre=None, fbcentresel=None):
+    def __init__(self, contype, selection, width, restraints, axes='xyz', fbcentre=None, fbcentresel=None):
         self.type = contype
         self.selection = selection
         self.width = ensurelist(width)
-        self.constraints = constraints
+        self.restraints = restraints
         self.axes = axes
         self.fbcentre = fbcentre
         self.fbcentresel = fbcentresel
@@ -45,16 +45,32 @@ class _Restraint:
 
         res += 'axes {axes} width "{width}" '.format(axes=self.axes, width=' '.join(map(str, self.width)))
         res += 'setpoints'
-        for p in self.constraints:
-            res += ' {con}@{time}'.format(con=p[0], time=p[1])
+        for p in self.restraints:
+            res += ' {rest}@{time}'.format(rest=p[0], time=p[1])
         return res
 
     def __str__(self):
         return self.format()
 
+    @staticmethod
+    def _fromDict(redict):
+        if 'axes' not in redict:
+            redict['axes'] = None
+        if 'fbcentre' not in redict:
+            redict['fbcentre'] = None
+        if 'fbcentresel' not in redict:
+            redict['fbcentresel'] = None
+
+        return _Restraint(redict['type'], redict['selection'], redict['width'], redict['restraints'], redict['axes'], redict['fbcentre'], redict['fbcentresel'])
+
+
+    def _toDict(self):
+        return self.__dict__
+
+
 
 class GroupRestraint(_Restraint):
-    def __init__(self, selection, width, constraints, fbcentre=None, fbcentresel=None, axes='xyz'):
+    def __init__(self, selection, width, restraints, fbcentre=None, fbcentresel=None, axes='xyz'):
         """ A restraint applied on the center of mass of a group of atoms.
 
         Parameters
@@ -64,9 +80,9 @@ class GroupRestraint(_Restraint):
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         width : float or list of floats
             The width of the flat-bottom potential box in Angstrom
-        constraints : list of tuples
-            A list of contraint/time pairs indicating which value the constraints should have at each point in time.
-            Constraints are given in kcal/mol units. Time can be either a timestep or time if one of the suffices
+        restraints : list of tuples
+            A list of restraint/time pairs indicating which value the restraints should have at each point in time.
+            Restraints are given in kcal/mol units. Time can be either a timestep or time if one of the suffices
             "us", "ns", "ps", "fs" is used.
         axes : str
             The axes on which to apply the potential.
@@ -79,11 +95,11 @@ class GroupRestraint(_Restraint):
         --------
         >>> gr = GroupRestraint('resname MOL', 10, [(20, '10ns'), (10, '20ns'), (0, '30ns')])
         """
-        super().__init__('group', selection, width, constraints, axes, fbcentre=fbcentre, fbcentresel=fbcentresel)
+        super().__init__('group', selection, width, restraints, axes, fbcentre=fbcentre, fbcentresel=fbcentresel)
 
 
 class AtomRestraint(_Restraint):
-    def __init__(self, selection, width, constraints, axes='xyz'):
+    def __init__(self, selection, width, restraints, axes='xyz'):
         """ A restraint applied individually on each atom in the selection
 
         Parameters
@@ -93,9 +109,9 @@ class AtomRestraint(_Restraint):
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         width : float or list of floats
             The width of the flat-bottom potential box in Angstrom
-        constraints : list of tuples
-            A list of contraint/time pairs indicating which value the constraints should have at each point in time.
-            Constraints are given in kcal/mol units. Time can be either a timestep or time if one of the suffices
+        restraints : list of tuples
+            A list of restraint/time pairs indicating which value the restraints should have at each point in time.
+            Restraints are given in kcal/mol units. Time can be either a timestep or time if one of the suffices
             "us", "ns", "ps", "fs" is used.
         axes : str
             The axes on which to apply the potential.
@@ -104,106 +120,10 @@ class AtomRestraint(_Restraint):
         --------
         >>> gr = AtomRestraint('name CA', 10, [(20, '10ns'), (10, '20ns'), (0, '30ns')])
         """
-        super().__init__('atom', selection, width, constraints, axes)
+        super().__init__('atom', selection, width, restraints, axes)
 
 
 class _Acemd(ProtocolInterface):
-    """ ACEMD class.
-
-    Parameters
-    ----------
-    temperature : float, default=None
-        Temperature of the thermostat in Kelvin.
-    restart : ('on', 'off'), str, default=None
-        Restart simulation.
-    restartfreq : int, default=None
-        Restart file frequency.
-    outputname : str, default=None
-        Output file name.
-    xtcfile : str, default=None
-        Output XTC file name.
-    xtcfreq : int, default=None
-        XTC sampling frequency in steps.
-    timestep : float, default=None
-        Simulation timestep.
-    rigidbonds : ('none', 'all'), str, default=None
-        Enable holonomic constraints on all hydrogen-heavy atom bond terms
-    hydrogenscale : float, default=None
-        Amount by which to scale the mass of H atoms
-    switching : ('on', 'off'), str, default=None
-        Enable to apply smoothing and switching functions to electrostatic and VdW forces.
-    switchdist : float, default=None
-        Range beyond which to begin to apply the switching functions.
-    cutoff : str, default=None
-        Cutoff distance for direct-space electrostatic interaction evaluation.
-    exclude : ('none', '1-2', '1-3', '1-4', 'scaled1-4'), str, default=None
-        Which pairs of bonded atoms should be excluded from non-bonded interactions
-    scaling14 : float, default=None
-        Scaling factor for 1-4 electrostatic interations.
-    langevin : ('on', 'off'), str, default=None
-        Enable the Langevin thermostat.
-    langevintemp : float, default=None
-        The set point in K for the Langevin thermostat.
-    langevindamping : float, default=None
-        Langevin damping constant gamma (1/ps)
-    pme : ('on', 'off'), str, default=None
-        Enable the use of PME for long-range electrostatics.
-    pmegridspacing : float, default=None
-        The spacing of the PME mesh in 1/A.
-    fullelectfrequency : int, default=None
-        The frequency in interations between successive calculations of long-range (PME) electrostatics.
-    energyfreq : int, default=None
-        The frequency with which ACEMD will calculate system energies.
-    constraints : ('on', 'off'), str, default=None
-        Set to enable positional constraints on specified atoms.
-    consref : str, default=None
-        Specify a PDB file giving reference positions for constrained atoms.
-    constraintscaling : float, default=None
-        The harmonic constraint energy function is multiplied by this parameter.
-    berendsenpressure : ('on', 'off'), str, default=None
-        Set to enable the Berendsen pressure bath barostatic control.
-    berendsenpressuretarget : float, default=None
-        The target pressure (Bar) for the barostat.
-    berendsenpressurerelaxationtime : float, default=None
-        Relaxation time for the barostat (fs).
-    tclforces : ('on', 'off'), str, default=None
-        Enable TCL force scripting.
-    minimize : int, default=None
-        Number of steps of conjugate-gradient minimisation to perform.
-    run : str, default=None
-        The number of simulation iterations to perform.
-    celldimension : str, default=None
-        Dimensions of the unit cell.
-    useconstantratio : ('on', 'off'), str, default=None
-        Keep the ratio of the X-Y dimensions constant while allowing Z to fluctuate independently.
-    amber : ('on', 'off'), str, default=None
-        Indicate that the Amber force field is to be used.
-    dielectric : float, default=None
-        Dielectric constant.
-    pairlistdist : str, default=None
-        Specify the buffer size for grid cells.
-    TCL : str, default=None
-
-    bincoordinates : str, default=None
-        Filename for initial structure coordinates, in NAMD Bincoor format.
-    binvelocities : str, default=None
-        Initial velocity field, in NAMD Bincoor format.
-    binindex : str, default=None
-        Filename for index file to set initial timestep (as made by a check-point)
-    structure : str, default=None
-        CHARMM structure topology in PSF format
-    parameters : str, default=None
-        CHARMM force-field parameter file (PRM)
-    extendedsystem : str, default=None
-        If set, specifies an extended system .xsc file, from which a cell dimension will be read.
-    coordinates : str, default=None
-        Filename for initial structure coordinates, in PDB format.
-    velocities : str, default=None
-        Initial velocity field, in PDB format.
-    parmfile : str, default=None
-        The filename of the Amber PRMTOP parameter file.
-
-    """
     _defaultfnames = {'bincoordinates': 'input.coor', 'binvelocities': 'input.vel', 'binindex': 'input.idx',
                       'structure': 'structure.*', 'parameters': 'parameters', 'extendedsystem': 'input.xsc',
                       'coordinates': 'structure.pdb', 'velocities': 'velocity.pdb', 'consref': 'structure.pdb',
@@ -271,7 +191,11 @@ class _Acemd(ProtocolInterface):
         self.writeConf(os.path.join(path, 'input'))
 
 
-    def setup(self, indir='./', outdir='./run', overwrite=False):
+    def write(self, inputdir='.', outputdir='run', overwrite=False):
+        self.setup(inputdir, outputdir, overwrite)
+
+
+    def setup(self, indir='.', outdir='run', overwrite=False):
         """ Convenience method performing load and save.
 
         Parameters
@@ -434,6 +358,11 @@ class Acemd2(_Acemd):
         Specify the buffer size for grid cells.
     TCL : str, default=None
         Extra TCL code to be prepended to the input file
+
+    Files
+    -----
+    Use these parameters to override the default search paths for these files.
+
     bincoordinates : str, default=None
         Filename for initial structure coordinates, in NAMD Bincoor format.
     binvelocities : str, default=None
@@ -557,6 +486,11 @@ class Acemd3(_Acemd):
         The dimensions of the unit cell in Angstrom. Note that the unit cell must be cuboid. Overrides any dimension given in the "coordinates" PDB.
     implicit : str, default=None
         Set to True to enable implicit solvent simulations in AMBER.
+
+    Files
+    -----
+    Use these parameters to override the default search paths for these files.
+
     bincoordinates : str, default=None
         Optional initial system geometry in NAMD BINCOOR format. If specified, overrides "coordinates"
     binvelocities : str, default=None
@@ -574,7 +508,7 @@ class Acemd3(_Acemd):
     velocities : str, default=None
         Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature"
     """
-    def __init__(self):
+    def __init__(self, config=None):
         super().__init__(version=3)
         # ACEMD3 Options
         self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None, val.Number(float, 'ANY'))
@@ -601,16 +535,66 @@ class Acemd3(_Acemd):
         self._arg('implicit', 'str', 'Set to True to enable implicit solvent simulations in AMBER.', None, val.String())
 
         # Files
-        self._arg('bincoordinates', 'str', 'Optional initial system geometry in NAMD BINCOOR format. If specified, overrides "coordinates"', None, val.String())
-        self._arg('binvelocities', 'str', 'Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature" and "velocities"', None, val.String())
-        self._arg('structure', 'str', 'The filename of a CHARMM PSF file', None, val.String())
-        self._arg('parameters', 'str', 'The filename of a CHARMM PAR file', None, val.String())
-        self._arg('parmfile', 'str', 'The filename of an Amber PRMTOP file', None, val.String())
-        self._arg('extendedsystem', 'str', 'Filename of a NAMD XSC format file giving the periodic cell dimensions. Overrides "celldimension" and any dimensions in the "coordinates" PDB', None, val.String())
-        self._arg('coordinates', 'str', 'Mandatory initial system geometry in PDB format', None, val.String())
-        self._arg('velocities', 'str', 'Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature"', None, val.String())
+        self._arg('bincoordinates', 'str', 'Optional initial system geometry in NAMD BINCOOR format. If specified, overrides "coordinates"', None, val.String(), nargs='*')
+        self._arg('binvelocities', 'str', 'Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature" and "velocities"', None, val.String(), nargs='*')
+        self._arg('structure', 'str', 'The filename of a CHARMM PSF file', None, val.String(), nargs='*')
+        self._arg('parameters', 'str', 'The filename of a CHARMM PAR file', None, val.String(), nargs='*')
+        self._arg('parmfile', 'str', 'The filename of an Amber PRMTOP file', None, val.String(), nargs='*')
+        self._arg('extendedsystem', 'str', 'Filename of a NAMD XSC format file giving the periodic cell dimensions. Overrides "celldimension" and any dimensions in the "coordinates" PDB', None, val.String(), nargs='*')
+        self._arg('coordinates', 'str', 'Mandatory initial system geometry in PDB format', None, val.String(), nargs='*')
+        self._arg('velocities', 'str', 'Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature"', None, val.String(), nargs='*')
 
+        if config is not None:
+            self.readConfig(config)
 
+    def readConfig(self, configfile):
+        import json
+
+        with open(configfile, 'r') as f:
+            config = json.load(f)
+
+        for key in config:
+            if key == 'restraints':
+                self.restraints = []
+                for restr in ensurelist(config[key]):
+                    self.restraints.append(_Restraint._fromDict(restr))
+            else:
+                setattr(self, key, config[key]['value'])
+
+    def _amberConfig(self):
+        # AMBER specific fixes
+        if self.structure.endswith('.prmtop') and self.parmfile is None:
+            self.parmfile = self.parameters
+            self.parameters = None
+
+    def load(self, path='.'):
+        super().load(path)
+        self._amberConfig()
+
+    def write(self, inputdir='.', outputdir='run', overwrite=False):
+        from htmd.units import convert
+        # numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
+        # self.acemd.run = str(numsteps)
+
+        if self.langevintemp is None:
+            self.langevintemp = self.temperature
+        if self.thermostattemp is None:
+            self.thermostattemp = self.temperature
+        # if self.adaptive:
+        #     self.binvelocities = None
+
+        # if self.celldimension is None and self.extendedsystem is None:
+        #     inmol = Molecule(os.path.join(inputdir, self.acemd.coordinates))
+        #     coords = inmol.get('coords', sel='water')
+        #     if coords.size == 0:  # It's a vacuum simulation
+        #         coords = inmol.get('coords', sel='all')
+        #         dim = np.max(coords, axis=0) - np.min(coords, axis=0)
+        #         dim = dim + 12.
+        #     else:
+        #         dim = np.max(coords, axis=0) - np.min(coords, axis=0)
+        #     self.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
+
+        super().setup(inputdir, outputdir, overwrite)
 
 
 from unittest import TestCase
