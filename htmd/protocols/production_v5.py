@@ -265,8 +265,7 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
-from htmd.mdengine.acemd.acemd import Acemd as Acemd3
-from htmd.mdengine.acemd.acemd import _Restraint, GroupRestraint, AtomRestraint
+from htmd.mdengine.acemd.acemd import Acemd3, _Restraint, GroupRestraint, AtomRestraint
 class ProductionAcemd3(ProtocolInterface):
     ''' Production protocol v5 for Acemd 3
 
@@ -298,7 +297,7 @@ class ProductionAcemd3(ProtocolInterface):
         self._arg('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False, val.Boolean())
         self._arg('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False, val.Boolean())
 
-        self.acemd = Acemd3(version=3)
+        self.acemd = Acemd3()
         self.acemd.binvelocities = None
         self.acemd.bincoordinates = 'output.coor'
         self.acemd.extendedsystem='output.xsc'
