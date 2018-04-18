@@ -357,6 +357,102 @@ class _Acemd(ProtocolInterface):
 
 
 class Acemd2(_Acemd):
+    """ Class for configuring an ACEMD2 run.
+
+    Parameters
+    ----------
+
+    temperature : float, default=None
+        Temperature of the thermostat in Kelvin.
+    restart : ('on', 'off'), str, default=None
+        Restart simulation.
+    restartfreq : int, default=None
+        Restart file frequency.
+    outputname : str, default=None
+        Output file name.
+    xtcfile : str, default=None
+        Output XTC file name.
+    xtcfreq : int, default=None
+        XTC sampling frequency in steps.
+    timestep : float, default=None
+        Simulation timestep.
+    rigidbonds : ('none', 'all'), str, default=None
+        Enable holonomic constraints on all hydrogen-heavy atom bond terms
+    hydrogenscale : float, default=None
+        Amount by which to scale the mass of H atoms
+    switching : ('on', 'off'), str, default=None
+        Enable to apply smoothing and switching functions to electrostatic and VdW forces.
+    switchdist : float, default=None
+        Range beyond which to begin to apply the switching functions.
+    cutoff : str, default=None
+        Cutoff distance for direct-space electrostatic interaction evaluation.
+    exclude : ('none', '1-2', '1-3', '1-4', 'scaled1-4'), str, default=None
+        Which pairs of bonded atoms should be excluded from non-bonded interactions
+    scaling14 : float, default=None
+        Scaling factor for 1-4 electrostatic interations.
+    langevin : ('on', 'off'), str, default=None
+        Enable the Langevin thermostat.
+    langevintemp : float, default=None
+        The set point in K for the Langevin thermostat.
+    langevindamping : float, default=None
+        Langevin damping constant gamma (1/ps)
+    pme : ('on', 'off'), str, default=None
+        Enable the use of PME for long-range electrostatics.
+    pmegridspacing : float, default=None
+        The spacing of the PME mesh in 1/A.
+    fullelectfrequency : int, default=None
+        The frequency in interations between successive calculations of long-range (PME) electrostatics.
+    energyfreq : int, default=None
+        The frequency with which ACEMD will calculate system energies.
+    constraints : ('on', 'off'), str, default=None
+        Set to enable positional constraints on specified atoms.
+    consref : str, default=None
+        Specify a PDB file giving reference positions for constrained atoms.
+    constraintscaling : float, default=None
+        The harmonic constraint energy function is multiplied by this parameter.
+    berendsenpressure : ('on', 'off'), str, default=None
+        Set to enable the Berendsen pressure bath barostatic control.
+    berendsenpressuretarget : float, default=None
+        The target pressure (Bar) for the barostat.
+    berendsenpressurerelaxationtime : float, default=None
+        Relaxation time for the barostat (fs).
+    tclforces : ('on', 'off'), str, default=None
+        Enable TCL force scripting.
+    minimize : int, default=None
+        Number of steps of conjugate-gradient minimisation to perform.
+    run : str, default=None
+        The number of simulation iterations to perform.
+    celldimension : str, default=None
+        Dimensions of the unit cell.
+    useconstantratio : ('on', 'off'), str, default=None
+        Keep the ratio of the X-Y dimensions constant while allowing Z to fluctuate independently.
+    amber : ('on', 'off'), str, default=None
+        Indicate that the Amber force field is to be used.
+    dielectric : float, default=None
+        Dielectric constant.
+    pairlistdist : str, default=None
+        Specify the buffer size for grid cells.
+    TCL : str, default=None
+        Extra TCL code to be prepended to the input file
+    bincoordinates : str, default=None
+        Filename for initial structure coordinates, in NAMD Bincoor format.
+    binvelocities : str, default=None
+        Initial velocity field, in NAMD Bincoor format.
+    binindex : str, default=None
+        Filename for index file to set initial timestep (as made by a check-point)
+    structure : str, default=None
+        CHARMM structure topology in PSF format
+    parameters : str, default=None
+        CHARMM force-field parameter file (PRM)
+    extendedsystem : str, default=None
+        If set, specifies an extended system .xsc file, from which a cell dimension will be read.
+    coordinates : str, default=None
+        Filename for initial structure coordinates, in PDB format.
+    velocities : str, default=None
+        Initial velocity field, in PDB format.
+    parmfile : str, default=None
+        The filename of the Amber PRMTOP parameter file.
+    """
     def __init__(self):
         super().__init__(version=2)
 
@@ -397,7 +493,7 @@ class Acemd2(_Acemd):
         self._arg('amber', 'str', 'Indicate that the Amber force field is to be used.', None, val.String(), valid_values=('on', 'off'))
         self._arg('dielectric', 'float', 'Dielectric constant.', None, val.Number(float, 'ANY'))
         self._arg('pairlistdist', 'str', 'Specify the buffer size for grid cells.', None, val.Number(float, 'ANY'))
-        self._arg('TCL', 'str', '', None, val.String(), nargs='*')
+        self._arg('TCL', 'str', 'Extra TCL code to be prepended to the input file', None, val.String(), nargs='*')
 
         # Files
         self._arg('bincoordinates', 'str', 'Filename for initial structure coordinates, in NAMD Bincoor format.', None, val.String())
@@ -412,6 +508,72 @@ class Acemd2(_Acemd):
 
 
 class Acemd3(_Acemd):
+    """ Class for configuring an ACEMD3 run.
+
+    Parameters
+    ----------
+
+    temperature : float, default=None
+        Temperature of the thermostat in Kelvin.
+    restart : str, default=None
+        Restart simulation.
+    trajectoryfile : str, default=None
+        Output file name.
+    trajectoryfreq : int, default=None
+        Trajectory sampling frequency in steps.
+    timestep : int, default=None
+        Simulation timestep.
+    pme : str, default=None
+        Particle-mesh Ewald summation.
+    switching : str, default=None
+        Apply switching function to the van der Waals potential.
+    switchdist : float, default=None
+        Distance in Angstrom at which to begin applying the switching function.
+    cutoff : float, default=None
+        Real-space cutoff in Angstroms for electrostatics and van der Waals.
+    thermostat : str, default=None
+        Enable thermostatic control
+    thermostattemp : float, default=None
+        Target temperature (K) for thermostatic control
+    thermostatdamping : float, default=None
+        Damping constant for the Langevin thermostat in ps^-1
+    restraints : str, default=None
+        Restraining potentials
+    barostat : str, default=None
+        Enable pressure control
+    barostatpressure : float, default=None
+        The target pressure in bar
+    useflexiblecell : str, default=None
+        Allow X, Y and Z unit cell dimensions to vary independently
+    useconstantarea : str, default=None
+        Constrain the X,Y dimensions of the unit cell. Allow Z to vary independently.
+    useconstantratio : str, default=None
+        Constrain the X:Y ratio of the unit cell dimensions. Allow Z to vary independently.
+    minimize : int, default=None
+        The number of energy minimization steps to perform before commencing dynamics.
+    run : str, default=None
+        The length of simulation ro run. May be specified as a number of steps or as a time if one of the suffices "us", "ns", "ps", "fs" is used.
+    celldimension : str, default=None
+        The dimensions of the unit cell in Angstrom. Note that the unit cell must be cuboid. Overrides any dimension given in the "coordinates" PDB.
+    implicit : str, default=None
+        Set to True to enable implicit solvent simulations in AMBER.
+    bincoordinates : str, default=None
+        Optional initial system geometry in NAMD BINCOOR format. If specified, overrides "coordinates"
+    binvelocities : str, default=None
+        Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature" and "velocities"
+    structure : str, default=None
+        The filename of a CHARMM PSF file
+    parameters : str, default=None
+        The filename of a CHARMM PAR file
+    parmfile : str, default=None
+        The filename of an Amber PRMTOP file
+    extendedsystem : str, default=None
+        Filename of a NAMD XSC format file giving the periodic cell dimensions. Overrides "celldimension" and any dimensions in the "coordinates" PDB
+    coordinates : str, default=None
+        Mandatory initial system geometry in PDB format
+    velocities : str, default=None
+        Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature"
+    """
     def __init__(self):
         super().__init__(version=3)
         # ACEMD3 Options
