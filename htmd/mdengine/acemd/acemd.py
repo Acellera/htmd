@@ -16,11 +16,18 @@ class _Restraint:
     def __init__(self, contype, selection, width, constraints, axes='xyz', fbcentre=None, fbcentresel=None):
         self.type = contype
         self.selection = selection
-        self.width = width
+        self.width = ensurelist(width)
         self.constraints = constraints
         self.axes = axes
-        self.fbcentre = None
-        self.fbcentresel = None
+        self.fbcentre = fbcentre
+        self.fbcentresel = fbcentresel
+
+        if len(self.width) != 1 and len(self.width) != 3:
+            raise RuntimeError('Restraint width must be either a single value or a list of 3 values for the xyz dimensions')
+        if self.fbcentre is not None:
+            self.fbcentre = ensurelist(self.fbcentre)
+            if len(self.fbcentre) != 3:
+                raise RuntimeError('Restraint fbcentre must be a list of 3 values for the xyz coordinates')
 
     def format(self, maxwidth=None):
         # {atom,group}Restraint "[atom selection]" fbcentre "[fb centre coor]" fbcentresel "[fb centre selection]" axes {xyz} width [l] setpoints [k@t]
@@ -29,14 +36,15 @@ class _Restraint:
         else:
             res = '{type: <{maxwidth}}\t'.format(type=self.type+'Restraint', maxwidth=maxwidth)
 
+        res += '"{}" '.format(self.selection)
+
         if self.fbcentre is not None:
-            res += 'fbcentre "{}" '.format(self.fbcentre)
+            res += 'fbcentre "{}" '.format(' '.join(map(str, self.fbcentre)))
         if self.fbcentresel is not None:
             res += 'fbcentresel "{}" '.format(self.fbcentresel)
 
-        res += '"{sel}" axes {axes} width "{width}" setpoints'.format(sel=self.selection,
-                                                                    axes=self.axes,
-                                                                    width=' '.join(map(str, self.width)))
+        res += 'axes {axes} width "{width}" '.format(axes=self.axes, width=' '.join(map(str, self.width)))
+        res += 'setpoints'
         for p in self.constraints:
             res += ' {con}@{time}'.format(con=p[0], time=p[1])
         return res
@@ -99,7 +107,7 @@ class AtomRestraint(_Restraint):
         super().__init__('atom', selection, width, constraints, axes)
 
 
-class Acemd(ProtocolInterface):
+class _Acemd(ProtocolInterface):
     """ ACEMD class.
 
     Parameters
@@ -208,93 +216,6 @@ class Acemd(ProtocolInterface):
         self._file_data = {}
         self._outnames = {}
 
-        if version == 3:
-            # ACEMD3 Options
-            self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None, val.Number(float, 'ANY'))
-            self._arg('restart', 'str', 'Restart simulation.', None, val.String())
-            self._arg('trajectoryfile', 'str', 'Output file name.', None, val.String())
-            self._arg('trajectoryfreq', 'int', 'Trajectory sampling frequency in steps.', None, val.Number(int, 'POS'))
-            self._arg('timestep', 'int', 'Simulation timestep.', None, val.Number(int, 'POS'))
-            self._arg('pme', 'str', 'Particle-mesh Ewald summation.', None, val.String())
-            self._arg('switching', 'str', 'Apply switching function to the van der Waals potential.', None, val.String())
-            self._arg('switchdist', 'float', 'Distance in Angstrom at which to begin applying the switching function.', None, val.Number(float, '0POS'))
-            self._arg('cutoff', 'float', 'Real-space cutoff in Angstroms for electrostatics and van der Waals.', None, val.Number(float, '0POS'))
-            self._arg('thermostat', 'str', 'Enable thermostatic control', None, val.String())
-            self._arg('thermostattemp', 'float', 'Target temperature (K) for thermostatic control', None, val.Number(float, '0POS'))
-            self._arg('thermostatdamping', 'float', 'Damping constant for the Langevin thermostat in ps^-1', None, val.Number(float, '0POS'))
-            self._arg('restraints', 'str', 'Restraining potentials', None, val.Object(_Restraint), nargs='*')
-            self._arg('barostat', 'str', 'Enable pressure control', None, val.String())
-            self._arg('barostatpressure', 'float', 'The target pressure in bar', None, val.Number(float, '0POS'))
-            self._arg('useflexiblecell', 'str', 'Allow X, Y and Z unit cell dimensions to vary independently', None, val.String())
-            self._arg('useconstantarea', 'str', 'Constrain the X,Y dimensions of the unit cell. Allow Z to vary independently.', None, val.String())
-            self._arg('useconstantratio', 'str', 'Constrain the X:Y ratio of the unit cell dimensions. Allow Z to vary independently.', None, val.String())
-            self._arg('minimize', 'int', 'The number of energy minimization steps to perform before commencing dynamics.', None, val.Number(int, '0POS'))
-            self._arg('run', 'str', 'The length of simulation ro run. May be specified as a number of steps or as a time if one of the suffices "us", "ns", "ps", "fs" is used.', None, val.String())
-            self._arg('celldimension', 'str', 'The dimensions of the unit cell in Angstrom. Note that the unit cell must be cuboid. Overrides any dimension given in the "coordinates" PDB.', None, val.String())
-            self._arg('implicit', 'str', 'Set to True to enable implicit solvent simulations in AMBER.', None, val.String())
-
-            # Files
-            self._arg('bincoordinates', 'str', 'Optional initial system geometry in NAMD BINCOOR format. If specified, overrides "coordinates"', None, val.String())
-            self._arg('binvelocities', 'str', 'Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature" and "velocities"', None, val.String())
-            self._arg('structure', 'str', 'The filename of a CHARMM PSF file', None, val.String())
-            self._arg('parameters', 'str', 'The filename of a CHARMM PAR file', None, val.String())
-            self._arg('parmfile', 'str', 'The filename of an Amber PRMTOP file', None, val.String())
-            self._arg('extendedsystem', 'str', 'Filename of a NAMD XSC format file giving the periodic cell dimensions. Overrides "celldimension" and any dimensions in the "coordinates" PDB', None, val.String())
-            self._arg('coordinates', 'str', 'Mandatory initial system geometry in PDB format', None, val.String())
-            self._arg('velocities', 'str', 'Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature"', None, val.String())
-
-
-        if version == 2:
-            logger.warning('The default Acemd engine for HTMD has changed to Acemd3. You can keep on using Acemd2 but will not be able to use new features introduced in Acemd3')
-            # ACEMD2 Options
-            self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None, val.Number(float, '0POS'))
-            self._arg('restart', 'str', 'Restart simulation.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('restartfreq', 'int', 'Restart file frequency.', None, val.Number(int, '0POS'))
-            self._arg('outputname', 'str', 'Output file name.', None, val.String())
-            self._arg('xtcfile', 'str', 'Output XTC file name.', None, val.String())
-            self._arg('xtcfreq', 'int', 'XTC sampling frequency in steps.', None, val.Number(int, '0POS'))
-            self._arg('timestep', 'float', 'Simulation timestep.', None, val.Number(float, '0POS'))
-            self._arg('rigidbonds', 'str', 'Enable holonomic constraints on all hydrogen-heavy atom bond terms', None, val.String(), valid_values=('none', 'all'))
-            self._arg('hydrogenscale', 'float', 'Amount by which to scale the mass of H atoms', None, val.Number(float, '0POS'))
-            self._arg('switching', 'str', 'Enable to apply smoothing and switching functions to electrostatic and VdW forces.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('switchdist', 'float', 'Range beyond which to begin to apply the switching functions.', None, val.Number(float, '0POS'))
-            self._arg('cutoff', 'str', 'Cutoff distance for direct-space electrostatic interaction evaluation.', None, val.Number(float, '0POS'))
-            self._arg('exclude', 'str', 'Which pairs of bonded atoms should be excluded from non-bonded interactions', None, val.String(), valid_values=('none', '1-2', '1-3', '1-4', 'scaled1-4'))
-            self._arg('scaling14', 'float', 'Scaling factor for 1-4 electrostatic interations.', None, val.Number(float, '0POS'))
-            self._arg('langevin', 'str', 'Enable the Langevin thermostat.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('langevintemp', 'float', 'The set point in K for the Langevin thermostat.', None, val.Number(float, '0POS'))
-            self._arg('langevindamping', 'float', 'Langevin damping constant gamma (1/ps)', None, val.Number(float, '0POS'))
-            self._arg('pme', 'str', 'Enable the use of PME for long-range electrostatics.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('pmegridspacing', 'float', 'The spacing of the PME mesh in 1/A.', None, val.Number(float, '0POS'))
-            self._arg('fullelectfrequency', 'int', 'The frequency in interations between successive calculations of long-range (PME) electrostatics.', None, val.Number(int, '0POS'))
-            self._arg('energyfreq', 'int', 'The frequency with which ACEMD will calculate system energies.', None, val.Number(int, '0POS'))
-            self._arg('constraints', 'str', 'Set to enable positional constraints on specified atoms.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('consref', 'str', 'Specify a PDB file giving reference positions for constrained atoms.', None, val.String())
-            self._arg('constraintscaling', 'float', 'The harmonic constraint energy function is multiplied by this parameter.', None, val.Number(float, 'ANY'))
-            self._arg('berendsenpressure', 'str', 'Set to enable the Berendsen pressure bath barostatic control.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('berendsenpressuretarget', 'float', 'The target pressure (Bar) for the barostat.', None, val.Number(float, '0POS'))
-            self._arg('berendsenpressurerelaxationtime', 'float', 'Relaxation time for the barostat (fs).', None, val.Number(float, '0POS'))
-            self._arg('tclforces', 'str', 'Enable TCL force scripting.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('minimize', 'int', 'Number of steps of conjugate-gradient minimisation to perform.', None, val.Number(int, '0POS'))
-            self._arg('run', 'str', 'The number of simulation iterations to perform.', None)
-            self._arg('celldimension', 'str', 'Dimensions of the unit cell.', None, val.Number(float, 'ANY'), nargs=3)
-            self._arg('useconstantratio', 'str', 'Keep the ratio of the X-Y dimensions constant while allowing Z to fluctuate independently.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('amber', 'str', 'Indicate that the Amber force field is to be used.', None, val.String(), valid_values=('on', 'off'))
-            self._arg('dielectric', 'float', 'Dielectric constant.', None, val.Number(float, 'ANY'))
-            self._arg('pairlistdist', 'str', 'Specify the buffer size for grid cells.', None, val.Number(float, 'ANY'))
-            self._arg('TCL', 'str', '', None, val.String(), nargs='*')
-
-            # Files
-            self._arg('bincoordinates', 'str', 'Filename for initial structure coordinates, in NAMD Bincoor format.', None, val.String())
-            self._arg('binvelocities', 'str', 'Initial velocity field, in NAMD Bincoor format.', None, val.String())
-            self._arg('binindex', 'str', 'Filename for index file to set initial timestep (as made by a check-point)', None, val.String())
-            self._arg('structure', 'str', 'CHARMM structure topology in PSF format', None, val.String())
-            self._arg('parameters', 'str', 'CHARMM force-field parameter file (PRM)', None, val.String())
-            self._arg('extendedsystem', 'str', 'If set, specifies an extended system .xsc file, from which a cell dimension will be read.', None, val.String())
-            self._arg('coordinates', 'str', 'Filename for initial structure coordinates, in PDB format.', None, val.String())
-            self._arg('velocities', 'str', 'Initial velocity field, in PDB format.', None, val.String())
-            self._arg('parmfile', 'str', 'The filename of the Amber PRMTOP parameter file.', None, val.String())
-
 
     def load(self, path='.'):
         """ Loads all files required to run a simulation and apply eventually configured protocols to it
@@ -388,7 +309,9 @@ class Acemd(ProtocolInterface):
         maxwidth = np.max([len(k) for k in self.__dict__.keys()])
 
         keys = sorted(list(self.__dict__.keys()))
-        keys = keys + [keys.pop(keys.index('restraints')), keys.pop(keys.index('run'))]  # Move the run command to the end
+        if 'restraints' in keys:
+            keys += [keys.pop(keys.index('restraints'))]
+        keys = keys + [keys.pop(keys.index('run'))]  # Move the run command to the end
         for cmd in keys:
             if cmd == 'restraints' and self.restraints is not None:
                 for r in ensurelist(self.restraints):
@@ -433,6 +356,101 @@ class Acemd(ProtocolInterface):
         fo.close()
 
 
+class Acemd2(_Acemd):
+    def __init__(self):
+        super().__init__(version=2)
+
+        logger.warning('The default Acemd engine for HTMD has changed to Acemd3. You can keep on using Acemd2 but will not be able to use new features introduced in Acemd3')
+        # ACEMD2 Options
+        self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None, val.Number(float, '0POS'))
+        self._arg('restart', 'str', 'Restart simulation.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('restartfreq', 'int', 'Restart file frequency.', None, val.Number(int, '0POS'))
+        self._arg('outputname', 'str', 'Output file name.', None, val.String())
+        self._arg('xtcfile', 'str', 'Output XTC file name.', None, val.String())
+        self._arg('xtcfreq', 'int', 'XTC sampling frequency in steps.', None, val.Number(int, '0POS'))
+        self._arg('timestep', 'float', 'Simulation timestep.', None, val.Number(float, '0POS'))
+        self._arg('rigidbonds', 'str', 'Enable holonomic constraints on all hydrogen-heavy atom bond terms', None, val.String(), valid_values=('none', 'all'))
+        self._arg('hydrogenscale', 'float', 'Amount by which to scale the mass of H atoms', None, val.Number(float, '0POS'))
+        self._arg('switching', 'str', 'Enable to apply smoothing and switching functions to electrostatic and VdW forces.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('switchdist', 'float', 'Range beyond which to begin to apply the switching functions.', None, val.Number(float, '0POS'))
+        self._arg('cutoff', 'str', 'Cutoff distance for direct-space electrostatic interaction evaluation.', None, val.Number(float, '0POS'))
+        self._arg('exclude', 'str', 'Which pairs of bonded atoms should be excluded from non-bonded interactions', None, val.String(), valid_values=('none', '1-2', '1-3', '1-4', 'scaled1-4'))
+        self._arg('scaling14', 'float', 'Scaling factor for 1-4 electrostatic interations.', None, val.Number(float, '0POS'))
+        self._arg('langevin', 'str', 'Enable the Langevin thermostat.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('langevintemp', 'float', 'The set point in K for the Langevin thermostat.', None, val.Number(float, '0POS'))
+        self._arg('langevindamping', 'float', 'Langevin damping constant gamma (1/ps)', None, val.Number(float, '0POS'))
+        self._arg('pme', 'str', 'Enable the use of PME for long-range electrostatics.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('pmegridspacing', 'float', 'The spacing of the PME mesh in 1/A.', None, val.Number(float, '0POS'))
+        self._arg('fullelectfrequency', 'int', 'The frequency in interations between successive calculations of long-range (PME) electrostatics.', None, val.Number(int, '0POS'))
+        self._arg('energyfreq', 'int', 'The frequency with which ACEMD will calculate system energies.', None, val.Number(int, '0POS'))
+        self._arg('constraints', 'str', 'Set to enable positional constraints on specified atoms.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('consref', 'str', 'Specify a PDB file giving reference positions for constrained atoms.', None, val.String())
+        self._arg('constraintscaling', 'float', 'The harmonic constraint energy function is multiplied by this parameter.', None, val.Number(float, 'ANY'))
+        self._arg('berendsenpressure', 'str', 'Set to enable the Berendsen pressure bath barostatic control.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('berendsenpressuretarget', 'float', 'The target pressure (Bar) for the barostat.', None, val.Number(float, '0POS'))
+        self._arg('berendsenpressurerelaxationtime', 'float', 'Relaxation time for the barostat (fs).', None, val.Number(float, '0POS'))
+        self._arg('tclforces', 'str', 'Enable TCL force scripting.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('minimize', 'int', 'Number of steps of conjugate-gradient minimisation to perform.', None, val.Number(int, '0POS'))
+        self._arg('run', 'str', 'The number of simulation iterations to perform.', None)
+        self._arg('celldimension', 'str', 'Dimensions of the unit cell.', None, val.Number(float, 'ANY'), nargs=3)
+        self._arg('useconstantratio', 'str', 'Keep the ratio of the X-Y dimensions constant while allowing Z to fluctuate independently.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('amber', 'str', 'Indicate that the Amber force field is to be used.', None, val.String(), valid_values=('on', 'off'))
+        self._arg('dielectric', 'float', 'Dielectric constant.', None, val.Number(float, 'ANY'))
+        self._arg('pairlistdist', 'str', 'Specify the buffer size for grid cells.', None, val.Number(float, 'ANY'))
+        self._arg('TCL', 'str', '', None, val.String(), nargs='*')
+
+        # Files
+        self._arg('bincoordinates', 'str', 'Filename for initial structure coordinates, in NAMD Bincoor format.', None, val.String())
+        self._arg('binvelocities', 'str', 'Initial velocity field, in NAMD Bincoor format.', None, val.String())
+        self._arg('binindex', 'str', 'Filename for index file to set initial timestep (as made by a check-point)', None, val.String())
+        self._arg('structure', 'str', 'CHARMM structure topology in PSF format', None, val.String())
+        self._arg('parameters', 'str', 'CHARMM force-field parameter file (PRM)', None, val.String())
+        self._arg('extendedsystem', 'str', 'If set, specifies an extended system .xsc file, from which a cell dimension will be read.', None, val.String())
+        self._arg('coordinates', 'str', 'Filename for initial structure coordinates, in PDB format.', None, val.String())
+        self._arg('velocities', 'str', 'Initial velocity field, in PDB format.', None, val.String())
+        self._arg('parmfile', 'str', 'The filename of the Amber PRMTOP parameter file.', None, val.String())
+
+
+class Acemd3(_Acemd):
+    def __init__(self):
+        super().__init__(version=3)
+        # ACEMD3 Options
+        self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None, val.Number(float, 'ANY'))
+        self._arg('restart', 'str', 'Restart simulation.', None, val.String())
+        self._arg('trajectoryfile', 'str', 'Output file name.', None, val.String())
+        self._arg('trajectoryfreq', 'int', 'Trajectory sampling frequency in steps.', None, val.Number(int, 'POS'))
+        self._arg('timestep', 'int', 'Simulation timestep.', None, val.Number(int, 'POS'))
+        self._arg('pme', 'str', 'Particle-mesh Ewald summation.', None, val.String())
+        self._arg('switching', 'str', 'Apply switching function to the van der Waals potential.', None, val.String())
+        self._arg('switchdist', 'float', 'Distance in Angstrom at which to begin applying the switching function.', None, val.Number(float, '0POS'))
+        self._arg('cutoff', 'float', 'Real-space cutoff in Angstroms for electrostatics and van der Waals.', None, val.Number(float, '0POS'))
+        self._arg('thermostat', 'str', 'Enable thermostatic control', None, val.String())
+        self._arg('thermostattemp', 'float', 'Target temperature (K) for thermostatic control', None, val.Number(float, '0POS'))
+        self._arg('thermostatdamping', 'float', 'Damping constant for the Langevin thermostat in ps^-1', None, val.Number(float, '0POS'))
+        self._arg('restraints', 'str', 'Restraining potentials', None, val.Object(_Restraint), nargs='*')
+        self._arg('barostat', 'str', 'Enable pressure control', None, val.String())
+        self._arg('barostatpressure', 'float', 'The target pressure in bar', None, val.Number(float, '0POS'))
+        self._arg('useflexiblecell', 'str', 'Allow X, Y and Z unit cell dimensions to vary independently', None, val.String())
+        self._arg('useconstantarea', 'str', 'Constrain the X,Y dimensions of the unit cell. Allow Z to vary independently.', None, val.String())
+        self._arg('useconstantratio', 'str', 'Constrain the X:Y ratio of the unit cell dimensions. Allow Z to vary independently.', None, val.String())
+        self._arg('minimize', 'int', 'The number of energy minimization steps to perform before commencing dynamics.', None, val.Number(int, '0POS'))
+        self._arg('run', 'str', 'The length of simulation ro run. May be specified as a number of steps or as a time if one of the suffices "us", "ns", "ps", "fs" is used.', None, val.String())
+        self._arg('celldimension', 'str', 'The dimensions of the unit cell in Angstrom. Note that the unit cell must be cuboid. Overrides any dimension given in the "coordinates" PDB.', None, val.String())
+        self._arg('implicit', 'str', 'Set to True to enable implicit solvent simulations in AMBER.', None, val.String())
+
+        # Files
+        self._arg('bincoordinates', 'str', 'Optional initial system geometry in NAMD BINCOOR format. If specified, overrides "coordinates"', None, val.String())
+        self._arg('binvelocities', 'str', 'Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature" and "velocities"', None, val.String())
+        self._arg('structure', 'str', 'The filename of a CHARMM PSF file', None, val.String())
+        self._arg('parameters', 'str', 'The filename of a CHARMM PAR file', None, val.String())
+        self._arg('parmfile', 'str', 'The filename of an Amber PRMTOP file', None, val.String())
+        self._arg('extendedsystem', 'str', 'Filename of a NAMD XSC format file giving the periodic cell dimensions. Overrides "celldimension" and any dimensions in the "coordinates" PDB', None, val.String())
+        self._arg('coordinates', 'str', 'Mandatory initial system geometry in PDB format', None, val.String())
+        self._arg('velocities', 'str', 'Optional initial system velocity field in NAMD BINCOOR format. If specified, overrides field generated by "temperature"', None, val.String())
+
+
+
+
 from unittest import TestCase
 class TestAcemd(TestCase):
     def test_acemd2(self):
@@ -444,7 +462,7 @@ class TestAcemd(TestCase):
 
         tmpdir = tempname()
 
-        acemd = Acemd()
+        acemd = Acemd2()
         acemd.temperature = 350
         acemd.restart = 'on'
         acemd.restartfreq = 25
@@ -512,15 +530,38 @@ class TestAcemd(TestCase):
 
         r = list()
         r.append(GroupRestraint('resname MOL', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z'))
+        r.append(GroupRestraint('resname MOL', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z', fbcentre=[4, 2, 7.3]))
+        r.append(GroupRestraint('resname MOL', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z', fbcentresel='protein'))
         r.append(AtomRestraint('name CA', 0.1, [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
+        r.append(AtomRestraint('name CA', [0.1, 0.5, 3], [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
 
-        acemd = Acemd(version=3)
+        acemd = Acemd3()
         acemd.structure = '5dhfr_cube.psf'
         acemd.parameters = 'par_all22_prot.inp'
         acemd.coordinates = '5dhfr_cube.pdb'
         acemd.restraints = r
         acemd.setup(homedir + '/data/dhfr', '/tmp/testdir', overwrite=True)
         print(acemd)
+
+        expected_result = """
+#
+coordinates             structure.pdb
+parameters              parameters
+structure               structure.psf
+groupRestraint          "resname MOL" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
+groupRestraint          "resname MOL" fbcentre "4 2 7.3" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
+groupRestraint          "resname MOL" fbcentresel "protein" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
+atomRestraint           "name CA" axes xyz width "0.1" setpoints 10@10ns 5@15ns 0@20ns
+atomRestraint           "name CA" axes xyz width "0.1 0.5 3" setpoints 10@10ns 5@15ns 0@20ns
+"""
+        with open('/tmp/testdir/input', 'r') as f:
+            lines = '\n'.join(f.readlines())
+
+        import re
+        lines = re.sub('\s+', ' ', lines)
+        expected_result = re.sub('\s+', ' ', expected_result)
+
+        assert expected_result.strip() == lines.strip()
 
 
 if __name__ == "__main__":
