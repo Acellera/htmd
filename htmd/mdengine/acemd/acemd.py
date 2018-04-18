@@ -202,10 +202,6 @@ class _Acemd(ProtocolInterface):
         self.writeConf(os.path.join(path, 'input'))
 
 
-    def write(self, inputdir='.', outputdir='run', overwrite=False):
-        self.setup(inputdir, outputdir, overwrite)
-
-
     def setup(self, indir='.', outdir='run', overwrite=False):
         """ Convenience method performing load and save.
 
@@ -596,15 +592,13 @@ class Acemd3(_Acemd):
 
     def load(self, path='.'):
         super().load(path)
+
+        # Simplifications for ACEMD3
         self._amberConfig()
-
-    def write(self, inputdir='.', outputdir='run', overwrite=False):
-        from htmd.units import convert
-        # numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
-        # self.acemd.run = str(numsteps)
-
         if self.thermostattemp is None:
             self.thermostattemp = self.temperature
+
+    def write(self, inputdir='.', outputdir='run', overwrite=False):
         # if self.adaptive:
         #     self.binvelocities = None
 
@@ -618,7 +612,6 @@ class Acemd3(_Acemd):
         #     else:
         #         dim = np.max(coords, axis=0) - np.min(coords, axis=0)
         #     self.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
-
         super().setup(inputdir, outputdir, overwrite)
 
 
