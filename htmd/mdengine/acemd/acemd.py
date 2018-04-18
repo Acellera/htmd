@@ -561,6 +561,10 @@ class Acemd3(_Acemd):
     def readConfig(self, configfile):
         import json
 
+        if not os.path.exists(configfile):
+            from htmd.home import home
+            configfile = os.path.join(home(), 'mdengine', 'acemd', 'config', '{}.json'.format(configfile))
+
         with open(configfile, 'r') as f:
             config = json.load(f)
 
