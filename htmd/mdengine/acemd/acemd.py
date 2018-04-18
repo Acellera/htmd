@@ -146,18 +146,29 @@ class _Acemd(ProtocolInterface):
             Working directory relative to which the configuration file is read
         """
         # load files and reset filenames
+
         for cmd in self._defaultfnames.keys():
             if cmd in self.__dict__ and self.__dict__[cmd] is not None:
-                fname = os.path.join(path, self.__dict__[cmd])
-                f = open(fname, 'rb')  # read all as binary
-                data = f.read()
-                f.close()
-                self._file_data[cmd] = data
+                found = False
+                for fname in ensurelist(self.__dict__[cmd]):
+                    fpath = os.path.join(path, fname)
+                    if not os.path.exists(fpath):
+                        continue
 
-                defaultname = self._defaultfnames[cmd]
-                if defaultname.endswith('*'):
-                    defaultname = '{}.{}'.format(os.path.splitext(defaultname)[0], os.path.splitext(fname)[1][1:])
-                self._outnames[cmd] = defaultname
+                    f = open(fpath, 'rb')  # read all as binary
+                    data = f.read()
+                    f.close()
+                    self._file_data[cmd] = data
+
+                    defaultname = self._defaultfnames[cmd]
+                    if defaultname.endswith('*'):
+                        defaultname = '{}.{}'.format(os.path.splitext(defaultname)[0], os.path.splitext(fpath)[1][1:])
+                    self._outnames[cmd] = defaultname
+                    self.__dict__[cmd] = fname
+                    found = True
+                    break
+                if not found:
+                    raise RuntimeError('Could not find any of the files "{}" specified for command "{}" in path {}'.format(self.__dict__[cmd], cmd, path))
 
 
     def save(self, path, overwrite=False):
@@ -556,7 +567,7 @@ class Acemd3(_Acemd):
         for key in config:
             if key == 'restraints':
                 self.restraints = []
-                for restr in ensurelist(config[key]):
+                for restr in ensurelist(config[key]['value']):
                     self.restraints.append(_Restraint._fromDict(restr))
             else:
                 setattr(self, key, config[key]['value'])
@@ -576,8 +587,6 @@ class Acemd3(_Acemd):
         # numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
         # self.acemd.run = str(numsteps)
 
-        if self.langevintemp is None:
-            self.langevintemp = self.temperature
         if self.thermostattemp is None:
             self.thermostattemp = self.temperature
         # if self.adaptive:
