@@ -182,7 +182,9 @@ class _Acemd(ProtocolInterface):
             Overwrite output directory if it exists.
         """
         if self.run is None:
-            raise RuntimeError('You need to define a runtime with the "run" command.')
+            raise RuntimeError('You need to specify the simulation length with the "run" command.')
+        if self.temperature is None:
+            raise RuntimeError('You need to specify the simulation temperature with the "temperature" command.')
 
         if os.path.exists(path):
             if overwrite:
@@ -707,6 +709,7 @@ class TestAcemd(TestCase):
         acemd.parameters = 'par_all22_prot.inp'
         acemd.coordinates = '5dhfr_cube.pdb'
         acemd.restraints = r
+        acemd.temperature = 300
         acemd.run = '1000'
         acemd.setup(homedir + '/data/dhfr', '/tmp/testdir', overwrite=True)
 
@@ -717,6 +720,8 @@ class TestAcemd(TestCase):
 coordinates             structure.pdb
 parameters              parameters
 structure               structure.psf
+temperature             300 
+thermostattemp          300
 groupRestraint          "resname MOL" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
 groupRestraint          "resname MOL" fbcentre "4 2 7.3" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
 groupRestraint          "resname MOL" fbcentresel "protein" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
@@ -745,6 +750,7 @@ run                     1000
         prod = Acemd3('production')
         prod.run = '1000'
         prod.trajectoryfreq = 200
+        prod.temperature = 300
         prod.write(home(dataDir=os.path.join('test-acemd', pdbid, 'equil_out')), tmpdir)
         print(tmpdir)
         # Compare with reference
@@ -773,6 +779,7 @@ run                     1000
         equil.celldimension = ' '.join(['{:3.1f}'.format(val) for val in celldim.squeeze()])
         equil.run = '1000'
         equil.trajectoryfreq = 200
+        equil.temperature = 300
 
         equil.write(builddir, tmpdir)
 
