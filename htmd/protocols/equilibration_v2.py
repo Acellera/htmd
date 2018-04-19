@@ -526,20 +526,34 @@ if __name__ == "__main__":
     # match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
     _compareResultFolders(refdir, tmpdir, '3PTB')
 
-    # if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-    #         raise RuntimeError('Different results produced by Equilibration.write for '
-    #                            'test {} between {} and {} in files {}.'.format(pdbid, refdir, tmpdir, mismatch))
 
-    # from htmd.protocols.production_v5 import ProductionAcemd3, GroupRestraint, AtomRestraint
-    r = list()
-    r.append(GroupRestraint('segid P2', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z'))
-    r.append(AtomRestraint('segid P1 and name CA', 0.1, [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
+    from htmd.home import home
+    import filecmp
+    from htmd.util import tempname
+    from glob import glob
+    from htmd.molecule.molecule import Molecule
 
-    eq = EquilibrationAcemd3()
-    eq.runtime = 4
-    eq.timeunits = 'ns'
-    eq.temperature = 300
-    eq.restraints = r
-    # eq.write('/workspace5/pablo/bound_KIX_cMYB/1_build/2-struct/', '/tmp/testdir2/')
+    tmpdir = tempname()
+    pdbid = '3PTB'
+    builddir = home(dataDir=os.path.join('test-acemd', pdbid, 'build'))
+
+    equil = EquilibrationAcemd3()
+    mol = Molecule(os.path.join(builddir, 'structure.pdb'))
+    celldim = mol.coords.max(axis=0) - mol.coords.min(axis=0)
+    equil.acemd.celldimension = ' '.join(['{:3.1f}'.format(val) for val in celldim.squeeze()])
+    equil.acemd.trajectoryfreq = 200
+    equil.runtime = 2000
+    equil.temperature = 300
+
+    equil.write(builddir, tmpdir)
+
+    # Compare with reference
+    refdir = home(dataDir=os.path.join('test-acemd', pdbid, 'equil'))
+    files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
+    match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
+
+    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+        raise RuntimeError('Different results produced by Acemd3 equilibration for '
+                           'test {} between {} and {} in files {}.'.format(pdbid, refdir, tmpdir, mismatch))
 
 
