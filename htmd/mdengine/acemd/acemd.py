@@ -137,6 +137,14 @@ class _Acemd(ProtocolInterface):
         self._outnames = {}
 
 
+    def _amberConfig(self):
+        # AMBER specific fixes
+        if self.structure.endswith('.prmtop'):
+            if self.parmfile is None:
+                self.parmfile = self.parameters
+            self.parameters = None
+
+
     def load(self, path='.'):
         """ Loads all files required to run a simulation and apply eventually configured protocols to it
 
@@ -150,6 +158,7 @@ class _Acemd(ProtocolInterface):
         for cmd in self._defaultfnames.keys():
             if cmd in self.__dict__ and self.__dict__[cmd] is not None:
                 found = False
+
                 for fname in ensurelist(self.__dict__[cmd]):
                     fpath = os.path.join(path, fname)
                     if not os.path.exists(fpath):
@@ -169,6 +178,10 @@ class _Acemd(ProtocolInterface):
                     break
                 if not found:
                     raise RuntimeError('Could not find any of the files "{}" specified for command "{}" in path {}'.format(self.__dict__[cmd], cmd, path))
+
+        self._amberConfig()  # Change stuff for AMBER
+        if self._version == 3 and self.thermostattemp is None:
+            self.thermostattemp = self.temperature
 
 
     def save(self, path, overwrite=False):
@@ -589,20 +602,6 @@ class Acemd3(_Acemd):
             else:
                 setattr(self, key, config[key]['value'])
 
-    def _amberConfig(self):
-        # AMBER specific fixes
-        if self.structure.endswith('.prmtop') and self.parmfile is None:
-            self.parmfile = self.parameters
-            self.parameters = None
-
-    def load(self, path='.'):
-        super().load(path)
-
-        # Simplifications for ACEMD3
-        self._amberConfig()
-        if self.thermostattemp is None:
-            self.thermostattemp = self.temperature
-
     def write(self, inputdir='.', outputdir='run', overwrite=False):
         # if self.adaptive:
         #     self.binvelocities = None
@@ -748,7 +747,7 @@ run                     1000
         pdbid = '3PTB'
 
         prod = Acemd3('production')
-        prod.run = '1000'
+        prod.run = '2000'
         prod.trajectoryfreq = 200
         prod.temperature = 300
         prod.write(home(dataDir=os.path.join('test-acemd', pdbid, 'equil_out')), tmpdir)
@@ -777,7 +776,7 @@ run                     1000
         mol = Molecule(os.path.join(builddir, 'structure.pdb'))
         celldim = mol.coords.max(axis=0) - mol.coords.min(axis=0)
         equil.celldimension = ' '.join(['{:3.1f}'.format(val) for val in celldim.squeeze()])
-        equil.run = '1000'
+        equil.run = '2000'
         equil.trajectoryfreq = 200
         equil.temperature = 300
 
