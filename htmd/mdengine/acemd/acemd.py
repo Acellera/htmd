@@ -181,6 +181,9 @@ class _Acemd(ProtocolInterface):
         overwrite : bool
             Overwrite output directory if it exists.
         """
+        if self.run is None:
+            raise RuntimeError('You need to define a runtime with the "run" command.')
+
         if os.path.exists(path):
             if overwrite:
                 import shutil
@@ -704,7 +707,9 @@ class TestAcemd(TestCase):
         acemd.parameters = 'par_all22_prot.inp'
         acemd.coordinates = '5dhfr_cube.pdb'
         acemd.restraints = r
+        acemd.run = '1000'
         acemd.setup(homedir + '/data/dhfr', '/tmp/testdir', overwrite=True)
+
         print(acemd)
 
         expected_result = """
@@ -717,6 +722,7 @@ groupRestraint          "resname MOL" fbcentre "4 2 7.3" axes z width "5" setpoi
 groupRestraint          "resname MOL" fbcentresel "protein" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
 atomRestraint           "name CA" axes xyz width "0.1" setpoints 10@10ns 5@15ns 0@20ns
 atomRestraint           "name CA" axes xyz width "0.1 0.5 3" setpoints 10@10ns 5@15ns 0@20ns
+run                     1000
 """
         with open('/tmp/testdir/input', 'r') as f:
             lines = '\n'.join(f.readlines())
@@ -725,7 +731,7 @@ atomRestraint           "name CA" axes xyz width "0.1 0.5 3" setpoints 10@10ns 5
         lines = re.sub('\s+', ' ', lines)
         expected_result = re.sub('\s+', ' ', expected_result)
 
-        assert expected_result.strip() == lines.strip()
+        self.assertTrue(expected_result.strip() == lines.strip(), 'Expected:\n{}\nGot:\n{}'.format(expected_result.strip(), lines.strip()))
 
     def test_acemd3production(self):
         from htmd.home import home
@@ -737,8 +743,10 @@ atomRestraint           "name CA" axes xyz width "0.1 0.5 3" setpoints 10@10ns 5
         pdbid = '3PTB'
 
         prod = Acemd3('production')
+        prod.run = '1000'
+        prod.trajectoryfreq = 200
         prod.write(home(dataDir=os.path.join('test-acemd', pdbid, 'equil_out')), tmpdir)
-
+        print(tmpdir)
         # Compare with reference
         refdir = home(dataDir=os.path.join('test-acemd', pdbid, 'prod'))
         files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
@@ -753,12 +761,20 @@ atomRestraint           "name CA" axes xyz width "0.1 0.5 3" setpoints 10@10ns 5
         import filecmp
         from htmd.util import tempname
         from glob import glob
+        from htmd.molecule.molecule import Molecule
 
         tmpdir = tempname()
         pdbid = '3PTB'
+        builddir = home(dataDir=os.path.join('test-acemd', pdbid, 'build'))
 
-        prod = Acemd3('equilibration')
-        prod.write(home(dataDir=os.path.join('test-acemd', pdbid, 'build')), tmpdir)
+        equil = Acemd3('equilibration')
+        mol = Molecule(os.path.join(builddir, 'structure.pdb'))
+        celldim = mol.coords.max(axis=0) - mol.coords.min(axis=0)
+        equil.celldimension = ' '.join(map(str, celldim.squeeze()))
+        equil.run = '1000'
+        equil.trajectoryfreq = 200
+
+        equil.write(builddir, tmpdir)
 
         # Compare with reference
         refdir = home(dataDir=os.path.join('test-acemd', pdbid, 'equil'))
