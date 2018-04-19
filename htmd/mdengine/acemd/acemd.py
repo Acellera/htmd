@@ -770,7 +770,7 @@ run                     1000
         equil = Acemd3('equilibration')
         mol = Molecule(os.path.join(builddir, 'structure.pdb'))
         celldim = mol.coords.max(axis=0) - mol.coords.min(axis=0)
-        equil.celldimension = ' '.join(map(str, celldim.squeeze()))
+        equil.celldimension = ' '.join(['{:3.1f}'.format(val) for val in celldim.squeeze()])
         equil.run = '1000'
         equil.trajectoryfreq = 200
 
