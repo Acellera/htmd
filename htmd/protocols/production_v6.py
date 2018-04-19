@@ -369,7 +369,6 @@ class ProductionAcemd3(ProtocolInterface):
         from htmd.units import convert
         numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
         self.acemd.temperature = self.temperature
-        self.acemd.langevintemp = self.temperature
         self.acemd.thermostattemp = self.temperature
         self.acemd.run = str(numsteps)
         self.acemd.restraints = self.restraints
@@ -408,14 +407,23 @@ if __name__ == "__main__":
             raise RuntimeError('Different results produced by Equilibration.write for '
                                'test {} between {} and {} in files {}.'.format(pdbid, refdir, tmpdir, mismatch))
 
-    # from htmd.protocols.production_v5 import ProductionAcemd3, GroupRestraint, AtomRestraint
-    r = list()
-    r.append(GroupRestraint('segid P2', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z'))
-    r.append(AtomRestraint('segid P1 and name CA', 0.1, [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
 
-    p = ProductionAcemd3()
-    p.runtime = 50
-    p.timeunits = 'ns'
-    p.temperature = 290
-    p.restraints = r
-    # p.write('/workspace5/pablo/bound_KIX_cMYB/2_equil/2-gen/', '/tmp/testdir/')
+    r = list()
+    r.append(GroupRestraint('resname MOL', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z'))
+    r.append(GroupRestraint('resname MOL', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z', fbcentre=[4, 2, 7.3]))
+    r.append(GroupRestraint('resname MOL', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z', fbcentresel='protein'))
+    r.append(AtomRestraint('name CA', 0.1, [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
+    r.append(AtomRestraint('name CA', [0.1, 0.5, 3], [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
+
+    prod = ProductionAcemd3()
+    prod.runtime = 1000
+    prod.acemd.trajectoryfreq = 200
+    prod.write(home(dataDir=os.path.join('test-acemd', pdbid, 'equil_out')), tmpdir)
+    # Compare with reference
+    refdir = home(dataDir=os.path.join('test-acemd', pdbid, 'prod'))
+    files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
+    match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
+
+    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+        raise RuntimeError('Different results produced by Acemd3 production for '
+                           'test {} between {} and {} in files {}.'.format(pdbid, refdir, tmpdir, mismatch))
