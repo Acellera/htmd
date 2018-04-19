@@ -51,7 +51,7 @@ class Production(OldProtocolInterface):
     '''
     def __init__(self):
         super().__init__()
-        self._cmdObject('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Acemd)
+        self._cmdObject('acemd', ':class:`Acemd2 <htmd.mdengine.acemd.acemd.Acemd2>` object', 'MD engine', None, Acemd2)
         self._cmdValue('runtime', 'float', 'Running time of the simulation.', 0, TYPE_FLOAT, RANGE_0POS)
         self._cmdString('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps')
         self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
@@ -294,7 +294,7 @@ class ProductionAcemd3(ProtocolInterface):
     '''
     def __init__(self):
         super().__init__()
-        self._arg('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, val.Object(Acemd3))
+        self._arg('acemd', ':class:`Acemd3 <htmd.mdengine.acemd.acemd.Acemd3>` object', 'MD engine', None, val.Object(Acemd3))
         self._arg('runtime', 'float', 'Running time of the simulation.', 0, val.Number(float, '0POS'))
         self._arg('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps', val.String())
         self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, val.Number(float, 'ANY'))
