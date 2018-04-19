@@ -416,7 +416,7 @@ if __name__ == "__main__":
     r.append(AtomRestraint('name CA', [0.1, 0.5, 3], [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
 
     prod = ProductionAcemd3()
-    prod.runtime = 1000
+    prod.runtime = 2000
     prod.acemd.trajectoryfreq = 200
     prod.write(home(dataDir=os.path.join('test-acemd', pdbid, 'equil_out')), tmpdir)
     # Compare with reference
