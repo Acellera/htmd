@@ -72,6 +72,7 @@ class SmallMol:
             name_sufix = os.path.splitext(mol)[-1]
             if name_sufix == ".mol2":
                 self._mol = Chem.MolFromMol2File(mol)
+
             elif name_sufix == ".pdb":
                 self._mol = Chem.MolFromPDBFile(mol)
 
