@@ -267,7 +267,7 @@ class Kinetics(object):
     def mfptGraph(self):
         """ Not yet implemented
         """
-        import pyemma.plots as mplt
+        import htmd.pyemma.plots as mplt
         self._intergrityCheck()
         #pos = np.array([[3,3],[4.25,0],[0,1],[1.75,0],[6,1.0]])
         #state_colors = ['green', 'blue', 'yellow', 'cyan', 'purple']
@@ -289,8 +289,8 @@ class Kinetics(object):
             Fraction of fluxes for which to report pathways. Doesn't change the plot, only the text output.
         """
         # Make mode a radio button with interactive plot
-        from pyemma import msm
-        from pyemma.plots import plot_flux
+        from htmd.pyemma import msm
+        from htmd.pyemma.plots import plot_flux
         from matplotlib import pylab as plt
         self._intergrityCheck()
 

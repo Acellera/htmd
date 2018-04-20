@@ -230,7 +230,7 @@ class AdaptiveMD(AdaptiveBase):
             logger.warning('Using less macrostates than requested due to lack of microstates. macronum = ' + str(macronum))
 
         # Calculating how many timescales are above the lag time to limit number of macrostates
-        from pyemma.msm import timescales_msm
+        from htmd.pyemma.msm import timescales_msm
         timesc = timescales_msm(data.St.tolist(), lags=self.lag, nits=macronum).get_timescales()
         macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
         return macronum

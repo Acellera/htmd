@@ -56,7 +56,7 @@ class TICA(object):
     """
 
     def __init__(self, data, lag, units='frames', dimensions=None):
-        from pyemma.coordinates.transform.tica import TICA as TICApyemma
+        from htmd.pyemma.coordinates.transform.tica import TICA as TICApyemma
         from tqdm import tqdm
 
         self.data = data
