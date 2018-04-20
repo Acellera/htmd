@@ -1835,7 +1835,7 @@ class Representations:
     >>> mol = tryp.copy()
     >>> mol.reps.add('protein', 'NewCartoon')
     >>> print(mol.reps)                     # doctest: +NORMALIZE_WHITESPACE
-    rep 0: sel='protein', style='NewCartoon', color='Name'
+    rep 0: sel='protein', style='NewCartoon', color='Name', material='Opaque'
     >>> mol.view() # doctest: +SKIP
     >>> mol.reps.remove() # doctest: +SKIP
     """
@@ -1850,7 +1850,7 @@ class Representations:
             raise NameError('You can only append Representations objects.')
         self.replist += reps.replist
 
-    def add(self, sel=None, style=None, color=None):
+    def add(self, sel=None, style=None, color=None, material=None, selupdate=False):
         """ Adds a new representation for Molecule.
 
         Parameters
@@ -1863,8 +1863,12 @@ class Representations:
         color : str or int
             Coloring mode (str) or ColorID (int).
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node85.html>`__.
+        material: str
+            Material mode (VMD only).
+        seluodate; bool
+            Set as True for updating the selection at each frame (VMD only)
         """
-        self.replist.append(_Representation(sel, style, color))
+        self.replist.append(_Representation(sel, style, color, material, selupdate))
 
     def remove(self, index=None):
         """ Removed one or all representations.
@@ -1887,7 +1891,7 @@ class Representations:
     def __str__(self):
         s = ''
         for i, r in enumerate(self.replist):
-            s += ('rep {}: sel=\'{}\', style=\'{}\', color=\'{}\'\n'.format(i, r.sel, r.style, r.color))
+            s += ('rep {}: sel=\'{}\', style=\'{}\', color=\'{}\', material=\'{}\'\n'.format(i, r.sel, r.style, r.color, r.material))
         return s
 
     def _translateNGL(self, rep):
@@ -1917,19 +1921,21 @@ class Representations:
         colortrans = {'secondary structure': 'Structure'}
         if len(self.replist) > 0:
             viewer.send('mol delrep 0 top')
-            for rep in self.replist:
+            for n, rep in enumerate(self.replist):
                 if isinstance(rep.color, str) and rep.color.lower() in colortrans:
                     color = colortrans[rep.color.lower()]
                 else:
                     color = rep.color
                 viewer.send('mol selection {}'.format(rep.sel))
                 viewer.send('mol representation {}'.format(rep.style))
+                viewer.send('mol material {}'.format(rep.material))
                 if isinstance(rep.color, str) and not rep.color.isnumeric():
                     viewer.send('mol color {}'.format(color))
                 else:
                     viewer.send('mol color ColorID {}'.format(color))
 
                 viewer.send('mol addrep top')
+                viewer.send('mol selupdate {} top {}'.format(n, rep.selupdate))
 
     def _repsNGL(self, viewer):
         if len(self.replist) > 0:
@@ -1963,7 +1969,7 @@ class _Representation:
     >>> r = _Representation(sel='ions', style='VDW', color=1)
     """
 
-    def __init__(self, sel=None, style=None, color=None):
+    def __init__(self, sel=None, style=None, color=None, material=None, selupdate=False):
         if sel is not None:
             self.sel = sel
         else:
@@ -1976,7 +1982,11 @@ class _Representation:
             self.color = color
         else:
             self.color = 'Name'
-
+        if material is not None:
+            self.material = material
+        else:
+            self.material = 'Opaque'
+        self.selupdate = selupdate
 
 class TestMolecule(TestCase):
     def test_trajReadingAppending(self):
