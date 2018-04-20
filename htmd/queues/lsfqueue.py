@@ -7,9 +7,10 @@ import os
 import shutil
 import random
 import string
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, CalledProcessError, DEVNULL
 from protocolinterface import ProtocolInterface, val
 from htmd.queues.simqueue import SimQueue
+from htmd.util import ensurelist
 from htmd.config import _config
 import yaml
 import logging
@@ -259,30 +260,33 @@ class LsfQueue(SimQueue, ProtocolInterface):
         if self.jobname is None:
             raise ValueError('The jobname needs to be defined.')
         user = getpass.getuser()
-        cmd = [self._qstatus, '-J', self.jobname, '-u', user, '-q', self.queue]
-        logger.debug(cmd)
+        l_total = 0
+        for q in ensurelist(self.queue):
+            cmd = [self._qstatus, '-J', self.jobname, '-u', user, '-q', q]
+            logger.debug(cmd)
 
-        # This command randomly fails so I need to allow it to repeat or it crashes adaptive
-        tries = 0
-        while tries < 3:
-            try:
-                ret = check_output(cmd)
-            except CalledProcessError:
-                if tries == 2:
-                    raise
-                tries += 1
-                time.sleep(3)
-                continue
-            break
+            # This command randomly fails so I need to allow it to repeat or it crashes adaptive
+            tries = 0
+            while tries < 3:
+                try:
+                    ret = check_output(cmd, stderr=DEVNULL)
+                except CalledProcessError:
+                    if tries == 2:
+                        raise
+                    tries += 1
+                    time.sleep(3)
+                    continue
+                break
 
-        logger.debug(ret.decode("ascii"))
+            logger.debug(ret.decode("ascii"))
 
-        # TODO: check lines and handle errors
-        l = ret.decode("ascii").split("\n")
-        l = len(l) - 2
-        if l < 0:
-            l = 0  # something odd happened
-        return l
+            # TODO: check lines and handle errors
+            l = ret.decode("ascii").split("\n")
+            l = len(l) - 2
+            if l < 0:
+                l = 0  # something odd happened
+            l_total += l
+        return l_total
 
     def stop(self):
         """ Cancels all currently running and queued jobs
@@ -291,10 +295,11 @@ class LsfQueue(SimQueue, ProtocolInterface):
         if self.queue is None:
             raise ValueError('The queue needs to be defined.')
         user = getpass.getuser()
-        cmd = [self._qcancel, '-J', self.jobname, '-u', user, '-q', self.queue]
-        logger.debug(cmd)
-        ret = check_output(cmd)
-        logger.debug(ret.decode("ascii"))
+        for q in ensurelist(self.queue):
+            cmd = [self._qcancel, '-J', self.jobname, '-u', user, '-q', q]
+            logger.debug(cmd)
+            ret = check_output(cmd, stderr=DEVNULL)
+            logger.debug(ret.decode("ascii"))
 
     @property
     def ncpu(self):
