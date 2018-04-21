@@ -71,7 +71,12 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
 
 # from matplotlib import pylab as plt
 # ----------------------------
+import warnings
 
+# Get rid of pyemma version warnings
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore', category=UserWarning)
+    from pyemma import coordinates
 
 
 
