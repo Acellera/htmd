@@ -219,6 +219,7 @@ def MOL2read(filename, frame=None, topoloc=None):
 
     # TODO: Error on bad format (using pandas?)
     natoms = end - start + 1
+    unguessed = []
     for i in range(natoms):
         s = l[i + start].strip().split()
         topo.record.append("HETATM")
@@ -236,9 +237,12 @@ def MOL2read(filename, frame=None, topoloc=None):
         if element in element_symbols:
             topo.element.append(element)
         else:
-            logger.warning('Element of atom ID {} could not be automatically guessed from its '
-                           'MOL2 atomtype ({}).'.format(int(s[0]), s[5]))
+            unguessed.append(s[5])
             topo.element.append('')
+    if len(unguessed) != 0:
+        logger.warning('Could not guess elements for {} atoms with MOL2 atomtypes '
+                       '({}).'.format(len(unguessed), ', '.join(np.unique(unguessed))))
+
     if bond:
         for i in range(bond, len(l)):
             b = l[i].split()
