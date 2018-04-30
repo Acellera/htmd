@@ -749,13 +749,13 @@ class MetricData:
             self.parent = MetricData()
             self.parent.load(vardict['parent'].__dict__)
 
-    def _defaultLags(self):
+    def _defaultLags(self, npoints):
         from scipy import stats
         modelen = stats.mode(self.trajLengths).mode - 1  # -1 to avoid warnings in timescales calc
         if modelen > 20:
-            lags = np.append(1, np.round(np.linspace(10, modelen, 25)))
+            lags = np.append(1, np.round(np.linspace(10, modelen, npoints)))
         else:
-            lags = np.append(1, np.round(np.linspace(2, modelen, 25)))
+            lags = np.append(1, np.round(np.linspace(2, modelen, npoints)))
         return lags.astype(int)
 
     def _contourPlot(self, x, y, z=None, resolution=100, levels=100, logplot=False, cmap=None, title=None, xlabel=None, ylabel=None):

@@ -217,14 +217,14 @@ class Model(object):
         macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
         return macro_ofcluster
 
-    def plotTimescales(self, lags=None, units='frames', errors=None, nits=None, results=False, plot=True, save=None):
+    def plotTimescales(self, lags=25, units='frames', errors=None, nits=None, results=False, plot=True, save=None):
         """ Plot the implied timescales of MSMs of various lag times
 
         Parameters
         ----------
         lags : list
-            The lag times at which to compute the timescales. By default it spreads out 25 lag times linearly from lag
-            10 until the mode length of the trajectories.
+            The lag times at which to compute the timescales. If lags is an integer it will use np.linspace to place
+            that many lag times between frames [10, mode] where mode is the mode length of the trajectories.
         units : str
             The units of lag. Can be 'frames' or any time unit given as a string.
         errors : errors
@@ -255,8 +255,8 @@ class Model(object):
         import pyemma.plots as mplt
         import pyemma.msm as msm
         self._integrityCheck()
-        if lags is None:
-            lags = self._defaultLags()
+        if isinstance(lags, int):
+            lags = self.data.defaultLags(lags)
         else:
             lags = unitconvert(units, 'frames', lags, fstep=self.data.fstep).tolist()
 
@@ -319,9 +319,6 @@ class Model(object):
             else:
                 lagidx = i
         return lags[lagidx], itime
-
-    def _defaultLags(self):
-        return self.data._defaultLags()
 
     def sampleStates(self, states=None, frames=20, statetype='macro', replacement=False, samplemode='random', allframes=False):
         """ Samples frames from a set of states
