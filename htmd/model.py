@@ -833,7 +833,7 @@ class Model(object):
 
         return Model(newdata)
 
-    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, countscmap=None, statescmap=None, plot=True, save=None, data=None):
+    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, fescmap=None, statescmap=None, plot=True, save=None, data=None):
         """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
         Parameters
@@ -850,8 +850,8 @@ class Model(object):
             Marker size for states.
         cmap :
             Control both countscmap and statecmap
-        countscmap :
-            Matplotlib colormap for the counts
+        fescmap :
+            Matplotlib colormap for the free energy surface
         statescmap:
             Matplotlib colormap for the states
         plot : bool
@@ -875,12 +875,12 @@ class Model(object):
                 raise RuntimeError('The data argument you provided uses a different simlist than the Model.')
             microcenters = np.vstack(getStateStatistic(self, data, range(self.micronum), statetype='micro'))
 
-        if countscmap is None:
-            countscmap = plt.cm.jet
+        if fescmap is None:
+            fescmap = plt.cm.jet
         if statescmap is None:
             statescmap = plt.cm.jet
         if cmap is not None:
-            countscmap = cmap
+            fescmap = cmap
             statescmap = cmap
 
         if data.description is not None:
@@ -894,7 +894,7 @@ class Model(object):
         title = 'Free energy surface'
 
         energy = -Kinetics._kB * temperature * np.log(self.msm.stationary_distribution)
-        f, ax, cf = data._contourPlot(microcenters[:, dimX], microcenters[:, dimY], energy, cmap=countscmap, xlabel=xlabel, ylabel=ylabel, title=title)
+        f, ax, cf = data._contourPlot(microcenters[:, dimX], microcenters[:, dimY], energy, cmap=fescmap, xlabel=xlabel, ylabel=ylabel, title=title)
         data._setColorbar(f, cf, 'kcal/mol', scientific=False)
         if states:
             colors = statescmap(np.linspace(0, 1, self.macronum))
