@@ -833,7 +833,7 @@ class Model(object):
 
         return Model(newdata)
 
-    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, countscmap=None, statecmap=None, plot=True, save=None, data=None):
+    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, countscmap=None, statescmap=None, plot=True, save=None, data=None):
         """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
         Parameters
@@ -852,7 +852,7 @@ class Model(object):
             Control both countscmap and statecmap
         countscmap :
             Matplotlib colormap for the counts
-        statecmap:
+        statescmap:
             Matplotlib colormap for the states
         plot : bool
             If the method should display the plot of the FES
@@ -877,12 +877,12 @@ class Model(object):
 
         if countscmap is None:
             countscmap = plt.cm.jet
-        if statecmap is None:
-            statecmap = plt.cm.jet
+        if statescmap is None:
+            statescmap = plt.cm.jet
         if cmap is not None:
             countscmap = cmap
-            statecmap = cmap
-            
+            statescmap = cmap
+
         if data.description is not None:
             xlabel = data.description.description[dimX]
         else:
@@ -897,7 +897,7 @@ class Model(object):
         f, ax, cf = data._contourPlot(microcenters[:, dimX], microcenters[:, dimY], energy, cmap=countscmap, xlabel=xlabel, ylabel=ylabel, title=title)
         data._setColorbar(f, cf, 'kcal/mol', scientific=False)
         if states:
-            colors = statecmap(np.linspace(0, 1, self.macronum))
+            colors = statescmap(np.linspace(0, 1, self.macronum))
             for m in range(self.macronum):
                 macromicro = microcenters[self.macro_ofmicro == m, :]
                 _ = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, c=colors[m], label='Macro {}'.format(m), edgecolors='none')
