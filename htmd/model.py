@@ -849,7 +849,7 @@ class Model(object):
         s : float
             Marker size for states.
         cmap :
-            Control both countscmap and statecmap
+            Sets the Matplotlib colormap for both `fescmap` and `statescmap`
         fescmap :
             Matplotlib colormap for the free energy surface
         statescmap:
@@ -862,6 +862,13 @@ class Model(object):
             Optionally you can pass a different MetricData object than the one used to build the model. For example
             if the user wants to build a model on distances but wants to plot the FES on top of RMSD values. The
             MetricData object needs to have the same simlist as the Model.
+
+        Examples
+        --------
+        >>> import matplotlib as plt
+        >>> model.plotFES(0, 1, 300)
+        >>> model.plotFES(2, 3, 300, data=otherdata, states='macro', fescmap=plt.cm.gray)
+        >>> model.plotFES(0, 2, 300, states='cluster', cmap=plt.cm.jet)
         """
         self._integrityCheck(postmsm=True)
         from matplotlib import pylab as plt
