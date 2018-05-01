@@ -443,10 +443,10 @@ class Model(object):
             from matplotlib import pylab as plt
             plt.ion()
             plt.figure()
-            plt.bar(range(self.macronum), macroeq)
+            plt.bar(np.arange(self.macronum)+0.4, macroeq)
             plt.ylabel('Equilibrium probability')
             plt.xlabel('Macrostates')
-            plt.xticks(np.arange(0.4, self.macronum+0.4, 1), range(self.macronum))
+            plt.xticks(np.arange(self.macronum)+0.4, range(self.macronum))
             if save is not None:
                 plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
             if plot:
