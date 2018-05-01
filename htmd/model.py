@@ -217,14 +217,20 @@ class Model(object):
         macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
         return macro_ofcluster
 
-    def plotTimescales(self, lags=None, units='frames', errors=None, nits=None, results=False, plot=True, save=None):
+    def plotTimescales(self, lags=None, minlag=None, maxlag=None, numlags=25, units='frames', errors=None, nits=None,
+                       results=False, plot=True, save=None):
         """ Plot the implied timescales of MSMs of various lag times
 
         Parameters
         ----------
         lags : list
-            The lag times at which to compute the timescales. By default it spreads out 25 lag times linearly from lag
-            10 until the mode length of the trajectories.
+            Specify explicitly at which lag times to compute the timescales.
+        minlag: float
+            The minimum lag time for the timescales. Used in combination with `maxlag` and `numlags`.
+        maxlag: float
+            The maximum lag time for the timescales. If None will default to the mode length of the trajectories.
+        numlags: int
+            The number of points to place between `minlag` and `maxlag`.
         units : str
             The units of lag. Can be 'frames' or any time unit given as a string.
         errors : errors
@@ -251,12 +257,13 @@ class Model(object):
         >>> model = Model(data)
         >>> model.plotTimescales()
         >>> model.plotTimescales(lags=list(range(1,100,5)))
+        >>> model.plotTimescales(minlag=0.1, maxlag=20, numlags=25, units='ns')
         """
         import pyemma.plots as mplt
         import pyemma.msm as msm
         self._integrityCheck()
         if lags is None:
-            lags = self._defaultLags()
+            lags = self.data._defaultLags(minlag, maxlag, numlags, units)
         else:
             lags = unitconvert(units, 'frames', lags, fstep=self.data.fstep).tolist()
 
@@ -319,9 +326,6 @@ class Model(object):
             else:
                 lagidx = i
         return lags[lagidx], itime
-
-    def _defaultLags(self):
-        return self.data._defaultLags()
 
     def sampleStates(self, states=None, frames=20, statetype='macro', replacement=False, samplemode='random', allframes=False):
         """ Samples frames from a set of states
