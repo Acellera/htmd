@@ -263,7 +263,7 @@ class Model(object):
         import pyemma.msm as msm
         self._integrityCheck()
         if lags is None:
-            lags = self.data.defaultLags(minlag, maxlag, numlags, units)
+            lags = self.data._defaultLags(minlag, maxlag, numlags, units)
         else:
             lags = unitconvert(units, 'frames', lags, fstep=self.data.fstep).tolist()
 
