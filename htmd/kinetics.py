@@ -254,10 +254,10 @@ class Kinetics(object):
     def _plotRate(self, rate, ylabel, log=False, lim1=False):
         import matplotlib.pyplot as plt
         plt.figure()
-        plt.bar(range(self.model.macronum), rate)
+        plt.bar(np.arange(self.model.macronum)+0.4, rate)
         plt.ylabel(ylabel)
         plt.xlabel('Macrostates')
-        plt.xticks(np.arange(0.4, self.model.macronum+0.4, 1), range(self.model.macronum))
+        plt.xticks(np.arange(self.model.macronum)+0.4, range(self.model.macronum))
         if log:
             plt.yscale('log')
         if lim1:
