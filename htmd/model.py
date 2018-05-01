@@ -867,8 +867,7 @@ class Model(object):
         --------
         >>> import matplotlib as plt
         >>> model.plotFES(0, 1, 300)
-        >>> model.plotFES(2, 3, 300, data=otherdata, states='macro', fescmap=plt.cm.gray)
-        >>> model.plotFES(0, 2, 300, states='cluster', cmap=plt.cm.jet)
+        >>> model.plotFES(2, 3, 300, data=otherdata, states=True, fescmap=plt.cm.gray)
         """
         self._integrityCheck(postmsm=True)
         from matplotlib import pylab as plt
