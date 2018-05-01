@@ -749,14 +749,23 @@ class MetricData:
             self.parent = MetricData()
             self.parent.load(vardict['parent'].__dict__)
 
-    def _defaultLags(self, npoints):
-        from scipy import stats
-        modelen = stats.mode(self.trajLengths).mode - 1  # -1 to avoid warnings in timescales calc
-        if modelen > 20:
-            lags = np.append(1, np.round(np.linspace(10, modelen, npoints)))
+    def _defaultLags(self, minlag=None, maxlag=None, numlags=None, units='frames'):
+        from htmd.units import convert as unitconvert
+        if maxlag is None:
+            from scipy import stats
+            maxlag = stats.mode(self.trajLengths).mode - 1  # -1 to avoid warnings in timescales calc
         else:
-            lags = np.append(1, np.round(np.linspace(2, modelen, npoints)))
-        return lags.astype(int)
+            maxlag = unitconvert(units, 'frames', maxlag, fstep=self.fstep)
+
+        if minlag is None:
+            if maxlag > 20:
+                minlag = 10
+            else:
+                minlag = 2
+        else:
+            minlag = unitconvert(units, 'frames', minlag, fstep=self.fstep)
+
+        return np.append(1, np.round(np.linspace(minlag, maxlag, numlags))).astype(int)
 
     def _contourPlot(self, x, y, z=None, resolution=100, levels=100, logplot=False, cmap=None, title=None, xlabel=None, ylabel=None):
         """ Plots a contour plot.
