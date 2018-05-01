@@ -575,6 +575,9 @@ class Model(object):
         from htmd.config import _config
         self._integrityCheck(postmsm=(statetype != 'cluster'))
 
+        if protein is None and ligand is None:
+            raise RuntimeError('You need to specify either the `protein` of `ligand` arguments for state visualization.')
+
         if _config['viewer'].lower() == 'ngl' or _config['viewer'].lower() == 'webgl':
             return self._viewStatesNGL(states, statetype, protein, ligand, mols, numsamples, gui=gui)
 
