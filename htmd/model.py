@@ -1106,8 +1106,10 @@ def _macroTrajectoriesReport(macronum, macrost, simlist=None):
     logger.info(macrotrajnum)
 
     for m in range(macronum):
-        if macrotrajnum[m] <= 3:
-            logger.info('Take care! Macro {} has been visited only in {} trajectories:'.format(m, macrotrajnum[m]))
+        ratio = macrotrajnum[m] / len(macrost)
+        if macrotrajnum[m] <= 3 and ratio <= 0.2:
+            logger.info('Take care! Macro {} has been visited only in {} trajectories'
+                        ' ({:.1f}% of total):'.format(m, macrotrajnum[m], ratio*100))
             if simlist is not None:
                 for s in macrotraj[m]:
                     logger.info(simlist[s])
