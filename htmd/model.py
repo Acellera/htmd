@@ -924,7 +924,7 @@ def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
     return mol
 
 
-def getStateStatistic(model, data, states, statetype='macro', weighted=False, method=np.mean, axis=0, existing=False, target=None):
+def getStateStatistic(reference, data, states, statetype='macro', weighted=False, method=np.mean, axis=0, existing=False, target=None):
     """ Calculates properties of the states.
 
     Calculates properties of data corresponding to states. Can calculate for example the mean distances of atoms in a
@@ -932,8 +932,8 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
 
     Parameters
     ----------
-    model : :class:`Model` object
-        A model containing the state definitions
+    reference : :class:`Model` object or :class:`MetricData` object
+        A model containing the state definitions or a MetricData object containing cluster definitions
     data : :class:`MetricData` object
         A projection corresponding to the conformations in the states of the model. The data and the model need to share
         the same `simlist`
@@ -966,26 +966,37 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
     >>> # Get the standard deviation of distances in all macrostates
     >>> getStateStatistic(model, data, list(range(5)), method=np.std)
     """
+    from htmd.metricdata import MetricData
     if axis != 0:
         logger.warning('Axis different than 0 might not work correctly yet')
-    if model.data.numTrajectories > 0 and np.any(model.data.trajLengths != data.trajLengths):
+
+    if isinstance(reference, Model):
+        refdata = reference.data
+    elif isinstance(reference, MetricData):
+        refdata = reference
+        if statetype != 'cluster':
+            raise RuntimeError('You can only use statetype cluster with reference MetricData object. To use other statetypes build a Model.')
+    else:
+        raise RuntimeError('Invalid argument type')
+
+    if refdata.numTrajectories > 0 and np.any(refdata.trajLengths != data.trajLengths):
         raise NameError('Data trajectories need to match in size and number to the trajectories in the model')
-    stconcat = np.concatenate(model.data.St)
+    stconcat = np.concatenate(refdata.St)
     datconcat = np.concatenate(data.dat)
 
     statistic = []
     for i, st in enumerate(states):
         if statetype == 'macro':
-            frames = model.macro_ofcluster[stconcat] == st
+            frames = reference.macro_ofcluster[stconcat] == st
         elif statetype == 'micro':
-            frames = model.micro_ofcluster[stconcat] == st
+            frames = reference.micro_ofcluster[stconcat] == st
         elif statetype == 'cluster':
             frames = stconcat == st
         else:
             raise NameError('No valid state type given (read documentation)')
 
         if statetype == 'macro' and weighted:
-            statistic.append(_weightedMethod(model, method, stconcat, datconcat, st, axis))
+            statistic.append(_weightedMethod(reference, method, stconcat, datconcat, st, axis))
         else:
             if axis is None:
                 statistic.append(method(datconcat[frames, ...]))
