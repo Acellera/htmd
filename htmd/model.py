@@ -840,7 +840,7 @@ class Model(object):
 
         return Model(newdata)
 
-    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, plot=True, save=None, data=None):
+    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, fescmap=None, statescmap=None, plot=True, save=None, data=None):
         """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
         Parameters
@@ -856,7 +856,11 @@ class Model(object):
         s : float
             Marker size for states.
         cmap :
-            Matplotlib colormap.
+            Sets the Matplotlib colormap for both `fescmap` and `statescmap`
+        fescmap :
+            Matplotlib colormap for the free energy surface
+        statescmap:
+            Matplotlib colormap for the states
         plot : bool
             If the method should display the plot of the FES
         save : str
@@ -865,6 +869,12 @@ class Model(object):
             Optionally you can pass a different MetricData object than the one used to build the model. For example
             if the user wants to build a model on distances but wants to plot the FES on top of RMSD values. The
             MetricData object needs to have the same simlist as the Model.
+
+        Examples
+        --------
+        >>> import matplotlib as plt
+        >>> model.plotFES(0, 1, 300)
+        >>> model.plotFES(2, 3, 300, data=otherdata, states=True, fescmap=plt.cm.gray)
         """
         self._integrityCheck(postmsm=True)
         from matplotlib import pylab as plt
@@ -874,13 +884,18 @@ class Model(object):
             data = self.data
             microcenters = self.data.Centers[self.cluster_ofmicro, :]
         else:
-
             if self.data.numFrames != data.numFrames or ~np.all([s1 == s2 for s1, s2 in zip(self.data.simlist, data.simlist)]):
                 raise RuntimeError('The data argument you provided uses a different simlist than the Model.')
             microcenters = np.vstack(getStateStatistic(self, data, range(self.micronum), statetype='micro'))
 
-        if cmap is None:
-            cmap = plt.cm.jet
+        if fescmap is None:
+            fescmap = plt.cm.autumn
+        if statescmap is None:
+            statescmap = plt.cm.nipy_spectral
+        if cmap is not None:
+            fescmap = cmap
+            statescmap = cmap
+
         if data.description is not None:
             xlabel = data.description.description[dimX]
         else:
@@ -892,10 +907,10 @@ class Model(object):
         title = 'Free energy surface'
 
         energy = -Kinetics._kB * temperature * np.log(self.msm.stationary_distribution)
-        f, ax, cf = data._contourPlot(microcenters[:, dimX], microcenters[:, dimY], energy, cmap=cmap, xlabel=xlabel, ylabel=ylabel, title=title)
+        f, ax, cf = data._contourPlot(microcenters[:, dimX], microcenters[:, dimY], energy, cmap=fescmap, xlabel=xlabel, ylabel=ylabel, title=title)
         data._setColorbar(f, cf, 'kcal/mol', scientific=False)
         if states:
-            colors = cmap(np.linspace(0, 1, self.macronum))
+            colors = statescmap(np.linspace(0, 1, self.macronum))
             for m in range(self.macronum):
                 macromicro = microcenters[self.macro_ofmicro == m, :]
                 _ = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, c=colors[m], label='Macro {}'.format(m), edgecolors='none')
@@ -931,7 +946,7 @@ def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
     return mol
 
 
-def getStateStatistic(model, data, states, statetype='macro', weighted=False, method=np.mean, axis=0, existing=False, target=None):
+def getStateStatistic(reference, data, states, statetype='macro', weighted=False, method=np.mean, axis=0, existing=False, target=None):
     """ Calculates properties of the states.
 
     Calculates properties of data corresponding to states. Can calculate for example the mean distances of atoms in a
@@ -939,8 +954,8 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
 
     Parameters
     ----------
-    model : :class:`Model` object
-        A model containing the state definitions
+    reference : :class:`Model` object or :class:`MetricData` object
+        A model containing the state definitions or a MetricData object containing cluster definitions
     data : :class:`MetricData` object
         A projection corresponding to the conformations in the states of the model. The data and the model need to share
         the same `simlist`
@@ -973,26 +988,37 @@ def getStateStatistic(model, data, states, statetype='macro', weighted=False, me
     >>> # Get the standard deviation of distances in all macrostates
     >>> getStateStatistic(model, data, list(range(5)), method=np.std)
     """
+    from htmd.metricdata import MetricData
     if axis != 0:
         logger.warning('Axis different than 0 might not work correctly yet')
-    if model.data.numTrajectories > 0 and np.any(model.data.trajLengths != data.trajLengths):
+
+    if isinstance(reference, Model):
+        refdata = reference.data
+    elif isinstance(reference, MetricData):
+        refdata = reference
+        if statetype != 'cluster':
+            raise RuntimeError('You can only use statetype cluster with reference MetricData object. To use other statetypes build a Model.')
+    else:
+        raise RuntimeError('Invalid argument type')
+
+    if refdata.numTrajectories > 0 and np.any(refdata.trajLengths != data.trajLengths):
         raise NameError('Data trajectories need to match in size and number to the trajectories in the model')
-    stconcat = np.concatenate(model.data.St)
+    stconcat = np.concatenate(refdata.St)
     datconcat = np.concatenate(data.dat)
 
     statistic = []
     for i, st in enumerate(states):
         if statetype == 'macro':
-            frames = model.macro_ofcluster[stconcat] == st
+            frames = reference.macro_ofcluster[stconcat] == st
         elif statetype == 'micro':
-            frames = model.micro_ofcluster[stconcat] == st
+            frames = reference.micro_ofcluster[stconcat] == st
         elif statetype == 'cluster':
             frames = stconcat == st
         else:
             raise NameError('No valid state type given (read documentation)')
 
         if statetype == 'macro' and weighted:
-            statistic.append(_weightedMethod(model, method, stconcat, datconcat, st, axis))
+            statistic.append(_weightedMethod(reference, method, stconcat, datconcat, st, axis))
         else:
             if axis is None:
                 statistic.append(method(datconcat[frames, ...]))

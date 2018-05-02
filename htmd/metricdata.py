@@ -889,20 +889,23 @@ class MetricData:
             centers = self.Centers
         else:
             from htmd.model import getStateStatistic
-            if self.numFrames != data.numFrames or ~np.all([s1 == s2 for s1, s2 in zip(self.data.simlist, data.simlist)]):
+            if self.numFrames != data.numFrames or ~np.all([s1 == s2 for s1, s2 in zip(self.simlist, data.simlist)]):
                 raise RuntimeError('The data argument you provided uses a different simlist than this object.')
             centers = np.vstack(getStateStatistic(self, data, range(self.K), statetype='cluster'))
 
         if cmap is None:
             cmap = plt.cm.jet
-        if self.description is not None:
-            xlabel = self.description.description[dimX]
+
+        if data.description is not None:
+            xlabel = data.description.description[dimX]
         else:
             xlabel = 'Dimension {}'.format(dimX)
-        if self.description is not None:
-            ylabel = self.description.description[dimY]
+
+        if data.description is not None:
+            ylabel = data.description.description[dimY]
         else:
             ylabel = 'Dimension {}'.format(dimY)
+
         title = 'Clusters plotted onto counts histogram'
         dc = np.concatenate(data.dat)
         f, ax, cf = self._contourPlot(dc[:, dimX], dc[:, dimY], resolution=resolution, xlabel=xlabel, ylabel=ylabel, title=title, logplot=logplot)
