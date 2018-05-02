@@ -217,7 +217,6 @@ class Builder:
         heavy_neighbors = sm.neighbors[attachToIdx]
         heavy_neighbors_num = len(heavy_neighbors)
         bondLength = pT.getBondRadius(heavy_element) + pT.getBondRadius(atom_element)
-
         dirVect = np.array([0,0,0])
         if heavy_neighbors_num == 1:
             dirVect[2] = 1
@@ -259,6 +258,9 @@ class Builder:
 
                 rot_matrix = _getRotationMatrix(perpVect, 60, deg=True)
                 dirVect = np.dot(rot_matrix, nbrVect)
+            elif heavy_hybridization == 2:
+                dirVect = nbrVect
+
 
         elif heavy_neighbors_num == 3:
             nbrs = self._filterNeighbors(attachToIdx, atomIdx)
