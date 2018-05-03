@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 import os
+import time
 import logging
 import unittest
 import numpy as np
@@ -322,10 +323,12 @@ class DihedralFitting:
 
         # Optimize the parameters
         logger.info('Start parameter optimization')
+        start = time.clock()
         # vector = self._optimize_CRS2_LM(vector)  # TODO this should work better, but it doesn't
         vector = self._optimize_random_search(vector)
+        finish = time.clock()
         logger.info('Final RMSD: %f kcal/mol' % self._objective(vector, None))
-        logger.info('Finished parameter optimization')
+        logger.info('Finished parameter optimization after %f s' % (finish-start))
 
         # Update the target dihedral with the optimized parameters
         self._vectorToParams(self.parameters, self._parameterizable_dihedral_atomtypes, vector)

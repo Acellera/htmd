@@ -145,8 +145,8 @@ class QMML(QMBase):
                 result.energy = float(calc.calculate(result.coords, self.molecule.element)[0])
                 result.dipole = self.molecule.getDipole()
 
-                if self.optimize:
-                    assert opt.last_optimum_value() == result.energy # A self-consistency test
+                #if self.optimize:
+                #    assert opt.last_optimum_value() == result.energy # A self-consistency test
 
                 finish = time.clock()
                 result.calculator_time = finish - start
