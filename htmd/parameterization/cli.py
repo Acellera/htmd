@@ -16,6 +16,7 @@ from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.qm import Psi4, Gaussian, FakeQM2
+from htmd.qm.custom import QMML
 from htmd.parameterization.fftype import FFTypeMethod, fftype
 from htmd.molecule.molecule import Molecule
 from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, \
@@ -42,7 +43,8 @@ def getArgumentParser():
                         help='Fix atomic charge during charge fitting (default: none)')
     parser.add_argument('-d', '--dihedral', nargs='+', default=[], metavar='A1-A2-A3-A4',
                         help='Select dihedral angle to parameterize (default: all parameterizable dihedral angles)')
-    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'], help='QM code (default: %(default)s)')
+    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian', 'QMML'],
+                        help='QM code (default: %(default)s)')
     parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP', 'wB97X-D'],
                         help='QM level of theory (default: %(default)s)')
     parser.add_argument('--basis', default='cc-pVDZ', choices=['6-31G*', '6-31+G*', '6-311G**', '6-311++G**', 'cc-pVDZ', 'aug-cc-pVDZ'],
@@ -166,6 +168,8 @@ def main_parameterize(arguments=None):
         qm = Psi4()
     elif args.code == 'Gaussian':
         qm = Gaussian()
+    elif args.code == 'QMML':
+        qm = QMML()
     else:
         raise NotImplementedError
 
