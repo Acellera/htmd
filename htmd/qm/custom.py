@@ -107,6 +107,7 @@ class QMML(QMBase):
             directory = os.path.join(self.directory, '%05d' % iframe)
             os.makedirs(directory, exist_ok=True)
             pickleFile = os.path.join(directory, 'data.pkl')
+            molFile = os.path.join(directory, 'mol.mol2')
 
             if self._completed(directory):
                 with open(pickleFile, 'rb') as fd:
@@ -141,6 +142,11 @@ class QMML(QMBase):
                     opt.set_initial_step(1e-3)
                     result.coords = opt.optimize(result.coords.ravel()).reshape((-1, 3, 1))
                     logger.info('Optimization status: %d' % opt.last_optimize_result())
+
+                    mol = self.molecule.copy()
+                    mol.frame = 0
+                    mol.coords = result.coords
+                    mol.write(molFile)
 
                 result.energy = float(calc.calculate(result.coords, self.molecule.element)[0])
                 result.dipole = self.molecule.getDipole()
