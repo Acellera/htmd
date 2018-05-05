@@ -9,10 +9,8 @@ written in Python. It provides a complete workspace for simulation-based discove
 aiming to solve the data generation and analysis problem as well as increase reproducibility.
 
 ## Licensing
-HTMD is free for non-profit organizations, like universities.
-
-A professional version of HTMD requires a license. Contact Acellera on 
-[www.acellera.com/contact](https://www.acellera.com/contact/) for a license.
+HTMD Community Edition is free to use for non-profit work. Contact Acellera 
+[www.acellera.com/contact](https://www.acellera.com/contact/) for information on the full version HTMD Pro or if you need a different license.
 
 ## Download HTMD
 
