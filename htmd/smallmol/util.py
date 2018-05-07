@@ -9,6 +9,7 @@ import numpy as np
 from htmd.molecule.voxeldescriptors import _getGridCenters
 from rdkit.Chem import ChemicalFeatures
 from rdkit import RDConfig
+from chembl_webresource_client.new_client import new_client
 
 
 _highlight_colors = [(1.00, 0.50, 0.00), (0.00, 0.50, 1.00), (0.00, 1.00, 0.50),
@@ -258,6 +259,35 @@ def alignMol(smallmol, refmol):
     sm_new.coords = coords_new[:, :, np.newaxis]
 
     return sm_new
+
+
+def getLigandMol2(ligname):
+    import requests
+    from htmd.molecule.support import string_to_tempfile
+    from htmd.molecule.molecule import Molecule
+    r = requests.get("https://files.rcsb.org/ligands/view/{}_ideal.sdf".format(ligname))
+    sdf_text = r.content.decode('ascii')
+    tempfile = string_to_tempfile(sdf_text, "sdf")
+    mol2 = openbabelConvert(tempfile, 'sdf', 'mol2')
+
+    return mol2
+
+
+def getSmileByDrugName(drugname):
+
+    molecule = new_client.molecule
+    results = molecule.search(drugname)
+
+    result_match = None
+
+    for item in results:
+        for idnames in item['cross_references']:
+            if idnames['xref_id'].lower() == drugname.lower() or idnames['xref_name'].lower() == drugname.lower():
+                result_match = item['molecule_structures']['canonical_smiles']
+
+        if result_match is not None:
+            break
+    return result_match
 
 
 def openbabelConvert(input_file, input_format, output_format):
