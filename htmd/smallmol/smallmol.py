@@ -92,7 +92,8 @@ class SmallMol(object):
                     'neighbors': object,
                     'bondtypes': int,
                     'coords': np.float32,
-                    '_chiraltags': object
+                    '_chiraltags': object,
+                    'isaromatic': object
                     }
 
     _mol_dtypes = {'_mol': object,
@@ -112,8 +113,9 @@ class SmallMol(object):
                   'bondtypes': (0,),
                   'hybridization': (0,),
                   'coords': (0, 3, 1),
-                  '_chiraltags': (0,)
-                    }
+                  '_chiraltags': (0,),
+                  'isaromatic': (0,)
+                  }
 
     _mol_dims = {'_mol': (0,),
                  'ligname': (0,),
@@ -286,6 +288,7 @@ class SmallMol(object):
         neighbors = []
         bondtypes = []
         chiraltags = []
+        isaromatic = []
 
         _mol = self._mol
 
@@ -303,6 +306,7 @@ class SmallMol(object):
             atomnames.append('{}{}'.format(e, i))
             formalcharges.append(a.GetFormalCharge())
             elements.append(e)
+            isaromatic.append(a.GetIsAromatic())
             neighbors.append([na.GetIdx() for na in a.GetNeighbors()])
             hybridizations.append(int(a.GetHybridization()))
             bondtypes.append([int(b.GetBondType()) for b in a.GetBonds()])
@@ -335,6 +339,7 @@ class SmallMol(object):
         self.__dict__['neighbors'] = np.array(neighbors)
         self.__dict__['bondtypes'] = np.array(bondtypes)
         self.__dict__['_chiraltags'] = np.array(chiraltags)
+        self.__dict__['isaromatic'] = np.array(isaromatic)
 
         if _mol.GetNumConformers() != 0:
             coords = _mol.GetConformer(0).GetPositions()
