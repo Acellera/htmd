@@ -2,7 +2,7 @@ from htmd.smallmol.smallmol import SmallMol
 from htmd.smallmol.chemlab.periodictable import PeriodicTable, _heavy_atoms, _hetero_atoms, _hybridizations_IdxToType
 import numpy as np
 from htmd.smallmol.util import _getPerpendicular, _normalizeVector, _getRotationMatrix
-
+import rdkit
 
 class Builder:
     """
@@ -31,11 +31,18 @@ class Builder:
 
     def __init__(self, smallmol=None, checkInitialConformer=True):
 
-        self.smallmol = smallmol
+        self.smallmol = self._initializeMol(smallmol) if smallmol is not None else smallmol
         self.periodictable = PeriodicTable()
 
         if checkInitialConformer and smallmol is not None:
             self._prepareConformer()
+
+
+    def _initializeMol(self, smallmol):
+        rmol = smallmol.toRdkitMol(includeConformer=True)
+        rdkit.Chem.Kekulize(rmol)
+        sm = SmallMol(rmol)
+        return sm
 
     def loadMol(self, smallmol, checkInitialConformer=True):
         """
