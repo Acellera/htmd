@@ -431,6 +431,31 @@ def getChemblSimilarLigandsBySmile(smi, threshold=85, returnSmiles=False):
 
     return lib
 
+def _ensurenestedlists( tocheck):
+
+    #if not isinstance(tocheck[0], list):
+    #    tocheck = [tocheck]
+    check = []
+    for i in tocheck:
+        if not isinstance(i, list):
+           i = [i]
+        check.append(i)
+
+    return check
+
+def _flatnestedlists(nlists, totype=None):
+
+
+    flist = [ e for l in nlists for e in l ]
+
+    while sum( [ isinstance(e, list) for e in flist ] ) != 0:
+        flist = [e for l in flist for e in l]
+
+    if totype is not None:
+        flist = [ totype(e) for e in flist]
+
+    return flist
+
 def openbabelConvert(input_file, input_format, output_format):
     """
     Converts the file from the input format to the output format specified. It uses the openbabel features
