@@ -1090,6 +1090,47 @@ def GROTOPread(filename, frame=None, topoloc=None):
 
     return topo, None
 
+def PDBXMMCIFread(filename, frame=None, topoloc=None):
+    from htmd.molecule.pdbx.reader.PdbxReader import PdbxReader
+    myDataList = []
+    ifh = open(filename, "r")
+    pRd = PdbxReader(ifh)
+    pRd.read(myDataList)
+    ifh.close()
+
+    atom_site_mapping = {'group_PDB': 'record',
+                         'id': 'serial',
+                         'type_symbol': 'element',
+                         'label_atom_id': 'name',
+                         'label_alt_id': 'altloc',
+                         'label_comp_id': 'resname',
+                         'label_entity_id': 'segid',
+                         'occupancy': 'occupancy',
+                         'B_iso_or_equiv': 'beta', }
+
+    topo = Topology()
+
+    for dataObj in myDataList:
+        coords = []
+        atom_site = dataObj.getObj('atom_site')
+        for i in range(atom_site.getRowCount()):
+            row = atom_site.getRow(i)
+            for source_field, target_field in atom_site_mapping.items():
+                val = row[atom_site.getAttributeIndex(source_field)]
+                if source_field == 'label_alt_id' and val == '.':  # Atoms without altloc seem to be stored with a dot
+                    val = ''
+                topo.__dict__[target_field].append(val)
+
+            coords.append([row[atom_site.getAttributeIndex('Cartn_x')],
+                           row[atom_site.getAttributeIndex('Cartn_y')],
+                           row[atom_site.getAttributeIndex('Cartn_z')]])
+
+    coords = np.array(coords, dtype=np.float32).reshape((-1, 3, 1))
+
+    return topo, Trajectory(coords=coords)
+
+
+
 
 # Register here all readers with their extensions
 _TOPOLOGY_READERS = {'prmtop': PRMTOPread,
@@ -1103,7 +1144,8 @@ _TOPOLOGY_READERS = {'prmtop': PRMTOPread,
                      'ent': PDBread,
                      'pdbqt': PDBQTread,
                      'top': [GROTOPread, PRMTOPread],
-                     'crd': CRDCARDread}
+                     'crd': CRDCARDread,
+                     'cif': PDBXMMCIFread}
 
 from mdtraj.core.trajectory import _TOPOLOGY_EXTS as _MDTRAJ_TOPOLOGY_EXTS
 _MDTRAJ_TOPOLOGY_EXTS = [x[1:] for x in _MDTRAJ_TOPOLOGY_EXTS]  # Removing the initial dot
