@@ -26,6 +26,7 @@ from htmd.molecule.pdbx.reader.PdbxReader  import PdbxReader
 from htmd.molecule.pdbx.writer.PdbxWriter  import PdbxWriter
 from htmd.molecule.pdbx.reader.PdbxContainers import DataContainer, DataCategory
 from htmd.home import home
+from htmd.util import tempname
 import os
 
 
@@ -34,7 +35,7 @@ class PdbxWriterTests(unittest.TestCase):
         self.lfh=sys.stderr
         self.verbose=False
         self.pathPdbxDataFile     = os.path.join(home(dataDir='molecule-readers'), "1kip.cif")
-        self.pathOutputFile       ="testOutputDataFile.cif"
+        self.pathOutputFile       = tempname(suffix='.cif')
 
     def tearDown(self):
         pass
@@ -47,7 +48,7 @@ class PdbxWriterTests(unittest.TestCase):
         try:
             #
             myDataList=[]
-            ofh = open("test-output.cif", "w")
+            ofh = open(tempname(suffix='.cif'), "w")
             curContainer=DataContainer("myblock")
             aCat=DataCategory("pdbx_seqtool_mapping_ref")
             aCat.appendAttribute("ordinal")
@@ -78,8 +79,9 @@ class PdbxWriterTests(unittest.TestCase):
         try:
             # Create a initial data file --
             #
+            tmpf = tempname(suffix='.cif')
             myDataList=[]
-            ofh = open("test-output-1.cif", "w")
+            ofh = open(tmpf, "w")
             curContainer=DataContainer("myblock")
             aCat=DataCategory("pdbx_seqtool_mapping_ref")
             aCat.appendAttribute("ordinal")
@@ -102,7 +104,7 @@ class PdbxWriterTests(unittest.TestCase):
             # Read and update the data -
             # 
             myDataList=[]
-            ifh = open("test-output-1.cif", "r")
+            ifh = open(tmpf, "r")
             pRd=PdbxReader(ifh)
             pRd.read(myDataList)
             ifh.close()
@@ -114,7 +116,7 @@ class PdbxWriterTests(unittest.TestCase):
             for iRow in range(0,myCat.getRowCount()):
                 myCat.setValue('some value', 'ref_mon_id',iRow)
                 myCat.setValue(100, 'ref_mon_num',iRow)
-            ofh = open("test-output-2.cif", "w")            
+            ofh = open(tempname(suffix='.cif'), "w")
             pdbxW=PdbxWriter(ofh)
             pdbxW.write(myDataList)
             ofh.close()            
