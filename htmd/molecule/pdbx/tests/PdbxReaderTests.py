@@ -15,15 +15,17 @@ Test cases for reading PDBx/mmCIF data files PdbxReader class -
 import sys, unittest, traceback
 
 from htmd.molecule.pdbx.reader.PdbxReader import PdbxReader
+from htmd.home import home
+import os
 
 
 class PdbxReaderTests(unittest.TestCase):
     def setUp(self):
         self.lfh=sys.stderr
         self.verbose=False
-        self.pathPdbxDataFile     ="1kip.cif"
-        self.pathBigPdbxDataFile  ="1ffk.cif"
-        self.pathSFDataFile       ="1kip-sf.cif"
+        self.pathPdbxDataFile     = os.path.join(home(dataDir='molecule-readers'), "1kip.cif")
+        self.pathBigPdbxDataFile  = os.path.join(home(dataDir='molecule-readers'), "1ffk.cif")
+        self.pathSFDataFile       = os.path.join(home(dataDir='molecule-readers'), "1kip-sf.cif")
 
     def tearDown(self):
         pass

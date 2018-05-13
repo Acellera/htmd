@@ -22,13 +22,15 @@ import sys, unittest, traceback
 from htmd.molecule.pdbx.reader.PdbxReader import PdbxReader
 from htmd.molecule.pdbx.writer.PdbxWriter import PdbxWriter
 from htmd.molecule.pdbx.reader.PdbxContainers import DataContainer, DataCategory
+from htmd.home import home
+import os
 
 
 class PdbxReadWriteTests(unittest.TestCase):
     def setUp(self):
         self.lfh=sys.stdout
         self.verbose=False
-        self.pathPdbxDataFile     = "1kip.cif"
+        self.pathPdbxDataFile     = os.path.join(home(dataDir='molecule-readers'), "1kip.cif")
         self.pathOutputFile       = "testOutputDataFile.cif"
 
     def tearDown(self):
