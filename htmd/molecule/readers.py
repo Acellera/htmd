@@ -1098,32 +1098,69 @@ def PDBXMMCIFread(filename, frame=None, topoloc=None):
     pRd.read(myDataList)
     ifh.close()
 
-    atom_site_mapping = {'group_PDB': 'record',
-                         'id': 'serial',
-                         'type_symbol': 'element',
-                         'label_atom_id': 'name',
-                         'label_alt_id': 'altloc',
-                         'label_comp_id': 'resname',
-                         'label_entity_id': 'segid',
-                         'occupancy': 'occupancy',
-                         'B_iso_or_equiv': 'beta', }
+    # Taken from http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html#ATOMP
+    atom_site_mapping = {'group_PDB': ('record', str),
+                         'id': ('serial', int),
+                         'auth_atom_id': ('name', str),
+                         'label_alt_id': ('altloc', str),
+                         'auth_comp_id': ('resname', str),
+                         'auth_asym_id': ('chain', str),
+                         'auth_seq_id': ('resid', int),
+                         'pdbx_PDB_ins_code': ('insertion', str),
+                         'label_entity_id': ('segid', str),
+                         'type_symbol': ('element', str),
+                         'occupancy': ('occupancy', float),
+                         'B_iso_or_equiv': ('beta', float),
+                         'pdbx_formal_charge': ('charge', float)}
+
+    cryst1_mapping = {'length_a': ('a', float),
+                      'length_b': ('b', float),
+                      'length_c': ('c', float),
+                      'angle_alpha': ('alpha', float),
+                      'angle_beta': ('beta', float),
+                      'angle_gamma': ('gamma', float),
+                      'space_group_name_H-M': ('sGroup', str),
+                      'Z_PDB': ('z', int)}
 
     topo = Topology()
 
-    for dataObj in myDataList:
-        coords = []
-        atom_site = dataObj.getObj('atom_site')
-        for i in range(atom_site.getRowCount()):
-            row = atom_site.getRow(i)
-            for source_field, target_field in atom_site_mapping.items():
-                val = row[atom_site.getAttributeIndex(source_field)]
-                if source_field == 'label_alt_id' and val == '.':  # Atoms without altloc seem to be stored with a dot
-                    val = ''
-                topo.__dict__[target_field].append(val)
+    if len(myDataList) > 1:
+        logger.warning('More than one model found in mmCIF file. Will only parse the first one. '
+                       'If you need to parse multiple models contact us on the HTMD issue tracker.')
 
-            coords.append([row[atom_site.getAttributeIndex('Cartn_x')],
-                           row[atom_site.getAttributeIndex('Cartn_y')],
-                           row[atom_site.getAttributeIndex('Cartn_z')]])
+    dataObj = myDataList[0]
+
+    # Parsing CRYST1 data
+    cryst = dataObj.getObj('cell')
+    if cryst.getRowCount() == 1:
+        row = cryst.getRow(0)
+
+        crystalinfo = {}
+        for source_field, target in cryst1_mapping.items():
+            target_field, dtype = target
+            val = dtype(row[cryst.getAttributeIndex(source_field)])
+            crystalinfo[target_field] = val
+
+        if isinstance(crystalinfo['sGroup'], str) or not np.isnan(crystalinfo['sGroup']):
+            crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
+        topo.crystalinfo = crystalinfo
+
+    # Parsing ATOM and HETATM data
+    coords = []
+    atom_site = dataObj.getObj('atom_site')
+    for i in range(atom_site.getRowCount()):
+        row = atom_site.getRow(i)
+        for source_field, target in atom_site_mapping.items():
+            target_field, dtype = target
+            val = dtype(row[atom_site.getAttributeIndex(source_field)])
+            if source_field == 'label_alt_id' and val == '.':  # Atoms without altloc seem to be stored with a dot
+                val = ''
+            topo.__dict__[target_field].append(val)
+
+        # modelid = row[atom_site.getAttributeIndex('pdbx_PDB_model_num')]
+        coords.append([row[atom_site.getAttributeIndex('Cartn_x')],
+                       row[atom_site.getAttributeIndex('Cartn_y')],
+                       row[atom_site.getAttributeIndex('Cartn_z')]])
 
     coords = np.array(coords, dtype=np.float32).reshape((-1, 3, 1))
 
