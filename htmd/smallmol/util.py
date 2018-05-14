@@ -433,15 +433,26 @@ def getChemblSimilarLigandsBySmile(smi, threshold=85, returnSmiles=False):
 
 def _ensurenestedlists( tocheck):
 
-    #if not isinstance(tocheck[0], list):
-    #    tocheck = [tocheck]
+    arelists = []
+    for i in tocheck:
+        arelists.append(isinstance(i, list))
+    nlists = sum(arelists)
+    lenlist = len(arelists)
+
+    if nlists == 0:
+        return [tocheck]
+
+    if nlists == lenlist:
+        return tocheck
+
     check = []
     for i in tocheck:
         if not isinstance(i, list):
-           i = [i]
+            i = [i]
         check.append(i)
 
     return check
+
 
 def _flatnestedlists(nlists, totype=None):
 
