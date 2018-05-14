@@ -30,13 +30,11 @@ class Builder:
     """
 
     def __init__(self, smallmol=None, checkInitialConformer=True):
-
         self.smallmol = self._initializeMol(smallmol) if smallmol is not None else smallmol
         self.periodictable = PeriodicTable()
 
         if checkInitialConformer and smallmol is not None:
             self._prepareConformer()
-
 
     def _initializeMol(self, smallmol):
         rmol = smallmol.toRdkitMol(includeConformer=True)
@@ -186,6 +184,7 @@ class Builder:
 
             # TODO: based on chiral
             sm._chiraltags = np.append(sm._chiraltags, 0)
+            sm.isaromatic = np.append(sm.isaromatic, False)
             # Development note: removed assignement explicitHs
 
             # coords
@@ -348,7 +347,6 @@ class Builder:
         sm = self.smallmol
 
         for k in sm._atom_fields:
-
             if k == 'coords':
                 sm.__dict__[k] = np.delete(sm.__dict__[k], ids, axis=0)
             else:
