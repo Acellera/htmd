@@ -9,6 +9,6 @@ export MAJOR=0
 export MINOR=1
 export SHORTHASH=$(git ls-tree HEAD htmd/data | awk '{print substr($3,0,7)}')
 
-export HTMD_DATA_VERSION="${MAJOR}.${MINOR}.${SHORTHASH}"
+export HTMD_DATA_VERSION="${MAJOR}.${MINOR}.hash-${SHORTHASH}"
 
 conda build package/htmd-data --no-include-recipe
