@@ -1090,6 +1090,109 @@ def GROTOPread(filename, frame=None, topoloc=None):
 
     return topo, None
 
+def PDBXMMCIFread(filename, frame=None, topoloc=None):
+    from htmd.molecule.pdbx.reader.PdbxReader import PdbxReader
+    myDataList = []
+    ifh = open(filename, "r")
+    pRd = PdbxReader(ifh)
+    pRd.read(myDataList)
+    ifh.close()
+
+    # Taken from http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html#ATOMP
+    atom_site_mapping = {'group_PDB': ('record', str),
+                         'id': ('serial', int),
+                         'auth_atom_id': ('name', str),
+                         'label_alt_id': ('altloc', str),
+                         'auth_comp_id': ('resname', str),
+                         'auth_asym_id': ('chain', str),
+                         'auth_seq_id': ('resid', int),
+                         'pdbx_PDB_ins_code': ('insertion', str),
+                         'label_entity_id': ('segid', str),
+                         'type_symbol': ('element', str),
+                         'occupancy': ('occupancy', float),
+                         'B_iso_or_equiv': ('beta', float),
+                         'pdbx_formal_charge': ('charge', float)}
+
+    cryst1_mapping = {'length_a': ('a', float),
+                      'length_b': ('b', float),
+                      'length_c': ('c', float),
+                      'angle_alpha': ('alpha', float),
+                      'angle_beta': ('beta', float),
+                      'angle_gamma': ('gamma', float),
+                      'space_group_name_H-M': ('sGroup', str),
+                      'Z_PDB': ('z', int)}
+
+    topo = Topology()
+
+    if len(myDataList) > 1:
+        logger.warning('Multiple Data objects in mmCIF. Please report this issue to the HTMD issue tracker')
+
+    dataObj = myDataList[0]
+
+    def fixDefault(val, dtype):
+        if val == '?':
+            if dtype == float or dtype == int:
+                val = 0
+            if dtype == str:
+                val = ''
+        return val
+
+    # Parsing CRYST1 data
+    cryst = dataObj.getObj('cell')
+    if cryst is not None and cryst.getRowCount() == 1:
+        row = cryst.getRow(0)
+
+        crystalinfo = {}
+        for source_field, target in cryst1_mapping.items():
+            target_field, dtype = target
+            val = dtype(fixDefault(row[cryst.getAttributeIndex(source_field)], dtype))
+            crystalinfo[target_field] = val
+
+        if isinstance(crystalinfo['sGroup'], str) or not np.isnan(crystalinfo['sGroup']):
+            crystalinfo['sGroup'] = crystalinfo['sGroup'].split()
+        topo.crystalinfo = crystalinfo
+
+    # Parsing ATOM and HETATM data
+    allcoords = []
+    coords = []
+    currmodel = -1
+    firstmodel = None
+    atom_site = dataObj.getObj('atom_site')
+    for i in range(atom_site.getRowCount()):
+        row = atom_site.getRow(i)
+        modelid = row[atom_site.getAttributeIndex('pdbx_PDB_model_num')]
+        # On a new model, restart coords and append the old ones
+        if currmodel != -1 and currmodel != modelid:
+            currmodel = modelid
+            allcoords.append(np.array(coords, dtype=np.float32))
+            coords = []
+
+        if currmodel == -1:
+            currmodel = modelid
+            firstmodel = modelid
+
+        if currmodel == firstmodel:
+            for source_field, target in atom_site_mapping.items():
+                target_field, dtype = target
+                val = row[atom_site.getAttributeIndex(source_field)]
+                val = dtype(fixDefault(val, dtype))
+                if source_field == 'label_alt_id' and val == '.':  # Atoms without altloc seem to be stored with a dot
+                    val = ''
+                topo.__dict__[target_field].append(val)
+
+        coords.append([row[atom_site.getAttributeIndex('Cartn_x')],
+                       row[atom_site.getAttributeIndex('Cartn_y')],
+                       row[atom_site.getAttributeIndex('Cartn_z')]])
+
+    if len(coords) != 0:
+        allcoords.append(np.array(coords, dtype=np.float32))
+
+    allcoords = np.stack(allcoords, axis=2)
+
+    return topo, Trajectory(coords=allcoords)
+
+
+
 
 # Register here all readers with their extensions
 _TOPOLOGY_READERS = {'prmtop': PRMTOPread,
@@ -1103,7 +1206,8 @@ _TOPOLOGY_READERS = {'prmtop': PRMTOPread,
                      'ent': PDBread,
                      'pdbqt': PDBQTread,
                      'top': [GROTOPread, PRMTOPread],
-                     'crd': CRDCARDread}
+                     'crd': CRDCARDread,
+                     'cif': PDBXMMCIFread}
 
 from mdtraj.core.trajectory import _TOPOLOGY_EXTS as _MDTRAJ_TOPOLOGY_EXTS
 _MDTRAJ_TOPOLOGY_EXTS = [x[1:] for x in _MDTRAJ_TOPOLOGY_EXTS]  # Removing the initial dot
@@ -1186,4 +1290,14 @@ if __name__ == '__main__':
 
     mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'gromacs.top'))
     print('Can read GROMACS top files.')
+
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '1j8k.cif'))
+    assert mol.numAtoms == 1402
+    assert mol.numFrames == 20
+    print('Can read multiframe mmCIF files.')
+
+    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '1ffk.cif'))
+    assert mol.numAtoms == 64281
+    assert mol.numFrames == 1
+    print('Can read single frame mmCIF files.')
 
