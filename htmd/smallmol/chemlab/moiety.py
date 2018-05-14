@@ -37,7 +37,7 @@ class MoietyRecognition:
         pT = self.periodicTable
         smallmol = self.smallmol
 
-        moietiesIdentified = self.moieties
+        moietiesIdentified = []
         atoms_lasting = set(smallmol.idx)
 
     # 1 - rings
@@ -82,7 +82,52 @@ class MoietyRecognition:
         atoms_lasting = set(sorted(atoms_lasting - set(atoms_placed)))
 
         print(atoms_lasting)
+    # merge all connected moieties (important for amide, esther and so on)
 
+        self.moieties = self._mergeConnectedMoieties(moietiesIdentified)
+
+
+    def _mergeConnectedMoieties(self, moieties):
+
+        confirmedMoieties = []
+        tocheckMoieties = []
+
+        for moi in moieties:
+            if moi.isring:
+                confirmedMoieties.append(moi)
+            else:
+                tocheckMoieties.append(moi)
+
+        moiN = 0
+        while len(tocheckMoieties) != 0:
+            moi = tocheckMoieties.pop(0)
+            print("moi1 ", moi.atoms)
+            merged = False
+
+            for moi2 in tocheckMoieties:
+                print('moi2 ', moi2.atoms)
+                matched1to2 = [alink for alink in moi.links if alink in moi2.atoms]
+                matched2to1 = [alink for alink in moi2.links if alink in moi.atoms]
+                print(matched1to2, matched2to1)
+
+                if len(matched1to2) != 0 and len(matched2to1) != 0:
+                    print(moi2.atoms, moi.mergedTo, moi2.mergedTo)
+                    if moi.mergedTo is not None:
+                        moi.mergedTo.mergeMoiety(moi2)
+                        moi2.mergedTo = moi.mergedTo
+                    elif moi2.mergedTo is not None:
+                        moi2.mergedTo.mergeMoiety(moi)
+                        moi.mergedTo = moi2.mergedTo
+
+                    else:
+                        moi.mergeMoiety(moi2)
+                        moi2.mergedTo = moi
+                    #tocheckMoieties.remove(moi2)
+            if moi.mergedTo is None:
+                confirmedMoieties.append(moi)
+            moiN+= 1
+
+        return confirmedMoieties
 
     def _getMoietiesSatureCarbons(self, carbonAtons):
 
@@ -109,7 +154,7 @@ class MoietyRecognition:
 
         mois = []
         for atoms in ring_atoms:
-            moi = Moiety(smallmol, atoms)
+            moi = Moiety(smallmol, atoms, isring=True)
             mois.append(moi)
 
         return mois, _flatnestedlists(ring_atoms)
@@ -133,7 +178,10 @@ class MoietyRecognition:
             atomsConnected_cleaned.append(i)
             merged = []
             for i2 in atomsConnected:
-                if set(i) >= set(i2):
+                #if set(i) >= set(i2):
+                if len(set(i) & set(i2)) != 0:
+                    atms = np.unique(np.concatenate((atomsConnected_cleaned[-1], i2)))
+                    atomsConnected_cleaned[-1] = atms.tolist()
                     merged.append(i2)
             for i2 in merged:
                 atomsConnected.remove(i2)
@@ -221,7 +269,7 @@ class MoietyRecognition:
         return  mois_cleaned, atomsMarked
 
 
-    def depict(self, showLinks=True, useDummies=True, showLabels=True, molspercol=3):
+    def depict(self, showLinks=True, showConnectorAs='dummies', showLabels=True, molspercol=3):
 
         from tempfile import NamedTemporaryFile
         import matplotlib.pyplot as plt
@@ -233,7 +281,7 @@ class MoietyRecognition:
         mois = self.moieties
 
         for n, moi in enumerate(mois):
-            im = moi.depict(showLinks, useDummies, showLabels)
+            im = moi.depict(showLinks, showConnectorAs, showLabels)
             fname = os.path.join(tmpdir, '%03d' % n)
             f = open(fname + '.svg', 'w')
             f.write(im.data)
@@ -253,7 +301,7 @@ class MoietyRecognition:
 
 class Moiety:
 
-    def __init__(self, parentsmallmol, fragmentatoms=None):
+    def __init__(self, parentsmallmol, fragmentatoms=None, isring=False):
 
         if fragmentatoms is None:
             logging.warning("Moiety object instanciated without atoms")
@@ -265,17 +313,13 @@ class Moiety:
         self.fragments = _ensurenestedlists(fragmentatoms)
         self.atoms = np.unique(sorted(_flatnestedlists(self.fragments)))
         self.links = []
+        self.isring = isring
+        self.mergedTo = None
 
         self.moismallmol = self._prepareSmallMol()
 
     def _prepareSmallMol(self):
 
-        # Qui si deve sistemare gli azoto aromatici.
-        # 1 idrogeni legati ad essi
-        # 2 attenzione che devi iterare sugli atomi del moiety e non su tutta la molecola, se no potresti prenderne
-        # da altri moities.
-        # 3 ricorda di rimappare sull'originale così da poter trovare gli idrogeni corretti
-        # Infine, aggiungi gli idrogeni non con la funzione addHydrogens ma con addatom in modo specifico
         parentsmallmol = self.parentsmallmol
         fragments = self.fragments
         atoms = self.atoms
@@ -284,17 +328,36 @@ class Moiety:
         atomsToRemove = parentsmallmol.get('idx', 'idx {}'.format(atoms_string), invert=True)
         b = Builder(parentsmallmol)
         b._removeAtoms(atomsToRemove)
-        nitrogenAromatic = [ a for a in atoms if parentsmallmol.element[a] == 'N' and parentsmallmol.isaromatic[a] ]
-        #nhydrogens = [  for n in nitrogenAromatic parentsmallmol.neighbors[n]  ]
-        print(nhydrogens)
-        if len(nitrogenAromatic) != 0:
-            b.addHydrogens(onlyExplicit=True)
+
+        if self.isring:
+            self._fixAromaticNitrogen(b)
 
         sm = b.getSmallMol()
 
         self._setBreakPoints(parentsmallmol, sm)
 
         return sm
+
+    def _fixAromaticNitrogen(self, builder):
+        pT = PeriodicTable()
+
+        parentsmallmol = self.parentsmallmol
+        atoms = self.atoms
+
+        nitrogenAromatic = [a for a in atoms if parentsmallmol.element[a] == 'N' and parentsmallmol.isaromatic[a]]
+        nonAromaticBonded = [n for n in nitrogenAromatic if len(parentsmallmol.neighbors[n]) != sum(parentsmallmol.isaromatic[parentsmallmol.neighbors[n]])]
+
+        if len(nonAromaticBonded) == 0:
+            return
+
+        nitrogensWithHydrogen = np.where(self.atoms == nonAromaticBonded[0])[0]
+
+        for n in nitrogensWithHydrogen:
+            atom = [na for na in parentsmallmol.neighbors[atoms[n]] if na not in atoms][0]
+            element = parentsmallmol.element[atom]
+            self.atoms = np.append(atoms, atom)
+            a = pT.getAtom(element, n)
+            builder._addAtoms([a])
 
     def _setBreakPoints(self, parentsmallmol, sm):
 
@@ -308,33 +371,35 @@ class Moiety:
 
         self.links = _flatnestedlists(neighbors)
 
-    def depict(self, showLinks=True, useDummies=True, showLabels=True):
+    def depict(self, showLinks=True, showConnectorAs='dummies',  showLabels=True):
+        # showConnectorAs dummies, atoms, groups
+
         from htmd.smallmol.util import _depictMol
+
+        showconnectChoices = ['dummies', 'atoms', 'groups']
+        if showConnectorAs not in showconnectChoices:
+            raise ValueError('The showConnectAs argument {} is not a valid one. Should be {}'.format(showConnectorAs, showconnectChoices))
 
         pT = PeriodicTable()
         parentsmallmol = self.parentsmallmol
         sm = copy.deepcopy(self.moismallmol)
         atoms = self.atoms
-        print(sm.element)
-        print(sm.idx)
-
         elements = parentsmallmol.element[atoms]
-        print(elements)
         indexes = parentsmallmol.idx[atoms]
         formalcharges = parentsmallmol.formalcharge[atoms]
         if showLinks:
             b = Builder(sm, checkInitialConformer=False)
             for n, links in enumerate(sm.links):
                 if len(links)  != 0:
-                    #el = ('Du', '' )if useDummies else (parentsmallmol.element[l[0]], parentsmallmol.element[l[0]])
                     for l in links:
-                        el = ('Du', '') if useDummies else (parentsmallmol.element[l], parentsmallmol.element[l])
+                        el = self._getAtomLinkFormat(showConnectorAs, l)
                         indexes = np.append(indexes, parentsmallmol.idx[l])
                         elements = np.append(elements, el[1])
                         formalcharges = np.append(formalcharges, 0)
                         A = pT.getAtom(el[0], n)
                         b._addAtoms([A])
             sm = b.getSmallMol()
+
         _mol = sm.toRdkitMol(includeConformer=True)
 
         rdkit.Chem.AllChem.Compute2DCoords(_mol)
@@ -350,6 +415,25 @@ class Moiety:
 
         return svg
 
+    def _getAtomLinkFormat(self, format, linkAtom):
+
+        parentsmallmol = self.parentsmallmol
+
+        atomName_Label = [None, None]
+
+        if format == 'dummies':
+            atomName_Label = ('Du', '')
+
+        elif format == 'atoms':
+
+            atomName_Label = (parentsmallmol.element[linkAtom], parentsmallmol.element[linkAtom])
+
+        elif format == 'groups':
+            atomName_Label = ('Du', '') if not parentsmallmol.isaromatic[linkAtom] else (parentsmallmol.element[linkAtom], 'Ar')
+
+
+        return atomName_Label
+
     def mergeMoiety(self, moi):
 
         atoms = self.atoms
@@ -359,7 +443,7 @@ class Moiety:
         common_links = list(set(moi.links) & set(links))
         newAtoms = _flatnestedlists([moi.atoms, self.atoms, common_links])
 
-        self.atoms = sorted(newAtoms)
+        self.atoms = np.unique(sorted(newAtoms))
         self.fragments = _ensurenestedlists(self.atoms)
         
         self.moismallmol = self._prepareSmallMol()
