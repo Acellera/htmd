@@ -35,8 +35,14 @@ _bondtypes_StringToType = {'SINGLE': BondType.SINGLE,
                            'DOUBLE': BondType.DOUBLE,
                            'TRIPLE': BondType.TRIPLE}
 
+# ['element', 'charge', 'formalcharge', 'chiral', 'hybridization', 'bondtype']
 _atoms = {'H': ['H', 0, 0, '', 1, 1],
-          'C': ['C', 0, 0, '', 4, 1]
+          'C': ['C', 0, 0, '', 4, 1],
+          'O': ['O', 0, 0, '', 4, 1],
+          'N': ['N', 0, 0, '', 4, 1],
+          'S': ['S', 0, 0, '', 4, 1],
+          'P': ['S', 0, 0, '', 4, 1],
+          'Du': ['*', 0, 0, '', 1, 1]
           }
 
 
@@ -181,5 +187,10 @@ class PeriodicTable:
 
     def isHeteroAtom(self, element):
         match = np.where(_hetero_atoms == element)[0]
+
+        return bool(len(match))
+
+    def isHalogenAtom(self, element):
+        match = np.where( _halogen_atoms == element )[0]
 
         return bool(len(match))
