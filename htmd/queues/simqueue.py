@@ -97,14 +97,20 @@ class SimQueue(metaclass=ABCMeta):
         if report is not None:
             if report > sleept:
                 from math import round
-                sleept = round(report / sleept) * sleept
+                reportfreq = round(report / sleept)
             else:
+                reportfreq = 1
                 sleept = report
 
+        i = 1
         while True:
             inprog = self.inprogress() if not sentinel else self.notcompleted()
             if report is not None:
-                logger.info('{} jobs are pending completion'.format(inprog))
+                if i == reportfreq:
+                    logger.info('{} jobs are pending completion'.format(inprog))
+                    i = 1
+                else:
+                    i += 1
             self.retrieve()
 
             if inprog == 0:
