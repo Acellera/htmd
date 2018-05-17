@@ -72,14 +72,20 @@ class SimQueue(metaclass=ABCMeta):
         """ Subclasses need to implement this method """
         pass
 
-    def wait(self, sentinel=False):
+    def wait(self, sentinel=False, sleept=5, report=None):
         """ Blocks script execution until all queued work completes
 
         Parameters
         ----------
-        sentinel : bool, default=False
+        sentinel : bool
             If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
             relies on the filesystem, in particular on the existence of a sentinel file for job completion.
+        sleept : float
+            The number of seconds to sleep before re-checking for completed jobs.
+        report : float
+            If set to a number it will report every `report` seconds the number of non-completed jobs. If this argument
+            is larger than `sleept`, the method will adjust it to the closest multiple of `sleept`. If it is shorter
+            than `sleept` it will override the `sleept` value.
 
         Examples
         --------
@@ -88,10 +94,24 @@ class SimQueue(metaclass=ABCMeta):
         from time import sleep
         import sys
 
-        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
+        if report is not None:
+            if report > sleept:
+                from math import round
+                sleept = round(report / sleept) * sleept
+            else:
+                sleept = report
+
+        while True:
+            inprog = self.inprogress() if not sentinel else self.notcompleted()
+            if report is not None:
+                logger.info('{} jobs are pending completion'.format(inprog))
             self.retrieve()
+
+            if inprog == 0:
+                break
+
             sys.stdout.flush()
-            sleep(5)
+            sleep(sleept)
 
     def notcompleted(self):
         """Returns the sum of the number of job directories which do not have the sentinel file for completion.
