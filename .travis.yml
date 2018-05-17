@@ -22,6 +22,8 @@ matrix:
 #        - brew cask uninstall oclint
 #        - brew install gcc
 
+services:
+  - docker
 
 install:
   # Make sure stdout is in blocking mode. Otherwise builds will fail due to large writes to stdout
@@ -58,11 +60,6 @@ install:
   # Always set it to 0 so we don't get a new release at every successful commit
   - export BUILD_NUMBER=0
 
-  # Install the Conda dependencies HTMD needs
-  - df -h
-  - conda install --file package/htmd-deps/DEPENDENCIES -y
-  # Cleaning to reduce amount of space used on disk
-  - conda clean --all -y
   - python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
   # If not PR, clone the private htmdlib repo,
@@ -72,16 +69,19 @@ install:
   - conda build package/htmd-data --no-include-recipe
   - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe
 
-  - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
-  - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
-  - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y -q
   # Cleaning to reduce amount of space used on disk
   - conda clean --all -y
+  - docker pull acellera/htmd:latest
 
 script:
-  - export HTMD_NONINTERACTIVE=1
-  - python htmd/tests/run_inline_file_tests.py
-  - htmd/tests/run_other_tests.sh
+  - docker run -d --mount type=bind,source=.,destination=/app/ --tty --name htmdcontainer htmdcontainer
+  - docker container cp $HOME/miniconda/conda-bld/ htmdcontainer:/home/user/conda/
+  - docker exec -it htmdcontainer sh -c "conda install /home/user/conda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2 -y -q"
+  - docker exec -it htmdcontainer sh -c "conda install /home/user/conda/conda-bld/*/htmd-data-[0-9]*.tar.bz2 -y -q"
+  - docker exec -it htmdcontainer sh -c "conda install /home/user/conda/conda-bld/*-64/htmd-[0-9]*.tar.bz2 -y -q"
+  - docker exec -it htmdcontainer sh -c "export HTMD_NONINTERACTIVE=1"
+  - docker exec -it htmdcontainer sh -c "python htmd/tests/run_inline_file_tests.py"
+  - docker exec -it htmdcontainer sh -c "htmd/tests/run_other_tests.sh"
   # If build did not fail, if it is not PR, it's on Acellera/htmd and a tagged build, do anaconda upload tasks
   - if [ "$TRAVIS_TEST_RESULT" == "0" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./continuous-integration/travis/conda_upload.sh; bash -x ./continuous-integration/travis/conda_build_upload_meta.sh ; fi
 
