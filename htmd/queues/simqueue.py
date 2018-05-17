@@ -72,7 +72,7 @@ class SimQueue(metaclass=ABCMeta):
         """ Subclasses need to implement this method """
         pass
 
-    def wait(self, sentinel=False, sleept=5, report=None):
+    def wait(self, sentinel=False, sleeptime=5, reporttime=None):
         """ Blocks script execution until all queued work completes
 
         Parameters
@@ -80,12 +80,12 @@ class SimQueue(metaclass=ABCMeta):
         sentinel : bool
             If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
             relies on the filesystem, in particular on the existence of a sentinel file for job completion.
-        sleept : float
+        sleeptime : float
             The number of seconds to sleep before re-checking for completed jobs.
-        report : float
-            If set to a number it will report every `report` seconds the number of non-completed jobs. If this argument
-            is larger than `sleept`, the method will adjust it to the closest multiple of `sleept`. If it is shorter
-            than `sleept` it will override the `sleept` value.
+        reporttime : float
+            If set to a number it will report every `reporttime` seconds the number of non-completed jobs. If this argument
+            is larger than `sleepttime`, the method will adjust it to the closest multiple of `sleepttime`. If it is shorter
+            than `sleepttime` it will override the `sleepttime` value.
 
         Examples
         --------
@@ -94,19 +94,19 @@ class SimQueue(metaclass=ABCMeta):
         from time import sleep
         import sys
 
-        if report is not None:
-            if report > sleept:
+        if reporttime is not None:
+            if reporttime > sleeptime:
                 from math import round
-                reportfreq = round(report / sleept)
+                reportfrequency = round(reporttime / sleeptime)
             else:
-                reportfreq = 1
-                sleept = report
+                reportfrequency = 1
+                sleeptime = reporttime
 
         i = 1
         while True:
             inprog = self.inprogress() if not sentinel else self.notcompleted()
-            if report is not None:
-                if i == reportfreq:
+            if reporttime is not None:
+                if i == reportfrequency:
                     logger.info('{} jobs are pending completion'.format(inprog))
                     i = 1
                 else:
@@ -117,7 +117,7 @@ class SimQueue(metaclass=ABCMeta):
                 break
 
             sys.stdout.flush()
-            sleep(sleept)
+            sleep(sleeptime)
 
     def notcompleted(self):
         """Returns the sum of the number of job directories which do not have the sentinel file for completion.
