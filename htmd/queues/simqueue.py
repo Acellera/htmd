@@ -72,7 +72,7 @@ class SimQueue(metaclass=ABCMeta):
         """ Subclasses need to implement this method """
         pass
 
-    def wait(self, sentinel=False, sleeptime=5, reporttime=None):
+    def wait(self, sentinel=False, sleeptime=5, reporttime=None, reportcallback=None):
         """ Blocks script execution until all queued work completes
 
         Parameters
@@ -83,9 +83,12 @@ class SimQueue(metaclass=ABCMeta):
         sleeptime : float
             The number of seconds to sleep before re-checking for completed jobs.
         reporttime : float
-            If set to a number it will report every `reporttime` seconds the number of non-completed jobs. If this argument
-            is larger than `sleepttime`, the method will adjust it to the closest multiple of `sleepttime`. If it is shorter
-            than `sleepttime` it will override the `sleepttime` value.
+            If set to a number it will report every `reporttime` seconds the number of non-completed jobs.
+            If this argument is larger than `sleepttime`, the method will adjust it to the closest multiple of
+            `sleepttime`. If it is shorter than `sleepttime` it will override the `sleepttime` value.
+        reportcallback : method
+            If not None, the reportcallback method will receive as it's first argument the number of non-completed
+            jobs.
 
         Examples
         --------
@@ -107,7 +110,10 @@ class SimQueue(metaclass=ABCMeta):
             inprog = self.inprogress() if not sentinel else self.notcompleted()
             if reporttime is not None:
                 if i == reportfrequency:
-                    logger.info('{} jobs are pending completion'.format(inprog))
+                    if reportcallback is not None:
+                        reportcallback(inprog)
+                    else:
+                        logger.info('{} jobs are pending completion'.format(inprog))
                     i = 1
                 else:
                     i += 1
