@@ -16,17 +16,20 @@ class Dihedral:
     Example
     -------
     >>> # Using the helper functions to construct a dihedral object
-    >>> d1 = Dihedral.phi(mol, 5, 6, segid='P0')
-    >>> d2 = Dihedral.chi1(mol, 12, segid='P0') # Defining segid
-    >>> d3 = Dihedral.chi1(mol, 38, chain='X') # Defining chain
+    >>> d1 = Dihedral.phi(mol, 'resid 5 and segid P0', 'resid 6 and segid P0')
+    >>> d2 = Dihedral.chi1(mol, 'resid 12 and chain X')
     >>> # Manual construction
-    >>> atom1 = {'name': 'N', 'resid': 5, 'segid': 'P'}
-    >>> atom2 = {'name': 'CA', 'resid': 3, 'segid': 'P', 'chain': 'A', 'insertion': 'B'}
-    >>> atom3 = {'name': 'C', 'resid': 46, 'segid': 'P', 'chain': 'X'}
-    >>> atom4 = {'name': 'O', 'resid': 2, 'segid': 'P'}
-    >>> d = Dihedral(atom1, atom2, atom3, atom4)
+    >>> d3 = Dihedral('resid 1 and name N', 'resid 1 and name CA', 'resid 1 and name C', 'resid 2 and name N')
     """
-    def __init__(self, atom1, atom2, atom3, atom4, dihedraltype=None):
+    def __init__(self, atom1, atom2, atom3, atom4, dihedraltype=None, mol=None):
+        if isinstance(atom1, str) and isinstance(atom2, str) and isinstance(atom3, str) and isinstance(atom4, str):
+            if mol is None:
+                raise RuntimeError('You must provide the `mol` argument to the Dihedral constructor.')
+            atom1 = UniqueAtomID.fromMolecule(mol, atom1)
+            atom2 = UniqueAtomID.fromMolecule(mol, atom2)
+            atom3 = UniqueAtomID.fromMolecule(mol, atom3)
+            atom4 = UniqueAtomID.fromMolecule(mol, atom4)
+
         self.atoms = [atom1, atom2, atom3, atom4]
         self.dihedraltype = dihedraltype
 
@@ -119,6 +122,11 @@ class Dihedral:
         -------
         dihedrals : list of :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` objects
             A list of Dihedral objects
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.proteinDihedrals(mol)
         """
         from htmd.builder.builder import sequenceID
         mol = mol.copy()
@@ -164,23 +172,20 @@ class Dihedral:
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
-        res1 : int
-            The resid of the first residue containing the C atom
-        res2 : int
-            The resid of the second residue containing the N CA C atoms
-        segid : str
-            The segment id of the residues
-        chain : str
-            The chain letter of the residues
-        insertion1 : str
-            The insertion letter of residue 1
-        insertion2 : str
-            The insertion letter of residue 2
+        sel1 : int
+            The atomselection of the first residue containing the C atom
+        sel2 : int
+            The atomselection of the second residue containing the N CA C atoms
 
         Returns
         -------
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.phi(mol, 'resid 50', 'resid 51')
         """
         phi = (('C'), ('N', 'CA', 'C'))
         return Dihedral._buildDihedral(mol, 'phi', phi, [sel1, sel2])
@@ -193,23 +198,20 @@ class Dihedral:
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
-        res1 : int
-            The resid of the first residue containing the N CA C atoms
-        res2 : int
-            The resid of the second residue containing the N atom
-        segid : str
-            The segment id of the residues
-        chain : str
-            The chain letter of the residues
-        insertion1 : str
-            The insertion letter of residue 1
-        insertion2 : str
-            The insertion letter of residue 2
+        sel1 : int
+            The atomselection of the first residue containing the N CA C atoms
+        sel2 : int
+            The atomselection of the second residue containing the N atom
 
         Returns
         -------
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.psi(mol, 'resid 50', 'resid 51')
         """
         psi = (('N', 'CA', 'C'), ('N'))
 
@@ -224,23 +226,20 @@ class Dihedral:
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
-        res1 : int
-            The resid of the first residue containing the CA C atoms
-        res2 : int
-            The resid of the second residue containing the N CA atoms
-        segid : str
-            The segment id of the residues
-        chain : str
-            The chain letter of the residues
-        insertion1 : str
-            The insertion letter of residue 1
-        insertion2 : str
-            The insertion letter of residue 2
+        sel1 : int
+            The atomselection of the first residue containing the CA C atoms
+        sel2 : int
+            The atomselection of the second residue containing the N CA atoms
 
         Returns
         -------
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.omega(mol, 'resid 50', 'resid 51')
         """
         omega = (('CA', 'C'), ('N', 'CA'))
 
@@ -261,6 +260,11 @@ class Dihedral:
         -------
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.chi1(mol, 'resid 66')
         """
         chi1std = ('N', 'CA', 'CB', 'CG')
         chi1 = {'ARG': chi1std, 'ASN': chi1std, 'ASP': chi1std, 'CYS': ('N', 'CA', 'CB', 'SG'), 'GLN': chi1std,
@@ -292,6 +296,11 @@ class Dihedral:
         -------
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.chi2(mol, 'resid 66')
         """
         chi2std = ('CA', 'CB', 'CG', 'CD')
         chi2 = {'ARG': chi2std, 'ASN': ('CA', 'CB', 'CG', 'OD1'), 'ASP': ('CA', 'CB', 'CG', 'OD1'), 'GLN': chi2std,
@@ -324,6 +333,11 @@ class Dihedral:
         -------
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.chi3(mol, 'resid 66')
         """
         chi3 = {'ARG': ('CB', 'CG', 'CD', 'NE'), 'GLN': ('CB', 'CG', 'CD', 'OE1'), 'GLU': ('CB', 'CG', 'CD', 'OE1'),
                 'LYS': ('CB', 'CG', 'CD', 'CE'), 'MET': ('CB', 'CG', 'SD', 'CE')}
@@ -352,6 +366,11 @@ class Dihedral:
         -------
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
+
+        Examples
+        --------
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.chi4(mol, 'resid 66')
         """
         chi4 = {'ARG': ('CG', 'CD', 'NE', 'CZ'), 'LYS': ('CG', 'CD', 'CE', 'NZ')}
 
@@ -382,7 +401,8 @@ class Dihedral:
 
         Examples
         --------
-        >>> Dihedral.chi5(mol, 'resid 5 and chain X')
+        >>> mol = Molecule('3ptb')
+        >>> Dihedral.chi5(mol, 'resid 66')
         """
         chi5 = {'ARG': ('CD', 'NE', 'CZ', 'NH1')}
 
