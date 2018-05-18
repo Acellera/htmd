@@ -130,7 +130,7 @@ class PreparationData:
             self.data.at[pos, key] = val
         else:
             try:
-                ov = self.data.iloc[pos][key]
+                ov = list(self.data.iloc[pos][key])
                 if type(ov) == float and math.isnan(ov):
                     ov = list()
             except:
