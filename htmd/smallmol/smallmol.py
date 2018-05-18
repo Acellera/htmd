@@ -1008,6 +1008,61 @@ class SmallMol:
 
         self._chiraltags[atom] = _chiraltag
 
+    def toSmarts(self, explicitHs=False):
+        """
+        Returns the smarts string of the molecule
+
+        Parameters
+        ----------
+        explicitHs: bool
+            Set as True for keep the hydrogens
+
+        Returns
+        -------
+        smart: str
+            The smarts string
+        """
+
+        sm = self.copy()
+        rmol = sm.toRdkitMol()
+        if not explicitHs and len(np.where(sm.element == 'H')[0]) != 0:
+            rmol = Chem.RemoveHs(rmol)
+
+        sma = Chem.MolToSmarts(rmol, isomericSmiles=True)
+
+        return sma
+
+    def toSmile(self, explicitHs=False, kekulizeSmile=True):
+        """
+        Returns the smiles string of the molecule
+
+        Parameters
+        ----------
+        explicitHs: bool
+            Set as True for keep the hydrogens
+        kekulizeSmile: bool
+            Set as True for returns the kekule smile format
+
+        Returns
+        -------
+        smi: str
+            The smiles string
+        """
+
+        sm = self.copy()
+        rmol = sm.toRdkitMol()
+        if not explicitHs and len(np.where(sm.element == 'H')[0]) !=  0:
+            rmol = Chem.RemoveHs(rmol)
+
+        if kekulizeSmile:
+            Chem.Kekulize(rmol)
+            smi = Chem.MolToSmiles(rmol, isomericSmiles=True, kekuleSmiles=True)
+        else:
+            smi = Chem.MolToSmiles(rmol, isomericSmiles=True)
+
+        return smi
+
+
     def toRdkitMol(self, includeConformer=False, _debug=False):
         """
         Returns the rdkit.Chem.rdchem.Mol object.
