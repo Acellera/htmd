@@ -451,7 +451,7 @@ class MetricDihedral(Projection):
         self._pc_dih = None
 
     def _precalculate(self, mol):
-        self._pc_dih = self._dihedralAtomsPrecalc(mol, mol.atomselect(self._protsel))
+        self._pc_dih = self._dihedralAtomsPrecalc(mol)
 
     def project(self, mol):
         """ Project molecule.
@@ -473,7 +473,7 @@ class MetricDihedral(Projection):
         if self._pc_dih is not None:
             return self._pc_dih
         else:
-            return self._dihedralAtomsPrecalc(mol, mol.atomselect(self._protsel))
+            return self._dihedralAtomsPrecalc(mol)
 
     def getMapping(self, mol):
         """ Returns the description of each projected dimension.
@@ -509,9 +509,9 @@ class MetricDihedral(Projection):
                 description += ['Angle of ' + mapstr]
         return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
-    def _dihedralAtomsPrecalc(self, mol, protsel):
+    def _dihedralAtomsPrecalc(self, mol):
         if self._dihedrals is None:  # Default phi psi dihedrals
-            dihedrals = Dihedral.proteinDihedrals(mol, protsel)
+            dihedrals = Dihedral.proteinDihedrals(mol, self._protsel)
         else:
             from htmd.util import ensurelist
             self._dihedrals = ensurelist(self._dihedrals)
