@@ -8,7 +8,6 @@ from nbconvert import PythonExporter
 from glob import glob
 import os
 import pytest
-import htmd
 
 
 def test_tutorials(testfolder, tutorials=('ligand-binding-analysis', 'protein-folding-analysis')):
@@ -37,7 +36,7 @@ def test_tutorials(testfolder, tutorials=('ligand-binding-analysis', 'protein-fo
             with open(os.path.join(testsubf, 'test_{}.py'.format(name)), 'w') as fo:
                 fo.writelines(format_script(output, testsubf, name))
 
-    return pytest.main([testfolder])
+    return pytest.main(['-k', 'test_tutorial', testfolder])
 
 
 def format_script(script, outdir, name):
@@ -46,7 +45,7 @@ def format_script(script, outdir, name):
 
     splitt = script.split('\n')
     lines = ['from htmd.ui import *\n',
-             'def test_{}():\n'.format(name.replace('-', '_')),
+             'def test_tutorial_{}():\n'.format(name.replace('-', '_')),
              '\tgetCurrentViewer(dispdev="text")\n',
              '\tnp.random.seed(0)\n',
              '\timport os\n',
