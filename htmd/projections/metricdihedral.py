@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.projections.projection import Projection
+from htmd.molecule.molecule import UniqueAtomID
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -25,19 +26,7 @@ class Dihedral:
     >>> atom4 = {'name': 'O', 'resid': 2, 'segid': 'P'}
     >>> d = Dihedral(atom1, atom2, atom3, atom4)
     """
-    def __init__(self, atom1, atom2, atom3, atom4, dihedraltype=None, check_valid=True):
-        if check_valid:
-            valid_keys = ('name', 'resid', 'segid', 'insertion', 'chain')
-            default_values = {'name': '', 'resid': 0, 'segid': '', 'insertion': '', 'chain': ''}
-            for i, a in enumerate([atom1, atom2, atom3, atom4]):
-                for k in a.keys():
-                    if k not in valid_keys:
-                        raise RuntimeError('Dictionary key can\'t be "{}". Valid keys are: {}'.format(k, valid_keys))
-                for k in np.setdiff1d(valid_keys, tuple(a.keys())):
-                    print(np.setdiff1d(valid_keys, tuple(a.keys())))
-                    a[k] = default_values[k]
-                #frames.append(pd.DataFrame(a, index=[i]))
-        #self.atoms = pd.concat(frames)
+    def __init__(self, atom1, atom2, atom3, atom4, dihedraltype=None):
         self.atoms = [atom1, atom2, atom3, atom4]
         self.dihedraltype = dihedraltype
 
@@ -45,31 +34,14 @@ class Dihedral:
         descr = ''
         if self.dihedraltype is not None:
             descr = '"{}" dihedral angle including atoms:\n'.format(self.dihedraltype)
-        descr += 'name\tresid\tinsertion\tchain\tsegid\n'
-        for a in self.atoms:
-            descr += '{}\t{}\t{}\t{}\t{}\n'.format(a['name'], a['resid'], a['insertion'], a['chain'], a['segid'])
+        descr += '\n'.join(map(str, self.atoms))
         return descr
 
     def __repr__(self):
         return self.__str__()
 
-    def _explanation(self):
-        descr = ''
-        if self.dihedraltype is not None:
-            descr += self.dihedraltype + ' '
-        resids = []
-        insertions = []
-        for a in self.atoms:
-            resids.append(a['resid'])
-            insertions.append(a['insertion'])
-        uqresids = list(np.unique(resids))
-        uqinsertions = list(np.unique(insertions))
-
-        descr += 'dihedral of Resid/Insertion/Chain/Segid/ {}/{}/{}/{}'.format(','.join(map(str, uqresids)), ','.join(uqinsertions), self.atoms[0]['chain'], self.atoms[0]['segid'])
-        return descr
-
     @staticmethod
-    def dihedralsToIndexes(mol, dihedrals, sel='all'):
+    def dihedralsToIndexes(mol, dihedrals):
         """ Converts dihedral objects to atom indexes of a given Molecule
         
         Parameters
@@ -77,10 +49,7 @@ class Dihedral:
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain atom information
         dihedrals : list
-            A single dihedral or a list of Dihedral objects
-        sel : str
-            Atom selection string to restrict the application of the selections.
-            See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
+            A single dihedral or a list of Dihedral objects_
 
         Returns
         -------
@@ -90,75 +59,47 @@ class Dihedral:
         Examples
         --------
         >>> dihs = []
-        >>> dihs.append(Dihedral.phi(mol, 1, 2))
-        >>> dihs.append(Dihedral.psi(mol, 2, 3))
+        >>> dihs.append(Dihedral.phi(mol, 'resid 1', 'resid 2'))
+        >>> dihs.append(Dihedral.psi(mol, 'resid 2', 'resid 3'))
         >>> indexes = Dihedral.dihedralsToIndexes(mol, dihs)
         """
-        selatoms = mol.atomselect(sel)
         from htmd.util import ensurelist
         indexes = []
         for dih in ensurelist(dihedrals):
             idx = []
             for a in dih.atoms:
-                atomsel = (mol.name == a['name']) & (mol.resid == a['resid']) & (mol.insertion == a['insertion']) & \
-                          (mol.chain == a['chain']) & (mol.segid == a['segid'])
-                atomsel = atomsel & selatoms
-                if np.sum(atomsel) != 1:
-                    raise RuntimeError(
-                        'Expected one atom from atomselection {}. Got {} instead.'.format(a, np.sum(atomsel)))
-                idx.append(np.where(atomsel)[0][0])
+                idx.append(a.selectAtom(mol))
             indexes.append(idx)
         return indexes
 
-    @staticmethod
-    def _findResidue(mol, resid, insertion=None, chain=None, segid=None):
-        idx = (mol.resid == resid)
-        descr = 'Resid "{}"'.format(resid)
-        if insertion is not None:
-            idx &= (mol.insertion == insertion)
-            descr += ' Insertion "{}"'.format(insertion)
-        if chain is not None:
-            idx &= (mol.chain == chain)
-            descr += ' Chain "{}"'.format(chain)
-        if segid is not None:
-            idx &= (mol.segid == segid)
-            descr += ' Segid "{}"'.format(segid)
-
-        if np.sum(idx) == 0:
-            raise RuntimeError('No residues found with description ({})'.format(descr))
-
-        idx2 = np.where(idx)[0]
-        if not np.array_equal(idx2, np.arange(idx2[0], idx2[-1]+1)):
-            raise RuntimeError('Residue with ({}) has non-continuous indexes in PBD file ({})'.format(descr, np.where(idx)[0]))
-
-        uqins = np.unique(mol.insertion[idx])
-        if len(uqins) > 1:
-            raise RuntimeError('Residue with ({}) exists with multiple insertions ({}). Define insertion to disambiguate.'.format(descr, uqins))
-        uqchain = np.unique(mol.chain[idx])
-        if len(uqchain) > 1:
-            raise RuntimeError('Residue with ({}) exists in multiple chains ({}). Define chain to disambiguate.'.format(descr, uqchain))
-        uqseg = np.unique(mol.segid[idx])
-        if len(uqseg) > 1:
-            raise RuntimeError('Residue with ({}) exists in multiple segments ({}). Define segid to disambiguate.'.format(descr, uqseg))
-        return {'resid': resid, 'insertion': uqins[0], 'chain': uqchain[0], 'segid': uqseg[0], 'idx': idx}
+    def getIndices(self, mol):
+        idx = []
+        for a in self.atoms:
+            idx.append(a.selectAtom(mol))
+        return idx
 
     @staticmethod
-    def _findAtom(mol, name, resdict):
-        atomidx = resdict['idx'] & (mol.name == name)
-        if np.sum(atomidx) == 0:
-            raise RuntimeError('No atoms found with description ({}) and name "{}".'.format(resdict, name))
-        newresdict = {'name': name, 'resid': resdict['resid'], 'insertion': resdict['insertion'], 'chain': resdict['chain'], 'segid': resdict['segid']}
-        return newresdict
+    def _buildDihedral(mol, dihname, dihatoms, sellist):
+        from htmd.util import ensurelist
+        sellist = ensurelist(sellist)
 
-    @staticmethod
-    def _findResname(mol, resdict):
-        residx = (mol.resid == resdict['resid']) & (mol.insertion == resdict['insertion']) & \
-                 (mol.chain == resdict['chain']) & (mol.segid == resdict['segid'])
-        uqresname = np.unique(mol.resname[residx])
+        atoms = []
+        if len(sellist) != 1:
+            for sel, dihatomnames in zip(sellist, dihatoms):
+                if isinstance(sel, str):
+                    sel = mol.atomselect(sel, indexes=True)
+                for atomname in dihatomnames:
+                    idx = sel[np.where(mol.name[sel] == atomname)[0][0]]
+                    atoms.append(UniqueAtomID.fromMolecule(mol, idx=idx))
+        else:
+            sel = sellist[0]
+            if isinstance(sel, str):
+                sel = mol.atomselect(sel, indexes=True)
+            for atomname in dihatoms:
+                idx = sel[np.where(mol.name[sel] == atomname)[0][0]]
+                atoms.append(UniqueAtomID.fromMolecule(mol, idx=idx))
+        return Dihedral(atoms[0], atoms[1], atoms[2], atoms[3], dihedraltype=dihname)
 
-        if len(uqresname) > 1:
-            raise RuntimeError('Multiple resnames ({}) found in ({})'.format(uqresname, resdict))
-        return uqresname[0]
 
     @staticmethod
     def proteinDihedrals(mol, sel='protein', dih=('psi', 'phi')):
@@ -179,51 +120,43 @@ class Dihedral:
         dihedrals : list of :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` objects
             A list of Dihedral objects
         """
+        from htmd.builder.builder import sequenceID
         mol = mol.copy()
         mol.filter(sel, _logger=False)
-        segments = []  # Here I consider segments both chains and segments
-        residues = []
-        ro = io = co = so = None  # "old" values as in previous atom's
-        for r, i, c, s in zip(mol.resid, mol.insertion, mol.chain, mol.segid):
-            if co is not None and so is not None and ((c != co) or (s != so)):
-                segments.append(residues)
-                residues = []
-            if (r != ro) or (i != io) or (c != co) or (s != so):
-                residues.append((r, i, c, s))
-                ro, io, co, so = (r, i, c, s)
-        if len(residues) != 0:
-            segments.append(residues)
+
+        segments = sequenceID((mol.chain, mol.segid)) # Here I consider segments both chains and segments
+        residues = sequenceID((mol.resid, mol.insertion, mol.chain, mol.segid))
 
         dihedrals = []
-        for s in segments:
-            residues = s
-            for r in range(len(residues)):
-                resid, ins, chain, segid = residues[r]
-                if 'psi' in dih and r != len(residues)-1:  # No psi angle for last residue
-                    resid2, ins2, _, _ = residues[r+1]
-                    dihedrals.append(Dihedral.psi(mol, resid, resid2, segid, chain, ins, ins2))
+        for s in np.unique(segments):
+            for r in np.unique(residues[segments == s]):
+                res1 = np.where(residues == r)[0]
+
+                if 'psi' in dih and r != residues.max():  # No psi angle for last residue
+                    res2 = np.where(residues == (r + 1))[0]
+                    dihedrals.append(Dihedral.psi(mol, res1, res2))
                 if 'phi' in dih and r != 0:  # No phi angle for first residue
-                    resid1neg, ins1neg, _, _ = residues[r-1]
-                    dihedrals.append(Dihedral.phi(mol, resid1neg, resid, segid, chain, ins1neg, ins))
-                if 'omega' in dih and r != len(residues)-1:
-                    resid2, ins2, _, _ = residues[r + 1]
-                    dihedrals.append(Dihedral.omega(mol, resid, resid2, segid, chain, ins, ins2))
+                    res2 = np.where(residues == (r - 1))[0]
+                    dihedrals.append(Dihedral.phi(mol, res2, res1))
+                if 'omega' in dih and r != residues.max():
+                    res2 = np.where(residues == (r + 1))[0]
+                    dihedrals.append(Dihedral.omega(mol, res1, res2))
                 if 'chi1' in dih:
-                    dihedrals.append(Dihedral.chi1(mol, resid, segid, chain, ins))
+                    dihedrals.append(Dihedral.chi1(mol, res1))
                 if 'chi2' in dih:
-                    dihedrals.append(Dihedral.chi2(mol, resid, segid, chain, ins))
+                    dihedrals.append(Dihedral.chi2(mol, res1))
                 if 'chi3' in dih:
-                    dihedrals.append(Dihedral.chi3(mol, resid, segid, chain, ins))
+                    dihedrals.append(Dihedral.chi3(mol, res1))
                 if 'chi4' in dih:
-                    dihedrals.append(Dihedral.chi4(mol, resid, segid, chain, ins))
+                    dihedrals.append(Dihedral.chi4(mol, res1))
                 if 'chi5' in dih:
-                    dihedrals.append(Dihedral.chi5(mol, resid, segid, chain, ins))
+                    dihedrals.append(Dihedral.chi5(mol, res1))
         return [d for d in dihedrals if d is not None]
 
     # Sidechain dihedral atoms taken from
     # http://www.ccp14.ac.uk/ccp/web-mirrors/garlic/garlic/commands/dihedrals.html
     @staticmethod
-    def phi(mol, res1, res2, segid=None, chain=None, insertion1=None, insertion2=None):
+    def phi(mol, sel1, sel2):
         """ Constructs a Dihedral object corresponding to the phi angle of res1 and res2
 
         Parameters
@@ -248,17 +181,11 @@ class Dihedral:
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
         """
-        res1dict = Dihedral._findResidue(mol, res1, insertion1, chain, segid)
-        res2dict = Dihedral._findResidue(mol, res2, insertion2, chain, segid)
-        return Dihedral(Dihedral._findAtom(mol, 'C', res1dict),
-                        Dihedral._findAtom(mol, 'N', res2dict),
-                        Dihedral._findAtom(mol, 'CA', res2dict),
-                        Dihedral._findAtom(mol, 'C', res2dict),
-                        dihedraltype='phi',
-                        check_valid=False)
+        phi = (('C'), ('N', 'CA', 'C'))
+        return Dihedral._buildDihedral(mol, 'phi', phi, [sel1, sel2])
 
     @staticmethod
-    def psi(mol, res1, res2, segid=None, chain=None, insertion1=None, insertion2=None):
+    def psi(mol, sel1, sel2):
         """ Constructs a Dihedral object corresponding to the psi angle of res1 and res2
 
         Parameters
@@ -283,17 +210,13 @@ class Dihedral:
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
         """
-        res1dict = Dihedral._findResidue(mol, res1, insertion1, chain, segid)
-        res2dict = Dihedral._findResidue(mol, res2, insertion2, chain, segid)
-        return Dihedral(Dihedral._findAtom(mol, 'N', res1dict),
-                        Dihedral._findAtom(mol, 'CA', res1dict),
-                        Dihedral._findAtom(mol, 'C', res1dict),
-                        Dihedral._findAtom(mol, 'N', res2dict),
-                        dihedraltype='psi',
-                        check_valid=False)
+        psi = (('N', 'CA', 'C'), ('N'))
+
+        return Dihedral._buildDihedral(mol, 'psi', psi, [sel1, sel2])
+
 
     @staticmethod
-    def omega(mol, res1, res2, segid=None, chain=None, insertion1=None, insertion2=None):
+    def omega(mol, sel1, sel2):
         """ Constructs a Dihedral object corresponding to the omega angle of res1 and res2
 
         Parameters
@@ -318,31 +241,20 @@ class Dihedral:
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
         """
-        res1dict = Dihedral._findResidue(mol, res1, insertion1, chain, segid)
-        res2dict = Dihedral._findResidue(mol, res2, insertion2, chain, segid)
-        return Dihedral(Dihedral._findAtom(mol, 'CA', res1dict),
-                        Dihedral._findAtom(mol, 'C', res1dict),
-                        Dihedral._findAtom(mol, 'N', res2dict),
-                        Dihedral._findAtom(mol, 'CA', res2dict),
-                        dihedraltype='omega',
-                        check_valid=False)
+        omega = (('CA', 'C'), ('N', 'CA'))
+
+        return Dihedral._buildDihedral(mol, 'omega', omega, [sel1, sel2])
 
     @staticmethod
-    def chi1(mol, res, segid=None, chain=None, insertion=None):
+    def chi1(mol, sel):
         """ Constructs a Dihedral object corresponding to the chi1 angle of a residue
 
         Parameters
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
-        res : int
-            The resid of the residue
-        segid : str
-            The segment id of the residue
-        chain : str
-            The chain letter of the residue
-        insertion : str
-            The insertion letter of the residue
+        sel : str
+            Atom selection of the residue
 
         Returns
         -------
@@ -355,33 +267,25 @@ class Dihedral:
                 'MET': chi1std, 'PHE': chi1std, 'PRO': chi1std, 'SER': ('N', 'CA', 'CB', 'OG'),
                 'THR': ('N', 'CA', 'CB', 'OG1'), 'TRP': chi1std, 'TYR': chi1std, 'VAL': ('N', 'CA', 'CB', 'CG1')}
 
-        resdict = Dihedral._findResidue(mol, res, insertion, chain, segid)
-        resname = Dihedral._findResname(mol, resdict)
+        if isinstance(sel, str):
+            sel = mol.atomselect(sel, indexes=True)
+        resname = np.unique(mol.resname[sel])[0]
         if resname not in chi1:
             return None
-        return Dihedral(Dihedral._findAtom(mol, chi1[resname][0], resdict),
-                        Dihedral._findAtom(mol, chi1[resname][1], resdict),
-                        Dihedral._findAtom(mol, chi1[resname][2], resdict),
-                        Dihedral._findAtom(mol, chi1[resname][3], resdict),
-                        dihedraltype='chi1',
-                        check_valid=False)
+        chi1 = chi1[resname]
+
+        return Dihedral._buildDihedral(mol, 'chi1', chi1, [sel,])
 
     @staticmethod
-    def chi2(mol, res, segid=None, chain=None, insertion=None):
+    def chi2(mol, sel):
         """ Constructs a Dihedral object corresponding to the chi2 angle of a residue
 
         Parameters
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
-        res : int
-            The resid of the residue
-        segid : str
-            The segment id of the residue
-        chain : str
-            The chain letter of the residue
-        insertion : str
-            The insertion letter of the residue
+        sel : str
+            Atom selection of the residue
 
         Returns
         -------
@@ -395,33 +299,25 @@ class Dihedral:
                 'MET': ('CA', 'CB', 'CG', 'SD'), 'PHE': ('CA', 'CB', 'CG', 'CD1'), 'PRO': chi2std,
                 'TRP': ('CA', 'CB', 'CG', 'CD1'), 'TYR': ('CA', 'CB', 'CG', 'CD1')}
 
-        resdict = Dihedral._findResidue(mol, res, insertion, chain, segid)
-        resname = Dihedral._findResname(mol, resdict)
+        if isinstance(sel, str):
+            sel = mol.atomselect(sel, indexes=True)
+        resname = np.unique(mol.resname[sel])[0]
         if resname not in chi2:
             return None
-        return Dihedral(Dihedral._findAtom(mol, chi2[resname][0], resdict),
-                        Dihedral._findAtom(mol, chi2[resname][1], resdict),
-                        Dihedral._findAtom(mol, chi2[resname][2], resdict),
-                        Dihedral._findAtom(mol, chi2[resname][3], resdict),
-                        dihedraltype='chi2',
-                        check_valid=False)
+        chi2 = chi2[resname]
+
+        return Dihedral._buildDihedral(mol, 'chi2', chi2, [sel,])
 
     @staticmethod
-    def chi3(mol, res, segid=None, chain=None, insertion=None):
+    def chi3(mol, sel):
         """ Constructs a Dihedral object corresponding to the chi3 angle of a residue
 
         Parameters
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
-        res : int
-            The resid of the residue
-        segid : str
-            The segment id of the residue
-        chain : str
-            The chain letter of the residue
-        insertion : str
-            The insertion letter of the residue
+        sel : str
+            Atom selection of the residue
 
         Returns
         -------
@@ -431,33 +327,25 @@ class Dihedral:
         chi3 = {'ARG': ('CB', 'CG', 'CD', 'NE'), 'GLN': ('CB', 'CG', 'CD', 'OE1'), 'GLU': ('CB', 'CG', 'CD', 'OE1'),
                 'LYS': ('CB', 'CG', 'CD', 'CE'), 'MET': ('CB', 'CG', 'SD', 'CE')}
 
-        resdict = Dihedral._findResidue(mol, res, insertion, chain, segid)
-        resname = Dihedral._findResname(mol, resdict)
+        if isinstance(sel, str):
+            sel = mol.atomselect(sel, indexes=True)
+        resname = np.unique(mol.resname[sel])[0]
         if resname not in chi3:
             return None
-        return Dihedral(Dihedral._findAtom(mol, chi3[resname][0], resdict),
-                        Dihedral._findAtom(mol, chi3[resname][1], resdict),
-                        Dihedral._findAtom(mol, chi3[resname][2], resdict),
-                        Dihedral._findAtom(mol, chi3[resname][3], resdict),
-                        dihedraltype='chi3',
-                        check_valid=False)
+        chi3 = chi3[resname]
+
+        return Dihedral._buildDihedral(mol, 'chi3', chi3, [sel,])
 
     @staticmethod
-    def chi4(mol, res, segid=None, chain=None, insertion=None):
+    def chi4(mol, sel):
         """ Constructs a Dihedral object corresponding to the chi4 angle of a residue
 
         Parameters
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
-        res : int
-            The resid of the residue
-        segid : str
-            The segment id of the residue
-        chain : str
-            The chain letter of the residue
-        insertion : str
-            The insertion letter of the residue
+        sel : str
+            Atom selection of the residue
 
         Returns
         -------
@@ -466,51 +354,45 @@ class Dihedral:
         """
         chi4 = {'ARG': ('CG', 'CD', 'NE', 'CZ'), 'LYS': ('CG', 'CD', 'CE', 'NZ')}
 
-        resdict = Dihedral._findResidue(mol, res, insertion, chain, segid)
-        resname = Dihedral._findResname(mol, resdict)
+        if isinstance(sel, str):
+            sel = mol.atomselect(sel, indexes=True)
+        resname = np.unique(mol.resname[sel])[0]
         if resname not in chi4:
             return None
-        return Dihedral(Dihedral._findAtom(mol, chi4[resname][0], resdict),
-                        Dihedral._findAtom(mol, chi4[resname][1], resdict),
-                        Dihedral._findAtom(mol, chi4[resname][2], resdict),
-                        Dihedral._findAtom(mol, chi4[resname][3], resdict),
-                        dihedraltype='chi4',
-                        check_valid=False)
+        chi4 = chi4[resname]
+
+        return Dihedral._buildDihedral(mol, 'chi4', chi4, [sel,])
 
     @staticmethod
-    def chi5(mol, res, segid=None, chain=None, insertion=None):
+    def chi5(mol, sel):
         """ Constructs a Dihedral object corresponding to the chi5 angle of a residue
 
         Parameters
         ----------
         mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
-        res : int
-            The resid of the residue
-        segid : str
-            The segment id of the residue
-        chain : str
-            The chain letter of the residue
-        insertion : str
-            The insertion letter of the residue
+        sel : str
+            The atomselection for the residue
 
         Returns
         -------
         dihedral : :class:`Dihedral <htmd.projections.metricdihedral.Dihedral>` object
             A Dihedral object
+
+        Examples
+        --------
+        >>> Dihedral.chi5(mol, 'resid 5 and chain X')
         """
         chi5 = {'ARG': ('CD', 'NE', 'CZ', 'NH1')}
 
-        resdict = Dihedral._findResidue(mol, res, insertion, chain, segid)
-        resname = Dihedral._findResname(mol, resdict)
+        if isinstance(sel, str):
+            sel = mol.atomselect(sel, indexes=True)
+        resname = np.unique(mol.resname[sel])[0]
         if resname not in chi5:
             return None
-        return Dihedral(Dihedral._findAtom(mol, chi5[resname][0], resdict),
-                        Dihedral._findAtom(mol, chi5[resname][1], resdict),
-                        Dihedral._findAtom(mol, chi5[resname][2], resdict),
-                        Dihedral._findAtom(mol, chi5[resname][3], resdict),
-                        dihedraltype='chi5',
-                        check_valid=False)
+        chi5 = chi5[resname]
+
+        return Dihedral._buildDihedral(mol, 'chi5', chi5, [sel,])
 
 
 class MetricDihedral(Projection):
@@ -523,20 +405,19 @@ class MetricDihedral(Projection):
     sincos : bool, optional
         Set to True to return the dihedral angles as their sine and cosine components. Makes them periodic.
     protsel : str, optional
-        Atom selection string for the protein segment for which to calculate dihedral angles. Resids should be unique
-        within that segment. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
+        If no `dih` are passed, `MetricDihedral` will automatically calculate the phi/psi dihedral angles of `protsel`.
 
     Examples
     --------
     >>> mol = Molecule('3PTB')
     >>> mol.filter('not insertion A')
-    >>> met = MetricDihedral()
+    >>> met = MetricDihedral(protsel='protein and segid 0')
     >>> met.project(mol)
     >>> # More complicated example
     >>> dih = []
-    >>> dih.append(Dihedral.chi1(mol, 45))
-    >>> dih.append(Dihedral.psi(mol, 29, 30))
-    >>> met = MetricDihedral(dih, protsel='protein and segid 0')
+    >>> dih.append(Dihedral.chi1(mol, 'resid 45'))
+    >>> dih.append(Dihedral.psi(mol, 'resid 29', 'resid 30'))
+    >>> met = MetricDihedral(dih)
     >>> met.project(mol)
     >>> met.getMapping(mol)
     """
@@ -608,8 +489,6 @@ class MetricDihedral(Projection):
         return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
     def _dihedralAtomsPrecalc(self, mol, protsel):
-        protatoms = mol.atomselect(protsel)
-
         if self._dihedrals is None:  # Default phi psi dihedrals
             dihedrals = Dihedral.proteinDihedrals(mol, protsel)
         else:
@@ -617,7 +496,7 @@ class MetricDihedral(Projection):
             self._dihedrals = ensurelist(self._dihedrals)
             dihedrals = self._dihedrals
 
-        return Dihedral.dihedralsToIndexes(mol, dihedrals, protatoms)
+        return Dihedral.dihedralsToIndexes(mol, dihedrals)
 
     def _calcDihedralAngles(self, mol, dihedrals, sincos=True):
         from htmd.numbautil import dihedralAngle
@@ -676,11 +555,11 @@ if __name__ == "__main__":
     metr = MetricDihedral(protsel='protein')
     data = metr.project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', 'ref.npy'))
-    assert np.allclose(data, dataref, atol=1e-03), 'Diherdals calculation gave different results from reference'
+    assert np.allclose(data, dataref, atol=1e-03), 'Dihedrals calculation gave different results from reference'
 
     mol = Molecule('5MAT')
     mol.filter('not insertion A and not altloc A B')
     mol = autoSegment(mol)
     data = MetricDihedral().project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', '5mat.npy'))
-    assert np.allclose(data, dataref, atol=1e-03), 'Diherdals calculation gave different results from reference'
+    assert np.allclose(data, dataref, atol=1e-03), 'Dihedrals calculation gave different results from reference'
