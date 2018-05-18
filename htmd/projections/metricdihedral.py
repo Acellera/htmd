@@ -562,4 +562,6 @@ if __name__ == "__main__":
     mol = autoSegment(mol)
     data = MetricDihedral().project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', '5mat.npy'))
+    refshape = (len(mol.sequence(noseg=True)['protein']) * 2 - 2) * 2  # 2 for phi/psi, minus two for termini, times 2 for sin/cos
+    assert data.shape[1] == refshape
     assert np.allclose(data, dataref, atol=1e-03), 'Dihedrals calculation gave different results from reference'
