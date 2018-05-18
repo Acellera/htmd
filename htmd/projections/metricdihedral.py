@@ -129,16 +129,17 @@ class Dihedral:
 
         dihedrals = []
         for s in np.unique(segments):
-            for r in np.unique(residues[segments == s]):
+            segres = residues[segments == s]
+            for r in np.unique(segres):
                 res1 = np.where(residues == r)[0]
 
-                if 'psi' in dih and r != residues.max():  # No psi angle for last residue
+                if 'psi' in dih and r != segres.max():  # No psi angle for last residue
                     res2 = np.where(residues == (r + 1))[0]
                     dihedrals.append(Dihedral.psi(mol, res1, res2))
-                if 'phi' in dih and r != 0:  # No phi angle for first residue
+                if 'phi' in dih and r != segres.min():  # No phi angle for first residue
                     res2 = np.where(residues == (r - 1))[0]
                     dihedrals.append(Dihedral.phi(mol, res2, res1))
-                if 'omega' in dih and r != residues.max():
+                if 'omega' in dih and r != segres.max():
                     res2 = np.where(residues == (r + 1))[0]
                     dihedrals.append(Dihedral.omega(mol, res1, res2))
                 if 'chi1' in dih:
@@ -562,6 +563,4 @@ if __name__ == "__main__":
     mol = autoSegment(mol)
     data = MetricDihedral().project(mol)
     dataref = np.load(path.join(home(), 'data', 'metricdihedral', '5mat.npy'))
-    refshape = (len(mol.sequence(noseg=True)['protein']) * 2 - 2) * 2  # 2 for phi/psi, minus two for termini, times 2 for sin/cos
-    assert data.shape[1] == refshape
     assert np.allclose(data, dataref, atol=1e-03), 'Dihedrals calculation gave different results from reference'
