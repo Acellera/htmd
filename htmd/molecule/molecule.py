@@ -1625,10 +1625,10 @@ class UniqueAtomID:
                     continue
             sel &= getattr(mol, f) == getattr(self, f)
 
-        if sum(sel) > 1:
+        if np.sum(sel) > 1:
             raise RuntimeError('The atom corresponding to {} is no longer unique in your '
                                'Molecule: {}'.format(self.__str__(), np.where(sel)[0]))
-        if sum(sel) == 0:
+        if not np.any(sel):
             raise RuntimeError('The atom corresponding to {} is no longer present in your '
                                'Molecule'.format(self.__str__()))
         if indexes:
