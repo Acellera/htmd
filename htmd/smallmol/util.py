@@ -486,6 +486,7 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
 
     """
     from os.path import splitext
+    from rdkit.Chem import Kekulize
     from rdkit.Chem.Draw import rdMolDraw2D
     from IPython.display import SVG
 
@@ -513,6 +514,10 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
         else:
             sel_atoms = highlightAtoms
             sel_colors = {aIdx: _highlight_colors[0] for aIdx in sel_atoms}
+
+    # kekulize
+    Kekulize(mol)
+
 
     drawer.DrawMolecule(mol, highlightAtoms=sel_atoms, highlightBonds=[], highlightAtomColors=sel_colors)
 
@@ -562,6 +567,7 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
             If ipython set as True, the SVG rendering is returned
 
         """
+    import rdkit
     from rdkit.Chem.Draw import MolsToGridImage
     from IPython.display import SVG
     from os.path import splitext
@@ -577,8 +583,12 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
             sel_atoms = highlightAtoms
             sel_colors = [{aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms]
 
-    svg = MolsToGridImage(mols_list, highlightAtomLists=sel_atoms, highlightBondLists=[],
-                          highlightAtomColors=sel_colors, legends=legends, molsPerRow=mols_perrow, useSVG=True)
+    if MolsToGridImage == rdkit.Chem.Draw.IPythonConsole.ShowMols:
+        rdkit.Chem.Draw.IPythonConsole.UninstallIPythonRenderer()
+        from rdkit.Chem.Draw import MolsToGridImage
+
+    svg = MolsToGridImage(mols_list, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
+                                                                legends=legends, molsPerRow=mols_perrow, useSVG=True)
 
     if filename:
         ext = splitext(filename)[-1]
@@ -588,6 +598,7 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
         f.close()
 
     if ipython:
-        return SVG(svg)
+            _svg = SVG(svg)
+            return _svg
     else:
         return None
