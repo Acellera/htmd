@@ -889,9 +889,9 @@ class Model(object):
             microcenters = np.vstack(getStateStatistic(self, data, range(self.micronum), statetype='micro'))
 
         if fescmap is None:
-            fescmap = plt.cm.autumn
+            fescmap = plt.cm.jet
         if statescmap is None:
-            statescmap = plt.cm.nipy_spectral
+            statescmap = plt.cm.jet
         if cmap is not None:
             fescmap = cmap
             statescmap = cmap
