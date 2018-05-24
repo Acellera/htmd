@@ -305,7 +305,7 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
-from htmd.apps.acemd3 import Acemd3, _Restraint, GroupRestraint, AtomRestraint
+from htmd.mdengine.acemd.acemd import Acemd3, _Restraint, GroupRestraint, AtomRestraint
 class EquilibrationAcemd3(ProtocolInterface):
     """ Equilibration protocol v2
 

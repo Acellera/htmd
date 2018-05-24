@@ -265,7 +265,7 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
-from htmd.apps.acemd3 import Acemd3, _Restraint, GroupRestraint, AtomRestraint
+from htmd.mdengine.acemd.acemd import Acemd3, _Restraint, GroupRestraint, AtomRestraint
 class ProductionAcemd3(ProtocolInterface):
     ''' Production protocol v5 for Acemd 3
 
