@@ -563,6 +563,14 @@ def _applyProteinCaps(mol, caps):
             mol.remove('segid {} and resid "{}" and name {}'.format(seg, orig_terminalresids[i], ' '.join(terminalatoms[cap])),
                        _logger=False)
 
+    # Remove terminal hydrogens regardless of caps or no caps. tleap confuses itself when it makes residues into terminals.
+    # For example HID has an atom H which in NHID should become H[123] and crashes tleap.
+    for seg in np.unique(mol.get('segid', 'protein')):
+        segidm = mol.segid == seg  # Mask for segid
+        segididx = np.where(segidm)[0]
+        resids = mol.resid[segididx]
+        mol.remove('(resid "{}" "{}") and segid {} and hydrogen'.format(resids[0], resids[-1], seg), _logger=False)
+
 
 def _removeProteinBonds(mol):
     segs = np.unique(mol.segid[mol.atomtype != ''])  # Keeping bonds related to mol2 files
