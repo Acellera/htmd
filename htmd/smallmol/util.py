@@ -11,15 +11,13 @@ from rdkit.Chem import ChemicalFeatures
 from rdkit import RDConfig
 
 
-_highlight_colors = [(1.00,0.50,0.00), (0.00,0.50,1.00), (0.00,1.00,0.50),
-                     (1.00,0.00,0.50), (0.50,0.00,1.00), (0.50,1.00,0.00),
-                     (1.00,0.00,0.25), (0.00,0.25,1.00), (0.25,1.00,0.00)]
+_highlight_colors = [(1.00, 0.50, 0.00), (0.00, 0.50, 1.00), (0.00, 1.00, 0.50),
+                     (1.00, 0.00, 0.50), (0.50, 0.00, 1.00), (0.50, 1.00, 0.00),
+                     (1.00, 0.00, 0.25), (0.00, 0.25, 1.00), (0.25, 1.00, 0.00)]
 
-array_cache = {(16, 1.): _getGridCenters(np.array([-8] * 3),
-                                               [16, 16, 16], 1.).reshape(16**3, 3),
-                   (24, 1.): _getGridCenters(np.array([-12] * 3),
-                                               [24, 24, 24], 1.).reshape(24**3, 3)}
-
+array_cache = {(16, 1.): _getGridCenters(np.array([-8] * 3), [16, 16, 16], 1.).reshape(16**3, 3),
+               (24, 1.): _getGridCenters(np.array([-12] * 3), [24, 24, 24], 1.).reshape(24**3, 3)
+               }
 
 
 fdefName = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
@@ -44,7 +42,7 @@ def get_rotationMatrix(axis, theta):
 
     axis = np.asarray(axis)
     theta = np.asarray(theta)
-    axis = axis / math.sqrt(np.dot(axis, axis))
+    axis /= math.sqrt(np.dot(axis, axis))
     a = math.cos(theta / 2)
     b, c, d = -axis * math.sin(theta / 2)
     aa, bb, cc, dd = a * a, b * b, c * c, d * d
@@ -69,7 +67,7 @@ def _getRotationMatrix(axis, theta, deg=False):
     rotmatrix: np.array
         The rotational matrix
     """
-    # Development note: I will test the above rotationl matrix. If same behaviour this one will be deprecated
+    # Development note: I will test the above rotation matrix. If same behaviour this one will be deprecated
 
     if deg:
         theta = math.radians(theta)
@@ -81,9 +79,10 @@ def _getRotationMatrix(axis, theta, deg=False):
     Y = axis[1]
     Z = axis[2]
 
-    return np.array([ [t*X*X+c, t*X*Y-s*Z, t*X*Z+s*Y],
-                      [t*X*Y+s*Z, t*Y*Y+c, t*Y*Z-s*X],
-                      [t*X*Z-s*Y, t*Y*Z+s*X, t*Z*Z+c] ])
+    return np.array([[t*X*X+c, t*X*Y-s*Z, t*X*Z+s*Y],
+                     [t*X*Y+s*Z, t*Y*Y+c, t*Y*Z-s*X],
+                     [t*X*Z-s*Y, t*Y*Z+s*X, t*Z*Z+c]])
+
 
 def _normalizeVector(v):
     """
@@ -104,8 +103,9 @@ def _normalizeVector(v):
 
     if l == 0:
         print('warning normalized vector goes to 0')
-        return np.array([0,0,0])
+        return np.array([0, 0, 0])
     return v / l
+
 
 def _getPerpendicular(v):
     """
@@ -121,7 +121,7 @@ def _getPerpendicular(v):
     V:  np.array
         The perpendicular vector
     """
-    V = [0,0,0]
+    V = [0, 0, 0]
     X, Y, Z = v[0], v[1], v[2]
     if X != 0:
         if Y != 0:
@@ -138,12 +138,13 @@ def _getPerpendicular(v):
             V[1] = Z
         else:
             V[0] = 1
-    elif Z !=0:
+    elif Z != 0:
         V[0] = 1
 
     return np.array(V)
 
-def rotate(coords, rotMat, center=(0,0,0)):
+
+def rotate(coords, rotMat, center=(0, 0, 0)):
     """ Rotate a selection of atoms by a given rotation around a center
     Parameters
     ----------
@@ -225,6 +226,7 @@ def alignMol(smallmol, refmol):
 
     return sm_new
 
+
 def openbabelConvert(input_file, input_format, output_format):
     """
     Converts the file from the input format to the output format specified. It uses the openbabel features
@@ -268,9 +270,10 @@ def convertToString(arr):
     elif isinstance(arr, tuple):
         arr_str = " ".join([str(i) for i in arr])
     else:
-        arr_str = " ".join([ str(i) for i in arr[0] ])
+        arr_str = " ".join([str(i) for i in arr[0]])
 
     return arr_str
+
 
 def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtoms=None):
     """
@@ -317,12 +320,12 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
     sel_colors = {}
     # highlight atoms
     if highlightAtoms is not None:
-        if isinstance(highlightAtoms[0], list ):
+        if isinstance(highlightAtoms[0], list):
             sel_atoms = [aIdx for subset in highlightAtoms for aIdx in subset]
-            sel_colors = {aIdx: _highlight_colors[n%len(_highlight_colors)] for n, subset in enumerate(highlightAtoms) for aIdx in subset}
+            sel_colors = {aIdx: _highlight_colors[n % len(_highlight_colors)] for n, subset in enumerate(highlightAtoms) for aIdx in subset}
         else:
             sel_atoms = highlightAtoms
-            sel_colors = { aIdx:_highlight_colors[0] for aIdx in sel_atoms }
+            sel_colors = {aIdx: _highlight_colors[0] for aIdx in sel_atoms}
 
     drawer.DrawMolecule(mol, highlightAtoms=sel_atoms, highlightBonds=[], highlightAtomColors=sel_colors)
 
@@ -332,7 +335,7 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
     svg = drawer.GetDrawingText()
 
     # activate saving into a file
-    if filename != None:
+    if filename is not None:
         ext = splitext(filename)[-1]
         filename = filename if ext != '' else filename + '.svg'
         f = open(filename, 'w')
@@ -345,6 +348,7 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
         return SVG(svg)
     else:
         return None
+
 
 def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, highlightAtoms=None, mols_perrow=3):
     """
@@ -379,14 +383,15 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
     sel_colors = []
     if highlightAtoms is not None:
         if isinstance(highlightAtoms[0][0], list):
-            sel_atoms = [ [a for a in subset] for mol_set in highlightAtoms for subset in mol_set ]
-            sel_colors = [ {aIdx:_highlight_colors[n%len(_highlight_colors)] for aIdx in subset } for mol_set in highlightAtoms for n, subset in enumerate(mol_set)  ]
+            sel_atoms = [[a for a in subset] for mol_set in highlightAtoms for subset in mol_set]
+            sel_colors = [{aIdx: _highlight_colors[n % len(_highlight_colors)] for aIdx in subset}
+                          for mol_set in highlightAtoms for n, subset in enumerate(mol_set)]
         else:
             sel_atoms = highlightAtoms
-            sel_colors = [ {aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms ]
+            sel_colors = [{aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms]
 
-    svg = MolsToGridImage(mols_list, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
-                                                                legends=legends, molsPerRow=mols_perrow, useSVG=True)
+    svg = MolsToGridImage(mols_list, highlightAtomLists=sel_atoms, highlightBondLists=[],
+                          highlightAtomColors=sel_colors, legends=legends, molsPerRow=mols_perrow, useSVG=True)
 
     if filename:
         ext = splitext(filename)[-1]

@@ -19,14 +19,14 @@ class Builder:
     -------
     >>> sm = SmallMol('CCC')
     >>> sm.coords[0], sm.numAtoms
-   ( array([[ 0.],[ 0.],[ 0.]]), 11)
-   >>> B = Builder(sm)
-   >>> sm_new = B.getSmallMol()
-   >>> sm_new.coords[0]
-   array([[ 1.1701015 ],[-0.21571056],[-0.21615667]])
-   >>> B.removeHydrogens()
-   >>> B.getSmallMol().numAtoms
-   3
+    ( array([[ 0.],[ 0.],[ 0.]]), 11)
+    >>> B = Builder(sm)
+    >>> sm_new = B.getSmallMol()
+    >>> sm_new.coords[0]
+    array([[ 1.1701015 ],[-0.21571056],[-0.21615667]])
+    >>> B.removeHydrogens()
+    >>> B.getSmallMol().numAtoms
+    3
     """
 
     def __init__(self, smallmol=None, checkInitialConformer=True):
@@ -93,14 +93,14 @@ class Builder:
         else:
             heavy_sel = ' '.join(_heavy_atoms)
 
-        atomidxs = sm.get( 'idx', 'element {}'.format(heavy_sel))
+        atomidxs = sm.get('idx', 'element {}'.format(heavy_sel))
         formalcharges = sm.get('formalcharge', 'element {}'.format(heavy_sel))
 
         missing_atoms = np.array([pT.getMissingValence(sm, aId, fch) for aId, fch in zip(atomidxs, formalcharges)])
         ids = np.where(missing_atoms > 0)
         heavyToFill = atomidxs[ids]
         numHydrogens = missing_atoms[ids]
-        #print("missing hydrogens: ", numHydrogens)
+        # print("missing hydrogens: ", numHydrogens)
         h_atoms = []
 
         for n_h, a in zip(numHydrogens, heavyToFill):
@@ -122,16 +122,14 @@ class Builder:
             If True, the non polar hydrogens will be removed
         """
 
-        ## TODO
-        ## Fix the the kekulization problem whem removing hydrogen from NH in aromatic system.
+        # TODO: Fix the the kekulization problem when removing hydrogen from NH in aromatic system.
         sm = self.smallmol
-        hydrogensIdx =  sm.get('idx', 'element H')
+        hydrogensIdx = sm.get('idx', 'element H')
 
         neighborsIdx = np.concatenate(sm.neighbors[hydrogensIdx])
         neighbors = sm.element[neighborsIdx]
-        hydrogensPolarIdx = hydrogensIdx[np.where( neighbors != 'C' )]
+        hydrogensPolarIdx = hydrogensIdx[np.where(neighbors != 'C')]
         hydrogensNonPolarIdx = hydrogensIdx[np.where(neighbors == 'C')]
-
 
         hydrogensIdx = np.array([], dtype=int)
         if removePolars:
@@ -153,10 +151,10 @@ class Builder:
 
         sm = self.smallmol
 
-        #c = 1
+        # c = 1
         for a in atoms:
             n_atom = sm.numAtoms
-           # print('placing {} to {}'.format(n_atom, a['attachTo']))
+            # print('placing {} to {}'.format(n_atom, a['attachTo']))
             sm.idx = np.append(sm.idx, n_atom)
             sm.element = np.append(sm.element, a['element'])
             sm.atomname = np.append(sm.atomname, '{}{}'.format(a['element'], n_atom))
@@ -179,14 +177,14 @@ class Builder:
                 sm.neighbors[a['attachTo']].append(n_atom)
                 sm.bondtypes[a['attachTo']].append(a['bondtype'])
 
-            #TODO based on chiral
+            # TODO: based on chiral
             sm._chiraltags = np.append(sm._chiraltags, 0)
             # Development note: removed assignement explicitHs
 
             # coords
             sm.coords[n_atom] = self._computeAtomCoords(n_atom, a['attachTo'])
 
-            #c += 1
+            # c += 1
 
     def _computeAtomCoords(self, atomIdx, attachToIdx):
         """
@@ -204,10 +202,9 @@ class Builder:
         newcoords: np.array
             The np.array of the new atom coords
         """
-        # TODO
-        # differenc hybridization from S SP SP2 SP3: Like S, P
+        # TODO: different hybridization from S SP SP2 SP3: Like S, P
 
-        sm =self.smallmol
+        sm = self.smallmol
         pT = self.periodictable
 
         atom_element = sm.element[atomIdx]
@@ -218,7 +215,7 @@ class Builder:
         heavy_neighbors_num = len(heavy_neighbors)
         bondLength = pT.getBondRadius(heavy_element) + pT.getBondRadius(atom_element)
 
-        dirVect = np.array([0,0,0])
+        dirVect = np.array([0, 0, 0])
         if heavy_neighbors_num == 1:
             dirVect[2] = 1
 
@@ -283,11 +280,12 @@ class Builder:
                 dirVect = np.dot(rot_matrix, dirVect)
 
         elif heavy_neighbors_num == 4:
-          #  print('last attachment sp3 procedure')
+            # print('last attachment sp3 procedure')
             nbrs = self._filterNeighbors(attachToIdx, atomIdx)
             nbr1, nbr2, nbr3 = nbrs
 
-            nbr1_coords, nbr2_coords, nbr3_coords = sm.coords[nbr1].reshape(3), sm.coords[nbr2].reshape(3), sm.coords[nbr3].reshape(3)
+            nbr1_coords, nbr2_coords, nbr3_coords = sm.coords[nbr1].reshape(3), sm.coords[nbr2].reshape(3), \
+                                                    sm.coords[nbr3].reshape(3)
 
             nbr1Vect = heavy_coords - nbr1_coords
             nbr2Vect = heavy_coords - nbr2_coords
@@ -302,7 +300,7 @@ class Builder:
 
         atom_coords = heavy_coords + dirVect * bondLength
 
-        return  atom_coords.reshape(3,1)
+        return atom_coords.reshape(3, 1)
 
     def _filterNeighbors(self, atomIdx, exclude):
         """
@@ -325,7 +323,7 @@ class Builder:
         sm = self.smallmol
 
         neighbors = sm.neighbors[atomIdx]
-        return [ n for n in neighbors if n != exclude]
+        return [n for n in neighbors if n != exclude]
 
     def _removeAtoms(self, ids):
         """
@@ -360,7 +358,7 @@ class Builder:
         sm.neighbors = np.array(new_neighbors)
         sm.bondtypes = np.array(new_bondstype)
 
-        atom_mapper = { hIdx:n for n, hIdx in enumerate(sm.idx) }
+        atom_mapper = {hIdx: n for n, hIdx in enumerate(sm.idx)}
 
         self._fixAtomNumber(atom_mapper)
 

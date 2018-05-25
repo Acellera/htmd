@@ -1,4 +1,3 @@
-
 from rdkit.Chem.rdchem import HybridizationType, BondType, ChiralType
 from rdkit.Chem import GetPeriodicTable
 from rdkit import rdBase
@@ -6,12 +5,10 @@ import numpy as np
 
 
 _heavy_atoms = ['C', 'N', 'O', 'F',
-                'Si','P', 'S', 'Cl', 'Br', 'I']
+                'Si', 'P', 'S', 'Cl', 'Br', 'I']
 
-_hetero_atoms = ['N', 'O', 'F',
-                'Si','P', 'S', 'Cl', 'Br', 'I']
+_hetero_atoms = ['N', 'O', 'F', 'Si', 'P', 'S', 'Cl', 'Br', 'I']
 
-_hetero_atoms = ['N', 'O', 'F', 'P', 'S', 'Cl', 'Br', 'I']
 _halogen_atoms = ['F', 'Cl', 'Br', 'I']
 
 
@@ -30,8 +27,8 @@ atom_mapping = {"Hydrophobe": 0,
                 "PosIonizable": 4,
                 "NegIonizable": 5}
 
-_chiral_type = {ChiralType.CHI_TETRAHEDRAL_CW:'clockwise',
-                ChiralType.CHI_TETRAHEDRAL_CCW:'anitclockwise'}
+_chiral_type = {ChiralType.CHI_TETRAHEDRAL_CW: 'clockwise',
+                ChiralType.CHI_TETRAHEDRAL_CCW: 'anticlockwise'}
 _chiral_type_Dict = ChiralType.values
 
 _bondtypes_IdxToType = BondType.values
@@ -39,9 +36,10 @@ _bondtypes_StringToType = {'SINGLE': BondType.SINGLE,
                            'DOUBLE': BondType.DOUBLE,
                            'TRIPLE': BondType.TRIPLE}
 
-_atoms = {'H': [ 'H', 0, 0, '', 1, 1],
-         'C': ['C', 0, 0, '', 4, 1],
-        }
+_atoms = {'H': ['H', 0, 0, '', 1, 1],
+          'C': ['C', 0, 0, '', 4, 1]
+          }
+
 
 class PeriodicTable:
     """
@@ -69,7 +67,7 @@ class PeriodicTable:
             The number of atoms that miss for completing the atom valence
 
         """
-        normbondvalence = sum([ 1.5 if int(b) == 12 else int(b) for b in btypes  ])
+        normbondvalence = sum([1.5 if int(b) == 12 else int(b) for b in btypes])
 
         missatoms = int(valence - normbondvalence)
 
@@ -115,12 +113,11 @@ class PeriodicTable:
             The number of atom that are missing for completing the valence
         """
 
-
         pT = self.PeriodicaTable
 
         element = smallmol.element[atomidx]
         btypes = smallmol.bondtypes[atomidx]
-        #steric_number = len(smallmol.neighbors[atomidx])
+        # steric_number = len(smallmol.neighbors[atomidx])
 
         valences = list(pT.GetValenceList(element))
 
@@ -135,14 +132,14 @@ class PeriodicTable:
 
         missingatoms = self._evaluateMissingAtoms(valence,  btypes)
 
-        missingatoms = missingatoms + formalcharge
+        missingatoms += formalcharge
 
         return missingatoms
 
-
-    def getAtom(self, element, attachTo=None, coords=None ):
+    def getAtom(self, element, attachTo=None, coords=None):
         """
-        Returns a dictionary with all the information necessary to create a new atom by using htmd.smallmol.chemlab.Builder
+        Returns a dictionary with all the information necessary to create a new atom by using
+        htmd.smallmol.chemlab.Builder
 
         Parameters
         ----------
@@ -168,18 +165,17 @@ class PeriodicTable:
         if element not in _atoms:
             raise ValueError('The element {} is not available'.format(element))
 
-        keys = ['element', 'charge','formalcharge', 'chiral', 'hybridization', 'bondtype']
+        keys = ['element', 'charge', 'formalcharge', 'chiral', 'hybridization', 'bondtype']
 
-        coords = coords if coords is not None else np.array([0,0,0])
-        coords = {'coords': coords.reshape(1,3,1)}
+        coords = coords if coords is not None else np.array([0, 0, 0])
+        coords = {'coords': coords.reshape(1, 3, 1)}
 
-        atom_data = {k:v for k,v in zip(keys, _atoms[element]) }
+        atom_data = {k: v for k, v in zip(keys, _atoms[element])}
         atom_data.update(coords)
 
         if attachTo is not None:
-            atom_data.update({'attachTo':attachTo})
+            atom_data.update({'attachTo': attachTo})
         else:
             atom_data.update({'attachTo': ''})
 
         return atom_data
-
