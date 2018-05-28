@@ -72,14 +72,23 @@ class SimQueue(metaclass=ABCMeta):
         """ Subclasses need to implement this method """
         pass
 
-    def wait(self, sentinel=False):
+    def wait(self, sentinel=False, sleeptime=5, reporttime=None, reportcallback=None):
         """ Blocks script execution until all queued work completes
 
         Parameters
         ----------
-        sentinel : bool, default=False
+        sentinel : bool
             If False, it relies on the queueing system reporting to determine the number of running jobs. If True, it
             relies on the filesystem, in particular on the existence of a sentinel file for job completion.
+        sleeptime : float
+            The number of seconds to sleep before re-checking for completed jobs.
+        reporttime : float
+            If set to a number it will report every `reporttime` seconds the number of non-completed jobs.
+            If this argument is larger than `sleepttime`, the method will adjust it to the closest multiple of
+            `sleepttime`. If it is shorter than `sleepttime` it will override the `sleepttime` value.
+        reportcallback : method
+            If not None, the reportcallback method will receive as it's first argument the number of non-completed
+            jobs.
 
         Examples
         --------
@@ -88,10 +97,33 @@ class SimQueue(metaclass=ABCMeta):
         from time import sleep
         import sys
 
-        while (self.inprogress() if not sentinel else self.notcompleted()) != 0:
+        if reporttime is not None:
+            if reporttime > sleeptime:
+                from math import round
+                reportfrequency = round(reporttime / sleeptime)
+            else:
+                reportfrequency = 1
+                sleeptime = reporttime
+
+        i = 1
+        while True:
+            inprog = self.inprogress() if not sentinel else self.notcompleted()
+            if reporttime is not None:
+                if i == reportfrequency:
+                    if reportcallback is not None:
+                        reportcallback(inprog)
+                    else:
+                        logger.info('{} jobs are pending completion'.format(inprog))
+                    i = 1
+                else:
+                    i += 1
             self.retrieve()
+
+            if inprog == 0:
+                break
+
             sys.stdout.flush()
-            sleep(5)
+            sleep(sleeptime)
 
     def notcompleted(self):
         """Returns the sum of the number of job directories which do not have the sentinel file for completion.
