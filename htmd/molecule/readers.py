@@ -225,6 +225,9 @@ def MOL2read(filename, frame=None, topoloc=None, singlemol=True):
             if line.startswith('@<TRIPOS>BOND'):
                 section = 'bond'
                 continue
+            if line.startswith('@<TRIPOS>'):  # Skip all other sections
+                section = None
+                continue
 
             if section == 'atom':
                 pieces = line.strip().split()
