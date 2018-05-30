@@ -192,68 +192,82 @@ def GJFread(filename, frame=None, topoloc=None):
     return topo, traj
 
 
-def MOL2read(filename, frame=None, topoloc=None):
+def MOL2read(filename, frame=None, topoloc=None, singlemol=True):
     from periodictable import elements
     element_objs = list(elements._element.values())[1:]
     element_symbols = [e.symbol for e in element_objs]
     assert len(element_symbols) == 118
 
-    topo = Topology()
-    coords = []
+    topologies = []  # Allow reading of multi-mol MOL2 files
+    topologies.append(Topology())
+    topo = topologies[-1]
+    coordinates = [[]]
+    coords = coordinates[-1]
+    section = None
 
-    with open(filename, "r") as f:
-        l = f.readlines()
-
-    start = None
-    end = None
-    bond = None
-    for i in range(len(l)):
-        if l[i].startswith("@<TRIPOS>ATOM"):
-            start = i + 1
-        if l[i].startswith("@<TRIPOS>BOND"):
-            end = i - 1
-            bond = i + 1
-
-    if not start or not end:
-        raise ValueError("File cannot be read")
-
-    # TODO: Error on bad format (using pandas?)
-    natoms = end - start + 1
+    molnum = 0
     unguessed = []
-    for i in range(natoms):
-        s = l[i + start].strip().split()
-        topo.record.append("HETATM")
-        topo.serial.append(int(s[0]))
-        topo.name.append(s[1])
-        coords.append([float(x) for x in s[2:5]])
-        topo.atomtype.append(s[5])
-        if len(s) > 6:
-            topo.resid.append(int(s[6]))
-            if len(s) > 7:
-                topo.resname.append(s[7][:3])
-                if len(s) > 8:
-                    topo.charge.append(float(s[8]))
-        element = s[5].split('.')[0]
-        if element in element_symbols:
-            topo.element.append(element)
-        else:
-            unguessed.append(s[5])
-            topo.element.append('')
+    with open(filename, "r") as f:
+        for line in f:
+            if line.startswith('@<TRIPOS>MOLECULE'):
+                section = None
+                molnum += 1
+                if molnum > 1:  # New Molecule, create new topology
+                    if singlemol:
+                        break
+                    topologies.append(Topology())
+                    topo = topologies[-1]
+                    coordinates.append([])
+                    coords = coordinates[-1]
+            if line.startswith('@<TRIPOS>ATOM'):
+                section = 'atom'
+                continue
+            if line.startswith('@<TRIPOS>BOND'):
+                section = 'bond'
+                continue
+
+            if section == 'atom':
+                pieces = line.strip().split()
+                topo.record.append('HETATM')
+                topo.serial.append(int(pieces[0]))
+                topo.name.append(pieces[1])
+                coords.append([float(x) for x in pieces[2:5]])
+                topo.atomtype.append(pieces[5])
+                if len(pieces) > 6:
+                    topo.resid.append(int(pieces[6]))
+                if len(pieces) > 7:
+                    topo.resname.append(pieces[7][:3])
+                if len(pieces) > 8:
+                    topo.charge.append(float(pieces[8]))
+
+                element = pieces[5].split('.')[0]
+                if element in element_symbols:
+                    topo.element.append(element)
+                else:
+                    unguessed.append(pieces[5])
+                    topo.element.append('')
+            elif section == 'bond':
+                pieces = line.strip().split()
+                if len(pieces) < 4:
+                    raise RuntimeError('Less than 4 values encountered in bonds definition in line {}'.format(line))
+                topo.bonds.append([int(pieces[1]) - 1, int(pieces[2]) - 1])
+                topo.bondtype.append(pieces[3])
+
+
     if len(unguessed) != 0:
         logger.warning('Could not guess elements for {} atoms with MOL2 atomtypes '
                        '({}).'.format(len(unguessed), ', '.join(np.unique(unguessed))))
 
-    if bond:
-        for i in range(bond, len(l)):
-            b = l[i].split()
-            if len(b) < 4:
-                break
-            topo.bonds.append([int(b[1]) - 1, int(b[2]) - 1])
-            topo.bondtype.append(b[3])
+    trajectories = []
+    for cc in coordinates:
+        trajectories.append(Trajectory(coords=np.vstack(cc)[:, :, np.newaxis]))
 
-    coords = np.vstack(coords)[:, :, np.newaxis]
-    traj = Trajectory(coords=coords)
-    return topo, traj
+    if singlemol:
+        if molnum > 1:
+            logger.warning('Mol2 file {} contained multiple molecules. Only the first was read.'.format(filename))
+        return topologies[0], trajectories[0]
+    else:
+        return topologies, trajectories
 
 
 def MAEread(fname, frame=None, topoloc=None):
