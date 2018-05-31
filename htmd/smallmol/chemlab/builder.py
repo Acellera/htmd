@@ -256,6 +256,9 @@ class Builder:
 
                 rot_matrix = _getRotationMatrix(perpVect, 60, deg=True)
                 dirVect = np.dot(rot_matrix, nbrVect)
+            elif heavy_hybridization == 2:
+                dirVect = nbrVect
+
 
         elif heavy_neighbors_num == 3:
             nbrs = self._filterNeighbors(attachToIdx, atomIdx)

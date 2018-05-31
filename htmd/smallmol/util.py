@@ -23,6 +23,39 @@ array_cache = {(16, 1.): _getGridCenters(np.array([-8] * 3), [16, 16, 16], 1.).r
 fdefName = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
 factory = ChemicalFeatures.BuildFeatureFactory(fdefName)
 
+def calculateAngle(atomcentercoords, atom1coords, atom2coords, deg=False):
+
+    r23 = np.zeros(3)
+    r21 = np.zeros(3)
+    norm23 = 0
+    norm21 = 0
+    dotprod = 0
+
+    for i in range(3):
+        r23[i] = atom1coords[i] - atomcentercoords[i]
+        r21[i] = atom2coords[i] - atomcentercoords[i]
+        dotprod += r23[i] * r21[i]
+        norm23 += r23[i] * r23[i]
+        norm21 += r21[i] * r21[i]
+
+    if norm23 == 0:
+        norm23inv = 0
+    else:
+        norm23inv = 1/math.sqrt(norm23)
+    if norm21 == 0:
+        norm21inv = 0
+    else:
+        norm21inv = 1 / math.sqrt(norm21)
+
+    costheta = dotprod * norm21inv * norm23inv
+
+    theta = math.acos(costheta)
+
+    if deg:
+        theta = math.degrees(theta)
+
+    return round(theta,2)
+
 
 def get_rotationMatrix(axis, theta):
     """ Generates a rotation matrix given an axis and radians
