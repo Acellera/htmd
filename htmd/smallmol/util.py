@@ -9,8 +9,6 @@ import numpy as np
 from htmd.molecule.voxeldescriptors import _getGridCenters
 from rdkit.Chem import ChemicalFeatures
 from rdkit import RDConfig
-from chembl_webresource_client.new_client import new_client
-
 
 _highlight_colors = [(1.00, 0.50, 0.00), (0.00, 0.50, 1.00), (0.00, 1.00, 0.50),
                      (1.00, 0.00, 0.50), (0.50, 0.00, 1.00), (0.50, 1.00, 0.00),
@@ -337,26 +335,37 @@ def getChemblLigandByDrugName(drugname, returnSmile=False):
         >>> smile
         'CC(=O)Nc1ccc(O)cc1'
         """
-
     from htmd.smallmol.smallmol import SmallMol
+    try:
+        from chembl_webresource_client.new_client import new_client
+    except ImportError as e:
+        raise ImportError(
+            'You need to install the chembl_webresource package to use this function. Try using `conda install '
+            '-c chembl chembl_webresource_client`.')
+    drug = new_client.drug
+    results = drug.filter(synonyms__icontains=drugname)
 
+    chembl_id = None
+
+    if len(results) == 0:
+        return None
+
+    found = False
+    for drug_chembl in results:
+        for name in drug_chembl['synonyms']:
+            matched = [True for na in name.split() if na.lower() == drugname.lower()]
+            if sum(matched) != 0:
+                found = True
+                chembl_id = drug_chembl['molecule_chembl_id']
+                break
+            if found:
+                break
     molecule = new_client.molecule
-    results = molecule.search(drugname)
-
-    result_match = None
-
-    for item in results:
-        for idnames in item['cross_references']:
-            if idnames['xref_id'].lower() == drugname.lower() or idnames['xref_name'].lower() == drugname.lower():
-                result_match = item['molecule_structures']['canonical_smiles']
-                result_match_fragment = result_match.split('.')
-                result_match_fragment_len = [len(fr) for fr in result_match_fragment]
-                fragment = result_match_fragment[result_match_fragment_len.index(max(result_match_fragment_len))]
-        if result_match is not None:
-            break
-    sm = SmallMol(fragment)
+    molecule_chembl = molecule.get(chembl_id)
+    smi = molecule_chembl['molecule_structures']['canonical_smiles']
+    sm = SmallMol(smi)
     if returnSmile:
-        return sm, fragment
+        return sm, smi
     return sm
 
 def getChemblSimilarLigandsBySmile(smi, threshold=85, returnSmiles=False):
@@ -392,6 +401,12 @@ def getChemblSimilarLigandsBySmile(smi, threshold=85, returnSmiles=False):
         4
         """
     from htmd.smallmol.smallmol import SmallMolLib, SmallMol
+    try:
+        from chembl_webresource_client.new_client import new_client
+    except ImportError as e:
+        raise ImportError(
+            'You need to install the chembl_webresource package to use this function. Try using `conda install '
+            '-c chembl chembl_webresource_client`.')
 
     smi_list = []
 

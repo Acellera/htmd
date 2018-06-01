@@ -1268,7 +1268,7 @@ class SmallMol:
                 bondtypes.append('ar')
         return np.vstack(bonds), np.array(bondtypes)
 
-    def depict(self, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True,
+    def depict(self, sketch=True, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True,
                atomlabels=None, highlightAtoms=None):
         """
         Depicts the molecules. It is possible to save it into an svg file and also generates a jupiter-notebook rendering
