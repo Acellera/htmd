@@ -34,7 +34,8 @@ packages = [
     ['rdkit', 'rdkit'],
     ['rdkit', 'boost'],
     ['conda-forge', 'nlopt'],
-    ['conda-forge', 'periodictable']
+    ['conda-forge', 'periodictable'],
+    ['chembl', 'chembl_webresource_client']
 ]
 
 # Package arguments

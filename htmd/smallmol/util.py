@@ -9,6 +9,7 @@ import numpy as np
 from htmd.molecule.voxeldescriptors import _getGridCenters
 from rdkit.Chem import ChemicalFeatures
 from rdkit import RDConfig
+from chembl_webresource_client.new_client import new_client
 
 
 _highlight_colors = [(1.00, 0.50, 0.00), (0.00, 0.50, 1.00), (0.00, 1.00, 0.50),
@@ -260,6 +261,159 @@ def alignMol(smallmol, refmol):
     return sm_new
 
 
+def getRCSBLigandByLigname(ligname, returnMol2=False):
+    """
+    Returns a SmallMol object of a ligand by its three letter lignane. This molecule is retrieve from RCSB and a mol2
+    written. It is possible to return also the mol2 filename.
+
+    Parameters
+    ----------
+    ligname: str
+        The three letter ligand name
+    returnMol2: bool
+        If True, the mol2 filename is returned
+
+    Returns
+    -------
+    sm: htmd.smallmol.smallmol.SmallMol
+        The SmallMol object
+
+    mol2filename: str
+        The mol2 filename
+
+    Example
+    -------
+    >>> mol = Molecule('4eiy')
+    >>> np.unique(mol.get('resname', 'not protein and not water'))
+    array(['CLR', 'NA', 'OLA', 'OLB', 'OLC', 'PEG', 'ZMA'], dtype=object)
+    >>> sm = getRCSBLigandByLigname('ZMA')
+    >>> sm.numAtoms
+    40
+    >>> sm, mol2filename = getRCSBLigandByLigname('ZMA', returnMol2=True)
+    >>> mol2filename
+    '/tmp/tmpazfg0mqv.mol2'
+
+    """
+    import requests
+    from htmd.molecule.support import string_to_tempfile
+    from htmd.smallmol.smallmol import SmallMol
+    r = requests.get("https://files.rcsb.org/ligands/view/{}_ideal.sdf".format(ligname))
+    sdf_text = r.content.decode('ascii')
+    tempfile = string_to_tempfile(sdf_text, "sdf")
+    mol2 = openbabelConvert(tempfile, 'sdf', 'mol2')
+
+    sm = SmallMol(mol2)
+    if returnMol2:
+        return sm, mol2
+
+    return sm
+
+def getChemblLigandByDrugName(drugname, returnSmile=False):
+    """
+        Returns a SmallMol object of a ligand by its drug name. This molecule is retrieve from Chembl. It is possible to
+        return also the smile of the ligand.
+
+        Parameters
+        ----------
+        drugname: str
+            The drug name
+        returnSmile: bool
+            If True, the smile is returned
+
+        Returns
+        -------
+        sm: htmd.smallmol.smallmol.SmallMol
+            The SmallMol object
+
+        smile: str
+            The smile
+
+        Example
+        -------
+        >>> sm = getChemblLigandByDrugName('paracetamol')
+        >>> sm.numAtoms
+        20
+        >>> sm, smile = getChemblLigandByDrugName('paracetamol', returnSmile=True)
+        >>> smile
+        'CC(=O)Nc1ccc(O)cc1'
+        """
+
+    from htmd.smallmol.smallmol import SmallMol
+
+    molecule = new_client.molecule
+    results = molecule.search(drugname)
+
+    result_match = None
+
+    for item in results:
+        for idnames in item['cross_references']:
+            if idnames['xref_id'].lower() == drugname.lower() or idnames['xref_name'].lower() == drugname.lower():
+                result_match = item['molecule_structures']['canonical_smiles']
+                result_match_fragment = result_match.split('.')
+                result_match_fragment_len = [len(fr) for fr in result_match_fragment]
+                fragment = result_match_fragment[result_match_fragment_len.index(max(result_match_fragment_len))]
+        if result_match is not None:
+            break
+    sm = SmallMol(fragment)
+    if returnSmile:
+        return sm, fragment
+    return sm
+
+def getChemblSimilarLigandsBySmile(smi, threshold=85, returnSmiles=False):
+    """
+        Returns a SmallMolLib object of the ligands having a similarity with a smile of at least the specified
+        threshold.. This molecules are retrieve from Chembl. It is possible to return also the list smiles.
+
+        Parameters
+        ----------
+        smi: str
+            The smile
+        threshold: int
+            The threshold value to apply for the similarity search
+        returnSmiles: bool
+            If True, the list smiles is returned
+
+        Returns
+        -------
+        sm: htmd.smallmol.smallmol.SmallMol
+            The SmallMol object
+
+        smiles: str
+            The list of smiles
+
+        Example
+        -------
+        >>> _, smile = getChemblLigandByDrugName('ibuprofen', returnSmile=True)
+        >>> lib = getChemblSimilarLigandsBySmile(smile)
+        >>> lib.numMols
+        4
+        >>> lib, smiles = getChemblSimilarLigandsBySmile(smile, returnSmiles=True)
+        >>> len(smiles)
+        4
+        """
+    from htmd.smallmol.smallmol import SmallMolLib, SmallMol
+
+    smi_list = []
+
+    similarity = new_client.similarity
+    results = similarity.filter(smiles=smi, similarity=threshold).only(['molecule_structures'])
+    results = results.all()
+    for r in range(len(results)):
+        tmp_smi = results[r]['molecule_structures']['canonical_smiles']
+        fragments = tmp_smi.split('.')
+        fragments_len = [ len(fr) for fr in fragments ]
+        fragment = fragments[fragments_len.index(max(fragments_len))]
+
+        if fragment not in smi_list: smi_list.append(fragment)
+
+    lib = SmallMolLib()
+    for smi in smi_list: lib.appendSmallMol(SmallMol(smi))
+
+    if returnSmiles:
+        return lib, smi_list
+
+    return lib
+
 def openbabelConvert(input_file, input_format, output_format):
     """
     Converts the file from the input format to the output format specified. It uses the openbabel features
@@ -332,6 +486,7 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
 
     """
     from os.path import splitext
+    from rdkit.Chem import Kekulize
     from rdkit.Chem.Draw import rdMolDraw2D
     from IPython.display import SVG
 
@@ -359,6 +514,10 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
         else:
             sel_atoms = highlightAtoms
             sel_colors = {aIdx: _highlight_colors[0] for aIdx in sel_atoms}
+
+    # kekulize
+    Kekulize(mol)
+
 
     drawer.DrawMolecule(mol, highlightAtoms=sel_atoms, highlightBonds=[], highlightAtomColors=sel_colors)
 
@@ -408,6 +567,7 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
             If ipython set as True, the SVG rendering is returned
 
         """
+    import rdkit
     from rdkit.Chem.Draw import MolsToGridImage
     from IPython.display import SVG
     from os.path import splitext
@@ -423,8 +583,12 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
             sel_atoms = highlightAtoms
             sel_colors = [{aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms]
 
-    svg = MolsToGridImage(mols_list, highlightAtomLists=sel_atoms, highlightBondLists=[],
-                          highlightAtomColors=sel_colors, legends=legends, molsPerRow=mols_perrow, useSVG=True)
+    if MolsToGridImage == rdkit.Chem.Draw.IPythonConsole.ShowMols:
+        rdkit.Chem.Draw.IPythonConsole.UninstallIPythonRenderer()
+        from rdkit.Chem.Draw import MolsToGridImage
+
+    svg = MolsToGridImage(mols_list, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
+                                                                legends=legends, molsPerRow=mols_perrow, useSVG=True)
 
     if filename:
         ext = splitext(filename)[-1]
@@ -434,6 +598,7 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
         f.close()
 
     if ipython:
-        return SVG(svg)
+            _svg = SVG(svg)
+            return _svg
     else:
         return None

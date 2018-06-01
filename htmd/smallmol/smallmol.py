@@ -32,7 +32,7 @@ class SmallMol:
     ----------
     mol: rdkit.Chem.rdchem.Mol  or filename or smile or htmd.smallmol.smallmol.SmallMol
         (i) Rdkit molecule or (ii) Location of molecule file (".pdb"/".mol2") or (iii) a smile string or iv) another
-        SmallMol object
+        SmallMol object or v) htmd.molecule.molecule.Molecule object
     ignore_errors: bool
         If True, errors will not be raised.
     force_reading: bool
@@ -213,6 +213,7 @@ class SmallMol:
         ----------
         mol: str or rdkit.Chem.rdchem.Mol or htmd.smallmol.smallmol.SmallMol
             i) rdkit.Chem.rdchem.Mol ii) The path to the pdb/mol2 to load iii) The smile string iv) SmallMol object
+            v) htmd.molecule.nolecule.Molecule
         force_reading: bool
            If the mol provided is not accepted, the molecule will be initially converted into sdf
 
@@ -223,6 +224,8 @@ class SmallMol:
         smallMol: htmd.smallmol.smallmol.SmallMol
             The smallMol object if SmallMol was passed
         """
+        from htmd.molecule.molecule import Molecule
+
         _mol = None
         smallMol = None
         if isinstance(mol, SmallMol):
@@ -231,6 +234,9 @@ class SmallMol:
 
         if isinstance(mol, Chem.Mol):
             _mol = mol
+
+        if isinstance(mol, Molecule):
+            _mol = self._fromMolecule(mol)
 
         elif isinstance(mol, str):
             if os.path.isfile(mol):
@@ -252,7 +258,10 @@ class SmallMol:
             # assuming is a smile
             # TODO validate it. Implement smarts recognition
             else:
-                _mol = Chem.MolFromSmiles(mol)
+                # try with smiles
+                psmile = Chem.SmilesParserParams()
+                psmile.removeHs = False
+                _mol = Chem.MolFromSmiles(mol, psmile)
 
         return _mol, smallMol
 
@@ -1008,6 +1017,113 @@ class SmallMol:
 
         self._chiraltags[atom] = _chiraltag
 
+    def toMol2(self, mol2filename=None):
+        """
+        Writes a mol2 file of the ligand. If extension is missing or wrong it will automatically modified to .mol2
+
+        Parameters
+        ----------
+        mol2filename: str
+            The mol2 filename
+        """
+
+        if mol2filename is None:
+            mol2filename = self.getProp('ligname') + '.mol2'
+
+        else:
+            basename, extension = os.path.splitext(mol2filename)
+
+            if extension == '':
+                mol2filename = basename + '.mol2'
+
+            elif extension != '.mol2':
+                logger.warning('Wrong extension. automatically modified to mol2')
+                mol2filename = basename + '.mol2'
+
+        if self.numConformers == 1 and np.sum(self.coords) == 0:
+            logger.warning('The molecule seems to not have a valid conformer. All the coords are 0')
+
+        mol = self.toMolecule()
+        mol.write(mol2filename)
+
+    def toSmarts(self, explicitHs=False):
+        """
+        Returns the smarts string of the molecule
+
+        Parameters
+        ----------
+        explicitHs: bool
+            Set as True for keep the hydrogens
+
+        Returns
+        -------
+        smart: str
+            The smarts string
+        """
+
+        sm = self.copy()
+        rmol = sm.toRdkitMol()
+        if not explicitHs and len(np.where(sm.element == 'H')[0]) != 0:
+            rmol = Chem.RemoveHs(rmol)
+
+        sma = Chem.MolToSmarts(rmol, isomericSmiles=True)
+
+        return sma
+
+    def toSmile(self, explicitHs=False, kekulizeSmile=True):
+        """
+        Returns the smiles string of the molecule
+
+        Parameters
+        ----------
+        explicitHs: bool
+            Set as True for keep the hydrogens
+        kekulizeSmile: bool
+            Set as True for returns the kekule smile format
+
+        Returns
+        -------
+        smi: str
+            The smiles string
+        """
+
+        sm = self.copy()
+        rmol = sm.toRdkitMol()
+        if not explicitHs and len(np.where(sm.element == 'H')[0]) !=  0:
+            rmol = Chem.RemoveHs(rmol)
+
+        if kekulizeSmile:
+            Chem.Kekulize(rmol)
+            smi = Chem.MolToSmiles(rmol, isomericSmiles=True, kekuleSmiles=True)
+        else:
+            smi = Chem.MolToSmiles(rmol, isomericSmiles=True)
+
+        return smi
+
+    def _fromMolecule(self, mol):
+        """
+        Returns the rdkit.Chem.rdchem.Mol object from an htmd.molecule.molecule.Molecule one
+
+        Parameters
+        ----------
+        mol: htmd.molecule.molecule.Molecule
+            The htmd Molecule object
+
+        Returns
+        -------
+        rmol: rdkit.Chem.rdchem.Mol
+            The rdkit molecule object
+        """
+
+        from tempfile import NamedTemporaryFile
+
+        tmpmol2 = NamedTemporaryFile(suffix='.mol2').name
+        mol.write(tmpmol2)
+
+        _mol = Chem.MolFromMol2File(tmpmol2, removeHs=False)
+
+        return _mol
+
     def toRdkitMol(self, includeConformer=False, _debug=False):
         """
         Returns the rdkit.Chem.rdchem.Mol object.
@@ -1284,8 +1400,8 @@ class SmallMolLib:
 
     Parameters
     ----------
-    sdf_file: str
-        The sdf file path
+    lib_file: str
+        The sdf or smi file path
     removeHs: bool
         If True, the hydrogens of the molecules will be removed
     fixHs: bool
@@ -1313,35 +1429,81 @@ class SmallMolLib:
 
     """
 
-    def __init__(self, sdf_file=None, removeHs=False, fixHs=True):  # , n_jobs=1
-        self._sdffile = sdf_file if self._isSdfFile(sdf_file) else None
+    def __init__(self, lib_file=None, removeHs=False, fixHs=True):  # , n_jobs=1
+        #self._sdffile = sdf_file if  self._isSdfFile(sdf_file) else None
+        self._libfile = lib_file if self._isValidFile(lib_file) else None
 
         self._mols = np.array([])
         self.fields = []
 
-        if sdf_file is not None:
-            self._initializeMolObjs(sdf_file, removeHs, fixHs)
+        if lib_file != None:
+            self._initializeMolObjs(lib_file, removeHs, fixHs)
+
+
+    def _isValidFile(self, lib_file):
+        """
+        Returns True if the input file provided is a valid sdf or smi file.
+
+        Parameters
+        ----------
+        lib_file: str
+            The file path
+
+        Returns
+        -------
+        isvalid: bool
+            True if the file is valid
+        """
+
+        if lib_file == None: return None
+
+        if not os.path.isfile(lib_file):
+            raise ValueError('The file {} does not exists'.format(lib_file))
+
+        sdfFile = self._isSdfFile(lib_file)
+        smiFile = self._isSmiFile(lib_file)
+
+        if sdfFile is not None:
+            return sdfFile
+        elif smiFile is not None:
+            return smiFile
+        else:
+            raise ValueError('The inputfile {} does not have a valid extension. Should be .sdf or .smi'.format(lib_file))
+
+
+    def _isSmiFile(self, smi_file):
+        """
+        Returns True if the file exists
+
+        Parameters
+        ----------
+        smi_file: str
+            The smi file
+        """
+
+        smi_ext = os.path.splitext(smi_file)[-1]
+        if smi_ext == '.smi':
+            return True
+
+        return None
 
     def _isSdfFile(self, sdf_file):
         """
         Returns True if the file exists
+
+        Parameters
+        ----------
         sdf_file: str
             The sdf file
         """
 
-        if sdf_file is None:
-            return None
-
-        if not os.path.isfile(sdf_file):
-            raise FileNotFoundError('The sdf file {} does not exist'.format(sdf_file))
-
         sdf_ext = os.path.splitext(sdf_file)[-1]
-        if sdf_ext != '.sdf':
-            raise TypeError('The file extension {} is not valid. Should be .sdf'.format(sdf_ext))
+        if sdf_ext == '.sdf':
+            return True
 
-        return True
+        return None
 
-    def _initializeMolObjs(self, sdf_file, removeHs, fixHs):
+    def _initializeMolObjs(self, lib_file, removeHs, fixHs):
         """
         Processes and loads the molecules inside in the sdf file
 
@@ -1355,10 +1517,38 @@ class SmallMolLib:
             If True,, the hydrogens are added and optmized
         """
 
+        if os.path.splitext(lib_file)[-1] == '.sdf':
+            mols_failed = self._loadFromSdf(lib_file, removeHs, fixHs)
+        elif os.path.splitext(lib_file)[-1] == '.smi':
+            mols_failed = self._loadFromSmi(lib_file, removeHs, fixHs)
+
+        if len(mols_failed) != 0:
+            logger.warning('The following entries were skipped beacause could not be loaded: {}.'.format(mols_failed))
+
+    def _loadFromSdf(self, sdf_file, removeHs, fixHs):
+        """
+        Loads the molecules from an sdf as SmallMol objects and returns the molecules that failed to be loaded.
+
+        Paramters
+        ---------
+        sdf_file: str
+            The sdf file path
+        removeHs: bool
+            Set as True to remove the hydrogens
+        fixHs: bool
+            Set as True to add or optimize hydrogens
+
+        Returns
+        -------
+        mols_failed: list
+            A list with indices of the molecule that were not loaded
+        """
+
         from tqdm import tqdm
-        supplier = Chem.SDMolSupplier(sdf_file, removeHs=False)
+
         mols_failed = []
 
+        supplier = Chem.SDMolSupplier(sdf_file, removeHs=False)
         for i, mol in enumerate(tqdm(supplier)):
             if mol is not None:
                 m = SmallMol(mol, removeHs=removeHs, fixHs=fixHs)
@@ -1366,8 +1556,43 @@ class SmallMolLib:
             else:
                 mols_failed.append(i)
 
-        if len(mols_failed) != 0:
-            logger.warning('The following entries were skipped beacause could not be loaded: {}.'.format(mols_failed))
+        return mols_failed
+
+    def _loadFromSmi(self, smi_file, removeHs, fixHs):
+        """
+        Loads the molecules from a smi file as SmallMol objects and returns the molecules that failed to be loaded.
+
+        Paramters
+        ---------
+        smi_file: str
+            The smi file path
+        removeHs: bool
+            Set as True to remove the hydrogens
+        fixHs: bool
+            Set as True to add or optimize hydrogens
+
+        Returns
+        -------
+        mols_failed: list
+            A list with indices of the molecule that were not loaded
+        """
+
+        from tqdm import tqdm
+
+        mols_failed = []
+
+        with open(smi_file) as f:
+            lines = f.readlines()[1:]
+            for i, line in enumerate(tqdm(lines)):
+                smi, name = line.strip().split()
+                try:
+                    sm = SmallMol(smi, removeHs=removeHs, fixHs=fixHs)
+                    sm.ligname = name
+                    self.appendSmallMol(sm, strictDirection=2)
+                except:
+                    mols_failed.append(i)
+
+        return mols_failed
 
     @property
     def numMols(self):
@@ -1427,6 +1652,39 @@ class SmallMolLib:
 
         for m in self._mols:
             writer.write(m._mol)
+
+    def writeSmiles(self, smi_name, explicitHs=True, names=False, header=None):
+        """
+        Writes a smi file with molecules stored. Is it possible to specify the header of the smi file. The name of the
+        ligands can be their ligand name or a sequential ID.
+
+        Parameters
+        ----------
+        smi_name: str<
+            The ouput smi filename
+        names: bool
+            Set as True to use the own ligand name for each ligand. Otherwise a sequential ID will be used
+        header: str
+            The header of the smi file. If is None the smi filename will be used.
+        """
+
+
+        smi_name = os.path.splitext(smi_name)[0] + '.smi'
+
+        f = open(smi_name, 'w')
+
+        if header is None:
+            header =  os.path.splitext(smi_name)[0]
+
+        f.write(header  + '\n')
+
+        for n, sm in enumerate(self.getMols()):
+            smi = sm.toSmile(explicitHs=explicitHs)
+            name = n if not names  else sm.ligname
+            f.write(smi + ' {} \n'.format(name))
+
+        f.close()
+
 
     def appendSmallLib(self, smallLib, strictField=False, strictDirection=1):
         """
@@ -1641,7 +1899,7 @@ class SmallMolLib:
         else:
             raise ValueError("n_jobs needs to be a positive integer!")
 
-    def depict(self, ids=None, sketch=False, filename=None, ipython=False, optimize=False, optimizemode='std',
+    def depict(self, ids=None, sketch=True, filename=None, ipython=False, optimize=False, optimizemode='std',
                removeHs=True,  legends=None, highlightAtoms=None, mols_perrow=3):
 
         """
