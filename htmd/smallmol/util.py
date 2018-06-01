@@ -281,15 +281,17 @@ def getRCSBLigandByLigname(ligname, returnMol2=False):
 
     Example
     -------
+    >>> from htmd.molecule.molecule import Molecule
     >>> mol = Molecule('4eiy')
     >>> np.unique(mol.get('resname', 'not protein and not water'))
     array(['CLR', 'NA', 'OLA', 'OLB', 'OLC', 'PEG', 'ZMA'], dtype=object)
-    >>> sm = getRCSBLigandByLigname('ZMA')
+    >>> sm = getRCSBLigandByLigname('ZMA')  # doctest: +ELLIPSIS
+    SmallMol module...
     >>> sm.numAtoms
     40
     >>> sm, mol2filename = getRCSBLigandByLigname('ZMA', returnMol2=True)
-    >>> mol2filename
-    '/tmp/tmpazfg0mqv.mol2'
+    >>> mol2filename  # doctest: +ELLIPSIS
+    '/tmp/tmp....mol2'
 
     """
     import requests
@@ -328,11 +330,11 @@ def getChemblLigandByDrugName(drugname, returnSmile=False):
 
         Example
         -------
-        >>> sm = getChemblLigandByDrugName('paracetamol')
-        >>> sm.numAtoms
+        >>> sm = getChemblLigandByDrugName('paracetamol')  # doctest: +SKIP
+        >>> sm.numAtoms  # doctest: +SKIP
         20
-        >>> sm, smile = getChemblLigandByDrugName('paracetamol', returnSmile=True)
-        >>> smile
+        >>> sm, smile = getChemblLigandByDrugName('paracetamol', returnSmile=True)  # doctest: +SKIP
+        >>> smile  # doctest: +SKIP
         'CC(=O)Nc1ccc(O)cc1'
         """
     from htmd.smallmol.smallmol import SmallMol
@@ -392,12 +394,12 @@ def getChemblSimilarLigandsBySmile(smi, threshold=85, returnSmiles=False):
 
         Example
         -------
-        >>> _, smile = getChemblLigandByDrugName('ibuprofen', returnSmile=True)
-        >>> lib = getChemblSimilarLigandsBySmile(smile)
-        >>> lib.numMols
+        >>> _, smile = getChemblLigandByDrugName('ibuprofen', returnSmile=True)  # doctest: +SKIP
+        >>> lib = getChemblSimilarLigandsBySmile(smile)  # doctest: +SKIP
+        >>> lib.numMols  # doctest: +SKIP
         4
-        >>> lib, smiles = getChemblSimilarLigandsBySmile(smile, returnSmiles=True)
-        >>> len(smiles)
+        >>> lib, smiles = getChemblSimilarLigandsBySmile(smile, returnSmiles=True)  # doctest: +SKIP
+        >>> len(smiles)  # doctest: +SKIP
         4
         """
     from htmd.smallmol.smallmol import SmallMolLib, SmallMol
@@ -598,8 +600,10 @@ def depictMultipleMols(mols_list, filename=None, ipython=False, legends=None, hi
             sel_atoms = highlightAtoms
             sel_colors = [{aIdx: _highlight_colors[0] for aIdx in subset} for subset in highlightAtoms]
 
-    if MolsToGridImage == rdkit.Chem.Draw.IPythonConsole.ShowMols:
-        rdkit.Chem.Draw.IPythonConsole.UninstallIPythonRenderer()
+    from rdkit.Chem.Draw import IPythonConsole as CDIPythonConsole
+
+    if MolsToGridImage == CDIPythonConsole.ShowMols:
+        CDIPythonConsole.UninstallIPythonRenderer()
         from rdkit.Chem.Draw import MolsToGridImage
 
     svg = MolsToGridImage(mols_list, highlightAtomLists=sel_atoms, highlightBondLists=[], highlightAtomColors=sel_colors,
