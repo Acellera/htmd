@@ -17,8 +17,10 @@ import os
 import shutil
 import numpy as np
 from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
+from htmd.decorators import _Deprecated
 
 
+@_Deprecated('1.13.5')
 class Pmemd(ProtocolInterface):
     _defaultfnames = {'bincoordinates': 'input.nc',
                       'parameters': 'parameters', 'coordinates': 'structure.rst',
