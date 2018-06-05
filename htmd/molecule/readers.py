@@ -127,6 +127,166 @@ class Trajectory:
         return self.__add__(other)
 
 
+class TopologyInconsistencyError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+class MolFactory:
+    """ This class converts Topology and Trajectory data into Molecule objects """
+    @staticmethod
+    def construct(topos, trajs, filename, skip, frame):
+        topos = ensurelist(topos)
+        trajs = ensurelist(trajs)
+        if len(topos) != len(trajs):
+            raise RuntimeError('Different number of topologies ({}) and trajectories ({}) were read from {}'.format(
+                len(topos), len(trajs), filename))
+
+        mols = []
+        for topo, traj in zip(topos, trajs):
+            natoms = MolFactory._getNumAtoms(topo, filename)
+
+            mol = Molecule()
+            mol.empty(natoms)
+
+            if topo is not None:
+                MolFactory._parseTopology(mol, topo, filename)
+            if traj is not None:
+                MolFactory._parseTraj(mol, traj, filename, skip, frame)
+
+            mols.append(mol)
+
+        if len(mols) == 1:
+            return mols[0]
+        else:
+            return mols
+
+    @staticmethod
+    def _getNumAtoms(topo, filename):
+        # Checking number of atoms that were read in the topology file for each field are the same
+        natoms = []
+        for field in topo.atominfo:
+            if len(topo.__dict__[field]) != 0:
+                natoms.append(len(topo.__dict__[field]))
+        natoms = np.unique(natoms)
+        if len(natoms) == 0:
+            raise RuntimeError('No atoms were read from file {}.'.format(filename))
+        if len(natoms) != 1:
+            raise TopologyInconsistencyError('Different number of atoms read from file {} for different fields: {}.'
+                                             .format(filename, natoms))
+        natoms = natoms[0]
+        return natoms
+
+    @staticmethod
+    def _parseTopology(mol, topo, filename):
+        for field in topo.__dict__:
+            if field == 'crystalinfo':
+                continue
+            newfielddata = np.array(topo.__dict__[field], dtype=mol._dtypes[field])
+
+            # Skip on empty new field data
+            if newfielddata is None or len(newfielddata) == 0 or np.all([x is None for x in topo.__dict__[field]]):
+                continue
+
+            # Objects could be ints for example but we want them as str
+            if mol._dtypes[field] == object and len(newfielddata) != 0:
+                newfielddata = np.array([str(x) for x in newfielddata], dtype=object)
+
+            mol.__dict__[field] = newfielddata
+
+        if len(mol.bonds) != 0 and len(topo.bondtype) == 0:
+            mol.bondtype = np.empty(mol.bonds.shape[0], dtype=Molecule._dtypes['bondtype'])
+            mol.bondtype[:] = 'un'
+
+        mol.element = mol._guessMissingElements()
+        mol.crystalinfo = topo.crystalinfo
+
+        if os.path.exists(filename):
+            filename = os.path.abspath(filename)
+        mol.topoloc = filename
+        mol.fileloc = [[filename, 0]]
+        mol.viewname = os.path.basename(filename)
+
+    @staticmethod
+    def _parseTraj(mol, traj, filename, skip, frame):
+        ext = os.path.splitext(filename)[1][1:]
+
+        assert traj.coords.ndim == 3, '{} reader must return 3D coordinates array for file {}'.format(ext, filename)
+        assert traj.coords.shape[1] == 3, '{} reader must return 3 values in 2nd dimension for file {}'.format(ext, filename)
+
+        mol.coords = traj.coords.astype(Molecule._dtypes['coords'])
+        if traj.box is None:
+            mol.box = np.zeros((3, 1), dtype=Molecule._dtypes['box'])
+        else:
+            mol.box = np.array(traj.box).astype(Molecule._dtypes['box'])
+            if mol.box.ndim == 1:
+                mol.box = mol.box[:, np.newaxis]
+
+        if traj.boxangles is None:
+            mol.boxangles = np.zeros((3, 1), dtype=Molecule._dtypes['boxangles'])
+        else:
+            mol.boxangles = np.array(traj.boxangles).astype(Molecule._dtypes['boxangles'])
+            if mol.boxangles.ndim == 1:
+                mol.boxangles = mol.boxangles[:, np.newaxis]
+
+        # mol.fileloc = traj.fileloc
+        mol.step = np.hstack(traj.step).astype(int)
+        mol.time = np.hstack(traj.time)
+
+        if ext in _TRAJECTORY_READERS and frame is None:
+            # Writing hidden index file containing number of frames in trajectory file
+            if os.path.isfile(filename):
+                MolFactory._writeNumFrames(filename, mol.numFrames)
+            ff = range(np.size(mol.numAtoms, 2))
+            # tr.step = tr.step + traj[-1].step[-1] + 1
+        elif frame is None:
+            ff = [0]
+        elif frame is not None:
+            ff = [frame]
+        else:
+            raise AssertionError('Should not reach here')
+        mol.fileloc = [[filename, j] for j in ff]
+
+        if skip is not None:
+            mol.coords = np.array(mol.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
+            if mol.box is not None:
+                mol.box = np.array(mol.box[:, ::skip])
+            if mol.boxangles is not None:
+                mol.boxangles = mol.boxangles[:, ::skip]
+            if mol.step is not None:
+                mol.step = mol.step[::skip]
+            if mol.time is not None:
+                mol.time = mol.time[::skip]
+            mol.fileloc = mol.fileloc[::skip]
+
+
+
+
+    @staticmethod
+    def _writeNumFrames(filepath, numFrames):
+        """ Write the number of frames in a hidden file. Allows us to check for trajectory length issues before projecting
+
+        Parameters
+        ----------
+        filepath : str
+            Path to trajectory file
+        numFrames : int
+            Number of frames in trajectory file
+        """
+        filepath = os.path.abspath(filepath)
+        filedir = os.path.dirname(filepath)
+        basename = os.path.basename(filepath)
+        numframefile = os.path.join(filedir, '.{}.numframes'.format(basename))
+        if not os.path.exists(numframefile) or (os.path.exists(numframefile) and (os.path.getmtime(numframefile) < os.path.getmtime(filepath))):
+            try:
+                with open(numframefile, 'w') as f:
+                    f.write(str(numFrames))
+            except:
+                pass
+
+
 def XYZread(filename, frame=None, topoloc=None):
     topo = Topology()
 

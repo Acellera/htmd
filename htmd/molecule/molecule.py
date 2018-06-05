@@ -882,36 +882,29 @@ class Molecule:
             readers = _ALL_READERS[ext]
             for rr in readers:
                 try:
-                    to, tr = rr(fname, frame=frame, topoloc=tmppdb, **kwargs)
+                    newmol = rr(fname, frame=frame, topoloc=tmppdb, **kwargs)
                 except FormatError:
                     continue
                 else:
                     break
 
-            if tr is not None:
-                self._keepFrame(tr, frame)
-                self._checkCoords(tr, rr, fname)
-                # TODO: Get rid of this if by moving it to a function
-                if ext in _TRAJECTORY_READERS and frame is None:
-                    # Writing hidden index file containing number of frames in trajectory file
-                    if os.path.isfile(fname):
-                        self._writeNumFrames(fname, tr.coords[0].shape[2])
-                    ff = range(np.size(tr.coords[0], 2))
-                    #tr.step = tr.step + traj[-1].step[-1] + 1
-                elif frame is None:
-                    ff = [0]
-                elif frame is not None:
-                    ff = [frame]
-                else:
-                    raise AssertionError('Should not reach here')
-                tr.fileloc = [[fname, j] for j in ff]
+            if newmol.numFrames != 0:
+                if frame is not None and newmol.numFrames > 1:
+                    newmol.dropFrames(keep=frame)
+
+                if self.numAtoms != 0 and newmol.numAtoms != self.numAtoms:
+                    raise ValueError(
+                        'Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(
+                            newmol.numAtoms, self.numAtoms))
+
+                # TODO: Append trajectories
                 traj += tr
 
-            if to is not None:
-                self._parseTopology(to, fname, overwrite=overwrite, _logger=_logger)
+            if newmol.numAtoms != 0:  # TODO: THIS WILL NOT WORK. THIS CHECKS ALSO THE TRAJ FOR NUMATOMS!!!!
+                self._parseTopology(to, fname, overwrite=overwrite, _logger=_logger) # TODO: Merge topologies!
 
         if len(traj.coords) != 0:
-            self._parseTraj(traj, skip=skip)
+            self._parseTraj(traj, skip=skip)P
 
         self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
 
@@ -930,29 +923,6 @@ class Molecule:
                     self.angles = angles
                 if 'dihedrals' in guess or ('dihedrals' in guessNE and len(self.dihedrals) == 0):
                     self.dihedrals = dihedrals
-
-    def _checkCoords(self, traj, reader, f):
-        coords = traj.coords[0]
-        if self.numAtoms != 0 and coords.shape[0] != self.numAtoms:
-            raise ValueError(
-                'Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(
-                    coords.shape[0], self.numAtoms))
-
-        assert coords.ndim == 3, 'Reader {} must return 3D coordinates array for file {}'.format(reader, f)
-        assert coords.shape[1] == 3, 'Reader {} must return 3 values in 2nd dimension for file {}'.format(reader, f)
-
-    def _keepFrame(self, traj, frame):
-        if frame is not None and traj.coords[0].shape[2] > 1:
-            traj.coords[0] = traj.coords[0][:, :, frame][:, :, np.newaxis]
-            traj.coords[0] = traj.coords[0].copy()  # Copying is needed to fix strides from mdtraj
-            if traj.box[0] is not None:
-                traj.box[0] = traj.box[0][:, frame][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
-            if traj.boxangles[0] is not None:
-                traj.boxangles[0] = traj.boxangles[0][:, frame][:, np.newaxis]  # [:, np.newaxis] for adding the second dimension
-            if traj.step[0] is not None:
-                traj.step[0] = traj.step[0][frame]
-            if traj.time[0] is not None:
-                traj.time[0] = traj.time[0][frame]
 
     def _getExt(self, fname, type):
         from htmd.molecule.readers import _ALL_READERS
@@ -1065,27 +1035,6 @@ class Molecule:
             self.fileloc = self.fileloc[::skip]
 
         self.coords = np.atleast_3d(self.coords)
-
-    def _writeNumFrames(self, filepath, numFrames):
-        """ Write the number of frames in a hidden file. Allows us to check for trajectory length issues before projecting
-
-        Parameters
-        ----------
-        filepath : str
-            Path to trajectory file
-        numFrames : int
-            Number of frames in trajectory file
-        """
-        filepath = os.path.abspath(filepath)
-        filedir = os.path.dirname(filepath)
-        basename = os.path.basename(filepath)
-        numframefile = os.path.join(filedir, '.{}.numframes'.format(basename))
-        if not os.path.exists(numframefile) or (os.path.exists(numframefile) and (os.path.getmtime(numframefile) < os.path.getmtime(filepath))):
-            try:
-                with open(numframefile, 'w') as f:
-                    f.write(str(numFrames))
-            except:
-                pass
 
     def view(self, sel=None, style=None, color=None, guessBonds=True, viewer=None, hold=False, name=None,
              viewerhandle=None, gui=False):
