@@ -8,7 +8,7 @@ from htmd.molecule.molecule import Molecule
 from htmd.protocols.oldprotocolinterface import TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 from htmd.protocols.oldprotocolinterface import ProtocolInterface as OldProtocolInterface
 from protocolinterface import ProtocolInterface, val
-from htmd.mdengine.acemd.acemd import Acemd2, Acemd3, _Restraint, GroupRestraint, AtomRestraint
+from htmd.mdengine.acemd.acemd import Acemd2, Acemd, _Restraint, GroupRestraint, AtomRestraint
 import os
 import numpy as np
 import logging
@@ -294,7 +294,7 @@ class ProductionAcemd3(ProtocolInterface):
     '''
     def __init__(self):
         super().__init__()
-        self._arg('acemd', ':class:`Acemd3 <htmd.mdengine.acemd.acemd.Acemd3>` object', 'MD engine', None, val.Object(Acemd3))
+        self._arg('acemd', ':class:`Acemd3 <htmd.mdengine.acemd.acemd.Acemd3>` object', 'MD engine', None, val.Object(Acemd))
         self._arg('runtime', 'float', 'Running time of the simulation.', 0, val.Number(float, '0POS'))
         self._arg('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps', val.String())
         self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, val.Number(float, 'ANY'))
@@ -302,7 +302,7 @@ class ProductionAcemd3(ProtocolInterface):
         self._arg('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False, val.Boolean())
         self._arg('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False, val.Boolean())
 
-        self.acemd = Acemd3()
+        self.acemd = Acemd()
         self.acemd.binvelocities = None
         self.acemd.bincoordinates = 'output.coor'
         self.acemd.extendedsystem='output.xsc'

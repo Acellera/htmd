@@ -305,7 +305,7 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
-from htmd.mdengine.acemd.acemd import Acemd3, _Restraint, GroupRestraint, AtomRestraint
+from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
 class EquilibrationAcemd3(ProtocolInterface):
     """ Equilibration protocol v2
 
@@ -355,7 +355,7 @@ class EquilibrationAcemd3(ProtocolInterface):
     """
     def __init__(self):
         super().__init__()
-        self._arg('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, val.Object(Acemd3))
+        self._arg('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, val.Object(Acemd))
         self._arg('runtime', 'float', 'Running time of the simulation.', 0, val.Number(float, '0POS'))
         self._arg('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps', val.String())
         self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, val.Number(float, 'ANY'))
@@ -363,7 +363,7 @@ class EquilibrationAcemd3(ProtocolInterface):
         self._arg('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False, val.Boolean())
         self._arg('constraintsteps', 'int', 'Number of initial steps to apply constraints in units of 4fs. Defaults to half the simulation time.', None, val.Number(int, 'ANY'))
 
-        self.acemd = Acemd3()
+        self.acemd = Acemd()
         self.acemd.coordinates = None
         self.acemd.structure = None
         self.acemd.parameters = None
