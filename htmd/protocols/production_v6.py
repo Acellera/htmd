@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Production(OldProtocolInterface):
-    ''' Production protocol v6
+    """ Production protocol v6
 
         Production protocol for globular and membrane proteins. You can optionally define a flatbottom potential box and
         atom constraints for the production run.
@@ -48,7 +48,7 @@ class Production(OldProtocolInterface):
             A dictionary of atomselections and values of the constraint to be applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.
         adaptive : bool, default=False
             Set to True if making production runs for adaptive sampling.
-    '''
+    """
     def __init__(self):
         super().__init__()
         self._cmdObject('acemd', ':class:`Acemd2 <htmd.mdengine.acemd.acemd.Acemd2>` object', 'MD engine', None, Acemd2)
@@ -396,7 +396,7 @@ if __name__ == "__main__":
     pd.fb_box = [-20, 20, -20, 20, 43, 45]
     pd.fb_k = 5
     tmpdir = tempname()
-    pd.write(home(dataDir=os.path.join('test-equilibration', pdbid, 'postrun')), tmpdir)
+    pd.write(home(dataDir=os.path.join('test-protocols', 'equilibration', pdbid, 'postrun')), tmpdir)
 
     # Compare with reference
     refdir = home(dataDir=os.path.join('test-production-v6', pdbid, 'prerun'))

@@ -392,7 +392,7 @@ if __name__ == "__main__":
     pd.fb_box = [-20, 20, -20, 20, 43, 45]
     pd.fb_k = 5
     tmpdir = tempname()
-    pd.write(home(dataDir=os.path.join('test-equilibration', pdbid, 'postrun')), tmpdir)
+    pd.write(home(dataDir=os.path.join('test-protocols', 'equilibration', pdbid, 'postrun')), tmpdir)
 
     # Compare with reference
     refdir = home(dataDir=os.path.join('test-production', pdbid, 'prerun'))
