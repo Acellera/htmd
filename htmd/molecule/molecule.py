@@ -806,7 +806,7 @@ class Molecule:
         self.moveBy(-com)
         self.moveBy(loc)
 
-    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', guess=None, guessNE=None, _logger=True):
+    def read(self, filename, type=None, skip=None, frames=None, append=False, overwrite='all', keepaltloc='A', guess=None, guessNE=None, _logger=True, **kwargs):
         """ Read any supported file. Currently supported files include pdb, psf, prmtop, prm, pdbqt, xtc, coor, xyz,
         mol2, gjf, mae, and crd, as well as all others supported by MDTraj.
 
@@ -882,7 +882,7 @@ class Molecule:
             readers = _ALL_READERS[ext]
             for rr in readers:
                 try:
-                    to, tr = rr(fname, frame=frame, topoloc=tmppdb)
+                    to, tr = rr(fname, frame=frame, topoloc=tmppdb, **kwargs)
                 except FormatError:
                     continue
                 else:
