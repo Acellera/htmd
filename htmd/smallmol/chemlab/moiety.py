@@ -1,5 +1,5 @@
 from htmd.smallmol.smallmol import SmallMol
-from htmd.smallmol.chemlab.periodictable import PeriodicTable
+from htmd.smallmol.chemlab.periodictable import PeriodicTable, _halogen_atoms
 from htmd.smallmol.chemlab.builder import Builder
 from htmd.smallmol.util import _ensurenestedlists, _flatnestedlists
 import numpy as np
@@ -9,7 +9,15 @@ from glob import glob
 import copy
 from itertools import combinations
 import logging
+import yaml
+from htmd.home import home
+import os
+
 logger = logging.getLogger(__name__)
+
+yTypes = os.path.join(home(), 'smallmol', 'chemlab', 'moietiesFiles', 'moietiesTypes.yaml')
+
+moiTypes = yaml.load(open(yTypes, 'r'))
 
 
 class MoietyRecognition:
@@ -24,14 +32,17 @@ class MoietyRecognition:
 
         self.smallmol = smallmol
         self.moieties = []
+        self.moietiesType = []
 
-    def run(self):
+    def run(self, classify=True, mode='moieities'):
 
     # moieties can be of four general types:
     # 1: rings. This are moieties on their own. The only procedure is checking fused rings
     # 2: moieties with hetero atoms.
     # 3: with  halogen atoms
     # 4: without any hetero atoms
+
+    # modes: blocks, moieties
 
 
         pT = self.periodicTable
@@ -81,19 +92,29 @@ class MoietyRecognition:
         atoms_placed = sorted(atomsMarked)
         atoms_lasting = set(sorted(atoms_lasting - set(atoms_placed)))
 
-        print(atoms_lasting)
+        #print(atoms_lasting)
     # merge all connected moieties (important for amide, esther and so on)
 
-        self.moieties = self._mergeConnectedMoieties(moietiesIdentified)
+        self.moieties = self._mergeConnectedMoieties(moietiesIdentified, mode)
 
+        if classify:
+            self._classifyMoieities()
 
-    def _mergeConnectedMoieties(self, moieties):
+    def _classifyMoieities(self):
+
+        for moi in self.moieties:
+            mtype, morder = moi._getMoietyType()
+            print(mtype, morder, moi.atoms)
+
+    def _mergeConnectedMoieties(self, moieties, mode):
+
+        # mode blocks or moieties
 
         confirmedMoieties = []
         tocheckMoieties = []
 
         for moi in moieties:
-            if moi.isring:
+            if moi.isring and mode == 'blocks':
                 confirmedMoieties.append(moi)
             else:
                 tocheckMoieties.append(moi)
@@ -101,17 +122,19 @@ class MoietyRecognition:
         moiN = 0
         while len(tocheckMoieties) != 0:
             moi = tocheckMoieties.pop(0)
-            print("moi1 ", moi.atoms)
+            #print("moi1 ", moi.atoms)
             merged = False
 
             for moi2 in tocheckMoieties:
-                print('moi2 ', moi2.atoms)
+                if moi2.isring:
+                    continue
+                #print('moi2 ', moi2.atoms)
                 matched1to2 = [alink for alink in moi.links if alink in moi2.atoms]
                 matched2to1 = [alink for alink in moi2.links if alink in moi.atoms]
-                print(matched1to2, matched2to1)
+                #print(matched1to2, matched2to1)
 
                 if len(matched1to2) != 0 and len(matched2to1) != 0:
-                    print(moi2.atoms, moi.mergedTo, moi2.mergedTo)
+                    #print(moi2.atoms, moi.mergedTo, moi2.mergedTo)
                     if moi.mergedTo is not None:
                         moi.mergedTo.mergeMoiety(moi2)
                         moi2.mergedTo = moi.mergedTo
@@ -269,10 +292,9 @@ class MoietyRecognition:
         return  mois_cleaned, atomsMarked
 
 
-    def depict(self, showLinks=True, showConnectorAs='dummies', showLabels=True, molspercol=3):
+    def depict(self, ipython=False, filename=None, showLinks=True, showConnectorAs='dummies', showLabels=True, molspercol=3):
 
         from tempfile import NamedTemporaryFile
-        import matplotlib.pyplot as plt
         from PIL import Image
 
         tmpdir = NamedTemporaryFile().name
@@ -281,23 +303,39 @@ class MoietyRecognition:
         mois = self.moieties
 
         for n, moi in enumerate(mois):
-            im = moi.depict(showLinks, showConnectorAs, showLabels)
+            im = moi.depict(True, showLinks=showLinks, showConnectorAs=showConnectorAs, showLabels=showLabels)
             fname = os.path.join(tmpdir, '%03d' % n)
             f = open(fname + '.svg', 'w')
             f.write(im.data)
             f.close()
             os.system('convert {}.svg {}.png'.format(fname, fname))
-        images = [Image.open(im) for im in sorted(glob(tmpdir + '/*.png'))]
 
-        columns = molspercol
-        fig = plt.figure(figsize=(40, 40))
+        images = [im for im in sorted(glob(tmpdir + '/*.png'))]
+        im_wsize = int(1000 / molspercol)
 
-        plt.axis('off')
-        for i, image in enumerate(images):
-            ax = plt.subplot(len(images) / columns + 1, columns, i + 1)
-            ax.axis('off')
-            ax.set_facecolor('white')
-            plt.imshow(image)
+        new_im = Image.new('RGB', (1000, 1000), 'white')
+
+        col = 0
+        row = 0
+        for i, elem in enumerate(images):
+            im = Image.open(elem)
+            wpercent = im_wsize/float(im.size[0])
+            im_hsize = int((im.size[1] * wpercent))
+            im.thumbnail((im_wsize, im_hsize), Image.ANTIALIAS)
+            new_im.paste(im, (im_wsize * col, im_hsize * row))
+            col += 1
+            if col == molspercol:
+                row += 1
+                col = 0
+
+        if filename is not None:
+            fname, extension = os.path.splitext(filename)
+            if extension != '.png':
+                filename = fname + '.png'
+            new_im.save(filename)
+
+        if ipython:
+            return new_im
 
 class Moiety:
 
@@ -312,29 +350,27 @@ class Moiety:
         self.parentsmallmol = parentsmallmol.copy()
         self.fragments = _ensurenestedlists(fragmentatoms)
         self.atoms = np.unique(sorted(_flatnestedlists(self.fragments)))
-        self.links = []
+        self.links = self._setBreakPoints()
         self.isring = isring
         self.mergedTo = None
+        #self.moismallmol = self._prepareSmallMol()
+        #self._setBreakPoints(self.parentsmallmol, self.moismallmol)
 
-        self.moismallmol = self._prepareSmallMol()
-
-    def _prepareSmallMol(self):
+    def getMoiSmallmol(self, includeLinks=False):
 
         parentsmallmol = self.parentsmallmol
         fragments = self.fragments
-        atoms = self.atoms
+        atoms = self.atoms if not includeLinks else self.atoms.tolist() + self.links
 
         atoms_string = " ".join([str(a) for a in atoms])
         atomsToRemove = parentsmallmol.get('idx', 'idx {}'.format(atoms_string), invert=True)
-        b = Builder(parentsmallmol)
+        b = Builder(parentsmallmol, checkInitialConformer=False)
         b._removeAtoms(atomsToRemove)
 
         if self.isring:
             self._fixAromaticNitrogen(b)
 
         sm = b.getSmallMol()
-
-        self._setBreakPoints(parentsmallmol, sm)
 
         return sm
 
@@ -359,19 +395,19 @@ class Moiety:
             a = pT.getAtom(element, n)
             builder._addAtoms([a])
 
-    def _setBreakPoints(self, parentsmallmol, sm):
+    def _setBreakPoints(self):
 
         atoms = self.atoms
+        parentsmallmol = self.parentsmallmol
 
         neighbors = []
         for a in atoms:
             ns = [ na for na in parentsmallmol.neighbors[a] if parentsmallmol.element[na] != 'H' and na not in atoms]
             neighbors.append(ns)
-        sm.__dict__['links'] = np.array(neighbors)
 
-        self.links = _flatnestedlists(neighbors)
+        return _flatnestedlists(neighbors)
 
-    def depict(self, showLinks=True, showConnectorAs='dummies',  showLabels=True):
+    def depict(self, ipython=False, filename=None, showLinks=True, showConnectorAs='dummies',  showLabels=True):
         # showConnectorAs dummies, atoms, groups
 
         from htmd.smallmol.util import _depictMol
@@ -382,23 +418,14 @@ class Moiety:
 
         pT = PeriodicTable()
         parentsmallmol = self.parentsmallmol
-        sm = copy.deepcopy(self.moismallmol)
-        atoms = self.atoms
-        elements = parentsmallmol.element[atoms]
-        indexes = parentsmallmol.idx[atoms]
-        formalcharges = parentsmallmol.formalcharge[atoms]
+        # sm = self.getMoiSmallmol()
+        atoms = self.atoms.tolist()
+        links = self.links
+        elements = parentsmallmol.element[atoms] if not showLinks else parentsmallmol.element[atoms + links]
+        indexes = parentsmallmol.idx[atoms] if not showLinks else parentsmallmol.element[atoms + links]
+        formalcharges = parentsmallmol.formalcharge[atoms] if not showLinks else parentsmallmol.element[atoms + links]
         if showLinks:
-            b = Builder(sm, checkInitialConformer=False)
-            for n, links in enumerate(sm.links):
-                if len(links)  != 0:
-                    for l in links:
-                        el = self._getAtomLinkFormat(showConnectorAs, l)
-                        indexes = np.append(indexes, parentsmallmol.idx[l])
-                        elements = np.append(elements, el[1])
-                        formalcharges = np.append(formalcharges, 0)
-                        A = pT.getAtom(el[0], n)
-                        b._addAtoms([A])
-            sm = b.getSmallMol()
+            sm = self.getMoiSmallmol(includeLinks=True)
 
         _mol = sm.toRdkitMol(includeConformer=True)
 
@@ -410,7 +437,7 @@ class Moiety:
             atomlabels = ["".join([str(i) for i in a]) for a in list(zip(*values))]
 
         rdkit.Chem.Kekulize(_mol)
-        svg = _depictMol(_mol, filename=None, ipython=True, atomlabels=atomlabels,
+        svg = _depictMol(_mol, filename=filename, ipython=ipython, atomlabels=atomlabels,
                           highlightAtoms=None)
 
         return svg
@@ -431,19 +458,81 @@ class Moiety:
         elif format == 'groups':
             atomName_Label = ('Du', '') if not parentsmallmol.isaromatic[linkAtom] else (parentsmallmol.element[linkAtom], 'Ar')
 
-
         return atomName_Label
 
     def mergeMoiety(self, moi):
 
         atoms = self.atoms
         links = self.links
-        parentsmallmol = self.parentsmallmol
 
         common_links = list(set(moi.links) & set(links))
-        newAtoms = _flatnestedlists([moi.atoms, self.atoms, common_links])
+        newAtoms = _flatnestedlists([moi.atoms, atoms, common_links])
+
 
         self.atoms = np.unique(sorted(newAtoms))
         self.fragments = _ensurenestedlists(self.atoms)
-        
-        self.moismallmol = self._prepareSmallMol()
+        self.links = self._setBreakPoints()
+
+    def _getMoietyOrder(self, moismallmol, moiType):
+
+        order = None
+        element = None
+        if moiType in ['amine', 'amide']:
+            #print('itself')
+            element = 'N'
+
+        elif moiType in ['alchol', 'thiol'] :
+            #print('first atom link')
+            element = 'C'
+        else:
+            return order
+
+        idx = np.where( moismallmol.element == element)[0]
+        nbrs = moismallmol.element[moismallmol.neighbors[idx][0]]
+        order = sum([ 1 for nbr in nbrs if nbr != 'H' ])
+        return  order
+
+    def _getMoietyType(self):
+
+        atoms = self.atoms.tolist()
+        maintype = 'ring' if self.isring else 'notring'
+        n_atoms = len(atoms)
+        elements = self.parentsmallmol.element[atoms]
+
+        sm = self.getMoiSmallmol(includeLinks=True)
+        rmol = sm.toRdkitMol()
+        #sma = rdkit.Chem.MolToSmarts(rmol)
+        moiType = None
+        moiOrder = None
+        try:
+            elements = [ el for el in elements.tolist() if el  not in _halogen_atoms ]
+            elementsString= "".join(sorted(elements))
+            #print("atoms: ", elementsString)
+            #print(moiTypes[maintype])
+            list_moieties = moiTypes[maintype]['{}atoms'.format(n_atoms)][elementsString]
+            #print("moieties ", list_moieties)
+            moiType = None
+
+            for mt, s in list_moieties.items():
+                match = rmol.HasSubstructMatch(rdkit.Chem.MolFromSmarts(s))
+                if match:
+                    moiType = mt
+                    break
+            moiOrder = self._getMoietyOrder(sm, moiType)
+            #print(sma)
+            #print(moiType)
+        except:
+            pass
+            #print('Unknown')
+
+        return moiType, moiOrder
+
+#
+#
+# from htmd.smallmol.smallmol import SmallMolLib
+#
+# lib = SmallMolLib('/shared/alberto/Projects/REPOS/Testing_repos/SmallMol_implementations/MoietyRecognition/MyTest.sdf')
+# for n in range(lib.numMols):
+#     sm = lib._mols[n]
+#     mf = MoietyRecognition(sm)
+#     mf.run()
