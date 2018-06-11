@@ -686,7 +686,7 @@ def _charmmLipid2Amber(mol):
 
 
 def _reorderMol(mol, order):
-    for k in mol._atom_fields:
+    for k in mol._atom_and_coord_fields:
         if mol.__dict__[k] is not None and np.size(mol.__dict__[k]) != 0:
             if k == 'coords':
                 mol.__dict__[k] = mol.__dict__[k][order, :, :]

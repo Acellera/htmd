@@ -137,6 +137,7 @@ def writeFRCMOD(mol, parameters, filename, typemap=None):
 
 def writePRM(mol, parameters, filename):
     from htmd.version import version as htmdversion
+    from htmd.util import ensurelist
 
     # for type, val in parameters.atom_types.items():
     #     if val.epsilon_14 != 1.0:
@@ -170,7 +171,7 @@ def writePRM(mol, parameters, filename):
     for type in types:
         val, field = getImproperParameter(type, parameters)
         if field == 'improper_periodic_types':
-            for term in val:
+            for term in ensurelist(val):
                 print("%-6s %-6s %-6s %-6s %12.8f %d %12.8f" % (type[0], type[1], type[2], type[3], term.phi_k, term.per, term.phase), file=f)
         elif field == 'improper_types':
             print("%-6s %-6s %-6s %-6s %12.8f %d %12.8f" % (type[0], type[1], type[2], type[3], val.psi_k, 0, val.psi_eq), file=f)

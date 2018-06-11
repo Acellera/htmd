@@ -85,46 +85,33 @@ class Trajectory:
         self.step = []
         self.time = []
         if coords is not None:
-            self.coords = [coords]
+            if coords.ndim == 2:
+                coords = coords[:, :, np.newaxis]
+            self.coords = coords
+
             nframes = self.numFrames
             if box is None:
-                self.box = [np.zeros((3, nframes), np.float32)]
+                self.box = np.zeros((3, nframes), np.float32)
             if boxangles is None:
-                self.boxangles = [np.zeros((3, nframes), np.float32)]
+                self.boxangles = np.zeros((3, nframes), np.float32)
             if step is None:
-                self.step = [np.arange(nframes, dtype=int)]
+                self.step = np.arange(nframes, dtype=int)
             if time is None:
-                self.time = [np.zeros(nframes, dtype=np.float32)]
+                self.time = np.zeros(nframes, dtype=np.float32)
         if box is not None:
-            self.box = [box]
+            self.box = box
         if boxangles is not None:
-            self.boxangles = [boxangles]
+            self.boxangles = boxangles
         if fileloc is not None:
-            self.fileloc = [fileloc]
+            self.fileloc = fileloc
         if step is not None:
-            self.step = [step]
+            self.step = step
         if time is not None:
-            self.time = [time]
+            self.time = time
 
     @property
     def numFrames(self):
-        n = 0
-        for c in self.coords:
-            n += c.shape[2]
-        return n
-
-    def __add__(self, other):
-        traj = Trajectory()
-        traj.coords = self.coords + other.coords
-        traj.box = self.box + other.box
-        traj.boxangles = self.boxangles + other.boxangles
-        traj.fileloc = self.fileloc + other.fileloc
-        traj.step = self.step + other.step
-        traj.time = self.time + other.time
-        return traj
-
-    def __radd__(self, other):
-        return self.__add__(other)
+        return self.coords.shape[2]
 
 
 class TopologyInconsistencyError(Exception):
@@ -137,7 +124,9 @@ class TopologyInconsistencyError(Exception):
 class MolFactory:
     """ This class converts Topology and Trajectory data into Molecule objects """
     @staticmethod
-    def construct(topos, trajs, filename, skip, frame):
+    def construct(topos, trajs, filename, frame):
+        from htmd.molecule.molecule import Molecule
+
         topos = ensurelist(topos)
         trajs = ensurelist(trajs)
         if len(topos) != len(trajs):
@@ -146,15 +135,15 @@ class MolFactory:
 
         mols = []
         for topo, traj in zip(topos, trajs):
-            natoms = MolFactory._getNumAtoms(topo, filename)
+            natoms = MolFactory._getNumAtoms(topo, traj, filename)
 
             mol = Molecule()
-            mol.empty(natoms)
-
             if topo is not None:
+                mol._emptyTopo(natoms)
                 MolFactory._parseTopology(mol, topo, filename)
             if traj is not None:
-                MolFactory._parseTraj(mol, traj, filename, skip, frame)
+                mol._emptyTraj(natoms)
+                MolFactory._parseTraj(mol, traj, filename, frame)
 
             mols.append(mol)
 
@@ -164,26 +153,43 @@ class MolFactory:
             return mols
 
     @staticmethod
-    def _getNumAtoms(topo, filename):
-        # Checking number of atoms that were read in the topology file for each field are the same
-        natoms = []
-        for field in topo.atominfo:
-            if len(topo.__dict__[field]) != 0:
-                natoms.append(len(topo.__dict__[field]))
-        natoms = np.unique(natoms)
-        if len(natoms) == 0:
-            raise RuntimeError('No atoms were read from file {}.'.format(filename))
-        if len(natoms) != 1:
-            raise TopologyInconsistencyError('Different number of atoms read from file {} for different fields: {}.'
-                                             .format(filename, natoms))
-        natoms = natoms[0]
-        return natoms
+    def _getNumAtoms(topo, traj, filename):
+        toponatoms = None
+        trajnatoms = None
+
+        if topo is not None:
+            natoms = []
+            # Checking number of atoms that were read in the topology file for each field are the same
+            for field in topo.atominfo:
+                if len(topo.__dict__[field]) != 0:
+                    natoms.append(len(topo.__dict__[field]))
+            natoms = np.unique(natoms)
+            if len(natoms) == 0:
+                raise RuntimeError('No atoms were read from file {}.'.format(filename))
+            if len(natoms) != 1:
+                raise TopologyInconsistencyError('Different number of atoms read from file {} for different fields: {}.'
+                                                 .format(filename, natoms))
+            toponatoms = natoms[0]
+        if traj is not None:
+            trajnatoms = traj.coords.shape[0]
+
+        if toponatoms is not None and trajnatoms is not None and toponatoms != trajnatoms:
+            raise TopologyInconsistencyError('Different number of atoms in topology ({}) and trajectory ({}) for '
+                                             'file {}'.format(toponatoms, trajnatoms, filename))
+
+        if toponatoms is not None:
+            return toponatoms
+        elif trajnatoms is not None:
+            return trajnatoms
 
     @staticmethod
     def _parseTopology(mol, topo, filename):
+        from htmd.molecule.molecule import Molecule
         for field in topo.__dict__:
             if field == 'crystalinfo':
+                mol.crystalinfo = topo.crystalinfo
                 continue
+
             newfielddata = np.array(topo.__dict__[field], dtype=mol._dtypes[field])
 
             # Skip on empty new field data
@@ -201,7 +207,6 @@ class MolFactory:
             mol.bondtype[:] = 'un'
 
         mol.element = mol._guessMissingElements()
-        mol.crystalinfo = topo.crystalinfo
 
         if os.path.exists(filename):
             filename = os.path.abspath(filename)
@@ -210,7 +215,8 @@ class MolFactory:
         mol.viewname = os.path.basename(filename)
 
     @staticmethod
-    def _parseTraj(mol, traj, filename, skip, frame):
+    def _parseTraj(mol, traj, filename, frame):
+        from htmd.molecule.molecule import Molecule
         ext = os.path.splitext(filename)[1][1:]
 
         assert traj.coords.ndim == 3, '{} reader must return 3D coordinates array for file {}'.format(ext, filename)
@@ -239,7 +245,7 @@ class MolFactory:
             # Writing hidden index file containing number of frames in trajectory file
             if os.path.isfile(filename):
                 MolFactory._writeNumFrames(filename, mol.numFrames)
-            ff = range(np.size(mol.numAtoms, 2))
+            ff = range(mol.numFrames)
             # tr.step = tr.step + traj[-1].step[-1] + 1
         elif frame is None:
             ff = [0]
@@ -248,21 +254,6 @@ class MolFactory:
         else:
             raise AssertionError('Should not reach here')
         mol.fileloc = [[filename, j] for j in ff]
-
-        if skip is not None:
-            mol.coords = np.array(mol.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
-            if mol.box is not None:
-                mol.box = np.array(mol.box[:, ::skip])
-            if mol.boxangles is not None:
-                mol.boxangles = mol.boxangles[:, ::skip]
-            if mol.step is not None:
-                mol.step = mol.step[::skip]
-            if mol.time is not None:
-                mol.time = mol.time[::skip]
-            mol.fileloc = mol.fileloc[::skip]
-
-
-
 
     @staticmethod
     def _writeNumFrames(filepath, numFrames):
@@ -314,7 +305,7 @@ def XYZread(filename, frame=None, topoloc=None):
 
     coords = np.stack(frames, axis=2)
     traj = Trajectory(coords=coords)
-    return topo, traj
+    return MolFactory.construct(topo, traj, filename, frame)
 
 
 def GJFread(filename, frame=None, topoloc=None):
@@ -349,7 +340,7 @@ def GJFread(filename, frame=None, topoloc=None):
 
     coords = np.vstack(coords)[:, :, np.newaxis]
     traj = Trajectory(coords=coords)
-    return topo, traj
+    return MolFactory.construct(topo, traj, filename, frame)
 
 
 def MOL2read(filename, frame=None, topoloc=None, singlemol=True):
@@ -428,9 +419,9 @@ def MOL2read(filename, frame=None, topoloc=None, singlemol=True):
     if singlemol:
         if molnum > 1:
             logger.warning('Mol2 file {} contained multiple molecules. Only the first was read.'.format(filename))
-        return topologies[0], trajectories[0]
+        return MolFactory.construct(topologies[0], trajectories[0], filename, frame)
     else:
-        return topologies, trajectories
+        return MolFactory.construct(topologies, trajectories, filename, frame)
 
 
 def MAEread(fname, frame=None, topoloc=None):
@@ -536,7 +527,7 @@ def MAEread(fname, frame=None, topoloc=None):
 
     coords = np.vstack(coords)[:, :, np.newaxis]
     traj = Trajectory(coords=coords)
-    return topo, traj
+    return MolFactory.construct(topo, traj, fname, frame)
 
 
 def _getPDB(pdbid):
@@ -816,7 +807,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
 
     topo.crystalinfo = crystalinfo
     traj = Trajectory(coords=coords)
-    return topo, traj
+    return MolFactory.construct(topo, traj, filename, frame)
 
 
 def PDBQTread(filename, frame=None, topoloc=None):
@@ -938,7 +929,7 @@ def PRMTOPread(filename, frame=None, topoloc=None):
         else:
             atoms[3] = abs(atoms[3])
             topo.impropers.append(atoms)
-    return topo, None
+    return MolFactory.construct(topo, None, filename, frame)
 
 
 def PSFread(filename, frame=None, topoloc=None):
@@ -999,7 +990,7 @@ def PSFread(filename, frame=None, topoloc=None):
                 mode = 'dihedral'
             elif '!NIMPHI' in line:
                 mode = 'improper'
-    return topo, None
+    return MolFactory.construct(topo, None, filename, frame)
 
 
 def XTCread(filename, frame=None, topoloc=None):
@@ -1099,7 +1090,7 @@ def XTCread(filename, frame=None, topoloc=None):
         step = np.arange(nframes)
     if len(time) != nframes or np.sum(time) == 0:
         time = np.zeros(nframes, dtype=np.float32)
-    return None, Trajectory(coords=coords, box=box, boxangles=boxangles, step=step, time=time)
+    return MolFactory.construct(None, Trajectory(coords=coords, box=box, boxangles=boxangles, step=step, time=time), filename, frame)
 
 
 def CRDread(filename, frame=None, topoloc=None):
@@ -1122,7 +1113,7 @@ def CRDread(filename, frame=None, topoloc=None):
                        if len(line[i:i + fieldlen].strip()) != 0]
 
     coords = np.vstack([coords[i:i + 3] for i in range(0, len(coords), 3)])[:, :, np.newaxis]
-    return None, Trajectory(coords=coords)
+    return MolFactory.construct(None, Trajectory(coords=coords), filename, frame)
 
 
 def CRDCARDread(filename, frame=None, topoloc=None):
@@ -1175,7 +1166,7 @@ def CRDCARDread(filename, frame=None, topoloc=None):
             topo.segid.append(pieces[7])
             topo.resid.append(int(pieces[8]))
     coords = np.vstack(coords)[:, :, np.newaxis]
-    return topo, Trajectory(coords=coords)
+    return MolFactory.construct(topo, Trajectory(coords=coords), filename, frame)
 
 
 def BINCOORread(filename, frame=None, topoloc=None):
@@ -1188,7 +1179,7 @@ def BINCOORread(filename, frame=None, topoloc=None):
         fmt = 'd' * (natoms * 3)
         coords = struct.unpack(fmt, dat)
         coords = np.array(coords, dtype=np.float32).reshape((natoms, 3, 1))
-    return None, Trajectory(coords=coords)
+    return MolFactory.construct(None, Trajectory(coords=coords), filename, frame)
 
 
 def MDTRAJread(filename, frame=None, topoloc=None):
@@ -1207,7 +1198,8 @@ def MDTRAJread(filename, frame=None, topoloc=None):
         boxangles = None
     else:
         boxangles = traj.unitcell_angles.T.copy()
-    return None, Trajectory(coords=coords.copy(), box=box, boxangles=boxangles, step=step, time=time)  # Copying coords needed to fix MDtraj stride
+    traj = Trajectory(coords=coords.copy(), box=box, boxangles=boxangles, step=step, time=time)  # Copying coords needed to fix MDtraj stride
+    return MolFactory.construct(None, traj, filename, frame)
 
 
 def MDTRAJTOPOread(filename, frame=None, topoloc=None):
@@ -1224,7 +1216,7 @@ def MDTRAJTOPOread(filename, frame=None, topoloc=None):
 
     coords = np.array(mdstruct.xyz.swapaxes(0, 1).swapaxes(1, 2) * 10, dtype=np.float32)
     topo.bonds = bonds
-    return topo, Trajectory(coords=coords)
+    return MolFactory.construct(topo, Trajectory(coords=coords), filename, frame)
 
 
 def GROTOPread(filename, frame=None, topoloc=None):
@@ -1265,7 +1257,7 @@ def GROTOPread(filename, frame=None, topoloc=None):
     for i in range(len(topo.bonds)):
         topo.bonds[i][0] = atommapping[topo.bonds[i][0]]
 
-    return topo, None
+    return MolFactory.construct(topo, None, filename, frame)
 
 def PDBXMMCIFread(filename, frame=None, topoloc=None):
     from htmd.molecule.pdbx.reader.PdbxReader import PdbxReader
@@ -1366,7 +1358,7 @@ def PDBXMMCIFread(filename, frame=None, topoloc=None):
 
     allcoords = np.stack(allcoords, axis=2)
 
-    return topo, Trajectory(coords=allcoords)
+    return MolFactory.construct(topo, Trajectory(coords=allcoords), filename, frame)
 
 
 
@@ -1477,4 +1469,38 @@ if __name__ == '__main__':
     assert mol.numAtoms == 64281
     assert mol.numFrames == 1
     print('Can read single frame mmCIF files.')
+
+    from htmd.home import home
+    mol = Molecule(os.path.join(home(dataDir='adaptive'), 'input', 'e1s1_1', 'structure.pdb'))
+    mol.read(glob(os.path.join(home(dataDir='adaptive'), 'data', '*', '*.xtc')))
+    # Try to vstack fileloc. This will fail with wrong fileloc shape
+    fileloc = np.vstack(mol.fileloc)
+    assert fileloc.shape == (12, 2)
+    print('Correct fileloc shape with multiple file reading.')
+
+    # Testing overwriting of topology fields
+    mol = Molecule(os.path.join(home(dataDir='test-ffevaluate'), '1dihedral', 'mol.psf'))
+    atomtypes = mol.atomtype.copy()
+    charges = mol.charge.copy()
+    coords = np.array([[[ 0.   ],
+                        [ 0.   ],
+                        [-0.17 ]],
+
+                       [[ 0.007],
+                        [ 1.21 ],
+                        [ 0.523]],
+
+                       [[ 0.   ],
+                        [ 0.   ],
+                        [-1.643]],
+
+                       [[-0.741],
+                        [-0.864],
+                        [-2.296]]], dtype=np.float32)
+
+    mol.read(os.path.join(home(dataDir='test-ffevaluate'), '1dihedral', 'mol.pdb'))
+    assert np.array_equal(mol.atomtype, atomtypes)
+    assert np.array_equal(mol.charge, charges)
+    assert np.array_equal(mol.coords, coords)
+    print('Merging of topology fields works')
 

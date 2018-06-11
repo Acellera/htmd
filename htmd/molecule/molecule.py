@@ -124,8 +124,11 @@ class Molecule:
         Atom types, valid only if PSF read and molecule unmodified
 
     """
-    _atom_fields = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion', 'coords',
+    _atom_fields = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
                    'occupancy', 'beta', 'segid', 'element', 'charge', 'masses', 'atomtype')
+    _topo_fields = tuple(list(_atom_fields) + ['bonds', 'bondtype', 'angles', 'dihedrals', 'impropers', 'crystalinfo'])
+    _traj_fields = ('coords', 'box', 'boxangles', 'fileloc', 'step', 'time')
+    _atom_and_coord_fields = tuple(list(_atom_fields) + ['coords', ])
 
     _dtypes = {
         'record': object,
@@ -162,7 +165,7 @@ class Molecule:
         'chain': (0,),
         'resid': (0,),
         'insertion': (0,),
-        'coords': (0, 3, 1),
+        'coords': (0, 3, 0),
         'occupancy': (0,),
         'beta': (0,),
         'segid': (0,),
@@ -175,8 +178,8 @@ class Molecule:
         'atomtype': (0,),
         'bondtype': (0,),
         'masses': (0,),
-        'box': (3, 1),
-        'boxangles': (3, 1),
+        'box': (3, 0),
+        'boxangles': (3, 0),
     }
 
     def __init__(self, filename=None, name=None, **kwargs):
@@ -310,7 +313,7 @@ class Molecule:
                     self.bonds = newbonds
                     self.bondtype = mol.bondtype
 
-            for k in self._atom_fields:
+            for k in self._atom_and_coord_fields:
                 if k == 'serial':
                     continue
                 data2 = mol.__dict__[k]
@@ -318,6 +321,9 @@ class Molecule:
                     data2 = self._empty(mol.numAtoms, k)
                 self.__dict__[k] = insertappend(index, self.__dict__[k], data2, append)
             self.serial = np.arange(1, self.numAtoms + 1)
+            # Reset the box to zeros as you cannot keep box size after inserting atoms
+            self.box = np.zeros((3, self.numFrames), dtype=self._dtypes['box'])
+            self.boxangles = np.zeros((3, self.numFrames), dtype=self._dtypes['boxangles'])
         except Exception as err:
             self = backup
             raise NameError('Failed to insert/append molecule at position {} with error: "{}"'.format(index, err))
@@ -345,7 +351,7 @@ class Molecule:
         """
         sel = self.atomselect(selection, indexes=True)
         self._updateBondsAnglesDihedrals(sel)
-        for k in self._atom_fields:
+        for k in self._atom_and_coord_fields:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
             if k == 'coords':
                 self.__dict__[k] = np.atleast_3d(self.__dict__[k])
@@ -379,7 +385,7 @@ class Molecule:
 
 
         """
-        if field != 'index' and field not in self._atom_fields:
+        if field != 'index' and field not in self._atom_and_coord_fields:
             raise NameError("Invalid field '" + field + "'")
         s = self.atomselect(sel)
         if field == 'coords':
@@ -411,7 +417,7 @@ class Molecule:
         >>> mol=tryp.copy()
         >>> mol.set('segid', 'P', sel='protein')
         """
-        if field not in self._atom_fields:
+        if field not in self._atom_and_coord_fields:
             raise NameError("Invalid field '" + field + "'")
         s = self.atomselect(sel)
         if field == 'coords':
@@ -852,7 +858,7 @@ class Molecule:
                 raise FileNotFoundError('File {} was not found.'.format(f))
 
         if len(filename) == 1 and isinstance(filename[0], Sim):
-            self.read(filename[0].molfile)
+            self.read(filename[0].molfile) # TODO: Should pass all parameters here!!!
             self.read(filename[0].trajectory)
             return
         if len(filename) == 1 and isinstance(filename[0], Frame):
@@ -861,12 +867,7 @@ class Molecule:
             self.dropFrames(keep=filename[0].frame)
             return
 
-        from htmd.molecule.readers import Trajectory
-        if append:
-            traj = Trajectory(self.coords, self.box, self.boxangles, self.fileloc, self.step, self.time)
-        else:
-            traj = Trajectory()
-
+        newmols = []
         for fname, frame in zip(filename, frames):
             fname = self._unzip(fname)
             ext = self._getExt(fname, type)
@@ -882,29 +883,23 @@ class Molecule:
             readers = _ALL_READERS[ext]
             for rr in readers:
                 try:
-                    newmol = rr(fname, frame=frame, topoloc=tmppdb, **kwargs)
+                    mol = rr(fname, frame=frame, topoloc=tmppdb, **kwargs)
                 except FormatError:
                     continue
                 else:
                     break
 
-            if newmol.numFrames != 0:
-                if frame is not None and newmol.numFrames > 1:
-                    newmol.dropFrames(keep=frame)
+            if self.numAtoms != 0 and mol.numAtoms != self.numAtoms:
+                raise ValueError('Number of atoms in file ({}) mismatch with number of atoms in the molecule '
+                                 '({})'.format(mol.numAtoms, self.numAtoms))
 
-                if self.numAtoms != 0 and newmol.numAtoms != self.numAtoms:
-                    raise ValueError(
-                        'Number of atoms in trajectory ({}) mismatch with number of atoms in the molecule ({})'.format(
-                            newmol.numAtoms, self.numAtoms))
+            if frame is not None:
+                mol.dropFrames(keep=frame)
 
-                # TODO: Append trajectories
-                traj += tr
+            newmols.append(mol)
 
-            if newmol.numAtoms != 0:  # TODO: THIS WILL NOT WORK. THIS CHECKS ALSO THE TRAJ FOR NUMATOMS!!!!
-                self._parseTopology(to, fname, overwrite=overwrite, _logger=_logger) # TODO: Merge topologies!
-
-        if len(traj.coords) != 0:
-            self._parseTraj(traj, skip=skip)P
+        self._mergeTopologies(newmols, overwrite=overwrite, _logger=_logger)
+        self._mergeTrajectories(newmols, append=append, skip=skip)
 
         self._dropAltLoc(keepaltloc=keepaltloc, _logger=_logger)
 
@@ -951,76 +946,82 @@ class Molecule:
             for a in otheraltlocs:
                 self.remove(self.altloc == a, _logger=_logger)
 
-    def _parseTopology(self, topo, filename, overwrite='all', _logger=True):
+
+
+    def _mergeTopologies(self, newmols, overwrite='all', _logger=True):
         if isinstance(overwrite, str):
             overwrite = (overwrite, )
 
-        # Checking number of atoms that were read in the topology file for each field are the same
-        natoms = []
-        for field in topo.atominfo:
-            if len(topo.__dict__[field]) != 0:
-                natoms.append(len(topo.__dict__[field]))
-        natoms = np.unique(natoms)
-        if len(natoms) == 0:
-            raise RuntimeError('No atoms were read from file {}.'.format(filename))
-        if len(natoms) != 1:
-            raise TopologyInconsistencyError('Different number of atoms read from file {} for different fields: {}.'
-                                             .format(filename, natoms))
-        natoms = natoms[0]
-
-        if self.numAtoms == 0:
-            self.empty(natoms)
-
-        for field in topo.__dict__:
-            if field == 'crystalinfo':
-                continue
-            newfielddata = np.array(topo.__dict__[field], dtype=self._dtypes[field])
-
-            # Skip on empty new field data
-            if newfielddata is None or len(newfielddata) == 0 or np.all([x is None for x in topo.__dict__[field]]):
+        for mol in newmols:
+            if mol._numAtomsTopo == 0:
                 continue
 
-            # Objects could be ints for example but we want them as str
-            if self._dtypes[field] == object and len(newfielddata) != 0:
-                newfielddata = np.array([str(x) for x in newfielddata], dtype=object)
+            if self._numAtomsTopo == 0:
+                self._emptyTopo(mol.numAtoms)
 
-            if (overwrite[0] == 'all') or (field in overwrite) or (len(self.__dict__[field])) == 0:
-                self.__dict__[field] = newfielddata
-            else:
-                if np.shape(self.__dict__[field]) != np.shape(newfielddata):
+            for field in mol._topo_fields:
+                if field == 'crystalinfo':
+                    continue
+
+                newfielddata = mol.__dict__[field]
+
+                # Continue if all values in the new mol are empty or zero
+                if newfielddata is None or len(newfielddata) == 0 or np.all([x is None for x in newfielddata]):
+                    continue
+                if self._dtypes[field] == object and np.all(newfielddata == ''):
+                    continue
+                if self._dtypes[field] != object and np.all(newfielddata == 0):
+                    continue
+
+                if field in Molecule._atom_fields and np.shape(self.__dict__[field]) != np.shape(newfielddata):
                     raise TopologyInconsistencyError(
-                        'Different number of atoms read from topology file {} for field {}'.format(filename, field))
-                if not np.array_equal(self.__dict__[field], newfielddata):
-                    raise TopologyInconsistencyError(
-                        'Different atom information read from topology file {} for field {}'.format(filename, field))
+                        'Different number of atoms read from topology file {} for field {}'.format(mol.fileloc, field))
 
-        if len(self.bonds) != 0 and len(topo.bondtype) == 0:
-            self.bondtype = np.empty(self.bonds.shape[0], dtype=Molecule._dtypes['bondtype'])
-            self.bondtype[:] = 'un'
+                if (overwrite[0] == 'all') or (field in overwrite):
+                    self.__dict__[field] = newfielddata
+                else:
+                    if not np.array_equal(self.__dict__[field], newfielddata):
+                        raise TopologyInconsistencyError(
+                            'Different atom information read from topology file {} for field {}'.format(mol.fileloc,
+                                                                                                        field))
 
-        self.element = self._guessMissingElements()
-        self.crystalinfo = topo.crystalinfo
+            if len(self.bonds) != 0 and len(self.bondtype) == 0:
+                self.bondtype = np.empty(self.bonds.shape[0], dtype=Molecule._dtypes['bondtype'])
+                self.bondtype[:] = 'un'
 
-        if os.path.exists(filename):
-            filename = os.path.abspath(filename)
-        self.topoloc = filename
-        self.fileloc = [[filename, 0]]
-        self.viewname = os.path.basename(filename)
+            self.element = self._guessMissingElements()
+            self.crystalinfo = mol.crystalinfo
+            self.topoloc = mol.topoloc
+            self.fileloc = mol.fileloc
+            self.viewname = mol.viewname
 
+    def _mergeTrajectories(self, newmols, skip=None, append=False):
+        from collections import defaultdict
+        trajinfo = defaultdict(list)
+        if append and self._numAtomsTraj != 0:
+            for field in Molecule._traj_fields:
+                trajinfo[field].append(self.__dict__[field])
 
-    def _parseTraj(self, traj, skip=None):
-        self.coords = np.concatenate(traj.coords, axis=2).astype(Molecule._dtypes['coords'])
-        if np.all([x is None for x in traj.box]):
-            self.box = np.zeros((3, 1), dtype=Molecule._dtypes['box'])
-        else:
-            self.box = np.concatenate(traj.box, axis=1).astype(Molecule._dtypes['box'])
-        if np.all([x is None for x in traj.boxangles]):
-            self.boxangles = np.zeros((3, 1), dtype=Molecule._dtypes['box'])
-        else:
-            self.boxangles = np.concatenate(traj.boxangles, axis=1).astype(Molecule._dtypes['boxangles'])
-        self.fileloc = traj.fileloc
-        self.step = np.hstack(traj.step).astype(int)
-        self.time = np.hstack(traj.time)
+        for mol in newmols:
+            if mol._numAtomsTraj == 0:
+                continue
+
+            for field in Molecule._traj_fields:
+                if field == 'fileloc':  # TODO: Make a PR where fileloc becomes (2, nframes) numpy array so we don't handle it separately
+                    trajinfo[field] += mol.__dict__[field]
+                else:
+                    trajinfo[field].append(mol.__dict__[field])
+
+        if len(trajinfo):
+            for field in Molecule._traj_fields:
+                if field == 'fileloc':
+                    self.__dict__[field] = trajinfo[field]
+                else:
+                    self.__dict__[field] = np.concatenate(trajinfo[field], axis=-1)
+
+        if self._numAtomsTopo != 0 and self._numAtomsTraj == 0:
+            self._emptyTraj(self._numAtomsTopo)
+            return
 
         if skip is not None:
             self.coords = np.array(self.coords[:, :, ::skip])  # np.array is required to make copy and thus free memory!
@@ -1062,6 +1063,9 @@ class Molecule:
             A specific viewer in which to visualize the molecule. If None it will use the current default viewer.
         """
         from htmd.util import tempname
+
+        if self.numFrames == 0:
+            raise RuntimeError('No frames in this molecule to visualize.')
 
         if sel is not None or style is not None or color is not None:
             self._tempreps.add(sel=sel, style=style, color=color)
@@ -1228,6 +1232,15 @@ class Molecule:
             raise IOError('Molecule cannot write files with "{}" extension yet. If you need such support please notify '
                           'us on the github htmd issue tracker.'.format(ext))
 
+    def _emptyTopo(self, numAtoms):
+        for field in Molecule._atom_fields:
+            self.__dict__[field] = self._empty(numAtoms, field)
+
+    def _emptyTraj(self, numAtoms):
+        self.coords = self._empty(numAtoms, 'coords')
+        self.box = np.zeros(self._dims['box'], dtype=np.float32)
+
+
     def empty(self, numAtoms):
         """ Creates an empty molecule of N atoms.
 
@@ -1241,9 +1254,8 @@ class Molecule:
         >>> newmol = Molecule()
         >>> newmol.empty(100)
         """
-        for field in Molecule._atom_fields:
-            self.__dict__[field] = self._empty(numAtoms, field)
-        self.box = np.zeros(self._dims['box'], dtype=np.float32)
+        self._emptyTopo(numAtoms)
+        self._emptyTraj(numAtoms)
 
     def sequence(self, oneletter=True, noseg=False):
         """ Return the AA sequence of the Molecule.
@@ -1469,12 +1481,20 @@ class Molecule:
         return np.size(np.atleast_3d(self.coords), 2)
 
     @property
+    def _numAtomsTopo(self):
+        return len(self.record)
+
+    @property
+    def _numAtomsTraj(self):
+        return self.coords.shape[0]
+
+    @property
     def numAtoms(self):
         """ Number of atoms in the molecule
         """
-        natoms = len(self.record)
+        natoms = self._numAtomsTopo
         if natoms == 0:
-            natoms = self.coords.shape[0]
+            natoms = self._numAtomsTraj
         return natoms
 
     @property
@@ -1507,10 +1527,10 @@ class Molecule:
             return rep
 
         rep = 'Molecule with ' + str(self.numAtoms) + ' atoms and ' + str(self.numFrames) + ' frames'
-        for p in sorted(self._atom_fields):
+        for p in sorted(self._atom_and_coord_fields):
             rep += '\n'
             rep += 'Atom field - ' + formatstr(p, self.__dict__[p])
-        for j in sorted(self.__dict__.keys() - list(Molecule._atom_fields)):
+        for j in sorted(self.__dict__.keys() - list(Molecule._atom_and_coord_fields)):
             if j[0] == '_':
                 continue
             rep += '\n'
@@ -1686,7 +1706,7 @@ class UniqueResidueID:
                + self.__str__()
 
 
-def mol_equal(mol1, mol2, checkFields=Molecule._atom_fields, exceptFields=None):
+def mol_equal(mol1, mol2, checkFields=Molecule._atom_and_coord_fields, exceptFields=None):
     difffields = []
     checkFields = list(checkFields)
     if exceptFields is not None:
