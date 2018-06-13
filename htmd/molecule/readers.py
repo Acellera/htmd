@@ -440,8 +440,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
         'beta': np.float32,
         'segid': str,
         'element': str,
-        'charge': np.float32,
-        'chargesign': str,
+        'charge': np.float32
     }
     coordcolspecs = [(30, 38), (38, 46), (46, 54)]
     coordnames = ('x', 'y', 'z')
@@ -560,21 +559,33 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
 
         parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
         parsedcryst1 = read_fwf(cryst1data, colspecs=cryst1colspecs, names=cryst1names, na_values=_NA_VALUES, keep_default_na=False)
-        parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
+        enforceddtypes = {'resname': str, 'segid': str}
+        parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False, dtype=enforceddtypes, delimiter='\r\t') #, dtype=topodtypes)
         parsedsymmetry = read_fwf(symmetrydata, colspecs=symmetrycolspecs, names=symmetrynames, na_values=_NA_VALUES, keep_default_na=False)
+        # from IPython.core.debugger import set_trace
+        # set_trace()
 
-    # if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
-    #    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+    # TODO: Before stripping guess elements from atomname!!
+
+    for field in topodtypes:
+        if field in parsedtopo and topodtypes[field] == str and parsedtopo[field].dtype == object:
+            parsedtopo[field] = parsedtopo[field].str.strip()
 
     # Fixing PDB format charges which can come after the number
     if parsedtopo.charge.dtype == 'object':
-        minuses = np.where(parsedtopo.charge.str.match('\d\-') == True)[0]
-        pluses = np.where(parsedtopo.charge.str.match('\d\+') == True)[0]
-        for m in minuses:
-            parsedtopo.loc[m, 'charge'] = int(parsedtopo.charge[m][0]) * -1
-        for p in pluses:
-            parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
-        parsedtopo.loc[parsedtopo.charge.isnull(), 'charge'] = 0
+        parsedtopo.charge = parsedtopo.charge.str.strip()
+        charges = np.zeros(len(parsedtopo.charge), dtype=np.float32)
+        for i, c in enumerate(parsedtopo.charge):
+            if not isinstance(c, str):
+                continue
+            if len(c) > 1:
+                if c[1] == '-':
+                    charges[i] = -1 * float(c[0])
+                elif c[1] == '+':
+                    charges[i] = float(c[0])
+            elif len(c):
+                charges[i] = float(c)
+        parsedtopo.charge = charges
     # Fixing hexadecimal index and resids
     # Support for reading hexadecimal
     if parsedtopo.serial.dtype == 'object':
@@ -631,7 +642,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
             mappedbonds = np.delete(mappedbonds, wrongidx, axis=0)
             topo.bonds = np.array(mappedbonds, dtype=np.uint32)
 
-    if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
+    if len(topo.segid) and np.all(np.array(topo.segid) == '') and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx
 
     if tempfile:
