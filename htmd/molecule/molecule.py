@@ -881,6 +881,7 @@ class Molecule:
             if ext not in _ALL_READERS:
                 raise ValueError('Unknown file type with extension "{}".'.format(ext))
             readers = _ALL_READERS[ext]
+            mol = None
             for rr in readers:
                 try:
                     mol = rr(fname, frame=frame, topoloc=tmppdb, **kwargs)
@@ -888,6 +889,12 @@ class Molecule:
                     continue
                 else:
                     break
+
+            if mol is None:
+                raise RuntimeError('No molecule read from file {} with any of the readers {}'.format(fname, readers))
+
+            if isinstance(mol, list):
+                raise AssertionError('Reader {} should not return multiple molecules. Report this error on github.')
 
             if self.numAtoms != 0 and mol.numAtoms != self.numAtoms:
                 raise ValueError('Number of atoms in file ({}) mismatch with number of atoms in the molecule '
