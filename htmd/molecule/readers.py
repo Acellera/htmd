@@ -384,6 +384,38 @@ def _getPDB(pdbid):
     return filepath, tempfile
 
 
+def pdbGuessElementByName(pdtopo):
+    """
+    https://www.cgl.ucsf.edu/chimera/docs/UsersGuide/tutorials/pdbintro.html#misalignment which states that elements
+    should be right-aligned in columns 13-14 unless it's a 4 letter name when it would end up being left-aligned.
+    """
+    from periodictable import elements
+    allelements = [str(el).upper() for el in list(elements._element.values())[1:]]
+
+    noelem = np.where(pdtopo.element.str.strip() == '')[0]
+    for idx in noelem:
+        name = pdtopo.name[idx]
+        elem = None
+        if name[0] == ' ':  # If there is no letter in col 13 then col 14 is the element
+            elem = name[1]
+        else:
+            if name[-1] == ' ':  # If it's not a 4 letter name then it's a two letter element
+                elem = name[0] + name[1].lower()
+            else:  # With 4 letter name it could be either a 1 letter element or 2 letter element
+                if name[0] in allelements:
+                    elem = name[0]
+                if name[:2].upper() in allelements:
+                    if elem is not None:
+                        tmp = name[0] + name[1].lower()
+                        tmpname = elements.__dict__[tmp].name
+                        logger.warning('Atom with name {} in position {} was guessed as element {} '
+                                       'but could also be {} ({}). If this is the case please replace it '
+                                       'with mol.element[{}] = \'{}\''.format(name, idx, elem, tmp, tmpname, idx, tmp))
+                    else:
+                        elem = name[0] + name[1].lower()
+        pdtopo.loc[idx, 'element'] = elem
+
+
 def PDBread(filename, mode='pdb', frame=None, topoloc=None):
     from pandas import read_fwf
     import io
@@ -566,6 +598,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
         # set_trace()
 
     # TODO: Before stripping guess elements from atomname!!
+    pdbGuessElementByName(parsedtopo)
 
     for field in topodtypes:
         if field in parsedtopo and topodtypes[field] == str and parsedtopo[field].dtype == object:
