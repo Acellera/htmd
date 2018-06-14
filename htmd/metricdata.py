@@ -19,7 +19,7 @@ def _getsizes(x):
             return len(x)
 
 
-class Trajectory:
+class Trajectory(object):
     def __init__(self, projection=None, reference=None, sim=None, cluster=None):
         self._projection = projection
         self._reference = reference
@@ -95,7 +95,7 @@ class Trajectory:
             'np.array(shape={})'.format(np.shape(self.cluster)) if self.cluster is not None else None)
 
 
-class MetricData:
+class MetricData(object):
     """ Class used for storing projected trajectories, their clustering and state assignments. Objects of this class
     are constructed by the `project` methods of the other projection classes. Only construct this class if you want to
     load saved data.

@@ -16,7 +16,6 @@ import numpy as np
 from scipy import stats
 import warnings
 import random
-from htmd.projections.metric import _singleMolfile
 from htmd.molecule.molecule import Molecule
 from htmd.vmdviewer import getCurrentViewer
 from htmd.units import convert as unitconvert
@@ -502,6 +501,7 @@ class Model(object):
         >>> for m in mols:
         >>>     m.view()
         """
+        from htmd.projections.metric import _singleMolfile
         self._integrityCheck(postmsm=(statetype != 'cluster'))
         if simlist is None:
             simlist = self.data.simlist

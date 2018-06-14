@@ -70,11 +70,12 @@ class VMDConvexHull(VMDGraphicObject):
 
         Examples
         --------
+        >>> from htmd.vmdgraphics import VMDConvexHull
         >>> m=Molecule("3PTB")
         >>> m.view()
         >>> mf=m.copy()
-        >>> mf.filter("protein ")
-        >>> gh=htmd.vmdgraphics.VMDConvexHull(mf)  # doctest: +ELLIPSIS
+        >>> _ = mf.filter("protein ")
+        >>> gh=VMDConvexHull(mf)  # doctest: +ELLIPSIS
         >>> gh.delete()
         """
 
@@ -280,8 +281,8 @@ class VMDLabels(VMDGraphicObject):
 
         Examples
         --------
-        >>> from htmd.ui import *
-        >>> from htmd.vmdgraphics import *
+        >>> from htmd.ui import *  # doctest: +ELLIPSIS
+        >>> from htmd.vmdgraphics import VMDLabels
         >>> mol = Molecule('3ptb')
         >>> mol.view()
         >>> x = VMDLabels(mol, 'resid 40')
@@ -291,7 +292,6 @@ class VMDLabels(VMDGraphicObject):
         """
         # TODO: After deleting labels it breaks. Better don't delete or fix the code
         super().__init__(None)
-        print(VMDLabels.count)
         idx = mol.atomselect(selection, indexes=True)
         cmd = '''label textsize {s}
 color Labels Atoms {c}
@@ -335,6 +335,6 @@ if __name__ == "__main__":
     ngh=htmd.vmdgraphics.VMDConvexHull(nf,solid=True)
 
     """
-    from htmd.ui import *
+    from htmd.molecule.molecule import Molecule
     import doctest
     doctest.testmod()

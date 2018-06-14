@@ -353,4 +353,4 @@ def _viewSphere(spherecoor):
     spheremol = Molecule()
     spheremol.empty(spherecoor.shape[0])
     spheremol.coords = np.atleast_3d(spherecoor)
-    spheremol.view(guessbonds=False)
+    spheremol.view(guessBonds=False)

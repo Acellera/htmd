@@ -275,7 +275,7 @@ class PdbxReader(object):
                     curRow = []
                     curCategory.append(curRow)
 
-                    for tAtt in curCategory.getAttributeList():
+                    for _ in curCategory.getAttributeList():
                         if curWord is not None:
                             curRow.append(curWord)
                         elif curQuotedString is not None:

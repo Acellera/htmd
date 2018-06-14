@@ -27,7 +27,7 @@ class FormatError(Exception):
         return repr(self.value)
 
 
-class Topology:
+class Topology(object):
     def __init__(self, pandasdata=None):
         self.record = []
         self.serial = []
@@ -76,7 +76,7 @@ class Topology:
             self.__dict__[field] = data
 
 
-class Trajectory:
+class Trajectory(object):
     def __init__(self, coords=None, box=None, boxangles=None, fileloc=None, step=None, time=None):
         self.coords = []
         self.box = []
@@ -121,7 +121,7 @@ class TopologyInconsistencyError(Exception):
     def __str__(self):
         return repr(self.value)
 
-class MolFactory:
+class MolFactory(object):
     """ This class converts Topology and Trajectory data into Molecule objects """
     @staticmethod
     def construct(topos, trajs, filename, frame):
