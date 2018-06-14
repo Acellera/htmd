@@ -1287,61 +1287,108 @@ for k in _COORDINATE_READERS:
     _ALL_READERS[k] += ensurelist(_COORDINATE_READERS[k])
 
 
+from htmd.molecule.molecule import Molecule
+from glob import glob
+from natsort import natsorted
+from unittest import TestCase
+class TestReaders(TestCase):
+    def testfolder(self, subname=None):
+        from htmd.home import home
+        if subname is None:
+            return home(dataDir='molecule-readers')
+        else:
+            return os.path.join(home(dataDir='molecule-readers'), subname)
+
+    def test_pdb(self):
+        from htmd.home import home
+        for f in glob(os.path.join(self.testfolder(), '*.pdb')):
+            mol = Molecule(f)
+        for f in glob(os.path.join(home(dataDir='pdb/'), '*.pdb')):
+            mol = Molecule(f)
+        print('Can read PDB files.')
+
+    def test_psf(self):
+        mol = Molecule(os.path.join(self.testfolder('4RWS'), 'structure.psf'))
+        print('Can read PSF files.')
+
+    def test_xtc(self):
+        mol = Molecule(os.path.join(self.testfolder('4RWS'), 'traj.xtc'))
+        print('Can read XTC files.')
+
+    def test_combine_topo_traj(self):
+        testfolder = self.testfolder('4RWS')
+        mol = Molecule(os.path.join(testfolder, 'structure.psf'))
+        mol.read(os.path.join(testfolder, 'traj.xtc'))
+
+    def test_prmtop(self):
+        testfolder = self.testfolder('3AM6')
+        mol = Molecule(os.path.join(testfolder, 'structure.prmtop'))
+        print('Can read PRMTOP files.')
+
+    def test_crd(self):
+        testfolder = self.testfolder('3AM6')
+        mol = Molecule(os.path.join(testfolder, 'structure.crd'))
+        print('Can read CRD files.')
+
+    def test_mol2(self):
+        testfolder = self.testfolder('3L5E')
+        mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
+        mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
+        print('Can read MOL2 files.')
+
+    def test_mae(self):
+        for f in glob(os.path.join(self.testfolder(), '*.mae')):
+            mol = Molecule(f)
+        print('Can read MAE files.')
+
+    def test_append_trajectories(self):
+        testfolder = self.testfolder('CMYBKIX')
+        mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
+        mol.read(natsorted(glob(os.path.join(testfolder, '*.xtc'))))
+        print('Can read/append XTC trajectories.')
+
+    def test_missing_crystal_info(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'weird-cryst.pdb'))
+        print('Can read missing crystal info.')
+
+    def test_dcd(self):
+        from htmd.home import home
+        mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
+        mol.read(os.path.join(home(dataDir='1kdx'), '1kdx.dcd'))
+        print('Can read DCD files.')
+
+    def test_dcd_frames(self):
+        from htmd.home import home
+        mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
+        mol.read(os.path.join(home(dataDir='1kdx'), '1kdx.dcd'))
+        tmpcoo = mol.coords.copy()
+        mol.read([os.path.join(home(dataDir='1kdx'), '1kdx.dcd')], frames=[8])
+        assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
+        print('Can read DCD specific frames.')
+
+    def test_gromacs_top(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'gromacs.top'))
+        print('Can read GROMACS top files.')
+
+    def test_mmcif_single_frame(self):
+        mol = Molecule(os.path.join(self.testfolder(), '1ffk.cif'))
+        assert mol.numAtoms == 64281
+        assert mol.numFrames == 1
+        print('Can read single frame mmCIF files.')
+
+    def test_mmcif_multi_frame(self):
+        mol = Molecule(os.path.join(self.testfolder(), '1j8k.cif'))
+        assert mol.numAtoms == 1402
+        assert mol.numFrames == 20
+        print('Can read multiframe mmCIF files.')
+
+
 if __name__ == '__main__':
-    from htmd.home import home
-    from htmd.molecule.molecule import Molecule
-    from glob import glob
-    from natsort import natsorted
-    import os
-    testfolder = home(dataDir='molecule-readers/4RWS/')
-    mol = Molecule(os.path.join(testfolder, 'structure.psf'))
-    print('Can read PSF files.')
-    mol.read(os.path.join(testfolder, 'traj.xtc'))
-    print('Can read XTC files.')
-    testfolder = home(dataDir='molecule-readers/3AM6/')
-    mol = Molecule(os.path.join(testfolder, 'structure.prmtop'))
-    print('Can read PRMTOP files.')
-    mol.read(os.path.join(testfolder, 'structure.crd'))
-    print('Can read CRD files.')
-    testfolder = home(dataDir='molecule-readers/3L5E/')
-    mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
-    mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
-    print('Can read MOL2 files.')
-    for f in glob(os.path.join(home(dataDir='molecule-readers/'), '*.mae')):
-        mol = Molecule(f)
-    print('Can read MAE files.')
-    for f in glob(os.path.join(home(dataDir='molecule-readers/'), '*.pdb')):
-        mol = Molecule(f)
-    for f in glob(os.path.join(home(dataDir='pdb/'), '*.pdb')):
-        mol = Molecule(f)
-    print('Can read PDB files.')
-    testfolder = home(dataDir='molecule-readers/CMYBKIX/')
-    mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
-    mol.read(natsorted(glob(os.path.join(testfolder, '*.xtc'))))
-    print('Can read/append XTC trajectories.')
+    import unittest
+    unittest.main(verbosity=2)
 
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'weird-cryst.pdb'))
-    print('Can read missing crystal info.')
 
-    # Testing DCD reader
-    mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
-    mol.read(os.path.join(home(dataDir='1kdx'), '1kdx.dcd'))
-    print('Can read DCD files.')
-    tmpcoo = mol.coords.copy()
-    mol.read([os.path.join(home(dataDir='1kdx'), '1kdx.dcd')], frames=[8])
-    assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
-    print('Can read DCD specific frames.')
 
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'gromacs.top'))
-    print('Can read GROMACS top files.')
 
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '1j8k.cif'))
-    assert mol.numAtoms == 1402
-    assert mol.numFrames == 20
-    print('Can read multiframe mmCIF files.')
 
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '1ffk.cif'))
-    assert mol.numAtoms == 64281
-    assert mol.numFrames == 1
-    print('Can read single frame mmCIF files.')
 
