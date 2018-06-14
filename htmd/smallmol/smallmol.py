@@ -1233,7 +1233,8 @@ class SmallMol:
                 mol.charge[:] = self.charge
             else:
                 mol.charge[:] = self.formalcharge
-            mol.coords[:, :, 0] = coords
+            mol.coords = coords.astype(np.float32).reshape(self.numAtoms, 3, 1)
+            mol.box = np.zeros((3, 1), dtype=np.float32)
             mol.viewname = self.getProp('ligname')
             mol.bonds, mol.bondtype = self.getBonds()
             if molHtmd is None:
