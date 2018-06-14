@@ -213,6 +213,9 @@ if __name__ == '__main__':
     from glob import glob
     import parmed
     import os
+    import logging
+
+    logging.getLogger('parmed.structure').setLevel('ERROR')
 
     for d in glob(os.path.join(home(dataDir='test-ffevaluate'), '*', '')):
         print('\nRunning test:', d)
