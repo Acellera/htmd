@@ -562,7 +562,12 @@ def pdbGuessElementByName(pdtopo):
     allelements = [str(el).upper() for el in list(elements._element.values())[1:]]
 
     alternatives = defaultdict(list)
-    noelem = np.where(pdtopo.element.str.strip() == '')[0]
+
+    if pdtopo.element.dtype == np.float64 and np.all(np.isnan(pdtopo.element)):
+        noelem = np.arange(len(pdtopo.element))
+    else:
+        noelem = np.where(pdtopo.element.str.strip() == '')[0]
+
     uqnames = np.unique(pdtopo.name[noelem])
     for name in uqnames:
         elem = None
