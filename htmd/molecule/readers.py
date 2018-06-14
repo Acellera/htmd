@@ -558,11 +558,13 @@ def pdbGuessElementByName(pdtopo):
     should be right-aligned in columns 13-14 unless it's a 4 letter name when it would end up being left-aligned.
     """
     from periodictable import elements
+    from collections import defaultdict
     allelements = [str(el).upper() for el in list(elements._element.values())[1:]]
 
+    alternatives = defaultdict(list)
     noelem = np.where(pdtopo.element.str.strip() == '')[0]
-    for idx in noelem:
-        name = pdtopo.name[idx]
+    uqnames = np.unique(pdtopo.name[noelem])
+    for name in uqnames:
         elem = None
         if name[0] == ' ':  # If there is no letter in col 13 then col 14 is the element
             elem = name[1]
@@ -574,14 +576,19 @@ def pdbGuessElementByName(pdtopo):
                     elem = name[0]
                 if name[:2].upper() in allelements:
                     if elem is not None:
-                        tmp = name[0] + name[1].lower()
-                        tmpname = elements.__dict__[tmp].name
-                        logger.warning('Atom with name {} in position {} was guessed as element {} '
-                                       'but could also be {} ({}). If this is the case please replace it '
-                                       'with mol.element[{}] = \'{}\''.format(name, idx, elem, tmp, tmpname, idx, tmp))
+                        altelem = name[0] + name[1].lower()
+                        alternatives[(elem, altelem)].append(name)
                     else:
                         elem = name[0] + name[1].lower()
-        pdtopo.loc[idx, 'element'] = elem
+        pdtopo.loc[pdtopo.name == name, 'element'] = elem
+
+    for elem, altelem in alternatives:
+        names = np.unique(alternatives[(elem, altelem)])
+        namestr = '["' + '", "'.join(names) + '"]'
+        altelemname = elements.__dict__[altelem].name
+        logger.warning('Atoms with names {} were guessed as element {} but could also be {} ({}). If this is a case,'
+                       'you can correct them with mol.element[np.in1d(mol.name, {})] = \'{}\''.format(namestr, elem, altelem,
+                                                                                            altelemname, namestr, altelem))
 
 
 def PDBread(filename, mode='pdb', frame=None, topoloc=None):
@@ -1537,6 +1544,43 @@ class TestReaders(TestCase):
         assert mol.numAtoms == 1402
         assert mol.numFrames == 20
 
+    def test_multiple_file_fileloc(self):
+        from htmd.home import home
+        mol = Molecule(os.path.join(home(dataDir='adaptive'), 'input', 'e1s1_1', 'structure.pdb'))
+        mol.read(glob(os.path.join(home(dataDir='adaptive'), 'data', '*', '*.xtc')))
+        # Try to vstack fileloc. This will fail with wrong fileloc shape
+        fileloc = np.vstack(mol.fileloc)
+        assert fileloc.shape == (12, 2)
+        print('Correct fileloc shape with multiple file reading.')
+
+    def test_topo_overwriting(self):
+        from htmd.home import home
+        # Testing overwriting of topology fields
+        mol = Molecule(os.path.join(home(dataDir='test-ffevaluate'), '1dihedral', 'mol.psf'))
+        atomtypes = mol.atomtype.copy()
+        charges = mol.charge.copy()
+        coords = np.array([[[0.],
+                            [0.],
+                            [-0.17]],
+
+                           [[0.007],
+                            [1.21],
+                            [0.523]],
+
+                           [[0.],
+                            [0.],
+                            [-1.643]],
+
+                           [[-0.741],
+                            [-0.864],
+                            [-2.296]]], dtype=np.float32)
+
+        mol.read(os.path.join(home(dataDir='test-ffevaluate'), '1dihedral', 'mol.pdb'))
+        assert np.array_equal(mol.atomtype, atomtypes)
+        assert np.array_equal(mol.charge, charges)
+        assert np.array_equal(mol.coords, coords)
+        print('Merging of topology fields works')
+
 
 if __name__ == '__main__':
     import unittest
@@ -1545,39 +1589,4 @@ if __name__ == '__main__':
 
 
 
-
-
-    from htmd.home import home
-    mol = Molecule(os.path.join(home(dataDir='adaptive'), 'input', 'e1s1_1', 'structure.pdb'))
-    mol.read(glob(os.path.join(home(dataDir='adaptive'), 'data', '*', '*.xtc')))
-    # Try to vstack fileloc. This will fail with wrong fileloc shape
-    fileloc = np.vstack(mol.fileloc)
-    assert fileloc.shape == (12, 2)
-    print('Correct fileloc shape with multiple file reading.')
-
-    # Testing overwriting of topology fields
-    mol = Molecule(os.path.join(home(dataDir='test-ffevaluate'), '1dihedral', 'mol.psf'))
-    atomtypes = mol.atomtype.copy()
-    charges = mol.charge.copy()
-    coords = np.array([[[ 0.   ],
-                        [ 0.   ],
-                        [-0.17 ]],
-
-                       [[ 0.007],
-                        [ 1.21 ],
-                        [ 0.523]],
-
-                       [[ 0.   ],
-                        [ 0.   ],
-                        [-1.643]],
-
-                       [[-0.741],
-                        [-0.864],
-                        [-2.296]]], dtype=np.float32)
-
-    mol.read(os.path.join(home(dataDir='test-ffevaluate'), '1dihedral', 'mol.pdb'))
-    assert np.array_equal(mol.atomtype, atomtypes)
-    assert np.array_equal(mol.charge, charges)
-    assert np.array_equal(mol.coords, coords)
-    print('Merging of topology fields works')
 
