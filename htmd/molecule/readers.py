@@ -552,6 +552,38 @@ def _getPDB(pdbid):
     return filepath, tempfile
 
 
+def pdbGuessElementByName(pdtopo):
+    """
+    https://www.cgl.ucsf.edu/chimera/docs/UsersGuide/tutorials/pdbintro.html#misalignment which states that elements
+    should be right-aligned in columns 13-14 unless it's a 4 letter name when it would end up being left-aligned.
+    """
+    from periodictable import elements
+    allelements = [str(el).upper() for el in list(elements._element.values())[1:]]
+
+    noelem = np.where(pdtopo.element.str.strip() == '')[0]
+    for idx in noelem:
+        name = pdtopo.name[idx]
+        elem = None
+        if name[0] == ' ':  # If there is no letter in col 13 then col 14 is the element
+            elem = name[1]
+        else:
+            if name[-1] == ' ':  # If it's not a 4 letter name then it's a two letter element
+                elem = name[0] + name[1].lower()
+            else:  # With 4 letter name it could be either a 1 letter element or 2 letter element
+                if name[0] in allelements:
+                    elem = name[0]
+                if name[:2].upper() in allelements:
+                    if elem is not None:
+                        tmp = name[0] + name[1].lower()
+                        tmpname = elements.__dict__[tmp].name
+                        logger.warning('Atom with name {} in position {} was guessed as element {} '
+                                       'but could also be {} ({}). If this is the case please replace it '
+                                       'with mol.element[{}] = \'{}\''.format(name, idx, elem, tmp, tmpname, idx, tmp))
+                    else:
+                        elem = name[0] + name[1].lower()
+        pdtopo.loc[idx, 'element'] = elem
+
+
 def PDBread(filename, mode='pdb', frame=None, topoloc=None):
     from pandas import read_fwf
     import io
@@ -608,8 +640,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
         'beta': np.float32,
         'segid': str,
         'element': str,
-        'charge': np.float32,
-        'chargesign': str,
+        'charge': np.float32
     }
     coordcolspecs = [(30, 38), (38, 46), (46, 54)]
     coordnames = ('x', 'y', 'z')
@@ -728,21 +759,34 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
 
         parsedbonds = read_fwf(conectdata, colspecs=bondcolspecs, names=bondnames, na_values=_NA_VALUES, keep_default_na=False)
         parsedcryst1 = read_fwf(cryst1data, colspecs=cryst1colspecs, names=cryst1names, na_values=_NA_VALUES, keep_default_na=False)
-        parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False)  #, dtype=topodtypes)
+        enforceddtypes = {'resname': str, 'segid': str}
+        parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False, dtype=enforceddtypes, delimiter='\r\t') #, dtype=topodtypes)
         parsedsymmetry = read_fwf(symmetrydata, colspecs=symmetrycolspecs, names=symmetrynames, na_values=_NA_VALUES, keep_default_na=False)
+        # from IPython.core.debugger import set_trace
+        # set_trace()
 
-    # if 'chargesign' in parsedtopo and not np.all(parsedtopo.chargesign.isnull()):
-    #    parsedtopo.loc[parsedtopo.chargesign == '-', 'charge'] *= -1
+    # TODO: Before stripping guess elements from atomname!!
+    pdbGuessElementByName(parsedtopo)
+
+    for field in topodtypes:
+        if field in parsedtopo and topodtypes[field] == str and parsedtopo[field].dtype == object:
+            parsedtopo[field] = parsedtopo[field].str.strip()
 
     # Fixing PDB format charges which can come after the number
     if parsedtopo.charge.dtype == 'object':
-        minuses = np.where(parsedtopo.charge.str.match('\d\-') == True)[0]
-        pluses = np.where(parsedtopo.charge.str.match('\d\+') == True)[0]
-        for m in minuses:
-            parsedtopo.loc[m, 'charge'] = int(parsedtopo.charge[m][0]) * -1
-        for p in pluses:
-            parsedtopo.loc[p, 'charge'] = int(parsedtopo.charge[p][0])
-        parsedtopo.loc[parsedtopo.charge.isnull(), 'charge'] = 0
+        parsedtopo.charge = parsedtopo.charge.str.strip()
+        charges = np.zeros(len(parsedtopo.charge), dtype=np.float32)
+        for i, c in enumerate(parsedtopo.charge):
+            if not isinstance(c, str):
+                continue
+            if len(c) > 1:
+                if c[1] == '-':
+                    charges[i] = -1 * float(c[0])
+                elif c[1] == '+':
+                    charges[i] = float(c[0])
+            elif len(c):
+                charges[i] = float(c)
+        parsedtopo.charge = charges
     # Fixing hexadecimal index and resids
     # Support for reading hexadecimal
     if parsedtopo.serial.dtype == 'object':
@@ -799,7 +843,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
             mappedbonds = np.delete(mappedbonds, wrongidx, axis=0)
             topo.bonds = np.array(mappedbonds, dtype=np.uint32)
 
-    if len(topo.segid) == 0 and currter != 0:  # If no segid was read, use the TER rows to define segments
+    if len(topo.segid) and np.all(np.array(topo.segid) == '') and currter != 0:  # If no segid was read, use the TER rows to define segments
         topo.segid = teridx
 
     if tempfile:
@@ -1412,63 +1456,96 @@ for k in _COORDINATE_READERS:
     _ALL_READERS[k] += ensurelist(_COORDINATE_READERS[k])
 
 
+from htmd.molecule.molecule import Molecule
+from glob import glob
+from natsort import natsorted
+from unittest import TestCase
+class TestReaders(TestCase):
+    def testfolder(self, subname=None):
+        from htmd.home import home
+        if subname is None:
+            return home(dataDir='molecule-readers')
+        else:
+            return os.path.join(home(dataDir='molecule-readers'), subname)
+
+    def test_pdb(self):
+        from htmd.home import home
+        for f in glob(os.path.join(self.testfolder(), '*.pdb')):
+            mol = Molecule(f)
+        for f in glob(os.path.join(home(dataDir='pdb/'), '*.pdb')):
+            mol = Molecule(f)
+
+    def test_psf(self):
+        mol = Molecule(os.path.join(self.testfolder('4RWS'), 'structure.psf'))
+
+    def test_xtc(self):
+        mol = Molecule(os.path.join(self.testfolder('4RWS'), 'traj.xtc'))
+
+    def test_combine_topo_traj(self):
+        testfolder = self.testfolder('4RWS')
+        mol = Molecule(os.path.join(testfolder, 'structure.psf'))
+        mol.read(os.path.join(testfolder, 'traj.xtc'))
+
+    def test_prmtop(self):
+        testfolder = self.testfolder('3AM6')
+        mol = Molecule(os.path.join(testfolder, 'structure.prmtop'))
+
+    def test_crd(self):
+        testfolder = self.testfolder('3AM6')
+        mol = Molecule(os.path.join(testfolder, 'structure.crd'))
+
+    def test_mol2(self):
+        testfolder = self.testfolder('3L5E')
+        mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
+        mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
+
+    def test_mae(self):
+        for f in glob(os.path.join(self.testfolder(), '*.mae')):
+            mol = Molecule(f)
+
+    def test_append_trajectories(self):
+        testfolder = self.testfolder('CMYBKIX')
+        mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
+        mol.read(natsorted(glob(os.path.join(testfolder, '*.xtc'))))
+
+    def test_missing_crystal_info(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'weird-cryst.pdb'))
+
+    def test_dcd(self):
+        from htmd.home import home
+        mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
+        mol.read(os.path.join(home(dataDir='1kdx'), '1kdx.dcd'))
+
+    def test_dcd_frames(self):
+        from htmd.home import home
+        mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
+        mol.read(os.path.join(home(dataDir='1kdx'), '1kdx.dcd'))
+        tmpcoo = mol.coords.copy()
+        mol.read([os.path.join(home(dataDir='1kdx'), '1kdx.dcd')], frames=[8])
+        assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
+
+    def test_gromacs_top(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'gromacs.top'))
+
+    def test_mmcif_single_frame(self):
+        mol = Molecule(os.path.join(self.testfolder(), '1ffk.cif'))
+        assert mol.numAtoms == 64281
+        assert mol.numFrames == 1
+
+    def test_mmcif_multi_frame(self):
+        mol = Molecule(os.path.join(self.testfolder(), '1j8k.cif'))
+        assert mol.numAtoms == 1402
+        assert mol.numFrames == 20
+
+
 if __name__ == '__main__':
-    from htmd.home import home
-    from htmd.molecule.molecule import Molecule
-    from glob import glob
-    from natsort import natsorted
-    import os
-    testfolder = home(dataDir='molecule-readers/4RWS/')
-    mol = Molecule(os.path.join(testfolder, 'structure.psf'))
-    print('Can read PSF files.')
-    mol.read(os.path.join(testfolder, 'traj.xtc'))
-    print('Can read XTC files.')
-    testfolder = home(dataDir='molecule-readers/3AM6/')
-    mol = Molecule(os.path.join(testfolder, 'structure.prmtop'))
-    print('Can read PRMTOP files.')
-    mol.read(os.path.join(testfolder, 'structure.crd'))
-    print('Can read CRD files.')
-    testfolder = home(dataDir='molecule-readers/3L5E/')
-    mol = Molecule(os.path.join(testfolder, 'protein.mol2'))
-    mol = Molecule(os.path.join(testfolder, 'ligand.mol2'))
-    print('Can read MOL2 files.')
-    for f in glob(os.path.join(home(dataDir='molecule-readers/'), '*.mae')):
-        mol = Molecule(f)
-    print('Can read MAE files.')
-    for f in glob(os.path.join(home(dataDir='molecule-readers/'), '*.pdb')):
-        mol = Molecule(f)
-    for f in glob(os.path.join(home(dataDir='pdb/'), '*.pdb')):
-        mol = Molecule(f)
-    print('Can read PDB files.')
-    testfolder = home(dataDir='molecule-readers/CMYBKIX/')
-    mol = Molecule(os.path.join(testfolder, 'filtered.pdb'))
-    mol.read(natsorted(glob(os.path.join(testfolder, '*.xtc'))))
-    print('Can read/append XTC trajectories.')
+    import unittest
+    unittest.main(verbosity=2)
 
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'weird-cryst.pdb'))
-    print('Can read missing crystal info.')
 
-    # Testing DCD reader
-    mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
-    mol.read(os.path.join(home(dataDir='1kdx'), '1kdx.dcd'))
-    print('Can read DCD files.')
-    tmpcoo = mol.coords.copy()
-    mol.read([os.path.join(home(dataDir='1kdx'), '1kdx.dcd')], frames=[8])
-    assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
-    print('Can read DCD specific frames.')
 
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), 'gromacs.top'))
-    print('Can read GROMACS top files.')
 
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '1j8k.cif'))
-    assert mol.numAtoms == 1402
-    assert mol.numFrames == 20
-    print('Can read multiframe mmCIF files.')
 
-    mol = Molecule(os.path.join(home(dataDir='molecule-readers/'), '1ffk.cif'))
-    assert mol.numAtoms == 64281
-    assert mol.numFrames == 1
-    print('Can read single frame mmCIF files.')
 
     from htmd.home import home
     mol = Molecule(os.path.join(home(dataDir='adaptive'), 'input', 'e1s1_1', 'structure.pdb'))
