@@ -769,10 +769,8 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
         enforceddtypes = {'resname': str, 'segid': str}
         parsedtopo = read_fwf(topodata, colspecs=topocolspecs, names=toponames, na_values=_NA_VALUES, keep_default_na=False, dtype=enforceddtypes, delimiter='\r\t') #, dtype=topodtypes)
         parsedsymmetry = read_fwf(symmetrydata, colspecs=symmetrycolspecs, names=symmetrynames, na_values=_NA_VALUES, keep_default_na=False)
-        # from IPython.core.debugger import set_trace
-        # set_trace()
 
-    # TODO: Before stripping guess elements from atomname!!
+    # Before stripping guess elements from atomname as the spaces are significant
     pdbGuessElementByName(parsedtopo)
 
     for field in topodtypes:
@@ -794,6 +792,7 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
             elif len(c):
                 charges[i] = float(c)
         parsedtopo.charge = charges
+        
     # Fixing hexadecimal index and resids
     # Support for reading hexadecimal
     if parsedtopo.serial.dtype == 'object':
