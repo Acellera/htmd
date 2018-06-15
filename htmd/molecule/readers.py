@@ -566,7 +566,7 @@ def pdbGuessElementByName(pdtopo):
     if pdtopo.element.dtype == np.float64 and np.all(np.isnan(pdtopo.element)):
         noelem = np.arange(len(pdtopo.element))
     else:
-        noelem = np.where(pdtopo.element.str.strip() == '')[0]
+        noelem = np.where((pdtopo.element.str.strip() == '') | pdtopo.element.isnull())[0]
 
     uqnames = np.unique(pdtopo.name[noelem])
     for name in uqnames:
@@ -797,12 +797,15 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
             elif len(c):
                 charges[i] = float(c)
         parsedtopo.charge = charges
-        
+
     # Fixing hexadecimal index and resids
     # Support for reading hexadecimal
     if parsedtopo.serial.dtype == 'object':
         logger.warning('Non-integer values were read from the PDB "serial" field. Dropping PDB values and assigning new ones.')
-        parsedtopo.serial = sequenceID(parsedtopo.serial)
+        if len(np.unique(parsedtopo.serial)) == len(parsedtopo.serial):
+            parsedtopo.serial = sequenceID(parsedtopo.serial)
+        else:
+            parsedtopo.serial = np.arange(len(parsedtopo.serial))
     if parsedtopo.resid.dtype == 'object':
         logger.warning('Non-integer values were read from the PDB "resid" field. Dropping PDB values and assigning new ones.')
         parsedtopo.resid = sequenceID(parsedtopo.resid)
@@ -1584,6 +1587,24 @@ class TestReaders(TestCase):
         assert np.array_equal(mol.charge, charges)
         assert np.array_equal(mol.coords, coords)
         print('Merging of topology fields works')
+
+    def test_integer_resnames(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'errors.pdb'))
+        assert np.unique(mol.resname) == '007'
+
+    def test_star_indexes(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'errors.pdb'))
+        assert np.all(mol.serial == np.arange(mol.numAtoms))
+
+    def test_pdb_element_guessing(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'errors.pdb'))
+        refelem = np.array(['C', 'C', 'C', 'C', 'C', 'C', 'C', 'N', 'N', 'H', 'H', 'C', 'Cl', 'Ca'], dtype=object)
+        assert np.array_equal(mol.element, refelem)
+
+    def test_pdb_charges(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'errors.pdb'))
+        refcharge = np.array([-1.,  1., -1.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.], dtype=np.float32)
+        assert np.array_equal(mol.charge, refcharge)
 
 
 if __name__ == '__main__':
