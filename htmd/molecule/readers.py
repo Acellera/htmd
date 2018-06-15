@@ -591,7 +591,7 @@ def pdbGuessElementByName(pdtopo):
         names = np.unique(alternatives[(elem, altelem)])
         namestr = '"' + '" "'.join(names) + '"'
         altelemname = elements.__dict__[altelem].name
-        logger.warning('Atoms with names {} were guessed as element {} but could also be {} ({}). If this is a case,'
+        logger.warning('Atoms with names {} were guessed as element {} but could also be {} ({}). If this is a case, '
                        'you can correct them with mol.set(\'element\', \'{}\', sel=\'name {}\')'.format(namestr, elem, altelem,
                                                                                             altelemname, altelem, namestr))
 
