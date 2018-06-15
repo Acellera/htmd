@@ -179,6 +179,20 @@ def nestedListToArray(nl, dtype, default=1):
     return arr
 
 
+def detectImproperCenter(indexes, graph):
+    for i in indexes:
+        if len(np.intersect1d(list(graph.neighbors(i)), indexes)) == 3:
+            return i
+
+def improperGraph(impropers, bonds):
+    import networkx as nx
+
+    g = nx.Graph()
+    g.add_nodes_from(np.unique(impropers))
+    g.add_edges_from([tuple(b) for b in bonds])
+    return g
+
+
 # TODO: Can be improved with lil sparse arrays
 def init(mol, prm, fromstruct=False):
     natoms = mol.numAtoms
@@ -264,13 +278,15 @@ def init(mol, prm, fromstruct=False):
     from parmed.amber import AmberParameterSet
     from parmed.charmm import CharmmParameterSet
     from parmed.parameters import ParameterSet
+    graph = improperGraph(mol.impropers, mol.bonds)
     for idx, impr in enumerate(mol.impropers):
-        if fromstruct:  # If we make prm from struct there is no ordering
+        center = detectImproperCenter(impr, graph)
+        if fromstruct and not isinstance(prm, AmberParameterSet):  # If we make prm from struct there is no ordering
             ty = tuple(uqtypes[typeint[impr]])
         elif isinstance(prm, AmberParameterSet):  # If prm is read from AMBER parameter file it's sorted 0,1,3 but not 2
-            ty = np.array(uqtypes[typeint[impr]])
-            ty[[0, 1, 3]] = sorted(ty[[0, 1, 3]])
-            ty = tuple(ty)
+            notcenter = np.setdiff1d(impr, center)
+            notcenter = sorted(uqtypes[typeint[notcenter]])
+            ty = tuple(notcenter[:2] + [uqtypes[typeint[center]],] + notcenter[2:])
         elif isinstance(prm, CharmmParameterSet):  # If prm is read from CHARMM parameter file it's sorted
             ty = tuple(sorted(uqtypes[typeint[impr]]))
         elif isinstance(prm, ParameterSet):
