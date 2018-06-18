@@ -16,6 +16,13 @@ try:
 except:
     print("HTMD: Logging setup failed")
 
+reg_file = os.path.join(os.path.expanduser('~'), '.htmd', '.registered-htmd', 'registration')
+if (not os.path.isfile(reg_file)) or os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG"):
+    print('\nHTMD License accepted automatically. Check license here: '
+          'https://raw.githubusercontent.com/Acellera/htmd/master/htmd/LICENCE.txt')
+    print('\nFor advanced features (e.g. parameterize) and to remove this message, we recommend '
+          'registering. Run htmd_register in your terminal.')
+
 if _config['configfile']:
     if not os.path.isfile(_config['configfile']):
         raise FileNotFoundError('HTMD Config file {} does not exist.'.format(_config['configfile']))
