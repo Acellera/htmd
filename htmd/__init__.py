@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.version import version as _version
+import __main__ as main
 import os.path
 from htmd.config import _config
 import htmd.home
@@ -17,11 +18,10 @@ except:
     print("HTMD: Logging setup failed")
 
 reg_file = os.path.join(os.path.expanduser('~'), '.htmd', '.registered-htmd', 'registration')
-if (not os.path.isfile(reg_file)) or os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG"):
-    print('\nHTMD License accepted automatically. Check license here: '
-          'https://raw.githubusercontent.com/Acellera/htmd/master/htmd/LICENCE.txt')
-    print('\nFor advanced features (e.g. parameterize) and to remove this message, we recommend '
-          'registering. Run htmd_register in your terminal.')
+if (not hasattr(main, '__file__')) and \
+        ((not os.path.isfile(reg_file)) or os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG")):
+    print('\nCopyright by Acellera Ltd. By executing you are accepting the License. In order to register, '
+          'run htmd_register on your terminal\n')
 
 if _config['configfile']:
     if not os.path.isfile(_config['configfile']):
