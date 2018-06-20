@@ -30,15 +30,16 @@ def show_news():
         pass
 
 
-def check_approval(product, prefix):
-    from htmdx.license import licenseEntitlements
-    jj = licenseEntitlements()
-    if "HTMD" in jj: return True
-    if "htmd" in jj: return True
+def check_approval(product, reg_file):
+    # TODO: this may come back in other form
+    # from htmdx.license import licenseEntitlements
+    # jj = licenseEntitlements()
+    # if "HTMD" in jj: return True
+    # if "htmd" in jj: return True
 
     j = {}
     try:
-        with open(os.path.join(prefix, "registration"), "r") as f:
+        with open(os.path.join(reg_file), "r") as f:
             j = json.load(f)
     except:
         # Couldn't read registration file
@@ -73,25 +74,11 @@ def check_registration(product=None):
     if not product:
         product = "NA"
 
-    prefix = os.path.join(os.path.expanduser('~'), '.htmd')
-    if not os.path.exists(prefix):
-        os.mkdir(prefix)
-    prefix = os.path.join(prefix, '.registered-' + product)
+    reg_file = os.path.join(os.path.expanduser('~'), '.htmd', '.registered-htmd', 'registration')
 
-    if not os.path.exists(prefix):
-        if not check_approval(product, prefix):
-            if os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG"):
-                print("Licence accepted automatically. License terms apply")
-                return 
-            else:
-                if product == 'htmd':
-                    print('\nHTMD License accepted automatically. Check license here: '
-                          'https://raw.githubusercontent.com/Acellera/htmd/master/htmd/LICENCE.txt')
-                    print('\nFor advanced features (e.g. parameterize) and to remove this message, we recommend '
-                          'registering. Run htmd_register in your terminal.')
-                else:
-                    accept_license(product=product)
-                    do_register(product=product)
+    if not (os.path.isfile(reg_file) and check_approval(product, reg_file)):
+        accept_license(product=product)
+        do_register(product=product)
 
 
 def accept_license(product=None):
@@ -133,10 +120,10 @@ def do_register(product=None):
     country = ""
 
     print("\n Welcome to HTMD. We'd like to know who you are so that we can keep in touch!")
-    print(" Please enter your name, affiliation and contact email address.\n")
+    print(" Please enter your name, affiliation and institutional email address.\n")
 
     while email == "" or not ("@" in email):
-        print(" Email       : ", end="")
+        print(" Institutional Email : ", end="")
         sys.stdout.flush()
         email = input().strip()
 
