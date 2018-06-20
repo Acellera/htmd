@@ -120,10 +120,10 @@ def do_register(product=None):
     country = ""
 
     print("\n Welcome to HTMD. We'd like to know who you are so that we can keep in touch!")
-    print(" Please enter your name, affiliation and contact email address.\n")
+    print(" Please enter your name, affiliation and institutional email address.\n")
 
     while email == "" or not ("@" in email):
-        print(" Email       : ", end="")
+        print(" Institutional Email : ", end="")
         sys.stdout.flush()
         email = input().strip()
 
