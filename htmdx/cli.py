@@ -76,11 +76,7 @@ def check_registration(product=None):
 
     reg_file = os.path.join(os.path.expanduser('~'), '.htmd', '.registered-htmd', 'registration')
 
-    if os.path.isfile(reg_file):
-        if not check_approval(product, reg_file):
-            accept_license(product=product)
-            do_register(product=product)
-    else:
+    if not (os.path.isfile(reg_file) and check_approval(product, reg_file)):
         accept_license(product=product)
         do_register(product=product)
 
