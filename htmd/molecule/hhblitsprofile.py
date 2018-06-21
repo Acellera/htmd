@@ -74,7 +74,7 @@ def getProfile(sequence, hhblits, hhblitsdb, ncpu=6, niter=4):
                     data.append(d)
 
         df = pandas.DataFrame(np.hstack((np.vstack(seq), np.vstack(data))), columns=['seq'] + col_desc)
-        return df, df.as_matrix()[1:, 1:21].astype(float)
+        return df, df.values[1:, 1:21].astype(float)
 
 
 if __name__ == '__main__':
