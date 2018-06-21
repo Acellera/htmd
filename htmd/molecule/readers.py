@@ -826,14 +826,14 @@ def PDBread(filename, mode='pdb', frame=None, topoloc=None):
     if len(parsedsymmetry):
         numcopies = int(len(parsedsymmetry)/3)
         crystalinfo['numcopies'] = numcopies
-        crystalinfo['rotations'] = parsedsymmetry[['rot1', 'rot2', 'rot3']].as_matrix().reshape((numcopies, 3, 3))
-        crystalinfo['translations'] = parsedsymmetry['trans'].as_matrix().reshape((numcopies, 3))
+        crystalinfo['rotations'] = parsedsymmetry[['rot1', 'rot2', 'rot3']].values.reshape((numcopies, 3, 3))
+        crystalinfo['translations'] = parsedsymmetry['trans'].values.reshape((numcopies, 3))
 
     topo = Topology(parsedtopo)
 
     # Bond formatting part
     # TODO: Speed this up. This is the slowest part for large PDB files. From 700ms to 7s
-    serials = parsedtopo.serial.as_matrix()
+    serials = parsedtopo.serial.values
     # if isinstance(serials[0], str) and np.any(serials == '*****'):
     #     logger.info('Non-integer serials were read. For safety we will discard all bond information and serials will be assigned automatically.')
     #     topo.serial = np.arange(1, len(serials)+1, dtype=np.int)
