@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 print('SmallMol module is in beta version')
 
 
-class SmallMol:
+class SmallMol(object):
     """
     Class to manipulate small molecule structures
 
@@ -1394,7 +1394,7 @@ def unwrap_self(arg, **kwarg):
     return SmallMolLib.vox_fun(arg[0], arg[1], **kwarg)
 
 
-class SmallMolLib:
+class SmallMolLib(object):
     """
     Class to manage ligands databases (sdf). Ligands are stored as htmd.smallmol.smallmol.SmallMol objects and
     fields type in the sdf are stored in a list

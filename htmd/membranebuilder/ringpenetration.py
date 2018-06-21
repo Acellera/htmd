@@ -96,10 +96,10 @@ def _checkAtomsPenetrating(coords2, bonds2, ringcoords, axis, ringcom, maxd, box
                 continue
 
             d = 0
-            for i in range(0, ringcoords.shape[0]):
-                p1 = ringcoords[i] - p
+            for k in range(0, ringcoords.shape[0]):
+                p1 = ringcoords[k] - p
                 try:
-                    p2 = ringcoords[i + 1] - p
+                    p2 = ringcoords[k + 1] - p
                 except:
                     p2 = ringcoords[0] - p
                 d += np.arccos(np.dot(p1, p2) / np.linalg.norm(p1) / np.linalg.norm(p2))
