@@ -24,7 +24,7 @@ def getEquivalentsAndDihedrals(mol):
     return mol, equivalents, all_dihedrals
 
 
-def canonicalizeAtomNames(mol, inplace=False):
+def canonicalizeAtomNames(mol, inplace=False, _logger=True):
     """
     This fixes up the atom naming and reside name to be consistent.
     NB this scheme matches what MATCH does.
@@ -33,9 +33,11 @@ def canonicalizeAtomNames(mol, inplace=False):
     if not inplace:
         mol = mol.copy()
     mol.segid[:] = 'L'
-    logger.info('Rename segment to %s' % mol.segid[0])
+    if _logger:
+        logger.info('Rename segment to %s' % mol.segid[0])
     mol.resname[:] = 'MOL'
-    logger.info('Rename residue to %s' % mol.resname[0])
+    if _logger:
+        logger.info('Rename residue to %s' % mol.resname[0])
 
     sufices = {}
     for i in range(mol.numAtoms):
@@ -44,7 +46,8 @@ def canonicalizeAtomNames(mol, inplace=False):
         sufices[name] = sufices.get(name, 0) + 1
         name += str(sufices[name])
 
-        logger.info('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
+        if _logger:
+            logger.info('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
         mol.name[i] = name
 
     if not inplace:
