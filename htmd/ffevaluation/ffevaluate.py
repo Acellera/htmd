@@ -328,8 +328,8 @@ def calculateSets(mol, betweensets):
         setB = mol.atomselect(betweensets[1], indexes=True)
         mol.bonds = np.empty((0, 2), dtype=np.uint32)
         mol.angles = np.empty((0, 3), dtype=np.uint32)
-        mol.dihedral = np.empty((0, 4), dtype=np.uint32)
-        mol.improper = np.empty((0, 4), dtype=np.uint32)
+        mol.dihedrals = np.empty((0, 4), dtype=np.uint32)
+        mol.impropers = np.empty((0, 4), dtype=np.uint32)
     return setA, setB
 
 
