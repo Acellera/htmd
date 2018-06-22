@@ -7,8 +7,10 @@ import ctypes as ct
 import os
 import platform
 import htmdx
+from htmd.decorators import _Deprecated
 
 
+@_Deprecated('1.13.5')
 def licenseEntitlements():
     libdir = os.path.join(htmdx.__path__[0], "..", "htmd", "lib", platform.system())
 

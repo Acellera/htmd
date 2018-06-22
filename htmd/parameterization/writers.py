@@ -203,8 +203,11 @@ def writeRTF(mol, parameters, netcharge, filename):
     print("\nAUTO ANGLES DIHE\n", file=f)
     print("RESI  MOL %8.5f" % netcharge, file=f)
     print("GROUP", file=f)
+
+    maxnamelen = max(4, np.max([len(na) for na in mol.name]))  # Minimum field size of 4
+    maxatomtypelen = max(6, np.max([len(at) for at in mol.atomtype]))  # Minimum field size of 6
     for n, a, c in zip(mol.name, mol.atomtype, mol.charge):
-        print("ATOM %4s %6s %8.6f" % (n, a, c), file=f)
+        print("ATOM {0:>{1}s} {2:>{3}s} {4:8.6f}".format(n, maxnamelen, a, maxatomtypelen, c), file=f)
     for a in mol.bonds:
         print("BOND {:>4s} {:>4s}".format(*sorted([mol.name[a[0]], mol.name[a[1]]])), file=f)
     for a in mol.impropers:
