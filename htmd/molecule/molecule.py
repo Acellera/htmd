@@ -825,7 +825,8 @@ class Molecule:
         append : bool, optional
             If the file is a trajectory or coor file, append the coordinates to the previous coordinates. Note append is slow.
         overwrite : str, list of str
-            A list of the existing fields in Molecule that we wish to overwrite when reading this file.
+            A list of the existing fields in Molecule that we wish to overwrite when reading this file. Set to None if
+            you don't want to overwrite any existing fields.
         keepaltloc : str
             Set to any string to only keep that specific altloc. Set to 'all' if you want to keep all alternative atom positions.
         guess : list of str
@@ -1014,7 +1015,7 @@ class Molecule:
             if self._dtypes[field] == object and len(newfielddata) != 0:
                 newfielddata = np.array([str(x) for x in newfielddata], dtype=object)
 
-            if (overwrite[0] == 'all') or (field in overwrite) or (len(self.__dict__[field])) == 0:
+            if overwrite is not None and ((overwrite[0] == 'all') or (field in overwrite) or (len(self.__dict__[field])) == 0):
                 self.__dict__[field] = newfielddata
             else:
                 if np.shape(self.__dict__[field]) != np.shape(newfielddata):
