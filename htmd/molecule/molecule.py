@@ -901,7 +901,8 @@ class Molecule:
                 raise ValueError('Number of atoms in file ({}) mismatch with number of atoms in the molecule '
                                  '({})'.format(mol.numAtoms, self.numAtoms))
 
-            if frame is not None:
+            # TODO: Needs redesign to remove hack
+            if frame is not None and ext != 'xtc':
                 mol.dropFrames(keep=frame)
 
             newmols.append(mol)
