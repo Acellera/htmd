@@ -258,7 +258,7 @@ proc calcforces_endstep { } { }
 
         fb_box = np.array(self.fb_box)
         # convert fb_box to width
-        width = list(np.std(np.array([fb_box[::2], fb_box[1::2]]), axis=0))
+        width = list(np.concatenate(np.diff(np.array([fb_box[::2], fb_box[1::2]]), axis=0)))
 
         # If fb_box is not symmetrical
         if not np.all(fb_box[::2] == -fb_box[1::2]):
@@ -454,7 +454,7 @@ if __name__ == "__main__":
     eq.fb_box = [-21, 21, -19, 19, 29, 30]
     eq.fb_k = 5
     tmpdir = tempname()
-    eq.write(home(dataDir=os.path.join('test-protocols', 'equilibration', 'protLig')), tmpdir)
+    eq.write(home(dataDir=os.path.join('test-protocols', 'build', 'protLig')), tmpdir)
 
     # Compare with reference
     refdir = home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd2', 'protLig', 'prerun'))
@@ -476,7 +476,7 @@ if __name__ == "__main__":
     eq.fb_box = [-21, 21, -19, 19, 29, 30]
     eq.fb_k = 5
     tmpdir = tempname()
-    eq.write(home(dataDir=os.path.join('test-protocols', 'equilibration', 'protLig')), tmpdir)
+    eq.write(home(dataDir=os.path.join('test-protocols', 'build', 'protLig')), tmpdir)
 
     # Compare with reference
     refdir = home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd3', 'protLig', 'prerun'))
