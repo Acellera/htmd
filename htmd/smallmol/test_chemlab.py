@@ -213,12 +213,14 @@ class TestSmallMol(unittest.TestCase):
         b = Builder(sm)
         b.addHydrogens()
 
-        centercoords = sm.coords[0]
+        sm_b = b.getSmallMol()
 
-        setone = [sm.coords[1], sm.coords[2]]
-        settwo = [sm.coords[2], sm.coords[3]]
-        setthree = [sm.coords[3], sm.coords[4]]
-        setfour = [sm.coords[4], sm.coords[1]]
+        centercoords = sm_b.coords[0]
+
+        setone = [sm_b.coords[1], sm_b.coords[2]]
+        settwo = [sm_b.coords[2], sm_b.coords[3]]
+        setthree = [sm_b.coords[3], sm_b.coords[4]]
+        setfour = [sm_b.coords[4], sm_b.coords[1]]
 
         sets = [setone, settwo, setthree, setfour]
 
@@ -243,16 +245,18 @@ class TestSmallMol(unittest.TestCase):
         b = Builder(sm)
         b.addHydrogens()
 
-        centercoords1 = sm.coords[0]
-        centercoords2 = sm.coords[1]
+        sm_b = b.getSmallMol()
 
-        set1one = [sm.coords[1], sm.coords[2]]
-        set1two = [sm.coords[2], sm.coords[3]]
-        set1three = [sm.coords[3], sm.coords[1]]
+        centercoords1 = sm_b.coords[0]
+        centercoords2 = sm_b.coords[1]
 
-        set2one = [sm.coords[0], sm.coords[4]]
-        set2two = [sm.coords[4], sm.coords[5]]
-        set2three = [sm.coords[5], sm.coords[0]]
+        set1one = [sm_b.coords[1], sm_b.coords[2]]
+        set1two = [sm_b.coords[2], sm_b.coords[3]]
+        set1three = [sm_b.coords[3], sm_b.coords[1]]
+
+        set2one = [sm_b.coords[0], sm_b.coords[4]]
+        set2two = [sm_b.coords[4], sm_b.coords[5]]
+        set2three = [sm_b.coords[5], sm_b.coords[0]]
 
         sets1 = [set1two, set1two, set1three]
         sets2 = [set2two, set2two, set2three]
@@ -291,11 +295,13 @@ class TestSmallMol(unittest.TestCase):
         b = Builder(sm)
         b.addHydrogens()
 
-        centercoords1 = sm.coords[0]
-        centercoords2 = sm.coords[1]
+        sm_b = b.getSmallMol()
 
-        set1one = [sm.coords[1], sm.coords[2]]
-        set2one = [sm.coords[0], sm.coords[3]]
+        centercoords1 = sm_b.coords[0]
+        centercoords2 = sm_b.coords[1]
+
+        set1one = [sm_b.coords[1], sm_b.coords[2]]
+        set2one = [sm_b.coords[0], sm_b.coords[3]]
 
         sets1 = [set1one]
         sets2 = [set2one]
