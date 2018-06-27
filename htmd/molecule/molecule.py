@@ -937,7 +937,7 @@ class Molecule:
         return os.path.splitext(fname)[1][1:]
 
     def _unzip(self, fname):
-        if fname.endswith('gz'):
+        if fname.endswith('.gz'):
             import gzip
             from htmd.util import tempname
             with gzip.open(fname, 'r') as f:
