@@ -20,7 +20,7 @@ from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYP
 from htmd.decorators import _Deprecated
 
 
-@_Deprecated('1.13.5')
+@_Deprecated('1.13.6')
 class Pmemd(ProtocolInterface):
     _defaultfnames = {'bincoordinates': 'input.nc',
                       'parameters': 'parameters', 'coordinates': 'structure.rst',
