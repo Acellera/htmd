@@ -102,9 +102,19 @@ class MoietyRecognition:
 
     def _classifyMoieities(self):
 
-        for moi in self.moieties:
-            mtype, morder = moi._getMoietyType()
-            print(mtype, morder, moi.atoms)
+        sm = self.smallmol
+
+        sm.setProp('moieties', self.moieties)
+        mois = np.ones(sm.numAtoms, dtype=int) * -1
+
+        print(self.moieties)
+        for n, moi in enumerate(self.moieties):
+            moi._getMoietyType()
+            print(n, moi.moiType, moi.moiOrder)
+            mois[moi.atoms] = n
+
+        sm.setPropsAtoms('moiety', mois)
+
 
     def _mergeConnectedMoieties(self, moieties, mode):
 
@@ -353,6 +363,8 @@ class Moiety:
         self.links = self._setBreakPoints()
         self.isring = isring
         self.mergedTo = None
+        self.moiType = None
+        self.moiOrder = None
         #self.moismallmol = self._prepareSmallMol()
         #self._setBreakPoints(self.parentsmallmol, self.moismallmol)
 
@@ -525,7 +537,8 @@ class Moiety:
             pass
             #print('Unknown')
 
-        return moiType, moiOrder
+        self.moiType =  moiType
+        self.moiOrder = moiOrder
 
 #
 #
