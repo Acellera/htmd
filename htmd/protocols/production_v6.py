@@ -257,7 +257,7 @@ proc calcforces_endstep { } { }
         # Do version consistency check
         if (self._version == 2 and not isinstance(self.acemd, Acemd2)) and \
                 (self._version == 3 and not isinstance(self.acemd, Acemd)):
-            raise RuntimeError('Acemd object version ({}) inconsistent with protocol version at instatiation '
+            raise RuntimeError('Acemd object version ({}) inconsistent with protocol version at instantiation '
                                '({})'.format(type(self.acemd), self._version))
 
         self._findFiles(inputdir)
