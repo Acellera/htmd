@@ -15,9 +15,11 @@ import numpy as np
 import logging
 import shutil
 import re
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+@_Deprecated('1.13.6')
 class Production(ProtocolInterface):
 
     """ Production protocol for globular and membrane proteins

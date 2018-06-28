@@ -11,9 +11,11 @@ from htmd.apps.localqueue import LocalGPUQueue, _executeMDcommand
 from shutil import which
 import logging
 import os
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+@_Deprecated('1.13.6')
 class PmemdLocal(LocalGPUQueue):
     """
     Parameters
