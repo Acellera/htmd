@@ -265,7 +265,7 @@ proc calcforces_endstep { } { }
             # convert fb_box and fb_reference to fbcentre and width
             mol = Molecule(os.path.join(inputdir, self.acemd.structure))
             mol.read(os.path.join(inputdir, self.acemd.coordinates))
-            fb_refcentre = np.concatenate(mol.coords[mol.atomselect(self.fb_reference)].mean(axis=0))
+            fb_refcentre = mol.get('coords', sel=self.fb_reference).mean(axis=0).squeeze()
 
             fbcentre = list(np.mean(np.array([fb_box[::2], fb_box[1::2]]), axis=0) + fb_refcentre)
             restraints.append(GroupRestraint(self.fb_selection, width, [(self.fb_k, 0)], fbcentre=fbcentre))
