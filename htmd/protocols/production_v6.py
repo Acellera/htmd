@@ -227,7 +227,7 @@ proc calcforces_endstep { } { }
             mol.read(os.path.join(inputdir, self.acemd.coordinates))
             fb_refcentre = mol.get('coords', sel=self.fb_reference).mean(axis=0).squeeze()
 
-            fbcentre = list(np.mean(np.array([fb_box[::2], fb_box[1::2]]), axis=0) + fb_refcentre)
+            fbcentre = list(np.around(np.mean(np.array([fb_box[::2], fb_box[1::2]]), axis=0) + fb_refcentre, 3))
             restraints.append(GroupRestraint(self.fb_selection, width, [(self.fb_k, 0)], fbcentre=fbcentre))
         else:
             restraints.append(GroupRestraint(self.fb_selection, width, [(self.fb_k, 0)], fbcentresel=self.fb_reference))
