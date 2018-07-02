@@ -14,6 +14,51 @@ from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+def loadParameters(fname):
+    """ Convenience method for reading parameter files with parmed
+
+    Parameters
+    ----------
+    fname : str
+        Parameter file name
+
+    Returns
+    -------
+    prm : ParameterSet
+        A parmed ParameterSet object
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from os.path import join
+    >>> prm = loadParameters(join(home(dataDir='test-ffevaluate'), 'thrombin-ligand-amber', 'structure.prmtop'))
+    """
+    import parmed
+
+    prm = None
+    if fname.endswith('.prm'):
+        try:
+            prm = parmed.charmm.CharmmParameterSet(fname)
+        except Exception as e:
+            print('Failed to read {} as CHARMM parameters. Attempting with AMBER prmtop reader'.format(fname))
+            try:
+                struct = parmed.amber.AmberParm(fname)
+                prm = parmed.amber.AmberParameterSet.from_structure(struct)
+            except Exception as e2:
+                print('Failed to read {} due to errors {} {}'.format(fname, e, e2))
+    elif fname.endswith('.prmtop'):
+        struct = parmed.amber.AmberParm(fname)
+        prm = parmed.amber.AmberParameterSet.from_structure(struct)
+    elif fname.endswith('.frcmod'):
+        prm = parmed.amber.AmberParameterSet(fname)
+
+    if prm is None:
+        raise RuntimeError('Extension of file {} not recognized. Report issue on HTMD issue tracker.'.format(fname))
+
+    return prm
+
+
+
 class FFEvaluate:
     @staticmethod
     def formatEnergies(energies):
