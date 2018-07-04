@@ -182,14 +182,15 @@ def compareForces(forces1, forces2):
     return np.max(np.abs(forces1 - forces2).flatten())
 
 
-def viewForces(mol, forces, omm_forces):
+def viewForces(mol, forces, omm_forces=None):
     mol.view()
     for cc, ff in zip(mol.coords[:, :, 0], forces):
         drawForce(cc, ff)
 
-    mol.view()
-    for cc, ff in zip(mol.coords[:, :, 0], omm_forces):
-        drawForce(cc, ff)
+    if omm_forces is not None:
+        mol.view()
+        for cc, ff in zip(mol.coords[:, :, 0], omm_forces):
+            drawForce(cc, ff)
 
 
 def fixParameters(parameterfile):
