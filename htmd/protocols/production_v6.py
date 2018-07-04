@@ -237,7 +237,7 @@ proc calcforces_endstep { } { }
     def _constraints2restraints(self):
 
         restraints = list()
-        for constr in self.constraints:
+        for constr in sorted(self.constraints):
             restraints.append(AtomRestraint(constr, 0, [(self.constraints[constr], 0)]))
 
         return restraints
