@@ -9,9 +9,11 @@ from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYP
 import os
 import numpy as np
 import logging
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+@_Deprecated('1.13.6')
 class Equilibration(ProtocolInterface):
     """ Equilibration protocol
 

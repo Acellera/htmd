@@ -4,25 +4,23 @@
 # No redistribution in whole or part
 #
 
-from htmd.molecule.molecule import Molecule
-from htmd.protocols.oldprotocolinterface import TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
-from htmd.protocols.oldprotocolinterface import ProtocolInterface as OldProtocolInterface
 from protocolinterface import ProtocolInterface, val
-from htmd.apps.acemd_v2 import Acemd
+from htmd.apps.acemd import Acemd as Acemd2
+from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
 import os
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
 
 
-class Production(OldProtocolInterface):
-    ''' Production protocol v6
+class Production(ProtocolInterface):
+    """ Production protocol v6
 
         Production protocol for globular and membrane proteins. You can optionally define a flatbottom potential box and
         atom constraints for the production run.
 
         An Acemd class object is stored in the Production object which can be used to modify futher options.
-        For documentation on further options see :class:`Acemd <htmd.apps.acemd_v2.Acemd>`
+        For documentation on further options see :class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>`
 
         Parameters
         ----------
@@ -48,63 +46,71 @@ class Production(OldProtocolInterface):
             A dictionary of atomselections and values of the constraint to be applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.
         adaptive : bool, default=False
             Set to True if making production runs for adaptive sampling.
-    '''
-    def __init__(self):
+    """
+    def __init__(self, _version=2):
         super().__init__()
-        self._cmdObject('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, Acemd)
-        self._cmdValue('runtime', 'float', 'Running time of the simulation.', 0, TYPE_FLOAT, RANGE_0POS)
-        self._cmdString('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps')
-        self._cmdValue('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, TYPE_FLOAT, RANGE_ANY)
-        self._cmdValue('fb_k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0,
-                       TYPE_FLOAT, RANGE_ANY)
-        self._cmdString('fb_reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.',
-                        'none')
-        self._cmdString('fb_selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none')
-        self._cmdList('fb_box', 'list', 'Position of the flatbottom box in term of the reference center given as '
-                                        '[xmin, xmax, ymin, ymax, zmin, zmax]', [0, 0, 0, 0, 0, 0])
-        self._cmdBoolean('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the '
-                                                     'barostat does not modify the xy aspect ratio.', False)
-        self._cmdList('useconstraints', 'bool', 'Apply constraints to the production simulation, defined by the '
-                                                'constraints parameter', False)
-        self._cmdDict('constraints', 'dict', 'A dictionary of atomselections and values of the constraint to be '
-                                             'applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.', {})
-        self._cmdBoolean('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False)
+        self._version = _version
+        self._arg('acemd', ':class:`Acemd2 <htmd.apps.acemd.Acemd>` or :class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>`'
+                           ' object', 'Acemd class object', None, val.Object([Acemd2, Acemd]))
+        self._arg('runtime', 'float', 'Running time of the simulation.', 25000, val.Number(float, '0POS'))
+        self._arg('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps', val.String())
+        self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, val.Number(float, 'ANY'))
+        self._arg('fb_k', 'float', 'Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5', 0,
+                  val.Number(float, 'ANY'))
+        self._arg('fb_reference', 'str', 'Reference selection to use as dynamic center of the flatbottom box.',
+                  'none', val.String())
+        self._arg('fb_selection', 'str', 'Selection of atoms to apply the flatbottom potential', 'none', val.String())
+        self._arg('fb_box', 'list', 'Position of the flatbottom box in term of the reference center given as '
+                                    '[xmin, xmax, ymin, ymax, zmin, zmax]',
+                  [0, 0, 0, 0, 0, 0], val.Number(float, 'ANY'), nargs=6)
+        self._arg('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat '
+                                              'does not modify the xy aspect ratio.', False, val.Boolean())
+        self._arg('useconstraints', 'bool', 'Apply constraints to the production simulation, defined by the '
+                                            'constraints parameter', False, val.Boolean())
+        self._arg('constraints', 'dict', 'A dictionary of atomselections and values of the constraint to be '
+                                         'applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.', {},
+                  val.Dictionary(key_type=str))
+        self._arg('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False,
+                  val.Boolean())
+        self._arg('restraints', 'list', 'A list of restraint objects. Only works with {}(_version=3),'
+                                'see :class:`AtomRestraint <htmd.mdengine.acemd.acemd.AtomRestraint>` and'
+                                ':class:`GroupRestraint <htmd.mdengine.acemd.acemd.GroupRestraint>`'
+                                ')'.format(self.__class__.__name__), None, val.Object(_Restraint), nargs='*')
 
-        self.acemd = Acemd()
-        #self.acemd.binindex='input.idx'
-        self.acemd.binindex = None
-        self.acemd.binvelocities = None
-        self.acemd.bincoordinates = 'output.coor'
-        self.acemd.extendedsystem='output.xsc'
-        self.acemd.coordinates = None
-        self.acemd.structure = None
-        self.acemd.parameters = None
-        self.acemd.temperature = None
-        self.acemd.restart = 'on'
-        self.acemd.restartfreq = 5000
-        self.acemd.outputname = 'output'
-        self.acemd.xtcfile = 'output.xtc'
-        self.acemd.xtcfreq = 25000
-        self.acemd.timestep = 4
-        self.acemd.rigidbonds = 'all'
-        self.acemd.hydrogenscale = 4
-        self.acemd.switching = 'on'
-        self.acemd.switchdist = 7.5
-        self.acemd.cutoff = 9
-        self.acemd.exclude = 'scaled1-4'
-        self.acemd.scaling14 = 1.0
-        self.acemd.langevin = 'on'
-        self.acemd.langevintemp = None
-        self.acemd.langevindamping = 0.1
-        self.acemd.pme = 'on'
-        self.acemd.pmegridspacing = 1.0
-        self.acemd.fullelectfrequency = 2
-        self.acemd.energyfreq = 5000
-        self.acemd.consref = None
-        self.acemd.run = '$numsteps'
-        self.acemd.TCL = ('''
+        if self._version == 2:
+            self.acemd = Acemd2()
+            self.acemd.binindex = None
+            self.acemd.binvelocities = None
+            self.acemd.bincoordinates = 'output.coor'
+            self.acemd.extendedsystem = 'output.xsc'
+            self.acemd.coordinates = None
+            self.acemd.structure = None
+            self.acemd.parameters = None
+            self.acemd.temperature = None
+            self.acemd.restart = 'on'
+            self.acemd.restartfreq = '5000'
+            self.acemd.outputname = 'output'
+            self.acemd.xtcfile = 'output.xtc'
+            self.acemd.xtcfreq = '25000'
+            self.acemd.timestep = '4'
+            self.acemd.rigidbonds = 'all'
+            self.acemd.hydrogenscale = '4'
+            self.acemd.switching = 'on'
+            self.acemd.switchdist = '7.5'
+            self.acemd.cutoff = '9'
+            self.acemd.exclude = 'scaled1-4'
+            self.acemd.scaling14 = '1.0'
+            self.acemd.langevin = 'on'
+            self.acemd.langevintemp = None
+            self.acemd.langevindamping = '0.1'
+            self.acemd.pme = 'on'
+            self.acemd.pmegridspacing = '1.0'
+            self.acemd.fullelectfrequency = '2'
+            self.acemd.energyfreq = '5000'
+            self.acemd.consref = None
+            self.acemd.run = '$numsteps'
+            self.acemd.TCL = ('''
 set numsteps {NUMSTEPS}
-set temperature {TEMPERATURE}
 set fb_refindex {{ {REFINDEX} }}
 set fb_selindex {{ {SELINDEX} }}
 set fb_box {{ {BOX} }}
@@ -145,6 +151,26 @@ proc calcforces {} {
 }
 proc calcforces_endstep { } { }
 ''')
+        elif self._version == 3:
+            self.acemd = Acemd()
+            self.acemd.binvelocities = None
+            self.acemd.bincoordinates = 'output.coor'
+            self.acemd.extendedsystem = 'output.xsc'
+            self.acemd.coordinates = None
+            self.acemd.structure = None
+            self.acemd.parameters = None
+            self.acemd.restart = 'on'
+            self.acemd.trajectoryfile = 'output.xtc'
+            self.acemd.trajectoryfreq = 25000
+            self.acemd.timestep = 4
+            self.acemd.switching = 'on'
+            self.acemd.switchdist = 7.5
+            self.acemd.cutoff = 9
+            self.acemd.thermostat = 'on'
+            self.acemd.thermostatdamping = 0.1
+            self.acemd.pme = 'on'
+        else:
+            raise ValueError('_version can not be {}. Choose either 2 or 3.'.format(self._version))
 
     def _findFiles(self, inputdir):
         # Tries to find default files if the given don't exist
@@ -173,16 +199,48 @@ proc calcforces_endstep { } { }
                                    'Please set the Production.acemd.{f:} property to '
                                    'point to the {f:} file'.format(f=field, i=inputdir))
 
-            if self.useconstraints and self.acemd.consref is None:
-                self.acemd.consref = self.acemd.coordinates
+            if self._version == 2:
+                if self.useconstraints and self.acemd.consref is None:
+                    self.acemd.consref = self.acemd.coordinates
 
     def _amberFixes(self):
         # AMBER specific fixes
         if self.acemd.structure.endswith('.prmtop'):
             self.acemd.parmfile = self.acemd.parameters
             self.acemd.parameters = None
-            self.acemd.scaling14 = 0.8333333
-            self.acemd.amber = 'on'
+            if self._version == 2:
+                self.acemd.scaling14 = '0.8333333'
+                self.acemd.amber = 'on'
+
+    def _fb_potential2restraints(self, inputdir):
+        from htmd.molecule.molecule import Molecule
+        restraints = list()
+
+        fb_box = np.array(self.fb_box)
+        # convert fb_box to width
+        width = list(np.concatenate(np.diff(np.array([fb_box[::2], fb_box[1::2]]), axis=0)))
+
+        # If fb_box is not symmetrical
+        if not np.all(fb_box[::2] == -fb_box[1::2]):
+            # convert fb_box and fb_reference to fbcentre and width
+            mol = Molecule(os.path.join(inputdir, self.acemd.structure))
+            mol.read(os.path.join(inputdir, self.acemd.coordinates))
+            fb_refcentre = mol.get('coords', sel=self.fb_reference).mean(axis=0).squeeze()
+
+            fbcentre = list(np.around(np.mean(np.array([fb_box[::2], fb_box[1::2]]), axis=0) + fb_refcentre, 3))
+            restraints.append(GroupRestraint(self.fb_selection, width, [(self.fb_k, 0)], fbcentre=fbcentre))
+        else:
+            restraints.append(GroupRestraint(self.fb_selection, width, [(self.fb_k, 0)], fbcentresel=self.fb_reference))
+
+        return restraints
+
+    def _constraints2restraints(self):
+
+        restraints = list()
+        for constr in sorted(self.constraints):
+            restraints.append(AtomRestraint(constr, 0, [(self.constraints[constr], 0)]))
+
+        return restraints
 
     def write(self, inputdir, outputdir):
         """ Writes the production protocol and files into a folder.
@@ -194,14 +252,28 @@ proc calcforces_endstep { } { }
         outputdir : str
             Directory where to write the production setup files.
         """
+        from htmd.molecule.molecule import Molecule
+
+        # Do version consistency check
+        if (self._version == 2 and not isinstance(self.acemd, Acemd2)) and \
+                (self._version == 3 and not isinstance(self.acemd, Acemd)):
+            raise RuntimeError('Acemd object version ({}) inconsistent with protocol version at instantiation '
+                               '({})'.format(type(self.acemd), self._version))
+
         self._findFiles(inputdir)
         self._amberFixes()
 
-        self.acemd.temperature = self.temperature
-        self.acemd.langevintemp = self.temperature
+        if self._version == 2:
+            self.acemd.temperature = str(self.temperature)
+            self.acemd.langevintemp = str(self.temperature)
+        elif self._version == 3:
+            self.acemd.temperature = self.temperature
+            self.acemd.thermostattemp = self.temperature
 
         from htmd.units import convert
         numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
+        if self._version == 3:
+            self.acemd.run = str(numsteps)
 
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
         inmol = Molecule(pdbfile)
@@ -210,26 +282,54 @@ proc calcforces_endstep { } { }
             logger.warning('Lipids detected in input structure. We highly recommend setting useconstantratio=True '
                            'for membrane simulations.')
 
-        if self.fb_k > 0:  # use TCL only for flatbottom
-            self.acemd.tclforces = 'on'
-            tcl = list(self.acemd.TCL)
-            tcl[0] = tcl[0].format(NUMSTEPS=numsteps, TEMPERATURE=self.temperature, KCONST=self.fb_k,
-                                   REFINDEX=' '.join(map(str, inmol.get('index', self.fb_reference))),
-                                   SELINDEX=' '.join(map(str, inmol.get('index', self.fb_selection))),
-                                   BOX=' '.join(map(str, self.fb_box)))
-            self.acemd.TCL = tcl[0] + tcl[1]
-        else:
-            self.acemd.TCL = 'set numsteps {NUMSTEPS}\n' \
-                             'set temperature {TEMPERATURE}\n'.format(NUMSTEPS=numsteps, TEMPERATURE=self.temperature)
-
-        if self.useconstraints:
-            # Turn on constraints
-            self.acemd.constraints = 'on'
-            self.acemd.constraintscaling = 1.0
-        else:
-            if len(self.constraints) != 0:
-                logger.warning('You have setup constraints to {} but constraints are turned off. '
-                               'If you want to use constraints, define useconstraints=True'.format(self.constraints))
+        if self._version == 2:
+            if self.restraints:
+                raise RuntimeWarning('restraints are only available on {}(_version=3)'.format(self.__class__.__name__))
+            if self.fb_k > 0:  # use TCL only for flatbottom
+                self.acemd.tclforces = 'on'
+                if isinstance(self.acemd.TCL, tuple):
+                    tcl = list(self.acemd.TCL)
+                    tcl[0] = tcl[0].format(NUMSTEPS=numsteps, TEMPERATURE=self.temperature, KCONST=self.fb_k,
+                                           REFINDEX=' '.join(map(str, inmol.get('index', self.fb_reference))),
+                                           SELINDEX=' '.join(map(str, inmol.get('index', self.fb_selection))),
+                                           BOX=' '.join(map(str, self.fb_box)))
+                    self.acemd.TCL = tcl[0] + tcl[1]
+                else:
+                    logger.warning('{} default TCL was already formatted.'.format(self.__class__.__name__))
+            else:
+                self.acemd.TCL = 'set numsteps {NUMSTEPS}\n'.format(NUMSTEPS=numsteps)
+            if self.useconstraints:
+                # Turn on constraints
+                self.acemd.constraints = 'on'
+                self.acemd.constraintscaling = '1.0'
+            else:
+                if len(self.constraints) != 0:
+                    logger.warning('You have setup constraints to {} but constraints are turned off. '
+                                   'If you want to use constraints, define '
+                                   'useconstraints=True'.format(self.constraints))
+        elif self._version == 3:
+            if self.restraints is not None:
+                logger.info('Using user-provided restraints and ignoring constraints and fb_potential')
+                self.acemd.restraints = self.restraints
+            else:
+                restraints = list()
+                if self.fb_k > 0:
+                    logger.warning('Converting fb_potential to restraints. This is a convenience '
+                                   'functional conversion. We recommend start using restraints with '
+                                   '{}(_version=3)'.format(self.__class__.__name__))
+                    restraints += self._fb_potential2restraints(inputdir)
+                if self.useconstraints:
+                    logger.warning('Converting constraints to restraints. This is a convenience '
+                                   'functional conversion. We recommend start using restraints with '
+                                   '{}(_version=3)'.format(self.__class__.__name__))
+                    restraints += self._constraints2restraints()
+                else:
+                    if len(self.constraints) != 0:
+                        logger.warning('You have setup constraints to {} but constraints are turned off. '
+                                       'If you want to use constraints, define '
+                                       'useconstraints=True'.format(self.constraints))
+                if len(restraints) != 0:
+                    self.acemd.restraints = restraints
 
         if self.useconstantratio:
             self.acemd.useconstantratio = 'on'
@@ -239,20 +339,21 @@ proc calcforces_endstep { } { }
 
         self.acemd.setup(inputdir, outputdir, overwrite=True)
 
-        # Adding constraints by writing them to the consref file
-        if self.useconstraints:
-            inconsreffile = os.path.join(inputdir, self.acemd.consref)
-            consrefmol = Molecule(inconsreffile)
-            consrefmol.set('occupancy', 0)
-            consrefmol.set('beta', 0)
-            if len(self.constraints) == 0:
-                raise RuntimeError('You have set the production to use constraints (useconstraints=True), but have not '
-                                   'defined any constraints (constraints={}).')
-            else:
-                for sel in self.constraints:
-                    consrefmol.set('beta', self.constraints[sel], sel)
-            outconsreffile = os.path.join(outputdir, self.acemd.consref)
-            consrefmol.write(outconsreffile)
+        if self._version == 2:
+            # Adding constraints by writing them to the consref file
+            if self.useconstraints:
+                inconsreffile = os.path.join(inputdir, self.acemd.consref)
+                consrefmol = Molecule(inconsreffile)
+                consrefmol.set('occupancy', 0)
+                consrefmol.set('beta', 0)
+                if len(self.constraints) == 0:
+                    raise RuntimeError('You have set the production to use constraints (useconstraints=True), but have '
+                                       'not defined any constraints (constraints={}).')
+                else:
+                    for sel in self.constraints:
+                        consrefmol.set('beta', self.constraints[sel], sel)
+                outconsreffile = os.path.join(outputdir, self.acemd.consref)
+                consrefmol.write(outconsreffile)
 
     def addConstraint(self, atomselect, factor=1):
         """ Convenience function for adding a new constraint to existing constraints.
@@ -271,152 +372,80 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
-from htmd.apps.acemd3 import Acemd3, _Restraint, GroupRestraint, AtomRestraint
-class ProductionAcemd3(ProtocolInterface):
-    ''' Production protocol v5 for Acemd 3
-
-        Production protocol for globular and membrane proteins. You can optionally define a flatbottom potential box and
-        atom constraints for the production run.
-
-        Parameters
-        ----------
-        runtime : float, default=0
-            Running time of the simulation.
-        timeunits : str, default='steps'
-            Units for runtime. Can be 'steps', 'ns' etc.
-        temperature : float, default=300
-            Temperature of the thermostat in Kelvin
-        restraints : list, default=None
-            A list of restraint objects
-        useconstantratio : bool, default=False
-            For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
-        adaptive : bool, default=False
-            Set to True if making production runs for adaptive sampling.
-    '''
-    def __init__(self):
-        super().__init__()
-        self._arg('acemd', ':class:`MDEngine <htmd.apps.app.App>` object', 'MD engine', None, val.Object(Acemd3))
-        self._arg('runtime', 'float', 'Running time of the simulation.', 0, val.Number(float, '0POS'))
-        self._arg('timeunits', 'str', 'Units for runtime. Can be \'steps\', \'ns\' etc.', 'steps', val.String())
-        self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin', 300, val.Number(float, 'ANY'))
-        self._arg('restraints', 'list', 'A list of restraint objects', None, val.Object(_Restraint), nargs='*')
-        self._arg('useconstantratio', 'bool', 'For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.', False, val.Boolean())
-        self._arg('adaptive', 'bool', 'Set to True if making production runs for adaptive sampling.', False, val.Boolean())
-
-        self.acemd = Acemd3()
-        self.acemd.binvelocities = None
-        self.acemd.bincoordinates = 'output.coor'
-        self.acemd.extendedsystem='output.xsc'
-        self.acemd.coordinates = None
-        self.acemd.structure = None
-        self.acemd.parameters = None
-        self.acemd.restart = 'on'
-        self.acemd.trajectoryfile = 'output.xtc'
-        self.acemd.trajectoryfreq = 25000
-        self.acemd.timestep = 4
-        self.acemd.switching = 'on'
-        self.acemd.switchdist = 7.5
-        self.acemd.cutoff = 9
-        self.acemd.thermostat = 'on'
-        self.acemd.thermostatdamping = 0.1
-        self.acemd.pme = 'on'
-
-    def _findFiles(self, inputdir):
-        # Tries to find default files if the given don't exist
-        defaults = {'coordinates': ('structure.pdb',),
-                    'structure': ('structure.psf', 'structure.prmtop'),
-                    'parameters': ('parameters', 'structure.prmtop')}
-
-        for field in defaults:
-            userval = self.acemd.__dict__[field]
-            if userval is not None and not os.path.exists(os.path.join(inputdir, userval)):
-                raise RuntimeError('Could not locate file {} set by the user for argument '
-                                   'Production.acemd.{}'.format(os.path.join(inputdir, userval), field))
-
-            if self.acemd.__dict__[field] is None:
-                for val in defaults[field]:
-                    if os.path.exists(os.path.join(inputdir, val)):
-                        self.acemd.__dict__[field] = val
-                        break
-
-            if userval is not None and self.acemd.__dict__[field] is not None and self.acemd.__dict__[field] != userval:
-                logger.warning('Could not locate structure file {}. Using {} instead.'.format(
-                    os.path.join(inputdir, userval), os.path.join(inputdir, self.acemd.__dict__[field])
-                ))
-            elif self.acemd.__dict__[field] is None:
-                raise RuntimeError('Could not locate any {f:} file in {i:}. '
-                                   'Please set the Production.acemd.{f:} property to '
-                                   'point to the {f:} file'.format(f=field, i=inputdir))
-
-    def _amberFixes(self):
-        # AMBER specific fixes
-        if self.acemd.structure.endswith('.prmtop'):
-            self.acemd.parmfile = self.acemd.parameters
-            self.acemd.parameters = None
-
-    def write(self, inputdir, outputdir):
-        """ Writes the production protocol and files into a folder.
-
-        Parameters
-        ----------
-        inputdir : str
-            Path to a directory containing the files produced by a equilibration process.
-        outputdir : str
-            Directory where to write the production setup files.
-        """
-        self._findFiles(inputdir)
-        self._amberFixes()
-
-        from htmd.units import convert
-        numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
-        self.acemd.temperature = self.temperature
-        self.acemd.langevintemp = self.temperature
-        self.acemd.thermostattemp = self.temperature
-        self.acemd.run = str(numsteps)
-        self.acemd.restraints = self.restraints
-        if self.adaptive:
-            self.acemd.binvelocities = None
-
-        self.acemd.setup(inputdir, outputdir, overwrite=True)
-
-
 if __name__ == "__main__":
     from htmd.home import home
     from htmd.util import tempname
     import filecmp
     from glob import glob
+    from os.path import join
 
-    pdbid = '3PTB'
-    pd = Production()
+    def _cutfirstline(infile, outfile):
+        # Cut out the first line of prmtop which has a build date in it
+        with open(infile, 'r') as fin:
+            data = fin.read().splitlines(True)
+        with open(outfile, 'w') as fout:
+            fout.writelines(data[1:])
+
+    def _compareResultFolders(compare, tmpdir, pid):
+        ignore_ftypes = ('.log', '.txt')
+        files = []
+        deletefiles = []
+        for f in glob(join(compare, '*')):
+            fname = os.path.basename(f)
+            if os.path.splitext(f)[1] in ignore_ftypes:
+                continue
+            if f.endswith('prmtop'):
+                _cutfirstline(f, join(compare, fname + '.mod'))
+                _cutfirstline(join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
+                files.append(os.path.basename(f) + '.mod')
+                deletefiles.append(join(compare, fname + '.mod'))
+            else:
+                files.append(os.path.basename(f))
+
+        match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
+        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+            raise RuntimeError(
+                'Different results produced by amber.build for test {} between {} and {} in files {}.'.format(pid, compare, tmpdir, mismatch))
+
+        for f in deletefiles:
+            os.remove(f)
+
+    # Test ACEMD version 2
+
+    pd = Production(_version=2)
     pd.runtime = 4
     pd.timeunits = 'ns'
-    pd.temperature = 350
+    pd.temperature = 300
     pd.useconstraints = True
     pd.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
     pd.fb_reference = 'protein and name CA'
-    pd.fb_selection = 'segname L and noh'
-    pd.fb_box = [-20, 20, -20, 20, 43, 45]
+    pd.fb_selection = 'resname MOL and noh'
+    pd.fb_box = [-21, 21, -19, 19, 29, 30]
     pd.fb_k = 5
     tmpdir = tempname()
-    pd.write(home(dataDir=os.path.join('test-equilibration', pdbid, 'postrun')), tmpdir)
+    pd.write(home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd2', 'protLig', 'postrun')), tmpdir)
 
     # Compare with reference
-    refdir = home(dataDir=os.path.join('test-production-v6', pdbid, 'prerun'))
+    refdir = home(dataDir=os.path.join('test-protocols', 'production', 'acemd2', 'protLig', 'prerun'))
     files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
-    match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
+    _compareResultFolders(refdir, tmpdir, 'protLig')
 
-    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
-            raise RuntimeError('Different results produced by Equilibration.write for '
-                               'test {} between {} and {} in files {}.'.format(pdbid, refdir, tmpdir, mismatch))
+    # Test new ACEMD version 3
 
-    # from htmd.protocols.production_v5 import ProductionAcemd3, GroupRestraint, AtomRestraint
-    r = list()
-    r.append(GroupRestraint('segid P2', 5, [(10, '10ns'), (5, '15ns'), (0, '20ns')], axes='z'))
-    r.append(AtomRestraint('segid P1 and name CA', 0.1, [(10, '10ns'), (5, '15ns'), (0, '20ns')]))
+    pd = Production(_version=3)
+    pd.runtime = 4
+    pd.timeunits = 'ns'
+    pd.temperature = 300
+    pd.useconstraints = True
+    pd.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
+    pd.fb_reference = 'protein and name CA'
+    pd.fb_selection = 'resname MOL and noh'
+    pd.fb_box = [-21, 21, -19, 19, 29, 30]
+    pd.fb_k = 5
+    tmpdir = tempname()
+    pd.write(home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd3', 'protLig', 'postrun')), tmpdir)
 
-    p = ProductionAcemd3()
-    p.runtime = 50
-    p.timeunits = 'ns'
-    p.temperature = 290
-    p.restraints = r
-    # p.write('/workspace5/pablo/bound_KIX_cMYB/2_equil/2-gen/', '/tmp/testdir/')
+    # Compare with reference
+    refdir = home(dataDir=os.path.join('test-protocols', 'production', 'acemd3', 'protLig', 'prerun'))
+    files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
+    _compareResultFolders(refdir, tmpdir, 'protLig')

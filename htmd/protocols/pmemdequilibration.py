@@ -14,9 +14,11 @@ import os
 import numpy as np
 import logging
 import shutil
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+@_Deprecated('1.13.6')
 class Equilibration(ProtocolInterface):
 
     """ Equilibration protocol

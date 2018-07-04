@@ -10,9 +10,11 @@ from htmd.apps.acemd import Acemd
 import os
 import htmd
 import logging
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+@_Deprecated('1.13.6')
 class Production(ProtocolInterface):
     ''' Production protocol v3
 
