@@ -179,3 +179,68 @@ class PeriodicTable:
             atom_data.update({'attachTo': ''})
 
         return atom_data
+
+    def listHybridizations(self):
+        """
+        Lists the Hybridization type available
+
+        """
+
+        dict_hyb = HybridizationType.values
+
+        print("Index  --> Hybridization\n")
+        for i, hyb in dict_hyb.items():
+            print("%5s " % i, '-->', " %-13s" % str(hyb))
+
+    def listBondTypes(self):
+        """
+        Lists the Bonds type available
+
+        """
+
+        dict_bt = BondType.values
+
+        print("Index  --> BondType\n")
+        for i, bt in dict_bt.items():
+            print("%5s " % i, '-->', " %-13s" % str(bt))
+
+
+    def getHybridization(self, index):
+        """
+        Returns the hybridization type from its index value
+
+        Parameters
+        ----------
+        index: int
+            The index representing the hybridization type
+
+        Returns
+        -------
+        hybtype: str
+            The hybridization type
+
+        """
+
+        dict_hyb = HybridizationType.values
+
+        return str(dict_hyb[index])
+
+    def getBondType(self, index):
+        """
+        Returns the bond type from its index value
+
+        Parameters
+        ----------
+        index: int
+            The index representing the bond type
+
+        Returns
+        -------
+        btype: str
+            The bond type
+
+        """
+
+        dict_bt = BondType.values
+
+        return str(dict_bt[index])
