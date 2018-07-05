@@ -182,14 +182,15 @@ def compareForces(forces1, forces2):
     return np.max(np.abs(forces1 - forces2).flatten())
 
 
-def viewForces(mol, forces, omm_forces):
+def viewForces(mol, forces, omm_forces=None):
     mol.view()
     for cc, ff in zip(mol.coords[:, :, 0], forces):
         drawForce(cc, ff)
 
-    mol.view()
-    for cc, ff in zip(mol.coords[:, :, 0], omm_forces):
-        drawForce(cc, ff)
+    if omm_forces is not None:
+        mol.view()
+        for cc, ff in zip(mol.coords[:, :, 0], omm_forces):
+            drawForce(cc, ff)
 
 
 def fixParameters(parameterfile):
@@ -213,6 +214,9 @@ if __name__ == '__main__':
     from glob import glob
     import parmed
     import os
+    import logging
+
+    logging.getLogger('parmed.structure').setLevel('ERROR')
 
     for d in glob(os.path.join(home(dataDir='test-ffevaluate'), '*', '')):
         print('\nRunning test:', d)
@@ -259,16 +263,14 @@ if __name__ == '__main__':
             if len(psfFile):
                 struct = parmed.charmm.CharmmPsfFile(psfFile[0])
                 prm = parmed.charmm.CharmmParameterSet(*prmFiles)
-                fromstruct = False
                 keepForces(prm, struct, mol, forces=force)
             elif len(prmtopFile):
                 struct = parmed.load_file(prmtopFile[0])
                 prm = parmed.amber.AmberParameterSet().from_structure(struct)
-                fromstruct = True
                 keepForces(prm, struct, mol, forces=force)
                 keepForcesAmber(struct, mol, forces=force)
 
-            energies, forces, atmnrg = FFEvaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa).calculate(mol.coords, mol.box)
+            energies, forces, atmnrg = FFEvaluate(mol, prm, cutoff=cutoff, rfa=rfa).calculate(mol.coords, mol.box)
             energies = FFEvaluate.formatEnergies(energies[:, 0])
             forces = forces[:, :, 0].squeeze()
             omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)
@@ -278,15 +280,13 @@ if __name__ == '__main__':
         if len(psfFile):
             struct = parmed.charmm.CharmmPsfFile(psfFile[0])
             prm = parmed.charmm.CharmmParameterSet(*prmFiles)
-            fromstruct = False
             keepForces(prm, struct, mol)
         elif len(prmtopFile):
             struct = parmed.load_file(prmtopFile[0])
             prm = parmed.amber.AmberParameterSet().from_structure(struct)
-            fromstruct = True
             keepForces(prm, struct, mol)
             keepForcesAmber(struct, mol)
-        energies, forces, atmnrg = FFEvaluate(mol, prm, fromstruct=fromstruct, cutoff=cutoff, rfa=rfa).calculate(mol.coords, mol.box)
+        energies, forces, atmnrg = FFEvaluate(mol, prm, cutoff=cutoff, rfa=rfa).calculate(mol.coords, mol.box)
         energies = FFEvaluate.formatEnergies(energies[:, 0])
         forces = forces[:, :, 0].squeeze()
         omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)

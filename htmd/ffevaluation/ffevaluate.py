@@ -14,6 +14,51 @@ from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+def loadParameters(fname):
+    """ Convenience method for reading parameter files with parmed
+
+    Parameters
+    ----------
+    fname : str
+        Parameter file name
+
+    Returns
+    -------
+    prm : ParameterSet
+        A parmed ParameterSet object
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from os.path import join
+    >>> prm = loadParameters(join(home(dataDir='test-ffevaluate'), 'thrombin-ligand-amber', 'structure.prmtop'))
+    """
+    import parmed
+
+    prm = None
+    if fname.endswith('.prm'):
+        try:
+            prm = parmed.charmm.CharmmParameterSet(fname)
+        except Exception as e:
+            print('Failed to read {} as CHARMM parameters. Attempting with AMBER prmtop reader'.format(fname))
+            try:
+                struct = parmed.amber.AmberParm(fname)
+                prm = parmed.amber.AmberParameterSet.from_structure(struct)
+            except Exception as e2:
+                print('Failed to read {} due to errors {} {}'.format(fname, e, e2))
+    elif fname.endswith('.prmtop'):
+        struct = parmed.amber.AmberParm(fname)
+        prm = parmed.amber.AmberParameterSet.from_structure(struct)
+    elif fname.endswith('.frcmod'):
+        prm = parmed.amber.AmberParameterSet(fname)
+
+    if prm is None:
+        raise RuntimeError('Extension of file {} not recognized. Report issue on HTMD issue tracker.'.format(fname))
+
+    return prm
+
+
+
 class FFEvaluate:
     @staticmethod
     def formatEnergies(energies):
@@ -33,7 +78,7 @@ class FFEvaluate:
         return {'angle': energies[3], 'bond': energies[0], 'dihedral': energies[4], 'elec': energies[2],
                 'improper': energies[5], 'vdw': energies[1], 'total': energies.sum(axis=0)}
 
-    def __init__(self, mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5, fromstruct=False):
+    def __init__(self, mol, prm, betweensets=None, cutoff=0, rfa=False, solventDielectric=78.5):
         """  Evaluates energies and forces of the forcefield for a given Molecule
 
         Parameters
@@ -54,9 +99,6 @@ class FFEvaluate:
             dielectric.
         solventDielectric : float
             Used together with `cutoff` and `rfa`
-        fromstruct : bool
-            If the parameters were derived from a parmed Structure set to True. This option will be removed in the future
-            as it will be unnecessary.
 
         Examples
         --------
@@ -65,7 +107,7 @@ class FFEvaluate:
         >>> import parmed
         >>> mol = Molecule('./htmd/data/test-ffevaluate/waterbox/structure.psf')
         >>> mol.read('./htmd/data/test-ffevaluate/waterbox/output.xtc')
-        >>> prm = parmed.charmm.CharmmParameterSet(fixParameters('./htmd/data/test-ffevaluate/waterbox/parameters.prm'))
+        >>> prm = loadParameters(fixParameters('./htmd/data/test-ffevaluate/waterbox/parameters.prm'))
         >>> ffev = FFEvaluate(mol, prm, betweensets=('resname SOD', 'water'))
         >>> energies, forces, atmnrg = ffev.calculate(mol.coords)
 
@@ -75,15 +117,14 @@ class FFEvaluate:
         >>>     drawForce(cc, ff)
 
         Amber style
-        >>> prmtop = parmed.amber.AmberParm('structure.prmtop')
-        >>> prm = parmed.amber.AmberParameterSet.from_structure(prmtop)
-        >>> ffev = FFEvaluate(mol, prm, betweensets=('resname SOD', 'water'), fromstruct=True)
+        >>> prm = loadParameters('structure.prmtop')
+        >>> ffev = FFEvaluate(mol, prm, betweensets=('resname SOD', 'water'))
         >>> energies, forces, atmnrg = ffev.calculate(mol.coords)
         """
         mol = mol.copy()
         setA, setB = calculateSets(mol, betweensets)
 
-        args = list(init(mol, prm, fromstruct))
+        args = list(init(mol, prm))
         args.append(setA)
         args.append(setB)
         args.append(cutoff)
@@ -179,8 +220,34 @@ def nestedListToArray(nl, dtype, default=1):
     return arr
 
 
+def detectImproperCenter(indexes, graph):
+    for i in indexes:
+        if len(np.intersect1d(list(graph.neighbors(i)), indexes)) == 3:
+            return i
+
+def improperGraph(impropers, bonds):
+    import networkx as nx
+
+    g = nx.Graph()
+    g.add_nodes_from(np.unique(impropers))
+    g.add_edges_from([tuple(b) for b in bonds])
+    return g
+
+
+def getImproperParameter(type, parameters):
+    from itertools import permutations
+    type = np.array(type)
+    perms = np.array([x for x in list(permutations((0, 1, 2, 3))) if x[2] == 2])
+    for p in perms:
+        if tuple(type[p]) in parameters.improper_types:
+            return parameters.improper_types[tuple(type[p])], 'improper_types'
+        elif tuple(type[p]) in parameters.improper_periodic_types:
+            return parameters.improper_periodic_types[tuple(type[p])], 'improper_periodic_types'
+    raise RuntimeError('Could not find improper parameters for key {}'.format(type))
+
+
 # TODO: Can be improved with lil sparse arrays
-def init(mol, prm, fromstruct=False):
+def init(mol, prm):
     natoms = mol.numAtoms
     charge = mol.charge.astype(np.float64)
     impropers = mol.impropers
@@ -261,30 +328,25 @@ def init(mol, prm, fromstruct=False):
             dihedral_params[idx].append(dip.per)
 
     improper_params = np.zeros((mol.impropers.shape[0], 3), dtype=np.float32)
-    from parmed.amber import AmberParameterSet
-    from parmed.charmm import CharmmParameterSet
-    from parmed.parameters import ParameterSet
+    graph = improperGraph(mol.impropers, mol.bonds)
     for idx, impr in enumerate(mol.impropers):
-        if fromstruct:  # If we make prm from struct there is no ordering
-            ty = tuple(uqtypes[typeint[impr]])
-        elif isinstance(prm, AmberParameterSet):  # If prm is read from AMBER parameter file it's sorted 0,1,3 but not 2
-            ty = np.array(uqtypes[typeint[impr]])
-            ty[[0, 1, 3]] = sorted(ty[[0, 1, 3]])
-            ty = tuple(ty)
-        elif isinstance(prm, CharmmParameterSet):  # If prm is read from CHARMM parameter file it's sorted
-            ty = tuple(sorted(uqtypes[typeint[impr]]))
-        elif isinstance(prm, ParameterSet):
-            ty = tuple(uqtypes[typeint[impr]])
-        else:
-            raise RuntimeError('Not a valid parameterset')
-        if ty in prm.improper_types:
-            imprparam = prm.improper_types[ty]
-            improper_params[idx, :] = [imprparam.psi_k, radians(imprparam.psi_eq), 0]
-        elif ty in prm.improper_periodic_types:
-            imprparam = prm.improper_periodic_types[ty]
+        ty = tuple(uqtypes[typeint[impr]])
+        try:
+            imprparam, impr_type = getImproperParameter(ty, prm)
+        except:
+            try:  # In some cases AMBER does not store the center as 3rd atom (i.e. if it's index is 0). Then you need to detect it
+                center = detectImproperCenter(impr, graph)
+                notcenter = np.setdiff1d(impr, center)
+                notcenter = sorted(uqtypes[typeint[notcenter]])
+                ty = tuple(notcenter[:2] + [uqtypes[typeint[center]],] + notcenter[2:])
+                imprparam, impr_type = getImproperParameter(ty, prm)
+            except:
+                raise RuntimeError('Could not find improper parameters for atom types {}'.format(ty))
+
+        if impr_type == 'improper_periodic_types':
             improper_params[idx, :] = [imprparam.phi_k, radians(imprparam.phase), imprparam.per]
-        else:
-            raise RuntimeError('Could not find parameters for {}'.format(ty))
+        elif impr_type == 'improper_types':
+            improper_params[idx, :] = [imprparam.psi_k, radians(imprparam.psi_eq), 0]
 
     excl = nestedListToArray(excl_list, dtype=np.int64, default=-1)
     s14a = nestedListToArray(s14_atom_list, dtype=np.int64, default=-1)
@@ -312,8 +374,8 @@ def calculateSets(mol, betweensets):
         setB = mol.atomselect(betweensets[1], indexes=True)
         mol.bonds = np.empty((0, 2), dtype=np.uint32)
         mol.angles = np.empty((0, 3), dtype=np.uint32)
-        mol.dihedral = np.empty((0, 4), dtype=np.uint32)
-        mol.improper = np.empty((0, 4), dtype=np.uint32)
+        mol.dihedrals = np.empty((0, 4), dtype=np.uint32)
+        mol.impropers = np.empty((0, 4), dtype=np.uint32)
     return setA, setB
 
 
