@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel', '.done')
 
 
-class AdaptiveBase(ProtocolInterface, metaclass=abc.ABCMeta):
+class AdaptiveBase(abc.ABC, ProtocolInterface):
     def __init__(self):
         super().__init__()
         from htmd.queues.simqueue import SimQueue
