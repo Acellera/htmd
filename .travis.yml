@@ -4,15 +4,18 @@ sudo: required
 dist: trusty
 group: deprecated-2017Q4
 
-# Defining project languages to help lgtm parse errors as it defaults to 2.7
-language: python
-os:
-  - linux
-
-python:
-  - "3.5"
-  - "3.6"
-
+matrix:
+  include:
+    - os: linux
+      language: python
+      python:
+        - "3.6"
+      env: MAKE_NOARCH=1 OSNAME=Linux  # Only one build needs MAKE_NOARCH=1 to upload the noarch packages to conda
+    - os: linux
+      language: python
+      python:
+        - "3.5"
+      env: OSNAME=Linux
 # TODO: Uncomment when MacOS comes back (travis-ci/travis-ci#9075)
 #    - os: osx
 #      language: generic
@@ -29,10 +32,6 @@ install:
   - if [ "$TRAVIS_OS_NAME" == "linux" ]; then python3 -c 'import os,sys,fcntl; flags = fcntl.fcntl(sys.stdout, fcntl.F_GETFL); fcntl.fcntl(sys.stdout, fcntl.F_SETFL, flags&~os.O_NONBLOCK);'; fi
   - if [ "$TRAVIS_OS_NAME" == "linux" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh; fi
   - if [ "$TRAVIS_OS_NAME" == "osx" ]; then wget https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh; fi
-
-  - if [ "$TRAVIS_PYTHON_VERSION" == "3.6" ]; then export MAKE_NOARCH=1; fi # Only one build needs MAKE_NOARCH=1 to upload the noarch packages to conda
-  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then export OSNAME=Darwin; fi
-  - if [ "$TRAVIS_OS_NAME" == "linux" ]; then export OSNAME=Linux; fi
 
   - echo $PACKAGE_NAME
 
