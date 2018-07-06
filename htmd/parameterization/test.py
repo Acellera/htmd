@@ -106,6 +106,7 @@ class TestParameterize(unittest.TestCase):
         self._execute(refDir, resDir, 'parameterize input.mol2 --no-esp --no-dihed')
         self._testFiles(refDir, resDir)
 
+    @unittest.skip(reason='joblib 0.11 breaks it on Travis?')  # TODO: bring back when joblib back to 0.12
     def test_h2o2_esp(self):
         refDir = os.path.join(self.dataDir, 'h2o2_esp')
         resDir = os.path.join(self.testDir, 'h2o2_esp')
