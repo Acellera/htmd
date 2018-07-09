@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class ProjectNotExistError(Exception):
         return repr(self.value)
 
 
-class SimQueue(metaclass=ABCMeta):
+class SimQueue(ABC):
 
     def __init__(self):
         super().__init__()
