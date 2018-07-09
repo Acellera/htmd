@@ -1474,6 +1474,8 @@ from htmd.molecule.molecule import Molecule
 from glob import glob
 from natsort import natsorted
 from unittest import TestCase
+
+
 class TestReaders(TestCase):
     def testfolder(self, subname=None):
         from htmd.home import home
@@ -1537,6 +1539,13 @@ class TestReaders(TestCase):
         tmpcoo = mol.coords.copy()
         mol.read([os.path.join(home(dataDir='1kdx'), '1kdx.dcd')], frames=[8])
         assert np.array_equal(tmpcoo[:, :, 8], np.squeeze(mol.coords)), 'Specific frame reading not working'
+
+    def test_xtc_frames(self):
+        mol = Molecule(os.path.join(self.testfolder('4RWS'), 'structure.pdb'))
+        mol.read(os.path.join(self.testfolder('4RWS'), 'traj.xtc'))
+        tmpcoo = mol.coords.copy()
+        mol.read([os.path.join(self.testfolder('4RWS'), 'traj.xtc')], frames=[1])
+        assert np.array_equal(tmpcoo[:, :, 1], np.squeeze(mol.coords)), 'Specific frame reading not working'
 
     def test_gromacs_top(self):
         mol = Molecule(os.path.join(self.testfolder(), 'gromacs.top'))
