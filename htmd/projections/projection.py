@@ -6,7 +6,7 @@
 import abc
 
 
-class Projection(metaclass=abc.ABCMeta):
+class Projection(abc.ABC):
     """
     Parent class for all trajectory projecting classes. Defines abstract functions.
     """

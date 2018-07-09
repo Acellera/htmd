@@ -9,9 +9,11 @@ from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYP
 from htmd.apps.acemd import Acemd
 import os
 import logging
+from htmd.decorators import _Deprecated
 logger = logging.getLogger(__name__)
 
 
+@_Deprecated('1.13.6')
 class Production(ProtocolInterface):
     ''' Production protocol for globular and membrane proteins
         It also includes a possible flatbottom potential box

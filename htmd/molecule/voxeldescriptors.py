@@ -339,19 +339,35 @@ def _getOccupancyNUMBA(coords, centers, channelsigmas, trunc):
     return occus
 
 
-def _getOccupancyCUDA(coords, centers, channelsigmas, trunc=5, device=0):
-    cuda.select_device(device)
-    occus = np.zeros((centers.shape[0], channelsigmas.shape[1]))
-    threadsperblock = 1024
+def _memsetArray(array, val=0, threadsperblock=256):
+    from math import ceil
+    totalelem = np.prod(array.shape)
+    nblocks = ceil(totalelem / threadsperblock)
+    _memsetArrayCUDAkernel[nblocks, threadsperblock](array.reshape(totalelem), val)
+
+@cuda.jit
+def _memsetArrayCUDAkernel(array, val):
+    threadidx = (cuda.threadIdx.x + (cuda.blockDim.x * cuda.blockIdx.x))
+    if threadidx >= array.shape[0]:
+        return
+    array[threadidx] = val
+
+def _getOccupancyCUDA(coords, centers, channelsigmas, trunc=5, device=0, resD=None, asnumpy=True, threadsperblock=256):
+    #cuda.select_device(device)
+    if resD is None:
+        resD = cuda.device_array((centers.shape[0], channelsigmas.shape[1]), dtype=np.float32)
+    _memsetArray(resD, val=0)
+
     natomblocks = int(np.ceil(coords.shape[0] / threadsperblock))
     blockspergrid = (centers.shape[0], natomblocks)
 
     centers = cuda.to_device(centers)
     coords = cuda.to_device(coords)
     channelsigmas = cuda.to_device(channelsigmas)
-    _getOccupancyCUDAkernel[blockspergrid, threadsperblock](occus, coords, centers, channelsigmas, trunc * trunc)
+    _getOccupancyCUDAkernel[blockspergrid, threadsperblock](resD, coords, centers, channelsigmas, trunc * trunc)
 
-    return occus
+    if asnumpy:
+        return resD.copy_to_host()
 
 @cuda.jit
 def _getOccupancyCUDAkernel(occus, coords, centers, channelsigmas, trunc):

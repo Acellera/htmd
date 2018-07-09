@@ -140,12 +140,6 @@ class ProtocolInterface:
             self.__dict__[k] = argsdict[k]
 
 
-'''class ProtocolInterface(CommandInterface, metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def run(self):
-        return'''
-
-
 class Validator:
     def __init__(self, key, datatype, descr, default):
         self.datatype = datatype

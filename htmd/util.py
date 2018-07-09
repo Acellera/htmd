@@ -267,7 +267,7 @@ def testDHFR():
 
 
 if __name__ == "__main__":
-    from htmd.ui import *
+    from htmd.molecule.molecule import Molecule
     import doctest
 
     doctest.testmod()

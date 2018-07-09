@@ -48,7 +48,8 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         self._arg('groupname', 'str', 'The name of the group of simulations you want to submit. If none is given, '
                                       'a randomly generated string will be used instead.', None, val.String())
         self._arg('datadir', 'str', 'The directory in which to retrieve your results.', None, val.String())
-        self._arg('instancetype', 'str', 'Instance type', 'g2.2xlarge', val.String(), valid_values=('g2.2xlarge', 'r4.large', 'p2.xlarge'))
+        self._arg('instancetype', 'str', 'Instance type', 'p2.xlarge', val.String(),
+                  valid_values=('g2.2xlarge', 'r4.large', 'p2.xlarge'))
         self._arg('hashnames', 'bool', 'If True, each job will have a name created from the hash of its directory '
                                        'instead of using the directory name.', False, val.Boolean())
         self._arg('verbose', 'bool', 'Turn verbosity mode on or off.', False, val.Boolean())
@@ -91,7 +92,7 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 import hashlib
                 name = hashlib.sha256(os.path.abspath(d).encode('utf-8')).hexdigest()[:10]
 
-            runscript = self._getRunScript(d)
+            runscript = self._hackRunScript(d)
             self._cleanSentinel(d)
 
             jobscript = os.path.abspath(os.path.join(d, 'job.sh'))
@@ -126,7 +127,6 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
         self._createCloud()
         from acecloud.status import Status, CloudError
         jj = self._cloud.getJobs(group=self.groupname)
-        currdir = os.getcwd()
         for j in jj:
             if self.datadir is not None:
                 outf = os.path.join(self.datadir, j.name)
@@ -134,7 +134,6 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
                 outf = j.path
             if not os.path.exists(outf):
                 os.makedirs(outf)
-            os.chdir(outf)
             try:
                 if j.status() == Status.COMPLETED:
                     j.retrieve(directory=outf)  # Duplicate code to avoid race condition with slow retrieve
@@ -146,7 +145,6 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
             except Exception as e:
                 logger.warning(e)
                 pass
-            os.chdir(currdir)
 
     def stop(self):
         # TODO: This not only stops the job, but also deletes the S3. Not exactly like the stop of other queues
@@ -168,6 +166,18 @@ class AceCloudQueue(SimQueue, ProtocolInterface):
             f.write('\n')
             f.write('bash run.sh')
         os.chmod(fname, 0o700)
+
+    def _hackRunScript(self, directory):
+        import fileinput
+
+        bak_suffix = '.acecloud.bak'
+        runscript = self._getRunScript(directory)
+
+        if not os.path.isfile(runscript + bak_suffix):
+            with fileinput.FileInput(runscript, inplace=True, backup=bak_suffix) as file:
+                for line in file:
+                    print(line.replace('acemd', '/home/ec2-user/miniconda3/bin/acemd'), end='')
+        return runscript
 
     @property
     def ncpu(self):

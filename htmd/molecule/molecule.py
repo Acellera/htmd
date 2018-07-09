@@ -831,7 +831,8 @@ class Molecule:
         append : bool, optional
             If the file is a trajectory or coor file, append the coordinates to the previous coordinates. Note append is slow.
         overwrite : str, list of str
-            A list of the existing fields in Molecule that we wish to overwrite when reading this file.
+            A list of the existing fields in Molecule that we wish to overwrite when reading this file. Set to None if
+            you don't want to overwrite any existing fields.
         keepaltloc : str
             Set to any string to only keep that specific altloc. Set to 'all' if you want to keep all alternative atom positions.
         guess : list of str
@@ -900,7 +901,8 @@ class Molecule:
                 raise ValueError('Number of atoms in file ({}) mismatch with number of atoms in the molecule '
                                  '({})'.format(mol.numAtoms, self.numAtoms))
 
-            if frame is not None:
+            # TODO: Needs redesign to remove hack
+            if frame is not None and ext != 'xtc':
                 mol.dropFrames(keep=frame)
 
             newmols.append(mol)
@@ -935,7 +937,7 @@ class Molecule:
         return os.path.splitext(fname)[1][1:]
 
     def _unzip(self, fname):
-        if fname.endswith('gz'):
+        if fname.endswith('.gz'):
             import gzip
             from htmd.util import tempname
             with gzip.open(fname, 'r') as f:
@@ -984,7 +986,7 @@ class Molecule:
                     raise TopologyInconsistencyError(
                         'Different number of atoms read from topology file {} for field {}'.format(mol.fileloc, field))
 
-                if (overwrite[0] == 'all') or (field in overwrite):
+                if overwrite is not None and ((overwrite[0] == 'all') or (field in overwrite)):
                     self.__dict__[field] = newfielddata
                 else:
                     if not np.array_equal(self.__dict__[field], newfielddata):

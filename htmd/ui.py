@@ -29,7 +29,7 @@ from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
 from htmd.vmdviewer import viewer, getCurrentViewer
 from htmd.builder.solvate import solvate
-from htmd.apps.acemd_v2 import Acemd
+from htmd.mdengine.acemd.acemd import Acemd, Acemd2, AtomRestraint, GroupRestraint
 from htmd.builder.builder import detectDisulfideBonds, autoSegment, embed, DisulfideBridge
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber

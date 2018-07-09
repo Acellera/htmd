@@ -329,7 +329,7 @@ class TautomerCanonicalizer:
                         score += 150
             # Add SMARTS scores
             for tscore in self.scores:
-                for match in t.GetSubstructMatches(tscore.smarts):
+                for _ in t.GetSubstructMatches(tscore.smarts):
                     logger.debug('Score %+d (%s)', tscore.score, tscore.name)
                     score += tscore.score
             # Add (P,S,Se,Te)-H scores

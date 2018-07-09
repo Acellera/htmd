@@ -987,7 +987,6 @@ if __name__ == '__main__':
     import unittest
     unittest.main()
 
-    from htmd.ui import *
     import doctest
     doctest.testmod()
 
