@@ -1532,6 +1532,12 @@ class TestReaders(TestCase):
         mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
         mol.read(os.path.join(home(dataDir='1kdx'), '1kdx.dcd'))
 
+    def test_dcd_into_prmtop(self):
+        from htmd.home import home
+        mol = Molecule(os.path.join(home(dataDir='molecule-readers'), 'dialanine', 'structure.prmtop'))
+        mol.read(os.path.join(home(dataDir='molecule-readers'), 'dialanine', 'traj.dcd'))
+        assert mol.numFrames == 2
+
     def test_dcd_frames(self):
         from htmd.home import home
         mol = Molecule(os.path.join(home(dataDir='1kdx'), '1kdx_0.pdb'))
