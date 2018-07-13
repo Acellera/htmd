@@ -1,10 +1,9 @@
 from htmd.smallmol.smallmol import SmallMol
 from htmd.smallmol.chemlab.periodictable import PeriodicTable, _halogen_atoms
 from htmd.smallmol.chemlab.builder import Builder
-from htmd.smallmol.util import _ensurenestedlists, _flatnestedlists
+from htmd.smallmol.util import _ensurenestedlists, _flatnestedlists, getAtomDistances
 import numpy as np
 import rdkit
-import os
 from glob import glob
 import copy
 from itertools import combinations
@@ -94,27 +93,36 @@ class MoietyRecognition:
 
         #print(atoms_lasting)
     # merge all connected moieties (important for amide, esther and so on)
-
         self.moieties = self._mergeConnectedMoieties(moietiesIdentified, mode)
 
-        if classify:
-            self._classifyMoieities()
 
-    def _classifyMoieities(self):
+        self._classifyMoieities(classify)
+
+
+    def _classifyMoieities(self, classify=False):
 
         sm = self.smallmol
 
-        sm.setProp('moieties', self.moieties)
         mois = np.ones(sm.numAtoms, dtype=int) * -1
 
-        print(self.moieties)
-        for n, moi in enumerate(self.moieties):
-            moi._getMoietyType()
-            print(n, moi.moiType, moi.moiOrder)
-            mois[moi.atoms] = n
+        #print(self.moieties)
+        new_moieties = []
+        for moi in self.moieties:
+            new_moi = moi._getMoietyType(splitMoiety=True)
+            if new_moi is not None:
+                new_moieties.extend(new_moi)
+            #print(n, moi.moiType, moi.moiOrder)
+            #mois[moi.atoms] = n
 
-        sm.setPropsAtoms('moiety', mois)
+        self.moieties.extend(new_moieties)
 
+
+        if classify:
+            for n, moi in enumerate(self.moieties):
+
+                mois[moi.atoms] = n
+            sm.setProp('moieties', self.moieties, overwrite=True)
+            sm.setPropsAtoms('moiety', mois)
 
     def _mergeConnectedMoieties(self, moieties, mode):
 
@@ -124,7 +132,9 @@ class MoietyRecognition:
         tocheckMoieties = []
 
         for moi in moieties:
-            if moi.isring and mode == 'blocks':
+            if moi.isring  and mode == 'blocks':
+                confirmedMoieties.append(moi)
+            if moi.isring and  not moi.isaromatic:
                 confirmedMoieties.append(moi)
             else:
                 tocheckMoieties.append(moi)
@@ -144,16 +154,17 @@ class MoietyRecognition:
                 #print(matched1to2, matched2to1)
 
                 if len(matched1to2) != 0 and len(matched2to1) != 0:
+                    isfragment = True if moi.isring else False
                     #print(moi2.atoms, moi.mergedTo, moi2.mergedTo)
                     if moi.mergedTo is not None:
-                        moi.mergedTo.mergeMoiety(moi2)
+                        moi.mergedTo.mergeMoiety(moi2, isfragment)
                         moi2.mergedTo = moi.mergedTo
                     elif moi2.mergedTo is not None:
-                        moi2.mergedTo.mergeMoiety(moi)
+                        moi2.mergedTo.mergeMoiety(moi, isfragment)
                         moi.mergedTo = moi2.mergedTo
 
                     else:
-                        moi.mergeMoiety(moi2)
+                        moi.mergeMoiety(moi2, isfragment)
                         moi2.mergedTo = moi
                     #tocheckMoieties.remove(moi2)
             if moi.mergedTo is None:
@@ -362,17 +373,43 @@ class Moiety:
         self.atoms = np.unique(sorted(_flatnestedlists(self.fragments)))
         self.links = self._setBreakPoints()
         self.isring = isring
+        self.isaromatic = self._isAromatic(self.atoms)
         self.mergedTo = None
+        self.isNested = False
         self.moiType = None
         self.moiOrder = None
+        self.linksTypes = []
+        self.nestedMoieties = []
+        self.pKa = None
         #self.moismallmol = self._prepareSmallMol()
         #self._setBreakPoints(self.parentsmallmol, self.moismallmol)
 
-    def getMoiSmallmol(self, includeLinks=False):
+    def _isAromatic(self, atoms):
+        if not self.isring:
+            return False
+
+        aromatics = self.parentsmallmol.isaromatic[atoms]
+        if sum(aromatics) == len(atoms):
+            return True
+        return False
+
+    def getMoiSmallmol(self, includeLinks=False, dropAtoms=None, keepAtoms=None):
 
         parentsmallmol = self.parentsmallmol
         fragments = self.fragments
-        atoms = self.atoms if not includeLinks else self.atoms.tolist() + self.links
+
+        atoms = self.atoms
+        if includeLinks:
+            atoms = self.atoms.tolist() + self.links
+        if dropAtoms is not None:
+            atoms = [a for a in atoms if a not in dropAtoms]
+        if keepAtoms is not None:
+            atoms = [a for a in atoms if a in keepAtoms]
+        # if dropLinks is not None:
+        #     keep = [a for a in self.links if a not in dropLinks]
+        #     atoms = self.atoms.tolist() + keep
+        # elif keepLinks is not None:
+        #     atoms = self.atoms.tolist() + keepLinks
 
         atoms_string = " ".join([str(a) for a in atoms])
         atomsToRemove = parentsmallmol.get('idx', 'idx {}'.format(atoms_string), invert=True)
@@ -401,9 +438,12 @@ class Moiety:
         nitrogensWithHydrogen = np.where(self.atoms == nonAromaticBonded[0])[0]
 
         for n in nitrogensWithHydrogen:
-            atom = [na for na in parentsmallmol.neighbors[atoms[n]] if na not in atoms][0]
+            try:
+                atom = [na for na in parentsmallmol.neighbors[atoms[n]] if na not in atoms][0]
+            except:
+                continue
             element = parentsmallmol.element[atom]
-            self.atoms = np.append(atoms, atom)
+            #self.atoms = np.append(atoms, atom)
             a = pT.getAtom(element, n)
             builder._addAtoms([a])
 
@@ -431,11 +471,12 @@ class Moiety:
         pT = PeriodicTable()
         parentsmallmol = self.parentsmallmol
         # sm = self.getMoiSmallmol()
+
         atoms = self.atoms.tolist()
         links = self.links
         elements = parentsmallmol.element[atoms] if not showLinks else parentsmallmol.element[atoms + links]
-        indexes = parentsmallmol.idx[atoms] if not showLinks else parentsmallmol.element[atoms + links]
-        formalcharges = parentsmallmol.formalcharge[atoms] if not showLinks else parentsmallmol.element[atoms + links]
+        indexes = parentsmallmol.idx[atoms] if not showLinks else parentsmallmol.idx[atoms + links]
+        formalcharges = parentsmallmol.formalcharge[atoms] if not showLinks else parentsmallmol.formalcharge[atoms + links]
         if showLinks:
             sm = self.getMoiSmallmol(includeLinks=True)
 
@@ -472,18 +513,72 @@ class Moiety:
 
         return atomName_Label
 
-    def mergeMoiety(self, moi):
+    def mergeMoiety(self, moi, isFragment=False):
 
         atoms = self.atoms
         links = self.links
+        moiatoms = moi.atoms
+        moilinks = moi.links
 
-        common_links = list(set(moi.links) & set(links))
-        newAtoms = _flatnestedlists([moi.atoms, atoms, common_links])
+        common_links = list(set(moilinks) & set(links))
+        newAtoms = _flatnestedlists([moiatoms, atoms, common_links])
 
+        atoms = np.unique(sorted(newAtoms))
+        if isFragment:
+            #self.fragments = _ensurenestedlists(self.atoms) +   _ensurenestedlists(moiatoms )
+            self.fragments = _ensurenestedlists(self.fragments) + _ensurenestedlists(moiatoms.tolist())
+        else:
+            self.fragments = _ensurenestedlists(atoms)
+        self.atoms = atoms
 
-        self.atoms = np.unique(sorted(newAtoms))
-        self.fragments = _ensurenestedlists(self.atoms)
         self.links = self._setBreakPoints()
+
+    def splitMoiety(self, atoms):
+
+
+        fragmentsToSplit = []
+        newMois = []
+        for fr in self.fragments:
+            isToSplit = False if sum([ True for afr in fr if afr in atoms ]) == 0 else True
+            if isToSplit:
+                fragmentsToSplit.append(fr)
+                self.atoms = np.array([a for a in self.atoms if a not in fr])
+                newMois.append(Moiety(self.parentsmallmol, fr))
+
+        self.fragments = [fr for fr in self.fragments if fr not in fragmentsToSplit]
+
+        return newMois
+
+    def addNestedMoiety(self, fragmentatoms):
+
+        moi = Moiety(self.parentsmallmol, fragmentatoms, self.isring)
+
+        sm = moi.getMoiSmallmol(includeLinks=True)
+        moi._getMoietyType(forceNotRing=True)
+        moi.moiOrder = moi._getMoietyOrder(sm, moi.moiType)
+        moi.linksTypes = moi._getLinksType()
+        moi.isNested = True
+        self.nestedMoieties.append(moi)
+
+    def _getLinksType(self):
+        atoms = self.atoms
+        links = self.links
+        sm = self.parentsmallmol
+
+        #print('inspecting Links Types. for  {}: . . .  {}'.format(atoms, links))
+        linksTypes = []
+        for a in links:
+            if sm.element[a] != 'C':
+                linksTypes.append('R')
+                continue
+            oAtoms = [ nbr for nbr in sm.neighbors[a] if nbr not in atoms]
+            hs = [ True for oa in oAtoms if sm.element[oa] == 'H']
+            if sum(hs) == 3:
+                linksTypes.append('CH3')
+            else:
+                linksTypes.append('R')
+        return linksTypes
+
 
     def _getMoietyOrder(self, moismallmol, moiType):
 
@@ -504,10 +599,128 @@ class Moiety:
         order = sum([ 1 for nbr in nbrs if nbr != 'H' ])
         return  order
 
-    def _getMoietyType(self):
+    def _getRingMoietyType(self, sm):
+        moiType = None
+
+        atoms = self.atoms
+        n_atoms = len(atoms)
+        elements = self.parentsmallmol.element[atoms]
+
+        fragments = self.fragments
+
+        #print("Fragments: ", fragments)
+
+        #rmol = sm.toRdkitMol()
+
+        possible_comb = []
+        possible_comb_size = []
+        for n_elem in range(1, len(fragments) + 1):
+            combs = list(combinations(fragments, n_elem))
+            combs = [np.unique(np.concatenate(c)).tolist() for c in combs]
+            for c in combs:
+                if len(c) >=3:
+                    possible_comb.append(c)
+                    possible_comb_size.append(len(c))
+
+        possible_comb_sorted = [ c for _,c in sorted(zip(possible_comb_size, possible_comb), reverse=True) ]
+
+        #print(possible_comb_sorted)
+        moiTypes_found = []
+        atom_assigned = []
+        for c in possible_comb_sorted:
+            if sum([True for a in c if a in atom_assigned]) == len(c):
+                continue
+            n_atoms = len(c)
+            #print(c, n_atoms)
+            try:
+                list_moieties = moiTypes['ring']['{}atoms'.format(n_atoms)]
+            except:
+                list_moieties = []
+            #print("For comb ", c , " ({}) ".format(n_atoms), ' found: ', list_moieties)
+            if len(list_moieties) == 0:
+                continue
+            rmol = self.getMoiSmallmol(keepAtoms=c).toRdkitMol()
+            for k, v in list_moieties.items():
+                #print(k)
+                refmol = rdkit.Chem.MolFromSmarts(v)
+                #print(rmol, rdkit.Chem.MolToSmarts(rmol))
+                #print(rdkit.Chem.MolToSmarts(refmol))
+                match = rmol.HasSubstructMatch(refmol)
+                #print(k, match)
+                if match:
+                    #print(k)
+                    moiTypes_found.append(k)
+                    atom_assigned.extend(c)
+                    found = True
+                    #print(atom_assigned, self.atoms)
+                    if len(atom_assigned) == len(self.atoms):
+                        #print('finito')
+                        break
+            if len(atom_assigned) == len(self.atoms):
+                #print('finito')
+                break
+        moiType = "-".join(moiTypes_found)
+
+        missAssigned = [a for a in self.atoms if a not in atom_assigned]
+
+        if len(missAssigned) == len(self.atoms):
+            return None, []
+        return moiType, missAssigned
+
+    def _getNotRingMoietyType(self, sm, fragmentAtoms=None):
+        moiType = None
+
+        atoms = self.atoms if fragmentAtoms is None else fragmentAtoms
+        n_atoms = len(atoms)
+        elements = self.parentsmallmol.element[atoms]
+
+        rmol = sm.toRdkitMol()
+
+        #print(n_atoms, atoms, self.fragments)
+
+        if n_atoms == 1:
+            elements = [el for el in elements.tolist()]
+        else:
+            elements = [el for el in elements.tolist() if el not in _halogen_atoms]
+        elementsString = "".join(sorted(elements))
+        # print("atoms: ", elementsString)
+        # print(moiTypes[maintype])
+        try:
+            list_moieties = moiTypes['notring']['{}atoms'.format(n_atoms)][elementsString]
+        except:
+            return None
+        # print("moieties ", list_moieties)
+
+        for mt, s in list_moieties.items():
+            match = rmol.HasSubstructMatch(rdkit.Chem.MolFromSmarts(s))
+            if match:
+                moiType = mt
+                break
+
+        return moiType
+
+    def _getMoietyType(self, splitMoiety=False, forceNotRing=False):
+
+        sm = self.getMoiSmallmol(includeLinks=True)
+        if self.isring and  not forceNotRing:
+            moiType, missAssignedAtoms = self._getRingMoietyType(sm)
+            #moiTypeNotRing = [ (self._getNotRingMoietyType(sm, fr), self._getSubPosition( self.parentsmallmol, fragmentRing, fr) ) for fr in fragmentsNotRing ]
+            #print(">>> ", moiTypeNotRing)
+            #print(moiType, missAssignedAtoms)
+            self.moiType = moiType
+            if splitMoiety and len(missAssignedAtoms) != 0:
+                return self.splitMoiety(missAssignedAtoms)
+        else:
+            moiType = self._getNotRingMoietyType(sm)
+
+        self.moiType = moiType
+        self.moiOrder = self._getMoietyOrder(sm, moiType)
+        self.linksTypes = self._getLinksType()
+
+        return
 
         atoms = self.atoms.tolist()
-        maintype = 'ring' if self.isring else 'notring'
+
         n_atoms = len(atoms)
         elements = self.parentsmallmol.element[atoms]
 
@@ -517,7 +730,10 @@ class Moiety:
         moiType = None
         moiOrder = None
         try:
-            elements = [ el for el in elements.tolist() if el  not in _halogen_atoms ]
+            if n_atoms == 1:
+                elements = [el for el in elements.tolist()]
+            else:
+                elements = [ el for el in elements.tolist() if el  not in _halogen_atoms ]
             elementsString= "".join(sorted(elements))
             #print("atoms: ", elementsString)
             #print(moiTypes[maintype])

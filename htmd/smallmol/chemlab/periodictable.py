@@ -45,6 +45,7 @@ _atoms = {'H': ['H', 0, 0, '', 1, 1],
           'Du': ['*', 0, 0, '', 1, 1]
           }
 
+_atoms_positions = ['0', 'α', 'β', 'γ', 'δ', 'ε', 'ζ']
 
 class PeriodicTable:
     """
@@ -184,6 +185,22 @@ class PeriodicTable:
             atom_data.update({'attachTo': ''})
 
         return atom_data
+
+    def converDistanceToPosition(self, smallmol, distance, path, weightbonds=False):
+
+        position = distance - 1
+        if weightbonds:
+            double_triple_bonds = []
+            for i in range(len(path)-1):
+                a = path[i]
+                n = path[i+1]
+                nbr_idx = smallmol.neighbors[a].index(n)
+                btype = smallmol.bondtypes[a][nbr_idx]
+                if btype in [2, 3]:
+                    double_triple_bonds.append(1)
+            position = position - sum(double_triple_bonds)
+
+        return position
 
     def isHeteroAtom(self, element):
         match = np.where(_hetero_atoms == element)[0]

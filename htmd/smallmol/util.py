@@ -56,6 +56,67 @@ def calculateAngle(atomcentercoords, atom1coords, atom2coords, deg=False):
     return round(theta,2)
 
 
+def getAtomDistances(sm, a1, as2, mode='all', returnPath=False):  # bellman-ford
+    # mode all or min or max
+
+    # TODO return all smallest path and not only one. This can roughly affect symmetric ring substitued
+    predecessors = np.ones(sm.numAtoms, dtype=int) * -1
+    predecessors[a1] = -2
+    predecessors[as2] = -3
+
+    # opens = np.zeros(sm.numAtoms)
+    # opens[a1] = 1
+    #distances = np.ones(sm.numAtoms) * 100000
+
+    found = 0
+    done = False
+    #curAtId = a1
+    list_toCheck = [a1]
+    while done == False:
+        curAtId = list_toCheck.pop(0)
+        #print(curAtId)
+        nbrs = sm.neighbors[curAtId]
+        list_toCheck.extend(nbrs)
+        for nbr in nbrs:
+            if found == len(as2):
+                done = True
+            if predecessors[nbr] == -3:
+                predecessors[nbr] = curAtId
+                found += 1
+            elif predecessors[nbr] == -2 or predecessors[nbr] != -1:
+                continue
+            else:
+                predecessors[nbr] = curAtId
+        #curAtId += 1
+    paths = []
+
+    for a in as2:
+        done = False
+        prev = predecessors[a]
+        path = [a, prev]
+
+        while done == False:
+            prev = predecessors[prev]
+            if prev == -2:
+                done = True
+            else:
+                path.append(prev)
+        paths.append(list(reversed(path)))
+    # print(paths)
+    lengths = [len(p) - 1 for p in paths]
+
+    if mode == 'all':
+        if returnPath:
+            return lengths, paths
+        return lengths
+    else:
+
+        length = min(lengths) if mode == 'min' else max(lengths)
+        if returnPath:
+            return length, paths[lengths.index(length)]
+
+        return length
+
 def get_rotationMatrix(axis, theta):
     """ Generates a rotation matrix given an axis and radians
     Return the rotation matrix associated with counterclockwise rotation about
