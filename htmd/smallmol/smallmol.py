@@ -1805,7 +1805,7 @@ class SmallMolLib(object):
         records = []
         indexes = []
         for i, m in enumerate(self._mols):
-            row = dict((f, m.getProp(f)) for f in fields)
+            row = dict((f, m.__dict__[f]) for f in fields)
             if sketch:
                 mm = deepcopy(m._mol)
                 Compute2DCoords(mm)
