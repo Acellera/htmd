@@ -48,7 +48,10 @@ for p in packages:
     if name in depnames:
         dep = next(dep for dep in deps if dep['name'] == name)
         if 'version' not in dep:
-            text += '    - {} >={}\n'.format(name, p['version'])
+            if name != 'htmd-data':
+                text += '    - {} >={}\n'.format(name, p['version'])
+            else:
+                text += '    - {} =={}\n'.format(name, p['version'])
         else:
             text += '    - {} {}\n'.format(name, dep['version'])
         found[name] = True

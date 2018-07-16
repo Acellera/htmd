@@ -117,12 +117,20 @@ def checkTruncations(mol):
 
 
 def PDBwrite(mol, filename, frames=None, writebonds=True):
-    if frames is None:
+    if frames is None and mol.numFrames != 0:
         frames = mol.frame
+    else:
+        frames = 0
     frames = ensurelist(frames)
 
     checkTruncations(mol)
-    coords = np.atleast_3d(mol.coords[:, :, frames])
+    if mol.numFrames != 0:
+        coords = np.atleast_3d(mol.coords[:, :, frames])
+        box = mol.box[:, frames[0]]
+    else:  # If Molecule only contains topology, PDB requires some coordinates so give it zeros
+        coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
+        box = None
+
     numFrames = coords.shape[2]
     nAtoms = coords.shape[0]
 
@@ -139,7 +147,7 @@ def PDBwrite(mol, filename, frames=None, writebonds=True):
             raise RuntimeError('Cannot write PDB beta/temperature with values smaller than -1E5 or larger than 1E6')
 
     fh = open(filename, 'w')
-    box = mol.box[:, frames[0]]
+
     if box is not None and not np.all(mol.box == 0):
         fh.write("CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1 \n" % (box[0], box[1], box[2], 90, 90, 90))
 

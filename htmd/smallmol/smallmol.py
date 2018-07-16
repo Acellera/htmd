@@ -1994,4 +1994,4 @@ if __name__ == '__main__':
     sm = SmallMol(os.path.join(home(dataDir='test-smallmol'), 'benzamidine.mol2'))
     lib = SmallMolLib(os.path.join(home(dataDir='test-smallmol'), 'fda_drugs_light.sdf'))
     doctest.testmod(extraglobs={'lib': lib.copy(), 'sm': sm.copy()})
-    pass
+

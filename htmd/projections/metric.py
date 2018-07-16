@@ -5,8 +5,6 @@
 # No redistribution in whole or part
 #
 import numpy as np
-import abc
-from abc import ABCMeta
 from htmd.molecule.molecule import Molecule
 from htmd.metricdata import MetricData
 from scipy import stats

@@ -253,7 +253,7 @@ if __name__ == '__main__':
     def getLongContacts(crystal, long=8):
         crystalMap = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).getMapping(
             crystal)
-        indexes = np.vstack(crystalMap.atomIndexes.as_matrix())
+        indexes = np.vstack(crystalMap.atomIndexes.values)
         return crystal.resid[indexes[:, 1]] - crystal.resid[indexes[:, 0]] > long
 
     def getCrystalSS(crystal):
