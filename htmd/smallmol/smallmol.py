@@ -9,7 +9,7 @@ import multiprocessing
 import math
 import numpy as np
 from rdkit import Chem
-from htmd.smallmol.util import get_rotationMatrix, rotate, openbabelConvert, _depictMol, depictMultipleMols
+from htmd.smallmol.util import get_rotationMatrix, rotate, openbabelConvert, _depictMol, depictMultipleMols, convertToString
 from htmd.smallmol.chemlab.periodictable import _hybridizations_IdxToType, _bondtypes_IdxToType,  _hybridizations_StringToType, _bondtypes_StringToType
 import logging
 logger = logging.getLogger(__name__)
@@ -160,7 +160,7 @@ class SmallMol(object):
         fields: list
             The list of properties
         """
-        _fields = list(self.mol_fields)
+        _fields = [f for f in list(self.mol_fields) if not f.startswith('_')]
         return _fields
 
     @property
@@ -173,7 +173,7 @@ class SmallMol(object):
         fields: list
             The list of properties
         """
-        _fields = list(self.atom_fields)
+        _fields = [f for f in list(self.atom_fields) if not f.startswith('_')]
         return _fields
 
     @property
@@ -502,7 +502,8 @@ class SmallMol(object):
         array([<rdkit.Chem.rdchem.Atom object at 0x7faf616dd120>,
                <rdkit.Chem.rdchem.Atom object at 0x7faf616dd170>], dtype=object)
         """
-
+        if sel == 'all':
+            sel = 'idx {}'.format(convertToString(self.idx.tolist()))
         # get the field key and the value to grep
         key = sel.split()[0]
         selector = sel.split()[1:]
@@ -1804,7 +1805,7 @@ class SmallMolLib(object):
         records = []
         indexes = []
         for i, m in enumerate(self._mols):
-            row = dict((f, m.getProp(f)) for f in fields)
+            row = dict((f, m.__dict__[f]) for f in fields)
             if sketch:
                 mm = deepcopy(m._mol)
                 Compute2DCoords(mm)
