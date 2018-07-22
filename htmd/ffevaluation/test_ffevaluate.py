@@ -60,22 +60,6 @@ def openmm_energy(prm, structure, coords, box=None, cutoff=None):
     return energies, forces
 
 
-def drawForce(start, vec):
-    assert start.ndim == 1 and vec.ndim == 1
-    from htmd.vmdviewer import getCurrentViewer
-    vmd = getCurrentViewer()
-    vmd.send("""
-    proc vmd_draw_arrow {start end} {
-        # an arrow is made of a cylinder and a cone
-        draw color green
-        set middle [vecadd $start [vecscale 0.9 [vecsub $end $start]]]
-        graphics top cylinder $start $middle radius 0.15
-        graphics top cone $middle $end radius 0.25
-    }
-    """)
-    vmd.send('vmd_draw_arrow {{ {} }} {{ {} }}'.format(' '.join(map(str, start)), ' '.join(map(str, start + vec))))
-
-
 def keepForces(prm, psf, mol, forces=('angle', 'bond', 'dihedral', 'lennardjones', 'electrostatic'), verbose=False):
     from collections import OrderedDict
     if 'angle' not in forces:
@@ -182,17 +166,6 @@ def compareForces(forces1, forces2):
     return np.max(np.abs(forces1 - forces2).flatten())
 
 
-def viewForces(mol, forces, omm_forces=None):
-    mol.view()
-    for cc, ff in zip(mol.coords[:, :, 0], forces):
-        drawForce(cc, ff)
-
-    if omm_forces is not None:
-        mol.view()
-        for cc, ff in zip(mol.coords[:, :, 0], omm_forces):
-            drawForce(cc, ff)
-
-
 def fixParameters(parameterfile):
     from htmd.util import tempname
     tmpfile = tempname(suffix='.prm')
@@ -292,8 +265,6 @@ if __name__ == '__main__':
         omm_energies, omm_forces = openmm_energy(prm, struct, coords, box=mol.box, cutoff=cutoff)
         ediff = compareEnergies(energies, omm_energies, abstol=abstol)
         print('All forces. Total energy:', energies['total'], 'Energy diff:', ediff, 'Force diff:', compareForces(forces, omm_forces))
-
-        # viewForces(mol, forces, omm_forces)
 
 
 

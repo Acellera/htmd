@@ -13,6 +13,8 @@ from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
+print('ffevaluate module is in beta version')
+
 
 def loadParameters(fname):
     """ Convenience method for reading parameter files with parmed
@@ -754,3 +756,30 @@ def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
     force[3, :] -= force4
 
     return pot, force
+
+
+def drawForce(start, vec):
+    assert start.ndim == 1 and vec.ndim == 1
+    from htmd.vmdviewer import getCurrentViewer
+    vmd = getCurrentViewer()
+    vmd.send("""
+    proc vmd_draw_arrow {start end} {
+        # an arrow is made of a cylinder and a cone
+        draw color green
+        set middle [vecadd $start [vecscale 0.9 [vecsub $end $start]]]
+        graphics top cylinder $start $middle radius 0.15
+        graphics top cone $middle $end radius 0.25
+    }
+    """)
+    vmd.send('vmd_draw_arrow {{ {} }} {{ {} }}'.format(' '.join(map(str, start)), ' '.join(map(str, start + vec))))
+
+
+def viewForces(mol, forces, omm_forces=None):
+    mol.view()
+    for cc, ff in zip(mol.coords[:, :, 0], forces):
+        drawForce(cc, ff)
+
+    if omm_forces is not None:
+        mol.view()
+        for cc, ff in zip(mol.coords[:, :, 0], omm_forces):
+            drawForce(cc, ff)
