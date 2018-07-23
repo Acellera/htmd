@@ -459,7 +459,7 @@ class Molecule:
         # raise NameError('Reference molecule has to be a Molecule object')
         sel = self.atomselect(sel, indexes=True)
         refsel = refmol.atomselect(refsel, indexes=True)
-        if (type(sel[0]) == bool) and (np.sum(sel) != np.sum(refsel)):
+        if sel.size != refsel.size:
             raise NameError('Cannot align molecules. The two selections produced different number of atoms')
         self.coords = _pp_align(self.coords, refmol.coords, np.array(sel, dtype=np.int64),
                                 np.array(refsel, dtype=np.int64), frames, refmol.frame)
