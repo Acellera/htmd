@@ -262,6 +262,12 @@ def init(mol, prm):
     # if len(dihedrals) == 0:
     #     logger.warning('No dihedrals are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
 
+    if prm.urey_bradley_types:
+        for type in prm.urey_bradley_types:
+            if prm.urey_bradley_types[type].k != 0:
+                logger.warning('Urey-Bradley types found in the parameters but are not implemented in FFEvaluate and will be ignored!')
+                break
+
     uqtypes, typeint = np.unique(mol.atomtype, return_inverse=True)
     sigma = np.zeros(len(uqtypes), dtype=np.float32)
     sigma14 = np.zeros(len(uqtypes), dtype=np.float32)
