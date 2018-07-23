@@ -5,6 +5,8 @@
 #
 import networkx as nx
 import numpy as np
+from unittest import TestCase
+import os
 
 
 def createProductGraph(G, H, tolerance, fields):
@@ -121,8 +123,8 @@ def maximalSubstructureAlignment(mol1, mol2, sel1='all', sel2='all', fields=('el
 
     _, _, matching = compareGraphs(g1, g2, fields=fields, tolerance=tolerance, returnmatching=True)
 
-    matchnodes1 = [x[0] for x in matching]
-    matchnodes2 = [x[1] for x in matching]
+    matchnodes1 = np.array([x[0] for x in matching])
+    matchnodes2 = np.array([x[1] for x in matching])
 
     mol2.align(sel=matchnodes2, refmol=mol1, refsel=matchnodes1)
 
@@ -134,3 +136,29 @@ def maximalSubstructureAlignment(mol1, mol2, sel1='all', sel2='all', fields=('el
         mol2.view(sel='all', style='Lines')
 
     return mol2
+
+
+class TestGraphAlignment(TestCase):
+    def test_maximalSubstructureAlignment(self):
+        from htmd.home import home
+        from htmd.molecule.molecule import Molecule
+
+        ref_lig = Molecule('2Y02')
+        ref_lig.filter('resname WHJ')
+        ref_lig.filter('residue 1')
+
+        lig2align = Molecule('2Y03')
+        lig2align.filter('resname 5FW')
+        lig2align.filter('residue 0')
+
+        lig_aligned = maximalSubstructureAlignment(ref_lig, lig2align)
+
+        lig_reference = Molecule(os.path.join(home(dataDir='test-molecule-graphalignment'), 'lig_aligned.pdb'))
+
+        self.assertTrue(np.allclose(lig_aligned.coords, lig_reference.coords, rtol=1e-4),
+                        'maximalSubstructureAlignment produced different coords')
+
+if __name__ == "__main__":
+    import unittest
+
+    unittest.main(verbosity=2)
