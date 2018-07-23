@@ -311,7 +311,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         os.chdir(outdir)
         f = open(logpath, 'w')
         #call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
-        call([psfgen, './build.vmd'], stdout=f)
+        my_env = os.environ.copy()
+        my_env['LC_ALL'] = 'C'
+        call([psfgen, './build.vmd'], stdout=f, stderr=f, env=my_env)
         f.close()
         errors = _logParser(logpath)
         os.chdir(currdir)
