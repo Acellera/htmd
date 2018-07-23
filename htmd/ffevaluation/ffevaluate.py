@@ -13,6 +13,8 @@ from htmd.decorators import _Deprecated
 
 logger = logging.getLogger(__name__)
 
+print('ffevaluate module is in beta version')
+
 
 def loadParameters(fname):
     """ Convenience method for reading parameter files with parmed
@@ -259,6 +261,12 @@ def init(mol, prm):
     #     logger.warning('No angles are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
     # if len(dihedrals) == 0:
     #     logger.warning('No dihedrals are defined in the input molecule. Check if this is correct. If not, use guessAnglesAndDihedrals.')
+
+    if prm.urey_bradley_types:
+        for type in prm.urey_bradley_types:
+            if prm.urey_bradley_types[type].k != 0:
+                logger.warning('Urey-Bradley types found in the parameters but are not implemented in FFEvaluate and will be ignored!')
+                break
 
     uqtypes, typeint = np.unique(mol.atomtype, return_inverse=True)
     sigma = np.zeros(len(uqtypes), dtype=np.float32)
@@ -754,3 +762,36 @@ def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
     force[3, :] -= force4
 
     return pot, force
+
+
+def _drawForce(start, vec):
+    assert start.ndim == 1 and vec.ndim == 1
+    from htmd.vmdviewer import getCurrentViewer
+    vmd = getCurrentViewer()
+    vmd.send("""
+    proc vmd_draw_arrow {start end} {
+        # an arrow is made of a cylinder and a cone
+        draw color green
+        set middle [vecadd $start [vecscale 0.9 [vecsub $end $start]]]
+        graphics top cylinder $start $middle radius 0.15
+        graphics top cone $middle $end radius 0.25
+    }
+    """)
+    vmd.send('vmd_draw_arrow {{ {} }} {{ {} }}'.format(' '.join(map(str, start)), ' '.join(map(str, start + vec))))
+
+
+def viewForces(mol, forces, frame=0):
+    """ Visualize force vectors in VMD
+
+    Parameters
+    ----------
+    mol : Molecule
+        The Molecule with the coordinates on which to visualize the forces
+    forces : np.ndarray
+        The force array produced by FFEvaluate
+    frame : int
+        The coordinate frame for which to show the forces and coordinates
+    """
+    mol.view()
+    for cc, ff in zip(mol.coords[:, :, frame], forces[:, :, frame]):
+        _drawForce(cc, ff)
