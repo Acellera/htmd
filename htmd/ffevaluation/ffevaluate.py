@@ -764,7 +764,7 @@ def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
     return pot, force
 
 
-def drawForce(start, vec):
+def _drawForce(start, vec):
     assert start.ndim == 1 and vec.ndim == 1
     from htmd.vmdviewer import getCurrentViewer
     vmd = getCurrentViewer()
@@ -780,12 +780,18 @@ def drawForce(start, vec):
     vmd.send('vmd_draw_arrow {{ {} }} {{ {} }}'.format(' '.join(map(str, start)), ' '.join(map(str, start + vec))))
 
 
-def viewForces(mol, forces, omm_forces=None):
-    mol.view()
-    for cc, ff in zip(mol.coords[:, :, 0], forces):
-        drawForce(cc, ff)
+def viewForces(mol, forces, frame=0):
+    """ Visualize force vectors in VMD
 
-    if omm_forces is not None:
-        mol.view()
-        for cc, ff in zip(mol.coords[:, :, 0], omm_forces):
-            drawForce(cc, ff)
+    Parameters
+    ----------
+    mol : Molecule
+        The Molecule with the coordinates on which to visualize the forces
+    forces : np.ndarray
+        The force array produced by FFEvaluate
+    frame : int
+        The coordinate frame for which to show the forces and coordinates
+    """
+    mol.view()
+    for cc, ff in zip(mol.coords[:, :, frame], forces[:, :, frame]):
+        _drawForce(cc, ff)
