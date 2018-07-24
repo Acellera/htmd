@@ -365,7 +365,7 @@ class Molecule:
         Parameters
         ----------
         field : str
-            The PDB field we want to get
+            The field we want to get. To see a list of all available fields do `print(Molecule._atom_and_coord_fields)`.
         sel : str
             Atom selection string for which atoms we want to get the field from. Default all.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
@@ -404,7 +404,7 @@ class Molecule:
         Parameters
         ----------
         field : str
-            The field of the Molecule to set
+            The field we want to set. To see a list of all available fields do `print(Molecule._atom_and_coord_fields)`.
         value : string or integer
             All atoms that match the atom selection will have the PDB field `field` set to this scalar value
             (or 3-vector if setting the coordinates)
