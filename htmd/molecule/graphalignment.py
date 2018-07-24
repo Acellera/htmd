@@ -143,17 +143,11 @@ class TestGraphAlignment(TestCase):
         from htmd.home import home
         from htmd.molecule.molecule import Molecule
 
-        ref_lig = Molecule('2Y02')
-        ref_lig.filter('resname WHJ')
-        ref_lig.filter('residue 1')
-
-        lig2align = Molecule('2Y03')
-        lig2align.filter('resname 5FW')
-        lig2align.filter('residue 0')
-
+        path = home(dataDir='test-molecule-graphalignment')
+        ref_lig = Molecule(os.path.join(path, 'ref_lig.pdb'))
+        lig2align = Molecule(os.path.join(path, 'lig2align.pdb'))
         lig_aligned = maximalSubstructureAlignment(ref_lig, lig2align)
-
-        lig_reference = Molecule(os.path.join(home(dataDir='test-molecule-graphalignment'), 'lig_aligned.pdb'))
+        lig_reference = Molecule(os.path.join(path, 'lig_aligned.pdb'))
 
         self.assertTrue(np.allclose(lig_aligned.coords, lig_reference.coords, rtol=1e-4),
                         'maximalSubstructureAlignment produced different coords')
