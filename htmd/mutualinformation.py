@@ -212,7 +212,7 @@ class MutualInformation:
         pd = pd.DataFrame(intermed, columns=['source', 'target', 'weight'])
         pd[['source', 'target']] = pd[['source', 'target']].astype(type('int', (int,), {}))
         pd['weight'] = pd['weight'].astype(type('float', (float,), {}))
-        G = nx.from_pandas_dataframe(pd, 'source', 'target', ['weight'])
+        G = nx.from_pandas_edgelist(pd, 'source', 'target', 'weight')
         ## setSegment
         segids = self.mol.get('segid', 'name CA')
         seg_res_dict = {key: value for (key, value) in zip(self.resids, segids) if
