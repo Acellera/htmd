@@ -150,7 +150,7 @@ class SimQueue(ABC):
             except:
                 logger.warning('Could not remove {} sentinel from {}'.format(self._sentinel, d))
             else:
-                logger.info('Removed existing {} sentinel from {}'.format(self._sentinel, d))
+                logger.debug('Removed existing {} sentinel from {}'.format(self._sentinel, d))
 
     def _getRunScript(self, d):
         import os
