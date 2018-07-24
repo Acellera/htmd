@@ -4,10 +4,24 @@
 # No redistribution in whole or part
 #
 import numpy as np
-from htmd.membranebuilder.wrappingdist import wrapping_dist_numba
+from numba import jit
+
+@jit('void(f8[:,:], f8[:,:], f8[:,:], f8[:])', nopython=True, target='cpu')
+def _wrapping_dist_numba(X, Y, D, box):
+    numX = X.shape[0]
+    numY = Y.shape[0]
+    numDim = X.shape[1]
+    for i in range(numX):
+        for j in range(numY):
+            d = 0.0
+            for k in range(numDim):
+                dist = X[i, k] - Y[j, k]
+                tmp = dist - box[k] * round(dist / box[k])
+                d += tmp * tmp
+            D[i, j] = np.sqrt(d)
 
 
-def totalContacts(x, *args):
+def _totalContacts(x, *args):
     from htmd.rotationmatrix import rotationMatrix
     lipids = args[0]
     headnames = args[1]
@@ -39,13 +53,13 @@ def totalContacts(x, *args):
             continue
         neighcoor = np.vstack(allcoords[neighbours[i]])
         dists = np.zeros((allcoords[i].shape[0], neighcoor.shape[0]))
-        wrapping_dist_numba(allcoords[i], neighcoor, dists, np.array(box, dtype=float))
+        _wrapping_dist_numba(allcoords[i], neighcoor, dists, np.array(box, dtype=float))
         numcontacts += np.count_nonzero(dists < thresh)
 
     return numcontacts
 
 
-class RandomDisplacementBounds(object):
+class _RandomDisplacementBounds(object):
     """random displacement with bounds"""
 
     def __init__(self, bounds, stepsizes):
@@ -78,10 +92,10 @@ def minimize(lipids, box, stepxy=0.5, steprot=50, contactthresh=2.6):
     stepsizes = np.hstack((stepsizes, np.ones(numlips) * steprot))  # Add the rotations
 
     # define the new step taking routine and pass it to basinhopping
-    take_step = RandomDisplacementBounds(np.vstack(bounds), stepsizes=stepsizes)
+    take_step = _RandomDisplacementBounds(np.vstack(bounds), stepsizes=stepsizes)
     minimizer_kwargs = dict(method="L-BFGS-B", bounds=bounds,
                             args=(lipids, headnames, zpos, contactthresh, neighbours, numlips, box))
-    res = basinhopping(totalContacts, x0, minimizer_kwargs=minimizer_kwargs, disp=True, take_step=take_step, niter=10)
+    res = basinhopping(_totalContacts, x0, minimizer_kwargs=minimizer_kwargs, disp=True, take_step=take_step, niter=10)
     newpos = res.x[:numlips * 2].reshape((-1, 2))
     newrot = res.x[numlips * 2:]
     return newpos, newrot

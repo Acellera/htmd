@@ -7,7 +7,6 @@ import simtk.openmm as mm
 from sys import stdout
 from simtk import unit
 from htmd.molecule.molecule import Molecule
-from htmd.util import tempname
 from simtk.openmm import app
 
 
@@ -45,7 +44,7 @@ defaultCharmmFiles = [
 ]
 
 
-def readCharmmParameters(folder, listfile=None):
+def _readCharmmParameters(folder, listfile=None):
     from glob import glob
     import os
     if listfile is None:
@@ -55,14 +54,14 @@ def readCharmmParameters(folder, listfile=None):
     return app.CharmmParameterSet(*files)
 
 
-def printEnergies(sim, text):
+def _printEnergies(sim, text):
     state = sim.context.getState(getEnergy=True)
     pot = state.getPotentialEnergy()
     kin = state.getKineticEnergy()
     print("{} {} {} {}".format(text, pot + kin, pot, kin))
 
 
-def getPlatform(plat, device):
+def _getPlatform(plat, device):
     platform = mm.Platform.getPlatformByName(plat)
     prop = None
     if plat == 'CUDA':
@@ -80,29 +79,29 @@ def equilibrateSystem(pdbfile, psffile, outpdb, numsteps=30000, minimplatform='C
     pdb = app.PDBFile(pdbfile)
     psf.setBox(celld[0], celld[1], celld[2])
 
-    params = readCharmmParameters(charmmfolder, defaultCharmmFiles)
+    params = _readCharmmParameters(charmmfolder, defaultCharmmFiles)
 
     system = psf.createSystem(params, nonbondedMethod=app.PME,
                               nonbondedCutoff=1*unit.nanometer,
                               constraints=app.HBonds)
     system.addForce(mm.MonteCarloBarostat(1*unit.atmospheres, temp*unit.kelvin, 25))
 
-    platform, prop = getPlatform(minimplatform, device)
+    platform, prop = _getPlatform(minimplatform, device)
     integrator = mm.LangevinIntegrator(temp*unit.kelvin, 1/unit.picosecond, 0.002*unit.picoseconds)
     simulation = app.Simulation(psf.topology, system, integrator, platform, prop)
     simulation.context.setPositions(pdb.positions)
 
     # Perform minimization
-    printEnergies(simulation, 'Energy before minimization')
+    _printEnergies(simulation, 'Energy before minimization')
     simulation.minimizeEnergy(tolerance=minimizetol*unit.kilojoule/unit.mole, maxIterations=minimize)
-    printEnergies(simulation, 'Energy after minimization')
+    _printEnergies(simulation, 'Energy after minimization')
 
     # Copy coordinates from miminization context to equilibration context
     state = simulation.context.getState(getPositions=True)
     pos = state.getPositions()
 
     # Set up the equilibration simulation
-    platform, prop = getPlatform(equilplatform, device)
+    platform, prop = _getPlatform(equilplatform, device)
     integrator = mm.LangevinIntegrator(temp*unit.kelvin, 1/unit.picosecond, 0.002*unit.picoseconds)
     simulation = app.Simulation(psf.topology, system, integrator, platform, prop)
     simulation.context.setPositions(pos)
@@ -111,16 +110,9 @@ def equilibrateSystem(pdbfile, psffile, outpdb, numsteps=30000, minimplatform='C
     simulation.context.setVelocitiesToTemperature(temp)
 
     from htmd.membranebuilder.pdbreporter import PDBReporter
-    from htmd.membranebuilder.dcdreporter import DCDReporter
     simulation.reporters.append(PDBReporter(outpdb, numsteps, enforcePeriodicBox=False))
     simulation.reporters.append(app.StateDataReporter(stdout, int(numsteps/10), step=True,
         potentialEnergy=True, kineticEnergy=True, totalEnergy=True, temperature=True,
         progress=True, speed=True, remainingTime=True, totalSteps=numsteps, separator='\t'))
     simulation.step(numsteps)
-
-    # mol = Molecule(psffile)
-    # mol.read(tmptraj)
-    # mol.frame = mol.numFrames - 1
-    # mol.wrap('not water')
-    # mol.write(outpdb)
 

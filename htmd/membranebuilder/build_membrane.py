@@ -6,7 +6,9 @@
 from htmd.molecule.molecule import Molecule
 from glob import glob
 import numpy as np
-from htmd.membranebuilder.wrappingdist import wrapping_dist_numba, wrapping_dist_python
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Based on: http://onlinelibrary.wiley.com/doi/10.1002/(SICI)1097-0134(199601)24:1%3C92::AID-PROT7%3E3.0.CO;2-Q/epdf
 # Structure, energetics, and dynamics of lipid–protein interactions: A molecular dynamics study
@@ -60,11 +62,12 @@ def listLipids():
     from natsort import natsorted
 
     membranebuilderhome = os.path.join( home(), 'membranebuilder', 'lipids', '' )
-    lipids = natsorted(glob( os.path.join(membranebuilderhome, '*')))
+    lipids = natsorted(glob( os.path.join(membranebuilderhome, '*', '')))
     print('---- Lipids list: ' + membranebuilderhome + ' ----')
     for l in lipids:
-        l = os.path.basename(l)
-        print('- ', l)
+        print('- ', os.path.basename(os.path.abspath(l)))
+    print('* Lipid DB file: ' + os.path.join(membranebuilderhome, 'lipiddb.csv'))
+
 
 
 def _createLipids(lipidratio, area, lipiddb, files, leaflet=None):
@@ -141,13 +144,15 @@ def _detectRings(mol):
     return fivesix
 
 
+def wrapping_dist_python(coor1, coor2, box):
+    assert (coor1.ndim == 1) or (coor2.ndim == 1)
+    dist = coor1 - coor2
+    dist = dist - box * np.round(dist / box)
+    return np.sqrt(np.sum(dist * dist, 1))
+
+
 def _findNeighbours(lipids, box):
     xypos = np.vstack([l.xyz[:2] for l in lipids])
-    # from scipy.spatial.distance import pdist, squareform
-    # dists = pdist(xypos)
-    # dists = np.triu(squareform(dists))  # Only store each neighbour once by zeroing lower triangle
-    # for i in range(len(lipids)):
-    #     lipids[i].neighbours = np.where((dists[i] < 11) & (dists[i] != 0))[0]
 
     for i in range(len(lipids)):
         dist = wrapping_dist_python(xypos[i, :], xypos[i + 1:, :], box)
@@ -199,7 +204,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
     outdir : str
         A folder in which to store the psf and pdb files
     lipidf : str
-        The path to the starting lipid conformations
+        The path to the folder containing the single-lipid PDB structures as well as the lipid DB file
 
     Returns
     -------
@@ -224,7 +229,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
 
     if lipidf is None:
         lipidf = os.path.join(home(), 'membranebuilder', 'lipids')
-    lipiddb = pd.read_csv(os.path.join(home(), 'membranebuilder', 'lipiddb.csv'), index_col='Name')
+    lipiddb = pd.read_csv(os.path.join(lipidf, 'lipiddb.csv'), index_col='Name')
 
     uqlip = np.unique(list(ratioupper.keys()) + list(ratiolower.keys()))
     files = _locateLipidFiles(lipidf, uqlip)
@@ -240,17 +245,14 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
 
     _loadMolecules(lipids, files)
 
-    resolveRingPenetrations(lipids, xysize)
-    memb = _createMembraneMolecule(lipids)
-
     # from globalminimization import minimize
     # newpos, newrot = minimize(lipids, xysize + [100], stepxy=0.5, steprot=50, contactthresh=1)
     # for i in range(len(lipids)):
     #     lipids[i].xyz[:2] = newpos[i]
     #     lipids[i].rot = newrot[i]
-    #
-    # resolveRingPenetrations(lipids, xysize)
-    # endmemb = _createMembraneMolecule(lipids)
+
+    resolveRingPenetrations(lipids, xysize)
+    memb = _createMembraneMolecule(lipids)
 
     minc = memb.get('coords', 'name P').min(axis=0) - 5
     maxc = memb.get('coords', 'name P').max(axis=0) + 5
@@ -264,7 +266,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
 
     if outdir is None:
         outdir = tempname()
-        print('Outdir ', outdir)
+        logger.info('Outdir {}'.format(outdir))
     res = build(smemb, ionize=False, stream=['str/lipid/toppar_all36_lipid_cholesterol_model_1.str'], outdir=outdir)
 
     if equilibrate:
