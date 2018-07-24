@@ -494,11 +494,12 @@ class Molecule:
         frames = np.array(frames)
         # if not isinstance(refmol, Molecule):
         # raise NameError('Reference molecule has to be a Molecule object')
-        sel = self.atomselect(sel)
-        refsel = refmol.atomselect(refsel)
-        if (type(sel[0]) == bool) and (np.sum(sel) != np.sum(refsel)):
+        sel = self.atomselect(sel, indexes=True)
+        refsel = refmol.atomselect(refsel, indexes=True)
+        if sel.size != refsel.size:
             raise NameError('Cannot align molecules. The two selections produced different number of atoms')
-        self.coords = _pp_align(self.coords, refmol.coords, sel, refsel, frames, refmol.frame)
+        self.coords = _pp_align(self.coords, refmol.coords, np.array(sel, dtype=np.int64),
+                                np.array(refsel, dtype=np.int64), frames, refmol.frame)
 
     def alignBySequence(self, ref, molseg=None, refseg=None, nalignfragment=1, returnAlignments=False, maxalignments=1):
         """ Aligns the Molecule to a reference Molecule by their longests sequences alignment
@@ -1815,7 +1816,7 @@ def _pp_measure_fit(P, Q):
     return U, RMSD
 
 
-@jit('float32[:, :, :](float32[:, :, :], float32[:, :, :], boolean[:], boolean[:], int64[:], int64)', nopython=True,
+@jit('float32[:, :, :](float32[:, :, :], float32[:, :, :], int64[:], int64[:], int64[:], int64)', nopython=True,
      nogil=True)
 def _pp_align(coords, refcoords, sel, refsel, frames, refframe):
     newcoords = np.zeros(coords.shape, dtype=coords.dtype)
