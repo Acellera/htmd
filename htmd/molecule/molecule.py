@@ -95,13 +95,58 @@ class Molecule:
 
     Attributes
     ----------
-
-    box : np.ndarray
-        Box dimensions of the simulation.
+    record : np.ndarray
+        The record field of a PDB file if the topology was read from a PDB.
+    serial : np.ndarray
+        The serial number of each atom.
+    name : np.ndarray
+        The name of each atom.
+    altloc : np.ndarray
+        The alternative location flag of the atoms if read from a PDB.
+    resname : np.ndarray
+        The residue name of each atom.
+    chain : np.ndarray
+        The chain name of each atom.
+    resid : np.ndarray
+        The residue ID of each atom.
+    insertion : np.ndarray
+        The insertion flag of the atoms if read from a PDB.
+    occupancy : np.ndarray
+        The occupancy value of each atom if read from a PDB.
+    beta : np.ndarray
+        The beta factor value of each atom if read from a PDB.
+    segid : np.ndarray
+        The segment ID of each atom.
+    element : np.ndarray
+        The element of each atom.
     charge : np.ndarray
-        Charges read from prmtop or psf files.
+        The charge of each atom.
     masses : np.ndarray
-        Masses read from prmtop or psf files.
+        The mass of each atom.
+    atomtype : np.ndarray
+        The atom type of each atom.
+
+    coords : np.ndarray
+        A float32 array with shape (natoms, 3, nframes) containing the coordinates of the Molecule.
+    box : np.ndarray
+        A float32 array with shape (3, nframes) containing the periodic box dimensions of an MD trajectory.
+    boxangles : np.ndarray
+        The angles of the box. If none are set they are assumed to be 90 degrees.
+
+    bonds : np.ndarray
+        Atom pairs corresponding to bond terms.
+    bondtype : np.ndarray
+        The type of each bond in `Molecule.bonds` if available.
+    angles : np.ndarray
+        Atom triplets corresponding to angle terms.
+    dihedrals : np.ndarray
+        Atom quadruplets corresponding to dihedral terms.
+    impropers : np.ndarray
+        Atom quadruplets corresponding to improper dihedral terms.
+
+    crystalinfo : dict
+        A dictionary containing crystallographic information. It has fields ['sGroup', 'numcopies', 'rotations', 'translations']
+
     frame : int
         The current frame. atomselection and get commands will be calculated on this frame.
     fileloc : list
@@ -114,14 +159,6 @@ class Molecule:
         A list of representations that is used when visualizing the molecule
     viewname : str
         The name used for the molecule in the viewer
-    angles : np.ndarray
-        Angle terms, valid only if PSF read and molecule unmodified
-    dihedrals : np.ndarray
-        Dihedral terms, valid only if PSF read and molecule unmodified
-    impropers : np.ndarray
-        Improper terms, valid only if PSF read and molecule unmodified
-    atomtype : np.ndarray
-        Atom types, valid only if PSF read and molecule unmodified
 
     """
     _atom_fields = ('record', 'serial', 'name', 'altloc', 'resname', 'chain', 'resid', 'insertion',
@@ -365,7 +402,7 @@ class Molecule:
         Parameters
         ----------
         field : str
-            The PDB field we want to get
+            The field we want to get. To see a list of all available fields do `print(Molecule._atom_and_coord_fields)`.
         sel : str
             Atom selection string for which atoms we want to get the field from. Default all.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
@@ -404,7 +441,7 @@ class Molecule:
         Parameters
         ----------
         field : str
-            The field of the Molecule to set
+            The field we want to set. To see a list of all available fields do `print(Molecule._atom_and_coord_fields)`.
         value : string or integer
             All atoms that match the atom selection will have the PDB field `field` set to this scalar value
             (or 3-vector if setting the coordinates)
