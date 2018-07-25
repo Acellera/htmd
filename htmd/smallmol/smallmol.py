@@ -25,7 +25,7 @@ class SmallMol(object):
     The fields can be access directly as attributes.
     Atom fields: 'idx', 'atomname', 'charge','formalcharge', 'element',  'chiral', 'hybridization',
                  'neighbors', 'bondtypes', 'coords', '_chiraltags'
-    Molecule fields: 'ligname', 'totalcharge', '_mol'
+    Molecule fields: 'ligname', '_mol'
 
     mol, ignore_errors=False, force_reading=False, fixHs=True, removeHs=False
     Parameters
@@ -61,24 +61,12 @@ class SmallMol(object):
     .. rubric:: Attributes
     .. autoautosummary:: htmd.smallmol.smallmol.SmallMol
        :attributes:
-
-    Attributes
-    ----------
-
-    listProps : list
-        List of the molecule property
-    listPropsAtoms : list
-        List of the atom property
-    numConformers : int
-        Number of confomrmers
-    numAtoms : int
-        Number of atoms
     """
 
     _atom_fields = ['idx', 'atomname', 'charge', 'formalcharge', 'element',  'chiral', 'hybridization',
                     'neighbors', 'bondtypes', 'coords', '_chiraltags']
 
-    _mol_fields = ['ligname', 'totalcharge', '_mol']
+    _mol_fields = ['ligname', '_mol']
 
     # Field types
     # Development Note:  'expliciths' removed.
@@ -96,8 +84,7 @@ class SmallMol(object):
                     }
 
     _mol_dtypes = {'_mol': object,
-                    'ligname': object,
-                   'totalcharge': np.int
+                   'ligname': object,
                    }
 
     # Field shapes
@@ -116,8 +103,7 @@ class SmallMol(object):
                     }
 
     _mol_dims = {'_mol': (0,),
-                 'ligname': (0,),
-                 'totalcharge': (0,)
+                 'ligname': (0,)
                  }
 
     def __init__(self, mol, ignore_errors=False, force_reading=False, fixHs=True, removeHs=False):
@@ -153,57 +139,37 @@ class SmallMol(object):
     @property
     def listProps(self):
         """
-        The list of properties of the molecule
-
-        Returns
-        -------
-        fields: list
-            The list of properties
+        Returns the list of properties of the molecule
         """
-        _fields = [f for f in list(self.mol_fields) if not f.startswith('_')]
-        return _fields
+        return [f for f in list(self.mol_fields) if not f.startswith('_')]
 
     @property
     def listPropsAtoms(self):
         """
-        The list of properties of the atoms
-
-        Returns
-        -------
-        fields: list
-            The list of properties
+        Returns the list of properties of the atoms
         """
-        _fields = [f for f in list(self.atom_fields) if not f.startswith('_')]
-        return _fields
+        return [f for f in list(self.atom_fields) if not f.startswith('_')]
 
     @property
     def numAtoms(self):
         """
         Returns the number of atoms in the molecule
-
-        Returns
-        -------
-        natoms: int
-            The number of atoms in the molecule
-
         """
-        # getting the number of atoms from the shape of element array
-        natoms = self.element.shape[0]
-        return natoms
+        return self.idx.shape[0]
 
     @property
     def numConformers(self):
         """
         Returns the number of conformers in the rdkit molecule object
-
-        Returns
-        -------
-        nconfs: int
-            The number of conformers in the molecule
         """
-        # getting the number of conformers from the shape of coords array
-        _nConformers = self.coords.shape[2]
-        return _nConformers
+        return self.coords.shape[2]
+
+    @property
+    def totalcharge(self):
+        """
+        Returns the total charge of the molecule based of the formal charges of the atoms
+        """
+        return sum(self.formalcharge)
 
     def _initializeMolObj(self, mol, force_reading):
         """
@@ -227,10 +193,10 @@ class SmallMol(object):
         from htmd.molecule.molecule import Molecule
 
         _mol = None
-        smallMol = None
+        smallmolecule = None
         if isinstance(mol, SmallMol):
             _mol = mol._mol
-            smallMol = mol
+            smallmolecule = mol
 
         if isinstance(mol, Chem.Mol):
             _mol = mol
@@ -263,15 +229,15 @@ class SmallMol(object):
                 psmile.removeHs = False
                 _mol = Chem.MolFromSmiles(mol, psmile)
 
-        return _mol, smallMol
+        return _mol, smallmolecule
 
-    def _readMol(self, smallMol):
+    def _readMol(self, smallmolecule):
         """
         Set up the parameters of SmallMol object.
 
         Parameters
         ----------
-        smallMol: htmd.smallmol.smallmol.SmallMol or None
+        smallmolecule: htmd.smallmol.smallmol.SmallMol or None
              If is not None the parameters are taken from this object
         """
         # the fields
@@ -289,8 +255,8 @@ class SmallMol(object):
 
         _mol = self._mol
 
-        if smallMol is not None:
-            for f, v in smallMol.__dict__.items():
+        if smallmolecule is not None:
+            for f, v in smallmolecule.__dict__.items():
                 self.__dict__[f] = v
             return
 
@@ -324,7 +290,6 @@ class SmallMol(object):
             self.setProp(k, v, overwrite=True)
 
         # Development note explicitHs removed
-        self.__dict__['totalcharge'] = sum(formalcharges)
         self.__dict__['idx'] = np.array(idxs)
         self.__dict__['atomname'] = np.array(atomnames)
         self.__dict__['charge'] = np.array(charges )
@@ -372,7 +337,7 @@ class SmallMol(object):
         -------
         >>> sm.setProp('Ki', 25)
         >>> sm.listProps
-        ['ligname', 'totalcharge', '_mol', 'Ki']
+        ['ligname', '_mol', 'Ki']
         >>> sm.setProp('ligname', 'myMol', overwrite=True)
         >>> sm.getProp('ligname')
         'myMol'
@@ -453,9 +418,7 @@ class SmallMol(object):
         if key not in self.listProps:
             raise KeyError('The property passed {} does not exist'.format(key))
 
-        _value = self.__dict__[key]
-
-        return _value
+        return self.__dict__[key]
 
     def get(self, returnField, sel, convertType=True, invert=False):
         """
@@ -579,16 +542,14 @@ class SmallMol(object):
             atomnames = self.get('atomname', 'idx {}'.format(idxs_str))
             chirals = self.get('chiral', 'idx {}'.format(idxs_str))
 
-            _details = [(a, c) for a, c in zip(atomnames, chirals)]
-
-            return True, _details
+            return True, [(a, c) for a, c in zip(atomnames, chirals)]
 
         return True
 
     def foundBondBetween(self, sel1, sel2, bondtype=None):
         """
-        Returns True if at least a bond is found between the two selections. Is possible to check for specific bond type.
-        A tuple is return like (True, [ [(0,1), rdkit.Chem.rdchem.BondType.SINGLE]] ])
+        Returns True if at least a bond is found between the two selections. It is possible to check for specific bond
+        type. A tuple is returned in the form (bool, [ [(idx1,idx2), rdkit.Chem.rdchem.BondType]] ])
 
         Parameters
         ----------
@@ -646,7 +607,7 @@ class SmallMol(object):
 
         Parameters
         ----------
-        id: int
+        confId: int
             The id of the conformer
             Default: 0
 
@@ -656,9 +617,7 @@ class SmallMol(object):
             A numpy array of the coords for the conformer
 
         """
-        coords = self.coords[:, :, confId]
-
-        return coords
+        return self.coords[:, :, confId]
 
     def _getAtomTypes(self):
         """
@@ -827,31 +786,31 @@ class SmallMol(object):
             coords += np.asarray(displacement)
 
         multisigmas = self._getChannelRadii()
-        #if (size, resolution) not in SmallMol.array_cache:
+        # if (size, resolution) not in SmallMol.array_cache:
         if (size, resolution) not in array_cache:
             N = [size, size, size]
             bbm = (np.zeros(3) - float(size * resolution / 2))
             centers = _getGridCenters(bbm, N, resolution)
 
             # Cache the array
-            #SmallMol.array_cache[(size, resolution)] = centers.reshape(size**3, 3)
+            # SmallMol.array_cache[(size, resolution)] = centers.reshape(size**3, 3)
             array_cache[(size, resolution)] = centers.reshape(size ** 3, 3)
             centers2D = centers + center
         else:
-            #centers2D = SmallMol.array_cache[(size, resolution)] + center
+            # centers2D = SmallMol.array_cache[(size, resolution)] + center
             centers2D = array_cache[(size, resolution)] + center
 
         voxels = _getOccupancyC(coords.astype(np.float32), centers2D,
                                 multisigmas).reshape(size, size, size, 8).astype(dtype)
         return voxels
 
-    def _getConformer(self, id):
+    def _getConformer(self, confId):
         """
         Returns the rdkit.Chem.rdchem.Conformer based on the id.
 
         Parameters
         ----------
-        id: int
+        confId: int
             The id of the conformer to return
 
         Returns
@@ -865,7 +824,7 @@ class SmallMol(object):
         from rdkit.Geometry.rdGeometry import Point3D
         conf = Conformer()
 
-        atoms_coords = self.getCoords(id)
+        atoms_coords = self.getCoords(confId)
         for n, coord in enumerate(atoms_coords):
             p = Point3D(*coord.tolist())
             conf.SetAtomPosition(n, p)
@@ -897,7 +856,7 @@ class SmallMol(object):
             raise IndexError("The ids list contains conformers ids {} that do not exist. Available "
                              "conformers: {}".format(ids, _nConformers))
 
-        return [self._getConformer(id) for id in ids]
+        return [self._getConformer(i) for i in ids]
 
     def writeConformers(self, savefolder='conformations', savename="molConf", filetype="sdf", savefolder_exist_ok=False,
                         merge=False, ids=None):
@@ -961,13 +920,13 @@ class SmallMol(object):
             fname = os.path.join(savefolder, '{}_merge.{}'.format(savename, filetype))
             writer = chemwrite(fname)
 
-        for id in ids:
+        for i in ids:
             # If merge is set as False a file is created for each conformer
             if not merge:
 
-                fname = os.path.join(savefolder, '{}_{}.{}'.format(savename, id, filetype))
+                fname = os.path.join(savefolder, '{}_{}.{}'.format(savename, i, filetype))
                 writer = chemwrite(fname)
-            writer.write(_mol, confId=id)
+            writer.write(_mol, confId=i)
 
     def removeConformers(self, ids=None):
         """
@@ -1062,14 +1021,12 @@ class SmallMol(object):
             The smarts string
         """
 
-        sm = self.copy()
-        rmol = sm.toRdkitMol()
+        smallmolecule = self.copy()
+        rmol = smallmolecule.toRdkitMol()
         if not explicitHs and len(np.where(sm.element == 'H')[0]) != 0:
             rmol = Chem.RemoveHs(rmol)
 
-        sma = Chem.MolToSmarts(rmol, isomericSmiles=True)
-
-        return sma
+        return Chem.MolToSmarts(rmol, isomericSmiles=True)
 
     def toSmile(self, explicitHs=False, kekulizeSmile=True):
         """
@@ -1088,9 +1045,9 @@ class SmallMol(object):
             The smiles string
         """
 
-        sm = self.copy()
-        rmol = sm.toRdkitMol()
-        if not explicitHs and len(np.where(sm.element == 'H')[0]) !=  0:
+        smallmolecule = self.copy()
+        rmol = smallmolecule.toRdkitMol()
+        if not explicitHs and len(np.where(smallmolecule.element == 'H')[0]) != 0:
             rmol = Chem.RemoveHs(rmol)
 
         if kekulizeSmile:
@@ -1121,9 +1078,7 @@ class SmallMol(object):
         tmpmol2 = NamedTemporaryFile(suffix='.mol2').name
         mol.write(tmpmol2)
 
-        _mol = Chem.MolFromMol2File(tmpmol2, removeHs=False)
-
-        return _mol
+        return Chem.MolFromMol2File(tmpmol2, removeHs=False)
 
     def toRdkitMol(self, includeConformer=False, _debug=False):
         """
@@ -1145,7 +1100,8 @@ class SmallMol(object):
 
         from rdkit.Chem import RWMol
         from rdkit.Chem import Atom
-        from htmd.smallmol.chemlab.periodictable import _hybridizations_IdxToType, _bondtypes_IdxToType, _chiral_type_Dict
+        from htmd.smallmol.chemlab.periodictable import _hybridizations_IdxToType, _bondtypes_IdxToType, \
+            _chiral_type_Dict
 
         rw = RWMol()
 
@@ -1177,8 +1133,8 @@ class SmallMol(object):
         mol = rw.GetMol()
 
         if includeConformer:
-            for id, conf in enumerate(self.getConformers()):
-                conf.SetId(id)
+            for i, conf in enumerate(self.getConformers()):
+                conf.SetId(i)
                 mol.AddConformer(conf)
 
         if _debug:
@@ -1271,7 +1227,7 @@ class SmallMol(object):
         return np.vstack(bonds), np.array(bondtypes)
 
     def depict(self, sketch=True, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True,
-               atomlabels=None, highlightAtoms=None):
+               atomlabels=None, highlightAtoms=None, resolution=(400, 200)):
         """
         Depicts the molecules. It is possible to save it into an svg file and also generates a jupiter-notebook rendering
 
@@ -1300,6 +1256,8 @@ class SmallMol(object):
         highlightAtoms: list
             List of atom to highlight. It can be also a list of atom list, in this case different colors will be used
             Default: None
+        resolution: tuple of integers
+            Resolution in pixels: (X, Y)
 
         Returns
         -------
@@ -1359,7 +1317,7 @@ class SmallMol(object):
                 MMFFOptimizeMolecule(_mol)
 
         return _depictMol(_mol, filename=filename, ipython=ipython,  atomlabels=atomlabels,
-                          highlightAtoms=highlightAtoms)
+                          highlightAtoms=highlightAtoms, resolution=resolution)
 
     def __repr__(self):
         return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
@@ -1432,15 +1390,14 @@ class SmallMolLib(object):
     """
 
     def __init__(self, lib_file=None, removeHs=False, fixHs=True):  # , n_jobs=1
-        #self._sdffile = sdf_file if  self._isSdfFile(sdf_file) else None
+        # self._sdffile = sdf_file if  self._isSdfFile(sdf_file) else None
         self._libfile = lib_file if self._isValidFile(lib_file) else None
 
         self._mols = np.array([])
         self.fields = []
 
-        if lib_file != None:
+        if lib_file is not None:
             self._initializeMolObjs(lib_file, removeHs, fixHs)
-
 
     def _isValidFile(self, lib_file):
         """
@@ -1457,7 +1414,8 @@ class SmallMolLib(object):
             True if the file is valid
         """
 
-        if lib_file == None: return None
+        if lib_file is None:
+            return None
 
         if not os.path.isfile(lib_file):
             raise ValueError('The file {} does not exists'.format(lib_file))
@@ -1470,8 +1428,8 @@ class SmallMolLib(object):
         elif smiFile is not None:
             return smiFile
         else:
-            raise ValueError('The inputfile {} does not have a valid extension. Should be .sdf or .smi'.format(lib_file))
-
+            raise ValueError('The inputfile {} does not have a valid extension. Should be .sdf or '
+                             '.smi'.format(lib_file))
 
     def _isSmiFile(self, smi_file):
         """
@@ -1487,7 +1445,7 @@ class SmallMolLib(object):
         if smi_ext == '.smi':
             return True
 
-        return None
+        return False
 
     def _isSdfFile(self, sdf_file):
         """
@@ -1511,21 +1469,22 @@ class SmallMolLib(object):
 
         Parameters
         ----------
-        sdf_file: str
+        lib_file: str
             The sdf file
         removeHs: bool
             If True, the hydrogens are removed
         fixHs: bool
-            If True,, the hydrogens are added and optmized
+            If True,, the hydrogens are added and optimized
         """
 
+        mols_failed = list()
         if os.path.splitext(lib_file)[-1] == '.sdf':
             mols_failed = self._loadFromSdf(lib_file, removeHs, fixHs)
         elif os.path.splitext(lib_file)[-1] == '.smi':
             mols_failed = self._loadFromSmi(lib_file, removeHs, fixHs)
 
         if len(mols_failed) != 0:
-            logger.warning('The following entries were skipped beacause could not be loaded: {}.'.format(mols_failed))
+            logger.warning('The following entries were skipped because could not be loaded: {}.'.format(mols_failed))
 
     def _loadFromSdf(self, sdf_file, removeHs, fixHs):
         """
@@ -1628,9 +1587,8 @@ class SmallMolLib(object):
             return self._mols
         if not isinstance(ids, list):
             raise TypeError("The argument ids {} should be list".format(type(ids)))
-        _mols = np.array(self._mols)
 
-        return _mols[ids]
+        return np.array(self._mols)[ids]
 
     def writeSdf(self, sdf_name, fields=None):
         """
@@ -1670,23 +1628,21 @@ class SmallMolLib(object):
             The header of the smi file. If is None the smi filename will be used.
         """
 
-
         smi_name = os.path.splitext(smi_name)[0] + '.smi'
 
         f = open(smi_name, 'w')
 
         if header is None:
-            header =  os.path.splitext(smi_name)[0]
+            header = os.path.splitext(smi_name)[0]
 
-        f.write(header  + '\n')
+        f.write(header + '\n')
 
         for n, sm in enumerate(self.getMols()):
             smi = sm.toSmile(explicitHs=explicitHs)
-            name = n if not names  else sm.ligname
+            name = n if not names else sm.ligname
             f.write(smi + ' {} \n'.format(name))
 
         f.close()
-
 
     def appendSmallLib(self, smallLib, strictField=False, strictDirection=1):
         """
@@ -1699,22 +1655,22 @@ class SmallMolLib(object):
         strictField: bool
             If True, the new SmallMolLib can be merged only if they have exactly the same fields
         strictDirection: int
-            The valid options are 1 or 2 only. With 1 only the fields of the current SmallMolLib are added to the new one.
-            With 2 also the fields of the new SmallMolLib are added into the current one.
+            The valid options are 1 or 2 only. With 1 only the fields of the current SmallMolLib are added to the new
+            one. With 2 also the fields of the new SmallMolLib are added into the current one.
 
         """
 
         # original sdf_filename should i store it???
         from tqdm import tqdm
 
-        for sm in tqdm(smallLib._mols):
-            self.appendSmallMol(sm, strictField, strictDirection)
+        for smallmolecule in tqdm(smallLib._mols):
+            self.appendSmallMol(smallmolecule, strictField, strictDirection)
 
-    def appendSmallMol(self, smallmol, strictField=False, strictDirection=1):
+    def appendSmallMol(self, smallmolecule, strictField=False, strictDirection=1):
         """
         Adds a new htmd.smallmol.smallmol.SmallMol object in the current SmallMolLib object
 
-        Paramters
+        Parameters
         ---------
         smallmol: htmd.smallmol.smallmol.SmallMol
             The SmallMol object to add
@@ -1732,7 +1688,7 @@ class SmallMolLib(object):
         if strictDirection not in [1, 2]:
             raise ValueError("The strictDirections should be 1 (add fields into new mol) or 2 (add fields also in the"
                              "database mols)")
-        tmp_fields = smallmol.listProps
+        tmp_fields = smallmolecule.listProps
 
         if strictField:
             areSameField = set(self.fields) == set(tmp_fields)
@@ -1745,7 +1701,7 @@ class SmallMolLib(object):
         if strictDirection >= 1:
             old_fields = set(self.fields) - set(tmp_fields)
             for f in old_fields:
-                smallmol.setProp(f, np.nan, True)
+                smallmolecule.setProp(f, np.nan, True)
         if strictDirection == 2:
             new_field = set(tmp_fields) - set(self.fields)
             self.fields += list(new_field)
@@ -1753,7 +1709,7 @@ class SmallMolLib(object):
                 for m in self._mols:
                     m.setProp(f, np.nan, True)
 
-        self._mols = np.append(self._mols, smallmol)
+        self._mols = np.append(self._mols, smallmolecule)
 
     def removeMols(self, ids):
         """
@@ -1799,7 +1755,7 @@ class SmallMolLib(object):
             if not isinstance(fields, list):
                 raise TypeError('The argument fields passed {} should be a list '.format(type(fields)))
         else:
-            firstFields = ['ligname', '_mol', 'totalcharge'] if molAsImage else ['ligname', 'totalcharge']
+            firstFields = ['ligname', '_mol'] if molAsImage else ['ligname']
             fields = firstFields + list(set(self.fields) - set(firstFields))
 
         records = []
