@@ -557,10 +557,10 @@ def pdbGuessElementByName(pdtopo):
     https://www.cgl.ucsf.edu/chimera/docs/UsersGuide/tutorials/pdbintro.html#misalignment which states that elements
     should be right-aligned in columns 13-14 unless it's a 4 letter name when it would end up being left-aligned.
     """
-    from periodictable import elements
+    import periodictable as pt
     from collections import defaultdict
     import re
-    allelements = [str(el).upper() for el in list(elements._element.values())[1:]]
+    allelements = [str(el).upper() for el in list(pt.elements._element.values())[1:]]
 
     alternatives = defaultdict(list)
 
@@ -589,10 +589,10 @@ def pdbGuessElementByName(pdtopo):
                         elem = name[0] + name[1].lower()
 
         elem = elem.strip()
-        if elem is not None and len(elem) != 0 and not elem.isalpha():
-            logger.warning('Element guessing failed for atom with name {} due to non-alphabetic characters in guessed '
-                           'element "{}". Check for incorrect column alignment in the PDB file or report to HTMD issue '
-                           'tracker.'.format(name, elem))
+        if elem is not None and len(elem) != 0 and elem not in pt.elements.__dict__:
+            logger.warning('Element guessing failed for atom with name {} as the guessed element "{}" was not found in '
+                           'the periodic table. Check for incorrect column alignment in the PDB file or report to HTMD '
+                           'issue tracker.'.format(name, elem))
             elem = None
 
         pdtopo.loc[pdtopo.name == name, 'element'] = elem
@@ -600,7 +600,7 @@ def pdbGuessElementByName(pdtopo):
     for elem, altelem in alternatives:
         names = np.unique(alternatives[(elem, altelem)])
         namestr = '"' + '" "'.join(names) + '"'
-        altelemname = elements.__dict__[altelem].name
+        altelemname = pt.elements.__dict__[altelem].name
         logger.warning('Atoms with names {} were guessed as element {} but could also be {} ({}). If this is a case, '
                        'you can correct them with mol.set(\'element\', \'{}\', sel=\'name {}\')'.format(namestr, elem, altelem,
                                                                                             altelemname, altelem, namestr))
