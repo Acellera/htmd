@@ -14,11 +14,6 @@ import nlopt
 from htmd.numbautil import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
 
-try:
-    from qmml import QMMLCalculator
-except ImportError as e:
-    raise ImportError('You need access to the qmml module.')
-
 logger = logging.getLogger(__name__)
 
 
@@ -118,6 +113,11 @@ class QMML(QMBase):
                 logger.info('Loading data from %s' % pickleFile)
 
             else:
+                try:
+                    from qmml import QMMLCalculator
+                except ImportError:
+                    raise ImportError('You need access to the qmml module.')
+
                 start = time.clock()
 
                 result = QMResult()
