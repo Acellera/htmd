@@ -17,7 +17,7 @@ from htmd.qm.base import QMBase, QMResult
 try:
     from qmml import QMMLCalculator
 except ImportError as e:
-    raise ImportError('You need access to the qmml module. Open a ')
+    raise ImportError('You need access to the qmml module.')
 
 logger = logging.getLogger(__name__)
 
