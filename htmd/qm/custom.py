@@ -14,7 +14,10 @@ import nlopt
 from htmd.numbautil import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
 
-from qmml import QMMLCalculator
+try:
+    from qmml import QMMLCalculator
+except ImportError as e:
+    raise ImportError('You need access to the qmml module. Open a ')
 
 logger = logging.getLogger(__name__)
 

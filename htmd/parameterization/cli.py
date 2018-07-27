@@ -16,7 +16,6 @@ from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.qm import Psi4, Gaussian, FakeQM2
-from htmd.qm.custom import QMML
 from htmd.parameterization.fftype import FFTypeMethod, fftype
 from htmd.molecule.molecule import Molecule
 from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, \
@@ -169,6 +168,7 @@ def main_parameterize(arguments=None):
     elif args.code == 'Gaussian':
         qm = Gaussian()
     elif args.code == 'QMML':
+        from htmd.qm.custom import QMML
         qm = QMML()
     else:
         raise NotImplementedError
