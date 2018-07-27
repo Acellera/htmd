@@ -557,9 +557,10 @@ def pdbGuessElementByName(pdtopo):
     https://www.cgl.ucsf.edu/chimera/docs/UsersGuide/tutorials/pdbintro.html#misalignment which states that elements
     should be right-aligned in columns 13-14 unless it's a 4 letter name when it would end up being left-aligned.
     """
-    from periodictable import elements
+    import periodictable as pt
     from collections import defaultdict
-    allelements = [str(el).upper() for el in list(elements._element.values())[1:]]
+    import re
+    allelements = [str(el).upper() for el in list(pt.elements._element.values())[1:]]
 
     alternatives = defaultdict(list)
 
@@ -570,6 +571,7 @@ def pdbGuessElementByName(pdtopo):
 
     uqnames = np.unique(pdtopo.name[noelem])
     for name in uqnames:
+        name = re.sub('\d', ' ', name[0]) + name[1:]  # Remove numbers from first column
         elem = None
         if name[0] == ' ':  # If there is no letter in col 13 then col 14 is the element
             elem = name[1]
@@ -585,12 +587,20 @@ def pdbGuessElementByName(pdtopo):
                         alternatives[(elem, altelem)].append(name)
                     else:
                         elem = name[0] + name[1].lower()
+
+        elem = elem.strip()
+        if elem is not None and len(elem) != 0 and elem not in pt.elements.__dict__:
+            logger.warning('Element guessing failed for atom with name {} as the guessed element "{}" was not found in '
+                           'the periodic table. Check for incorrect column alignment in the PDB file or report to HTMD '
+                           'issue tracker.'.format(name, elem))
+            elem = None
+
         pdtopo.loc[pdtopo.name == name, 'element'] = elem
 
     for elem, altelem in alternatives:
         names = np.unique(alternatives[(elem, altelem)])
         namestr = '"' + '" "'.join(names) + '"'
-        altelemname = elements.__dict__[altelem].name
+        altelemname = pt.elements.__dict__[altelem].name
         logger.warning('Atoms with names {} were guessed as element {} but could also be {} ({}). If this is a case, '
                        'you can correct them with mol.set(\'element\', \'{}\', sel=\'name {}\')'.format(namestr, elem, altelem,
                                                                                             altelemname, altelem, namestr))
@@ -1615,6 +1625,12 @@ class TestReaders(TestCase):
         mol = Molecule(os.path.join(self.testfolder(), 'errors.pdb'))
         refelem = np.array(['C', 'C', 'C', 'C', 'C', 'C', 'C', 'N', 'N', 'H', 'H', 'C', 'Cl', 'Ca'], dtype=object)
         assert np.array_equal(mol.element, refelem)
+
+        mol = Molecule(os.path.join(self.testfolder(), 'dialanine_solute.pdb'))
+        refelem = np.array(['H', 'C', 'H', 'H', 'C', 'O', 'N', 'H', 'C', 'H', 'C', 'H', 'H', 'H', 'C', 'O', 'N', 'H',
+                            'C', 'H', 'H', 'H'], dtype=object)
+        assert np.array_equal(mol.element, refelem)
+
 
     def test_pdb_charges(self):
         mol = Molecule(os.path.join(self.testfolder(), 'errors.pdb'))
