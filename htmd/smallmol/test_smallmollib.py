@@ -11,7 +11,7 @@ SDF_N_MOLS = 100
 
 SDF_IDS_DELETE = [1,10,15,16]
 SDF_MOLNAME_DELETE = ['ZINC02583363', 'ZINC86860147', 'ZINC04342657', 'ZINC02023420']
-SDF_FIELDS = ['ligname', '_mol', 'totalcharge']
+SDF_FIELDS = ['ligname', '_mol']
 SDF_LOC_0_99 = 'ZINC02141008'
 
 class TestSmallMol(unittest.TestCase):

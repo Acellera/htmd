@@ -479,7 +479,7 @@ def convertToString(arr):
     return arr_str
 
 
-def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtoms=None):
+def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtoms=None, resolution=(400, 200)):
     """
     Returns the image or the ipython rendering.
 
@@ -511,7 +511,7 @@ def _depictMol(mol, filename=None, ipython=False, atomlabels=None, highlightAtom
         raise ValueError('highlightAtoms should be a list of atom idx or a list of atom idx list ')
 
     # init the drawer object
-    drawer = rdMolDraw2D.MolDraw2DSVG(400, 200)
+    drawer = rdMolDraw2D.MolDraw2DSVG(*resolution)
     # get the drawer options
     opts = drawer.drawOptions()
 
