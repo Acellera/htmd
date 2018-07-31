@@ -212,22 +212,22 @@ class MutualInformation:
         pd = pd.DataFrame(intermed, columns=['source', 'target', 'weight'])
         pd[['source', 'target']] = pd[['source', 'target']].astype(type('int', (int,), {}))
         pd['weight'] = pd['weight'].astype(type('float', (float,), {}))
-        G = nx.from_pandas_dataframe(pd, 'source', 'target', ['weight'])
+        G = nx.from_pandas_edgelist(pd, 'source', 'target', 'weight')
         ## setSegment
         segids = self.mol.get('segid', 'name CA')
         seg_res_dict = {key: value for (key, value) in zip(self.resids, segids) if
                         np.any(pd.loc[(pd['source'] == key)].index) or np.any(pd.loc[(pd['target'] == key)].index)}
-        nx.set_node_attributes(G, 'Segment', seg_res_dict)
+        nx.set_node_attributes(G,  seg_res_dict, 'Segment')
         ## set
         if not nx.is_connected(G):
             G = max(nx.connected_component_subgraphs(G), key=len)
         flow_cent = nx.current_flow_betweenness_centrality(G, weight='weight')
-        nx.set_node_attributes(G, 'flowcent', flow_cent)
+        nx.set_node_attributes(G, flow_cent, 'flowcent')
         Spectre = SpectralClustering(n_clusters=10, affinity='precomputed')
         model = Spectre.fit_predict(self.graph_array)
         model = model.astype(type('float', (float,), {}))
         spectral_dict = {key: value for (key, value) in zip(self.resids, model) if key in G.nodes()}
-        nx.set_node_attributes(G, 'spectral', spectral_dict)
+        nx.set_node_attributes(G, spectral_dict, 'spectral')
         self.graph = G
 
     def save_graphml(self, path):
