@@ -125,7 +125,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
                         raise RuntimeError('There is no profile in {} for configuration '
                                            'app {}'.format(lsfconfig, _configapp))
                     for p in properties:
-                        self.__dict__[p] = properties[p]
+                        setattr(self, p, properties[p])
                         logger.info('Setting {} to {}'.format(p, properties[p]))
             else:
                 raise RuntimeError('No LSF configuration YAML file defined for the configapp')
