@@ -146,3 +146,16 @@ def norm(vec):
     for i in range(3):
         n += vec[i] * vec[i]
     return sqrt(n)
+
+
+@jit(nopython=True)
+def pairwiseRMSD(coords):
+    nframes = coords.shape[2]
+    pairwise = np.zeros(int(nframes*(nframes-1)/2), dtype=np.float32)
+
+    k = 0
+    for i in range(nframes):
+        for j in range(i+1, nframes):
+            pairwise[k] = np.sqrt(np.mean((coords[:, :, i] - coords[:, :, j]) ** 2))
+            k +=1
+    return pairwise
