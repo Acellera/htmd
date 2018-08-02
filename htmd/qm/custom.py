@@ -234,31 +234,9 @@ class CustomQM(QMBase):
                 result.coords = self.molecule.coords[:, :, iframe:iframe + 1].copy()
 
                 if self.optimize:
-                    opt = nlopt.opt(nlopt.LN_COBYLA, result.coords.size)
-
-                    def objective(x, _):
-                        return float(self.calculator.calculate(x.reshape((-1, 3, 1)), self.molecule.element)[0])
-
-                    opt.set_min_objective(objective)
-
-                    if self.restrained_dihedrals is not None:
-                        for dihedral in self.restrained_dihedrals:
-                            indices = dihedral.copy()
-                            ref_angle = dihedralAngle(self.molecule.coords[indices, :, iframe])
-
-                            def constraint(x, _):
-                                coords = x.reshape((-1, 3))
-                                angle = dihedralAngle(coords[indices])
-                                return np.sin(.5*(angle - ref_angle))
-
-                            opt.add_equality_constraint(constraint)
-
-                    opt.set_xtol_abs(1e-3) # Similar to Psi4 default
-                    opt.set_maxeval(1000*opt.get_dimension())
-                    opt.set_initial_step(1e-3)
-                    result.coords = opt.optimize(result.coords.ravel()).reshape((-1, 3, 1))
-                    logger.info('Optimization status: %d' % opt.last_optimize_result())
-
+                    if self.minimizer is None:
+                        self.minimizer = CustomEnergyBasedMinimizer(mol, self.calculator)
+                    result.coords = self.minimizer.minimize(result.coords, self.restrained_dihedrals).reshape((-1, 3, 1))
                     mol = self.molecule.copy()
                     mol.frame = 0
                     mol.coords = result.coords
