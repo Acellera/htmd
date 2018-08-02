@@ -97,7 +97,7 @@ class OMMMinimizer(Minimizer):
 
             for dihedral in restrained_dihedrals:
                 theta0 = dihedralAngle(coords[dihedral])
-                f.addTorsion(dihedral[0], dihedral[1], dihedral[2], dihedral[3], [10000000, theta0])
+                f.addTorsion(int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]), [float(10000000), float(theta0)])
 
             fidx = self.system.addForce(f)
             forceidx.append(fidx)
