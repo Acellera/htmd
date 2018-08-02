@@ -165,7 +165,7 @@ class CustomCalculator(QMBase):
                     mol.write(molFile)
 
                 result.energy = float(self.calculator.calculate(result.coords, self.molecule.element)[0])
-                result.dipole = self.molecule.getDipole()
+                result.dipole = [0, 0, 0]
 
                 #if self.optimize:
                 #    assert opt.last_optimum_value() == result.energy # A self-consistency test
