@@ -31,6 +31,36 @@ class Minimizer(abc.ABC):
 
 class OMMMinimizer(Minimizer):
     def __init__(self, mol, prm, platform='CPU', device=0, buildff='AMBER', guessAnglesDihedrals=True):
+        """ A minimizer based on OpenMM
+
+        Parameters
+        ----------
+        mol : Molecule
+            The Molecule object containing the topology of the molecule
+        prm : parmed.ParameterSet
+            A parmed ParameterSet object containing the parameters of the molecule
+        platform : str
+            The platform on which to run the minimization ('CPU', 'CUDA')
+        device : int
+            If platform is 'CUDA' this defines which GPU device to use
+        buildff : str
+            The forcefield for which to build the Molecule to then minimize it with OpenMM
+        guessAnglesDihedrals : bool
+            If the class should guess angles and dihedrals of the Molecule.
+
+        Examples
+        --------
+        >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+        >>> from htmd.parameterization.util import canonicalizeAtomNames
+        >>> from htmd.molecule.molecule import Molecule
+
+        >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
+        >>> mol = Molecule(molFile)
+        >>> mol = canonicalizeAtomNames(mol)
+        >>> prm, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+        >>> mini = OMMMinimizer(mol, prm)
+        >>> minimcoor = mini.minimize(mol.coords, restrained_dihedrals=[0, 1, 6, 12])
+        """
         super().__init__()
 
         import parmed
