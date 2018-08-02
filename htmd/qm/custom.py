@@ -7,6 +7,7 @@ import os
 import time
 import pickle
 import logging
+import abc
 
 import numpy as np
 import nlopt
@@ -15,10 +16,109 @@ from htmd.numbautil import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
 from protocolinterface import val
 
+
 logger = logging.getLogger(__name__)
 
 
-class CustomCalculator(QMBase):
+class Minimizer(abc.ABC):
+    def __init__(self):
+        pass
+
+    @abc.abstractmethod
+    def minimize(self, coords, restrained_dihedrals):
+        pass
+
+
+class OMMMinimizer(Minimizer):
+    def __init__(self, mol, prm, platform='CPU', device=0, buildff='AMBER', guessAnglesDihedrals=True):
+        super().__init__()
+
+        import parmed
+        from htmd.util import tempname
+        import simtk.openmm as mm
+
+        if buildff == 'AMBER':
+            from htmd.builder.amber import build
+            from htmd.parameterization.writers import writeFRCMOD
+            from htmd.molecule.util import guessAnglesAndDihedrals
+            frcmodfile = tempname(suffix='.frcmod')
+            buildfolder = tempname()
+            if guessAnglesDihedrals:
+                mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
+            writeFRCMOD(mol, prm, frcmodfile)
+            _ = build(mol, param=[frcmodfile,], outdir=buildfolder)
+            self.structure = parmed.amber.AmberParm(os.path.join(buildfolder, 'structure.prmtop'))
+
+        self.system = self.structure.createSystem()
+        self.platform = mm.Platform.getPlatformByName(platform)
+        self.platprop = {'CudaPrecision': 'mixed', 'CudaDeviceIndex': device} if platform == 'CUDA' else None
+
+
+    def minimize(self, coords, restrained_dihedrals):
+        from simtk import unit
+        from simtk.openmm import CustomTorsionForce, app
+        import simtk.openmm as mm
+
+        forceidx = []
+        if restrained_dihedrals:
+            f = CustomTorsionForce('0.5*k*(theta-theta0)^2')
+            f.addPerTorsionParameter('k')
+            f.addPerTorsionParameter('theta0')
+
+            for dihedral in restrained_dihedrals:
+                theta0 = dihedralAngle(coords[dihedral])
+                f.addTorsion(dihedral[0], dihedral[1], dihedral[2], dihedral[3], [10000000, theta0])
+
+            fidx = self.system.addForce(f)
+            forceidx.append(fidx)
+
+        integrator = mm.LangevinIntegrator(0, 0, 0)
+        self.sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
+
+        if coords.ndim == 3:
+            coords = coords[:, :, 0]
+        self.sim.context.setPositions(coords * unit.angstrom)
+        self.sim.minimizeEnergy()
+        state = self.sim.context.getState(getEnergy=True, getPositions=True)
+        endcoords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom)
+
+        if restrained_dihedrals:
+            for fi in forceidx:
+                self.system.removeForce(fi)
+
+        return endcoords
+
+
+class CustomEnergyBasedMinimizer(Minimizer):
+    def __init__(self, mol, calculator):
+        super().__init__()
+        self.opt = nlopt.opt(nlopt.LN_COBYLA, (mol.numAtoms, 3, 1))
+
+        def objective(x, _):
+            return float(calculator.calculate(x.reshape((-1, 3, 1)), mol.element)[0])
+
+        self.opt.set_min_objective(objective)
+
+    def minimize(self, coords, restrained_dihedrals):
+        if restrained_dihedrals is not None:
+            for dihedral in restrained_dihedrals:
+                indices = dihedral.copy()
+                ref_angle = dihedralAngle(coords[indices, :, 0])
+
+                def constraint(x, _):
+                    coords = x.reshape((-1, 3))
+                    angle = dihedralAngle(coords[indices])
+                    return np.sin(.5 * (angle - ref_angle))
+
+                self.opt.add_equality_constraint(constraint)
+
+        self.opt.set_xtol_abs(1e-3)  # Similar to Psi4 default
+        self.opt.set_maxeval(1000 * self.opt.get_dimension())
+        self.opt.set_initial_step(1e-3)
+        return self.opt.optimize(coords.ravel()).reshape((-1, 3, 1))
+
+
+class CustomQM(QMBase):
     """
     Imitation of QM calculations with custom class
 
@@ -28,7 +128,7 @@ class CustomCalculator(QMBase):
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
     >>> from htmd.molecule.molecule import Molecule
-    >>> from htmd.qm.custom import CustomCalculator
+    >>> from htmd.qm.custom import CustomQM
     >>> from acemdai.calculator import AAICalculator
 
     Create a molecule
@@ -41,7 +141,7 @@ class CustomCalculator(QMBase):
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
-    ...     qm = CustomCalculator()
+    ...     qm = CustomQM()
     ...     qm.calculator = aceai
     ...     qm.molecule = mol
     ...     qm.esp_points = np.array([[1., 1., 1.]])
@@ -63,7 +163,7 @@ class CustomCalculator(QMBase):
 
     Run a minimization
     >>> with TemporaryDirectory() as tmpDir:
-    ...     qm = CustomCalculator()
+    ...     qm = CustomQM()
     ...     qm.calculator = aceai
     ...     qm.molecule = mol
     ...     qm.optimize = True
@@ -79,7 +179,7 @@ class CustomCalculator(QMBase):
 
     Run a constrained minimization
     >>> with TemporaryDirectory() as tmpDir:
-    ...     qm = CustomCalculator()
+    ...     qm = CustomQM()
     ...     qm.calculator = aceai
     ...     qm.molecule = mol
     ...     qm.optimize = True
@@ -97,8 +197,8 @@ class CustomCalculator(QMBase):
 
     def __init__(self):
         super().__init__()
-        self._arg('calculator', ':class: `Calculator`', 'Calculator object', default=None,
-                  validator=None, required=True)
+        self._arg('calculator', ':class: `Calculator`', 'Calculator object', default=None, validator=None, required=True)
+        self._arg('minimizer', ':class: `Minimizer`', 'Minimizer object', default=None, validator=None)
 
     # Fake implementations of the abstract methods
     def _command(self): pass
