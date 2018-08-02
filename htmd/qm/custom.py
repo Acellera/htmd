@@ -92,7 +92,7 @@ class OMMMinimizer(Minimizer):
 class CustomEnergyBasedMinimizer(Minimizer):
     def __init__(self, mol, calculator):
         super().__init__()
-        self.opt = nlopt.opt(nlopt.LN_COBYLA, (mol.numAtoms, 3, 1))
+        self.opt = nlopt.opt(nlopt.LN_COBYLA, mol.coords.size)
 
         def objective(x, _):
             return float(calculator.calculate(x.reshape((-1, 3, 1)), mol.element)[0])
@@ -235,7 +235,7 @@ class CustomQM(QMBase):
 
                 if self.optimize:
                     if self.minimizer is None:
-                        self.minimizer = CustomEnergyBasedMinimizer(mol, self.calculator)
+                        self.minimizer = CustomEnergyBasedMinimizer(self.molecule, self.calculator)
                     result.coords = self.minimizer.minimize(result.coords, self.restrained_dihedrals).reshape((-1, 3, 1))
                     mol = self.molecule.copy()
                     mol.frame = 0
