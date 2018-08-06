@@ -9,7 +9,7 @@ from simtk.openmm import app
 import numpy as np
 
 
-def halton_sequence(p, n):
+def _halton_sequence(p, n):
     """
     Halton deterministic sequence on [0,1].
     Parameters
@@ -29,9 +29,9 @@ def halton_sequence(p, n):
     Examples
     --------
     Generate some sequences with different prime number bases.
-    >>> x = halton_sequence(2,100)
-    >>> y = halton_sequence(3,100)
-    >>> z = halton_sequence(5,100)
+    >>> x = _halton_sequence(2,100)
+    >>> y = _halton_sequence(3,100)
+    >>> z = _halton_sequence(5,100)
     """
     eps = np.finfo(np.double).eps
     # largest number of digits (adding one for halton_sequence(2,64) corner case)
@@ -50,7 +50,7 @@ def halton_sequence(p, n):
     return u
 
 
-def subrandom_particle_positions(nparticles, box_vectors, ndim, method='halton'):
+def _subrandom_particle_positions(nparticles, box_vectors, ndim, method='halton'):
     """Generate a deterministic list of subrandom particle positions."""
     # Create positions array.
     positions = np.zeros([nparticles, 3], np.float32)
@@ -58,7 +58,7 @@ def subrandom_particle_positions(nparticles, box_vectors, ndim, method='halton')
     # Fill in each dimension.
     primes = [2, 3, 5]  # prime bases for Halton sequence
     for dim in range(ndim):
-        x = halton_sequence(primes[dim], nparticles)
+        x = _halton_sequence(primes[dim], nparticles)
         l = box_vectors[dim][dim]
         positions[:, dim] = x - 0.5
 
@@ -105,7 +105,7 @@ def distributeLipids(boxsize,
             system.addParticle(mass)
             nb.addParticle(0.0 * unit.elementary_charge, s * unit.angstrom, epsilon)
 
-        positions = subrandom_particle_positions(nparticles, system.getDefaultPeriodicBoxVectors(), 2)
+        positions = _subrandom_particle_positions(nparticles, system.getDefaultPeriodicBoxVectors(), 2)
 
         # Add the nonbonded force.
         system.addForce(nb)
@@ -131,13 +131,10 @@ def distributeLipids(boxsize,
         topology.setUnitCellDimensions(unit.Quantity(boxsize, unit.angstrom)) 
             
         # Simulate it
-        from simtk.openmm import LangevinIntegrator, VerletIntegrator
-        from simtk.openmm.app import Simulation, PDBReporter, StateDataReporter, PDBFile
-        from simtk.unit import kelvin, picoseconds, picosecond, angstrom
-        from sys import stdout
-        from mdtraj.reporters import DCDReporter
+        from simtk.openmm import VerletIntegrator
+        from simtk.openmm.app import Simulation
+        from simtk.unit import picoseconds, picosecond, angstrom
         nsteps = 10000
-        freq = 1
 
         integrator = VerletIntegrator(0.002 * picoseconds)
         simulation = Simulation(topology, system, integrator)
@@ -149,13 +146,6 @@ def distributeLipids(boxsize,
 
         state = simulation.context.getState(getPositions=True, enforcePeriodicBox=True)
         allfinalpos = state.getPositions(asNumpy=True).value_in_unit(angstrom)
-
-        # with open('topology.pdb', 'w') as f:
-        #     PDBFile.writeFile(topology, positions, f)
-
-        # from htmd.molecule.molecule import Molecule
-        # mol = Molecule('topology.pdb')
-        # mol.read('output.dcd')
 
         return allfinalpos
 
