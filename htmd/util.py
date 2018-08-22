@@ -184,7 +184,7 @@ def opm(pdb, keep=False, keepaltloc='A'):
     from htmd.molecule.support import string_to_tempfile
     from htmd.molecule.molecule import Molecule
     # http://opm.phar.umich.edu/pdb/1z98.pdb
-    r = requests.get("http://opm.phar.umich.edu/pdb/{:s}.pdb".format(pdb.lower()))
+    r = requests.get("https://storage.googleapis.com/opm-assets/pdb/{:s}.pdb".format(pdb.lower()))
 
     if r.status_code != 200:
         raise NameError('PDB code not found in the OPM database')
