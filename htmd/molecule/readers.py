@@ -190,11 +190,19 @@ class MolFactory(object):
                 mol.crystalinfo = topo.crystalinfo
                 continue
 
-            newfielddata = np.array(topo.__dict__[field], dtype=mol._dtypes[field])
-
             # Skip on empty new field data
-            if newfielddata is None or len(newfielddata) == 0 or np.all([x is None for x in topo.__dict__[field]]):
+            if topo.__dict__[field] is None \
+                    or len(topo.__dict__[field]) == 0 \
+                    or np.all([x is None for x in topo.__dict__[field]]):
                 continue
+
+            # Empty strings in future float dtype arrays cannot be converted to numbers so here we set them to 0
+            if np.issubdtype(mol._dtypes[field], np.float) \
+                    and isinstance(topo.__dict__[field], list)\
+                    and isinstance(topo.__dict__[field][0], str):
+                topo.__dict__[field] = [x if len(x.strip()) else 0 for x in topo.__dict__[field]]
+
+            newfielddata = np.array(topo.__dict__[field], dtype=mol._dtypes[field])
 
             # Objects could be ints for example but we want them as str
             if mol._dtypes[field] == object and len(newfielddata) != 0:
@@ -1536,6 +1544,13 @@ class TestReaders(TestCase):
 
     def test_missing_crystal_info(self):
         mol = Molecule(os.path.join(self.testfolder(), 'weird-cryst.pdb'))
+
+    def test_missing_occu_beta(self):
+        mol = Molecule(os.path.join(self.testfolder(), 'opm_missing_occu_beta.pdb'))
+        assert np.all(mol.occupancy[:2141] != 0)
+        assert np.all(mol.occupancy[2141:] == 0)
+        assert np.all(mol.beta[:2141] != 0)
+        assert np.all(mol.beta[2141:] == 0)
 
     def test_dcd(self):
         from htmd.home import home
