@@ -1176,6 +1176,11 @@ class SmallMol(object):
         elif not isinstance(ids, list):
             raise ValueError('The argument ids should be a list of confomer ids')
 
+        # checks if coordintates exist
+        n_coords = self.getCoords().shape[0]
+        if n_coords == 0:
+            raise ValueError('No coordinates found. You need at least one atom coordinate.')
+
         molHtmd = None
         for n in ids:
             coords = self.getCoords(confId=n)
@@ -1215,7 +1220,7 @@ class SmallMol(object):
         bondtypes = []
         _mol = self.toRdkitMol()
         for bo in _mol.GetBonds():  # self._mol.GetBonds():
-            bonds.append([bo.GetBeginAtomIdx(), bo.GetEndAtomIdx()])
+            bonds.append([bo.GetBeginAtomIdx(), bo.GetEndAtom_Idx()])
             if bo.GetBondType() == BondType.SINGLE:
                 bondtypes.append('1')
             elif bo.GetBondType() == BondType.DOUBLE:
@@ -1224,6 +1229,8 @@ class SmallMol(object):
                 bondtypes.append('3')
             elif bo.GetBondType() == BondType.AROMATIC:
                 bondtypes.append('ar')
+        if len(bonds) == 0:
+            return bonds, bondtypes
         return np.vstack(bonds), np.array(bondtypes)
 
     def depict(self, sketch=True, filename=None, ipython=False, optimize=False, optimizemode='std', removeHs=True,
