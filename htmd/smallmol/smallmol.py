@@ -1179,7 +1179,8 @@ class SmallMol(object):
         # checks if coordintates exist
         n_coords = self.getCoords().shape[0]
         if n_coords == 0:
-            raise ValueError('No coordinates found. You need at least one atom coordinate.')
+            raise ValueError('No coordinates found. You need at least one atom coordinate to convert SmallMol'
+                             ' to a Molecule object.')
 
         molHtmd = None
         for n in ids:
@@ -1220,7 +1221,7 @@ class SmallMol(object):
         bondtypes = []
         _mol = self.toRdkitMol()
         for bo in _mol.GetBonds():  # self._mol.GetBonds():
-            bonds.append([bo.GetBeginAtomIdx(), bo.GetEndAtom_Idx()])
+            bonds.append([bo.GetBeginAtomIdx(), bo.GetEndAtomIdx()])
             if bo.GetBondType() == BondType.SINGLE:
                 bondtypes.append('1')
             elif bo.GetBondType() == BondType.DOUBLE:
