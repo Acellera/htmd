@@ -225,17 +225,17 @@ class Psi4(QMBase):
                 lines = f.readlines()
 
             for i in range(len(lines)):
-                if "Mulliken Charges: (a.u.)" in lines[i]:
+                if lines[i].strip().startswith('Mulliken Charges:'):
                     result.mulliken = []
                     for j in range(self._natoms):
                         s = lines[i + 2 + j].split()
                         result.mulliken.append(float(s[5]))
 
-                if "Dipole Moment: (Debye)" in lines[i]:
+                if lines[i].strip().startswith('Dipole Moment:'):
                     s = lines[i + 1].split()
                     result.dipole = [float(s[1]), float(s[3]), float(s[5]), float(s[7])]
 
-                if " Traceless Quadrupole Moment: (Debye Ang)" in lines[i]:
+                if lines[i].strip().startswith('Traceless Quadrupole Moment:'):
                     s1, s2 = lines[i + 1].split(), lines[i + 2].split()
                     result.quadrupole = [float(s1[1]), float(s1[3]), float(s1[5]),
                                          float(s2[1]), float(s2[3]), float(s2[5])]
