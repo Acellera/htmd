@@ -386,6 +386,9 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             f.write('\n')
             mol.remove(torem, _logger=False)
 
+    # Calculate the bounding box and store it in the CRD file
+    f.write('setBox mol "vdw"\n\n')
+
     f.write('# Writing out the results\n')
     f.write('saveamberparm mol ' + prefix + '.prmtop ' + prefix + '.crd\n')
     f.write('quit')
@@ -433,8 +436,11 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         if os.path.exists(os.path.join(outdir, 'structure.crd')) and \
                         os.path.getsize(os.path.join(outdir, 'structure.crd')) != 0 and \
                         os.path.getsize(os.path.join(outdir, 'structure.prmtop')) != 0:
-            molbuilt = Molecule(os.path.join(outdir, 'structure.prmtop'))
-            molbuilt.read(os.path.join(outdir, 'structure.crd'))
+            try:
+                molbuilt = Molecule(os.path.join(outdir, 'structure.prmtop'))
+                molbuilt.read(os.path.join(outdir, 'structure.crd'))
+            except Exception as e:
+                raise RuntimeError('Failed at reading structure.prmtop/structure.crd due to error: {}'.format(e))
         else:
             raise BuildError('No structure pdb/prmtop file was generated. Check {} for errors in building.'.format(logpath))
 

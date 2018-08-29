@@ -1181,12 +1181,19 @@ def CRDread(filename, frame=None, topoloc=None):
         if lines[0].startswith('*'):
             raise FormatError('CRDread failed. Trying other readers.')
 
+        natoms = None
+        try:
+            natoms = int(lines[1])
+        except:
+            logger.warning('Didn\'t find number of atoms in CRD file. Will read until the end.')
+
         coords = []
         fieldlen = 12
-        k = 0
         for line in lines[2:]:  # skip first 2 lines
             coords += [float(line[i:i + fieldlen].strip()) for i in range(0, len(line), fieldlen)
                        if len(line[i:i + fieldlen].strip()) != 0]
+            if natoms is not None and len(coords) == natoms*3:
+                break
 
     coords = np.vstack([coords[i:i + 3] for i in range(0, len(coords), 3)])[:, :, np.newaxis]
     return MolFactory.construct(None, Trajectory(coords=coords), filename, frame)
