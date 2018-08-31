@@ -44,6 +44,8 @@ def ensurelist(tocheck, tomod=None):
         tomod = tocheck
     if isinstance(tocheck, np.ndarray):
         return list(tomod)
+    if isinstance(tocheck, range):
+        return list(tocheck)
     if not isinstance(tocheck, list) and not isinstance(tocheck, tuple):
         return [tomod, ]
     return tomod
