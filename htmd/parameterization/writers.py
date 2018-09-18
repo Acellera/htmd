@@ -1,6 +1,5 @@
 from htmd.parameterization.util import _qm_method_name
 from htmd.parameterization.parameterset import getImproperParameter, getParameter
-from htmd.parameterization.fftype import FFTypeMethod
 import os
 import parmed
 import numpy as np
@@ -227,7 +226,7 @@ def writeParameters(mol, parameters, qm, method, netcharge, outdir, original_coo
     typemap = None
     extensions = ('mol2', 'pdb', 'coor')
 
-    if method == FFTypeMethod.CGenFF_2b6:
+    if method == 'CGenFF_2b6':
         extensions += ('psf', 'rtf', 'prm')
 
         # TODO: remove?
@@ -254,7 +253,7 @@ run 0'''
         print(tmp, file=f)
         f.close()
 
-    elif method in (FFTypeMethod.GAFF, FFTypeMethod.GAFF2):
+    elif method in ('GAFF', 'GAFF2'):
         # types need to be remapped because Amber FRCMOD format limits the type to characters
         # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
         # TODO: get rid of this mapping

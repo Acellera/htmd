@@ -34,7 +34,7 @@ class FakeQM(QMBase):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype
     >>> from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
@@ -43,7 +43,7 @@ class FakeQM(QMBase):
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
     >>> mol = Molecule(molFile)
     >>> mol = canonicalizeAtomNames(mol)
-    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    >>> parameters, mol = fftype(mol, method='GAFF2')
     >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
     Run a single-point energy and ESP calculation
@@ -183,7 +183,7 @@ class FakeQM2(FakeQM):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype
     >>> from htmd.parameterization.util import canonicalizeAtomNames
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM2
@@ -192,7 +192,7 @@ class FakeQM2(FakeQM):
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
     >>> mol = canonicalizeAtomNames(mol)
-    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    >>> parameters, mol = fftype(mol, method='GAFF2')
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
@@ -248,7 +248,6 @@ class FakeQM2(FakeQM):
 
     def _get_prmtop(self):
         from htmd.parameterization.writers import writeFRCMOD, getAtomTypeMapping
-        from htmd.parameterization.fftype import FFTypeMethod
 
         with TemporaryDirectory() as tmpDir:
             frcFile = os.path.join(tmpDir, 'mol.frcmod')
