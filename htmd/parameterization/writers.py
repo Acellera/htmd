@@ -150,19 +150,19 @@ def writePRM(mol, parameters, filename):
     print("BONDS", file=f)
     types = getSortedAndUniqueTypes(mol.atomtype[mol.bonds], 'bond_types')
     for type in types:
-        val = parameters.bond_types[type]
+        val = getParameter(type, parameters.bond_types)
         print("%-6s %-6s %8.2f %8.4f" % (type[0], type[1], val.k, val.req), file=f)
 
     print("\nANGLES", file=f)
     types = getSortedAndUniqueTypes(mol.atomtype[mol.angles], 'angle_types')
     for type in types:
-        val = parameters.angle_types[type]
+        val = getParameter(type, parameters.angle_types)
         print("%-6s %-6s %-6s %8.2f %8.2f" % (type[0], type[1], type[2], val.k, val.theteq), file=f)
 
     print("\nDIHEDRALS", file=f)
     types = getSortedAndUniqueTypes(mol.atomtype[mol.dihedrals], 'dihedral_types')
     for type in types:
-        val = parameters.dihedral_types[type]
+        val = getParameter(type, parameters.dihedral_types)
         for term in val:
             print("%-6s %-6s %-6s %-6s %12.8f %d %12.8f" % (type[0], type[1], type[2], type[3], term.phi_k, term.per, term.phase), file=f)
 

@@ -42,16 +42,9 @@ contribute to HTMD, please visit:
 
 If you use HTMD in your publication please cite:
 
-### Main citation
-
 Stefan Doerr, Matthew J. Harvey, Frank Noé, and Gianni De Fabritiis. 
 **HTMD: High-throughput molecular dynamics for molecular discovery.** 
 *Journal of Chemical Theory and Computation*, **2016**, *12* (4), pp 1845–1852.
 [doi:10.1021/acs.jctc.6b00049](http://pubs.acs.org/doi/abs/10.1021/acs.jctc.6b00049)
 
-### Other citations
 
-Stefan Doerr, Toni Giorgino, Gerard Martínez-Rosell, João M. Damas, and Gianni De Fabritiis.
-**High-Throughput Automated Preparation and Simulation of Membrane Proteins with HTMD.**
-*Journal of Chemical Theory and Computation*, **2017**, *13* (9), pp 4003–4011.
-[doi:10.1021/acs.jctc.7b00480](https://pubs.acs.org/doi/abs/10.1021/acs.jctc.7b00480)
