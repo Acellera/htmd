@@ -111,7 +111,8 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 
     print('Equivalent atom groups:')
     for atom_group in equivalents[0]:
-        print('  ' + ', '.join(mol.name[list(atom_group)]))
+        if len(atom_group) > 1:
+            print('  ' + ', '.join(mol.name[list(atom_group)]))
 
     print('Parameterizable dihedral angles:')
     for equivalent_dihedrals in all_dihedrals:
