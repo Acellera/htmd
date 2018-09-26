@@ -220,7 +220,7 @@ def writeRTF(mol, parameters, netcharge, filename):
 
 def writeParameters(mol, parameters, qm, method, netcharge, outdir, original_coords=None):
 
-    paramDir = os.path.join(outdir, 'parameters', method.name, _qm_method_name(qm))
+    paramDir = os.path.join(outdir, 'parameters', method, _qm_method_name(qm))
     os.makedirs(paramDir, exist_ok=True)
 
     typemap = None

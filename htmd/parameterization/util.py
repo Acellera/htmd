@@ -41,7 +41,7 @@ def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
 
     sufices = {}
     for i in range(mol.numAtoms):
-        name = createElementForFftype(i, mol, fftypemethod).upper()
+        name = guessElementForFftype(i, mol, fftypemethod).upper()
 
         sufices[name] = sufices.get(name, 0) + 1
         name += str(sufices[name])
@@ -54,24 +54,24 @@ def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
         return mol
 
 
-def createElementForFftype(index, mol, fftypemethod):
+def guessElementForFftype(index, mol, fftypemethod):
     """
     Guess element from an atom name
 
-    >>> from htmd.parameterization.util import createElementForFftype
-    >>> createElementForFftype('C')
+    >>> from htmd.parameterization.util import guessElementForFftype
+    >>> guessElementForFftype('C')
     'C'
-    >>> createElementForFftype('C1')
+    >>> guessElementForFftype('C1')
     'C'
-    >>> createElementForFftype('C42')
+    >>> guessElementForFftype('C42')
     'C'
-    >>> createElementForFftype('C7S')
+    >>> guessElementForFftype('C7S')
     'C'
-    >>> createElementForFftype('HN1')
+    >>> guessElementForFftype('HN1')
     'H'
-    >>> createElementForFftype('CL')
+    >>> guessElementForFftype('CL')
     'Cl'
-    >>> createElementForFftype('CA1')
+    >>> guessElementForFftype('CA1')
     'Ca'
     """
 

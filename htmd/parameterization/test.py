@@ -31,7 +31,7 @@ class TestParameterize(unittest.TestCase):
         self.assertTrue(os.path.exists(molFile))
         shutil.copy(molFile, resDir)
 
-        print('') # Just for a better readability
+        print('')  # Just for a better readability
         returncode = call(command.split(), cwd=resDir)
         self.assertEqual(returncode, 0)
 
@@ -71,7 +71,7 @@ class TestParameterize(unittest.TestCase):
                     except ValueError:
                         if refField == resField:
                             continue
-                    self.assertListEqual(refLines, resLines) # If there is a mismatch, print a diff of all file
+                    self.assertListEqual(refLines, resLines)  # If there is a mismatch, print a diff of all file
 
         print('')
 
@@ -106,7 +106,6 @@ class TestParameterize(unittest.TestCase):
         self._execute(refDir, resDir, 'parameterize input.mol2 --no-esp --no-dihed')
         self._testFiles(refDir, resDir)
 
-    @unittest.skip(reason='joblib 0.11 breaks it on Travis?')  # TODO: bring back when joblib back to 0.12
     def test_h2o2_esp(self):
         refDir = os.path.join(self.dataDir, 'h2o2_esp')
         resDir = os.path.join(self.testDir, 'h2o2_esp')
