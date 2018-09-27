@@ -1,5 +1,4 @@
 import numpy as np
-from copy import copy
 import logging
 import re
 import os
@@ -154,7 +153,8 @@ def minimize(mol, qm, outdir):
 
 
 def fitCharges(mol, qm, outdir, fixed=()):
-    from htmd.parameterization.esp import ESP
+
+    from htmd.charge.esp import ESP
 
     # Create an ESP directory
     espDir = os.path.join(outdir, "esp", _qm_method_name(qm))
