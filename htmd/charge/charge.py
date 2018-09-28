@@ -38,8 +38,8 @@ def fitGasteigerCharges(mol):
 
     >>> new_mol = fitGasteigerCharges(mol)
     >>> assert new_mol is not mol
-    >>> print(new_mol.charge) # doctest: +ELLIPSIS
-    [-0.4115095   0.20575476  0.20575476]
+    >>> new_mol.charge # doctest: +ELLIPSIS
+    array([-0.411509...,  0.205754...,  0.205754...], dtype=float32)
     """
 
     from rdkit.Chem.rdmolfiles import MolFromMol2File
@@ -110,8 +110,8 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     >>> with TemporaryDirectory() as tmpDir:
     ...     new_mol, extra = fitESPCharges(mol, Psi4(), tmpDir)
     >>> assert new_mol is not mol
-    >>> print(new_mol.charge) # doctest: +ELLIPSIS
-    [-0.39405966  0.19702983  0.19702983]
+    >>> new_mol.charge # doctest: +ELLIPSIS
+    array([-0.394059...,  0.197029...,  0.197029...], dtype=float32)
     """
 
     from htmd.qm import Psi4
