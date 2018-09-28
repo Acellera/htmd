@@ -19,8 +19,9 @@ from htmd.qm import Psi4, Gaussian, FakeQM2
 from htmd.parameterization.fftype import FFTypeMethod, fftype
 from htmd.molecule.molecule import Molecule
 from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, \
-    minimize, getFixedChargeAtomIndices, fitCharges, fitDihedrals, getDipole, \
+    minimize, getFixedChargeAtomIndices, fitDihedrals, getDipole, \
     _qm_method_name
+from htmd.charge import fitESPCharges
 from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
 from htmd.parameterization.writers import writeParameters
 
@@ -261,10 +262,10 @@ def main_parameterize(arguments=None):
             fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
 
             # Fit ESP charges
-            mol, _, esp_charges, qm_dipole = fitCharges(mol, qm, args.outdir, fixed=fixed_atom_indices)
+            if isinstance(qm, Psi4):
+                mol, _, esp_charges, qm_dipole = fitESPCharges(mol, qm, args.outdir, fixed=fixed_atom_indices)
+                logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
 
-            # Print dipoles
-            logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
             mm_dipole = getDipole(mol)
             if np.all(np.isfinite(mm_dipole)):
                 logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
