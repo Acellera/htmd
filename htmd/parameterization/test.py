@@ -247,7 +247,7 @@ class TestParameterize(unittest.TestCase):
     def test_benzamidine_gaff2(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_gaff2')
         resDir = os.path.join(self.testDir, 'benzamidine_gaff2')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 --charge-type Gasteiger --no-min --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 --charge-type None --no-min --no-dihed')
         self._testFiles(refDir, resDir)
 
     def test_benzamidine_cgenff(self):
