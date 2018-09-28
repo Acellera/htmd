@@ -84,26 +84,26 @@ class TestParameterize(unittest.TestCase):
     def test_h2o2_gaff2(self):
         refDir = os.path.join(self.dataDir, 'h2o2_gaff2')
         resDir = os.path.join(self.testDir, 'h2o2_gaff2')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --no-min --no-esp --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type None --no-min --no-dihed')
         self._testFiles(refDir, resDir)
 
     def test_h2o2_outdir(self):
         refDir = os.path.join(self.dataDir, 'h2o2_outdir')
         resDir = os.path.join(self.testDir, 'h2o2_outdir')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --no-min --no-esp --no-dihed -o dir')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type None --no-min --no-dihed -o dir')
         self._testFiles(refDir, resDir)
 
     def test_h2o2_min(self):
         refDir = os.path.join(self.dataDir, 'h2o2_min')
         resDir = os.path.join(self.testDir, 'h2o2_min')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --no-esp --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type None --no-dihed')
         self._testFiles(refDir, resDir)
 
     def test_h2o2_min_restart(self):
         refDir = os.path.join(self.dataDir, 'h2o2_min_restart')
         resDir = os.path.join(self.testDir, 'h2o2_min_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 --no-esp --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 --charge-type None --no-dihed')
         self._testFiles(refDir, resDir)
 
     @unittest.skip(reason='joblib 0.11 breaks it on Travis?')  # TODO: bring back when joblib back to 0.12
@@ -131,7 +131,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'h2o2_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
+        self._execute(refDir, resDir, 'parameterize input.mol2 --charge-type None --no-min --no-dihed-opt')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
@@ -145,7 +145,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt_restart')
         resDir = os.path.join(self.testDir, 'h2o2_dihed_opt_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp')
+        self._execute(refDir, resDir, 'parameterize input.mol2 --charge-type None --no-min')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
@@ -176,7 +176,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'ethene_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'ethene_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
+        self._execute(refDir, resDir, 'parameterize input.mol2 --charge-type None --no-min --no-dihed-opt')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
@@ -190,7 +190,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 --no-min --no-esp --no-dihed-opt')
+        self._execute(refDir, resDir, 'parameterize input.mol2 --charge-type None --no-min --no-dihed-opt')
         self._testFiles(refDir, resDir)
 
     def test_glycol_dihed_fix_restart_2(self):
@@ -198,7 +198,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart_2')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['O1-C1-C2-O2', 'C1-C2-O2-H6']
-        self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --no-min --no-esp --no-dihed-opt'.format(' '.join(dihedrals)))
+        self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type None --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
         self._testFiles(refDir, resDir)
 
     def test_glycol_dihed_select_1_restart(self):
@@ -206,7 +206,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'glycol_dihed_select_1_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['O1-C1-C2-O2',]
-        self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --no-min --no-esp --no-dihed-opt'.format(' '.join(dihedrals)))
+        self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type None --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
         self._testFiles(refDir, resDir)
 
     def test_glycol_dihed_select_2_restart(self):
@@ -214,7 +214,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'glycol_dihed_select_2_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['C1-C2-O2-H6',]
-        self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --no-min --no-esp --no-dihed-opt'.format(' '.join(dihedrals)))
+        self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type None --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
@@ -235,19 +235,19 @@ class TestParameterize(unittest.TestCase):
     def test_benzamidine_gaff(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_gaff')
         resDir = os.path.join(self.testDir, 'benzamidine_gaff')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF --no-min --no-esp --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF --charge-type None --no-min --no-dihed')
         self._testFiles(refDir, resDir)
 
     def test_benzamidine_gaff2(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_gaff2')
         resDir = os.path.join(self.testDir, 'benzamidine_gaff2')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 --no-min --no-esp --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 --charge-type None --no-min --no-dihed')
         self._testFiles(refDir, resDir)
 
     def test_benzamidine_cgenff(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_cgenff')
         resDir = os.path.join(self.testDir, 'benzamidine_cgenff')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --no-min --no-esp --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --charge-type None --no-min --no-dihed')
         self._testFiles(refDir, resDir)
 
     def test_benzamidine_rtf_prm(self):
@@ -256,7 +256,7 @@ class TestParameterize(unittest.TestCase):
         os.makedirs(resDir, exist_ok=True)
         shutil.copy(os.path.join(refDir, 'input.rtf'), resDir)
         shutil.copy(os.path.join(refDir, 'input.prm'), resDir)
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --rtf-prm input.rtf input.prm --no-min --no-esp --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --rtf-prm input.rtf input.prm --charge-type None --no-min --no-dihed')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')

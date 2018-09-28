@@ -154,9 +154,6 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     # Update the charges
     mol = mol.copy()
     mol.charge[:] = esp_result['charges']
-    for name, charge in zip(mol.name, mol.charge):
-        logger.info('Set charge {}: {:6.3f}'.format(name, charge))
-
     extra = {'qm_dipole': qm_results[0].dipole,
              'esp_loss': esp_result['loss']}
 

@@ -16,12 +16,12 @@ from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
 from htmd.qm import Psi4, Gaussian, FakeQM2
-from htmd.parameterization.fftype import FFTypeMethod, fftype
+from htmd.charge import fitGasteigerCharges, fitESPCharges
 from htmd.molecule.molecule import Molecule
+
+from htmd.parameterization.fftype import FFTypeMethod, fftype
 from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, \
-    minimize, getFixedChargeAtomIndices, fitDihedrals, getDipole, \
-    _qm_method_name
-from htmd.charge import fitESPCharges
+    minimize, getFixedChargeAtomIndices, fitDihedrals, getDipole, _qm_method_name
 from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
 from htmd.parameterization.writers import writeParameters
 
@@ -53,7 +53,8 @@ def getArgumentParser():
                         help='QM environment (default: %(default)s)')
     parser.add_argument('--no-min', action='store_false', dest='minimize',
                         help='Do not perform QM structure minimization')
-    parser.add_argument('--no-esp', action='store_false', dest='fit_charges', help='Do not perform QM charge fitting')
+    parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
+                        help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
     parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
@@ -122,6 +123,59 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
             print('    Equivalents:')
             for dihedral in equivalent_dihedrals:
                 print('      ' + '-'.join(mol.name[list(dihedral)]))
+
+
+def _fit_charges(mol, args, qm):
+
+    logger.info('=== Fitting atomic charges ===')
+
+    if args.charge_type == 'None':
+
+        if len(args.fix_charge) > 0:
+            logger.warning('Flag --fix-charge does not have effect!')
+
+        logger.info('Atom charges are taken from {}'.format(args.filename))
+
+    elif args.charge_type == 'Gasteiger':
+
+        if len(args.fix_charge) > 0:
+            logger.warning('Flag --fix-charge does not have effect!')
+
+        mol = fitGasteigerCharges(mol)
+
+    elif args.charge_type == 'ESP':
+
+        # Set random number generator seed
+        if args.seed:
+            np.random.seed(args.seed)
+
+        # Select the atoms with fixed charges
+        fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
+
+        if isinstance(qm, Psi4):
+            # Create an ESP directory
+            espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
+            os.makedirs(espDir, exist_ok=True)
+
+            # Fit ESP charges
+            mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
+            logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
+
+    else:
+        raise ValueError()
+
+    mm_dipole = getDipole(mol)
+    if np.all(np.isfinite(mm_dipole)):
+        logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
+    else:  # TODO fix
+        logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
+
+    # Print the new charges
+    logger.info('Atomic charges:')
+    for name, charge in zip(mol.name, mol.charge):
+        logger.info('    {}: {:6.3f}'.format(name, charge))
+
+    return mol
 
 
 def main_parameterize(arguments=None):
@@ -250,31 +304,8 @@ def main_parameterize(arguments=None):
             print('\n == Minimizing ==\n')
             mol = minimize(mol, qm, args.outdir)
 
-        # Fit ESP charges
-        if args.fit_charges:
-            print('\n == Fitting ESP charges ==\n')
-
-            # Set random number generator seed
-            if args.seed:
-                np.random.seed(args.seed)
-
-            # Select the atoms with fixed charges
-            fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
-
-            if isinstance(qm, Psi4):
-                # Create an ESP directory
-                espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
-                os.makedirs(espDir, exist_ok=True)
-
-                # Fit ESP charges
-                mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
-                logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
-
-            mm_dipole = getDipole(mol)
-            if np.all(np.isfinite(mm_dipole)):
-                logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
-            else: # TODO fix
-                logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
+        # Fit charges
+        mol = _fit_charges(mol, args, qm)
 
         # Fit dihedral angle parameters
         if args.fit_dihedral:
@@ -303,7 +334,7 @@ def main_parameterize(arguments=None):
         printEnergies(mol, parameters, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
-        
+
 if __name__ == "__main__":
 
     args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
