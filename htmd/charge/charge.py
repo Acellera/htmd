@@ -3,13 +3,13 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import os
 import logging
-import numpy as np
+import os
 from tempfile import TemporaryDirectory
 
+import numpy as np
+
 from htmd.molecule.molecule import Molecule
-from htmd.parameterization.util import _qm_method_name
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def fitGasteigerCharges(mol):
 
     >>> new_mol = fitGasteigerCharges(mol)
     >>> assert new_mol is not mol
-    >>> print(new_mol.charge)
+    >>> print(new_mol.charge) # doctest: +ELLIPSIS
     [-0.4115095   0.20575476  0.20575476]
     """
 
@@ -83,8 +83,13 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
 
     Return
     ------
-    results: Molecule
+    mol: Molecule
         Copy of the molecule with the charges set
+    extra: dict
+        extra['qm_dipole']
+            QM dipole moments
+        extra['esp_loss']
+            ESP fitting loss
 
     Examples
     --------
@@ -97,8 +102,11 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.qm import Psi4
     ffevaluate module is in beta version
-    >>> qm = Psi4()
-
+    >>> with TemporaryDirectory() as tmpDir:
+    ...     new_mol, extra = fitESPCharges(mol, Psi4(), tmpDir)
+    >>> assert new_mol is not mol
+    >>> print(new_mol.charge) # doctest: +ELLIPSIS
+    [-0.39405966  0.19702983  0.19702983]
     """
 
     from htmd.qm import Psi4
@@ -112,18 +120,15 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     if not isinstance(qm, Psi4):
         raise ValueError('"qm" has to be instance of {}'.format(Psi4))
 
-    # Create an ESP directory
-    espDir = os.path.join(outdir, "esp", _qm_method_name(qm))
-    os.makedirs(espDir, exist_ok=True)
-
     # Get ESP points
-    point_file = os.path.join(espDir, "00000", "grid.dat")
+    point_file = os.path.join(outdir, "00000", "grid.dat")
     if os.path.exists(point_file):
         # Load a point file if one exists from a previous job
-        esp_points = np.loadtxt(point_file)
         logger.info('Reusing ESP grid from %s' % point_file)
+        esp_points = np.loadtxt(point_file)
     else:
         # Generate ESP points
+        logger.info('Generating ESP grid')
         esp_points = ESP.generate_points(mol)[0]
 
     # Run QM simulation
@@ -131,7 +136,7 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     qm.esp_points = esp_points
     qm.optimize = False
     qm.restrained_dihedrals = None
-    qm.directory = espDir
+    qm.directory = outdir
     qm_results = qm.run()
     if qm_results[0].errored:
         raise RuntimeError('\nQM calculation failed! Check logs at %s\n' % espDir)
@@ -145,15 +150,17 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     esp.qm_results = qm_results
     esp.fixed = fixed
     esp_result = esp.run()
-    esp_charges, esp_loss = esp_result['charges'], esp_result['loss']
 
     # Update the charges
     mol = mol.copy()
-    mol.charge[:] = esp_charges
+    mol.charge[:] = esp_result['charges']
     for name, charge in zip(mol.name, mol.charge):
         logger.info('Set charge {}: {:6.3f}'.format(name, charge))
 
-    return mol, esp_loss, esp_charges, qm_results[0].dipole
+    extra = {'qm_dipole': qm_results[0].dipole,
+             'esp_loss': esp_result['loss']}
+
+    return mol, extra
 
 
 if __name__ == '__main__':

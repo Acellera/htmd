@@ -261,15 +261,19 @@ def main_parameterize(arguments=None):
             # Select the atoms with fixed charges
             fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
 
-            # Fit ESP charges
             if isinstance(qm, Psi4):
-                mol, _, esp_charges, qm_dipole = fitESPCharges(mol, qm, args.outdir, fixed=fixed_atom_indices)
-                logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
+                # Create an ESP directory
+                espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
+                os.makedirs(espDir, exist_ok=True)
+
+                # Fit ESP charges
+                mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
+                logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
 
             mm_dipole = getDipole(mol)
             if np.all(np.isfinite(mm_dipole)):
                 logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
-            else:
+            else: # TODO fix
                 logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
 
         # Fit dihedral angle parameters
