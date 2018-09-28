@@ -143,6 +143,9 @@ def _fit_charges(mol, args, qm):
 
         mol = fitGasteigerCharges(mol)
 
+        if args.charge is not None:
+            raise RuntimeError('Specified molecular charge is {}, but Gasteiger atomic charges add up to {}.'.format(args.charge, np.sum(mol.charge)))
+
     elif args.charge_type == 'ESP':
 
         # Set random number generator seed
@@ -174,6 +177,7 @@ def _fit_charges(mol, args, qm):
     logger.info('Atomic charges:')
     for name, charge in zip(mol.name, mol.charge):
         logger.info('    {}: {:6.3f}'.format(name, charge))
+    logger.info('Total molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
 
     return mol
 
