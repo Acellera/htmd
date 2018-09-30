@@ -154,15 +154,15 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.parameterization.fftype import FFTypeMethod, fftype
+        from htmd.parameterization.fftype import fftype
         from htmd.parameterization.util import canonicalizeAtomNames, getEquivalentsAndDihedrals
         from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'glycol.mol2')
         mol = Molecule(molFile)
-        mol = canonicalizeAtomNames(mol)
+        mol = canonicalizeAtomNames(mol, 'GAFF2')
         mol, self.equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-        _, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+        _, mol = fftype(mol, method='GAFF2')
         self.mol = mol
 
     def test_getEquivalentDihedrals(self):

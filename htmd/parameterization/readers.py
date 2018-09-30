@@ -12,12 +12,15 @@ def _guessElement(name):
     name = name.lower().capitalize()
     return name
 
+
 def _guessMass(element):
     from htmd.molecule import vdw
     return vdw.massByElement(element)
 
+
+# TODO: fix guessElement
 def readRTF(filename):
-    f = open(filename, "r")
+    f = open(filename, 'r')
     lines = f.readlines()
     f.close()
 
@@ -90,14 +93,13 @@ def readRTF(filename):
 
     for type_ in type_by_index:
         if re.match(_ATOM_TYPE_REG_EX, type_):
-            raise ValueError('Atom type %s is incompatable. It cannot finish with "x" + number!'.format(type_))
+            raise ValueError('Atom type %s is incompatible. It cannot finish with "x" + number!'.format(type_))
 
     return names, element_by_idx, type_by_index, charge_by_idx, mass_by_idx, improper_indices
 
 
-
 def readPREPI(mol, prepi):
-    f = open(prepi, "r")
+    f = open(prepi, 'r')
     lines = f.readlines()
     f.close()
     f = lines
@@ -107,29 +109,22 @@ def readPREPI(mol, prepi):
 
     types = []
     names = np.array(['' for _ in range(mol.numAtoms)], dtype=object)
-    element_by_idx = np.array(['' for _ in range(mol.numAtoms)], dtype=object)
     type_by_idx = np.array(['' for _ in range(mol.numAtoms)], dtype=object)
     charge_by_idx = np.zeros(mol.numAtoms, dtype=np.float32)
-    typeindex_by_type = dict()
 
-    if f[4].split()[1] != "INT":
-        raise ValueError("Invalid prepi format line 5")
+    if f[4].split()[1] != 'INT':
+        raise ValueError('Invalid prepi format line 5')
     if f[5].strip() != "CORRECT     OMIT DU   BEG":
-        raise ValueError("Invalid prepi format line 6")
+        raise ValueError('Invalid prepi format line 6')
 
     ctr = 10
-    while f[ctr].strip() != "":
+    while f[ctr].strip() != '':
         ff = f[ctr].split()
         ff[1] = ff[1].upper()
         idx = index_by_name[ff[1]]
         names[idx] = ff[1]
         type_by_idx[idx] = ff[2]
         charge_by_idx[idx] = float(ff[10])
-        element_by_idx[idx] = _guessElement(ff[1])
-        if not (ff[2] in types):
-            types.append(ff[2])
-            typeindex_by_type[ff[2]] = 900 + len(
-                types) - 1  # add a big offset so it doesn't collide with real charm types
         ctr += 1
 
     # Read improper section
@@ -150,8 +145,28 @@ def readPREPI(mol, prepi):
 
     for type_ in type_by_idx:
         if re.match(_ATOM_TYPE_REG_EX, type_):
-            raise ValueError('Atom type %s is incompatable. It cannot finish with "x" + number!'.format(type_))
+            raise ValueError('Atom type %s is incompatible. It cannot finish with "x" + number!'.format(type_))
 
-    mass_by_idx = np.array([_guessMass(e) for e in element_by_idx], dtype=np.float32)
+    return names, type_by_idx, charge_by_idx, improper_indices
 
-    return names, element_by_idx, type_by_idx, charge_by_idx, mass_by_idx, improper_indices
+
+def readFRCMOD(atomtypes, frcmod):
+    from periodictable import elements
+    mass2element = {e.mass: e.symbol for e in list(elements._element.values())[1:]}
+
+    # Read MASS section
+    with open(frcmod) as file:
+        text = file.read()
+    section = re.search('^MASS\n(.+?)\n\n', text, re.MULTILINE | re.DOTALL)
+
+    mass_by_atomtype = {line.split()[0]: float(line.split()[1]) for line in section.group(1).split('\n')}
+    element_by_atomtype = {}
+    for at in mass_by_atomtype:
+        for m in mass2element:
+            if np.isclose(mass_by_atomtype[at], m, atol=1e-1):
+                element_by_atomtype[at] = mass2element[m]
+
+    element_by_idx = np.array([element_by_atomtype[at] for at in atomtypes]).astype(np.object)
+    mass_by_idx = np.array([mass_by_atomtype[at] for at in atomtypes]).astype(np.float32)
+
+    return mass_by_idx, element_by_idx

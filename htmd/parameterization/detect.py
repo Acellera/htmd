@@ -22,7 +22,7 @@ def _getMolecularGraph(molecule):
 
     graph = nx.Graph()
     for i, element in enumerate(molecule.element):
-        graph.add_node(i, element=element, number=elements.symbol(element).number)
+        graph.add_node(i, element=element, number=elements.symbol(element.capitalize()).number)
     graph.add_edges_from(molecule.bonds)
 
     return graph

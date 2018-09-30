@@ -357,7 +357,7 @@ class TestESP(unittest.TestCase):
 
         from htmd.qm import QMResult
 
-        np.random.seed(20170901) # Make the test deterministic
+        np.random.seed(20170901)  # Make the test deterministic
 
         result = QMResult
         result.esp_points = np.random.normal(size=(100, 3))
@@ -368,6 +368,7 @@ class TestESP(unittest.TestCase):
         rms = self.esp._compute_objective([1, 2], None)
         self.assertAlmostEqual(rms, 6.0746907953331517)
 
+
 def load_tests(loader, tests, ignore):
     """Load DocTests into as a Unittest suite"""
 
@@ -377,6 +378,7 @@ def load_tests(loader, tests, ignore):
         tests.addTests(doctest.DocTestSuite(__name__))
 
     return tests
+
 
 if __name__ == '__main__':
 
