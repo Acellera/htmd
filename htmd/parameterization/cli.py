@@ -234,7 +234,14 @@ def main_parameterize(arguments=None):
         print(" === Fitting for %s ===\n" % method)
         printReport(mol, netcharge, equivalents, all_dihedrals)
 
-        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+        # TODO: move charging out of fftype and have it for cgenff as well
+        if method in ('GAFF', 'GAFF2'):
+            acCharges = 'bcc'
+            parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge,
+                                     acCharges=acCharges)
+        else:
+            parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+
         if isinstance(qm, FakeQM2):
             qm._parameters = parameters
 

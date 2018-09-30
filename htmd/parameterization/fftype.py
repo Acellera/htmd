@@ -311,12 +311,16 @@ class TestFftype(unittest.TestCase):
 
         from tempfile import mkdtemp
         tmpDir = mkdtemp(suffix='fftype')
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as cm:
             _, _ = fftype(testMolecule,
                           method='GAFF2',
                           acCharges=None,
                           netcharge=None,
                           tmpDir=tmpDir)
+
+        self.assertEqual(cm.exception.args[0], 'Initial atom names BR1 were changed by antechamber to CR1. '
+                                               'This probably means that the start of the atom name does not '
+                                               'match element symbol. Please check the molecule.')
 
 
 if __name__ == '__main__':
@@ -324,9 +328,7 @@ if __name__ == '__main__':
     import sys
 
     unittest.main(verbosity=2)
-    sys.exit(0)
 
-    import sys
     import re
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
@@ -361,5 +363,5 @@ if __name__ == '__main__':
                     assert refData == tmpData
 
     with TemporaryDirectory() as tmpDir:
-        parameters, mol = fftype(mol, method=FFTypeMethod.CGenFF_2b6, tmpDir=tmpDir)
+        parameters, mol = fftype(mol, method='CGenFF_2b6', tmpDir=tmpDir)
         assert sorted(os.listdir(tmpDir)) == ['mol.pdb', 'mol.prm', 'mol.rtf', 'top_mol.rtf']
