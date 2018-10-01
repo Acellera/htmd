@@ -45,8 +45,6 @@ def fitGasteigerCharges(mol):
     from rdkit.Chem.rdmolfiles import MolFromMol2File
     from rdkit.Chem.rdPartialCharges import ComputeGasteigerCharges
 
-    from htmd.parameterization.util import guessElementFromName
-
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
     if mol.numFrames != 1:
@@ -54,7 +52,7 @@ def fitGasteigerCharges(mol):
 
     # Guess and set elements, overwise rdkit refuse to read a MOL2 file
     htmd_mol = mol.copy()
-    htmd_mol.atomtype[:] = [guessElementFromName(name) for name in htmd_mol.name]
+    htmd_mol.atomtype = htmd_mol.element
 
     # Convert Molecule to rdkit Mol
     with TemporaryDirectory() as tmpDir:
