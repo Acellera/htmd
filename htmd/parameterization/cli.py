@@ -117,7 +117,6 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitESPCharges
-    from htmd.qm import Psi4
     from htmd.parameterization.util import getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
@@ -127,7 +126,7 @@ def _fit_charges(mol, args, qm):
         if len(args.fix_charge) > 0:
             logger.warning('Flag --fix-charge does not have effect!')
 
-        logger.info('Atom charges are taken from {}'.format(args.filename))
+        logger.info('Atomic charges are taken from {}'.format(args.filename))
 
     elif args.charge_type == 'Gasteiger':
 
@@ -136,8 +135,10 @@ def _fit_charges(mol, args, qm):
 
         mol = fitGasteigerCharges(mol)
 
-        if args.charge is not None:
-            raise RuntimeError('Specified molecular charge is {}, but Gasteiger atomic charges add up to {}.'.format(args.charge, np.sum(mol.charge)))
+        charge = int(round(np.sum(mol.charge)))
+        if args.charge != charge:
+            raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
+                args.charge, charge))
 
     elif args.charge_type == 'ESP':
 
@@ -148,14 +149,13 @@ def _fit_charges(mol, args, qm):
         # Select the atoms with fixed charges
         fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
 
-        if isinstance(qm, Psi4):
-            # Create an ESP directory
-            espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
-            os.makedirs(espDir, exist_ok=True)
+        # Create an ESP directory
+        espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
+        os.makedirs(espDir, exist_ok=True)
 
-            # Fit ESP charges
-            mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
-            logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
+        # Fit ESP charges
+        mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
+        logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
 
     else:
         raise ValueError()
@@ -170,7 +170,7 @@ def _fit_charges(mol, args, qm):
     logger.info('Atomic charges:')
     for name, charge in zip(mol.name, mol.charge):
         logger.info('    {}: {:6.3f}'.format(name, charge))
-    logger.info('Total molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
+    logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
 
     return mol
 
@@ -259,6 +259,24 @@ def main_parameterize(arguments=None):
         print()
         sys.exit(0)
 
+    # Print arguments
+    print('\n === Arguments ===\n')
+    for key, value in vars(args).items():
+        print('{:>12s}: {:s}'.format(key, str(value)))
+
+    # Get the molecular charge
+    charge = int(round(np.sum(mol.charge)))
+    if args.charge is None:
+        args.charge = charge
+        logger.info('Moleculer charge is set to {} by adding up the atomic charges in {}'.format(args.charge,
+                                                                                              args.filename))
+    else:
+        logger.info('Moleculer charge is set to {}'.format(args.charge))
+        if args.charge_type == 'None' and args.charge != charge:
+            raise ValueError(
+                'The molecular charge is set to {}, but the partial atomic charges in {} add up to {}'.format(
+                    args.charge, args.filename, charge))
+
     # Select which dihedrals to fit
     parameterizable_dihedrals = [list(dih[0]) for dih in all_dihedrals]
     if len(args.dihedral) > 0:
@@ -269,20 +287,12 @@ def main_parameterize(arguments=None):
                 raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
             parameterizable_dihedrals.append(list(all_dihedrals[all_dihedral_names.index(dihedral_name)][0]))
 
-    # Get netcharge
-    netcharge = args.charge if args.charge is not None else int(round(np.sum(mol.charge)))
-
-    # Print arguments
-    print('\n === Arguments ===\n')
-    for key, value in vars(args).items():
-        print('{:>12s}: {:s}'.format(key, str(value)))
-
     # Set up the QM object
     qm.theory = args.theory
     qm.basis = args.basis
     qm.solvent = args.environment
     qm.queue = queue
-    qm.charge = netcharge
+    qm.charge = args.charge
 
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in args.forcefield:
@@ -293,15 +303,11 @@ def main_parameterize(arguments=None):
         mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
         print(" === Fitting for %s ===\n" % method)
-        printReport(mol, netcharge, equivalents, all_dihedrals)
+        printReport(mol, args.charge, equivalents, all_dihedrals)
 
-        # TODO: move charging out of fftype and have it for cgenff as well
-        if method in ('GAFF', 'GAFF2'):
-            acCharges = 'bcc'
-            parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge,
-                                     acCharges=acCharges)
-        else:
-            parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+        _charge = mol.charge.copy()
+        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+        assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
 
         if isinstance(qm, FakeQM2):
             qm._parameters = parameters
@@ -316,7 +322,7 @@ def main_parameterize(arguments=None):
 
         # Update basis sets
         # TODO: this is silent and not documented stuff
-        if netcharge < 0 and qm.solvent == 'vacuum':
+        if args.charge < 0 and qm.solvent == 'vacuum':
             if qm.basis == '6-31G*':
                 qm.basis = '6-31+G*'
             if qm.basis == '6-311G**':
@@ -354,7 +360,7 @@ def main_parameterize(arguments=None):
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
-        writeParameters(mol, parameters, qm, method, netcharge, args.outdir, original_coords=orig_coor)
+        writeParameters(mol, parameters, qm, method, args.charge, args.outdir, original_coords=orig_coor)
 
         # Write energy file
         energyFile = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm), 'energies.txt')
