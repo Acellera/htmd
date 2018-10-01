@@ -112,7 +112,7 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     array([-0.394059...,  0.197029...,  0.197029...], dtype=float32)
     """
 
-    from htmd.qm import Psi4
+    from htmd.qm.base import QMBase
     from htmd.charge.esp import ESP
 
     if not isinstance(mol, Molecule):
@@ -120,8 +120,8 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     if mol.numFrames != 1:
         raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
 
-    if not isinstance(qm, Psi4):
-        raise ValueError('"qm" has to be instance of {}'.format(Psi4))
+    if not issubclass(type(qm), QMBase):
+        raise ValueError('"qm" has to be instance of {}'.format(QMBase))
 
     # Get ESP points
     point_file = os.path.join(outdir, "00000", "grid.dat")
