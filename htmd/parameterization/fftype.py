@@ -68,9 +68,8 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
         raise ValueError('Invalid method {}. Available methods {}'.format(method, ','.join(fftypemethods)))
 
     if netcharge is None:
-        logger.info('Using atomic charges from molecule object to calculate net charge')
-        netcharge = np.sum(mol.charge)
-    netcharge = int(round(netcharge))
+        netcharge = int(round(np.sum(mol.charge)))
+        logger.warning('Using atomic charges from molecule object to calculate net charge')
 
     prm = names = elements = atomtypes = charges = impropers = masses = None
     if rtfFile and prmFile:
@@ -174,7 +173,8 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
     mol.name = names
     mol.element = elements
     mol.atomtype = atomtypes
-    mol.charge = charges
+    if acCharges is not None:
+        mol.charge = charges
     mol.impropers = impropers
     if np.sum(mol.masses) == 0:
         mol.masses = masses
