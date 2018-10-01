@@ -64,6 +64,24 @@ def getArgumentParser():
 
     return parser
 
+def _get_molecule(args):
+
+    from htmd.molecule.molecule import Molecule
+
+    mol = Molecule(args.filename)
+
+    if mol.numFrames != 1:
+        raise RuntimeError('{} has to contain only one molecule, but found {}'.format(args.filename, mol.numFrames))
+
+    # TODO: check elements
+
+    # TODO: check bonds
+
+    if np.unique(mol.name).size != mol.numAtoms:
+        raise RuntimeError('The atom names in {} has to be unique!'.format(args.filename))
+
+    return mol
+
 
 def printEnergies(molecule, parameters, filename):
     from htmd.ffevaluation.ffevaluate import FFEvaluate
@@ -179,8 +197,8 @@ def main_parameterize(arguments=None):
 
     args = getArgumentParser().parse_args(args=arguments)
 
-    if not os.path.exists(args.filename):
-        raise ValueError('File %s cannot be found' % args.filename)
+    # Get a molecule and check its validity
+    mol = _get_molecule(args)
 
     # Get RTF and PRM file names
     rtfFile, prmFile = None, None
@@ -242,8 +260,6 @@ def main_parameterize(arguments=None):
     from htmd.parameterization.writers import writeParameters
 
     # Get molecule with default atomtyping just for initial processing
-    from htmd.molecule.molecule import Molecule
-    mol = Molecule(args.filename)
     mol = canonicalizeAtomNames(mol, fftypemethod=getArgumentParser().get_default('forcefield')[0])
 
     # Get rotatable dihedral angles
@@ -298,7 +314,6 @@ def main_parameterize(arguments=None):
     for method in args.forcefield:
 
         # Reload molecule for this fftypemethod
-        mol = Molecule(args.filename)
         mol = canonicalizeAtomNames(mol, fftypemethod=method)
         mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
