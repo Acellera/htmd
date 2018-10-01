@@ -864,7 +864,7 @@ class TestAmberBuild(unittest.TestCase):
 
     def testProteinLigand(self):
         from htmd.builder.solvate import solvate
-        from htmd.parameterization.fftype import fftype, FFTypeMethod
+        from htmd.parameterization.fftype import fftype
         from htmd.parameterization.writers import writeFRCMOD
 
         # Test protein ligand building with parametrized ligand
@@ -874,7 +874,7 @@ class TestAmberBuild(unittest.TestCase):
 
         mol = Molecule(join(refdir, '3ptb_mod.pdb'))
         lig = Molecule(join(refdir, 'benzamidine.pdb'), guess=('bonds', 'angles', 'dihedrals'))
-        prm, lig = fftype(lig, method=FFTypeMethod.GAFF2)
+        prm, lig = fftype(lig, method='GAFF2')
         writeFRCMOD(lig, prm, join(tmpdir, 'mol.frcmod'))
         lig.segid[:] = 'L'
 

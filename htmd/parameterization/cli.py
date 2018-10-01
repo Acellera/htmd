@@ -10,20 +10,7 @@ import logging
 import numpy as np
 
 from htmd.version import version
-from htmd.queues.localqueue import LocalCPUQueue
-from htmd.queues.slurmqueue import SlurmQueue
-from htmd.queues.lsfqueue import LsfQueue
-from htmd.queues.pbsqueue import PBSQueue
-from htmd.queues.acecloudqueue import AceCloudQueue
-from htmd.qm import Psi4, Gaussian, FakeQM2
-from htmd.charge import fitGasteigerCharges, fitESPCharges
-from htmd.molecule.molecule import Molecule
-
-from htmd.parameterization.fftype import FFTypeMethod, fftype
-from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, \
-    minimize, getFixedChargeAtomIndices, fitDihedrals, getDipole, _qm_method_name
-from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
-from htmd.parameterization.writers import writeParameters
+from htmd.parameterization.fftype import fftypemethods
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +24,8 @@ def getArgumentParser():
                         help='Total charge of the molecule (default: sum of partial charges)')
     parser.add_argument('-l', '--list', action='store_true', help='List parameterizable dihedral angles')
     parser.add_argument('--rtf-prm', nargs=2, metavar='<filename>', help='CHARMM RTF and PRM files')
-    parser.add_argument('-ff', '--forcefield', nargs='+', default=['GAFF2'], choices=['GAFF', 'GAFF2', 'CGENFF'],
-                        help='Inital force field guess (default: %(default)s)')
+    parser.add_argument('-ff', '--forcefield', nargs='+', default=['GAFF2'], choices=fftypemethods,
+                        help='Initial atom type and parameter assignment (default: %(default)s)')
     parser.add_argument('--fix-charge', nargs='+', default=[], metavar='<atom name>',
                         help='Fix atomic charge during charge fitting (default: none)')
     parser.add_argument('-d', '--dihedral', nargs='+', default=[], metavar='A1-A2-A3-A4',
@@ -47,7 +34,8 @@ def getArgumentParser():
                         help='QM code (default: %(default)s)')
     parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP', 'wB97X-D'],
                         help='QM level of theory (default: %(default)s)')
-    parser.add_argument('--basis', default='cc-pVDZ', choices=['6-31G*', '6-31+G*', '6-311G**', '6-311++G**', 'cc-pVDZ', 'aug-cc-pVDZ'],
+    parser.add_argument('--basis', default='cc-pVDZ', choices=['6-31G*', '6-31+G*', '6-311G**', '6-311++G**', 'cc-pVDZ',
+                                                               'aug-cc-pVDZ'],
                         help='QM basis set (default: %(default)s)')
     parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
                         help='QM environment (default: %(default)s)')
@@ -113,7 +101,8 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 
     print('Equivalent atom groups:')
     for atom_group in equivalents[0]:
-        print('  ' + ', '.join(mol.name[list(atom_group)]))
+        if len(atom_group) > 1:
+            print('  ' + ', '.join(mol.name[list(atom_group)]))
 
     print('Parameterizable dihedral angles:')
     for equivalent_dihedrals in all_dihedrals:
@@ -126,6 +115,10 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 
 
 def _fit_charges(mol, args, qm):
+
+    from htmd.charge import fitGasteigerCharges, fitESPCharges
+    from htmd.qm import Psi4
+    from htmd.parameterization.util import getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
 
@@ -189,15 +182,18 @@ def main_parameterize(arguments=None):
     if not os.path.exists(args.filename):
         raise ValueError('File %s cannot be found' % args.filename)
 
-    method_map = {'GAFF': FFTypeMethod.GAFF, 'GAFF2': FFTypeMethod.GAFF2, 'CGENFF': FFTypeMethod.CGenFF_2b6}
-    methods = [method_map[method] for method in args.forcefield]
-
     # Get RTF and PRM file names
     rtfFile, prmFile = None, None
     if args.rtf_prm:
         rtfFile, prmFile = args.rtf_prm
 
     # Create a queue for QM
+    from htmd.queues.localqueue import LocalCPUQueue
+    from htmd.queues.slurmqueue import SlurmQueue
+    from htmd.queues.lsfqueue import LsfQueue
+    from htmd.queues.pbsqueue import PBSQueue
+    from htmd.queues.acecloudqueue import AceCloudQueue
+
     if args.queue == 'local':
         queue = LocalCPUQueue()
     elif args.queue == 'Slurm':
@@ -222,6 +218,8 @@ def main_parameterize(arguments=None):
         queue.memory = args.memory
 
     # Create a QM object
+    from htmd.qm import Psi4, Gaussian, FakeQM2
+
     if args.code == 'Psi4':
         qm = Psi4()
     elif args.code == 'Gaussian':
@@ -231,17 +229,25 @@ def main_parameterize(arguments=None):
         qm = QMML()
     else:
         raise NotImplementedError
-
     # This is for debugging only!
     if args.fake_qm:
         qm = FakeQM2()
         logger.warning('Using FakeQM')
 
-    # Get rotatable dihedral angles
+    # Start processing
+    from htmd.parameterization.fftype import fftype
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, minimize, \
+        fitDihedrals, _qm_method_name
+    from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
+    from htmd.parameterization.writers import writeParameters
+
+    # Get molecule with default atomtyping just for initial processing
+    from htmd.molecule.molecule import Molecule
     mol = Molecule(args.filename)
-    mol = canonicalizeAtomNames(mol)
+    mol = canonicalizeAtomNames(mol, fftypemethod=getArgumentParser().get_default('forcefield')[0])
+
+    # Get rotatable dihedral angles
     mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-    netcharge = args.charge if args.charge is not None else int(round(np.sum(mol.charge)))
 
     if args.list:
         print('\n === Parameterizable dihedral angles of {} ===\n'.format(args.filename))
@@ -253,13 +259,6 @@ def main_parameterize(arguments=None):
         print()
         sys.exit(0)
 
-    # Set up the QM object
-    qm.theory = args.theory
-    qm.basis = args.basis
-    qm.solvent = args.environment
-    qm.queue = queue
-    qm.charge = netcharge
-
     # Select which dihedrals to fit
     parameterizable_dihedrals = [list(dih[0]) for dih in all_dihedrals]
     if len(args.dihedral) > 0:
@@ -270,17 +269,40 @@ def main_parameterize(arguments=None):
                 raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
             parameterizable_dihedrals.append(list(all_dihedrals[all_dihedral_names.index(dihedral_name)][0]))
 
+    # Get netcharge
+    netcharge = args.charge if args.charge is not None else int(round(np.sum(mol.charge)))
+
     # Print arguments
     print('\n === Arguments ===\n')
     for key, value in vars(args).items():
         print('{:>12s}: {:s}'.format(key, str(value)))
 
+    # Set up the QM object
+    qm.theory = args.theory
+    qm.basis = args.basis
+    qm.solvent = args.environment
+    qm.queue = queue
+    qm.charge = netcharge
+
     print('\n === Parameterizing %s ===\n' % args.filename)
-    for method in methods:
-        print(" === Fitting for %s ===\n" % method.name)
+    for method in args.forcefield:
+
+        # Reload molecule for this fftypemethod
+        mol = Molecule(args.filename)
+        mol = canonicalizeAtomNames(mol, fftypemethod=method)
+        mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+
+        print(" === Fitting for %s ===\n" % method)
         printReport(mol, netcharge, equivalents, all_dihedrals)
 
-        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+        # TODO: move charging out of fftype and have it for cgenff as well
+        if method in ('GAFF', 'GAFF2'):
+            acCharges = 'bcc'
+            parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge,
+                                     acCharges=acCharges)
+        else:
+            parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+
         if isinstance(qm, FakeQM2):
             qm._parameters = parameters
 
@@ -327,14 +349,15 @@ def main_parameterize(arguments=None):
                 qm._parameters = parameters
 
             # Fit the parameters
-            fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir, geomopt=args.optimize_dihedral)
+            fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir,
+                         geomopt=args.optimize_dihedral)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
         writeParameters(mol, parameters, qm, method, netcharge, args.outdir, original_coords=orig_coor)
 
         # Write energy file
-        energyFile = os.path.join(args.outdir, 'parameters', method.name, _qm_method_name(qm), 'energies.txt')
+        energyFile = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm), 'energies.txt')
         printEnergies(mol, parameters, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 

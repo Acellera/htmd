@@ -23,7 +23,7 @@ def getEquivalentsAndDihedrals(mol):
     return mol, equivalents, all_dihedrals
 
 
-def canonicalizeAtomNames(mol, inplace=False, _logger=True):
+def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
     """
     This fixes up the atom naming and reside name to be consistent.
     NB this scheme matches what MATCH does.
@@ -40,7 +40,7 @@ def canonicalizeAtomNames(mol, inplace=False, _logger=True):
 
     sufices = {}
     for i in range(mol.numAtoms):
-        name = guessElementFromName(mol.name[i]).upper()
+        name = guessElementForFftype(i, mol, fftypemethod).upper()
 
         sufices[name] = sufices.get(name, 0) + 1
         name += str(sufices[name])
@@ -53,38 +53,79 @@ def canonicalizeAtomNames(mol, inplace=False, _logger=True):
         return mol
 
 
-def guessElementFromName(name):
-    '''
+def guessElementForFftype(index, mol, fftypemethod):
+    """
     Guess element from an atom name
 
-    >>> from htmd.parameterization.util import guessElementFromName
-    >>> guessElementFromName('C')
+    >>> from htmd.parameterization.util import guessElementForFftype
+    >>> guessElementForFftype('C')
     'C'
-    >>> guessElementFromName('C1')
+    >>> guessElementForFftype('C1')
     'C'
-    >>> guessElementFromName('C42')
+    >>> guessElementForFftype('C42')
     'C'
-    >>> guessElementFromName('C7S')
+    >>> guessElementForFftype('C7S')
     'C'
-    >>> guessElementFromName('HN1')
+    >>> guessElementForFftype('HN1')
     'H'
-    >>> guessElementFromName('CL')
+    >>> guessElementForFftype('CL')
     'Cl'
-    >>> guessElementFromName('CA1')
+    >>> guessElementForFftype('CA1')
     'Ca'
-    '''
-    import periodictable
-    symbol = name.capitalize()
+    """
 
-    while symbol:
-        try:
-            element = periodictable.elements.symbol(symbol)
-        except ValueError:
-            symbol = symbol[:-1]
+    from htmd.parameterization.fftype import fftypemethods
+
+    elements = dict()
+    elements['GAFF'] = ['H', 'O', 'C', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I']
+    elements['GAFF2'] = ['H', 'O', 'C', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I']
+
+    if fftypemethod == 'CGenFF_2b6':
+        import periodictable
+        name = mol.name[index]
+        symbol = name.capitalize()
+
+        while symbol:
+            try:
+                element = periodictable.elements.symbol(symbol)
+            except ValueError:
+                symbol = symbol[:-1]
+            else:
+                return element.symbol
+
+        raise ValueError('Cannot guess element from atom name: {}'.format(name))
+    elif fftypemethod in ('GAFF2', 'GAFF'):
+        name = mol.name[index]
+        scan = {'matches': 0, 'elements': []}
+        for e in elements[fftypemethod]:
+            if name.capitalize().startswith(e):
+                scan['matches'] += 1
+                scan['elements'].append(e)
+
+        if scan['matches'] == 1:
+            return scan['elements'][0]
+        elif scan['matches'] > 1:
+            # Should only happen with atom names starting with CL
+            import networkx as nx
+
+            # Guess bonds if not present
+            if len(mol.bonds) == 0:
+                logger.warning('No bonds found! Guessing them...')
+                mol.bonds = mol._guessBonds()
+
+            g = nx.Graph()
+            g.add_edges_from(mol.bonds)
+
+            if len(g[index]) == 1:
+                return 'Cl'
+            else:
+                return 'C'
         else:
-            return element.symbol
-
-    raise ValueError('Cannot guess element from atom name: {}'.format(name))
+            raise ValueError('Cannot create element from atom name: {}. It probably does not match the atom elements'
+                             'available for {}: {}'.format(name, fftypemethod, elements[fftypemethod]))
+    else:
+        raise RuntimeError('Not a valid fftypemethod: {}. Valid methods: {}'.format(fftypemethod,
+                                                                                    ','.join(fftypemethods)))
 
 
 def centreOfMass(mol):
@@ -203,7 +244,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
         qm.optimize = geomopt
         qm.restrained_dihedrals = np.array([dihedral])
         qm.directory = directory
-        qm.setup() # QM object is reused, so it has to be properly set up before retrieving.
+        qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
         qm_results.append(qm.retrieve())
 
     # Fit the dihedral parameters
@@ -214,7 +255,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
-    df.result_directory = os.path.join(outdir, 'parameters', method.name, _qm_method_name(qm), 'plots')
+    df.result_directory = os.path.join(outdir, 'parameters', method, _qm_method_name(qm), 'plots')
 
     # In case of FakeQM, the initial parameters are set to zeros.
     # It prevents DihedralFitting class from cheating :D

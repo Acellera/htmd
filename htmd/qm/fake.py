@@ -34,7 +34,7 @@ class FakeQM(QMBase):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype
     >>> from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
@@ -42,8 +42,9 @@ class FakeQM(QMBase):
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
     >>> mol = Molecule(molFile)
-    >>> mol = canonicalizeAtomNames(mol)
-    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    >>> fftypemethod = 'GAFF2'
+    >>> mol = canonicalizeAtomNames(mol, fftypemethod)
+    >>> parameters, mol = fftype(mol, method=fftypemethod)
     >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
     Run a single-point energy and ESP calculation
@@ -62,7 +63,7 @@ class FakeQM(QMBase):
     >>> result.errored
     False
     >>> result.energy # doctest: +ELLIPSIS
-    8.39480...
+    8.38083...
     >>> result.esp_points
     array([[ 1.,  1.,  1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
@@ -79,9 +80,9 @@ class FakeQM(QMBase):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.730...
+    7.697...
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
-    100.37...
+    102.67...
 
     Run a constrained minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -93,7 +94,7 @@ class FakeQM(QMBase):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.870...
+    7.872...
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     89.99...
     """
@@ -183,7 +184,7 @@ class FakeQM2(FakeQM):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.fftype import fftype, FFTypeMethod
+    >>> from htmd.parameterization.fftype import fftype
     >>> from htmd.parameterization.util import canonicalizeAtomNames
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM2
@@ -191,8 +192,9 @@ class FakeQM2(FakeQM):
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
-    >>> mol = canonicalizeAtomNames(mol)
-    >>> parameters, mol = fftype(mol, method=FFTypeMethod.GAFF2)
+    >>> fftypemethod = 'GAFF2'
+    >>> mol = canonicalizeAtomNames(mol, fftypemethod)
+    >>> parameters, mol = fftype(mol, method=fftypemethod)
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
@@ -210,7 +212,7 @@ class FakeQM2(FakeQM):
     >>> result.errored
     False
     >>> result.energy # doctest: +ELLIPSIS
-    8.394807...
+    8.380840...
     >>> result.esp_points
     array([[ 1.,  1.,  1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
@@ -227,9 +229,9 @@ class FakeQM2(FakeQM):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.72959...
+    7.69312...
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
-    101.444...
+    104.821...
 
     Run a constrained minimization
     >>> with TemporaryDirectory() as tmpDir:
@@ -241,14 +243,13 @@ class FakeQM2(FakeQM):
     ...     qm.directory = tmpDir
     ...     result = qm.run()[0]
     >>> result.energy # doctest: +ELLIPSIS
-    7.866173...
+    7.869959...
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
-    90.07915...
+    90.07949...
     """
 
     def _get_prmtop(self):
         from htmd.parameterization.writers import writeFRCMOD, getAtomTypeMapping
-        from htmd.parameterization.fftype import FFTypeMethod
 
         with TemporaryDirectory() as tmpDir:
             frcFile = os.path.join(tmpDir, 'mol.frcmod')

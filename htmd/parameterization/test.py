@@ -31,7 +31,7 @@ class TestParameterize(unittest.TestCase):
         self.assertTrue(os.path.exists(molFile))
         shutil.copy(molFile, resDir)
 
-        print('') # Just for a better readability
+        print('')  # Just for a better readability
         returncode = call(command.split(), cwd=resDir)
         self.assertEqual(returncode, 0)
 
@@ -71,7 +71,7 @@ class TestParameterize(unittest.TestCase):
                     except ValueError:
                         if refField == resField:
                             continue
-                    self.assertListEqual(refLines, resLines) # If there is a mismatch, print a diff of all file
+                    self.assertListEqual(refLines, resLines)  # If there is a mismatch, print a diff of all file
 
         print('')
 
@@ -106,7 +106,6 @@ class TestParameterize(unittest.TestCase):
         self._execute(refDir, resDir, 'parameterize input.mol2 --charge-type None --no-dihed')
         self._testFiles(refDir, resDir)
 
-    @unittest.skip(reason='joblib 0.11 breaks it on Travis?')  # TODO: bring back when joblib back to 0.12
     def test_h2o2_esp(self):
         refDir = os.path.join(self.dataDir, 'h2o2_esp')
         resDir = os.path.join(self.testDir, 'h2o2_esp')
@@ -253,7 +252,7 @@ class TestParameterize(unittest.TestCase):
     def test_benzamidine_cgenff(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_cgenff')
         resDir = os.path.join(self.testDir, 'benzamidine_cgenff')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --charge-type None --no-min --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGenFF_2b6 --charge-type None --no-min --no-dihed')
         self._testFiles(refDir, resDir)
 
     def test_benzamidine_rtf_prm(self):
@@ -262,7 +261,7 @@ class TestParameterize(unittest.TestCase):
         os.makedirs(resDir, exist_ok=True)
         shutil.copy(os.path.join(refDir, 'input.rtf'), resDir)
         shutil.copy(os.path.join(refDir, 'input.prm'), resDir)
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGENFF --rtf-prm input.rtf input.prm --charge-type None --no-min --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff CGenFF_2b6 --rtf-prm input.rtf input.prm --charge-type None --no-min --no-dihed')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
@@ -270,18 +269,17 @@ class TestParameterize(unittest.TestCase):
         assert 'HTMD_CONFIG' in os.environ, '"HTMD_CONFIG" environment variable has to be set'
         refDir = os.path.join(self.dataDir, 'benzamidine_full')
         resDir = os.path.join(self.testDir, 'benzamidine_full')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF --basis 6-31G* -q Slurm')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --basis 6-31G* -q Slurm')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
-    @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
     def test_benzamidine_full_restart(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_full_restart')
         resDir = os.path.join(self.testDir, 'benzamidine_full_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF --basis 6-31G*')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --basis 6-31G*')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
@@ -290,7 +288,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'benzamidine_esp_freeze_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF --fix-charge N2 --basis 6-31G* --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --fix-charge N2 --basis 6-31G* --no-dihed')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
@@ -300,7 +298,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGENFF -d C2-C1-C7-N1 --basis 6-31G*')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 -d C2-C1-C7-N1 --basis 6-31G*')
         self._testFiles(refDir, resDir)
 
 
