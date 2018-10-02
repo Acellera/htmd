@@ -55,19 +55,30 @@ parameters are generated for *GAFF2*. It can be changed with the ``--forcefield`
 switches to *CGenFF*.
 
 The tool can be used to obtain just GAFF, GAFF2 or CGenFF parameters, (without any QM calculations) by setting the
-``--no-min``, ``--no-esp`` and ``--no-dihed`` flags:
+``--charge-type Gasteiger``, ``--no-min``, and ``--no-dihed`` flags:
 
 .. code:: bash
 
-    parameterize benzamidine.mol2 --charge 1 --no-min --no-esp --no-dihed --outdir initial
+    parameterize benzamidine.mol2 --charge 1 --charge-type Gasteiger --no-min --no-dihed --outdir initial
 
 The results are written to ``initial/parameters/GAFF2`` directory (the root directory is specified with ``--outdir``
 flag).
 
+Atomic charges
+--------------
+
+The partial atomic charges are controlled with ``--charge-type`` flag:
+
+- Charges are read from the molecule file (``--charge-type None``).
+- Gasteiger charges are computed (``--charge-type Gasteiger``).
+- ESP charges are computed (``--charge-type ESP``). This requires QM calculations, so it is the slowest option, but more reliable.
+
+
+
 List parameterizable dihedral angles
 ------------------------------------
 
-Parameterizable dihedral angles for a given molecule can be listed using the ``--list `` flag.
+Parameterizable dihedral angles for a given molecule can be listed using the ``--list`` flag.
 
 .. code:: bash
 
@@ -102,7 +113,7 @@ The default QM level is the density functional theory (DFT) with B3LYP exchange-
 dispersion correction. The level of theory can be changed with the ``--theory`` flag, i.e. ``--theory HF`` switches to
 Hartree-Fock method.
 
-The default basis sets are ``cc-pVZD``, though for a negatively charged molecule, the more diffuse ``aug-cc-pVZD`` are
+The default basis sets are ``cc-pVDZ``, though for a negatively charged molecule, the more diffuse ``aug-cc-pVDZ`` are
 used. The basis sets can be changed with ``--basis`` flag, i.e. ``--basis 6-31G*``.
 
 The default QM environment (solvation model) is vacuum. It can be changed with the ``--environment`` flag, i.e.

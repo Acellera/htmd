@@ -69,10 +69,10 @@ class ESP:
     False
 
     Create an ESP charge fitting object
-    >>> from htmd.parameterization.esp import ESP
+    >>> from htmd.charge.esp import ESP
     >>> esp = ESP()
     >>> esp # doctest: +ELLIPSIS
-    <htmd.parameterization.esp.ESP object at 0x...>
+    <htmd.charge.esp.ESP object at 0x...>
 
     Set up and run charge fitting
     >>> esp.molecule = mol

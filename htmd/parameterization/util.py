@@ -1,5 +1,4 @@
 import numpy as np
-from copy import copy
 import logging
 import re
 import os
@@ -192,53 +191,6 @@ def minimize(mol, qm, outdir):
     # Replace coordinates with the minimized set
     mol.coords = np.atleast_3d(np.array(results[0].coords, dtype=np.float32))
     return mol
-
-
-def fitCharges(mol, qm, outdir, fixed=()):
-    from htmd.parameterization.esp import ESP
-
-    # Create an ESP directory
-    espDir = os.path.join(outdir, "esp", _qm_method_name(qm))
-    os.makedirs(espDir, exist_ok=True)
-
-    # Get ESP points
-    point_file = os.path.join(espDir, "00000", "grid.dat")
-    if os.path.exists(point_file):
-        # Load a point file if one exists from a previous job
-        esp_points = np.loadtxt(point_file)
-        logger.info('Reusing ESP grid from %s' % point_file)
-    else:
-        # Generate ESP points
-        esp_points = ESP.generate_points(mol)[0]
-
-    # Run QM simulation
-    qm.molecule = mol
-    qm.esp_points = esp_points
-    qm.optimize = False
-    qm.restrained_dihedrals = None
-    qm.directory = espDir
-    qm_results = qm.run()
-    if qm_results[0].errored:
-        raise RuntimeError('\nQM calculation failed! Check logs at %s\n' % espDir)
-
-    # Safeguard QM code from changing coordinates :)
-    assert np.all(np.isclose(mol.coords, qm_results[0].coords, atol=1e-6))
-
-    # Fit ESP charges
-    esp = ESP()
-    esp.molecule = mol
-    esp.qm_results = qm_results
-    esp.fixed = fixed
-    esp_result = esp.run()
-    esp_charges, esp_loss = esp_result['charges'], esp_result['loss']
-
-    # Update the charges
-    mol = mol.copy()
-    mol.charge[:] = esp_charges
-    for name, charge in zip(mol.name, mol.charge):
-        logger.info('Set charge {}: {:6.3f}'.format(name, charge))
-
-    return mol, esp_loss, esp_charges, qm_results[0].dipole
 
 
 def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt=True):

@@ -41,7 +41,8 @@ def getArgumentParser():
                         help='QM environment (default: %(default)s)')
     parser.add_argument('--no-min', action='store_false', dest='minimize',
                         help='Do not perform QM structure minimization')
-    parser.add_argument('--no-esp', action='store_false', dest='fit_charges', help='Do not perform QM charge fitting')
+    parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
+                        help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
     parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
@@ -113,6 +114,67 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
                 print('      ' + '-'.join(mol.name[list(dihedral)]))
 
 
+def _fit_charges(mol, args, qm):
+
+    from htmd.charge import fitGasteigerCharges, fitESPCharges
+    from htmd.parameterization.util import getFixedChargeAtomIndices, getDipole, _qm_method_name
+
+    logger.info('=== Fitting atomic charges ===')
+
+    if args.charge_type == 'None':
+
+        if len(args.fix_charge) > 0:
+            logger.warning('Flag --fix-charge does not have effect!')
+
+        logger.info('Atomic charges are taken from {}'.format(args.filename))
+
+    elif args.charge_type == 'Gasteiger':
+
+        if len(args.fix_charge) > 0:
+            logger.warning('Flag --fix-charge does not have effect!')
+
+        mol = fitGasteigerCharges(mol)
+
+        charge = int(round(np.sum(mol.charge)))
+        if args.charge != charge:
+            raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
+                args.charge, charge))
+
+    elif args.charge_type == 'ESP':
+
+        # Set random number generator seed
+        if args.seed:
+            np.random.seed(args.seed)
+
+        # Select the atoms with fixed charges
+        fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
+
+        # Create an ESP directory
+        espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
+        os.makedirs(espDir, exist_ok=True)
+
+        # Fit ESP charges
+        mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
+        logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
+
+    else:
+        raise ValueError()
+
+    mm_dipole = getDipole(mol)
+    if np.all(np.isfinite(mm_dipole)):
+        logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
+    else:  # TODO fix
+        logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
+
+    # Print the new charges
+    logger.info('Atomic charges:')
+    for name, charge in zip(mol.name, mol.charge):
+        logger.info('    {}: {:6.3f}'.format(name, charge))
+    logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
+
+    return mol
+
+
 def main_parameterize(arguments=None):
 
     args = getArgumentParser().parse_args(args=arguments)
@@ -174,9 +236,8 @@ def main_parameterize(arguments=None):
 
     # Start processing
     from htmd.parameterization.fftype import fftype
-    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, \
-        minimize, getFixedChargeAtomIndices, fitCharges, fitDihedrals, getDipole, \
-        _qm_method_name
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, minimize, \
+        fitDihedrals, _qm_method_name
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
 
@@ -198,6 +259,24 @@ def main_parameterize(arguments=None):
         print()
         sys.exit(0)
 
+    # Print arguments
+    print('\n === Arguments ===\n')
+    for key, value in vars(args).items():
+        print('{:>12s}: {:s}'.format(key, str(value)))
+
+    # Get the molecular charge
+    charge = int(round(np.sum(mol.charge)))
+    if args.charge is None:
+        args.charge = charge
+        logger.info('Molecular charge is set to {} by adding up the atomic charges in {}'.format(args.charge,
+                                                                                              args.filename))
+    else:
+        logger.info('Molecular charge is set to {}'.format(args.charge))
+        if args.charge_type == 'None' and args.charge != charge:
+            raise ValueError(
+                'The molecular charge is set to {}, but the partial atomic charges in {} add up to {}'.format(
+                    args.charge, args.filename, charge))
+
     # Select which dihedrals to fit
     parameterizable_dihedrals = [list(dih[0]) for dih in all_dihedrals]
     if len(args.dihedral) > 0:
@@ -208,20 +287,12 @@ def main_parameterize(arguments=None):
                 raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
             parameterizable_dihedrals.append(list(all_dihedrals[all_dihedral_names.index(dihedral_name)][0]))
 
-    # Get netcharge
-    netcharge = args.charge if args.charge is not None else int(round(np.sum(mol.charge)))
-
-    # Print arguments
-    print('\n === Arguments ===\n')
-    for key, value in vars(args).items():
-        print('{:>12s}: {:s}'.format(key, str(value)))
-
     # Set up the QM object
     qm.theory = args.theory
     qm.basis = args.basis
     qm.solvent = args.environment
     qm.queue = queue
-    qm.charge = netcharge
+    qm.charge = args.charge
 
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in args.forcefield:
@@ -232,15 +303,11 @@ def main_parameterize(arguments=None):
         mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
         print(" === Fitting for %s ===\n" % method)
-        printReport(mol, netcharge, equivalents, all_dihedrals)
+        printReport(mol, args.charge, equivalents, all_dihedrals)
 
-        # TODO: move charging out of fftype and have it for cgenff as well
-        if method in ('GAFF', 'GAFF2'):
-            acCharges = 'bcc'
-            parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge,
-                                     acCharges=acCharges)
-        else:
-            parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+        _charge = mol.charge.copy()
+        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+        assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
 
         if isinstance(qm, FakeQM2):
             qm._parameters = parameters
@@ -255,7 +322,7 @@ def main_parameterize(arguments=None):
 
         # Update basis sets
         # TODO: this is silent and not documented stuff
-        if netcharge < 0 and qm.solvent == 'vacuum':
+        if args.charge < 0 and qm.solvent == 'vacuum':
             if qm.basis == '6-31G*':
                 qm.basis = '6-31+G*'
             if qm.basis == '6-311G**':
@@ -269,27 +336,8 @@ def main_parameterize(arguments=None):
             print('\n == Minimizing ==\n')
             mol = minimize(mol, qm, args.outdir)
 
-        # Fit ESP charges
-        if args.fit_charges:
-            print('\n == Fitting ESP charges ==\n')
-
-            # Set random number generator seed
-            if args.seed:
-                np.random.seed(args.seed)
-
-            # Select the atoms with fixed charges
-            fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
-
-            # Fit ESP charges
-            mol, _, esp_charges, qm_dipole = fitCharges(mol, qm, args.outdir, fixed=fixed_atom_indices)
-
-            # Print dipoles
-            logger.info('QM dipole: %f %f %f; %f' % tuple(qm_dipole))
-            mm_dipole = getDipole(mol)
-            if np.all(np.isfinite(mm_dipole)):
-                logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
-            else:
-                logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
+        # Fit charges
+        mol = _fit_charges(mol, args, qm)
 
         # Fit dihedral angle parameters
         if args.fit_dihedral:
@@ -312,14 +360,14 @@ def main_parameterize(arguments=None):
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
-        writeParameters(mol, parameters, qm, method, netcharge, args.outdir, original_coords=orig_coor)
+        writeParameters(mol, parameters, qm, method, args.charge, args.outdir, original_coords=orig_coor)
 
         # Write energy file
         energyFile = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm), 'energies.txt')
         printEnergies(mol, parameters, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
-        
+
 if __name__ == "__main__":
 
     args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
