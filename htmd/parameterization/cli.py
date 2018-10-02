@@ -67,18 +67,19 @@ def getArgumentParser():
 def _get_molecule(args):
 
     from htmd.molecule.molecule import Molecule
+    from htmd.parameterization.util import guessElements
 
     mol = Molecule(args.filename)
 
     if mol.numFrames != 1:
         raise RuntimeError('{} has to contain only one molecule, but found {}'.format(args.filename, mol.numFrames))
 
-    # TODO: check elements
-
-    # TODO: check bonds
-
     if np.unique(mol.name).size != mol.numAtoms:
         raise RuntimeError('The atom names in {} has to be unique!'.format(args.filename))
+
+    mol = guessElements(mol, args.forcefield[0])
+
+    # TODO: check bonds
 
     return mol
 

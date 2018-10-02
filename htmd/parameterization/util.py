@@ -40,7 +40,7 @@ def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
 
     sufices = {}
     for i in range(mol.numAtoms):
-        name = guessElementForFftype(i, mol, fftypemethod).upper()
+        name = mol.element[i].upper()
 
         sufices[name] = sufices.get(name, 0) + 1
         name += str(sufices[name])
@@ -53,79 +53,49 @@ def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
         return mol
 
 
-def guessElementForFftype(index, mol, fftypemethod):
+def guessElements(mol, fftypemethod):
     """
     Guess element from an atom name
-
-    >>> from htmd.parameterization.util import guessElementForFftype
-    >>> guessElementForFftype('C')
-    'C'
-    >>> guessElementForFftype('C1')
-    'C'
-    >>> guessElementForFftype('C42')
-    'C'
-    >>> guessElementForFftype('C7S')
-    'C'
-    >>> guessElementForFftype('HN1')
-    'H'
-    >>> guessElementForFftype('CL')
-    'Cl'
-    >>> guessElementForFftype('CA1')
-    'Ca'
     """
 
-    from htmd.parameterization.fftype import fftypemethods
+    elements = {}
+    elements['CGenFF_2b6'] = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
+    elements['GAFF']       = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
+    elements['GAFF2']      = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
 
-    elements = dict()
-    elements['GAFF'] = ['H', 'O', 'C', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I']
-    elements['GAFF2'] = ['H', 'O', 'C', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I']
+    mol = mol.copy()
 
-    if fftypemethod == 'CGenFF_2b6':
-        import periodictable
-        name = mol.name[index]
-        symbol = name.capitalize()
+    for i, name in enumerate(mol.name):
 
-        while symbol:
-            try:
-                element = periodictable.elements.symbol(symbol)
-            except ValueError:
-                symbol = symbol[:-1]
-            else:
-                return element.symbol
+        candidates = [element for element in elements[fftypemethod] if name.capitalize().startswith(element)]
 
-        raise ValueError('Cannot guess element from atom name: {}'.format(name))
-    elif fftypemethod in ('GAFF2', 'GAFF'):
-        name = mol.name[index]
-        scan = {'matches': 0, 'elements': []}
-        for e in elements[fftypemethod]:
-            if name.capitalize().startswith(e):
-                scan['matches'] += 1
-                scan['elements'].append(e)
+        if len(candidates) == 1:
+            mol.element[i] = candidates[0]
+            continue
 
-        if scan['matches'] == 1:
-            return scan['elements'][0]
-        elif scan['matches'] > 1:
-            # Should only happen with atom names starting with CL
-            import networkx as nx
+        if candidates == ['C', 'Cl']:
 
-            # Guess bonds if not present
             if len(mol.bonds) == 0:
-                logger.warning('No bonds found! Guessing them...')
-                mol.bonds = mol._guessBonds()
+                raise RuntimeError('No chemical bonds found in the molecule')
 
-            g = nx.Graph()
-            g.add_edges_from(mol.bonds)
+            # Create a molecular graph
+            import networkx as nx
+            graph = nx.Graph()
+            graph.add_edges_from(mol.bonds)
 
-            if len(g[index]) == 1:
-                return 'Cl'
-            else:
-                return 'C'
-        else:
-            raise ValueError('Cannot create element from atom name: {}. It probably does not match the atom elements'
-                             'available for {}: {}'.format(name, fftypemethod, elements[fftypemethod]))
-    else:
-        raise RuntimeError('Not a valid fftypemethod: {}. Valid methods: {}'.format(fftypemethod,
-                                                                                    ','.join(fftypemethods)))
+            if len(graph[i]) in (2, 3, 4):
+                mol.element[i] = 'C'
+                continue
+
+            if len(graph[i]) == 1:
+                mol.element[i] = 'Cl'
+                continue
+
+        raise ValueError('Cannot guess element from atom name: {}. '
+                         'It does not match any of the expected elements ({}) for {}.'
+                         ''.format(name, elements[fftypemethod], fftypemethod))
+
+    return mol
 
 
 def centreOfMass(mol):
