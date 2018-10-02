@@ -23,36 +23,6 @@ def getEquivalentsAndDihedrals(mol):
     return mol, equivalents, all_dihedrals
 
 
-def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
-    """
-    This fixes up the atom naming and reside name to be consistent.
-    NB this scheme matches what MATCH does.
-    Don't change it or the naming will be inconsistent with the RTF.
-    """
-    if not inplace:
-        mol = mol.copy()
-    mol.segid[:] = 'L'
-    if _logger:
-        logger.info('Rename segment to %s' % mol.segid[0])
-    mol.resname[:] = 'MOL'
-    if _logger:
-        logger.info('Rename residue to %s' % mol.resname[0])
-
-    sufices = {}
-    for i in range(mol.numAtoms):
-        name = mol.element[i].upper()
-
-        sufices[name] = sufices.get(name, 0) + 1
-        name += str(sufices[name])
-
-        if _logger:
-            logger.info('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
-        mol.name[i] = name
-
-    if not inplace:
-        return mol
-
-
 def guessElements(mol, fftypemethod):
     """
     Guess element from an atom name

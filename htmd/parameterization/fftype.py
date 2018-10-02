@@ -20,6 +20,32 @@ logger = logging.getLogger(__name__)
 fftypemethods = ('CGenFF_2b6', 'GAFF', 'GAFF2')
 
 
+def _canonicalizeAtomNames(mol):
+    """
+    This fixes up the atom naming and reside name to be consistent.
+    NB this scheme matches what MATCH does.
+    Don't change it or the naming will be inconsistent with the RTF.
+    """
+
+    mol = mol.copy()
+
+    mol.segid[:] = 'L'
+    logger.info('Rename segment to %s' % mol.segid[0])
+    mol.resname[:] = 'MOL'
+    logger.info('Rename residue to %s' % mol.resname[0])
+
+    sufices = {}
+    for i in range(mol.numAtoms):
+        name = mol.element[i].upper()
+        sufices[name] = sufices.get(name, 0) + 1
+        name += str(sufices[name])
+
+        logger.info('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
+        mol.name[i] = name
+
+    return mol
+
+
 def listFftypemethods():
     print('\n'.join(fftypemethods))
     return
@@ -188,12 +214,12 @@ class TestFftype(unittest.TestCase):
         super(TestFftype, self).__init__(*args, **kwargs)
         from htmd.home import home
         from htmd.molecule.molecule import Molecule
-        from htmd.parameterization.util import canonicalizeAtomNames, getEquivalentsAndDihedrals
+        from htmd.parameterization.util import getEquivalentsAndDihedrals
         from yaml import load as yamlload
         from pickle import load as pickleload
         self.refDir = home(dataDir='test-fftype')
         self.Molecule = Molecule
-        self.canonicalizeAtomNames = canonicalizeAtomNames
+        self.canonicalizeAtomNames = _canonicalizeAtomNames
         self.getEquivalentsAndDihedrals = getEquivalentsAndDihedrals
         self.yamlload = yamlload
         self.pickleload = pickleload
@@ -333,7 +359,7 @@ if __name__ == '__main__':
     from htmd.home import home
     from htmd.molecule.molecule import Molecule
     from htmd.parameterization.writers import writeRTF, writePRM
-    from htmd.parameterization.util import canonicalizeAtomNames, getEquivalentsAndDihedrals
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, logger
 
     # BUG: MATCH does not work on Mac!
     if 'TRAVIS_OS_NAME' in os.environ:
@@ -346,7 +372,7 @@ if __name__ == '__main__':
 
     with TemporaryDirectory() as tmpDir:
 
-        mol = canonicalizeAtomNames(mol, 'CGenFF_2b6')
+        mol = _canonicalizeAtomNames(mol)
         mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
         parameters, mol = fftype(mol, method='CGenFF_2b6')
         writeRTF(mol, parameters, 0, os.path.join(tmpDir, 'cgenff.rtf'))

@@ -50,8 +50,7 @@ class OMMMinimizer(Minimizer):
 
         Examples
         --------
-        >>> from htmd.parameterization.fftype import fftype
-        >>> from htmd.parameterization.util import canonicalizeAtomNames
+        >>> from htmd.parameterization.fftype import fftype, _canonicalizeAtomNames
         >>> from htmd.molecule.molecule import Molecule
 
         >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')

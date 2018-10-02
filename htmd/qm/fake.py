@@ -34,8 +34,8 @@ class FakeQM(QMBase):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.fftype import fftype
-    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames
+    >>> from htmd.parameterization.fftype import fftype, _canonicalizeAtomNames
+    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
 
@@ -43,7 +43,7 @@ class FakeQM(QMBase):
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
     >>> mol = Molecule(molFile)
     >>> fftypemethod = 'GAFF2'
-    >>> mol = canonicalizeAtomNames(mol, fftypemethod)
+    >>> mol = canonicalizeAtomNames(mol)
     >>> parameters, mol = fftype(mol, method=fftypemethod)
     >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
@@ -184,8 +184,7 @@ class FakeQM2(FakeQM):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.fftype import fftype
-    >>> from htmd.parameterization.util import canonicalizeAtomNames
+    >>> from htmd.parameterization.fftype import fftype, _canonicalizeAtomNames
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM2
 
@@ -193,7 +192,7 @@ class FakeQM2(FakeQM):
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
     >>> fftypemethod = 'GAFF2'
-    >>> mol = canonicalizeAtomNames(mol, fftypemethod)
+    >>> mol = canonicalizeAtomNames(mol)
     >>> parameters, mol = fftype(mol, method=fftypemethod)
 
     Run a single-point energy and ESP calculation

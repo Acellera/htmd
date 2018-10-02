@@ -10,7 +10,7 @@ import logging
 import numpy as np
 
 from htmd.version import version
-from htmd.parameterization.fftype import fftypemethods
+from htmd.parameterization.fftype import fftypemethods, _canonicalizeAtomNames
 
 logger = logging.getLogger(__name__)
 
@@ -255,13 +255,13 @@ def main_parameterize(arguments=None):
 
     # Start processing
     from htmd.parameterization.fftype import fftype
-    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, minimize, \
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, minimize, \
         fitDihedrals, _qm_method_name
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
 
     # Get molecule with default atomtyping just for initial processing
-    mol = canonicalizeAtomNames(mol, fftypemethod=getArgumentParser().get_default('forcefield')[0])
+    mol = _canonicalizeAtomNames(mol)
 
     # Get rotatable dihedral angles
     mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
@@ -315,7 +315,7 @@ def main_parameterize(arguments=None):
     for method in args.forcefield:
 
         # Reload molecule for this fftypemethod
-        mol = canonicalizeAtomNames(mol, fftypemethod=method)
+        mol = _canonicalizeAtomNames(mol)
         mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
         print(" === Fitting for %s ===\n" % method)
