@@ -268,10 +268,10 @@ def main_parameterize(arguments=None):
     charge = int(round(np.sum(mol.charge)))
     if args.charge is None:
         args.charge = charge
-        logger.info('Moleculer charge is set to {} by adding up the atomic charges in {}'.format(args.charge,
+        logger.info('Molecular charge is set to {} by adding up the atomic charges in {}'.format(args.charge,
                                                                                               args.filename))
     else:
-        logger.info('Moleculer charge is set to {}'.format(args.charge))
+        logger.info('Molecular charge is set to {}'.format(args.charge))
         if args.charge_type == 'None' and args.charge != charge:
             raise ValueError(
                 'The molecular charge is set to {}, but the partial atomic charges in {} add up to {}'.format(

@@ -50,7 +50,7 @@ def fitGasteigerCharges(mol):
     if mol.numFrames != 1:
         raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
 
-    # Guess and set elements, overwise rdkit refuse to read a MOL2 file
+    # Set atom types to elements, overwise rdkit refuse to read a MOL2 file
     htmd_mol = mol.copy()
     htmd_mol.atomtype = htmd_mol.element
 
