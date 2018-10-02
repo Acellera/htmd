@@ -260,9 +260,6 @@ def main_parameterize(arguments=None):
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
 
-    # Get molecule with default atomtyping just for initial processing
-    mol = _canonicalizeAtomNames(mol)
-
     # Get rotatable dihedral angles
     mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
@@ -314,8 +311,6 @@ def main_parameterize(arguments=None):
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in args.forcefield:
 
-        # Reload molecule for this fftypemethod
-        mol = _canonicalizeAtomNames(mol)
         mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
         print(" === Fitting for %s ===\n" % method)
