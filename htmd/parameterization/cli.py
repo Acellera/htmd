@@ -10,7 +10,7 @@ import logging
 import numpy as np
 
 from htmd.version import version
-from htmd.parameterization.fftype import fftypemethods, _canonicalizeAtomNames
+from htmd.parameterization.fftype import fftypemethods
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,9 @@ def _get_molecule(args):
         raise RuntimeError('The atom names in {} has to be unique!'.format(args.filename))
 
     mol = guessElements(mol, args.forcefield[0])
+
+    # Set segment ID
+    mol.segid[:] = 'L'
 
     # TODO: check bonds
 
