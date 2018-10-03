@@ -50,11 +50,6 @@ def _canonicalizeAtomNames(mol):
     return mol
 
 
-def listFftypemethods():
-    print('\n'.join(fftypemethods))
-    return
-
-
 def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpDir=None, netcharge=None):
     """
     Function to assign atom types and force field parameters for a given molecule.
@@ -213,11 +208,10 @@ class TestFftype(unittest.TestCase):
             acCharges = chargetuple[0]
             netcharge = chargetuple[1]
 
-        testMolecule = Molecule(molFile)
-        testMolecule = _canonicalizeAtomNames(testMolecule)
+        mol = Molecule(molFile)
 
         with TemporaryDirectory() as tmpDir:
-            self.testParameters, self.testMolecule = fftype(testMolecule,
+            self.testParameters, self.testMolecule = fftype(mol,
                                                             method=ffTypeMethod,
                                                             acCharges=acCharges,
                                                             netcharge=netcharge,
