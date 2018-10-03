@@ -34,7 +34,7 @@ class FakeQM(QMBase):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.fftype import fftype, _canonicalizeAtomNames
+    >>> from htmd.parameterization.fftype import fftype
     >>> from htmd.parameterization.util import getEquivalentsAndDihedrals
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
@@ -182,7 +182,7 @@ class FakeQM2(FakeQM):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.parameterization.fftype import fftype, _canonicalizeAtomNames
+    >>> from htmd.parameterization.fftype import fftype
     >>> from htmd.molecule.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM2
 

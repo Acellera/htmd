@@ -175,14 +175,11 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
     assert np.all(mol.element == elements)
 
     mol = mol.copy()
-    #mol.name = names
-    #mol.element = elements
     mol.atomtype = atomtypes
+    mol.masses = masses
+    mol.impropers = impropers
     if acCharges is not None:
         mol.charge = charges
-    mol.impropers = impropers
-    if np.sum(mol.masses) == 0:
-        mol.masses = masses
 
     return prm, mol
 
