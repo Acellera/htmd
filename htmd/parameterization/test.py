@@ -288,7 +288,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'benzamidine_esp_freeze_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --fix-charge N2 --basis 6-31G* --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --fix-charge N14 --basis 6-31G* --no-dihed')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
@@ -298,7 +298,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 -d C2-C1-C7-N1 --basis 6-31G*')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 -d C2-C1-C7-N13 --basis 6-31G*')
         self._testFiles(refDir, resDir)
 
 
