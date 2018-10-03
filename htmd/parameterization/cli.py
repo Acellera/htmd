@@ -71,16 +71,23 @@ def _get_molecule(args):
 
     mol = Molecule(args.filename)
 
+    # Check if the file contain just one conformation
     if mol.numFrames != 1:
         raise RuntimeError('{} has to contain only one molecule, but found {}'.format(args.filename, mol.numFrames))
 
+    # Check if each atom name is unique
     if np.unique(mol.name).size != mol.numAtoms:
         raise RuntimeError('The atom names in {} has to be unique!'.format(args.filename))
 
+    # Guess elements
+    # TODO: it should not depend on FF
     mol = guessElements(mol, args.forcefield[0])
 
     # Set segment ID
+    # Note: it is need to write complete PDB files
     mol.segid[:] = 'L'
+
+    # TODO: check charge
 
     # TODO: check bonds
 
@@ -258,8 +265,7 @@ def main_parameterize(arguments=None):
 
     # Start processing
     from htmd.parameterization.fftype import fftype
-    from htmd.parameterization.util import getEquivalentsAndDihedrals, minimize, \
-        fitDihedrals, _qm_method_name
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, minimize, fitDihedrals, _qm_method_name
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
 
@@ -313,8 +319,6 @@ def main_parameterize(arguments=None):
 
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in args.forcefield:
-
-        mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
         print(" === Fitting for %s ===\n" % method)
         printReport(mol, args.charge, equivalents, all_dihedrals)
