@@ -63,9 +63,9 @@ class FakeQM(QMBase):
     >>> result.energy # doctest: +ELLIPSIS
     8.38083...
     >>> result.esp_points
-    array([[1., 1., 1.]])
+    array([[ 1.,  1.,  1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
-    array([0.37135...])
+    array([ 0.37135...])
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     89.99...
 
@@ -209,9 +209,9 @@ class FakeQM2(FakeQM):
     >>> result.energy # doctest: +ELLIPSIS
     8.380840...
     >>> result.esp_points
-    array([[1., 1., 1.]])
+    array([[ 1.,  1.,  1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
-    array([0.371352...])
+    array([ 0.371352...])
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     89.99954...
 
