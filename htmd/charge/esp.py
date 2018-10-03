@@ -221,7 +221,7 @@ class ESP:
     def _compute_constraint(self, group_charges, _):
 
         charges = self._map_groups_to_atoms(group_charges)
-        constraint = np.sum(charges) - int(np.round(self.molecule.charge.sum()))
+        constraint = np.sum(charges) - self._charge
 
         return constraint
 
@@ -273,13 +273,11 @@ class ESP:
         """
         logger.info('Start charge optimization')
 
-        equivalents = detectEquivalentAtoms(self.molecule)
+        self._charge = self.qm_results[0].charge
 
+        equivalents = detectEquivalentAtoms(self.molecule)
         self._equivalent_atom_groups = equivalents[0]
         self._equivalent_group_by_atom = equivalents[2]
-
-        for result in self.qm_results:
-            assert int(np.round(self.molecule.charge.sum())) == result.charge
 
         # Get charge bounds
         lower_bounds, upper_bounds = self._get_bounds()
