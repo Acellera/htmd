@@ -200,6 +200,8 @@ class ESP:
         self.qm_results = None
         self.fixed = []
 
+        self._charge = 0
+
         self._reciprocal_distances = None
 
         self._equivalent_atom_groups = None
