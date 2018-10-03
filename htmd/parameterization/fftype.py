@@ -52,7 +52,9 @@ def _canonicalizeAtomNames(mol):
 
 def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpDir=None, netcharge=None):
     """
-    Function to assign atom types and force field parameters for a given molecule.
+    Assing atom types and force field parameters for a given molecule.
+    Additionally, atom masses and improper dihedral are set.
+    Optionally, atom charges can be set if `acCharges` is set (see below).
 
     The assignment can be done:
       1. For CHARMM CGenFF_2b6 with MATCH (method = 'CGenFF_2b6');
@@ -73,8 +75,8 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
         methods.
         Default: :func:`fftype.defaultFftypemethod <htmd.parameterization.fftype.defaultFftypemethod>`
     acCharges : str
-        Optionally assign charges with antechamber. Check `antechamber -L` for available options. Caution: This will
-        overwrite any charges defined in the mol2 file.
+        Optionally assign charges with antechamber. Check `antechamber -L` for available options.
+        Note: only works for GAFF and GAFF2.
     tmpDir: str
         Directory for temporary files. If None, a directory is created and
         deleted automatically.
@@ -91,6 +93,9 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
 
     if method not in fftypemethods:
         raise ValueError('Invalid method {}. Available methods {}'.format(method, ','.join(fftypemethods)))
+
+    if method == 'CGenFF_2b6' and acCharges:
+        raise ValueError('acCharges')
 
     if netcharge is None:
         netcharge = int(round(np.sum(mol.charge)))
