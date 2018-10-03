@@ -42,9 +42,7 @@ class FakeQM(QMBase):
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
     >>> mol = Molecule(molFile)
-    >>> fftypemethod = 'GAFF2'
-    >>> mol = canonicalizeAtomNames(mol)
-    >>> parameters, mol = fftype(mol, method=fftypemethod)
+    >>> parameters, mol = fftype(mol, method='GAFF2')
     >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
     Run a single-point energy and ESP calculation
@@ -65,9 +63,9 @@ class FakeQM(QMBase):
     >>> result.energy # doctest: +ELLIPSIS
     8.38083...
     >>> result.esp_points
-    array([[ 1.,  1.,  1.]])
+    array([[1., 1., 1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
-    array([ 0.37135...])
+    array([0.37135...])
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     89.99...
 
@@ -191,9 +189,7 @@ class FakeQM2(FakeQM):
     Create a molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
-    >>> fftypemethod = 'GAFF2'
-    >>> mol = canonicalizeAtomNames(mol)
-    >>> parameters, mol = fftype(mol, method=fftypemethod)
+    >>> parameters, mol = fftype(mol, method='GAFF2')
 
     Run a single-point energy and ESP calculation
     >>> with TemporaryDirectory() as tmpDir:
@@ -213,9 +209,9 @@ class FakeQM2(FakeQM):
     >>> result.energy # doctest: +ELLIPSIS
     8.380840...
     >>> result.esp_points
-    array([[ 1.,  1.,  1.]])
+    array([[1., 1., 1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
-    array([ 0.371352...])
+    array([0.371352...])
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     89.99954...
 
