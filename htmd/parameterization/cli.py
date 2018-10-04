@@ -93,6 +93,81 @@ def _get_molecule(args):
 
     return mol
 
+def _get_reference_calculator(args):
+
+    # Create a queue
+    if args.queue == 'local':
+        from htmd.queues.localqueue import LocalCPUQueue
+        queue = LocalCPUQueue()
+    elif args.queue == 'Slurm':
+        from htmd.queues.slurmqueue import SlurmQueue
+        queue = SlurmQueue(_configapp=args.code.lower())
+    elif args.queue == 'LSF':
+        from htmd.queues.lsfqueue import LsfQueue
+        queue = LsfQueue(_configapp=args.code.lower())
+    elif args.queue == 'PBS':
+        from htmd.queues.pbsqueue import PBSQueue
+        queue = PBSQueue()  # TODO: configure
+    elif args.queue == 'AceCloud':
+        from htmd.queues.acecloudqueue import AceCloudQueue
+        queue = AceCloudQueue()  # TODO: configure
+        queue.groupname = args.groupname
+        queue.hashnames = True
+    else:
+        raise NotImplementedError
+
+    # Configure the queue
+    if args.ncpus:
+        logger.info('Overriding ncpus to {}'.format(args.ncpus))
+        queue.ncpu = args.ncpus
+    if args.memory:
+        logger.info('Overriding memory to {}'.format(args.memory))
+        queue.memory = args.memory
+
+    # Create a QM object
+    if args.code == 'Psi4':
+        from htmd.qm import Psi4
+        qm = Psi4()
+    elif args.code == 'Gaussian':
+        from htmd.qm import Gaussian
+        qm = Gaussian()
+    elif args.code == 'QMML':
+        from htmd.qm.custom import QMML
+        qm = QMML()
+    else:
+        raise NotImplementedError
+
+    # Override with a FakeQM object
+    if args.fake_qm:
+        from htmd.qm import FakeQM2
+        qm = FakeQM2()
+        logger.warning('Using FakeQM')
+
+    # Configure the QM object
+    qm.theory = args.theory
+    qm.basis = args.basis
+    qm.solvent = args.environment
+    qm.queue = queue
+    qm.charge = args.charge
+
+    # Update B3LYP to B3LYP-D3
+    # TODO: this is silent and not documented stuff
+    if qm.theory == 'B3LYP':
+        qm.correction = 'D3'
+
+    # Update basis sets
+    # TODO: this is silent and not documented stuff
+    if args.charge < 0 and qm.solvent == 'vacuum':
+        if qm.basis == '6-31G*':
+            qm.basis = '6-31+G*'
+        if qm.basis == '6-311G**':
+            qm.basis = '6-311++G**'
+        if qm.basis == 'cc-pVDZ':
+            qm.basis = 'aug-cc-pVDZ'
+        logger.info('Changing basis sets to %s' % qm.basis)
+
+    return qm
+
 
 def printEnergies(molecule, parameters, filename):
     from htmd.ffevaluation.ffevaluate import FFEvaluate
@@ -219,58 +294,6 @@ def main_parameterize(arguments=None):
     # Get a molecule and check its validity
     mol = _get_molecule(args)
 
-    # Get RTF and PRM file names
-    rtfFile, prmFile = None, None
-    if args.rtf_prm:
-        rtfFile, prmFile = args.rtf_prm
-
-    # Create a queue for QM
-    from htmd.queues.localqueue import LocalCPUQueue
-    from htmd.queues.slurmqueue import SlurmQueue
-    from htmd.queues.lsfqueue import LsfQueue
-    from htmd.queues.pbsqueue import PBSQueue
-    from htmd.queues.acecloudqueue import AceCloudQueue
-
-    if args.queue == 'local':
-        queue = LocalCPUQueue()
-    elif args.queue == 'Slurm':
-        queue = SlurmQueue(_configapp=args.code.lower())
-    elif args.queue == 'LSF':
-        queue = LsfQueue(_configapp=args.code.lower())
-    elif args.queue == 'PBS':
-        queue = PBSQueue()  # TODO: configure
-    elif args.queue == 'AceCloud':
-        queue = AceCloudQueue()  # TODO: configure
-        queue.groupname = args.groupname
-        queue.hashnames = True
-    else:
-        raise NotImplementedError
-
-    # Override default ncpus
-    if args.ncpus:
-        logger.info('Overriding ncpus to {}'.format(args.ncpus))
-        queue.ncpu = args.ncpus
-    if args.memory:
-        logger.info('Overriding memory to {}'.format(args.memory))
-        queue.memory = args.memory
-
-    # Create a QM object
-    from htmd.qm import Psi4, Gaussian, FakeQM2
-
-    if args.code == 'Psi4':
-        qm = Psi4()
-    elif args.code == 'Gaussian':
-        qm = Gaussian()
-    elif args.code == 'QMML':
-        from htmd.qm.custom import QMML
-        qm = QMML()
-    else:
-        raise NotImplementedError
-    # This is for debugging only!
-    if args.fake_qm:
-        qm = FakeQM2()
-        logger.warning('Using FakeQM')
-
     # Start processing
     from htmd.parameterization.fftype import fftype
     from htmd.parameterization.util import getEquivalentsAndDihedrals, minimize, fitDihedrals, _qm_method_name
@@ -313,12 +336,10 @@ def main_parameterize(arguments=None):
                 raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
             parameterizable_dihedrals.append(list(all_dihedrals[all_dihedral_names.index(dihedral_name)][0]))
 
-    # Set up the QM object
-    qm.theory = args.theory
-    qm.basis = args.basis
-    qm.solvent = args.environment
-    qm.queue = queue
-    qm.charge = args.charge
+    # Get a reference calculator
+    qm = None
+    if args.minize or args.charge_type == 'ESP' or args.fit_dihedral:
+        qm = _get_reference_calculator(args)
 
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in args.forcefield:
@@ -326,31 +347,18 @@ def main_parameterize(arguments=None):
         print(" === Fitting for %s ===\n" % method)
         printReport(mol, args.charge, equivalents, all_dihedrals)
 
+        # Get RTF and PRM file names
+        rtfFile, prmFile = args.rtf_prm if args.rtf_prm else None, None
+
         _charge = mol.charge.copy()
         parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
         assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
 
-        if isinstance(qm, FakeQM2):
+        if args.fake_qm:
             qm._parameters = parameters
 
         # Copy the molecule to preserve initial coordinates
         orig_coor = mol.coords.copy()
-
-        # Update B3LYP to B3LYP-D3
-        # TODO: this is silent and not documented stuff
-        if qm.theory == 'B3LYP':
-            qm.correction = 'D3'
-
-        # Update basis sets
-        # TODO: this is silent and not documented stuff
-        if args.charge < 0 and qm.solvent == 'vacuum':
-            if qm.basis == '6-31G*':
-                qm.basis = '6-31+G*'
-            if qm.basis == '6-311G**':
-                qm.basis = '6-311++G**'
-            if qm.basis == 'cc-pVDZ':
-                qm.basis = 'aug-cc-pVDZ'
-            logger.info('Changing basis sets to %s' % qm.basis)
 
         # Minimize molecule
         if args.minimize:
@@ -372,7 +380,7 @@ def main_parameterize(arguments=None):
             mol, originaltypes = inventAtomTypes(mol, parameterizable_dihedrals, equivalents)
             parameters = recreateParameters(mol, originaltypes, parameters)
             parameters = createMultitermDihedralTypes(parameters)
-            if isinstance(qm, FakeQM2):
+            if args.fake_qm:
                 qm._parameters = parameters
 
             # Fit the parameters
