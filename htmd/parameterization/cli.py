@@ -206,7 +206,15 @@ def _fit_charges(mol, args, qm):
 
 def main_parameterize(arguments=None):
 
+    logger.info('===== Parameterize =====')
+
+    # Parse arguments
     args = getArgumentParser().parse_args(args=arguments)
+    logger.info('Arguments:')
+    for key, value in vars(args).items():
+        if key in ('fake_qm',):
+            continue
+        logger.info('{:>20s}: {:s}'.format(key, str(value)))
 
     # Get a molecule and check its validity
     mol = _get_molecule(args)
@@ -281,11 +289,6 @@ def main_parameterize(arguments=None):
                 fh.write(dihedral_name+'\n')
         print()
         sys.exit(0)
-
-    # Print arguments
-    print('\n === Arguments ===\n')
-    for key, value in vars(args).items():
-        print('{:>12s}: {:s}'.format(key, str(value)))
 
     # Get the molecular charge
     charge = int(round(np.sum(mol.charge)))
