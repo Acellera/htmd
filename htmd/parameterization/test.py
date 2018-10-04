@@ -75,6 +75,18 @@ class TestParameterize(unittest.TestCase):
 
         print('')
 
+    def test_parameterize_speed(self):
+        import time
+        _started_at = time.time()
+
+        command = 'parameterize -h'
+        print('')  # Just for a better readability
+        returncode = call(command.split())
+        self.assertEqual(returncode, 0)
+
+        elapsed = time.time() - _started_at
+        self.assertLessEqual(elapsed, 1.5)
+
     def test_h2o2_list(self):
         refDir = os.path.join(self.dataDir, 'h2o2_list')
         resDir = os.path.join(self.testDir, 'h2o2_list')
