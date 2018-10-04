@@ -52,11 +52,9 @@ class Psi4(QMBase):
     Create an object of H2 molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.parameterization.util import getEquivalentsAndDihedrals
     >>> from htmd.molecule.molecule import Molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2-0.74.mol2')
     >>> mol = Molecule(molFile)
-    >>> mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
     Create a Psi4 object
     >>> from htmd.qm import Psi4

@@ -310,12 +310,10 @@ class TestESP(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.parameterization.util import getEquivalentsAndDihedrals
         from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'H2O2.mol2')
         mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
-        mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
         self.mol = mol
         self.esp = ESP()
         self.esp.molecule = self.mol

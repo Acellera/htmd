@@ -6,23 +6,6 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def getEquivalentsAndDihedrals(mol):
-    from htmd.molecule.util import guessAnglesAndDihedrals
-    from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
-
-    mol = mol.copy()
-
-    # Guess bonds
-    if len(mol.bonds) == 0:
-        logger.warning('No bonds found! Guessing them...')
-        mol.bonds = mol._guessBonds()
-
-    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
-    equivalents = detectEquivalentAtoms(mol)
-    all_dihedrals = detectParameterizableDihedrals(mol)
-    return mol, equivalents, all_dihedrals
-
-
 def guessElements(mol, fftypemethod):
     """
     Guess element from an atom name

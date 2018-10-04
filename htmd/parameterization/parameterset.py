@@ -161,15 +161,14 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.parameterization.fftype import fftype
-        from htmd.parameterization.util import getEquivalentsAndDihedrals
         from htmd.molecule.molecule import Molecule
+        from htmd.parameterization.detect import detectEquivalentAtoms
+        from htmd.parameterization.fftype import fftype
 
         molFile = os.path.join(home('test-param'), 'glycol.mol2')
         mol = Molecule(molFile)
-        mol, self.equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-        _, mol = fftype(mol, method='GAFF2')
-        self.mol = mol
+        self.equivalents = detectEquivalentAtoms(mol)
+        _, self.mol = fftype(mol, method='GAFF2')
 
     def test_getEquivalentDihedrals(self):
         self.assertListEqual(_getEquivalentDihedrals(self.mol, self.equivalents, [0, 1, 2, 3]), [[0, 1, 2, 3]])

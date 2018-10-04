@@ -326,8 +326,12 @@ def main_parameterize(arguments=None):
     mol = _get_molecule(args)
 
     # Get rotatable dihedral angles
-    from htmd.parameterization.util import getEquivalentsAndDihedrals
-    mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    from htmd.molecule.util import guessAnglesAndDihedrals
+    from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
+
+    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
+    equivalents = detectEquivalentAtoms(mol)
+    all_dihedrals = detectParameterizableDihedrals(mol)
     printReport(mol, equivalents, all_dihedrals)
 
     if args.list:
