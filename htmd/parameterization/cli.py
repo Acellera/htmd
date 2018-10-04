@@ -76,7 +76,7 @@ def _get_molecule(args):
         raise RuntimeError('{} has to be in MOL2 format'.format(args.filename))
 
     # Read the molecule file
-    mol = Molecule(args.filename)
+    mol = Molecule(args.filename, guessNE='bonds', guess=('angles', 'dihedrals'))
     logger.info('Read a molecule from file: {}'.format(args.filename))
 
     # Check if the file contain just one conformation
@@ -230,25 +230,6 @@ VdW      : {VDW_ENERGY}
         file_.write(string)
 
 
-def printReport(mol, equivalents, all_dihedrals):
-
-    print('\n == Molecule report ==\n')
-
-    print('Equivalent atom groups:')
-    for atom_group in equivalents[0]:
-        if len(atom_group) > 1:
-            print('  ' + ', '.join(mol.name[list(atom_group)]))
-
-    print('Parameterizable dihedral angles:')
-    for equivalent_dihedrals in all_dihedrals:
-        dihedral, equivalent_dihedrals = equivalent_dihedrals[0], equivalent_dihedrals[1:]
-        print('  ' + '-'.join(mol.name[list(dihedral)]))
-        if equivalent_dihedrals:
-            print('    Equivalents:')
-            for dihedral in equivalent_dihedrals:
-                print('      ' + '-'.join(mol.name[list(dihedral)]))
-
-
 def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitESPCharges
@@ -312,10 +293,11 @@ def _fit_charges(mol, args, qm):
 
 def main_parameterize(arguments=None):
 
-    logger.info('===== Parameterize =====')
-
     # Parse arguments
     args = getArgumentParser().parse_args(args=arguments)
+
+    # Print arguments
+    logger.info('===== Parameterize =====')
     logger.info('Arguments:')
     for key, value in vars(args).items():
         if key in ('fake_qm',):
@@ -325,34 +307,51 @@ def main_parameterize(arguments=None):
     # Get a molecule and check its validity
     mol = _get_molecule(args)
 
-    # Get rotatable dihedral angles
-    from htmd.molecule.util import guessAnglesAndDihedrals
-    from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
+    # Detect equivalent atom groups
+    if args.charge_type == 'ESP':
+        from htmd.parameterization.detect import detectEquivalentAtoms
 
-    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
-    equivalents = detectEquivalentAtoms(mol)
-    all_dihedrals = detectParameterizableDihedrals(mol)
-    printReport(mol, equivalents, all_dihedrals)
+        logger.info('Equivalent atom groups:')
+        atom_groups = [group for group in detectEquivalentAtoms(mol)[0] if len(group) > 1]
+        for atom_group in atom_groups:
+            logger.info('    {}'.format(', '.join(mol.name[list(atom_group)])))
 
+    # Detect parameterizable dihedral angles
+    if args.fit_dihedral or args.list:
+        from htmd.parameterization.detect import detectParameterizableDihedrals
+
+        param_dihedrals = detectParameterizableDihedrals(mol)
+
+        logger.info('Parameterizable dihedral angles (and their equivalents):')
+        for dihedrals in param_dihedrals:
+            names = ['-'.join(mol.name[list(dihedral)]) for dihedral in dihedrals]
+            line = '    {}'.format(names[0])
+            if names[1:]:
+                line += ' ({})'.format(', '.join(names[1:]))
+            logger.info(line)
+
+    # Print parameterize dihedral list to a file
     if args.list:
-        print('\n === Parameterizable dihedral angles of {} ===\n'.format(args.filename))
-        with open('torsions.txt', 'w') as fh:
-            for dihedral in all_dihedrals:
-                dihedral_name = '-'.join(mol.name[list(dihedral[0])])
-                print('  {}'.format(dihedral_name))
-                fh.write(dihedral_name+'\n')
-        print()
+        dihedral_file = 'torsions.txt'
+        with open(dihedral_file, 'w') as fh:
+            for dihedrals in param_dihedrals:
+                name = '-'.join(mol.name[list(dihedrals[0])])
+                fh.write('{}\n'.format(name))
+            logger.info('Parameterizable dihedral angle list written to {}'.format(dihedral_file))
         sys.exit(0)
 
-    # Select which dihedrals to fit
-    parameterizable_dihedrals = [list(dih[0]) for dih in all_dihedrals]
-    if len(args.dihedral) > 0:
-        all_dihedral_names = ['-'.join(mol.name[list(dihedral[0])]) for dihedral in all_dihedrals]
-        parameterizable_dihedrals = []
-        for dihedral_name in args.dihedral:
-            if dihedral_name not in all_dihedral_names:
-                raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
-            parameterizable_dihedrals.append(list(all_dihedrals[all_dihedral_names.index(dihedral_name)][0]))
+    # Select dihedrals to parameterize
+    if args.fit_dihedral:
+        if args.dihedral:
+            selected_dihedrals = []
+            name2dihedral = {'-'.join(mol.name[list(dihedrals[0])]): dihedrals[0] for dihedrals in param_dihedrals}
+            for dihedral_name in args.dihedral:
+                if dihedral_name not in name2dihedral.keys():
+                    raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
+                selected_dihedrals.append(list(name2dihedral[dihedral_name]))
+        else:
+            # By default parameterize all the dihedrals
+            selected_dihedrals = [list(dihedrals[0]) for dihedrals in param_dihedrals]
 
     # Get a reference calculator
     qm = _get_reference_calculator(args)
@@ -397,14 +396,14 @@ def main_parameterize(arguments=None):
                 np.random.seed(args.seed)
 
             # Invent new atom types for dihedral atoms
-            mol, originaltypes = inventAtomTypes(mol, parameterizable_dihedrals, equivalents)
+            mol, originaltypes = inventAtomTypes(mol, selected_dihedrals)
             parameters = recreateParameters(mol, originaltypes, parameters)
             parameters = createMultitermDihedralTypes(parameters)
             if args.fake_qm:
                 qm._parameters = parameters
 
             # Fit the parameters
-            fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir,
+            fitDihedrals(mol, qm, method, parameters, param_dihedrals, selected_dihedrals, args.outdir,
                          geomopt=args.optimize_dihedral)
 
         # Output the FF parameters
