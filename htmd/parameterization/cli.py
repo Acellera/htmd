@@ -69,27 +69,61 @@ def _get_molecule(args):
     from htmd.molecule.molecule import Molecule
     from htmd.parameterization.util import guessElements
 
+    logger.info('=== Molecule ===')
+
+    # Check the file extension
+    if os.path.splitext(args.filename)[1] != '.mol2':
+        raise RuntimeError('{} has to be in MOL2 format'.format(args.filename))
+
+    # Read the molecule file
     mol = Molecule(args.filename)
+    logger.info('Read a molecule from file: {}'.format(args.filename))
 
     # Check if the file contain just one conformation
     if mol.numFrames != 1:
-        raise RuntimeError('{} has to contain only one molecule, but found {}'.format(args.filename, mol.numFrames))
+        raise RuntimeError('{} has to contain only one conformation, but found {}'.format(args.filename, mol.numFrames))
 
-    # Check if each atom name is unique
+    # Check the number of atoms
+    if mol.numAtoms < 2:
+        raise RuntimeError('Molecule has to contain more than one atom')
+    logger.info('Number of atoms: {}'.format(mol.numAtoms))
+
+    # Check the number of bonds
+    if mol.bonds.size < 1:
+        raise RuntimeError('Molecule has to have at least one bond')
+    logger.info('Number of bonds: {}'.format(mol.bonds.size))
+
+    # Set the molecular charge
+    charge = int(round(np.sum(mol.charge)))
+    if args.charge is None:
+        args.charge = charge
+        logger.info('Molecular charge is set to {} by adding up the atomic charges in {}'
+                    ''.format(args.charge, args.filename))
+    else:
+        logger.info('Molecular charge is set to {}'.format(args.charge))
+        if args.charge_type == 'None' and args.charge != charge:
+            raise ValueError('The molecular charge is set to {}, but the partial atomic charges in {} '
+                             'add up to {}'.format(args.charge, args.filename, charge))
+
+    # Check atom names are unique
     if np.unique(mol.name).size != mol.numAtoms:
         raise RuntimeError('The atom names in {} has to be unique!'.format(args.filename))
 
     # Guess elements
     # TODO: it should not depend on FF
     mol = guessElements(mol, args.forcefield[0])
+    logger.info('Elements detected:')
+    for name, element in zip(mol.name, mol.element):
+        logger.info('    {:6s}: {:2s}'.format(name, element))
+
+    # Check residue names
+    if not np.all(mol.resname == mol.resname[0]):
+        raise RuntimeError('Molecule has to have the same residue name')
+    logger.info('Residue name: {}'.format(mol.resname[0]))
 
     # Set segment ID
-    # Note: it is need to write complete PDB files
-    mol.segid[:] = 'L'
-
-    # TODO: check charge
-
-    # TODO: check bonds
+    mol.segid[:] = 'L' # Note: it is need to write complete PDB files
+    logger.info('Sgment ID: {}'.format(mol.segid[0]))
 
     return mol
 
@@ -196,12 +230,9 @@ VdW      : {VDW_ENERGY}
         file_.write(string)
 
 
-def printReport(mol, netcharge, equivalents, all_dihedrals):
+def printReport(mol, equivalents, all_dihedrals):
 
     print('\n == Molecule report ==\n')
-
-    print('Total number of atoms: %d' % mol.numAtoms)
-    print('Total charge: %d' % netcharge)
 
     print('Equivalent atom groups:')
     for atom_group in equivalents[0]:
@@ -294,14 +325,10 @@ def main_parameterize(arguments=None):
     # Get a molecule and check its validity
     mol = _get_molecule(args)
 
-    # Start processing
-    from htmd.parameterization.fftype import fftype
-    from htmd.parameterization.util import getEquivalentsAndDihedrals, minimize, fitDihedrals, _qm_method_name
-    from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
-    from htmd.parameterization.writers import writeParameters
-
     # Get rotatable dihedral angles
+    from htmd.parameterization.util import getEquivalentsAndDihedrals
     mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
+    printReport(mol, equivalents, all_dihedrals)
 
     if args.list:
         print('\n === Parameterizable dihedral angles of {} ===\n'.format(args.filename))
@@ -312,19 +339,6 @@ def main_parameterize(arguments=None):
                 fh.write(dihedral_name+'\n')
         print()
         sys.exit(0)
-
-    # Get the molecular charge
-    charge = int(round(np.sum(mol.charge)))
-    if args.charge is None:
-        args.charge = charge
-        logger.info('Molecular charge is set to {} by adding up the atomic charges in {}'.format(args.charge,
-                                                                                              args.filename))
-    else:
-        logger.info('Molecular charge is set to {}'.format(args.charge))
-        if args.charge_type == 'None' and args.charge != charge:
-            raise ValueError(
-                'The molecular charge is set to {}, but the partial atomic charges in {} add up to {}'.format(
-                    args.charge, args.filename, charge))
 
     # Select which dihedrals to fit
     parameterizable_dihedrals = [list(dih[0]) for dih in all_dihedrals]
@@ -337,15 +351,17 @@ def main_parameterize(arguments=None):
             parameterizable_dihedrals.append(list(all_dihedrals[all_dihedral_names.index(dihedral_name)][0]))
 
     # Get a reference calculator
-    qm = None
-    if args.minize or args.charge_type == 'ESP' or args.fit_dihedral:
-        qm = _get_reference_calculator(args)
+    qm = _get_reference_calculator(args)
+
+    from htmd.parameterization.fftype import fftype
+    from htmd.parameterization.util import minimize, fitDihedrals, _qm_method_name
+    from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
+    from htmd.parameterization.writers import writeParameters
 
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in args.forcefield:
 
         print(" === Fitting for %s ===\n" % method)
-        printReport(mol, args.charge, equivalents, all_dihedrals)
 
         # Get RTF and PRM file names
         rtfFile, prmFile = args.rtf_prm if args.rtf_prm else None, None
