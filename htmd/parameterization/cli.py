@@ -222,15 +222,19 @@ def main_parameterize(arguments=None):
     # Create a QM object
     from htmd.qm import Psi4, Gaussian, FakeQM2
 
-    if args.code == 'Psi4':
-        qm = Psi4()
-    elif args.code == 'Gaussian':
-        qm = Gaussian()
-    elif args.code == 'QMML':
-        from htmd.qm.custom import QMML
-        qm = QMML()
+    if args.qmml:
+        import importlib
+        from htmd.qm.custom import CustomQM
+        qm = CustomQM()
+        qm.calculator = importlib.import_module(args.qmml).get_calculator()
     else:
-        raise NotImplementedError
+        if args.code == 'Psi4':
+            qm = Psi4()
+        elif args.code == 'Gaussian':
+            qm = Gaussian()
+        else:
+            raise NotImplementedError
+
     # This is for debugging only!
     if args.fake_qm:
         qm = FakeQM2()
