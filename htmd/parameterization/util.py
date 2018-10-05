@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def getEquivalentsAndDihedrals(mol):
+
     from htmd.molecule.util import guessAnglesAndDihedrals
     from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
 
@@ -27,6 +28,12 @@ def guessElements(mol, fftypemethod):
     """
     Guess element from an atom name
     """
+
+    from htmd.parameterization.fftype import fftypemethods
+
+    if fftypemethod not in fftypemethods:
+        raise ValueError('Invalid "fftypemethod": {}. Valid methods: {}'
+                         ''.format(fftypemethod, ','.join(fftypemethods)))
 
     elements = {}
     elements['CGenFF_2b6'] = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']

@@ -289,6 +289,7 @@ class TestFftype(unittest.TestCase):
 
                 refDir = os.path.join(self.refDir, name, method)
                 self._init_mol(name, method, chargetuple)
+                # self._generate_references(name, method)
 
                 with open(os.path.join(refDir, 'mol_props.yaml')) as infile:
                     refProps = yaml.load(infile)
