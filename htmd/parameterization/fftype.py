@@ -118,6 +118,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
 
             if method in ('GAFF', 'GAFF2'):
 
+                from htmd.molecule.molecule import Molecule
                 from htmd.parameterization.readers import readPREPI, readFRCMOD
 
                 # Write the molecule to a file
@@ -149,6 +150,18 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
                 returncode = subprocess.call(cmd, cwd=tmpdir)
                 if returncode != 0:
                     raise RuntimeError('"parmchk2" failed')
+
+                # Check if antechamber did changes in atom names (and suggest the user to fix the names)
+                acmol = Molecule(os.path.join(tmpdir, 'NEWPDB.PDB'), type='pdb')
+                acmol.name = np.array([n.upper() for n in acmol.name]).astype(np.object)
+                changed_mol_acmol = np.setdiff1d(renamed_mol.name, acmol.name)
+                changed_acmol_mol = np.setdiff1d(acmol.name, renamed_mol.name)
+                if len(changed_mol_acmol) != 0 or len(changed_acmol_mol) != 0:
+                    raise RuntimeError('Initial atom names {} were changed by antechamber to {}. '
+                                       'This probably means that the start of the atom name does not match '
+                                       'element symbol. '
+                                       'Please check the molecule.'
+                                       ''.format(','.join(changed_mol_acmol), ','.join(changed_acmol_mol)))
 
                 # Read the results
                 prm = parmed.amber.AmberParameterSet(os.path.join(tmpdir, 'mol.frcmod'))
@@ -311,8 +324,12 @@ class TestFftype(unittest.TestCase):
 
         mol = Molecule(molFile)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as cm:
             fftype(mol, method='GAFF2')
+
+            self.assertEqual(cm.exception.args[0], 'Initial atom names BR1 were changed by antechamber to CR1. '
+                                                   'This probably means that the start of the atom name does not '
+                                                   'match element symbol. Please check the molecule.')
 
 
 if __name__ == '__main__':

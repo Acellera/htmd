@@ -69,7 +69,7 @@ def _get_molecule(args):
     from htmd.molecule.molecule import Molecule
     from htmd.parameterization.util import guessElements
 
-    mol = Molecule(args.filename)
+    mol = Molecule(args.filename, guessNE=['bonds'], guess=[])
 
     # Check if the file contain just one conformation
     if mol.numFrames != 1:
