@@ -6,8 +6,10 @@
 import os
 import sys
 import shutil
+import time
 import unittest
 from subprocess import call
+
 import numpy as np
 
 from htmd.home import home
@@ -76,7 +78,7 @@ class TestParameterize(unittest.TestCase):
         print('')
 
     def test_parameterize_speed(self):
-        import time
+
         _started_at = time.time()
 
         command = 'parameterize -h'
