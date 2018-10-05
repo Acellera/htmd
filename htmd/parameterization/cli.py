@@ -46,7 +46,9 @@ def getArgumentParser():
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
     parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
-                        help='Do not perform QM structure optimisation when scanning dihedral angles')
+                        help='DEPRECATED: use `--dihed-opt` instead')
+    parser.add_argument('--dihed-opt', default='qm', dest='opt_type', choices=['no', 'qm', 'mm'],
+                        help='Type of structure optimization when scanning dihedral angles (default: %(default)s)')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
@@ -177,7 +179,12 @@ def _fit_charges(mol, args, qm):
 
 def main_parameterize(arguments=None):
 
-    args = getArgumentParser().parse_args(args=arguments)
+    parser = getArgumentParser()
+    args = parser.parse_args(args=arguments)
+
+    # Argument deprecation
+    if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
+        raise DeprecationWarning('Use `--dihed-opt instead.`')
 
     if not os.path.exists(args.filename):
         raise ValueError('File %s cannot be found' % args.filename)
@@ -237,7 +244,7 @@ def main_parameterize(arguments=None):
     # Start processing
     from htmd.parameterization.fftype import fftype
     from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, minimize, \
-        fitDihedrals, _qm_method_name
+        fitDihedrals, fitDihedralsNew, _qm_method_name
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
 
@@ -348,15 +355,28 @@ def main_parameterize(arguments=None):
                 np.random.seed(args.seed)
 
             # Invent new atom types for dihedral atoms
+            before_invention = (mol.copy(), parameters)
             mol, originaltypes = inventAtomTypes(mol, parameterizable_dihedrals, equivalents)
             parameters = recreateParameters(mol, originaltypes, parameters)
             parameters = createMultitermDihedralTypes(parameters)
-            if isinstance(qm, FakeQM2):
-                qm._parameters = parameters
 
-            # Fit the parameters
-            fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir,
-                         geomopt=args.optimize_dihedral)
+            if args.opt_type != 'mm':
+                if isinstance(qm, FakeQM2):
+                    qm._parameters = parameters
+
+                if args.opt_type == 'qm':
+                    geomopt = True
+                elif args.opt_type == 'no':
+                    geomopt = False
+                else:
+                    raise NotImplementedError
+
+                # Fit the parameters
+                fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir,
+                             geomopt=geomopt)
+            elif args.opt_type == 'mm':
+                fitDihedralsNew(mol, qm, method, parameters, before_invention, all_dihedrals, parameterizable_dihedrals,
+                                args.outdir)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')

@@ -268,3 +268,95 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     return prm
 
 
+def fitDihedralsNew(mol, qm, method, prm, before_invention, all_dihedrals, dihedrals, outdir):
+    """
+    Dihedrals passed as 4 atom indices
+    """
+    from htmd.parameterization.dihedral import DihedralFitting
+    from htmd.qm.custom import OMMMinimizer
+    from htmd.qm import FakeQM2
+
+    # Create molecules with rotamers and minimize them
+    molecules = []
+    for dihedral in dihedrals:
+        nrotamers = 36  # Number of rotamers for each dihedral to compute
+
+        # Minimize with MM
+        # Adapted from Stefan's code
+        def rotamerScan(mol, minim, dih_atoms, scanangles, sequential=True):
+            from tqdm import tqdm
+            startdihrad = mol.getDihedral(dih_atoms)
+            scancoords = []
+            tmpmol = mol.copy()
+            outmol = mol.copy()
+            for angle in tqdm(scanangles, desc='Scanning {}'.format('-'.join(map(str, dih_atoms)))):
+                if len(scancoords) == 0:
+                    tmpmol.coords[:, :, 0] = mol.coords[:, :, 0]
+                else:
+                    if sequential:
+                        tmpmol.coords[:, :, 0] = scancoords[-1]
+                    else:
+                        tmpmol.coords[:, :, 0] = scancoords[0]
+
+                bonds = tmpmol._getBonds()
+                tmpmol.setDihedral(dih_atoms, startdihrad + np.deg2rad(angle), bonds=bonds)
+                minimizedcoords = minim.minimize(tmpmol.coords.squeeze(), restrained_dihedrals=[dih_atoms, ])
+                scancoords.append(minimizedcoords)
+
+            outmol.coords = np.stack(scancoords, axis=2).astype(np.float32)
+            outmol.box = np.zeros((3, mol.numFrames), dtype=np.float32)
+            return outmol
+
+        minimizer = OMMMinimizer(before_invention[0], before_invention[1])
+        angles = np.linspace(-180, 180, num=nrotamers, endpoint=False)
+        molecules.append(rotamerScan(before_invention[0], minimizer, dihedral, angles, sequential=False))
+
+    # Create directories for QM data
+    directories = []
+    dihedral_directory = 'dihedral-opt-mm'
+    for dihedral in dihedrals:
+        dihedral_name = '-'.join(mol.name[dihedral])
+        directory = os.path.join(outdir, dihedral_directory, dihedral_name, _qm_method_name(qm))
+        os.makedirs(directory, exist_ok=True)
+        directories.append(directory)
+
+    # Setup and submit QM calculations
+    for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
+        qm.molecule = molecule
+        qm.esp_points = None
+        qm.optimize = False
+        qm.restrained_dihedrals = np.array([dihedral])
+        qm.directory = directory
+        qm.setup()
+        qm.submit()
+
+    # Wait and retrieve QM calculation data
+    qm_results = []
+    for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
+        qm.molecule = molecule
+        qm.esp_points = None
+        qm.optimize = False
+        qm.restrained_dihedrals = np.array([dihedral])
+        qm.directory = directory
+        qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
+        qm_results.append(qm.retrieve())
+
+    # Fit the dihedral parameters
+    df = DihedralFitting()
+    df.parmedMode = True
+    df.parameters = prm
+    df._parameterizable_dihedrals = all_dihedrals
+    df.molecule = mol
+    df.dihedrals = dihedrals
+    df.qm_results = qm_results
+    df.result_directory = os.path.join(outdir, 'parameters', method, _qm_method_name(qm), 'plots')
+
+    # In case of FakeQM, the initial parameters are set to zeros.
+    # It prevents DihedralFitting class from cheating :D
+    if isinstance(qm, FakeQM2):
+        df.zeroed_parameters = True
+
+    # Fit dihedral parameters
+    df.run()
+
+    return prm
