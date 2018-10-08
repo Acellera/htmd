@@ -62,7 +62,8 @@ def getArgumentParser():
     # This is intedended for debugging only and should be kept hidden.
     parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
 
-    parser.add_argument('--qmml', metavar='<qmml>', help=argparse.SUPPRESS)
+    # QMML module name
+    parser.add_argument('--qmml', help=argparse.SUPPRESS)
 
     return parser
 
@@ -226,7 +227,11 @@ def main_parameterize(arguments=None):
         import importlib
         from htmd.qm.custom import CustomQM
         qm = CustomQM()
-        qm.calculator = importlib.import_module(args.qmml).get_calculator()
+        qmml_module = importlib.import_module(args.qmml)
+        logger.info('QMML module: {}'.format(qmml_module))
+        qmml_calculator = qmml_module.get_calculator()
+        logger.info('QMML calculator: {}'.format(qmml_calculator))
+        qm.calculator = qmml_calculator
     else:
         if args.code == 'Psi4':
             qm = Psi4()
