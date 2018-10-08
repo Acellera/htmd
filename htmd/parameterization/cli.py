@@ -64,7 +64,7 @@ def getArgumentParser():
 
     return parser
 
-def _get_molecule(args):
+def _prepare_molecule(args):
 
     from htmd.molecule.molecule import Molecule
     from htmd.parameterization.util import guessElements
@@ -209,7 +209,7 @@ def main_parameterize(arguments=None):
     args = getArgumentParser().parse_args(args=arguments)
 
     # Get a molecule and check its validity
-    mol = _get_molecule(args)
+    mol = _prepare_molecule(args)
 
     # Get RTF and PRM file names
     rtfFile, prmFile = None, None
