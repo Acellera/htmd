@@ -322,14 +322,14 @@ class TestFftype(unittest.TestCase):
 
         molFile = os.path.join(self.refDir, 'ethanolamine_wrongnames.mol2')
 
-        mol = Molecule(molFile)
+        mol = Molecule(molFile, guessNE=['bonds'], guess=[])
 
         with self.assertRaises(RuntimeError) as cm:
             fftype(mol, method='GAFF2')
 
-            self.assertEqual(cm.exception.args[0], 'Initial atom names BR1 were changed by antechamber to CR1. '
-                                                   'This probably means that the start of the atom name does not '
-                                                   'match element symbol. Please check the molecule.')
+        self.assertEqual(cm.exception.args[0], 'Initial atom names BR1 were changed by antechamber to CR1. '
+                                               'This probably means that the start of the atom name does not '
+                                               'match element symbol. Please check the molecule.')
 
 
 if __name__ == '__main__':
