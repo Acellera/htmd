@@ -235,6 +235,12 @@ class VMD:
                 os.system('{convert} {outname}{ext} -trim {outname}{ext}'.format(convert=convert, outname=outname, ext=ext))
             os.remove(outname+tmpext)
 
+    def close(self):
+        self.send('exit')
+
+    def __del__(self):
+        self.close()
+
 
 def getVMDpath(vmd=None):
     sys = platform.system()
@@ -296,8 +302,9 @@ def viewer(dispdev='win'):
             todrop = np.append(todrop, i)
     _viewers = np.delete(_viewers, todrop)
     # Creating a new viewer
-    _viewers = np.append(_viewers, VMD(dispdev=dispdev))
-    print(_viewers)
+    handle = VMD(dispdev=dispdev)
+    _viewers = np.append(_viewers, handle)
+    return handle
 
 
 def _tempfilename():
