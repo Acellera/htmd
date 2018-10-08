@@ -6,6 +6,7 @@
 import logging
 import subprocess
 import os
+import re
 import unittest
 from tempfile import TemporaryDirectory
 
@@ -204,7 +205,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
     return prm, mol
 
 
-class TestFftype(unittest.TestCase):
+class TestFftypeGAFF(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
@@ -332,5 +333,45 @@ class TestFftype(unittest.TestCase):
                                                'match element symbol. Please check the molecule.')
 
 
+class TestFftypeCGenFF(unittest.TestCase):
+
+    def setUp(self):
+
+        self.maxDiff = None
+
+        from htmd.home import home
+        from htmd.molecule.molecule import Molecule
+
+        molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
+        self.mol = Molecule(molFile, guessNE=['bonds'], guess=['angles', 'dihedrals'])
+
+    def test_rtf_prm(self):
+
+        from htmd.home import home
+        from htmd.parameterization.writers import writeRTF, writePRM
+
+        refDir = home(dataDir='test-fftype/benzamidine')
+        with TemporaryDirectory() as resDir:
+            parameters, mol = fftype(self.mol, method='CGenFF_2b6')
+            writeRTF(mol, parameters, 0, os.path.join(resDir, 'cgenff.rtf'))
+            writePRM(mol, parameters, os.path.join(resDir, 'cgenff.prm'))
+
+            for testFile in ('cgenff.rtf', 'cgenff.prm'):
+                with self.subTest(testFile=testFile):
+                    # Get rid of the first linw with HTMD version string
+                    with open(os.path.join(refDir, testFile)) as refFile:
+                        refData = refFile.readlines()[1:]
+                    with open(os.path.join(resDir, testFile)) as resFile:
+                        resData = resFile.readlines()[1:]
+                    self.assertListEqual(refData, resData, msg=testFile)
+
+    def test_tmp_files(self):
+
+        with TemporaryDirectory() as tmpDir:
+            _, _ = fftype(self.mol, method='CGenFF_2b6', tmpDir=tmpDir)
+            self.assertListEqual(sorted(os.listdir(tmpDir)), ['mol.pdb', 'mol.prm', 'mol.rtf', 'top_mol.rtf'])
+
+
 if __name__ == '__main__':
+
     unittest.main(verbosity=2)
