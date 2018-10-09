@@ -462,8 +462,12 @@ class Molecule:
         else:
             self.__dict__[field][s] = value
 
-    def align(self, sel, refmol=None, refsel=None, frames=None):
-        """ Align the molecule to a reference structure
+    def align(self, sel, refmol=None, refsel=None, frames=None, matchingframes=False):
+        """ Align conformations.
+
+        Align a given set of frames of this molecule to either the current active frame of this molecule (mol.frame)
+        or the current frame of a different reference molecule. To align to any frame other than the current active one
+        modify the refmol.frame property before calling this method.
 
         Parameters
         ----------
@@ -478,6 +482,9 @@ class Molecule:
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         frames : list or range
             A list of frames which to align. By default it will align all frames of the Molecule
+        matchingframes : bool
+            If set to True it will align the selected frames of this molecule to the corresponding frames of the refmol.
+            This requires both molecules to have the same number of frames.
 
         Examples
         --------
@@ -488,11 +495,18 @@ class Molecule:
         from htmd.molecule.util import _pp_align
         if refmol is None:
             refmol = self
+            if matchingframes:
+                raise ValueError('You cannot align a molecule\'s frames to themselves. '
+                                 'If you want to use the matchinframes option supply a reference molecule.')
         if refsel is None:
             refsel = sel
         if frames is None:
             frames = range(self.numFrames)
         frames = np.array(frames)
+
+        if matchingframes and self.numFrames != refmol.numFrames:
+            raise RuntimeError('This molecule and the reference molecule need the same number or frames to use the matchinframes option.')
+        
         # if not isinstance(refmol, Molecule):
         # raise NameError('Reference molecule has to be a Molecule object')
         sel = self.atomselect(sel, indexes=True)
@@ -500,7 +514,7 @@ class Molecule:
         if sel.size != refsel.size:
             raise NameError('Cannot align molecules. The two selections produced different number of atoms')
         self.coords = _pp_align(self.coords, refmol.coords, np.array(sel, dtype=np.int64),
-                                np.array(refsel, dtype=np.int64), frames, refmol.frame)
+                                np.array(refsel, dtype=np.int64), frames, refmol.frame, matchingframes)
 
     def alignBySequence(self, ref, molseg=None, refseg=None, nalignfragment=1, returnAlignments=False, maxalignments=1):
         """ Aligns the Molecule to a reference Molecule by their longests sequences alignment
