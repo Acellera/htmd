@@ -68,20 +68,40 @@ class OMMMinimizer(Minimizer):
         import simtk.openmm as mm
 
         if buildff == 'AMBER':
-            from htmd.builder.amber import build
-            from htmd.parameterization.writers import writeFRCMOD
-            from htmd.molecule.util import guessAnglesAndDihedrals
-            frcmodfile = tempname(suffix='.frcmod')
-            buildfolder = tempname()
-            if guessAnglesDihedrals:
-                mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
-            writeFRCMOD(mol, prm, frcmodfile)
-            _ = build(mol, param=[frcmodfile,], outdir=buildfolder)
-            self.structure = parmed.amber.AmberParm(os.path.join(buildfolder, 'structure.prmtop'))
+            self.structure = self._get_prmtop(mol, prm)
 
         self.system = self.structure.createSystem()
         self.platform = mm.Platform.getPlatformByName(platform)
         self.platprop = {'CudaPrecision': 'mixed', 'CudaDeviceIndex': device} if platform == 'CUDA' else None
+
+
+    def _get_prmtop(self, mol, prm):
+        from htmd.parameterization.writers import writeFRCMOD, getAtomTypeMapping
+        from tempfile import TemporaryDirectory
+        from subprocess import call
+        from simtk.openmm import app
+
+        with TemporaryDirectory() as tmpDir:
+            frcFile = os.path.join(tmpDir, 'mol.frcmod')
+            mapping = getAtomTypeMapping(prm)
+            writeFRCMOD(mol, prm, frcFile, typemap=mapping)
+            mol2 = mol.copy()
+            mol2.atomtype[:] = np.vectorize(mapping.get)(mol2.atomtype)
+            molFile = os.path.join(tmpDir, 'mol.mol2')
+            mol2.write(molFile)
+
+            with open(os.path.join(tmpDir, 'tleap.inp'), 'w') as file:
+                file.writelines(('loadAmberParams %s\n' % frcFile,
+                                 'MOL = loadMol2 %s\n' % molFile,
+                                 'saveAmberParm MOL mol.prmtop mol.inpcrd\n',
+                                 'quit'))
+
+            with open(os.path.join(tmpDir, 'tleap.out'), 'w') as out:
+                call(('tleap', '-f', 'tleap.inp'), cwd=tmpDir, stdout=out)
+
+            prmtop = app.AmberPrmtopFile(os.path.join(tmpDir, 'mol.prmtop'))
+
+        return prmtop
 
 
     def minimize(self, coords, restrained_dihedrals):

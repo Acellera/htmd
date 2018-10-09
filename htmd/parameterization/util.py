@@ -287,19 +287,12 @@ def fitDihedralsNew(mol, qm, method, prm, before_invention, all_dihedrals, dihed
             from tqdm import tqdm
             startdihrad = mol.getDihedral(dih_atoms)
             scancoords = []
+            bonds = mol._getBonds()
             tmpmol = mol.copy()
             outmol = mol.copy()
             for angle in tqdm(scanangles, desc='Scanning {}'.format('-'.join(map(str, dih_atoms)))):
-                if len(scancoords) == 0:
-                    tmpmol.coords[:, :, 0] = mol.coords[:, :, 0]
-                else:
-                    if sequential:
-                        tmpmol.coords[:, :, 0] = scancoords[-1]
-                    else:
-                        tmpmol.coords[:, :, 0] = scancoords[0]
-
-                bonds = tmpmol._getBonds()
-                tmpmol.setDihedral(dih_atoms, startdihrad + np.deg2rad(angle), bonds=bonds)
+                tmpmol.coords[:, :, 0] = mol.coords[:, :, 0].copy()
+                tmpmol.setDihedral(dih_atoms, np.deg2rad(angle), bonds=bonds)
                 minimizedcoords = minim.minimize(tmpmol.coords.squeeze(), restrained_dihedrals=[dih_atoms, ])
                 scancoords.append(minimizedcoords)
 

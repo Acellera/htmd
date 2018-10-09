@@ -45,7 +45,7 @@ def getArgumentParser():
                         help='Do not perform QM structure minimization')
     parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
                         help='Partial atomic charge type (default: %(default)s)')
-    parser.add_argument('--charge-type-stef', default='None', choices=['None', 'gas'],
+    parser.add_argument('--charge-type-stef', default='None', choices=['None', 'gas', 'bcc'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
@@ -306,6 +306,8 @@ def main_parameterize(arguments=None):
         parameterizable_dihedrals = []
         for dihedral_name in args.dihedral:
             if dihedral_name not in all_dihedral_names:
+                # from IPython.core.debugger import set_trace
+                # set_trace()
                 raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
             parameterizable_dihedrals.append(list(all_dihedrals[all_dihedral_names.index(dihedral_name)][0]))
 
