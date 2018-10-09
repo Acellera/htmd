@@ -682,7 +682,7 @@ def _pp_measure_fit(P, Q):
 @jit('float32[:, :, :](float32[:, :, :], float32[:, :, :], int64[:], int64[:], int64[:], int64)', nopython=True,
      nogil=True)
 def _pp_align(coords, refcoords, sel, refsel, frames, refframe):
-    newcoords = np.zeros(coords.shape, dtype=coords.dtype)
+    newcoords = coords.copy()
     for f in frames:
         P = coords[sel, :, f]
         Q = refcoords[refsel, :, refframe]
