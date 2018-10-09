@@ -202,7 +202,7 @@ def minimizeNew(mol, prm, outdir):
     mindir = os.path.join(outdir, 'minimize', 'mm')
     os.makedirs(mindir, exist_ok=True)
 
-    outfile = os.path.join(mindir, 'minimized.mol2')
+    outfile = os.path.join(mindir, 'minimized.xyz')
     if not os.path.isfile(outfile):
         molhere = mol.copy()
 
@@ -210,10 +210,12 @@ def minimizeNew(mol, prm, outdir):
         minimizedcoords = minimizer.minimize(molhere.coords.squeeze(), restrained_dihedrals=None)
 
         molhere.coords = np.atleast_3d(np.array(minimizedcoords, dtype=np.float32))
-        molhere.write(os.path.join(mindir, 'minimized.mol2'))
+        molhere.write(os.path.join(mindir, 'minimized.xyz'))
     else:
         logger.info('Reusing previously minimized conformation {}'.format(outfile))
-        molhere = Molecule(outfile)
+        molhere = mol.copy()
+        minimizedcoords = Molecule(outfile).coords
+        molhere.coords = minimizedcoords
 
     return molhere
 
