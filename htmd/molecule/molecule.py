@@ -503,6 +503,10 @@ class Molecule:
         if frames is None:
             frames = range(self.numFrames)
         frames = np.array(frames)
+
+        if matchingframes and self.numFrames != refmol.numFrames:
+            raise RuntimeError('This molecule and the reference molecule need the same number or frames to use the matchinframes option.')
+        
         # if not isinstance(refmol, Molecule):
         # raise NameError('Reference molecule has to be a Molecule object')
         sel = self.atomselect(sel, indexes=True)
