@@ -309,7 +309,9 @@ def fitDihedralsNew(mol, qm, method, prm, before_invention, all_dihedrals, dihed
 
         minimizer = OMMMinimizer(before_invention[0], before_invention[1])
         angles = np.linspace(-180, 180, num=nrotamers, endpoint=False)
-        molecules.append(rotamerScan(before_invention[0], minimizer, dihedral, angles, sequential=False))
+        rotamerMol = rotamerScan(before_invention[0], minimizer, dihedral, angles, sequential=False)
+        molecules.append(rotamerMol)
+        np.save(os.path.join(outdir, 'mm_minim_coords_{}_{}.npy'.format(method, _qm_method_name(qm))), rotamerMol.coords)
 
     # Create directories for QM data
     directories = []
@@ -341,6 +343,7 @@ def fitDihedralsNew(mol, qm, method, prm, before_invention, all_dihedrals, dihed
         qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
         qm_results.append(qm.retrieve())
 
+    np.save(os.path.join(outdir, 'mm_minim_results_{}_{}.npy'.format(method, _qm_method_name(qm))), qm_results)
     # Fit the dihedral parameters
     df = DihedralFitting()
     df.parmedMode = True
