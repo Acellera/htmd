@@ -343,7 +343,7 @@ def fitDihedralsNew(mol, qm, method, prm, before_invention, all_dihedrals, dihed
         qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
         qm_results.append(qm.retrieve())
 
-    np.save(os.path.join(outdir, 'mm_minim_results_{}_{}.npy'.format(method, _qm_method_name(qm))), qm_results)
+    np.save(os.path.join(outdir, 'mm_minim_energy_{}_{}.npy'.format(method, _qm_method_name(qm))), [x.energy for x in qm_results[0]])
     # Fit the dihedral parameters
     df = DihedralFitting()
     df.parmedMode = True
