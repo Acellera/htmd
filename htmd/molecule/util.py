@@ -679,7 +679,7 @@ def _pp_measure_fit(P, Q):
     return U, RMSD
 
 
-@jit('float32[:, :, :](float32[:, :, :], float32[:, :, :], int64[:], int64[:], int64[:], int64, bool)', nopython=True,
+@jit('float32[:, :, :](float32[:, :, :], float32[:, :, :], int64[:], int64[:], int64[:], int64, boolean)', nopython=True,
      nogil=True)
 def _pp_align(coords, refcoords, sel, refsel, frames, refframe, matchingframes):
     newcoords = coords.copy()
