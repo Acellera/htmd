@@ -193,6 +193,31 @@ def minimize(mol, qm, outdir):
     return mol
 
 
+def minimizeNew(mol, prm, outdir):
+    from htmd.qm.custom import OMMMinimizer
+    from htmd.molecule.molecule import Molecule
+
+    assert mol.numFrames == 1
+
+    mindir = os.path.join(outdir, 'minimize', 'mm')
+    os.makedirs(mindir, exist_ok=True)
+
+    outfile = os.path.join(mindir, 'minimized.mol2')
+    if not os.path.isfile(outfile):
+        molhere = mol.copy()
+
+        minimizer = OMMMinimizer(molhere, prm)
+        minimizedcoords = minimizer.minimize(molhere.coords.squeeze(), restrained_dihedrals=None)
+
+        molhere.coords = np.atleast_3d(np.array(minimizedcoords, dtype=np.float32))
+        molhere.write(os.path.join(mindir, 'minimized.mol2'))
+    else:
+        logger.info('Reusing previously minimized conformation {}'.format(outfile))
+        molhere = Molecule(outfile)
+
+    return molhere
+
+
 def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt=True):
     """
     Dihedrals passed as 4 atom indices

@@ -76,13 +76,12 @@ class OMMMinimizer(Minimizer):
             if guessAnglesDihedrals:
                 mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
             writeFRCMOD(mol, prm, frcmodfile)
-            _ = build(mol, param=[frcmodfile,], outdir=buildfolder)
+            _ = build(mol, param=[frcmodfile,], outdir=buildfolder, ionize=False)
             self.structure = parmed.amber.AmberParm(os.path.join(buildfolder, 'structure.prmtop'))
 
         self.system = self.structure.createSystem()
         self.platform = mm.Platform.getPlatformByName(platform)
         self.platprop = {'CudaPrecision': 'mixed', 'CudaDeviceIndex': device} if platform == 'CUDA' else None
-
 
     def minimize(self, coords, restrained_dihedrals):
         from simtk import unit

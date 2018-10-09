@@ -40,7 +40,9 @@ def getArgumentParser():
     parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
                         help='QM environment (default: %(default)s)')
     parser.add_argument('--no-min', action='store_false', dest='minimize',
-                        help='Do not perform QM structure minimization')
+                        help='DEPRECATED: use `--min-opt` instead')
+    parser.add_argument('--min-opt', default='qm', dest='min_type', choices=['no', 'qm', 'mm'],
+                        help='Type of initial structure optimization (default: %(default)s)')
     parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
@@ -185,6 +187,8 @@ def main_parameterize(arguments=None):
     # Argument deprecation
     if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
         raise DeprecationWarning('Use `--dihed-opt instead.`')
+    if args.minimize is not parser.get_default('optimize_dihedral'):
+        raise DeprecationWarning('Use `--min-opt instead.`')
 
     if not os.path.exists(args.filename):
         raise ValueError('File %s cannot be found' % args.filename)
@@ -243,7 +247,7 @@ def main_parameterize(arguments=None):
 
     # Start processing
     from htmd.parameterization.fftype import fftype
-    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, minimize, \
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, minimize, minimizeNew, \
         fitDihedrals, fitDihedralsNew, _qm_method_name
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
@@ -339,9 +343,15 @@ def main_parameterize(arguments=None):
             logger.info('Changing basis sets to %s' % qm.basis)
 
         # Minimize molecule
-        if args.minimize:
-            print('\n == Minimizing ==\n')
+        print('\n == Minimizing with {} ==\n'.format(args.min_type))
+        if args.min_type == 'qm':
             mol = minimize(mol, qm, args.outdir)
+        elif args.min_type == 'mm':
+            mol = minimizeNew(mol, parameters, args.outdir)
+        elif args.min_type == 'no':
+            pass
+        else:
+            raise NotImplementedError
 
         # Fit charges
         mol = _fit_charges(mol, args, qm)

@@ -368,6 +368,9 @@ def MOL2read(filename, frame=None, topoloc=None, singlemol=True):
     unguessed = []
     with open(filename, "r") as f:
         for line in f:
+            if line == '\n':
+                section = None
+                continue
             if line.startswith('@<TRIPOS>MOLECULE'):
                 section = None
                 molnum += 1
