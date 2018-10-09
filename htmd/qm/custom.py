@@ -96,8 +96,6 @@ class OMMMinimizer(Minimizer):
 
             for dihedral in restrained_dihedrals:
                 theta0 = dihedralAngle(coords[dihedral])
-                # TODO: This is a work-around. jit signatures should be fixed instead so theta0 is never a ndarray
-                theta0 = theta0 if not isinstance(theta0, np.ndarray) else float(theta0[0])
                 f.addTorsion(int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]), [float(10000000), float(theta0)])
 
             fidx = self.system.addForce(f)

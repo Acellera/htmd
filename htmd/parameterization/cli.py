@@ -30,7 +30,7 @@ def getArgumentParser():
                         help='Fix atomic charge during charge fitting (default: none)')
     parser.add_argument('-d', '--dihedral', nargs='+', default=[], metavar='A1-A2-A3-A4',
                         help='Select dihedral angle to parameterize (default: all parameterizable dihedral angles)')
-    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian', 'QMML'],
+    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'],
                         help='QM code (default: %(default)s)')
     parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP', 'wB97X-D'],
                         help='QM level of theory (default: %(default)s)')
@@ -44,6 +44,8 @@ def getArgumentParser():
     parser.add_argument('--min-opt', default='qm', dest='min_type', choices=['no', 'qm', 'mm'],
                         help='Type of initial structure optimization (default: %(default)s)')
     parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
+                        help='Partial atomic charge type (default: %(default)s)')
+    parser.add_argument('--charge-type-stef', default='None', choices=['None', 'gas'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
@@ -65,6 +67,9 @@ def getArgumentParser():
     # Enable replacement of any real QM class with FakeQM.
     # This is intedended for debugging only and should be kept hidden.
     parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
+
+    # QMML module name
+    parser.add_argument('--qmml', help=argparse.SUPPRESS)
 
     return parser
 
@@ -231,15 +236,23 @@ def main_parameterize(arguments=None):
     # Create a QM object
     from htmd.qm import Psi4, Gaussian, FakeQM2
 
-    if args.code == 'Psi4':
-        qm = Psi4()
-    elif args.code == 'Gaussian':
-        qm = Gaussian()
-    elif args.code == 'QMML':
-        from htmd.qm.custom import QMML
-        qm = QMML()
+    if args.qmml:
+        import importlib
+        from htmd.qm.custom import CustomQM
+        qm = CustomQM()
+        qmml_module = importlib.import_module(args.qmml)
+        logger.info('QMML module: {}'.format(qmml_module))
+        qmml_calculator = qmml_module.get_calculator()
+        logger.info('QMML calculator: {}'.format(qmml_calculator))
+        qm.calculator = qmml_calculator
     else:
-        raise NotImplementedError
+        if args.code == 'Psi4':
+            qm = Psi4()
+        elif args.code == 'Gaussian':
+            qm = Gaussian()
+        else:
+            raise NotImplementedError
+
     # This is for debugging only!
     if args.fake_qm:
         qm = FakeQM2()
@@ -317,8 +330,8 @@ def main_parameterize(arguments=None):
         printReport(mol, args.charge, equivalents, all_dihedrals)
 
         _charge = mol.charge.copy()
-        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
-        assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
+        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge, acCharges=args.charge_type_stef)
+        #assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
 
         if isinstance(qm, FakeQM2):
             qm._parameters = parameters

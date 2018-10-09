@@ -118,7 +118,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
                        '-i', 'mol.mol2',
                        '-fo', 'prepi',
                        '-o', 'mol.prepi']
-                if acCharges is not None:
+                if acCharges is not None and acCharges != 'None':
                     cmd += ['-c', acCharges]
                 returncode = subprocess.call(cmd, cwd=tmpdir)
                 if returncode != 0:
