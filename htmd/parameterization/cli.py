@@ -41,7 +41,11 @@ def getArgumentParser():
                         help='QM environment (default: %(default)s)')
     parser.add_argument('--no-min', action='store_false', dest='minimize',
                         help='Do not perform QM structure minimization')
+    parser.add_argument('--min', dest='minimize-mode', default='qm', choices=['no', 'qm', 'mm'],
+                        help='Do not perform QM structure minimization')
     parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
+                        help='Partial atomic charge type (default: %(default)s)')
+    parser.add_argument('--charge-type-stef', default='None', choices=['None', 'gas'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
@@ -313,8 +317,8 @@ def main_parameterize(arguments=None):
         printReport(mol, args.charge, equivalents, all_dihedrals)
 
         _charge = mol.charge.copy()
-        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
-        assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
+        parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge, acCharges=args.charge_type_stef)
+        #assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
 
         if isinstance(qm, FakeQM2):
             qm._parameters = parameters
