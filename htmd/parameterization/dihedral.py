@@ -138,13 +138,14 @@ class DihedralFitting:
             self._reference_energies.append(np.array([result.energy for result in results]))
             self._coords.append([result.coords for result in results])
 
-        # Calculate dihedral angle values for the fitted equivalent dihedral
+        # Calculate dihedral angle values
         self._angle_values = []
         for rotamer_coords, equivalent_indices in zip(self._coords, self._equivalent_indices):
             angle_values = []
             for coords in rotamer_coords:
                 angle_values.append([np.rad2deg(dihedralAngle(coords[indices, :, 0])) for indices in equivalent_indices])
             self._angle_values.append(np.array(angle_values))
+        # [# of dihedrals, # of conformations, # of equivalents, 1]
         self._angle_values_rad = [np.deg2rad(angle_values)[:, :, None] for angle_values in self._angle_values]
 
         self._parameterizable_dihedral_atomtypes = [tuple(self.molecule.atomtype[idx]) for idx in self.dihedrals]
@@ -496,6 +497,27 @@ class TestDihedralFitting(unittest.TestCase):
             self.assertEqual(param.phi_k, i+30)
             self.assertEqual(param.per, i+1)
             self.assertEqual(param.phase, i+40)
+
+    def test_objective(self):
+
+        np.random.seed(20181010)
+
+        for ndihed, nequiv, nconf, ref_value in [(1, 1, 1, 24.42596142417680),
+                                                 (1, 1, 5, 48.18558086197684),
+                                                 (1, 3, 1, 98.68735836301542),
+                                                 (2, 1, 1, 33.99548640546348),
+                                                 (2, 3, 5, 82.28916720844373)]:
+            with self.subTest(ndihed=ndihed, nequiv=nequiv, nconf=nconf):
+                self.df.dihedrals = [[0]*4]*ndihed
+                self.df._angle_values_rad = 2*np.pi * np.random.random((ndihed, nconf, nequiv))[:, :, :, None] - np.pi
+                self.df._all_target_energies = 10*np.random.random(ndihed*nconf)
+                vector = np.random.random(13*ndihed)
+                vector[:ndihed] *= 10
+                vector[ndihed:2*ndihed] *= 2*np.pi
+                vector[ndihed:2*ndihed] += np.pi
+                vector[2*ndihed:] *= 10
+                value = self.df._objective(vector, None)
+                self.assertAlmostEqual(ref_value, value)
 
     # Note: the rest methods are tested indirectly via the "parameterize" tests in test.py
 
