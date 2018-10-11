@@ -175,7 +175,7 @@ class DihedralFitting:
 
         return lower_bounds, upper_bounds
 
-    def _objective(self, x, _):
+    def _objective(self, x, grad):
         """
         Objective function for the parameter fitting.
         """
@@ -186,14 +186,37 @@ class DihedralFitting:
         n = np.arange(1, self.MAX_DIHEDRAL_MULTIPLICITY + 1)
         phi0 = np.deg2rad(phi0)
 
-        all_energies = []
+        actual_energies = []
         for i in range(self.numDihedrals):
             phis = self._angle_values_rad[i]
             energies = np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2)) + offset[i]
-            all_energies.append(energies)
+            actual_energies.append(energies)
 
-        all_energies = np.concatenate(all_energies)
-        rmsd = np.sqrt(np.mean((all_energies - self._all_target_energies)**2))
+        all_actual_energies = np.concatenate(actual_energies)
+        rmsd = np.sqrt(np.mean((all_actual_energies - self._all_target_energies)**2))
+
+        if grad is not None:
+            if grad.size > 0:
+
+                grad_k0 = []
+                grad_phi0 = []
+                grad_offset = []
+
+                for i in range(self.numDihedrals):
+
+                    # Compute partial derivatives
+                    phis = self._angle_values_rad[i]
+                    dL_dV = (actual_energies[i] - self._target_energies[i])/(rmsd*all_actual_energies.size)
+                    dV_dk0 = np.sum(1 + np.cos(n * phis - phi0[i]), axis=1)
+                    dV_dphi0 = np.sum(k0[i] * np.sin(n * phis - phi0[i]), axis=1)
+
+                    # Compute gradients with the chain rule
+                    grad_k0.append(dL_dV @ dV_dk0)
+                    grad_phi0.append(np.deg2rad(dL_dV @ dV_dphi0))
+                    grad_offset.append(np.sum(dL_dV, keepdims=True))
+
+                # Pack gradients
+                grad[:] = np.concatenate(grad_k0 + grad_phi0 + grad_offset)
 
         return rmsd
 
@@ -500,6 +523,8 @@ class TestDihedralFitting(unittest.TestCase):
 
     def test_objective(self):
 
+        from scipy.misc import derivative
+
         np.random.seed(20181010)
 
         for ndihed, nequiv, nconf, ref_value in [(1, 1, 1, 24.42596142417680),
@@ -508,16 +533,32 @@ class TestDihedralFitting(unittest.TestCase):
                                                  (2, 1, 1, 33.99548640546348),
                                                  (2, 3, 5, 82.28916720844373)]:
             with self.subTest(ndihed=ndihed, nequiv=nequiv, nconf=nconf):
+
                 self.df.dihedrals = [[0]*4]*ndihed
                 self.df._angle_values_rad = 2*np.pi * np.random.random((ndihed, nconf, nequiv))[:, :, :, None] - np.pi
-                self.df._all_target_energies = 10*np.random.random(ndihed*nconf)
+                self.df._target_energies = 10*np.random.random((ndihed, nconf))
+                self.df._all_target_energies = np.concatenate(self.df._target_energies)
+
                 vector = np.random.random(13*ndihed)
                 vector[:ndihed] *= 10
                 vector[ndihed:2*ndihed] *= 2*np.pi
                 vector[ndihed:2*ndihed] += np.pi
                 vector[2*ndihed:] *= 10
-                value = self.df._objective(vector, None)
+                grad = np.zeros_like(vector)
+                value = self.df._objective(vector, grad)
                 self.assertAlmostEqual(ref_value, value)
+
+                for i in range(vector.size):
+
+                    def func(x):
+                        v = vector.copy()
+                        v[i] = x
+                        return self.df._objective(v, None)
+
+                    # Compute gradient numerically
+                    ref_grad = derivative(func, vector[i], dx=1e-3, order=5)
+
+                    self.assertAlmostEqual(ref_grad, grad[i])
 
     # Note: the rest methods are tested indirectly via the "parameterize" tests in test.py
 
