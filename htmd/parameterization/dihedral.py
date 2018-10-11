@@ -478,10 +478,15 @@ class TestDihedralFitting(unittest.TestCase):
         self.assertEqual(len(self.df._getValidQMResults()[0]), 17)
 
     def test_getBounds(self):
-        self.df.dihedrals = [[0, 1, 2, 3]]
-        lower_bounds, upper_bounds = self.df._getBounds()
-        self.assertListEqual(list(lower_bounds), [0.,  0.,  0.,  0.,  0.,  0.,   0.,   0.,   0.,   0.,   0.,   0., -10.])
-        self.assertListEqual(list(upper_bounds), [10., 10., 10., 10., 10., 10., 360., 360., 360., 360., 360., 360.,  10.])
+
+        for ndihed in range(1, 3):
+            with self.subTest(ndihed=ndihed):
+                nterm = DihedralFitting.MAX_DIHEDRAL_MULTIPLICITY * ndihed
+                self.df.dihedrals = [[0, 0, 0, 0]] * ndihed
+                self.assertEquals(ndihed, self.df.numDihedrals)
+                lower_bounds, upper_bounds = self.df._getBounds()
+                self.assertListEqual(list(lower_bounds), [0] * 2 * nterm + [-10] * ndihed)
+                self.assertListEqual(list(upper_bounds), [10] * nterm + [360] * nterm + [10] * ndihed)
 
     def test_paramsToVector(self):
         from parmed.parameters import ParameterSet
