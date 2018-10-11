@@ -277,35 +277,41 @@ class DihedralFitting:
         """
 
         # Create a local optimizer
-        opt = nlopt.opt(nlopt.LN_BOBYQA, vector.size)
+        opt = nlopt.opt(nlopt.LD_LBFGS, vector.size)
+        logger.info('Local optimizer: {}'.format(opt.get_algorithm_name()))
         opt.set_min_objective(self._objective)
+
+        # Set bounds
         lower_bounds, upper_bounds = self._getBounds()
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
-        opt.set_xtol_rel(1e-3)
-        opt.set_maxeval(10000 * opt.get_dimension())
-        opt.set_initial_step(1e-3 * (upper_bounds - lower_bounds))
 
-        # Optimize the initial vector
-        logger.info('Initial RMSD: %f kcal/mol' % self._objective(vector, None))
-        best_vector = opt.optimize(vector)  # TODO check optimizer status
-        best_loss = opt.last_optimum_value()
-        assert self._objective(best_vector, None) == best_loss
-        logger.info('Current RMSD: %f kcal/mol' % best_loss)
+        # Set convergence criteria
+        opt.set_xtol_rel(1e-3)
+        opt.set_maxeval(100 * opt.get_dimension())
+
+        # Initialize
+        best_loss = self._objective(vector, None)
+        best_vector = vector
+        logger.info('Initial RMSD: {:.6f} kcal/mol'.format(best_loss))
 
         # Naive random search
-        for i in range(opt.get_dimension()):  # TODO allow to tune this parameter
+        niter = 10 * opt.get_dimension()  # TODO allow to tune this parameter
+        logger.info('Number of random searches: {}'.format(niter))
+        for i in range(niter):
 
-            # Get random vector and optimize it
-            random_vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
-            vector = opt.optimize(random_vector)  # TODO check optimizer status
+            vector = opt.optimize(vector)  # TODO check optimizer status
+            loss = opt.last_optimum_value()
 
-            if opt.last_optimum_value() < best_loss:
-                best_loss = opt.last_optimum_value()
+            if loss < best_loss:
+                best_loss = loss
                 best_vector = vector
-                logger.info('Current RMSD: %f kcal/mol' % best_loss)
+                logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
+
+            vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
 
         self.loss = best_loss
+        logger.info('Final RMSD: {:.6f} kcal/mol'.format(best_loss))
 
         return best_vector
 
@@ -346,7 +352,6 @@ class DihedralFitting:
         # vector = self._optimize_CRS2_LM(vector)  # TODO this should work better, but it doesn't
         vector = self._optimize_random_search(vector)
         finish = time.clock()
-        logger.info('Final RMSD: %f kcal/mol' % self._objective(vector, None))
         logger.info('Finished parameter optimization after %f s' % (finish-start))
 
         # Update the target dihedral with the optimized parameters
