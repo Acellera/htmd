@@ -64,13 +64,11 @@ class DihedralFitting:
         self._reference_energies = None
         self._coords = None
         self._angle_values = None
+        self._angle_values_rad = None
 
         self._initial_energies = None
         self._target_energies = None
         self._fitted_energies = None
-
-        self._all_target_energies = None
-        self._angle_values_rad = None
 
         self._parameterizable_dihedrals = None
         self._parameterizable_dihedral_atomtypes = None
@@ -193,7 +191,8 @@ class DihedralFitting:
             actual_energies.append(energies)
 
         all_actual_energies = np.concatenate(actual_energies)
-        rmsd = np.sqrt(np.mean((all_actual_energies - self._all_target_energies)**2))
+        all_target_energies = np.concatenate(self._target_energies)
+        rmsd = np.sqrt(np.mean((all_actual_energies - all_target_energies)**2))
 
         if grad is not None:
             if grad.size > 0:
@@ -343,7 +342,6 @@ class DihedralFitting:
             energies = ref_energies - np.array([ff.calculateEnergies(coords[:, :, 0])['total'] for coords in rotamer_coords])
             energies -= np.min(energies)
             self._target_energies.append(energies)
-        self._all_target_energies = np.concatenate(self._target_energies)
 
         # Optimize the parameters
         logger.info('Start parameter optimization')
@@ -537,7 +535,6 @@ class TestDihedralFitting(unittest.TestCase):
                 self.df.dihedrals = [[0]*4]*ndihed
                 self.df._angle_values_rad = 2*np.pi * np.random.random((ndihed, nconf, nequiv))[:, :, :, None] - np.pi
                 self.df._target_energies = 10*np.random.random((ndihed, nconf))
-                self.df._all_target_energies = np.concatenate(self.df._target_energies)
 
                 vector = np.random.random(13*ndihed)
                 vector[:ndihed] *= 10
