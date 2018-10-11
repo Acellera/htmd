@@ -300,13 +300,18 @@ class DihedralFitting:
         logger.info('Number of random searches: {}'.format(niter))
         for i in range(niter):
 
-            vector = opt.optimize(vector)  # TODO check optimizer status
-            loss = opt.last_optimum_value()
+            try:
+                vector = opt.optimize(vector)  # TODO check optimizer status
+                loss = opt.last_optimum_value()
 
-            if loss < best_loss:
-                best_loss = loss
-                best_vector = vector
-                logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
+            except RuntimeError:
+                pass
+
+            else:
+                if loss < best_loss:
+                    best_loss = loss
+                    best_vector = vector
+                    logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
 
             vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
 
