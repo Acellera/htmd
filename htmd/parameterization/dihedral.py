@@ -64,7 +64,6 @@ class DihedralFitting:
         self._reference_energies = None
         self._coords = None
         self._angle_values = None
-        self._angle_values_rad = None
 
         self._initial_energies = None
         self._target_energies = None
@@ -137,14 +136,14 @@ class DihedralFitting:
             self._coords.append([result.coords for result in results])
 
         # Calculate dihedral angle values
+        # [# of dihedrals, # of conformations, # of equivalents]
         self._angle_values = []
         for rotamer_coords, equivalent_indices in zip(self._coords, self._equivalent_indices):
             angle_values = []
             for coords in rotamer_coords:
-                angle_values.append([np.rad2deg(dihedralAngle(coords[indices, :, 0])) for indices in equivalent_indices])
+                angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
             self._angle_values.append(np.array(angle_values))
-        # [# of dihedrals, # of conformations, # of equivalents, 1]
-        self._angle_values_rad = [np.deg2rad(angle_values)[:, :, None] for angle_values in self._angle_values]
+        self._angle_values_rad = [angle_values[:, :, None] for angle_values in self._angle_values]
 
         self._parameterizable_dihedral_atomtypes = [tuple(self.molecule.atomtype[idx]) for idx in self.dihedrals]
 
@@ -165,7 +164,7 @@ class DihedralFitting:
 
         # Set force constant and phase bounds
         upper_bounds[:nterms] = 10
-        upper_bounds[nterms:2*nterms] = 360
+        upper_bounds[nterms:2*nterms] = 2 * np.pi
 
         # Set offset bounds
         lower_bounds[-self.numDihedrals:] = -10
@@ -182,11 +181,10 @@ class DihedralFitting:
         offset = x[-self.numDihedrals:]
 
         n = np.arange(1, self.MAX_DIHEDRAL_MULTIPLICITY + 1)
-        phi0 = np.deg2rad(phi0)
 
         actual_energies = []
         for i in range(self.numDihedrals):
-            phis = self._angle_values_rad[i]
+            phis = self._angle_values[i][:, :, None]
             energies = np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2)) + offset[i]
             actual_energies.append(energies)
 
@@ -204,14 +202,14 @@ class DihedralFitting:
                 for i in range(self.numDihedrals):
 
                     # Compute partial derivatives
-                    phis = self._angle_values_rad[i]
+                    phis = self._angle_values[i][:, :, None]
                     dL_dV = (actual_energies[i] - self._target_energies[i])/(rmsd*all_actual_energies.size)
                     dV_dk0 = np.sum(1 + np.cos(n * phis - phi0[i]), axis=1)
                     dV_dphi0 = np.sum(k0[i] * np.sin(n * phis - phi0[i]), axis=1)
 
                     # Compute gradients with the chain rule
                     grad_k0.append(dL_dV @ dV_dk0)
-                    grad_phi0.append(np.deg2rad(dL_dV @ dV_dphi0))
+                    grad_phi0.append(dL_dV @ dV_dphi0)
                     grad_offset.append(np.sum(dL_dV, keepdims=True))
 
                 # Pack gradients
@@ -230,7 +228,7 @@ class DihedralFitting:
                 vector.append(term.phi_k)
         for k in dihedral_atomtypes:
             for term in params.dihedral_types[k]:
-                vector.append(term.phase)
+                vector.append(np.deg2rad(term.phase))
         for i in range(self.numDihedrals):
             vector.append(0)  # The offset
 
@@ -318,10 +316,9 @@ class DihedralFitting:
         for i, k in enumerate(dihedral_atomtypes):
             for j, t in enumerate(parameters.dihedral_types[k]):
                 t.phi_k = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j]
-                t.phase = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j+nparams]
+                t.phase = np.rad2deg(vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j+nparams])
 
     def _fit(self):
-        from copy import deepcopy
 
         # Save the initial parameters
         vector = self._paramsToVector(self.parameters, self._parameterizable_dihedral_atomtypes)
@@ -390,7 +387,7 @@ class DihedralFitting:
         Plot conformer energies for a specific dihedral angle, including QM, original and fitted MM energies.
         """
 
-        angle = self._angle_values[idihed][:, 0]
+        angle = np.rad2deg(self._angle_values[idihed][:, 0])
         reference_energy = self._reference_energies[idihed] - np.min(self._reference_energies[idihed])
         initial_energy = self._initial_energies[idihed] - np.min(self._initial_energies[idihed])
         fitted_energy = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
@@ -483,10 +480,10 @@ class TestDihedralFitting(unittest.TestCase):
             with self.subTest(ndihed=ndihed):
                 nterm = DihedralFitting.MAX_DIHEDRAL_MULTIPLICITY * ndihed
                 self.df.dihedrals = [[0, 0, 0, 0]] * ndihed
-                self.assertEquals(ndihed, self.df.numDihedrals)
+                self.assertEqual(ndihed, self.df.numDihedrals)
                 lower_bounds, upper_bounds = self.df._getBounds()
                 self.assertListEqual(list(lower_bounds), [0] * 2 * nterm + [-10] * ndihed)
-                self.assertListEqual(list(upper_bounds), [10] * nterm + [360] * nterm + [10] * ndihed)
+                self.assertListEqual(list(upper_bounds), [10] * nterm + [2*np.pi] * nterm + [10] * ndihed)
 
     def test_paramsToVector(self):
         from parmed.parameters import ParameterSet
@@ -501,7 +498,9 @@ class TestDihedralFitting(unittest.TestCase):
 
         self.df.dihedrals = [(0, 0, 0, 0),]
         vector = self.df._paramsToVector(params, [('x', 'x', 'x', 'x'),])
-        self.assertListEqual(list(vector), [10., 11., 12., 13., 14., 15., 20., 21., 22., 23., 24., 25., 0.])
+        self.assertListEqual(list(vector), [10, 11, 12, 13, 14, 15,
+                                            np.deg2rad(20), np.deg2rad(21), np.deg2rad(22),
+                                            np.deg2rad(23), np.deg2rad(24), np.deg2rad(25), 0.])
 
     def test_vectorToParams(self):
         from parmed.parameters import ParameterSet
@@ -515,14 +514,14 @@ class TestDihedralFitting(unittest.TestCase):
         params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
 
         self.df.dihedrals = [[0, 1, 2, 3]]
-        vector = np.array([30., 31., 32., 33., 34., 35., 40., 41., 42., 43., 44., 45., 50.])
+        vector = np.array([30, 31, 32, 33, 34, 35, 40, 41, 42, 43, 44, 45, 50])
         self.df._vectorToParams(params, [('x', 'x', 'x', 'x'),], vector)
 
         self.assertEqual(len(params.dihedral_types[('x', 'x', 'x', 'x')]), 6)
         for i, param in enumerate(params.dihedral_types[('x', 'x', 'x', 'x')]):
             self.assertEqual(param.phi_k, i+30)
             self.assertEqual(param.per, i+1)
-            self.assertEqual(param.phase, i+40)
+            self.assertAlmostEqual(np.deg2rad(param.phase), i+40)
 
     def test_objective(self):
 
@@ -530,22 +529,18 @@ class TestDihedralFitting(unittest.TestCase):
 
         np.random.seed(20181010)
 
-        for ndihed, nequiv, nconf, ref_value in [(1, 1, 1, 24.42596142417680),
-                                                 (1, 1, 5, 48.18558086197684),
-                                                 (1, 3, 1, 98.68735836301542),
-                                                 (2, 1, 1, 33.99548640546348),
-                                                 (2, 3, 5, 82.28916720844373)]:
+        for ndihed, nequiv, nconf, ref_value in [(1, 1, 1, 372.32948041618585),
+                                                 (1, 1, 5, 308.20314159433246),
+                                                 (1, 3, 1, 745.73230831710710),
+                                                 (2, 1, 1, 368.27031744452563),
+                                                 (2, 3, 5, 832.25851847289550)]:
             with self.subTest(ndihed=ndihed, nequiv=nequiv, nconf=nconf):
 
                 self.df.dihedrals = [[0]*4]*ndihed
-                self.df._angle_values_rad = 2*np.pi * np.random.random((ndihed, nconf, nequiv))[:, :, :, None] - np.pi
-                self.df._target_energies = 10*np.random.random((ndihed, nconf))
+                self.df._angle_values = 100*np.random.random((ndihed, nconf, nequiv))
+                self.df._target_energies = 100*np.random.random((ndihed, nconf))
 
-                vector = np.random.random(13*ndihed)
-                vector[:ndihed] *= 10
-                vector[ndihed:2*ndihed] *= 2*np.pi
-                vector[ndihed:2*ndihed] += np.pi
-                vector[2*ndihed:] *= 10
+                vector = 100*np.random.random(13*ndihed)
                 grad = np.zeros_like(vector)
                 value = self.df._objective(vector, grad)
                 self.assertAlmostEqual(ref_value, value)
