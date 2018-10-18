@@ -3,4 +3,4 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.charge.charge import fitGasteigerCharges, fitESPCharges
+from htmd.charge.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges
