@@ -5,6 +5,7 @@
 #
 import logging
 import os
+import subprocess
 from tempfile import TemporaryDirectory
 
 import numpy as np
@@ -65,6 +66,91 @@ def fitGasteigerCharges(mol):
     ComputeGasteigerCharges(rdkit_mol, throwOnParamFailure=True)
     mol = mol.copy()
     mol.charge[:] = [atom.GetDoubleProp('_GasteigerCharge') for atom in rdkit_mol.GetAtoms()]
+
+    return mol
+
+
+def fitChargesWithAntechamber(mol, type='gas', molCharge=None):
+    """
+    Fit atomic charges with Antechamber
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to fit the charges
+    type: str
+        Charge type
+    molCharge: int
+        Molecular charge
+
+    Return
+    ------
+    results: Molecule
+        Copy of the molecule with the charges set
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.charge[:] = 0
+
+    >>> new_mol = fitChargesWithAntechamber(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.charge
+    array([-0.411518,  0.205759,  0.205759], dtype=float32)
+
+    >>> new_mol = fitChargesWithAntechamber(mol, type='gas')
+    >>> assert new_mol is not mol
+    >>> new_mol.charge
+    array([-0.411518,  0.205759,  0.205759], dtype=float32)
+
+    >>> new_mol = fitChargesWithAntechamber(mol, type='gas', molCharge=10)
+    >>> assert new_mol is not mol
+    >>> new_mol.charge
+    array([-0.411518,  0.205759,  0.205759], dtype=float32)
+
+    >>> new_mol = fitChargesWithAntechamber(mol, type='bcc')
+    >>> assert new_mol is not mol
+    >>> new_mol.charge
+    array([-0.785,  0.392,  0.392], dtype=float32)
+
+    >>> new_mol = fitChargesWithAntechamber(mol, type='bcc', molCharge=0)
+    >>> assert new_mol is not mol
+    >>> new_mol.charge
+    array([-0.785,  0.392,  0.392], dtype=float32)
+    """
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+    if mol.numFrames != 1:
+        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+
+    if type not in ('gas', 'bcc'):
+        raise ValueError('"type" has to be "gas" or "bcc"')
+
+    if molCharge is None:
+        molCharge = int(round(np.sum(mol.charge)))
+        logger.info('Using partial atomic charges to calculate molecular charge')
+
+    mol = mol.copy()
+
+    with TemporaryDirectory() as tmpDir:
+        old_name = os.path.join(tmpDir, 'old.mol2')
+        new_name = os.path.join(tmpDir, 'new.mol2')
+
+        mol.write(old_name)
+
+        cmd = ['antechamber',
+               '-fi', 'mol2', '-i', old_name,
+               '-nc', str(molCharge),
+               '-c', type,
+               '-fo', 'mol2', '-o', new_name]
+        if subprocess.call(cmd, cwd=tmpDir) != 0:
+            raise RuntimeError('"antechamber" failed')
+
+        mol.charge[:] = Molecule(new_name).charge
 
     return mol
 
