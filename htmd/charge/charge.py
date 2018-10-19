@@ -135,6 +135,7 @@ def fitChargesWithAntechamber(mol, type='gas', molCharge=None):
         logger.info('Using partial atomic charges to calculate molecular charge')
 
     mol = mol.copy()
+    mol.charge[:] = molCharge/mol.numAtoms
 
     with TemporaryDirectory() as tmpDir:
         old_name = os.path.join(tmpDir, 'old.mol2')
