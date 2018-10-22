@@ -98,28 +98,28 @@ def fitChargesWithAntechamber(mol, type='gas', molCharge=None):
 
     >>> new_mol = fitChargesWithAntechamber(mol)
     >>> assert new_mol is not mol
-    >>> new_mol.charge
-    array([-0.411518,  0.205759,  0.205759], dtype=float32)
+    >>> new_mol.charge # doctest: +ELLIPSIS
+    array([-0.411518...,  0.205759...,  0.205759...], dtype=float32)
 
     >>> new_mol = fitChargesWithAntechamber(mol, type='gas')
     >>> assert new_mol is not mol
-    >>> new_mol.charge
-    array([-0.411518,  0.205759,  0.205759], dtype=float32)
+    >>> new_mol.charge # doctest: +ELLIPSIS
+    array([-0.411518...,  0.205759...,  0.205759...], dtype=float32)
 
     >>> new_mol = fitChargesWithAntechamber(mol, type='gas', molCharge=10)
     >>> assert new_mol is not mol
-    >>> new_mol.charge
-    array([-0.411518,  0.205759,  0.205759], dtype=float32)
+    >>> new_mol.charge # doctest: +ELLIPSIS
+    array([-0.411518...,  0.205759...,  0.205759...], dtype=float32)
 
     >>> new_mol = fitChargesWithAntechamber(mol, type='bcc')
     >>> assert new_mol is not mol
-    >>> new_mol.charge
-    array([-0.785,  0.392,  0.392], dtype=float32)
+    >>> new_mol.charge # doctest: +ELLIPSIS
+    array([-0.785...,  0.39...,  0.39...], dtype=float32)
 
     >>> new_mol = fitChargesWithAntechamber(mol, type='bcc', molCharge=0)
     >>> assert new_mol is not mol
-    >>> new_mol.charge
-    array([-0.785,  0.392,  0.392], dtype=float32)
+    >>> new_mol.charge # doctest: +ELLIPSIS
+    array([-0.785...,  0.39...,  0.39...], dtype=float32)
     """
 
     if not isinstance(mol, Molecule):
