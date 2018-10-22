@@ -67,7 +67,7 @@ def getArgumentParser():
 def _prepare_molecule(args):
 
     from htmd.molecule.molecule import Molecule
-    from htmd.parameterization.util import guessElements
+    from htmd.parameterization.util import makeAtomNamesUnique, guessElements
 
     mol = Molecule(args.filename, guessNE=['bonds'], guess=[])
 
@@ -75,9 +75,14 @@ def _prepare_molecule(args):
     if mol.numFrames != 1:
         raise RuntimeError('{} has to contain only one molecule, but found {}'.format(args.filename, mol.numFrames))
 
-    # Check if each atom name is unique
+    # Make atom names unique if needed
     if np.unique(mol.name).size != mol.numAtoms:
-        raise RuntimeError('The atom names in {} has to be unique!'.format(args.filename))
+        logger.warning('Atom names in the molecule are not unique!')
+        new_mol = makeAtomNamesUnique(mol)
+        for i, (old_name, new_name) in enumerate(zip(mol.name, new_mol.name)):
+            if old_name != new_name:
+                logger.warning('Rename atom {:3d}: {:4s} --> {:4s}'.format(i, old_name, new_name))
+        mol = new_mol
 
     # Guess elements
     # TODO: it should not depend on FF
