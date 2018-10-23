@@ -315,6 +315,12 @@ class TestParameterize(unittest.TestCase):
         self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 -d C2-C1-C7-N13 --basis 6-31G*')
         self._testFiles(refDir, resDir)
 
+    def test_water_full(self):
+        refDir = os.path.join(self.dataDir, 'water_full')
+        resDir = os.path.join(self.testDir, 'water_full')
+        self._execute(refDir, resDir, 'parameterize input.mol2')
+        self._testFiles(refDir, resDir)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
