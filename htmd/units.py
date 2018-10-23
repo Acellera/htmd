@@ -18,7 +18,7 @@ def convert(fromunit, tounit, value, fstep=1, timestep=4):
         Unit to convert to
     value : scalar
         The value to convert
-    fstep : int
+    fstep : float
         The sampling frame step of the simulation in nanoseconds
     timestep : int
         The timestep of the simulation in femtoseconds

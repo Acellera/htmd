@@ -1,7 +1,14 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 import numpy as np
 import logging
 import re
 import os
+import subprocess
+from tempfile import TemporaryDirectory
 
 logger = logging.getLogger(__name__)
 
@@ -214,4 +221,156 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
 
     return prm
 
+def guessBondType(mol):
 
+    """
+    Guess bond type with Antechamber
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to guess the bond types
+
+    Return
+    ------
+    results: Molecule
+        Copy of the molecule with the bond type set
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+
+    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['1', '1'], dtype=object)
+
+    >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['1', '1', '1'], dtype=object)
+
+    >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['ar', 'ar', '1', 'ar', '1', 'ar', '1', 'ar', '1', 'ar', '1', '1',
+           '2', '1', '1', '1', '1', '1'], dtype=object)
+
+    """
+
+    from htmd.molecule.molecule import Molecule
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+    if mol.numFrames != 1:
+        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+
+    mol = mol.copy()
+
+    with TemporaryDirectory() as tmpDir:
+        old_name = os.path.join(tmpDir, 'old.mol2')
+        new_name = os.path.join(tmpDir, 'new.mol2')
+
+        mol.write(old_name)
+
+        cmd = ['antechamber',
+               '-fi', 'mol2', '-i', old_name,
+               '-fo', 'mol2', '-o', new_name]
+        if subprocess.call(cmd, cwd=tmpDir) != 0:
+            raise RuntimeError('"antechamber" failed')
+
+        mol.bondtype[:] = Molecule(new_name).bondtype
+
+    return mol
+
+def makeAtomNamesUnique(mol):
+    """
+    Make atom names unique by appending/incrementing terminal digits.
+    Already unique names are preserved.
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to make atom name unique
+
+    Return
+    ------
+    results: Molecule
+        Copy of the molecule with the atom names set
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+    >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+    >>> mol = Molecule(molFile)
+
+    >>> mol.name[:] = ['A', 'A', 'A', 'A']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'A0', 'A1', 'A2'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'A', 'A', 'A0']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'A1', 'A2', 'A0'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'B', 'A', 'B']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'B', 'A0', 'B0'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'B', 'C', 'D']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'B', 'C', 'D'], dtype=object)
+
+    >>> mol.name[:] = ['1A', '1A', 'A1B1', 'A1B1']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['1A', '1A0', 'A1B1', 'A1B2'], dtype=object)
+    """
+
+    from htmd.molecule.molecule import Molecule
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+
+    mol = mol.copy()
+
+    for i, name in enumerate(mol.name):
+        while np.sum(name == mol.name) > 1: # Check for identical names
+            j = np.flatnonzero(name == mol.name)[1] # Get the second identical name index
+            prefix, sufix = re.match('(.*?\D*)(\d*)$', mol.name[j]).groups()
+            sufix = 0 if sufix == '' else int(sufix)
+            while prefix + str(sufix) in mol.name: # Search for a unique name
+                sufix += 1
+            mol.name[j] = prefix + str(sufix)
+
+    return mol
+
+
+if __name__ == '__main__':
+
+    import sys
+    import doctest
+
+    sys.exit(doctest.testmod().failed)
