@@ -66,7 +66,9 @@ class DihedralFitting:
         self._angle_values = None
 
         self._initial_energies = None
+        self._const_energies = None
         self._target_energies = None
+        self._actual_energies = None
         self._fitted_energies = None
 
         self._parameterizable_dihedrals = None
@@ -136,22 +138,25 @@ class DihedralFitting:
             self._coords.append([result.coords for result in results])
 
         # Calculate dihedral angle values
-        # [# of dihedrals, # of conformations, # of equivalents]
+        # [# of scans, # of dihedrals, # of conformations, # of equivalents]
         self._angle_values = []
-        for rotamer_coords, equivalent_indices in zip(self._coords, self._equivalent_indices):
-            angle_values = []
-            for coords in rotamer_coords:
-                angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
-            self._angle_values.append(np.array(angle_values))
-        self._angle_values_rad = [angle_values[:, :, None] for angle_values in self._angle_values]
+        for scan_coords in self._coords:
+            scan_angle_values = []
+            for equivalent_indices in self._equivalent_indices:
+                angle_values = []
+                for coords in scan_coords:
+                    angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
+                scan_angle_values.append(np.array(angle_values))
+            self._angle_values.append(scan_angle_values)
 
         self._parameterizable_dihedral_atomtypes = [tuple(self.molecule.atomtype[idx]) for idx in self.dihedrals]
 
         # Calculated initial MM energies
         ff = FFEvaluate(self.molecule, self.parameters)
         self._initial_energies = []
-        for rotamer_coords in self._coords:
-            self._initial_energies.append(np.array([ff.calculateEnergies(coords[:, :, 0])['total'] for coords in rotamer_coords]))
+        for scan_coords in self._coords:
+            energies = [ff.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
+            self._initial_energies.append(np.array(energies))
 
     def _getBounds(self):
         """
@@ -182,35 +187,41 @@ class DihedralFitting:
 
         n = np.arange(1, self.MAX_DIHEDRAL_MULTIPLICITY + 1)
 
-        actual_energies = []
-        for i in range(self.numDihedrals):
-            phis = self._angle_values[i][:, :, None]
-            energies = np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2)) + offset[i]
-            actual_energies.append(energies)
+        self._actual_energies = [0] * self.numDihedrals
+        for iscan in range(self.numDihedrals):
+            for idihed in range(self.numDihedrals):
+                phis = self._angle_values[iscan][idihed][:, :, None]
+                energies = np.sum(k0[idihed] * (1 + np.cos(n * phis - phi0[idihed])), axis=(1, 2)) + offset[iscan]
+                self._actual_energies[iscan] += energies
 
-        all_actual_energies = np.concatenate(actual_energies)
+        all_actual_energies = np.concatenate(self._actual_energies)
         all_target_energies = np.concatenate(self._target_energies)
         rmsd = np.sqrt(np.mean((all_actual_energies - all_target_energies)**2))
 
         if grad is not None:
             if grad.size > 0:
 
-                grad_k0 = []
-                grad_phi0 = []
+                grad_k0 = [0] * self.numDihedrals
+                grad_phi0 = [0] * self.numDihedrals
                 grad_offset = []
 
-                for i in range(self.numDihedrals):
+                for iscan in range(self.numDihedrals):
 
                     # Compute partial derivatives
-                    phis = self._angle_values[i][:, :, None]
-                    dL_dV = (actual_energies[i] - self._target_energies[i])/(rmsd*all_actual_energies.size)
-                    dV_dk0 = np.sum(1 + np.cos(n * phis - phi0[i]), axis=1)
-                    dV_dphi0 = np.sum(k0[i] * np.sin(n * phis - phi0[i]), axis=1)
+                    dL_dV = (self._actual_energies[iscan] - self._target_energies[iscan]) / (rmsd*all_actual_energies.size)
 
-                    # Compute gradients with the chain rule
-                    grad_k0.append(dL_dV @ dV_dk0)
-                    grad_phi0.append(dL_dV @ dV_dphi0)
-                    grad_offset.append(np.sum(dL_dV, keepdims=True))
+                    for idihed in range(self.numDihedrals):
+
+                        # Compute partial derivatives
+                        phis = self._angle_values[iscan][idihed][:, :, None]
+                        dV_dk0 = np.sum(1 + np.cos(n * phis - phi0[idihed]), axis=1)
+                        dV_dphi0 = np.sum(k0[idihed] * np.sin(n * phis - phi0[idihed]), axis=1)
+
+                        # Compute gradients with the chain rule
+                        grad_k0[idihed] += dL_dV @ dV_dk0
+                        grad_phi0[idihed] += dL_dV @ dV_dphi0
+
+                    grad_offset.append(self.numDihedrals*np.sum(dL_dV, keepdims=True))
 
                 # Pack gradients
                 grad[:] = np.concatenate(grad_k0 + grad_phi0 + grad_offset)
@@ -333,23 +344,39 @@ class DihedralFitting:
 
         # Save the initial parameters
         vector = self._paramsToVector(self.parameters, self._parameterizable_dihedral_atomtypes)
-        if self.zeroed_parameters:
-            vector[:] = 0
 
-        # Evaluate the MM potential with this dihedral zeroed out
+        # Exclude the parameterizable dihedral contributions
         # The objective function will try to fit to the delta between
         # the QM potential and this modified MM potential
         for key in self._parameterizable_dihedral_atomtypes:
             for term in self.parameters.dihedral_types[key]:
                 term.phi_k = 0
+                assert term.per > 0 # Guard from messing up with improper dihedrals
 
-        # Now evaluate the FF without the dihedral being fitted
-        self._target_energies = []
+        # Evaluate MM energies with the parameterizable dihedral contributions excluded
+        self._const_energies = []
         ff = FFEvaluate(self.molecule, self.parameters)
-        for rotamer_coords, ref_energies in zip(self._coords, self._reference_energies):
-            energies = ref_energies - np.array([ff.calculateEnergies(coords[:, :, 0])['total'] for coords in rotamer_coords])
+        for scan_coords in self._coords:
+            energies = [ff.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
+            self._const_energies.append(np.array(energies))
+
+        # Evaluate target energies for fitting
+        self._target_energies = []
+        for ref_energies, const_energies in zip(self._reference_energies, self._const_energies):
+            energies = ref_energies - const_energies
             energies -= np.min(energies)
             self._target_energies.append(energies)
+
+        # Check self-consistency of computed energies
+        self._objective(vector, None)
+        test_energies = zip(self._initial_energies, self._const_energies, self._actual_energies)
+        for initial_energies, const_energies, actual_enegies in test_energies:
+            errors = initial_energies - (const_energies + actual_enegies)
+            assert np.max(np.abs(errors)) < 1e-5
+
+        # Zero the initial parameters, so they are not used to start the parameter fitting
+        if self.zeroed_parameters:
+            vector[:] = 0
 
         # Optimize the parameters
         logger.info('Start parameter optimization')
@@ -369,8 +396,9 @@ class DihedralFitting:
         # Evaluate the fitted energies
         self._fitted_energies = []
         ffeval = FFEvaluate(self.molecule, self.parameters)
-        for rotamer_coords in self._coords:
-            self._fitted_energies.append(np.array([ffeval.calculateEnergies(coords[:, :, 0])['total'] for coords in rotamer_coords]))
+        for scan_coords in self._coords:
+            energies = [ffeval.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
+            self._fitted_energies.append(np.array(energies))
 
         # TODO make the self-consistency test numerically robust
         #reference_energies = np.concatenate([energies - np.mean(energies) for energies in self._reference_energies])
@@ -397,7 +425,7 @@ class DihedralFitting:
         Plot conformer energies for a specific dihedral angle, including QM, original and fitted MM energies.
         """
 
-        angle = np.rad2deg(self._angle_values[idihed][:, 0])
+        angle = np.rad2deg(self._angle_values[idihed][idihed][:, 0])
         reference_energy = self._reference_energies[idihed] - np.min(self._reference_energies[idihed])
         initial_energy = self._initial_energies[idihed] - np.min(self._initial_energies[idihed])
         fitted_energy = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
@@ -542,12 +570,12 @@ class TestDihedralFitting(unittest.TestCase):
         for ndihed, nequiv, nconf, ref_value in [(1, 1, 1, 372.32948041618585),
                                                  (1, 1, 5, 308.20314159433246),
                                                  (1, 3, 1, 745.73230831710710),
-                                                 (2, 1, 1, 368.27031744452563),
-                                                 (2, 3, 5, 832.25851847289550)]:
+                                                 (2, 1, 1, 616.7816057498425),
+                                                 (2, 3, 5, 1781.2220869682305)]:
             with self.subTest(ndihed=ndihed, nequiv=nequiv, nconf=nconf):
 
                 self.df.dihedrals = [[0]*4]*ndihed
-                self.df._angle_values = 100*np.random.random((ndihed, nconf, nequiv))
+                self.df._angle_values = 100*np.random.random((ndihed, ndihed, nconf, nequiv))
                 self.df._target_energies = 100*np.random.random((ndihed, nconf))
 
                 vector = 100*np.random.random(13*ndihed)
