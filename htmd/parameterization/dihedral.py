@@ -326,6 +326,10 @@ class DihedralFitting:
 
             vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
 
+            if best_loss < 1e-3:
+                logger.info('Terminate optization: small RMSD reached!')
+                break
+
         self.loss = best_loss
         logger.info('Final RMSD: {:.6f} kcal/mol'.format(best_loss))
 
@@ -374,8 +378,7 @@ class DihedralFitting:
         self._objective(vector, None)
         test_energies = zip(self._initial_energies, self._const_energies, self._actual_energies)
         for initial_energies, const_energies, actual_enegies in test_energies:
-            errors = initial_energies - (const_energies + actual_enegies)
-            assert np.max(np.abs(errors)) < 1e-5
+            assert np.allclose(initial_energies, const_energies + actual_enegies, rtol=0, atol=1e-5)
 
         # Zero the initial parameters, so they are not used to start the parameter fitting
         if self.zeroed_parameters:
