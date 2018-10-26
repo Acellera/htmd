@@ -341,8 +341,8 @@ class DihedralFitting:
         parameters = copy.deepcopy(self.parameters)
 
         # Disable parameterizable (i.e. non-constant) terms
-        for key in self._dihedral_atomtypes:
-            for term in parameters.dihedral_types[key]:
+        for atomtypes in self._dihedral_atomtypes:
+            for term in parameters.dihedral_types[atomtypes]:
                 term.phi_k = 0
                 assert term.per > 0 # Guard from messing up with improper dihedrals
 
