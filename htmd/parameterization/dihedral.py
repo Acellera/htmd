@@ -243,20 +243,35 @@ class DihedralFitting:
         """
         Convert the parameter objects to a vector.
         """
-        vector = []
+        phi_ks = []
+        phases = []
 
         for atomtypes in self._dihedral_atomtypes:
             assert len(parameters.dihedral_types[atomtypes]) == self.MAX_DIHEDRAL_MULTIPLICITY
-            for term in parameters.dihedral_types[atomtypes]:
-                vector.append(term.phi_k)
+            for i, term in enumerate(parameters.dihedral_types[atomtypes]):
+                phi_ks.append(term.phi_k)
+                phases.append(np.deg2rad(term.phase))
+                assert term.per == i + 1  # Check if the periodicity is correct
 
-        for atomtypes in self._dihedral_atomtypes:
-            for term in parameters.dihedral_types[atomtypes]:
-                vector.append(np.deg2rad(term.phase))
+        return np.array(phi_ks + phases + [0])
 
-        vector.append(0)  # The offset
+    def _vectorToParams(self, vector):
+        """
+        Convert a vector to a parameter object
+        """
 
-        return np.array(vector)
+        assert vector.size == 2 * len(self._dihedral_atomtypes) * self.MAX_DIHEDRAL_MULTIPLICITY + 1
+        phi_k, phase = np.reshape(vector[:-1], (2, -1, self.MAX_DIHEDRAL_MULTIPLICITY))
+
+        parameters = copy.deepcopy(self.parameters)
+        for i, atomtypes in enumerate(self._dihedral_atomtypes):
+            assert len(parameters.dihedral_types[atomtypes]) == self.MAX_DIHEDRAL_MULTIPLICITY
+            for j, term in enumerate(parameters.dihedral_types[atomtypes]):
+                term.phi_k = phi_k[i, j]
+                term.phase = np.rad2deg(phase[i, j])
+                assert term.per == j + 1  # Check if the periodicity is still correct
+
+        return parameters
 
     def _optimizeWithRandomSearch(self, vector):
         """
@@ -317,23 +332,6 @@ class DihedralFitting:
         logger.info('Final RMSD: {:.6f} kcal/mol'.format(best_loss))
 
         return best_vector
-
-    def _vectorToParams(self, vector):
-        """
-        Convert a vector to a parameter object
-        """
-
-        assert vector.size == 2 * len(self._dihedral_atomtypes) * self.MAX_DIHEDRAL_MULTIPLICITY + 1
-        phi_k, phase = vector[:-1].reshape(2, -1, self.MAX_DIHEDRAL_MULTIPLICITY)
-
-        parameters = copy.deepcopy(self.parameters)
-        for i, atomtypes in enumerate(self._dihedral_atomtypes):
-            for j, term in enumerate(parameters.dihedral_types[atomtypes]):
-                term.phi_k = phi_k[i, j]
-                term.phase = np.rad2deg(phase[i, j])
-                assert term.per == j + 1  # Check if the periodicity is still correct
-
-        return parameters
 
     def _evaluateConstTerms(self):
         """
