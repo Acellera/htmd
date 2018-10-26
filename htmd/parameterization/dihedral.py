@@ -247,41 +247,6 @@ class DihedralFitting:
 
         return np.array(vector)
 
-    def _optimize_CRS2_LM(self, vector):
-        """
-        Controlled random search with local mutations
-        """
-
-        # Create a global optimizer
-        opt = nlopt.opt(nlopt.GN_CRS2_LM, vector.size)
-        opt.set_min_objective(self._objective)
-        lower_bounds, upper_bounds = self._getBounds()
-        opt.set_lower_bounds(lower_bounds)
-        opt.set_upper_bounds(upper_bounds)
-        neval = 10000 * opt.get_dimension()  # TODO allow to tune this parameter
-        opt.set_maxeval(neval)
-
-        # Optimize parameters
-        vector = opt.optimize(vector)  # TODO check optimizer status
-        self.loss = opt.last_optimum_value()
-        assert self._objective(vector, None) == self.loss
-
-        # Create a local optimizer
-        opt = nlopt.opt(nlopt.LN_BOBYQA, opt.get_dimension())
-        opt.set_min_objective(self._objective)
-        opt.set_lower_bounds(lower_bounds)
-        opt.set_upper_bounds(upper_bounds)
-        opt.set_xtol_rel(1e-3)
-        opt.set_maxeval(neval)
-        opt.set_initial_step(1e-3 * (upper_bounds-lower_bounds))
-
-        # Optimize parameters
-        vector = opt.optimize(vector)  # TODO check optimizer status
-        self.loss = opt.last_optimum_value()
-        assert self._objective(vector, None) == self.loss
-
-        return vector
-
     def _optimize_random_search(self, vector):
         """
         Naive random search
@@ -394,7 +359,6 @@ class DihedralFitting:
         # Optimize the parameters
         logger.info('Start parameter optimization')
         start = time.clock()
-        # vector = self._optimize_CRS2_LM(vector)  # TODO this should work better, but it doesn't
         vector = self._optimize_random_search(vector)
         finish = time.clock()
         logger.info('Finished parameter optimization after %f s' % (finish-start))
