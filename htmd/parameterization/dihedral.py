@@ -3,6 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import copy
 import os
 import time
 import logging
@@ -232,18 +233,21 @@ class DihedralFitting:
 
         return rmsd
 
-    def _paramsToVector(self, params, dihedral_atomtypes):
+    def _paramsToVector(self, parameters):
         """
         Convert the parameter objects to a vector.
         """
         vector = []
-        for k in dihedral_atomtypes:
-            assert len(params.dihedral_types[k]) == self.MAX_DIHEDRAL_MULTIPLICITY
-            for term in params.dihedral_types[k]:
+
+        for atomtypes in self._dihedral_atomtypes:
+            assert len(parameters.dihedral_types[atomtypes]) == self.MAX_DIHEDRAL_MULTIPLICITY
+            for term in parameters.dihedral_types[atomtypes]:
                 vector.append(term.phi_k)
-        for k in dihedral_atomtypes:
-            for term in params.dihedral_types[k]:
+
+        for atomtypes in self._dihedral_atomtypes:
+            for term in parameters.dihedral_types[atomtypes]:
                 vector.append(np.deg2rad(term.phase))
+
         vector.append(0)  # The offset
 
         return np.array(vector)
@@ -308,35 +312,52 @@ class DihedralFitting:
 
         return best_vector
 
-    def _vectorToParams(self, parameters, dihedral_atomtypes, vector):
+    def _vectorToParams(self, vector):
+        """
+        Convert a vector to a parameter object
+        """
 
-        nparams = len(dihedral_atomtypes) * self.MAX_DIHEDRAL_MULTIPLICITY
-        assert vector.size == 2 * nparams + 1
+        assert vector.size == 2 * len(self._dihedral_atomtypes) * self.MAX_DIHEDRAL_MULTIPLICITY + 1
+        phi_k, phase = vector[:-1].reshape(2, -1, self.MAX_DIHEDRAL_MULTIPLICITY)
 
-        for i, k in enumerate(dihedral_atomtypes):
-            for j, t in enumerate(parameters.dihedral_types[k]):
-                t.phi_k = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j]
-                t.phase = np.rad2deg(vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j+nparams])
+        parameters = copy.deepcopy(self.parameters)
+        for i, atomtypes in enumerate(self._dihedral_atomtypes):
+            for j, term in enumerate(parameters.dihedral_types[atomtypes]):
+                term.phi_k = phi_k[i, j]
+                term.phase = np.rad2deg(phase[i, j])
+                assert term.per == j + 1  # Check if the periodicity is still correct
+
+        return parameters
+
+    def _evaluateConstTerms(self):
+        """
+        Evalutate constant MM terms
+        """
+
+        parameters = copy.deepcopy(self.parameters)
+
+        # Disable parameterizable (i.e. non-constant) terms
+        for key in self._dihedral_atomtypes:
+            for term in parameters.dihedral_types[key]:
+                term.phi_k = 0
+                assert term.per > 0 # Guard from messing up with improper dihedrals
+
+        # Evaluate MM energies
+        const_energies = []
+        ff = FFEvaluate(self.molecule, parameters)
+        for scan_coords in self._coords:
+            energies = [ff.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
+            const_energies.append(np.array(energies))
+
+        return const_energies
 
     def _fit(self):
 
         # Save the initial parameters
-        vector = self._paramsToVector(self.parameters, self._dihedral_atomtypes)
+        vector = self._paramsToVector(self.parameters)
 
-        # Exclude the parameterizable dihedral contributions
-        # The objective function will try to fit to the delta between
-        # the QM potential and this modified MM potential
-        for key in self._dihedral_atomtypes:
-            for term in self.parameters.dihedral_types[key]:
-                term.phi_k = 0
-                assert term.per > 0 # Guard from messing up with improper dihedrals
-
-        # Evaluate MM energies with the parameterizable dihedral contributions excluded
-        self._const_energies = []
-        ff = FFEvaluate(self.molecule, self.parameters)
-        for scan_coords in self._coords:
-            energies = [ff.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
-            self._const_energies.append(np.array(energies))
+        # Evaluate constant terms
+        self._const_energies = self._evaluateConstTerms()
 
         # Evaluate target energies for fitting
         self._target_energies = []
@@ -364,8 +385,8 @@ class DihedralFitting:
         finish = time.clock()
         logger.info('Finished parameter optimization after %f s' % (finish-start))
 
-        # Update the target dihedral with the optimized parameters
-        self._vectorToParams(self.parameters, self._dihedral_atomtypes, vector)
+        # Update parameters
+        self.parameters = self._vectorToParams(vector)
 
         return self.loss
 
@@ -515,7 +536,8 @@ class TestDihedralFitting(unittest.TestCase):
         params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
 
         self.df.dihedrals = [(0, 0, 0, 0),]
-        vector = self.df._paramsToVector(params, [('x', 'x', 'x', 'x'),])
+        self.df._dihedral_atomtypes = [('x', 'x', 'x', 'x')]
+        vector = self.df._paramsToVector(params)
         self.assertListEqual(list(vector), [10, 11, 12, 13, 14, 15,
                                             np.deg2rad(20), np.deg2rad(21), np.deg2rad(22),
                                             np.deg2rad(23), np.deg2rad(24), np.deg2rad(25), 0.])
@@ -532,11 +554,15 @@ class TestDihedralFitting(unittest.TestCase):
         params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
 
         self.df.dihedrals = [[0, 1, 2, 3]]
+        self.df.parameters = params
+        self.df._dihedral_atomtypes = [('x', 'x', 'x', 'x')]
         vector = np.array([30, 31, 32, 33, 34, 35, 40, 41, 42, 43, 44, 45, 50])
-        self.df._vectorToParams(params, [('x', 'x', 'x', 'x'),], vector)
 
-        self.assertEqual(len(params.dihedral_types[('x', 'x', 'x', 'x')]), 6)
-        for i, param in enumerate(params.dihedral_types[('x', 'x', 'x', 'x')]):
+        new_params = self.df._vectorToParams(vector)
+
+        self.assertFalse(params is new_params)
+        self.assertEqual(len(new_params.dihedral_types[('x', 'x', 'x', 'x')]), 6)
+        for i, param in enumerate(new_params.dihedral_types[('x', 'x', 'x', 'x')]):
             self.assertEqual(param.phi_k, i+30)
             self.assertEqual(param.per, i+1)
             self.assertAlmostEqual(np.deg2rad(param.phase), i+40)
