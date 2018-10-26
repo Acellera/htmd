@@ -255,7 +255,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
-    df.result_directory = os.path.join(outdir, 'parameters', method, _qm_method_name(qm), 'plots')
+    df.result_directory = os.path.join(outdir, 'parameters', method, _qm_method_name(qm))
 
     # In case of FakeQM, the initial parameters are set to zeros.
     # It prevents DihedralFitting class from cheating :D

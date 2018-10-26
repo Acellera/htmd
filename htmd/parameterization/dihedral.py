@@ -75,6 +75,8 @@ class DihedralFitting:
         self._parameterizable_dihedrals = None
         self._dihedral_atomtypes = None
 
+        self._plot_directory = None
+
     @property
     def numDihedrals(self):
         """Number of dihedral angles"""
@@ -159,6 +161,10 @@ class DihedralFitting:
         for scan_coords in self._coords:
             energies = [ff.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
             self._initial_energies.append(np.array(energies))
+
+        # Make result directories
+        self._plot_directory = os.path.join(self.result_directory, 'plots')
+        os.makedirs(self._plot_directory, exist_ok=True)
 
     def _getBounds(self):
         """
@@ -279,7 +285,7 @@ class DihedralFitting:
         # Naive random search
         niter = 10 * opt.get_dimension()  # TODO allow to tune this parameter
         logger.info('Number of random searches: {}'.format(niter))
-        with open(os.path.join(self.result_directory, '..', 'random-search.log'), 'w') as log:
+        with open(os.path.join(self.result_directory, 'random-search.log'), 'w') as log:
             log.write('{:6s} {:6s} {:10s} {}\n'.format('# Step', 'Status', 'Loss', 'Vector'))
             for i in range(niter):
 
@@ -407,11 +413,9 @@ class DihedralFitting:
         loss = np.sqrt(np.mean((fitted_energies - reference_energies)**2))
         assert np.isclose(self.loss, loss, rtol=0, atol=1e-5)
 
-        if self.result_directory:
-            os.makedirs(self.result_directory, exist_ok=True)
-            self.plotConformerEnergies()
-            for idihed in range(len(self.dihedrals)):
-                self.plotDihedralEnergies(idihed)
+        self.plotConformerEnergies()
+        for idihed in range(len(self.dihedrals)):
+            self.plotDihedralEnergies(idihed)
 
     def run(self):
 
@@ -432,7 +436,7 @@ class DihedralFitting:
         fitted_energy = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
         indices = np.argsort(angle)
 
-        path = os.path.join(self.result_directory, self._names[idihed])
+        path = os.path.join(self._plot_directory, self._names[idihed])
 
         if write_data:
             fmtsz = 8
@@ -468,7 +472,7 @@ class DihedralFitting:
         regression.fit(qm_energy, mm_energy)
         prediction = regression.predict(qm_energy)
 
-        path = os.path.join(self.result_directory, 'conformer-energies')
+        path = os.path.join(self._plot_directory, 'conformer-energies')
 
         if write_data:
             fmtsz = 8
