@@ -4,15 +4,15 @@
 # No redistribution in whole or part
 #
 import copy
+import logging
 import os
 import time
-import logging
 import unittest
-import numpy as np
-import nlopt
-import matplotlib
-matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
+import nlopt
+import numpy as np
+
 from sklearn.linear_model import LinearRegression
 
 from htmd.numbautil import dihedralAngle
