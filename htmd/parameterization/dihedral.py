@@ -309,26 +309,33 @@ class DihedralFitting:
         # Naive random search
         niter = 10 * opt.get_dimension()  # TODO allow to tune this parameter
         logger.info('Number of random searches: {}'.format(niter))
-        for i in range(niter):
+        with open(os.path.join(self.result_directory, '..', 'random-search.log'), 'w') as log:
+            log.write('{:6s} {:6s} {:10s} {}\n'.format('# Step', 'Status', 'Loss', 'Vector'))
+            for i in range(niter):
 
-            try:
-                vector = opt.optimize(vector)  # TODO check optimizer status
-                loss = opt.last_optimum_value()
+                try:
+                    vector = opt.optimize(vector)
+                    loss = opt.last_optimum_value()
+                    status = opt.last_optimize_result()
 
-            except RuntimeError:
-                pass
+                except RuntimeError:
+                    loss = -1
+                    status = -1
 
-            else:
-                if loss < best_loss:
-                    best_loss = loss
-                    best_vector = vector
-                    logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
+                else:
+                    if loss < best_loss:
+                        best_loss = loss
+                        best_vector = vector
+                        logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
 
-            vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
+                string = ' '.join(['{:10.6f}'.format(value) for value in vector])
+                log.write('{:6d} {:6d} {:10.6f} {}\n'.format(i, status, loss, string))
 
-            if best_loss < 1e-3:
-                logger.info('Terminate optization: small RMSD reached!')
-                break
+                vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
+
+                if best_loss < 1e-3:
+                    logger.info('Terminate optization: small RMSD reached!')
+                    break
 
         self.loss = best_loss
         logger.info('Final RMSD: {:.6f} kcal/mol'.format(best_loss))
