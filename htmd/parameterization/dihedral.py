@@ -350,7 +350,7 @@ class DihedralFitting:
         self._objective(vector, None)
         test_energies = zip(self._initial_energies, self._const_energies, self._actual_energies)
         for initial_energies, const_energies, actual_enegies in test_energies:
-            assert np.allclose(initial_energies, const_energies + actual_enegies, rtol=0, atol=1e-5)
+            assert np.allclose(initial_energies, const_energies + actual_enegies, rtol=0, atol=1e-5) # TODO debug
 
         # Zero the initial parameters, so they are not used to start the parameter fitting
         if self.zeroed_parameters:
@@ -377,11 +377,13 @@ class DihedralFitting:
             energies = [ffeval.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
             self._fitted_energies.append(np.array(energies))
 
-        # TODO make the self-consistency test numerically robust
-        #reference_energies = np.concatenate([energies - np.mean(energies) for energies in self._reference_energies])
-        #fitted_energies = np.concatenate([energies - np.mean(energies) for energies in self._fitted_energies])
-        #check_loss = np.sqrt(np.mean((fitted_energies - reference_energies)**2))
-        #assert np.isclose(self.loss, check_loss)
+        # Check the self-consistency of fitting
+        reference_energies = np.concatenate(self._reference_energies)
+        reference_energies -= np.mean(reference_energies)
+        fitted_energies = np.concatenate(self._fitted_energies)
+        fitted_energies -= np.mean(fitted_energies)
+        loss = np.sqrt(np.mean((fitted_energies - reference_energies)**2))
+        assert np.isclose(self.loss, loss, rtol=0, atol=1e-5)
 
         if self.result_directory:
             os.makedirs(self.result_directory, exist_ok=True)
