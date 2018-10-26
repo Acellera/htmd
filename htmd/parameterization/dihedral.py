@@ -58,7 +58,7 @@ class DihedralFitting:
         self.loss = None
 
         self._names = None
-        self._equivalent_indices = None
+        self._equivalent_dihedrals = None
 
         self._valid_qm_results = None
         self._reference_energies = None
@@ -72,7 +72,7 @@ class DihedralFitting:
         self._fitted_energies = None
 
         self._parameterizable_dihedrals = None
-        self._parameterizable_dihedral_atomtypes = None
+        self._dihedral_atomtypes = None
 
     @property
     def numDihedrals(self):
@@ -118,16 +118,19 @@ class DihedralFitting:
         self._names = ['-'.join(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
 
         # Get equivalent dihedral atom indices
-        self._equivalent_indices = []
+        self._equivalent_dihedrals = []
         for idihed, dihedral in enumerate(self.dihedrals):
             found = False
             for parameterizableDihedral in self._parameterizable_dihedrals:
                 if np.all(list(parameterizableDihedral[0]) == dihedral):
-                    self._equivalent_indices.append(parameterizableDihedral)
+                    self._equivalent_dihedrals.append(parameterizableDihedral)
                     found = True
                     break
             if not found:
                 raise ValueError('%s is not recognized as a parameterizable dihedral\n' % self._names[idihed])
+
+        # Get dihedral atom types
+        self._dihedral_atomtypes = [tuple(self.molecule.atomtype[dihedral]) for dihedral in self.dihedrals]
 
         # Get reference QM energies and rotamer coordinates
         self._valid_qm_results = self._getValidQMResults()
@@ -142,14 +145,12 @@ class DihedralFitting:
         self._angle_values = []
         for scan_coords in self._coords:
             scan_angle_values = []
-            for equivalent_indices in self._equivalent_indices:
+            for equivalent_indices in self._equivalent_dihedrals:
                 angle_values = []
                 for coords in scan_coords:
                     angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
                 scan_angle_values.append(np.array(angle_values))
             self._angle_values.append(scan_angle_values)
-
-        self._parameterizable_dihedral_atomtypes = [tuple(self.molecule.atomtype[idx]) for idx in self.dihedrals]
 
         # Calculated initial MM energies
         ff = FFEvaluate(self.molecule, self.parameters)
@@ -320,12 +321,12 @@ class DihedralFitting:
     def _fit(self):
 
         # Save the initial parameters
-        vector = self._paramsToVector(self.parameters, self._parameterizable_dihedral_atomtypes)
+        vector = self._paramsToVector(self.parameters, self._dihedral_atomtypes)
 
         # Exclude the parameterizable dihedral contributions
         # The objective function will try to fit to the delta between
         # the QM potential and this modified MM potential
-        for key in self._parameterizable_dihedral_atomtypes:
+        for key in self._dihedral_atomtypes:
             for term in self.parameters.dihedral_types[key]:
                 term.phi_k = 0
                 assert term.per > 0 # Guard from messing up with improper dihedrals
@@ -364,7 +365,7 @@ class DihedralFitting:
         logger.info('Finished parameter optimization after %f s' % (finish-start))
 
         # Update the target dihedral with the optimized parameters
-        self._vectorToParams(self.parameters, self._parameterizable_dihedral_atomtypes, vector)
+        self._vectorToParams(self.parameters, self._dihedral_atomtypes, vector)
 
         return self.loss
 
