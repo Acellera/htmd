@@ -179,7 +179,7 @@ class DihedralFitting:
 
         return lower_bounds, upper_bounds
 
-    def _objective(self, x, grad):
+    def _objective(self, x, grad=None):
         """
         Objective function for the parameter fitting.
         """
@@ -252,7 +252,7 @@ class DihedralFitting:
 
         return np.array(vector)
 
-    def _optimize_random_search(self, vector):
+    def _optimizeWithRandomSearch(self, vector):
         """
         Naive random search
         """
@@ -272,7 +272,7 @@ class DihedralFitting:
         opt.set_maxeval(100 * opt.get_dimension())
 
         # Initialize
-        best_loss = self._objective(vector, None)
+        best_loss = self._objective(vector)
         best_vector = vector
         logger.info('Initial RMSD: {:.6f} kcal/mol'.format(best_loss))
 
@@ -369,7 +369,7 @@ class DihedralFitting:
         self._target_energies = [energies - shift for energies in self._target_energies]
 
         # Check self-consistency of computed energies
-        self._objective(vector, None)
+        self._objective(vector)
         test_energies = zip(self._initial_energies, self._const_energies, self._actual_energies)
         for initial_energies, const_energies, actual_enegies in test_energies:
             assert np.allclose(initial_energies, const_energies + actual_enegies, rtol=0, atol=1e-5) # TODO debug
@@ -381,7 +381,7 @@ class DihedralFitting:
         # Optimize the parameters
         logger.info('Start parameter optimization')
         start = time.clock()
-        vector = self._optimize_random_search(vector)
+        vector = self._optimizeWithRandomSearch(vector)
         finish = time.clock()
         logger.info('Finished parameter optimization after %f s' % (finish-start))
 
@@ -594,7 +594,7 @@ class TestDihedralFitting(unittest.TestCase):
                     def func(x):
                         v = vector.copy()
                         v[i] = x
-                        return self.df._objective(v, None)
+                        return self.df._objective(v)
 
                     # Compute gradient numerically
                     ref_grad = derivative(func, vector[i], dx=1e-3, order=5)
