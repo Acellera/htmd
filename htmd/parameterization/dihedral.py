@@ -9,6 +9,9 @@ import os
 import time
 import unittest
 
+import matplotlib
+matplotlib.use('Agg') # Use Agg to work on Travis
+
 import matplotlib.pyplot as plt
 import nlopt
 import numpy as np
