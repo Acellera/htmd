@@ -366,8 +366,8 @@ def main_parameterize(arguments=None):
                 qm._parameters = parameters
 
             # Fit the parameters
-            fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir,
-                         geomopt=args.optimize_dihedral)
+            parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
+                                      args.outdir, geomopt=args.optimize_dihedral)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')

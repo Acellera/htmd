@@ -265,6 +265,6 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     # Fit dihedral parameters
     df.run()
 
-    return prm
+    return df.parameters
 
 
