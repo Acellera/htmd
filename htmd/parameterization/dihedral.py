@@ -285,6 +285,7 @@ class DihedralFitting:
         opt = nlopt.opt(nlopt.LD_LBFGS, vector.size)
         logger.info('Local optimizer: {}'.format(opt.get_algorithm_name()))
         opt.set_min_objective(self._objective)
+        opt.set_vector_storage(opt.get_dimension())
 
         # Set bounds
         lower_bounds, upper_bounds = self._getBounds()
