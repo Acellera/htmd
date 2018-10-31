@@ -283,9 +283,9 @@ class DihedralFitting:
 
         # Create a local optimizer
         opt = nlopt.opt(nlopt.LD_LBFGS, vector.size)
-        logger.info('Local optimizer: {}'.format(opt.get_algorithm_name()))
-        opt.set_min_objective(self._objective)
         opt.set_vector_storage(opt.get_dimension())
+        logger.info('Local optimizer: {} with {} vector storage'.format(opt.get_algorithm_name(),
+                                                                        opt.get_vector_storage()))
 
         # Set bounds
         lower_bounds, upper_bounds = self._getBounds()
@@ -300,6 +300,7 @@ class DihedralFitting:
         best_loss = self._objective(vector)
         best_vector = vector
         logger.info('Initial RMSD: {:.6f} kcal/mol'.format(best_loss))
+        opt.set_min_objective(self._objective)
 
         # Naive random search
         niter = 10 * opt.get_dimension()  # TODO allow to tune this parameter
