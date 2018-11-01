@@ -16,7 +16,7 @@ For benzamidine, it can be downloaded from *HTMD* repository:
 
 .. code:: bash
 
-    wget https://raw.githubusercontent.com/Acellera/htmd/master/htmd/data/test-param/benzamidine.mol2
+    wget https://raw.githubusercontent.com/Acellera/htmd-data/master/test-param/benzamidine.mol2
 
 ``benzamidine.mol2`` file contains a molecule ready for parameterization.
 
