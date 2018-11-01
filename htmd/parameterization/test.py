@@ -37,7 +37,7 @@ class TestParameterize(unittest.TestCase):
 
     def _testFiles(self, refDir, resDir):
         testFiles = []
-        exclusions = ('minimize', 'esp', 'dihedral', '.coor', '.svg')
+        exclusions = ('minimize', 'esp', 'dihedral', '.coor', '.svg', 'random-search.log')
         for root, _, files in os.walk(refDir, followlinks=True):
             for file in files:
                 relFile = os.path.relpath(os.path.join(root, file), start=refDir)
