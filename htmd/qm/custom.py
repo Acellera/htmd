@@ -106,18 +106,16 @@ class OMMMinimizer(Minimizer):
 
     def minimize(self, coords, restrained_dihedrals):
         from simtk import unit
-        from simtk.openmm import CustomTorsionForce, app
+        from simtk.openmm import CustomTorsionForce, PeriodicTorsionForce, app
         import simtk.openmm as mm
 
         forceidx = []
         if restrained_dihedrals:
-            f = CustomTorsionForce('0.5*k*(theta-theta0)^2')
-            f.addPerTorsionParameter('k')
-            f.addPerTorsionParameter('theta0')
+            f = PeriodicTorsionForce()
 
             for dihedral in restrained_dihedrals:
                 theta0 = dihedralAngle(coords[dihedral])
-                f.addTorsion(int(dihedral[0]), int(dihedral[1]), int(dihedral[2]), int(dihedral[3]), [float(10000000), float(theta0)])
+                f.addTorsion(*tuple(map(int, dihedral)), periodicity=1, phase=theta0, k=-10000 * unit.kilocalories_per_mole)
 
             fidx = self.system.addForce(f)
             forceidx.append(fidx)
@@ -145,7 +143,7 @@ class CustomEnergyBasedMinimizer(Minimizer):
         self.opt = nlopt.opt(nlopt.LN_COBYLA, mol.coords.size)
 
         def objective(x, _):
-            return float(calculator.calculate(x.reshape((-1, 3, 1)), mol.element)[0])
+            return float(calculator.calculate(x.reshape((-1, 3, 1)), mol.element, units='kcalmol')[0])
 
         self.opt.set_min_objective(objective)
 
@@ -245,8 +243,9 @@ class CustomQM(QMBase):
     89.99...
     """
 
-    def __init__(self):
+    def __init__(self, verbose=True):
         super().__init__()
+        self._verbose = verbose
         self._arg('calculator', ':class: `Calculator`', 'Calculator object', default=None, validator=None, required=True)
         self._arg('minimizer', ':class: `Minimizer`', 'Minimizer object', default=None, validator=None)
 
@@ -292,7 +291,7 @@ class CustomQM(QMBase):
                     mol.coords = result.coords
                     mol.write(molFile)
 
-                result.energy = float(self.calculator.calculate(result.coords, self.molecule.element)[0])
+                result.energy = float(self.calculator.calculate(result.coords, self.molecule.element, units='kcalmol')[0])
                 result.dipole = [0, 0, 0]
 
                 #if self.optimize:
@@ -300,7 +299,8 @@ class CustomQM(QMBase):
 
                 finish = time.clock()
                 result.calculator_time = finish - start
-                logger.info('Custom calculator calculation time: %f s' % result.calculator_time)
+                if self._verbose:
+                    logger.info('Custom calculator calculation time: %f s' % result.calculator_time)
 
                 with open(pickleFile, 'wb') as fd:
                     pickle.dump(result, fd)
