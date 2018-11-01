@@ -268,6 +268,37 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     return prm
 
 
+# Minimize with MM
+# Adapted from Stefan's code
+def rotamerScan(mol, minim, dih_atoms, scanangles, sequential=True, bonds=None):
+    from tqdm import tqdm
+    startdihrad = mol.getDihedral(dih_atoms)
+    scancoords = []
+    if bonds is None:
+        if len(mol.bonds) == 0:
+            bonds = mol._getBonds()
+        else:
+            bonds = mol.bonds
+    tmpmol = mol.copy()
+    outmol = mol.copy()
+    rmsd = []
+    startcoords = []
+    for angle in tqdm(scanangles, desc='Scanning {}'.format('-'.join(map(str, dih_atoms)))):
+        tmpmol.coords[:, :, 0] = mol.coords[:, :, 0].copy()
+        tmpmol.setDihedral(dih_atoms, np.deg2rad(angle), bonds=bonds)
+        startcoor = tmpmol.coords.squeeze()
+        startcoords.append(startcoor.copy())
+        minimizedcoords = minim.minimize(startcoor, restrained_dihedrals=[dih_atoms, ])
+        scancoords.append(minimizedcoords)
+        rmsd.append(np.sqrt(np.mean((startcoor - minimizedcoords) ** 2)))
+
+    outmol.coords = np.stack(scancoords, axis=2).astype(np.float32)
+    outmol.box = np.zeros((3, mol.numFrames), dtype=np.float32)
+    #startmol = outmol.copy()
+    #startmol.coords = np.stack(startcoords, axis=2).astype(np.float32)
+    return outmol, np.array(rmsd)#, startmol
+
+
 def fitDihedralsNew(mol, qm, method, prm, before_invention, all_dihedrals, dihedrals, outdir):
     """
     Dihedrals passed as 4 atom indices
