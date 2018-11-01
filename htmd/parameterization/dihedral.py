@@ -16,6 +16,7 @@ from sklearn.linear_model import LinearRegression
 
 from htmd.numbautil import dihedralAngle
 from htmd.ffevaluation.ffevaluate import FFEvaluate
+from htmd.parameterization.parameterset import findDihedralType
 
 logger = logging.getLogger(__name__)
 
@@ -313,6 +314,7 @@ class DihedralFitting:
         assert vector.size == 2 * nparams + 1
 
         for i, k in enumerate(dihedral_atomtypes):
+            k = findDihedralType(k, parameters)
             for j, t in enumerate(parameters.dihedral_types[k]):
                 t.phi_k = vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j]
                 t.phase = np.rad2deg(vector[i*self.MAX_DIHEDRAL_MULTIPLICITY+j+nparams])
@@ -326,6 +328,7 @@ class DihedralFitting:
         # The objective function will try to fit to the delta between
         # the QM potential and this modified MM potential
         for key in self._parameterizable_dihedral_atomtypes:
+            key = findDihedralType(key, self.parameters)
             for term in self.parameters.dihedral_types[key]:
                 term.phi_k = 0
                 assert term.per > 0 # Guard from messing up with improper dihedrals
