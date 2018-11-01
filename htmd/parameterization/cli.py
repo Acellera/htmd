@@ -161,8 +161,11 @@ def _fit_charges(mol, args, qm):
 
         charge = int(round(np.sum(mol.charge)))
         if args.charge != charge:
-            logger.info('Molecular charge is set to {}, but atomic charges of passed molecule add up to {}. '
-                        'Distributing molecular charge equally over molecule atoms'.format(args.charge, charge))
+            logger.warning('Molecular charge is set to {}, but atomic charges of passed molecule add up to {}. '.format(
+                args.charge, charge))
+            if len(args.fix_charge) > 0:
+                raise RuntimeError('Flag --fix-charge cannot be used when atomic charges are inconsistent with passed '
+                                   'molecular charge {}'.format(args.charge))
             mol.charge[:] = args.charge/mol.numAtoms
 
         # Fit ESP charges
