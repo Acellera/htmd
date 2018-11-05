@@ -37,7 +37,7 @@ class TestParameterize(unittest.TestCase):
 
     def _testFiles(self, refDir, resDir):
         testFiles = []
-        exclusions = ('minimize', 'esp', 'dihedral', '.coor', '.svg')
+        exclusions = ('minimize', 'esp', 'dihedral', '.coor', '.svg', 'random-search.log')
         for root, _, files in os.walk(refDir, followlinks=True):
             for file in files:
                 relFile = os.path.relpath(os.path.join(root, file), start=refDir)
@@ -223,7 +223,6 @@ class TestParameterize(unittest.TestCase):
         self._execute(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --no-min --no-dihed-opt')
         self._testFiles(refDir, resDir)
 
-    @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
     def test_ethanolamine_dihed_fix_restart(self):
         refDir = os.path.join(self.dataDir, 'ethanolamine_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'ethanolamine_dihed_fix_restart')
