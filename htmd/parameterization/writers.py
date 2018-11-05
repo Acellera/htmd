@@ -1,5 +1,4 @@
-from htmd.parameterization.util import _qm_method_name
-from htmd.parameterization.parameterset import getImproperParameter, getParameter
+from htmd.parameterization.parameterset import findImproperType, getParameter
 import os
 import parmed
 import numpy as np
@@ -113,7 +112,8 @@ def writeFRCMOD(mol, parameters, filename, typemap=None):
     f.write('\nIMPR\n')
     types = getSortedAndUniqueTypes(atomtypes[mol.impropers], 'improper_types')
     for type in types:
-        val, field = getImproperParameter(type, parameters)
+        type, field = findImproperType(type, parameters)
+        val = parameters.__dict__[field][type]
         fmt = '{:<2s}-{:<2s}-{:<2s}-{:<2s}     {:>10.8f}{:>9.3f}{:>6.1f}\n'
         if field == 'improper_periodic_types':
             if val.phi_k == 0:
@@ -169,7 +169,8 @@ def writePRM(mol, parameters, filename):
     print("\nIMPROPER", file=f)
     types = getSortedAndUniqueTypes(mol.atomtype[mol.impropers], 'improper_types')
     for type in types:
-        val, field = getImproperParameter(type, parameters)
+        type, field = findImproperType(type, parameters)
+        val = parameters.__dict__[field][type]
         if field == 'improper_periodic_types':
             for term in ensurelist(val):
                 print("%-6s %-6s %-6s %-6s %12.8f %d %12.8f" % (type[0], type[1], type[2], type[3], term.phi_k, term.per, term.phase), file=f)
@@ -218,10 +219,8 @@ def writeRTF(mol, parameters, netcharge, filename):
     f.close()
 
 
-def writeParameters(mol, parameters, qm, method, netcharge, outdir, original_coords=None):
-
-    paramDir = os.path.join(outdir, 'parameters', method, _qm_method_name(qm))
-    os.makedirs(paramDir, exist_ok=True)
+def writeParameters(outdir, mol, parameters, method, netcharge, original_coords=None):
+    os.makedirs(outdir, exist_ok=True)
 
     typemap = None
     extensions = ('mol2', 'pdb', 'coor')
@@ -230,7 +229,7 @@ def writeParameters(mol, parameters, qm, method, netcharge, outdir, original_coo
         extensions += ('psf', 'rtf', 'prm')
 
         # TODO: remove?
-        f = open(os.path.join(paramDir, "input.namd"), "w")
+        f = open(os.path.join(outdir, "input.namd"), "w")
         tmp = '''parameters mol.prm
 paraTypeCharmm on
 coordinates mol.pdb
@@ -257,12 +256,12 @@ run 0'''
         # types need to be remapped because Amber FRCMOD format limits the type to characters
         # writeFrcmod does this on the fly and returns a mapping that needs to be applied to the mol
         # TODO: get rid of this mapping
-        frcFile = os.path.join(paramDir, 'mol.frcmod')
+        frcFile = os.path.join(outdir, 'mol.frcmod')
         typemap = getAtomTypeMapping(parameters)
         writeFRCMOD(mol, parameters, frcFile, typemap=typemap)
         logger.info('Write FRCMOD file: %s' % frcFile)
 
-        tleapFile = os.path.join(paramDir, 'tleap.in')
+        tleapFile = os.path.join(outdir, 'tleap.in')
         with open(tleapFile, 'w') as file_:
             file_.write('loadAmberParams mol.frcmod\n')
             file_.write('A = loadMol2 mol.mol2\n')
@@ -271,7 +270,7 @@ run 0'''
         logger.info('Write tleap input file: %s' % tleapFile)
 
         # TODO: remove?
-        f = open(os.path.join(paramDir, "input.namd"), "w")
+        f = open(os.path.join(outdir, "input.namd"), "w")
         tmp = '''parmfile structure.prmtop
 amber on
 coordinates mol.pdb
@@ -306,7 +305,7 @@ run 0'''
     tmpmol = remapAtomTypes(mol)
 
     for ext in extensions:
-        file_ = os.path.join(paramDir, "mol." + ext)
+        file_ = os.path.join(outdir, "mol." + ext)
         if ext == 'prm':
             writePRM(mol, parameters, file_)
         elif ext == 'rtf':
@@ -316,7 +315,7 @@ run 0'''
         logger.info('Write %s file: %s' % (ext.upper(), file_))
 
     if original_coords is not None:
-        molFile = os.path.join(paramDir, 'mol-orig.mol2')
+        molFile = os.path.join(outdir, 'mol-orig.mol2')
         tmpmol.coords = original_coords
         tmpmol.write(molFile)
         logger.info('Write MOL2 file (with original coordinates): {}'.format(molFile))

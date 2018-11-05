@@ -386,10 +386,11 @@ def main_parameterize(arguments=None):
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
-        writeParameters(mol, parameters, qm, method, args.charge, args.outdir, original_coords=orig_coor)
+        paramoutdir = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm))
+        writeParameters(paramoutdir, mol, parameters, method, args.charge, original_coords=orig_coor)
 
         # Write energy file
-        energyFile = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm), 'energies.txt')
+        energyFile = os.path.join(paramoutdir, 'energies.txt')
         printEnergies(mol, parameters, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
