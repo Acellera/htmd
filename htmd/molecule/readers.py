@@ -197,7 +197,7 @@ class MolFactory(object):
                 continue
 
             # Empty strings in future float dtype arrays cannot be converted to numbers so here we set them to 0
-            if np.issubdtype(mol._dtypes[field], np.float) \
+            if np.issubdtype(mol._dtypes[field], np.floating) \
                     and isinstance(topo.__dict__[field], list)\
                     and isinstance(topo.__dict__[field][0], str):
                 topo.__dict__[field] = [x if len(x.strip()) else 0 for x in topo.__dict__[field]]
