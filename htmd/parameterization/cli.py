@@ -71,6 +71,9 @@ def getArgumentParser():
     # QMML module name
     parser.add_argument('--qmml', help=argparse.SUPPRESS)
 
+    # Debug mode
+    parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
+
     return parser
 
 
@@ -162,6 +165,15 @@ def _fit_charges(mol, args, qm):
         espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
         os.makedirs(espDir, exist_ok=True)
 
+        charge = int(round(np.sum(mol.charge)))
+        if args.charge != charge:
+            logger.warning('Molecular charge is set to {}, but atomic charges of passed molecule add up to {}. '.format(
+                args.charge, charge))
+            if len(args.fix_charge) > 0:
+                raise RuntimeError('Flag --fix-charge cannot be used when atomic charges are inconsistent with passed '
+                                   'molecular charge {}'.format(args.charge))
+            mol.charge[:] = args.charge/mol.numAtoms
+
         # Fit ESP charges
         mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
         logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
@@ -186,12 +198,10 @@ def _fit_charges(mol, args, qm):
 
 def main_parameterize(arguments=None):
 
-    parser = getArgumentParser()
-    args = parser.parse_args(args=arguments)
-
-    # Argument deprecation
-    if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
-        raise DeprecationWarning('Use `--dihed-opt instead.`')
+    args = getArgumentParser().parse_args(args=arguments)
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug(sys.argv[1:])
 
     if not os.path.exists(args.filename):
         raise ValueError('File %s cannot be found' % args.filename)
@@ -377,23 +387,9 @@ def main_parameterize(arguments=None):
             parameters = recreateParameters(mol, originaltypes, parameters)
             parameters = createMultitermDihedralTypes(parameters)
 
-            if args.opt_type != 'mm':
-                if isinstance(qm, FakeQM2):
-                    qm._parameters = parameters
-
-                if args.opt_type == 'qm':
-                    geomopt = True
-                elif args.opt_type == 'no':
-                    geomopt = False
-                else:
-                    raise NotImplementedError
-
-                # Fit the parameters
-                fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir,
-                             geomopt=geomopt)
-            elif args.opt_type == 'mm':
-                fitDihedralsNew(mol, qm, method, parameters, before_invention, all_dihedrals, parameterizable_dihedrals,
-                                args.outdir)
+            # Fit the parameters
+            parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
+                                      args.outdir, geomopt=args.optimize_dihedral)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
@@ -407,5 +403,5 @@ def main_parameterize(arguments=None):
 
 if __name__ == "__main__":
 
-    args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
-    main_parameterize(arguments=args)
+    arguments = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
+    main_parameterize(arguments=arguments)
