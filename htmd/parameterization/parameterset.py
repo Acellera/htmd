@@ -14,16 +14,24 @@ def getParameter(type, parameterfield):
     raise RuntimeError('Could not find parameters for key {}'.format(type))
 
 
-def getImproperParameter(type, parameters):
+def findImproperType(type, parameters):
     from itertools import permutations
     type = np.array(type)
     perms = np.array([x for x in list(permutations((0, 1, 2, 3))) if x[2] == 2])
     for p in perms:
         if tuple(type[p]) in parameters.improper_types:
-            return parameters.improper_types[tuple(type[p])], 'improper_types'
+            return tuple(type[p]), 'improper_types'
         elif tuple(type[p]) in parameters.improper_periodic_types:
-            return parameters.improper_periodic_types[tuple(type[p])], 'improper_periodic_types'
-    raise RuntimeError('Could not find improper parameters for key {}'.format(type))
+            return tuple(type[p]), 'improper_periodic_types'
+    return None
+
+
+def findDihedralType(type, parameters):
+    if type in parameters.dihedral_types:
+        return type
+    elif type[::-1] in parameters.dihedral_types:
+        return type[::-1]
+    return None
 
 
 def recreateParameters(mol, originaltypes, parameters):
@@ -50,14 +58,19 @@ def recreateParameters(mol, originaltypes, parameters):
 
     for idx in mol.dihedrals:
         newkey = tuple(mol.atomtype[idx])
+        if findDihedralType(newkey, newparams) is not None:  # A permutation of it already exists
+            continue
         oldkey = tuple(np.vectorize(originaltypes.get)(newkey))
+        oldkey = findDihedralType(oldkey, parameters)
         newparams.dihedral_types[newkey] = copy(parameters.dihedral_types[oldkey])
 
     for idx in mol.impropers:
         newkey = tuple(mol.atomtype[idx])
+        if findImproperType(newkey, newparams) is not None:  # A permutation of it already exists
+            continue
         oldkey = np.vectorize(originaltypes.get)(newkey)
-        oldval, field = getImproperParameter(oldkey, parameters)
-        newparams.__dict__[field][newkey] = copy(oldval)
+        oldkey, field = findImproperType(oldkey, parameters)
+        newparams.__dict__[field][newkey] = copy(parameters.__dict__[field][oldkey])
 
     return newparams
 
