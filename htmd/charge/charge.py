@@ -249,6 +249,53 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
 
     return mol, extra
 
+def symmerizeCharges(mol):
+    """
+    Average the charges of equivalent atoms
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to symmetrize the charges
+
+    Return
+    ------
+    results: Molecule
+        Copy of the molecule with the symmetrized charges
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.charge[:] = [0.5, -0.5, 0.0]
+
+    >>> new_mol = symmerizeCharges(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.charge
+    array([ 0.5 , -0.25, -0.25], dtype=float32)
+    """
+
+    from htmd.parameterization.detect import detectEquivalentAtoms
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+    if mol.numFrames != 1:
+        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+
+    mol = mol.copy()
+    molCharge = np.sum(mol.charge)
+
+    equivalent_groups, _, _ = detectEquivalentAtoms(mol)
+    for atoms in equivalent_groups:
+        atoms = list(atoms)
+        mol.charge[atoms] = np.mean(mol.charge[atoms])
+
+    assert np.isclose(np.sum(mol.charge), molCharge)
+
+    return mol
+
 
 if __name__ == '__main__':
 
