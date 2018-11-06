@@ -123,7 +123,7 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitESPCharges
-    from htmd.parameterization.util import getFixedChargeAtomIndices, getDipole, _qm_method_name
+    from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
 
@@ -138,6 +138,10 @@ def _fit_charges(mol, args, qm):
 
         if len(args.fix_charge) > 0:
             logger.warning('Flag --fix-charge does not have effect!')
+
+        if np.any(mol.bondtype == "un"):
+            logger.info('Guessing bond types')
+            mol = guessBondType(mol)
 
         mol = fitGasteigerCharges(mol)
 

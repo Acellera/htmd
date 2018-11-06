@@ -1,7 +1,14 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 import numpy as np
 import logging
 import re
 import os
+import subprocess
+from tempfile import TemporaryDirectory
 
 logger = logging.getLogger(__name__)
 
@@ -56,22 +63,6 @@ def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
 def guessElementForFftype(index, mol, fftypemethod):
     """
     Guess element from an atom name
-
-    >>> from htmd.parameterization.util import guessElementForFftype
-    >>> guessElementForFftype('C')
-    'C'
-    >>> guessElementForFftype('C1')
-    'C'
-    >>> guessElementForFftype('C42')
-    'C'
-    >>> guessElementForFftype('C7S')
-    'C'
-    >>> guessElementForFftype('HN1')
-    'H'
-    >>> guessElementForFftype('CL')
-    'Cl'
-    >>> guessElementForFftype('CA1')
-    'Ca'
     """
 
     from htmd.parameterization.fftype import fftypemethods
@@ -267,4 +258,85 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
 
     return df.parameters
 
+def guessBondType(mol):
 
+    """
+    Guess bond type with Antechamber
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to guess the bond types
+
+    Return
+    ------
+    results: Molecule
+        Copy of the molecule with the bond type set
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+
+    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['1', '1'], dtype=object)
+
+    >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['1', '1', '1'], dtype=object)
+
+    >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['ar', 'ar', '1', 'ar', '1', 'ar', '1', 'ar', '1', 'ar', '1', '1',
+           '2', '1', '1', '1', '1', '1'], dtype=object)
+
+    """
+
+    from htmd.molecule.molecule import Molecule
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+    if mol.numFrames != 1:
+        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+
+    mol = mol.copy()
+
+    with TemporaryDirectory() as tmpDir:
+        old_name = os.path.join(tmpDir, 'old.mol2')
+        new_name = os.path.join(tmpDir, 'new.mol2')
+
+        mol.write(old_name)
+
+        cmd = ['antechamber',
+               '-fi', 'mol2', '-i', old_name,
+               '-fo', 'mol2', '-o', new_name]
+        if subprocess.call(cmd, cwd=tmpDir) != 0:
+            raise RuntimeError('"antechamber" failed')
+
+        mol.bondtype[:] = Molecule(new_name).bondtype
+
+    return mol
+
+
+if __name__ == '__main__':
+
+    import sys
+    import doctest
+
+    sys.exit(doctest.testmod().failed)
