@@ -30,7 +30,7 @@ def getArgumentParser():
                         help='Fix atomic charge during charge fitting (default: none)')
     parser.add_argument('-d', '--dihedral', nargs='+', default=[], metavar='A1-A2-A3-A4',
                         help='Select dihedral angle to parameterize (default: all parameterizable dihedral angles)')
-    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian', 'QMML'],
+    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'],
                         help='QM code (default: %(default)s)')
     parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP', 'wB97X-D'],
                         help='QM level of theory (default: %(default)s)')
@@ -62,9 +62,15 @@ def getArgumentParser():
     # This is intedended for debugging only and should be kept hidden.
     parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
 
+    # QMML module name
+    parser.add_argument('--qmml', help=argparse.SUPPRESS)
+
+    # Debug mode
+    parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
+
     return parser
 
-def _get_molecule(args):
+def _prepare_molecule(args):
 
     from htmd.molecule.molecule import Molecule
     from htmd.parameterization.util import guessElements
@@ -233,7 +239,7 @@ VdW      : {VDW_ENERGY}
 def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitESPCharges
-    from htmd.parameterization.util import getFixedChargeAtomIndices, getDipole, _qm_method_name
+    from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
 
@@ -248,6 +254,10 @@ def _fit_charges(mol, args, qm):
 
         if len(args.fix_charge) > 0:
             logger.warning('Flag --fix-charge does not have effect!')
+
+        if np.any(mol.bondtype == "un"):
+            logger.info('Guessing bond types')
+            mol = guessBondType(mol)
 
         mol = fitGasteigerCharges(mol)
 
@@ -268,6 +278,15 @@ def _fit_charges(mol, args, qm):
         # Create an ESP directory
         espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
         os.makedirs(espDir, exist_ok=True)
+
+        charge = int(round(np.sum(mol.charge)))
+        if args.charge != charge:
+            logger.warning('Molecular charge is set to {}, but atomic charges of passed molecule add up to {}. '.format(
+                args.charge, charge))
+            if len(args.fix_charge) > 0:
+                raise RuntimeError('Flag --fix-charge cannot be used when atomic charges are inconsistent with passed '
+                                   'molecular charge {}'.format(args.charge))
+            mol.charge[:] = args.charge/mol.numAtoms
 
         # Fit ESP charges
         mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
@@ -295,6 +314,9 @@ def main_parameterize(arguments=None):
 
     # Parse arguments
     args = getArgumentParser().parse_args(args=arguments)
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug(sys.argv[1:])
 
     # Print arguments
     logger.info('===== Parameterize =====')
@@ -305,7 +327,7 @@ def main_parameterize(arguments=None):
         logger.info('{:>20s}: {:s}'.format(key, str(value)))
 
     # Get a molecule and check its validity
-    mol = _get_molecule(args)
+    mol = _prepare_molecule(args)
 
     # Detect equivalent atom groups
     if args.charge_type == 'ESP':
@@ -403,20 +425,21 @@ def main_parameterize(arguments=None):
                 qm._parameters = parameters
 
             # Fit the parameters
-            fitDihedrals(mol, qm, method, parameters, param_dihedrals, selected_dihedrals, args.outdir,
-                         geomopt=args.optimize_dihedral)
+            parameters = fitDihedrals(mol, qm, method, parameters, param_dihedrals, selected_dihedrals,
+                                      args.outdir, geomopt=args.optimize_dihedral)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
-        writeParameters(mol, parameters, qm, method, args.charge, args.outdir, original_coords=orig_coor)
+        paramoutdir = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm))
+        writeParameters(paramoutdir, mol, parameters, method, args.charge, original_coords=orig_coor)
 
         # Write energy file
-        energyFile = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm), 'energies.txt')
+        energyFile = os.path.join(paramoutdir, 'energies.txt')
         printEnergies(mol, parameters, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
 
 if __name__ == "__main__":
 
-    args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
-    main_parameterize(arguments=args)
+    arguments = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
+    main_parameterize(arguments=arguments)

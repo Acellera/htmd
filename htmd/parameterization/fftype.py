@@ -3,20 +3,14 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import os
 import logging
 import subprocess
+import os
+import re
 import unittest
-from yaml import load as yamlload
-from pickle import load as pickleload
 from tempfile import TemporaryDirectory
 
 import numpy as np
-import parmed
-
-from htmd.home import home
-from htmd.molecule.molecule import Molecule
-from htmd.parameterization.readers import readPREPI, readFRCMOD, readRTF
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +85,8 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
         The modified Molecule object with the matching atom types for the ParameterSet
     """
 
+    import parmed
+
     if method not in fftypemethods:
         raise ValueError('Invalid method {}. Available methods {}'.format(method, ','.join(fftypemethods)))
 
@@ -102,6 +98,9 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
         logger.warning('Using atomic charges from molecule object to calculate net charge')
 
     if rtfFile and prmFile:
+
+        from htmd.parameterization.readers import readRTF
+
         logger.info('Reading FF parameters from {} and {}'.format(rtfFile, prmFile))
         prm = parmed.charmm.CharmmParameterSet(rtfFile, prmFile)
         names, elements, atomtypes, charges, masses, impropers = readRTF(rtfFile)
@@ -119,6 +118,9 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
             logger.debug('Temporary directory: {}'.format(tmpdir))
 
             if method in ('GAFF', 'GAFF2'):
+
+                from htmd.molecule.molecule import Molecule
+                from htmd.parameterization.readers import readPREPI, readFRCMOD
 
                 # Write the molecule to a file
                 renamed_mol.write(os.path.join(tmpdir, 'mol.mol2'))
@@ -150,12 +152,26 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
                 if returncode != 0:
                     raise RuntimeError('"parmchk2" failed')
 
+                # Check if antechamber did changes in atom names (and suggest the user to fix the names)
+                acmol = Molecule(os.path.join(tmpdir, 'NEWPDB.PDB'), type='pdb')
+                acmol.name = np.array([n.upper() for n in acmol.name]).astype(np.object)
+                changed_mol_acmol = np.setdiff1d(renamed_mol.name, acmol.name)
+                changed_acmol_mol = np.setdiff1d(acmol.name, renamed_mol.name)
+                if len(changed_mol_acmol) != 0 or len(changed_acmol_mol) != 0:
+                    raise RuntimeError('Initial atom names {} were changed by antechamber to {}. '
+                                       'This probably means that the start of the atom name does not match '
+                                       'element symbol. '
+                                       'Please check the molecule.'
+                                       ''.format(','.join(changed_mol_acmol), ','.join(changed_acmol_mol)))
+
                 # Read the results
                 prm = parmed.amber.AmberParameterSet(os.path.join(tmpdir, 'mol.frcmod'))
                 names, atomtypes, charges, impropers = readPREPI(renamed_mol, os.path.join(tmpdir, 'mol.prepi'))
                 masses, elements = readFRCMOD(atomtypes, os.path.join(tmpdir, 'mol.frcmod'))
 
             elif method == 'CGenFF_2b6':
+
+                from htmd.parameterization.readers import readRTF
 
                 # Write the molecule to a file
                 renamed_mol.write(os.path.join(tmpdir, 'mol.pdb'))
@@ -189,9 +205,10 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
     return prm, mol
 
 
-class TestFftype(unittest.TestCase):
+class TestFftypeGAFF(unittest.TestCase):
 
     def setUp(self):
+        from htmd.home import home
         self.refDir = home(dataDir='test-fftype')
 
     def assertListAlmostEqual(self, list1, list2, places=7):
@@ -200,6 +217,8 @@ class TestFftype(unittest.TestCase):
             self.assertAlmostEqual(a, b, places=places)
 
     def _init_mol(self, molName, ffTypeMethod, chargetuple):
+
+        from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(self.refDir, '{}.mol2'.format(molName))
 
@@ -221,16 +240,16 @@ class TestFftype(unittest.TestCase):
             self.testIntermediaryFiles = sorted(os.listdir(tmpDir))
 
     def _generate_references(self, name, method):
+
         import numbers
-        import numpy
-        from pickle import dump as pickledump
+        import pickle
 
         def mapping(value):
             if isinstance(value, str):
                 return '\'{}\''.format(value)
             elif isinstance(value, numbers.Real) or isinstance(value, numbers.Integral):
                 return str(value)
-            elif isinstance(value, numpy.ndarray):
+            elif isinstance(value, np.ndarray):
                 return '[{}]'.format(', '.join(map(mapping, list(value))))
             else:
                 raise Exception('No mapping for type {}'.format(type(value)))
@@ -243,7 +262,7 @@ class TestFftype(unittest.TestCase):
         with open(os.path.join(self.refDir, name, method, 'params.p'), 'wb') as outfile:
             for i in self.testParameters.__dict__:
                 print(i, getattr(self.testParameters, i))
-            pickledump(self.testParameters, outfile)
+            pickle.dump(self.testParameters, outfile)
 
         print('\nCopy these to intermediary_files.yaml')
         print('[{}]'.format(', '.join('\'{}\''.format(i) for i in self.testIntermediaryFiles)))
@@ -269,6 +288,9 @@ class TestFftype(unittest.TestCase):
 
     def test_mol(self):
 
+        import pickle
+        import yaml
+
         toTest = (
             ('ethanolamine', 'GAFF2', 'None'),
             ('1o5b_ligand', 'GAFF2', ('gas', 1)),
@@ -281,28 +303,75 @@ class TestFftype(unittest.TestCase):
 
                 refDir = os.path.join(self.refDir, name, method)
                 self._init_mol(name, method, chargetuple)
+                # self._generate_references(name, method)
 
                 with open(os.path.join(refDir, 'mol_props.yaml')) as infile:
-                    refProps = yamlload(infile)
+                    refProps = yaml.load(infile)
                 self._test_mol_props(**refProps)
 
                 with open(os.path.join(refDir, 'params.p'), 'rb') as infile:
-                    refParams = pickleload(infile)
+                    refParams = pickle.load(infile)
                 self._test_params(refParams)
 
                 with open(os.path.join(refDir, 'intermediary_files.yaml')) as infile:
-                    refFiles = yamlload(infile)
+                    refFiles = yaml.load(infile)
                 self._test_intermediary_files(refFiles)
 
     def test_broken_atomname(self):
 
+        from htmd.molecule.molecule import Molecule
+
         molFile = os.path.join(self.refDir, 'ethanolamine_wrongnames.mol2')
 
-        mol = Molecule(molFile)
+        mol = Molecule(molFile, guessNE=['bonds'], guess=[])
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as cm:
             fftype(mol, method='GAFF2')
+
+        self.assertEqual(cm.exception.args[0], 'Initial atom names BR1 were changed by antechamber to CR1. '
+                                               'This probably means that the start of the atom name does not '
+                                               'match element symbol. Please check the molecule.')
+
+
+class TestFftypeCGenFF(unittest.TestCase):
+
+    def setUp(self):
+
+        self.maxDiff = None
+
+        from htmd.home import home
+        from htmd.molecule.molecule import Molecule
+
+        molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
+        self.mol = Molecule(molFile, guessNE=['bonds'], guess=['angles', 'dihedrals'])
+
+    def test_rtf_prm(self):
+
+        from htmd.home import home
+        from htmd.parameterization.writers import writeRTF, writePRM
+
+        refDir = home(dataDir='test-fftype/benzamidine')
+        with TemporaryDirectory() as resDir:
+            parameters, mol = fftype(self.mol, method='CGenFF_2b6')
+            writeRTF(mol, parameters, 0, os.path.join(resDir, 'cgenff.rtf'))
+            writePRM(mol, parameters, os.path.join(resDir, 'cgenff.prm'))
+
+            for testFile in ('cgenff.rtf', 'cgenff.prm'):
+                with self.subTest(testFile=testFile):
+                    # Get rid of the first linw with HTMD version string
+                    with open(os.path.join(refDir, testFile)) as refFile:
+                        refData = refFile.readlines()[1:]
+                    with open(os.path.join(resDir, testFile)) as resFile:
+                        resData = resFile.readlines()[1:]
+                    self.assertListEqual(refData, resData, msg=testFile)
+
+    def test_tmp_files(self):
+
+        with TemporaryDirectory() as tmpDir:
+            _, _ = fftype(self.mol, method='CGenFF_2b6', tmpDir=tmpDir)
+            self.assertListEqual(sorted(os.listdir(tmpDir)), ['mol.pdb', 'mol.prm', 'mol.rtf', 'top_mol.rtf'])
 
 
 if __name__ == '__main__':
+
     unittest.main(verbosity=2)
