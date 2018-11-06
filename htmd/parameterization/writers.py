@@ -202,7 +202,8 @@ def writeRTF(mol, parameters, netcharge, filename):
         val = parameters.atom_types[type]
         print("MASS %5d %s %8.5f %s" % (val.number, type, val.mass, periodictable.elements[val.atomic_number]), file=f)
     print("\nAUTO ANGLES DIHE\n", file=f)
-    print("RESI  MOL %8.5f" % netcharge, file=f)
+    assert np.unique(mol.resname).size == 1 # Check if all atoms have the same residue name
+    print("RESI %s %8.5f" % (mol.resname[0], netcharge), file=f)
     print("GROUP", file=f)
 
     maxnamelen = max(4, np.max([len(na) for na in mol.name]))  # Minimum field size of 4

@@ -6,8 +6,10 @@
 import os
 import sys
 import shutil
+import time
 import unittest
 from subprocess import call
+
 import numpy as np
 
 from htmd.home import home
@@ -74,6 +76,18 @@ class TestParameterize(unittest.TestCase):
                     self.assertListEqual(refLines, resLines)  # If there is a mismatch, print a diff of all file
 
         print('')
+
+    def test_load_time(self):
+
+        _started_at = time.time()
+
+        command = 'parameterize -h'
+        print('')  # Just for a better readability
+        returncode = call(command.split())
+        self.assertEqual(returncode, 0)
+
+        elapsed = time.time() - _started_at
+        self.assertLessEqual(elapsed, 1.5)
 
     def test_h2o2_list(self):
         refDir = os.path.join(self.dataDir, 'h2o2_list')
@@ -196,7 +210,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart_2')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        dihedrals = ['O1-C1-C2-O2', 'C1-C2-O2-H6']
+        dihedrals = ['O1-C2-C3-O4', 'C2-C3-O4-H10']
         self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
         self._testFiles(refDir, resDir)
 
@@ -204,7 +218,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_select_1_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        dihedrals = ['O1-C1-C2-O2',]
+        dihedrals = ['O1-C2-C3-O4']
         self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
         self._testFiles(refDir, resDir)
 
@@ -212,7 +226,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_2_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_select_2_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        dihedrals = ['C1-C2-O2-H6',]
+        dihedrals = ['C2-C3-O4-H10']
         self._execute(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
         self._testFiles(refDir, resDir)
 
@@ -287,7 +301,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'benzamidine_esp_freeze_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --fix-charge N2 --basis 6-31G* --no-dihed')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --fix-charge N14 --basis 6-31G* --no-dihed')
         self._testFiles(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
@@ -297,7 +311,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 -d C2-C1-C7-N1 --basis 6-31G*')
+        self._execute(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 -d C2-C1-C7-N13 --basis 6-31G*')
         self._testFiles(refDir, resDir)
 
 

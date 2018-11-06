@@ -1,6 +1,13 @@
-import numpy as np
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
+import os
 import re
+import unittest
 
+import numpy as np
 
 _ATOM_TYPE_REG_EX = re.compile('^\S+x\d+$')
 
@@ -74,6 +81,7 @@ def recreateParameters(mol, originaltypes, parameters):
 
     return newparams
 
+
 def createMultitermDihedralTypes(parameters, nterms=6, scee=1.2, scnb=2):
     from parmed.topologyobjects import DihedralTypeList, DihedralType
     from copy import deepcopy
@@ -95,6 +103,7 @@ def createMultitermDihedralTypes(parameters, nterms=6, scee=1.2, scnb=2):
         parameters.dihedral_types[key] = dihlist
 
     return parameters
+
 
 def inventAtomTypes(mol, fit_dihedrals, equivalents):
     """
@@ -161,19 +170,16 @@ def _getEquivalentDihedrals(mol, equivalents, dihedral):
     return unique_dihedrals
 
 
-import unittest
-import os
 class Test(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
         from htmd.parameterization.fftype import fftype
-        from htmd.parameterization.util import canonicalizeAtomNames, getEquivalentsAndDihedrals
+        from htmd.parameterization.util import getEquivalentsAndDihedrals
         from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'glycol.mol2')
         mol = Molecule(molFile)
-        mol = canonicalizeAtomNames(mol, 'GAFF2')
         mol, self.equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
         _, mol = fftype(mol, method='GAFF2')
         self.mol = mol
@@ -200,5 +206,4 @@ class Test(unittest.TestCase):
 
 
 if __name__ == '__main__':
-
     unittest.main(verbosity=2)
