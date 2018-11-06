@@ -152,7 +152,7 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitESPCharges
-    from htmd.parameterization.util import getFixedChargeAtomIndices, getDipole, _qm_method_name
+    from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
 
@@ -167,6 +167,10 @@ def _fit_charges(mol, args, qm):
 
         if len(args.fix_charge) > 0:
             logger.warning('Flag --fix-charge does not have effect!')
+
+        if np.any(mol.bondtype == "un"):
+            logger.info('Guessing bond types')
+            mol = guessBondType(mol)
 
         mol = fitGasteigerCharges(mol)
 
@@ -404,10 +408,11 @@ def main_parameterize(arguments=None):
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
-        writeParameters(mol, parameters, qm, method, args.charge, args.outdir, original_coords=orig_coor)
+        paramoutdir = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm))
+        writeParameters(paramoutdir, mol, parameters, method, args.charge, original_coords=orig_coor)
 
         # Write energy file
-        energyFile = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm), 'energies.txt')
+        energyFile = os.path.join(paramoutdir, 'energies.txt')
         printEnergies(mol, parameters, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 

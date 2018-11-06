@@ -6,7 +6,6 @@
 
 import tempfile
 import logging
-import requests
 import re
 import io
 import os
@@ -182,7 +181,7 @@ def opm(pdb, keep=False, keepaltloc='A'):
     True
 
     """
-
+    import requests
     from htmd.molecule.support import string_to_tempfile
     from htmd.molecule.molecule import Molecule
     # http://opm.phar.umich.edu/pdb/1z98.pdb
