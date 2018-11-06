@@ -324,7 +324,12 @@ def init(mol, prm):
             continue
         alreadyadded[stringrep] = True
         ty = tuple(uqtypes[typeint[dihed]])
-        dihparam = prm.dihedral_types[ty]
+        if ty in prm.dihedral_types:
+            dihparam = prm.dihedral_types[ty]
+        elif ty[::-1] in prm.dihedral_types:
+            dihparam = prm.dihedral_types[ty[::-1]]
+        else:
+            raise RuntimeError('Could not find type {} in dihedral_types'.format(ty))
         i, j = sorted([dihed[0], dihed[3]])
         s14_atom_list[i].append(j)
         s14_value_list[i].append(dihparam[0].scnb)

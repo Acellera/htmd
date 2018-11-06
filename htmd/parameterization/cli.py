@@ -30,7 +30,7 @@ def getArgumentParser():
                         help='Fix atomic charge during charge fitting (default: none)')
     parser.add_argument('-d', '--dihedral', nargs='+', default=[], metavar='A1-A2-A3-A4',
                         help='Select dihedral angle to parameterize (default: all parameterizable dihedral angles)')
-    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian', 'QMML'],
+    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'],
                         help='QM code (default: %(default)s)')
     parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP', 'wB97X-D'],
                         help='QM level of theory (default: %(default)s)')
@@ -61,6 +61,12 @@ def getArgumentParser():
     # Enable replacement of any real QM class with FakeQM.
     # This is intedended for debugging only and should be kept hidden.
     parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
+
+    # QMML module name
+    parser.add_argument('--qmml', help=argparse.SUPPRESS)
+
+    # Debug mode
+    parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
 
     return parser
 
@@ -191,6 +197,15 @@ def _fit_charges(mol, args, qm):
         espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
         os.makedirs(espDir, exist_ok=True)
 
+        charge = int(round(np.sum(mol.charge)))
+        if args.charge != charge:
+            logger.warning('Molecular charge is set to {}, but atomic charges of passed molecule add up to {}. '.format(
+                args.charge, charge))
+            if len(args.fix_charge) > 0:
+                raise RuntimeError('Flag --fix-charge cannot be used when atomic charges are inconsistent with passed '
+                                   'molecular charge {}'.format(args.charge))
+            mol.charge[:] = args.charge/mol.numAtoms
+
         # Fit ESP charges
         mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
         logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
@@ -216,6 +231,9 @@ def _fit_charges(mol, args, qm):
 def main_parameterize(arguments=None):
 
     args = getArgumentParser().parse_args(args=arguments)
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug(sys.argv[1:])
 
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
@@ -258,15 +276,23 @@ def main_parameterize(arguments=None):
     # Create a QM object
     from htmd.qm import Psi4, Gaussian, FakeQM2
 
-    if args.code == 'Psi4':
-        qm = Psi4()
-    elif args.code == 'Gaussian':
-        qm = Gaussian()
-    elif args.code == 'QMML':
-        from htmd.qm.custom import QMML
-        qm = QMML()
+    if args.qmml:
+        import importlib
+        from htmd.qm.custom import CustomQM
+        qm = CustomQM()
+        qmml_module = importlib.import_module(args.qmml)
+        logger.info('QMML module: {}'.format(qmml_module))
+        qmml_calculator = qmml_module.get_calculator()
+        logger.info('QMML calculator: {}'.format(qmml_calculator))
+        qm.calculator = qmml_calculator
     else:
-        raise NotImplementedError
+        if args.code == 'Psi4':
+            qm = Psi4()
+        elif args.code == 'Gaussian':
+            qm = Gaussian()
+        else:
+            raise NotImplementedError
+
     # This is for debugging only!
     if args.fake_qm:
         qm = FakeQM2()
@@ -384,23 +410,24 @@ def main_parameterize(arguments=None):
                     qm._parameters = parameters
 
                 # Fit the parameters
-                fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir,
-                             geomopt=args.optimize_dihedral)
+                parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
+                                          args.outdir, geomopt=args.optimize_dihedral)
 
             else:
                 logger.info('No parameterizable dihedral angles detected!')
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
-        writeParameters(mol, parameters, qm, method, args.charge, args.outdir, original_coords=orig_coor)
+        paramoutdir = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm))
+        writeParameters(paramoutdir, mol, parameters, method, args.charge, original_coords=orig_coor)
 
         # Write energy file
-        energyFile = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm), 'energies.txt')
+        energyFile = os.path.join(paramoutdir, 'energies.txt')
         printEnergies(mol, parameters, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
 
 if __name__ == "__main__":
 
-    args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
-    main_parameterize(arguments=args)
+    arguments = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
+    main_parameterize(arguments=arguments)
