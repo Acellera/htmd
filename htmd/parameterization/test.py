@@ -250,7 +250,7 @@ class TestParameterize(unittest.TestCase):
         self._run(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
         self._test(refDir, resDir, energyTermRelTol=1e-5)
 
-      def test_glycol_dihed_select_1_restart(self):
+    def test_glycol_dihed_select_1_restart(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
         resDir = os.path.join(self.testDir, 'glycol_dihed_select_1_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
