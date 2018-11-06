@@ -192,6 +192,7 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
         # Replace coordinates with the minimized set
         mol.coords = np.atleast_3d(np.array(results[0].coords, dtype=np.float32))
     elif min_type == 'mm':
+        mol = mol.copy()
         mol.coords[:, :, 0] = mm_minimizer.minimize(mol.coords)
     elif min_type == 'None':
         pass
@@ -245,7 +246,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
         qm.molecule = molecule
         qm.esp_points = None
-        qm.optimize = True if dihed_opt_type == 'qm' else False
+        qm.optimize = (dihed_opt_type == 'qm')
         qm.restrained_dihedrals = np.array([dihedral])
         qm.directory = directory
         qm.setup()
@@ -256,7 +257,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
         qm.molecule = molecule
         qm.esp_points = None
-        qm.optimize = True if dihed_opt_type == 'qm' else False
+        qm.optimize = (dihed_opt_type == 'qm')
         qm.restrained_dihedrals = np.array([dihedral])
         qm.directory = directory
         qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
