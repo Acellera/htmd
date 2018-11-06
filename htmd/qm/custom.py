@@ -104,7 +104,7 @@ class OMMMinimizer(Minimizer):
         return prmtop
 
 
-    def minimize(self, coords, restrained_dihedrals):
+    def minimize(self, coords, restrained_dihedrals=None):
         from simtk import unit
         from simtk.openmm import CustomTorsionForce, PeriodicTorsionForce, app
         import simtk.openmm as mm
