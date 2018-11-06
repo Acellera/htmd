@@ -20,6 +20,7 @@ from sklearn.linear_model import LinearRegression
 
 from htmd.numbautil import dihedralAngle
 from htmd.ffevaluation.ffevaluate import FFEvaluate
+from htmd.parameterization.parameterset import findDihedralType
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ class DihedralFitting:
                 raise ValueError('%s is not recognized as a parameterizable dihedral\n' % self._names[idihed])
 
         # Get dihedral atom types
-        self._dihedral_atomtypes = [tuple(self.molecule.atomtype[dihedral]) for dihedral in self.dihedrals]
+        self._dihedral_atomtypes = [findDihedralType(tuple(self.molecule.atomtype[dihedral]), self.parameters) for dihedral in self.dihedrals]
 
         # Get reference QM energies and rotamer coordinates
         self._valid_qm_results = self._getValidQMResults()
