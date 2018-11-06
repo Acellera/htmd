@@ -19,7 +19,7 @@ class TestParameterize(unittest.TestCase):
 
     def setUp(self):
 
-        self.maxDiff = None
+        self.maxDiff = None  # Make the diff to be complete
         self.dataDir = home(dataDir='test-param')
         self.testDir = os.environ.get('TESTDIR', tempname())
 
@@ -27,18 +27,23 @@ class TestParameterize(unittest.TestCase):
 
         os.makedirs(resDir, exist_ok=True)
 
+        # Check the existance of the input file and copy it
         molFile = os.path.join(refDir, 'input.mol2')
         self.assertTrue(os.path.exists(molFile))
         shutil.copy(molFile, resDir)
 
-        print('')  # Just for a better readability
+        # Execute the test
+        print('', flush=True)
         self.assertEqual(call(command.split(), cwd=resDir), 0)
+        print('', flush=True)
 
-    def _test(self, refDir, resDir):
+    def _test(self, refDir, resDir, energyTermRelTol=1e-6):
+
+        assert energyTermRelTol < 1
 
         # Default tolerances
-        absTol = 1e-6
-        relTol = 1e-6
+        defaultAbsTol = 1e-6
+        defaultRelTol = 1e-6
 
         # Find the tested files
         testedFiles = []
@@ -51,13 +56,22 @@ class TestParameterize(unittest.TestCase):
                 testedFiles.append(os.path.join(root, file))
 
         # Test the files
-        print('\nCompared files:', flush=True)
+        print('Compared files:', flush=True)
         for file in testedFiles:
             relFile = os.path.relpath(file, start=refDir)
             refFile = os.path.join(refDir, relFile)
             resFile = os.path.join(resDir, relFile)
-
             print('  {}'.format(relFile))
+
+            # Reset tolerances
+            absTol = defaultAbsTol
+            relTol = defaultRelTol
+
+            # Set the tolerance for the energy terms
+            if file == 'energies.txt':
+                absTol = 0
+                relTol = energyTermRelTol
+
             with self.subTest(refFile=refFile):
 
                 self.assertTrue(os.path.exists(resFile))
@@ -67,26 +81,34 @@ class TestParameterize(unittest.TestCase):
 
                 # Removes the first line with the HTMD version
                 if file.endswith('frcmod') or file.endswith('rtf') or file.endswith('prm'):
-                    refLines, resLines = refLines[1:], resLines[1:]
+                    refLines = refLines[1:]
+                    resLines = resLines[1:]
 
+                # Iterate over lines in the file
                 for refLine, resLine in zip(refLines, resLines):
-                    for refFields, resFields in zip(refLine.split(), resLine.split()):
-                        for iField, (refField, resField) in enumerate(zip(refFields, resFields)):
+                    refFields = refLine.split()
+                    resFields = resLine.split()
 
-                            try:
-                                refField = float(refField)
-                                resField = float(resField)
-                            except ValueError:
-                                if refField == resField:
-                                    continue
-                            else:
-                                if np.isclose(refField, resField, atol=absTol, rtol=relTol):
-                                    continue
+                    # Iterate over fields in the line
+                    for iField, (refField, resField) in enumerate(zip(refFields, resFields)):
 
-                            print('Failed: {} == {}'.format(refField, resField))
-                            print('Absolute tolerance: {}'.format(absTol))
-                            print('Relative tolernace: {}'.format(relTol))
-                            self.assertListEqual(refLines, resLines)  # If there is a mismatch, print a diff of all file
+                        try:
+                            refField = float(refField)
+                            resField = float(resField)
+                        except ValueError:
+                            # The fields cannot be converted to floats, so compare them directly
+                            if refField == resField:
+                                continue
+                        else:
+                            # The fields can be converted to floats, so compare them with the tolerances
+                            if np.isclose(refField, resField, atol=absTol, rtol=relTol):
+                                continue
+
+                        # Print in case of failure
+                        print('Failed: {} == {}'.format(refField, resField))
+                        print('Absolute tolerance: {}'.format(absTol))
+                        print('Relative tolernace: {}'.format(relTol))
+                        self.assertListEqual(refLines, resLines)  # If there is a mismatch, print a diff of all file
 
         print('', flush=True)
 
