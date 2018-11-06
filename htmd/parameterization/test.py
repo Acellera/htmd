@@ -77,7 +77,7 @@ class TestParameterize(unittest.TestCase):
 
         print('')
 
-    def test_parameterize_speed(self):
+    def test_load_time(self):
 
         _started_at = time.time()
 
