@@ -87,7 +87,7 @@ def _prepare_molecule(args):
         new_mol = makeAtomNamesUnique(mol)
         for i, (old_name, new_name) in enumerate(zip(mol.name, new_mol.name)):
             if old_name != new_name:
-                logger.warning('Rename atom {:3d}: {:4s} --> {:4s}'.format(i, old_name, new_name))
+                logger.warning('Renamed atom {:3d}: {:4s} --> {:4s}'.format(i, old_name, new_name))
         mol = new_mol
 
     # Guess elements

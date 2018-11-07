@@ -352,7 +352,7 @@ def makeAtomNamesUnique(mol):
     from htmd.molecule.molecule import Molecule
 
     if not isinstance(mol, Molecule):
-        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+        raise TypeError('"mol" has to be an instance of {}'.format(Molecule))
 
     mol = mol.copy()
 
