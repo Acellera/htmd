@@ -312,6 +312,77 @@ def guessBondType(mol):
 
     return mol
 
+def makeAtomNamesUnique(mol):
+    """
+    Make atom names unique by appending/incrementing terminal digits.
+    Already unique names are preserved.
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to make atom name unique
+
+    Return
+    ------
+    results: Molecule
+        Copy of the molecule with the atom names set
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+    >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+    >>> mol = Molecule(molFile)
+
+    >>> mol.name[:] = ['A', 'A', 'A', 'A']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'A0', 'A1', 'A2'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'A', 'A', 'A0']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'A1', 'A2', 'A0'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'B', 'A', 'B']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'B', 'A0', 'B0'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'B', 'C', 'D']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'B', 'C', 'D'], dtype=object)
+
+    >>> mol.name[:] = ['1A', '1A', 'A1B1', 'A1B1']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['1A', '1A0', 'A1B1', 'A1B2'], dtype=object)
+    """
+
+    from htmd.molecule.molecule import Molecule
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be an instance of {}'.format(Molecule))
+
+    mol = mol.copy()
+
+    for i, name in enumerate(mol.name):
+        while np.sum(name == mol.name) > 1: # Check for identical names
+            j = np.flatnonzero(name == mol.name)[1] # Get the second identical name index
+            prefix, sufix = re.match('(.*?\D*)(\d*)$', mol.name[j]).groups()
+            sufix = 0 if sufix == '' else int(sufix)
+            while prefix + str(sufix) in mol.name: # Search for a unique name
+                sufix += 1
+            mol.name[j] = prefix + str(sufix)
+
+    return mol
+
 
 if __name__ == '__main__':
 
