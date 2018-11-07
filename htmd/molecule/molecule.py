@@ -1962,6 +1962,9 @@ class TestMolecule(TestCase):
         self.trajmol = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
         self.trajmol.read(path.join(home(dataDir='metricdistance'), 'traj.xtc'))
 
+        self.trajmollig = self.trajmol.copy()
+        _ = self.trajmollig.filter('resname MOL')
+
         self.mol3PTB = Molecule('3PTB')
 
     def test_trajReadingAppending(self):
@@ -2063,9 +2066,7 @@ class TestMolecule(TestCase):
         from htmd.home import home
 
         # Checking bonds
-        mol = self.trajmol.copy()
-        _ = mol.filter('resname MOL')
-
+        mol = self.trajmollig.copy()
         mol.align('noh')
 
         refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-selfalign-mol.npy'))
@@ -2076,8 +2077,7 @@ class TestMolecule(TestCase):
         from htmd.home import home
 
         # Checking bonds
-        mol = self.trajmol.copy()
-        _ = mol.filter('resname MOL')
+        mol = self.trajmollig.copy()
 
         mol2 = mol.copy()
         mol2.dropFrames(keep=3)  # Keep a random frame
@@ -2094,8 +2094,7 @@ class TestMolecule(TestCase):
         from htmd.home import home
 
         # Checking bonds
-        mol = self.trajmol.copy()
-        _ = mol.filter('resname MOL')
+        mol = self.trajmollig.copy()
 
         mol2 = mol.copy()
         mol2.coords = np.roll(mol.coords, 3, axis=2)
@@ -2104,6 +2103,25 @@ class TestMolecule(TestCase):
 
         refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-align-refmol-matchingframes.npy'))
 
+        assert np.allclose(mol.coords, refcoords, atol=1E-6)
+
+    def test_alignToReferenceSpecificFrames(self):
+        from htmd.home import home
+
+        # Checking bonds
+        mol = self.trajmollig.copy()
+
+        mol2 = mol.copy()
+        mol2.dropFrames(keep=3)  # Keep a random frame
+        _ = mol2.filter('noh') # Remove some atoms to check aligning molecules with different numAtoms
+
+        originalcoords = mol.coords.copy()
+
+        mol.align('noh', refmol=mol2, frames=[0, 1, 2, 3])
+
+        refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-align-refmol-selectedframes.npy'))
+
+        assert np.allclose(originalcoords[:, :, 4:], mol.coords[:, :, 4:], atol=1E-6)
         assert np.allclose(mol.coords, refcoords, atol=1E-6)
 
 
