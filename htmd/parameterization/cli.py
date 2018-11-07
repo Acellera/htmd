@@ -73,7 +73,7 @@ def getArgumentParser():
 def _prepare_molecule(args):
 
     from htmd.molecule.molecule import Molecule
-    from htmd.parameterization.util import guessElements
+    from htmd.parameterization.util import makeAtomNamesUnique, guessElements
 
     logger.info('=== Molecule ===')
 
@@ -111,9 +111,14 @@ def _prepare_molecule(args):
             raise ValueError('The molecular charge is set to {}, but the partial atomic charges in {} '
                              'add up to {}'.format(args.charge, args.filename, charge))
 
-    # Check atom names are unique
+    # Make atom names unique if needed
     if np.unique(mol.name).size != mol.numAtoms:
-        raise RuntimeError('The atom names in {} has to be unique!'.format(args.filename))
+        logger.warning('Atom names in the molecule are not unique!')
+        new_mol = makeAtomNamesUnique(mol)
+        for i, (old_name, new_name) in enumerate(zip(mol.name, new_mol.name)):
+            if old_name != new_name:
+                logger.warning('Renamed atom {:3d}: {:4s} --> {:4s}'.format(i, old_name, new_name))
+        mol = new_mol
 
     # Guess elements
     # TODO: it should not depend on FF
