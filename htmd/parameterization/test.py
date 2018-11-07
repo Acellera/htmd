@@ -376,8 +376,8 @@ class TestParameterize(unittest.TestCase):
     def test_h2o2_dihed_opt_mm_fake(self):
         refDir = os.path.join(self.dataDir, 'h2o2_min_mm_dihed_opt_mm_fake')
         resDir = os.path.join(self.testDir, 'h2o2_min_mm_dihed_opt_mm_fake')
-        self._execute(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type mm --scan-type mm --fake-qm')
-        self._testFiles(refDir, resDir)
+        self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type mm --scan-type mm --fake-qm')
+        self._test(refDir, resDir)
 
 
 if __name__ == '__main__':
