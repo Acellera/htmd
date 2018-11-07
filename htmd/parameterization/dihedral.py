@@ -184,8 +184,8 @@ class DihedralFitting:
         upper_bounds[nterms:2*nterms] = 2 * np.pi
 
         # Set offset bounds
-        lower_bounds[-1] = -10
-        upper_bounds[-1] = 10
+        lower_bounds[-1] = -20
+        upper_bounds[-1] = 20
 
         return lower_bounds, upper_bounds
 
@@ -394,6 +394,10 @@ class DihedralFitting:
         vector = self._optimizeWithRandomSearch(vector)
         finish = time.clock()
         logger.info('Finished parameter optimization after %f s' % (finish-start))
+
+        upper_bounds, lower_bounds = self._getBounds()
+        if vector[-1] == upper_bounds[-1] or vector[-1] == lower_bounds[-1]:
+            raise AssertionError('Fitting hit upper/lower bound of the offset. Please report this issue.')
 
         # Update parameters
         self.parameters = self._vectorToParams(vector)
