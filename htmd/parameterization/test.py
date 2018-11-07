@@ -38,9 +38,10 @@ class TestParameterize(unittest.TestCase):
         self.assertEqual(call(command.split(), cwd=resDir), 0)
         print('', flush=True)
 
-    def _test(self, refDir, resDir, energyTermRelTol=1e-6):
+    def _test(self, refDir, resDir, energyTermRelTol=1e-6, energyProfileAbsTol=1e-6):
 
         assert energyTermRelTol < 1
+        assert energyProfileAbsTol < 1
 
         # Default tolerances
         defaultAbsTol = 1e-6
@@ -68,10 +69,14 @@ class TestParameterize(unittest.TestCase):
             absTol = defaultAbsTol
             relTol = defaultRelTol
 
-            # Set the tolerance for the energy terms
-            if file == 'energies.txt':
+            # Set the tolerance for "energies.txt" file
+            if relFile.endswith('energies.txt'):
                 absTol = 0
                 relTol = energyTermRelTol
+
+            if relFile.endswith('.dat'):
+                absTol = energyProfileAbsTol
+                relTol = 0
 
             with self.subTest(refFile=refFile):
 
@@ -240,7 +245,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --no-min --no-dihed-opt')
-        self._test(refDir, resDir, energyTermRelTol=1e-5)
+        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1e-3)
 
     def test_glycol_dihed_fix_restart_2(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
@@ -248,7 +253,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['O1-C2-C3-O4', 'C2-C3-O4-H10']
         self._run(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
-        self._test(refDir, resDir, energyTermRelTol=1e-5)
+        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1e-3)
 
     def test_glycol_dihed_select_1_restart(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
@@ -256,7 +261,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['O1-C2-C3-O4']
         self._run(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
-        self._test(refDir, resDir, energyTermRelTol=1e-5)
+        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1e-3)
 
     def test_glycol_dihed_select_2_restart(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_2_restart')
@@ -264,7 +269,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['C2-C3-O4-H10']
         self._run(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --no-min --no-dihed-opt'.format(' '.join(dihedrals)))
-        self._test(refDir, resDir, energyTermRelTol=1e-5)
+        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1e-3)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_ethanolamine_dihed_fix(self):
@@ -278,7 +283,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'ethanolamine_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --no-min --no-dihed-opt')
-        self._test(refDir, resDir, energyTermRelTol=5e-5)
+        self._test(refDir, resDir, energyTermRelTol=5e-5, energyProfileAbsTol=1e-3)
 
     def test_benzamidine_gasteiger(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_gasteiger')
