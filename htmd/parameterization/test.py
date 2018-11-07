@@ -83,7 +83,8 @@ class TestParameterize(unittest.TestCase):
 
             with self.subTest(refFile=refFile):
 
-                self.assertTrue(os.path.exists(resFile))
+                self.assertTrue(os.path.exists(resFile),
+                                msg='Could not find file {} corresponding to {}'.format(resFile, refFile))
 
                 with open(refFile) as ref, open(resFile) as res:
                     refLines, resLines = ref.readlines(), res.readlines()
