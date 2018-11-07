@@ -108,28 +108,37 @@ def getFixedChargeAtomIndices(mol, fix_charge):
     return fixed_atom_indices
 
 
-def minimize(mol, qm, outdir):
+def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
     assert mol.numFrames == 1
 
-    mindir = os.path.join(outdir, "minimize", _qm_method_name(qm))
-    os.makedirs(mindir, exist_ok=True)
+    if min_type == 'qm':
+        mindir = os.path.join(outdir, "minimize", _qm_method_name(qm))
+        os.makedirs(mindir, exist_ok=True)
 
-    qm.molecule = mol
-    qm.esp_points = None
-    qm.optimize = True
-    qm.restrained_dihedrals = None
-    qm.directory = mindir
-    results = qm.run()
-    if results[0].errored:
-        raise RuntimeError('\nQM minimization failed! Check logs at %s\n' % mindir)
+        qm.molecule = mol
+        qm.esp_points = None
+        qm.optimize = True
+        qm.restrained_dihedrals = None
+        qm.directory = mindir
+        results = qm.run()
+        if results[0].errored:
+            raise RuntimeError('\nQM minimization failed! Check logs at %s\n' % mindir)
 
-    mol = mol.copy()
-    # Replace coordinates with the minimized set
-    mol.coords = np.atleast_3d(np.array(results[0].coords, dtype=np.float32))
+        mol = mol.copy()
+        # Replace coordinates with the minimized set
+        mol.coords = np.atleast_3d(np.array(results[0].coords, dtype=np.float32))
+    elif min_type == 'mm':
+        mol = mol.copy()
+        mol.coords[:, :, 0] = mm_minimizer.minimize(mol.coords)
+    elif min_type == 'None':
+        pass
+    else:
+        raise RuntimeError('Invalid minimization mode {}. Check parameterize help.'.format(min_type))
+
     return mol
 
 
-def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt=True):
+def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None):
     """
     Dihedrals passed as 4 atom indices
     """
@@ -144,6 +153,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
         # Create a copy of molecule with "nrotamers" frames
         tmpmol = mol.copy()
         tmpmol.coords = np.tile(tmpmol.coords, (1, 1, nrotamers))
+        tmpmol.box = np.zeros((3, tmpmol.numFrames), dtype=np.float32)
 
         # Set rotamer coordinates
         angles = np.linspace(-np.pi, np.pi, num=nrotamers, endpoint=False)
@@ -153,9 +163,15 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
 
         molecules.append(tmpmol)
 
+    # Minimize with MM if requested
+    if dihed_opt_type == 'mm':
+        for dihedral, tmpmol in zip(dihedrals, molecules):
+            for f in range(tmpmol.numFrames):
+                tmpmol.coords[:, :, f] = mm_minimizer.minimize(tmpmol.coords[:, :, f], restrained_dihedrals=[dihedral,])
+
     # Create directories for QM data
     directories = []
-    dihedral_directory = 'dihedral-opt' if geomopt else 'dihedral-single-point'
+    dihedral_directory = 'dihedral-opt' if dihed_opt_type == 'qm' else 'dihedral-single-point'
     for dihedral in dihedrals:
         dihedral_name = '-'.join(mol.name[dihedral])
         directory = os.path.join(outdir, dihedral_directory, dihedral_name, _qm_method_name(qm))
@@ -166,7 +182,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
         qm.molecule = molecule
         qm.esp_points = None
-        qm.optimize = geomopt
+        qm.optimize = (dihed_opt_type == 'qm')
         qm.restrained_dihedrals = np.array([dihedral])
         qm.directory = directory
         qm.setup()
@@ -177,7 +193,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
         qm.molecule = molecule
         qm.esp_points = None
-        qm.optimize = geomopt
+        qm.optimize = (dihed_opt_type == 'qm')
         qm.restrained_dihedrals = np.array([dihedral])
         qm.directory = directory
         qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
