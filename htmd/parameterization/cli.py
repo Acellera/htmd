@@ -30,7 +30,7 @@ def getArgumentParser():
                         help='Fix atomic charge during charge fitting (default: none)')
     parser.add_argument('-d', '--dihedral', nargs='+', default=[], metavar='A1-A2-A3-A4',
                         help='Select dihedral angle to parameterize (default: all parameterizable dihedral angles)')
-    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian', 'QMML'],
+    parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'],
                         help='QM code (default: %(default)s)')
     parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP', 'wB97X-D'],
                         help='QM level of theory (default: %(default)s)')
@@ -62,7 +62,42 @@ def getArgumentParser():
     # This is intedended for debugging only and should be kept hidden.
     parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
 
+    # QMML module name
+    parser.add_argument('--qmml', help=argparse.SUPPRESS)
+
+    # Debug mode
+    parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
+
     return parser
+
+def _prepare_molecule(args):
+
+    from htmd.molecule.molecule import Molecule
+    from htmd.parameterization.util import guessElements
+
+    mol = Molecule(args.filename, guessNE=['bonds'], guess=[])
+
+    # Check if the file contain just one conformation
+    if mol.numFrames != 1:
+        raise RuntimeError('{} has to contain only one molecule, but found {}'.format(args.filename, mol.numFrames))
+
+    # Check if each atom name is unique
+    if np.unique(mol.name).size != mol.numAtoms:
+        raise RuntimeError('The atom names in {} has to be unique!'.format(args.filename))
+
+    # Guess elements
+    # TODO: it should not depend on FF
+    mol = guessElements(mol, args.forcefield[0])
+
+    # Set segment ID
+    # Note: it is need to write complete PDB files
+    mol.segid[:] = 'L'
+
+    # TODO: check charge
+
+    # TODO: check bonds
+
+    return mol
 
 
 def printEnergies(molecule, parameters, filename):
@@ -117,7 +152,7 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitESPCharges
-    from htmd.parameterization.util import getFixedChargeAtomIndices, getDipole, _qm_method_name
+    from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
 
@@ -132,6 +167,10 @@ def _fit_charges(mol, args, qm):
 
         if len(args.fix_charge) > 0:
             logger.warning('Flag --fix-charge does not have effect!')
+
+        if np.any(mol.bondtype == "un"):
+            logger.info('Guessing bond types')
+            mol = guessBondType(mol)
 
         mol = fitGasteigerCharges(mol)
 
@@ -152,6 +191,15 @@ def _fit_charges(mol, args, qm):
         # Create an ESP directory
         espDir = os.path.join(args.outdir, "esp", _qm_method_name(qm))
         os.makedirs(espDir, exist_ok=True)
+
+        charge = int(round(np.sum(mol.charge)))
+        if args.charge != charge:
+            logger.warning('Molecular charge is set to {}, but atomic charges of passed molecule add up to {}. '.format(
+                args.charge, charge))
+            if len(args.fix_charge) > 0:
+                raise RuntimeError('Flag --fix-charge cannot be used when atomic charges are inconsistent with passed '
+                                   'molecular charge {}'.format(args.charge))
+            mol.charge[:] = args.charge/mol.numAtoms
 
         # Fit ESP charges
         mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
@@ -178,9 +226,12 @@ def _fit_charges(mol, args, qm):
 def main_parameterize(arguments=None):
 
     args = getArgumentParser().parse_args(args=arguments)
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug(sys.argv[1:])
 
-    if not os.path.exists(args.filename):
-        raise ValueError('File %s cannot be found' % args.filename)
+    # Get a molecule and check its validity
+    mol = _prepare_molecule(args)
 
     # Get RTF and PRM file names
     rtfFile, prmFile = None, None
@@ -220,15 +271,23 @@ def main_parameterize(arguments=None):
     # Create a QM object
     from htmd.qm import Psi4, Gaussian, FakeQM2
 
-    if args.code == 'Psi4':
-        qm = Psi4()
-    elif args.code == 'Gaussian':
-        qm = Gaussian()
-    elif args.code == 'QMML':
-        from htmd.qm.custom import QMML
-        qm = QMML()
+    if args.qmml:
+        import importlib
+        from htmd.qm.custom import CustomQM
+        qm = CustomQM()
+        qmml_module = importlib.import_module(args.qmml)
+        logger.info('QMML module: {}'.format(qmml_module))
+        qmml_calculator = qmml_module.get_calculator()
+        logger.info('QMML calculator: {}'.format(qmml_calculator))
+        qm.calculator = qmml_calculator
     else:
-        raise NotImplementedError
+        if args.code == 'Psi4':
+            qm = Psi4()
+        elif args.code == 'Gaussian':
+            qm = Gaussian()
+        else:
+            raise NotImplementedError
+
     # This is for debugging only!
     if args.fake_qm:
         qm = FakeQM2()
@@ -236,15 +295,9 @@ def main_parameterize(arguments=None):
 
     # Start processing
     from htmd.parameterization.fftype import fftype
-    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, minimize, \
-        fitDihedrals, _qm_method_name
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, minimize, fitDihedrals, _qm_method_name
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
-
-    # Get molecule with default atomtyping just for initial processing
-    from htmd.molecule.molecule import Molecule
-    mol = Molecule(args.filename)
-    mol = canonicalizeAtomNames(mol, fftypemethod=getArgumentParser().get_default('forcefield')[0])
 
     # Get rotatable dihedral angles
     mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
@@ -296,11 +349,6 @@ def main_parameterize(arguments=None):
 
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in args.forcefield:
-
-        # Reload molecule for this fftypemethod
-        mol = Molecule(args.filename)
-        mol = canonicalizeAtomNames(mol, fftypemethod=method)
-        mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
         print(" === Fitting for %s ===\n" % method)
         printReport(mol, args.charge, equivalents, all_dihedrals)
@@ -355,20 +403,21 @@ def main_parameterize(arguments=None):
                 qm._parameters = parameters
 
             # Fit the parameters
-            fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals, args.outdir,
-                         geomopt=args.optimize_dihedral)
+            parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
+                                      args.outdir, geomopt=args.optimize_dihedral)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
-        writeParameters(mol, parameters, qm, method, args.charge, args.outdir, original_coords=orig_coor)
+        paramoutdir = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm))
+        writeParameters(paramoutdir, mol, parameters, method, args.charge, original_coords=orig_coor)
 
         # Write energy file
-        energyFile = os.path.join(args.outdir, 'parameters', method, _qm_method_name(qm), 'energies.txt')
+        energyFile = os.path.join(paramoutdir, 'energies.txt')
         printEnergies(mol, parameters, energyFile)
         logger.info('Write energy file: %s' % energyFile)
 
 
 if __name__ == "__main__":
 
-    args = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
-    main_parameterize(arguments=args)
+    arguments = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
+    main_parameterize(arguments=arguments)

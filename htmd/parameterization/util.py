@@ -1,12 +1,20 @@
+# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 import numpy as np
 import logging
 import re
 import os
+import subprocess
+from tempfile import TemporaryDirectory
 
 logger = logging.getLogger(__name__)
 
 
 def getEquivalentsAndDihedrals(mol):
+
     from htmd.molecule.util import guessAnglesAndDihedrals
     from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
 
@@ -23,109 +31,55 @@ def getEquivalentsAndDihedrals(mol):
     return mol, equivalents, all_dihedrals
 
 
-def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
-    """
-    This fixes up the atom naming and reside name to be consistent.
-    NB this scheme matches what MATCH does.
-    Don't change it or the naming will be inconsistent with the RTF.
-    """
-    if not inplace:
-        mol = mol.copy()
-    mol.segid[:] = 'L'
-    if _logger:
-        logger.info('Rename segment to %s' % mol.segid[0])
-    mol.resname[:] = 'MOL'
-    if _logger:
-        logger.info('Rename residue to %s' % mol.resname[0])
-
-    sufices = {}
-    for i in range(mol.numAtoms):
-        name = guessElementForFftype(i, mol, fftypemethod).upper()
-
-        sufices[name] = sufices.get(name, 0) + 1
-        name += str(sufices[name])
-
-        if _logger:
-            logger.info('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
-        mol.name[i] = name
-
-    if not inplace:
-        return mol
-
-
-def guessElementForFftype(index, mol, fftypemethod):
+def guessElements(mol, fftypemethod):
     """
     Guess element from an atom name
-
-    >>> from htmd.parameterization.util import guessElementForFftype
-    >>> guessElementForFftype('C')
-    'C'
-    >>> guessElementForFftype('C1')
-    'C'
-    >>> guessElementForFftype('C42')
-    'C'
-    >>> guessElementForFftype('C7S')
-    'C'
-    >>> guessElementForFftype('HN1')
-    'H'
-    >>> guessElementForFftype('CL')
-    'Cl'
-    >>> guessElementForFftype('CA1')
-    'Ca'
     """
 
     from htmd.parameterization.fftype import fftypemethods
 
-    elements = dict()
-    elements['GAFF'] = ['H', 'O', 'C', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I']
-    elements['GAFF2'] = ['H', 'O', 'C', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I']
+    if fftypemethod not in fftypemethods:
+        raise ValueError('Invalid "fftypemethod": {}. Valid methods: {}'
+                         ''.format(fftypemethod, ','.join(fftypemethods)))
 
-    if fftypemethod == 'CGenFF_2b6':
-        import periodictable
-        name = mol.name[index]
-        symbol = name.capitalize()
+    elements = {}
+    elements['CGenFF_2b6'] = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
+    elements['GAFF']       = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
+    elements['GAFF2']      = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
 
-        while symbol:
-            try:
-                element = periodictable.elements.symbol(symbol)
-            except ValueError:
-                symbol = symbol[:-1]
-            else:
-                return element.symbol
+    mol = mol.copy()
 
-        raise ValueError('Cannot guess element from atom name: {}'.format(name))
-    elif fftypemethod in ('GAFF2', 'GAFF'):
-        name = mol.name[index]
-        scan = {'matches': 0, 'elements': []}
-        for e in elements[fftypemethod]:
-            if name.capitalize().startswith(e):
-                scan['matches'] += 1
-                scan['elements'].append(e)
+    for i, name in enumerate(mol.name):
 
-        if scan['matches'] == 1:
-            return scan['elements'][0]
-        elif scan['matches'] > 1:
-            # Should only happen with atom names starting with CL
-            import networkx as nx
+        candidates = [element for element in elements[fftypemethod] if name.capitalize().startswith(element)]
 
-            # Guess bonds if not present
+        if len(candidates) == 1:
+            mol.element[i] = candidates[0]
+            continue
+
+        if candidates == ['C', 'Cl']:
+
             if len(mol.bonds) == 0:
-                logger.warning('No bonds found! Guessing them...')
-                mol.bonds = mol._guessBonds()
+                raise RuntimeError('No chemical bonds found in the molecule')
 
-            g = nx.Graph()
-            g.add_edges_from(mol.bonds)
+            # Create a molecular graph
+            import networkx as nx
+            graph = nx.Graph()
+            graph.add_edges_from(mol.bonds)
 
-            if len(g[index]) == 1:
-                return 'Cl'
-            else:
-                return 'C'
-        else:
-            raise ValueError('Cannot create element from atom name: {}. It probably does not match the atom elements'
-                             'available for {}: {}'.format(name, fftypemethod, elements[fftypemethod]))
-    else:
-        raise RuntimeError('Not a valid fftypemethod: {}. Valid methods: {}'.format(fftypemethod,
-                                                                                    ','.join(fftypemethods)))
+            if len(graph[i]) in (2, 3, 4):
+                mol.element[i] = 'C'
+                continue
+
+            if len(graph[i]) == 1:
+                mol.element[i] = 'Cl'
+                continue
+
+        raise ValueError('Cannot guess element from atom name: {}. '
+                         'It does not match any of the expected elements ({}) for {}.'
+                         ''.format(name, elements[fftypemethod], fftypemethod))
+
+    return mol
 
 
 def centreOfMass(mol):
@@ -255,7 +209,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
-    df.result_directory = os.path.join(outdir, 'parameters', method, _qm_method_name(qm), 'plots')
+    df.result_directory = os.path.join(outdir, 'parameters', method, _qm_method_name(qm))
 
     # In case of FakeQM, the initial parameters are set to zeros.
     # It prevents DihedralFitting class from cheating :D
@@ -265,6 +219,87 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, geomopt
     # Fit dihedral parameters
     df.run()
 
-    return prm
+    return df.parameters
+
+def guessBondType(mol):
+
+    """
+    Guess bond type with Antechamber
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to guess the bond types
+
+    Return
+    ------
+    results: Molecule
+        Copy of the molecule with the bond type set
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+
+    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['1', '1'], dtype=object)
+
+    >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['1', '1', '1'], dtype=object)
+
+    >>> molFile = os.path.join(home('test-param'), 'benzamidine.mol2')
+    >>> mol = Molecule(molFile)
+    >>> mol.bondtype[:] = "un"
+
+    >>> new_mol = guessBondType(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.bondtype
+    array(['ar', 'ar', '1', 'ar', '1', 'ar', '1', 'ar', '1', 'ar', '1', '1',
+           '2', '1', '1', '1', '1', '1'], dtype=object)
+
+    """
+
+    from htmd.molecule.molecule import Molecule
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+    if mol.numFrames != 1:
+        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+
+    mol = mol.copy()
+
+    with TemporaryDirectory() as tmpDir:
+        old_name = os.path.join(tmpDir, 'old.mol2')
+        new_name = os.path.join(tmpDir, 'new.mol2')
+
+        mol.write(old_name)
+
+        cmd = ['antechamber',
+               '-fi', 'mol2', '-i', old_name,
+               '-fo', 'mol2', '-o', new_name]
+        if subprocess.call(cmd, cwd=tmpDir) != 0:
+            raise RuntimeError('"antechamber" failed')
+
+        mol.bondtype[:] = Molecule(new_name).bondtype
+
+    return mol
 
 
+if __name__ == '__main__':
+
+    import sys
+    import doctest
+
+    sys.exit(doctest.testmod().failed)
