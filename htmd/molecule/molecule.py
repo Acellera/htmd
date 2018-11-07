@@ -1955,8 +1955,8 @@ class _Representation:
 
 
 class TestMolecule(TestCase):
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpClass(self):
         from htmd.home import home
 
         self.trajmol = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
