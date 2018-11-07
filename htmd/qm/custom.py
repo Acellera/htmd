@@ -51,12 +51,10 @@ class OMMMinimizer(Minimizer):
         Examples
         --------
         >>> from htmd.parameterization.fftype import fftype
-        >>> from htmd.parameterization.util import canonicalizeAtomNames
         >>> from htmd.molecule.molecule import Molecule
 
         >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
         >>> mol = Molecule(molFile)
-        >>> mol = canonicalizeAtomNames(mol)
         >>> prm, mol = fftype(mol, method='GAFF2')
         >>> mini = OMMMinimizer(mol, prm)
         >>> minimcoor = mini.minimize(mol.coords, restrained_dihedrals=[0, 1, 6, 12])

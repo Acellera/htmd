@@ -70,6 +70,40 @@ def getArgumentParser():
 
     return parser
 
+def _prepare_molecule(args):
+
+    from htmd.molecule.molecule import Molecule
+    from htmd.parameterization.util import makeAtomNamesUnique, guessElements
+
+    mol = Molecule(args.filename, guessNE=['bonds'], guess=[])
+
+    # Check if the file contain just one conformation
+    if mol.numFrames != 1:
+        raise RuntimeError('{} has to contain only one molecule, but found {}'.format(args.filename, mol.numFrames))
+
+    # Make atom names unique if needed
+    if np.unique(mol.name).size != mol.numAtoms:
+        logger.warning('Atom names in the molecule are not unique!')
+        new_mol = makeAtomNamesUnique(mol)
+        for i, (old_name, new_name) in enumerate(zip(mol.name, new_mol.name)):
+            if old_name != new_name:
+                logger.warning('Renamed atom {:3d}: {:4s} --> {:4s}'.format(i, old_name, new_name))
+        mol = new_mol
+
+    # Guess elements
+    # TODO: it should not depend on FF
+    mol = guessElements(mol, args.forcefield[0])
+
+    # Set segment ID
+    # Note: it is need to write complete PDB files
+    mol.segid[:] = 'L'
+
+    # TODO: check charge
+
+    # TODO: check bonds
+
+    return mol
+
 
 def printEnergies(molecule, parameters, filename):
     from htmd.ffevaluation.ffevaluate import FFEvaluate
@@ -208,8 +242,8 @@ def main_parameterize(arguments=None):
         logger.setLevel(logging.DEBUG)
         logger.debug(sys.argv[1:])
 
-    if not os.path.exists(args.filename):
-        raise ValueError('File %s cannot be found' % args.filename)
+    # Get a molecule and check its validity
+    mol = _prepare_molecule(args)
 
     # Get RTF and PRM file names
     rtfFile, prmFile = None, None
@@ -273,15 +307,9 @@ def main_parameterize(arguments=None):
 
     # Start processing
     from htmd.parameterization.fftype import fftype
-    from htmd.parameterization.util import getEquivalentsAndDihedrals, canonicalizeAtomNames, minimize, \
-        fitDihedrals, _qm_method_name
+    from htmd.parameterization.util import getEquivalentsAndDihedrals, minimize, fitDihedrals, _qm_method_name
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
-
-    # Get molecule with default atomtyping just for initial processing
-    from htmd.molecule.molecule import Molecule
-    mol = Molecule(args.filename)
-    mol = canonicalizeAtomNames(mol, fftypemethod=getArgumentParser().get_default('forcefield')[0])
 
     # Get rotatable dihedral angles
     mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
@@ -333,11 +361,6 @@ def main_parameterize(arguments=None):
 
     print('\n === Parameterizing %s ===\n' % args.filename)
     for method in args.forcefield:
-
-        # Reload molecule for this fftypemethod
-        mol = Molecule(args.filename)
-        mol = canonicalizeAtomNames(mol, fftypemethod=method)
-        mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
 
         print(" === Fitting for %s ===\n" % method)
         printReport(mol, args.charge, equivalents, all_dihedrals)

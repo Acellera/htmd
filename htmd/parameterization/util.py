@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def getEquivalentsAndDihedrals(mol):
+
     from htmd.molecule.util import guessAnglesAndDihedrals
     from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
 
@@ -30,93 +31,55 @@ def getEquivalentsAndDihedrals(mol):
     return mol, equivalents, all_dihedrals
 
 
-def canonicalizeAtomNames(mol, fftypemethod, inplace=False, _logger=True):
-    """
-    This fixes up the atom naming and reside name to be consistent.
-    NB this scheme matches what MATCH does.
-    Don't change it or the naming will be inconsistent with the RTF.
-    """
-    if not inplace:
-        mol = mol.copy()
-    mol.segid[:] = 'L'
-    if _logger:
-        logger.info('Rename segment to %s' % mol.segid[0])
-    mol.resname[:] = 'MOL'
-    if _logger:
-        logger.info('Rename residue to %s' % mol.resname[0])
-
-    sufices = {}
-    for i in range(mol.numAtoms):
-        name = guessElementForFftype(i, mol, fftypemethod).upper()
-
-        sufices[name] = sufices.get(name, 0) + 1
-        name += str(sufices[name])
-
-        if _logger:
-            logger.info('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
-        mol.name[i] = name
-
-    if not inplace:
-        return mol
-
-
-def guessElementForFftype(index, mol, fftypemethod):
+def guessElements(mol, fftypemethod):
     """
     Guess element from an atom name
     """
 
     from htmd.parameterization.fftype import fftypemethods
 
-    elements = dict()
-    elements['GAFF'] = ['H', 'O', 'C', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I']
-    elements['GAFF2'] = ['H', 'O', 'C', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I']
+    if fftypemethod not in fftypemethods:
+        raise ValueError('Invalid "fftypemethod": {}. Valid methods: {}'
+                         ''.format(fftypemethod, ','.join(fftypemethods)))
 
-    if fftypemethod == 'CGenFF_2b6':
-        import periodictable
-        name = mol.name[index]
-        symbol = name.capitalize()
+    elements = {}
+    elements['CGenFF_2b6'] = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
+    elements['GAFF']       = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
+    elements['GAFF2']      = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
 
-        while symbol:
-            try:
-                element = periodictable.elements.symbol(symbol)
-            except ValueError:
-                symbol = symbol[:-1]
-            else:
-                return element.symbol
+    mol = mol.copy()
 
-        raise ValueError('Cannot guess element from atom name: {}'.format(name))
-    elif fftypemethod in ('GAFF2', 'GAFF'):
-        name = mol.name[index]
-        scan = {'matches': 0, 'elements': []}
-        for e in elements[fftypemethod]:
-            if name.capitalize().startswith(e):
-                scan['matches'] += 1
-                scan['elements'].append(e)
+    for i, name in enumerate(mol.name):
 
-        if scan['matches'] == 1:
-            return scan['elements'][0]
-        elif scan['matches'] > 1:
-            # Should only happen with atom names starting with CL
-            import networkx as nx
+        candidates = [element for element in elements[fftypemethod] if name.capitalize().startswith(element)]
 
-            # Guess bonds if not present
+        if len(candidates) == 1:
+            mol.element[i] = candidates[0]
+            continue
+
+        if candidates == ['C', 'Cl']:
+
             if len(mol.bonds) == 0:
-                logger.warning('No bonds found! Guessing them...')
-                mol.bonds = mol._guessBonds()
+                raise RuntimeError('No chemical bonds found in the molecule')
 
-            g = nx.Graph()
-            g.add_edges_from(mol.bonds)
+            # Create a molecular graph
+            import networkx as nx
+            graph = nx.Graph()
+            graph.add_edges_from(mol.bonds)
 
-            if len(g[index]) == 1:
-                return 'Cl'
-            else:
-                return 'C'
-        else:
-            raise ValueError('Cannot create element from atom name: {}. It probably does not match the atom elements'
-                             'available for {}: {}'.format(name, fftypemethod, elements[fftypemethod]))
-    else:
-        raise RuntimeError('Not a valid fftypemethod: {}. Valid methods: {}'.format(fftypemethod,
-                                                                                    ','.join(fftypemethods)))
+            if len(graph[i]) in (2, 3, 4):
+                mol.element[i] = 'C'
+                continue
+
+            if len(graph[i]) == 1:
+                mol.element[i] = 'Cl'
+                continue
+
+        raise ValueError('Cannot guess element from atom name: {}. '
+                         'It does not match any of the expected elements ({}) for {}.'
+                         ''.format(name, elements[fftypemethod], fftypemethod))
+
+    return mol
 
 
 def centreOfMass(mol):
@@ -330,6 +293,77 @@ def guessBondType(mol):
             raise RuntimeError('"antechamber" failed')
 
         mol.bondtype[:] = Molecule(new_name).bondtype
+
+    return mol
+
+def makeAtomNamesUnique(mol):
+    """
+    Make atom names unique by appending/incrementing terminal digits.
+    Already unique names are preserved.
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to make atom name unique
+
+    Return
+    ------
+    results: Molecule
+        Copy of the molecule with the atom names set
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+    >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+    >>> mol = Molecule(molFile)
+
+    >>> mol.name[:] = ['A', 'A', 'A', 'A']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'A0', 'A1', 'A2'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'A', 'A', 'A0']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'A1', 'A2', 'A0'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'B', 'A', 'B']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'B', 'A0', 'B0'], dtype=object)
+
+    >>> mol.name[:] = ['A', 'B', 'C', 'D']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['A', 'B', 'C', 'D'], dtype=object)
+
+    >>> mol.name[:] = ['1A', '1A', 'A1B1', 'A1B1']
+    >>> new_mol = makeAtomNamesUnique(mol)
+    >>> assert new_mol is not mol
+    >>> new_mol.name
+    array(['1A', '1A0', 'A1B1', 'A1B2'], dtype=object)
+    """
+
+    from htmd.molecule.molecule import Molecule
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be an instance of {}'.format(Molecule))
+
+    mol = mol.copy()
+
+    for i, name in enumerate(mol.name):
+        while np.sum(name == mol.name) > 1: # Check for identical names
+            j = np.flatnonzero(name == mol.name)[1] # Get the second identical name index
+            prefix, sufix = re.match('(.*?\D*)(\d*)$', mol.name[j]).groups()
+            sufix = 0 if sufix == '' else int(sufix)
+            while prefix + str(sufix) in mol.name: # Search for a unique name
+                sufix += 1
+            mol.name[j] = prefix + str(sufix)
 
     return mol
 
