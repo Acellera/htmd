@@ -8,6 +8,7 @@ import sys
 import argparse
 import logging
 import numpy as np
+from copy import deepcopy
 
 from htmd.version import version
 from htmd.parameterization.fftype import fftypemethods
@@ -40,13 +41,17 @@ def getArgumentParser():
     parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
                         help='QM environment (default: %(default)s)')
     parser.add_argument('--no-min', action='store_false', dest='minimize',
-                        help='Do not perform QM structure minimization')
+                        help='DDEPRECATED: use `--min-type` instead')
+    parser.add_argument('--min-type', default='qm', dest='min_type', choices=['None', 'qm', 'mm'],
+                        help='Type of initial structure optimization (default: %(default)s)')
     parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
     parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
-                        help='Do not perform QM structure optimisation when scanning dihedral angles')
+                        help='DEPRECATED: use `--scan-type` instead')
+    parser.add_argument('--scan-type', default='qm', dest='dihed_opt_type', choices=['None', 'qm', 'mm'],
+                        help='Type of structure optimization when scanning dihedral angles (default: %(default)s)')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
@@ -230,13 +235,23 @@ def _fit_charges(mol, args, qm):
 
 def main_parameterize(arguments=None):
 
-    args = getArgumentParser().parse_args(args=arguments)
+    parser = getArgumentParser()
+    args = parser.parse_args(args=arguments)
     if args.debug:
         logger.setLevel(logging.DEBUG)
         logger.debug(sys.argv[1:])
 
+    if args.minimize is not parser.get_default('minimize'):
+        raise DeprecationWarning('Use `--min-type` instead.')
+    if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
+        raise DeprecationWarning('Use `--scan-type` instead.')
+
+    if not os.path.exists(args.filename):
+        raise ValueError('File %s cannot be found' % args.filename)
+
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
+
 
     # Get RTF and PRM file names
     rtfFile, prmFile = None, None
@@ -362,6 +377,11 @@ def main_parameterize(arguments=None):
         parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
         assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
 
+        mm_minimizer = None
+        if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
+            from htmd.qm.custom import OMMMinimizer
+            mm_minimizer = OMMMinimizer(mol, parameters)
+
         if isinstance(qm, FakeQM2):
             qm._parameters = parameters
 
@@ -385,9 +405,8 @@ def main_parameterize(arguments=None):
             logger.info('Changing basis sets to %s' % qm.basis)
 
         # Minimize molecule
-        if args.minimize:
-            print('\n == Minimizing ==\n')
-            mol = minimize(mol, qm, args.outdir)
+        if args.min_type != 'None': print('\n == Minimizing ==\n')
+        mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
         # Fit charges
         mol = _fit_charges(mol, args, qm)
@@ -409,7 +428,8 @@ def main_parameterize(arguments=None):
 
             # Fit the parameters
             parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
-                                      args.outdir, geomopt=args.optimize_dihedral)
+                                      args.outdir, dihed_opt_type=args.dihed_opt_type,
+                                      mm_minimizer=mm_minimizer)
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
