@@ -376,8 +376,8 @@ class TestParameterize(unittest.TestCase):
     def test_water_full(self):
         refDir = os.path.join(self.dataDir, 'water_full')
         resDir = os.path.join(self.testDir, 'water_full')
-        self._execute(refDir, resDir, 'parameterize input.mol2')
-        self._testFiles(refDir, resDir)
+        self._run(refDir, resDir, 'parameterize input.mol2')
+        self._test(refDir, resDir)
 
 
 if __name__ == '__main__':
