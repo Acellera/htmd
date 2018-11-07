@@ -218,14 +218,14 @@ class TestParameterize(unittest.TestCase):
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --no-min')
         self._test(refDir, resDir)
 
-    @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
+    #@unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
     def test_h2o2_full_fake(self):
         refDir = os.path.join(self.dataDir, 'h2o2_full_fake')
         resDir = os.path.join(self.testDir, 'h2o2_full_fake')
         self._run(refDir, resDir, 'parameterize input.mol2 --fake-qm')
         self._test(refDir, resDir)
 
-    @unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
+    #@unittest.skipUnless(sys.version_info.major == 3 and sys.version_info.minor > 5, 'Python 3.5 issue')
     def test_h2o2_full_fake_restart(self):
         refDir = os.path.join(self.dataDir, 'h2o2_full_fake_restart')
         resDir = os.path.join(self.testDir, 'h2o2_full_fake_restart')
