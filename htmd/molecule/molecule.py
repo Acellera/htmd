@@ -462,8 +462,12 @@ class Molecule:
         else:
             self.__dict__[field][s] = value
 
-    def align(self, sel, refmol=None, refsel=None, frames=None):
-        """ Align the molecule to a reference structure
+    def align(self, sel, refmol=None, refsel=None, frames=None, matchingframes=False):
+        """ Align conformations.
+
+        Align a given set of frames of this molecule to either the current active frame of this molecule (mol.frame)
+        or the current frame of a different reference molecule. To align to any frame other than the current active one
+        modify the refmol.frame property before calling this method.
 
         Parameters
         ----------
@@ -478,6 +482,9 @@ class Molecule:
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         frames : list or range
             A list of frames which to align. By default it will align all frames of the Molecule
+        matchingframes : bool
+            If set to True it will align the selected frames of this molecule to the corresponding frames of the refmol.
+            This requires both molecules to have the same number of frames.
 
         Examples
         --------
@@ -488,11 +495,18 @@ class Molecule:
         from htmd.molecule.util import _pp_align
         if refmol is None:
             refmol = self
+            if matchingframes:
+                raise ValueError('You cannot align a molecule\'s frames to themselves. '
+                                 'If you want to use the matchingframes option supply a reference molecule.')
         if refsel is None:
             refsel = sel
         if frames is None:
             frames = range(self.numFrames)
         frames = np.array(frames)
+
+        if matchingframes and self.numFrames != refmol.numFrames:
+            raise RuntimeError('This molecule and the reference molecule need the same number or frames to use the matchinframes option.')
+        
         # if not isinstance(refmol, Molecule):
         # raise NameError('Reference molecule has to be a Molecule object')
         sel = self.atomselect(sel, indexes=True)
@@ -500,7 +514,7 @@ class Molecule:
         if sel.size != refsel.size:
             raise NameError('Cannot align molecules. The two selections produced different number of atoms')
         self.coords = _pp_align(self.coords, refmol.coords, np.array(sel, dtype=np.int64),
-                                np.array(refsel, dtype=np.int64), frames, refmol.frame)
+                                np.array(refsel, dtype=np.int64), frames, refmol.frame, matchingframes)
 
     def alignBySequence(self, ref, molseg=None, refseg=None, nalignfragment=1, returnAlignments=False, maxalignments=1):
         """ Aligns the Molecule to a reference Molecule by their longests sequences alignment
@@ -1332,7 +1346,7 @@ class Molecule:
         ['PTR', 'GLU', 'GLU', 'ILE']
         >>> pYseq = sh2.sequence(oneletter=True)
         >>> pYseq['1']
-        '?EEI'
+        'XEEI'
 
         """
         from htmd.molecule.util import sequenceID
@@ -1685,10 +1699,10 @@ class UniqueResidueID:
         --------
         >>> mol = Molecule('3ptb')
         >>> uqid = UniqueResidueID.fromMolecule(mol, 'resid 20')
-        >>> uqid.selectAtom(mol)
+        >>> uqid.selectAtoms(mol)
         array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34])
         >>> _ = mol.remove('resid 19')
-        >>> uqid.selectAtom(mol)
+        >>> uqid.selectAtoms(mol)
         array([19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30])
         """
         for key in kwargs:
@@ -1941,9 +1955,20 @@ class _Representation:
 
 
 class TestMolecule(TestCase):
-    def test_trajReadingAppending(self):
+    @classmethod
+    def setUpClass(self):
         from htmd.home import home
 
+        self.trajmol = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
+        self.trajmol.read(path.join(home(dataDir='metricdistance'), 'traj.xtc'))
+
+        self.trajmollig = self.trajmol.copy()
+        _ = self.trajmollig.filter('resname MOL')
+
+        self.mol3PTB = Molecule('3PTB')
+
+    def test_trajReadingAppending(self):
+        from htmd.home import home
         # Testing trajectory reading and appending
         ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
         xtcfile = path.join(home(dataDir='metricdistance'), 'traj.xtc')
@@ -1955,11 +1980,8 @@ class TestMolecule(TestCase):
         assert ref.coords.shape == (4507, 3, 600)
 
     def test_guessBonds(self):
-        from htmd.home import home
-
         # Checking bonds
-        ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))
-        ref.read(path.join(home(dataDir='metricdistance'), 'traj.xtc'))
+        ref = self.trajmol.copy()
         ref.coords = np.atleast_3d(ref.coords[:, :, 0])
         len1 = len(ref._guessBonds())
         ref.coords = np.array(ref.coords, dtype=np.float32)
@@ -2001,7 +2023,7 @@ class TestMolecule(TestCase):
         from htmd.home import home
 
         # Testing appending of bonds and bondtypes
-        mol = Molecule('3ptb')
+        mol = self.mol3PTB.copy()
         lig = Molecule(
             path.join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum',
                       'mol.mol2'))
@@ -2014,12 +2036,12 @@ class TestMolecule(TestCase):
 
     def test_mdtrajWriter(self):
         # Testing MDtraj writer
-        m = Molecule('3PTB')
+        m = self.mol3PTB.copy()
         tmp = tempname(suffix='.h5')
         m.write(tmp, 'name CA')
 
     def test_uniqueAtomID(self):
-        mol = Molecule('3ptb')
+        mol = self.mol3PTB.copy()
         uqid = UniqueAtomID.fromMolecule(mol, 'resid 20 and name CA')
         assert uqid.selectAtom(mol) == 24
         mol.remove('resid 19')
@@ -2029,7 +2051,7 @@ class TestMolecule(TestCase):
         assert a1 == a2
 
     def test_uniqueResidueID(self):
-        mol = Molecule('3ptb')
+        mol = self.mol3PTB.copy()
         uqid = UniqueResidueID.fromMolecule(mol, 'resid 20')
         assert np.array_equal(uqid.selectAtoms(mol), np.array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]))
         mol.remove('resid 19')
@@ -2039,6 +2061,70 @@ class TestMolecule(TestCase):
         r3 = UniqueResidueID.fromMolecule(mol, 'resid 21 and name CA')
         assert r1 == r2
         assert r2 != r3
+
+    def test_selfalign(self):
+        from htmd.home import home
+
+        # Checking bonds
+        mol = self.trajmollig.copy()
+        mol.align('noh')
+
+        refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-selfalign-mol.npy'))
+
+        assert np.allclose(mol.coords, refcoords, atol=1E-3)
+
+    def test_alignToReference(self):
+        from htmd.home import home
+
+        # Checking bonds
+        mol = self.trajmollig.copy()
+
+        mol2 = mol.copy()
+        mol2.dropFrames(keep=3)  # Keep a random frame
+        _ = mol2.filter('noh') # Remove some atoms to check aligning molecules with different numAtoms
+
+        mol.align('noh', refmol=mol2)
+
+        refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-align-refmol.npy'))
+
+        assert np.allclose(mol.coords, refcoords, atol=1E-3)
+        assert np.allclose(mol.coords[mol.atomselect('noh'), :, 3], mol2.coords[:, :, 0], atol=1E-3)
+
+    def test_alignToReferenceMatchingFrames(self):
+        from htmd.home import home
+
+        # Checking bonds
+        mol = self.trajmollig.copy()
+
+        mol2 = mol.copy()
+        mol2.coords = np.roll(mol.coords, 3, axis=2)
+
+        mol.align('noh', refmol=mol2, matchingframes=True)
+
+        refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-align-refmol-matchingframes.npy'))
+
+        assert np.allclose(mol.coords, refcoords, atol=1E-3)
+
+    def test_alignToReferenceSpecificFrames(self):
+        from htmd.home import home
+
+        # Checking bonds
+        mol = self.trajmollig.copy()
+
+        mol2 = mol.copy()
+        mol2.dropFrames(keep=3)  # Keep a random frame
+        _ = mol2.filter('noh') # Remove some atoms to check aligning molecules with different numAtoms
+
+        originalcoords = mol.coords.copy()
+
+        mol.align('noh', refmol=mol2, frames=[0, 1, 2, 3])
+
+        refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-align-refmol-selectedframes.npy'))
+
+        assert np.allclose(originalcoords[:, :, 4:], mol.coords[:, :, 4:], atol=1E-3)
+        assert np.allclose(mol.coords, refcoords, atol=1E-3)
+
+
 
 
 if __name__ == "__main__":
