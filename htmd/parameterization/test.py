@@ -260,8 +260,8 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None')
-        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1.1e-3,
-                   dihedralForceConstAbsTol=1e-5, dihedralPhaseAbsTol=0.3)
+        self._test(refDir, resDir, energyTermRelTol=3e-5, energyProfileAbsTol=1.1e-3,
+                   dihedralForceConstAbsTol=1e-4, dihedralPhaseAbsTol=0.6)
 
     def test_glycol_dihed_fix_restart_2(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
@@ -269,8 +269,8 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['O1-C2-C3-O4', 'C2-C3-O4-H10']
         self._run(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --min-type None --scan-type None'.format(' '.join(dihedrals)))
-        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1.1e-3,
-                   dihedralForceConstAbsTol=1e-5, dihedralPhaseAbsTol=0.3)
+        self._test(refDir, resDir, energyTermRelTol=3e-5, energyProfileAbsTol=1.1e-3,
+                   dihedralForceConstAbsTol=1e-4, dihedralPhaseAbsTol=0.6)
 
     def test_glycol_dihed_select_1_restart(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
