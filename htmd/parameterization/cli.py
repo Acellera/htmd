@@ -161,7 +161,7 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 
 def _fit_charges(mol, args, qm):
 
-    from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges
+    from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges, symmetrizeCharges
     from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
@@ -195,6 +195,7 @@ def _fit_charges(mol, args, qm):
             logger.warning('Flag --fix-charge does not have effect!')
 
         mol = fitChargesWithAntechamber(mol, type='bcc', molCharge=args.charge)
+        mol = symmetrizeCharges(mol)
 
     elif args.charge_type == 'ESP':
 
