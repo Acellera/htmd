@@ -380,6 +380,12 @@ class TestParameterize(unittest.TestCase):
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type mm --scan-type mm --fake-qm')
         self._test(refDir, resDir)
 
+    def test_water_full(self):
+        refDir = os.path.join(self.dataDir, 'water_full')
+        resDir = os.path.join(self.testDir, 'water_full')
+        self._run(refDir, resDir, 'parameterize input.mol2')
+        self._test(refDir, resDir)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
