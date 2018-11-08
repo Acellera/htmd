@@ -249,7 +249,7 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
 
     return mol, extra
 
-def symmerizeCharges(mol):
+def symmetrizeCharges(mol):
     """
     Average the charges of equivalent atoms
 
@@ -271,7 +271,7 @@ def symmerizeCharges(mol):
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = [0.5, -0.5, 0.0]
 
-    >>> new_mol = symmerizeCharges(mol)
+    >>> new_mol = symmetrizeCharges(mol)
     >>> assert new_mol is not mol
     >>> new_mol.charge
     array([ 0.5 , -0.25, -0.25], dtype=float32)
