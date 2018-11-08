@@ -396,7 +396,7 @@ class DihedralFitting:
         logger.info('Finished parameter optimization after %f s' % (finish-start))
 
         upper_bounds, lower_bounds = self._getBounds()
-        if vector[-1] == upper_bounds[-1] or vector[-1] == lower_bounds[-1]:
+        if np.isclose(vector[-1], upper_bounds[-1], atol=0.01) or np.isclose(vector[-1], lower_bounds[-1], atol=0.01):
             raise AssertionError('Fitting hit upper/lower bound of the offset. Please report this issue.')
 
         # Update parameters
