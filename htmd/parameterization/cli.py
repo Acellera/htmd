@@ -8,7 +8,6 @@ import sys
 import argparse
 import logging
 import numpy as np
-from copy import deepcopy
 
 from htmd.version import version
 from htmd.parameterization.fftype import fftypemethods
@@ -423,21 +422,26 @@ def main_parameterize(arguments=None):
         if args.fit_dihedral:
             print('\n == Fitting dihedral angle parameters ==\n')
 
-            # Set random number generator seed
-            if args.seed:
-                np.random.seed(args.seed)
+            if len(parameterizable_dihedrals) > 0:
 
-            # Invent new atom types for dihedral atoms
-            mol, originaltypes = inventAtomTypes(mol, parameterizable_dihedrals, equivalents)
-            parameters = recreateParameters(mol, originaltypes, parameters)
-            parameters = createMultitermDihedralTypes(parameters)
-            if isinstance(qm, FakeQM2):
-                qm._parameters = parameters
+                # Set random number generator seed
+                if args.seed:
+                    np.random.seed(args.seed)
 
-            # Fit the parameters
-            parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
-                                      args.outdir, dihed_opt_type=args.dihed_opt_type,
-                                      mm_minimizer=mm_minimizer)
+                # Invent new atom types for dihedral atoms
+                mol, originaltypes = inventAtomTypes(mol, parameterizable_dihedrals, equivalents)
+                parameters = recreateParameters(mol, originaltypes, parameters)
+                parameters = createMultitermDihedralTypes(parameters)
+                if isinstance(qm, FakeQM2):
+                    qm._parameters = parameters
+
+                # Fit the parameters
+                parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
+                                          args.outdir, dihed_opt_type=args.dihed_opt_type,
+                                          mm_minimizer=mm_minimizer)
+
+            else:
+                logger.info('No parameterizable dihedral angles detected!')
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
