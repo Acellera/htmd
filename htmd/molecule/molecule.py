@@ -2071,7 +2071,7 @@ class TestMolecule(TestCase):
 
         refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-selfalign-mol.npy'))
 
-        assert np.allclose(mol.coords, refcoords, atol=1E-6)
+        assert np.allclose(mol.coords, refcoords, atol=1E-3)
 
     def test_alignToReference(self):
         from htmd.home import home
@@ -2087,8 +2087,8 @@ class TestMolecule(TestCase):
 
         refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-align-refmol.npy'))
 
-        assert np.allclose(mol.coords, refcoords, atol=1E-6)
-        assert np.allclose(mol.coords[mol.atomselect('noh'), :, 3], mol2.coords[:, :, 0], atol=1E-6)
+        assert np.allclose(mol.coords, refcoords, atol=1E-3)
+        assert np.allclose(mol.coords[mol.atomselect('noh'), :, 3], mol2.coords[:, :, 0], atol=1E-3)
 
     def test_alignToReferenceMatchingFrames(self):
         from htmd.home import home
@@ -2103,7 +2103,7 @@ class TestMolecule(TestCase):
 
         refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-align-refmol-matchingframes.npy'))
 
-        assert np.allclose(mol.coords, refcoords, atol=1E-6)
+        assert np.allclose(mol.coords, refcoords, atol=1E-3)
 
     def test_alignToReferenceSpecificFrames(self):
         from htmd.home import home
@@ -2121,8 +2121,8 @@ class TestMolecule(TestCase):
 
         refcoords = np.load(path.join(home(dataDir='test-molecule'), 'test-align-refmol-selectedframes.npy'))
 
-        assert np.allclose(originalcoords[:, :, 4:], mol.coords[:, :, 4:], atol=1E-6)
-        assert np.allclose(mol.coords, refcoords, atol=1E-6)
+        assert np.allclose(originalcoords[:, :, 4:], mol.coords[:, :, 4:], atol=1E-3)
+        assert np.allclose(mol.coords, refcoords, atol=1E-3)
 
 
 
