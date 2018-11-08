@@ -216,7 +216,8 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'h2o2_dihed_opt_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None')
-        self._test(refDir, resDir)
+        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1.1e-3,
+                   dihedralForceConstAbsTol=1e-5, dihedralPhaseAbsTol=1.1e-3)
 
     def test_h2o2_full_fake(self):
         refDir = os.path.join(self.dataDir, 'h2o2_full_fake')
