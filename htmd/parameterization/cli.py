@@ -43,7 +43,7 @@ def getArgumentParser():
                         help='DDEPRECATED: use `--min-type` instead')
     parser.add_argument('--min-type', default='qm', dest='min_type', choices=['None', 'qm', 'mm'],
                         help='Type of initial structure optimization (default: %(default)s)')
-    parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
+    parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'AM1-BCC', 'ESP'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
@@ -160,7 +160,7 @@ def printReport(mol, netcharge, equivalents, all_dihedrals):
 
 def _fit_charges(mol, args, qm):
 
-    from htmd.charge import fitGasteigerCharges, fitESPCharges
+    from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges, symmetrizeCharges
     from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
@@ -187,6 +187,14 @@ def _fit_charges(mol, args, qm):
         if args.charge != charge:
             raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
                 args.charge, charge))
+
+    elif args.charge_type == 'AM1-BCC':
+
+        if len(args.fix_charge) > 0:
+            logger.warning('Flag --fix-charge does not have effect!')
+
+        mol = fitChargesWithAntechamber(mol, type='bcc', molCharge=args.charge)
+        mol = symmetrizeCharges(mol)
 
     elif args.charge_type == 'ESP':
 
