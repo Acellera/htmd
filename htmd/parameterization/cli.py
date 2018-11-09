@@ -384,11 +384,6 @@ def main_parameterize(arguments=None):
         parameters, mol = fftype(mol, method=method, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
         assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
 
-        mm_minimizer = None
-        if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
-            from htmd.qm.custom import OMMMinimizer
-            mm_minimizer = OMMMinimizer(mol, parameters)
-
         if isinstance(qm, FakeQM2):
             qm._parameters = parameters
 
@@ -411,12 +406,22 @@ def main_parameterize(arguments=None):
                 qm.basis = 'aug-cc-pVDZ'
             logger.info('Changing basis sets to %s' % qm.basis)
 
+        mm_minimizer = None
+        if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
+            from htmd.qm.custom import OMMMinimizer
+            mm_minimizer = OMMMinimizer(mol, parameters)
+
         # Minimize molecule
         if args.min_type != 'None': print('\n == Minimizing ==\n')
         mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
         # Fit charges
         mol = _fit_charges(mol, args, qm)
+
+        mm_minimizer = None
+        if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
+            from htmd.qm.custom import OMMMinimizer
+            mm_minimizer = OMMMinimizer(mol, parameters)
 
         # Fit dihedral angle parameters
         if args.fit_dihedral:
