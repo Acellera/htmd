@@ -151,6 +151,9 @@ class OMMMinimizer(Minimizer):
             dihidx = np.concatenate(restrained_dihedrals).flatten()
             otheridx = np.setdiff1d(np.arange(coords.shape[0]), dihidx)
 
+        if len(otheridx) == 0:  # If the molecule only consists of the dihedral atoms return
+            return coords
+
         def goalFunc(x, grad):
             currcoords = coords.copy()
             currcoords[otheridx] = x.reshape((len(otheridx), 3))
