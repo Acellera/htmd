@@ -308,7 +308,13 @@ class TestParameterize(unittest.TestCase):
     def test_benzamidine_gasteiger(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_gasteiger')
         resDir = os.path.join(self.testDir, 'benzamidine_gasteiger')
-        self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --no-dihed')
+        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 --charge-type Gasteiger --min-type None --no-dihed')
+        self._test(refDir, resDir)
+
+    def test_benzamidine_am1_bcc(self):
+        refDir = os.path.join(self.dataDir, 'benzamidine_am1_bcc')
+        resDir = os.path.join(self.testDir, 'benzamidine_am1_bcc')
+        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 --charge-type AM1-BCC --min-type None --no-dihed')
         self._test(refDir, resDir)
 
     def test_benzamidine_gaff(self):
@@ -379,6 +385,12 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'h2o2_min_mm_dihed_opt_mm_fake')
         resDir = os.path.join(self.testDir, 'h2o2_min_mm_dihed_opt_mm_fake')
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type mm --scan-type mm --fake-qm')
+        self._test(refDir, resDir)
+
+    def test_water_full(self):
+        refDir = os.path.join(self.dataDir, 'water_full')
+        resDir = os.path.join(self.testDir, 'water_full')
+        self._run(refDir, resDir, 'parameterize input.mol2')
         self._test(refDir, resDir)
 
 
