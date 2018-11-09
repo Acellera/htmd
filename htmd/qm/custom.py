@@ -102,7 +102,7 @@ class OMMMinimizer(Minimizer):
         return prmtop
 
 
-    def minimize(self, coords, restrained_dihedrals=None):
+    def minimizeOMM(self, coords, restrained_dihedrals=None):
         from simtk import unit
         from simtk.openmm import CustomTorsionForce, PeriodicTorsionForce, app
         import simtk.openmm as mm
@@ -119,13 +119,13 @@ class OMMMinimizer(Minimizer):
             forceidx.append(fidx)
 
         integrator = mm.LangevinIntegrator(0, 0, 0)
-        self.sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
+        sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
 
         if coords.ndim == 3:
             coords = coords[:, :, 0]
-        self.sim.context.setPositions(coords * unit.angstrom)
-        self.sim.minimizeEnergy()
-        state = self.sim.context.getState(getEnergy=True, getPositions=True)
+        sim.context.setPositions(coords * unit.angstrom)
+        sim.minimizeEnergy()
+        state = sim.context.getState(getEnergy=True, getPositions=True)
         endcoords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom)
 
         if restrained_dihedrals:
@@ -133,6 +133,156 @@ class OMMMinimizer(Minimizer):
                 self.system.removeForce(fi)
 
         return endcoords
+
+    def minimize(self, coords, restrained_dihedrals=None):
+        from simtk import unit
+        from simtk.openmm import app
+        import simtk.openmm as mm
+        import nlopt
+
+        if coords.ndim == 3:
+            coords = coords[:, :, 0]
+
+        integrator = mm.LangevinIntegrator(0, 0, 0)
+        sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
+
+        otheridx = np.arange(coords.shape[0])
+        if restrained_dihedrals is not None:
+            dihidx = np.concatenate(restrained_dihedrals).flatten()
+            otheridx = np.setdiff1d(np.arange(coords.shape[0]), dihidx)
+
+        def goalFunc(x, grad):
+            currcoords = coords.copy()
+            currcoords[otheridx] = x.reshape((len(otheridx), 3))
+
+            sim.context.setPositions(currcoords * unit.angstrom)
+            state = sim.context.getState(getEnergy=True, getForces=True)
+            energy = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
+            forces = state.getForces(asNumpy=True).value_in_unit(unit.kilocalories_per_mole / unit.angstrom)
+            grad[:] = -forces[otheridx].reshape(-1)
+            return energy
+
+        opt = nlopt.opt(nlopt.LD_LBFGS, len(otheridx)*3)
+        opt.set_min_objective(goalFunc)
+        opt.set_ftol_abs(1E-4)
+        opt.set_xtol_abs(1E-6)
+        x = opt.optimize(coords[otheridx].reshape(-1))
+        endcoords = coords.copy()
+        endcoords[otheridx] = x.reshape((len(otheridx), 3))
+
+        return endcoords
+
+    def getEnergy(self, coords):
+        from simtk import unit
+        from simtk.openmm import app
+        import simtk.openmm as mm
+
+        integrator = mm.LangevinIntegrator(0, 0, 0)
+        sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
+
+        if coords.ndim == 3:
+            coords = coords[:, :, 0]
+        sim.context.setPositions(coords * unit.angstrom)
+        state = sim.context.getState(getEnergy=True)
+        energy = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
+
+        return energy
+
+    def anneal(self, coords, restrained_dihedrals=None, startingtemp=1000, endingtemp=0, ndecrements=100, nsteps=1000):
+        from simtk import unit
+        from simtk.openmm import PeriodicTorsionForce, app, CMMotionRemover
+        import simtk.openmm as mm
+
+        if coords.ndim == 3:
+            coords = coords[:, :, 0]
+
+        forceidx = []
+        f = CMMotionRemover()
+        fidx = self.system.addForce(f)
+        forceidx.append(fidx)
+
+        if restrained_dihedrals:
+            f = PeriodicTorsionForce()
+
+            for dihedral in restrained_dihedrals:
+                theta0 = dihedralAngle(coords[dihedral, :, None])
+                f.addTorsion(*tuple(map(int, dihedral)), periodicity=1, phase=theta0, k=-10000 * unit.kilocalories_per_mole)
+
+            fidx = self.system.addForce(f)
+            forceidx.append(fidx)
+
+        integrator = mm.LangevinIntegrator(300*unit.kelvin, 1/unit.picosecond, 0.0001*unit.picoseconds)
+
+        sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
+
+        sim.context.setPositions(coords * unit.angstrom)
+        sim.minimizeEnergy()
+        for temp in np.linspace(startingtemp, endingtemp, ndecrements):
+            integrator.setTemperature(temp * unit.kelvin)
+            sim.step(nsteps)
+        sim.minimizeEnergy()
+
+        state = sim.context.getState(getEnergy=True, getPositions=True)
+        endcoords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom)
+
+        if restrained_dihedrals:
+            for fi in forceidx[::-1]:
+                self.system.removeForce(fi)
+
+        return endcoords
+
+    def sampleConformers(self, coords, restrained_dihedrals=None, nconformers=20, temp=1000, simtimens=0.05, stepsizefs=0.5):
+        from simtk import unit
+        from simtk.openmm import PeriodicTorsionForce, app, CMMotionRemover
+        import simtk.openmm as mm
+
+        if coords.ndim == 3:
+            coords = coords[:, :, 0]
+
+        forceidx = []
+        f = CMMotionRemover()
+        fidx = self.system.addForce(f)
+        forceidx.append(fidx)
+
+        if restrained_dihedrals:
+            f = PeriodicTorsionForce()
+
+            for dihedral in restrained_dihedrals:
+                theta0 = dihedralAngle(coords[dihedral, :, None])
+                f.addTorsion(*tuple(map(int, dihedral)), periodicity=1, phase=theta0, k=-10000 * unit.kilocalories_per_mole)
+
+            fidx = self.system.addForce(f)
+            forceidx.append(fidx)
+
+        integrator = mm.LangevinIntegrator(temp*unit.kelvin, 1/unit.picosecond, stepsizefs*unit.femtoseconds)
+
+        sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
+        sim.context.setPositions(coords * unit.angstrom)
+        sim.minimizeEnergy()
+
+        nsteps = int((simtimens * 1e6) / stepsizefs)
+        samplefreq = int(nsteps / nconformers)
+        confs = []
+        for s in range(0, nsteps, samplefreq):
+            sim.step(samplefreq)
+            state = sim.context.getState(getPositions=True)
+            confs.append(state.getPositions(asNumpy=True).value_in_unit(unit.angstrom))
+
+        if restrained_dihedrals:
+            for fi in forceidx[::-1]:
+                self.system.removeForce(fi)
+
+        minimconfs = []
+        minimenerg = []
+        for conf in confs:
+            minimconfs.append(self.minimize(conf, restrained_dihedrals=restrained_dihedrals))
+        for conf in minimconfs:
+            sim.context.setPositions(conf * unit.angstrom)
+            state = sim.context.getState(getEnergy=True)
+            energy = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
+            minimenerg.append(energy)
+
+        return minimconfs, minimenerg
 
 
 class CustomEnergyBasedMinimizer(Minimizer):
