@@ -301,7 +301,7 @@ def main_parameterize(arguments=None):
     if args.qmml:
         import importlib
         from htmd.qm.custom import CustomQM
-        qm = CustomQM()
+        qm = CustomQM(verbose=False)
         qmml_module = importlib.import_module(args.qmml)
         logger.info('QMML module: {}'.format(qmml_module))
         qmml_calculator = qmml_module.get_calculator()
