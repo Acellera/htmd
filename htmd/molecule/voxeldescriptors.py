@@ -259,7 +259,7 @@ def _getRadii(mol):
         'BR': 'Br'
     }
 
-    for el in ['H', 'C', 'N', 'O', 'F', 'Mg', 'P', 'S', 'Cl', 'Ca', 'Fe', 'Zn', 'Br', 'I']:
+    for el in vdw.radiidict.keys():
         mappings[el] = el
 
     res = np.zeros(mol.numAtoms)
