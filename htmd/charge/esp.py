@@ -19,6 +19,26 @@ from htmd.parameterization.detect import detectEquivalentAtoms
 logger = logging.getLogger(__name__)
 
 
+def randomPointsOnSphere(num_points):
+    """
+    Generate random points on a sphere
+
+    >>> np.random.seed(20181113)
+    >>> randomPointsOnSphere(2)
+    array([[-0.8483968 , -0.52844579, -0.03111143],
+           [ 0.37728796, -0.925473  ,  0.03396356]])
+    """
+    points = np.random.normal(size=(num_points, 3))
+    points = np.where(points == [0, 0, 0], [1, 0, 0], points)
+
+    points /= np.linalg.norm(points, axis=1, keepdims=True)
+
+    assert points.shape == (num_points, 3)
+    assert np.allclose(np.linalg.norm(points, axis=1), 1)
+
+    return points
+
+
 class ESP:
     """
     Electrostatic potential (ESP) charge fitting
