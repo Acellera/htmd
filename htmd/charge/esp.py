@@ -8,7 +8,6 @@ import os
 import unittest
 
 import numpy as np
-from numpy.random import uniform
 from scipy import constants as const
 from scipy.spatial.distance import cdist
 import nlopt
@@ -71,7 +70,7 @@ class MoleculeGrid:
     >>> grid = MoleculeGrid(mol)
     >>> len(grid.getPoints())
     16721
-    >>> grid.getPoints()
+    >>> grid.getPoints() # doctest: +NORMALIZE_WHITESPACE
     array([[-1.2036197 ,  0.24013364, -0.02211065],
            [ 1.01384586,  1.05265777,  1.92898618],
            [-0.10072499,  1.90416201,  0.43233528],
@@ -85,7 +84,7 @@ class MoleculeGrid:
     >>> grid = MoleculeGrid(mol, shell_factors=(1, 2), density=50)
     >>> len(grid.getPoints())
     4345
-    >>> grid.getPoints()
+    >>> grid.getPoints() # doctest: +NORMALIZE_WHITESPACE
     array([[ 1.63974354,  1.22579616, -0.64424237],
            [ 0.34472016,  0.77105343,  1.26543536],
            [ 0.85159681, -0.45357728,  1.46317876],
