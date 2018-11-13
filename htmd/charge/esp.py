@@ -5,17 +5,16 @@
 #
 import os
 import logging
-from math import pi as PI
-from math import sqrt, sin, cos, acos
-import numpy as np
-from numpy.random import uniform as rand
-from scipy import constants as const
-from scipy.spatial.distance import cdist
-from htmd.parameterization.detect import detectEquivalentAtoms
-import nlopt
 import unittest
 
+import numpy as np
+from numpy.random import uniform
+from scipy import constants as const
+from scipy.spatial.distance import cdist
+import nlopt
+
 from htmd.molecule.vdw import radiusByElement
+from htmd.parameterization.detect import detectEquivalentAtoms
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +86,7 @@ class ESP:
     @staticmethod
     def _dist(a, b):
         c = a - b
-        return sqrt(c.dot(c))
+        return np.sqrt(c.dot(c))
 
     @staticmethod
     def _dist2(a, b):
@@ -99,10 +98,10 @@ class ESP:
         # Produce a set of points on the sphere of radius r centred on centre
         # with ~density points / unit^2
 
-        surface_area = 4. / 3. * PI * r * r
+        surface_area = 4. / 3. * np.pi * r * r
         n_points = int(density * surface_area)
         area_per_point = 1. / density  # surface_area / n_points
-        mindist = sqrt(area_per_point / PI)
+        mindist = np.sqrt(area_per_point / np.pi)
 
         points = np.zeros((n_points, 3))
 
@@ -110,11 +109,11 @@ class ESP:
         mindist2 = mindist * mindist
         pos = np.zeros(3)
         while i < n_points:
-            z = 2. * rand() - 1.
-            lon = 2. * PI * rand()
-            lat = acos(z)
-            x = cos(lon) * sin(lat)
-            y = sin(lon) * sin(lat)
+            z = 2. * uniform() - 1.
+            lon = 2. * np.pi * uniform()
+            lat = np.arccos(z)
+            x = np.cos(lon) * np.sin(lat)
+            y = np.sin(lon) * np.sin(lat)
 
             pos[0] = x * r
             pos[1] = y * r
@@ -371,11 +370,9 @@ class TestESP(unittest.TestCase):
 
 def load_tests(loader, tests, ignore):
     """Load DocTests into as a Unittest suite"""
-
     import doctest
 
-    if os.environ.get('TRAVIS_OS_NAME') != 'osx':  # Psi4 does not work on Mac
-        tests.addTests(doctest.DocTestSuite(__name__))
+    tests.addTests(doctest.DocTestSuite(__name__))
 
     return tests
 
