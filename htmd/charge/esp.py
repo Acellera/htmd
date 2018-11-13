@@ -3,8 +3,8 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import os
 import logging
+import os
 import unittest
 
 import numpy as np
@@ -13,6 +13,7 @@ from scipy import constants as const
 from scipy.spatial.distance import cdist
 import nlopt
 
+from htmd.molecule.molecule import Molecule
 from htmd.molecule.vdw import radiusByElement
 from htmd.parameterization.detect import detectEquivalentAtoms
 
@@ -37,6 +38,119 @@ def randomPointsOnSphere(num_points):
     assert np.allclose(np.linalg.norm(points, axis=1), 1)
 
     return points
+
+class MoleculeGrid:
+    """
+    Molecular grid for RESP charge fitting
+
+    Examples
+    --------
+
+    Load water molecule
+    >>> import os
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
+    >>> mol.write('H2O.xyz')
+
+    >>> np.random.seed(20181113)
+    >>> grid = MoleculeGrid(mol)
+    >>> len(grid.getPoints())
+    16721
+    >>> grid.getPoints()
+    array([[-1.2036197 ,  0.24013364, -0.02211065],
+           [ 1.01384586,  1.05265777,  1.92898618],
+           [-0.10072499,  1.90416201,  0.43233528],
+           ...,
+           [ 1.06367915, -0.13911785,  2.49208771],
+           [-1.7040881 , -0.30808665,  0.22394069],
+           [ 0.21843581, -2.82419591,  1.50233482]])
+    >>> grid.writeXYZ('H2O_default.xyz')
+
+    >>> np.random.seed(20181113)
+    >>> grid = MoleculeGrid(mol, shell_factors=(1, 2), density=50)
+    >>> len(grid.getPoints())
+    4345
+    >>> grid.getPoints()
+    array([[ 1.63974354,  1.22579616, -0.64424237],
+           [ 0.34472016,  0.77105343,  1.26543536],
+           [ 0.85159681, -0.45357728,  1.46317876],
+           ...,
+           [ 1.35323883, -3.08583052, -0.17044048],
+           [-0.80667116,  0.64144373, -0.99312377],
+           [ 2.45040501, -2.23107494, -0.48419202]])
+    >>> grid.writeXYZ('H2O_1_2__50.xyz')
+    """
+
+    def __init__(self, molecule, shell_factors=(1.4, 1.6, 1.8, 2.0), density=100):
+
+        self._molecule = molecule
+        if not isinstance(self._molecule, Molecule):
+            raise TypeError()
+        if self._molecule.numFrames != 1:
+            raise ValueError()
+
+        self._shell_factors = list(map(float, shell_factors))
+        for factor in self._shell_factors:
+            if factor <= 0:
+                raise ValueError()
+
+        self._density = density
+        if self._density <= 0:
+            raise ValueError()
+
+        self._points = self._generatePoints()
+        self._points = self._filterPoints(self._points)
+
+    def _generatePoints(self):
+
+        all_points = []
+
+        for element, coord in zip(self._molecule.element, self._molecule.coords[:, :, 0]):
+            vdw_radius = radiusByElement(element)
+            for factor in self._shell_factors:
+
+                # Compute the number of point for each shell
+                radius = factor * vdw_radius
+                area = 4/3 * np.pi * radius**2
+                num_points = int(self._density * area)
+
+                # Generate points
+                points = radius * randomPointsOnSphere(num_points) + coord
+                all_points.append(points)
+
+        return np.concatenate(all_points)
+
+    def _filterPoints(self, points):
+
+        # Compute distance threshold for each atom
+        thresholds = [radiusByElement(element) for element in self._molecule.element]
+        thresholds = min(self._shell_factors) * np.array(thresholds)
+
+        # Detect the points further away for each atom than its threshold
+        distances = cdist(points, self._molecule.coords[:, :, 0])
+        is_valid = np.all(distances > thresholds, axis=1)
+
+        return points[is_valid]
+
+    def getPoints(self):
+        return self._points
+
+    def writeXYZ(self, file):
+        """
+        Write the molecular grid in XYZ format
+        """
+
+        if isinstance(file, str):
+            with open(file, 'w') as stream:
+                self.writeXYZ(stream)
+
+        else:
+            points = self.getPoints()
+            file.write('{}\n\n'.format(len(points)))
+            for point in points:
+                file.write('X {:10.6f} {:10.6f} {:10.6f}\n'.format(*tuple(point)))
 
 
 class ESP:
@@ -76,12 +190,18 @@ class ESP:
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
 
+    Generate points
+    >>> np.random.seed(20181113)
+    >>> grid = MoleculeGrid(mol)
+    >>> len(grid.getPoints())
+    16721
+
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4
     >>> from tempfile import mkdtemp
     >>> qm = Psi4()
     >>> qm.molecule = mol
-    >>> qm.esp_points = ESP.generate_points(mol)[0]
+    >>> qm.esp_points = grid.getPoints()
     >>> qm.directory = mkdtemp()
     >>> qm_results = qm.run()
     >>> qm_results[0].errored
@@ -100,7 +220,7 @@ class ESP:
 
     ESP charges for water molecule
     >>> esp_results['charges'] # doctest: +ELLIPSIS
-    array([-0.3940...,  0.1970...,  0.1970...])
+    array([-0.3908...,  0.1954...,  0.1954...])
     """
 
     @staticmethod
