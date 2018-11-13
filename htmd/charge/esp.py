@@ -251,6 +251,7 @@ class ESP:
 
         self.molecule = None
         self.qm_results = None
+        self.apply_bounds = True
         self.restraint_factor = 0
         self.fixed = []
 
@@ -285,15 +286,21 @@ class ESP:
 
     def _get_bounds(self):
 
-        # Set bounds
-        lower_bounds = np.ones(self.ngroups) * -1.25
-        upper_bounds = np.ones(self.ngroups) * +1.25
+        # Set very loose bounds, i.e. effectively no bounds
+        lower_bounds = -10 * np.ones(self.ngroups)
+        upper_bounds = +10 * np.ones(self.ngroups)
 
-        # Set the lower bound for hydrogens
-        for i in range(self.ngroups):
-            element = self.molecule.element[self._equivalent_atom_groups[i][0]]
-            if element == 'H':
-                lower_bounds[i] = 0
+        if self.apply_bounds:
+
+            # Set reasonable bounds
+            lower_bounds = np.ones(self.ngroups) * -1.25
+            upper_bounds = np.ones(self.ngroups) * +1.25
+
+            # Bond hydrogen charges to be positive
+            for i in range(self.ngroups):
+                element = self.molecule.element[self._equivalent_atom_groups[i][0]]
+                if element == 'H':
+                    lower_bounds[i] = 0
 
         # Fix atom charges considering equivalent groups
         for atom in self.fixed:
@@ -410,15 +417,24 @@ class TestESP(unittest.TestCase):
         self.assertEqual(list(lower_bounds), [-1.25, 0.0])
         self.assertEqual(list(upper_bounds), [1.25, 1.25])
 
+        self.esp.apply_bounds = False
+        self.esp.fixed = []
+        lower_bounds, upper_bounds = self.esp._get_bounds()
+        self.assertEqual(list(lower_bounds), [-10, -10])
+        self.assertEqual(list(upper_bounds), [10, 10])
+
+        self.esp.apply_bounds = True
         self.esp.fixed = [0]
         lower_bounds, upper_bounds = self.esp._get_bounds()
         self.assertEqual(list(lower_bounds), [-0.25279998779296875, 0.0])
         self.assertEqual(list(upper_bounds), [-0.25279998779296875, 1.25])
 
+        self.esp.apply_bounds = True
         self.esp.fixed = [3]
         lower_bounds, upper_bounds = self.esp._get_bounds()
         self.assertEqual(list(lower_bounds), [-1.25, 0.25279998779296875])
         self.assertEqual(list(upper_bounds), [1.25, 0.25279998779296875])
+
 
     def test_objective(self):
 
