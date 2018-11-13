@@ -242,7 +242,7 @@ class ESP:
         self.qm_results = None
         self.fixed = []
 
-        self._charge = 0
+        self._molecular_charge = 0
 
         self._reciprocal_distances = None
 
@@ -262,27 +262,26 @@ class ESP:
 
         return charges
 
-    def _compute_constraint(self, group_charges, _):
+    def _constraint(self, group_charges, _):
 
         charges = self._map_groups_to_atoms(group_charges)
-        constraint = np.sum(charges) - self._charge
+        constraint = np.sum(charges) - self._molecular_charge
 
         return constraint
 
     def _get_bounds(self):
 
-        # Set bound arrays
+        # Set bounds
         lower_bounds = np.ones(self.ngroups) * -1.25
         upper_bounds = np.ones(self.ngroups) * +1.25
 
-        # If the restraint relates to an H, set the lower bound to 0
+        # Set the lower bound for hydrogens
         for i in range(self.ngroups):
-            if 'H' == self.molecule.element[self._equivalent_atom_groups[i][0]]:
-                lower_bounds[i] = 0.001
+            element = self.molecule.element[self._equivalent_atom_groups[i][0]]
+            if element == 'H':
+                lower_bounds[i] = 0
 
-        # Fix the charges of the specified atoms to those already set in the
-        # charge array. Note this also fixes the charges of the atoms in the
-        # same equivalency group.
+        # Fix atom charges considering equivalent groups
         for atom in self.fixed:
             group = self._equivalent_group_by_atom[atom]
             lower_bounds[group] = self.molecule.charge[atom]
@@ -290,7 +289,7 @@ class ESP:
 
         return lower_bounds, upper_bounds
 
-    def _compute_objective(self, group_charges, _):
+    def _objective(self, group_charges, _):
 
         qm_result = self.qm_results[0]
 
@@ -302,7 +301,7 @@ class ESP:
 
         charges = self._map_groups_to_atoms(group_charges)
         esp_values = np.dot(self._reciprocal_distances, charges)
-        rms = np.sqrt(np.mean((esp_values - qm_result.esp_values)**2))
+        rms = np.mean((esp_values - qm_result.esp_values)**2)
 
         return rms
 
@@ -317,7 +316,7 @@ class ESP:
         """
         logger.info('Start charge optimization')
 
-        self._charge = self.qm_results[0].charge
+        self._molecular_charge = self.qm_results[0].charge
 
         equivalents = detectEquivalentAtoms(self.molecule)
         self._equivalent_atom_groups = equivalents[0]
@@ -328,36 +327,34 @@ class ESP:
 
         # Set up NLopt
         opt = nlopt.opt(nlopt.LN_COBYLA, self.ngroups)
-        opt.set_min_objective(self._compute_objective)
+        opt.set_min_objective(self._objective)
+        opt.add_equality_constraint(self._constraint)
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
-        opt.add_equality_constraint(self._compute_constraint)
         opt.set_xtol_rel(1.e-6)
         opt.set_maxeval(1000*self.ngroups)
         opt.set_initial_step(0.001)
 
         # Optimize the charges
-        group_charges = opt.optimize(np.zeros(self.ngroups) + 0.001) # TODO: a more elegant way to set initial charges
+        group_charges = opt.optimize(np.zeros(self.ngroups))
         # TODO: check optimizer status
         charges = self._map_groups_to_atoms(group_charges)
-        loss = self._compute_objective(group_charges, None)
-        logger.info('Final RMSD: %f au' % loss)
+        loss = self._objective(group_charges, None)
+        logger.info('Final RMSD: %f au' % np.sqrt(loss))
 
         logger.info('Finish charge optimization')
 
-        return {'charges': charges, 'loss': loss}
+        return {'charges': charges, 'loss': np.sqrt(loss)}
 
 
 class TestESP(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.parameterization.util import getEquivalentsAndDihedrals
         from htmd.molecule.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'H2O2.mol2')
         mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
-        mol, equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
         self.mol = mol
         self.esp = ESP()
         self.esp.molecule = self.mol
@@ -375,19 +372,19 @@ class TestESP(unittest.TestCase):
         charges = self.esp._map_groups_to_atoms([1, 2])
         self.assertListEqual(list(charges), [1, 1, 2, 2])
 
-    def test_constraint_function(self):
+    def test_constraint(self):
 
-        self.assertEqual(self.esp._compute_constraint([1, 2], None), 6)
+        self.assertEqual(self.esp._constraint([1, 2], None), 6)
 
     def test_get_bounds(self):
 
         lower_bounds, upper_bounds = self.esp._get_bounds()
-        self.assertEqual(list(lower_bounds), [-1.25, 0.001])
+        self.assertEqual(list(lower_bounds), [-1.25, 0.0])
         self.assertEqual(list(upper_bounds), [1.25, 1.25])
 
         self.esp.fixed = [0]
         lower_bounds, upper_bounds = self.esp._get_bounds()
-        self.assertEqual(list(lower_bounds), [-0.25279998779296875, 0.001])
+        self.assertEqual(list(lower_bounds), [-0.25279998779296875, 0.0])
         self.assertEqual(list(upper_bounds), [-0.25279998779296875, 1.25])
 
         self.esp.fixed = [3]
@@ -395,7 +392,7 @@ class TestESP(unittest.TestCase):
         self.assertEqual(list(lower_bounds), [-1.25, 0.25279998779296875])
         self.assertEqual(list(upper_bounds), [1.25, 0.25279998779296875])
 
-    def test_compute_objective(self):
+    def test_objective(self):
 
         from htmd.qm import QMResult
 
@@ -407,8 +404,8 @@ class TestESP(unittest.TestCase):
 
         self.esp.qm_results = [result]
 
-        rms = self.esp._compute_objective([1, 2], None)
-        self.assertAlmostEqual(rms, 6.0746907953331517)
+        rms = self.esp._objective([1, 2], None)
+        self.assertAlmostEqual(rms, 36.90186825890532)
 
 
 def load_tests(loader, tests, ignore):
