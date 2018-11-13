@@ -192,15 +192,17 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.qm import Psi4
     ffevaluate module is in beta version
+
+    >>> np.random.seed(20181113)
     >>> with TemporaryDirectory() as tmpDir:
     ...     new_mol, extra = fitESPCharges(mol, Psi4(), tmpDir)
     >>> assert new_mol is not mol
     >>> new_mol.charge # doctest: +ELLIPSIS
-    array([-0.394059...,  0.197029...,  0.197029...], dtype=float32)
+    array([-0.3908...,  0.1954...,  0.1954...], dtype=float32)
     """
 
     from htmd.qm.base import QMBase
-    from htmd.charge.esp import ESP
+    from htmd.charge.esp import MoleculeGrid, ESP
 
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
@@ -219,7 +221,7 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     else:
         # Generate ESP points
         logger.info('Generating ESP grid')
-        esp_points = ESP.generate_points(mol)[0]
+        esp_points = MoleculeGrid(mol).getPoints()
 
     # Run QM simulation
     qm.molecule = mol
