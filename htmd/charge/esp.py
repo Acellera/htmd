@@ -220,26 +220,38 @@ class ESP:
     >>> qm_results[0].errored
     False
 
-    Create an ESP charge fitting object
+    Fit ESP charges
     >>> from htmd.charge.esp import ESP
     >>> esp = ESP()
     >>> esp # doctest: +ELLIPSIS
     <htmd.charge.esp.ESP object at 0x...>
-
-    Set up and run charge fitting
     >>> esp.molecule = mol
     >>> esp.qm_results = qm_results
     >>> esp_results = esp.run()
-
-    ESP charges for water molecule
     >>> esp_results['charges'] # doctest: +ELLIPSIS
     array([-0.3908...,  0.1954...,  0.1954...])
-    """
+    >>> esp_results['loss'] # doctest: +ELLIPSIS
+    1.539...e-05
+    >>> esp_results['RMSD'] # doctest: +ELLIPSIS
+    0.003923...
 
+    >>> esp = ESP()
+    >>> esp.molecule = mol
+    >>> esp.qm_results = qm_results
+    >>> esp.restraint_factor = 0.001
+    >>> esp_results = esp.run()
+    >>> esp_results['charges'] # doctest: +ELLIPSIS
+    array([-0.3749...,  0.1874...,  0.1874...])
+    >>> esp_results['loss'] # doctest: +ELLIPSIS
+    6.422...e-05
+    >>> esp_results['RMSD'] # doctest: +ELLIPSIS
+    0.004168...
+    """
     def __init__(self):
 
         self.molecule = None
         self.qm_results = None
+        self.restraint_factor = 0
         self.fixed = []
 
         self._molecular_charge = 0
@@ -248,6 +260,8 @@ class ESP:
 
         self._equivalent_atom_groups = None
         self._equivalent_group_by_atom = None
+
+        self._restraint_factors = None
 
     @property
     def ngroups(self):
@@ -291,19 +305,20 @@ class ESP:
 
     def _objective(self, group_charges, _):
 
-        qm_result = self.qm_results[0]
+        points = self.qm_results[0].esp_points
+        target_values = self.qm_results[0].esp_values
 
         # Compute the reciprocal distances between ESP points and atomic charges
         if self._reciprocal_distances is None:
-            distances = cdist(qm_result.esp_points, self.molecule.coords[:, :, 0])
+            distances = cdist(points, self.molecule.coords[:, :, 0])
             distances *= const.physical_constants['Bohr radius'][0]/const.angstrom  # Angstrom --> Bohr
             self._reciprocal_distances = np.reciprocal(distances)
 
         charges = self._map_groups_to_atoms(group_charges)
-        esp_values = np.dot(self._reciprocal_distances, charges)
-        rms = np.mean((esp_values - qm_result.esp_values)**2)
+        actual_values = np.dot(self._reciprocal_distances, charges)
+        loss = np.mean((actual_values - target_values)**2) + np.mean(self._restraint_factors * charges**2)
 
-        return rms
+        return loss
 
     def run(self):
         """
@@ -318,9 +333,17 @@ class ESP:
 
         self._molecular_charge = self.qm_results[0].charge
 
+        # Detect equivalent atoms
         equivalents = detectEquivalentAtoms(self.molecule)
         self._equivalent_atom_groups = equivalents[0]
         self._equivalent_group_by_atom = equivalents[2]
+
+        # Set up heavy atom restrains
+        self._restraint_factors = np.zeros(self.molecule.numAtoms)
+        if self.restraint_factor > 0:
+            for i, element in enumerate(self.molecule.element):
+                if element != 'H':
+                    self._restraint_factors[i] = self.restraint_factor
 
         # Get charge bounds
         lower_bounds, upper_bounds = self._get_bounds()
@@ -340,11 +363,16 @@ class ESP:
         # TODO: check optimizer status
         charges = self._map_groups_to_atoms(group_charges)
         loss = self._objective(group_charges, None)
-        logger.info('Final RMSD: %f au' % np.sqrt(loss))
+        logger.info('Final loss: {:.6f}'.format(loss))
+
+        # Compute RMSD
+        self._restraint_factors[:] = 0
+        msd = self._objective(group_charges, None)
+        logger.info('Final RMSD: {:.6f} au'.format(np.sqrt(msd)))
 
         logger.info('Finish charge optimization')
 
-        return {'charges': charges, 'loss': np.sqrt(loss)}
+        return {'charges': charges, 'loss': loss, 'RMSD': np.sqrt(msd)}
 
 
 class TestESP(unittest.TestCase):
@@ -404,8 +432,13 @@ class TestESP(unittest.TestCase):
 
         self.esp.qm_results = [result]
 
-        rms = self.esp._objective([1, 2], None)
-        self.assertAlmostEqual(rms, 36.90186825890532)
+        self.esp._restraint_factors = [0, 0, 0, 0]
+        loss = self.esp._objective([1, 2], None)
+        self.assertAlmostEqual(loss, 36.90186825890532)
+
+        self.esp._restraint_factors = [1, 1, 0, 0]
+        loss = self.esp._objective([1, 2], None)
+        self.assertAlmostEqual(loss, 37.40186825890532)
 
 
 def load_tests(loader, tests, ignore):
