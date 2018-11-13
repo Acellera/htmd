@@ -103,42 +103,48 @@ class OMMMinimizer(Minimizer):
 
     def minimize(self, coords, restrained_dihedrals=None):
         from simtk import unit
-        from simtk.openmm import app
+        from simtk.openmm import app, PeriodicTorsionForce
         import simtk.openmm as mm
         import nlopt
+
+        forceidx = []
+        if restrained_dihedrals:
+            f = PeriodicTorsionForce()
+
+            for dihedral in restrained_dihedrals:
+                theta0 = dihedralAngle(coords[dihedral])
+                f.addTorsion(*tuple(map(int, dihedral)), periodicity=1, phase=theta0, k=-10000 * unit.kilocalories_per_mole)
+
+            fidx = self.system.addForce(f)
+            forceidx.append(fidx)
 
         if coords.ndim == 3:
             coords = coords[:, :, 0]
 
+        natoms = coords.shape[0]
+
         integrator = mm.LangevinIntegrator(0, 0, 0)
         sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
 
-        otheridx = np.arange(coords.shape[0])
-        if restrained_dihedrals is not None:
-            dihidx = np.concatenate(restrained_dihedrals).flatten()
-            otheridx = np.setdiff1d(np.arange(coords.shape[0]), dihidx)
-
-        if len(otheridx) == 0:  # If the molecule only consists of the dihedral atoms return
-            return coords
-
         def goalFunc(x, grad):
-            currcoords = coords.copy()
-            currcoords[otheridx] = x.reshape((len(otheridx), 3))
-
-            sim.context.setPositions(currcoords * unit.angstrom)
+            sim.context.setPositions(x.reshape((natoms, 3)) * unit.angstrom)
             state = sim.context.getState(getEnergy=True, getForces=True)
             energy = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
             forces = state.getForces(asNumpy=True).value_in_unit(unit.kilocalories_per_mole / unit.angstrom)
-            grad[:] = -forces[otheridx].reshape(-1)
+            grad[:] = -forces.reshape(-1)
             return energy
 
-        opt = nlopt.opt(nlopt.LD_LBFGS, len(otheridx)*3)
+        opt = nlopt.opt(nlopt.LD_LBFGS, natoms*3)
+        opt.set_vector_storage(opt.get_dimension())
         opt.set_min_objective(goalFunc)
         opt.set_ftol_abs(1E-4)
         opt.set_xtol_abs(1E-6)
-        x = opt.optimize(coords[otheridx].reshape(-1))
-        endcoords = coords.copy()
-        endcoords[otheridx] = x.reshape((len(otheridx), 3))
+        x = opt.optimize(coords.reshape(-1))
+        endcoords = x.reshape((natoms, 3)).copy()
+
+        if restrained_dihedrals:
+            for fi in forceidx[::-1]:
+                self.system.removeForce(fi)
 
         return endcoords
 
