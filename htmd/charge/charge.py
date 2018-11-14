@@ -33,7 +33,7 @@ def fitGasteigerCharges(mol):
     --------
     >>> from htmd.home import home
     >>> from htmd.molecule.molecule import Molecule
-    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = 0
 
@@ -92,7 +92,7 @@ def fitChargesWithAntechamber(mol, type='gas', molCharge=None):
     --------
     >>> from htmd.home import home
     >>> from htmd.molecule.molecule import Molecule
-    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = 0
 
@@ -156,7 +156,7 @@ def fitChargesWithAntechamber(mol, type='gas', molCharge=None):
     return mol
 
 
-def fitESPCharges(mol, qm, outdir, fixed=()):
+def fitESPCharges(mol, qm, outdir, apply_bounds=True, restraint_factor=0, fixed=()):
     """
     Fit ESP atomic charges
 
@@ -168,6 +168,10 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
         Psi4 instance for QM calculations
     outdir: str
         Output directory for the QM calculations
+    apply_bounds: boolean
+        Apply bounds to atomic charges
+    restraint_factor: float
+        Restraint factor for heavy elements
     fixed : list of ints
         List of fixed atom indices
 
@@ -185,7 +189,7 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     --------
     >>> from htmd.home import home
     >>> from htmd.molecule.molecule import Molecule
-    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = 0
 
@@ -211,6 +215,9 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
 
     if not issubclass(type(qm), QMBase):
         raise ValueError('"qm" has to be instance of {}'.format(QMBase))
+
+    apply_bounds = bool(apply_bounds)
+    restraint_factor = float(restraint_factor)
 
     # Get ESP points
     point_file = os.path.join(outdir, "00000", "grid.dat")
@@ -240,6 +247,8 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     esp = ESP()
     esp.molecule = mol
     esp.qm_results = qm_results
+    esp.apply_bounds = apply_bounds
+    esp.restraint_factor = restraint_factor
     esp.fixed = fixed
     esp_result = esp.run()
 
@@ -247,7 +256,8 @@ def fitESPCharges(mol, qm, outdir, fixed=()):
     mol = mol.copy()
     mol.charge[:] = esp_result['charges']
     extra = {'qm_dipole': qm_results[0].dipole,
-             'esp_loss': esp_result['loss']}
+             'esp_loss': esp_result['loss'],
+             'esp_rmsd': esp_result['RMSD']}
 
     return mol, extra
 
@@ -269,7 +279,7 @@ def symmetrizeCharges(mol):
     --------
     >>> from htmd.home import home
     >>> from htmd.molecule.molecule import Molecule
-    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = [0.5, -0.5, 0.0]
 
