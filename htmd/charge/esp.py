@@ -62,7 +62,7 @@ class MoleculeGrid:
     >>> import os
     >>> from htmd.home import home
     >>> from htmd.molecule.molecule import Molecule
-    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
     >>> mol.write('H2O.xyz')
 
@@ -203,7 +203,7 @@ class ESP:
     >>> import os
     >>> from htmd.home import home
     >>> from htmd.molecule.molecule import Molecule
-    >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
+    >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
 
     Generate points
