@@ -180,7 +180,7 @@ class ESP:
     The charges are fitting to reproduce ESP at the reference point computed by QM. The fitting is performed with
     COBYLA algorithm considering the equivalent atoms and imposing the total charge of the molecule.
 
-    The charge values are confined to [-1.25; 1.25] ([0.001; 1.25] for hydrogen) range to prevent non-physical results.
+    The charge values are confined to [-1.25; 1.25] ([0.0; 1.25] for hydrogen) range to prevent non-physical results.
     Also, the specific charges can be fixed to the orginal values (as defined in the molecule object).
 
     Attributes
@@ -189,6 +189,10 @@ class ESP:
         Molecule object
     qm_results : List of QMResult
         Reference QM results
+    apply_bounds: boolean
+        Apply bounds to atomic charges
+    restraint_factor: float
+        Restraint factor for heavy elements
     fixed : list of ints
         List of fixed atom indices
 
@@ -335,7 +339,7 @@ class ESP:
         results : dict
             Dictionary with the fitted charges and fitting loss value
         """
-        logger.info('Start charge optimization')
+        logger.info('Start RESP charge fitting')
 
         self._molecular_charge = self.qm_results[0].charge
 
@@ -354,10 +358,19 @@ class ESP:
         # Get charge bounds
         lower_bounds, upper_bounds = self._get_bounds()
 
-        # Set up NLopt
+        logger.info('Atom charge boundaries and restraint factor:')
+        for i, name in enumerate(self.molecule.name):
+            lower = lower_bounds[self._equivalent_group_by_atom[i]]
+            upper = upper_bounds[self._equivalent_group_by_atom[i]]
+            factor = self._restraint_factors[i]
+            logger.info('  {:4s}: {:7.3f} {:7.3f} {:10.6f}'.format(name, lower, upper, factor))
+
+        # Set up optimizer
         opt = nlopt.opt(nlopt.LN_COBYLA, self.ngroups)
+        logger.info('Optimizer: {}'.format(opt.get_algorithm_name()))
         opt.set_min_objective(self._objective)
         opt.add_equality_constraint(self._constraint)
+        logger.info('Molecular charges constraint: {:.3f}'.format(self._molecular_charge))
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
         opt.set_xtol_rel(1.e-6)
@@ -366,9 +379,10 @@ class ESP:
 
         # Optimize the charges
         group_charges = opt.optimize(np.zeros(self.ngroups))
-        # TODO: check optimizer status
-        charges = self._map_groups_to_atoms(group_charges)
+        status = opt.last_optimize_result()
         loss = self._objective(group_charges, None)
+        charges = self._map_groups_to_atoms(group_charges)
+        logger.info('Optimizer status: {}'.format(status))
         logger.info('Final loss: {:.6f}'.format(loss))
 
         # Compute RMSD
@@ -376,9 +390,9 @@ class ESP:
         msd = self._objective(group_charges, None)
         logger.info('Final RMSD: {:.6f} au'.format(np.sqrt(msd)))
 
-        logger.info('Finish charge optimization')
+        logger.info('Finish RESP charge fitting')
 
-        return {'charges': charges, 'loss': loss, 'RMSD': np.sqrt(msd)}
+        return {'charges': charges, 'status': status, 'loss': loss, 'RMSD': np.sqrt(msd)}
 
 
 class TestESP(unittest.TestCase):
