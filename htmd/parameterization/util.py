@@ -383,6 +383,60 @@ def makeAtomNamesUnique(mol):
 
     return mol
 
+def detectChrilCenters(mol):
+    """
+    Detect chiral centers
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to detect chiral centers
+
+    Return
+    ------
+    results: list of tuples
+        List of chiral centers as tuples made of an atom index and a label ('S', 'R', '?')
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+
+    >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+    >>> mol = Molecule(molFile)
+    >>> detectChrilCenters(mol)
+    []
+
+    >>> molFile = os.path.join(home('test-param'), 'fluorchlorcyclopronol.mol2')
+    >>> mol = Molecule(molFile)
+    >>> detectChrilCenters(mol)
+    [(0, 'R'), (2, 'S'), (4, 'R')]
+    """
+
+    from htmd.molecule.molecule import Molecule
+    from rdkit.Chem import MolFromMol2File, AssignAtomChiralTagsFromStructure, FindMolChiralCenters
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+    if mol.numFrames != 1:
+        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+
+    # Set atom types to elements, overwise rdkit refuse to read a MOL2 file
+    htmd_mol = mol.copy()
+    htmd_mol.atomtype = htmd_mol.element
+
+    # Convert Molecule to rdkit Mol
+    with TemporaryDirectory() as tmpDir:
+        filename = os.path.join(tmpDir, 'mol.mol2')
+        htmd_mol.write(filename)
+        rdkit_mol = MolFromMol2File(filename, removeHs=False)
+    assert mol.numAtoms == rdkit_mol.GetNumAtoms()
+
+    # Detect chiral centers and assign their labels
+    AssignAtomChiralTagsFromStructure(rdkit_mol)
+    chiral_centers = FindMolChiralCenters(rdkit_mol, includeUnassigned=True)
+
+    return chiral_centers
 
 if __name__ == '__main__':
 
