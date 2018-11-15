@@ -383,7 +383,7 @@ def makeAtomNamesUnique(mol):
 
     return mol
 
-def detectChrilCenters(mol):
+def detectChiralCenters(mol):
     """
     Detect chiral centers
 
@@ -405,16 +405,16 @@ def detectChrilCenters(mol):
 
     >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
     >>> mol = Molecule(molFile)
-    >>> detectChrilCenters(mol)
+    >>> detectChiralCenters(mol)
     [[]]
 
     >>> molFile = os.path.join(home('test-param'), 'fluorchlorcyclopronol.mol2')
     >>> mol = Molecule(molFile)
-    >>> detectChrilCenters(mol)
+    >>> detectChiralCenters(mol)
     [[(0, 'R'), (2, 'S'), (4, 'R')]]
 
     >>> mol.appendFrames(mol)
-    >>> detectChrilCenters(mol)
+    >>> detectChiralCenters(mol)
     [[(0, 'R'), (2, 'S'), (4, 'R')], [(0, 'R'), (2, 'S'), (4, 'R')]]
     """
 
