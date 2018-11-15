@@ -259,7 +259,6 @@ def main_parameterize(arguments=None):
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
 
-
     # Get RTF and PRM file names
     rtfFile, prmFile = None, None
     if args.rtf_prm:
