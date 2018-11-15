@@ -98,18 +98,18 @@ class MoleculeGrid:
 
         self._molecule = molecule
         if not isinstance(self._molecule, Molecule):
-            raise TypeError()
+            raise TypeError('"molecule" has to be instance of {}'.format(Molecule))
         if self._molecule.numFrames != 1:
-            raise ValueError()
+            raise ValueError('"molecule" can have just one frame, but it has {}'.format(self._molecule.numFrames))
 
         self._shell_factors = list(map(float, shell_factors))
         for factor in self._shell_factors:
             if factor <= 0:
-                raise ValueError()
+                raise ValueError('The elements of "shell_factors" have to be positive, but get {}'.format(factor))
 
         self._density = density
         if self._density <= 0:
-            raise ValueError()
+            raise ValueError('"density" has to be positive, but get {}'.format(self._density))
 
         self._points = self._generatePoints()
         self._points = self._filterPoints(self._points)
