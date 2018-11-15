@@ -30,7 +30,7 @@ class Minimizer(abc.ABC):
 
 
 class OMMMinimizer(Minimizer):
-    def __init__(self, mol, prm, platform='CPU', device=0, buildff='AMBER', guessAnglesDihedrals=True):
+    def __init__(self, mol, prm, platform='CPU', device=0, buildff='AMBER'):
         """ A minimizer based on OpenMM
 
         Parameters
@@ -45,8 +45,6 @@ class OMMMinimizer(Minimizer):
             If platform is 'CUDA' this defines which GPU device to use
         buildff : str
             The forcefield for which to build the Molecule to then minimize it with OpenMM
-        guessAnglesDihedrals : bool
-            If the class should guess angles and dihedrals of the Molecule.
 
         Examples
         --------
@@ -61,8 +59,6 @@ class OMMMinimizer(Minimizer):
         """
         super().__init__()
 
-        import parmed
-        from htmd.util import tempname
         import simtk.openmm as mm
 
         if buildff == 'AMBER':
@@ -101,7 +97,7 @@ class OMMMinimizer(Minimizer):
 
         return prmtop
 
-    def minimize(self, coords, restrained_dihedrals=None):
+    def minimize(self, coords, restrained_dihedrals=None, maxeval=None):
         from simtk import unit
         from simtk.openmm import app, PeriodicTorsionForce
         import simtk.openmm as mm
@@ -131,13 +127,15 @@ class OMMMinimizer(Minimizer):
             state = sim.context.getState(getEnergy=True, getForces=True)
             energy = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
             forces = state.getForces(asNumpy=True).value_in_unit(unit.kilocalories_per_mole / unit.angstrom)
-            grad[:] = -forces.reshape(-1)
+            if grad.size > 0:
+                grad[:] = -forces.reshape(-1)
             return energy
 
-        opt = nlopt.opt(nlopt.LD_LBFGS, natoms*3)
-        opt.set_vector_storage(opt.get_dimension())
+        opt = nlopt.opt(nlopt.LD_SLSQP, natoms*3)
+        if maxeval is not None:
+            opt.set_maxeval(maxeval)
         opt.set_min_objective(goalFunc)
-        opt.set_ftol_abs(1E-4)
+        opt.set_ftol_abs(1E-3)
         opt.set_xtol_abs(1E-6)
         x = opt.optimize(coords.reshape(-1))
         endcoords = x.reshape((natoms, 3)).copy()
