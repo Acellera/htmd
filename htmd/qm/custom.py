@@ -101,7 +101,7 @@ class OMMMinimizer(Minimizer):
         from simtk import unit
         from simtk.openmm import app, PeriodicTorsionForce
         import simtk.openmm as mm
-        import nlopt
+        from scipy.optimize import minimize
 
         forceidx = []
         if restrained_dihedrals:
@@ -122,23 +122,16 @@ class OMMMinimizer(Minimizer):
         integrator = mm.LangevinIntegrator(0, 0, 0)
         sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
 
-        def goalFunc(x, grad):
+        def goalFunc(x):
             sim.context.setPositions(x.reshape((natoms, 3)) * unit.angstrom)
             state = sim.context.getState(getEnergy=True, getForces=True)
             energy = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
             forces = state.getForces(asNumpy=True).value_in_unit(unit.kilocalories_per_mole / unit.angstrom)
-            if grad.size > 0:
-                grad[:] = -forces.reshape(-1)
-            return energy
+            grad = -forces.reshape(-1)
+            return energy, grad
 
-        opt = nlopt.opt(nlopt.LD_SLSQP, natoms*3)
-        if maxeval is not None:
-            opt.set_maxeval(maxeval)
-        opt.set_min_objective(goalFunc)
-        opt.set_ftol_abs(1E-3)
-        opt.set_xtol_abs(1E-6)
-        x = opt.optimize(coords.reshape(-1))
-        endcoords = x.reshape((natoms, 3)).copy()
+        res = minimize(goalFunc, coords.reshape(-1), method='L-BFGS-B', jac=True, options={'ftol': 0, 'gtol': 0.05})
+        endcoords = res.x.reshape((natoms, 3)).copy()
 
         if restrained_dihedrals:
             for fi in forceidx[::-1]:
