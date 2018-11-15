@@ -69,15 +69,15 @@ class MoleculeGrid:
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol)
     >>> len(grid.getPoints())
-    16721
+    4158
     >>> grid.getPoints() # doctest: +NORMALIZE_WHITESPACE
     array([[-1.2036197 ,  0.24013364, -0.02211065],
            [ 1.01384586,  1.05265777,  1.92898618],
            [-0.10072499,  1.90416201,  0.43233528],
            ...,
-           [ 1.06367915, -0.13911785,  2.49208771],
-           [-1.7040881 , -0.30808665,  0.22394069],
-           [ 0.21843581, -2.82419591,  1.50233482]])
+           [-0.77827968, -2.58209328,  1.06180501],
+           [ 0.14494011, -0.39823904, -2.07498691],
+           [-1.50372053, -0.32872076,  1.19264375]])
     >>> grid.writeXYZ('H2O_default.xyz')
 
     >>> np.random.seed(20181113)
@@ -94,7 +94,7 @@ class MoleculeGrid:
            [ 2.45040501, -2.23107494, -0.48419202]])
     >>> grid.writeXYZ('H2O_1_2__50.xyz')
     """
-    def __init__(self, molecule, shell_factors=(1.4, 1.6, 1.8, 2.0), density=100):
+    def __init__(self, molecule, shell_factors=(1.4, 1.6, 1.8, 2.0), density=25):
 
         self._molecule = molecule
         if not isinstance(self._molecule, Molecule):
@@ -210,7 +210,7 @@ class ESP:
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol)
     >>> len(grid.getPoints())
-    16721
+    4158
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4
@@ -232,11 +232,11 @@ class ESP:
     >>> esp.qm_results = qm_results
     >>> esp_results = esp.run()
     >>> esp_results['charges'] # doctest: +ELLIPSIS
-    array([-0.3908...,  0.1954...,  0.1954...])
+    array([-0.3898...,  0.1949...,  0.1949...])
     >>> esp_results['loss'] # doctest: +ELLIPSIS
-    1.539...e-05
+    1.449...e-05
     >>> esp_results['RMSD'] # doctest: +ELLIPSIS
-    0.003923...
+    0.003807...
 
     >>> esp = ESP()
     >>> esp.molecule = mol
@@ -244,11 +244,11 @@ class ESP:
     >>> esp.restraint_factor = 0.001
     >>> esp_results = esp.run()
     >>> esp_results['charges'] # doctest: +ELLIPSIS
-    array([-0.3749...,  0.1874...,  0.1874...])
+    array([-0.3744...,  0.1872...,  0.1872...])
     >>> esp_results['loss'] # doctest: +ELLIPSIS
-    6.422...e-05
+    6.314...e-05
     >>> esp_results['RMSD'] # doctest: +ELLIPSIS
-    0.004168...
+    0.004051...
     """
     def __init__(self):
 
