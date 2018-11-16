@@ -21,6 +21,7 @@ from sklearn.linear_model import LinearRegression
 from htmd.numbautil import dihedralAngle
 from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmd.parameterization.parameterset import findDihedralType
+from htmd.parameterization.util import detectChiralCenters
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,23 @@ class DihedralFitting:
             # Remove failed QM results
             # TODO print removed QM jobs
             valid_results = [result for result in results if not result.errored]
+
+            # Remove results with wrong chiral centers
+            new_results = []
+            for result in valid_results:
+
+                # Convert QM result into Molecule
+                mol = self.molecule.copy()
+                mol.coords[:, :, 0] = result.coords
+
+                # Detect chiral centers
+                chiral_centers = detectChiralCenters(mol)
+                if self.molecule.chiral_centers == chiral_centers:
+                    new_results.append(result)
+                else:
+                    logger.warning('Rotamer is removed due to a change of chiral centers: '
+                                   '{} --> {}'.format(self.molecule.chiral_centers, chiral_centers))
+            valid_results = new_results
 
             # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
             # TODO print removed QM jobs
