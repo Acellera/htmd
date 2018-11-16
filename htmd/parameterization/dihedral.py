@@ -108,10 +108,10 @@ class DihedralFitting:
 
                 # Convert QM result into Molecule
                 mol = self.molecule.copy()
-                mol.coords[:, :, 0] = result.coords
+                mol.coords = result.coords
 
-                # Detect chiral centers
-                chiral_centers = detectChiralCenters(mol)
+                # Detect changes of chiral centers
+                chiral_centers = detectChiralCenters(mol)[0]
                 if self.molecule.chiral_centers == chiral_centers:
                     new_results.append(result)
                 else:

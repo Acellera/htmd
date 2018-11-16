@@ -423,9 +423,10 @@ def main_parameterize(arguments=None):
         if args.min_type != 'None': print('\n == Minimizing ==\n')
         mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
+        # Check if the chiral center hasn't changed during the minimization
         chiral_centers = detectChiralCenters(mol)[0]
         if mol.chiral_centers != chiral_centers:
-            raise RuntimeError('Chiral centers have changed after minization: '
+            raise RuntimeError('Chiral centers have changed during the minization: '
                                '{} --> {}'.format(mol.chiral_centers, chiral_centers))
 
         # Fit charges
