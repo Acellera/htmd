@@ -397,7 +397,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_min_mm_fake')
         resDir = os.path.join(self.testDir, 'glycol_min_mm_fake')
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type mm --scan-type None --fake-qm')
-        self._test(refDir, resDir)
+        self._test(refDir, resDir, dihedralForceConstAbsTol=1e-4)
 
     def test_water_full(self):
         refDir = os.path.join(self.dataDir, 'water_full')
