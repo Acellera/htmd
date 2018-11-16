@@ -202,7 +202,7 @@ def fitESPCharges(mol, qm, outdir, apply_bounds=True, restraint_factor=0, fixed=
     ...     new_mol, extra = fitESPCharges(mol, Psi4(), tmpDir)
     >>> assert new_mol is not mol
     >>> new_mol.charge # doctest: +ELLIPSIS
-    array([-0.3898...,  0.1949...,  0.1949...], dtype=float32)
+    array([-0.3908...,  0.1954...,  0.1954...], dtype=float32)
     """
 
     from htmd.qm.base import QMBase

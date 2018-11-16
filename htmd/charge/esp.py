@@ -69,11 +69,11 @@ class MoleculeGrid:
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol)
     >>> len(grid.getPoints())
-    4158
+    4592
     >>> grid.getPoints() # doctest: +NORMALIZE_WHITESPACE
-    array([[-1.2036197 ,  0.24013364, -0.02211065],
-           [ 1.01384586,  1.05265777,  1.92898618],
-           [-0.10072499,  1.90416201,  0.43233528],
+    array([[ 0.62043862,  2.06506096, -0.65822007],
+           [ 1.92876094,  1.68531462, -0.91805932],
+           [ 2.07125112,  0.63736808, -1.65750379],
            ...,
            [-0.77827968, -2.58209328,  1.06180501],
            [ 0.14494011, -0.39823904, -2.07498691],
@@ -83,11 +83,11 @@ class MoleculeGrid:
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol, shell_factors=(1, 2), density=50)
     >>> len(grid.getPoints())
-    4345
+    4764
     >>> grid.getPoints() # doctest: +NORMALIZE_WHITESPACE
-    array([[ 1.63974354,  1.22579616, -0.64424237],
-           [ 0.34472016,  0.77105343,  1.26543536],
-           [ 0.85159681, -0.45357728,  1.46317876],
+    array([[ 0.70522759,  1.49704354, -0.45864291],
+           [ 1.63974354,  1.22579616, -0.64424237],
+           [ 1.74152223,  0.47726292, -1.17241699],
            ...,
            [ 1.35323883, -3.08583052, -0.17044048],
            [-0.80667116,  0.64144373, -0.99312377],
@@ -136,8 +136,8 @@ class MoleculeGrid:
     def _filterPoints(self, points):
 
         # Compute distance threshold for each atom
-        thresholds = [radiusByElement(element) for element in self._molecule.element]
-        thresholds = min(self._shell_factors) * np.array(thresholds)
+        thresholds = np.array([radiusByElement(element) for element in self._molecule.element])
+        thresholds *= min(self._shell_factors) - 0.001
 
         # Detect the points further away for each atom than its threshold
         distances = cdist(points, self._molecule.coords[:, :, 0])
@@ -210,7 +210,7 @@ class ESP:
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol)
     >>> len(grid.getPoints())
-    4158
+    4592
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4
@@ -232,11 +232,11 @@ class ESP:
     >>> esp.qm_results = qm_results
     >>> esp_results = esp.run()
     >>> esp_results['charges'] # doctest: +ELLIPSIS
-    array([-0.3898...,  0.1949...,  0.1949...])
+    array([-0.3908...,  0.1954...,  0.1954...])
     >>> esp_results['loss'] # doctest: +ELLIPSIS
-    1.449...e-05
+    1.700...e-05
     >>> esp_results['RMSD'] # doctest: +ELLIPSIS
-    0.003807...
+    0.004123...
 
     >>> esp = ESP()
     >>> esp.molecule = mol
@@ -244,11 +244,11 @@ class ESP:
     >>> esp.restraint_factor = 0.001
     >>> esp_results = esp.run()
     >>> esp_results['charges'] # doctest: +ELLIPSIS
-    array([-0.3744...,  0.1872...,  0.1872...])
+    array([-0.3770...,  0.1885...,  0.1885...])
     >>> esp_results['loss'] # doctest: +ELLIPSIS
-    6.314...e-05
+    6.612...e-05
     >>> esp_results['RMSD'] # doctest: +ELLIPSIS
-    0.004051...
+    0.004329...
     """
     def __init__(self):
 
