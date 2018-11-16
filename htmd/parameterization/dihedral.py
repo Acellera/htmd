@@ -103,21 +103,22 @@ class DihedralFitting:
             valid_results = [result for result in results if not result.errored]
 
             # Remove results with wrong chiral centers
-            new_results = []
-            for result in valid_results:
+            if self.molecule:
+                new_results = []
+                for result in valid_results:
 
-                # Convert QM result into Molecule
-                mol = self.molecule.copy()
-                mol.coords = result.coords
+                    # Convert QM result into Molecule
+                    mol = self.molecule.copy()
+                    mol.coords = result.coords
 
-                # Detect changes of chiral centers
-                chiral_centers = detectChiralCenters(mol)[0]
-                if self.molecule.chiral_centers == chiral_centers:
-                    new_results.append(result)
-                else:
-                    logger.warning('Rotamer is removed due to a change of chiral centers: '
-                                   '{} --> {}'.format(self.molecule.chiral_centers, chiral_centers))
-            valid_results = new_results
+                    # Detect changes of chiral centers
+                    chiral_centers = detectChiralCenters(mol)[0]
+                    if self.molecule.chiral_centers == chiral_centers:
+                        new_results.append(result)
+                    else:
+                        logger.warning('Rotamer is removed due to a change of chiral centers: '
+                                       '{} --> {}'.format(self.molecule.chiral_centers, chiral_centers))
+                valid_results = new_results
 
             # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
             # TODO print removed QM jobs
