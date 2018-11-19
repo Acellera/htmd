@@ -455,8 +455,6 @@ def filterQMResults(all_results, mol=None, chiral_centers=None):
         QM results
     mol: Molecule
         A molecule corresponding to the QM results
-    chiral_centers: list of tuples
-        Chiral centers of the molecule
 
     Return:
     valid_results: List of list of QMResult
@@ -506,20 +504,21 @@ def filterQMResults(all_results, mol=None, chiral_centers=None):
                 valid_results.append(result)
 
         # Remove results with wrong chiral centers
-        if mol and chiral_centers:
+        if mol:
             if not isinstance(mol, Molecule):
                 raise TypeError('"mol" has to be instance of {}'.format(Molecule))
             mol = mol.copy()
+            intial_chiral_centers = detectChiralCenters(mol)
 
             new_results = []
             for result in valid_results:
                 mol.coords = result.coords
-                current_chiral_centers = detectChiralCenters(mol)
-                if current_chiral_centers == chiral_centers:
+                chiral_centers = detectChiralCenters(mol)
+                if intial_chiral_centers == chiral_centers:
                     new_results.append(result)
                 else:
                     logger.warning('Rotamer is removed due to a change of chiral centers: '
-                                   '{} --> {}'.format(chiral_centers, current_chiral_centers))
+                                   '{} --> {}'.format(intial_chiral_centers, chiral_centers))
             valid_results = new_results
 
         # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
