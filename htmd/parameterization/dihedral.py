@@ -112,7 +112,7 @@ class DihedralFitting:
                     mol.coords = result.coords
 
                     # Detect changes of chiral centers
-                    chiral_centers = detectChiralCenters(mol)[0]
+                    chiral_centers = detectChiralCenters(mol)
                     if self.molecule.chiral_centers == chiral_centers:
                         new_results.append(result)
                     else:

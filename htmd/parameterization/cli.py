@@ -108,7 +108,7 @@ def _prepare_molecule(args):
     # TODO: check bonds
 
     # Detect chiral centers
-    mol.chiral_centers = detectChiralCenters(mol)[0]
+    mol.chiral_centers = detectChiralCenters(mol)
     if len(mol.chiral_centers) > 0:
         logger.info('Chiral centers:')
         for atom_index, chiral_label in mol.chiral_centers:
@@ -424,7 +424,7 @@ def main_parameterize(arguments=None):
         mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
         # Check if the chiral center hasn't changed during the minimization
-        chiral_centers = detectChiralCenters(mol)[0]
+        chiral_centers = detectChiralCenters(mol)
         if mol.chiral_centers != chiral_centers:
             raise RuntimeError('Chiral centers have changed during the minization: '
                                '{} --> {}'.format(mol.chiral_centers, chiral_centers))
