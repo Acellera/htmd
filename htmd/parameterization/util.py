@@ -218,7 +218,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
         qm_results.append(qm.retrieve())
 
     # Filter QM results
-    qm_results = filterQMResults(qm_results, mol=mol, chiral_centers=mol.chiral_centers)
+    qm_results = filterQMResults(qm_results, mol=mol)
 
     # Fit the dihedral parameters
     df = DihedralFitting()
@@ -445,7 +445,7 @@ def detectChiralCenters(mol):
     return chiral_centers
 
 
-def filterQMResults(all_results, mol=None, chiral_centers=None):
+def filterQMResults(all_results, mol=None):
     """
     Filter QM results
 
@@ -456,7 +456,8 @@ def filterQMResults(all_results, mol=None, chiral_centers=None):
     mol: Molecule
         A molecule corresponding to the QM results
 
-    Return:
+    Return
+    ------
     valid_results: List of list of QMResult
         Valid QM results
 
