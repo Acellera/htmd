@@ -216,7 +216,8 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'h2o2_dihed_opt_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None')
-        self._test(refDir, resDir)
+        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1.1e-3,
+                   dihedralForceConstAbsTol=1e-5, dihedralPhaseAbsTol=1.1e-3)
 
     def test_h2o2_full_fake(self):
         refDir = os.path.join(self.dataDir, 'h2o2_full_fake')
@@ -259,8 +260,8 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'glycol_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None')
-        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1.1e-3,
-                   dihedralForceConstAbsTol=1e-5, dihedralPhaseAbsTol=0.3)
+        self._test(refDir, resDir, energyTermRelTol=3e-5, energyProfileAbsTol=1.1e-3,
+                   dihedralForceConstAbsTol=1e-4, dihedralPhaseAbsTol=0.6)
 
     def test_glycol_dihed_fix_restart_2(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_fix_restart')
@@ -268,8 +269,8 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         dihedrals = ['O1-C2-C3-O4', 'C2-C3-O4-H10']
         self._run(refDir, resDir, 'parameterize input.mol2 -d {} --charge-type Gasteiger --min-type None --scan-type None'.format(' '.join(dihedrals)))
-        self._test(refDir, resDir, energyTermRelTol=1e-5, energyProfileAbsTol=1.1e-3,
-                   dihedralForceConstAbsTol=1e-5, dihedralPhaseAbsTol=0.3)
+        self._test(refDir, resDir, energyTermRelTol=3e-5, energyProfileAbsTol=1.1e-3,
+                   dihedralForceConstAbsTol=1e-4, dihedralPhaseAbsTol=0.6)
 
     def test_glycol_dihed_select_1_restart(self):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_select_1_restart')
@@ -307,7 +308,13 @@ class TestParameterize(unittest.TestCase):
     def test_benzamidine_gasteiger(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_gasteiger')
         resDir = os.path.join(self.testDir, 'benzamidine_gasteiger')
-        self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --no-dihed')
+        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 --charge-type Gasteiger --min-type None --no-dihed')
+        self._test(refDir, resDir)
+
+    def test_benzamidine_am1_bcc(self):
+        refDir = os.path.join(self.dataDir, 'benzamidine_am1_bcc')
+        resDir = os.path.join(self.testDir, 'benzamidine_am1_bcc')
+        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 --charge-type AM1-BCC --min-type None --no-dihed')
         self._test(refDir, resDir)
 
     def test_benzamidine_gaff(self):
@@ -378,6 +385,12 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'h2o2_min_mm_dihed_opt_mm_fake')
         resDir = os.path.join(self.testDir, 'h2o2_min_mm_dihed_opt_mm_fake')
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type mm --scan-type mm --fake-qm')
+        self._test(refDir, resDir)
+
+    def test_water_full(self):
+        refDir = os.path.join(self.dataDir, 'water_full')
+        resDir = os.path.join(self.testDir, 'water_full')
+        self._run(refDir, resDir, 'parameterize input.mol2')
         self._test(refDir, resDir)
 
 

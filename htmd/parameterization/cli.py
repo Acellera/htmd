@@ -8,7 +8,6 @@ import sys
 import argparse
 import logging
 import numpy as np
-from copy import deepcopy
 
 from htmd.version import version
 from htmd.parameterization.fftype import fftypemethods
@@ -44,7 +43,7 @@ def getArgumentParser():
                         help='DDEPRECATED: use `--min-type` instead')
     parser.add_argument('--min-type', default='qm', dest='min_type', choices=['None', 'qm', 'mm'],
                         help='Type of initial structure optimization (default: %(default)s)')
-    parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'ESP'],
+    parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'AM1-BCC', 'ESP'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
@@ -248,7 +247,7 @@ VdW      : {VDW_ENERGY}
 
 def _fit_charges(mol, args, qm):
 
-    from htmd.charge import fitGasteigerCharges, fitESPCharges
+    from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges, symmetrizeCharges
     from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
 
     logger.info('=== Fitting atomic charges ===')
@@ -275,6 +274,14 @@ def _fit_charges(mol, args, qm):
         if args.charge != charge:
             raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
                 args.charge, charge))
+
+    elif args.charge_type == 'AM1-BCC':
+
+        if len(args.fix_charge) > 0:
+            logger.warning('Flag --fix-charge does not have effect!')
+
+        mol = fitChargesWithAntechamber(mol, type='bcc', molCharge=args.charge)
+        mol = symmetrizeCharges(mol)
 
     elif args.charge_type == 'ESP':
 
@@ -436,21 +443,26 @@ def main_parameterize(arguments=None):
         if args.fit_dihedral:
             print('\n == Fitting dihedral angle parameters ==\n')
 
-            # Set random number generator seed
-            if args.seed:
-                np.random.seed(args.seed)
+            if len(parameterizable_dihedrals) > 0:
 
-            # Invent new atom types for dihedral atoms
-            mol, originaltypes = inventAtomTypes(mol, selected_dihedrals)
-            parameters = recreateParameters(mol, originaltypes, parameters)
-            parameters = createMultitermDihedralTypes(parameters)
-            if args.fake_qm:
-                qm._parameters = parameters
+                # Set random number generator seed
+                if args.seed:
+                    np.random.seed(args.seed)
 
-            # Fit the parameters
-            parameters = fitDihedrals(mol, qm, method, parameters, param_dihedrals, selected_dihedrals,
-                                      args.outdir, dihed_opt_type=args.dihed_opt_type,
-                                      mm_minimizer=mm_minimizer)
+                # Invent new atom types for dihedral atoms
+                mol, originaltypes = inventAtomTypes(mol, parameterizable_dihedrals, equivalents)
+                parameters = recreateParameters(mol, originaltypes, parameters)
+                parameters = createMultitermDihedralTypes(parameters)
+                if isinstance(qm, FakeQM2):
+                    qm._parameters = parameters
+
+                # Fit the parameters
+                parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
+                                          args.outdir, dihed_opt_type=args.dihed_opt_type,
+                                          mm_minimizer=mm_minimizer)
+
+            else:
+                logger.info('No parameterizable dihedral angles detected!')
 
         # Output the FF parameters
         print('\n == Writing results ==\n')
