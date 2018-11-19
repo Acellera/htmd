@@ -237,6 +237,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
 
     return df.parameters
 
+
 def guessBondType(mol):
 
     """
@@ -312,6 +313,7 @@ def guessBondType(mol):
 
     return mol
 
+
 def makeAtomNamesUnique(mol):
     """
     Make atom names unique by appending/incrementing terminal digits.
@@ -383,6 +385,7 @@ def makeAtomNamesUnique(mol):
 
     return mol
 
+
 def detectChiralCenters(mol):
     """
     Detect chiral centers
@@ -437,6 +440,103 @@ def detectChiralCenters(mol):
     chiral_centers = FindMolChiralCenters(rdkit_mol, includeUnassigned=True)
 
     return chiral_centers
+
+
+def filterQMResults(all_results, mol=None, chiral_centers=None):
+    """
+    Filter QM results
+
+    Parameters
+    ----------
+    all_results: list of list of QMResult
+        QM results
+    mol: Molecule
+        A molecule corresponding to the QM results
+    chiral_centers: list of tuples
+        Chiral centers of the molecule
+
+    Return:
+    valid_results: List of list of QMResult
+        Valid QM results
+
+    Examples
+    --------
+    >>> from htmd.qm import QMResult
+
+    >>> results = [QMResult() for _ in range(20)]
+    >>> for result in results:
+    ...     result.energy = 0
+    >>> all_results = [results]
+
+    >>> valid_results  = filterQMResults(all_results)
+    >>> len(valid_results)
+    1
+    >>> len(valid_results[0])
+    20
+
+    >>> results[1].errored = True
+    >>> results[19].errored = True
+    >>> len(filterQMResults(all_results)[0])
+    18
+
+    >>> results[10].energy = -5
+    >>> results[12].energy = 12
+    >>> results[15].energy = 17
+    >>> len(filterQMResults(all_results)[0])
+    17
+    """
+
+    from htmd.qm import QMResult
+    from htmd.molecule.molecule import Molecule
+
+    all_valid_results = []
+    for results in all_results:
+
+        # Remove failed QM results
+        valid_results = []
+        for result in results:
+            if not isinstance(result, QMResult):
+                raise TypeError('"results" has to a list of list of {} instance'.format(QMResult))
+
+            if result.errored:
+                logger.warning('Rotamer is removed due to a failed QM calculations')
+            else:
+                valid_results.append(result)
+
+        # Remove results with wrong chiral centers
+        if mol and chiral_centers:
+            if not isinstance(mol, Molecule):
+                raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+            mol = mol.copy()
+
+            new_results = []
+            for result in valid_results:
+                mol.coords = result.coords
+                current_chiral_centers = detectChiralCenters(mol)
+                if current_chiral_centers == chiral_centers:
+                    new_results.append(result)
+                else:
+                    logger.warning('Rotamer is removed due to a change of chiral centers: '
+                                   '{} --> {}'.format(chiral_centers, current_chiral_centers))
+            valid_results = new_results
+
+        # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
+        if len(valid_results) > 0:
+            qm_min = np.min([result.energy for result in valid_results])
+
+            new_results = []
+            for result in valid_results:
+                if (result.energy - qm_min) < 20:  # kcal/mol
+                    new_results.append(result)
+            valid_results = new_results
+
+        if len(valid_results) < 13:
+            raise RuntimeError('Less than 13 valid QM results per dihedral. Not enough to fit!')
+
+        all_valid_results.append(valid_results)
+
+    return all_valid_results
+
 
 if __name__ == '__main__':
 
