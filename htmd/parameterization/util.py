@@ -217,6 +217,9 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
         qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
         qm_results.append(qm.retrieve())
 
+    # Filter QM results
+    qm_results = filterQMResults(qm_results, mol=mol, chiral_centers=mol.chiral_centers)
+
     # Fit the dihedral parameters
     df = DihedralFitting()
     df.parmedMode = True
@@ -462,7 +465,6 @@ def filterQMResults(all_results, mol=None, chiral_centers=None):
     Examples
     --------
     >>> from htmd.qm import QMResult
-
     >>> results = [QMResult() for _ in range(20)]
     >>> for result in results:
     ...     result.energy = 0
@@ -542,5 +544,8 @@ if __name__ == '__main__':
 
     import sys
     import doctest
+
+    # Pre-import QMResult to silence import messages in the doctests
+    from htmd.qm import QMResult
 
     sys.exit(doctest.testmod().failed)

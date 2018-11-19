@@ -21,7 +21,6 @@ from sklearn.linear_model import LinearRegression
 from htmd.numbautil import dihedralAngle
 from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmd.parameterization.parameterset import findDihedralType
-from htmd.parameterization.util import detectChiralCenters
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +65,6 @@ class DihedralFitting:
         self._names = None
         self._equivalent_dihedrals = None
 
-        self._valid_qm_results = None
         self._reference_energies = None
         self._coords = None
         self._angle_values = None
@@ -86,54 +84,6 @@ class DihedralFitting:
     def numDihedrals(self):
         """Number of dihedral angles"""
         return len(self.dihedrals)
-
-    def _getValidQMResults(self):
-        """
-        Get a set of valid QM results
-        """
-
-        all_valid_results = []
-        for results in self.qm_results:
-
-            # TODO: The test with fake QMResult does not work with this, because there is no molecule
-            # dihedral_atomnames = tuple(self.molecule.name[self.dihedrals[self.qm_results.index(results)]])
-
-            # Remove failed QM results
-            # TODO print removed QM jobs
-            valid_results = [result for result in results if not result.errored]
-
-            # Remove results with wrong chiral centers
-            if self.molecule:
-                new_results = []
-                for result in valid_results:
-
-                    # Convert QM result into Molecule
-                    mol = self.molecule.copy()
-                    mol.coords = result.coords
-
-                    # Detect changes of chiral centers
-                    chiral_centers = detectChiralCenters(mol)
-                    if self.molecule.chiral_centers == chiral_centers:
-                        new_results.append(result)
-                    else:
-                        logger.warning('Rotamer is removed due to a change of chiral centers: '
-                                       '{} --> {}'.format(self.molecule.chiral_centers, chiral_centers))
-                valid_results = new_results
-
-            # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
-            # TODO print removed QM jobs
-            if valid_results:
-                qm_min = np.min([result.energy for result in valid_results])
-                valid_results = [result for result in valid_results if (result.energy - qm_min) < 20]
-            else:
-                raise RuntimeError('No valid results.')
-
-            if len(valid_results) < 13:
-                raise RuntimeError('Fewer than 13 valid QM points. Not enough to fit.')
-
-            all_valid_results.append(valid_results)
-
-        return all_valid_results
 
     def _setup(self):
 
@@ -159,10 +109,9 @@ class DihedralFitting:
         self._dihedral_atomtypes = [findDihedralType(tuple(self.molecule.atomtype[dihedral]), self.parameters) for dihedral in self.dihedrals]
 
         # Get reference QM energies and rotamer coordinates
-        self._valid_qm_results = self._getValidQMResults()
         self._reference_energies = []
         self._coords = []
-        for results in self._valid_qm_results:
+        for results in self.qm_results:
             self._reference_energies.append(np.array([result.energy for result in results]))
             self._coords.append([result.coords for result in results])
 
@@ -525,24 +474,6 @@ class TestDihedralFitting(unittest.TestCase):
     def test_numDihedrals(self):
         self.df.dihedrals = [[0, 1, 2, 3]]
         self.assertEqual(self.df.numDihedrals, 1)
-
-    def test_getValidQMResults(self):
-        from htmd.qm import QMResult
-
-        results = [QMResult() for _ in range(20)]
-        for result in results:
-            result.energy = 0.
-        self.df.qm_results = [results]
-        self.assertEqual(len(self.df._getValidQMResults()[0]), 20)
-
-        results[1].errored = True
-        results[19].errored = True
-        self.assertEqual(len(self.df._getValidQMResults()[0]), 18)
-
-        results[10].energy = -5
-        results[12].energy = 12
-        results[15].energy = 17
-        self.assertEqual(len(self.df._getValidQMResults()[0]), 17)
 
     def test_getBounds(self):
 
