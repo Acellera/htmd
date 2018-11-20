@@ -399,9 +399,32 @@ def _select_dihedrals(mol, args):
     return selected_dihedrals
 
 
-def main_parameterize(arguments=None):
+def _get_initial_parameters(mol, args):
 
     from htmd.parameterization.fftype import fftype
+
+    logger.info('=== Atom type and initial parameter assignment ===')
+    logger.info('Method: {}'.format(args.forcefield))
+
+    # Get RTF and PRM file names
+    rtfFile, prmFile = args.rtf_prm if args.rtf_prm else None, None
+
+    # Assing atom types and initial force field parameters
+    _charge = mol.charge.copy()
+    parameters, mol = fftype(mol, method=args.forcefield, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+    assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
+
+    logger.info('Atom types:')
+    for name, type in zip(mol.name, mol.atomtype):
+        logger.info('   {:4s} : {}'.format(name, type))
+
+    # TODO write initial parameter to a file
+
+    return mol, parameters
+
+
+def main_parameterize(arguments=None):
+
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.util import minimize, fitDihedrals, _qm_method_name, detectChiralCenters
     from htmd.parameterization.writers import writeParameters
@@ -443,16 +466,11 @@ def main_parameterize(arguments=None):
     # Get a reference calculator
     qm = _get_reference_calculator(args)
 
-    logger.info('=== Atom type and initial parameter assignment')
-    logger.info('Method: {}'.format(args.forcefield))
+    # Assign atom types and initial force field parameters
+    mol, parameters = _get_initial_parameters(mol, args)
 
-    # Get RTF and PRM file names
-    rtfFile, prmFile = args.rtf_prm if args.rtf_prm else None, None
-
-    _charge = mol.charge.copy()
-    parameters, mol = fftype(mol, method=args.forcefield, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
-    assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
-
+    # Get a MM calculator
+    # TODO refactor
     mm_minimizer = None
     if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
         from htmd.qm.custom import OMMMinimizer
