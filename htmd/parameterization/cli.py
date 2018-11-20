@@ -503,35 +503,48 @@ def main_parameterize(arguments=None):
         # Check if the chiral center hasn't changed during the minimization
         chiral_centers = detectChiralCenters(mol)
         if initial_chiral_centers != chiral_centers:
-            raise RuntimeError('Chiral centers have changed during the minization: '
+            raise RuntimeError('Chiral centers have changed during the minimization: '
                                '{} --> {}'.format(initial_chiral_centers, chiral_centers))
 
     # Fit charges
     mol = _fit_charges(mol, args, qm)
 
-    # Fit dihedral angle parameters
-    if args.fit_dihedral:
-        print('\n == Fitting dihedral angle parameters ==\n')
+    # Scan dihedrals and fit parameters
+    # TODO refactor
+    if len(selected_dihedrals) > 0:
 
-        if len(selected_dihedrals) > 0:
+        logger.info('=== Dihedral angle scanning and parameter fitting ===')
 
-            # Set random number generator seed
-            if args.seed:
-                np.random.seed(args.seed)
-
-            # Invent new atom types for dihedral atoms
-            mol, originaltypes = inventAtomTypes(mol, selected_dihedrals)
-            parameters = recreateParameters(mol, originaltypes, parameters)
-            parameters = createMultitermDihedralTypes(parameters)
-            if args.fake_qm:
-                qm._parameters = parameters
-
-            # Fit the parameters
-            parameters = fitDihedrals(mol, qm, args.forcefield, parameters, selected_dihedrals, args.outdir,
-                                      dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
-
+        if args.dihed_opt_type == 'None':
+            logger.info('Dihedral scanning: static')
+        elif args.dihed_opt_type == 'mm':
+            logger.info('Dihedral scanning: mimimized with MM (using the initial force field parameters)')
+        elif args.dihed_opt_type == 'qm':
+            logger.info('Dihedral scanning: mimimized with the reference method')
         else:
-            logger.info('No parameterizable dihedral angles detected!')
+            raise ValueError()
+
+        # Invent new atom types for dihedral atoms
+        mol, initial_types = inventAtomTypes(mol, selected_dihedrals)
+        parameters = recreateParameters(mol, initial_types, parameters)
+        parameters = createMultitermDihedralTypes(parameters)
+        logger.info('Assign atom with new atom types:')
+        for name, new_type, old_type in zip(mol.name, mol.atomtype, initial_types):
+            if new_type != old_type:
+                logger.info('   {:4s} : {:6s} --> {:6s}'.format(name, old_type, new_type))
+
+        # Set parameters for the fake QM
+        if args.fake_qm:
+            qm._parameters = parameters
+
+        # Set random number generator seed
+        if args.seed:
+            np.random.seed(args.seed)
+
+        # Fit the parameters
+        # TODO separate scanning and fitting
+        parameters = fitDihedrals(mol, qm, args.forcefield, parameters, selected_dihedrals, args.outdir,
+                                  dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
 
     # Output the FF parameters
     print('\n == Writing results ==\n')
