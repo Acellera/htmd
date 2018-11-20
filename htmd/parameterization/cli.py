@@ -443,21 +443,21 @@ def main_parameterize(arguments=None):
         if args.fit_dihedral:
             print('\n == Fitting dihedral angle parameters ==\n')
 
-            if len(parameterizable_dihedrals) > 0:
+            if len(selected_dihedrals) > 0:
 
                 # Set random number generator seed
                 if args.seed:
                     np.random.seed(args.seed)
 
                 # Invent new atom types for dihedral atoms
-                mol, originaltypes = inventAtomTypes(mol, parameterizable_dihedrals, equivalents)
+                mol, originaltypes = inventAtomTypes(mol, selected_dihedrals)
                 parameters = recreateParameters(mol, originaltypes, parameters)
                 parameters = createMultitermDihedralTypes(parameters)
-                if isinstance(qm, FakeQM2):
+                if args.fake_qm:
                     qm._parameters = parameters
 
                 # Fit the parameters
-                parameters = fitDihedrals(mol, qm, method, parameters, all_dihedrals, parameterizable_dihedrals,
+                parameters = fitDihedrals(mol, qm, method, parameters, param_dihedrals, selected_dihedrals,
                                           args.outdir, dihed_opt_type=args.dihed_opt_type,
                                           mm_minimizer=mm_minimizer)
 
