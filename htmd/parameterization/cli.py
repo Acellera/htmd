@@ -74,10 +74,11 @@ def getArgumentParser():
 
     return parser
 
+
 def _prepare_molecule(args):
 
     from htmd.molecule.molecule import Molecule
-    from htmd.parameterization.util import makeAtomNamesUnique, guessElements
+    from htmd.parameterization.util import makeAtomNamesUnique, guessElements, detectChiralCenters
 
     logger.info('=== Molecule ===')
 
@@ -140,7 +141,15 @@ def _prepare_molecule(args):
     mol.segid[:] = 'L' # Note: it is need to write complete PDB files
     logger.info('Sgment ID: {}'.format(mol.segid[0]))
 
+    # Detect chiral centers
+    chiral_centers = detectChiralCenters(mol)
+    if len(chiral_centers) > 0:
+        logger.info('Chiral centers:')
+        for atom_index, chiral_label in chiral_centers:
+            logger.info(' {:4} {}'.format(mol.name[atom_index], chiral_label))
+
     return mol
+
 
 def _get_reference_calculator(args):
 
@@ -405,7 +414,7 @@ def main_parameterize(arguments=None):
     qm = _get_reference_calculator(args)
 
     from htmd.parameterization.fftype import fftype
-    from htmd.parameterization.util import minimize, fitDihedrals, _qm_method_name
+    from htmd.parameterization.util import minimize, fitDihedrals, _qm_method_name, detectChiralCenters
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.writers import writeParameters
 
@@ -433,8 +442,20 @@ def main_parameterize(arguments=None):
         orig_coor = mol.coords.copy()
 
         # Minimize molecule
-        if args.min_type != 'None': print('\n == Minimizing ==\n')
-        mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
+        if args.min_type != 'None':
+            print('\n == Minimizing ==\n')
+
+            # Detect chiral centers
+            intial_chiral_centers = detectChiralCenters(mol)
+
+            # Minimize molecule
+            mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
+
+            # Check if the chiral center hasn't changed during the minimization
+            chiral_centers = detectChiralCenters(mol)
+            if intial_chiral_centers != chiral_centers:
+                raise RuntimeError('Chiral centers have changed during the minization: '
+                                   '{} --> {}'.format(intial_chiral_centers, chiral_centers))
 
         # Fit charges
         mol = _fit_charges(mol, args, qm)
