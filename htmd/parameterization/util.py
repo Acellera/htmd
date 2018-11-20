@@ -109,7 +109,9 @@ def getFixedChargeAtomIndices(mol, fix_charge):
 
 
 def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
+
     assert mol.numFrames == 1
+    mol = mol.copy()
 
     if min_type == 'qm':
         mindir = os.path.join(outdir, "minimize", _qm_method_name(qm))
@@ -124,11 +126,10 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
         if results[0].errored:
             raise RuntimeError('\nQM minimization failed! Check logs at %s\n' % mindir)
 
-        mol = mol.copy()
+
         # Replace coordinates with the minimized set
         mol.coords = np.atleast_3d(np.array(results[0].coords, dtype=np.float32))
     elif min_type == 'mm':
-        mol = mol.copy()
         mol.coords[:, :, 0] = mm_minimizer.minimize(mol.coords)
     elif min_type == 'None':
         pass

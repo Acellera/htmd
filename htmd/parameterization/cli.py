@@ -476,24 +476,35 @@ def main_parameterize(arguments=None):
         from htmd.qm.custom import OMMMinimizer
         mm_minimizer = OMMMinimizer(mol, parameters)
 
-    if args.fake_qm:
-        qm._parameters = parameters
-
-    # Minimize molecule
+    # Geometry minimization
+    # TODO refactor
     if args.min_type != 'None':
-        print('\n == Minimizing ==\n')
+        logger.info(' === Geometry minimization ===')
+
+        if args.min_type == 'mm':
+            logger.info('Model: MM with the initial force field parameters')
+        elif args.min_type == 'qm':
+            logger.info('Model: reference method')
+        else:
+            raise ValueError()
+
+        # Set parameters for the fake QM
+        if args.fake_qm:
+            qm._parameters = parameters
 
         # Detect chiral centers
-        intial_chiral_centers = detectChiralCenters(mol)
+        initial_chiral_centers = detectChiralCenters(mol)
 
         # Minimize molecule
         mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
+        # TODO print minimization status
+
         # Check if the chiral center hasn't changed during the minimization
         chiral_centers = detectChiralCenters(mol)
-        if intial_chiral_centers != chiral_centers:
+        if initial_chiral_centers != chiral_centers:
             raise RuntimeError('Chiral centers have changed during the minization: '
-                               '{} --> {}'.format(intial_chiral_centers, chiral_centers))
+                               '{} --> {}'.format(initial_chiral_centers, chiral_centers))
 
     # Fit charges
     mol = _fit_charges(mol, args, qm)
