@@ -82,6 +82,10 @@ def _prepare_molecule(args):
 
     logger.info('=== Molecule ===')
 
+    # Check if the molecule faile exist
+    if not os.path.exists(args.filename):
+        raise ValueError('File {} cannot be found'.format(args.filename))
+
     # Check the file extension
     if os.path.splitext(args.filename)[1] != '.mol2':
         raise RuntimeError('{} has to be in MOL2 format'.format(args.filename))
@@ -336,30 +340,83 @@ def _fit_charges(mol, args, qm):
     return mol
 
 
+def _select_dihedrals(mol, args):
+
+    from htmd.parameterization.detect import detectParameterizableDihedrals
+
+    logger.info('=== Dihedral angles ===')
+
+    # Detect parameterizable dihedral angles
+    parameterizable_dihedrals = detectParameterizableDihedrals(mol)
+    logger.info('Parameterizable dihedral angles (and their equivalents):')
+    for i, equivalent_dihedrals in enumerate(parameterizable_dihedrals):
+        names = ['-'.join(mol.name[list(dihedral)]) for dihedral in equivalent_dihedrals]
+        line = '    {:2d}: {}'.format(i+1, names[0])
+        if names[1:]:
+            line += ' ({})'.format(', '.join(names[1:]))
+        logger.info(line)
+
+    # Print parameterize dihedral list to a file and exit
+    # TODO factor this out
+    if args.list:
+        dihedral_file = 'torsions.txt'
+        with open(dihedral_file, 'w') as file:
+            for dihedrals in parameterizable_dihedrals:
+                name = '-'.join(mol.name[list(dihedrals[0])])
+                file.write('{}\n'.format(name))
+            logger.info('Write the list of the parameterizable dihedral angles to {}'.format(dihedral_file))
+        sys.exit()
+
+    # Select dihedrals to parameterize
+    selected_dihedrals = []
+    if args.fit_dihedral:
+        if args.dihedral:
+            name2dihedral = {'-'.join(mol.name[list(dihedrals[0])]): dihedrals[0] for dihedrals in parameterizable_dihedrals}
+            for dihedral_name in args.dihedral:
+                if dihedral_name not in name2dihedral.keys():
+                    raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
+                selected_dihedrals.append(list(name2dihedral[dihedral_name]))
+        else:
+            # By default parameterize all the dihedrals
+            selected_dihedrals = [list(dihedrals[0]) for dihedrals in parameterizable_dihedrals]
+
+    if len(selected_dihedrals) > 0:
+        logger.info('Selected dihedral angles:')
+        for i, dihedral in enumerate(selected_dihedrals):
+            name = '-'.join(mol.name[list(dihedral)])
+            logger.info('   {:2d}: {}'.format(i+1, name))
+    else:
+        logger.info('No dihedral angles selected')
+
+    return selected_dihedrals
+
+
 def main_parameterize(arguments=None):
+
+    logger.info('===== Parameterize =====')
 
     # Parse arguments
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
+
+    # Configure loggers
     if args.debug:
         logger.setLevel(logging.DEBUG)
         logger.debug(sys.argv[1:])
 
+    # Deprecation warnings
+    # TODO remove at some point of time
     if args.minimize is not parser.get_default('minimize'):
         raise DeprecationWarning('Use `--min-type` instead.')
     if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
         raise DeprecationWarning('Use `--scan-type` instead.')
 
     # Print arguments
-    logger.info('===== Parameterize =====')
-    logger.info('Arguments:')
+    logger.info('=== Arguments ===')
     for key, value in vars(args).items():
-        if key in ('fake_qm',):
+        if key in ('fake_qm',):  # Hidden
             continue
         logger.info('{:>20s}: {:s}'.format(key, str(value)))        
-
-    if not os.path.exists(args.filename):
-        raise ValueError('File %s cannot be found' % args.filename)
 
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
@@ -373,42 +430,8 @@ def main_parameterize(arguments=None):
         for atom_group in atom_groups:
             logger.info('    {}'.format(', '.join(mol.name[list(atom_group)])))
 
-    # Detect parameterizable dihedral angles
-    if args.fit_dihedral or args.list:
-        from htmd.parameterization.detect import detectParameterizableDihedrals
-
-        param_dihedrals = detectParameterizableDihedrals(mol)
-
-        logger.info('Parameterizable dihedral angles (and their equivalents):')
-        for dihedrals in param_dihedrals:
-            names = ['-'.join(mol.name[list(dihedral)]) for dihedral in dihedrals]
-            line = '    {}'.format(names[0])
-            if names[1:]:
-                line += ' ({})'.format(', '.join(names[1:]))
-            logger.info(line)
-
-    # Print parameterize dihedral list to a file
-    if args.list:
-        dihedral_file = 'torsions.txt'
-        with open(dihedral_file, 'w') as fh:
-            for dihedrals in param_dihedrals:
-                name = '-'.join(mol.name[list(dihedrals[0])])
-                fh.write('{}\n'.format(name))
-            logger.info('Parameterizable dihedral angle list written to {}'.format(dihedral_file))
-        sys.exit(0)
-
-    # Select dihedrals to parameterize
-    if args.fit_dihedral:
-        if args.dihedral:
-            selected_dihedrals = []
-            name2dihedral = {'-'.join(mol.name[list(dihedrals[0])]): dihedrals[0] for dihedrals in param_dihedrals}
-            for dihedral_name in args.dihedral:
-                if dihedral_name not in name2dihedral.keys():
-                    raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
-                selected_dihedrals.append(list(name2dihedral[dihedral_name]))
-        else:
-            # By default parameterize all the dihedrals
-            selected_dihedrals = [list(dihedrals[0]) for dihedrals in param_dihedrals]
+    # Select dihedral angles to parameterize
+    selected_dihedrals = _select_dihedrals(mol, args)
 
     # Get a reference calculator
     qm = _get_reference_calculator(args)
@@ -478,9 +501,8 @@ def main_parameterize(arguments=None):
                     qm._parameters = parameters
 
                 # Fit the parameters
-                parameters = fitDihedrals(mol, qm, method, parameters, param_dihedrals, selected_dihedrals,
-                                          args.outdir, dihed_opt_type=args.dihed_opt_type,
-                                          mm_minimizer=mm_minimizer)
+                parameters = fitDihedrals(mol, qm, method, parameters, selected_dihedrals, args.outdir,
+                                          dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
 
             else:
                 logger.info('No parameterizable dihedral angles detected!')

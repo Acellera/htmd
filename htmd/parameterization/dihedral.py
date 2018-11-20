@@ -21,6 +21,7 @@ from sklearn.linear_model import LinearRegression
 from htmd.numbautil import dihedralAngle
 from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmd.parameterization.parameterset import findDihedralType
+from htmd.parameterization.detect import detectParameterizableDihedrals
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,6 @@ class DihedralFitting:
         self._actual_energies = None
         self._fitted_energies = None
 
-        self._parameterizable_dihedrals = None
         self._dihedral_atomtypes = None
 
         self._plot_directory = None
@@ -97,7 +97,7 @@ class DihedralFitting:
         self._equivalent_dihedrals = []
         for idihed, dihedral in enumerate(self.dihedrals):
             found = False
-            for parameterizableDihedral in self._parameterizable_dihedrals:
+            for parameterizableDihedral in detectParameterizableDihedrals(self.molecule):
                 if np.all(list(parameterizableDihedral[0]) == dihedral):
                     self._equivalent_dihedrals.append(parameterizableDihedral)
                     found = True

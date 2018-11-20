@@ -138,7 +138,7 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
     return mol
 
 
-def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None):
+def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None):
     """
     Dihedrals passed as 4 atom indices
     """
@@ -206,7 +206,6 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
     df = DihedralFitting()
     df.parmedMode = True
     df.parameters = prm
-    df._parameterizable_dihedrals = all_dihedrals
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
