@@ -231,33 +231,6 @@ def _get_reference_calculator(args):
     return qm
 
 
-def printEnergies(molecule, parameters, filename):
-    from htmd.ffevaluation.ffevaluate import FFEvaluate
-    assert molecule.numFrames == 1
-    energies = FFEvaluate(molecule, parameters).calculateEnergies(molecule.coords[:, :, 0])
-
-    string = '''
-== Diagnostic Energies ==
-
-Bond     : {BOND_ENERGY}
-Angle    : {ANGLE_ENERGY}
-Dihedral : {DIHEDRAL_ENERGY}
-Improper : {IMPROPER_ENERGY}
-Electro  : {ELEC_ENERGY}
-VdW      : {VDW_ENERGY}
-
-'''.format(BOND_ENERGY=energies['bond'],
-           ANGLE_ENERGY=energies['angle'],
-           DIHEDRAL_ENERGY=energies['dihedral'],
-           IMPROPER_ENERGY=energies['improper'],
-           ELEC_ENERGY=energies['elec'],
-           VDW_ENERGY=energies['vdw'])
-
-    sys.stdout.write(string)
-    with open(filename, 'w') as file_:
-        file_.write(string)
-
-
 def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges, symmetrizeCharges
@@ -423,11 +396,60 @@ def _get_initial_parameters(mol, args):
     return mol, parameters
 
 
+def _printEnergies(molecule, parameters, filename):
+
+    from htmd.ffevaluation.ffevaluate import FFEvaluate
+
+    energies = FFEvaluate(molecule, parameters).calculateEnergies(molecule.coords[:, :, 0])
+
+    string = '''
+== Diagnostic Energies ==
+
+Bond     : {BOND_ENERGY}
+Angle    : {ANGLE_ENERGY}
+Dihedral : {DIHEDRAL_ENERGY}
+Improper : {IMPROPER_ENERGY}
+Electro  : {ELEC_ENERGY}
+VdW      : {VDW_ENERGY}
+
+'''.format(BOND_ENERGY=energies['bond'],
+           ANGLE_ENERGY=energies['angle'],
+           DIHEDRAL_ENERGY=energies['dihedral'],
+           IMPROPER_ENERGY=energies['improper'],
+           ELEC_ENERGY=energies['elec'],
+           VDW_ENERGY=energies['vdw'])
+
+    with open(filename, 'w') as file_:
+        file_.write(string)
+    logger.info('Write energy file: {}'.format(filename))
+
+    logger.info('Diagnostic energies:')
+    for name in ('bond', 'angle', 'dihedral', 'improper', 'elec', 'vdw'):
+        logger.info('   {:8s} : {:10.3f} kcal/mol'.format(name, energies[name]))
+
+
+def _output_results(mol, parameters, original_coords, qm, args):
+
+    from htmd.parameterization.util import _qm_method_name
+    from htmd.parameterization.writers import writeParameters
+
+    logger.info('=== Results ===')
+
+    # Output the FF parameters and other files
+    # TODO get rid of QM
+    paramoutdir = os.path.join(args.outdir, 'parameters', args.forcefield, _qm_method_name(qm))
+    # TODO split into separate writer
+    writeParameters(paramoutdir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
+
+    # Write energy file
+    energyFile = os.path.join(paramoutdir, 'energies.txt')
+    _printEnergies(mol, parameters, energyFile)
+
+
 def main_parameterize(arguments=None):
 
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.util import minimize, fitDihedrals, _qm_method_name, detectChiralCenters
-    from htmd.parameterization.writers import writeParameters
 
     logger.info('===== Parameterize =====')
 
@@ -546,15 +568,7 @@ def main_parameterize(arguments=None):
         parameters = fitDihedrals(mol, qm, args.forcefield, parameters, selected_dihedrals, args.outdir,
                                   dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
 
-    # Output the FF parameters
-    print('\n == Writing results ==\n')
-    paramoutdir = os.path.join(args.outdir, 'parameters', args.forcefield, _qm_method_name(qm))
-    writeParameters(paramoutdir, mol, parameters, args.forcefield, args.charge, original_coords=orig_coor)
-
-    # Write energy file
-    energyFile = os.path.join(paramoutdir, 'energies.txt')
-    printEnergies(mol, parameters, energyFile)
-    logger.info('Write energy file: %s' % energyFile)
+    _output_results(mol, parameters, orig_coor, qm, args)
 
 
 if __name__ == "__main__":
