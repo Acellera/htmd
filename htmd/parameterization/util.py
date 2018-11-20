@@ -490,46 +490,48 @@ def filterQMResults(all_results, mol=None):
     from htmd.qm import QMResult
     from htmd.molecule.molecule import Molecule
 
+    if mol:
+        if not isinstance(mol, Molecule):
+             raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+        initial_chiral_centers = detectChiralCenters(mol)
+        mol = mol.copy()
+
     all_valid_results = []
     for results in all_results:
 
-        # Remove failed QM results
         valid_results = []
         for result in results:
+
+            # Remove failed calculations
             if not isinstance(result, QMResult):
                 raise TypeError('"results" has to a list of list of {} instance'.format(QMResult))
-
             if result.errored:
                 logger.warning('Rotamer is removed due to a failed QM calculations')
-            else:
-                valid_results.append(result)
+                continue
 
-        # Remove results with wrong chiral centers
-        if mol:
-            if not isinstance(mol, Molecule):
-                raise TypeError('"mol" has to be instance of {}'.format(Molecule))
-            mol = mol.copy()
-            intial_chiral_centers = detectChiralCenters(mol)
-
-            new_results = []
-            for result in valid_results:
+            # Remove results with wrong chiral centers
+            if mol:
                 mol.coords = result.coords
                 chiral_centers = detectChiralCenters(mol)
-                if intial_chiral_centers == chiral_centers:
-                    new_results.append(result)
-                else:
+                if initial_chiral_centers != chiral_centers:
                     logger.warning('Rotamer is removed due to a change of chiral centers: '
-                                   '{} --> {}'.format(intial_chiral_centers, chiral_centers))
-            valid_results = new_results
+                                   '{} --> {}'.format(initial_chiral_centers, chiral_centers))
+                    continue
 
-        # Remove QM results with too high QM energies (>20 kcal/mol above the minimum)
+            valid_results.append(result)
+
+        # Remove results with too high energies (>20 kcal/mol above the minimum)
         if len(valid_results) > 0:
-            qm_min = np.min([result.energy for result in valid_results])
+            minimum_energy = np.min([result.energy for result in valid_results])
 
             new_results = []
             for result in valid_results:
-                if (result.energy - qm_min) < 20:  # kcal/mol
+                relative_energy = result.energy - minimum_energy
+                if relative_energy < 20:  # kcal/mol
                     new_results.append(result)
+                else:
+                    logger.warning('Rotamer is removed due to high energy: '
+                                   '{} kcal/mol above minimum'.format(relative_energy))
             valid_results = new_results
 
         if len(valid_results) < 13:
