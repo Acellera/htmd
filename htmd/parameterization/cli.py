@@ -262,8 +262,10 @@ def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges, symmetrizeCharges
     from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
+    from htmd.parameterization.detect import detectEquivalentAtoms
 
-    logger.info('=== Fitting atomic charges ===')
+    logger.info('=== Atomic charge fitting ===')
+    logger.info('Method: {}'.format(args.charge_type))
 
     if args.charge_type == 'None':
 
@@ -298,9 +300,11 @@ def _fit_charges(mol, args, qm):
 
     elif args.charge_type == 'ESP':
 
-        # Set random number generator seed
-        if args.seed:
-            np.random.seed(args.seed)
+        # Detect equivalent atom groups
+        logger.info('Equivalent atom groups:')
+        atom_groups = [group for group in detectEquivalentAtoms(mol)[0] if len(group) > 1]
+        for atom_group in atom_groups:
+            logger.info('    {}'.format(', '.join(mol.name[list(atom_group)])))
 
         # Select the atoms with fixed charges
         fixed_atom_indices = getFixedChargeAtomIndices(mol, args.fix_charge)
@@ -311,30 +315,34 @@ def _fit_charges(mol, args, qm):
 
         charge = int(round(np.sum(mol.charge)))
         if args.charge != charge:
-            logger.warning('Molecular charge is set to {}, but atomic charges of passed molecule add up to {}. '.format(
-                args.charge, charge))
+            logger.warning('Molecular charge is set to {}, but atomic charges add up to {}'
+                           ''.format(args.charge, charge))
             if len(args.fix_charge) > 0:
                 raise RuntimeError('Flag --fix-charge cannot be used when atomic charges are inconsistent with passed '
                                    'molecular charge {}'.format(args.charge))
             mol.charge[:] = args.charge/mol.numAtoms
 
+        # Set random number generator seed
+        if args.seed:
+            np.random.seed(args.seed)
+
         # Fit ESP charges
         mol, extra = fitESPCharges(mol, qm, espDir, fixed=fixed_atom_indices)
-        logger.info('QM dipole: %f %f %f; %f' % tuple(extra['qm_dipole']))
+
+        # Print QM dipole
+        logger.info('QM dipole: {:6.3f} {:6.3f} {:6.3f}; total: {:6.3f}'.format(*extra['qm_dipole']))
 
     else:
         raise ValueError()
 
+    # Print MM dipole
     mm_dipole = getDipole(mol)
-    if np.all(np.isfinite(mm_dipole)):
-        logger.info('MM dipole: %f %f %f; %f' % tuple(mm_dipole))
-    else:  # TODO fix
-        logger.warning('MM dipole cannot be computed. Check if elements are detected correctly.')
+    logger.info('MM dipole: {:6.3f} {:6.3f} {:6.3f}; total: {:6.3f}'.format(*mm_dipole))
 
     # Print the new charges
     logger.info('Atomic charges:')
     for name, charge in zip(mol.name, mol.charge):
-        logger.info('    {}: {:6.3f}'.format(name, charge))
+        logger.info('   {:4s}: {:6.3f}'.format(name, charge))
     logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
 
     return mol
@@ -420,15 +428,6 @@ def main_parameterize(arguments=None):
 
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
-
-    # Detect equivalent atom groups
-    if args.charge_type == 'ESP':
-        from htmd.parameterization.detect import detectEquivalentAtoms
-
-        logger.info('Equivalent atom groups:')
-        atom_groups = [group for group in detectEquivalentAtoms(mol)[0] if len(group) > 1]
-        for atom_group in atom_groups:
-            logger.info('    {}'.format(', '.join(mol.name[list(atom_group)])))
 
     # Select dihedral angles to parameterize
     selected_dihedrals = _select_dihedrals(mol, args)
