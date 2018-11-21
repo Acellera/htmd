@@ -365,7 +365,7 @@ def _select_dihedrals(mol, args):
         logger.info('Selected dihedral angles:')
         for i, dihedral in enumerate(selected_dihedrals):
             name = '-'.join(mol.name[list(dihedral)])
-            logger.info('   {:2d}: {}'.format(i+1, name))
+            logger.info('    {:2d}: {}'.format(i+1, name))
     else:
         logger.info('No dihedral angles selected')
 
@@ -547,12 +547,13 @@ def main_parameterize(arguments=None):
             raise ValueError()
 
         # Invent new atom types for dihedral atoms
+        old_types = mol.atomtype
         mol, initial_types = inventAtomTypes(mol, selected_dihedrals)
         parameters = recreateParameters(mol, initial_types, parameters)
         parameters = createMultitermDihedralTypes(parameters)
         logger.info('Assign atom with new atom types:')
-        for name, new_type, old_type in zip(mol.name, mol.atomtype, initial_types):
-            if new_type != old_type:
+        for name, old_type, new_type in zip(mol.name, old_types, mol.atomtype):
+            if old_type != new_type:
                 logger.info('   {:4s} : {:6s} --> {:6s}'.format(name, old_type, new_type))
 
         # Set parameters for the fake QM
