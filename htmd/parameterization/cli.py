@@ -51,6 +51,8 @@ def getArgumentParser():
                         help='DEPRECATED: use `--scan-type` instead')
     parser.add_argument('--scan-type', default='qm', dest='dihed_opt_type', choices=['None', 'qm', 'mm'],
                         help='Type of structure optimization when scanning dihedral angles (default: %(default)s)')
+    parser.add_argument('--dihed-num-searches', default=None, type=int,
+                        help='Number of random search during the dihedral parameter fitting')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
@@ -567,7 +569,8 @@ def main_parameterize(arguments=None):
         # Fit the parameters
         # TODO separate scanning and fitting
         parameters = fitDihedrals(mol, qm, args.forcefield, parameters, selected_dihedrals, args.outdir,
-                                  dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
+                                  dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer,
+                                  num_searches=args.dihed_num_searches)
 
     # Output the parameters and other results
     _output_results(mol, parameters, orig_coor, qm, args)
