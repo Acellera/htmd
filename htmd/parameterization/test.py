@@ -204,6 +204,14 @@ class TestParameterize(unittest.TestCase):
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None')
         self._test(refDir, resDir)
 
+    def test_h2o2_zero_searches_restart(self):
+        refDir = os.path.join(self.dataDir, 'h2o2_zero_searches_restart')
+        resDir = os.path.join(self.testDir, 'h2o2_zero_searches_restart')
+        shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
+        self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None '
+                                  '--scan-type None --dihed-num-searches 0')
+        self._test(refDir, resDir)
+
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_opt(self):
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt')
