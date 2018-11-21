@@ -140,12 +140,12 @@ def _prepare_molecule(args):
 
     # Check residue names
     if not np.all(mol.resname == mol.resname[0]):
-        raise RuntimeError('Molecule has to have the same residue name')
+        raise RuntimeError('All atoms of the molecule need to have the same residue name')
     logger.info('Residue name: {}'.format(mol.resname[0]))
 
     # Set segment ID
     mol.segid[:] = 'L' # Note: it is need to write complete PDB files
-    logger.info('Sgment ID: {}'.format(mol.segid[0]))
+    logger.info('Segment ID: {}'.format(mol.segid[0]))
 
     # Detect chiral centers
     chiral_centers = detectChiralCenters(mol)
