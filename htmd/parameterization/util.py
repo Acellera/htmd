@@ -13,24 +13,6 @@ from tempfile import TemporaryDirectory
 logger = logging.getLogger(__name__)
 
 
-def getEquivalentsAndDihedrals(mol):
-
-    from htmd.molecule.util import guessAnglesAndDihedrals
-    from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
-
-    mol = mol.copy()
-
-    # Guess bonds
-    if len(mol.bonds) == 0:
-        logger.warning('No bonds found! Guessing them...')
-        mol.bonds = mol._guessBonds()
-
-    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
-    equivalents = detectEquivalentAtoms(mol)
-    all_dihedrals = detectParameterizableDihedrals(mol)
-    return mol, equivalents, all_dihedrals
-
-
 def guessElements(mol, fftypemethod):
     """
     Guess element from an atom name
@@ -127,7 +109,9 @@ def getFixedChargeAtomIndices(mol, fix_charge):
 
 
 def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
+
     assert mol.numFrames == 1
+    mol = mol.copy()
 
     if min_type == 'qm':
         mindir = os.path.join(outdir, "minimize", _qm_method_name(qm))
@@ -142,11 +126,10 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
         if results[0].errored:
             raise RuntimeError('\nQM minimization failed! Check logs at %s\n' % mindir)
 
-        mol = mol.copy()
+
         # Replace coordinates with the minimized set
         mol.coords = np.atleast_3d(np.array(results[0].coords, dtype=np.float32))
     elif min_type == 'mm':
-        mol = mol.copy()
         mol.coords[:, :, 0] = mm_minimizer.minimize(mol.coords)
     elif min_type == 'None':
         pass
@@ -156,7 +139,7 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
     return mol
 
 
-def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None):
+def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None):
     """
     Dihedrals passed as 4 atom indices
     """
@@ -224,7 +207,6 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
     df = DihedralFitting()
     df.parmedMode = True
     df.parameters = prm
-    df._parameterizable_dihedrals = all_dihedrals
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
