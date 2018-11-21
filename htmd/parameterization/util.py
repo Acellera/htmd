@@ -139,7 +139,7 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
     return mol
 
 
-def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None):
+def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None, num_searches=None):
     """
     Dihedrals passed as 4 atom indices
     """
@@ -210,6 +210,7 @@ def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, dihed_opt_type='qm', m
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
+    df.num_searches = num_searches
     df.result_directory = os.path.join(outdir, 'parameters', method, _qm_method_name(qm))
 
     # In case of FakeQM, the initial parameters are set to zeros.
