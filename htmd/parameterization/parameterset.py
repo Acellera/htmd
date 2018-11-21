@@ -105,11 +105,15 @@ def createMultitermDihedralTypes(parameters, nterms=6, scee=1.2, scnb=2):
     return parameters
 
 
-def inventAtomTypes(mol, fit_dihedrals, equivalents):
+def inventAtomTypes(mol, fit_dihedrals):
     """
     Duplicate atom types of the dihedral, so its parameters are unique.
     """
     # TODO check symmetry
+
+    from htmd.parameterization.detect import detectEquivalentAtoms
+
+    equivalents = detectEquivalentAtoms(mol)
 
     mol = mol.copy()
 
@@ -174,15 +178,14 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.parameterization.fftype import fftype
-        from htmd.parameterization.util import getEquivalentsAndDihedrals
         from htmd.molecule.molecule import Molecule
+        from htmd.parameterization.detect import detectEquivalentAtoms
+        from htmd.parameterization.fftype import fftype
 
         molFile = os.path.join(home('test-param'), 'glycol.mol2')
         mol = Molecule(molFile)
-        mol, self.equivalents, all_dihedrals = getEquivalentsAndDihedrals(mol)
-        _, mol = fftype(mol, method='GAFF2')
-        self.mol = mol
+        self.equivalents = detectEquivalentAtoms(mol)
+        _, self.mol = fftype(mol, method='GAFF2')
 
     def test_getEquivalentDihedrals(self):
         self.assertListEqual(_getEquivalentDihedrals(self.mol, self.equivalents, [0, 1, 2, 3]), [[0, 1, 2, 3]])
@@ -193,15 +196,15 @@ class Test(unittest.TestCase):
         self.assertListEqual(self.mol.atomtype.tolist(), ['oh', 'c3', 'c3', 'oh', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
 
         mol = self.mol.copy()
-        mol, _ = inventAtomTypes(mol, [[0, 1, 2, 3]], self.equivalents)
+        mol, _ = inventAtomTypes(mol, [[0, 1, 2, 3]])
         self.assertListEqual(mol.atomtype.tolist(), ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
 
         mol = self.mol.copy()
-        mol, _ = inventAtomTypes(mol, [[4, 0, 1, 2]], self.equivalents)
+        mol, _ = inventAtomTypes(mol, [[4, 0, 1, 2]])
         self.assertListEqual(mol.atomtype.tolist(), ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'hox0', 'h1', 'h1', 'h1', 'h1', 'hox0'])
 
         mol = self.mol.copy()
-        mol, _ = inventAtomTypes(mol, [[5, 1, 2, 7]], self.equivalents)
+        mol, _ = inventAtomTypes(mol, [[5, 1, 2, 7]])
         self.assertListEqual(mol.atomtype.tolist(), ['oh', 'c3x0', 'c3x0', 'oh', 'ho', 'h1x0', 'h1x0', 'h1x0', 'h1x0', 'ho'])
 
 

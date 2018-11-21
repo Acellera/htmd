@@ -13,24 +13,6 @@ from tempfile import TemporaryDirectory
 logger = logging.getLogger(__name__)
 
 
-def getEquivalentsAndDihedrals(mol):
-
-    from htmd.molecule.util import guessAnglesAndDihedrals
-    from htmd.parameterization.detect import detectParameterizableDihedrals, detectEquivalentAtoms
-
-    mol = mol.copy()
-
-    # Guess bonds
-    if len(mol.bonds) == 0:
-        logger.warning('No bonds found! Guessing them...')
-        mol.bonds = mol._guessBonds()
-
-    mol.angles, mol.dihedrals = guessAnglesAndDihedrals(mol.bonds)
-    equivalents = detectEquivalentAtoms(mol)
-    all_dihedrals = detectParameterizableDihedrals(mol)
-    return mol, equivalents, all_dihedrals
-
-
 def guessElements(mol, fftypemethod):
     """
     Guess element from an atom name
@@ -127,7 +109,9 @@ def getFixedChargeAtomIndices(mol, fix_charge):
 
 
 def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
+
     assert mol.numFrames == 1
+    mol = mol.copy()
 
     if min_type == 'qm':
         mindir = os.path.join(outdir, "minimize", _qm_method_name(qm))
@@ -142,11 +126,10 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
         if results[0].errored:
             raise RuntimeError('\nQM minimization failed! Check logs at %s\n' % mindir)
 
-        mol = mol.copy()
+
         # Replace coordinates with the minimized set
         mol.coords = np.atleast_3d(np.array(results[0].coords, dtype=np.float32))
     elif min_type == 'mm':
-        mol = mol.copy()
         mol.coords[:, :, 0] = mm_minimizer.minimize(mol.coords)
     elif min_type == 'None':
         pass
@@ -156,7 +139,7 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
     return mol
 
 
-def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None):
+def fitDihedrals(mol, qm, method, prm, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None, num_searches=None):
     """
     Dihedrals passed as 4 atom indices
     """
@@ -217,14 +200,17 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
         qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
         qm_results.append(qm.retrieve())
 
+    # Filter QM results
+    qm_results = filterQMResults(qm_results, mol=mol)
+
     # Fit the dihedral parameters
     df = DihedralFitting()
     df.parmedMode = True
     df.parameters = prm
-    df._parameterizable_dihedrals = all_dihedrals
     df.molecule = mol
     df.dihedrals = dihedrals
     df.qm_results = qm_results
+    df.num_searches = num_searches
     df.result_directory = os.path.join(outdir, 'parameters', method, _qm_method_name(qm))
 
     # In case of FakeQM, the initial parameters are set to zeros.
@@ -236,6 +222,7 @@ def fitDihedrals(mol, qm, method, prm, all_dihedrals, dihedrals, outdir, dihed_o
     df.run()
 
     return df.parameters
+
 
 def guessBondType(mol):
 
@@ -312,6 +299,7 @@ def guessBondType(mol):
 
     return mol
 
+
 def makeAtomNamesUnique(mol):
     """
     Make atom names unique by appending/incrementing terminal digits.
@@ -384,9 +372,165 @@ def makeAtomNamesUnique(mol):
     return mol
 
 
+def detectChiralCenters(mol):
+    """
+    Detect chiral centers
+
+    Parameters
+    ----------
+    mol: Molecule
+        Molecule to detect chiral centers
+
+    Return
+    ------
+    results: List of tuples
+        List of chircal centers, where the chiral centers are tuples made of an atom index and a label ('S', 'R', '?').
+
+    Examples
+    --------
+    >>> from htmd.home import home
+    >>> from htmd.molecule.molecule import Molecule
+
+    >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
+    >>> mol = Molecule(molFile)
+    >>> detectChiralCenters(mol)
+    []
+
+    >>> molFile = os.path.join(home('test-param'), 'fluorchlorcyclopronol.mol2')
+    >>> mol = Molecule(molFile)
+    >>> detectChiralCenters(mol)
+    [(0, 'R'), (2, 'S'), (4, 'R')]
+    """
+
+    from htmd.molecule.molecule import Molecule
+    from rdkit.Chem import MolFromMol2File, AssignAtomChiralTagsFromStructure, FindMolChiralCenters
+
+    if not isinstance(mol, Molecule):
+        raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+    if mol.numFrames != 1:
+        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+
+    # Set atom types to elements, overwise rdkit refuse to read a MOL2 file
+    htmd_mol = mol.copy()
+    htmd_mol.atomtype = htmd_mol.element
+
+    # Convert Molecule to rdkit Mol
+    with TemporaryDirectory() as tmpDir:
+        filename = os.path.join(tmpDir, 'mol.mol2')
+        htmd_mol.write(filename)
+        rdkit_mol = MolFromMol2File(filename, removeHs=False)
+    assert mol.numAtoms == rdkit_mol.GetNumAtoms()
+
+    # Detect chiral centers and assign their labels
+    AssignAtomChiralTagsFromStructure(rdkit_mol)
+    chiral_centers = FindMolChiralCenters(rdkit_mol, includeUnassigned=True)
+
+    return chiral_centers
+
+
+def filterQMResults(all_results, mol=None):
+    """
+    Filter QM results
+
+    Parameters
+    ----------
+    all_results: list of list of QMResult
+        QM results
+    mol: Molecule
+        A molecule corresponding to the QM results
+
+    Return
+    ------
+    valid_results: List of list of QMResult
+        Valid QM results
+
+    Examples
+    --------
+    >>> from htmd.qm import QMResult
+    >>> results = [QMResult() for _ in range(20)]
+    >>> for result in results:
+    ...     result.energy = 0
+    >>> all_results = [results]
+
+    >>> valid_results  = filterQMResults(all_results)
+    >>> len(valid_results)
+    1
+    >>> len(valid_results[0])
+    20
+
+    >>> results[1].errored = True
+    >>> results[19].errored = True
+    >>> len(filterQMResults(all_results)[0])
+    18
+
+    >>> results[10].energy = -5
+    >>> results[12].energy = 12
+    >>> results[15].energy = 17
+    >>> len(filterQMResults(all_results)[0])
+    17
+    """
+
+    from htmd.qm import QMResult
+    from htmd.molecule.molecule import Molecule
+
+    if mol:
+        if not isinstance(mol, Molecule):
+             raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+        initial_chiral_centers = detectChiralCenters(mol)
+        mol = mol.copy()
+
+    all_valid_results = []
+    for results in all_results:
+
+        valid_results = []
+        for result in results:
+
+            # Remove failed calculations
+            if not isinstance(result, QMResult):
+                raise TypeError('"results" has to a list of list of {} instance'.format(QMResult))
+            if result.errored:
+                logger.warning('Rotamer is removed due to a failed QM calculations')
+                continue
+
+            # Remove results with wrong chiral centers
+            if mol:
+                mol.coords = result.coords
+                chiral_centers = detectChiralCenters(mol)
+                if initial_chiral_centers != chiral_centers:
+                    logger.warning('Rotamer is removed due to a change of chiral centers: '
+                                   '{} --> {}'.format(initial_chiral_centers, chiral_centers))
+                    continue
+
+            valid_results.append(result)
+
+        # Remove results with too high energies (>20 kcal/mol above the minimum)
+        if len(valid_results) > 0:
+            minimum_energy = np.min([result.energy for result in valid_results])
+
+            new_results = []
+            for result in valid_results:
+                relative_energy = result.energy - minimum_energy
+                if relative_energy < 20:  # kcal/mol
+                    new_results.append(result)
+                else:
+                    logger.warning('Rotamer is removed due to high energy: '
+                                   '{} kcal/mol above minimum'.format(relative_energy))
+            valid_results = new_results
+
+        if len(valid_results) < 13:
+            raise RuntimeError('Less than 13 valid QM results per dihedral. Not enough to fit!')
+
+        all_valid_results.append(valid_results)
+
+    return all_valid_results
+
+
 if __name__ == '__main__':
 
     import sys
     import doctest
+
+    # Pre-import QMResult to silence import messages in the doctests
+    from htmd.qm import QMResult
 
     sys.exit(doctest.testmod().failed)
