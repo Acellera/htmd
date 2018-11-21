@@ -212,7 +212,6 @@ class TestParameterize(unittest.TestCase):
                                   '--scan-type None --dihed-num-searches 0')
         self._test(refDir, resDir)
 
-
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_h2o2_dihed_opt(self):
         refDir = os.path.join(self.dataDir, 'h2o2_dihed_opt')
