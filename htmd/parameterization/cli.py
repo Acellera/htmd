@@ -155,6 +155,57 @@ def _prepare_molecule(args):
     return mol
 
 
+def _select_dihedrals(mol, args):
+
+    from htmd.parameterization.detect import detectParameterizableDihedrals
+
+    logger.info('=== Dihedral angles ===')
+
+    # Detect parameterizable dihedral angles
+    parameterizable_dihedrals = detectParameterizableDihedrals(mol)
+    logger.info('Parameterizable dihedral angles (and their equivalents):')
+    for i, equivalent_dihedrals in enumerate(parameterizable_dihedrals):
+        names = ['-'.join(mol.name[list(dihedral)]) for dihedral in equivalent_dihedrals]
+        line = '    {:2d}: {}'.format(i+1, names[0])
+        if names[1:]:
+            line += ' ({})'.format(', '.join(names[1:]))
+        logger.info(line)
+
+    # Print parameterize dihedral list to a file and exit
+    # TODO factor this out
+    if args.list:
+        dihedral_file = 'torsions.txt'
+        with open(dihedral_file, 'w') as file:
+            for dihedrals in parameterizable_dihedrals:
+                name = '-'.join(mol.name[list(dihedrals[0])])
+                file.write('{}\n'.format(name))
+            logger.info('Write the list of the parameterizable dihedral angles to {}'.format(dihedral_file))
+        sys.exit()
+
+    # Select dihedrals to parameterize
+    selected_dihedrals = []
+    if args.fit_dihedral:
+        if args.dihedral:
+            name2dihedral = {'-'.join(mol.name[list(dihedrals[0])]): dihedrals[0] for dihedrals in parameterizable_dihedrals}
+            for dihedral_name in args.dihedral:
+                if dihedral_name not in name2dihedral.keys():
+                    raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
+                selected_dihedrals.append(list(name2dihedral[dihedral_name]))
+        else:
+            # By default parameterize all the dihedrals
+            selected_dihedrals = [list(dihedrals[0]) for dihedrals in parameterizable_dihedrals]
+
+    if len(selected_dihedrals) > 0:
+        logger.info('Selected dihedral angles:')
+        for i, dihedral in enumerate(selected_dihedrals):
+            name = '-'.join(mol.name[list(dihedral)])
+            logger.info('    {:2d}: {}'.format(i+1, name))
+    else:
+        logger.info('No dihedral angles selected')
+
+    return selected_dihedrals
+
+
 def _get_reference_calculator(args):
 
     # Create a queue
@@ -229,6 +280,30 @@ def _get_reference_calculator(args):
         logger.info('Changing basis sets to %s' % qm.basis)
 
     return qm
+
+
+def _get_initial_parameters(mol, args):
+
+    from htmd.parameterization.fftype import fftype
+
+    logger.info('=== Atom type and initial parameter assignment ===')
+    logger.info('Method: {}'.format(args.forcefield))
+
+    # Get RTF and PRM file names
+    rtfFile, prmFile = args.rtf_prm if args.rtf_prm else None, None
+
+    # Assing atom types and initial force field parameters
+    _charge = mol.charge.copy()
+    parameters, mol = fftype(mol, method=args.forcefield, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
+    assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
+
+    logger.info('Atom types:')
+    for name, type in zip(mol.name, mol.atomtype):
+        logger.info('   {:4s} : {}'.format(name, type))
+
+    # TODO write initial parameter to a file
+
+    return mol, parameters
 
 
 def _fit_charges(mol, args, qm):
@@ -321,81 +396,6 @@ def _fit_charges(mol, args, qm):
     return mol
 
 
-def _select_dihedrals(mol, args):
-
-    from htmd.parameterization.detect import detectParameterizableDihedrals
-
-    logger.info('=== Dihedral angles ===')
-
-    # Detect parameterizable dihedral angles
-    parameterizable_dihedrals = detectParameterizableDihedrals(mol)
-    logger.info('Parameterizable dihedral angles (and their equivalents):')
-    for i, equivalent_dihedrals in enumerate(parameterizable_dihedrals):
-        names = ['-'.join(mol.name[list(dihedral)]) for dihedral in equivalent_dihedrals]
-        line = '    {:2d}: {}'.format(i+1, names[0])
-        if names[1:]:
-            line += ' ({})'.format(', '.join(names[1:]))
-        logger.info(line)
-
-    # Print parameterize dihedral list to a file and exit
-    # TODO factor this out
-    if args.list:
-        dihedral_file = 'torsions.txt'
-        with open(dihedral_file, 'w') as file:
-            for dihedrals in parameterizable_dihedrals:
-                name = '-'.join(mol.name[list(dihedrals[0])])
-                file.write('{}\n'.format(name))
-            logger.info('Write the list of the parameterizable dihedral angles to {}'.format(dihedral_file))
-        sys.exit()
-
-    # Select dihedrals to parameterize
-    selected_dihedrals = []
-    if args.fit_dihedral:
-        if args.dihedral:
-            name2dihedral = {'-'.join(mol.name[list(dihedrals[0])]): dihedrals[0] for dihedrals in parameterizable_dihedrals}
-            for dihedral_name in args.dihedral:
-                if dihedral_name not in name2dihedral.keys():
-                    raise ValueError('%s is not recognized as a rotatable dihedral angle' % dihedral_name)
-                selected_dihedrals.append(list(name2dihedral[dihedral_name]))
-        else:
-            # By default parameterize all the dihedrals
-            selected_dihedrals = [list(dihedrals[0]) for dihedrals in parameterizable_dihedrals]
-
-    if len(selected_dihedrals) > 0:
-        logger.info('Selected dihedral angles:')
-        for i, dihedral in enumerate(selected_dihedrals):
-            name = '-'.join(mol.name[list(dihedral)])
-            logger.info('    {:2d}: {}'.format(i+1, name))
-    else:
-        logger.info('No dihedral angles selected')
-
-    return selected_dihedrals
-
-
-def _get_initial_parameters(mol, args):
-
-    from htmd.parameterization.fftype import fftype
-
-    logger.info('=== Atom type and initial parameter assignment ===')
-    logger.info('Method: {}'.format(args.forcefield))
-
-    # Get RTF and PRM file names
-    rtfFile, prmFile = args.rtf_prm if args.rtf_prm else None, None
-
-    # Assing atom types and initial force field parameters
-    _charge = mol.charge.copy()
-    parameters, mol = fftype(mol, method=args.forcefield, rtfFile=rtfFile, prmFile=prmFile, netcharge=args.charge)
-    assert np.all(mol.charge == _charge), 'fftype is meddling with charges!'
-
-    logger.info('Atom types:')
-    for name, type in zip(mol.name, mol.atomtype):
-        logger.info('   {:4s} : {}'.format(name, type))
-
-    # TODO write initial parameter to a file
-
-    return mol, parameters
-
-
 def _printEnergies(molecule, parameters, filename):
 
     from htmd.ffevaluation.ffevaluate import FFEvaluate
@@ -449,7 +449,7 @@ def _output_results(mol, parameters, original_coords, qm, args):
 def main_parameterize(arguments=None):
 
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
-    from htmd.parameterization.util import minimize, fitDihedrals, _qm_method_name, detectChiralCenters
+    from htmd.parameterization.util import minimize, fitDihedrals, detectChiralCenters
 
     logger.info('===== Parameterize =====')
 
@@ -569,10 +569,11 @@ def main_parameterize(arguments=None):
         parameters = fitDihedrals(mol, qm, args.forcefield, parameters, selected_dihedrals, args.outdir,
                                   dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
 
+    # Output the parameters and other results
     _output_results(mol, parameters, orig_coor, qm, args)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
 
     arguments = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
     main_parameterize(arguments=arguments)
