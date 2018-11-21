@@ -52,7 +52,7 @@ def getArgumentParser():
     parser.add_argument('--scan-type', default='qm', dest='dihed_opt_type', choices=['None', 'qm', 'mm'],
                         help='Type of structure optimization when scanning dihedral angles (default: %(default)s)')
     parser.add_argument('--dihed-num-searches', default=None, type=int,
-                        help='Number of random search during the dihedral parameter fitting')
+                        help='Number of random searches during the dihedral parameter fitting')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
