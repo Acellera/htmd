@@ -245,27 +245,20 @@ def _get_queue(args):
     return queue
 
 
-def _get_reference_calculator(args, queue):
+def _get_qm_calculator(args, queue):
 
     from htmd.qm import Psi4, Gaussian, FakeQM2
 
+    logger.info('=== QM configuration ===')
+
     # Create a QM object
-    if args.nnp:
-        import importlib
-        from htmd.qm.custom import CustomQM
-        qm = CustomQM(verbose=False)
-        nnp_module = importlib.import_module(args.nnp)
-        logger.info('NNP module: {}'.format(nnp_module))
-        nnp_calculator = nnp_module.get_calculator()
-        logger.info('NNP calculator: {}'.format(nnp_calculator))
-        qm.calculator = nnp_calculator
+    logger.info('Code: {}'.format(args.code))
+    if args.code == 'Psi4':
+        qm = Psi4()
+    elif args.code == 'Gaussian':
+        qm = Gaussian()
     else:
-        if args.code == 'Psi4':
-            qm = Psi4()
-        elif args.code == 'Gaussian':
-            qm = Gaussian()
-        else:
-            raise NotImplementedError
+        raise AssertionError()
 
     # Override with a FakeQM object
     if args.fake_qm:
@@ -274,8 +267,11 @@ def _get_reference_calculator(args, queue):
 
     # Configure the QM object
     qm.theory = args.theory
+    logger.info('Theory: {}'.format(qm.theory))
     qm.basis = args.basis
+    logger.info('Basis sets: {}'.format(qm.basis))
     qm.solvent = args.environment
+    logger.info('Environment: {}'.format(qm.solvent))
     qm.queue = queue
     qm.charge = args.charge
 
@@ -283,6 +279,7 @@ def _get_reference_calculator(args, queue):
     # TODO: this is silent and not documented stuff
     if qm.theory == 'B3LYP':
         qm.correction = 'D3'
+        logger.warning('The dispersion correction is set to {}'.format(qm.correction))
 
     # Update basis sets
     # TODO: this is silent and not documented stuff
@@ -293,9 +290,37 @@ def _get_reference_calculator(args, queue):
             qm.basis = '6-311++G**'
         if qm.basis == 'cc-pVDZ':
             qm.basis = 'aug-cc-pVDZ'
-        logger.info('Changing basis sets to %s' % qm.basis)
+        logger.warning('Basis sets are changed to {}'.format(qm.basis))
 
     return qm
+
+def _get_nnp_calculator(args, queue):
+
+    if args.nnp:
+        import importlib
+        from htmd.qm.custom import CustomQM
+
+        logger.info('=== NNP configuration ===')
+
+        # Get NNP calculator
+        nnp_module = importlib.import_module(args.nnp)
+        logger.info('NNP module: {}'.format(nnp_module))
+        nnp_calculator = nnp_module.get_calculator()
+        logger.info('NNP calculator: {}'.format(nnp_calculator))
+
+        # Create a custom "QM" object
+        nnp = CustomQM(verbose=False)
+        nnp.theory = args.nnp
+        nnp.basis = ''
+        nnp.solvent = ''
+        nnp.queue = queue
+        nnp.charge = args.charge
+        nnp.calculator = nnp_calculator
+
+    else:
+        nnp = None
+
+    return nnp
 
 
 def _get_initial_parameters(mol, args):
@@ -544,11 +569,14 @@ def main_parameterize(arguments=None):
     # Select dihedral angles to parameterize
     selected_dihedrals = _select_dihedrals(mol, args)
 
-    # Get a queue, if needed
+    # Get a queue
     queue = _get_queue(args)
 
-    # Get a reference calculator
-    qm = _get_reference_calculator(args, queue)
+    # Get a QM calculator
+    qm = _get_qm_calculator(args, queue)
+
+    # Get a NNP calculator
+    nnp = _get_nnp_calculator(args, queue)
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
