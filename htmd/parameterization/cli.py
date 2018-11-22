@@ -339,10 +339,10 @@ def _fit_initial_charges(mol, args):
             logger.info('Initial atomic charges are not required')
 
         else:
-            raise ValueError()
+            raise AssertionError()
 
     else:
-        raise ValueError()
+        raise AssertionError()
 
     return mol
 
