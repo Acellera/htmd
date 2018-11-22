@@ -68,8 +68,8 @@ def getArgumentParser():
     # This is intedended for debugging only and should be kept hidden.
     parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
 
-    # QMML module name
-    parser.add_argument('--qmml', help=argparse.SUPPRESS)
+    # NNP module name
+    parser.add_argument('--nnp', help=argparse.SUPPRESS)
 
     # Debug mode
     parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
@@ -242,15 +242,15 @@ def _get_reference_calculator(args):
     # Create a QM object
     from htmd.qm import Psi4, Gaussian, FakeQM2
 
-    if args.qmml:
+    if args.nnp:
         import importlib
         from htmd.qm.custom import CustomQM
         qm = CustomQM(verbose=False)
-        qmml_module = importlib.import_module(args.qmml)
-        logger.info('QMML module: {}'.format(qmml_module))
-        qmml_calculator = qmml_module.get_calculator()
-        logger.info('QMML calculator: {}'.format(qmml_calculator))
-        qm.calculator = qmml_calculator
+        nnp_module = importlib.import_module(args.nnp)
+        logger.info('NNP module: {}'.format(nnp_module))
+        nnp_calculator = nnp_module.get_calculator()
+        logger.info('NNP calculator: {}'.format(nnp_calculator))
+        qm.calculator = nnp_calculator
     else:
         if args.code == 'Psi4':
             qm = Psi4()
