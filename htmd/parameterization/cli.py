@@ -541,6 +541,10 @@ def main_parameterize(arguments=None):
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
 
+    # Validate arguments
+    if args.fake_qm and args.nnp:
+        raise ValueError('FakeQM and NNP are not compatible')
+
     # Configure loggers
     if args.debug:
         logger.setLevel(logging.DEBUG)
@@ -572,11 +576,10 @@ def main_parameterize(arguments=None):
     # Get a queue
     queue = _get_queue(args)
 
-    # Get a QM calculator
+    # Get calculators
     qm = _get_qm_calculator(args, queue)
-
-    # Get a NNP calculator
     nnp = _get_nnp_calculator(args, queue)
+    ref = nnp if args.nnp else qm
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
@@ -599,19 +602,20 @@ def main_parameterize(arguments=None):
         if args.min_type == 'mm':
             logger.info('Model: MM with the initial force field parameters')
         elif args.min_type == 'qm':
-            logger.info('Model: reference method')
+            logger.info('Model: {}'.format(ref.theory))
         else:
             raise ValueError()
 
         # Set parameters for the fake QM
         if args.fake_qm:
-            qm._parameters = parameters
+            assert not args.nnp
+            ref._parameters = parameters
 
         # Detect chiral centers
         initial_chiral_centers = detectChiralCenters(mol)
 
         # Minimize molecule
-        mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
+        mol = minimize(mol, ref, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
         # TODO print minimization status
 
@@ -633,9 +637,9 @@ def main_parameterize(arguments=None):
         if args.dihed_opt_type == 'None':
             logger.info('Dihedral scanning: static')
         elif args.dihed_opt_type == 'mm':
-            logger.info('Dihedral scanning: mimimized with MM (using the initial force field parameters)')
+            logger.info('Dihedral scanning: minimized with MM (using the initial force field parameters)')
         elif args.dihed_opt_type == 'qm':
-            logger.info('Dihedral scanning: mimimized with the reference method')
+            logger.info('Dihedral scanning: minimized with {}'.format(ref.theory))
         else:
             raise ValueError()
 
@@ -651,7 +655,8 @@ def main_parameterize(arguments=None):
 
         # Set parameters for the fake QM
         if args.fake_qm:
-            qm._parameters = parameters
+            assert not args.nnp
+            ref._parameters = parameters
 
         # Set random number generator seed
         if args.seed:
@@ -659,7 +664,7 @@ def main_parameterize(arguments=None):
 
         # Fit the parameters
         # TODO separate scanning and fitting
-        parameters = fitDihedrals(mol, qm, args.forcefield, parameters, selected_dihedrals, args.outdir,
+        parameters = fitDihedrals(mol, ref, args.forcefield, parameters, selected_dihedrals, args.outdir,
                                   dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer,
                                   num_searches=args.dihed_num_searches)
 
