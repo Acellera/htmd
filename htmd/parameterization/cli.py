@@ -208,9 +208,12 @@ def _select_dihedrals(mol, args):
     return selected_dihedrals
 
 
-def _get_reference_calculator(args):
+def _get_queue(args):
+
+    logger.info('=== Computation queue ===')
 
     # Create a queue
+    logger.info('Queue type: {}'.format(args.queue))
     if args.queue == 'local':
         from htmd.queues.localqueue import LocalCPUQueue
         queue = LocalCPUQueue()
@@ -229,7 +232,7 @@ def _get_reference_calculator(args):
         queue.groupname = args.groupname
         queue.hashnames = True
     else:
-        raise NotImplementedError
+        raise AssertionError()
 
     # Configure the queue
     if args.ncpus:
@@ -239,9 +242,14 @@ def _get_reference_calculator(args):
         logger.info('Overriding memory to {}'.format(args.memory))
         queue.memory = args.memory
 
-    # Create a QM object
+    return queue
+
+
+def _get_reference_calculator(args, queue):
+
     from htmd.qm import Psi4, Gaussian, FakeQM2
 
+    # Create a QM object
     if args.nnp:
         import importlib
         from htmd.qm.custom import CustomQM
@@ -536,8 +544,11 @@ def main_parameterize(arguments=None):
     # Select dihedral angles to parameterize
     selected_dihedrals = _select_dihedrals(mol, args)
 
+    # Get a queue, if needed
+    queue = _get_queue(args)
+
     # Get a reference calculator
-    qm = _get_reference_calculator(args)
+    qm = _get_reference_calculator(args, queue)
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
