@@ -240,21 +240,27 @@ def _get_reference_calculator(args):
         queue.memory = args.memory
 
     # Create a QM object
-    if args.code == 'Psi4':
-        from htmd.qm import Psi4
-        qm = Psi4()
-    elif args.code == 'Gaussian':
-        from htmd.qm import Gaussian
-        qm = Gaussian()
-    elif args.code == 'QMML':
-        from htmd.qm.custom import QMML
-        qm = QMML()
+    from htmd.qm import Psi4, Gaussian, FakeQM2
+
+    if args.qmml:
+        import importlib
+        from htmd.qm.custom import CustomQM
+        qm = CustomQM(verbose=False)
+        qmml_module = importlib.import_module(args.qmml)
+        logger.info('QMML module: {}'.format(qmml_module))
+        qmml_calculator = qmml_module.get_calculator()
+        logger.info('QMML calculator: {}'.format(qmml_calculator))
+        qm.calculator = qmml_calculator
     else:
-        raise NotImplementedError
+        if args.code == 'Psi4':
+            qm = Psi4()
+        elif args.code == 'Gaussian':
+            qm = Gaussian()
+        else:
+            raise NotImplementedError
 
     # Override with a FakeQM object
     if args.fake_qm:
-        from htmd.qm import FakeQM2
         qm = FakeQM2()
         logger.warning('Using FakeQM')
 
