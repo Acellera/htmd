@@ -512,21 +512,20 @@ VdW      : {VDW_ENERGY}
         logger.info('   {:8s} : {:10.3f} kcal/mol'.format(name, energies[name]))
 
 
-def _output_results(mol, parameters, original_coords, qm, args):
+def _output_results(mol, parameters, original_coords, args):
 
-    from htmd.parameterization.util import _qm_method_name
     from htmd.parameterization.writers import writeParameters
 
     logger.info('=== Results ===')
 
     # Output the FF parameters and other files
     # TODO get rid of QM
-    paramoutdir = os.path.join(args.outdir, 'parameters', args.forcefield, _qm_method_name(qm))
+    dir = os.path.join(args.outdir, 'parameters')
     # TODO split into separate writer
-    writeParameters(paramoutdir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
+    writeParameters(dir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
 
     # Write energy file
-    energyFile = os.path.join(paramoutdir, 'energies.txt')
+    energyFile = os.path.join(dir, 'energies.txt')
     _printEnergies(mol, parameters, energyFile)
 
 
@@ -568,7 +567,7 @@ def main_parameterize(arguments=None):
     mol = _prepare_molecule(args)
 
     # Copy the molecule to preserve initial coordinates
-    orig_coor = mol.coords.copy()
+    initial_coords = mol.coords.copy()
 
     # Select dihedral angles to parameterize
     selected_dihedrals = _select_dihedrals(mol, args)
@@ -664,12 +663,12 @@ def main_parameterize(arguments=None):
 
         # Fit the parameters
         # TODO separate scanning and fitting
-        parameters = fitDihedrals(mol, ref, args.forcefield, parameters, selected_dihedrals, args.outdir,
+        parameters = fitDihedrals(mol, ref, parameters, selected_dihedrals, args.outdir,
                                   dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer,
                                   num_searches=args.dihed_num_searches)
 
     # Output the parameters and other results
-    _output_results(mol, parameters, orig_coor, qm, args)
+    _output_results(mol, parameters, initial_coords, args)
 
 
 if __name__ == '__main__':
