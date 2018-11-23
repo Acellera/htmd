@@ -238,7 +238,7 @@ def fitESPCharges(mol, qm, outdir, apply_bounds=True, restraint_factor=0, fixed=
     qm.directory = outdir
     qm_results = qm.run()
     if qm_results[0].errored:
-        raise RuntimeError('\nQM calculation failed! Check logs at %s\n' % espDir)
+        raise RuntimeError('QM calculation failed! Check logs at {}'.format(outdir))
 
     # Safeguard QM code from changing coordinates :)
     assert np.all(np.isclose(mol.coords, qm_results[0].coords, atol=1e-6))

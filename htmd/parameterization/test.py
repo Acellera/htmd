@@ -401,6 +401,18 @@ class TestParameterize(unittest.TestCase):
         self._run(refDir, resDir, 'parameterize input.mol2')
         self._test(refDir, resDir)
 
+    def test_water_min_mm_charge_bcc(self):
+        refDir = os.path.join(self.dataDir, 'water_min_mm_charge_bcc')
+        resDir = os.path.join(self.testDir, 'water_min_mm_charge_bcc')
+        self._run(refDir, resDir, 'parameterize input.mol2 --min-type mm --charge-type AM1-BCC')
+        self._test(refDir, resDir)
+
+    def test_water_min_mm_charge_none(self):
+        refDir = os.path.join(self.dataDir, 'water_min_mm_charge_none')
+        resDir = os.path.join(self.testDir, 'water_min_mm_charge_none')
+        self._run(refDir, resDir, 'parameterize input.mol2 --min-type mm --charge-type None')
+        self._test(refDir, resDir)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

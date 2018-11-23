@@ -308,6 +308,45 @@ def _get_initial_parameters(mol, args):
     return mol, parameters
 
 
+def _fit_initial_charges(mol, args):
+
+    from htmd.charge import fitGasteigerCharges
+    from htmd.parameterization.util import guessBondType
+
+    logger.info('=== Initial atomic charge fitting ===')
+
+    if args.charge_type == 'None':
+        logger.info('Initial atomic charges are taken from {}'.format(args.filename))
+
+    elif args.charge_type in ('Gasteiger', 'AM1-BCC', 'ESP'):
+        if args.min_type == 'mm':
+            logger.info('Method: Gasteiger')
+
+            # TODO move to _prepare_molecule
+            if np.any(mol.bondtype == "un"):
+                logger.info('Guessing bond types')
+                mol = guessBondType(mol)
+
+            mol = fitGasteigerCharges(mol)
+
+            # Print the initial charges
+            logger.info('Initial atomic charges:')
+            for name, charge in zip(mol.name, mol.charge):
+                logger.info('   {:4s}: {:6.3f}'.format(name, charge))
+            logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
+
+        elif args.min_type in ('None', 'qm'):
+            logger.info('Initial atomic charges are not required')
+
+        else:
+            raise AssertionError()
+
+    else:
+        raise AssertionError()
+
+    return mol
+
+
 def _fit_charges(mol, args, qm):
 
     from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges, symmetrizeCharges
@@ -319,6 +358,7 @@ def _fit_charges(mol, args, qm):
 
     if args.charge_type == 'None':
 
+        # TODO move to argument validation
         if len(args.fix_charge) > 0:
             logger.warning('Flag --fix-charge does not have effect!')
 
@@ -326,9 +366,11 @@ def _fit_charges(mol, args, qm):
 
     elif args.charge_type == 'Gasteiger':
 
+        # TODO move to argument validation
         if len(args.fix_charge) > 0:
             logger.warning('Flag --fix-charge does not have effect!')
 
+        # TODO move to _prepare_molecule
         if np.any(mol.bondtype == "un"):
             logger.info('Guessing bond types')
             mol = guessBondType(mol)
@@ -342,6 +384,7 @@ def _fit_charges(mol, args, qm):
 
     elif args.charge_type == 'AM1-BCC':
 
+        # TODO move to argument validation
         if len(args.fix_charge) > 0:
             logger.warning('Flag --fix-charge does not have effect!')
 
@@ -492,6 +535,9 @@ def main_parameterize(arguments=None):
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
+
+    # Assign initial atomic charges, if needed
+    mol = _fit_initial_charges(mol, args)
 
     # Get a MM calculator
     # TODO refactor
