@@ -2024,9 +2024,8 @@ class TestMolecule(TestCase):
 
         # Testing appending of bonds and bondtypes
         mol = self.mol3PTB.copy()
-        lig = Molecule(
-            path.join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'GAFF2', 'B3LYP-cc-pVDZ-vacuum',
-                      'mol.mol2'))
+        # TODO do not use parameterize data
+        lig = Molecule(path.join(home(dataDir='test-param'), 'h2o2_gaff2', 'parameters', 'mol.mol2'))
         assert mol.bonds.shape[0] == len(mol.bondtype)  # Checking that Molecule fills in empty bondtypes
         newmol = Molecule()
         newmol.append(lig)
