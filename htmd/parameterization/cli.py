@@ -310,9 +310,6 @@ def _get_nnp_calculator(args, queue):
 
         # Create a custom "QM" object
         nnp = CustomQM(verbose=False)
-        nnp.theory = args.nnp
-        nnp.basis = ''
-        nnp.solvent = ''
         nnp.queue = queue
         nnp.charge = args.charge
         nnp.calculator = nnp_calculator
@@ -578,7 +575,12 @@ def main_parameterize(arguments=None):
     # Get calculators
     qm = _get_qm_calculator(args, queue)
     nnp = _get_nnp_calculator(args, queue)
-    ref = nnp if args.nnp else qm
+    if args.nnp:
+        ref = nnp
+        logger.info('Reference method: NNP')
+    else:
+        ref = qm
+        logger.info('Reference method: QM')
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
@@ -601,7 +603,7 @@ def main_parameterize(arguments=None):
         if args.min_type == 'mm':
             logger.info('Model: MM with the initial force field parameters')
         elif args.min_type == 'qm':
-            logger.info('Model: {}'.format(ref.theory))
+            logger.info('Model: the reference method')
         else:
             raise ValueError()
 
@@ -638,7 +640,7 @@ def main_parameterize(arguments=None):
         elif args.dihed_opt_type == 'mm':
             logger.info('Dihedral scanning: minimized with MM (using the initial force field parameters)')
         elif args.dihed_opt_type == 'qm':
-            logger.info('Dihedral scanning: minimized with {}'.format(ref.theory))
+            logger.info('Dihedral scanning: minimized with the reference method')
         else:
             raise ValueError()
 
