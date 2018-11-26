@@ -516,7 +516,6 @@ def _output_results(mol, parameters, original_coords, args):
     logger.info('=== Results ===')
 
     # Output the FF parameters and other files
-    # TODO get rid of QM
     dir = os.path.join(args.outdir, 'parameters')
     # TODO split into separate writer
     writeParameters(dir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
@@ -573,13 +572,13 @@ def main_parameterize(arguments=None):
     queue = _get_queue(args)
 
     # Get calculators
-    qm = _get_qm_calculator(args, queue)
-    nnp = _get_nnp_calculator(args, queue)
+    qm_calculator = _get_qm_calculator(args, queue)
+    nnp_calculator = _get_nnp_calculator(args, queue)
     if args.nnp:
-        ref = nnp
+        ref_calculator = nnp_calculator
         logger.info('Reference method: NNP')
     else:
-        ref = qm
+        ref_calculator = qm_calculator
         logger.info('Reference method: QM')
 
     # Assign atom types and initial force field parameters
@@ -610,13 +609,13 @@ def main_parameterize(arguments=None):
         # Set parameters for the fake QM
         if args.fake_qm:
             assert not args.nnp
-            ref._parameters = parameters
+            ref_calculator._parameters = parameters
 
         # Detect chiral centers
         initial_chiral_centers = detectChiralCenters(mol)
 
         # Minimize molecule
-        mol = minimize(mol, ref, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
+        mol = minimize(mol, ref_calculator, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
         # TODO print minimization status
 
@@ -627,7 +626,7 @@ def main_parameterize(arguments=None):
                                '{} --> {}'.format(initial_chiral_centers, chiral_centers))
 
     # Fit charges
-    mol = _fit_charges(mol, args, qm)
+    mol = _fit_charges(mol, args, qm_calculator)
 
     # Scan dihedrals and fit parameters
     # TODO refactor
@@ -657,7 +656,7 @@ def main_parameterize(arguments=None):
         # Set parameters for the fake QM
         if args.fake_qm:
             assert not args.nnp
-            ref._parameters = parameters
+            ref_calculator._parameters = parameters
 
         # Set random number generator seed
         if args.seed:
@@ -665,7 +664,7 @@ def main_parameterize(arguments=None):
 
         # Fit the parameters
         # TODO separate scanning and fitting
-        parameters = fitDihedrals(mol, ref, parameters, selected_dihedrals, args.outdir,
+        parameters = fitDihedrals(mol, ref_calculator, parameters, selected_dihedrals, args.outdir,
                                   dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer,
                                   num_searches=args.dihed_num_searches)
 
