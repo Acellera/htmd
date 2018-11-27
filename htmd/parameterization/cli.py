@@ -587,13 +587,6 @@ def main_parameterize(arguments=None):
     # Assign initial atomic charges, if needed
     mol = _fit_initial_charges(mol, args)
 
-    # Get a MM calculator
-    # TODO refactor
-    mm_minimizer = None
-    if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
-        from htmd.qm.custom import OMMMinimizer
-        mm_minimizer = OMMMinimizer(mol, parameters)
-
     # Geometry minimization
     # TODO refactor
     if args.min_type != 'None':
@@ -614,11 +607,15 @@ def main_parameterize(arguments=None):
         # Detect chiral centers
         initial_chiral_centers = detectChiralCenters(mol)
 
+        mm_minimizer = None
+        if args.min_type == 'mm':
+            from htmd.qm.custom import OMMMinimizer
+            mm_minimizer = OMMMinimizer(mol, parameters)
+
         # Minimize molecule
         mol = minimize(mol, ref_calculator, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
         # TODO print minimization status
-
         # Check if the chiral center hasn't changed during the minimization
         chiral_centers = detectChiralCenters(mol)
         if initial_chiral_centers != chiral_centers:
@@ -642,6 +639,12 @@ def main_parameterize(arguments=None):
             logger.info('Dihedral scanning: minimized with the reference method')
         else:
             raise ValueError()
+
+        # Recreate MM minimizer now that charges have been fitted
+        mm_minimizer = None
+        if args.dihed_opt_type == 'mm':
+            from htmd.qm.custom import OMMMinimizer
+            mm_minimizer = OMMMinimizer(mol, parameters)
 
         # Invent new atom types for dihedral atoms
         old_types = mol.atomtype

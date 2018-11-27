@@ -30,7 +30,7 @@ class Minimizer(abc.ABC):
 
 
 class OMMMinimizer(Minimizer):
-    def __init__(self, mol, prm, platform='CPU', device=0, buildff='AMBER', guessAnglesDihedrals=True):
+    def __init__(self, mol, prm, platform='CPU', device=0, buildff='AMBER'):
         """ A minimizer based on OpenMM
 
         Parameters
@@ -45,8 +45,6 @@ class OMMMinimizer(Minimizer):
             If platform is 'CUDA' this defines which GPU device to use
         buildff : str
             The forcefield for which to build the Molecule to then minimize it with OpenMM
-        guessAnglesDihedrals : bool
-            If the class should guess angles and dihedrals of the Molecule.
 
         Examples
         --------
@@ -61,8 +59,6 @@ class OMMMinimizer(Minimizer):
         """
         super().__init__()
 
-        import parmed
-        from htmd.util import tempname
         import simtk.openmm as mm
 
         if buildff == 'AMBER':
@@ -101,11 +97,11 @@ class OMMMinimizer(Minimizer):
 
         return prmtop
 
-
-    def minimize(self, coords, restrained_dihedrals=None):
+    def minimize(self, coords, restrained_dihedrals=None, maxeval=None):
         from simtk import unit
-        from simtk.openmm import CustomTorsionForce, PeriodicTorsionForce, app
+        from simtk.openmm import app, PeriodicTorsionForce
         import simtk.openmm as mm
+        from scipy.optimize import minimize
 
         forceidx = []
         if restrained_dihedrals:
@@ -118,18 +114,27 @@ class OMMMinimizer(Minimizer):
             fidx = self.system.addForce(f)
             forceidx.append(fidx)
 
-        integrator = mm.LangevinIntegrator(0, 0, 0)
-        self.sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
-
         if coords.ndim == 3:
             coords = coords[:, :, 0]
-        self.sim.context.setPositions(coords * unit.angstrom)
-        self.sim.minimizeEnergy()
-        state = self.sim.context.getState(getEnergy=True, getPositions=True)
-        endcoords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom)
+
+        natoms = coords.shape[0]
+
+        integrator = mm.LangevinIntegrator(0, 0, 0)
+        sim = app.Simulation(self.structure.topology, self.system, integrator, self.platform, self.platprop)
+
+        def goalFunc(x):
+            sim.context.setPositions(x.reshape((natoms, 3)) * unit.angstrom)
+            state = sim.context.getState(getEnergy=True, getForces=True)
+            energy = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
+            forces = state.getForces(asNumpy=True).value_in_unit(unit.kilocalories_per_mole / unit.angstrom)
+            grad = -forces.reshape(-1)
+            return energy, grad
+
+        res = minimize(goalFunc, coords.reshape(-1), method='L-BFGS-B', jac=True, options={'ftol': 0, 'gtol': 0.05})
+        endcoords = res.x.reshape((natoms, 3)).copy()
 
         if restrained_dihedrals:
-            for fi in forceidx:
+            for fi in forceidx[::-1]:
                 self.system.removeForce(fi)
 
         return endcoords

@@ -395,6 +395,18 @@ class TestParameterize(unittest.TestCase):
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type mm --scan-type mm --fake-qm')
         self._test(refDir, resDir)
 
+    def test_glycol_dihed_opt_mm_fake(self):
+        refDir = os.path.join(self.dataDir, 'glycol_dihed_opt_mm_fake')
+        resDir = os.path.join(self.testDir, 'glycol_dihed_opt_mm_fake')
+        self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type None --scan-type mm --fake-qm --dihed-num-searches 0')
+        self._test(refDir, resDir, energyProfileAbsTol=0.002)
+
+    def test_glycol_min_mm_fake(self):
+        refDir = os.path.join(self.dataDir, 'glycol_min_mm_fake')
+        resDir = os.path.join(self.testDir, 'glycol_min_mm_fake')
+        self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type mm --scan-type None --fake-qm')
+        self._test(refDir, resDir, dihedralForceConstAbsTol=1e-4)
+
     def test_water_full(self):
         refDir = os.path.join(self.dataDir, 'water_full')
         resDir = os.path.join(self.testDir, 'water_full')
