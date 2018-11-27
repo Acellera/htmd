@@ -608,7 +608,7 @@ def main_parameterize(arguments=None):
         initial_chiral_centers = detectChiralCenters(mol)
 
         mm_minimizer = None
-        if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
+        if args.min_type == 'mm':
             from htmd.qm.custom import OMMMinimizer
             mm_minimizer = OMMMinimizer(mol, parameters)
 
@@ -642,7 +642,7 @@ def main_parameterize(arguments=None):
 
         # Recreate MM minimizer now that charges have been fitted
         mm_minimizer = None
-        if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
+        if args.dihed_opt_type == 'mm':
             from htmd.qm.custom import OMMMinimizer
             mm_minimizer = OMMMinimizer(mol, parameters)
 
