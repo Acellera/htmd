@@ -93,7 +93,7 @@ def writeFRCMOD(mol, parameters, filename, typemap=None):
 
         toprint = []
         for term in val:
-            if term.phi_k == 0:
+            if term.phi_k < 1e-6:
                 continue
             toprint.append(term)
 
@@ -116,11 +116,11 @@ def writeFRCMOD(mol, parameters, filename, typemap=None):
         val = parameters.__dict__[field][type]
         fmt = '{:<2s}-{:<2s}-{:<2s}-{:<2s}     {:>10.8f}{:>9.3f}{:>6.1f}\n'
         if field == 'improper_periodic_types':
-            if val.phi_k == 0:
+            if val.phi_k < 1e-6:
                 continue
             f.write(fmt.format(type[0], type[1], type[2], type[3], val.phi_k, val.phase, val.per))
         elif field == 'improper_types':
-            if val.psi_k == 0:
+            if val.psi_k < 1e-6:
                 continue
             f.write(fmt.format(type[0], type[1], type[2], type[3], val.psi_k, val.psi_eq, 1))
 
