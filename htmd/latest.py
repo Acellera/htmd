@@ -57,9 +57,12 @@ def compareVersions():
         return
 
     if currver != 'unpackaged' and natsorted((latest, currver))[1] != currver:
-        print('New {} HTMD version ({}{}) is available. You are currently on ({}). Use \'conda update -c '
-              'acellera htmd\' to update to the new version. You might need to update your python version as well '
-              'if there is no release for your current version.'.format(verstring, latest, pydeps, currver))
+        print('New {verstring} HTMD version ({latest}{pydeps}) is available. You are currently on ({currver}).'
+              'There are several methods to update:'
+              '    - Create a new conda env. using `conda create -n htmd{latest} htmd={latest} -c acellera -c psi4`'
+              '    - Create a brand new conda installation and run `conda install htmd -c acellera -c psi4`'
+              '    - Run: `conda update htmd -c acellera -c psi4` (NOT RECOMMENDED)'
+              ''.format(verstring=verstring, latest=latest, pydeps=pydeps, currver=currver))
     else:
         if currver != 'unpackaged':
             print('You are on the latest HTMD version ({}).'.format(currver))
