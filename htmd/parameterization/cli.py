@@ -68,8 +68,8 @@ def getArgumentParser():
     # This is intedended for debugging only and should be kept hidden.
     parser.add_argument('--fake-qm', action='store_true', default=False, dest='fake_qm', help=argparse.SUPPRESS)
 
-    # QMML module name
-    parser.add_argument('--qmml', help=argparse.SUPPRESS)
+    # NNP module name
+    parser.add_argument('--nnp', help=argparse.SUPPRESS)
 
     # Debug mode
     parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
@@ -208,9 +208,12 @@ def _select_dihedrals(mol, args):
     return selected_dihedrals
 
 
-def _get_reference_calculator(args):
+def _get_queue(args):
+
+    logger.info('=== Computation queue ===')
 
     # Create a queue
+    logger.info('Queue type: {}'.format(args.queue))
     if args.queue == 'local':
         from htmd.queues.localqueue import LocalCPUQueue
         queue = LocalCPUQueue()
@@ -229,7 +232,7 @@ def _get_reference_calculator(args):
         queue.groupname = args.groupname
         queue.hashnames = True
     else:
-        raise NotImplementedError
+        raise AssertionError()
 
     # Configure the queue
     if args.ncpus:
@@ -239,29 +242,36 @@ def _get_reference_calculator(args):
         logger.info('Overriding memory to {}'.format(args.memory))
         queue.memory = args.memory
 
+    return queue
+
+
+def _get_qm_calculator(args, queue):
+
+    from htmd.qm import Psi4, Gaussian, FakeQM2
+
+    logger.info('=== QM configuration ===')
+
     # Create a QM object
+    logger.info('Code: {}'.format(args.code))
     if args.code == 'Psi4':
-        from htmd.qm import Psi4
         qm = Psi4()
     elif args.code == 'Gaussian':
-        from htmd.qm import Gaussian
         qm = Gaussian()
-    elif args.code == 'QMML':
-        from htmd.qm.custom import QMML
-        qm = QMML()
     else:
-        raise NotImplementedError
+        raise AssertionError()
 
     # Override with a FakeQM object
     if args.fake_qm:
-        from htmd.qm import FakeQM2
         qm = FakeQM2()
         logger.warning('Using FakeQM')
 
     # Configure the QM object
     qm.theory = args.theory
+    logger.info('Theory: {}'.format(qm.theory))
     qm.basis = args.basis
+    logger.info('Basis sets: {}'.format(qm.basis))
     qm.solvent = args.environment
+    logger.info('Environment: {}'.format(qm.solvent))
     qm.queue = queue
     qm.charge = args.charge
 
@@ -269,6 +279,7 @@ def _get_reference_calculator(args):
     # TODO: this is silent and not documented stuff
     if qm.theory == 'B3LYP':
         qm.correction = 'D3'
+        logger.warning('The dispersion correction is set to {}'.format(qm.correction))
 
     # Update basis sets
     # TODO: this is silent and not documented stuff
@@ -279,9 +290,34 @@ def _get_reference_calculator(args):
             qm.basis = '6-311++G**'
         if qm.basis == 'cc-pVDZ':
             qm.basis = 'aug-cc-pVDZ'
-        logger.info('Changing basis sets to %s' % qm.basis)
+        logger.warning('Basis sets are changed to {}'.format(qm.basis))
 
     return qm
+
+def _get_nnp_calculator(args, queue):
+
+    if args.nnp:
+        import importlib
+        from htmd.qm.custom import CustomQM
+
+        logger.info('=== NNP configuration ===')
+
+        # Get NNP calculator
+        nnp_module = importlib.import_module(args.nnp)
+        logger.info('NNP module: {}'.format(nnp_module))
+        nnp_calculator = nnp_module.get_calculator()
+        logger.info('NNP calculator: {}'.format(nnp_calculator))
+
+        # Create a custom "QM" object
+        nnp = CustomQM(verbose=False)
+        nnp.queue = queue
+        nnp.charge = args.charge
+        nnp.calculator = nnp_calculator
+
+    else:
+        nnp = None
+
+    return nnp
 
 
 def _get_initial_parameters(mol, args):
@@ -473,21 +509,19 @@ VdW      : {VDW_ENERGY}
         logger.info('   {:8s} : {:10.3f} kcal/mol'.format(name, energies[name]))
 
 
-def _output_results(mol, parameters, original_coords, qm, args):
+def _output_results(mol, parameters, original_coords, args):
 
-    from htmd.parameterization.util import _qm_method_name
     from htmd.parameterization.writers import writeParameters
 
     logger.info('=== Results ===')
 
     # Output the FF parameters and other files
-    # TODO get rid of QM
-    paramoutdir = os.path.join(args.outdir, 'parameters', args.forcefield, _qm_method_name(qm))
+    dir = os.path.join(args.outdir, 'parameters')
     # TODO split into separate writer
-    writeParameters(paramoutdir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
+    writeParameters(dir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
 
     # Write energy file
-    energyFile = os.path.join(paramoutdir, 'energies.txt')
+    energyFile = os.path.join(dir, 'energies.txt')
     _printEnergies(mol, parameters, energyFile)
 
 
@@ -501,6 +535,10 @@ def main_parameterize(arguments=None):
     # Parse arguments
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
+
+    # Validate arguments
+    if args.fake_qm and args.nnp:
+        raise ValueError('FakeQM and NNP are not compatible')
 
     # Configure loggers
     if args.debug:
@@ -525,13 +563,23 @@ def main_parameterize(arguments=None):
     mol = _prepare_molecule(args)
 
     # Copy the molecule to preserve initial coordinates
-    orig_coor = mol.coords.copy()
+    initial_coords = mol.coords.copy()
 
     # Select dihedral angles to parameterize
     selected_dihedrals = _select_dihedrals(mol, args)
 
-    # Get a reference calculator
-    qm = _get_reference_calculator(args)
+    # Get a queue
+    queue = _get_queue(args)
+
+    # Get calculators
+    qm_calculator = _get_qm_calculator(args, queue)
+    nnp_calculator = _get_nnp_calculator(args, queue)
+    if args.nnp:
+        ref_calculator = nnp_calculator
+        logger.info('Reference method: NNP')
+    else:
+        ref_calculator = qm_calculator
+        logger.info('Reference method: QM')
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
@@ -547,13 +595,14 @@ def main_parameterize(arguments=None):
         if args.min_type == 'mm':
             logger.info('Model: MM with the initial force field parameters')
         elif args.min_type == 'qm':
-            logger.info('Model: reference method')
+            logger.info('Model: the reference method')
         else:
             raise ValueError()
 
         # Set parameters for the fake QM
         if args.fake_qm:
-            qm._parameters = parameters
+            assert not args.nnp
+            ref_calculator._parameters = parameters
 
         # Detect chiral centers
         initial_chiral_centers = detectChiralCenters(mol)
@@ -564,7 +613,7 @@ def main_parameterize(arguments=None):
             mm_minimizer = OMMMinimizer(mol, parameters)
 
         # Minimize molecule
-        mol = minimize(mol, qm, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
+        mol = minimize(mol, ref_calculator, args.outdir, min_type=args.min_type, mm_minimizer=mm_minimizer)
 
         # TODO print minimization status
         # Check if the chiral center hasn't changed during the minimization
@@ -574,7 +623,7 @@ def main_parameterize(arguments=None):
                                '{} --> {}'.format(initial_chiral_centers, chiral_centers))
 
     # Fit charges
-    mol = _fit_charges(mol, args, qm)
+    mol = _fit_charges(mol, args, qm_calculator)
 
     # Recreate MM minimizer once charges have been fitted
     mm_minimizer = None
@@ -591,9 +640,9 @@ def main_parameterize(arguments=None):
         if args.dihed_opt_type == 'None':
             logger.info('Dihedral scanning: static')
         elif args.dihed_opt_type == 'mm':
-            logger.info('Dihedral scanning: mimimized with MM (using the initial force field parameters)')
+            logger.info('Dihedral scanning: minimized with MM (using the initial force field parameters)')
         elif args.dihed_opt_type == 'qm':
-            logger.info('Dihedral scanning: mimimized with the reference method')
+            logger.info('Dihedral scanning: minimized with the reference method')
         else:
             raise ValueError()
 
@@ -609,7 +658,8 @@ def main_parameterize(arguments=None):
 
         # Set parameters for the fake QM
         if args.fake_qm:
-            qm._parameters = parameters
+            assert not args.nnp
+            ref_calculator._parameters = parameters
 
         # Set random number generator seed
         if args.seed:
@@ -617,12 +667,12 @@ def main_parameterize(arguments=None):
 
         # Fit the parameters
         # TODO separate scanning and fitting
-        parameters = fitDihedrals(mol, qm, args.forcefield, parameters, selected_dihedrals, args.outdir,
+        parameters = fitDihedrals(mol, ref_calculator, parameters, selected_dihedrals, args.outdir,
                                   dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer,
                                   num_searches=args.dihed_num_searches)
 
     # Output the parameters and other results
-    _output_results(mol, parameters, orig_coor, qm, args)
+    _output_results(mol, parameters, initial_coords, args)
 
 
 if __name__ == '__main__':
