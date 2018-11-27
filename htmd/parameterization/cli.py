@@ -539,13 +539,6 @@ def main_parameterize(arguments=None):
     # Assign initial atomic charges, if needed
     mol = _fit_initial_charges(mol, args)
 
-    # Get a MM calculator
-    # TODO refactor
-    mm_minimizer = None
-    if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
-        from htmd.qm.custom import OMMMinimizer
-        mm_minimizer = OMMMinimizer(mol, parameters)
-
     # Geometry minimization
     # TODO refactor
     if args.min_type != 'None':
@@ -582,6 +575,12 @@ def main_parameterize(arguments=None):
 
     # Fit charges
     mol = _fit_charges(mol, args, qm)
+
+    # Recreate MM minimizer once charges have been fitted
+    mm_minimizer = None
+    if args.min_type == 'mm' or args.dihed_opt_type == 'mm':
+        from htmd.qm.custom import OMMMinimizer
+        mm_minimizer = OMMMinimizer(mol, parameters)
 
     # Scan dihedrals and fit parameters
     # TODO refactor
