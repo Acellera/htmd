@@ -697,6 +697,13 @@ def main_parameterize(arguments=None):
         # Fit dihedral parameters
         parameters = df.run()
 
+        # Plot dihedral profiles
+        plotDir = os.path.join(args.outdir, 'parameters', 'plots')
+        os.makedirs(plotDir, exist_ok=True)
+        df.plotConformerEnergies(plotDir)
+        for idihed in range(len(df.dihedrals)):
+            df.plotDihedralEnergies(idihed, plotDir)
+
     # Output the parameters and other results
     _output_results(mol, parameters, initial_coords, args)
 

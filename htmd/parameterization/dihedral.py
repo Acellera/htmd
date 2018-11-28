@@ -79,8 +79,6 @@ class DihedralFitting:
 
         self._dihedral_atomtypes = None
 
-        self._plot_directory = None
-
     @property
     def numDihedrals(self):
         """Number of dihedral angles"""
@@ -136,8 +134,7 @@ class DihedralFitting:
             self._initial_energies.append(np.array(energies))
 
         # Make result directories
-        self._plot_directory = os.path.join(self.result_directory, 'plots')
-        os.makedirs(self._plot_directory, exist_ok=True)
+        os.makedirs(self.result_directory, exist_ok=True)
 
     def _getBounds(self):
         """
@@ -396,10 +393,6 @@ class DihedralFitting:
         if self.num_searches != 0:
             assert np.isclose(self.loss, loss, rtol=0, atol=1e-5)
 
-        self.plotConformerEnergies()
-        for idihed in range(len(self.dihedrals)):
-            self.plotDihedralEnergies(idihed)
-
     def run(self):
 
         self._setup()
@@ -408,7 +401,7 @@ class DihedralFitting:
 
         return self.parameters
 
-    def plotDihedralEnergies(self, idihed, write_data=True):
+    def plotDihedralEnergies(self, idihed, directory='.', write_data=True):
         """
         Plot conformer energies for a specific dihedral angle, including QM, original and fitted MM energies.
         """
@@ -419,7 +412,7 @@ class DihedralFitting:
         fitted_energy = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
         indices = np.argsort(angle)
 
-        path = os.path.join(self._plot_directory, self._names[idihed])
+        path = os.path.join(directory, self._names[idihed])
 
         if write_data:
             fmtsz = 8
@@ -441,7 +434,7 @@ class DihedralFitting:
         plt.savefig(path + '.svg')
         plt.close()
 
-    def plotConformerEnergies(self, write_data=True):
+    def plotConformerEnergies(self, directory='.', write_data=True):
         """
         Plot all conformer QM energies versus MM energies with the fitted parameters
         """
@@ -455,7 +448,7 @@ class DihedralFitting:
         regression.fit(qm_energy, mm_energy)
         prediction = regression.predict(qm_energy)
 
-        path = os.path.join(self._plot_directory, 'conformer-energies')
+        path = os.path.join(directory, 'conformer-energies')
 
         if write_data:
             fmtsz = 8
