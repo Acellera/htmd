@@ -120,9 +120,7 @@ def pp_calcMinDistances(mol, sel1, sel2, metric='distances', threshold=8, pbc=Tr
         if mol.box is None or np.sum(mol.box) == 0:
             raise NameError('No periodic box dimensions given in the molecule/trajectory. '
                             'If you want to calculate distance without wrapping, set the pbc option to False')
-        box = mol.box[:, 0]  # TODO: make it work for varying box size
-        if np.max(mol.box.T - mol.box[:, 0]) != 0:
-            raise NameError('Different box sizes per frame. Still unsupported by mindist. Contact Stefan Doerr.')
+        box = mol.box
 
     coords = mol.coords
 
