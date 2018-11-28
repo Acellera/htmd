@@ -390,51 +390,56 @@ def reconstructContactMap(vector, mapping, truecontacts=None, plot=True, figsize
             plt.show()
     return cm
 
-if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
-    from htmd.home import home
-    from os import path
-    mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
-    mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
-    metr = MetricDistance('protein and name CA', 'resname MOL and noh', metric='contacts')
-    data = metr.project(mol)
-    contframes = np.array([46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  75,  93,  94,
-                           95,  96,  97,  98,  99, 100, 101, 102, 103, 114, 118, 119, 120,
-                           121, 122, 123, 124, 125, 126, 128, 129, 130, 131, 132, 133, 134,
-                           135, 136, 137, 138, 140, 141, 142, 143, 144, 145, 146, 153, 154,
-                           156, 157, 158, 159, 160, 161, 165, 166, 167, 168, 169, 170, 171,
-                           172, 173, 174, 175, 176])
-    assert np.all(np.unique(np.where(data)[0]) == contframes), 'Contact map calculation is broken'
+import unittest
+from htmd.home import home
+import os
+class TestMetricDistance(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+            from htmd.molecule.molecule import Molecule
+            from os import path
+            self.mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
+            self.mol_skipped = self.mol.copy()
 
-    metr = MetricDistance('protein and name CA', 'resname MOL and noh', metric='distances')
-    data = metr.project(mol)
-    lastdists = np.array([ 32.41402817,  35.00286865,  37.82732391,  38.58649445,
-                           39.26222229,  36.91499329,  37.93645477,  36.98008728,
-                           33.43220901,  33.0732193 ,  30.82616615,  27.90420341,
-                           28.2709713 ,  27.94139481,  24.85671616,  23.1801281 ,
-                           25.09490013,  24.58997917,  20.71271324], dtype=np.float32)
-    assert np.all(np.abs(data[-1, -20:-1] - lastdists) < 0.001), 'Distance calculation is broken'
+            self.mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'))
+            self.mol_skipped.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'), skip=10)
 
-    metr = MetricDistance('protein and noh', 'resname MOL and noh', groupsel1='residue', groupsel2='all')
-    data = metr.project(mol)
-    lastdists = np.array([28.99010277,  30.08285904,  32.75860214,  32.42934036,
-                          33.58397293,  32.05215073,  32.83199692,  31.5758419 ,
-                          27.89051056,  27.47974586,  25.18564415,  21.57362175,
-                          23.08990097,  22.45937729,  18.47289085,  18.41271782,
-                          20.87875175,  19.73318672,  15.1692543 ,  12.0577631 ], dtype=np.float32)
-    assert np.all(np.abs(data[-1, -20:] - lastdists) < 0.001), 'Minimum distance calculation is broken'
+    def test_contacts(self):
+        metr = MetricDistance('protein and name CA', 'resname MOL and noh', metric='contacts')
+        data = metr.project(self.mol)
+        refdata = np.load(os.path.join(home(), 'data', 'metricdistance', 'contacts.npy'))
+        assert np.allclose(data, refdata, atol=1e-3), 'Contact calculation is broken'
 
-    metr = MetricDistance('protein and resid 1 to 50 and noh', 'protein and resid 1 to 50 and noh', groupsel1='residue', groupsel2='residue')
-    data = metr.project(mol)
-    dataref = np.load(path.join(home(), 'data', 'metricdistance', 'selfdist1.npy'))
-    assert np.all(np.abs(data - dataref) < 0.001), 'Manual self-distance is broken'
+    def test_distances(self):
+        metr = MetricDistance('protein and name CA', 'resname MOL and noh', metric='distances')
+        data = metr.project(self.mol)
+        refdata = np.load(os.path.join(home(), 'data', 'metricdistance', 'distances.npy'))
+        assert np.allclose(data, refdata, atol=1e-3), 'Distance calculation is broken'
 
-    metr = MetricSelfDistance('protein and resid 1 to 50 and noh', groupsel='residue')
-    data = metr.project(mol)
-    dataref = np.load(path.join(home(), 'data', 'metricdistance', 'selfdist2.npy'))
-    assert np.all(np.abs(data - dataref) < 0.001), 'Automatic self-distance is broken'
+    def test_mindistances(self):
+        metr = MetricDistance('protein and noh', 'resname MOL and noh', groupsel1='residue', groupsel2='all')
+        data = metr.project(self.mol)
+        refdata = np.load(os.path.join(home(), 'data', 'metricdistance', 'mindistances.npy'))
+        assert np.allclose(data, refdata, atol=1e-3), 'Minimum distance calculation is broken'
 
-    mol.read(path.join(home(), 'data', 'metricdistance', 'traj.xtc'), skip=10)
-    data2 = metr.project(mol)
-    assert np.array_equal(data2, data[::10, :]), 'Minimum distance calculation with skipping is broken'
+    def test_selfmindistance_manual(self):
+        metr = MetricDistance('protein and resid 1 to 50 and noh', 'protein and resid 1 to 50 and noh', groupsel1='residue', groupsel2='residue')
+        data = metr.project(self.mol)
+        refdata = np.load(os.path.join(home(), 'data', 'metricdistance', 'selfmindistance.npy'))
+        assert np.allclose(data, refdata, atol=1e-3), 'Manual self-distance is broken'
 
+    def test_selfmindistance_auto(self):
+        metr = MetricSelfDistance('protein and resid 1 to 50 and noh', groupsel='residue')
+        data = metr.project(self.mol)
+        refdata = np.load(os.path.join(home(), 'data', 'metricdistance', 'selfmindistance.npy'))
+        assert np.allclose(data, refdata, atol=1e-3), 'Automatic self-distance is broken'
+
+    def test_mindistances_skip(self):
+        metr = MetricSelfDistance('protein and resid 1 to 50 and noh', groupsel='residue')
+        data = metr.project(self.mol_skipped)  
+        refdata = np.load(os.path.join(home(), 'data', 'metricdistance', 'selfmindistance.npy'))
+        assert np.allclose(data, refdata[::10, :], atol=1e-3), 'Minimum distance calculation with skipping is broken'
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
