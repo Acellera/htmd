@@ -294,28 +294,25 @@ def _get_qm_calculator(args, queue):
 
     return qm
 
+
 def _get_nnp_calculator(args, queue):
 
-    if args.nnp:
-        import importlib
-        from htmd.qm.custom import CustomQM
+    import importlib
+    from htmd.qm.custom import CustomQM
 
-        logger.info('=== NNP configuration ===')
+    logger.info('=== NNP configuration ===')
 
-        # Get NNP calculator
-        nnp_module = importlib.import_module(args.nnp)
-        logger.info('NNP module: {}'.format(nnp_module))
-        nnp_calculator = nnp_module.get_calculator()
-        logger.info('NNP calculator: {}'.format(nnp_calculator))
+    # Get NNP calculator
+    nnp_module = importlib.import_module(args.nnp)
+    logger.info('NNP module: {}'.format(nnp_module))
+    nnp_calculator = nnp_module.get_calculator()
+    logger.info('NNP calculator: {}'.format(nnp_calculator))
 
-        # Create a custom "QM" object
-        nnp = CustomQM(verbose=False)
-        nnp.queue = queue
-        nnp.charge = args.charge
-        nnp.calculator = nnp_calculator
-
-    else:
-        nnp = None
+    # Create a custom "QM" object
+    nnp = CustomQM(verbose=False)
+    nnp.queue = queue
+    nnp.charge = args.charge
+    nnp.calculator = nnp_calculator
 
     return nnp
 
@@ -571,9 +568,17 @@ def main_parameterize(arguments=None):
     # Get a queue
     queue = _get_queue(args)
 
-    # Get calculators
-    qm_calculator = _get_qm_calculator(args, queue)
-    nnp_calculator = _get_nnp_calculator(args, queue)
+    # Get QM calculators
+    qm_calculator = None
+    if args.min_type == 'qm' or args.charge_type == 'ESP' or (args.fit_dihedral and not args.nnp):
+        qm_calculator = _get_qm_calculator(args, queue)
+
+    # Get NNP calculators
+    nnp_calculator = None
+    if args.nnp:
+        nnp_calculator = _get_nnp_calculator(args, queue)
+
+    # Set the reference calculator
     if args.nnp:
         ref_calculator = nnp_calculator
         logger.info('Reference method: NNP')
