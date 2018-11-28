@@ -8,7 +8,7 @@ import logging
 import re
 import os
 import subprocess
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, TemporaryFile
 
 logger = logging.getLogger(__name__)
 
@@ -292,8 +292,13 @@ def guessBondType(mol):
         cmd = ['antechamber',
                '-fi', 'mol2', '-i', old_name,
                '-fo', 'mol2', '-o', new_name]
-        if subprocess.call(cmd, cwd=tmpDir) != 0:
-            raise RuntimeError('"antechamber" failed')
+
+        with TemporaryFile() as stream:
+            if subprocess.call(cmd, cwd=tmpDir, stdout=stream, stderr=stream) != 0:
+                raise RuntimeError('"antechamber" failed')
+            stream.seek(0)
+            for line in stream.readlines():
+                logger.debug(line)
 
         mol.bondtype[:] = Molecule(new_name).bondtype
 
