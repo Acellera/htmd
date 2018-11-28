@@ -525,7 +525,7 @@ def _output_results(mol, parameters, original_coords, args):
 def main_parameterize(arguments=None):
 
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
-    from htmd.parameterization.util import minimize, fitDihedrals, detectChiralCenters
+    from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
 
     logger.info('===== Parameterize =====')
 
@@ -634,6 +634,8 @@ def main_parameterize(arguments=None):
     # TODO refactor
     if len(selected_dihedrals) > 0:
 
+        from htmd.parameterization.dihedral import DihedralFitting  # Slow import
+
         logger.info('=== Dihedral angle scanning and parameter fitting ===')
 
         if args.dihed_opt_type == 'None':
@@ -666,15 +668,34 @@ def main_parameterize(arguments=None):
             assert not args.nnp
             ref_calculator._parameters = parameters
 
+        # Scan dihedral angles
+        # TODO separate scanning and fitting
+        scan_results = scanDihedrals(mol, ref_calculator, selected_dihedrals, args.outdir,
+                                     dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
+
+        # Filter scan results
+        scan_results = filterQMResults(scan_results, mol=mol)
+
         # Set random number generator seed
         if args.seed:
             np.random.seed(args.seed)
 
-        # Fit the parameters
-        # TODO separate scanning and fitting
-        parameters = fitDihedrals(mol, ref_calculator, parameters, selected_dihedrals, args.outdir,
-                                  dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer,
-                                  num_searches=args.dihed_num_searches)
+        # Fit the dihedral parameters
+        df = DihedralFitting()
+        df.parameters = parameters
+        df.molecule = mol
+        df.dihedrals = selected_dihedrals
+        df.qm_results = scan_results
+        df.num_searches = args.dihed_num_searches
+        df.result_directory = os.path.join(args.outdir, 'parameters')
+
+        # In case of FakeQM, the initial parameters are set to zeros.
+        # It prevents DihedralFitting class from cheating :D
+        if args.fake_qm:
+            df.zeroed_parameters = True
+
+        # Fit dihedral parameters
+        parameters = df.run()
 
     # Output the parameters and other results
     _output_results(mol, parameters, initial_coords, args)

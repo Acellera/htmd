@@ -406,7 +406,7 @@ class DihedralFitting:
         self._fit()
         self._check()
 
-        return self.loss
+        return self.parameters
 
     def plotDihedralEnergies(self, idihed, write_data=True):
         """

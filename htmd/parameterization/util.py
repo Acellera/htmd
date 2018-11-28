@@ -139,12 +139,10 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
     return mol
 
 
-def fitDihedrals(mol, qm, prm, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None, num_searches=None):
+def scanDihedrals(mol, qm, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None):
     """
     Dihedrals passed as 4 atom indices
     """
-    from htmd.parameterization.dihedral import DihedralFitting
-    from htmd.qm import FakeQM2
 
     # Create molecules with rotamers
     molecules = []
@@ -200,28 +198,7 @@ def fitDihedrals(mol, qm, prm, dihedrals, outdir, dihed_opt_type='qm', mm_minimi
         qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
         qm_results.append(qm.retrieve())
 
-    # Filter QM results
-    qm_results = filterQMResults(qm_results, mol=mol)
-
-    # Fit the dihedral parameters
-    df = DihedralFitting()
-    df.parmedMode = True
-    df.parameters = prm
-    df.molecule = mol
-    df.dihedrals = dihedrals
-    df.qm_results = qm_results
-    df.num_searches = num_searches
-    df.result_directory = os.path.join(outdir, 'parameters')
-
-    # In case of FakeQM, the initial parameters are set to zeros.
-    # It prevents DihedralFitting class from cheating :D
-    if isinstance(qm, FakeQM2):
-        df.zeroed_parameters = True
-
-    # Fit dihedral parameters
-    df.run()
-
-    return df.parameters
+    return qm_results
 
 
 def guessBondType(mol):
