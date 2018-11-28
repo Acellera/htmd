@@ -8,7 +8,7 @@ import subprocess
 import os
 import re
 import unittest
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, TemporaryFile
 
 import numpy as np
 
@@ -28,9 +28,9 @@ def _canonicalizeAtomNames(mol):
     mol = mol.copy()
 
     mol.segid[:] = 'L'
-    logger.info('Rename segment to %s' % mol.segid[0])
+    logger.debug('Rename segment to %s' % mol.segid[0])
     mol.resname[:] = 'MOL'
-    logger.info('Rename residue to %s' % mol.resname[0])
+    logger.debug('Rename residue to %s' % mol.resname[0])
 
     sufices = {}
     for i in range(mol.numAtoms):
@@ -38,7 +38,7 @@ def _canonicalizeAtomNames(mol):
         sufices[name] = sufices.get(name, 0) + 1
         name += str(sufices[name])
 
-        logger.info('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
+        logger.debug('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
         mol.name[i] = name
 
     return mol
@@ -95,7 +95,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
 
     if netcharge is None:
         netcharge = int(round(np.sum(mol.charge)))
-        logger.warning('Using atomic charges from molecule object to calculate net charge')
+        logger.warning('Molecular charge is set to {} by adding up the atomic charges'.format(netcharge))
 
     if rtfFile and prmFile:
 
@@ -127,7 +127,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
 
                 atomtype = method.lower()
 
-                # Run antechamber
+                # Set arguments
                 cmd = ['antechamber',
                        '-at', atomtype,
                        '-nc', str(netcharge),
@@ -137,20 +137,30 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
                        '-o', 'mol.prepi']
                 if acCharges is not None:
                     cmd += ['-c', acCharges]
-                returncode = subprocess.call(cmd, cwd=tmpdir)
-                if returncode != 0:
-                    raise RuntimeError('"antechamber" failed')
 
-                # Run parmchk2
+                # Run antechamber
+                with TemporaryFile() as stream:
+                    if subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream) != 0:
+                        raise RuntimeError('"antechamber" failed')
+                    stream.seek(0)
+                    for line in stream.readlines():
+                        logger.debug(line)
+
+                # Set arguments
                 cmd = ['parmchk2',
                        '-f', 'prepi',
                        '-s', atomtype,
                        '-i', 'mol.prepi',
                        '-o', 'mol.frcmod',
                        '-a', 'Y']
-                returncode = subprocess.call(cmd, cwd=tmpdir)
-                if returncode != 0:
-                    raise RuntimeError('"parmchk2" failed')
+
+                # Run parmchk2
+                with TemporaryFile() as stream:
+                    if subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream) != 0:
+                        raise RuntimeError('"parmchk2" failed')
+                    stream.seek(0)
+                    for line in stream.readlines():
+                        logger.debug(line)
 
                 # Check if antechamber did changes in atom names (and suggest the user to fix the names)
                 acmol = Molecule(os.path.join(tmpdir, 'NEWPDB.PDB'), type='pdb')
@@ -176,14 +186,19 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
                 # Write the molecule to a file
                 renamed_mol.write(os.path.join(tmpdir, 'mol.pdb'))
 
-                # Run match-type
+                # Set arguments
                 cmd = ['match-typer',
                        '-charge', str(netcharge),
                        '-forcefield', 'top_all36_cgenff_new',
                        'mol.pdb']
-                returncode = subprocess.call(cmd, cwd=tmpdir)
-                if returncode != 0:
-                    raise RuntimeError('"match-typer" failed')
+
+                # Run match-type
+                with TemporaryFile() as stream:
+                    if subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream) != 0:
+                        raise RuntimeError('"match-typer" failed')
+                    stream.seek(0)
+                    for line in stream.readlines():
+                        logger.debug(line)
 
                 prm = parmed.charmm.CharmmParameterSet(os.path.join(tmpdir, 'mol.rtf'), os.path.join(tmpdir, 'mol.prm'))
                 names, elements, atomtypes, charges, masses, impropers = readRTF(os.path.join(tmpdir, 'mol.rtf'))
