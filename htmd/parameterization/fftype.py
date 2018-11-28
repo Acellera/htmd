@@ -28,9 +28,9 @@ def _canonicalizeAtomNames(mol):
     mol = mol.copy()
 
     mol.segid[:] = 'L'
-    logger.info('Rename segment to %s' % mol.segid[0])
+    logger.debug('Rename segment to %s' % mol.segid[0])
     mol.resname[:] = 'MOL'
-    logger.info('Rename residue to %s' % mol.resname[0])
+    logger.debug('Rename residue to %s' % mol.resname[0])
 
     sufices = {}
     for i in range(mol.numAtoms):
@@ -38,7 +38,7 @@ def _canonicalizeAtomNames(mol):
         sufices[name] = sufices.get(name, 0) + 1
         name += str(sufices[name])
 
-        logger.info('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
+        logger.debug('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
         mol.name[i] = name
 
     return mol
@@ -95,7 +95,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
 
     if netcharge is None:
         netcharge = int(round(np.sum(mol.charge)))
-        logger.warning('Using atomic charges from molecule object to calculate net charge')
+        logger.warning('Molecular charge is set to {} by adding up the atomic charges'.format(netcharge))
 
     if rtfFile and prmFile:
 
