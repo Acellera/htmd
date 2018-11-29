@@ -428,7 +428,7 @@ class DihedralFitting:
 
         if write_data:
             fmtsz = 8
-            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# angle', 'QM_ref', 'MM_init', 'MM_fit'])
+            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# angle', 'ref', 'MM_init', 'MM_fit'])
             data = np.column_stack((angle_values, reference_energies, initial_energies, fitted_energies))
             np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
 
@@ -473,7 +473,7 @@ class DihedralFitting:
 
         if write_data:
             fmtsz = 8
-            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# QM', 'MM'])
+            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# ref', 'MM'])
             data = np.column_stack((qm_energy, mm_energy))
             np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
 
