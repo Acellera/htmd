@@ -676,7 +676,6 @@ def main_parameterize(arguments=None):
             ref_calculator._parameters = parameters
 
         # Scan dihedral angles
-        # TODO separate scanning and fitting
         scan_results = scanDihedrals(mol, ref_calculator, selected_dihedrals, args.outdir,
                                      scan_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
 
