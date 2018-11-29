@@ -92,17 +92,16 @@ class DihedralFitting:
         # Get dihedral names
         self._names = ['-'.join(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
 
-        # Get equivalent dihedral atom indices
+        # Get all equivalent dihedrals
+        all_equivalent_dihedrals = detectParameterizableDihedrals(self.molecule)
+        all_equivalent_dihedrals = {tuple(dihedrals[0]): dihedrals for dihedrals in all_equivalent_dihedrals}
+
+        # Choose the selected dihedrals
         self._equivalent_dihedrals = []
-        for idihed, dihedral in enumerate(self.dihedrals):
-            found = False
-            for parameterizableDihedral in detectParameterizableDihedrals(self.molecule):
-                if np.all(list(parameterizableDihedral[0]) == dihedral):
-                    self._equivalent_dihedrals.append(parameterizableDihedral)
-                    found = True
-                    break
-            if not found:
-                raise ValueError('%s is not recognized as a parameterizable dihedral\n' % self._names[idihed])
+        for dihedral, name in zip(self.dihedrals, self._names):
+            if tuple(dihedral) not in all_equivalent_dihedrals:
+                raise ValueError('{} is not a parameterizable dihedral!'.format(name))
+            self._equivalent_dihedrals.append(all_equivalent_dihedrals[tuple(dihedral)])
 
         # Get dihedral atom types
         self._dihedral_atomtypes = [findDihedralType(tuple(self.molecule.atomtype[dihedral]), self.parameters) for dihedral in self.dihedrals]
