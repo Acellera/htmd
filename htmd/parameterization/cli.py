@@ -570,21 +570,28 @@ def main_parameterize(arguments=None):
 
     # Get QM calculators
     qm_calculator = None
+    qm_name = ''
     if args.min_type == 'qm' or args.charge_type == 'ESP' or (args.fit_dihedral and not args.nnp):
         qm_calculator = _get_qm_calculator(args, queue)
+        qm_name = '{}/{}'.format(qm_calculator.theory, qm_calculator.basis)
+        if args.fake_qm:
+            qm_name = 'Fake QM'
 
     # Get NNP calculators
     nnp_calculator = None
+    nnp_name = ''
     if args.nnp:
         nnp_calculator = _get_nnp_calculator(args, queue)
+        nnp_name = args.npp
 
     # Set the reference calculator
     if args.nnp:
         ref_calculator = nnp_calculator
-        logger.info('Reference method: NNP')
+        ref_name = nnp_name
     else:
         ref_calculator = qm_calculator
-        logger.info('Reference method: QM')
+        ref_name = qm_name
+    logger.info('Reference method: {}'.format(ref_name))
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
@@ -698,11 +705,11 @@ def main_parameterize(arguments=None):
         parameters = df.run()
 
         # Plot dihedral profiles
-        plotDir = os.path.join(args.outdir, 'parameters', 'plots')
-        os.makedirs(plotDir, exist_ok=True)
-        df.plotConformerEnergies(plotDir)
+        plot_dir = os.path.join(args.outdir, 'parameters', 'plots')
+        os.makedirs(plot_dir, exist_ok=True)
+        df.plotConformerEnergies(plot_dir, ref_name=ref_name)
         for idihed in range(len(df.dihedrals)):
-            df.plotDihedralEnergies(idihed, plotDir)
+            df.plotDihedralEnergies(idihed, plot_dir, ref_name=ref_name)
 
     # Output the parameters and other results
     _output_results(mol, parameters, initial_coords, args)

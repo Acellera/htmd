@@ -11,17 +11,17 @@ import unittest
 
 import matplotlib
 matplotlib.use('Agg') # Use Agg to work on Travis
-
 import matplotlib.pyplot as plt
+
 import nlopt
 import numpy as np
 
 from sklearn.linear_model import LinearRegression
 
-from htmd.numbautil import dihedralAngle
 from htmd.ffevaluation.ffevaluate import FFEvaluate
-from htmd.parameterization.parameterset import findDihedralType
+from htmd.numbautil import dihedralAngle
 from htmd.parameterization.detect import detectParameterizableDihedrals
+from htmd.parameterization.parameterset import findDihedralType
 
 logger = logging.getLogger(__name__)
 
@@ -400,54 +400,76 @@ class DihedralFitting:
 
         return self.parameters
 
-    def plotDihedralEnergies(self, idihed, directory='.', write_data=True):
+    def plotDihedralEnergies(self, idihed, directory='.', ref_name = 'Ref', write_data=True):
         """
         Plot conformer energies for a specific dihedral angle, including QM, original and fitted MM energies.
         """
 
-        angle = np.rad2deg(self._angle_values[idihed][idihed][:, 0])
-        reference_energy = self._reference_energies[idihed] - np.min(self._reference_energies[idihed])
-        initial_energy = self._initial_energies[idihed] - np.min(self._initial_energies[idihed])
-        fitted_energy = self._fitted_energies[idihed] - np.min(self._fitted_energies[idihed])
-        indices = np.argsort(angle)
-
         path = os.path.join(directory, self._names[idihed])
+
+        # Get data
+        angle_values = self._angle_values[idihed][idihed][:, 0]
+        reference_energies = self._reference_energies[idihed]
+        initial_energies = self._initial_energies[idihed]
+        fitted_energies = self._fitted_energies[idihed]
+
+        # Convert and offset data
+        angle_values = np.rad2deg(angle_values)
+        reference_energies -= np.min(reference_energies)
+        initial_energies -= np.min(initial_energies)
+        fitted_energies -= np.min(fitted_energies)
+
+        # Sort data
+        indices = np.argsort(angle_values)
+        angle_values = angle_values[indices]
+        reference_energies = reference_energies[indices]
+        initial_energies = initial_energies[indices]
+        fitted_energies = fitted_energies[indices]
 
         if write_data:
             fmtsz = 8
             header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# angle', 'QM_ref', 'MM_init', 'MM_fit'])
-            data = np.column_stack((angle[indices], reference_energy[indices], initial_energy[indices],
-                                    fitted_energy[indices]))
+            data = np.column_stack((angle_values, reference_energies, initial_energies, fitted_energies))
             np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
 
+        # Impose periodic boundaries
+        angle_values = np.concatenate([[angle_values[-1] - 360], angle_values, [angle_values[0] + 360]])
+        reference_energies = np.concatenate([[reference_energies[-1]], reference_energies, [reference_energies[0]]])
+        initial_energies = np.concatenate([[initial_energies[-1]], initial_energies, [initial_energies[0]]])
+        fitted_energies = np.concatenate([[fitted_energies[-1]], fitted_energies, [fitted_energies[0]]])
+
         plt.figure()
-        plt.title(self._names[idihed])
-        plt.xlabel('Dihedral angle, deg')
+        plt.title('Dihedral angle: {}'.format(self._names[idihed]))
+        plt.xlabel('Dihedral angle [deg]')
         plt.xlim(-180, 180)
         plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
-        plt.ylabel('Energy, kcal/mol')
-        plt.plot(angle[indices], reference_energy[indices], 'r-', marker='o', lw=3, label='QM')
-        plt.plot(angle[indices], initial_energy[indices], 'g-', marker='o', label='MM initial')
-        plt.plot(angle[indices], fitted_energy[indices], 'b-', marker='o', label='MM fitted')
+        plt.ylabel('Energy [kcal/mol]')
+        plt.plot(angle_values, reference_energies, 'r-', marker='o', lw=3, label=ref_name)
+        plt.plot(angle_values, initial_energies, 'g-', marker='o', lw=2, label='MM initial')
+        plt.plot(angle_values, fitted_energies, 'b-', marker='o', lw=2, label='MM fitted')
         plt.legend()
         plt.savefig(path + '.svg')
         plt.close()
 
-    def plotConformerEnergies(self, directory='.', write_data=True):
+    def plotConformerEnergies(self, directory='.', ref_name='Ref', write_data=True):
         """
         Plot all conformer QM energies versus MM energies with the fitted parameters
         """
 
+        path = os.path.join(directory, 'conformer-energies')
+
+        # Get data
         qm_energy = np.concatenate(self._reference_energies)[:, None]
         mm_energy = np.concatenate(self._fitted_energies)[:, None]
+
+        # Offset data
         qm_energy -= np.min(qm_energy)
         mm_energy -= np.min(mm_energy)
 
+        # Fit a linear regression
         regression = LinearRegression(fit_intercept=False)
         regression.fit(qm_energy, mm_energy)
         prediction = regression.predict(qm_energy)
-
-        path = os.path.join(directory, 'conformer-energies')
 
         if write_data:
             fmtsz = 8
@@ -456,9 +478,9 @@ class DihedralFitting:
             np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
 
         plt.figure()
-        plt.title('Conformer Energies MM vs QM')
-        plt.xlabel('QM energy, kcal/mol')
-        plt.ylabel('MM energy, kcal/mol')
+        plt.title('{} vs MM energies'.format(ref_name))
+        plt.xlabel('{} energy [kcal/mol]'.format(ref_name))
+        plt.ylabel('MM energy [kcal/mol]')
         plt.plot(qm_energy, mm_energy, 'ko')
         plt.plot(qm_energy, prediction, 'r-', lw=2)
         plt.savefig(path + '.svg')
