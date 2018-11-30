@@ -357,7 +357,7 @@ class TestParameterize(unittest.TestCase):
         assert 'HTMD_CONFIG' in os.environ, '"HTMD_CONFIG" environment variable has to be set'
         refDir = os.path.join(self.dataDir, 'benzamidine_full')
         resDir = os.path.join(self.testDir, 'benzamidine_full')
-        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --basis 6-31G* -q Slurm')
+        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 --basis 6-31G* -q Slurm')
         self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_LONGTESTS') == 'yes', 'Too long')
@@ -367,7 +367,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --basis 6-31G*')
+        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 --basis 6-31G*')
         self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
@@ -376,7 +376,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'benzamidine_esp_freeze_restart')
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
-        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 --fix-charge N14 --basis 6-31G* --no-dihed')
+        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 --fix-charge N14 --basis 6-31G* --no-dihed')
         self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_UNSTABLETESTS') == 'yes', 'Unstable')
@@ -386,7 +386,7 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'minimize'), os.path.join(resDir, 'minimize'))
         shutil.copytree(os.path.join(refDir, 'esp'), os.path.join(resDir, 'esp'))
         shutil.copytree(os.path.join(refDir, 'dihedral-opt'), os.path.join(resDir, 'dihedral-opt'))
-        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 CGenFF_2b6 -d C2-C1-C7-N13 --basis 6-31G*')
+        self._run(refDir, resDir, 'parameterize input.mol2 -c 1 -ff GAFF2 -d C2-C1-C7-N13 --basis 6-31G*')
         self._test(refDir, resDir)
 
     def test_h2o2_dihed_opt_mm_fake(self):

@@ -481,14 +481,14 @@ def _printEnergies(molecule, parameters, filename):
     energies = FFEvaluate(molecule, parameters).calculateEnergies(molecule.coords[:, :, 0])
 
     string = '''
-== Diagnostic Energies ==
+== Diagnostic Energies (in kcal/mol) ==
 
-Bond     : {BOND_ENERGY}
-Angle    : {ANGLE_ENERGY}
-Dihedral : {DIHEDRAL_ENERGY}
-Improper : {IMPROPER_ENERGY}
-Electro  : {ELEC_ENERGY}
-VdW      : {VDW_ENERGY}
+Bond     : {BOND_ENERGY:10.3f}
+Angle    : {ANGLE_ENERGY:10.3f}
+Dihedral : {DIHEDRAL_ENERGY:10.3f}
+Improper : {IMPROPER_ENERGY:10.3f}
+Electro  : {ELEC_ENERGY:10.3f}
+VdW      : {VDW_ENERGY:10.3f}
 
 '''.format(BOND_ENERGY=energies['bond'],
            ANGLE_ENERGY=energies['angle'],
@@ -497,13 +497,29 @@ VdW      : {VDW_ENERGY}
            ELEC_ENERGY=energies['elec'],
            VDW_ENERGY=energies['vdw'])
 
+    for l in string.split('\n'):
+        logger.info(l)
     with open(filename, 'w') as file_:
         file_.write(string)
     logger.info('Write energy file: {}'.format(filename))
 
-    logger.info('Diagnostic energies:')
-    for name in ('bond', 'angle', 'dihedral', 'improper', 'elec', 'vdw'):
-        logger.info('   {:8s} : {:10.3f} kcal/mol'.format(name, energies[name]))
+
+def _printArguments(args, filename=None):
+
+    if filename:
+        logger.propagate = False
+        fh = logging.FileHandler(filename)
+        logger.addHandler(fh)
+
+    logger.info('=== Arguments ===')
+    for key, value in vars(args).items():
+        if key in ('fake_qm',):  # Hidden
+            continue
+        logger.info('{:>20s}: {:s}'.format(key, str(value)))
+
+    if filename:
+        logger.propagate = True
+        logger.removeHandler(fh)
 
 
 def _output_results(mol, parameters, original_coords, args):
@@ -512,8 +528,13 @@ def _output_results(mol, parameters, original_coords, args):
 
     logger.info('=== Results ===')
 
+    dir = os.path.join(args.outdir, 'parameters', args.forcefield)
+
+    # Write arguments
+    argumentsFile = os.path.join(dir, 'arguments.txt')
+    _printArguments(args, filename=argumentsFile)
+
     # Output the FF parameters and other files
-    dir = os.path.join(args.outdir, 'parameters')
     # TODO split into separate writer
     writeParameters(dir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
 
@@ -549,12 +570,7 @@ def main_parameterize(arguments=None):
     if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
         raise DeprecationWarning('Use `--scan-type` instead.')
 
-    # Print arguments
-    logger.info('=== Arguments ===')
-    for key, value in vars(args).items():
-        if key in ('fake_qm',):  # Hidden
-            continue
-        logger.info('{:>20s}: {:s}'.format(key, str(value)))        
+    _printArguments(args)
 
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
@@ -693,7 +709,7 @@ def main_parameterize(arguments=None):
         df.dihedrals = selected_dihedrals
         df.qm_results = scan_results
         df.num_searches = args.dihed_num_searches
-        df.result_directory = os.path.join(args.outdir, 'parameters')
+        df.result_directory = os.path.join(args.outdir, 'parameters', args.forcefield)
 
         # In case of FakeQM, the initial parameters are set to zeros.
         # It prevents DihedralFitting class from cheating :D
@@ -704,7 +720,7 @@ def main_parameterize(arguments=None):
         parameters = df.run()
 
         # Plot dihedral profiles
-        plot_dir = os.path.join(args.outdir, 'parameters', 'plots')
+        plot_dir = os.path.join(args.outdir, 'parameters', args.forcefield, 'plots')
         os.makedirs(plot_dir, exist_ok=True)
         df.plotConformerEnergies(plot_dir, ref_name=ref_name)
         for idihed in range(len(df.dihedrals)):
