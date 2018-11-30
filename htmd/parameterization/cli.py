@@ -525,7 +525,7 @@ def _output_results(mol, parameters, original_coords, args):
 def main_parameterize(arguments=None):
 
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
-    from htmd.parameterization.util import minimize, fitDihedrals, detectChiralCenters
+    from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
 
     logger.info('===== Parameterize =====')
 
@@ -570,21 +570,28 @@ def main_parameterize(arguments=None):
 
     # Get QM calculators
     qm_calculator = None
+    qm_name = ''
     if args.min_type == 'qm' or args.charge_type == 'ESP' or (args.fit_dihedral and not args.nnp):
         qm_calculator = _get_qm_calculator(args, queue)
+        qm_name = '{}/{}'.format(qm_calculator.theory, qm_calculator.basis)
+        if args.fake_qm:
+            qm_name = 'Fake QM'
 
     # Get NNP calculators
     nnp_calculator = None
+    nnp_name = ''
     if args.nnp:
         nnp_calculator = _get_nnp_calculator(args, queue)
+        nnp_name = args.npp
 
     # Set the reference calculator
     if args.nnp:
         ref_calculator = nnp_calculator
-        logger.info('Reference method: NNP')
+        ref_name = nnp_name
     else:
         ref_calculator = qm_calculator
-        logger.info('Reference method: QM')
+        ref_name = qm_name
+    logger.info('Reference method: {}'.format(ref_name))
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
@@ -634,6 +641,8 @@ def main_parameterize(arguments=None):
     # TODO refactor
     if len(selected_dihedrals) > 0:
 
+        from htmd.parameterization.dihedral import DihedralFitting  # Slow import
+
         logger.info('=== Dihedral angle scanning and parameter fitting ===')
 
         if args.dihed_opt_type == 'None':
@@ -666,15 +675,40 @@ def main_parameterize(arguments=None):
             assert not args.nnp
             ref_calculator._parameters = parameters
 
+        # Scan dihedral angles
+        scan_results = scanDihedrals(mol, ref_calculator, selected_dihedrals, args.outdir,
+                                     scan_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
+
+        # Filter scan results
+        scan_results = filterQMResults(scan_results, mol=mol)
+
         # Set random number generator seed
         if args.seed:
             np.random.seed(args.seed)
 
-        # Fit the parameters
-        # TODO separate scanning and fitting
-        parameters = fitDihedrals(mol, ref_calculator, parameters, selected_dihedrals, args.outdir,
-                                  dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer,
-                                  num_searches=args.dihed_num_searches)
+        # Fit the dihedral parameters
+        df = DihedralFitting()
+        df.parameters = parameters
+        df.molecule = mol
+        df.dihedrals = selected_dihedrals
+        df.qm_results = scan_results
+        df.num_searches = args.dihed_num_searches
+        df.result_directory = os.path.join(args.outdir, 'parameters')
+
+        # In case of FakeQM, the initial parameters are set to zeros.
+        # It prevents DihedralFitting class from cheating :D
+        if args.fake_qm:
+            df.zeroed_parameters = True
+
+        # Fit dihedral parameters
+        parameters = df.run()
+
+        # Plot dihedral profiles
+        plot_dir = os.path.join(args.outdir, 'parameters', 'plots')
+        os.makedirs(plot_dir, exist_ok=True)
+        df.plotConformerEnergies(plot_dir, ref_name=ref_name)
+        for idihed in range(len(df.dihedrals)):
+            df.plotDihedralEnergies(idihed, plot_dir, ref_name=ref_name)
 
     # Output the parameters and other results
     _output_results(mol, parameters, initial_coords, args)
