@@ -77,6 +77,24 @@ def getArgumentParser():
     return parser
 
 
+def _printArguments(args, filename=None):
+
+    if filename:
+        logger.propagate = False  # Turn off logging to stdout
+        fh = logging.FileHandler(filename)
+        logger.addHandler(fh)
+
+    logger.info('=== Arguments ===')
+    for key, value in vars(args).items():
+        if key in ('fake_qm',):  # Hidden
+            continue
+        logger.info('{:>20s}: {:s}'.format(key, str(value)))
+
+    if filename:
+        logger.propagate = True  # Turn on logging to stdout
+        logger.removeHandler(fh)
+
+
 def _prepare_molecule(args):
 
     from htmd.molecule.molecule import Molecule
@@ -481,14 +499,14 @@ def _printEnergies(molecule, parameters, filename):
     energies = FFEvaluate(molecule, parameters).calculateEnergies(molecule.coords[:, :, 0])
 
     string = '''
-== Diagnostic Energies (in kcal/mol) ==
+== Diagnostic Energies ==
 
-Bond     : {BOND_ENERGY:10.3f}
-Angle    : {ANGLE_ENERGY:10.3f}
-Dihedral : {DIHEDRAL_ENERGY:10.3f}
-Improper : {IMPROPER_ENERGY:10.3f}
-Electro  : {ELEC_ENERGY:10.3f}
-VdW      : {VDW_ENERGY:10.3f}
+Bond     : {BOND_ENERGY:12.6f} kcal/mol
+Angle    : {ANGLE_ENERGY:12.6f} kcal/mol
+Dihedral : {DIHEDRAL_ENERGY:12.6f} kcal/mol
+Improper : {IMPROPER_ENERGY:12.6f} kcal/mol
+Electro  : {ELEC_ENERGY:12.6f} kcal/mol
+VdW      : {VDW_ENERGY:12.6f} kcal/mol
 
 '''.format(BOND_ENERGY=energies['bond'],
            ANGLE_ENERGY=energies['angle'],
@@ -497,29 +515,11 @@ VdW      : {VDW_ENERGY:10.3f}
            ELEC_ENERGY=energies['elec'],
            VDW_ENERGY=energies['vdw'])
 
-    for l in string.split('\n'):
-        logger.info(l)
+    for line in string.split('\n'):
+        logger.info(line)
     with open(filename, 'w') as file_:
         file_.write(string)
     logger.info('Write energy file: {}'.format(filename))
-
-
-def _printArguments(args, filename=None):
-
-    if filename:
-        logger.propagate = False
-        fh = logging.FileHandler(filename)
-        logger.addHandler(fh)
-
-    logger.info('=== Arguments ===')
-    for key, value in vars(args).items():
-        if key in ('fake_qm',):  # Hidden
-            continue
-        logger.info('{:>20s}: {:s}'.format(key, str(value)))
-
-    if filename:
-        logger.propagate = True
-        logger.removeHandler(fh)
 
 
 def _output_results(mol, parameters, original_coords, args):
@@ -528,18 +528,19 @@ def _output_results(mol, parameters, original_coords, args):
 
     logger.info('=== Results ===')
 
-    dir = os.path.join(args.outdir, 'parameters', args.forcefield)
+    paramDir = os.path.join(args.outdir, 'parameters', args.forcefield)
 
     # Write arguments
-    argumentsFile = os.path.join(dir, 'arguments.txt')
+    argumentsFile = os.path.join(paramDir, 'arguments.txt')
     _printArguments(args, filename=argumentsFile)
+    logger.info('Write the list of  to {}'.format(argumentsFile))
 
     # Output the FF parameters and other files
     # TODO split into separate writer
-    writeParameters(dir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
+    writeParameters(paramDir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
 
     # Write energy file
-    energyFile = os.path.join(dir, 'energies.txt')
+    energyFile = os.path.join(paramDir, 'energies.txt')
     _printEnergies(mol, parameters, energyFile)
 
 
@@ -553,6 +554,7 @@ def main_parameterize(arguments=None):
     # Parse arguments
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
+    _printArguments(args)
 
     # Validate arguments
     if args.fake_qm and args.nnp:
@@ -569,8 +571,6 @@ def main_parameterize(arguments=None):
         raise DeprecationWarning('Use `--min-type` instead.')
     if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
         raise DeprecationWarning('Use `--scan-type` instead.')
-
-    _printArguments(args)
 
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
