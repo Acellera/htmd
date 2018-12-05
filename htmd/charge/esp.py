@@ -64,7 +64,7 @@ class MoleculeGrid:
     >>> from htmd.molecule.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
-    >>> mol.write('H2O.xyz')
+    >>> mol.write('H2O.xyz') # doctest: +SKIP
 
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol)
@@ -78,7 +78,7 @@ class MoleculeGrid:
            [-0.77827968, -2.58209328,  1.06180501],
            [ 0.14494011, -0.39823904, -2.07498691],
            [-1.50372053, -0.32872076,  1.19264375]])
-    >>> grid.writeXYZ('H2O_default.xyz')
+    >>> grid.writeXYZ('H2O_default.xyz') # doctest: +SKIP
 
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol, shell_factors=(1, 2), density=50)
@@ -92,7 +92,7 @@ class MoleculeGrid:
            [ 1.35323883, -3.08583052, -0.17044048],
            [-0.80667116,  0.64144373, -0.99312377],
            [ 2.45040501, -2.23107494, -0.48419202]])
-    >>> grid.writeXYZ('H2O_1_2__50.xyz')
+    >>> grid.writeXYZ('H2O_1_2__50.xyz') # doctest: +SKIP
     """
     def __init__(self, molecule, shell_factors=(1.4, 1.6, 1.8, 2.0), density=25):
 
@@ -447,7 +447,6 @@ class TestESP(unittest.TestCase):
         lower_bounds, upper_bounds = self.esp._get_bounds()
         self.assertEqual(list(lower_bounds), [-1.25, 0.25279998779296875])
         self.assertEqual(list(upper_bounds), [1.25, 0.25279998779296875])
-
 
     def test_objective(self):
 
