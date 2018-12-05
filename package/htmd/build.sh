@@ -39,6 +39,9 @@ else
     exit 1
 fi
 
+# Delete compiled libs from other OS
+find $DIR/htmd/lib -maxdepth 1 ! -name "$OSNAME" ! -path $DIR/htmd/lib -type d -exec rm -rf {} \; -print || true
+
 # copy compiled libs
 if [ -e "$STARTDIR/htmd/lib/$OSNAME" ]; then
     if [ -e "$DIR/htmd/lib/$OSNAME" ]; then
