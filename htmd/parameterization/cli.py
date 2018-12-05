@@ -81,7 +81,7 @@ def _printArguments(args, filename=None):
 
     if filename:
         logger.propagate = False  # Turn off logging to stdout
-        fh = logging.FileHandler(filename)
+        fh = logging.FileHandler(filename, mode='w')
         logger.addHandler(fh)
 
     logger.info('=== Arguments ===')
@@ -501,12 +501,12 @@ def _printEnergies(molecule, parameters, filename):
     string = '''
 == Diagnostic Energies ==
 
-Bond     : {BOND_ENERGY:12.6f} kcal/mol
-Angle    : {ANGLE_ENERGY:12.6f} kcal/mol
-Dihedral : {DIHEDRAL_ENERGY:12.6f} kcal/mol
-Improper : {IMPROPER_ENERGY:12.6f} kcal/mol
-Electro  : {ELEC_ENERGY:12.6f} kcal/mol
-VdW      : {VDW_ENERGY:12.6f} kcal/mol
+Bond     : {BOND_ENERGY:12.6g} kcal/mol
+Angle    : {ANGLE_ENERGY:12.6g} kcal/mol
+Dihedral : {DIHEDRAL_ENERGY:12.6g} kcal/mol
+Improper : {IMPROPER_ENERGY:12.6g} kcal/mol
+Electro  : {ELEC_ENERGY:12.6g} kcal/mol
+VdW      : {VDW_ENERGY:12.6g} kcal/mol
 
 '''.format(BOND_ENERGY=energies['bond'],
            ANGLE_ENERGY=energies['angle'],
@@ -529,6 +529,7 @@ def _output_results(mol, parameters, original_coords, args):
     logger.info('=== Results ===')
 
     paramDir = os.path.join(args.outdir, 'parameters', args.forcefield)
+    os.makedirs(paramDir, exist_ok=True)
 
     # Write arguments
     argumentsFile = os.path.join(paramDir, 'arguments.txt')
