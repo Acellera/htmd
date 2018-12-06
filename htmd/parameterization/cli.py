@@ -85,7 +85,7 @@ def _printArguments(args, filename=None):
         logger.addHandler(fh)
 
     logger.info('=== Arguments ===')
-    for key, value in vars(args).items():
+    for key, value in sorted(vars(args).items()):
         if key in ('fake_qm',):  # Hidden
             continue
         logger.info('{:>20s}: {:s}'.format(key, str(value)))
