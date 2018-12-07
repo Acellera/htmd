@@ -55,11 +55,11 @@ parameters are generated for *GAFF2*. It can be changed with the ``--forcefield`
 switches to *CGenFF*.
 
 The tool can be used to obtain just GAFF, GAFF2 or CGenFF parameters, (without any QM calculations) by setting the
-``--charge-type Gasteiger``, ``--no-min``, and ``--no-dihed`` flags:
+``--charge-type Gasteiger``, ``--min-type None``, and ``--no-dihed`` flags:
 
 .. code:: bash
 
-    parameterize benzamidine.mol2 --charge 1 --charge-type Gasteiger --no-min --no-dihed --outdir initial
+    parameterize benzamidine.mol2 --charge 1 --charge-type Gasteiger --min-type None --no-dihed --outdir initial
 
 The results are written to ``initial/parameters/GAFF2`` directory (the root directory is specified with ``--outdir``
 flag).
@@ -142,13 +142,13 @@ Benzamidine parametrization on the local machine:
 
 .. note::
 
-    Parameterizations can takes up to 12 hours depending on your machine.
+    Parameterizations can take up to 12 hours depending on your machine and on the molecule
 
 Benzamidine parameterization with Slurm queuing system:
 
 .. code:: bash
 
-    parameterize benzamidine.mol2 --charge 1 --queue Slurm --outdir Slurm
+    parameterize benzamidine.mol2 --charge 1 --queue Slurm --outdir slurm
 
 The computation resources needed for the QM calculation depend on the number of atom and the number of
 parameterizable dihedral angles::
@@ -210,7 +210,7 @@ for *AMBER*. The parameters for *CHARMM* can be fitted by reusing the calculatio
 
 .. code:: bash
 
-    parameterize benzamidine.mol2 --charge 1 --forcefield CGENFF --outdir slurm
+    parameterize benzamidine.mol2 --charge 1 --forcefield CGenFF_2b6 --outdir slurm
 
 .. note::
 
@@ -223,29 +223,42 @@ The fitted parameter files are writen to `<outdir>/parameters` directory::
 
     slurm/parameters
     ├── CGenFF_2b6
-    │   └── B3LYP-cc-pVDZ-vacuum
-    │       ├── energies.txt
-    │       ├── mol.mol2
-    │       ├── mol.pdb
-    │       ├── mol.prm
-    │       ├── mol.psf
-    │       ├── mol.rtf
-    │       └── plots
-    │           ├── C1-C7-N1-H8.svg
-    │           ├── C2-C1-C7-N1.svg
-    │           └── conformer-energies.svg
+    │   ├── arguments.txt
+    │   ├── energies.txt
+    │   ├── input.namd
+    │   ├── mol.coor
+    │   ├── mol.mol2
+    │   ├── mol-orig.mol2
+    │   ├── mol.pdb
+    │   ├── mol.prm
+    │   ├── mol.psf
+    │   ├── mol.rtf
+    │   ├── plots
+    │   │   ├── C1-C7-N13-H17.dat
+    │   │   ├── C1-C7-N13-H17.svg
+    │   │   ├── C2-C1-C7-N13.dat
+    │   │   ├── C2-C1-C7-N13.svg
+    │   │   ├── conformer-energies.dat
+    │   │   └── conformer-energies.svg
+    │   └── random-search.log
     └── GAFF2
-        └── B3LYP-cc-pVDZ-vacuum
-            ├── energies.txt
-            ├── mol.coor
-            ├── mol.frcmod
-            ├── mol.mol2
-            ├── mol.pdb
-            ├── plots
-            │   ├── C1-C7-N1-H8.svg
-            │   ├── C2-C1-C7-N1.svg
-            │   └── conformer-energies.svg
-            └── tleap.in
+        ├── arguments.txt
+        ├── energies.txt
+        ├── input.namd
+        ├── mol.coor
+        ├── mol.frcmod
+        ├── mol.mol2
+        ├── mol-orig.mol2
+        ├── mol.pdb
+        ├── plots
+        │   ├── C1-C7-N13-H17.dat
+        │   ├── C1-C7-N13-H17.svg
+        │   ├── C2-C1-C7-N13.dat
+        │   ├── C2-C1-C7-N13.svg
+        │   ├── conformer-energies.dat
+        │   └── conformer-energies.svg
+        ├── random-search.log
+        └── tleap.in
 
 The directory contains a folder for each fitted force field (`CGenFF` and `GAFF2`) with structure, topology, and
 parameters files.
