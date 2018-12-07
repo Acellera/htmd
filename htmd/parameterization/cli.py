@@ -599,7 +599,7 @@ def main_parameterize(arguments=None):
     nnp_name = ''
     if args.nnp:
         nnp_calculator = _get_nnp_calculator(args, queue)
-        nnp_name = args.npp
+        nnp_name = args.nnp
 
     # Set the reference calculator
     if args.nnp:
