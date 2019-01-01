@@ -43,7 +43,12 @@ class MetricRmsd(Projection):
             refalnstr = trajalnstr
         if refrmsdstr is None:
             refrmsdstr = trajrmsdstr
-        self._refmol = refmol
+
+        self._refmol = refmol.copy()
+        if self._refmol.numFrames > 1:
+            logger.warning('Reference molecule contains multiple frames. MetricRmsd will calculate the RMSD to the frame set in the refmol.frame variable.')
+            self._refmol.dropFrames(keep=self._refmol.frame)
+
         self._refalnsel = self._refmol.atomselect(refalnstr)
         self._refrmsdsel = self._refmol.atomselect(refrmsdstr)
         self._trajalnsel = trajalnstr
@@ -57,7 +62,8 @@ class MetricRmsd(Projection):
     def _precalculate(self, mol):
         self._pc_trajalnsel = mol.atomselect(self._trajalnsel)
         self._pc_trajrmsdsel = mol.atomselect(self._trajrmsdsel)
-        self._pc_centersel = mol.atomselect(self._centersel)
+        if self._pbc:
+            self._pc_centersel = mol.atomselect(self._centersel)
 
     def project(self, mol):
         """ Project molecule.
@@ -83,6 +89,7 @@ class MetricRmsd(Projection):
         return molRMSD(mol, self._refmol, trajrmsdsel, self._refrmsdsel)
 
     def _getSelections(self, mol):
+        centersel = None
         if self._pc_trajalnsel is not None and self._pc_trajrmsdsel is not None and self._pc_centersel is not None:
             trajalnsel = self._pc_trajalnsel
             trajrmsdsel = self._pc_trajrmsdsel
@@ -90,12 +97,13 @@ class MetricRmsd(Projection):
         else:
             trajalnsel = mol.atomselect(self._trajalnsel)
             trajrmsdsel = mol.atomselect(self._trajrmsdsel)
-            centersel = mol.atomselect(self._centersel)
+            if self._pbc:
+                centersel = mol.atomselect(self._centersel)
         if np.sum(trajalnsel) == 0:
             raise NameError('Alignment selection resulted in 0 atoms.')
         if np.sum(trajrmsdsel) == 0:
             raise NameError('RMSD atom selection resulted in 0 atoms.')
-        if np.sum(centersel) == 0:
+        if self._pbc and np.sum(centersel) == 0:
             raise NameError('Centering selection resulted in 0 atoms.')
         return trajalnsel, trajrmsdsel, centersel
 
