@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.projections.metriccoordinate import MetricCoordinate as _MetricCoordinate
-from htmd.molecule.util import sequenceID
+from htmdmol.util import sequenceID
 import numpy as np
 
 
@@ -20,7 +20,7 @@ class MetricFluctuation(_MetricCoordinate):
 
     Parameters
     ----------
-    refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    refmol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The reference Molecule to which we will align.
     atomsel : str
         Atom selection string for the atoms whose fluctuations we want to calculate.
@@ -61,8 +61,8 @@ class MetricFluctuation(_MetricCoordinate):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>`
+            A :class:`Molecule <htmdmol.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -107,7 +107,7 @@ class MetricFluctuation(_MetricCoordinate):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns

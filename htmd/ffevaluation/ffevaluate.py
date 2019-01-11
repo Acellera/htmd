@@ -85,7 +85,7 @@ class FFEvaluate:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
             A Molecule object. Can contain multiple frames.
         prm : :class:`ParameterSet <parmed.ParameterSet>` object
             Forcefield parameters.

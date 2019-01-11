@@ -7,8 +7,8 @@
 # Rapidly exploring random tree to find reaction coordinate for umbrella sampling!
 # Use VMD draw line to visualize! (dashed for failed, solid for connected)
 import numpy as np
-from htmd.molecule.util import maxDistance, uniformRandomRotation
-from htmd.molecule.molecule import Molecule
+from htmdmol.util import maxDistance, uniformRandomRotation
+from htmdmol.molecule import Molecule
 from htmd.vmdviewer import getCurrentViewer
 from scipy.spatial.distance import cdist
 

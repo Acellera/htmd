@@ -12,7 +12,7 @@ from pdb2pqr.main import runPDB2PQR
 from pdb2pqr.src.pdb import readPDB
 
 from htmd.builder.preparationdata import PreparationData
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 
 logger = logging.getLogger(__name__)
 

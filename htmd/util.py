@@ -111,7 +111,7 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The Molecule object
     sel : str
         Atom selection string for what to be outputted.
@@ -182,8 +182,8 @@ def opm(pdb, keep=False, keepaltloc='A'):
 
     """
     import requests
-    from htmd.molecule.support import string_to_tempfile
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.support import string_to_tempfile
+    from htmdmol.molecule import Molecule
     # http://opm.phar.umich.edu/pdb/1z98.pdb
     r = requests.get("https://storage.googleapis.com/opm-assets/pdb/{:s}.pdb".format(pdb.lower()))
 
@@ -268,7 +268,7 @@ def testDHFR():
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
     import doctest
 
     doctest.testmod()

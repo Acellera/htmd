@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory, TemporaryFile
 
 import numpy as np
 
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def fitGasteigerCharges(mol):
     Examples
     --------
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = 0
@@ -91,7 +91,7 @@ def fitChargesWithAntechamber(mol, type='gas', molCharge=None):
     Examples
     --------
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = 0
@@ -193,7 +193,7 @@ def fitESPCharges(mol, qm, outdir, apply_bounds=True, restraint_factor=0, fixed=
     Examples
     --------
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = 0
@@ -283,7 +283,7 @@ def symmetrizeCharges(mol):
     Examples
     --------
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
     >>> mol.charge[:] = [0.5, -0.5, 0.0]

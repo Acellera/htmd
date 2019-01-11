@@ -52,7 +52,7 @@ class Psi4(QMBase):
     Create an object of H2 molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> molFile = os.path.join(home('test-qm'), 'H2-0.74.mol2')
     >>> mol = Molecule(molFile)
 

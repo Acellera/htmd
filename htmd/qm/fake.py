@@ -35,7 +35,7 @@ class FakeQM(QMBase):
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
     >>> from htmd.parameterization.fftype import fftype
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
 
     Create a molecule
@@ -181,7 +181,7 @@ class FakeQM2(FakeQM):
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
     >>> from htmd.parameterization.fftype import fftype
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM2
 
     Create a molecule

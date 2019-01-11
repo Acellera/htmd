@@ -17,7 +17,7 @@ class MetricCoordinate(Projection):
     atomsel : str
         Atom selection string for the atoms whose coordinates we want to calculate.
         See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-    refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    refmol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The reference Molecule to which we will align.
     trajalnstr : str, optional
         Atom selection string for the trajectories from which to align to the reference structure.
@@ -36,7 +36,7 @@ class MetricCoordinate(Projection):
     metr : MetricCoordinate object
     """
     def __init__(self, atomsel, refmol=None, trajalnstr='protein and name CA', refalnstr=None, centerstr='protein', pbc=True):
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
         if isinstance(atomsel, Molecule) and (refmol is None or isinstance(refmol, str)):
             logger.warning('The order of arguments in MetricCoordinate has changed since 1.12.0. Please look at the updated documentation of the class.')
             tmp = refmol
@@ -73,8 +73,8 @@ class MetricCoordinate(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>`
+            A :class:`Molecule <htmdmol.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -113,7 +113,7 @@ class MetricCoordinate(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -140,7 +140,7 @@ import unittest
 class TestMetricCoordinate(unittest.TestCase):
 
     def test_project(self):
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
         from htmd.home import home
         from os import path
         mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
@@ -158,7 +158,7 @@ class TestMetricCoordinate(unittest.TestCase):
         assert np.all(np.abs(data[-1, -20:] - lastcoors) < 0.001), 'Coordinates calculation is broken'
 
     def test_project_align(self):
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
         from htmd.home import home
         from os import path
         mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))

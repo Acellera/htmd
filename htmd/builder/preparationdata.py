@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import math
 
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 
 logger = logging.getLogger(__name__)
 

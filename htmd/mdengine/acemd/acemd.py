@@ -809,7 +809,7 @@ run                     1000
         import filecmp
         from htmd.util import tempname
         from glob import glob
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
 
         tmpdir = tempname()
         pdbid = '3PTB'

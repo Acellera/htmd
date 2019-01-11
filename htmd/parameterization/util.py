@@ -221,7 +221,7 @@ def guessBondType(mol):
     Examples
     --------
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
 
     >>> molFile = os.path.join(home('test-qm'), 'H2O.mol2')
     >>> mol = Molecule(molFile)
@@ -253,7 +253,7 @@ def guessBondType(mol):
 
     """
 
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
 
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
@@ -302,7 +302,7 @@ def makeAtomNamesUnique(mol):
     Examples
     --------
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
     >>> mol = Molecule(molFile)
 
@@ -337,7 +337,7 @@ def makeAtomNamesUnique(mol):
     array(['1A', '1A0', 'A1B1', 'A1B2'], dtype=object)
     """
 
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
 
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be an instance of {}'.format(Molecule))
@@ -373,7 +373,7 @@ def detectChiralCenters(mol):
     Examples
     --------
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
 
     >>> molFile = os.path.join(home('test-param'), 'H2O2.mol2')
     >>> mol = Molecule(molFile)
@@ -386,7 +386,7 @@ def detectChiralCenters(mol):
     [(0, 'R'), (2, 'S'), (4, 'R')]
     """
 
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
     from rdkit.Chem import MolFromMol2File, AssignAtomChiralTagsFromStructure, FindMolChiralCenters
 
     if not isinstance(mol, Molecule):
@@ -455,7 +455,7 @@ def filterQMResults(all_results, mol=None):
     """
 
     from htmd.qm import QMResult
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
 
     if mol:
         if not isinstance(mol, Molecule):

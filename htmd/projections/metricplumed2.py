@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.projections.projection import Projection
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 from htmd.util import ensurelist
 
 from abc import ABC
@@ -491,8 +491,8 @@ class MetricPlumed2(Projection):
 
         Parameters
         ------------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>`
+            A :class:`Molecule <htmdmol.molecule.Molecule>` object to project.
         debug : bool
             Do not delete intermediate files.
 

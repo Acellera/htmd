@@ -7,7 +7,7 @@
 # Author: Juan Eiros Zamora (je714@ic.ac.uk) & Gil Ferreira Hoben (gf712@ic.ac.uk) Organisation: Imperial College London
 # Modified by: Stefan Doerr
 
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 from htmd.apps.pmemd import Pmemd
 from htmd.protocols.oldprotocolinterface import ProtocolInterface, TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 import os

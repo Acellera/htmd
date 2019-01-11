@@ -49,7 +49,7 @@ class OMMMinimizer(Minimizer):
         Examples
         --------
         >>> from htmd.parameterization.fftype import fftype
-        >>> from htmd.molecule.molecule import Molecule
+        >>> from htmdmol.molecule import Molecule
 
         >>> molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
         >>> mol = Molecule(molFile)
@@ -178,7 +178,7 @@ class CustomQM(QMBase):
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
     >>> from htmd.numbautil import dihedralAngle
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> from htmd.qm.custom import CustomQM
     >>> from acemdai.calculator import AAICalculator
 

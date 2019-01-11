@@ -81,7 +81,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
     -------
     prm : :class:`ParameterSet <parmed.parameters.ParameterSet>` object
         Returns a parmed ParameterSet object with the parameters.
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The modified Molecule object with the matching atom types for the ParameterSet
     """
 
@@ -119,7 +119,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
 
             if method in ('GAFF', 'GAFF2'):
 
-                from htmd.molecule.molecule import Molecule
+                from htmdmol.molecule import Molecule
                 from htmd.parameterization.readers import readPREPI, readFRCMOD
 
                 # Write the molecule to a file
@@ -233,7 +233,7 @@ class TestFftypeGAFF(unittest.TestCase):
 
     def _init_mol(self, molName, ffTypeMethod, chargetuple):
 
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
 
         molFile = os.path.join(self.refDir, '{}.mol2'.format(molName))
 
@@ -334,7 +334,7 @@ class TestFftypeGAFF(unittest.TestCase):
 
     def test_broken_atomname(self):
 
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
 
         molFile = os.path.join(self.refDir, 'ethanolamine_wrongnames.mol2')
 
@@ -355,7 +355,7 @@ class TestFftypeCGenFF(unittest.TestCase):
         self.maxDiff = None
 
         from htmd.home import home
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
 
         molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
         self.mol = Molecule(molFile, guessNE=['bonds'], guess=['angles', 'dihedrals'])

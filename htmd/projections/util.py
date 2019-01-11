@@ -5,7 +5,6 @@
 #
 import numpy as np
 import logging
-import htmd.molecule.molecule
 
 logger = logging.getLogger(__name__)
 
@@ -235,12 +234,13 @@ def readSimlistIndices(prj, selector):
 
     """
     from tqdm import tqdm
+    from htmdmol.molecule import Molecule
     idx = [i for i, x in enumerate(selector) if x]
     frs = prj.abs2sim(idx)
     nf = len(frs)
 
     molfile = prj.simlist[0].molfile
-    mol = htmd.Molecule(molfile)
+    mol = Molecule(molfile)
     mol.dropFrames([])
 
     tset = set()

@@ -12,8 +12,8 @@ from scipy import constants as const
 from scipy.spatial.distance import cdist
 import nlopt
 
-from htmd.molecule.molecule import Molecule
-from htmd.molecule.vdw import radiusByElement
+from htmdmol.molecule import Molecule
+from htmdmol.vdw import radiusByElement
 from htmd.parameterization.detect import detectEquivalentAtoms
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class MoleculeGrid:
     Load water molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
     >>> mol.write('H2O.xyz') # doctest: +SKIP
@@ -202,7 +202,7 @@ class ESP:
     Load water molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
 
@@ -399,7 +399,7 @@ class TestESP(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'H2O2.mol2')
         mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))

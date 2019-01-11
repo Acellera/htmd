@@ -1029,7 +1029,7 @@ class MetricData(object):
             confs = np.random.choice(confs, nsamples, replace=False)
         sims = self.abs2sim(confs)
 
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
         if singlemol:
             mol = Molecule(sims[0])
             for i in range(1, len(sims)):

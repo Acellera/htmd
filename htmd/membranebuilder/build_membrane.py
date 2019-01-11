@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 from glob import glob
 import numpy as np
 import logging
@@ -208,7 +208,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
 
     Returns
     -------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule`
+    mol : :class:`Molecule <htmdmol.molecule.Molecule`
         The resulting membrane including surrounding waters
 
     Examples
@@ -222,7 +222,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
     from htmd.builder.solvate import solvate
     from htmd.builder.charmm import build
     from htmd.util import tempname
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
     from htmd.home import home
     import os
     import pandas as pd

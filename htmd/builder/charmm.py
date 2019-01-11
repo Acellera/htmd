@@ -14,8 +14,8 @@ import textwrap
 
 from subprocess import call
 from htmd.home import home
-from htmd.molecule.molecule import Molecule
-from htmd.molecule.util import _missingChain, _missingSegID
+from htmdmol.molecule import Molecule
+from htmdmol.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds, convertDisulfide
 from htmd.builder.builder import _checkMixedSegment, UnknownResidueError, BuildError
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
@@ -98,7 +98,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The Molecule object containing the system
     topo : list of str
         A list of topology `rtf` files.
@@ -144,7 +144,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     Returns
     -------
-    molbuilt : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    molbuilt : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The built system in a Molecule object
 
     Example
@@ -252,7 +252,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     # Printing out patches for the disulfide bridges
     # TODO: Remove this once we deprecate the class
     from htmd.builder.builder import DisulfideBridge
-    from htmd.molecule.molecule import UniqueResidueID
+    from htmdmol.molecule import UniqueResidueID
     if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0], DisulfideBridge):
         newdisu = []
         for d in disulfide:
@@ -886,7 +886,7 @@ def _checkFailedAtoms(mol):
 
 class TestCharmmBuild(TestCase):
     def test_build(self):
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
         from htmd.builder.solvate import solvate
         from htmd.home import home
         from htmd.util import tempname, assertSameAsReferenceDir
@@ -918,7 +918,7 @@ class TestCharmmBuild(TestCase):
                 # shutil.rmtree(tmpdir)
 
     def test_customDisulfideBonds(self):
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
         from htmd.builder.solvate import solvate
         from htmd.home import home
         from htmd.util import tempname, assertSameAsReferenceDir
@@ -956,7 +956,7 @@ class TestCharmmBuild(TestCase):
         # TODO: Remove up to here -----------
 
     def test_disulfideWithInsertion(self):
-        from htmd.molecule.molecule import Molecule
+        from htmdmol.molecule import Molecule
         from htmd.builder.solvate import solvate
         from htmd.home import home
         from htmd.util import tempname, assertSameAsReferenceDir

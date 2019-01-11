@@ -54,8 +54,8 @@ class MetricNull(Projection):
 
         Parameters
         ------------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>`
+            A :class:`Molecule <htmdmol.molecule.Molecule>` object to project.
 
         Returns
         -------

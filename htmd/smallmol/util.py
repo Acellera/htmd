@@ -6,7 +6,7 @@
 import os
 import math
 import numpy as np
-from htmd.molecule.voxeldescriptors import _getGridCenters
+from htmdmol.tools.voxeldescriptors import _getGridCenters
 from rdkit.Chem import ChemicalFeatures
 from rdkit import RDConfig
 
@@ -194,7 +194,7 @@ def rotate(coords, rotMat, center=(0, 0, 0)):
 
 def drawIsoSurface(values3d, resolution=1., plot_center=None, viewer=None):
     from htmd.vmdviewer import getCurrentViewer
-    from htmd.molecule.util import writeVoxels
+    from htmdmol.util import writeVoxels
     # plot_center should be - molecule.get_center() + 12
     if len(values3d.shape) != 3:
         raise ValueError("Your provided a box of {} dimensions."
@@ -281,7 +281,7 @@ def getRCSBLigandByLigname(ligname, returnMol2=False):
 
     Example
     -------
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from htmdmol.molecule import Molecule
     >>> mol = Molecule('4eiy')
     >>> np.unique(mol.get('resname', 'not protein and not water'))
     array(['CLR', 'NA', 'OLA', 'OLB', 'OLC', 'PEG', 'ZMA'], dtype=object)
@@ -295,7 +295,7 @@ def getRCSBLigandByLigname(ligname, returnMol2=False):
 
     """
     import requests
-    from htmd.molecule.support import string_to_tempfile
+    from htmdmol.support import string_to_tempfile
     from htmd.smallmol.smallmol import SmallMol
     r = requests.get("https://files.rcsb.org/ligands/view/{}_ideal.sdf".format(ligname))
     sdf_text = r.content.decode('ascii')

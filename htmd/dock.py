@@ -11,7 +11,7 @@ import os
 import shutil
 from subprocess import call, check_output
 from htmd.util import tempname
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 from glob import glob
 import logging
 logger = logging.getLogger(__name__)
@@ -24,9 +24,9 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
 
     Parameters
     ----------
-    protein : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    protein : :class:`Molecule <htmdmol.molecule.Molecule>` object
         Molecule object representing the receptor
-    ligand : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    ligand : :class:`Molecule <htmdmol.molecule.Molecule>` object
         Molecule object representing the ligand to dock
     center : list
         3-vec centre of of the search bounding box (optional)
@@ -164,7 +164,7 @@ def _parseScoring(outf):
     return kcal, rmsdlb, rmsdub
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
     from os import path
     from htmd.home import home
     protein = Molecule(path.join(home(), 'data', 'docking', 'protein.pdb'))

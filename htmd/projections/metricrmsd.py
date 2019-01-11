@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.projections.projection import Projection
-from htmd.molecule.util import molRMSD
+from htmdmol.util import molRMSD
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ class MetricRmsd(Projection):
 
     Parameters
     ----------
-    refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    refmol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The reference Molecule to which we want to calculate the RMSD.
     trajrmsdstr : str
         Atom selection string for the trajectories from which to calculate the RMSD.
@@ -70,8 +70,8 @@ class MetricRmsd(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>`
+            A :class:`Molecule <htmdmol.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -112,7 +112,7 @@ class MetricRmsd(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -138,7 +138,7 @@ class MetricRmsd(Projection):
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
     from htmd.home import home
     import numpy as np
     from os import path

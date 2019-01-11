@@ -14,7 +14,7 @@ def _guessElement(name):
 
 
 def _guessMass(element):
-    from htmd.molecule import vdw
+    from htmdmol.molecule import vdw
     return vdw.massByElement(element)
 
 

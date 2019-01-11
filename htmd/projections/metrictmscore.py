@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.projections.projection import Projection
-from htmd.molecule.util import molTMscore
+from htmdmol.util import molTMscore
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ class MetricTMscore(Projection):
 
     Parameters
     ----------
-    refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    refmol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The reference Molecule to which we want to calculate the TMscore.
     trajtmstr : str
         Atom selection string for the trajectories from which to calculate the TMscore.
@@ -43,8 +43,8 @@ class MetricTMscore(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>`
+            A :class:`Molecule <htmdmol.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -71,7 +71,7 @@ class MetricTMscore(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -88,7 +88,7 @@ class MetricTMscore(Projection):
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from htmdmol.molecule import Molecule
     from htmd.home import home
     import numpy as np
     from os import path

@@ -11,12 +11,12 @@ import numpy as np
 import os
 from os.path import join
 from glob import glob
-from htmd.molecule.util import _missingSegID, sequenceID
+from htmdmol.util import _missingSegID, sequenceID
 import shutil
 from htmd.builder.builder import detectDisulfideBonds, convertDisulfide, BuildError, UnknownResidueError, MissingAngleError, MissingBondError, MissingParameterError, MissingTorsionError, MissingAtomTypeError
 from htmd.builder.builder import _checkMixedSegment
 from subprocess import call, check_output, DEVNULL
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist
 import unittest
@@ -170,7 +170,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The Molecule object containing the system
     ff : list of str
         A list of leaprc forcefield files.
@@ -221,7 +221,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     Returns
     -------
-    molbuilt : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    molbuilt : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The built system in a Molecule object
 
     Example
@@ -349,7 +349,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     if not ionize:
         # TODO: Remove this once we deprecate the class
         from htmd.builder.builder import DisulfideBridge
-        from htmd.molecule.molecule import UniqueResidueID
+        from htmdmol.molecule import UniqueResidueID
         if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0], DisulfideBridge):
             newdisu = []
             for d in disulfide:
@@ -613,12 +613,12 @@ def _charmmLipid2Amber(mol):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         The Molecule object containing the membrane
 
     Returns
     -------
-    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    newmol : :class:`Molecule <htmdmol.molecule.Molecule>` object
         A new Molecule object with the membrane converted to AMBER
     """
 

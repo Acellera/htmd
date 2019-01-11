@@ -6,7 +6,7 @@
 import simtk.openmm as mm
 from sys import stdout
 from simtk import unit
-from htmd.molecule.molecule import Molecule
+from htmdmol.molecule import Molecule
 from simtk.openmm import app
 
 
