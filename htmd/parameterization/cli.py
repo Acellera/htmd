@@ -660,7 +660,7 @@ def main_parameterize(arguments=None):
 
         from htmd.parameterization.dihedral import DihedralFitting  # Slow import
 
-        logger.info('=== Dihedral angle scanning and parameter fitting ===')
+        logger.info('=== Dihedral angle scanning ===')
 
         if args.dihed_opt_type == 'None':
             logger.info('Dihedral scanning: static')
@@ -688,6 +688,14 @@ def main_parameterize(arguments=None):
 
         # Filter scan results
         scan_results = filterQMResults(scan_results, mol=mol)
+        logger.info('Valid rotamers:')
+        for idihed, (dihedral, results) in enumerate(zip(selected_dihedrals, scan_results)):
+            dihed_name = '-'.join(mol.name[list(dihedral)])
+            logger.info('  {:2d}: {}: {}'.format(idihed, dihed_name, len(results)))
+
+            if len(results) < 13:
+                raise RuntimeError('Less than 13 valid rotamers for {} dihedral. '
+                                   'Not enough for fitting!'.format(dihed_name))
 
         # Invent new atom types for dihedral atoms
         old_types = mol.atomtype

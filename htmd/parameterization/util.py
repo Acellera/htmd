@@ -145,10 +145,14 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
     """
     num_rotamers = 36  # Number of rotamers for each dihedral to compute
 
+    logger.info('Number of rotamers per dihedral angles: {}'.format(num_rotamers))
+
     # Create molecules with rotamers
     # TODO factor out dihedral generation
+    logger.info('Generate rotamers for:')
     molecules = []
-    for dihedral in dihedrals:
+    for idihed, dihedral in enumerate(dihedrals):
+        logger.info('  {:2d}: {}'.format(idihed, '-'.join(mol.name[list(dihedral)])))
 
         # Create a copy of molecule with "nrotamers" frames
         new_mol = mol.copy()
@@ -165,7 +169,9 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
 
     # Minimize with MM if requested
     if scan_type == 'mm':
-        for dihedral, molecule in zip(dihedrals, molecules):
+        logger.info('Minimize rotamers with MM for:')
+        for idihed, (dihedral, molecule) in enumerate(zip(dihedrals, molecules)):
+            logger.info('  {:2d}: {}'.format(idihed, '-'.join(mol.name[list(dihedral)])))
             for iframe in range(molecule.numFrames):
                 molecule.coords[:, :, iframe] = mm_minimizer.minimize(molecule.coords[:, :, iframe],
                                                                       restrained_dihedrals=[dihedral])
@@ -180,6 +186,7 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
         directories.append(directory)
 
     # Setup and submit QM calculations
+    logger.info('Compute rotamer energies for:')
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
         ref.molecule = molecule
         ref.esp_points = None
@@ -191,7 +198,8 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
 
     # Wait and retrieve QM calculation data
     scan_results = []
-    for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
+    for idihed, (molecule, dihedral, directory) in enumerate(zip(molecules, dihedrals, directories)):
+        logger.info('  {:2d}: {}'.format(idihed, '-'.join(mol.name[list(dihedral)])))
         ref.molecule = molecule
         ref.esp_points = None
         ref.optimize = (scan_type == 'qm')
@@ -500,9 +508,6 @@ def filterQMResults(all_results, mol=None):
                     logger.warning('Rotamer is removed due to high energy: '
                                    '{} kcal/mol above minimum'.format(relative_energy))
             valid_results = new_results
-
-        if len(valid_results) < 13:
-            raise RuntimeError('Less than 13 valid QM results per dihedral. Not enough to fit!')
 
         all_valid_results.append(valid_results)
 
