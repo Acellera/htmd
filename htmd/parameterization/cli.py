@@ -697,6 +697,8 @@ def main_parameterize(arguments=None):
                 raise RuntimeError('Less than 13 valid rotamers for {} dihedral. '
                                    'Not enough for fitting!'.format(dihed_name))
 
+        logger.info('=== Dihedral parameter fitting ===')
+
         # Invent new atom types for dihedral atoms
         old_types = mol.atomtype
         mol, initial_types = inventAtomTypes(mol, selected_dihedrals)
