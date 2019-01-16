@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.projections.projection import Projection
-from htmdmol.util import molTMscore
+from htmdmol.tools.tmscore import molTMscore
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
