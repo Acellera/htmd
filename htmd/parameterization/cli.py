@@ -660,7 +660,7 @@ def main_parameterize(arguments=None):
 
         from htmd.parameterization.dihedral import DihedralFitting  # Slow import
 
-        logger.info('=== Dihedral angle scanning and parameter fitting ===')
+        logger.info('=== Dihedral angle scanning ===')
 
         if args.dihed_opt_type == 'None':
             logger.info('Dihedral scanning: static')
@@ -677,16 +677,6 @@ def main_parameterize(arguments=None):
             from htmd.qm.custom import OMMMinimizer
             mm_minimizer = OMMMinimizer(mol, parameters)
 
-        # Invent new atom types for dihedral atoms
-        old_types = mol.atomtype
-        mol, initial_types = inventAtomTypes(mol, selected_dihedrals)
-        parameters = recreateParameters(mol, initial_types, parameters)
-        parameters = createMultitermDihedralTypes(parameters)
-        logger.info('Assign atom with new atom types:')
-        for name, old_type, new_type in zip(mol.name, old_types, mol.atomtype):
-            if old_type != new_type:
-                logger.info('   {:4s} : {:6s} --> {:6s}'.format(name, old_type, new_type))
-
         # Set parameters for the fake QM
         if args.fake_qm:
             assert not args.nnp
@@ -698,6 +688,26 @@ def main_parameterize(arguments=None):
 
         # Filter scan results
         scan_results = filterQMResults(scan_results, mol=mol)
+        logger.info('Valid rotamers:')
+        for idihed, (dihedral, results) in enumerate(zip(selected_dihedrals, scan_results)):
+            dihed_name = '-'.join(mol.name[list(dihedral)])
+            logger.info('  {:2d}: {}: {}'.format(idihed, dihed_name, len(results)))
+
+            if len(results) < 13:
+                raise RuntimeError('Less than 13 valid rotamers for {} dihedral. '
+                                   'Not enough for fitting!'.format(dihed_name))
+
+        logger.info('=== Dihedral parameter fitting ===')
+
+        # Invent new atom types for dihedral atoms
+        old_types = mol.atomtype
+        mol, initial_types = inventAtomTypes(mol, selected_dihedrals)
+        parameters = recreateParameters(mol, initial_types, parameters)
+        parameters = createMultitermDihedralTypes(parameters)
+        logger.info('Assign atom with new atom types:')
+        for name, old_type, new_type in zip(mol.name, old_types, mol.atomtype):
+            if old_type != new_type:
+                logger.info('   {:4s} : {:6s} --> {:6s}'.format(name, old_type, new_type))
 
         # Set random number generator seed
         if args.seed:
