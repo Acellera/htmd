@@ -153,8 +153,8 @@ class DihedralFitting:
         upper_bounds[nterms:2*nterms] = 2 * np.pi
 
         # Set offset bounds
-        lower_bounds[-1] = -20
-        upper_bounds[-1] = 20
+        lower_bounds[-1] = -25
+        upper_bounds[-1] = 25
 
         return lower_bounds, upper_bounds
 

@@ -309,7 +309,7 @@ def symmetrizeCharges(mol):
         atoms = list(atoms)
         mol.charge[atoms] = np.mean(mol.charge[atoms])
 
-    assert np.isclose(np.sum(mol.charge), molCharge)
+    assert np.isclose(np.sum(mol.charge), molCharge, atol=1e-6)
 
     return mol
 
