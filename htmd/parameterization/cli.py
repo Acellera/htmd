@@ -77,6 +77,24 @@ def getArgumentParser():
     return parser
 
 
+def _printArguments(args, filename=None):
+
+    if filename:
+        logger.propagate = False  # Turn off logging to stdout
+        fh = logging.FileHandler(filename, mode='w')
+        logger.addHandler(fh)
+
+    logger.info('=== Arguments ===')
+    for key, value in sorted(vars(args).items()):
+        if key in ('fake_qm',):  # Hidden
+            continue
+        logger.info('{:>20s}: {:s}'.format(key, str(value)))
+
+    if filename:
+        logger.propagate = True  # Turn on logging to stdout
+        logger.removeHandler(fh)
+
+
 def _prepare_molecule(args):
 
     from htmd.molecule.molecule import Molecule
@@ -483,12 +501,12 @@ def _printEnergies(molecule, parameters, filename):
     string = '''
 == Diagnostic Energies ==
 
-Bond     : {BOND_ENERGY}
-Angle    : {ANGLE_ENERGY}
-Dihedral : {DIHEDRAL_ENERGY}
-Improper : {IMPROPER_ENERGY}
-Electro  : {ELEC_ENERGY}
-VdW      : {VDW_ENERGY}
+Bond     : {BOND_ENERGY:12.6g} kcal/mol
+Angle    : {ANGLE_ENERGY:12.6g} kcal/mol
+Dihedral : {DIHEDRAL_ENERGY:12.6g} kcal/mol
+Improper : {IMPROPER_ENERGY:12.6g} kcal/mol
+Electro  : {ELEC_ENERGY:12.6g} kcal/mol
+VdW      : {VDW_ENERGY:12.6g} kcal/mol
 
 '''.format(BOND_ENERGY=energies['bond'],
            ANGLE_ENERGY=energies['angle'],
@@ -497,13 +515,11 @@ VdW      : {VDW_ENERGY}
            ELEC_ENERGY=energies['elec'],
            VDW_ENERGY=energies['vdw'])
 
+    for line in string.split('\n'):
+        logger.info(line)
     with open(filename, 'w') as file_:
         file_.write(string)
     logger.info('Write energy file: {}'.format(filename))
-
-    logger.info('Diagnostic energies:')
-    for name in ('bond', 'angle', 'dihedral', 'improper', 'elec', 'vdw'):
-        logger.info('   {:8s} : {:10.3f} kcal/mol'.format(name, energies[name]))
 
 
 def _output_results(mol, parameters, original_coords, args):
@@ -512,26 +528,34 @@ def _output_results(mol, parameters, original_coords, args):
 
     logger.info('=== Results ===')
 
+    paramDir = os.path.join(args.outdir, 'parameters', args.forcefield)
+    os.makedirs(paramDir, exist_ok=True)
+
+    # Write arguments
+    argumentsFile = os.path.join(paramDir, 'arguments.txt')
+    _printArguments(args, filename=argumentsFile)
+    logger.info('Write the list of  to {}'.format(argumentsFile))
+
     # Output the FF parameters and other files
-    dir = os.path.join(args.outdir, 'parameters')
     # TODO split into separate writer
-    writeParameters(dir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
+    writeParameters(paramDir, mol, parameters, args.forcefield, args.charge, original_coords=original_coords)
 
     # Write energy file
-    energyFile = os.path.join(dir, 'energies.txt')
+    energyFile = os.path.join(paramDir, 'energies.txt')
     _printEnergies(mol, parameters, energyFile)
 
 
 def main_parameterize(arguments=None):
 
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
-    from htmd.parameterization.util import minimize, fitDihedrals, detectChiralCenters
+    from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
 
     logger.info('===== Parameterize =====')
 
     # Parse arguments
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
+    _printArguments(args)
 
     # Validate arguments
     if args.fake_qm and args.nnp:
@@ -549,13 +573,6 @@ def main_parameterize(arguments=None):
     if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
         raise DeprecationWarning('Use `--scan-type` instead.')
 
-    # Print arguments
-    logger.info('=== Arguments ===')
-    for key, value in vars(args).items():
-        if key in ('fake_qm',):  # Hidden
-            continue
-        logger.info('{:>20s}: {:s}'.format(key, str(value)))        
-
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
 
@@ -570,21 +587,28 @@ def main_parameterize(arguments=None):
 
     # Get QM calculators
     qm_calculator = None
+    qm_name = ''
     if args.min_type == 'qm' or args.charge_type == 'ESP' or (args.fit_dihedral and not args.nnp):
         qm_calculator = _get_qm_calculator(args, queue)
+        qm_name = '{}/{}'.format(qm_calculator.theory, qm_calculator.basis)
+        if args.fake_qm:
+            qm_name = 'Fake QM'
 
     # Get NNP calculators
     nnp_calculator = None
+    nnp_name = ''
     if args.nnp:
         nnp_calculator = _get_nnp_calculator(args, queue)
+        nnp_name = args.nnp
 
     # Set the reference calculator
     if args.nnp:
         ref_calculator = nnp_calculator
-        logger.info('Reference method: NNP')
+        ref_name = nnp_name
     else:
         ref_calculator = qm_calculator
-        logger.info('Reference method: QM')
+        ref_name = qm_name
+    logger.info('Reference method: {}'.format(ref_name))
 
     # Assign atom types and initial force field parameters
     mol, parameters = _get_initial_parameters(mol, args)
@@ -634,6 +658,8 @@ def main_parameterize(arguments=None):
     # TODO refactor
     if len(selected_dihedrals) > 0:
 
+        from htmd.parameterization.dihedral import DihedralFitting  # Slow import
+
         logger.info('=== Dihedral angle scanning and parameter fitting ===')
 
         if args.dihed_opt_type == 'None':
@@ -666,15 +692,40 @@ def main_parameterize(arguments=None):
             assert not args.nnp
             ref_calculator._parameters = parameters
 
+        # Scan dihedral angles
+        scan_results = scanDihedrals(mol, ref_calculator, selected_dihedrals, args.outdir,
+                                     scan_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
+
+        # Filter scan results
+        scan_results = filterQMResults(scan_results, mol=mol)
+
         # Set random number generator seed
         if args.seed:
             np.random.seed(args.seed)
 
-        # Fit the parameters
-        # TODO separate scanning and fitting
-        parameters = fitDihedrals(mol, ref_calculator, parameters, selected_dihedrals, args.outdir,
-                                  dihed_opt_type=args.dihed_opt_type, mm_minimizer=mm_minimizer,
-                                  num_searches=args.dihed_num_searches)
+        # Fit the dihedral parameters
+        df = DihedralFitting()
+        df.parameters = parameters
+        df.molecule = mol
+        df.dihedrals = selected_dihedrals
+        df.qm_results = scan_results
+        df.num_searches = args.dihed_num_searches
+        df.result_directory = os.path.join(args.outdir, 'parameters', args.forcefield)
+
+        # In case of FakeQM, the initial parameters are set to zeros.
+        # It prevents DihedralFitting class from cheating :D
+        if args.fake_qm:
+            df.zeroed_parameters = True
+
+        # Fit dihedral parameters
+        parameters = df.run()
+
+        # Plot dihedral profiles
+        plot_dir = os.path.join(args.outdir, 'parameters', args.forcefield, 'plots')
+        os.makedirs(plot_dir, exist_ok=True)
+        df.plotConformerEnergies(plot_dir, ref_name=ref_name)
+        for idihed in range(len(df.dihedrals)):
+            df.plotDihedralEnergies(idihed, plot_dir, ref_name=ref_name)
 
     # Output the parameters and other results
     _output_results(mol, parameters, initial_coords, args)

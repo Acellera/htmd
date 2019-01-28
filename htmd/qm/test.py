@@ -108,6 +108,8 @@ class TestBase:
 
     def setUp(self):
 
+        self.testDir = None
+
         molFile = os.path.join(home('test-qm'), 'H2-0.74.mol2')
         self.h2_074 = Molecule(molFile)
 
@@ -141,7 +143,7 @@ class TestBase:
     def test_multiplicity(self):
 
         for charge, multiplicity in ((-1, 2), (0, 1), (0, 3), (1, 2)):
-            with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+            with TemporaryDirectory(dir=self.testDir) as tmpDir:
                 self.qm.molecule = self.h2_074
                 self.qm.multiplicity = multiplicity
                 self.qm.theory = 'HF'
@@ -156,7 +158,7 @@ class TestBase:
     def test_theories(self):
 
         for theory in self.qm.THEORIES:
-            with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+            with TemporaryDirectory(dir=self.testDir) as tmpDir:
                 self.qm.molecule = self.h2_074
                 self.qm.theory = theory
                 self.qm.basis = '3-21G'
@@ -168,7 +170,7 @@ class TestBase:
     def test_corrections(self):
 
         for correction in self.qm.CORRECTIONS:
-            with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+            with TemporaryDirectory(dir=self.testDir) as tmpDir:
                 self.qm.molecule = self.h2_074
                 self.qm.theory = 'BLYP' # Using BLYP as HF-D isn't available
                 self.qm.correction = correction
@@ -181,7 +183,7 @@ class TestBase:
     def test_basis_sets(self):
 
         for basis in self.qm.BASIS_SETS:
-            with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+            with TemporaryDirectory(dir=self.testDir) as tmpDir:
                 self.qm.molecule = self.h2_074
                 self.qm.theory = 'HF'
                 self.qm.basis = basis
@@ -194,7 +196,7 @@ class TestBase:
     def test_solvents(self):
 
         for solvent in self.qm.SOLVENTS:
-            with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+            with TemporaryDirectory(dir=self.testDir) as tmpDir:
                 self.qm.molecule = self.h2_074
                 self.qm.theory = 'HF'
                 self.qm.basis = '3-21G'
@@ -207,7 +209,7 @@ class TestBase:
     @unittest.skip(reason='joblib 0.11 breaks it on travis?')  # TODO: bring back when joblib back to 0.12
     def test_properties(self):
 
-        with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+        with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.molecule = self.h2_074
             self.qm.theory = 'HF'
             self.qm.basis = '3-21G'
@@ -220,7 +222,7 @@ class TestBase:
             self.assertTrue(np.all(np.isclose(REF_MULLIKEN, result.mulliken)))
             self.assertTrue(np.all(np.isclose(REF_ESP_VALUES, result.esp_values)))
 
-        with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+        with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.esp_points = None
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
@@ -229,7 +231,7 @@ class TestBase:
 
     def test_optimization(self):
 
-        with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+        with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.molecule = self.h2_100
             self.qm.theory = 'BLYP' # HF fails
             self.qm.basis = '3-21G'
@@ -239,7 +241,7 @@ class TestBase:
             self.assertFalse(result.errored)
             self.assertTrue(np.all(np.isclose(REF_OPT_COORDS, result.coords)))
 
-        with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+        with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.optimize = False
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
@@ -252,7 +254,7 @@ class TestBase:
         angle = np.rad2deg(dihedralAngle(self.h2o2_90.coords[quad, :, 0]))
         self.assertAlmostEqual(89.999544881803772, angle, places=5)
 
-        with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+        with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.molecule = self.h2o2_90
             self.qm.theory = 'BLYP' # HF fails
             self.qm.basis = '3-21G'
@@ -264,7 +266,7 @@ class TestBase:
             angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
             self.assertAlmostEqual(89.999541178019271, angle, places=5)
 
-        with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+        with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.restrained_dihedrals = None
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
@@ -274,7 +276,7 @@ class TestBase:
 
     def test_directory(self):
 
-        with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+        with TemporaryDirectory(dir=self.testDir) as tmpDir:
             tmpDir2 = os.path.join(tmpDir, 'test')
             self.qm.molecule = self.h2_074
             self.qm.theory = 'HF'
@@ -289,7 +291,7 @@ class TestBase:
         mol = self.h2_074
         mol.appendFrames(self.h2_100)
 
-        with TemporaryDirectory(dir=os.getcwd()) as tmpDir:
+        with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.molecule = mol
             self.qm.theory = 'HF'
             self.qm.basis = '3-21G'
@@ -320,6 +322,9 @@ class TestPsi4Slurm(TestBase, unittest.TestCase):
 
         if 'TRAVIS' in os.environ:
            self.skipTest('No Psi4 Slurm tests on Travis')
+
+        # For Slurm, the test directory has to be on a shared filesystem
+        self.testDir = os.getcwd()
 
         self.qm = Psi4()
         self.qm.queue = SlurmQueue()

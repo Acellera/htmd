@@ -139,89 +139,68 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
     return mol
 
 
-def fitDihedrals(mol, qm, prm, dihedrals, outdir, dihed_opt_type='qm', mm_minimizer=None, num_searches=None):
+def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None):
     """
     Dihedrals passed as 4 atom indices
     """
-    from htmd.parameterization.dihedral import DihedralFitting
-    from htmd.qm import FakeQM2
+    num_rotamers = 36  # Number of rotamers for each dihedral to compute
 
     # Create molecules with rotamers
+    # TODO factor out dihedral generation
     molecules = []
     for dihedral in dihedrals:
-        nrotamers = 36  # Number of rotamers for each dihedral to compute
 
         # Create a copy of molecule with "nrotamers" frames
-        tmpmol = mol.copy()
-        tmpmol.coords = np.tile(tmpmol.coords, (1, 1, nrotamers))
-        tmpmol.box = np.zeros((3, tmpmol.numFrames), dtype=np.float32)
+        new_mol = mol.copy()
+        new_mol.coords = np.tile(new_mol.coords, (1, 1, num_rotamers))
+        new_mol.box = np.zeros((3, new_mol.numFrames), dtype=np.float32)
 
         # Set rotamer coordinates
-        angles = np.linspace(-np.pi, np.pi, num=nrotamers, endpoint=False)
+        angles = np.linspace(-np.pi, np.pi, num=num_rotamers, endpoint=False)
         for frame, angle in enumerate(angles):
-            tmpmol.frame = frame
-            tmpmol.setDihedral(dihedral, angle, bonds=tmpmol.bonds)
+            new_mol.frame = frame
+            new_mol.setDihedral(dihedral, angle, bonds=new_mol.bonds)
 
-        molecules.append(tmpmol)
+        molecules.append(new_mol)
 
     # Minimize with MM if requested
-    if dihed_opt_type == 'mm':
-        for dihedral, tmpmol in zip(dihedrals, molecules):
-            for f in range(tmpmol.numFrames):
-                tmpmol.coords[:, :, f] = mm_minimizer.minimize(tmpmol.coords[:, :, f], restrained_dihedrals=[dihedral,])
+    if scan_type == 'mm':
+        for dihedral, molecule in zip(dihedrals, molecules):
+            for iframe in range(molecule.numFrames):
+                molecule.coords[:, :, iframe] = mm_minimizer.minimize(molecule.coords[:, :, iframe],
+                                                                      restrained_dihedrals=[dihedral])
 
     # Create directories for QM data
     directories = []
-    dihedral_directory = 'dihedral-opt' if dihed_opt_type == 'qm' else 'dihedral-single-point'
+    dihedral_directory = 'dihedral-opt' if scan_type == 'qm' else 'dihedral-single-point'
     for dihedral in dihedrals:
         dihedral_name = '-'.join(mol.name[dihedral])
-        directory = os.path.join(outdir, dihedral_directory, dihedral_name, _qm_method_name(qm))
+        directory = os.path.join(outdir, dihedral_directory, dihedral_name, _qm_method_name(ref))
         os.makedirs(directory, exist_ok=True)
         directories.append(directory)
 
     # Setup and submit QM calculations
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
-        qm.molecule = molecule
-        qm.esp_points = None
-        qm.optimize = (dihed_opt_type == 'qm')
-        qm.restrained_dihedrals = np.array([dihedral])
-        qm.directory = directory
-        qm.setup()
-        qm.submit()
+        ref.molecule = molecule
+        ref.esp_points = None
+        ref.optimize = (scan_type == 'qm')
+        ref.restrained_dihedrals = np.array([dihedral])
+        ref.directory = directory
+        ref.setup()
+        ref.submit()
 
     # Wait and retrieve QM calculation data
-    qm_results = []
+    scan_results = []
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
-        qm.molecule = molecule
-        qm.esp_points = None
-        qm.optimize = (dihed_opt_type == 'qm')
-        qm.restrained_dihedrals = np.array([dihedral])
-        qm.directory = directory
-        qm.setup()  # QM object is reused, so it has to be properly set up before retrieving.
-        qm_results.append(qm.retrieve())
+        ref.molecule = molecule
+        ref.esp_points = None
+        ref.optimize = (scan_type == 'qm')
+        ref.restrained_dihedrals = np.array([dihedral])
+        ref.directory = directory
+        ref.setup()  # QM object is reused, so it has to be properly set up before retrieving.
+        scan_results.append(ref.retrieve())
 
-    # Filter QM results
-    qm_results = filterQMResults(qm_results, mol=mol)
-
-    # Fit the dihedral parameters
-    df = DihedralFitting()
-    df.parmedMode = True
-    df.parameters = prm
-    df.molecule = mol
-    df.dihedrals = dihedrals
-    df.qm_results = qm_results
-    df.num_searches = num_searches
-    df.result_directory = os.path.join(outdir, 'parameters')
-
-    # In case of FakeQM, the initial parameters are set to zeros.
-    # It prevents DihedralFitting class from cheating :D
-    if isinstance(qm, FakeQM2):
-        df.zeroed_parameters = True
-
-    # Fit dihedral parameters
-    df.run()
-
-    return df.parameters
+    return scan_results
 
 
 def guessBondType(mol):
