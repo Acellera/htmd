@@ -186,7 +186,6 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
         directories.append(directory)
 
     # Setup and submit QM calculations
-    logger.info('Compute rotamer energies for:')
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
         ref.molecule = molecule
         ref.esp_points = None
@@ -198,6 +197,7 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
 
     # Wait and retrieve QM calculation data
     scan_results = []
+    logger.info('Compute rotamer energies for:')
     for idihed, (molecule, dihedral, directory) in enumerate(zip(molecules, dihedrals, directories)):
         logger.info('  {:2d}: {}'.format(idihed, '-'.join(mol.name[list(dihedral)])))
         ref.molecule = molecule
