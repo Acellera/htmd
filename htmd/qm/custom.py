@@ -142,7 +142,7 @@ class OMMMinimizer(Minimizer):
                 bestforces = maxforcecomp
                 bestres = res
 
-            if np.abs(res.jac).max() > gtol:
+            if maxforcecomp > gtol:
                 # Try to continue minimization by restarting the minimizer
                 res = minimize(goalFunc, res.x, method='L-BFGS-B', jac=True, options={'ftol': 0, 'gtol': gtol})
                 maxforcecomp = np.abs(res.jac).max()
