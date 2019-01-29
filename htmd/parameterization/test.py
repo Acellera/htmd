@@ -259,7 +259,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'ethene_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None')
-        self._test(refDir, resDir)
+        self._test(refDir, resDir, energyTermRelTol=5e-6, dihedralForceConstAbsTol=5e-6)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_glycol_dihed_fix(self):
