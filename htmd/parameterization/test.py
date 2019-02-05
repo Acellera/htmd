@@ -413,7 +413,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'glycol_dihed_opt_mm_fake')
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type None '
                                   '--scan-type mm --fake-qm --dihed-num-searches 0')
-        self._test(refDir, resDir, energyProfileAbsTol=0.002)
+        self._test(refDir, resDir, energyProfileAbsTol=2.1e-3)
 
     def test_glycol_min_mm_fake(self):
         refDir = os.path.join(self.dataDir, 'glycol_min_mm_fake')
