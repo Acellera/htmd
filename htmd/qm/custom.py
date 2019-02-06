@@ -130,14 +130,40 @@ class OMMMinimizer(Minimizer):
             grad = -forces.reshape(-1)
             return energy, grad
 
-        res = minimize(goalFunc, coords.reshape(-1), method='L-BFGS-B', jac=True, options={'ftol': 0, 'gtol': 0.05})
-        endcoords = res.x.reshape((natoms, 3)).copy()
+        force_tolerance = 0.1  # kcal/mol/A
+        max_attempts = 50
+        best_result = None
+        best_force = np.inf
+        for i in range(max_attempts):
+            result = minimize(goalFunc, coords.reshape(-1), method='L-BFGS-B', jac=True, options={'ftol': 0, 'gtol': force_tolerance})
+            max_force = np.abs(result.jac).max()
+
+            if max_force < best_force:
+                best_force = max_force
+                best_result = result
+
+            if max_force > force_tolerance:
+                # Try to continue minimization by restarting the minimizer
+                result = minimize(goalFunc, result.x, method='L-BFGS-B', jac=True, options={'ftol': 0, 'gtol': force_tolerance})
+                max_force = np.abs(result.jac).max()
+            
+            if max_force < best_force:
+                best_force = max_force
+                best_result = result
+
+            if max_force <= force_tolerance:
+                break
+
+        if best_force > force_tolerance:
+            logger.warning('Did not manage to minimize structure to the desired force tolerance. Best minimized structure had a max force component {:.2f} kcal/mol/A. Threshold is {}'.format(best_force, force_tolerance))
+
+        minimized_coords = best_result.x.reshape((natoms, 3)).copy()
 
         if restrained_dihedrals:
             for fi in forceidx[::-1]:
                 self.system.removeForce(fi)
 
-        return endcoords
+        return minimized_coords
 
 
 class CustomEnergyBasedMinimizer(Minimizer):

@@ -149,8 +149,8 @@ class DihedralFitting:
         upper_bounds[nterms:2*nterms] = 2 * np.pi
 
         # Set offset bounds
-        lower_bounds[-1] = -20
-        upper_bounds[-1] = 20
+        lower_bounds[-1] = -25
+        upper_bounds[-1] = 25
 
         return lower_bounds, upper_bounds
 
@@ -504,8 +504,8 @@ class TestDihedralFitting(unittest.TestCase):
                 self.df.dihedrals = [[0, 0, 0, 0]] * ndihed
                 self.assertEqual(ndihed, self.df.numDihedrals)
                 lower_bounds, upper_bounds = self.df._getBounds()
-                self.assertListEqual(list(lower_bounds), [0] * 2 * nterm + [-20])
-                self.assertListEqual(list(upper_bounds), [10] * nterm + [2*np.pi] * nterm + [20])
+                self.assertListEqual(list(lower_bounds), [0] * 2 * nterm + [-25])
+                self.assertListEqual(list(upper_bounds), [10] * nterm + [2*np.pi] * nterm + [25])
 
     def test_paramsToVector(self):
         from parmed.parameters import ParameterSet

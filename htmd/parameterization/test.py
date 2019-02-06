@@ -259,7 +259,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'ethene_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None')
-        self._test(refDir, resDir)
+        self._test(refDir, resDir, energyTermRelTol=5e-6, dihedralForceConstAbsTol=5e-6, dihedralPhaseAbsTol=1.1e-3)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
     def test_glycol_dihed_fix(self):
@@ -318,7 +318,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'ethanolamine_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None')
-        self._test(refDir, resDir, energyTermRelTol=5e-5, energyProfileAbsTol=1.1e-3,
+        self._test(refDir, resDir, energyTermRelTol=5e-5, energyProfileAbsTol=2.1e-3,
                    dihedralForceConstAbsTol=1e-4, dihedralPhaseAbsTol=2.5)
 
     def test_benzamidine_gasteiger(self):
@@ -413,7 +413,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'glycol_dihed_opt_mm_fake')
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type None '
                                   '--scan-type mm --fake-qm --dihed-num-searches 0')
-        self._test(refDir, resDir, energyProfileAbsTol=0.002)
+        self._test(refDir, resDir, energyProfileAbsTol=2.1e-3)
 
     def test_glycol_min_mm_fake(self):
         refDir = os.path.join(self.dataDir, 'glycol_min_mm_fake')
