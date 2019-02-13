@@ -214,7 +214,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'h2o2_zero_searches_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None '
-                                  '--scan-type None --dihed-num-searches 0')
+                                  '--scan-type None --dihed-num-iterations 0')
         self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
@@ -412,7 +412,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_opt_mm_fake')
         resDir = os.path.join(self.testDir, 'glycol_dihed_opt_mm_fake')
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type None '
-                                  '--scan-type mm --fake-qm --dihed-num-searches 0')
+                                  '--scan-type mm --fake-qm --dihed-num-iterations 0')
         self._test(refDir, resDir, energyProfileAbsTol=2.1e-3)
 
     def test_glycol_min_mm_fake(self):

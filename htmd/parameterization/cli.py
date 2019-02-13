@@ -51,8 +51,8 @@ def getArgumentParser():
                         help='DEPRECATED: use `--scan-type` instead')
     parser.add_argument('--scan-type', default='qm', dest='dihed_opt_type', choices=['None', 'qm', 'mm'],
                         help='Type of structure optimization when scanning dihedral angles (default: %(default)s)')
-    parser.add_argument('--dihed-num-searches', default=None, type=int,
-                        help='Number of random searches during the dihedral parameter fitting')
+    parser.add_argument('--dihed-num-iterations', default=3, type=int,
+                        help='Number of iterations during the dihedral parameter fitting')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
@@ -719,7 +719,7 @@ def main_parameterize(arguments=None):
         df.molecule = mol
         df.dihedrals = selected_dihedrals
         df.qm_results = scan_results
-        df.num_searches = args.dihed_num_searches
+        df.num_iterations = args.dihed_num_iterations
         df.result_directory = os.path.join(args.outdir, 'parameters', args.forcefield)
 
         # In case of FakeQM, the initial parameters are set to zeros.
