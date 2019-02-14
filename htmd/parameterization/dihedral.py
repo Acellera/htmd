@@ -254,6 +254,7 @@ class DihedralFitting:
         return parameters
 
     def _optimizeWithIterativeScheme(self, vector, target_energies):
+        logger.info('Using iterative fitting scheme with {} iterations'.format(self.num_iterations))
         best_loss = None
         best_vector = None
         for i in range(self.num_iterations):
@@ -433,7 +434,7 @@ class DihedralFitting:
             vector[:] = 0
 
         # Optimize each dihedral individually
-        logger.info('Start parameter optimization with {} iterations'.format(self.num_iterations))
+        logger.info('Start parameter optimization')
         start = time.clock()
         if self.fit_type.lower() == 'iterative':
             vector = self._optimizeWithIterativeScheme(vector, target_energies)
