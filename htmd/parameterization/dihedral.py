@@ -60,7 +60,7 @@ class DihedralFitting:
         self.result_directory = None
         self.zeroed_parameters = False
         self.num_iterations = 3
-        self.fit_type = 'Iterative'
+        self.fit_type = 'iterative'
 
         self.parameters = None
         self.loss = None
@@ -94,11 +94,11 @@ class DihedralFitting:
         all_equivalent_dihedrals = {tuple(dihedrals[0]): dihedrals for dihedrals in all_equivalent_dihedrals}
 
         # Choose the selected dihedrals
-        _equivalent_dihedrals = []
+        equivalent_dihedrals = []
         for dihedral, name in zip(self.dihedrals, self._names):
             if tuple(dihedral) not in all_equivalent_dihedrals:
                 raise ValueError('{} is not a parameterizable dihedral!'.format(name))
-            _equivalent_dihedrals.append(all_equivalent_dihedrals[tuple(dihedral)])
+            equivalent_dihedrals.append(all_equivalent_dihedrals[tuple(dihedral)])
 
         # Get dihedral atom types
         self._dihedral_atomtypes = [findDihedralType(tuple(self.molecule.atomtype[dihedral]), self.parameters) for dihedral in self.dihedrals]
@@ -115,7 +115,7 @@ class DihedralFitting:
         self._angle_values = []
         for scan_coords in self._coords:
             scan_angle_values = []
-            for equivalent_indices in _equivalent_dihedrals:
+            for equivalent_indices in equivalent_dihedrals:
                 angle_values = []
                 for coords in scan_coords:
                     angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
@@ -162,12 +162,11 @@ class DihedralFitting:
         actual_energies = []
 
         for iscan in range(numScans):
-            current_energy = 0
+            energies = 0
             for i, idihed in enumerate(dihedrals):
                 phis = angle_values[iscan][idihed][:, :, None]
-                energies = np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2)) + offset
-                current_energy += energies
-            actual_energies.append(current_energy)
+                energies += np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2)) + offset
+            actual_energies.append(energies)
 
         return actual_energies
 
@@ -253,10 +252,44 @@ class DihedralFitting:
 
         return parameters
 
-    def _optimizeWithIterativeScheme(self, vector, target_energies):
-        logger.info('Using iterative fitting scheme with {} iterations'.format(self.num_iterations))
-        best_loss = None
-        best_vector = None
+    def _getOptimizer(self, numDihedrals):
+        opt = nlopt.opt(nlopt.LD_LBFGS, 2 * numDihedrals * self.MAX_DIHEDRAL_MULTIPLICITY + 1)
+        opt.set_vector_storage(opt.get_dimension())
+
+        # Set bounds
+        lower_bounds, upper_bounds = self._getBounds(numDihedrals)
+        opt.set_lower_bounds(lower_bounds)
+        opt.set_upper_bounds(upper_bounds)
+
+        # Set convergence criteria
+        opt.set_xtol_rel(1e-4)
+        opt.set_maxeval(100 * opt.get_dimension())
+
+        return opt
+
+    def _optimize(self, opt, vector, best_vector=None, best_loss=None):
+        try:
+            vector = opt.optimize(vector)
+            loss = opt.last_optimum_value()
+            status = opt.last_optimize_result()
+        except RuntimeError:
+            loss = -1
+            status = -1
+        else:
+            if loss < best_loss:
+                best_loss = loss
+                best_vector = vector
+        if best_loss is None:
+            best_loss = loss
+        if best_vector is None:
+            best_vector = vector
+        return best_vector, best_loss, status, loss
+
+    def _optimizeWithIterativeScheme(self, vector, target_energies, opt_all, opt_dih):
+        best_loss = self._objective(vector, None, self._angle_values, target_energies)
+        best_vector = vector
+        logger.info('Number of iterations: {}'.format(self.num_iterations))
+
         for i in range(self.num_iterations):
             logger.info('Dihedral fitting iteration {}'.format(i+1))
 
@@ -270,7 +303,8 @@ class DihedralFitting:
             for idihed in range(self.numDihedrals):
                 logger.info('Optimizing dihedral {}/{}'.format(idihed+1, self.numDihedrals))
                 subvector = self._paramsToVector(current_params, idihed)
-                subvector = self._optimizeWithRandomSearch(subvector, target_energies_dihedral, num_searches=20, idihed=idihed, _logger=False)
+                opt_dih.set_min_objective(lambda x, grad: self._objective(x, grad, self._angle_values, target_energies_dihedral, idihed))
+                subvector = self._optimizeWithRandomSearch(subvector, target_energies_dihedral, opt_dih, num_searches=20, idihed=idihed, _logger=False)
                 dihedral_vectors.append(subvector)
 
             # Pack the individually fitted parameters into a vector
@@ -278,69 +312,44 @@ class DihedralFitting:
 
             # Perform global optimization of all dihedrals
             logger.info('Globally optimizing all dihedrals')
-            vector = self._optimizeWithRandomSearch(vector, target_energies, best_vector=best_vector, best_loss=best_loss, num_searches=1)
-            best_vector = vector.copy()
-            best_loss = self._objective(vector, None, self._angle_values, target_energies)
+            logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
+            best_vector, best_loss, _, _ = self._optimize(opt_all, vector, best_vector, best_loss)
+            logger.info('Optimized RMSD: {:.6f} kcal/mol'.format(best_loss))
 
-        return vector
+        self.loss = best_loss
 
-    def _optimizeWithRandomSearch(self, vector, target_energies, idihed=None, convergence_rmsd=1e-3,
-                                  num_searches=None, best_vector=None, best_loss=None, _logger=True):
+        return best_vector
+
+    def _optimizeWithRandomSearch(self, vector, target_energies, opt, idihed=None, convergence_rmsd=1e-3, num_searches=None, _logger=True):
         """
         Naive random search
         """
         numDihedrals = self.numDihedrals if idihed is None else 1
 
-        # Create a local optimizer
-        opt = nlopt.opt(nlopt.LD_LBFGS, vector.size)
-        opt.set_vector_storage(opt.get_dimension())
-
-        # Set bounds
-        lower_bounds, upper_bounds = self._getBounds(numDihedrals)
-        opt.set_lower_bounds(lower_bounds)
-        opt.set_upper_bounds(upper_bounds)
-
-        # Set convergence criteria
-        opt.set_xtol_rel(1e-4)
-        opt.set_maxeval(100 * opt.get_dimension())
-
         # Initialize
-        if best_loss is None:
-            best_loss = self._objective(vector, None, self._angle_values, target_energies, idihed)
-        if best_vector is None:
-            best_vector = vector
-        if _logger:
-            logger.info('Initial RMSD: {:.6f} kcal/mol'.format(best_loss))
+        best_loss = self._objective(vector, None, self._angle_values, target_energies, idihed)
+        best_vector = vector
 
-        opt.set_min_objective(lambda x, grad: self._objective(x, grad, self._angle_values, target_energies, idihed))
+        lower_bounds, upper_bounds = self._getBounds(numDihedrals)
 
         # Decide the number of the random searches
         num_searches = 10 * opt.get_dimension() if num_searches is None else int(num_searches)
         if num_searches < 0:
             raise ValueError('The number of random searches has to be possive, but it is {}'.format(num_searches))
+        if _logger:
+            logger.info('Number of searches: {}'.format(num_searches))
+            logger.info('Initial RMSD: {:.6f} kcal/mol'.format(best_loss))
 
         with open(os.path.join(self.result_directory, 'random-search.log'), 'w') as log:
             log.write('{:6s} {:6s} {:10s} {}\n'.format('# Step', 'Status', 'Loss', 'Vector'))
             for i in range(num_searches):
-
-                try:
-                    vector = opt.optimize(vector)
-                    loss = opt.last_optimum_value()
-                    status = opt.last_optimize_result()
-
-                except RuntimeError:
-                    loss = -1
-                    status = -1
-
-                else:
-                    if loss < best_loss:
-                        best_loss = loss
-                        best_vector = vector
-                        if _logger:
-                            logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
+                old_loss = best_loss
+                best_vector, best_loss, status, curr_loss = self._optimize(opt, vector, best_vector, best_loss)
+                if _logger and (best_loss < old_loss):
+                    logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
 
                 string = ' '.join(['{:10.6f}'.format(value) for value in vector])
-                log.write('{:6d} {:6d} {:10.6f} {}\n'.format(i, status, loss, string))
+                log.write('{:6d} {:6d} {:10.6f} {}\n'.format(i, status, curr_loss, string))
 
                 vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
 
@@ -378,7 +387,6 @@ class DihedralFitting:
         return const_energies
 
     def _evaluateConstTermsPerDihedral(self, parameters):
-        # for key in parameters.dihedral_types: print(key, [term.phi_k for term in parameters.dihedral_types[key]])
         # Evaluate MM energies
         const_energies = []
         for idihed in range(self.numDihedrals):
@@ -433,13 +441,20 @@ class DihedralFitting:
         if self.zeroed_parameters:
             vector[:] = 0
 
-        # Optimize each dihedral individually
         logger.info('Start parameter optimization')
         start = time.clock()
+        
+        # Initialize global optimizer
+        opt_all = self._getOptimizer(self.numDihedrals)
+        opt_all.set_min_objective(lambda x, grad: self._objective(x, grad, self._angle_values, target_energies))
+
         if self.fit_type.lower() == 'iterative':
-            vector = self._optimizeWithIterativeScheme(vector, target_energies)
+            logger.info('Using iterative fitting scheme')
+            opt_dih = self._getOptimizer(1)
+            vector = self._optimizeWithIterativeScheme(vector, target_energies, opt_all, opt_dih)
         elif self.fit_type.lower() == 'nrs':
-            vector = self._optimizeWithRandomSearch(vector, target_energies)                            
+            logger.info('Using naive random search (NRS) fitting scheme')
+            vector = self._optimizeWithRandomSearch(vector, target_energies, opt_all)                            
         finish = time.clock()
         logger.info('Finished parameter optimization after %f s' % (finish-start))
 
