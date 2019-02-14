@@ -450,7 +450,7 @@ class DihedralFitting:
 
         if self.fit_type.lower() == 'iterative':
             logger.info('Using iterative fitting scheme')
-            opt_dih = self._getOptimizer(1)
+            opt_dih = self._getOptimizer(1) # Initialize single-dihedral optimizer needed for the iterative scheme
             vector = self._optimizeWithIterativeScheme(vector, target_energies, opt_all, opt_dih)
         elif self.fit_type.lower() == 'nrs':
             logger.info('Using naive random search (NRS) fitting scheme')
