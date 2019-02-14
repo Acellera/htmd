@@ -26,20 +26,6 @@ from htmd.parameterization.parameterset import findDihedralType
 logger = logging.getLogger(__name__)
 
 
-def _evaluateScanEnergies(k0, phi0, offset, n, angle_values, numScans, dihedrals):
-    actual_energies = []
-
-    for iscan in range(numScans):
-        current_energy = 0
-        for i, idihed in enumerate(dihedrals):
-            phis = angle_values[iscan][idihed][:, :, None]
-            energies = np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2)) + offset
-            current_energy += energies
-        actual_energies.append(current_energy)
-
-    return actual_energies
-
-
 class DihedralFitting:
     """
     Dihedral parameter fitting
@@ -74,6 +60,7 @@ class DihedralFitting:
         self.result_directory = None
         self.zeroed_parameters = False
         self.num_iterations = 3
+        self.fit_type = 'Iterative'
 
         self.parameters = None
         self.loss = None
@@ -170,6 +157,20 @@ class DihedralFitting:
         n = np.arange(1, self.MAX_DIHEDRAL_MULTIPLICITY + 1)
         return k0, phi0, offset, n
 
+    @staticmethod
+    def _evaluateScanEnergies(k0, phi0, offset, n, angle_values, numScans, dihedrals):
+        actual_energies = []
+
+        for iscan in range(numScans):
+            current_energy = 0
+            for i, idihed in enumerate(dihedrals):
+                phis = angle_values[iscan][idihed][:, :, None]
+                energies = np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2)) + offset
+                current_energy += energies
+            actual_energies.append(current_energy)
+
+        return actual_energies
+
     def _objective(self, x, grad, angle_values, target_energies, idihed=None):
         """
         Objective function for the parameter fitting.
@@ -177,7 +178,7 @@ class DihedralFitting:
         dihedrals = np.arange(self.numDihedrals) if idihed is None else [idihed,]
 
         k0, phi0, offset, n = self._unpackVector(x)
-        actual_energies = _evaluateScanEnergies(k0, phi0, offset, n, angle_values, self.numDihedrals, dihedrals)
+        actual_energies = DihedralFitting._evaluateScanEnergies(k0, phi0, offset, n, angle_values, self.numDihedrals, dihedrals)
 
         all_actual_energies = np.concatenate([actual_energies[d] for d in dihedrals])
         all_target_energies = np.concatenate([target_energies[d] for d in dihedrals])
@@ -251,6 +252,36 @@ class DihedralFitting:
                 assert term.per == j + 1  # Check if the periodicity is still correct
 
         return parameters
+
+    def _optimizeWithIterativeScheme(self, vector, target_energies):
+        best_loss = None
+        best_vector = None
+        for i in range(self.num_iterations):
+            logger.info('Dihedral fitting iteration {}'.format(i+1))
+
+            # Evaluate constant terms for single dihedral fitting
+            current_params = self._vectorToParams(vector)
+            const_energies_dihedral = self._evaluateConstTermsPerDihedral(current_params)
+            target_energies_dihedral = self._calculateTargetEnergies(const_energies_dihedral)
+
+            # Fit the individual dihedrals
+            dihedral_vectors = []
+            for idihed in range(self.numDihedrals):
+                logger.info('Optimizing dihedral {}/{}'.format(idihed+1, self.numDihedrals))
+                subvector = self._paramsToVector(current_params, idihed)
+                subvector = self._optimizeWithRandomSearch(subvector, target_energies_dihedral, num_searches=20, idihed=idihed, _logger=False)
+                dihedral_vectors.append(subvector)
+
+            # Pack the individually fitted parameters into a vector
+            vector = DihedralFitting._subvectorsToVector(dihedral_vectors, vector)
+
+            # Perform global optimization of all dihedrals
+            logger.info('Globally optimizing all dihedrals')
+            vector = self._optimizeWithRandomSearch(vector, target_energies, best_vector=best_vector, best_loss=best_loss, num_searches=1)
+            best_vector = vector.copy()
+            best_loss = self._objective(vector, None, self._angle_values, target_energies)
+
+        return vector
 
     def _optimizeWithRandomSearch(self, vector, target_energies, idihed=None, convergence_rmsd=1e-3,
                                   num_searches=None, best_vector=None, best_loss=None, _logger=True):
@@ -364,6 +395,14 @@ class DihedralFitting:
 
         return const_energies
 
+    @staticmethod
+    def _subvectorsToVector(dihedral_vectors, prev_vector):
+        halfsize = int((len(dihedral_vectors[0])-1)/2)
+        vector = np.hstack([vv[:halfsize] for vv in dihedral_vectors] +
+                        [vv[halfsize:-1] for vv in dihedral_vectors] +
+                        [prev_vector[-1]]) # Keep last offset from previous iteration
+        return vector
+
     def _calculateTargetEnergies(self, const_energies):
         target_energies = []
         for ref_energies, const_energies_dih in zip(self._reference_energies, const_energies):
@@ -384,7 +423,7 @@ class DihedralFitting:
 
         # Check self-consistency of computed energies
         k0, phi0, offset, n = self._unpackVector(vector)
-        actual_energies = _evaluateScanEnergies(k0, phi0, offset, n, self._angle_values, self.numDihedrals, np.arange(self.numDihedrals))
+        actual_energies = DihedralFitting._evaluateScanEnergies(k0, phi0, offset, n, self._angle_values, self.numDihedrals, np.arange(self.numDihedrals))
         test_energies = zip(self._initial_energies, const_energies, actual_energies)
         for initial_energies, const_energies, actual_enegies in test_energies:
             assert np.allclose(initial_energies, const_energies + actual_enegies, rtol=0, atol=1e-5) # TODO debug
@@ -396,36 +435,10 @@ class DihedralFitting:
         # Optimize each dihedral individually
         logger.info('Start parameter optimization with {} iterations'.format(self.num_iterations))
         start = time.clock()
-        best_loss = None
-        best_vector = None
-        for i in range(self.num_iterations):
-            logger.info('Dihedral fitting iteration {}'.format(i+1))
-
-            # Evaluate constant terms for single dihedral fitting
-            current_params = self._vectorToParams(vector)
-            const_energies_dihedral = self._evaluateConstTermsPerDihedral(current_params)
-            target_energies_dihedral = self._calculateTargetEnergies(const_energies_dihedral)
-
-            # Fit the individual dihedrals
-            dihedral_vectors = []
-            for idihed in range(self.numDihedrals):
-                logger.info('Optimizing dihedral {}/{}'.format(idihed+1, self.numDihedrals))
-                subvector = self._paramsToVector(current_params, idihed)
-                subvector = self._optimizeWithRandomSearch(subvector, target_energies_dihedral, num_searches=20, idihed=idihed, _logger=False)
-                dihedral_vectors.append(subvector)
-
-            # Pack the individually fitted parameters into a vector
-            halfsize = int((len(subvector)-1)/2)
-            vector = np.hstack([vv[:halfsize] for vv in dihedral_vectors] +
-                            [vv[halfsize:-1] for vv in dihedral_vectors] +
-                            [vector[-1]]) # Keep last offset from previous iteration
-
-            # Perform global optimization of all dihedrals
-            logger.info('Globally optimizing all dihedrals')
-            vector = self._optimizeWithRandomSearch(vector, target_energies, best_vector=best_vector, best_loss=best_loss, num_searches=1)
-            best_vector = vector.copy()
-            best_loss = self._objective(vector, None, self._angle_values, target_energies)
-                            
+        if self.fit_type.lower() == 'iterative':
+            vector = self._optimizeWithIterativeScheme(vector, target_energies)
+        elif self.fit_type.lower() == 'nrs':
+            vector = self._optimizeWithRandomSearch(vector, target_energies)                            
         finish = time.clock()
         logger.info('Finished parameter optimization after %f s' % (finish-start))
 
