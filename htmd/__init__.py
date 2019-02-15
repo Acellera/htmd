@@ -21,7 +21,8 @@ reg_file = os.path.join(os.path.expanduser('~'), '.htmd', '.registered-htmd', 'r
 if (not hasattr(main, '__file__')) and \
         ((not os.path.isfile(reg_file)) or os.getenv("LICENCE_ACCEPTED") == "YES" or os.getenv("TRAVIS_REPO_SLUG")):
     print('\nCopyright by Acellera Ltd. By executing you are accepting the License. In order to register, '
-          'run htmd_register on your terminal\n')
+          'run htmd_register on your terminal.')
+    print('The registration information must be valid so that it might be verified.')
 
 if _config['configfile']:
     if not os.path.isfile(_config['configfile']):

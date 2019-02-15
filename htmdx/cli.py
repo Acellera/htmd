@@ -121,6 +121,7 @@ def do_register(product=None):
 
     print("\n Welcome to HTMD. We'd like to know who you are so that we can keep in touch!")
     print(" Please enter your name, affiliation and institutional email address.\n")
+    print(" Please provide valid information so that it might be verified.\n")
 
     while email == "" or not ("@" in email):
         print(" Institutional Email : ", end="")
