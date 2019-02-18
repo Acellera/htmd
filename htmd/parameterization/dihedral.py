@@ -262,7 +262,7 @@ class DihedralFitting:
         opt.set_upper_bounds(upper_bounds)
 
         # Set convergence criteria
-        opt.set_xtol_rel(1e-4)
+        opt.set_xtol_rel(1e-3)
         opt.set_maxeval(100 * opt.get_dimension())
 
         return opt

@@ -53,7 +53,7 @@ def getArgumentParser():
                         help='Type of structure optimization when scanning dihedral angles (default: %(default)s)')
     parser.add_argument('--dihed-num-iterations', default=3, type=int,
                         help='Number of iterations during the dihedral parameter fitting')
-    parser.add_argument('--dihed-fit-type', default='iterative', choices=['iterative', 'NRS'],
+    parser.add_argument('--dihed-fit-type', default='NRS', choices=['iterative', 'NRS'],
                         help='Dihedral fitting method. Can be either iterative or naive random search (NRS).')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
                         help='QM queue (default: %(default)s)')
