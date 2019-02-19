@@ -57,6 +57,9 @@ class TestParameterize(unittest.TestCase):
                 relFile = os.path.relpath(os.path.join(root, file), start=refDir)
                 if any([relFile.startswith(exclusion) or relFile.endswith(exclusion) for exclusion in exclusions]):
                     continue
+                # HACK: fix Travis glitch
+                if 'parameters.c~' in relFile:
+                    continue
                 testedFiles.append(os.path.join(root, file))
 
         # Test the files
