@@ -323,8 +323,8 @@ class TestParameterize(unittest.TestCase):
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None'
                                   ' --dihed-fit-type iterative')
-        self._test(refDir, resDir, energyTermRelTol=5e-5, energyProfileAbsTol=2.1e-3,
-                   dihedralForceConstAbsTol=1e-4, dihedralPhaseAbsTol=2.5)
+        self._test(refDir, resDir, energyTermRelTol=2e-4, energyProfileAbsTol=5.1e-3,
+                   dihedralForceConstAbsTol=5e-4, dihedralPhaseAbsTol=3.5)
 
     def test_benzamidine_gasteiger(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_gasteiger')
