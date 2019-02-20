@@ -174,7 +174,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
                 else:
                     raise AttributeError('Version not supported')
             if self.resources is not None:
-                for resource in self.resources:
+                for resource in ensurelist(self.resources):
                     f.write('#BSUB -R "{}"\n'.format(resource))
             f.write('#BSUB -M {}\n'.format(self.memory))
             f.write('#BSUB -cwd {}\n'.format(workdir))
@@ -189,7 +189,7 @@ class LsfQueue(SimQueue, ProtocolInterface):
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\n')
             if self.prerun is not None:
-                for call in self.prerun:
+                for call in ensurelist(self.prerun):
                     f.write('{}\n'.format(call))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))

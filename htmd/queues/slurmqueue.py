@@ -26,7 +26,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         Job name (identifier)
     partition : str or list of str, default=None
         The queue (partition) or list of queues to run on. If list, the one offering earliest initiation will be used.
-    priority : str, default='gpu_priority'
+    priority : str, default=None
         Job priority
     ngpu : int, default=1
         Number of GPUs to use for a single job
@@ -39,10 +39,6 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         SLURM.
     walltime : int, default=None
         Job timeout (s)
-    envvars : str, default='ACEMD_HOME,HTMD_LICENSE_FILE'
-        Envvars to propagate from submission node to the running node (comma-separated)
-    prerun : list of strings, default=None
-        Shell commands to execute on the running node before the job (e.g. loading modules).
     mailtype : str, default=None
         When to send emails. Separate options with commas like 'END,FAIL'.
     mailuser : str, default=None
@@ -57,8 +53,12 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         Extension of trajectory files. This is needed to copy them to datadir.
     nodelist : list, default=None
         A list of nodes on which to run every job at the *same time*! Careful! The jobs will be duplicated!
-    exclude : list
+    exclude : list, default=None
         A list of nodes on which *not* to run the jobs. Use this to select nodes on which to allow the jobs to run on.
+    envvars : str, default='ACEMD_HOME,HTMD_LICENSE_FILE'
+        Envvars to propagate from submission node to the running node (comma-separated)
+    prerun : list, default=None
+        Shell commands to execute on the running node before the job (e.g. loading modules)
 
     Examples
     --------
@@ -82,7 +82,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                   val.Number(int, '0POS'))
         self._arg('ncpu', 'int', 'Number of CPUs to use for a single job', self._defaults['ncpu'],
                   val.Number(int, 'POS'))
-        self._arg('memory', 'int', 'Amount of memory per job (MB)', self._defaults['memory'], val.Number(int, 'POS'))
+        self._arg('memory', 'int', 'Amount of memory per job (MiB)', self._defaults['memory'], val.Number(int, 'POS'))
         self._arg('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. '
                                       'Check how to define gpu_mem on SLURM.', None, val.Number(int, '0POS'))
         self._arg('walltime', 'int', 'Job timeout (s)', self._defaults['walltime'], val.Number(int, 'POS'))
@@ -180,7 +180,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\n')
             if self.prerun is not None:
-                for call in self.prerun:
+                for call in ensurelist(self.prerun):
                     f.write('{}\n'.format(call))
             f.write('\ncd {}\n'.format(workdir))
             f.write('{}'.format(runsh))
