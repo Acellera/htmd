@@ -57,6 +57,9 @@ class TestParameterize(unittest.TestCase):
                 relFile = os.path.relpath(os.path.join(root, file), start=refDir)
                 if any([relFile.startswith(exclusion) or relFile.endswith(exclusion) for exclusion in exclusions]):
                     continue
+                # HACK: fix Travis glitch
+                if 'parameters.c~' in relFile:
+                    continue
                 testedFiles.append(os.path.join(root, file))
 
         # Test the files
@@ -214,7 +217,7 @@ class TestParameterize(unittest.TestCase):
         resDir = os.path.join(self.testDir, 'h2o2_zero_searches_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
         self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None '
-                                  '--scan-type None --dihed-num-searches 0')
+                                  '--scan-type None --dihed-fit-type iterative --dihed-num-iterations 0')
         self._test(refDir, resDir)
 
     @unittest.skipUnless(os.environ.get('HTMD_VERYLONGTESTS') == 'yes', 'Too long')
@@ -310,16 +313,18 @@ class TestParameterize(unittest.TestCase):
     def test_ethanolamine_dihed_fix(self):
         refDir = os.path.join(self.dataDir, 'ethanolamine_dihed_fix')
         resDir = os.path.join(self.testDir, 'ethanolamine_dihed_fix')
-        self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None')
+        self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None'
+                                  ' --dihed-fit-type iterative')
         self._test(refDir, resDir)
 
     def test_ethanolamine_dihed_fix_restart(self):
         refDir = os.path.join(self.dataDir, 'ethanolamine_dihed_fix_restart')
         resDir = os.path.join(self.testDir, 'ethanolamine_dihed_fix_restart')
         shutil.copytree(os.path.join(refDir, 'dihedral-single-point'), os.path.join(resDir, 'dihedral-single-point'))
-        self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None')
-        self._test(refDir, resDir, energyTermRelTol=5e-5, energyProfileAbsTol=2.1e-3,
-                   dihedralForceConstAbsTol=1e-4, dihedralPhaseAbsTol=2.5)
+        self._run(refDir, resDir, 'parameterize input.mol2 --charge-type Gasteiger --min-type None --scan-type None'
+                                  ' --dihed-fit-type iterative')
+        self._test(refDir, resDir, energyTermRelTol=2e-4, energyProfileAbsTol=5.1e-3,
+                   dihedralForceConstAbsTol=5e-4, dihedralPhaseAbsTol=3.5)
 
     def test_benzamidine_gasteiger(self):
         refDir = os.path.join(self.dataDir, 'benzamidine_gasteiger')
@@ -412,7 +417,7 @@ class TestParameterize(unittest.TestCase):
         refDir = os.path.join(self.dataDir, 'glycol_dihed_opt_mm_fake')
         resDir = os.path.join(self.testDir, 'glycol_dihed_opt_mm_fake')
         self._run(refDir, resDir, 'parameterize input.mol2 -f GAFF2 --charge-type Gasteiger --min-type None '
-                                  '--scan-type mm --fake-qm --dihed-num-searches 0')
+                                  '--scan-type mm --dihed-fit-type iterative --dihed-num-iterations 0 --fake-qm')
         self._test(refDir, resDir, energyProfileAbsTol=2.1e-3)
 
     def test_glycol_min_mm_fake(self):
