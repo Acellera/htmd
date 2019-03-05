@@ -148,7 +148,8 @@ def PDBQTwrite(mol, filename, frames=None, writebonds=True):
                  (box[0], box[1], box[2], 90, 90, 90))
 
     for f in range(numFrames):
-        fh.write("MODEL    %5d\n" % (frames[f] + 1))
+        #print('Warning, modified to input to smina')
+        #fh.write("MODEL    %5d\n" % (frames[f] + 1))
         for i in range(0, len(mol.record)):
             name = _deduce_PDB_atom_name(mol.name[i], mol.resname[i])
 
@@ -219,6 +220,8 @@ def prepProtForFeats(mol, pH=7, thickness=None, autosegment=False, prepare=True)
         bonds = pmol._guessBonds()
         pmol.bonds = bonds
     else:
+        bonds = mol._guessBonds()
+        mol.bonds = bonds
         pmol = mol
 
     return pmol
@@ -362,19 +365,23 @@ def getFeatures(mol):
 
 
 def myPdbqt(pdb, outfolder):
-    oname = pdb.split('/')[-2]
+    oname = pdb.split('/')[-1]
+    oname = oname[:oname.rfind('.')]
     outname = './{}/{}.pdbqt'.format(outfolder, oname)
-    if os.path.isfile(outname):
-        return
+    #print('WRITING PDBQT AT',outname)
+    #if os.path.isfile(outname):
+    #    return
     try:
         m = Molecule(pdb)
     except:
         return (pdb, 'read')
     try:
-        pmol = prepProtForFeats(m)  # , prepare=False)
+        pmol = prepProtForFeats(m,prepare=False)  # , prepare=False)
         pmolPDBQT = molPDBQT(pmol)
         writePDBQT(pmolPDBQT, outname)
+        return pmol
     except:
+        raise
         return (pdb, 'process')
 
 

@@ -227,6 +227,7 @@ class Molecule:
         self.fileloc = []
         self.time = []
         self.step = []
+        self.history = []
         self.crystalinfo = None
 
         self.reps = Representations(self)
@@ -392,8 +393,8 @@ class Molecule:
             self.__dict__[k] = np.delete(self.__dict__[k], sel, axis=0)
             if k == 'coords':
                 self.__dict__[k] = np.atleast_3d(self.__dict__[k])
-        if _logger:
-            logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
+        #if _logger:
+        #    logger.info('Removed {} atoms. {} atoms remaining in the molecule.'.format(len(sel), self.numAtoms))
         return sel
 
     def get(self, field, sel=None):
@@ -648,7 +649,7 @@ class Molecule:
         """
         return deepcopy(self)
 
-    def filter(self, sel, _logger=True):
+    def filter(self, sel, _logger=False):
         """Removes all atoms not included in the selection
 
         Parameters
@@ -843,6 +844,50 @@ class Molecule:
         M = rotationMatrix(rotax, radians-rads)
         self.rotateBy(M, center=self.coords[atom_quad[1], :, self.frame], sel=right)
 
+
+    def get_LR(self, bond, bonds=None):
+        """ Sets the angle of a dihedral.
+        
+        Parameters
+        ----------
+        atom_quad : list
+            Four atom indexes corresponding to the atoms defining the dihedral
+        radians : float
+            The angle in radians to which we want to set the dihedral
+        bonds : np.ndarray
+            An array containing all bonds of the molecule. This is needed if multiple modifications are done as the
+            bond guessing can get messed up if atoms come very close after the rotation.
+
+        Examples
+        --------
+        >>> mol.setDihedral([0, 5, 8, 12], 0.16)
+        >>> # If we perform multiple modifications, calculate bonds first and pass them as argument to be safe
+        >>> bonds = mol._getBonds()
+        >>> mol.setDihedral([0, 5, 8, 12], 0.16, bonds=bonds)
+        >>> mol.setDihedral([18, 20, 24, 30], -1.8, bonds=bonds)
+        """
+        import scipy.sparse.csgraph as sp
+        from htmd.numbautil import dihedralAngle
+        if bonds is None:
+            bonds = self._getBonds()
+
+        # Now we have to make the lists of atoms that are on either side of the dihedral bond
+        natoms = self.numAtoms
+        conn = np.zeros((natoms, natoms), dtype=np.bool)
+        for b in bonds:
+            conn[b[0], b[1]] = True
+            conn[b[1], b[0]] = True
+
+        # disconnect the structure across the dihedral bond
+        conn[[bond[0], bond[1]]] = 0
+        conn[[bond[1], bond[0]]] = 0
+        left = np.unique(sp.breadth_first_tree(conn, bond[0], directed=False).indices.flatten())
+        right = np.unique(sp.breadth_first_tree(conn, bond[1], directed=False).indices.flatten())
+
+        left = np.append(left,bond[0])
+        right = np.append(right,bond[1])
+        return left, right
+
     def center(self, loc=(0, 0, 0), sel='all'):
         """ Moves the geometric center of the Molecule to a given location
 
@@ -1003,8 +1048,8 @@ class Molecule:
         # Dropping atom alternative positions
         otheraltlocs = [x for x in np.unique(self.altloc) if len(x) and x != keepaltloc]
         if len(otheraltlocs) >= 1 and not keepaltloc == 'all' and _logger:
-            logger.warning('Alternative atom locations detected. Only altloc {} was kept. If you prefer to keep all '
-                           'use the keepaltloc="all" option when reading the file.'.format(keepaltloc))
+            #logger.warning('Alternative atom locations detected. Only altloc {} was kept. If you prefer to keep all '
+            #               'use the keepaltloc="all" option when reading the file.'.format(keepaltloc))
             for a in otheraltlocs:
                 self.remove(self.altloc == a, _logger=_logger)
 

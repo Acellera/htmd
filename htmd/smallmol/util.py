@@ -205,7 +205,6 @@ def drawIsoSurface(values3d, resolution=1., plot_center=None, viewer=None):
     mincoor = np.zeros(3, dtype=np.float64)
     maxcoor = np.array(values3d.shape, dtype=np.float64)
     rescoor = np.array([resolution] * 3)
-
     # Adjust the plotting center
     if plot_center is None:
         plot_center = maxcoor / 2.

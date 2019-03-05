@@ -109,11 +109,13 @@ def checkTruncations(mol):
     for f in fieldsizes:
         if np.any([True if len(x) > fieldsizes[f] else False for x in mol.__dict__[f].astype('str')]):
             if fieldsizes[f] == 1:
-                logger.warning('Field "{}" of PDB overflows. Your data will be truncated to 1 character.'.format(f))
+                #logger.warning('Field "{}" of PDB overflows. Your data will be truncated to 1 character.'.format(f))
+                pass
             else:
-                logger.warning('Field "{}" of PDB overflows. Your data will be truncated to {} characters.'.format(f,
-                                                                                                                   fieldsizes[
-                                                                                                                       f]))
+                pass
+                #logger.warning('Field "{}" of PDB overflows. Your data will be truncated to {} characters.'.format(f,
+                #                                                                                                   fieldsizes[
+                #                                                                                                       f]))
 
 
 def PDBwrite(mol, filename, frames=None, writebonds=True):

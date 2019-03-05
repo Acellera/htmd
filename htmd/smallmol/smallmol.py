@@ -215,7 +215,7 @@ class SmallMol(object):
                     _mol = Chem.MolFromPDBFile(mol, removeHs=False)
                 # if the file failed to be loaded and 'force_reading' = True, file convert to sdf and than loaded
                 if _mol is None and force_reading:
-                    logger.warning('Reading {} with force_reading procedure'.format(mol))
+                    #logger.warning('Reading {} with force_reading procedure'.format(mol))
                     sdf = openbabelConvert(mol, name_suffix, 'sdf')
                     _mol = Chem.SDMolSupplier(sdf, removeHs=False)[0]
 
@@ -737,7 +737,7 @@ class SmallMol(object):
                 self.coords = np.concatenate((self.coords, coords), axis=2).astype(np.float32)
 
     def getVoxels(self, center=None, size=24, resolution=1., rotation=None, displacement=None, dtype=np.float32,
-                  confId=0):
+                  confId=0,scalesigma=1):
         """
         Computes molecule voxelization.
 
@@ -786,6 +786,7 @@ class SmallMol(object):
             coords += np.asarray(displacement)
 
         multisigmas = self._getChannelRadii()
+        multisigmas = multisigmas * scalesigma
         # if (size, resolution) not in SmallMol.array_cache:
         if (size, resolution) not in array_cache:
             N = [size, size, size]

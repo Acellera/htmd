@@ -409,10 +409,10 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
     seqref = ref.sequence()
 
     if len(seqmol) > 1:
-        logger.info('Multiple segments ({}) detected in `mol`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqmol.keys())))
+        #logger.info('Multiple segments ({}) detected in `mol`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqmol.keys())))
         seqmol = mol.sequence(noseg=True)
     if len(seqref) > 1:
-        logger.info('Multiple segments ({}) detected in `ref`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqref.keys())))
+        #logger.info('Multiple segments ({}) detected in `ref`. Alignment will be done on all. Otherwise please specify which segment to align.'.format(list(seqref.keys())))
         seqref = ref.sequence(noseg=True)
 
     if molseg is None:
@@ -440,8 +440,8 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
     alignments = pairwise2.align.globaldx(seqref[refseg], seqmol[molseg], matlist.blosum62)
     numaln = len(alignments)
 
-    if numaln > maxalignments:
-        logger.warning('{} alignments found. Limiting to {} as specified in the `maxalignments` argument.'.format(numaln, maxalignments))
+    #if numaln > maxalignments:
+    #    logger.warning('{} alignments found. Limiting to {} as specified in the `maxalignments` argument.'.format(numaln, maxalignments))
 
     alignedstructs = []
     for i in range(min(maxalignments, numaln)):
@@ -488,8 +488,8 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
 
         start_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r]]] for r in _list_starts])
         finish_residues = np.concatenate([ mol.resid[molsegidx[molfakeresid == residmol[r-1]]] for r in _list_finish])
-        logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}'.format(
-            i, len(refalnresid), np.unique(mol.segid[molidx])[0], ', '.join(['{}-{}'.format(s,f) for s, f in zip(start_residues,finish_residues)])  ))
+        #logger.info('Alignment #{} was done on {} residues: mol segid {} resid {}'.format(
+        #    i, len(refalnresid), np.unique(mol.segid[molidx])[0], ', '.join(['{}-{}'.format(s,f) for s, f in zip(start_residues,finish_residues)])  ))
 
         alignedmol = mol.copy()
         alignedmol.align(molboolidx, ref, refboolidx)
