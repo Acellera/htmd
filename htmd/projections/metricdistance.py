@@ -77,7 +77,7 @@ class MetricDistance(Projection):
         if np.ndim(sel1) == 1 and np.ndim(sel2) == 1:  # normal distances
             metric = pp_calcDistances(mol, sel1, sel2, self.metric, self.threshold, self.pbc, truncate=self.truncate)
         else:  # minimum distances by groups
-            metric = pp_calcMinDistances(mol, sel1, sel2, self.metric, self.threshold, pbc=self.pbc)
+            metric = pp_calcMinDistances(mol, sel1, sel2, self.metric, self.threshold, pbc=self.pbc, truncate=self.truncate)
 
         return metric
 
@@ -421,6 +421,12 @@ class TestMetricDistance(unittest.TestCase):
         data = metr.project(self.mol)
         refdata = np.load(os.path.join(home(), 'data', 'metricdistance', 'mindistances.npy'))
         assert np.allclose(data, refdata, atol=1e-3), 'Minimum distance calculation is broken'
+
+    def test_mindistances_truncate(self):
+        metr = MetricDistance('protein and noh', 'resname MOL and noh', groupsel1='residue', groupsel2='all', truncate=3)
+        data = metr.project(self.mol)
+        refdata = np.load(os.path.join(home(), 'data', 'metricdistance', 'mindistances.npy'))
+        assert np.allclose(data, np.clip(refdata, 0, 3), atol=1e-3), 'Minimum distance calculation is broken'
 
     def test_selfmindistance_manual(self):
         metr = MetricDistance('protein and resid 1 to 50 and noh', 'protein and resid 1 to 50 and noh', groupsel1='residue', groupsel2='residue')
