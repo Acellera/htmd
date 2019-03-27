@@ -364,7 +364,7 @@ def makeAtomNamesUnique(mol):
     return mol
 
 
-def detectChiralCenters(mol):
+def detectChiralCenters(mol, atom_types=None):
     """
     Detect chiral centers
 
@@ -392,6 +392,11 @@ def detectChiralCenters(mol):
     >>> mol = Molecule(molFile)
     >>> detectChiralCenters(mol)
     [(0, 'R'), (2, 'S'), (4, 'R')]
+
+    >>> molFile = os.path.join(home('test-param'), 'fluorchlorcyclopronol.mol2')
+    >>> mol = Molecule(molFile)
+    >>> detectChiralCenters(mol, atom_types=mol.atomtype)
+    [(0, 'R'), (2, 'S'), (4, 'R')]
     """
 
     from htmd.molecule.molecule import Molecule
@@ -402,9 +407,10 @@ def detectChiralCenters(mol):
     if mol.numFrames != 1:
         raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
 
-    # Set atom types to elements, overwise rdkit refuse to read a MOL2 file
+    # Set atom types, overwise rdkit refuse to read some MOL2 files
     htmd_mol = mol.copy()
-    htmd_mol.atomtype = htmd_mol.element
+    if atom_types is not None:
+        htmd_mol.atomtype = atom_types
 
     # Convert Molecule to rdkit Mol
     with TemporaryDirectory() as tmpDir:
