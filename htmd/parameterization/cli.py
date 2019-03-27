@@ -578,8 +578,8 @@ def main_parameterize(arguments=None):
     # Get a molecule and check its validity
     mol = _prepare_molecule(args)
 
-    # Copy the molecule to preserve initial coordinates
-    initial_coords = mol.coords.copy()
+    # Preserve the initial molecule
+    initial_mol = mol.copy()
 
     # Select dihedral angles to parameterize
     selected_dihedrals = _select_dihedrals(mol, args)
@@ -741,7 +741,7 @@ def main_parameterize(arguments=None):
             df.plotDihedralEnergies(idihed, plot_dir, ref_name=ref_name)
 
     # Output the parameters and other results
-    _output_results(mol, parameters, initial_coords, args)
+    _output_results(mol, parameters, initial_mol.coords, args)
 
 
 if __name__ == '__main__':
