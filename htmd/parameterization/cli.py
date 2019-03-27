@@ -636,7 +636,7 @@ def main_parameterize(arguments=None):
             ref_calculator._parameters = parameters
 
         # Detect chiral centers
-        initial_chiral_centers = detectChiralCenters(mol)
+        initial_chiral_centers = detectChiralCenters(mol, atom_types=initial_mol.atomtype)
 
         mm_minimizer = None
         if args.min_type == 'mm':
@@ -648,7 +648,7 @@ def main_parameterize(arguments=None):
 
         # TODO print minimization status
         # Check if the chiral center hasn't changed during the minimization
-        chiral_centers = detectChiralCenters(mol)
+        chiral_centers = detectChiralCenters(mol, atom_types=initial_mol.atomtype)
         if initial_chiral_centers != chiral_centers:
             raise RuntimeError('Chiral centers have changed during the minimization: '
                                '{} --> {}'.format(initial_chiral_centers, chiral_centers))
@@ -689,7 +689,7 @@ def main_parameterize(arguments=None):
                                      scan_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
 
         # Filter scan results
-        scan_results = filterQMResults(scan_results, mol=mol)
+        scan_results = filterQMResults(scan_results, mol=initial_mol)
         logger.info('Valid rotamers:')
         for idihed, (dihedral, results) in enumerate(zip(selected_dihedrals, scan_results)):
             dihed_name = '-'.join(mol.name[list(dihedral)])
