@@ -193,7 +193,7 @@ def rotate(coords, rotMat, center=(0, 0, 0)):
 
 
 def drawIsoSurface(values3d, resolution=1., plot_center=None, viewer=None):
-    from htmd.vmdviewer import getCurrentViewer
+    from moleculekit.vmdviewer import getCurrentViewer
     from moleculekit.util import writeVoxels
     # plot_center should be - molecule.get_center() + 12
     if len(values3d.shape) != 3:

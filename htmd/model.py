@@ -17,7 +17,7 @@ from scipy import stats
 import warnings
 import random
 from moleculekit.molecule import Molecule
-from htmd.vmdviewer import getCurrentViewer
+from moleculekit.vmdviewer import getCurrentViewer
 from htmd.units import convert as unitconvert
 import logging
 logger = logging.getLogger(__name__)
@@ -553,7 +553,7 @@ class Model(object):
         ligand : str, optional
             Atom selection string for the ligand.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-        viewer : :class:`VMD <htmd.vmdviewer.VMD>` object, optional
+        viewer : :class:`VMD <moleculekit.vmdviewer.VMD>` object, optional
             A viewer in which to visualize the states
         mols : ndarray, optional
             An array of :class:`Molecule <moleculekit.molecule.Molecule>` objects to visualize

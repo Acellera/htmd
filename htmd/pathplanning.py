@@ -9,7 +9,7 @@
 import numpy as np
 from moleculekit.util import maxDistance, uniformRandomRotation
 from moleculekit.molecule import Molecule
-from htmd.vmdviewer import getCurrentViewer
+from moleculekit.vmdviewer import getCurrentViewer
 from scipy.spatial.distance import cdist
 
 

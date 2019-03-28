@@ -19,7 +19,7 @@ from moleculekit.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds, convertDisulfide
 from htmd.builder.builder import _checkMixedSegment, UnknownResidueError, BuildError
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
-from htmd.vmdviewer import getVMDpath
+from moleculekit.vmdviewer import getVMDpath
 from glob import glob
 from unittest import TestCase
 

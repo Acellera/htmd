@@ -771,7 +771,7 @@ def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
 
 def _drawForce(start, vec):
     assert start.ndim == 1 and vec.ndim == 1
-    from htmd.vmdviewer import getCurrentViewer
+    from moleculekit.vmdviewer import getCurrentViewer
     vmd = getCurrentViewer()
     vmd.send("""
     proc vmd_draw_arrow {start end} {

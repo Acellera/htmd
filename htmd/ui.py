@@ -27,7 +27,7 @@ from htmd.adaptive.adaptivegoal import AdaptiveGoal
 from htmd.adaptive.adaptive import reconstructAdaptiveTraj
 from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
-from htmd.vmdviewer import viewer, getCurrentViewer
+from moleculekit.vmdviewer import viewer, getCurrentViewer
 from htmd.builder.solvate import solvate
 from htmd.mdengine.acemd.acemd import Acemd, Acemd2, AtomRestraint, GroupRestraint
 from htmd.builder.builder import detectDisulfideBonds, autoSegment, embed, DisulfideBridge
@@ -45,7 +45,7 @@ from htmd.queues.localqueue import LocalGPUQueue, LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
-from htmd.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
+from moleculekit.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
 from htmd.builder.loopmodeler import loopModeller
 from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmdx.cli import check_registration, show_news
