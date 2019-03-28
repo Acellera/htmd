@@ -21,7 +21,7 @@ from htmd.projections.metric import Metric
 from htmd.projections.tica import TICA
 from htmd.projections.kmeanstri import KMeansTri
 from htmd.projections.gwpca import GWPCA
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.adaptive.adaptiverun import AdaptiveMD
 from htmd.adaptive.adaptivegoal import AdaptiveGoal
 from htmd.adaptive.adaptive import reconstructAdaptiveTraj
@@ -33,7 +33,7 @@ from htmd.mdengine.acemd.acemd import Acemd, Acemd2, AtomRestraint, GroupRestrai
 from htmd.builder.builder import detectDisulfideBonds, autoSegment, embed, DisulfideBridge
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
-from htmd.molecule.util import uniformRandomRotation
+from moleculekit.util import uniformRandomRotation
 from htmd.rotationmatrix import rotationMatrix
 from htmd.builder.preparation import proteinPrepare
 from htmd.dock import dock

@@ -5,7 +5,7 @@
 #
 from htmd.projections.metricdihedral import MetricDihedral, Dihedral
 from htmd.projections.metric import Metric
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from joblib import Parallel, delayed
 from sklearn.metrics import mutual_info_score
 import numpy as np
@@ -20,7 +20,7 @@ class MutualInformation:
         ----------
         model : :class:`Model <htmd.model.Model>` object
             A Model object with a calculated MSM
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A reference molecule from which to obtain structural information. By default model.data.simlist[0].molfile
             will be used.
         fstep : float

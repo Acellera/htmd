@@ -5,7 +5,7 @@
 #
 from __future__ import print_function
 
-from htmd.molecule.util import sequenceID
+from moleculekit.util import sequenceID
 import numpy as np
 import logging
 import string
@@ -115,16 +115,16 @@ def embed(mol1, mol2, gap=1.3):
 
     Parameters
     ----------
-    mol1 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The first Molecule object
-    mol2 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The second Molecule object
     gap : float
         Minimum space in A between atoms of the two molecules
 
     Return
     ------
-    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    newmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The resulting Molecule object
 
     Example
@@ -158,7 +158,7 @@ def embed(mol1, mol2, gap=1.3):
 
 
 def convertDisulfide(mol, disu):
-    from htmd.molecule.molecule import UniqueResidueID
+    from moleculekit.molecule import UniqueResidueID
     newdisu = []
     for d in disu:
         if not isinstance(d[0], str) or not isinstance(d[1], str):
@@ -172,7 +172,7 @@ def detectDisulfideBonds(mol, thresh=3):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The molecule for which to detect disulfide bonds
     thresh : float
         The threshold under which two sulfurs are considered as bonded
@@ -183,7 +183,7 @@ def detectDisulfideBonds(mol, thresh=3):
         A list of :class:`DisulfideBridge <htmd.builder.builder.DisulfideBridge>` objects
     """
     from scipy.spatial.distance import pdist, squareform
-    from htmd.molecule.molecule import UniqueResidueID
+    from moleculekit.molecule import UniqueResidueID
     disubonds = []
 
     # Find all SG atoms belonging to resnames starting with CY
@@ -208,8 +208,11 @@ def detectDisulfideBonds(mol, thresh=3):
 
     numbonds = np.sum(close, axis=0)
     if np.any(numbonds > 1):
-        rows, cols = np.where(numbonds > 1)
-        pairs = [(str(residues[r]), str(residues[c])) for r, c in zip(rows, cols)]
+        multibonded_idx1 = np.where(numbonds > 1)[0]
+        multibonded_indexes = np.where(close[multibonded_idx1])
+        multibonded_idx1 = multibonded_idx1[multibonded_indexes[0]]
+        multibonded_idx2 = multibonded_indexes[1]
+        pairs = [(str(residues[r]), str(residues[c])) for r, c in zip(multibonded_idx1, multibonded_idx2)]
         raise RuntimeError('Sulphur atoms between pairs {} have multiple possible bonds. Cannot guess disulfide bonds. '
                            'Please specify them manually.'.format(pairs))
 
@@ -235,7 +238,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The Molecule object
     sel : str
         Atom selection string on which to check for gaps.
@@ -251,7 +254,7 @@ def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, fiel
 
     Returns
     -------
-    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    newmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         A new Molecule object with modified segids
 
     Example
@@ -323,7 +326,7 @@ def autoSegment2(mol, sel='(protein or resname ACE NME)', basename='P', fields=(
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The Molecule object
     sel : str
         Atom selection string on which to check for gaps.
@@ -342,7 +345,7 @@ def autoSegment2(mol, sel='(protein or resname ACE NME)', basename='P', fields=(
 
     Returns
     -------
-    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    newmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         A new Molecule object with modified segids
 
     Example
@@ -452,9 +455,9 @@ def removeAtomsInHull(mol1, mol2, hullsel, removesel):
 
     Parameters
     ----------
-    mol1 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>` object
         Molecule for which to calculate the convex hull
-    mol2 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>` object
         Molecule which contains the atoms which we check if they are within the hull
     hullsel : str
         Atom selection string for atoms in mol1 from which to calculate the convex hull.
@@ -511,7 +514,7 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
     Parameters
     ----------
-    memb : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    memb : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The membrane to be tiled
     xmin : float
         Minimum x coordinate
@@ -542,7 +545,7 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
     logger.info('Replicating Membrane {}x{}'.format(xreps, yreps))
 
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     megamemb = Molecule()
     bar = tqdm(total=xreps * yreps, desc='Replicating Membrane')
     k = 0
@@ -599,7 +602,7 @@ def minimalRotation(prot):
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from htmd.home import home
     from os import path
 

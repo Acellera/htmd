@@ -141,7 +141,7 @@ def maximalSubstructureAlignment(mol1, mol2, sel1='all', sel2='all', fields=('el
 class TestGraphAlignment(TestCase):
     def test_maximalSubstructureAlignment(self):
         from htmd.home import home
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
 
         path = home(dataDir='test-molecule-graphalignment')
         ref_lig = Molecule(os.path.join(path, 'ref_lig.pdb'))

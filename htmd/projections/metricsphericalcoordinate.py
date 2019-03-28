@@ -15,7 +15,7 @@ class MetricSphericalCoordinate(Projection):
 
     Parameters
     ----------
-    refmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    refmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The reference Molecule to which we will align.
     targetcom : str
         Atom selection string from which to calculate the target center of mass.
@@ -64,8 +64,8 @@ class MetricSphericalCoordinate(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+            A :class:`Molecule <moleculekit.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -116,7 +116,7 @@ class MetricSphericalCoordinate(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -135,7 +135,7 @@ class MetricSphericalCoordinate(Projection):
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from htmd.home import home
     from os import path
     ref = Molecule(path.join(home(dataDir='metricdistance'), 'filtered.pdb'))

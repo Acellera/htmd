@@ -5,7 +5,7 @@
 #
 import numpy as np
 import logging
-import htmd.molecule.molecule
+import moleculekit.molecule
 
 logger = logging.getLogger(__name__)
 

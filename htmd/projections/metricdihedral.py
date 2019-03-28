@@ -74,7 +74,7 @@ class Dihedral:
         
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain atom information
         dihedrals : list
             A single dihedral or a list of Dihedral objects
@@ -166,7 +166,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         sel : str
             Atom selection string to restrict the atoms for which to calculate dihedrals (e.g. only one of many chains).
@@ -228,7 +228,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         res1 : int
             The resid of the first residue containing the C atom
@@ -263,7 +263,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         res1 : int
             The resid of the first residue containing the N CA C atoms
@@ -298,7 +298,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         res1 : int
             The resid of the first residue containing the CA C atoms
@@ -333,7 +333,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         res : int
             The resid of the residue
@@ -372,7 +372,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         res : int
             The resid of the residue
@@ -412,7 +412,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         res : int
             The resid of the residue
@@ -448,7 +448,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         res : int
             The resid of the residue
@@ -483,7 +483,7 @@ class Dihedral:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object from which to obtain structural information
         res : int
             The resid of the residue
@@ -556,8 +556,8 @@ class MetricDihedral(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+            A :class:`Molecule <moleculekit.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -578,7 +578,7 @@ class MetricDihedral(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -667,7 +667,7 @@ class MetricDihedral(Projection):
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from htmd.home import home
     from htmd.builder.builder import autoSegment
     from os import path

@@ -32,7 +32,7 @@ class SmallMol(object):
     ----------
     mol: rdkit.Chem.rdchem.Mol  or filename or smile or htmd.smallmol.smallmol.SmallMol
         (i) Rdkit molecule or (ii) Location of molecule file (".pdb"/".mol2") or (iii) a smile string or iv) another
-        SmallMol object or v) htmd.molecule.molecule.Molecule object
+        SmallMol object or v) moleculekit.molecule.Molecule object
     ignore_errors: bool
         If True, errors will not be raised.
     force_reading: bool
@@ -190,7 +190,7 @@ class SmallMol(object):
         smallMol: htmd.smallmol.smallmol.SmallMol
             The smallMol object if SmallMol was passed
         """
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
 
         _mol = None
         smallmolecule = None
@@ -1060,11 +1060,11 @@ class SmallMol(object):
 
     def _fromMolecule(self, mol):
         """
-        Returns the rdkit.Chem.rdchem.Mol object from an htmd.molecule.molecule.Molecule one
+        Returns the rdkit.Chem.rdchem.Mol object from an moleculekit.molecule.Molecule one
 
         Parameters
         ----------
-        mol: htmd.molecule.molecule.Molecule
+        mol: moleculekit.molecule.Molecule
             The htmd Molecule object
 
         Returns
@@ -1145,7 +1145,7 @@ class SmallMol(object):
 
     def toMolecule(self, formalcharges=False, ids=None):
         """
-        Return the htmd.molecule.molecule.Molecule
+        Return the moleculekit.molecule.Molecule
 
         Parameters
         ----------
@@ -1157,11 +1157,11 @@ class SmallMol(object):
 
         Returns
         -------
-        mol: htmd.molecule.molecule.Molecule
+        mol: moleculekit.molecule.Molecule
          The htmd Molecule object
 
         """
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
 
         class NoConformerError(Exception):
             pass

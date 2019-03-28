@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.molecule.util import sequenceID
+from moleculekit.util import sequenceID
 from htmd.projections.projection import Projection
 import numpy as np
 import logging
@@ -99,8 +99,8 @@ class MetricSecondaryStructure(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+            A :class:`Molecule <moleculekit.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -151,7 +151,7 @@ class MetricSecondaryStructure(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -196,7 +196,7 @@ def _ssmap(sschar):
     return ssnum
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     import numpy as np
     mol = Molecule('2HBB')  # NTL9
     mol.filter('protein')

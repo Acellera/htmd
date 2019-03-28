@@ -3,7 +3,7 @@ import unittest
 from tempfile import NamedTemporaryFile
 from glob import glob
 from htmd.home import home
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.smallmol.smallmol import SmallMol, SmallMolLib
 import rdkit
 from rdkit.Chem import MolFromSmiles

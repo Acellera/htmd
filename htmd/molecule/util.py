@@ -24,9 +24,9 @@ def molTMscore(mol, ref, selCAmol, selCAref):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         A Molecule containing a single or multiple frames
-    ref : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    ref : :class:`Molecule <moleculekit.molecule.Molecule>` object
         A reference Molecule containing a single frame. Will automatically keep only ref.frame.
     selCAmol : numpy.ndarray
         An atomselection array of booleans or indexes of the CA atoms for mol
@@ -45,7 +45,7 @@ def molTMscore(mol, ref, selCAmol, selCAref):
     tmscore, rmsd = molTMscore(mol, ref, mol.atomselect('protein'), ref.atomselect('protein'))
     """
     from htmd.builder.builder import sequenceID
-    from htmd.molecule.molecule import _residueNameTable
+    from moleculekit.molecule import _residueNameTable
 
     def calculateVariables(currmol):
         res = sequenceID((currmol.resid, currmol.insertion, currmol.segid, currmol.chain))
@@ -101,7 +101,7 @@ def molRMSD(mol, refmol, rmsdsel1, rmsdsel2):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
     refmol
     rmsdsel1
     rmsdsel2
@@ -241,7 +241,7 @@ def maxDistance(mol, sel='all', origin=None):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The molecule containing the atoms
     sel : str
         Atom selection string for atoms for which to calculate distances.
@@ -272,7 +272,7 @@ def boundingBox(mol, sel='all'):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The molecule containing the atoms
     sel : str
         Atom selection string of atoms. See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
@@ -375,9 +375,9 @@ def sequenceStructureAlignment(mol, ref, molseg=None, refseg=None, maxalignments
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The Molecule we want to align
-    ref : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    ref : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The reference Molecule to which we want to align
     molseg : str
         The segment of `mol` we want to align
@@ -713,7 +713,7 @@ from unittest import TestCase
 class TestUtils(TestCase):
     def test_guessAnglesDihedrals(self):
         from htmd.home import home
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
 
         mol = Molecule(os.path.join(home(dataDir='test-molecule-utils'), 'NH4.pdb'))
         angles, dihedrals = guessAnglesAndDihedrals(mol.bonds)
@@ -724,7 +724,7 @@ class TestUtils(TestCase):
         self.assertTrue(np.all(dihedrals.shape == (0, 4)), 'Returned wrong number of dihedrals')
 
     def test_tmscore(self):
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         expectedTMscore = np.array([0.21418524, 0.2367377, 0.23433833, 0.21362964, 0.20935164,
                                     0.20279461, 0.27012895, 0.22675238, 0.21230793, 0.2372011])
         expectedRMSD = np.array([3.70322128, 3.43637027, 3.188193, 3.84455877, 3.53053882,

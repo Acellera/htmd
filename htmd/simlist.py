@@ -304,7 +304,7 @@ def _filtSim(i, sims, outFolder, filterSel):
         return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile, numframes=numframes)
 
     try:
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         mol = Molecule(sims[i].molfile)
     except:
         logger.warning('Error! Skipping simulation ' + name)
@@ -370,7 +370,7 @@ def _renameSims(trajectory, simname, outfolder):
 def _filterTopology(sim, outfolder, filtsel):
     from htmd.util import ensurelist
     try:
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         mol = Molecule(sim.molfile)
     except IOError as e:
         raise RuntimeError('simFilter: {}. Cannot read topology file {}'.format(e, sim.molfile))

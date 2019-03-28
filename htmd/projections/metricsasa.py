@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.projections.projection import Projection
-from htmd.molecule.util import sequenceID
+from moleculekit.util import sequenceID
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -72,8 +72,8 @@ class MetricSasa(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+            A :class:`Molecule <moleculekit.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -95,7 +95,7 @@ class MetricSasa(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -123,8 +123,8 @@ class MetricSasa(Projection):
         return DataFrame({'type': types, 'atomIndexes': indexes, 'description': description})
 
 
-if __name__ == '__name__':
-    from htmd.molecule.molecule import Molecule
+if __name__ == '__main__':
+    from moleculekit.molecule import Molecule
     from htmd.home import home
     from os import path
     import numpy as np

@@ -99,11 +99,11 @@ class VMD:
             time.sleep(0.01)
 
     def loadMol(self, mol, name=None):
-        """ Load a :class:`Molecule <htmd.molecule.molecule.Molecule>` object into VMD
+        """ Load a :class:`Molecule <moleculekit.molecule.Molecule>` object into VMD
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             The Molecule to load into VMD
         name : str
             The name to give to the Molecule

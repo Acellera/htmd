@@ -6,7 +6,7 @@
 
 # -> Notes: line 69 explanation missing
 
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.vmdviewer import VMD
 import numpy as np
 import copy

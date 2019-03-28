@@ -543,7 +543,7 @@ for ext in _MDTRAJ_SAVERS:
 
 if __name__ == '__main__':
     from htmd.home import home
-    from htmd.molecule.molecule import Molecule, mol_equal
+    from moleculekit.molecule import Molecule, mol_equal
     from htmd.util import tempname
     import numpy as np
     import os

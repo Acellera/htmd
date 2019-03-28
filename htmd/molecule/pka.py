@@ -150,6 +150,6 @@ def _pka_backend_external(molecule, propka=None, pH=7.0):
 # A test method
 if __name__ == "__main__":
     import doctest
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     doctest.testmod()
 

@@ -5,7 +5,7 @@
 # No redistribution in whole or part
 #
 import numpy as np
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.metricdata import MetricData
 from scipy import stats
 from htmd.projections.projection import Projection
@@ -37,7 +37,7 @@ class Metric:
     >>> # Or define your own function which accepts as first argument a Molecule object. Further arguments are passed as
     >>> # function/argument tuples
     >>> def foo(mol, ref):
-    >>>     from htmd.molecule.util import molRMSD
+    >>>     from moleculekit.util import molRMSD
     >>>     mol.wrap('protein')
     >>>     mol.align('protein and name CA', refmol=ref)
     >>>     return molRMSD(mol, ref, mol.atomselect('protein and name CA'), ref.atomselect('protein and name CA'))
@@ -84,7 +84,7 @@ class Metric:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -273,7 +273,7 @@ def _calcRef(pieces, fileloc):
 
 
 def _singleMolfile(sims):
-    from htmd.molecule.molecule import mol_equal
+    from moleculekit.molecule import mol_equal
     from htmd.util import ensurelist
     if isinstance(sims, Molecule):
         return False, []
@@ -309,7 +309,7 @@ def _projector(metric, i):
     return metric._projectSingle(i)
 
 if __name__ == '__main__':
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from htmd.projections.metricrmsd import MetricRmsd
 
     # Testing the set method of Metric
@@ -323,7 +323,7 @@ if __name__ == '__main__':
     assert len(metr.projectionlist) == 2
 
     def foo(mol, ref):
-        from htmd.molecule.util import molRMSD
+        from moleculekit.util import molRMSD
         mol.wrap('protein')
         mol.align('protein and name CA', refmol=ref)
         return molRMSD(mol, ref, mol.atomselect('protein and name CA'), ref.atomselect('protein and name CA'))

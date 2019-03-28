@@ -5,8 +5,8 @@
 #
 import numpy as np
 import scipy.spatial.distance as distance
-from htmd.molecule.molecule import Molecule
-from htmd.molecule.util import sequenceID
+from moleculekit.molecule import Molecule
+from moleculekit.util import sequenceID
 import logging
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The Molecule object
     anion_resname : str
         Resname of the added anions
@@ -144,7 +144,7 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
         
     Returns
     -------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The molecule with the ions added
     """
 

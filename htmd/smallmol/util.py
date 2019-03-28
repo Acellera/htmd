@@ -194,7 +194,7 @@ def rotate(coords, rotMat, center=(0, 0, 0)):
 
 def drawIsoSurface(values3d, resolution=1., plot_center=None, viewer=None):
     from htmd.vmdviewer import getCurrentViewer
-    from htmd.molecule.util import writeVoxels
+    from moleculekit.util import writeVoxels
     # plot_center should be - molecule.get_center() + 12
     if len(values3d.shape) != 3:
         raise ValueError("Your provided a box of {} dimensions."
@@ -281,7 +281,7 @@ def getRCSBLigandByLigname(ligname, returnMol2=False):
 
     Example
     -------
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from moleculekit.molecule import Molecule
     >>> mol = Molecule('4eiy')
     >>> np.unique(mol.get('resname', 'not protein and not water'))
     array(['CLR', 'NA', 'OLA', 'OLB', 'OLC', 'PEG', 'ZMA'], dtype=object)

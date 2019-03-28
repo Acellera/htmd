@@ -178,7 +178,7 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         from htmd.parameterization.detect import detectEquivalentAtoms
         from htmd.parameterization.fftype import fftype
 

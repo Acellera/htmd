@@ -64,8 +64,8 @@ class MetricDistance(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>`
-            A :class:`Molecule <htmd.molecule.molecule.Molecule>` object to project.
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+            A :class:`Molecule <moleculekit.molecule.Molecule>` object to project.
 
         Returns
         -------
@@ -86,7 +86,7 @@ class MetricDistance(Projection):
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object which will be used to calculate the descriptions of the projected dimensions.
 
         Returns
@@ -396,7 +396,7 @@ import os
 class TestMetricDistance(unittest.TestCase):
     @classmethod
     def setUpClass(self):
-            from htmd.molecule.molecule import Molecule
+            from moleculekit.molecule import Molecule
             from os import path
             self.mol = Molecule(path.join(home(), 'data', 'metricdistance', 'filtered.pdb'))
             self.mol_skipped = self.mol.copy()

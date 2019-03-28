@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.molecule.util import boundingBox
+from moleculekit.util import boundingBox
 from htmd.molecule import vdw
 import numpy as np
 import ctypes
@@ -404,7 +404,7 @@ def _getOccupancyCUDAkernel(occus, coords, centers, channelsigmas, trunc):
 
 
 if __name__ == '__main__':
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from htmd.home import home
     import os
     import numpy as np

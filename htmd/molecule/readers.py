@@ -6,7 +6,7 @@
 import ctypes as ct
 import numpy as np
 from htmd.molecule.support import pack_double_buffer, pack_int_buffer, pack_string_buffer, pack_ulong_buffer, xtc_lib
-from htmd.molecule.util import sequenceID
+from moleculekit.util import sequenceID
 import os
 import logging
 logger = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ class MolFactory(object):
     """ This class converts Topology and Trajectory data into Molecule objects """
     @staticmethod
     def construct(topos, trajs, filename, frame):
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
 
         topos = ensurelist(topos)
         trajs = ensurelist(trajs)
@@ -184,7 +184,7 @@ class MolFactory(object):
 
     @staticmethod
     def _parseTopology(mol, topo, filename):
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         for field in topo.__dict__:
             if field == 'crystalinfo':
                 mol.crystalinfo = topo.crystalinfo
@@ -224,7 +224,7 @@ class MolFactory(object):
 
     @staticmethod
     def _parseTraj(mol, traj, filename, frame):
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         ext = os.path.splitext(filename)[1][1:]
 
         assert traj.coords.ndim == 3, '{} reader must return 3D coordinates array for file {}'.format(ext, filename)
@@ -1495,7 +1495,7 @@ for k in _COORDINATE_READERS:
     _ALL_READERS[k] += ensurelist(_COORDINATE_READERS[k])
 
 
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from glob import glob
 from natsort import natsorted
 from unittest import TestCase

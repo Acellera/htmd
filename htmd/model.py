@@ -16,7 +16,7 @@ import numpy as np
 from scipy import stats
 import warnings
 import random
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.vmdviewer import getCurrentViewer
 from htmd.units import convert as unitconvert
 import logging
@@ -479,7 +479,7 @@ class Model(object):
         alignsel : str, optional, default='name CA'
             Atom selection string used for aligning all frames. Set to None to disable aligning.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-        alignmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        alignmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A reference molecule onto which to align all others
         samplemode : ['weighted','random'], optional, default='weighted'
             How to obtain the samples from the states
@@ -490,8 +490,8 @@ class Model(object):
 
         Returns
         -------
-        mols : ndarray of :class:`Molecule <htmd.molecule.molecule.Molecule>` objects
-            A list of :class:`Molecule <htmd.molecule.molecule.Molecule>` objects containing the samples of each state
+        mols : ndarray of :class:`Molecule <moleculekit.molecule.Molecule>` objects
+            A list of :class:`Molecule <moleculekit.molecule.Molecule>` objects containing the samples of each state
 
         Examples
         --------
@@ -556,7 +556,7 @@ class Model(object):
         viewer : :class:`VMD <htmd.vmdviewer.VMD>` object, optional
             A viewer in which to visualize the states
         mols : ndarray, optional
-            An array of :class:`Molecule <htmd.molecule.molecule.Molecule>` objects to visualize
+            An array of :class:`Molecule <moleculekit.molecule.Molecule>` objects to visualize
         numsamples : int
             Number of samples (conformations) for each state.
         wrapsel : str, optional, default='protein'
@@ -603,7 +603,7 @@ class Model(object):
             viewer.send('start_sscache')
 
     def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples, gui=False):
-        from htmd.molecule.util import sequenceID
+        from moleculekit.util import sequenceID
         if states is None:
             states = range(self.macronum)
         if isinstance(states, int):

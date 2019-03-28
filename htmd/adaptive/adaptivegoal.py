@@ -307,7 +307,7 @@ class AdaptiveGoal(AdaptiveMD):
 if __name__ == '__main__':
     from htmd.projections.metricdistance import MetricDistance
     import htmd.home
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from htmd.queues.localqueue import LocalGPUQueue
     import os
     import shutil

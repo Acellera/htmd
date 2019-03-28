@@ -87,10 +87,10 @@ class Molecule:
     ...
 
     .. rubric:: Methods
-    .. autoautosummary:: htmd.molecule.molecule.Molecule
+    .. autoautosummary:: moleculekit.molecule.Molecule
        :methods:
     .. rubric:: Attributes
-    .. autoautosummary:: htmd.molecule.molecule.Molecule
+    .. autoautosummary:: moleculekit.molecule.Molecule
        :attributes:
 
     Attributes
@@ -283,7 +283,7 @@ class Molecule:
 
     @property
     def numResidues(self):
-        from htmd.molecule.util import sequenceID
+        from moleculekit.util import sequenceID
         return len(np.unique(sequenceID((self.resid, self.insertion, self.chain))))
 
     def insert(self, mol, index, collisions=0, coldist=1.3):
@@ -492,7 +492,7 @@ class Molecule:
         >>> mol.align('protein')
         >>> mol.align('name CA', refmol=Molecule('3PTB'))
         """
-        from htmd.molecule.util import _pp_align
+        from moleculekit.util import _pp_align
         if refmol is None:
             refmol = self
             if matchingframes:
@@ -521,7 +521,7 @@ class Molecule:
 
         Parameters
         ----------
-        ref : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        ref : :class:`Molecule <moleculekit.molecule.Molecule>` object
             The reference Molecule to which we want to align
         molseg : str
             The segment of this Molecule we want to align
@@ -540,7 +540,7 @@ class Molecule:
             If returnAlignments is True it returns a list of Molecules each containing a different alignment. Otherwise
             it modifies the current Molecule with the best single alignment.
         """
-        from htmd.molecule.util import sequenceStructureAlignment
+        from moleculekit.util import sequenceStructureAlignment
         aligns = sequenceStructureAlignment(self, ref, molseg, refseg, maxalignments, nalignfragment)
         if returnAlignments:
             return aligns
@@ -974,7 +974,7 @@ class Molecule:
                 self.bonds = self._guessBonds()
                 self.bondtype = np.array(['un'] * self.bonds.shape[0], dtype=Molecule._dtypes['bondtype'])
             if 'dihedrals' in guess or 'angles' in guess:
-                from htmd.molecule.util import guessAnglesAndDihedrals
+                from moleculekit.util import guessAnglesAndDihedrals
                 angles, dihedrals = guessAnglesAndDihedrals(self.bonds)
                 if 'angles' in guess or ('angles' in guessNE and len(self.angles) == 0):
                     self.angles = angles
@@ -1349,7 +1349,7 @@ class Molecule:
         'XEEI'
 
         """
-        from htmd.molecule.util import sequenceID
+        from moleculekit.util import sequenceID
         prot = self.atomselect('protein')
 
         increm = sequenceID((self.resid, self.insertion, self.chain))
@@ -1512,7 +1512,7 @@ class Molecule:
         --------
         >>> mapping = mol.renumberResidues(returnMapping=True)
         """
-        from htmd.molecule.util import sequenceID
+        from moleculekit.util import sequenceID
         if returnMapping:
             resid = self.resid.copy()
             insertion = self.insertion.copy()
@@ -1793,7 +1793,7 @@ def _detectCollisions(mol1, frame1, mol2, frame2, gap):
 
 
 def _getResidueIndexesByAtom(mol, idx):
-    from htmd.molecule.util import sequenceID
+    from moleculekit.util import sequenceID
     seqid = sequenceID(mol.resid)
     allres = np.unique(seqid[idx])
     torem = np.zeros(len(seqid), dtype=bool)
@@ -1807,7 +1807,7 @@ class Representations:
 
     Examples
     --------
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from moleculekit.molecule import Molecule
     >>> mol = tryp.copy()
     >>> mol.reps.add('protein', 'NewCartoon')
     >>> print(mol.reps)                     # doctest: +NORMALIZE_WHITESPACE

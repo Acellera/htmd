@@ -14,7 +14,7 @@ from htmd.qm import Psi4, Gaussian
 from htmd.queues.localqueue import LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.numbautil import dihedralAngle
 
 

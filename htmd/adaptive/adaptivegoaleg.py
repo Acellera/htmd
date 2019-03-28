@@ -210,7 +210,7 @@ if __name__ == '__main__':
     import htmd.home
     from htmd.projections.metricdistance import MetricDistance
     from htmd.queues.localqueue import LocalGPUQueue
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     import os
     import shutil
     from htmd.util import tempname

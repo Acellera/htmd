@@ -335,6 +335,6 @@ if __name__ == "__main__":
     ngh=htmd.vmdgraphics.VMDConvexHull(nf,solid=True)
 
     """
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     import doctest
     doctest.testmod()
