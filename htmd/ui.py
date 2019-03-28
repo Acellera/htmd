@@ -34,7 +34,7 @@ from htmd.builder.builder import detectDisulfideBonds, autoSegment, embed, Disul
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
 from moleculekit.util import uniformRandomRotation
-from htmd.rotationmatrix import rotationMatrix
+from moleculekit.util import rotationMatrix
 from htmd.builder.preparation import proteinPrepare
 from htmd.dock import dock
 from htmd.util import tempname

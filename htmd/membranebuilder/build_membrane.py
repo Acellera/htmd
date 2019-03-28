@@ -105,7 +105,7 @@ def _setPositionsLJSim(width, lipids):
 
 
 def _createMembraneMolecule(lipids):
-    from htmd.rotationmatrix import rotationMatrix
+    from moleculekit.util import rotationMatrix
 
     allmols = []
     for i, l in enumerate(lipids):
@@ -160,7 +160,7 @@ def _findNeighbours(lipids, box):
 
 
 def _loadMolecules(lipids, files):
-    from htmd.rotationmatrix import rotationMatrix
+    from moleculekit.util import rotationMatrix
     # Create Molecules
     for l in lipids:
         randidx = np.random.randint(len(files[l.resname]))
