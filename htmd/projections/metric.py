@@ -310,7 +310,7 @@ def _projector(metric, i):
 
 if __name__ == '__main__':
     from moleculekit.molecule import Molecule
-    from htmd.projections.metricrmsd import MetricRmsd
+    from moleculekit.projections.metricrmsd import MetricRmsd
 
     # Testing the set method of Metric
     sims = []

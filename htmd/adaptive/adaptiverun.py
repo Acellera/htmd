@@ -8,7 +8,6 @@ from os import path, makedirs
 import numpy as np
 from htmd.adaptive.adaptive import AdaptiveBase
 from htmd.simlist import simlist, simfilter
-from htmd.projections.metricdistance import MetricDistance
 from htmd.model import Model, macroAccumulate
 from protocolinterface import val
 from htmd.projections.tica import TICA
@@ -241,6 +240,7 @@ if __name__ == "__main__":
     import os
     import shutil
     from htmd.util import tempname
+    from moleculekit.projections.metricdistance import MetricDistance
 
     tmpdir = tempname()
     shutil.copytree(htmd.home.home()+'/data/adaptive/', tmpdir)

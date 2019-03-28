@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.projections.metricdihedral import MetricDihedral, Dihedral
+from moleculekit.projections.metricdihedral import MetricDihedral, Dihedral
 from htmd.projections.metric import Metric
 from moleculekit.molecule import Molecule
 from joblib import Parallel, delayed

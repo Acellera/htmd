@@ -8,15 +8,15 @@ import htmd.home
 from htmd.session import htmdsave, htmdload
 from htmd.simlist import simlist, simfilter, simmerge
 from htmd.metricdata import MetricData
-from htmd.projections.metricdistance import MetricDistance, MetricSelfDistance, reconstructContactMap
-from htmd.projections.metricrmsd import MetricRmsd
-from htmd.projections.metricfluctuation import MetricFluctuation
-from htmd.projections.metriccoordinate import MetricCoordinate
-from htmd.projections.metricdihedral import MetricDihedral, Dihedral
-from htmd.projections.metricshell import MetricShell
-from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
-from htmd.projections.metricsasa import MetricSasa
-from htmd.projections.metrictmscore import MetricTMscore
+from moleculekit.projections.metricdistance import MetricDistance, MetricSelfDistance, reconstructContactMap
+from moleculekit.projections.metricrmsd import MetricRmsd
+from moleculekit.projections.metricfluctuation import MetricFluctuation
+from moleculekit.projections.metriccoordinate import MetricCoordinate
+from moleculekit.projections.metricdihedral import MetricDihedral, Dihedral
+from moleculekit.projections.metricshell import MetricShell
+from moleculekit.projections.metricsecondarystructure import MetricSecondaryStructure
+from moleculekit.projections.metricsasa import MetricSasa
+from moleculekit.projections.metrictmscore import MetricTMscore
 from htmd.projections.metric import Metric
 from htmd.projections.tica import TICA
 from htmd.projections.kmeanstri import KMeansTri

@@ -208,7 +208,7 @@ class AdaptiveGoalEG(AdaptiveGoal):
 
 if __name__ == '__main__':
     import htmd.home
-    from htmd.projections.metricdistance import MetricDistance
+    from moleculekit.projections.metricdistance import MetricDistance
     from htmd.queues.localqueue import LocalGPUQueue
     from moleculekit.molecule import Molecule
     import os
@@ -239,8 +239,8 @@ if __name__ == '__main__':
     # md.run()
 
     # Some real testing now
-    from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
-    from htmd.projections.metricdistance import MetricSelfDistance
+    from moleculekit.projections.metricsecondarystructure import MetricSecondaryStructure
+    from moleculekit.projections.metricdistance import MetricSelfDistance
     import numpy as np
 
     os.chdir(path.join(home(), 'data', 'test-adaptive'))

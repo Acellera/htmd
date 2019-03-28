@@ -205,7 +205,7 @@ class TICA(object):
 if __name__ == '__main__':
     from htmd.simlist import simlist
     from glob import glob
-    from htmd.projections.metricdistance import MetricSelfDistance
+    from moleculekit.projections.metricdistance import MetricSelfDistance
     from htmd.home import home
     from os.path import join
 
