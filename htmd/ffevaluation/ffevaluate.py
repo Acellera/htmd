@@ -6,7 +6,8 @@
 import logging
 from math import sqrt, acos, radians, cos, sin, pi
 import numpy as np
-from htmd.numbautil import dihedralAngleFull, wrapBondedDistance, wrapDistance, cross, dot
+from htmd.numbautil import cross, dot
+from moleculekit.dihedral import dihedralAngleFull, wrapBondedDistance, wrapDistance
 from numba import jit
 from scipy import constants as const
 from htmd.decorators import _Deprecated

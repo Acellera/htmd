@@ -15,7 +15,7 @@ from htmd.queues.localqueue import LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.acecloudqueue import AceCloudQueue
 from moleculekit.molecule import Molecule
-from htmd.numbautil import dihedralAngle
+from moleculekit.dihedral import dihedralAngle
 
 
 # For H2 0.74 A with HF and 3-21G basis

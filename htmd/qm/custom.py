@@ -12,7 +12,7 @@ import abc
 import numpy as np
 import nlopt
 
-from htmd.numbautil import dihedralAngle
+from moleculekit.dihedral import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
 from protocolinterface import val
 
@@ -203,7 +203,7 @@ class CustomQM(QMBase):
     >>> import numpy as np
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
-    >>> from htmd.numbautil import dihedralAngle
+    >>> from moleculekit.dihedral import dihedralAngle
     >>> from moleculekit.molecule import Molecule
     >>> from htmd.qm.custom import CustomQM
     >>> from acemdai.calculator import AAICalculator

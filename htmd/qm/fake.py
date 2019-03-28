@@ -17,7 +17,7 @@ from simtk import unit
 from simtk import openmm
 from simtk.openmm import app
 
-from htmd.numbautil import dihedralAngle
+from moleculekit.dihedral import dihedralAngle
 from htmd.qm.base import QMBase, QMResult
 from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmd.parameterization.util import getDipole
@@ -33,7 +33,7 @@ class FakeQM(QMBase):
     >>> import numpy as np
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
-    >>> from htmd.numbautil import dihedralAngle
+    >>> from moleculekit.dihedral import dihedralAngle
     >>> from htmd.parameterization.fftype import fftype
     >>> from moleculekit.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM
@@ -179,7 +179,7 @@ class FakeQM2(FakeQM):
     >>> import numpy as np
     >>> from tempfile import TemporaryDirectory
     >>> from htmd.home import home
-    >>> from htmd.numbautil import dihedralAngle
+    >>> from moleculekit.dihedral import dihedralAngle
     >>> from htmd.parameterization.fftype import fftype
     >>> from moleculekit.molecule import Molecule
     >>> from htmd.qm.fake import FakeQM2
