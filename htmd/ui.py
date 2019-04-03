@@ -30,7 +30,7 @@ from htmd.kinetics import Kinetics
 from moleculekit.vmdviewer import viewer, getCurrentViewer
 from htmd.builder.solvate import solvate
 from htmd.mdengine.acemd.acemd import Acemd, Acemd2, AtomRestraint, GroupRestraint
-from htmd.builder.builder import detectDisulfideBonds, autoSegment, embed, DisulfideBridge
+from htmd.builder.builder import detectDisulfideBonds, embed, DisulfideBridge
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
 from moleculekit.util import uniformRandomRotation
@@ -46,6 +46,7 @@ from htmd.queues.slurmqueue import SlurmQueue
 from htmd.queues.lsfqueue import LsfQueue
 from htmd.queues.pbsqueue import PBSQueue
 from moleculekit.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
+from moleculekit.tools.autosegment import autoSegment
 from htmd.builder.loopmodeler import loopModeller
 from htmd.ffevaluation.ffevaluate import FFEvaluate
 from htmdx.cli import check_registration, show_news

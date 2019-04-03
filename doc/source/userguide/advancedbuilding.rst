@@ -64,7 +64,7 @@ List of useful tools
 :func:`~moleculekit.molecule.Molecule.mutateResidue` :func:`~moleculekit.util.boundingBox`
 :func:`~moleculekit.molecule.Molecule.moveBy`        :func:`~moleculekit.util.sequenceID`
 :func:`~moleculekit.molecule.Molecule.rotateBy`      :func:`~htmd.builder.builder.embed`
----                                                    :func:`~htmd.builder.builder.autoSegment`
+---                                                    :func:`~moleculekit.tools.autosegment.autoSegment`
 ====================================================== ==================
 
 List of common CHARMM patches
