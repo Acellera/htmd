@@ -57,7 +57,7 @@ class AdaptiveGoalEG(AdaptiveGoal):
         See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     filteredpath : str, default='filtered'
         The directory in which the filtered simulations will be stored
-    projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None
+    projection : :class:`Projection <moleculekit.projections.projection.Projection>` object, default=None
         A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
     truncation : str, default=None
         Method for truncating the prob distribution (None, 'cumsum', 'statecut'

@@ -59,7 +59,7 @@ class AdaptiveMD(AdaptiveBase):
         See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     filteredpath : str, default='filtered'
         The directory in which the filtered simulations will be stored
-    projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None
+    projection : :class:`Projection <moleculekit.projections.projection.Projection>` object, default=None
         A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
     truncation : str, default=None
         Method for truncating the prob distribution (None, 'cumsum', 'statecut'
@@ -100,13 +100,13 @@ class AdaptiveMD(AdaptiveBase):
     def __init__(self):
         from sklearn.base import ClusterMixin
         from htmd.clustering.kcenters import KCenter
-        from htmd.projections.projection import Projection
+        from moleculekit.projections.projection import Projection
         super().__init__()
         self._arg('datapath', 'str', 'The directory in which the completed simulations are stored', 'data', val.String())
         self._arg('filter', 'bool', 'Enable or disable filtering of trajectories.', True, val.Boolean())
         self._arg('filtersel', 'str', 'Filtering atom selection', 'not water', val.String())
         self._arg('filteredpath', 'str', 'The directory in which the filtered simulations will be stored', 'filtered', val.String())
-        self._arg('projection', ':class:`Projection <htmd.projections.projection.Projection>` object',
+        self._arg('projection', ':class:`Projection <moleculekit.projections.projection.Projection>` object',
                   'A Projection class object or a list of objects which will be used to project the simulation '
                    'data before constructing a Markov model', None, val.Object(Projection), nargs='+')
         self._arg('truncation', 'str', 'Method for truncating the prob distribution (None, \'cumsum\', \'statecut\'', None, val.String())
