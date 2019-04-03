@@ -13,13 +13,13 @@ Contents:
 
     MetricData - Storage for projected data <htmd.metricdata>
     Metric - Helper class for combining Metrics for projection <htmd.projections.metric>
-    MetricCoordinate - coordinates of an atom selection <htmd.projections.metriccoordinate>
-    MetricDistance - (Self-)distance-based metrics between atoms selections <htmd.projections.metricdistance>
-    MetricDihedral - Dihedral-based metrics <htmd.projections.metricdihedral>
-    MetricRmsd - RMSD-based metric <htmd.projections.metricrmsd>
-    MetricShell - occupancy of an atom selection (e.g. water) around another selection <htmd.projections.metricshell>
-    MetricSecondaryStructure - secondary structure-based metric <htmd.projections.metricsecondarystructure>
-    MetricPlumed2 - access all Plumed2 metrics (CVs) <htmd.projections.metricplumed2>
-    MetricSasa - Solvent accessible surface area <htmd.projections.metricsasa>
-    MetricTMscore - TMscore-based metric <htmd.projections.metrictmscore>
-    MetricFluctuation - RMSF-based metric <htmd.projections.metricfluctuation>
+    MetricCoordinate - coordinates of an atom selection <moleculekit.projections.metriccoordinate>
+    MetricDistance - (Self-)distance-based metrics between atoms selections <moleculekit.projections.metricdistance>
+    MetricDihedral - Dihedral-based metrics <moleculekit.projections.metricdihedral>
+    MetricRmsd - RMSD-based metric <moleculekit.projections.metricrmsd>
+    MetricShell - occupancy of an atom selection (e.g. water) around another selection <moleculekit.projections.metricshell>
+    MetricSecondaryStructure - secondary structure-based metric <moleculekit.projections.metricsecondarystructure>
+    MetricPlumed2 - access all Plumed2 metrics (CVs) <moleculekit.projections.metricplumed2>
+    MetricSasa - Solvent accessible surface area <moleculekit.projections.metricsasa>
+    MetricTMscore - TMscore-based metric <moleculekit.projections.metrictmscore>
+    MetricFluctuation - RMSF-based metric <moleculekit.projections.metricfluctuation>

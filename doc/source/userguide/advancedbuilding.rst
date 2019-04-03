@@ -57,13 +57,13 @@ List of useful tools
 --------------------
 
 ====================================================== ==================
-:class:`~htmd.molecule.molecule.Molecule` class        Building functions
+:class:`~moleculekit.molecule.Molecule` class        Building functions
 ====================================================== ==================
-:func:`~htmd.molecule.molecule.Molecule.append`        :func:`~htmd.molecule.util.maxDistance`
-:func:`~htmd.molecule.molecule.Molecule.center`        :func:`~htmd.molecule.util.uniformRandomRotation`
-:func:`~htmd.molecule.molecule.Molecule.mutateResidue` :func:`~htmd.molecule.util.boundingBox`
-:func:`~htmd.molecule.molecule.Molecule.moveBy`        :func:`~htmd.molecule.util.sequenceID`
-:func:`~htmd.molecule.molecule.Molecule.rotateBy`      :func:`~htmd.builder.builder.embed`
+:func:`~moleculekit.molecule.Molecule.append`        :func:`~moleculekit.util.maxDistance`
+:func:`~moleculekit.molecule.Molecule.center`        :func:`~moleculekit.util.uniformRandomRotation`
+:func:`~moleculekit.molecule.Molecule.mutateResidue` :func:`~moleculekit.util.boundingBox`
+:func:`~moleculekit.molecule.Molecule.moveBy`        :func:`~moleculekit.util.sequenceID`
+:func:`~moleculekit.molecule.Molecule.rotateBy`      :func:`~htmd.builder.builder.embed`
 ---                                                    :func:`~htmd.builder.builder.autoSegment`
 ====================================================== ==================
 

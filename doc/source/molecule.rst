@@ -19,4 +19,4 @@ Contents:
 .. toctree::
     :maxdepth: 1
 
-    Molecule module <htmd.molecule.molecule>
+    Molecule module <moleculekit.molecule>
