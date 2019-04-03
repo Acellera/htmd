@@ -8,7 +8,7 @@ import numpy as np
 from moleculekit.molecule import Molecule
 from htmd.metricdata import MetricData
 from scipy import stats
-from htmd.projections.projection import Projection
+from moleculekit.projections.projection import Projection
 from joblib import Parallel, delayed
 from htmd.parallelprogress import ParallelExecutor
 import logging
@@ -64,7 +64,7 @@ class Metric:
 
         Parameters
         ----------
-        projection : function or :class:`Projection <htmd.projections.projection.Projection>` object or list of objects
+        projection : function or :class:`Projection <moleculekit.projections.projection.Projection>` object or list of objects
             A function or projection or a list of projections/functions which to use on the simulations
         """
         self.projectionlist = projection
@@ -130,7 +130,7 @@ class Metric:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:
                 if isinstance(proj, Projection):
-                    proj._precalculate(uqMol)
+                    proj._setCache(uqMol)
         else:
             logger.warning('Cannot calculate description of dimensions due to different topology files for each trajectory.')
         mapping = self.getMapping(uqMol)
