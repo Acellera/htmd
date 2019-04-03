@@ -15,7 +15,7 @@ import numpy as np
 from htmd.queues.simqueue import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
 from joblib import Parallel, delayed
 from htmd.simlist import _simName
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from protocolinterface import ProtocolInterface, val
 import logging
 logger = logging.getLogger(__name__)
@@ -297,7 +297,7 @@ def reconstructAdaptiveTraj(simlist, trajID):
 
     Returns
     -------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         A Molecule object containing the reconstructed trajectory
     chain : np.ndarray
         The simulation IDs of all simulations involved

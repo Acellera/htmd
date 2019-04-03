@@ -5,7 +5,7 @@
 #
 from __future__ import print_function
 
-from htmd.molecule.util import sequenceID
+from moleculekit.util import sequenceID
 import numpy as np
 import logging
 import string
@@ -115,16 +115,16 @@ def embed(mol1, mol2, gap=1.3):
 
     Parameters
     ----------
-    mol1 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The first Molecule object
-    mol2 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The second Molecule object
     gap : float
         Minimum space in A between atoms of the two molecules
 
     Return
     ------
-    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    newmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The resulting Molecule object
 
     Example
@@ -158,7 +158,7 @@ def embed(mol1, mol2, gap=1.3):
 
 
 def convertDisulfide(mol, disu):
-    from htmd.molecule.molecule import UniqueResidueID
+    from moleculekit.molecule import UniqueResidueID
     newdisu = []
     for d in disu:
         if not isinstance(d[0], str) or not isinstance(d[1], str):
@@ -172,7 +172,7 @@ def detectDisulfideBonds(mol, thresh=3):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The molecule for which to detect disulfide bonds
     thresh : float
         The threshold under which two sulfurs are considered as bonded
@@ -183,7 +183,7 @@ def detectDisulfideBonds(mol, thresh=3):
         A list of :class:`DisulfideBridge <htmd.builder.builder.DisulfideBridge>` objects
     """
     from scipy.spatial.distance import pdist, squareform
-    from htmd.molecule.molecule import UniqueResidueID
+    from moleculekit.molecule import UniqueResidueID
     disubonds = []
 
     # Find all SG atoms belonging to resnames starting with CY
@@ -208,8 +208,11 @@ def detectDisulfideBonds(mol, thresh=3):
 
     numbonds = np.sum(close, axis=0)
     if np.any(numbonds > 1):
-        rows, cols = np.where(numbonds > 1)
-        pairs = [(str(residues[r]), str(residues[c])) for r, c in zip(rows, cols)]
+        multibonded_idx1 = np.where(numbonds > 1)[0]
+        multibonded_indexes = np.where(close[multibonded_idx1])
+        multibonded_idx1 = multibonded_idx1[multibonded_indexes[0]]
+        multibonded_idx2 = multibonded_indexes[1]
+        pairs = [(str(residues[r]), str(residues[c])) for r, c in zip(multibonded_idx1, multibonded_idx2)]
         raise RuntimeError('Sulphur atoms between pairs {} have multiple possible bonds. Cannot guess disulfide bonds. '
                            'Please specify them manually.'.format(pairs))
 
@@ -225,204 +228,6 @@ def detectDisulfideBonds(mol, thresh=3):
     else:
         logger.info('{} disulfide bonds were added'.format(len(disubonds)))
     return sorted(disubonds, key=lambda x: x[0].resid)
-
-
-def autoSegment(mol, sel='all', basename='P', spatial=True, spatialgap=4.0, field="segid"):
-    """ Detects resid gaps in a selection and assigns incrementing segid to each fragment
-
-    !!!WARNING!!! If you want to use atom selections like 'protein' or 'fragment',
-    use this function on a Molecule containing only protein atoms, otherwise the protein selection can fail.
-
-    Parameters
-    ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        The Molecule object
-    sel : str
-        Atom selection string on which to check for gaps.
-        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-    basename : str
-        The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
-    spatial : bool
-        Only considers a discontinuity in resid as a gap of the CA atoms have distance more than `spatialgap` Angstrom
-    spatialgap : float
-        The size of a spatial gap which validates a discontinuity (A)
-    field : str
-        Field to fix. Can be "segid" (default), "chain", or "both"
-
-    Returns
-    -------
-    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        A new Molecule object with modified segids
-
-    Example
-    -------
-    >>> newmol = autoSegment(mol,'chain B','P')
-    """
-    mol = mol.copy()
-
-    idx = mol.atomselect(sel, indexes=True)
-    rid = mol.get('resid', sel)
-    residiff = np.diff(rid)
-    gappos = np.where((residiff != 1) & (residiff != 0))[0]  # Points to the index before the gap!
-
-    # Letters to be used for chains, if free: 0123456789abcd...ABCD..., minus chain symbols already used
-    used_chains = set(mol.chain)
-    chain_alphabet = list(string.digits + string.ascii_letters)
-    available_chains = [x for x in chain_alphabet if x not in used_chains]
-
-    idxstartseg = [idx[0]] + idx[gappos + 1].tolist()
-    idxendseg = idx[gappos].tolist() + [idx[-1]]
-
-    mol.set('segid', basename, sel)
-
-    if len(gappos) == 0:
-        mol.set('segid', basename+'0', sel)
-        return mol
-
-    if spatial:
-        residbackup = mol.get('resid')
-        mol.set('resid', sequenceID(mol.resid))  # Assigning unique resids to be able to do the distance selection
-
-        todelete = []
-        i = 0
-        for s, e in zip(idxstartseg[1:], idxendseg[:-1]):
-            coords = mol.get('coords', sel='resid "{}" "{}" and name CA'.format(mol.resid[e], mol.resid[s]))
-            if np.shape(coords) == (2, 3):
-                dist = np.sqrt(np.sum((coords[0, :] - coords[1, :]) ** 2))
-                if dist < spatialgap:
-                    todelete.append(i)
-            i += 1
-        # Join the non-real gaps into segments
-        idxstartseg = np.delete(idxstartseg, np.array(todelete)+1)
-        idxendseg = np.delete(idxendseg, todelete)
-
-        mol.set('resid', residbackup)  # Restoring the original resids
-
-    i = 0
-    for s, e in zip(idxstartseg, idxendseg):
-        # Fixup segid
-        if field in ['segid', 'both']:
-            newsegid = basename + str(i)
-            if np.any(mol.segid == newsegid):
-                raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(newsegid))
-            logger.info('Created segment {} between resid {} and {}.'.format(newsegid, mol.resid[s], mol.resid[e]))
-            mol.segid[s:e+1] = newsegid
-        # Fixup chain
-        if field in ['chain', 'both']:
-            newchainid = available_chains[i]
-            logger.info('Set chain {} between resid {} and {}.'.format(newchainid, mol.resid[s], mol.resid[e]))
-            mol.chain[s:e+1] = newchainid
-
-        i += 1
-
-    return mol
-
-
-def autoSegment2(mol, sel='(protein or resname ACE NME)', basename='P', fields=('segid',), residgaps=False, residgaptol=1, chaingaps=True):
-    """ Detects bonded segments in a selection and assigns incrementing segid to each segment
-
-    Parameters
-    ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        The Molecule object
-    sel : str
-        Atom selection string on which to check for gaps.
-        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-    basename : str
-        The basename for segment ids. For example if given 'P' it will name the segments 'P1', 'P2', ...
-    fields : tuple of strings
-        Field to fix. Can be "segid" (default) or any other Molecule field or combinations thereof.
-    residgaps : bool
-        Set to True to consider gaps in resids as structural gaps. Set to False to ignore resids
-    residgaptol : int
-        Above what resid difference is considered a gap. I.e. with residgaptol 1, 235-233 = 2 > 1 hence is a gap. We set
-        default to 2 because in many PDBs single residues are missing in the proteins without any gaps.
-    chaingaps : bool
-        Set to True to consider changes in chains as structural gaps. Set to False to ignore chains
-
-    Returns
-    -------
-    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
-        A new Molecule object with modified segids
-
-    Example
-    -------
-    >>> newmol = autoSegment2(mol)
-    """
-    from scipy.sparse import csr_matrix
-    from scipy.sparse.csgraph import connected_components
-
-    if isinstance(fields, str):
-        fields = (fields,)
-
-    sel += ' and backbone or (resname NME ACE and name N C O CH3)'  # Looking for bonds only over the backbone of the protein
-    idx = mol.atomselect(sel, indexes=True)  # Keep the original atom indexes to map from submol to mol
-    submol = mol.copy()  # We filter out everything not on the backbone to calculate only those bonds
-    submol.filter(sel, _logger=False)
-    bonds = submol._getBonds()  # Calculate both file and guessed bonds
-
-    if residgaps:
-        # Remove bonds between residues without continuous resids
-        bondresiddiff = np.abs(submol.resid[bonds[:, 0]] - submol.resid[bonds[:, 1]])
-        bonds = bonds[bondresiddiff <= residgaptol, :]
-    else:
-        # Warning about bonds bonding non-continuous resids
-        bondresiddiff = np.abs(submol.resid[bonds[:, 0]] - submol.resid[bonds[:, 1]])
-        if np.any(bondresiddiff > 1):
-            for i in np.where(bondresiddiff > residgaptol)[0]:
-                logger.warning('Bonds found between resid gaps: resid {} and {}'.format(submol.resid[bonds[i, 0]],
-                                                                                        submol.resid[bonds[i, 1]]))
-    if chaingaps:
-        # Remove bonds between residues without same chain
-        bondsamechain = submol.chain[bonds[:, 0]] == submol.chain[bonds[:, 1]]
-        bonds = bonds[bondsamechain, :]
-    else:
-        # Warning about bonds bonding different chains
-        bondsamechain = submol.chain[bonds[:, 0]] == submol.chain[bonds[:, 1]]
-        if np.any(bondsamechain == False):
-            for i in np.where(bondsamechain == False)[0]:
-                logger.warning('Bonds found between chain gaps: resid {}/{} and {}/{}'.format(submol.resid[bonds[i, 0]],
-                                                                                              submol.chain[bonds[i, 0]],
-                                                                                              submol.resid[bonds[i, 1]],
-                                                                                              submol.chain[bonds[i, 1]]
-                                                                                              ))
-
-    # Calculate connected components using the bonds
-    sparsemat = csr_matrix((np.ones(bonds.shape[0] * 2),  # Values
-                            (np.hstack((bonds[:, 0], bonds[:, 1])),  # Rows
-                             np.hstack((bonds[:, 1], bonds[:, 0])))), shape=[submol.numAtoms, submol.numAtoms])  # Columns
-    numcomp, compidx = connected_components(sparsemat, directed=False)
-
-    # Letters to be used for chains, if free: 0123456789abcd...ABCD..., minus chain symbols already used
-    used_chains = set(mol.chain)
-    chain_alphabet = list(string.digits + string.ascii_letters)
-    available_chains = [x for x in chain_alphabet if x not in used_chains]
-
-    mol = mol.copy()
-    prevsegres = None
-    for i in range(numcomp):  # For each connected component / segment
-        segid = basename + str(i)
-        backboneSegIdx = idx[compidx == i]  # The backbone atoms of the segment
-        segres = mol.atomselect('same residue as index {}'.format(' '.join(map(str, backboneSegIdx)))) # Get whole residues
-
-        # Warning about separating segments with continuous resids
-        if i > 0 and (np.min(mol.resid[segres]) - np.max(mol.resid[prevsegres])) == 1:
-            logger.warning('Separated segments {} and {}, despite continuous resids, due to lack of bonding.'.format(
-                            basename + str(i-1), segid))
-
-        # Add the new segment ID to all fields the user specified
-        for f in fields:
-            if f != 'chain':
-                if np.any(mol.__dict__[f] == segid):
-                    raise RuntimeError('Segid {} already exists in the molecule. Please choose different prefix.'.format(segid))
-                mol.__dict__[f][segres] = segid  # Assign the segid to the correct atoms
-            else:
-                mol.__dict__[f][segres] = available_chains[i % len(available_chains)]
-        logger.info('Created segment {} between resid {} and {}.'.format(segid, np.min(mol.resid[segres]),
-                                                                         np.max(mol.resid[segres])))
-        prevsegres = segres  # Store old segment atom indexes for the warning about continuous resids
-
-    return mol
 
 
 def _checkMixedSegment(mol):
@@ -452,9 +257,9 @@ def removeAtomsInHull(mol1, mol2, hullsel, removesel):
 
     Parameters
     ----------
-    mol1 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>` object
         Molecule for which to calculate the convex hull
-    mol2 : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>` object
         Molecule which contains the atoms which we check if they are within the hull
     hullsel : str
         Atom selection string for atoms in mol1 from which to calculate the convex hull.
@@ -511,7 +316,7 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
     Parameters
     ----------
-    memb : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    memb : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The membrane to be tiled
     xmin : float
         Minimum x coordinate
@@ -542,7 +347,7 @@ def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
 
     logger.info('Replicating Membrane {}x{}'.format(xreps, yreps))
 
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     megamemb = Molecule()
     bar = tqdm(total=xreps * yreps, desc='Replicating Membrane')
     k = 0
@@ -599,7 +404,8 @@ def minimalRotation(prot):
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
+    from moleculekit.tools.autosegment import autoSegment
     from htmd.home import home
     from os import path
 

@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.ffevaluation.ffevaluate import FFEvaluate
 import parmed
 from glob import glob
@@ -183,7 +183,7 @@ def fixParameters(parameterfile):
 if __name__ == '__main__':
     from natsort import natsorted
     from htmd.home import home
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from glob import glob
     import parmed
     import os

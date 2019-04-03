@@ -57,7 +57,7 @@ class AdaptiveGoalEG(AdaptiveGoal):
         See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
     filteredpath : str, default='filtered'
         The directory in which the filtered simulations will be stored
-    projection : :class:`Projection <htmd.projections.projection.Projection>` object, default=None
+    projection : :class:`Projection <moleculekit.projections.projection.Projection>` object, default=None
         A Projection class object or a list of objects which will be used to project the simulation data before constructing a Markov model
     truncation : str, default=None
         Method for truncating the prob distribution (None, 'cumsum', 'statecut'
@@ -208,9 +208,9 @@ class AdaptiveGoalEG(AdaptiveGoal):
 
 if __name__ == '__main__':
     import htmd.home
-    from htmd.projections.metricdistance import MetricDistance
+    from moleculekit.projections.metricdistance import MetricDistance
     from htmd.queues.localqueue import LocalGPUQueue
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     import os
     import shutil
     from htmd.util import tempname
@@ -239,8 +239,8 @@ if __name__ == '__main__':
     # md.run()
 
     # Some real testing now
-    from htmd.projections.metricsecondarystructure import MetricSecondaryStructure
-    from htmd.projections.metricdistance import MetricSelfDistance
+    from moleculekit.projections.metricsecondarystructure import MetricSecondaryStructure
+    from moleculekit.projections.metricdistance import MetricSelfDistance
     import numpy as np
 
     os.chdir(path.join(home(), 'data', 'test-adaptive'))

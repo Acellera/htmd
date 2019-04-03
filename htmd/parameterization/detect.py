@@ -75,7 +75,7 @@ def detectEquivalentAtoms(molecule):
 
     Arguments
     ---------
-    molecule : :class:`Molecule <htmd.molecule.molecule.Molecule>`
+    molecule : :class:`Molecule <moleculekit.molecule.Molecule>`
         Molecule object
 
     Return
@@ -92,7 +92,7 @@ def detectEquivalentAtoms(molecule):
 
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from moleculekit.molecule import Molecule
     >>> from htmd.parameterization.detect import detectEquivalentAtoms
 
     Get benzamidine
@@ -260,7 +260,7 @@ def detectParameterizableDihedrals(molecule):
 
     Arguments
     ---------
-    molecule : :class:`Molecule <htmd.molecule.molecule.Molecule>`
+    molecule : :class:`Molecule <moleculekit.molecule.Molecule>`
         Molecule object
 
     Return
@@ -274,7 +274,7 @@ def detectParameterizableDihedrals(molecule):
 
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from moleculekit.molecule import Molecule
     >>> from htmd.parameterization.detect import detectParameterizableDihedrals
 
     Find the parameterizable dihedrals of glycol

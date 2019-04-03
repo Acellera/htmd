@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.protocols.oldprotocolinterface import TYPE_INT, TYPE_FLOAT, RANGE_0POS, RANGE_POS, RANGE_ANY
 from htmd.protocols.oldprotocolinterface import ProtocolInterface as OldProtocolInterface
 from htmd.decorators import _Deprecated

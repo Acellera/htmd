@@ -111,7 +111,7 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The Molecule object
     sel : str
         Atom selection string for what to be outputted.
@@ -146,74 +146,6 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
         rl = [x for x in rl if (x.startswith("ATOM") or x.startswith("HETATM"))]
 
     return rl
-
-
-
-def opm(pdb, keep=False, keepaltloc='A'):
-    """Download a molecule from the OPM.
-
-    Removes DUM atoms.
-
-    Parameters
-    ----------
-    pdb: str
-        The 4-letter PDB code
-    keep: bool
-        If False, removes the DUM atoms. If True, it keeps them.
-
-    Returns
-    -------
-    mol: Molecule
-        The oriented molecule
-
-    thickness: float or None
-        The bilayer thickness (both layers)
-
-    Examples
-    --------
-    >>> mol, thickness = opm("1z98")
-    >>> mol.numAtoms
-    7902
-    >>> thickness
-    28.2
-    >>> _, thickness = opm('4u15')
-    >>> thickness is None
-    True
-
-    """
-    import requests
-    from htmd.molecule.support import string_to_tempfile
-    from htmd.molecule.molecule import Molecule
-    # http://opm.phar.umich.edu/pdb/1z98.pdb
-    r = requests.get("https://storage.googleapis.com/opm-assets/pdb/{:s}.pdb".format(pdb.lower()))
-
-    if r.status_code != 200:
-        raise NameError('PDB code not found in the OPM database')
-
-    tempfile = string_to_tempfile(r.content.decode('ascii'), "pdb")
-    mol = Molecule(tempfile, keepaltloc=keepaltloc)
-    if not keep:
-        mol.filter("not resname DUM")
-
-    # Assuming the half-thickness is the last word in the matched line
-    # REMARK      1/2 of bilayer thickness:   14.1
-    tmp = open(tempfile)
-    pattern = re.compile('^REMARK.+thickness')
-
-    match = None
-    for line in tmp:
-        if re.match(pattern, line):
-            match = line
-    tmp.close()
-    os.unlink(tempfile)
-
-    if not match:
-        thickness = None
-    else:
-        split_line = match.split()
-        thickness = 2.0 * float(split_line[-1])
-
-    return mol, thickness
 
 
 def assertSameAsReferenceDir(compareDir, outdir="."):
@@ -268,7 +200,7 @@ def testDHFR():
 
 
 if __name__ == "__main__":
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     import doctest
 
     doctest.testmod()

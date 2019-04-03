@@ -40,8 +40,8 @@ class ModelHMM(object):
 
     def viewStates(self, protein=None, ligand=None, nsamples=20):
         from htmd.projections.metric import _singleMolfile
-        from htmd.molecule.molecule import Molecule
-        from htmd.vmdviewer import getCurrentViewer
+        from moleculekit.molecule import Molecule
+        from moleculekit.vmdviewer import getCurrentViewer
         (single, molfile) = _singleMolfile(self.data.simlist)
         if not single:
             raise RuntimeError('Can''t visualize states without unique molfile')

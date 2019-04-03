@@ -6,7 +6,7 @@
 from htmd.util import tempname
 from subprocess import call
 import numpy as np
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 import shutil
 
 
@@ -15,7 +15,7 @@ def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modell
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         A Molecule object.
     segid : str
         The name of the segment containing the gap.
@@ -32,7 +32,7 @@ def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modell
 
     Returns
     -------
-    newmol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    newmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         A new Molecule object containing the protein with the modelled loop.
 
     Examples
@@ -141,6 +141,6 @@ def loopmodelerFALC(mol, segid, seq, pos, inspos, outname='loop'):
 
 if __name__ == '__main__':
     pass
-    # from htmd.molecule.molecule import Molecule
+    # from moleculekit.molecule import Molecule
     # mol = Molecule('1qg8')
     # mol2 = loopModeller(mol, '0', 'ENR', 133)

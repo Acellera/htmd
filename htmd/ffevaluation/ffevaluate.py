@@ -6,7 +6,8 @@
 import logging
 from math import sqrt, acos, radians, cos, sin, pi
 import numpy as np
-from htmd.numbautil import dihedralAngleFull, wrapBondedDistance, wrapDistance, cross, dot
+from htmd.numbautil import cross, dot
+from moleculekit.dihedral import dihedralAngleFull, wrapBondedDistance, wrapDistance
 from numba import jit
 from scipy import constants as const
 from htmd.decorators import _Deprecated
@@ -85,7 +86,7 @@ class FFEvaluate:
 
         Parameters
         ----------
-        mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A Molecule object. Can contain multiple frames.
         prm : :class:`ParameterSet <parmed.ParameterSet>` object
             Forcefield parameters.
@@ -771,7 +772,7 @@ def _evaluate_torsion(pos, torsionparam, box):  # Dihedrals and impropers
 
 def _drawForce(start, vec):
     assert start.ndim == 1 and vec.ndim == 1
-    from htmd.vmdviewer import getCurrentViewer
+    from moleculekit.vmdviewer import getCurrentViewer
     vmd = getCurrentViewer()
     vmd.send("""
     proc vmd_draw_arrow {start end} {

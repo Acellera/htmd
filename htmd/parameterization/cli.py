@@ -99,7 +99,7 @@ def _printArguments(args, filename=None):
 
 def _prepare_molecule(args):
 
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from htmd.parameterization.util import makeAtomNamesUnique, guessElements, detectChiralCenters
 
     logger.info('=== Molecule ===')

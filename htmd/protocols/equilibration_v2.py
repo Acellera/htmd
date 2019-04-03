@@ -253,7 +253,7 @@ proc calcforces_endstep { } { }
         return restraints
 
     def _fb_potential2restraints(self, inputdir):
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         restraints = list()
 
         fb_box = np.array(self.fb_box)
@@ -293,7 +293,7 @@ proc calcforces_endstep { } { }
         >>> md.write('./build','./equil')
         """
 
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
 
         # Do version consistency check
         if (self._version == 2 and not isinstance(self.acemd, Acemd2)) and \

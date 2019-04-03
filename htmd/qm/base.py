@@ -68,11 +68,11 @@ class QMBase(ABC, ProtocolInterface):
     SOLVENTS = ('vacuum', 'PCM')
 
     def __init__(self):
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
 
         super().__init__()
 
-        self._arg('molecule', ':class: `htmd.molecule.molecule.Molecule`', 'Molecule',
+        self._arg('molecule', ':class: `moleculekit.molecule.Molecule`', 'Molecule',
                   default=None, validator=val.Object(Molecule), required=True)
         self._arg('charge', 'int', 'Charge of the molecule in electron charges', default=None,
                   validator=val.Number(int, 'ANY'), required=True)

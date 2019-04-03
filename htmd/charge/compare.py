@@ -11,7 +11,7 @@ import unittest
 import numpy as np
 
 from htmd.home import home
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from htmd.qm import Psi4
 from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges
 

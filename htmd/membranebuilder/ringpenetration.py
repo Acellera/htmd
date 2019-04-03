@@ -44,7 +44,7 @@ def wrap(coor, com2, box):
 
 
 def moveLipidToPos(mol, lip):
-    from htmd.rotationmatrix import rotationMatrix
+    from moleculekit.util import rotationMatrix
     mol = mol.copy()
     headpos = mol.coords[mol.name == lip.headname].flatten()[np.newaxis, :]
     mol.moveBy(-headpos)

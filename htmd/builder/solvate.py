@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 import os
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 import numpy as np
 import sys
 import logging
@@ -19,7 +19,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
 
     Parameters
     ----------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The molecule object we want to solvate
     pad : float
         The padding to add to the minmax in all dimensions. You can specify different padding in each dimension using
@@ -62,7 +62,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
 
     Returns
     -------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule>` object
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         A solvated molecule
 
     Examples

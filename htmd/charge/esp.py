@@ -12,8 +12,8 @@ from scipy import constants as const
 from scipy.spatial.distance import cdist
 import nlopt
 
-from htmd.molecule.molecule import Molecule
-from htmd.molecule.vdw import radiusByElement
+from moleculekit.molecule import Molecule
+from moleculekit.periodictable import periodictable
 from htmd.parameterization.detect import detectEquivalentAtoms
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class MoleculeGrid:
     Load water molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from moleculekit.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
     >>> mol.write('H2O.xyz') # doctest: +SKIP
@@ -69,29 +69,29 @@ class MoleculeGrid:
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol)
     >>> len(grid.getPoints())
-    4592
+    4157
     >>> grid.getPoints() # doctest: +NORMALIZE_WHITESPACE
-    array([[ 0.62043862,  2.06506096, -0.65822007],
-           [ 1.92876094,  1.68531462, -0.91805932],
-           [ 2.07125112,  0.63736808, -1.65750379],
+    array([[-0.88818835, -1.04753265, -0.02590512],
+           [-0.03612161, -0.95868347,  1.63620777],
+           [ 0.62043862,  2.06506096, -0.65822007],
            ...,
-           [-0.77827968, -2.58209328,  1.06180501],
-           [ 0.14494011, -0.39823904, -2.07498691],
-           [-1.50372053, -0.32872076,  1.19264375]])
+           [ 1.79185447, -2.69472971,  0.04730653],
+           [ 0.15053   , -2.95065264,  0.56205264],
+           [ 1.34573805, -1.44031174, -1.75836006]])
     >>> grid.writeXYZ('H2O_default.xyz') # doctest: +SKIP
 
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol, shell_factors=(1, 2), density=50)
     >>> len(grid.getPoints())
-    4764
+    4275
     >>> grid.getPoints() # doctest: +NORMALIZE_WHITESPACE
     array([[ 0.70522759,  1.49704354, -0.45864291],
            [ 1.63974354,  1.22579616, -0.64424237],
            [ 1.74152223,  0.47726292, -1.17241699],
            ...,
-           [ 1.35323883, -3.08583052, -0.17044048],
-           [-0.80667116,  0.64144373, -0.99312377],
-           [ 2.45040501, -2.23107494, -0.48419202]])
+           [-0.70728694, -2.44544594,  0.88320856],
+           [ 0.59560643, -2.38238637,  1.79258897],
+           [ 2.11277479, -1.56282107, -1.2258255 ]])
     >>> grid.writeXYZ('H2O_1_2__50.xyz') # doctest: +SKIP
     """
     def __init__(self, molecule, shell_factors=(1.4, 1.6, 1.8, 2.0), density=25):
@@ -119,7 +119,7 @@ class MoleculeGrid:
         all_points = []
 
         for element, coord in zip(self._molecule.element, self._molecule.coords[:, :, 0]):
-            vdw_radius = radiusByElement(element)
+            vdw_radius = periodictable[element].vdw_radius
             for factor in self._shell_factors:
 
                 # Compute the number of point for each shell
@@ -136,7 +136,7 @@ class MoleculeGrid:
     def _filterPoints(self, points):
 
         # Compute distance threshold for each atom
-        thresholds = np.array([radiusByElement(element) for element in self._molecule.element])
+        thresholds = np.array([periodictable[element].vdw_radius for element in self._molecule.element])
         thresholds *= min(self._shell_factors) - 0.001
 
         # Detect the points further away for each atom than its threshold
@@ -202,7 +202,7 @@ class ESP:
     Load water molecule
     >>> import os
     >>> from htmd.home import home
-    >>> from htmd.molecule.molecule import Molecule
+    >>> from moleculekit.molecule import Molecule
     >>> molFile = os.path.join(home('test-charge'), 'H2O.mol2')
     >>> mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
 
@@ -210,7 +210,7 @@ class ESP:
     >>> np.random.seed(20181113)
     >>> grid = MoleculeGrid(mol)
     >>> len(grid.getPoints())
-    4592
+    4157
 
     Set up and run a QM (B3LYP/6-31G*) calculation of ESP
     >>> from htmd.qm import Psi4
@@ -232,11 +232,11 @@ class ESP:
     >>> esp.qm_results = qm_results
     >>> esp_results = esp.run()
     >>> esp_results['charges'] # doctest: +ELLIPSIS
-    array([-0.3908...,  0.1954...,  0.1954...])
+    array([-0.3936...,  0.1968...,  0.1968...])
     >>> esp_results['loss'] # doctest: +ELLIPSIS
-    1.700...e-05
+    1.835...e-05
     >>> esp_results['RMSD'] # doctest: +ELLIPSIS
-    0.004123...
+    0.004284...
 
     >>> esp = ESP()
     >>> esp.molecule = mol
@@ -244,11 +244,11 @@ class ESP:
     >>> esp.restraint_factor = 0.001
     >>> esp_results = esp.run()
     >>> esp_results['charges'] # doctest: +ELLIPSIS
-    array([-0.3770...,  0.1885...,  0.1885...])
+    array([-0.3811...,  0.1905...,  0.1905...])
     >>> esp_results['loss'] # doctest: +ELLIPSIS
-    6.612...e-05
+    6.836...e-05
     >>> esp_results['RMSD'] # doctest: +ELLIPSIS
-    0.004329...
+    0.004465...
     """
     def __init__(self):
 
@@ -399,7 +399,7 @@ class TestESP(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
 
         molFile = os.path.join(home('test-param'), 'H2O2.mol2')
         mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))

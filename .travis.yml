@@ -11,11 +11,11 @@ matrix:
       python:
         - "3.6"
       env: MAKE_NOARCH=1 OSNAME=Linux  # Only one build needs MAKE_NOARCH=1 to upload the noarch packages to conda
-    - os: linux
-      language: python
-      python:
-        - "3.5"
-      env: OSNAME=Linux
+#    - os: linux
+#      language: python
+#      python:
+#        - "3.5"
+#      env: OSNAME=Linux
 # TODO: Uncomment when MacOS comes back (travis-ci/travis-ci#9075)
 #    - os: osx
 #      language: generic
@@ -73,9 +73,6 @@ install:
   - python package/htmd-deps/write_meta_yaml.py package/htmd-deps
   - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe
   - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
-
-  # If not PR, clone the private htmdlib repo,
-  - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then bash -x ./continuous-integration/travis/compile_htmdlib.sh ; fi
 
   # Build and install HTMD
   - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe

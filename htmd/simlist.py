@@ -304,7 +304,7 @@ def _filtSim(i, sims, outFolder, filterSel):
         return Sim(simid=sims[i].simid, parent=sims[i], input=None, trajectory=ftrajectory, molfile=fmolfile, numframes=numframes)
 
     try:
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         mol = Molecule(sims[i].molfile)
     except:
         logger.warning('Error! Skipping simulation ' + name)
@@ -370,7 +370,7 @@ def _renameSims(trajectory, simname, outfolder):
 def _filterTopology(sim, outfolder, filtsel):
     from htmd.util import ensurelist
     try:
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         mol = Molecule(sim.molfile)
     except IOError as e:
         raise RuntimeError('simFilter: {}. Cannot read topology file {}'.format(e, sim.molfile))
@@ -392,7 +392,7 @@ def _filterTopology(sim, outfolder, filtsel):
 
 
 def _autoDetectTrajectories(folder):
-    from htmd.molecule.readers import _TRAJECTORY_READERS
+    from moleculekit.readers import _TRAJECTORY_READERS
     import natsort
     for tt in _TRAJECTORY_READERS:
         trajectories = glob(path.join(folder, '*.{}'.format(tt)))
@@ -400,7 +400,7 @@ def _autoDetectTrajectories(folder):
             return natsort.natsorted(trajectories)
 
 
-from htmd.molecule.readers import _TOPOLOGY_READERS
+from moleculekit.readers import _TOPOLOGY_READERS
 __readers = list(_TOPOLOGY_READERS.keys())
 __defaultReaders = ['pdb', 'prmtop', 'psf']
 __otherReaders = list(np.setdiff1d(__readers, __defaultReaders))

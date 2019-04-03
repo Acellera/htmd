@@ -152,7 +152,7 @@ class TICA(object):
             parent = None
             if self.dimensions is not None:
                 from htmd.projections.metric import _singleMolfile
-                from htmd.molecule.molecule import Molecule
+                from moleculekit.molecule import Molecule
                 (single, molfile) = _singleMolfile(metr.simulations)
                 if single:
                     keepdimdesc = metr.getMapping(Molecule(molfile))
@@ -205,7 +205,7 @@ class TICA(object):
 if __name__ == '__main__':
     from htmd.simlist import simlist
     from glob import glob
-    from htmd.projections.metricdistance import MetricSelfDistance
+    from moleculekit.projections.metricdistance import MetricSelfDistance
     from htmd.home import home
     from os.path import join
 

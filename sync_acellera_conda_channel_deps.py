@@ -24,7 +24,7 @@ packages = [
     ['omnia', 'ambermini'],
     ['omnia', 'bhmm'],
     ['omnia', 'funcsigs'],
-    ['omnia', 'mdtraj'],
+    ['conda-forge', 'mdtraj'],
     ['conda-forge', 'msmtools'],
     ['openbabel', 'openbabel'],
     ['omnia', 'pint'],

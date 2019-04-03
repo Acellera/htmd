@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.molecule.molecule import Molecule
+from moleculekit.molecule import Molecule
 from glob import glob
 import numpy as np
 import logging
@@ -105,7 +105,7 @@ def _setPositionsLJSim(width, lipids):
 
 
 def _createMembraneMolecule(lipids):
-    from htmd.rotationmatrix import rotationMatrix
+    from moleculekit.util import rotationMatrix
 
     allmols = []
     for i, l in enumerate(lipids):
@@ -160,7 +160,7 @@ def _findNeighbours(lipids, box):
 
 
 def _loadMolecules(lipids, files):
-    from htmd.rotationmatrix import rotationMatrix
+    from moleculekit.util import rotationMatrix
     # Create Molecules
     for l in lipids:
         randidx = np.random.randint(len(files[l.resname]))
@@ -208,7 +208,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
 
     Returns
     -------
-    mol : :class:`Molecule <htmd.molecule.molecule.Molecule`
+    mol : :class:`Molecule <moleculekit.molecule.Molecule`
         The resulting membrane including surrounding waters
 
     Examples
@@ -222,7 +222,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
     from htmd.builder.solvate import solvate
     from htmd.builder.charmm import build
     from htmd.util import tempname
-    from htmd.molecule.molecule import Molecule
+    from moleculekit.molecule import Molecule
     from htmd.home import home
     import os
     import pandas as pd

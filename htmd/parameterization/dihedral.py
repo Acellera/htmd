@@ -19,7 +19,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 
 from htmd.ffevaluation.ffevaluate import FFEvaluate
-from htmd.numbautil import dihedralAngle
+from moleculekit.dihedral import dihedralAngle
 from htmd.parameterization.detect import detectParameterizableDihedrals
 from htmd.parameterization.parameterset import findDihedralType
 

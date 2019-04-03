@@ -22,7 +22,7 @@ def _wrapping_dist_numba(X, Y, D, box):
 
 
 def _totalContacts(x, *args):
-    from htmd.rotationmatrix import rotationMatrix
+    from moleculekit.util import rotationMatrix
     lipids = args[0]
     headnames = args[1]
     zpos = args[2]

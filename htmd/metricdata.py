@@ -1029,7 +1029,7 @@ class MetricData(object):
             confs = np.random.choice(confs, nsamples, replace=False)
         sims = self.abs2sim(confs)
 
-        from htmd.molecule.molecule import Molecule
+        from moleculekit.molecule import Molecule
         if singlemol:
             mol = Molecule(sims[0])
             for i in range(1, len(sims)):
@@ -1108,9 +1108,9 @@ if __name__ == '__main__':
     from htmd.simlist import simlist, simfilter
     from glob import glob
     from htmd.projections.metric import Metric
-    from htmd.projections.metricdistance import MetricDistance
-    from htmd.projections.metricdihedral import MetricDihedral
-    from htmd.util import tempname
+    from moleculekit.projections.metricdistance import MetricDistance
+    from moleculekit.projections.metricdihedral import MetricDihedral
+    from moleculekit.util import tempname
     from htmd.home import home
     from os.path import join
 
