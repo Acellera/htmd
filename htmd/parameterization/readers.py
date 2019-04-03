@@ -14,8 +14,8 @@ def _guessElement(name):
 
 
 def _guessMass(element):
-    from htmd.molecule import vdw
-    return vdw.massByElement(element)
+    from moleculekit.periodictable import periodictable
+    return periodictable[element].mass
 
 
 # TODO: fix guessElement

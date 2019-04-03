@@ -13,7 +13,7 @@ from scipy.spatial.distance import cdist
 import nlopt
 
 from moleculekit.molecule import Molecule
-from htmd.molecule.vdw import radiusByElement
+from moleculekit.periodictable import periodictable
 from htmd.parameterization.detect import detectEquivalentAtoms
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ class MoleculeGrid:
         all_points = []
 
         for element, coord in zip(self._molecule.element, self._molecule.coords[:, :, 0]):
-            vdw_radius = radiusByElement(element)
+            vdw_radius = periodictable[element].vdw_radius
             for factor in self._shell_factors:
 
                 # Compute the number of point for each shell
@@ -136,7 +136,7 @@ class MoleculeGrid:
     def _filterPoints(self, points):
 
         # Compute distance threshold for each atom
-        thresholds = np.array([radiusByElement(element) for element in self._molecule.element])
+        thresholds = np.array([periodictable[element].vdw_radius for element in self._molecule.element])
         thresholds *= min(self._shell_factors) - 0.001
 
         # Detect the points further away for each atom than its threshold
