@@ -826,7 +826,7 @@ class TestAmberBuild(unittest.TestCase):
             os.remove(f)
 
     def testWithProteinPrepare(self):
-        from htmd.builder.preparation import proteinPrepare
+        from moleculekit.tools.preparation import proteinPrepare
         from htmd.builder.solvate import solvate
         # Test with proteinPrepare
         pdbids = ['3PTB']
