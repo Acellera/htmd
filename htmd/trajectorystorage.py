@@ -1,6 +1,7 @@
 from natsort import natsorted
 from htmd.util import ensurelist
 from glob import glob
+from tqdm import tqdm
 import numpy as np
 import os
 import h5py
@@ -14,6 +15,61 @@ class DuplicateTrajectoryError(Exception):
         self.value = value
     def __str__(self):
         return repr(self.value)
+
+
+class _Trajectory(object):
+    def __init__(self, topologyFile, trajectoryFiles=None, inputFolder=None, parent=''):
+        self.topologyFile = topologyFile
+        self.trajectoryFiles = trajectoryFiles
+        self.inputFolder = inputFolder
+        self.parent = parent
+
+    @staticmethod
+    def _getFileMd5sum(trajectory):
+        import hashlib
+        return hashlib.md5(open(trajectory, 'rb').read()).hexdigest()
+
+    @staticmethod
+    def _getStringMd5sum(string):
+        import hashlib
+        return hashlib.md5(string.encode('utf-8')).hexdigest()
+
+    def getName(self):
+        return _Trajectory._getStringMd5sum(' '.join(self.trajectoryFiles))
+
+    def writeToH5(self, parentgroup):
+        trajgroup = parentgroup.create_group(self.getName())
+        trajgroup.attrs['topology_file'] = self.topologyFile
+        trajgroup.attrs['parent'] = self.parent
+        if self.inputFolder is not None:
+            trajgroup.attrs['input_folder'] = self.inputFolder
+
+        filesgroup = trajgroup.create_group('trajectory_files')
+        for i, piece in enumerate(self.trajectoryFiles):
+            piecegroup = filesgroup.create_group(str(i))
+            piecegroup.attrs['trajectory_file'] = piece
+            piecegroup.attrs['trajectory_md5sum'] = _Trajectory._getFileMd5sum(piece)
+
+    @staticmethod
+    def fromH5(group):
+        topologyFile = group.attrs['topology_file']
+        inputFolder = None
+        trajectoryFiles = None
+        parent = ''
+        if 'input_folder' in group.attrs:
+            inputFolder = group.attrs['input_folder']
+        if 'parent' in group.attrs:
+            parent = group.attrs['parent']
+        if 'trajectory_files' in group:
+            trajectoryFiles = []
+            for pieceName in sorted(group['trajectory_files']):
+                trajectoryFiles.append(group['trajectory_files'][pieceName].attrs['trajectory_file'])
+        return _Trajectory(topologyFile, trajectoryFiles, inputFolder, parent)
+
+    def toDict(self):
+        resdict = self.__dict__.copy()
+        resdict['trajName'] = self.getName()
+        return resdict
 
 
 
@@ -39,16 +95,6 @@ class TrajectoryStorage(object):
     def __repr__(self):
         return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
                + self.__str__()
-
-    @staticmethod
-    def _getFileMd5sum(trajectory):
-        import hashlib
-        return hashlib.md5(open(trajectory, 'rb').read()).hexdigest()
-
-    @staticmethod
-    def _getStringMd5sum(string):
-        import hashlib
-        return hashlib.md5(string.encode('utf-8')).hexdigest()
 
     def addTrajectory(self, trajectory, topologyFile, inputFolder=None, sortByName=True):
         """ Add a trajectory to the storage
@@ -83,24 +129,14 @@ class TrajectoryStorage(object):
         if sortByName:
             trajpieces = natsorted(trajpieces)
 
-        trajpieces = [os.path.abspath(traj) for traj in trajpieces]
+        traj = _Trajectory(topologyFile=topologyFile, trajectoryFiles=trajpieces, inputFolder=inputFolder, parent='')
 
-        name = TrajectoryStorage._getStringMd5sum(' '.join(trajpieces))
-        
+        # trajpieces = [os.path.abspath(traj) for traj in trajpieces]  # I think I prefer relative file paths
+
         with h5py.File(self.storagelocation, 'a') as f:
-            if name in f['trajectories']:
+            if traj.getName() in f['trajectories']:
                 raise DuplicateTrajectoryError('A trajectory is already in the dataset with files {}'.format(trajpieces))
-            trajgroup = f['trajectories'].create_group(name)
-            trajgroup.attrs['topology_file'] = topologyFile
-            trajgroup.attrs['parent'] = ''
-            if inputFolder is not None:
-                trajgroup.attrs['input_folder'] = inputFolder
-
-            filesgroup = trajgroup.create_group('trajectory_files')
-            for piece in trajpieces:
-                piecegroup = filesgroup.create_group(TrajectoryStorage._getStringMd5sum(piece))
-                piecegroup.attrs['trajectory_file'] = piece
-                piecegroup.attrs['trajectory_md5sum'] = TrajectoryStorage._getFileMd5sum(piece)
+            traj.writeToH5(f['trajectories'])
 
 
     def autoDetectFiles(self, trajectoryFolders, topologyFolders=None, inputFolders=None):
@@ -210,7 +246,7 @@ class TrajectoryStorage(object):
 
         keys = natsort.natsorted(trajectorynames.keys())
         notraj = {}  # Folders which don't have trajectories
-        from tqdm import tqdm
+        
         for k in tqdm(keys, desc='Detecting trajectories'):
             trajectories = _autoDetectTrajectories(trajectorynames[k])
 
@@ -241,6 +277,112 @@ class TrajectoryStorage(object):
 
 
         logger.info('{} folder(s) were missing trajectories'.format(len(notraj)))
+
+    def _getAllTrajectoriesAsDicts(self):
+        alltraj = []
+        with h5py.File(self.storagelocation, 'r') as f:
+            for trajname in f['trajectories']:
+                traj = _Trajectory.fromH5(f['trajectories'][trajname]).toDict()
+                alltraj.append(traj)
+        # from IPython.core.debugger import set_trace
+        # set_trace()
+        return alltraj
+
+    def projectTrajectories(self, projection, projectionName=None, numWorkers=1):
+        from multiprocessing import Process
+        from multiprocessing import JoinableQueue as Queue
+        import signal
+
+        if projectionName is None:
+            projectionName = str(type(projection))
+        if len(projectionName) == 0:
+            raise RuntimeError('projectionName should not be an empty string')
+        logger.info('Calculating projections: {}'.format(projectionName))
+
+        alltraj = self._getAllTrajectoriesAsDicts()
+
+        unique_mol = None
+
+        input_queue = Queue()
+        output_queue = Queue()
+
+        for item in alltraj:
+            input_queue.put(item)
+
+        processes = []
+
+        original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN) # Set SIGINT to ignore so that child processes inherit it
+        processes = [Process(target=_project_worker, args=(input_queue, output_queue, projection, unique_mol)) for x in range(numWorkers)]
+        for p in processes:
+            p.start()
+        signal.signal(signal.SIGINT, original_sigint_handler)  # Set back the original signal handler
+
+        try:
+            with h5py.File(self.storagelocation, 'a') as f:
+                for i in tqdm(range(len(alltraj)), desc='Projecting trajectories'):
+                    res, trajname = output_queue.get()
+                    if projectionName in f['trajectories'][trajname]:
+                        del f['trajectories'][trajname][projectionName]
+                    f['trajectories'][trajname].create_dataset(projectionName, data=res)
+                output_queue.task_done()
+        except KeyboardInterrupt:
+            for p in processes:
+                p.terminate()
+
+        for p in processes:
+            input_queue.put(None)
+
+        for p in processes:
+            p.join()
+
+
+def _project_worker(input_queue, output_queue, projection, unique_mol):
+    from moleculekit.projections.projection import Projection
+    from moleculekit.molecule import Molecule
+
+    if unique_mol is not None:
+        unique_mol = unique_mol.copy()
+
+    while True:
+        try:
+            item = input_queue.get()
+            if item is None:
+                break
+
+            mol = unique_mol
+            if mol is None:
+                mol = Molecule(item['topologyFile'])
+
+            mol.read(item['trajectoryFiles'])
+
+            if isinstance(projection, Projection):
+                res = projection.project(mol)
+            elif hasattr(projection, '__call__'): # If it's a function
+                res = projection(mol)
+            elif isinstance(projection, tuple) and hasattr(projection[0], '__call__'): # If it's a function with extra arguments
+                res = projection[0](mol, *projection[1])
+            else:
+                raise RuntimeError('Invalid projection type {}'.format(type(projection)))
+
+            if isinstance(res, list) or isinstance(res, tuple):
+                res = np.array(res)
+
+            _checkProjectionDims(res, mol, 'projection')
+
+            output_queue.put((res, item['trajName']))
+            input_queue.task_done()
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            logger.error('Failed to project simulation with name {} due to {}'.format(item['trajName'], e))
+
+def _checkProjectionDims(result, mol, name):
+    if (result.ndim == 1 and len(result) != mol.numFrames) or \
+       (result.ndim == 2 and result.shape[0] != mol.numFrames):
+        raise RuntimeError('The {} produced an incorrect result. It produced a {} shaped array for {} frames. '
+                           'The {} should return a numpy array of (nframes, ndim) shape '
+                           'where nframes the number of frames in the Molecule it accepts as an '
+                           'argument.'.format(name, result.shape, mol.numFrames, name))
 
 
 def _autoDetectTrajectories(folder):
