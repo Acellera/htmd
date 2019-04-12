@@ -361,7 +361,7 @@ def _get_initial_parameters(mol, args):
     return mol, parameters
 
 
-def _fit_initial_charges(mol, args):
+def _fit_initial_charges(mol, args, atom_types):
 
     from htmd.charge import fitGasteigerCharges
     from htmd.parameterization.util import guessBondType
@@ -380,7 +380,7 @@ def _fit_initial_charges(mol, args):
                 logger.info('Guessing bond types')
                 mol = guessBondType(mol)
 
-            mol = fitGasteigerCharges(mol)
+            mol = fitGasteigerCharges(mol, atom_types=atom_types)
 
             # Print the initial charges
             logger.info('Initial atomic charges:')
@@ -400,7 +400,7 @@ def _fit_initial_charges(mol, args):
     return mol
 
 
-def _fit_charges(mol, args, qm):
+def _fit_charges(mol, args, qm, atom_types):
 
     from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges, symmetrizeCharges
     from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
@@ -428,7 +428,7 @@ def _fit_charges(mol, args, qm):
             logger.info('Guessing bond types')
             mol = guessBondType(mol)
 
-        mol = fitGasteigerCharges(mol)
+        mol = fitGasteigerCharges(mol, atom_types=atom_types)
 
         charge = int(round(np.sum(mol.charge)))
         if args.charge != charge:
@@ -616,7 +616,7 @@ def main_parameterize(arguments=None):
     mol, parameters = _get_initial_parameters(mol, args)
 
     # Assign initial atomic charges, if needed
-    mol = _fit_initial_charges(mol, args)
+    mol = _fit_initial_charges(mol, args, initial_mol.atomtype)
 
     # Geometry minimization
     # TODO refactor
@@ -654,7 +654,7 @@ def main_parameterize(arguments=None):
                                '{} --> {}'.format(initial_chiral_centers, chiral_centers))
 
     # Fit charges
-    mol = _fit_charges(mol, args, qm_calculator)
+    mol = _fit_charges(mol, args, qm_calculator, initial_mol.atomtype)
 
     # Scan dihedrals and fit parameters
     # TODO refactor

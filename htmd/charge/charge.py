@@ -15,7 +15,7 @@ from moleculekit.molecule import Molecule
 logger = logging.getLogger(__name__)
 
 
-def fitGasteigerCharges(mol):
+def fitGasteigerCharges(mol, atom_types=None):
     """
     Fit Gasteiger atomic charges
 
@@ -41,6 +41,11 @@ def fitGasteigerCharges(mol):
     >>> assert new_mol is not mol
     >>> new_mol.charge # doctest: +ELLIPSIS
     array([-0.411509...,  0.205754...,  0.205754...], dtype=float32)
+
+    >>> new_mol = fitGasteigerCharges(mol, atom_types=mol.atomtype)
+    >>> assert new_mol is not mol
+    >>> new_mol.charge # doctest: +ELLIPSIS
+    array([-0.411509...,  0.205754...,  0.205754...], dtype=float32)
     """
 
     from rdkit.Chem.rdmolfiles import MolFromMol2File
@@ -53,7 +58,8 @@ def fitGasteigerCharges(mol):
 
     # Set atom types to elements, overwise rdkit refuse to read a MOL2 file
     htmd_mol = mol.copy()
-    htmd_mol.atomtype = htmd_mol.element
+    if atom_types is not None:
+        htmd_mol.atomtype = atom_types
 
     # Convert Molecule to rdkit Mol
     with TemporaryDirectory() as tmpDir:
