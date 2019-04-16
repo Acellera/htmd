@@ -392,6 +392,11 @@ def _fit_initial_charges(mol, args, atom_types):
                 logger.info('   {:4s}: {:6.3f}'.format(name, charge))
             logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
 
+            charge = int(round(np.sum(mol.charge)))
+            if args.charge != charge:
+                raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
+                    args.charge, charge))
+
         elif args.min_type in ('None', 'qm'):
             logger.info('Initial atomic charges are not required')
 
