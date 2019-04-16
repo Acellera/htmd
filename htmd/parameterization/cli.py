@@ -100,6 +100,7 @@ def _printArguments(args, filename=None):
 def _prepare_molecule(args):
 
     from moleculekit.molecule import Molecule
+    from htmd.parameterization.fixes import fixPhosphateTypes
     from htmd.parameterization.util import makeAtomNamesUnique, guessElements, detectChiralCenters
 
     logger.info('=== Molecule ===')
@@ -166,6 +167,9 @@ def _prepare_molecule(args):
     # Set segment ID
     mol.segid[:] = 'L' # Note: it is need to write complete PDB files
     logger.info('Segment ID: {}'.format(mol.segid[0]))
+
+    # Fix atom and bond types
+    mol = fixPhosphateTypes(mol)
 
     # Detect chiral centers
     chiral_centers = detectChiralCenters(mol)
