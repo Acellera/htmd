@@ -4,6 +4,8 @@
 # No redistribution in whole or part
 #
 import logging
+import os
+
 import networkx as nx
 
 logger = logging.getLogger(__name__)
@@ -24,10 +26,11 @@ def _getMolecularGraph(molecule):
 
 def fixPhosphateTypes(molecule):
     """
+    >>> from htmd.home import home
     >>> from moleculekit.molecule import Molecule
     >>> from htmd.charge import fitGasteigerCharges
 
-    >>> mol = Molecule('/home/raimis/pm-param.git/param_tests_2/ligForRamis/1a1e_ligand.mol2')
+    >>> mol = Molecule(os.path.join(home('test-param'), '1a1e_ligand.mol2'))
 
     >>> fitGasteigerCharges(mol) # doctest: +ELLIPSIS
     Traceback (most recent call last):
@@ -54,7 +57,7 @@ def fixPhosphateTypes(molecule):
     >>> print(round(sum(fitGasteigerCharges(new_mol).charge)))
     -3.0
 
-    >>> mol = Molecule('/home/raimis/pm-param.git/param_tests_2/ligForRamis/1afk_ligand.mol2')
+    >>> mol = Molecule(os.path.join(home('test-param'), '1afk_ligand.mol2'))
 
     >>> new_mol = fixPhosphateTypes(mol)
 
