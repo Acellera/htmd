@@ -58,7 +58,6 @@ def fixPhosphateTypes(molecule):
     -3.0
 
     >>> mol = Molecule(os.path.join(home('test-param'), '1afk_ligand.mol2'))
-
     >>> new_mol = fixPhosphateTypes(mol)
 
     >>> print(new_mol.atomtype)
@@ -74,6 +73,21 @@ def fixPhosphateTypes(molecule):
 
     >>> print(round(sum(fitGasteigerCharges(new_mol).charge)))
     -5.0
+
+    >>> mol = Molecule(os.path.join(home('test-param'), '1aj7_ligand.mol2'))
+    >>> new_mol = fixPhosphateTypes(mol)
+
+    >>> print(new_mol.atomtype)
+    ['C.ar' 'N.2' 'O.2' 'O.2' 'C.ar' 'C.ar' 'C.ar' 'C.ar' 'C.ar' 'O.3' 'P.3'
+     'O.3' 'O.2' 'C.3' 'C.3' 'C.3' 'C.3' 'C.2' 'O.co2' 'O.co2' 'H' 'H' 'H' 'H'
+     'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H']
+
+    >>> print(new_mol.bondtype)
+    ['ar' 'ar' '1' '2' '2' 'ar' 'ar' '1' 'ar' 'ar' '1' '1' '2' '1' '1' '1' '1'
+     '1' 'ar' 'ar' '1' '1' '1' '1' '1' '1' '1' '1' '1' '1' '1' '1']
+
+    >>> print(round(sum(fitGasteigerCharges(new_mol).charge)))
+    -2.0
     """
 
     molecule = molecule.copy()
@@ -85,13 +99,16 @@ def fixPhosphateTypes(molecule):
         if graph.nodes[node]['element'] != 'P':
             continue
 
-        # Skip P not in PO4
+        # Skip P atom without 4 atoms connected
         neighbors = list(graph.neighbors(node))
-        is_oxygen = lambda node: graph.nodes[node]['element'] == 'O'
-        if list(map(is_oxygen, neighbors)) != [True]*4:
+        if len(neighbors) != 4:
             continue
 
-        # Sort neighbor atoms according to descending charge
+        # Filter O atoms
+        is_oxygen = lambda node: graph.nodes[node]['element'] == 'O'
+        neighbors = filter(is_oxygen, neighbors)
+
+        # Sort O atoms according to descending charge
         # Note: a double bond has to be near the most positive oxygen
         charge = lambda neighbor: molecule.charge[neighbor]
         neighbors = sorted(neighbors, key=charge, reverse=True)
