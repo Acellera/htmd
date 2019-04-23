@@ -1,0 +1,378 @@
+* Patches to acheive charged and uncharged amino acids D, E, H and K
+* Contact C.L. Brooks III for additional information
+*
+
+read rtf card append
+* title
+*
+ 36 1
+!----------------------------------------------------------------------------
+! ASPARTIC ACID (ASP) PATCHES
+! Note: ASPP1x series must be read in before ASPP2x due to NB exclusion
+!       setup in BLOCK. ASPP1x usage depends on the position of the
+!       residue in the protein
+!----------------------------------------------------------------------------
+
+pres aspp1 0           ! od1 protonated species
+! HB1M   OD1M-HD1M
+!  |     /
+! -CBM--CGM
+!  |     \\
+! HB2M   OD2M
+
+group
+atom cbm  ct2  -0.21  cb cg hb1 hb2 od1 od2 !cbp cgp hb1p hb2p od1p od2p hd2p
+atom hb1m ha2   0.09  cb cg hb1 hb2 od1 od2 !cbp cgp hb1p hb2p od1p od2p hd2p
+atom hb2m ha2   0.09  cb cg hb1 hb2 od1 od2 !cbp cgp hb1p hb2p od1p od2p hd2p
+group
+atom cgm  cd    0.75  cb cg hb1 hb2 od1 od2 !cbp cgp hb1p hb2p od1p od2p hd2p
+group
+atom od1m oh1  -0.61  cb cg hb1 hb2 od1 od2 !cbp cgp hb1p hb2p od1p od2p hd2p
+atom hd1m h     0.44  cb cg hb1 hb2 od1 od2 !cbp cgp hb1p hb2p od1p od2p hd2p
+group
+atom od2m ob   -0.55  cb cg hb1 hb2 od1 od2 !cbp cgp hb1p hb2p od1p od2p hd2p
+
+bond od1m hd1m
+bond cbm hb2m
+bond ca cbm
+bond cbm hb1m
+bond cgm cbm
+bond cgm od1m
+bond cgm od2m
+
+impr cgm cbm od2m od1m
+
+acceptor od1m cgm
+acceptor od2m cgm
+donor hd1m od1m
+
+pres aspp2 0           ! od2 protonated species
+! HB1P   OD1P
+!  |     //
+! -CBP--CGP
+!  |     \
+! HB2P   OD2P-HD2P
+
+group
+atom cbp  ct2  -0.21  cb cg hb1 hb2 od1 od2 cbm cgm hb1m hb2m od1m od2m hd1m
+atom hb1p ha2   0.09  cb cg hb1 hb2 od1 od2 cbm cgm hb1m hb2m od1m od2m hd1m
+atom hb2p ha2   0.09  cb cg hb1 hb2 od1 od2 cbm cgm hb1m hb2m od1m od2m hd1m
+group
+atom cgp  cd    0.75  cb cg hb1 hb2 od1 od2 cbm cgm hb1m hb2m od1m od2m hd1m
+group
+atom od1p ob   -0.55  cb cg hb1 hb2 od1 od2 cbm cgm hb1m hb2m od1m od2m hd1m
+group
+atom od2p oh1  -0.61  cb cg hb1 hb2 od1 od2 cbm cgm hb1m hb2m od1m od2m hd1m
+atom hd2p h     0.44  cb cg hb1 hb2 od1 od2 cbm cgm hb1m hb2m od1m od2m hd1m
+
+bond od2p hd2p
+bond cbp hb2p
+bond ca cbp
+bond cbp hb1p
+bond cgp cbp
+bond cgp od1p
+bond cgp od2p
+
+impr cgp cbp od2p od1p
+
+acceptor od1p cgp
+acceptor od2p cgp
+donor hd2p od2p
+
+
+!----------------------------------------------------------------------------
+! GLUTAMIC ACID (GLU) PATCHES
+! Note: GLUP1 must be read in before GLUP2 due to NB exclusion setup in BLOCK.
+!       There is no GLUP1x series as the patch does not extend to atoms 
+!       that are relevant to amide linkage.
+!----------------------------------------------------------------------------
+
+pres glup1 0           ! oe1 protonated species
+! HG1M    OE1M-HE1M
+!  |     /
+! -CGM--CDM
+!  |     \\
+! HG2M     OE2M
+
+atom cgm   ct2    -0.21  cg cd hg1 hg2 oe1 oe2 ! cgp cdp hg1p hg2p oe1p oe2p he2p
+atom hg1m  ha2     0.09  cg cd hg1 hg2 oe1 oe2 ! cgp cdp hg1p hg2p oe1p oe2p he2p
+atom hg2m  ha2     0.09  cg cd hg1 hg2 oe1 oe2 ! cgp cdp hg1p hg2p oe1p oe2p he2p
+atom cdm   cd      0.75  cg cd hg1 hg2 oe1 oe2 ! cgp cdp hg1p hg2p oe1p oe2p he2p
+atom oe2m  ob     -0.55  cg cd hg1 hg2 oe1 oe2 ! cgp cdp hg1p hg2p oe1p oe2p he2p
+atom oe1m  oh1    -0.61  cg cd hg1 hg2 oe1 oe2 ! cgp cdp hg1p hg2p oe1p oe2p he2p
+atom he1m  h       0.44  cg cd hg1 hg2 oe1 oe2 ! cgp cdp hg1p hg2p oe1p oe2p he2p
+
+bond cb cgm
+bond cgm hg1m
+bond cgm hg2m
+bond cgm cdm
+bond cdm oe1m
+bond cdm oe2m
+bond oe1m he1m  !!proton
+
+impr cdm cgm oe2m oe1m
+
+acceptor oe2m cdm
+acceptor oe1m cdm
+donor he1m oe1m
+
+pres glup2 0           ! oe2 protonated species
+! HG1P    OE1P
+!  |     //
+! -CGP--CDP
+!  |     \
+! HG2P     OE2P-HE2P
+
+atom cgp   ct2    -0.21  cg cd hg1 hg2 oe1 oe2 cgm cdm hg1m hg2m oe1m oe2m he1m
+atom hg1p  ha2     0.09  cg cd hg1 hg2 oe1 oe2 cgm cdm hg1m hg2m oe1m oe2m he1m
+atom hg2p  ha2     0.09  cg cd hg1 hg2 oe1 oe2 cgm cdm hg1m hg2m oe1m oe2m he1m
+atom cdp   cd      0.75  cg cd hg1 hg2 oe1 oe2 cgm cdm hg1m hg2m oe1m oe2m he1m
+atom oe1p  ob     -0.55  cg cd hg1 hg2 oe1 oe2 cgm cdm hg1m hg2m oe1m oe2m he1m
+atom oe2p  oh1    -0.61  cg cd hg1 hg2 oe1 oe2 cgm cdm hg1m hg2m oe1m oe2m he1m
+atom he2p  h       0.44  cg cd hg1 hg2 oe1 oe2 cgm cdm hg1m hg2m oe1m oe2m he1m
+
+bond cb cgp
+bond cgp hg1p
+bond cgp hg2p
+bond cgp cdp
+bond cdp oe1p
+bond cdp oe2p
+bond oe2p he2p  !!proton
+
+impr cdp  cgp oe2p oe1p
+
+acceptor oe1p cdp
+acceptor oe2p cdp
+donor he2p oe2p
+!----------------------------------------------------------------------------
+! LYSINE (LYS) PATCHES
+!----------------------------------------------------------------------------
+
+! Neutral lysine (LSY). This is the patch for neutral lysine. The HZ3 atom was deleted.
+
+pres lysn 0
+
+ !     |
+ !  HN-N
+ !     |   HB1 HG1 HD1 HE1    HZ1
+ !     |   |   |   |   |     /
+ !  HA-CA--CB--CG--CD--CE--NZ--HZ2
+ !     |   |   |   |   |     \
+ !     |   HB2 HG2 HD2 HE2    
+ !   O=C
+ !     |
+
+atom cem   ct2     0.13   ce he1 he2 nz hz1 hz2 hz3
+atom he1m  ha2     0.075  ce he1 he2 nz hz1 hz2 hz3
+atom he2m  ha2     0.075  ce he1 he2 nz hz1 hz2 hz3
+atom nzm   nh2    -0.96   ce he1 he2 nz hz1 hz2 hz3
+atom hz1m  hc      0.34   ce he1 he2 nz hz1 hz2 hz3
+atom hz2m  hc      0.34   ce he1 he2 nz hz1 hz2 hz3
+
+bond cd cem
+bond cem he1m
+bond cem he2m
+bond cem nzm
+bond nzm hz1m
+bond nzm hz2m
+
+!----------------------------------------------------------------------------
+! TYROSINE (TYR) PATCHES
+!----------------------------------------------------------------------------
+
+! Deprotonated tyrosine (TYR)
+! This is the patch for deprotonated tyrosine. The HH atom was deleted
+
+pres tyru -1
+!     |        HD1  HE1M   
+!  HN-N         |    |   
+!     |   HB1  CD1--CE1M
+!     |   |   //      \\
+!  HA-CA--CB--CG      CZM--OHM
+!     |   |    \  __  /
+!     |   HB2  CD2--CE2M
+!   O=C         |    |  
+!     |        HD2  HE2M  
+
+group
+atom ce1m  ca     -0.60   ce1 he1 ce2 he2 cz oh hh
+atom he1m  hp      0.28   ce1 he1 ce2 he2 cz oh hh
+group
+atom ce2m  ca     -0.60   ce1 he1 ce2 he2 cz oh hh
+atom he2m  hp      0.28   ce1 he1 ce2 he2 cz oh hh
+group
+atom czm   ca      0.40   ce1 he1 ce2 he2 cz oh hh
+atom ohm   oh1    -0.76   ce1 he1 ce2 he2 cz oh hh
+
+bond cd1 ce1m
+bond ce1m he1m
+bond ce1m czm
+bond czm ohm
+bond czm ce2m
+bond cd2 ce2m
+bond ce2m he2m
+
+!----------------------------------------------------------------------------
+! HISTIDINE (HIS) PATCHES
+! Note: Histidines must be entered as doubly-protonated form (HSP) for the wt
+!       followed by hsdn and then hsen.
+!----------------------------------------------------------------------------
+
+! Neutral histidine (HIS)
+! This is the patch for neutral Histidine with the proton on (HSD)
+
+pres hsdn 0
+ !     |          HD1M    HE1M
+ !  HN-N           |     /
+ !     |   HB1M   ND1M--CE1M
+ !     |   |     /      ||
+ !  HA-CA--CBM--CGM     ||
+ !     |   |     \\     ||
+ !     |   HB2M   CD2M--NE2M
+ !   O=C           |
+ !     |          HD2M
+
+group
+atom cbm   ct2    -0.09   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom hb1m  ha2     0.09   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom hb2m  ha2     0.09   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom cd2m  cph1    0.22   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom hd2m  hr3     0.10   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom cgm   cph1   -0.05   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+group
+atom nd1m  nr1    -0.36   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom hd1m  h       0.32   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom ce1m  cph2    0.25   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom he1m  hr1     0.13   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+atom ne2m  nr2    -0.70   cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2 
+
+bond ca cbm
+bond cbm hb1m
+bond cbm hb2m
+bond cbm cgm
+bond nd1m hd1m
+bond nd1m cgm
+bond nd1m ce1m
+bond cgm cd2m
+bond ce1m he1m
+bond ce1m ne2m
+bond ne2m cd2m
+bond cd2m hd2m
+
+impr nd1m cgm ce1m hd1m
+impr cd2m cgm  ne2m hd2m
+impr ce1m nd1m ne2m he1m
+impr nd1m ce1m cgm hd1m
+impr cd2m ne2m cgm hd2m
+impr ce1m ne2m nd1m he1m
+
+! Neutral histidine (HIS)
+! This is the patch for neutral Histidine with the proton on (HSE)
+
+pres hsen 0
+ !     |                 HE1P
+ !  HN-N             __  /
+ !     |   HB1P   ND1P--CE1P
+ !     |   |     /      |
+ !  HA-CA--CBP--CGP     |
+ !     |   |     \\     |
+ !     |   HB2P   CD2P--NE2P
+ !   O=C           |     \
+ !     |          HD2P    HE2P
+group
+atom cbp   ct2    -0.08   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom hb1p  ha2     0.09   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom hb2p  ha2     0.09   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom cd2p  cph1   -0.05   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom hd2p  hr3     0.09   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom cgp   cph1    0.22   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+group
+atom nd1p  nr2    -0.70   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom ce1p  cph2    0.25   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom he1p  hr1     0.13   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom ne2p  nr1    -0.36   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+atom he2p  h       0.32   cb hb1 hb2 nd1 cg ce1 he1 ne2 he2 cd2 hd2  cbm hb1m hb2m nd1m cgm ce1m he1m ne2m cd2m hd2m
+
+bond ca cbp
+bond cbp hb1p
+bond cbp hb2p
+bond cbp cgp
+bond nd1p cgp
+bond nd1p ce1p
+bond cgp cd2p
+bond ce1p he1p
+bond ce1p ne2p
+bond ne2p he2p
+bond ne2p cd2p
+bond cd2p hd2p
+
+impr ne2p cd2p ce1p he2p
+impr cd2p cgp  ne2p hd2p
+impr ce1p nd1p ne2p he1p
+impr ne2p ce1p cd2p he2p
+impr cd2p ne2p cgp  hd2p
+impr ce1p ne2p nd1p he1p
+
+end
+
+
+read param card flex append
+
+dihedrals
+nh2 cc ct1 ct2 0 1 0
+
+improper
+oh1 x x cd 96 0 0
+
+end
+
+echo "**************************************************INFORMATIONAL**************************************************"
+echo " Read patches for setting up charge variations for ionizable protein side chains."
+echo " These include: aspp1 (H on OD1), aspp2 (H on OD2), atoms cb, cg, hb1, hb2, od1 (hd1),"
+echo "                od2 (hd2). side chain atoms have appended M for aspp1 and P for aspp2."
+echo "                To include both tautomers patch order must be aspp1 and then aspp2. Patches don't"
+echo "                include angles or dihedrals, so use AUTO ANGL DIHE and remove extraneous angle and"
+echo "                dihedral terms using"
+echo ""
+echo "DELETE ANGLE SELE ( type cb .or. type cg .or. type hb1 .or. type hb2 .or. type od1 .or. type od2 ) END SELE ( type *m ) END"
+echo "DELETE DIHE SELE ( type cb .or. type cg .or. type hb1 .or. type hb2 .or. type od1 .or. type od2 ) END SELE ( type *m ) END"
+echo "DELETE ANGLE SELE ( type cb .or. type cg .or. type hb1 .or. type hb2 .or. type od1 .or. type od2 ) END SELE ( type *p ) END"
+echo "DELETE DIHE SELE ( type cb .or. type cg .or. type hb1 .or. type hb2 .or. type od1 .or. type od2 ) END SELE ( type *p ) END"
+echo ""
+echo "                glup1 (H on OE1), glup2 (H on OE2), atoms cg, hg1, hg2, cd, oe1 (he1),"
+echo "                oe2 (he2). side chain atoms have appended M for glup1 and P for glup2."
+echo "                To include both tautomers patch order must be glup1 and then glup2. Patches don't"
+echo "                include angles or dihedrals, so use AUTO ANGL DIHE and remove extraneous angle and"
+echo "                dihedral terms using"
+echo ""
+echo "DELETE ANGLE SELE ( type cg .or. type cd .or. type hg1 .or. type hg2 .or. type or1 .or. type oe2 ) END SELE ( type *m ) END"
+echo "DELETE DIHE SELE ( type cg .or. type cd .or. type hg1 .or. type hg2 .or. type oe1 .or. type oe2 ) END SELE ( type *m ) END"
+echo "DELETE ANGLE SELE ( type cg .or. type cd .or. type hg1 .or. type hg2 .or. type oe1 .or. type oe2 ) END SELE ( type *p ) END"
+echo "DELETE DIHE SELE ( type cg .or. type cd .or. type hg1 .or. type hg2 .or. type oe1 .or. type oe2 ) END SELE ( type *p ) END"
+echo ""
+echo "                lysn (neutral lysine, hz3 removed), atoms ce he1 he2 nz hz1 hz2. To generate this state"
+echo "                apply patch w/ AUTO ANGL DIHE and remove extraneous terms with"
+echo ""
+echo "DELETE ANGLE SELE ( type ce .or. type he1 .or. type he2 .or. type nz .or. type hz1 .or. type hz2 .or. type hz2 ) END SELE ( type *m ) END" 
+echo "DELETE DIHE SELE ( type ce .or. type he1 .or. type he2 .or. type nz .or. type hz1 .or. type hz2 .or. type hz2 ) END SELE ( type *m ) END" 
+echo ""
+echo "                tyru (negative tyrozine, hh removed), atoms ce1 he1 ce2 he2 cz oh hh. To generate this state"
+echo "                apply patch w/ AUTO ANGL DIHE and remove extraneous terms with"
+echo ""
+echo "DELETE ANGLE SELE (type ce1 .or. type he1 .or. type ce2 .or. type he2 .or. type cz .or. type oh .or. type hh) END SELE ( type *m ) END"
+echo "DELETE DIHE SELE (type ce1 .or. type he1 .or. type ce2 .or. type he2 .or. type cz .or. type oh .or. type hh) END SELE ( type *m ) END"
+echo ""
+echo "                hsdn (neutral histidine, proton on nd1), hsen (neutral histidine, proton on ne1),"
+echo "                atoms cb hb1 hb2 nd1 hd1 cg ce1 he1 ne2 he2 cd2 hd2. To generate, first patch histidine to"
+echo "                represent charged (+1) hsp, then apply patches hsdb followed by hsen using"
+echo "                AUTO ANGL DIHE. Remove extraneous terms with:"
+echo ""
+echo DELETE ANGL SELE (type cb .or. type hb1 .or. type hb2 .or. type nd1 .or. type hd1 .or. type cg .or. type ce1 .or. type he1 .or. type ne2 .or. type he2 .or. type cd2 .or. type hd2) END SELE ( type *m ) END"
+echo DELETE DIHE SELE (type cb .or. type hb1 .or. type hb2 .or. type nd1 .or. type hd1 .or. type cg .or. type ce1 .or. type he1 .or. type ne2 .or. type he2 .or. type cd2 .or. type hd2) END SELE ( type *m ) END"
+echo DELETE ANGL SELE (type cb .or. type hb1 .or. type hb2 .or. type nd1 .or. type hd1 .or. type cg .or. type ce1 .or. type he1 .or. type ne2 .or. type he2 .or. type cd2 .or. type hd2) END SELE ( type *p ) END"
+echo DELETE DIHE SELE (type cb .or. type hb1 .or. type hb2 .or. type nd1 .or. type hd1 .or. type cg .or. type ce1 .or. type he1 .or. type ne2 .or. type he2 .or. type cd2 .or. type hd2) END SELE ( type *p ) END"
+echo ""
+echo "*****************************************************************************************************************"
+
+return
+
