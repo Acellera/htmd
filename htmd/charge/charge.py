@@ -325,5 +325,10 @@ if __name__ == '__main__':
     import sys
     import doctest
 
+    # Prevent HTMD importing inside doctest to fail if importing gives text output
+    from htmd.home import home
+
+    home()
+
     if doctest.testmod().failed:
         sys.exit(1)
