@@ -17,7 +17,7 @@ from htmd.home import home
 from moleculekit.molecule import Molecule
 from moleculekit.util import _missingChain, _missingSegID
 from htmd.builder.builder import detectDisulfideBonds, convertDisulfide
-from htmd.builder.builder import _checkMixedSegment, UnknownResidueError, BuildError
+from htmd.builder.builder import _checkMixedSegment, _checkLongResnames, UnknownResidueError, BuildError
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from moleculekit.vmdviewer import getVMDpath
 from glob import glob
@@ -91,7 +91,7 @@ def defaultStream():
 
 
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, psfgen=None, execute=True, _clean=True):
+          saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, aliasresidues=None, psfgen=None, execute=True, _clean=True):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -137,6 +137,8 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     noregen : list of str
         A list of patches that must not be regenerated (angles and dihedrals)
         Default: ['FHEM', 'PHEM', 'PLOH', 'PLO2', 'PLIG', 'PSUL']
+    aliasresidues : dict of aliases
+        A dictionary of key: value pairs of residue names we want to alias
     psfgen : str
         Path to psfgen executable used to build for CHARMM
     execute : bool
@@ -165,6 +167,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     mol = mol.copy()
     _missingSegID(mol)
     _checkMixedSegment(mol)
+    _checkLongResnames(mol, aliasresidues)
     if psfgen is None:
         psfgen = shutil.which('psfgen', mode=os.X_OK)
         if not psfgen:
@@ -226,6 +229,10 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     f.write('\n')
 
     _printAliases(f)
+    if aliasresidues is not None:  # User defined aliases
+        for key, val in aliasresidues.items():
+            mol.resname[mol.resname == key] = val
+            f.write('        pdbalias residue {} {}\n'.format(val, key))
 
     # Printing out segments
     if not path.exists(path.join(outdir, 'segments')):
@@ -322,8 +329,8 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         logger.info('Finished building.')
 
         if path.isfile(path.join(outdir, 'structure.pdb')) and path.isfile(path.join(outdir, 'structure.psf')):
-            molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
-            molbuilt.read(path.join(outdir, 'structure.psf'))
+            molbuilt = Molecule(path.join(outdir, 'structure.pdb'), validateElements=False)
+            molbuilt.read(path.join(outdir, 'structure.psf'), validateElements=False)
         else:
             raise BuildError('No structure pdb/psf file was generated. Check {} for errors in building.'.format(logpath))
 
@@ -340,7 +347,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             # Redo the whole build but now with ions included
             return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False,
                          caps=caps, execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches,
-                         noregen=noregen, psfgen=psfgen, _clean=False)
+                         noregen=noregen, aliasresidues=aliasresidues, psfgen=psfgen, _clean=False)
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
     return molbuilt
