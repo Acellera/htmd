@@ -111,7 +111,7 @@ class DisulfideBridge(object):
 def embed(mol1, mol2, gap=1.3):
     '''Embeds one molecule into another removing overlaps.
 
-    Will remove residues of mol1 which have collisions with atoms of mol2.
+    Will remove residues of mol2 which have collisions with atoms of mol1.
 
     Parameters
     ----------
@@ -241,6 +241,12 @@ def _checkMixedSegment(mol):
     if len(intersection) != 0:
         logger.warning('Segments {} contain both protein and non-protein atoms. '
                        'Please assign separate segments to them or the build procedure might fail.'.format(intersection))
+
+
+def _checkLongResnames(mol, aliasresidues):
+    for resname in np.unique(mol.resname):
+        if len(resname) > 4 and resname not in aliasresidues:
+            raise RuntimeError('Too long residue names in Molecule. Please give a 4-letter alias to these residues with the aliasresidues option.')
 
 
 def removeLipidsInProtein(prot, memb, lipidsel='lipids'):
