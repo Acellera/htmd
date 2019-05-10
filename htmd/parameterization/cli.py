@@ -100,6 +100,7 @@ def _printArguments(args, filename=None):
 def _prepare_molecule(args):
 
     from moleculekit.molecule import Molecule
+    from htmd.parameterization.fixes import fixPhosphateTypes
     from htmd.parameterization.util import makeAtomNamesUnique, guessElements, detectChiralCenters
 
     logger.info('=== Molecule ===')
@@ -166,6 +167,9 @@ def _prepare_molecule(args):
     # Set segment ID
     mol.segid[:] = 'L' # Note: it is need to write complete PDB files
     logger.info('Segment ID: {}'.format(mol.segid[0]))
+
+    # Fix atom and bond types
+    mol = fixPhosphateTypes(mol)
 
     # Detect chiral centers
     chiral_centers = detectChiralCenters(mol)
@@ -387,6 +391,11 @@ def _fit_initial_charges(mol, args, atom_types):
             for name, charge in zip(mol.name, mol.charge):
                 logger.info('   {:4s}: {:6.3f}'.format(name, charge))
             logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
+
+            charge = int(round(np.sum(mol.charge)))
+            if args.charge != charge:
+                raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
+                    args.charge, charge))
 
         elif args.min_type in ('None', 'qm'):
             logger.info('Initial atomic charges are not required')
