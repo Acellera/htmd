@@ -11,7 +11,6 @@ import numpy as np
 
 from htmd.version import version
 from htmd.parameterization.fftype import fftypemethods
-from htmd.parameterization.progress import Progress
 
 logger = logging.getLogger(__name__)
 
@@ -557,13 +556,12 @@ def _output_results(mol, parameters, original_coords, args):
     _printEnergies(mol, parameters, energyFile)
 
 
-def main_parameterize(arguments=None, job=None):
+def main_parameterize(arguments=None, progress=None):
 
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
 
-    progress = Progress(job, num_stages=12)
-    progress('Initialize')
+    progress = progress if progress else lambda x: None
 
     logger.info('===== Parameterize =====')
 
@@ -600,7 +598,6 @@ def main_parameterize(arguments=None, job=None):
     selected_dihedrals = _select_dihedrals(mol, args)
 
     # Get a queue
-    progress('Prepare a calculator')
     queue = _get_queue(args)
 
     # Get QM calculators
@@ -771,4 +768,4 @@ def main_parameterize(arguments=None, job=None):
 if __name__ == '__main__':
 
     arguments = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
-    main_parameterize(arguments=arguments)
+    main_parameterize(arguments)
