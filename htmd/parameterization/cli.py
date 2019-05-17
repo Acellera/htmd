@@ -556,10 +556,12 @@ def _output_results(mol, parameters, original_coords, args):
     _printEnergies(mol, parameters, energyFile)
 
 
-def main_parameterize(arguments=None):
+def main_parameterize(arguments=None, progress=None):
 
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
+
+    progress = progress if callable(progress) else lambda x: None
 
     logger.info('===== Parameterize =====')
 
@@ -585,12 +587,14 @@ def main_parameterize(arguments=None):
         raise DeprecationWarning('Use `--scan-type` instead.')
 
     # Get a molecule and check its validity
+    progress('Prepare the molecule')
     mol = _prepare_molecule(args)
 
     # Preserve the initial molecule
     initial_mol = mol.copy()
 
     # Select dihedral angles to parameterize
+    progress('Detect dihedral angles')
     selected_dihedrals = _select_dihedrals(mol, args)
 
     # Get a queue
@@ -622,14 +626,17 @@ def main_parameterize(arguments=None):
     logger.info('Reference method: {}'.format(ref_name))
 
     # Assign atom types and initial force field parameters
+    progress('Assign atom types and initial parameters')
     mol, parameters = _get_initial_parameters(mol, args)
 
     # Assign initial atomic charges, if needed
+    progress('Assign initial atomic charges')
     mol = _fit_initial_charges(mol, args, initial_mol.atomtype)
 
     # Geometry minimization
     # TODO refactor
     if args.min_type != 'None':
+        progress('Optimize geometry')
         logger.info(' === Geometry minimization ===')
 
         if args.min_type == 'mm':
@@ -663,6 +670,7 @@ def main_parameterize(arguments=None):
                                '{} --> {}'.format(initial_chiral_centers, chiral_centers))
 
     # Fit charges
+    progress('Assign atomic charges')
     mol = _fit_charges(mol, args, qm_calculator, initial_mol.atomtype)
 
     # Scan dihedrals and fit parameters
@@ -671,6 +679,7 @@ def main_parameterize(arguments=None):
 
         from htmd.parameterization.dihedral import DihedralFitting  # Slow import
 
+        progress('Scan dihedral angles')
         logger.info('=== Dihedral angle scanning ===')
 
         if args.dihed_opt_type == 'None':
@@ -711,6 +720,7 @@ def main_parameterize(arguments=None):
         logger.info('=== Dihedral parameter fitting ===')
 
         # Invent new atom types for dihedral atoms
+        progress('Create new atom types')
         old_types = mol.atomtype
         mol, initial_types = inventAtomTypes(mol, selected_dihedrals)
         parameters = recreateParameters(mol, initial_types, parameters)
@@ -725,6 +735,7 @@ def main_parameterize(arguments=None):
             np.random.seed(args.seed)
 
         # Fit the dihedral parameters
+        progress('Fit dihedral angle parameters')
         df = DihedralFitting()
         df.parameters = parameters
         df.molecule = mol
@@ -750,10 +761,11 @@ def main_parameterize(arguments=None):
             df.plotDihedralEnergies(idihed, plot_dir, ref_name=ref_name)
 
     # Output the parameters and other results
+    progress('Output results')
     _output_results(mol, parameters, initial_mol.coords, args)
 
 
 if __name__ == '__main__':
 
     arguments = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
-    main_parameterize(arguments=arguments)
+    main_parameterize(arguments)
