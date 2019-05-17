@@ -13,27 +13,26 @@ from tempfile import TemporaryDirectory, TemporaryFile
 logger = logging.getLogger(__name__)
 
 
-def guessElements(mol, fftypemethod):
+def guessElements(mol, method):
     """
     Guess element from an atom name
     """
-
-    from htmd.parameterization.fftype import fftypemethods
-
-    if fftypemethod not in fftypemethods:
-        raise ValueError('Invalid "fftypemethod": {}. Valid methods: {}'
-                         ''.format(fftypemethod, ','.join(fftypemethods)))
 
     elements = {}
     elements['CGenFF_2b6'] = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
     elements['GAFF']       = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
     elements['GAFF2']      = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
+    elements['ANI-1x']     = ['H', 'C', 'N', 'O']
+
+    if method not in elements.keys():
+        raise ValueError('Invalid "method": {}. Valid methods: {}'
+                         ''.format(method, ','.join(elements.keys())))
 
     mol = mol.copy()
 
     for i, name in enumerate(mol.name):
 
-        candidates = [element for element in elements[fftypemethod] if name.capitalize().startswith(element)]
+        candidates = [element for element in elements[method] if name.capitalize().startswith(element)]
 
         if len(candidates) == 1:
             mol.element[i] = candidates[0]
@@ -59,7 +58,7 @@ def guessElements(mol, fftypemethod):
 
         raise ValueError('Cannot guess element from atom name: {}. '
                          'It does not match any of the expected elements ({}) for {}.'
-                         ''.format(name, elements[fftypemethod], fftypemethod))
+                         ''.format(name, ', '.join(elements[method]), method))
 
     return mol
 
