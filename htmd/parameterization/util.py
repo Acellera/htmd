@@ -13,27 +13,26 @@ from tempfile import TemporaryDirectory, TemporaryFile
 logger = logging.getLogger(__name__)
 
 
-def guessElements(mol, fftypemethod):
+def guessElements(mol, method):
     """
     Guess element from an atom name
     """
-
-    from htmd.parameterization.fftype import fftypemethods
-
-    if fftypemethod not in fftypemethods:
-        raise ValueError('Invalid "fftypemethod": {}. Valid methods: {}'
-                         ''.format(fftypemethod, ','.join(fftypemethods)))
 
     elements = {}
     elements['CGenFF_2b6'] = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
     elements['GAFF']       = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
     elements['GAFF2']      = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
+    elements['ANI-1x']     = ['H', 'C', 'N', 'O']
+
+    if method not in elements.keys():
+        raise ValueError('Invalid "method": {}. Valid methods: {}'
+                         ''.format(method, ','.join(elements.keys())))
 
     mol = mol.copy()
 
     for i, name in enumerate(mol.name):
 
-        candidates = [element for element in elements[fftypemethod] if name.capitalize().startswith(element)]
+        candidates = [element for element in elements[method] if name.capitalize().startswith(element)]
 
         if len(candidates) == 1:
             mol.element[i] = candidates[0]
@@ -59,7 +58,7 @@ def guessElements(mol, fftypemethod):
 
         raise ValueError('Cannot guess element from atom name: {}. '
                          'It does not match any of the expected elements ({}) for {}.'
-                         ''.format(name, elements[fftypemethod], fftypemethod))
+                         ''.format(name, ', '.join(elements[method]), method))
 
     return mol
 
@@ -364,7 +363,7 @@ def makeAtomNamesUnique(mol):
     return mol
 
 
-def detectChiralCenters(mol):
+def detectChiralCenters(mol, atom_types=None):
     """
     Detect chiral centers
 
@@ -392,6 +391,11 @@ def detectChiralCenters(mol):
     >>> mol = Molecule(molFile)
     >>> detectChiralCenters(mol)
     [(0, 'R'), (2, 'S'), (4, 'R')]
+
+    >>> molFile = os.path.join(home('test-param'), 'fluorchlorcyclopronol.mol2')
+    >>> mol = Molecule(molFile)
+    >>> detectChiralCenters(mol, atom_types=mol.atomtype)
+    [(0, 'R'), (2, 'S'), (4, 'R')]
     """
 
     from moleculekit.molecule import Molecule
@@ -402,9 +406,10 @@ def detectChiralCenters(mol):
     if mol.numFrames != 1:
         raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
 
-    # Set atom types to elements, overwise rdkit refuse to read a MOL2 file
+    # Set atom types, overwise rdkit refuse to read some MOL2 files
     htmd_mol = mol.copy()
-    htmd_mol.atomtype = htmd_mol.element
+    if atom_types is not None:
+        htmd_mol.atomtype = atom_types
 
     # Convert Molecule to rdkit Mol
     with TemporaryDirectory() as tmpDir:

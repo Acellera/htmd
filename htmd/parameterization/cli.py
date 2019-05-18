@@ -100,6 +100,7 @@ def _printArguments(args, filename=None):
 def _prepare_molecule(args):
 
     from moleculekit.molecule import Molecule
+    from htmd.parameterization.fixes import fixPhosphateTypes
     from htmd.parameterization.util import makeAtomNamesUnique, guessElements, detectChiralCenters
 
     logger.info('=== Molecule ===')
@@ -166,6 +167,9 @@ def _prepare_molecule(args):
     # Set segment ID
     mol.segid[:] = 'L' # Note: it is need to write complete PDB files
     logger.info('Segment ID: {}'.format(mol.segid[0]))
+
+    # Fix atom and bond types
+    mol = fixPhosphateTypes(mol)
 
     # Detect chiral centers
     chiral_centers = detectChiralCenters(mol)
@@ -361,7 +365,7 @@ def _get_initial_parameters(mol, args):
     return mol, parameters
 
 
-def _fit_initial_charges(mol, args):
+def _fit_initial_charges(mol, args, atom_types):
 
     from htmd.charge import fitGasteigerCharges
     from htmd.parameterization.util import guessBondType
@@ -380,13 +384,18 @@ def _fit_initial_charges(mol, args):
                 logger.info('Guessing bond types')
                 mol = guessBondType(mol)
 
-            mol = fitGasteigerCharges(mol)
+            mol = fitGasteigerCharges(mol, atom_types=atom_types)
 
             # Print the initial charges
             logger.info('Initial atomic charges:')
             for name, charge in zip(mol.name, mol.charge):
                 logger.info('   {:4s}: {:6.3f}'.format(name, charge))
             logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
+
+            charge = int(round(np.sum(mol.charge)))
+            if args.charge != charge:
+                raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
+                    args.charge, charge))
 
         elif args.min_type in ('None', 'qm'):
             logger.info('Initial atomic charges are not required')
@@ -400,7 +409,7 @@ def _fit_initial_charges(mol, args):
     return mol
 
 
-def _fit_charges(mol, args, qm):
+def _fit_charges(mol, args, qm, atom_types):
 
     from htmd.charge import fitGasteigerCharges, fitChargesWithAntechamber, fitESPCharges, symmetrizeCharges
     from htmd.parameterization.util import guessBondType, getFixedChargeAtomIndices, getDipole, _qm_method_name
@@ -428,7 +437,7 @@ def _fit_charges(mol, args, qm):
             logger.info('Guessing bond types')
             mol = guessBondType(mol)
 
-        mol = fitGasteigerCharges(mol)
+        mol = fitGasteigerCharges(mol, atom_types=atom_types)
 
         charge = int(round(np.sum(mol.charge)))
         if args.charge != charge:
@@ -547,10 +556,12 @@ def _output_results(mol, parameters, original_coords, args):
     _printEnergies(mol, parameters, energyFile)
 
 
-def main_parameterize(arguments=None):
+def main_parameterize(arguments=None, progress=None):
 
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
+
+    progress = progress if callable(progress) else lambda x: None
 
     logger.info('===== Parameterize =====')
 
@@ -576,12 +587,14 @@ def main_parameterize(arguments=None):
         raise DeprecationWarning('Use `--scan-type` instead.')
 
     # Get a molecule and check its validity
+    progress('Prepare the molecule')
     mol = _prepare_molecule(args)
 
-    # Copy the molecule to preserve initial coordinates
-    initial_coords = mol.coords.copy()
+    # Preserve the initial molecule
+    initial_mol = mol.copy()
 
     # Select dihedral angles to parameterize
+    progress('Detect dihedral angles')
     selected_dihedrals = _select_dihedrals(mol, args)
 
     # Get a queue
@@ -613,14 +626,17 @@ def main_parameterize(arguments=None):
     logger.info('Reference method: {}'.format(ref_name))
 
     # Assign atom types and initial force field parameters
+    progress('Assign atom types and initial parameters')
     mol, parameters = _get_initial_parameters(mol, args)
 
     # Assign initial atomic charges, if needed
-    mol = _fit_initial_charges(mol, args)
+    progress('Assign initial atomic charges')
+    mol = _fit_initial_charges(mol, args, initial_mol.atomtype)
 
     # Geometry minimization
     # TODO refactor
     if args.min_type != 'None':
+        progress('Optimize geometry')
         logger.info(' === Geometry minimization ===')
 
         if args.min_type == 'mm':
@@ -636,7 +652,7 @@ def main_parameterize(arguments=None):
             ref_calculator._parameters = parameters
 
         # Detect chiral centers
-        initial_chiral_centers = detectChiralCenters(mol)
+        initial_chiral_centers = detectChiralCenters(mol, atom_types=initial_mol.atomtype)
 
         mm_minimizer = None
         if args.min_type == 'mm':
@@ -648,13 +664,14 @@ def main_parameterize(arguments=None):
 
         # TODO print minimization status
         # Check if the chiral center hasn't changed during the minimization
-        chiral_centers = detectChiralCenters(mol)
+        chiral_centers = detectChiralCenters(mol, atom_types=initial_mol.atomtype)
         if initial_chiral_centers != chiral_centers:
             raise RuntimeError('Chiral centers have changed during the minimization: '
                                '{} --> {}'.format(initial_chiral_centers, chiral_centers))
 
     # Fit charges
-    mol = _fit_charges(mol, args, qm_calculator)
+    progress('Assign atomic charges')
+    mol = _fit_charges(mol, args, qm_calculator, initial_mol.atomtype)
 
     # Scan dihedrals and fit parameters
     # TODO refactor
@@ -662,6 +679,7 @@ def main_parameterize(arguments=None):
 
         from htmd.parameterization.dihedral import DihedralFitting  # Slow import
 
+        progress('Scan dihedral angles')
         logger.info('=== Dihedral angle scanning ===')
 
         if args.dihed_opt_type == 'None':
@@ -689,7 +707,7 @@ def main_parameterize(arguments=None):
                                      scan_type=args.dihed_opt_type, mm_minimizer=mm_minimizer)
 
         # Filter scan results
-        scan_results = filterQMResults(scan_results, mol=mol)
+        scan_results = filterQMResults(scan_results, mol=initial_mol)
         logger.info('Valid rotamers:')
         for idihed, (dihedral, results) in enumerate(zip(selected_dihedrals, scan_results)):
             dihed_name = '-'.join(mol.name[list(dihedral)])
@@ -702,6 +720,7 @@ def main_parameterize(arguments=None):
         logger.info('=== Dihedral parameter fitting ===')
 
         # Invent new atom types for dihedral atoms
+        progress('Create new atom types')
         old_types = mol.atomtype
         mol, initial_types = inventAtomTypes(mol, selected_dihedrals)
         parameters = recreateParameters(mol, initial_types, parameters)
@@ -716,6 +735,7 @@ def main_parameterize(arguments=None):
             np.random.seed(args.seed)
 
         # Fit the dihedral parameters
+        progress('Fit dihedral angle parameters')
         df = DihedralFitting()
         df.parameters = parameters
         df.molecule = mol
@@ -741,10 +761,11 @@ def main_parameterize(arguments=None):
             df.plotDihedralEnergies(idihed, plot_dir, ref_name=ref_name)
 
     # Output the parameters and other results
-    _output_results(mol, parameters, initial_coords, args)
+    progress('Output results')
+    _output_results(mol, parameters, initial_mol.coords, args)
 
 
 if __name__ == '__main__':
 
     arguments = sys.argv[1:] if len(sys.argv) > 1 else ['-h']
-    main_parameterize(arguments=arguments)
+    main_parameterize(arguments)
