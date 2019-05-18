@@ -263,7 +263,7 @@ proc calcforces_endstep { } { }
         # If fb_box is not symmetrical
         if not np.all(fb_box[::2] == -fb_box[1::2]):
             # convert fb_box and fb_reference to fbcentre and width
-            mol = Molecule(os.path.join(inputdir, self.acemd.structure), validateElements=False)
+            mol = Molecule(os.path.join(inputdir, self.acemd.structure))
             mol.read(os.path.join(inputdir, self.acemd.coordinates))
             fb_refcentre = mol.get('coords', sel=self.fb_reference).mean(axis=0).squeeze()
 
