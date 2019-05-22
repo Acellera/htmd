@@ -263,7 +263,7 @@ proc calcforces_endstep { } { }
         # If fb_box is not symmetrical
         if not np.all(fb_box[::2] == -fb_box[1::2]):
             # convert fb_box and fb_reference to fbcentre and width
-            mol = Molecule(os.path.join(inputdir, self.acemd.structure), validateElements=False)
+            mol = Molecule(os.path.join(inputdir, self.acemd.structure))
             mol.read(os.path.join(inputdir, self.acemd.coordinates))
             fb_refcentre = mol.get('coords', sel=self.fb_reference).mean(axis=0).squeeze()
 
@@ -312,7 +312,7 @@ proc calcforces_endstep { } { }
             self.acemd.run = str(numsteps)
 
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
-        inmol = Molecule(pdbfile, validateElements=False)
+        inmol = Molecule(pdbfile)
 
         if np.any(inmol.atomselect('lipids')) and not self.useconstantratio:
             logger.warning('Lipids detected in input structure. We highly recommend setting useconstantratio=True '
@@ -371,7 +371,7 @@ proc calcforces_endstep { } { }
         if self._version == 2:
             # Adding constraints by writing them to the consref file
             inconsreffile = os.path.join(inputdir, self.acemd.consref)
-            consrefmol = Molecule(inconsreffile, validateElements=False)
+            consrefmol = Molecule(inconsreffile)
             consrefmol.set('occupancy', 0)
             consrefmol.set('beta', 0)
             if len(self.constraints) == 0:
