@@ -330,8 +330,8 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         logger.info('Finished building.')
 
         if path.isfile(path.join(outdir, 'structure.pdb')) and path.isfile(path.join(outdir, 'structure.psf')):
-            molbuilt = Molecule(path.join(outdir, 'structure.pdb'), validateElements=False)
-            molbuilt.read(path.join(outdir, 'structure.psf'), validateElements=False)
+            molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
+            molbuilt.read(path.join(outdir, 'structure.psf'))
         else:
             raise BuildError('No structure pdb/psf file was generated. Check {} for errors in building.'.format(logpath))
 
