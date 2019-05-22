@@ -103,6 +103,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                   self._defaults['envvars'], val.String())
         self._arg('prerun', 'list', 'Shell commands to execute on the running node before the job (e.g. '
                                     'loading modules)', self._defaults['prerun'], val.String(), nargs='*')
+        self._arg('account', 'str', 'Charge resources used by the jobs to specified account.', None, val.String())
 
         # Load Slurm configuration profile
         slurmconfig = _config['slurm']
@@ -176,6 +177,8 @@ class SlurmQueue(SimQueue, ProtocolInterface):
                 f.write('#SBATCH --nodelist={}\n'.format(','.join(ensurelist(self.nodelist))))
             if self.exclude is not None:
                 f.write('#SBATCH --exclude={}\n'.format(','.join(ensurelist(self.exclude))))
+            if self.account is not None:
+                f.write('#SBATCH --account={}\n'.format(self.account))
             # Trap kill signals to create sentinel file
             f.write('\ntrap "touch {}" EXIT SIGTERM\n'.format(os.path.normpath(os.path.join(workdir, self._sentinel))))
             f.write('\n')
