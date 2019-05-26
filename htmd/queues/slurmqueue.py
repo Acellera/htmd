@@ -85,7 +85,7 @@ class SlurmQueue(SimQueue, ProtocolInterface):
         self._arg('memory', 'int', 'Amount of memory per job (MiB)', self._defaults['memory'], val.Number(int, 'POS'))
         self._arg('gpumemory', 'int', 'Only run on GPUs with at least this much memory. Needs special setup of SLURM. '
                                       'Check how to define gpu_mem on SLURM.', None, val.Number(int, '0POS'))
-        self._arg('walltime', 'int', 'Job timeout (s)', self._defaults['walltime'], val.Number(int, 'POS'))
+        self._arg('walltime', 'int', 'Job timeout (minutes)', self._defaults['walltime'], val.Number(int, 'POS'))
         self._cmdDeprecated('environment', 'envvars')
         self._arg('mailtype', 'str', 'When to send emails. Separate options with commas like \'END,FAIL\'.', None,
                   val.String())
