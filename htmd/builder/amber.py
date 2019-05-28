@@ -25,20 +25,44 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _findTleap():
-    tleap = shutil.which("tleap", mode=os.X_OK)
-    if not tleap:
-        raise FileNotFoundError('tleap not found. You should either have AmberTools or ambermini installed '
+def _findTeLeap():
+    teleap = shutil.which("teLeap", mode=os.X_OK)
+    if not teleap:
+        raise FileNotFoundError('teLeap not found. You should either have AmberTools or ambermini installed '
                                 '(to install ambermini do: conda install ambermini -c acellera)')
-    if os.path.islink(tleap):
-        if os.path.isabs(os.readlink(tleap)):
-            tleap = os.readlink(tleap)
+    if os.path.islink(teleap):
+        if os.path.isabs(os.readlink(teleap)):
+            teleap = os.readlink(teleap)
         else:
-            tleap = os.path.join(os.path.dirname(tleap), os.readlink(tleap))
-    return tleap
+            teleap = os.path.join(os.path.dirname(teleap), os.readlink(teleap))
+    return teleap
+
+
+def defaultAmberHome(teleap=None):
+    """ Returns the default AMBERHOME as defined by the location of teLeap binary
+
+    Parameters:
+    -----------
+    teleap : str
+        Path to teLeap executable used to build the system for AMBER
+    """
+    if teleap is None:
+        teleap = _findTeLeap()
+    else:
+        if shutil.which(teleap) is None:
+            raise NameError('Could not find executable: `{}` in the PATH.'.format(teleap))
+
+    return os.path.normpath(os.path.join(os.path.dirname(teleap), '../'))
+
+
+def htmdAmberHome():
+    """ Returns the location of the AMBER files distributed with HTMD"""
+
+    return os.path.abspath(os.path.join(home(), 'builder', 'amberfiles'))
+
 
 def listFiles():
-    """ Lists all available AMBER forcefield files
+    """ Lists all AMBER forcefield files available in HTMD
 
     Example
     -------
@@ -51,10 +75,8 @@ def listFiles():
     leaprc.ff14SB.redq
     ...
     """
-    from os.path import join
-    tleap = _findTleap()
 
-    amberhome = os.path.normpath(os.path.join(os.path.dirname(tleap), '../'))
+    amberhome = defaultAmberHome()
 
     # Original AMBER FFs
     ffdir = join(amberhome, 'dat', 'leap', 'cmd')
@@ -86,8 +108,9 @@ def listFiles():
     for f in sorted(ffs, key=str.lower):
         print(f.replace(join(frcmoddir, ''), ''))
 
+    htmdamberdir = htmdAmberHome()
+
     # Extra AMBER FFs on HTMD
-    htmdamberdir = os.path.abspath(os.path.join(home(), 'builder', 'amberfiles', ''))
     extraffs = glob(join(htmdamberdir, '*', 'leaprc.*'))
     print('---- Extra forcefield files list: ' + join(htmdamberdir, '') + ' ----')
     for f in sorted(extraffs, key=str.lower):
@@ -105,9 +128,9 @@ def listFiles():
         print(f.replace(join(htmdamberdir, ''), ''))
 
 
-def _locateFile(fname, type, tleap):
-    amberhome = os.path.normpath(os.path.join(os.path.dirname(tleap), '../'))
-    htmdamberdir = os.path.abspath(os.path.join(home(), 'builder', 'amberfiles', ''))
+def _locateFile(fname, type, teleap):
+    amberhome = defaultAmberHome(teleap=teleap)
+    htmdamberdir = htmdAmberHome()
     if type == 'topo':
         topodir = os.path.join(amberhome, 'dat', 'leap', 'prep')
         foundfile = glob(os.path.join(topodir, fname))
@@ -162,8 +185,8 @@ def defaultParam():
 
 
 def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, tleap=None, execute=True, atomtypes=None,
-          offlibraries=None, gbsa=False, igb=2):
+          saltanion=None, saltcation=None, disulfide=None, teleap=None, teleapimports=None, execute=True,
+          atomtypes=None, offlibraries=None, gbsa=False, igb=2):
     """ Builds a system for AMBER
 
     Uses tleap to build a system for AMBER. Additionally it allows the user to ionize and add disulfide bridges.
@@ -204,8 +227,12 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     disulfide : list of pairs of atomselection strings
         If None it will guess disulfide bonds. Otherwise provide a list pairs of atomselection strings for each pair of
         residues forming the disulfide bridge.
-    tleap : str
-        Path to tleap executable used to build the system for AMBER
+    teleap : str
+        Path to teLeap executable used to build the system for AMBER
+    teleapimports : list
+        A list of paths to pass to teLeap '-I' flag, i.e. directories to be searched
+        Default: determined from :func:`amber.defaultAmberHome <htmd.builder.amber.defaultAmberHome>` and
+        :func:`amber.htmdAmberHome <htmd.builder.amber.htmdAmberHome>`
     execute : bool
         Disable building. Will only write out the input script needed by tleap. Does not include ionization.
     atomtypes : list of triplets
@@ -237,11 +264,11 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     mol = mol.copy()
     _removeProteinBonds(mol)
 
-    if tleap is None:
-        tleap = _findTleap()
+    if teleap is None:
+        teleap = _findTeLeap()
     else:
-        if shutil.which(tleap) is None:
-            raise NameError('Could not find executable: `{}` in the PATH. Cannot build for AMBER.'.format(tleap))
+        if shutil.which(teleap) is None:
+            raise NameError('Could not find executable: `{}` in the PATH. Cannot build for AMBER.'.format(teleap))
 
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
@@ -266,11 +293,9 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     f.write('# tleap file generated by amber.build\n')
 
     # Printing out the forcefields
-    if isinstance(ff, str):
-        ff = [ff]
-    for i, force in enumerate(ff):
+    for i, force in enumerate(ensurelist(ff)):
         if not os.path.isfile(force):
-            force = _locateFile(force, 'ff', tleap)
+            force = _locateFile(force, 'ff', teleap)
             if force is None:
                 continue
         newname = 'ff{}_{}'.format(i, os.path.basename(force))
@@ -295,7 +320,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     # Loading OFF libraries
     if offlibraries is not None:
         offlibraries = ensurelist(offlibraries)
-        for off in offlibraries:
+        for i, off in enumerate(offlibraries):
             if not os.path.isfile(off):
                 raise RuntimeError('Could not find off-library in location {}'.format(off))
             newname = 'offlib{}_{}'.format(i, os.path.basename(off))
@@ -306,7 +331,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     f.write('# Loading parameter files\n')
     for i, p in enumerate(param):
         if not os.path.isfile(p):
-            p = _locateFile(p, 'param', tleap)
+            p = _locateFile(p, 'param', teleap)
             if p is None:
                 continue
         newname = 'param{}_{}'.format(i, os.path.basename(p))
@@ -318,7 +343,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
     f.write('# Loading prepi topologies\n')
     for i, t in enumerate(topo):
         if not os.path.isfile(t):
-            t = _locateFile(t, 'topo', tleap)
+            t = _locateFile(t, 'topo', teleap)
             if t is None:
                 continue
         newname = 'topo{}_{}'.format(i, os.path.basename(t))
@@ -406,26 +431,40 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
 
     molbuilt = None
     if execute:
-        # Source paths of extra dirs (our dirs, not amber default)
-        htmdamberdir = os.path.abspath(os.path.join(home(), 'builder', 'amberfiles'))
-        sourcepaths = [htmdamberdir]
-        sourcepaths += [os.path.join(htmdamberdir, os.path.dirname(f))
-                        for f in ff if os.path.isfile(os.path.join(htmdamberdir, f))]
-        extrasource = []
-        for p in sourcepaths:
-            extrasource.append('-I')
-            extrasource.append('{}'.format(p))
+        if not teleapimports:
+            teleapimports = []
+            # Source default Amber (i.e. the same paths tleap imports)
+            amberhome = defaultAmberHome(teleap=teleap)
+            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'prep'))
+            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'lib'))
+            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'parm'))
+            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'cmd'))
+            if len(teleapimports) == 0:
+                raise RuntimeWarning('No default Amber force-field found. Check teLeap location: {}'.format(teleap))
+            # Source HTMD Amber paths that contain ffs
+            htmdamberdir = htmdAmberHome()
+            teleapimports += [os.path.join(htmdamberdir, os.path.dirname(f))
+                              for f in ff if os.path.isfile(os.path.join(htmdamberdir, f))]
+            if len(teleapimports) == 0:
+                raise RuntimeError('No default Amber force-field imports found. Check '
+                                   '`htmd.builder.amber.defaultAmberHome()` and `htmd.builder.amber.htmdAmberHome()`')
+        # Set import flags for teLeap
+        teleapimportflags = []
+        for p in teleapimports:
+            teleapimportflags.append('-I')
+            teleapimportflags.append('{}'.format(p))
         logpath = os.path.abspath(os.path.join(outdir, 'log.txt'))
         logger.info('Starting the build.')
         currdir = os.getcwd()
         os.chdir(outdir)
         f = open(logpath, 'w')
         try:
-            cmd = [tleap, '-f', './tleap.in']
-            cmd[1:1] = extrasource
+            cmd = [teleap, '-f', './tleap.in']
+            cmd[1:1] = teleapimportflags
+            logger.debug(cmd)
             call(cmd, stdout=f)
         except:
-            raise NameError('tleap failed at execution')
+            raise NameError('teLeap failed at execution')
         f.close()
         errors = _logParser(logpath)
         os.chdir(currdir)
@@ -454,7 +493,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
-                         execute=execute, saltconc=saltconc, disulfide=disulfide, tleap=tleap, atomtypes=atomtypes,
+                         execute=execute, saltconc=saltconc, disulfide=disulfide, teleap=teleap, atomtypes=atomtypes,
                          offlibraries=offlibraries)
     tmpbonds = molbuilt.bonds
     molbuilt.bonds = []  # Removing the bonds to speed up writing
@@ -941,6 +980,28 @@ class TestAmberBuild(unittest.TestCase):
             np.random.seed(1)
             tmpdir = os.path.join(self.testDir, 'withoutProtPrep', pid)
             _ = build(smol, ff=ffs, outdir=tmpdir)
+
+            refdir = home(dataDir=join('test-amber-build', 'nopp', pid))
+            TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
+
+    def test_customTeLeapImports(self):
+        from htmd.builder.solvate import solvate
+        # Test without proteinPrepare
+        pdbids = ['3PTB']
+        # pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+        for pid in pdbids:
+            np.random.seed(1)
+            mol = Molecule(pid)
+            mol.filter('protein')
+            smol = solvate(mol)
+            ffs = defaultFf()
+            tmpdir = os.path.join(self.testDir, 'withoutProtPrep', pid)
+
+            amberhome = defaultAmberHome()
+            teleapimports = []
+            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'lib'))
+            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'parm'))
+            _ = build(smol, ff=ffs, outdir=tmpdir, teleapimports=teleapimports)
 
             refdir = home(dataDir=join('test-amber-build', 'nopp', pid))
             TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
