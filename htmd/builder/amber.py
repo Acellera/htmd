@@ -452,7 +452,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
         teleapimportflags = []
         for p in teleapimports:
             teleapimportflags.append('-I')
-            teleapimportflags.append('{}'.format(p))
+            teleapimportflags.append(str(p))
         logpath = os.path.abspath(os.path.join(outdir, 'log.txt'))
         logger.info('Starting the build.')
         currdir = os.getcwd()
