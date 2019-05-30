@@ -55,6 +55,13 @@ def defaultAmberHome(teleap=None):
     return os.path.normpath(os.path.join(os.path.dirname(teleap), '../'))
 
 
+_defaultAmberSearchPaths = {'ff': join('dat', 'leap', 'cmd'),
+                            'topo': join('dat', 'leap', 'prep'),
+                            'param': join('dat', 'leap', 'parm'),
+                            'lib': join('dat', 'leap', 'lib')
+                            }
+
+
 def htmdAmberHome():
     """ Returns the location of the AMBER files distributed with HTMD"""
 
@@ -79,7 +86,7 @@ def listFiles():
     amberhome = defaultAmberHome()
 
     # Original AMBER FFs
-    ffdir = join(amberhome, 'dat', 'leap', 'cmd')
+    ffdir = join(amberhome, _defaultAmberSearchPaths['ff'])
     ffs = glob(join(ffdir, '*'))
     print('---- Forcefield files list: ' + join(ffdir, '') + ' ----')
     for f in sorted(ffs, key=str.lower):
@@ -87,13 +94,13 @@ def listFiles():
             continue
         print(f.replace(join(ffdir, ''), ''))
 
-    oldffdir = join(amberhome, 'dat', 'leap', 'cmd', 'oldff')
+    oldffdir = join(amberhome, _defaultAmberSearchPaths['ff'], 'oldff')
     ffs = glob(join(oldffdir, '*'))
     print('---- OLD Forcefield files list: ' + join(ffdir, '') + ' ----')
     for f in sorted(ffs, key=str.lower):
         print(f.replace(join(ffdir, ''), ''))
 
-    topodir = os.path.join(amberhome, 'dat', 'leap', 'prep')
+    topodir = os.path.join(amberhome, _defaultAmberSearchPaths['topo'])
     topos = glob(join(topodir, '*'))
     print('---- Topology files list: ' + join(topodir, '') + ' ----')
     for f in sorted(topos, key=str.lower):
@@ -102,7 +109,7 @@ def listFiles():
         print(f.replace(join(topodir, ''), ''))
 
     # FRCMOD files
-    frcmoddir = os.path.join(amberhome, 'dat', 'leap', 'parm')
+    frcmoddir = os.path.join(amberhome, _defaultAmberSearchPaths['param'])
     ffs = glob(join(frcmoddir, 'frcmod.*'))
     print('---- Parameter files list: ' + join(frcmoddir, '') + ' ----')
     for f in sorted(ffs, key=str.lower):
@@ -131,33 +138,14 @@ def listFiles():
 def _locateFile(fname, type, teleap):
     amberhome = defaultAmberHome(teleap=teleap)
     htmdamberdir = htmdAmberHome()
-    if type == 'topo':
-        topodir = os.path.join(amberhome, 'dat', 'leap', 'prep')
-        foundfile = glob(os.path.join(topodir, fname))
-        if len(foundfile) != 0:
-            return foundfile[0]
-        foundfile = glob(os.path.join(htmdamberdir, fname))
-        if len(foundfile) != 0:
-            return foundfile[0]
-        logger.warning('Was not able to find topology file {}'.format(fname))
-    elif type == 'param':
-        parmdir = os.path.join(amberhome, 'dat', 'leap', 'parm')
-        foundfile = glob(os.path.join(parmdir, fname))
-        if len(foundfile) != 0:
-            return foundfile[0]
-        foundfile = glob(os.path.join(htmdamberdir, fname))
-        if len(foundfile) != 0:
-            return foundfile[0]
-        logger.warning('Was not able to find parameter file {}'.format(fname))
-    elif type == 'ff':
-        ffdir = os.path.join(amberhome, 'dat', 'leap', 'cmd')
-        foundfile = glob(os.path.join(ffdir, fname))
-        if len(foundfile) != 0:
-            return foundfile[0]
-        foundfile = glob(os.path.join(htmdamberdir, fname))
-        if len(foundfile) != 0:
-            return foundfile[0]
-        logger.warning('Was not able to find forcefield file {}'.format(fname))
+    searchdir = os.path.join(amberhome, _defaultAmberSearchPaths[type])
+    foundfile = glob(os.path.join(searchdir, fname))
+    if len(foundfile) != 0:
+        return foundfile[0]
+    foundfile = glob(os.path.join(htmdamberdir, fname))
+    if len(foundfile) != 0:
+        return foundfile[0]
+    logger.warning('Was not able to find {} file {}'.format(type, fname))
 
 
 def defaultFf():
@@ -435,10 +423,7 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             teleapimports = []
             # Source default Amber (i.e. the same paths tleap imports)
             amberhome = defaultAmberHome(teleap=teleap)
-            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'prep'))
-            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'lib'))
-            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'parm'))
-            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'cmd'))
+            teleapimports += [os.path.join(amberhome, s) for s in _defaultAmberSearchPaths.values()]
             if len(teleapimports) == 0:
                 raise RuntimeWarning('No default Amber force-field found. Check teLeap location: {}'.format(teleap))
             # Source HTMD Amber paths that contain ffs
@@ -999,8 +984,8 @@ class TestAmberBuild(unittest.TestCase):
 
             amberhome = defaultAmberHome()
             teleapimports = []
-            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'lib'))
-            teleapimports.append(os.path.join(amberhome, 'dat', 'leap', 'parm'))
+            teleapimports.append(os.path.join(amberhome, _defaultAmberSearchPaths['lib']))
+            teleapimports.append(os.path.join(amberhome, _defaultAmberSearchPaths['param']))
             _ = build(smol, ff=ffs, outdir=tmpdir, teleapimports=teleapimports)
 
             refdir = home(dataDir=join('test-amber-build', 'nopp', pid))
