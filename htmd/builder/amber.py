@@ -135,17 +135,17 @@ def listFiles():
         print(f.replace(join(htmdamberdir, ''), ''))
 
 
-def _locateFile(fname, type, teleap):
+def _locateFile(fname, ftype, teleap):
     amberhome = defaultAmberHome(teleap=teleap)
     htmdamberdir = htmdAmberHome()
-    searchdir = os.path.join(amberhome, _defaultAmberSearchPaths[type])
+    searchdir = os.path.join(amberhome, _defaultAmberSearchPaths[ftype])
     foundfile = glob(os.path.join(searchdir, fname))
     if len(foundfile) != 0:
         return foundfile[0]
     foundfile = glob(os.path.join(htmdamberdir, fname))
     if len(foundfile) != 0:
         return foundfile[0]
-    logger.warning('Was not able to find {} file {}'.format(type, fname))
+    logger.warning('Was not able to find {} file {}'.format(ftype, fname))
 
 
 def defaultFf():
