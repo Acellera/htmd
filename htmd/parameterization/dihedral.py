@@ -587,7 +587,7 @@ class DihedralFitting:
         plt.close()
 
 
-class TestDihedralFitting(unittest.TestCase):
+class _TestDihedralFitting(unittest.TestCase):
 
     def setUp(self):
         self.df = DihedralFitting()

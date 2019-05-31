@@ -775,7 +775,7 @@ def _logParser(fname):
     return errors
 
 
-class TestAmberBuild(unittest.TestCase):
+class _TestAmberBuild(unittest.TestCase):
     currentResult = None  # holds last result object passed to run method
 
     def setUp(self):

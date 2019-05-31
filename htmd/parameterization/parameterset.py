@@ -174,7 +174,7 @@ def _getEquivalentDihedrals(mol, equivalents, dihedral):
     return unique_dihedrals
 
 
-class Test(unittest.TestCase):
+class _Test(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home

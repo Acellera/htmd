@@ -660,7 +660,7 @@ class Acemd(_Acemd):
         super().setup(inputdir, outputdir, overwrite)
 
 
-class TestAcemd(TestCase):
+class _TestAcemd(TestCase):
 
     def test_acemd2(self):
         from htmd.home import home
