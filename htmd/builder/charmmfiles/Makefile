@@ -1,4 +1,4 @@
-VERSION = c36_feb16
+VERSION = c36_jul18
 
 .PHONY: clean clean_$(VERSION) mostlyclean mostlyclean_$(VERSION) current all diff diff_$(VERSION) new
 
