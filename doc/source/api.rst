@@ -9,7 +9,7 @@ Contents:
 .. toctree::
     :maxdepth: 2
 
-    Molecule <molecule>
+    Molecule <../moleculekit/moleculekit.molecule.rst>
     Building <building>
     MD Simulations <simulation>
     Simulation List <htmd.simlist>
