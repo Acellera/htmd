@@ -755,6 +755,7 @@ def combine(prmlist, outfile):
                         prm_list[context] += line
                 else:
                     continue
+        fh.close()
 
     prm = ''.join(map(str, prm_list))+"END"
     prmfh = open(outfile, "w")
