@@ -35,5 +35,8 @@ setup(name='htmd',
               'activate_license  = htmdx.cli:main_activate'
           ]
       },
+      package_data={
+        'htmd': ['share/*/*/*/*'],
+      },
       include_package_data=True
       )
