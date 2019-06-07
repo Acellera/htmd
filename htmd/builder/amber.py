@@ -65,7 +65,7 @@ _defaultAmberSearchPaths = {'ff': join('dat', 'leap', 'cmd'),
 def htmdAmberHome():
     """ Returns the location of the AMBER files distributed with HTMD"""
 
-    return os.path.abspath(os.path.join(home(), 'builder', 'amberfiles'))
+    return os.path.abspath(os.path.join(home(shareDir=True), 'builder', 'amberfiles'))
 
 
 def listFiles():
@@ -646,7 +646,7 @@ def _charmmLipid2Amber(mol):
         A new Molecule object with the membrane converted to AMBER
     """
 
-    resdict = _readcsvdict(os.path.join(home(), 'builder', 'charmmlipid2amber.csv'))
+    resdict = _readcsvdict(os.path.join(home(shareDir=True), 'builder', 'charmmlipid2amber.csv'))
 
     natoms = mol.numAtoms
     neworder = np.array(list(range(natoms)))  # After renaming the atoms and residues I have to reorder them

@@ -10,7 +10,7 @@ import inspect
 import platform
 
 
-def home(dataDir=None, libDir=False):
+def home(dataDir=None, libDir=False, shareDir=False):
     """Return the pathname of the HTMD root directory (or a data subdirectory).
 
     Parameters
@@ -44,12 +44,17 @@ def home(dataDir=None, libDir=False):
       pass
 
     if dataDir:
-        return os.path.join(homeDir, "data", dataDir)
+        return os.path.join(homeDir, 'data', dataDir)
     elif libDir:
-        libdir = os.path.join(homeDir, "lib", platform.system())
+        libdir = os.path.join(homeDir, 'lib', platform.system())
         if not os.path.exists(libdir):
             raise FileNotFoundError('Could not find libs.')
         return libdir
+    elif shareDir:
+        sharedir = os.path.join(homeDir, 'share')
+        if not os.path.exists(sharedir):
+            raise FileNotFoundError('Could not find HTMD share directory.')
+        return sharedir
     else:
         return homeDir
 

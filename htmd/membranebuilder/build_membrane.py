@@ -61,7 +61,7 @@ def listLipids():
     import os
     from natsort import natsorted
 
-    membranebuilderhome = os.path.join( home(), 'membranebuilder', 'lipids', '' )
+    membranebuilderhome = os.path.join( home(shareDir=True), 'membranebuilder', 'lipids', '' )
     lipids = natsorted(glob( os.path.join(membranebuilderhome, '*', '')))
     print('---- Lipids list: ' + membranebuilderhome + ' ----')
     for l in lipids:
@@ -228,7 +228,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
     import pandas as pd
 
     if lipidf is None:
-        lipidf = os.path.join(home(), 'membranebuilder', 'lipids')
+        lipidf = os.path.join(home(shareDir=True), 'membranebuilder', 'lipids')
     lipiddb = pd.read_csv(os.path.join(lipidf, 'lipiddb.csv'), index_col='Name')
 
     uqlip = np.unique(list(ratioupper.keys()) + list(ratiolower.keys()))
@@ -273,7 +273,7 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
         from htmd.membranebuilder.simulate_openmm import equilibrateSystem
         from shutil import copy, move
         outpdb = tempname(suffix='.pdb')
-        charmmf = os.path.join(home(), 'membranebuilder', 'charmm-toppar')
+        charmmf = os.path.join(home(shareDir=True), 'membranebuilder', 'charmm-toppar')
         equilibrateSystem(os.path.join(outdir, 'structure.pdb'), os.path.join(outdir, 'structure.psf'), outpdb,
                           charmmfolder=charmmf, equilplatform=equilplatform, minimplatform=minimplatform)
         res = Molecule(outpdb)
