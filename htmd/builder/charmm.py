@@ -82,7 +82,7 @@ def defaultTopo():
 
 def defaultParam():
     """ Returns the default parameters used by charmm.build """
-    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm', 'par/par_all36_cgenff.prm']
+    return ['par/par_all36_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm', 'par/par_all36_cgenff.prm']
 
 
 def defaultStream():
@@ -107,7 +107,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     param : list of str
         A list of parameter `prm` files.
         Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available parameter files.
-        Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+        Default: ['par/par_all36_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
     stream : list of str
         A list of stream `str` files containing topologies and parameters.
         Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available stream files.
@@ -159,7 +159,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
                  B: [serial 298 resid 58 resname CYS chain A segid 0]...
     >>> # More complex example
     >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf', 'top/top_water_ions.rtf']
-    >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm', 'par/par_water_ions.prm']
+    >>> params = ['par/par_all36_prot.prm', './benzamidine.prm', 'par/par_water_ions.prm']
     >>> disu = [['segid P and resid 157', 'segid P and resid 13'], ['segid K and resid 1', 'segid K and resid 25']]
     >>> ar = {'SAPI24': 'SP24'}  # Alias large resnames to a short-hand version
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu, aliasresidues=ar)  # doctest: +SKIP
@@ -755,6 +755,7 @@ def combine(prmlist, outfile):
                         prm_list[context] += line
                 else:
                     continue
+        fh.close()
 
     prm = ''.join(map(str, prm_list))+"END"
     prmfh = open(outfile, "w")
@@ -916,7 +917,7 @@ class TestCharmmBuild(TestCase):
                 np.random.seed(1)  # Needed for ions
                 smol = solvate(mol)
                 topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-                params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+                params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
                 tmpdir = tempname()
                 _ = build(smol, topo=topos, param=params, outdir=tmpdir)
 
@@ -945,7 +946,7 @@ class TestCharmmBuild(TestCase):
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-        params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+        params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
         disu = [['segid 1 and resid 110', 'segid 1 and resid 187'], ['segid 0 and resid 110', 'segid 0 and resid 187']]
         tmpdir = tempname()
         _ = build(smol, topo=topos, param=params, outdir=tmpdir, disulfide=disu)
@@ -985,7 +986,7 @@ class TestCharmmBuild(TestCase):
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-        params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+        params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
 
         smol.insertion[smol.resid == 42] = 'A'  # Adding an insertion to test that disulfide bonds with insertions work
         tmpdir = tempname()
