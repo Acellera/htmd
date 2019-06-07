@@ -646,7 +646,7 @@ def _charmmLipid2Amber(mol):
         A new Molecule object with the membrane converted to AMBER
     """
 
-    resdict = _readcsvdict(os.path.join(home(), 'builder', 'charmmlipid2amber.csv'))
+    resdict = _readcsvdict(os.path.join(home(shareDir=True), 'builder', 'charmmlipid2amber.csv'))
 
     natoms = mol.numAtoms
     neworder = np.array(list(range(natoms)))  # After renaming the atoms and residues I have to reorder them
