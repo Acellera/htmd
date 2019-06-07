@@ -28,6 +28,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def htmdCharmmHome():
+    """ Returns the location of the CHARMM files distributed with HTMD"""
+    return os.path.abspath(os.path.join(home(shareDir=True), 'builder', 'charmmfiles', ''))
+
 def listFiles():
     """ Lists all available Charmm topologies and parameter files
 
@@ -39,7 +43,7 @@ def listFiles():
 
     """
     from natsort import natsorted
-    charmmdir = path.join(home(), 'builder', 'charmmfiles', '')  # maybe just lookup current module?
+    charmmdir = htmdCharmmHome()
     topos = natsorted(glob(path.join(charmmdir, 'top', '*.rtf')))
     params = natsorted(glob(path.join(charmmdir, 'par', '*.prm')))
     streams = natsorted(glob(path.join(charmmdir, 'str', '*', '*.str')))
@@ -71,8 +75,7 @@ def search(key, name):
     --------
     >>> charmm.search(key='RESI', name = 'CHL1')  # doctest: +SKIP
     """
-    charmmdir = path.join(home(), 'builder', 'charmmfiles', '')
-    os.system('find {} -type f -exec grep -n "{} {}" {{}} +'.format(charmmdir, key, name))
+    os.system('find {} -type f -exec grep -n "{} {}" {{}} +'.format(htmdCharmmHome(), key, name))
 
 
 def defaultTopo():
@@ -194,7 +197,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     allparam = param.copy()
 
     # Splitting the stream files and adding them to the list of parameter and topology files
-    charmmdir = path.join(home(), 'builder', 'charmmfiles')
+    charmmdir = htmdCharmmHome()
     for s in stream:
         if s[0] != '.' and path.isfile(path.join(charmmdir, s)):
             s = path.join(charmmdir, s)
@@ -652,7 +655,7 @@ def combine(prmlist, outfile):
     # Process parameter files
     prm_list = ["!COMMENTS\n", "!ATOMS\n", "BONDS\n", "ANGLES\n", "DIHEDRALS\n", "IMPROPER\n", "CMAP\n", "NONBONDED\n", "NBFIX\n", "HBOND\n"]
 
-    charmmdir = path.join(home(), 'builder', 'charmmfiles')
+    charmmdir = htmdCharmmHome()
     for myfile in prmlist:
         if myfile[0] != '.' and path.isfile(path.join(charmmdir, myfile)):
             myfile = path.join(charmmdir, myfile)
@@ -755,7 +758,6 @@ def combine(prmlist, outfile):
                         prm_list[context] += line
                 else:
                     continue
-        fh.close()
 
     prm = ''.join(map(str, prm_list))+"END"
     prmfh = open(outfile, "w")

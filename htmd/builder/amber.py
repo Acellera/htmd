@@ -65,7 +65,7 @@ _defaultAmberSearchPaths = {'ff': join('dat', 'leap', 'cmd'),
 def htmdAmberHome():
     """ Returns the location of the AMBER files distributed with HTMD"""
 
-    return os.path.abspath(os.path.join(home(), 'builder', 'amberfiles'))
+    return os.path.abspath(os.path.join(home(shareDir=True), 'builder', 'amberfiles'))
 
 
 def listFiles():
