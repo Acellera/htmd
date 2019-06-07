@@ -687,9 +687,24 @@ class Model(object):
         >>> model.save('./model.dat')
         """
         import pickle
+
+        # Temporarily store data object and replace with dicts
+        tmpdata = self.data
+        if self.data.parent is not None:
+            tmpparentdata = self.data.parent
+            self.data.parent = self.data.parent.__dict__
+        self.data = self.data.__dict__
+
+        # Dump the dict
         f = open(filename, 'wb')
         pickle.dump(self.__dict__, f)
         f.close()
+
+        # Restore data to classes
+        self.data = tmpdata
+        if self.data.parent is not None:
+            self.data.parent = tmpparentdata
+        
 
     def load(self, filename):
         """ Load a :class:`MetricData <htmd.metricdata.MetricData>` object from disk
@@ -719,7 +734,7 @@ class Model(object):
         for k in z:
             if k == 'data':
                 m = MetricData()
-                m.load(z[k].__dict__)
+                m.load(z[k])
                 self.__dict__[k] = m
             else:
                 self.__dict__[k] = z[k]
@@ -1166,14 +1181,51 @@ def _macroTrajSt(St, macro_ofcluster):
     from msmtools.estimation import transition_matrix
     return transition_matrix(macroC, reversible=True)'''
 
-if __name__ == '__main__':
-    from htmd.util import tempname
-    from htmd.home import home
-    from os.path import join
+import unittest
+class _TestModel(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        from htmd.simlist import simlist, simfilter
+        from glob import glob
+        from htmd.projections.metric import Metric
+        from moleculekit.projections.metricdistance import MetricDistance
+        from moleculekit.projections.metricdihedral import MetricDihedral
+        from moleculekit.util import tempname
+        from sklearn.cluster import MiniBatchKMeans
+        from htmd.home import home
+        from os.path import join
 
-    testfolder = home(dataDir='model')
-    model = Model(file=join(testfolder, 'model.dat'))
-    tmpsave = tempname(suffix='.dat')
-    model.save(tmpsave)
+        sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*')))
+        fsims = simfilter(sims, tempname(), 'not water')
+
+        from IPython.core.debugger import set_trace
+        set_trace()
+        metr = Metric(fsims)
+        metr.set(MetricDistance('protein and resid 10 and name CA', 'resname BEN and noh', metric='contacts', groupsel1='residue', threshold=4))
+        data = metr.project()
+        data.cluster(MiniBatchKMeans(n_clusters=4))
+
+        self.model = Model(data)
+
+    def test_model_saving_loading(self):
+        from moleculekit.util import tempname
+
+        modelfile = tempname(suffix='.dat')
+        self.model.save(modelfile)
+
+        newmodel = Model(file=modelfile)
+        assert newmodel.data.numTrajectories == 2
+
+        # Testing model saving when data has parent
+        self.model.data.parent = self.model.data.copy()
+        self.model.save(modelfile)
+        newmodel = Model(file=modelfile)
+        assert newmodel.data.numTrajectories == 2
+        assert newmodel.data.parent.numTrajectories == 2
+        self.model.data.parent = None
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
+
 
 
