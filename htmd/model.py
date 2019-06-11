@@ -1198,8 +1198,6 @@ class _TestModel(unittest.TestCase):
         sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*')))
         fsims = simfilter(sims, tempname(), 'not water')
 
-        from IPython.core.debugger import set_trace
-        set_trace()
         metr = Metric(fsims)
         metr.set(MetricDistance('protein and resid 10 and name CA', 'resname BEN and noh', metric='contacts', groupsel1='residue', threshold=4))
         data = metr.project()
