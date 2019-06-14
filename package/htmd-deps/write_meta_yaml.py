@@ -13,7 +13,7 @@ workdir = sys.argv[1]
 metatemplate = """
 package:
   name: htmd-deps
-  version: {{ environ.get('BUILD_VERSION') }}
+  version: {{{{ environ.get('BUILD_VERSION') }}}}
 
 source:
    path: .
