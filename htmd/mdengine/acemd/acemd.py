@@ -630,7 +630,7 @@ class Acemd(_Acemd):
 
         if not os.path.exists(configfile):
             from htmd.home import home
-            configfile = os.path.join(home(), 'mdengine', 'acemd', 'config', '{}.json'.format(configfile))
+            configfile = os.path.join(home(shareDir=True), 'mdengine', 'acemd', 'config', '{}.json'.format(configfile))
 
         with open(configfile, 'r') as f:
             config = json.load(f)

@@ -10,10 +10,10 @@ import os
 
 workdir = sys.argv[1]
 
-text = """
+metatemplate = """
 package:
   name: htmd-deps
-  version: {{ environ.get('BUILD_VERSION') }}
+  version: {{{{ environ.get('BUILD_VERSION') }}}}
 
 source:
    path: .
@@ -24,6 +24,10 @@ requirements:
     - requests
 
   run:
+{run}
+
+  run_constrained:
+{run_constrained}
 """
 
 # Read in all dependencies
@@ -41,6 +45,8 @@ packages = check_output(['conda', 'list', '--json']).decode('utf8')
 packages = json.loads(packages)
 
 # Find the version of each dependency and add them to the meta.yaml file
+rundeps = ''
+runconstdeps = ''
 depnames = [dep['name'] for dep in deps]
 found = dict(zip(depnames, [False] * len(depnames)))
 for p in packages:
@@ -48,13 +54,20 @@ for p in packages:
     if name in depnames:
         dep = next(dep for dep in deps if dep['name'] == name)
         if 'version' not in dep:
-            if name != 'htmd-data':
-                text += '    - {} >={}\n'.format(name, p['version'])
+            if name == 'htmd-data':
+                text = '    - {} =={}\n'.format(name, p['version'])
             else:
-                text += '    - {} =={}\n'.format(name, p['version'])
+                text = '    - {} >={}\n'.format(name, p['version'])
         else:
-            text += '    - {} {}\n'.format(name, dep['version'])
+            text = '    - {} {}\n'.format(name, dep['version'])
+
+        if name == 'htmd-data':
+            runconstdeps += text
+        else:
+            rundeps += text
         found[name] = True
+
+metatemplate = metatemplate.format(run=rundeps, run_constrained=runconstdeps)
 
 # Check if all dependencies were found. If not print which and exit with error
 if not all(found):
@@ -65,4 +78,4 @@ if not all(found):
 
 # Write htmd-deps meta.yaml file
 with open(os.path.join(workdir, 'meta.yaml'), 'w') as f:
-    f.write(text)
+    f.write(metatemplate)
