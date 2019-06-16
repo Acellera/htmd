@@ -114,7 +114,19 @@ class TrajectoryStorage(object):
         with h5py.File(self.storagelocation, 'r') as f:
             return len(list(f['trajectories']))
 
-    def addTrajectory(self, trajectory, topologyFile, inputFolder=None, sortByName=True):
+    @property
+    def projectionCounts(self):
+        allproj = []
+        with h5py.File(self.storagelocation, 'r') as f:
+            for trajname in f['trajectories']:
+                if 'projections' in f['trajectories'][trajname]:
+                    for projname in f['trajectories'][trajname]['projections']:
+                        allproj.append(projname)
+        vals, counts = np.unique(allproj, return_counts=True)
+        return vals, counts
+            
+
+    def addTrajectory(self, trajectory, topologyFiles, inputFolder=None, sortByName=True):
         """ Add a trajectory to the storage
 
         Parameters
@@ -125,7 +137,7 @@ class TrajectoryStorage(object):
                 - A list of paths of trajectory pieces.
                 - A folder containing the trajectory
                 - A folder containing a trajectory split in multiple pieces
-        topologyFile : file, or list of files
+        topologyFiles : file, or list of files
             The path to the topology file corresponding to the trajectory
         inputFolder : str
             The path to the folder which creates all files that were used to create this trajectory
@@ -145,7 +157,7 @@ class TrajectoryStorage(object):
         if sortByName:
             trajpieces = natsorted(trajpieces)
 
-        traj = _Trajectory(topologyFiles=ensurelist(topologyFile), trajectoryFiles=trajpieces, inputFolder=inputFolder, parent='')
+        traj = _Trajectory(topologyFiles=ensurelist(topologyFiles), trajectoryFiles=trajpieces, inputFolder=inputFolder, parent='')
 
         # trajpieces = [os.path.abspath(traj) for traj in trajpieces]  # I think I prefer relative file paths
 
@@ -352,10 +364,14 @@ class TrajectoryStorage(object):
             with h5py.File(self.storagelocation, 'a') as f:
                 for i in tqdm(range(len(alltraj)), desc='Projecting trajectories'):
                     res, trajname = output_queue.get()
-                    if projectionName in f['trajectories'][trajname]:
-                        del f['trajectories'][trajname][projectionName]
-                    f['trajectories'][trajname].create_dataset(projectionName, data=res)
-                output_queue.task_done()
+                    output_queue.task_done()
+                    if res is None:
+                        continue
+                    if not 'projections' in f['trajectories'][trajname]:
+                        f['trajectories'][trajname].create_group('projections')
+                    if projectionName in f['trajectories'][trajname]['projections']:
+                        del f['trajectories'][trajname]['projections'][projectionName]
+                    f['trajectories'][trajname]['projections'].create_dataset(projectionName, data=res)
         except KeyboardInterrupt:
             for p in processes:
                 p.terminate()
@@ -382,7 +398,7 @@ def _project_worker(input_queue, output_queue, projection, unique_mol):
 
             mol = unique_mol
             if mol is None:
-                mol = Molecule(item['topologyFile'])
+                mol = Molecule(item['topologyFiles'])
 
             mol.read(item['trajectoryFiles'])
 
@@ -406,6 +422,8 @@ def _project_worker(input_queue, output_queue, projection, unique_mol):
             break
         except Exception as e:
             logger.error('Failed to project simulation with name {} due to {}'.format(item['trajName'], e))
+            input_queue.task_done()
+            output_queue.put((None, item['trajName']))
 
 def _checkProjectionDims(result, mol, name):
     if (result.ndim == 1 and len(result) != mol.numFrames) or \
@@ -572,6 +590,32 @@ class _TestTrajectoryStorage(unittest.TestCase):
         del ts
         os.remove(tmph5)
         compareDicts(mode4dict, alltraj)
+
+    def test_projection(self):
+        import os
+        from htmd.home import home
+        from htmd.util import tempname
+        from moleculekit.projections.metricdistance import MetricDistance
+        
+        tmph5 = tempname(suffix='.h5')
+        ts = TrajectoryStorage(tmph5)
+        ts.autoDetectFiles(natsorted(glob(os.path.join(home(dataDir='test-trajectory-storage'), 'mode1', 'trajectories', '*', ''))))
+
+        proj = MetricDistance('resname BEN and name C4', 'protein and resid 5 and name HE1')
+        ts.projectTrajectories(proj, projectionName='C4-HE1 distance')
+        projs, counts = ts.projectionCounts
+        assert len(projs) == 1
+        assert projs[0] == 'C4-HE1 distance'
+        assert counts[0] == 2
+
+        proj = MetricDistance('resname BEN and name C4', 'resname BEN and name C7')
+        ts.projectTrajectories(proj, projectionName='C4-C7 distance')
+        projs, counts = ts.projectionCounts
+        assert len(projs) == 2
+        assert projs[0] == 'C4-C7 distance'
+        assert counts[0] == 2
+        assert projs[1] == 'C4-HE1 distance'
+        assert counts[1] == 2
 
 
 if __name__ == '__main__':
