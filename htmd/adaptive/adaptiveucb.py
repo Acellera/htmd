@@ -257,6 +257,7 @@ class AdaptiveUCB(AdaptiveBase):
         return data
 
     def _createMSM(self, data):
+        from htmd.model import Model
         kmeanserror = True
         while kmeanserror:
             try:
@@ -298,17 +299,51 @@ class AdaptiveUCB(AdaptiveBase):
         return macronum
 
 
-from unittest import TestCase
-class _TestAdaptiveUCB(TestCase):
+import unittest
+class _TestAdaptiveUCB(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         from htmd.util import tempname
         from htmd.home import home
         from moleculekit.projections.metricdistance import MetricDistance
+        import shutil
+        import os
 
         tmpdir = tempname()
         shutil.copytree(home(dataDir='adaptive'), tmpdir)
         os.chdir(tmpdir)
 
     def test_adaptive(self):
-        ad = AdaptiveUCB()
+        from sklearn.cluster import MiniBatchKMeans
+        from htmd.queues.localqueue import LocalCPUQueue
+        from moleculekit.projections.metricdistance import MetricDistance
+
+        md = AdaptiveUCB()
+        md.app = LocalCPUQueue()
+        md.generatorspath = 'generators'
+        md.inputpath = 'input'
+        md.datapath = 'data'
+        md.coorname = 'input.coor'
+        md.filter = True
+        md.filtersel = 'all'
+
+        md.clustmethod = MiniBatchKMeans
+        md.projection = MetricDistance('protein resid 173 and name CA', 'resname BEN and name C1 C2 C3 C7')
+        md.ticadim = 2
+        md.nmin=1
+        md.nmax=2
+        md.nepochs= 9999
+        md.nframes = 1000000
+
+        md.reward_method = 'mean'
+        md.exploration = 0.01
+        md.actionspace = 'tica'
+        md.actionpool = -1
+        md.recluster = False
+
+        md.save = True
+        md.dryrun = True
+        md.run()
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
