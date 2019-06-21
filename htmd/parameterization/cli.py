@@ -519,12 +519,12 @@ Improper : {IMPROPER_ENERGY:12.6g} kcal/mol
 Electro  : {ELEC_ENERGY:12.6g} kcal/mol
 VdW      : {VDW_ENERGY:12.6g} kcal/mol
 
-'''.format(BOND_ENERGY=energies['bond'],
-           ANGLE_ENERGY=energies['angle'],
-           DIHEDRAL_ENERGY=energies['dihedral'],
-           IMPROPER_ENERGY=energies['improper'],
-           ELEC_ENERGY=energies['elec'],
-           VDW_ENERGY=energies['vdw'])
+'''.format(BOND_ENERGY=np.round(energies['bond'], decimals=5),
+           ANGLE_ENERGY=np.round(energies['angle'], decimals=5),
+           DIHEDRAL_ENERGY=np.round(energies['dihedral'], decimals=5),
+           IMPROPER_ENERGY=np.round(energies['improper'], decimals=5),
+           ELEC_ENERGY=np.round(energies['elec'], decimals=5),
+           VDW_ENERGY=np.round(energies['vdw'], decimals=5))
 
     for line in string.split('\n'):
         logger.info(line)
