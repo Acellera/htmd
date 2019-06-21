@@ -637,12 +637,8 @@ class MetricData(object):
         if relFrames.ndim == 1:
             relFrames = relFrames[np.newaxis, :]
 
-        sims = []
         frames = []
-        for i in range(np.size(relFrames, 0)):
-            trajID = relFrames[i, 0]
-            trajFrame = relFrames[i, 1]
-            sims.append(simlist[trajID])
+        for trajID, trajFrame in relFrames:
             ref = self.trajectories[trajID].reference
             frames.append(Frame(simlist[trajID], ref[trajFrame, 0], ref[trajFrame, 1]))
         return np.array(frames)
