@@ -318,6 +318,11 @@ class _TestAdaptiveUCB(unittest.TestCase):
         from htmd.queues.localqueue import LocalCPUQueue
         from moleculekit.projections.metricdistance import MetricDistance
 
+        import numpy as np
+        import random
+        np.random.seed(0)  # Needed for the clustering to always give same results
+        random.seed(0)
+
         md = AdaptiveUCB()
         md.app = LocalCPUQueue()
         md.generatorspath = 'generators'
