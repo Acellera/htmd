@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class AdaptiveUCB(AdaptiveBase):
+class AdaptiveBandit(AdaptiveBase):
     def __init__(self):
         from sklearn.base import ClusterMixin
         from moleculekit.projections.projection import Projection
@@ -300,7 +300,7 @@ class AdaptiveUCB(AdaptiveBase):
 
 
 import unittest
-class _TestAdaptiveUCB(unittest.TestCase):
+class _TestAdaptiveBandit(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         from htmd.util import tempname
@@ -323,7 +323,7 @@ class _TestAdaptiveUCB(unittest.TestCase):
         np.random.seed(0)  # Needed for the clustering to always give same results
         random.seed(0)
 
-        md = AdaptiveUCB()
+        md = AdaptiveBandit()
         md.app = LocalCPUQueue()
         md.generatorspath = 'generators'
         md.inputpath = 'input'
