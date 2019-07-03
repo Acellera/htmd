@@ -263,4 +263,4 @@ if __name__ == "__main__":
     from moleculekit.molecule import Molecule
     import doctest
 
-    doctest.testmod()
+    sys.exit(doctest.testmod().failed)
