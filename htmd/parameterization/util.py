@@ -399,6 +399,7 @@ def detectChiralCenters(mol, atom_types=None):
     """
 
     from moleculekit.molecule import Molecule
+    from htmd.util import _convertMoleculeToRDKitMol
     from rdkit.Chem import MolFromMol2File, AssignAtomChiralTagsFromStructure, FindMolChiralCenters
 
     if not isinstance(mol, Molecule):
@@ -411,12 +412,8 @@ def detectChiralCenters(mol, atom_types=None):
     if atom_types is not None:
         htmd_mol.atomtype = atom_types
 
-    # Convert Molecule to rdkit Mol
-    with TemporaryDirectory() as tmpDir:
-        filename = os.path.join(tmpDir, 'mol.mol2')
-        htmd_mol.write(filename)
-        rdkit_mol = MolFromMol2File(filename, removeHs=False)
-    assert mol.numAtoms == rdkit_mol.GetNumAtoms()
+    # Convert Molecule to RDKit Mol
+    rdkit_mol = _convertMoleculeToRDKitMol(mol)
 
     # Detect chiral centers and assign their labels
     AssignAtomChiralTagsFromStructure(rdkit_mol)
