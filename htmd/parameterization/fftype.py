@@ -220,7 +220,7 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
     return prm, mol
 
 
-class TestFftypeGAFF(unittest.TestCase):
+class _TestFftypeGAFF(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home
@@ -348,7 +348,7 @@ class TestFftypeGAFF(unittest.TestCase):
                                                'match element symbol. Please check the molecule.')
 
 
-class TestFftypeCGenFF(unittest.TestCase):
+class _TestFftypeCGenFF(unittest.TestCase):
 
     def setUp(self):
 
