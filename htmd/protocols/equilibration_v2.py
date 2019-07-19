@@ -5,6 +5,7 @@
 #
 from htmd.apps.acemd import Acemd as Acemd2
 from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
+from htmd.config import _config
 from protocolinterface import ProtocolInterface, val
 import os
 import numpy as np
@@ -59,7 +60,7 @@ class Equilibration(ProtocolInterface):
         >>> md.fb_k = 5
         >>> md.write('./build','./equil')
     """
-    def __init__(self, _version=2):
+    def __init__(self, _version=_config['acemdversion']):
         super().__init__()
         self._version = _version
         self._arg('acemd', ':class:`Acemd2 <htmd.apps.acemd.Acemd>` or :class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>`'

@@ -10,6 +10,7 @@ from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRes
 import os
 import numpy as np
 import logging
+from htmd.config import _config
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +48,7 @@ class Production(ProtocolInterface):
         adaptive : bool, default=False
             Set to True if making production runs for adaptive sampling.
     """
-    def __init__(self, _version=2):
+    def __init__(self, _version=_config['acemdversion']):
         super().__init__()
         self._version = _version
         self._arg('acemd', ':class:`Acemd2 <htmd.apps.acemd.Acemd>` or :class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>`'
