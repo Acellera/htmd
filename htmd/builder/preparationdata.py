@@ -12,7 +12,7 @@ import math
 from htmd.molecule.molecule import Molecule
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(40)
 
 # This takes a pdb2pqr Residue
 def prettyPrintResidue(r):

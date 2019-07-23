@@ -15,7 +15,7 @@ from htmd.builder.preparationdata import PreparationData
 from htmd.molecule.molecule import Molecule
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(40)
 
 def _selToHoldList(mol, sel):
     if sel:

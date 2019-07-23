@@ -795,7 +795,7 @@ class Molecule:
         from htmd.numbautil import dihedralAngle
         return dihedralAngle(self.coords[atom_quad, :, self.frame])
 
-    def setDihedral(self, atom_quad, radians, bonds=None):
+    def setDihedral(self, atom_quad, radians, bonds=None,ret_LR=False):
         """ Sets the angle of a dihedral.
         
         Parameters
@@ -843,9 +843,10 @@ class Molecule:
         rads = dihedralAngle(quad_coords)
         M = rotationMatrix(rotax, radians-rads)
         self.rotateBy(M, center=self.coords[atom_quad[1], :, self.frame], sel=right)
+        if ret_LR:
+            return left, right
 
-
-    def get_LR(self, bond, bonds=None):
+    def get_LR(self, bond, bonds=None,check_cycle=False):
         """ Sets the angle of a dihedral.
         
         Parameters
@@ -883,6 +884,9 @@ class Molecule:
         conn[[bond[1], bond[0]]] = 0
         left = np.unique(sp.breadth_first_tree(conn, bond[0], directed=False).indices.flatten())
         right = np.unique(sp.breadth_first_tree(conn, bond[1], directed=False).indices.flatten())
+
+        if (bond[1] in left) or (bond[0] in right) and check_cycle:
+            return -1
 
         left = np.append(left,bond[0])
         right = np.append(right,bond[1])
