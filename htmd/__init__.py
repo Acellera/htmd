@@ -37,3 +37,7 @@ if _config['configfile']:
             raise RuntimeError('Failed to execute the HTMD Config file {}.'.format(_config['configfile']))
         else:
             print('\nHTMD Config file {} executed.'.format(_config['configfile']))
+
+import warnings
+warnings.warn('As of HTMD 1.16 the default ACEMD version for all protocols has changed to version 3. If you want to use version 2 protocols change the _version argument in the protocols or add `config(acemdversion=2)` to the beginning of your scripts. Feel free to remove this line of code from the file shown at the beginning of the warning to get rid of the warning.'
+, UserWarning)

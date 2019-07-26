@@ -7,6 +7,7 @@ import os
 
 _config = {'viewer': 'VMD',
            'ncpus': -2,
+           'acemdversion': 3,
            'configfile': os.getenv('HTMD_CONFIG') if os.getenv('HTMD_CONFIG') else None,
            'lsf': None,
            'slurm': None
@@ -15,6 +16,7 @@ _config = {'viewer': 'VMD',
 
 def config(viewer=_config['viewer'],
            ncpus=_config['ncpus'],
+           acemdversion=_config['acemdversion'],
            configfile=_config['configfile'],
            lsf=_config['lsf'],
            slurm=_config['slurm']):
@@ -36,6 +38,7 @@ def config(viewer=_config['viewer'],
     """
     _config['viewer'] = viewer
     _config['ncpus'] = ncpus
+    _config['acemdversion'] = acemdversion
     _config['configfile'] = configfile
     _config['lsf'] = lsf
     _config['slurm'] = slurm
