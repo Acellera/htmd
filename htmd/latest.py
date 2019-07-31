@@ -23,8 +23,8 @@ def compareVersions():
     __file = os.path.join(__htmdconf, '.latestversion')
 
     # Check if one day has passed since last version check. If yes, get new version and write to file
-    if not os.path.isfile(__file) or time.time() > os.path.getmtime(__file) + 86400 or os.stat(__file).st_size == 0:
-        _writeLatestVersionFile(__file)
+    #if not os.path.isfile(__file) or time.time() > os.path.getmtime(__file) + 86400 or os.stat(__file).st_size == 0:
+    #    _writeLatestVersionFile(__file)
 
     try:
         f = open(__file, 'r')
