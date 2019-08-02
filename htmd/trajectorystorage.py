@@ -83,14 +83,19 @@ class _Trajectory(object):
 
 
 class TrajectoryStorage(object):
-    def __init__(self, storagelocation):
+    def __init__(self, storagelocation, overwrite=False):
         self.storagelocation = storagelocation
 
         if os.path.splitext(storagelocation)[-1] != '.h5' and os.path.splitext(storagelocation)[-1] != '.hdf5':
             raise RuntimeError('Only storage files with .h5 or .hdf5 extensions are allowed')
 
-        with h5py.File(storagelocation, 'w') as f:
-            f.create_group('trajectories')
+        if os.path.exists(storagelocation) and not overwrite:
+            logger.info(f'Loading {storagelocation} trajectory storage containing {self.numTrajectories} trajectories')
+
+        if not os.path.exists(storagelocation) or overwrite:
+            logger.info(f'Creating new trajectory storage at {storagelocation}')
+            with h5py.File(storagelocation, 'w') as f:
+                f.create_group('trajectories')
 
     def __str__(self):
         ntraj = self.numTrajectories
