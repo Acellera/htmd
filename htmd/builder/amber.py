@@ -799,7 +799,7 @@ def _logParser(fname):
     return errors
 
 
-class TestAmberBuild(unittest.TestCase):
+class _TestAmberBuild(unittest.TestCase):
     currentResult = None  # holds last result object passed to run method
 
     def setUp(self):
@@ -867,7 +867,7 @@ class TestAmberBuild(unittest.TestCase):
             _ = build(smol, ff=ffs, outdir=tmpdir)
 
             refdir = home(dataDir=join('test-amber-build', 'pp', pid))
-            TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
+            _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
     def testWithoutProteinPrepare(self):
         from htmd.builder.solvate import solvate
@@ -884,7 +884,7 @@ class TestAmberBuild(unittest.TestCase):
             _ = build(smol, ff=ffs, outdir=tmpdir)
 
             refdir = home(dataDir=join('test-amber-build', 'nopp', pid))
-            TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
+            _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
     def testProteinLigand(self):
         from htmd.builder.solvate import solvate
@@ -913,7 +913,7 @@ class TestAmberBuild(unittest.TestCase):
         _ = build(smol, outdir=tmpdir, param=params, ionize=False)
 
         refdir = home(dataDir=join('test-amber-build', 'protLig', 'results'))
-        TestAmberBuild._compareResultFolders(refdir, tmpdir, '3PTB')
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, '3PTB')
 
         # # Test protein-ligand building
         # folder = home(dataDir='building-protein-ligand')
@@ -960,14 +960,14 @@ class TestAmberBuild(unittest.TestCase):
             _ = build(smol, ff=ffs, outdir=tmpdir, disulfide=disu)
 
             refdir = home(dataDir=join('test-amber-build', 'nopp', pid))
-            TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
+            _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
             np.random.seed(1)
             tmpdir = os.path.join(self.testDir, 'withoutProtPrep', pid)
             _ = build(smol, ff=ffs, outdir=tmpdir)
 
             refdir = home(dataDir=join('test-amber-build', 'nopp', pid))
-            TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
+            _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
     def test_customTeLeapImports(self):
         from htmd.builder.solvate import solvate
@@ -989,7 +989,7 @@ class TestAmberBuild(unittest.TestCase):
             _ = build(smol, ff=ffs, outdir=tmpdir, teleapimports=teleapimports)
 
             refdir = home(dataDir=join('test-amber-build', 'nopp', pid))
-            TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
+            _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
 
 if __name__ == '__main__':

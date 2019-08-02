@@ -5,6 +5,7 @@
 #
 from htmd.apps.acemd import Acemd as Acemd2
 from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
+from htmd.config import _config
 from protocolinterface import ProtocolInterface, val
 import os
 import numpy as np
@@ -59,7 +60,7 @@ class Equilibration(ProtocolInterface):
         >>> md.fb_k = 5
         >>> md.write('./build','./equil')
     """
-    def __init__(self, _version=2):
+    def __init__(self, _version=_config['acemdversion']):
         super().__init__()
         self._version = _version
         self._arg('acemd', ':class:`Acemd2 <htmd.apps.acemd.Acemd>` or :class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>`'
@@ -191,10 +192,10 @@ proc calcforces_endstep { } { }
             self.acemd.parameters = None
             self.acemd.restart = 'on'
             self.acemd.trajectoryfile = 'output.xtc'
-            self.acemd.trajectoryfreq = 25000
+            self.acemd.trajectoryperiod = 25000
             self.acemd.timestep = 4
             self.acemd.switching = 'on'
-            self.acemd.switchdist = 7.5
+            self.acemd.switchdistance = 7.5
             self.acemd.cutoff = 9
             self.acemd.thermostat = 'on'
             self.acemd.thermostatdamping = 1
@@ -308,7 +309,7 @@ proc calcforces_endstep { } { }
         numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
         if self._version == 3:
             self.acemd.temperature = self.temperature
-            self.acemd.thermostattemp = self.temperature
+            self.acemd.thermostattemperature = self.temperature
             self.acemd.run = str(numsteps)
 
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
@@ -353,7 +354,8 @@ proc calcforces_endstep { } { }
                     restraints += self._fb_potential2restraints(inputdir)
                 self.acemd.restraints = restraints
 
-        if self.acemd.celldimension is None and self.acemd.extendedsystem is None:
+        if ((self._version == 2) and self.acemd.celldimension is None and self.acemd.extendedsystem is None) or \
+            ((self._version == 3) and self.acemd.boxsize is None and self.acemd.extendedsystem is None):
             coords = inmol.get('coords', sel='water')
             if coords.size == 0:  # It's a vacuum simulation
                 coords = inmol.get('coords', sel='all')
@@ -361,7 +363,10 @@ proc calcforces_endstep { } { }
                 dim += 12.
             else:
                 dim = np.max(coords, axis=0) - np.min(coords, axis=0)
-            self.acemd.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
+            if self._version == 2:
+                self.acemd.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
+            else:
+                self.acemd.boxsize = '{} {} {}'.format(dim[0], dim[1], dim[2])
 
         if self.useconstantratio:
             self.acemd.useconstantratio = 'on'

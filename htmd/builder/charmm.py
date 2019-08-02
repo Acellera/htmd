@@ -895,7 +895,7 @@ def _checkFailedAtoms(mol):
                         'Check log file for more details.'.format(idx))
 
 
-class TestCharmmBuild(TestCase):
+class _TestCharmmBuild(TestCase):
     def test_build(self):
         from moleculekit.molecule import Molecule
         from htmd.builder.solvate import solvate

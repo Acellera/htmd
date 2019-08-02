@@ -306,8 +306,8 @@ def _filtSim(i, sims, outFolder, filterSel):
     try:
         from moleculekit.molecule import Molecule
         mol = Molecule(sims[i].molfile)
-    except:
-        logger.warning('Error! Skipping simulation ' + name)
+    except Exception as e:
+        logger.warning('Error! Skipping simulation ' + name + ' due to error: ' + str(e))
         return
 
     sel = mol.atomselect(filterSel)

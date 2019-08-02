@@ -10,6 +10,7 @@ from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRes
 import os
 import numpy as np
 import logging
+from htmd.config import _config
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +48,7 @@ class Production(ProtocolInterface):
         adaptive : bool, default=False
             Set to True if making production runs for adaptive sampling.
     """
-    def __init__(self, _version=2):
+    def __init__(self, _version=_config['acemdversion']):
         super().__init__()
         self._version = _version
         self._arg('acemd', ':class:`Acemd2 <htmd.apps.acemd.Acemd>` or :class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>`'
@@ -161,10 +162,10 @@ proc calcforces_endstep { } { }
             self.acemd.parameters = None
             self.acemd.restart = 'on'
             self.acemd.trajectoryfile = 'output.xtc'
-            self.acemd.trajectoryfreq = 25000
+            self.acemd.trajectoryperiod = 25000
             self.acemd.timestep = 4
             self.acemd.switching = 'on'
-            self.acemd.switchdist = 7.5
+            self.acemd.switchdistance = 7.5
             self.acemd.cutoff = 9
             self.acemd.thermostat = 'on'
             self.acemd.thermostatdamping = 0.1
@@ -268,7 +269,7 @@ proc calcforces_endstep { } { }
             self.acemd.langevintemp = str(self.temperature)
         elif self._version == 3:
             self.acemd.temperature = self.temperature
-            self.acemd.thermostattemp = self.temperature
+            self.acemd.thermostattemperature = self.temperature
 
         from htmd.units import convert
         numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)

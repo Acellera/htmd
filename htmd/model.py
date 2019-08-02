@@ -948,12 +948,12 @@ class Model(object):
 def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
     frames = self.data.rel2sim(rel, simlist=simlist)
     mol = Molecule(molfile)
-    trajs = np.empty(0, dtype=str)
-    frs = np.empty(0, dtype=int)
+    trajs = []
+    frs = []
     for f in frames:
-        trajs = np.append(trajs, f.sim.trajectory[f.piece])
-        frs = np.append(frs, f.frame)
-    mol.read(trajs, frames=frs)
+        trajs.append(f.sim.trajectory[f.piece])
+        frs.append(f.frame)
+    mol.read(np.array(trajs), frames=np.array(frs))
     if len(wrapsel) > 0:
         mol.wrap(wrapsel)
     if (refmol is not None) and (alignsel is not None):

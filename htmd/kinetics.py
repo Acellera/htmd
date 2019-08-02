@@ -279,6 +279,8 @@ class Kinetics(object):
     def plotFluxPathways(self, statetype='macro', mode='net_flux', fraction=1.0):
         """ Plot flux pathways between source and sink state.
 
+        The flux is in units of transition events per lag time used to construct the Markov model.
+
         Parameters
         ----------
         statetype : {'macro','coarse','micro'}

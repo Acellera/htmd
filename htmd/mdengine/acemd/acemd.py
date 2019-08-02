@@ -178,8 +178,8 @@ class _Acemd(ProtocolInterface):
                                        'in path {}'.format(self.__dict__[cmd], cmd, path))
 
         self._amberConfig()  # Change stuff for AMBER
-        if self._version == 3 and self.thermostattemp is None:
-            self.thermostattemp = self.temperature
+        if self._version == 3 and self.thermostattemperature is None:
+            self.thermostattemperature = self.temperature
 
     def save(self, path, overwrite=False):
         """ Create a directory with all necessary input to run acemd.
@@ -571,36 +571,44 @@ class Acemd(_Acemd):
     def __init__(self, config=None):
         super().__init__(version=3)
         # ACEMD3 Options
+        self._cmdDeprecated('trajectoryfreq', 'trajectoryperiod')
+        self._cmdDeprecated('switchdist', 'switchdistance')
+        self._cmdDeprecated('thermostattemp', 'thermostattemperature')
+        self._cmdDeprecated('useflexiblecell', 'barostatanisotropic')
+        self._cmdDeprecated('useconstantarea', 'barostatconstxy')
+        self._cmdDeprecated('useconstantratio', 'barostatconstratio')
+        self._cmdDeprecated('celldimension', 'boxsize')
+
         self._arg('temperature', 'float', 'Temperature of the thermostat in Kelvin.', None, val.Number(float, 'ANY'))
         self._arg('restart', 'str', 'Restart simulation.', None, val.String())
         self._arg('trajectoryfile', 'str', 'Output file name.', None, val.String())
-        self._arg('trajectoryfreq', 'int', 'Trajectory sampling frequency in steps.', None, val.Number(int, 'POS'))
+        self._arg('trajectoryperiod', 'int', 'Trajectory sampling frequency in steps.', None, val.Number(int, 'POS'))
         self._arg('timestep', 'int', 'Simulation timestep.', None, val.Number(int, 'POS'))
         self._arg('pme', 'str', 'Particle-mesh Ewald summation.', None, val.String())
         self._arg('switching', 'str', 'Apply switching function to the van der Waals potential.', None, val.String())
-        self._arg('switchdist', 'float', 'Distance in Angstrom at which to begin applying the switching function.',
+        self._arg('switchdistance', 'float', 'Distance in Angstrom at which to begin applying the switching function.',
                   None, val.Number(float, '0POS'))
         self._arg('cutoff', 'float', 'Real-space cutoff in Angstroms for electrostatics and van der Waals.', None,
                   val.Number(float, '0POS'))
         self._arg('thermostat', 'str', 'Enable thermostatic control', None, val.String())
-        self._arg('thermostattemp', 'float', 'Target temperature (K) for thermostatic control', None,
+        self._arg('thermostattemperature', 'float', 'Target temperature (K) for thermostatic control', None,
                   val.Number(float, '0POS'))
         self._arg('thermostatdamping', 'float', 'Damping constant for the Langevin thermostat in ps^-1', None,
                   val.Number(float, '0POS'))
         self._arg('restraints', 'str', 'Restraining potentials', None, val.Object(_Restraint), nargs='*')
         self._arg('barostat', 'str', 'Enable pressure control', None, val.String())
         self._arg('barostatpressure', 'float', 'The target pressure in bar', None, val.Number(float, '0POS'))
-        self._arg('useflexiblecell', 'str', 'Allow X, Y and Z unit cell dimensions to vary independently', None,
+        self._arg('barostatanisotropic', 'str', 'Allow X, Y and Z unit cell dimensions to vary independently', None,
                   val.String())
-        self._arg('useconstantarea', 'str', 'Constrain the X,Y dimensions of the unit cell. Allow Z to vary '
+        self._arg('barostatconstxy', 'str', 'Constrain the X,Y dimensions of the unit cell. Allow Z to vary '
                                             'independently.', None, val.String())
-        self._arg('useconstantratio', 'str', 'Constrain the X:Y ratio of the unit cell dimensions. Allow Z to vary '
+        self._arg('barostatconstratio', 'str', 'Constrain the X:Y ratio of the unit cell dimensions. Allow Z to vary '
                                              'independently.', None, val.String())
         self._arg('minimize', 'int', 'The number of energy minimization steps to perform before commencing dynamics.',
                   None, val.Number(int, '0POS'))
         self._arg('run', 'str', 'The length of simulation to run. May be specified as a number of steps or as a time '
                                 'if one of the suffices "us", "ns", "ps", "fs" is used.', None, val.String())
-        self._arg('celldimension', 'str', 'The dimensions of the unit cell in Angstrom. Note that the unit cell must '
+        self._arg('boxsize', 'str', 'The dimensions of the unit cell in Angstrom. Note that the unit cell must '
                                           'be cuboid. Overrides any dimension given in the "coordinates" PDB.', None,
                   val.String())
         self._arg('implicit', 'str', 'Set to True to enable implicit solvent simulations in AMBER.', None, val.String())
@@ -660,7 +668,7 @@ class Acemd(_Acemd):
         super().setup(inputdir, outputdir, overwrite)
 
 
-class TestAcemd(TestCase):
+class _TestAcemd(TestCase):
 
     def test_acemd2(self):
         from htmd.home import home
@@ -762,7 +770,7 @@ coordinates             structure.pdb
 parameters              parameters
 structure               structure.psf
 temperature             300 
-thermostattemp          300
+thermostattemperature   300
 groupRestraint          "resname MOL" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
 groupRestraint          "resname MOL" fbcentre "4 2 7.3" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
 groupRestraint          "resname MOL" fbcentresel "protein" axes z width "5" setpoints 10@10ns 5@15ns 0@20ns
@@ -791,7 +799,7 @@ run                     1000
 
         prod = Acemd('production')
         prod.run = '2000'
-        prod.trajectoryfreq = 200
+        prod.trajectoryperiod = 200
         prod.temperature = 300
         prod.write(home(dataDir=os.path.join('test-acemd', pdbid, 'equil_out')), tmpdir)
         print(tmpdir)
@@ -818,9 +826,9 @@ run                     1000
         equil = Acemd('equilibration')
         mol = Molecule(os.path.join(builddir, 'structure.pdb'))
         celldim = mol.coords.max(axis=0) - mol.coords.min(axis=0)
-        equil.celldimension = ' '.join(['{:3.1f}'.format(val) for val in celldim.squeeze()])
+        equil.boxsize = ' '.join(['{:3.1f}'.format(val) for val in celldim.squeeze()])
         equil.run = '2000'
-        equil.trajectoryfreq = 200
+        equil.trajectoryperiod = 200
         equil.temperature = 300
 
         equil.write(builddir, tmpdir)
