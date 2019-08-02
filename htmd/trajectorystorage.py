@@ -331,7 +331,7 @@ class TrajectoryStorage(object):
         # set_trace()
         return alltraj
 
-    def projectTrajectories(self, projection, projectionName=None, numWorkers=1):
+    def projectTrajectories(self, projection, projectionName=None, numWorkers=1, skip=1):
         from multiprocessing import Process
         from multiprocessing import JoinableQueue as Queue
         import signal
@@ -355,7 +355,7 @@ class TrajectoryStorage(object):
         processes = []
 
         original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN) # Set SIGINT to ignore so that child processes inherit it
-        processes = [Process(target=_project_worker, args=(input_queue, output_queue, projection, unique_mol)) for x in range(numWorkers)]
+        processes = [Process(target=_project_worker, args=(input_queue, output_queue, projection, unique_mol, skip)) for x in range(numWorkers)]
         for p in processes:
             p.start()
         signal.signal(signal.SIGINT, original_sigint_handler)  # Set back the original signal handler
@@ -363,15 +363,18 @@ class TrajectoryStorage(object):
         try:
             with h5py.File(self.storagelocation, 'a') as f:
                 for i in tqdm(range(len(alltraj)), desc='Projecting trajectories'):
-                    res, trajname = output_queue.get()
+                    data, ref, trajname = output_queue.get()
                     output_queue.task_done()
-                    if res is None:
+                    if data is None:
                         continue
                     if not 'projections' in f['trajectories'][trajname]:
                         f['trajectories'][trajname].create_group('projections')
-                    if projectionName in f['trajectories'][trajname]['projections']:
-                        del f['trajectories'][trajname]['projections'][projectionName]
-                    f['trajectories'][trajname]['projections'].create_dataset(projectionName, data=res)
+                    projgroup = f['trajectories'][trajname]['projections']
+                    if projectionName in projgroup:
+                        del projgroup[projectionName]
+                    projgroup.create_group(projectionName)
+                    projgroup[projectionName].create_dataset('data', data=data)
+                    projgroup[projectionName].create_dataset('ref', data=ref)
         except KeyboardInterrupt:
             for p in processes:
                 p.terminate()
@@ -383,7 +386,16 @@ class TrajectoryStorage(object):
             p.join()
 
 
-def _project_worker(input_queue, output_queue, projection, unique_mol):
+def _calcRef(pieces, fileloc):
+    locs = np.array(list([x[0] for x in fileloc]))
+    frames = list([x[1] for x in fileloc])
+    ref = np.zeros((len(frames), 2), dtype='u4')
+    ref[:, 1] = frames
+    for i, p in enumerate(pieces):
+        ref[locs == p, 0] = i
+    return ref
+
+def _project_worker(input_queue, output_queue, projection, unique_mol, skip):
     from moleculekit.projections.projection import Projection
     from moleculekit.molecule import Molecule
 
@@ -400,7 +412,7 @@ def _project_worker(input_queue, output_queue, projection, unique_mol):
             if mol is None:
                 mol = Molecule(item['topologyFiles'])
 
-            mol.read(item['trajectoryFiles'])
+            mol.read(item['trajectoryFiles'], skip=skip)
 
             if isinstance(projection, Projection):
                 res = projection.project(mol)
@@ -416,14 +428,16 @@ def _project_worker(input_queue, output_queue, projection, unique_mol):
 
             _checkProjectionDims(res, mol, 'projection')
 
-            output_queue.put((res, item['trajName']))
+            refs = _calcRef(item['trajectoryFiles'], mol.fileloc)
+
+            output_queue.put((res, refs, item['trajName']))
             input_queue.task_done()
         except KeyboardInterrupt:
             break
         except Exception as e:
             logger.error('Failed to project simulation with name {} due to {}'.format(item['trajName'], e))
             input_queue.task_done()
-            output_queue.put((None, item['trajName']))
+            output_queue.put((None, None, item['trajName']))
 
 def _checkProjectionDims(result, mol, name):
     if (result.ndim == 1 and len(result) != mol.numFrames) or \
