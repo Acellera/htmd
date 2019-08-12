@@ -90,7 +90,7 @@ class TrajectoryStorage(object):
             raise RuntimeError('Only storage files with .h5 or .hdf5 extensions are allowed')
 
         if os.path.exists(storagelocation) and not overwrite:
-            logger.info(f'Loading {storagelocation} trajectory storage containing {self.numTrajectories} trajectories')
+            logger.info(f'Loading from {storagelocation} a {self}')
 
         if not os.path.exists(storagelocation) or overwrite:
             logger.info(f'Creating new trajectory storage at {storagelocation}')
@@ -99,10 +99,17 @@ class TrajectoryStorage(object):
 
     def __str__(self):
         ntraj = self.numTrajectories
+        allproj, counts = self.projectionCounts
+        nproj = len(allproj)
         if ntraj == 1:
-            string = 'TrajectoryStorage with {} trajectory'.format(ntraj)
+            string = f'TrajectoryStorage with {ntraj} trajectory'
         else:
-            string = 'TrajectoryStorage with {} trajectories'.format(ntraj)
+            string = f'TrajectoryStorage with {ntraj} trajectories'
+        if nproj == 1:
+            string += f' and 1 projection ({allproj[0]})'
+        else:
+            string += f' and {nproj} projections'
+
         return string
 
     def __repr__(self):
@@ -340,6 +347,7 @@ class TrajectoryStorage(object):
         from multiprocessing import Process
         from multiprocessing import JoinableQueue as Queue
         import signal
+        from moleculekit.molecule import Molecule
 
         if projectionName is None:
             projectionName = str(type(projection))
@@ -350,6 +358,9 @@ class TrajectoryStorage(object):
         alltraj = self._getAllTrajectoriesAsDicts()
 
         unique_mol = None
+        unique_topo = self._singleTopology()
+        if unique_topo is not None:
+            unique_mol = Molecule(unique_topo)
 
         input_queue = Queue()
         output_queue = Queue()
@@ -360,7 +371,7 @@ class TrajectoryStorage(object):
         processes = []
 
         original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN) # Set SIGINT to ignore so that child processes inherit it
-        processes = [Process(target=_project_worker, args=(input_queue, output_queue, projection, unique_mol, skip)) for x in range(numWorkers)]
+        processes = [Process(target=_project_worker, args=(input_queue, output_queue, projection, unique_mol, skip)) for _ in range(numWorkers)]
         for p in processes:
             p.start()
         signal.signal(signal.SIGINT, original_sigint_handler)  # Set back the original signal handler
@@ -389,6 +400,32 @@ class TrajectoryStorage(object):
 
         for p in processes:
             p.join()
+
+
+    def _singleTopology(self):
+        from moleculekit.molecule import mol_equal
+        from htmd.util import ensurelist
+
+        with h5py.File(self.storagelocation, 'a') as f:
+            alltopo = []
+            for trajname in f['trajectories']: 
+                currtrajtopos = f['trajectories'][trajname]['topology_files']
+                alltopo.append(tuple([currtrajtopos[piece].attrs['topology_file'] for piece in currtrajtopos]))
+
+        uqtopo = list(set(alltopo))
+
+        if len(uqtopo) == 0:
+            raise RuntimeError('No topologies found in TrajectoryStorage')
+        elif len(uqtopo) == 1:
+            return uqtopo[0]
+        elif len(uqtopo) > 1:  # If more than one molfile load them and see if they are different Molecules
+            ref = Molecule(uqtopo[0], _logger=False)
+            for i in range(1, len(uqtopo)):
+                mol = Molecule(uqtopo[i], _logger=False)
+                if not mol_equal(ref, mol, exceptFields=['coords']):
+                    return None
+            return uqtopo[0]
+        return None
 
 
 def _calcRef(pieces, fileloc):
