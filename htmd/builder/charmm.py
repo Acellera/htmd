@@ -94,7 +94,8 @@ def defaultStream():
 
 
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, aliasresidues=None, psfgen=None, execute=True, _clean=True):
+          saltanion=None, saltcation=None, disulfide=None, regenerate=['angles', 'dihedrals'], patches=None, noregen=None, 
+          aliasresidues=None, psfgen=None, execute=True, _clean=True):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -135,6 +136,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     disulfide : list of pairs of atomselection strings
         If None it will guess disulfide bonds. Otherwise provide a list pairs of atomselection strings for each pair of
         residues forming the disulfide bridge.
+    regenerate : None or list of strings of: ['angles', 'dihedrals']
+        Disable angle/dihedral regeneration with `regenerate=None`, or enable it with `regenerate=['angles', 'diheldrals']` 
+        or just one of the two options with `regenerate=['angles']` or `regenerate=['diheldrals']`.
     patches : list of str
         Any further patches the user wants to apply
     noregen : list of str
@@ -296,8 +300,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         f.write('\n')
 
     # Regenerate angles and dihedrals
-    f.write('regenerate angles dihedrals\n')
-    f.write('\n')
+    if regenerate is not None:
+        f.write('regenerate {}\n'.format(' '.join(regenerate)))
+        f.write('\n')
 
     # Printing non-regenerable patches
     if len(noregenpatches) != 0:
