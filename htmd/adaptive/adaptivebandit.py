@@ -12,6 +12,91 @@ logger = logging.getLogger(__name__)
 
 
 class AdaptiveBandit(AdaptiveBase):
+    """
+
+    Parameters
+    ----------
+    app : :class:`SimQueue <htmd.queues.simqueue.SimQueue>` object, default=None
+        A SimQueue class object used to retrieve and submit simulations
+    project : str, default='adaptive'
+        The name of the project
+    nmin : int, default=1
+        Minimum number of running simulations
+    nmax : int, default=1
+        Maximum number of running simulations
+    nepochs : int, default=1000
+        Stop adaptive once we have reached this number of epochs
+    nframes : int, default=0
+        Stop adaptive once we have simulated this number of aggregate simulation frames.
+    inputpath : str, default='input'
+        The directory used to store input folders
+    generatorspath : str, default='generators'
+        The directory containing the generators
+    dryrun : boolean, default=False
+        A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations
+    updateperiod : float, default=0
+        When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
+    coorname : str, default='input.coor'
+        Name of the file containing the starting coordinates for the new simulations
+    lock : bool, default=False
+        Lock the folder while adaptive is ongoing
+    datapath : str, default='data'
+        The directory in which the completed simulations are stored
+    filter : bool, default=True
+        Enable or disable filtering of trajectories.
+    filtersel : str, default='not water'
+        Filtering atom selection
+    filteredpath : str, default='filtered'
+        The directory in which the filtered simulations will be stored
+    projection : :class:`Projection <moleculekit.projections.projection.Projection>` object, default=None
+        A Projection class object or a list of objects which will be used to project the simulation data before
+        constructing a Markov model
+    goalfunction : function, default=None
+        This function will be used to convert the goal-projected simulation data to a ranking whichcan be used for the
+        directed component of FAST.
+    reward_method : str, default='max'
+        The reward method
+    skip : int, default=1
+        Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
+    lag : int, default=1
+        The lagtime used to create the Markov model. Units are in frames.
+    exploration : float, default=0.5
+        Exploration is the coefficient used in UCB algorithm to weight the exploration value
+    temperature : int, default=300
+        Temperature used to compute the free energy
+    ticalag : int, default=20
+        Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
+    ticadim : int, default=3
+        Number of TICA dimensions to use. When set to 0 it disables TICA
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` class, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
+        Clustering algorithm used to cluster the contacts or distances
+    macronum : int, default=8
+        The number of macrostates to produce
+    save : bool, default=False
+        Save the model generated
+    save_qval : bool, default=False
+        Save the Q(a) and N values for every epoch
+    actionspace : str, default='metric'
+        The action space
+    recluster : bool, default=False
+        If to recluster the action space.
+    reclusterMethod : , default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
+        Clustering method for reclustering.
+    random : bool, default=False
+        Random decision mode for baseline.
+    reward_mode : str, default='parent'
+        (parent, frame)
+    reward_window : int, default=None
+        The reward window
+    pucb : bool, default=False
+        If True, it uses PUCB algorithm using the provided goal function as a prior
+    goal_init : float, default=0.3
+        The proportional ratio of goal initialization compared to max frames set by nframes
+    goal_preprocess : function, default=None
+        This function will be used to preprocess goal data after it has been computed for all frames.
+    actionpool : int, default=0
+        The number of top scoring actions used to randomly select respawning simulations
+    """
     def __init__(self):
         from sklearn.base import ClusterMixin
         from moleculekit.projections.projection import Projection
@@ -28,7 +113,7 @@ class AdaptiveBandit(AdaptiveBase):
                   'can be used for the directed component of FAST.', None, val.Function(), nargs='any')
         self._arg('reward_method', 'str', 'The reward method', 'max', val.String())
         self._arg('skip', 'int', 'Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame', 1, val.Number(int, 'POS'))
-        self._arg('lag', 'int', 'The lagtime used to create the Markov model', 1, val.Number(int, 'POS'))
+        self._arg('lag', 'int', 'The lagtime used to create the Markov model. Units are in frames.', 1, val.Number(int, 'POS'))
         self._arg('exploration', 'float', 'Exploration is the coefficient used in UCB algorithm to weight the exploration value', 0.5, val.Number(float, 'OPOS'))
         self._arg('temperature', 'int', 'Temperature used to compute the free energy', 300, val.Number(int, 'POS'))
         self._arg('ticalag', 'int', 'Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.', 20, val.Number(int, '0POS'))
