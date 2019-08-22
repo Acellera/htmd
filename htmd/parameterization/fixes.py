@@ -35,7 +35,10 @@ def fixPhosphateTypes(molecule):
     >>> fitGasteigerCharges(mol) # doctest: +ELLIPSIS
     Traceback (most recent call last):
     ...
-    AttributeError: 'NoneType' object has no attribute 'GetNumAtoms'
+    RuntimeError: RDKit error
+    [...]     MOL: warning - O.co2 with non C.2 or S.o2 neighbor.
+    <BLANKLINE>
+    <BLANKLINE>
 
     >>> new_mol = fixPhosphateTypes(mol)
 
@@ -47,7 +50,7 @@ def fixPhosphateTypes(molecule):
      'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H' 'H'
      'H' 'H' 'H' 'H' 'H' 'H']
 
-    >>> print(new_mol.bondtype)
+    >>> print(new_mol.bondtype) # doctest: +NORMALIZE_WHITESPACE
     ['2' '1' '1' '1' '1' '2' '1' 'ar' 'ar' 'ar' 'ar' '1' 'ar' 'ar' '1' '2' '1'
      '1' '1' '1' '1' '1' '1' 'ar' 'ar' '2' '1' '1' '1' '1' '1' '1' '1' '1' '1'
      '1' 'am' 'am' 'am' '1' '1' '1' '1' '1' '1' '1' '1' '1' '1' '1' '1' '1' '1'
