@@ -48,7 +48,7 @@ def fitGasteigerCharges(mol, atom_types=None):
     array([-0.411509...,  0.205754...,  0.205754...], dtype=float32)
     """
 
-    from htmd.util import _convertMoleculeToRDKitMol
+    from moleculekit.rdkitintegration import _convertMoleculeToRDKitMol
     from rdkit.Chem.rdPartialCharges import ComputeGasteigerCharges
 
     if not isinstance(mol, Molecule):
