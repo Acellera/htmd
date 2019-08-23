@@ -9,23 +9,19 @@ from subprocess import call
 import inspect
 import htmdx
 import json
-import requests
+import urllib.request
+import urllib.parse
 import platform
 
 has_connection = True
-
-
-def main_do_nothing():
-    import htmd
-
 
 def htmd_do_register():
     do_register('htmd')
 
 def show_news():
     try:
-        r = requests.get("https://www.htmd.org/news/content", timeout=(3.05, 3.05))
-        print(r.content.decode("ascii"))
+        response = urllib.request.urlopen('https://www.htmd.org/news/content', timeout=3.05)
+        print(response.read().decode('ascii'))
     except:
         pass
 
@@ -37,33 +33,32 @@ def check_approval(product, reg_file):
     # if "HTMD" in jj: return True
     # if "htmd" in jj: return True
 
-    j = {}
+    registration_data = {}
     try:
         with open(os.path.join(reg_file), "r") as f:
-            j = json.load(f)
+            registration_data = json.load(f)
     except:
         # Couldn't read registration file
         return False
 
-    if not j['ret']:
+    if not registration_data['ret']:
         # There's no registration code in the file
         return False
 
     # Do online check
     try:
         payload = {
-            'code': j['ret'],
+            'code': registration_data['ret'],
             'product': product
         }
-        r = requests.post("https://www.acellera.com/licensing/htmd/check.php", params=payload, timeout=(3.05, 3.05))
-        ret = json.loads(r.content.decode("ascii"))
+        data = urllib.parse.urlencode(payload).encode('ascii')
+        with urllib.request.urlopen("https://www.acellera.com/licensing/htmd/check.php", data, timeout=3.05) as f:
+            ret = json.loads(f.read().decode("ascii"))
+
         if 'approved' in ret:
             return True
         if 'pending' in ret:
             return True
-        #    except requests.exceptions.Timeout as e:
-        # dont' trigger registration if connection timed out
-        #      return True
     except:
         return True
 
@@ -123,7 +118,7 @@ def do_register(product=None):
     print(" Please enter your name, affiliation and institutional email address.\n")
     print(" Please provide valid information so that it might be verified.\n")
 
-    while email == "" or not ("@" in email):
+    while email == "" or not ("@" in email) or not ('.' in email):
         print(" Institutional Email : ", end="")
         sys.stdout.flush()
         email = input().strip()
@@ -132,6 +127,7 @@ def do_register(product=None):
         print(" Full name   : ", end="")
         sys.stdout.flush()
         name = input().strip()
+        
     while institution == "":
         print(" Institution : ", end="")
         sys.stdout.flush()
@@ -147,7 +143,6 @@ def do_register(product=None):
         sys.stdout.flush()
         country = input().strip()
 
-    import requests
     payload = {
         'name': name,
         'institution': institution,
@@ -157,80 +152,56 @@ def do_register(product=None):
         'country': country
     }
     try:
-        r = requests.post("https://www.acellera.com/licensing/htmd/register.php", params=payload)
-        ret = json.dumps(r.content.decode("ascii"))
+        data = urllib.parse.urlencode(payload).encode('ascii')
+        with urllib.request.urlopen("https://www.acellera.com/licensing/htmd/register.php", data) as f:
+            text = f.read().decode("ascii")
 
-        prefix = os.path.join(os.path.expanduser('~'), '.htmd')
-        if not os.path.exists(prefix):
-            os.mkdir(prefix)
-        prefix = os.path.join(prefix, '.registered-' + product)
-        if not os.path.exists(prefix):
-            os.mkdir(prefix)
+        prefix = os.path.join(os.path.expanduser('~'), '.htmd', '.registered-' + product))
+        os.makedirs(prefix, exist_ok=True)
         regfile = os.path.join(prefix, "registration")
-        fh = open(regfile, "w")
-        fh.write(r.content.decode("ascii"))
-        fh.close()
+        with open(regfile, "w") as fh:
+            fh.write(text)
         print("")
     except:
         print("\nCould not register!\n")
 
 
-def check_ipython_profile():
-    prefix = os.path.join(os.path.expanduser('~'), '.ipython')
-    if not os.path.exists(prefix):
-        os.mkdir(prefix)
-    prefix = os.path.join(prefix, 'profile_default')
-    if not os.path.exists(prefix):
-        os.mkdir(prefix)
-    prefix = os.path.join(prefix, 'startup')
-    if not os.path.exists(prefix):
-        os.mkdir(prefix)
-
-    prefix = os.path.join(prefix, "00-htmd.py")
-    if not os.path.exists(prefix):
-        f = open(prefix, "w")
-        f.write("from htmd.ui import *\n")
-        f.close()
-
-
 def main_activate():
     import sys
-    import requests
     if len(sys.argv) != 2:
-      print("\n Acellera License Installation\n\n Syntax: activate [activation token]\n\nPlease contact support@acellera.com for licensing\n\n" )
-      sys.exit(0)
-    
-    token=sys.argv[1]
-    r = requests.get( "https://licensing.acellera.com/issue/?token=" + token )
-    if ( r.status_code != 200 ):
-       print("\n Error: " + r.text + "(" + str(r.status_code) + ")\n\n" )
+        print("\n Acellera License Installation\n\n Syntax: activate [activation token]\n\nPlease contact support@acellera.com for licensing\n\n")
+        sys.exit(0)
+
+    token = sys.argv[1]
+    response = urllib.request.urlopen("https://licensing.acellera.com/issue/?token="+token)
+    text = response.read()
+    if isinstance(text, bytes):
+        text = text.decode('ascii')
+
+    if response.status != 200:
+        print("\n Error: " + text + "(" + str(response.status) + ")\n\n")
     else:
-       prefix = os.path.join(os.path.expanduser('~'), ".acellera" );
-       try: 
-         os.mkdir( prefix )
-       except:
-         pass
-       f = open(os.path.join( prefix, "license.dat"), "a" )   
-       try:      
-         print(r.content.decode("ascii"), file=f )
-       except:
-         print(r.content, file=f )
-       f.close()
-       print( "\n License installed in ~/.acellera/license.dat\n\n" );
-       try:
-         f = open(os.path.join( "/opt/acellera/license.dat"), "a" )   
+        prefix = os.path.join(os.path.expanduser('~'), ".acellera")
+        try:
+            os.mkdir(prefix)
+        except:
+            pass
+    
+        with open(os.path.join(prefix, "license.dat"), "a") as f:
+            f.write(text)
             
-         print(r.content.decode("ascii"), file=f )
-         f.close()
-         print( "\n License installed in /opt/acellera/license.dat\n\n" );
-       except:
-         pass
+        print("\n License installed in ~/.acellera/license.dat\n\n")
+        try:
+            with open(os.path.join("/opt/acellera/license.dat"), "a") as f:
+                f.write(text)
+            print("\n License installed in /opt/acellera/license.dat\n\n")
+        except:
+            pass
 
 
 def main_htmd():
     check_registration(product="htmd")
 
-    #    check_ipython_profile()
     sys.argv.append('--no-banner')
     sys.argv.append('--no-confirm-exit')
     if ('DISPLAY' in os.environ) and os.environ['DISPLAY']:
@@ -244,8 +215,6 @@ def main_htmd():
 def main_htmd_notebook():
     import sys
     check_registration(product="htmd")
-
-    #    check_ipython_profile()
 
     from notebook.notebookapp import main
     sys.exit(main())
