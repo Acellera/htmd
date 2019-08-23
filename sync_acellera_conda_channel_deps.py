@@ -34,7 +34,6 @@ packages = [
     ['rdkit', 'rdkit'],
     ['rdkit', 'boost'],
     ['conda-forge', 'nlopt'],
-    ['conda-forge', 'periodictable']
 ]
 
 # Package arguments

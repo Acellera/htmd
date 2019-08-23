@@ -151,8 +151,7 @@ def readPREPI(mol, prepi):
 
 
 def readFRCMOD(atomtypes, frcmod):
-    from periodictable import elements
-    mass2element = {e.mass: e.symbol for e in list(elements._element.values())[1:]}
+    from moleculekit.periodictable import elements_from_masses
 
     # Read MASS section
     with open(frcmod) as file:
@@ -162,9 +161,7 @@ def readFRCMOD(atomtypes, frcmod):
     mass_by_atomtype = {line.split()[0]: float(line.split()[1]) for line in section.group(1).split('\n')}
     element_by_atomtype = {}
     for at in mass_by_atomtype:
-        for m in mass2element:
-            if np.isclose(mass_by_atomtype[at], m, atol=1e-1):
-                element_by_atomtype[at] = mass2element[m]
+        element_by_atomtype[at] = elements_from_masses(mass_by_atomtype[at])
 
     element_by_idx = np.array([element_by_atomtype[at] for at in atomtypes]).astype(np.object)
     mass_by_idx = np.array([mass_by_atomtype[at] for at in atomtypes]).astype(np.float32)
