@@ -19,7 +19,7 @@ class Psi4(QMBase):
     - Single-point energy calculations with HF and DFT.
     - Electronic properties: dipole and quadrupole monents, Mulliken charges, ESP at given points
     - Geometry optimization with/without dihedral restraints
-    - Can use various queuing systems and on AceCloud
+    - Can use various queuing systems
 
     Attributes
     ----------
@@ -109,8 +109,8 @@ class Psi4(QMBase):
             [ 0.37527978]]])
 
     The QM calculations run using LocalCPUQueue by default, but this can be changed to the others.
-    >>> from htmd.queues.acecloudqueue import AceCloudQueue
-    >>> qm.queue = AceCloudQueue() # doctest: +SKIP
+    >>> from htmd.queues.slurmqueue import SlurmQueue
+    >>> qm.queue = SlurmQueue() # doctest: +SKIP
     """
 
     @property
