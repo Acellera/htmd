@@ -73,6 +73,9 @@ def getArgumentParser():
     # NNP module name
     parser.add_argument('--nnp', help=argparse.SUPPRESS)
 
+    # Token
+    parser.add_argument('--pm-token', help=argparse.SUPPRESS)
+
     # Debug mode
     parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
 
