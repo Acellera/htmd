@@ -8,8 +8,8 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 from protocolinterface import ProtocolInterface, val
-from htmd.queues.simqueue import SimQueue
 from htmd.queues.localqueue import LocalCPUQueue
+from htmd.queues.playqueue import PlayQueue
 import logging
 
 logger = logging.getLogger(__name__)
@@ -188,8 +188,8 @@ class QMBase(ABC, ProtocolInterface):
         # Wait only if there is something to wait for
         # TODO: queue object should handle this logic
         if self.queue._dirs:
-            if isinstance(self.queue, LocalCPUQueue):
-                self.queue.wait(sentinel=False) # TODO: sentinel is still broken
+            if isinstance(self.queue, (LocalCPUQueue, PlayQueue)):
+                self.queue.wait(sentinel=False)
             else:
                 self.queue.wait(sentinel=True)
             self.queue.retrieve()
