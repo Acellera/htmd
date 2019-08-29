@@ -253,6 +253,11 @@ def _get_queue(args):
     elif args.queue == 'PBS':
         from htmd.queues.pbsqueue import PBSQueue
         queue = PBSQueue()  # TODO: configure
+    elif args.queue == 'PlayQueue':
+        from htmd.queues.playqueue import PlayQueue
+        queue = PlayQueue()  # TODO: configure
+        queue.token = args.pm_token
+        queue.app = 'Psi4'
     else:
         raise AssertionError()
 
@@ -566,6 +571,7 @@ def main_parameterize(arguments=None, progress=None):
     # Parse arguments
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
+    args.queue = 'PlayQueue' if args.pm_token else args.queue
     _printArguments(args)
 
     # Validate arguments
