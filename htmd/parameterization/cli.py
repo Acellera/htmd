@@ -55,7 +55,7 @@ def getArgumentParser():
                         help='Number of iterations during the dihedral parameter fitting')
     parser.add_argument('--dihed-fit-type', default='NRS', choices=['iterative', 'NRS'],
                         help='Dihedral fitting method. Can be either iterative or naive random search (NRS).')
-    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
+    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
                                                                       'defaults)')
@@ -250,11 +250,6 @@ def _get_queue(args):
     elif args.queue == 'PBS':
         from htmd.queues.pbsqueue import PBSQueue
         queue = PBSQueue()  # TODO: configure
-    elif args.queue == 'AceCloud':
-        from htmd.queues.acecloudqueue import AceCloudQueue
-        queue = AceCloudQueue()  # TODO: configure
-        queue.groupname = args.groupname
-        queue.hashnames = True
     else:
         raise AssertionError()
 
