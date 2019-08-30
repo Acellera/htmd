@@ -373,33 +373,32 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
-if __name__ == "__main__":
-    from htmd.home import home
-    from htmd.util import tempname
-    import filecmp
-    from glob import glob
-    from os.path import join
-
-    def _cutfirstline(infile, outfile):
+import unittest
+class _TestProduction(unittest.TestCase):
+    def _cutfirstline(self, infile, outfile):
         # Cut out the first line of prmtop which has a build date in it
         with open(infile, 'r') as fin:
             data = fin.read().splitlines(True)
         with open(outfile, 'w') as fout:
             fout.writelines(data[1:])
 
-    def _compareResultFolders(compare, tmpdir, pid):
+    def _compareResultFolders(self, compare, tmpdir, pid):
+        from glob import glob
+        import os
+        import filecmp
+
         ignore_ftypes = ('.log', '.txt')
         files = []
         deletefiles = []
-        for f in glob(join(compare, '*')):
+        for f in glob(os.path.join(compare, '*')):
             fname = os.path.basename(f)
             if os.path.splitext(f)[1] in ignore_ftypes:
                 continue
             if f.endswith('prmtop'):
-                _cutfirstline(f, join(compare, fname + '.mod'))
-                _cutfirstline(join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
+                self._cutfirstline(f, os.path.join(compare, fname + '.mod'))
+                self._cutfirstline(os.path.join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
                 files.append(os.path.basename(f) + '.mod')
-                deletefiles.append(join(compare, fname + '.mod'))
+                deletefiles.append(os.path.join(compare, fname + '.mod'))
             else:
                 files.append(os.path.basename(f))
 
@@ -411,42 +410,89 @@ if __name__ == "__main__":
         for f in deletefiles:
             os.remove(f)
 
-    # Test ACEMD version 2
+    def test_acemd2(self):
+        from htmd.util import tempname
+        from htmd.home import home
+        from glob import glob
+        import os
 
-    pd = Production(_version=2)
-    pd.runtime = 4
-    pd.timeunits = 'ns'
-    pd.temperature = 300
-    pd.useconstraints = True
-    pd.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
-    pd.fb_reference = 'protein and name CA'
-    pd.fb_selection = 'resname MOL and noh'
-    pd.fb_box = [-21, 21, -19, 19, 29, 30]
-    pd.fb_k = 5
-    tmpdir = tempname()
-    pd.write(home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd2', 'protLig', 'postrun')), tmpdir)
+        pd = Production(_version=2)
+        pd.runtime = 4
+        pd.timeunits = 'ns'
+        pd.temperature = 300
+        pd.useconstraints = True
+        pd.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
+        pd.fb_reference = 'protein and name CA'
+        pd.fb_selection = 'resname MOL and noh'
+        pd.fb_box = [-21, 21, -19, 19, 29, 30]
+        pd.fb_k = 5
+        tmpdir = tempname()
+        pd.write(home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd2', 'protLig', 'postrun')), tmpdir)
 
-    # Compare with reference
-    refdir = home(dataDir=os.path.join('test-protocols', 'production', 'acemd2', 'protLig', 'prerun'))
-    files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
-    _compareResultFolders(refdir, tmpdir, 'protLig')
+        # Compare with reference
+        refdir = home(dataDir=os.path.join('test-protocols', 'production', 'acemd2', 'protLig', 'prerun'))
+        files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
+        self._compareResultFolders(refdir, tmpdir, 'protLig')
 
-    # Test new ACEMD version 3
+    def test_acemd3(self):
+        from htmd.util import tempname
+        from htmd.home import home
+        from glob import glob
+        import os
 
-    pd = Production(_version=3)
-    pd.runtime = 4
-    pd.timeunits = 'ns'
-    pd.temperature = 300
-    pd.useconstraints = True
-    pd.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
-    pd.fb_reference = 'protein and name CA'
-    pd.fb_selection = 'resname MOL and noh'
-    pd.fb_box = [-21, 21, -19, 19, 29, 30]
-    pd.fb_k = 5
-    tmpdir = tempname()
-    pd.write(home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd3', 'protLig', 'postrun')), tmpdir)
+        pd = Production(_version=3)
+        pd.runtime = 4
+        pd.timeunits = 'ns'
+        pd.temperature = 300
+        pd.useconstraints = True
+        pd.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
+        pd.fb_reference = 'protein and name CA'
+        pd.fb_selection = 'resname MOL and noh'
+        pd.fb_box = [-21, 21, -19, 19, 29, 30]
+        pd.fb_k = 5
+        tmpdir = tempname()
+        pd.write(home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd3', 'protLig', 'postrun')), tmpdir)
 
-    # Compare with reference
-    refdir = home(dataDir=os.path.join('test-protocols', 'production', 'acemd3', 'protLig', 'prerun'))
-    files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
-    _compareResultFolders(refdir, tmpdir, 'protLig')
+        # Compare with reference
+        refdir = home(dataDir=os.path.join('test-protocols', 'production', 'acemd3', 'protLig', 'prerun'))
+        files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
+        self._compareResultFolders(refdir, tmpdir, 'protLig')
+
+    def test_run_water(self):
+        from htmd.util import tempname
+        from htmd.home import home
+        from glob import glob
+        from subprocess import check_output
+        import subprocess
+        import shutil
+        import os
+
+        acemd3exe = shutil.which('acemd3', mode=os.X_OK)
+        if not acemd3exe:
+            raise NameError('Could not find acemd3, or no execute permissions are given')
+
+        for system in ['amber-equil-completed', 'charmm-equil-completed']:
+            pd = Production(_version=3)
+            pd.runtime = 5
+            pd.timeunits = 'steps'
+            pd.temperature = 300
+            pd.constraints = {}
+            # Set these down for tiny box size of water
+            pd.acemd.cutoff = 3
+            pd.acemd.switchdistance = 2
+            ######
+            tmpdir = tempname()
+            pd.write(home(dataDir=os.path.join('test-acemd', 'tiny-water', system)), tmpdir)
+            try:
+                res = check_output(['acemd3', '--platform', 'CPU', '--playmolecule'], cwd=tmpdir)  # Remember to set ACEMD_PM_TOKEN
+            except subprocess.CalledProcessError as exc:
+                assert False, f'Failed to run due to error: {exc}\n\n ---> Error log:\n\n{exc.output.decode("ascii")}'
+            res = res.decode('utf-8').strip()
+            print(res)
+            assert res.endswith('Completed simulation!'), 'Failed at system ' + system
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
+
+
