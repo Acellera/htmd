@@ -13,7 +13,6 @@ from htmd.qm.base import QMBase
 from htmd.qm import Psi4, Gaussian
 from htmd.queues.localqueue import LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
-from htmd.queues.acecloudqueue import AceCloudQueue
 from moleculekit.molecule import Molecule
 from moleculekit.dihedral import dihedralAngle
 
@@ -335,18 +334,6 @@ class TestPsi4Slurm(TestBase, unittest.TestCase):
     def test_queue(self):
 
         self.assertIsInstance(self.qm.queue, SlurmQueue)
-
-
-class TestPsi4AceCloud(TestBase, unittest.TestCase):
-
-    def setUp(self):
-
-        # TODO finish
-        self.skipTest('No AceCloud tests')
-
-        self.qm = Psi4()
-        self.qm.queue = AceCloudQueue()
-        super().setUp()
 
 
 class TestGaussian(TestBase, unittest.TestCase):
