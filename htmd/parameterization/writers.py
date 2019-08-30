@@ -190,7 +190,7 @@ def writePRM(mol, parameters, filename):
 
 
 def writeRTF(mol, parameters, netcharge, filename):
-    import periodictable
+    from moleculekit.periodictable import periodictable_by_number
     from htmd.version import version as htmdversion
 
     f = open(filename, "w")
@@ -200,7 +200,7 @@ def writeRTF(mol, parameters, netcharge, filename):
     types = getSortedAndUniqueTypes(mol.atomtype, 'atom_types')
     for type in types:
         val = parameters.atom_types[type]
-        print("MASS %5d %s %8.5f %s" % (val.number, type, val.mass, periodictable.elements[val.atomic_number]), file=f)
+        print("MASS %5d %s %8.5f %s" % (val.number, type, val.mass, periodictable_by_number[val.atomic_number].symbol), file=f)
     print("\nAUTO ANGLES DIHE\n", file=f)
     assert np.unique(mol.resname).size == 1 # Check if all atoms have the same residue name
     print("RESI %s %8.5f" % (mol.resname[0], netcharge), file=f)

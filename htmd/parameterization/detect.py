@@ -7,7 +7,7 @@ import logging
 from collections import OrderedDict
 import itertools
 import networkx as nx
-from periodictable import elements
+from moleculekit.periodictable import periodictable
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def _getMolecularGraph(molecule):
 
     graph = nx.Graph()
     for i, element in enumerate(molecule.element):
-        graph.add_node(i, element=element, number=elements.symbol(element.capitalize()).number)
+        graph.add_node(i, element=element, number=periodictable[element.capitalize()].number)
     graph.add_edges_from(molecule.bonds)
 
     return graph

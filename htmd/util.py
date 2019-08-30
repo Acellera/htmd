@@ -6,9 +6,8 @@
 
 import tempfile
 import logging
-import re
-import io
 import os
+import sys
 import numpy as np
 
 
@@ -203,4 +202,4 @@ if __name__ == "__main__":
     from moleculekit.molecule import Molecule
     import doctest
 
-    doctest.testmod()
+    sys.exit(doctest.testmod().failed)
