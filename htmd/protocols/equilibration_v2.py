@@ -498,6 +498,7 @@ class _TestEquilibration(unittest.TestCase):
         from htmd.util import tempname
         from htmd.home import home
         from glob import glob
+        import subprocess
         from subprocess import check_output
         import shutil
         import os
@@ -519,7 +520,10 @@ class _TestEquilibration(unittest.TestCase):
             ######
             tmpdir = tempname()
             eq.write(home(dataDir=os.path.join('test-acemd', 'tiny-water', system)), tmpdir)
-            res = check_output(['acemd3', '--platform', 'CPU'], cwd=tmpdir)
+            try:
+                res = check_output(['acemd3', '--platform', 'CPU'], cwd=tmpdir)
+            except subprocess.CalledProcessError as exc:
+                assert False, f'Failed to run due to error: {exc}\n\n ---> Error log:\n\n{exc.output.decode("ascii")}'
             res = res.decode('utf-8').strip()
             assert 'Completed minimization' in res, 'Failed at system ' + system
             assert res.endswith('Completed simulation!'), 'Failed at system ' + system

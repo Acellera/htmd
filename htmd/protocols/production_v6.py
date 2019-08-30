@@ -463,6 +463,7 @@ class _TestProduction(unittest.TestCase):
         from htmd.home import home
         from glob import glob
         from subprocess import check_output
+        import subprocess
         import shutil
         import os
 
@@ -482,7 +483,10 @@ class _TestProduction(unittest.TestCase):
             ######
             tmpdir = tempname()
             pd.write(home(dataDir=os.path.join('test-acemd', 'tiny-water', system)), tmpdir)
-            res = check_output(['acemd3', '--platform', 'CPU'], cwd=tmpdir)
+            try:
+                res = check_output(['acemd3', '--platform', 'CPU'], cwd=tmpdir)
+            except subprocess.CalledProcessError as exc:
+                assert False, f'Failed to run due to error: {exc}\n\n ---> Error log:\n\n{exc.output.decode("ascii")}'
             res = res.decode('utf-8').strip()
             print(res)
             assert res.endswith('Completed simulation!'), 'Failed at system ' + system
