@@ -29,7 +29,7 @@ class PlayQueue(SimQueue, ProtocolInterface):
         self._arg('token', 'str', 'PM token', required=True, validator=String())
         self._arg('app', 'str', 'App name', required=True, validator=String())
 
-        self._jobIDs = {}
+        self._dirs = {}
 
     def _getSession(self):
 
@@ -37,51 +37,52 @@ class PlayQueue(SimQueue, ProtocolInterface):
 
         return Session(self.token)
 
-    def _makeZIP(self, directory):
+    def _makeZIP(self, dir_):
 
-        zipFile = os.path.join(directory, 'input.zip')
+        zipFile = os.path.join(dir_, 'input.zip')
 
-        files = os.listdir(directory)
+        files = os.listdir(dir_)
         with zipfile.ZipFile(zipFile, 'w') as zf:
             for file in files:
-                zf.write(os.path.join(directory, file), arcname=file)
+                zf.write(os.path.join(dir_, file), arcname=file)
 
         return zipFile
 
-    def submit(self, directories):
+    def submit(self, dirs):
 
-        self._dirs = self._submitinit(directories)
+        dirs = [dirs, ] if isinstance(dirs, str) else dirs
 
-        for directory in self._dirs:
+        for dir_ in dirs:
             job = self._getSession().startApp(self.app)
-            job.input = self._makeZIP(directory)
+            job.input = self._makeZIP(dir_)
             job.submit()
-            self._jobIDs[directory] = job._execid
+            self._dirs[job._execid] = dir_
 
     def inprogress(self):
 
         counter = 0
-        for directory in self._dirs:
-            job = self._getSession().getJob(id=self._jobIDs[directory])
+        for jobID in self._dirs:
+            job = self._getSession().getJob(id=jobID)
             status = job.getStatus(_logger=False)
             if status in (0, 1, 2, 3, 6, 7): # Queuing, running, etc.
                 counter += 1
             elif status in (4, 5): # Completed or errored
                 pass
             else:
-                raise ValueError('Unknow job status')
+                raise ValueError('Unknown job status')
 
         return counter
 
     def retrieve(self):
 
-        for directory in self._dirs:
-            job = self._getSession().getJob(id=self._jobIDs[directory])
+        for jobID, dir_ in list(self._dirs.items()):
+            job = self._getSession().getJob(id=jobID)
             with tempfile.TemporaryDirectory() as tmpDir:
                 outDir = job.retrieve(path=tmpDir)
                 if outDir:
                     for file in os.listdir(outDir):
-                        shutil.copy(os.path.join(outDir, file), directory)
+                        shutil.copy(os.path.join(outDir, file), dir_)
+                    self._dirs.pop(jobID)
 
     def stop(self):
         raise NotImplemented()
