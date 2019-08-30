@@ -156,7 +156,7 @@ def do_register(product=None):
         with urllib.request.urlopen("https://www.acellera.com/licensing/htmd/register.php", data) as f:
             text = f.read().decode("ascii")
 
-        prefix = os.path.join(os.path.expanduser('~'), '.htmd', '.registered-' + product))
+        prefix = os.path.join(os.path.expanduser('~'), '.htmd', '.registered-' + product)
         os.makedirs(prefix, exist_ok=True)
         regfile = os.path.join(prefix, "registration")
         with open(regfile, "w") as fh:
