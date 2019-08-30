@@ -54,9 +54,13 @@ class PlayQueue(SimQueue, ProtocolInterface):
 
         for dir_ in dirs:
             job = self._getSession().startApp(self.app)
-            job.input = self._makeZIP(dir_)
-            job.submit()
+            job.input = self._makeZIP(dir_) # TODO this is Psi4 specific
+            job.submit(_logger=False)
             self._dirs[job._execid] = dir_
+            logger.info(f'Submitted job {job._execid}:')
+            logger.info(f'    App name: {self.app}')
+            logger.info(f'    Input directory: {dir_}')
+            logger.info(f'    Resources: {self.ngpu} GPUs, {self.ncpu} CPUs, {self.memory} MB of memory')
 
     def inprogress(self):
 
@@ -78,11 +82,19 @@ class PlayQueue(SimQueue, ProtocolInterface):
         for jobID, dir_ in list(self._dirs.items()):
             job = self._getSession().getJob(id=jobID)
             with tempfile.TemporaryDirectory() as tmpDir:
-                outDir = job.retrieve(path=tmpDir)
-                if outDir:
+                status = job.getStatus(_logger=False)
+                if status in (4, 5):
+                    logger.info(f'Job {jobID} completed:')
+                    logger.info(f'    Status: {status}')
+                    outDir = job.retrieve(_logger=False, path=tmpDir)
                     for file in os.listdir(outDir):
                         shutil.copy(os.path.join(outDir, file), dir_)
                     self._dirs.pop(jobID)
+                    logger.info(f'    Retrieved results to {dir_}')
+                elif status in (0, 1, 2, 3, 6, 7):
+                    pass
+                else:
+                    raise ValueError('Unknown job status')
 
     def stop(self):
         raise NotImplemented()
