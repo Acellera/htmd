@@ -273,7 +273,8 @@ class Model(object):
         its = msm.its(self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=_config['ncpus'])
         if plot or (save is not None):
             from matplotlib import pylab as plt
-            plt.ion()
+            if plot:
+                plt.ion()
             plt.figure()
             try:
                 mplt.plot_implied_timescales(its, dt=self.data.fstep, units='ns')
@@ -283,6 +284,7 @@ class Model(object):
                                  'Please correct the model.data.fstep to correspond to the simulation frame step in nanoseconds.')
             if save is not None:
                 plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+                plt.close()
             if plot:
                 plt.show()
         if results:
