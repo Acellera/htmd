@@ -494,6 +494,7 @@ class _TestEquilibration(unittest.TestCase):
         files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
         self._compareResultFolders(refdir, tmpdir, 'protLig')
 
+    @unittest.skipUnless('ACE3ARG' in os.environ, 'Untrusted PR')
     def test_run_water(self):
         from htmd.util import tempname
         from htmd.home import home
