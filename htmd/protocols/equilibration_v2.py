@@ -521,7 +521,7 @@ class _TestEquilibration(unittest.TestCase):
             tmpdir = tempname()
             eq.write(home(dataDir=os.path.join('test-acemd', 'tiny-water', system)), tmpdir)
             try:
-                res = check_output(['acemd3', '--platform', 'CPU', os.getenv('ACE3ARG')], cwd=tmpdir)
+                res = check_output(['acemd3', '--platform', 'CPU', '--playmolecule'], cwd=tmpdir)  # Remember to set ACEMD_PM_TOKEN
             except subprocess.CalledProcessError as exc:
                 assert False, f'Failed to run due to error: {exc}\n\n ---> Error log:\n\n{exc.output.decode("ascii")}'
             res = res.decode('utf-8').strip()
