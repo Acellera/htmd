@@ -64,6 +64,9 @@ class PlayQueue(SimQueue, ProtocolInterface):
 
     def inprogress(self):
 
+        # TODO updated to use playmolecule.Job.getChildren
+        #      see https://github.com/Acellera/htmd/pull/910
+
         counter = 0
         for jobID in self._dirs:
             job = self._getSession().getJob(id=jobID)
