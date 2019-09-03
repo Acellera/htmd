@@ -17,7 +17,13 @@ class TeraChem(QMBase):
         return 'terachem terachem.in &> terachem.out'
 
     def _completed(self, directory):
-        return os.path.exists(os.path.join(directory, 'timer.dat'))
+
+        with open(os.path.join(directory, 'terachem.out')) as fd:
+            for line in fd.readlines():
+                if line.startswith(' Job terminated:'):
+                    return True
+
+        return False
 
     def _writeInput(self, directory, iframe):
 
