@@ -73,6 +73,9 @@ def getArgumentParser():
     # NNP module name
     parser.add_argument('--nnp', help=argparse.SUPPRESS)
 
+    # Token
+    parser.add_argument('--pm-token', help=argparse.SUPPRESS)
+
     # Debug mode
     parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
 
@@ -88,7 +91,7 @@ def _printArguments(args, filename=None):
 
     logger.info('=== Arguments ===')
     for key, value in sorted(vars(args).items()):
-        if key in ('fake_qm',):  # Hidden
+        if key in ('fake_qm', 'pm_token'):  # Hidden
             continue
         logger.info('{:>20s}: {:s}'.format(key, str(value)))
 
@@ -250,6 +253,11 @@ def _get_queue(args):
     elif args.queue == 'PBS':
         from htmd.queues.pbsqueue import PBSQueue
         queue = PBSQueue()  # TODO: configure
+    elif args.queue == 'PlayQueue':
+        from htmd.queues.playqueue import PlayQueue
+        queue = PlayQueue()  # TODO: configure
+        queue.token = args.pm_token
+        queue.app = 'Psi4'
     else:
         raise AssertionError()
 
@@ -563,6 +571,7 @@ def main_parameterize(arguments=None, progress=None):
     # Parse arguments
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
+    args.queue = 'PlayQueue' if args.pm_token else args.queue
     _printArguments(args)
 
     # Validate arguments
