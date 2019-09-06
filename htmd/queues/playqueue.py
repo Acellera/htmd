@@ -43,10 +43,14 @@ class PlayQueue(SimQueue, ProtocolInterface):
 
     @staticmethod
     def _getCurrentJobID():
-
         # TODO this could be part of PM API
 
-        with open('/data/in/config') as fd:
+        configFile = '/data/in/config'
+
+        if not os.path.exists(configFile):
+            return None
+
+        with open(configFile) as fd:
             return json.load(fd)['execid']
 
     def _makeZIP(self, dir_):
