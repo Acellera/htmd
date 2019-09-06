@@ -6,7 +6,9 @@
 import logging
 import os
 import shutil
+import sys
 import tempfile
+import time
 import zipfile
 
 from htmd.queues.simqueue import SimQueue
@@ -25,6 +27,7 @@ class PlayQueue(SimQueue, ProtocolInterface):
         self._arg('ngpu', 'int', 'Number of GPUs', default=0, validator=Number(int, '0POS'))
         self._arg('ncpu', 'int', 'Number of CPUs', default=1, validator=Number(int, '0POS'))
         self._arg('memory', 'int', 'Amount of memory (MB)', default=1000, validator=Number(int, 'POS'))
+        self._arg('max_jobs', 'int', 'Maximum number of concurent jobs', default=sys.maxsize, validator=Number(int, 'POS'))
 
         self._arg('token', 'str', 'PM token', required=True, validator=String())
         self._arg('app', 'str', 'App name', required=True, validator=String())
@@ -50,9 +53,16 @@ class PlayQueue(SimQueue, ProtocolInterface):
 
     def submit(self, dirs):
 
-        dirs = [dirs, ] if isinstance(dirs, str) else dirs
+        logger.info(f'Maximum number of concurrent jobs: {self.max_jobs}')
 
+        dirs = [dirs, ] if isinstance(dirs, str) else dirs
         for dir_ in dirs:
+
+            # Delay submission
+            while self.inprogress() >= self.max_jobs:
+                time.sleep(5)
+
+            # Submit a job
             job = self._getSession().startApp(self.app)
             job.input = self._makeZIP(dir_) # TODO this is Psi4 specific
             job.submit(_logger=False)
