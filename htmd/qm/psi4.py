@@ -115,7 +115,7 @@ class Psi4(QMBase):
 
     @property
     def _command(self):
-        return 'export HTMD_PSI4_WORKDIR=$(pwd)\npsi4 -i psi4.in -o psi4.out &> psi4.log'
+        return 'psi4 -i psi4.in -o psi4.out &> psi4.log'
 
     def _completed(self, directory):
         # Abuse "timer.dat" to detect if a Psi4 job has completed.
@@ -178,10 +178,6 @@ class Psi4(QMBase):
             theory = 'SCF' if self.theory == 'HF' else self.theory
             theory += '' if self.correction == 'none' else '-%s' % self.correction
             f.write('energy, wfn = %s(\'%s\', return_wfn=True)\n\n' % (function, theory))
-
-            # Psi4 changes directory then PCM is used, so we need to return
-            f.write('import os\n')
-            f.write('os.chdir(os.environ[\'HTMD_PSI4_WORKDIR\'])\n\n')
 
             f.write('oeprop(wfn, \'DIPOLE\', \'QUADRUPOLE\', \'MULLIKEN_CHARGES\')\n')
             if self.esp_points is not None:
