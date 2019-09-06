@@ -566,7 +566,7 @@ def main_parameterize(arguments=None, progress=None):
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
 
-    progress = progress if callable(progress) else lambda x: None
+    progress = progress if callable(progress) else lambda x, **kwds: None
 
     logger.info('===== Parameterize =====')
 
