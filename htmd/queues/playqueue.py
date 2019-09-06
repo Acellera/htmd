@@ -3,6 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import json
 import logging
 import os
 import shutil
@@ -40,6 +41,14 @@ class PlayQueue(SimQueue, ProtocolInterface):
 
         return Session(self.token)
 
+    @staticmethod
+    def _getCurrentJobID():
+
+        # TODO this could be part of PM API
+
+        with open('/data/in/config') as fd:
+            return json.load(fd)['execid']
+
     def _makeZIP(self, dir_):
 
         zipFile = os.path.join(dir_, 'input.zip')
@@ -65,7 +74,7 @@ class PlayQueue(SimQueue, ProtocolInterface):
             # Submit a job
             job = self._getSession().startApp(self.app)
             job.input = self._makeZIP(dir_) # TODO this is Psi4 specific
-            job.submit(_logger=False)
+            job.submit(_logger=False, childOf=self._getCurrentJobID())
             self._dirs[job._execid] = dir_
             logger.info(f'Submitted job {job._execid}:')
             logger.info(f'    App name: {self.app}')
