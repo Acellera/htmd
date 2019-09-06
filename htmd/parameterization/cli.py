@@ -685,7 +685,7 @@ def main_parameterize(arguments=None, progress=None):
 
         from htmd.parameterization.dihedral import DihedralFitting  # Slow import
 
-        progress('Scan dihedral angles')
+        progress('Scan dihedral angles', num_jobs=36*len(selected_dihedrals))
         logger.info('=== Dihedral angle scanning ===')
 
         if args.dihed_opt_type == 'None':
