@@ -119,7 +119,7 @@ class PlayQueue(SimQueue, ProtocolInterface):
                 elif status == 5:
                     logger.info(f'Job {jobID} failed (status: {status})')
                     self._dirs.pop(jobID)
-                elif status in (0, 1, 2, 3, 5, 6, 7):
+                elif status in (0, 1, 2, 3, 6, 7):
                     pass
                 else:
                     raise ValueError('Unknown job status')
