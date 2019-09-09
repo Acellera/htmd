@@ -109,14 +109,16 @@ class PlayQueue(SimQueue, ProtocolInterface):
             job = self._getSession().getJob(id=jobID)
             with tempfile.TemporaryDirectory() as tmpDir:
                 status = job.getStatus(_logger=False)
-                if status in (4, 5):
-                    logger.info(f'Job {jobID} completed:')
-                    logger.info(f'    Status: {status}')
+                if status == 4:
+                    logger.info(f'Job {jobID} completed (status: {status}):')
                     outDir = job.retrieve(_logger=False, path=tmpDir)
                     for file in os.listdir(outDir):
                         shutil.copy(os.path.join(outDir, file), dir_)
                     self._dirs.pop(jobID)
                     logger.info(f'    Retrieved results to {dir_}')
+                elif status == 5:
+                    logger.info(f'Job {jobID} failed (status: {status})')
+                    self._dirs.pop(jobID)
                 elif status in (0, 1, 2, 3, 6, 7):
                     pass
                 else:
