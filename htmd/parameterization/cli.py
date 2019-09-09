@@ -566,7 +566,7 @@ def main_parameterize(arguments=None, progress=None):
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
 
-    progress = progress if callable(progress) else lambda x: None
+    progress = progress if callable(progress) else lambda x, **kwds: None
 
     logger.info('===== Parameterize =====')
 
@@ -685,7 +685,7 @@ def main_parameterize(arguments=None, progress=None):
 
         from htmd.parameterization.dihedral import DihedralFitting  # Slow import
 
-        progress('Scan dihedral angles')
+        progress('Scan dihedral angles', num_jobs=36*len(selected_dihedrals))
         logger.info('=== Dihedral angle scanning ===')
 
         if args.dihed_opt_type == 'None':
