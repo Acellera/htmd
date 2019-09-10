@@ -289,12 +289,12 @@ class QMBase(ABC, ProtocolInterface):
         Example
         -------
 
-        >>> result = qm.run()
+        >>> result = qm.run() # doctest: +SKIP
 
         It is equivalent to:
-        >>> qm.setup()
-        >>> qm.submit()
-        >>> result = qm.retrieve()
+        >>> qm.setup() # doctest: +SKIP
+        >>> qm.submit() # doctest: +SKIP
+        >>> result = qm.retrieve() # doctest: +SKIP
 
         Return
         ------
@@ -302,10 +302,16 @@ class QMBase(ABC, ProtocolInterface):
             List of QMResult objects (one for each molecule frames).
         """
 
-        self.setup()
-        self.submit()
-        return self.retrieve()
+        self.setup() # doctest: +SKIP
+        self.submit() # doctest: +SKIP
+        return self.retrieve() # doctest: +SKIP
 
 
 if __name__ == '__main__':
-    pass
+
+    import doctest
+    import sys
+
+    import htmd
+
+    sys.exit(doctest.testmod().failed)
