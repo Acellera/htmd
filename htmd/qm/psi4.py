@@ -7,7 +7,7 @@ import os
 import numpy as np
 from scipy import constants as const
 
-import periodictable as pt
+from moleculekit.periodictable import periodictable
 
 from htmd.qm.base import QMBase, QMResult
 
@@ -142,7 +142,7 @@ class Psi4(QMBase):
             f.write('set { reference %s }\n\n' % reference)
 
             # Set basis sets
-            atomic_number = lambda element: pt.elements.symbol(element).number
+            atomic_number = lambda element: periodictable[element.capitalize()].number
             elements = sorted(np.unique(self._molecule.element), key=atomic_number)
             element_basis = [self.substituteBasisSet(element, self.basis) for element in elements]
             f.write('basis = \'\'\n')
