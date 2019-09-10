@@ -136,7 +136,6 @@ class QMBase(ABC, ProtocolInterface):
                 else:
                     raise ValueError()
                 new_basis_sets = f'def2-{core}V{polar}{diffuse}'
-
         else:
             raise RuntimeError()
 

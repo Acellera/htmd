@@ -147,8 +147,8 @@ class Psi4(QMBase):
             element_basis = [self.substituteBasisSet(element, self.basis) for element in elements]
             f.write('basis = \'\'\n')
             for element, basis in zip(elements, element_basis):
-                f.write(f'basis += \'assign {element} {basis}\'\n')
-            f.write('psi4.basis_helper(basis)\n\n')
+                f.write(f'basis += \'assign {element} {basis}\\n\'\n')
+            f.write('psi4.basis_helper(basis, name=\'custom\')\n\n')
 
             if self.solvent == 'vacuum':
                 pass
