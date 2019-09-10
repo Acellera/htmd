@@ -8,8 +8,8 @@ import logging
 import os
 import re
 
+from moleculekit.periodictable import periodictable
 import numpy as np
-from periodictable import elements
 from protocolinterface import ProtocolInterface, val
 
 from htmd.queues.localqueue import LocalCPUQueue
@@ -71,7 +71,7 @@ class QMBase(ABC, ProtocolInterface):
     SOLVENTS = ('vacuum', 'PCM')
 
     @staticmethod
-    def substituteBasisSet(element_symbol, basis_sets):
+    def substituteBasisSet(element, basis_sets):
         """
         Substitute basis sets for heavy elements
 
@@ -109,7 +109,7 @@ class QMBase(ABC, ProtocolInterface):
         'def2-TZVPD'
         """
 
-        element = elements.symbol(element_symbol)
+        element = periodictable[element]
         if basis_sets not in QMBase.BASIS_SETS:
             raise ValueError(f'Unrecognized basis sets {basis_sets}')
 
@@ -119,7 +119,7 @@ class QMBase(ABC, ProtocolInterface):
         match_pople = re.match('^(3-21|6-31|6-311)([\+]{0,2})G[\*]{0,2}$', basis_sets)
 
         if match_dunning:
-            if element .number > 18:
+            if element.number > 18:
                 core = {'D': 'S', 'T': 'TZ', 'Q':'QZ'}[match_dunning.group(2)]
                 diffuse = 'D' if match_dunning.group(1) else ''
                 new_basis_sets = f'def2-{core}VP{diffuse}'
