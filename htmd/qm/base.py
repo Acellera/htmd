@@ -71,9 +71,32 @@ class QMBase(ABC, ProtocolInterface):
     SOLVENTS = ('vacuum', 'PCM')
 
     @staticmethod
-    def substituteBasisSet(element, basis_sets):
+    def substituteBasisSet(element, basis_set):
         """
-        Substitute basis sets for heavy elements
+        Substitute basis sets, if a given element does not have a requested basis set.
+
+        Pople (6-31G, etc.) and Dunning (cc-pVDZ, etc.) basis sets are replaced with
+        Ahlrichs-Karlsruhe (def2-SVP, etc.) basis sets for elements heavier than Ar.
+
+        Arguments
+        ---------
+        element : str
+            Element symbol
+        basis_set : str
+            Requested basis set name
+
+        Return
+        ------
+        new_basis_set : str
+            Substituted basis set name
+
+        References
+        ----------
+        https://www.basissetexchange.org
+        http://www.psicode.org/psi4manual/master/basissets_byelement.html
+
+        Examples
+        --------
 
         >>> from htmd.qm.base import QMBase
         ffevaluate module is in beta version
@@ -110,19 +133,19 @@ class QMBase(ABC, ProtocolInterface):
         """
 
         element = periodictable[element]
-        if basis_sets not in QMBase.BASIS_SETS:
-            raise ValueError(f'Unrecognized basis sets {basis_sets}')
+        if basis_set not in QMBase.BASIS_SETS:
+            raise ValueError(f'Unrecognized basis sets {basis_set}')
 
-        new_basis_sets = basis_sets
+        new_basis_set = basis_set
 
-        match_dunning = re.match('^(|aug-)cc-pV(D|T|Q)Z$', basis_sets)
-        match_pople = re.match('^(3-21|6-31|6-311)([\+]{0,2})G[\*]{0,2}$', basis_sets)
+        match_dunning = re.match('^(|aug-)cc-pV(D|T|Q)Z$', basis_set)
+        match_pople = re.match('^(3-21|6-31|6-311)([\+]{0,2})G[\*]{0,2}$', basis_set)
 
         if match_dunning:
             if element.number > 18:
                 core = {'D': 'S', 'T': 'TZ', 'Q':'QZ'}[match_dunning.group(2)]
                 diffuse = 'D' if match_dunning.group(1) else ''
-                new_basis_sets = f'def2-{core}VP{diffuse}'
+                new_basis_set = f'def2-{core}VP{diffuse}'
         elif match_pople:
             if element.number > 18:
                 if match_pople.group(1) == '3-21':
@@ -135,14 +158,14 @@ class QMBase(ABC, ProtocolInterface):
                     diffuse = 'D' if match_pople.group(2) and match_pople.group(2) else ''
                 else:
                     raise ValueError()
-                new_basis_sets = f'def2-{core}V{polar}{diffuse}'
+                new_basis_set = f'def2-{core}V{polar}{diffuse}'
         else:
             raise RuntimeError()
 
-        if basis_sets != new_basis_sets:
-            logger.info(f'Basis set substitution for {element.symbol}: {basis_sets} --> {new_basis_sets}')
+        if basis_set != new_basis_set:
+            logger.info(f'Basis set substitution for {element.symbol}: {basis_set} --> {new_basis_set}')
 
-        return new_basis_sets
+        return new_basis_set
 
     def __init__(self):
         from moleculekit.molecule import Molecule
