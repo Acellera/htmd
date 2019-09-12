@@ -102,6 +102,15 @@ REF_MULTISTRUCTURE_ENERGIES = {}
 REF_MULTISTRUCTURE_ENERGIES[0] = -704.6590602770854
 REF_MULTISTRUCTURE_ENERGIES[1] = -684.8589617509701
 
+# For Br with HF
+# Note: basis sets are substituted
+REF_BR_ENERGIES = {}
+REF_BR_ENERGIES['3-21G']       = -1614005.9194762693
+REF_BR_ENERGIES['6-31+G*']     = -1614007.7511329607
+REF_BR_ENERGIES['6-311++G**']  = -1614204.3952243670
+REF_BR_ENERGIES['cc-pVDZ']     = -1614005.9194762693
+REF_BR_ENERGIES['aug-cc-pVTZ'] = -1614204.3952243670
+
 
 class TestBase:
 
@@ -117,6 +126,9 @@ class TestBase:
 
         molFile = os.path.join(home('test-qm'), 'H2O2-90.mol2')
         self.h2o2_90 = Molecule(molFile)
+
+        molFile = os.path.join(home('test-qm'), 'Br.mol2')
+        self.Br = Molecule(molFile)
 
     def test_type(self):
 
@@ -299,6 +311,21 @@ class TestBase:
             for ires, result in enumerate(results):
                 self.assertFalse(result.errored, msg=ires)
                 self.assertAlmostEqual(REF_MULTISTRUCTURE_ENERGIES[ires], result.energy, msg=ires)
+
+    def test_basis_set_substitution(self):
+
+        for basis in ('3-21G', '6-31+G*', '6-311++G**', 'cc-pVDZ', 'aug-cc-pVTZ'):
+            with self.subTest(basis=basis):
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    #tmpDir = '.'
+                    self.qm.molecule = self.Br
+                    self.qm.multiplicity = 2
+                    self.qm.theory = 'HF'
+                    self.qm.basis = basis
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored)
+                    self.assertAlmostEqual(REF_BR_ENERGIES[basis], result.energy)
 
 
 class TestPsi4Local(TestBase, unittest.TestCase):

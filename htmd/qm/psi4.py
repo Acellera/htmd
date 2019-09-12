@@ -7,6 +7,8 @@ import os
 import numpy as np
 from scipy import constants as const
 
+from moleculekit.periodictable import periodictable
+
 from htmd.qm.base import QMBase, QMResult
 
 
@@ -127,6 +129,8 @@ class Psi4(QMBase):
 
         with open(os.path.join(directory, 'psi4.in'), 'w') as f:
 
+            f.write('import psi4\n\n')
+
             f.write('set_num_threads(%d)\n' % self.queue.ncpu)
             f.write('set_memory(\'{} MB\')\n\n'.format(self.queue.memory))
 
@@ -135,8 +139,16 @@ class Psi4(QMBase):
 
             reference = 'r' if self.multiplicity == 1 else 'u'
             reference += 'hf' if self.theory == 'HF' else 'ks'
-            f.write('set { reference %s }\n' % reference)
-            f.write('set { basis %s }\n\n' % self.basis)
+            f.write('set { reference %s }\n\n' % reference)
+
+            # Set basis sets
+            atomic_number = lambda element: periodictable[element.capitalize()].number
+            elements = sorted(np.unique(self._molecule.element), key=atomic_number)
+            element_basis = [self.substituteBasisSet(element, self.basis) for element in elements]
+            f.write('basis = \'\'\n')
+            for element, basis in zip(elements, element_basis):
+                f.write(f'basis += \'assign {element} {basis}\\n\'\n')
+            f.write('psi4.basis_helper(basis, name=\'custom\')\n\n')
 
             if self.solvent == 'vacuum':
                 pass
