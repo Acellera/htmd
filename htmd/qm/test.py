@@ -112,7 +112,7 @@ REF_BR_ENERGIES['cc-pVDZ']     = -1614005.9194762693
 REF_BR_ENERGIES['aug-cc-pVTZ'] = -1614204.3952243670
 
 
-class TestBase:
+class _TestBase:
 
     def setUp(self):
 
@@ -328,7 +328,7 @@ class TestBase:
                     self.assertAlmostEqual(REF_BR_ENERGIES[basis], result.energy)
 
 
-class TestPsi4Local(TestBase, unittest.TestCase):
+class _TestPsi4Local(_TestBase, unittest.TestCase):
 
     def setUp(self):
 
@@ -339,7 +339,7 @@ class TestPsi4Local(TestBase, unittest.TestCase):
         super().setUp()
 
 
-class TestPsi4Slurm(TestBase, unittest.TestCase):
+class _TestPsi4Slurm(_TestBase, unittest.TestCase):
 
     def setUp(self):
 
@@ -362,7 +362,7 @@ class TestPsi4Slurm(TestBase, unittest.TestCase):
         self.assertIsInstance(self.qm.queue, SlurmQueue)
 
 
-class TestGaussian(TestBase, unittest.TestCase):
+class _TestGaussian(_TestBase, unittest.TestCase):
 
     def setUp(self):
 
