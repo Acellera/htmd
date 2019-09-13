@@ -27,7 +27,7 @@ def _issueWarnings():
 
     if '1.17' not in disabledversions:
         warnings.warn('As of HTMD 1.17 the default number of threads HTMD spawns for calculations is set to 1. ' \
-                    'You can enable parallelism at your own risk using `config(ncpus=-2)` in the beginning of your scripts. ' \
+                    'You can enable parallelism at your own risk using `config(njobs=-2)` in the beginning of your scripts. ' \
                     'To disable this warning run once: `from htmd import _disableWarnings; _disableWarnings(\'1.17\');`'
         , UserWarning)
 

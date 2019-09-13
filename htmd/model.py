@@ -535,7 +535,7 @@ class Model(object):
         from htmd.config import _config
         from htmd.parallelprogress import ParallelExecutor, delayed
         # This loop really iterates over states. sampleStates returns an array of arrays
-        # Removed ncpus because it was giving errors on some systems.
+        # Don't increase njobs because it was giving errors on some systems.
         aprun = ParallelExecutor(n_jobs=1)
         mols = aprun(total=len(relframes), desc='Getting state Molecules')\
             (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist) for rel in relframes)

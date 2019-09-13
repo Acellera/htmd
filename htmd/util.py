@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def _getNjobs():
     from htmd.config import _config
-    njobs = _config['ncpus']
+    njobs = _config['njobs']
     if njobs < 0:
         import multiprocessing
         njobs = multiprocessing.cpu_count() + njobs + 1

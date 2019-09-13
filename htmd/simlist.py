@@ -257,7 +257,7 @@ def simfilter(sims, outfolder, filtersel, njobs=None):
 
     from htmd.config import _config
     from htmd.parallelprogress import ParallelExecutor, delayed
-    aprun = ParallelExecutor(n_jobs=njobs if njobs is not None else _config['ncpus'])
+    aprun = ParallelExecutor(n_jobs=njobs if njobs is not None else _config['njobs'])
     filtsims = aprun(total=len(sims), desc='Filtering trajectories')(delayed(_filtSim)(i, sims, outfolder, filtersel) for i in range(len(sims)))
 
     logger.debug('Finished filtering of simulations')

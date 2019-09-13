@@ -143,7 +143,7 @@ class Metric:
 
         logger.debug('Metric: Starting projection of trajectories.')
         from htmd.config import _config
-        aprun = ParallelExecutor(n_jobs=njobs if njobs is not None else _config['ncpus'])
+        aprun = ParallelExecutor(n_jobs=njobs if njobs is not None else _config['njobs'])
         results = aprun(total=numSim, desc='Projecting trajectories')(delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
 
         metrics = np.empty(numSim, dtype=object)
