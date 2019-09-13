@@ -6,7 +6,7 @@
 import os
 
 _config = {'viewer': 'VMD',
-           'ncpus': -2,
+           'ncpus': 1,
            'acemdversion': 3,
            'configfile': os.getenv('HTMD_CONFIG') if os.getenv('HTMD_CONFIG') else None,
            'lsf': None,
