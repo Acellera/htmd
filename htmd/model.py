@@ -217,7 +217,7 @@ class Model(object):
         return macro_ofcluster
 
     def plotTimescales(self, lags=None, minlag=None, maxlag=None, numlags=25, units='frames', errors=None, nits=None,
-                       results=False, plot=True, save=None):
+                       results=False, plot=True, save=None, njobs=-2):
         """ Plot the implied timescales of MSMs of various lag times
 
         Parameters
@@ -242,6 +242,9 @@ class Model(object):
             If the method should display the plot of implied timescales
         save : str
             Path of the file in which to save the figure
+        njobs : int
+            Number of parallel jobs to spawn for calculation of timescales. Negative numbers are used for spawning jobs as many as CPU threads. 
+            -1: for all CPUs -2: for all except one etc.
 
         Returns
         -------
@@ -270,7 +273,7 @@ class Model(object):
             nits = np.min((self.data.K, 20))
 
         from htmd.config import _config
-        its = msm.its(self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=_config['ncpus'])
+        its = msm.its(self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=njobs) # Use all CPUs minus one
         if plot or (save is not None):
             from matplotlib import pylab as plt
             plt.ion()
@@ -532,8 +535,8 @@ class Model(object):
         from htmd.config import _config
         from htmd.parallelprogress import ParallelExecutor, delayed
         # This loop really iterates over states. sampleStates returns an array of arrays
-        # Removed ncpus because it was giving errors on some systems.
-        aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
+        # Don't increase njobs because it was giving errors on some systems.
+        aprun = ParallelExecutor(n_jobs=1)
         mols = aprun(total=len(relframes), desc='Getting state Molecules')\
             (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist) for rel in relframes)
         return np.array(mols, dtype=object)

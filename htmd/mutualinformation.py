@@ -78,7 +78,13 @@ class MutualInformation:
         self.graph = None
 
 
-    def calculate(self):
+    def calculate(self, njobs=1):
+        """
+        Parameters
+        ----------
+        njobs : int
+            Number of parallel jobs to spawn for the calculation of MI
+        """
         from htmd.config import _config
         from htmd.parallelprogress import ParallelExecutor
         numchi = self.chi.numDimensions
@@ -86,7 +92,7 @@ class MutualInformation:
         stconcat = np.concatenate(self.model.data.St)
         microcat = self.model.micro_ofcluster[stconcat]
 
-        aprun = ParallelExecutor(n_jobs=_config['ncpus'])
+        aprun = ParallelExecutor(n_jobs=njobs)
         res = aprun(total=numchi, desc='Calculating MI')(delayed(self._parallelAll)(numchi, dih1, 4, self.model.micronum, self.bindihcat, microcat, statdist) for dih1 in range(numchi))
         MI_all = np.zeros((len(self.resids), len(self.resids)))
         for r in res:

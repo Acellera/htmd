@@ -6,7 +6,6 @@
 import warnings
 import numpy as np
 import random
-from htmd.util import _getNcpus
 from htmd.projections.metric import Metric, _projectionGenerator
 from htmd.units import convert as unitconvert
 from joblib import Parallel, delayed
@@ -32,6 +31,8 @@ class TICA(object):
     dimensions : list
         A list of dimensions of the original data on which to apply TICA. All other dimensions will stay unaltered.
         If None is given, it will apply on all dimensions.
+    njobs : int
+        Number of jobs to spawn for parallel computation of TICA components. If None it will use the default from htmd.config.
 
     Example
     -------
@@ -55,12 +56,14 @@ class TICA(object):
     for Markov model construction. J. Chem. Phys., 139 . 015102.
     """
 
-    def __init__(self, data, lag, units='frames', dimensions=None):
+    def __init__(self, data, lag, units='frames', dimensions=None, njobs=None):
         from pyemma.coordinates.transform.tica import TICA as TICApyemma
         from tqdm import tqdm
+        from htmd.util import _getNjobs
 
         self.data = data
         self.dimensions = dimensions
+        self.njobs = njobs if njobs is not None else _getNjobs()
 
         if isinstance(data, Metric):  # Memory efficient TICA projecting trajectories on the fly
             if units != 'frames':
@@ -69,7 +72,7 @@ class TICA(object):
             metr = data
 
             pbar = tqdm(total=len(metr.simulations))
-            for proj in _projectionGenerator(metr, _getNcpus()):
+            for proj in _projectionGenerator(metr, self.njobs):
                 for pro in proj:
                     if pro is None:
                         continue
@@ -127,7 +130,7 @@ class TICA(object):
             k = -1
             droppedsims = []
             pbar = tqdm(total=len(metr.simulations))
-            for projecteddata in _projectionGenerator(metr, _getNcpus()):
+            for projecteddata in _projectionGenerator(metr, self.njobs):
                 for pro in projecteddata:
                     k += 1
                     if pro is None:

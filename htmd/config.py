@@ -4,9 +4,12 @@
 # No redistribution in whole or part
 #
 import os
+import logging
+
+logger = logging.getLogger(__file__)
 
 _config = {'viewer': 'VMD',
-           'ncpus': -2,
+           'njobs': 1,
            'acemdversion': 3,
            'configfile': os.getenv('HTMD_CONFIG') if os.getenv('HTMD_CONFIG') else None,
            'lsf': None,
@@ -15,7 +18,8 @@ _config = {'viewer': 'VMD',
 
 
 def config(viewer=_config['viewer'],
-           ncpus=_config['ncpus'],
+           ncpus=None,
+           njobs=_config['njobs'],
            acemdversion=_config['acemdversion'],
            configfile=_config['configfile'],
            lsf=_config['lsf'],
@@ -27,8 +31,10 @@ def config(viewer=_config['viewer'],
     ----------
     viewer : str
         Defines the backend viewer for molecular visualization
-    ncpus : int
-        Defines the number of cpus available for several HTMD operations
+    njobs : int
+        Defines the number of parallel jobs spawned for several HTMD operations.
+        Negative numbers are used for spawning jobs as many as CPU threads. 
+        -1: for all CPUs -2: for all except one etc.
     configfile : str
         Defines the HTMD configuration file that is called at the beginning of importing
     lsf : str
@@ -37,7 +43,11 @@ def config(viewer=_config['viewer'],
         Defines a YAML file that can contain default profile configurations for an SlurmQueue
     """
     _config['viewer'] = viewer
-    _config['ncpus'] = ncpus
+    if ncpus is not None:
+        logger.warning('The ncpus config option has been renamed to njobs. Please use njobs instead.')
+        _config['njobs'] = ncpus
+    else:
+        _config['njobs'] = njobs
     _config['acemdversion'] = acemdversion
     _config['configfile'] = configfile
     _config['lsf'] = lsf
