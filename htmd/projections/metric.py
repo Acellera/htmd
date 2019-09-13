@@ -101,9 +101,15 @@ class Metric:
                 pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
         return pandamap
 
-    def project(self):
+    def project(self, njobs=None):
         """
         Applies all projections stored in Metric on all simulations.
+
+        Parameters
+        ----------
+        njobs : int
+            Number of parallel jobs to spawn for projection of trajectories. Take care that this can use large amounts 
+            of memory as multiple trajectories are loaded at once.  If None it will use the default from htmd.config.
 
         Returns
         -------
@@ -137,7 +143,7 @@ class Metric:
 
         logger.debug('Metric: Starting projection of trajectories.')
         from htmd.config import _config
-        aprun = ParallelExecutor(n_jobs=_config['ncpus'])
+        aprun = ParallelExecutor(n_jobs=njobs if njobs is not None else _config['ncpus'])
         results = aprun(total=numSim, desc='Projecting trajectories')(delayed(_processSim)(self.simulations[i], self.projectionlist, uqMol, self.skip) for i in range(numSim))
 
         metrics = np.empty(numSim, dtype=object)
@@ -298,10 +304,10 @@ def _singleMolfile(sims):
     return False, []
 
 
-def _projectionGenerator(metric, ncpus):
-    for i in range(0, len(metric.simulations), ncpus):
-        simrange = range(i, np.min((i+ncpus, len(metric.simulations))))
-        results = Parallel(n_jobs=ncpus, verbose=0)(delayed(_projector)(metric, i) for i in simrange)
+def _projectionGenerator(metric, njobs):
+    for i in range(0, len(metric.simulations), njobs):
+        simrange = range(i, np.min((i+njobs, len(metric.simulations))))
+        results = Parallel(n_jobs=njobs, verbose=0)(delayed(_projector)(metric, i) for i in simrange)
         yield results
 
 
