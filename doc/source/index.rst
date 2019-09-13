@@ -27,7 +27,7 @@ The user guide is a good place to start playing around.
 
 .. toctree::
     :maxdepth: 3
-
+    Installation <https://software.acellera.com/install-htmd.html>
     userguide
     api
     developers
