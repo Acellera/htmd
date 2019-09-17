@@ -391,16 +391,16 @@ def _fit_initial_charges(mol, args, atom_types):
 
             mol = fitGasteigerCharges(mol, atom_types=atom_types)
 
+            charge = int(round(np.sum(mol.charge)))
+            if args.charge != charge:
+                logger.warning(f'Molecular charge is {args.charge}, but Gasteiger atomic charges add up to {charge}!')
+                args.charge = charge
+
             # Print the initial charges
             logger.info('Initial atomic charges:')
             for name, charge in zip(mol.name, mol.charge):
                 logger.info('   {:4s}: {:6.3f}'.format(name, charge))
             logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
-
-            charge = int(round(np.sum(mol.charge)))
-            if args.charge != charge:
-                raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
-                    args.charge, charge))
 
         elif args.min_type in ('None', 'qm'):
             logger.info('Initial atomic charges are not required')
@@ -446,8 +446,8 @@ def _fit_charges(mol, args, qm, atom_types):
 
         charge = int(round(np.sum(mol.charge)))
         if args.charge != charge:
-            raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
-                args.charge, charge))
+            logger.warning(f'Molecular charge is {args.charge}, but Gasteiger atomic charges add up to {charge}!')
+            args.charge = charge
 
     elif args.charge_type == 'AM1-BCC':
 
