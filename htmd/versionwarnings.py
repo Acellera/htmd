@@ -13,7 +13,10 @@ except:
 
 def _issueWarnings():
     if not os.path.exists(_warningsfile):
-        return
+        return  # Don't issue warnings if we failed to create the disable file
+
+    if ('CI' in os.environ) and os.environ['CI']:
+        return  # Don't issue warnings if running in CI
 
     with open(_warningsfile, 'r') as f:
         disabledversions = f.read().splitlines()
