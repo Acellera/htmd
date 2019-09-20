@@ -27,7 +27,9 @@ class _Trajectory(object):
     @staticmethod
     def _getFileMd5sum(trajectory):
         import hashlib
-        return hashlib.md5(open(trajectory, 'rb').read()).hexdigest()
+        with open(trajectory, 'rb') as f:
+            filemd5 = hashlib.md5(f.read()).hexdigest()
+        return filemd5
 
     @staticmethod
     def _getStringMd5sum(string):
@@ -403,7 +405,7 @@ class TrajectoryStorage(object):
 
 
     def _singleTopology(self):
-        from moleculekit.molecule import mol_equal
+        from moleculekit.molecule import Molecule, mol_equal
         from htmd.util import ensurelist
 
         with h5py.File(self.storagelocation, 'a') as f:
