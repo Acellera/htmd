@@ -6,22 +6,21 @@
 
 import tempfile
 import logging
-import re
-import io
 import os
+import sys
 import numpy as np
 
 
 logger = logging.getLogger(__name__)
 
 
-def _getNcpus():
+def _getNjobs():
     from htmd.config import _config
-    ncpus = _config['ncpus']
-    if ncpus < 0:
+    njobs = _config['njobs']
+    if njobs < 0:
         import multiprocessing
-        ncpus = multiprocessing.cpu_count() + ncpus + 1
-    return ncpus
+        njobs = multiprocessing.cpu_count() + njobs + 1
+    return njobs
 
 
 def tempname(suffix='', create=False):
@@ -203,4 +202,4 @@ if __name__ == "__main__":
     from moleculekit.molecule import Molecule
     import doctest
 
-    doctest.testmod()
+    sys.exit(doctest.testmod().failed)

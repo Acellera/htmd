@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 from htmd.version import version as _version
+from htmd.versionwarnings import _issueWarnings, _disableWarnings
 import __main__ as main
 import os.path
 from htmd.config import _config
@@ -37,3 +38,5 @@ if _config['configfile']:
             raise RuntimeError('Failed to execute the HTMD Config file {}.'.format(_config['configfile']))
         else:
             print('\nHTMD Config file {} executed.'.format(_config['configfile']))
+
+_issueWarnings()

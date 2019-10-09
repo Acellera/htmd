@@ -68,7 +68,7 @@ class AdaptiveGoal(AdaptiveMD):
     skip : int, default=1
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
-        The lagtime used to create the Markov model
+        The lagtime used to create the Markov model. Units are in frames.
     clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` class, default=<class 'htmd.clustering.kcenters.KCenter'>
         Clustering algorithm used to cluster the contacts or distances
     method : str, default='1/Mc'

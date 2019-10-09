@@ -217,7 +217,7 @@ class Model(object):
         return macro_ofcluster
 
     def plotTimescales(self, lags=None, minlag=None, maxlag=None, numlags=25, units='frames', errors=None, nits=None,
-                       results=False, plot=True, save=None):
+                       results=False, plot=True, save=None, njobs=-2):
         """ Plot the implied timescales of MSMs of various lag times
 
         Parameters
@@ -242,6 +242,9 @@ class Model(object):
             If the method should display the plot of implied timescales
         save : str
             Path of the file in which to save the figure
+        njobs : int
+            Number of parallel jobs to spawn for calculation of timescales. Negative numbers are used for spawning jobs as many as CPU threads. 
+            -1: for all CPUs -2: for all except one etc.
 
         Returns
         -------
@@ -270,7 +273,7 @@ class Model(object):
             nits = np.min((self.data.K, 20))
 
         from htmd.config import _config
-        its = msm.its(self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=_config['ncpus'])
+        its = msm.its(self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=njobs) # Use all CPUs minus one
         if plot or (save is not None):
             from matplotlib import pylab as plt
             plt.ion()
@@ -532,8 +535,8 @@ class Model(object):
         from htmd.config import _config
         from htmd.parallelprogress import ParallelExecutor, delayed
         # This loop really iterates over states. sampleStates returns an array of arrays
-        # Removed ncpus because it was giving errors on some systems.
-        aprun = ParallelExecutor(n_jobs=1)  # _config['ncpus'])
+        # Don't increase njobs because it was giving errors on some systems.
+        aprun = ParallelExecutor(n_jobs=1)
         mols = aprun(total=len(relframes), desc='Getting state Molecules')\
             (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist) for rel in relframes)
         return np.array(mols, dtype=object)
@@ -687,9 +690,24 @@ class Model(object):
         >>> model.save('./model.dat')
         """
         import pickle
+
+        # Temporarily store data object and replace with dicts
+        tmpdata = self.data
+        if self.data.parent is not None:
+            tmpparentdata = self.data.parent
+            self.data.parent = self.data.parent.__dict__
+        self.data = self.data.__dict__
+
+        # Dump the dict
         f = open(filename, 'wb')
         pickle.dump(self.__dict__, f)
         f.close()
+
+        # Restore data to classes
+        self.data = tmpdata
+        if self.data.parent is not None:
+            self.data.parent = tmpparentdata
+        
 
     def load(self, filename):
         """ Load a :class:`MetricData <htmd.metricdata.MetricData>` object from disk
@@ -719,7 +737,7 @@ class Model(object):
         for k in z:
             if k == 'data':
                 m = MetricData()
-                m.load(z[k].__dict__)
+                m.load(z[k])
                 self.__dict__[k] = m
             else:
                 self.__dict__[k] = z[k]
@@ -933,12 +951,12 @@ class Model(object):
 def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
     frames = self.data.rel2sim(rel, simlist=simlist)
     mol = Molecule(molfile)
-    trajs = np.empty(0, dtype=str)
-    frs = np.empty(0, dtype=int)
+    trajs = []
+    frs = []
     for f in frames:
-        trajs = np.append(trajs, f.sim.trajectory[f.piece])
-        frs = np.append(frs, f.frame)
-    mol.read(trajs, frames=frs)
+        trajs.append(f.sim.trajectory[f.piece])
+        frs.append(f.frame)
+    mol.read(np.array(trajs), frames=np.array(frs))
     if len(wrapsel) > 0:
         mol.wrap(wrapsel)
     if (refmol is not None) and (alignsel is not None):
@@ -1166,14 +1184,49 @@ def _macroTrajSt(St, macro_ofcluster):
     from msmtools.estimation import transition_matrix
     return transition_matrix(macroC, reversible=True)'''
 
-if __name__ == '__main__':
-    from htmd.util import tempname
-    from htmd.home import home
-    from os.path import join
+import unittest
+class _TestModel(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        from htmd.simlist import simlist, simfilter
+        from glob import glob
+        from htmd.projections.metric import Metric
+        from moleculekit.projections.metricdistance import MetricDistance
+        from moleculekit.projections.metricdihedral import MetricDihedral
+        from moleculekit.util import tempname
+        from sklearn.cluster import MiniBatchKMeans
+        from htmd.home import home
+        from os.path import join
 
-    testfolder = home(dataDir='model')
-    model = Model(file=join(testfolder, 'model.dat'))
-    tmpsave = tempname(suffix='.dat')
-    model.save(tmpsave)
+        sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*')))
+        fsims = simfilter(sims, tempname(), 'not water')
+
+        metr = Metric(fsims)
+        metr.set(MetricDistance('protein and resid 10 and name CA', 'resname BEN and noh', metric='contacts', groupsel1='residue', threshold=4))
+        data = metr.project()
+        data.cluster(MiniBatchKMeans(n_clusters=4))
+
+        self.model = Model(data)
+
+    def test_model_saving_loading(self):
+        from moleculekit.util import tempname
+
+        modelfile = tempname(suffix='.dat')
+        self.model.save(modelfile)
+
+        newmodel = Model(file=modelfile)
+        assert newmodel.data.numTrajectories == 2
+
+        # Testing model saving when data has parent
+        self.model.data.parent = self.model.data.copy()
+        self.model.save(modelfile)
+        newmodel = Model(file=modelfile)
+        assert newmodel.data.numTrajectories == 2
+        assert newmodel.data.parent.numTrajectories == 2
+        self.model.data.parent = None
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
+
 
 

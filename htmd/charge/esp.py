@@ -395,7 +395,7 @@ class ESP:
         return {'charges': charges, 'status': status, 'loss': loss, 'RMSD': np.sqrt(msd)}
 
 
-class TestESP(unittest.TestCase):
+class _TestESP(unittest.TestCase):
 
     def setUp(self):
         from htmd.home import home

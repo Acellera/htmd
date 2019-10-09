@@ -5,6 +5,7 @@
 #
 from htmd.apps.acemd import Acemd as Acemd2
 from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
+from htmd.config import _config
 from protocolinterface import ProtocolInterface, val
 import os
 import numpy as np
@@ -59,7 +60,7 @@ class Equilibration(ProtocolInterface):
         >>> md.fb_k = 5
         >>> md.write('./build','./equil')
     """
-    def __init__(self, _version=2):
+    def __init__(self, _version=_config['acemdversion']):
         super().__init__()
         self._version = _version
         self._arg('acemd', ':class:`Acemd2 <htmd.apps.acemd.Acemd>` or :class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>`'
@@ -191,10 +192,10 @@ proc calcforces_endstep { } { }
             self.acemd.parameters = None
             self.acemd.restart = 'on'
             self.acemd.trajectoryfile = 'output.xtc'
-            self.acemd.trajectoryfreq = 25000
+            self.acemd.trajectoryperiod = 25000
             self.acemd.timestep = 4
             self.acemd.switching = 'on'
-            self.acemd.switchdist = 7.5
+            self.acemd.switchdistance = 7.5
             self.acemd.cutoff = 9
             self.acemd.thermostat = 'on'
             self.acemd.thermostatdamping = 1
@@ -308,7 +309,7 @@ proc calcforces_endstep { } { }
         numsteps = convert(self.timeunits, 'timesteps', self.runtime, timestep=self.acemd.timestep)
         if self._version == 3:
             self.acemd.temperature = self.temperature
-            self.acemd.thermostattemp = self.temperature
+            self.acemd.thermostattemperature = self.temperature
             self.acemd.run = str(numsteps)
 
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
@@ -353,7 +354,8 @@ proc calcforces_endstep { } { }
                     restraints += self._fb_potential2restraints(inputdir)
                 self.acemd.restraints = restraints
 
-        if self.acemd.celldimension is None and self.acemd.extendedsystem is None:
+        if ((self._version == 2) and self.acemd.celldimension is None and self.acemd.extendedsystem is None) or \
+            ((self._version == 3) and self.acemd.boxsize is None and self.acemd.extendedsystem is None):
             coords = inmol.get('coords', sel='water')
             if coords.size == 0:  # It's a vacuum simulation
                 coords = inmol.get('coords', sel='all')
@@ -361,7 +363,10 @@ proc calcforces_endstep { } { }
                 dim += 12.
             else:
                 dim = np.max(coords, axis=0) - np.min(coords, axis=0)
-            self.acemd.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
+            if self._version == 2:
+                self.acemd.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
+            else:
+                self.acemd.boxsize = '{} {} {}'.format(dim[0], dim[1], dim[2])
 
         if self.useconstantratio:
             self.acemd.useconstantratio = 'on'
@@ -400,34 +405,32 @@ proc calcforces_endstep { } { }
         self.constraints[atomselect] = factor
 
 
-if __name__ == "__main__":
-    from htmd.home import home
-    from htmd.util import tempname
-    import filecmp
-    from glob import glob
-    from os.path import join
-
-    def _cutfirstline(infile, outfile):
+import unittest
+class _TestEquilibration(unittest.TestCase):
+    def _cutfirstline(self, infile, outfile):
         # Cut out the first line of prmtop which has a build date in it
         with open(infile, 'r') as fin:
             data = fin.read().splitlines(True)
         with open(outfile, 'w') as fout:
             fout.writelines(data[1:])
 
+    def _compareResultFolders(self, compare, tmpdir, pid):
+        from glob import glob
+        import os
+        import filecmp
 
-    def _compareResultFolders(compare, tmpdir, pid):
         ignore_ftypes = ('.log', '.txt')
         files = []
         deletefiles = []
-        for f in glob(join(compare, '*')):
+        for f in glob(os.path.join(compare, '*')):
             fname = os.path.basename(f)
             if os.path.splitext(f)[1] in ignore_ftypes:
                 continue
             if f.endswith('prmtop'):
-                _cutfirstline(f, join(compare, fname + '.mod'))
-                _cutfirstline(join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
+                self._cutfirstline(f, os.path.join(compare, fname + '.mod'))
+                self._cutfirstline(os.path.join(tmpdir, fname), os.path.join(tmpdir, fname + '.mod'))
                 files.append(os.path.basename(f) + '.mod')
-                deletefiles.append(join(compare, fname + '.mod'))
+                deletefiles.append(os.path.join(compare, fname + '.mod'))
             else:
                 files.append(os.path.basename(f))
 
@@ -439,46 +442,92 @@ if __name__ == "__main__":
         for f in deletefiles:
             os.remove(f)
 
-    # Test ACEMD version 2
+    def test_acemd2(self):
+        from htmd.util import tempname
+        from htmd.home import home
+        from glob import glob
+        import os
 
-    eq = Equilibration(_version=2)
-    eq.runtime = 4
-    eq.timeunits = 'ns'
-    eq.temperature = 300
-    # keep protein on the same place during all equilibration
-    from htmd.units import convert
-    eq.constraintsteps = convert(eq.timeunits, 'timesteps', eq.runtime, timestep=eq.acemd.timestep)
-    eq.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
-    eq.fb_reference = 'protein and name CA'
-    eq.fb_selection = 'resname MOL and noh'
-    eq.fb_box = [-21, 21, -19, 19, 29, 30]
-    eq.fb_k = 5
-    tmpdir = tempname()
-    eq.write(home(dataDir=os.path.join('test-protocols', 'build', 'protLig')), tmpdir)
+        eq = Equilibration(_version=2)
+        eq.runtime = 4
+        eq.timeunits = 'ns'
+        eq.temperature = 300
+        # keep protein on the same place during all equilibration
+        from htmd.units import convert
+        eq.constraintsteps = convert(eq.timeunits, 'timesteps', eq.runtime, timestep=eq.acemd.timestep)
+        eq.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
+        eq.fb_reference = 'protein and name CA'
+        eq.fb_selection = 'resname MOL and noh'
+        eq.fb_box = [-21, 21, -19, 19, 29, 30]
+        eq.fb_k = 5
+        tmpdir = tempname()
+        eq.write(home(dataDir=os.path.join('test-protocols', 'build', 'protLig')), tmpdir)
 
-    # Compare with reference
-    refdir = home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd2', 'protLig', 'prerun'))
-    files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
-    _compareResultFolders(refdir, tmpdir, 'protLig')
+        # Compare with reference
+        refdir = home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd2', 'protLig', 'prerun'))
+        files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
+        self._compareResultFolders(refdir, tmpdir, 'protLig')
 
-    # Test new ACEMD version 3
+    def test_acemd3(self):
+        from htmd.util import tempname
+        from htmd.home import home
+        from glob import glob
+        import os
 
-    eq = Equilibration(_version=3)
-    eq.runtime = 4
-    eq.timeunits = 'ns'
-    eq.temperature = 300
-    # keep protein on the same place during all equilibration
-    from htmd.units import convert
-    eq.constraintsteps = convert(eq.timeunits, 'timesteps', eq.runtime, timestep=eq.acemd.timestep)
-    eq.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
-    eq.fb_reference = 'protein and name CA'
-    eq.fb_selection = 'resname MOL and noh'
-    eq.fb_box = [-21, 21, -19, 19, 29, 30]
-    eq.fb_k = 5
-    tmpdir = tempname()
-    eq.write(home(dataDir=os.path.join('test-protocols', 'build', 'protLig')), tmpdir)
+        eq = Equilibration(_version=3)
+        eq.runtime = 4
+        eq.timeunits = 'ns'
+        eq.temperature = 300
+        # keep protein on the same place during all equilibration
+        from htmd.units import convert
+        eq.constraintsteps = convert(eq.timeunits, 'timesteps', eq.runtime, timestep=eq.acemd.timestep)
+        eq.constraints = {'protein and name CA': 1, 'protein and noh and not name CA': 0.1}
+        eq.fb_reference = 'protein and name CA'
+        eq.fb_selection = 'resname MOL and noh'
+        eq.fb_box = [-21, 21, -19, 19, 29, 30]
+        eq.fb_k = 5
+        tmpdir = tempname()
+        eq.write(home(dataDir=os.path.join('test-protocols', 'build', 'protLig')), tmpdir)
 
-    # Compare with reference
-    refdir = home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd3', 'protLig', 'prerun'))
-    files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
-    _compareResultFolders(refdir, tmpdir, 'protLig')
+        # Compare with reference
+        refdir = home(dataDir=os.path.join('test-protocols', 'equilibration', 'acemd3', 'protLig', 'prerun'))
+        files = [os.path.basename(f) for f in glob(os.path.join(refdir, '*'))]
+        self._compareResultFolders(refdir, tmpdir, 'protLig')
+
+    @unittest.skipUnless('ACE3ARG' in os.environ, 'Untrusted PR')
+    def test_run_water(self):
+        from htmd.util import tempname
+        from htmd.home import home
+        from glob import glob
+        import subprocess
+        from subprocess import check_output
+        import shutil
+        import os
+
+        acemd3exe = shutil.which('acemd3', mode=os.X_OK)
+        if not acemd3exe:
+            raise NameError('Could not find acemd3, or no execute permissions are given')
+
+        for system in ['amber-build', 'charmm-build']:
+            eq = Equilibration(_version=3)
+            eq.runtime = 5
+            eq.timeunits = 'steps'
+            eq.temperature = 300
+            eq.constraints = {}
+            # Set these down for tiny box size of water
+            eq.acemd.cutoff = 3
+            eq.acemd.switchdistance = 2
+            eq.acemd.minimize = 50  # Do few steps to finish fast
+            ######
+            tmpdir = tempname()
+            eq.write(home(dataDir=os.path.join('test-acemd', 'tiny-water', system)), tmpdir)
+            try:
+                res = check_output(['acemd3', '--platform', 'CPU', os.getenv('ACE3ARG')], cwd=tmpdir)
+            except subprocess.CalledProcessError as exc:
+                assert False, f'Failed to run due to error: {exc}\n\n ---> Error log:\n\n{exc.output.decode("ascii")}'
+            res = res.decode('utf-8').strip()
+            assert 'Completed minimization' in res, 'Failed at system ' + system
+            assert res.endswith('Completed simulation!'), 'Failed at system ' + system
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

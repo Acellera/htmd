@@ -22,19 +22,24 @@ packages = [
     ['omnia', 'openmm'],
     ['omnia', 'parmed'],
     ['omnia', 'ambermini'],
-    ['omnia', 'bhmm'],
     ['omnia', 'funcsigs'],
     ['conda-forge', 'mdtraj'],
-    ['conda-forge', 'msmtools'],
     ['openbabel', 'openbabel'],
     ['omnia', 'pint'],
+    # PYEMMA packages
     ['conda-forge', 'pyemma'],
+    ['conda-forge', 'msmtools'],
     ['conda-forge', 'thermotools'],
-    ['bioconda', 'nglview'],
+    ['conda-forge', 'bhmm'],
+    # NGLview packages
+    ['conda-forge', 'nglview'],
+    ['conda-forge', 'widgetsnbextension'],
+    ['conda-forge', 'ipywidgets'],
+    # RDkit packages
     ['rdkit', 'rdkit'],
     ['rdkit', 'boost'],
+    # NLOpt
     ['conda-forge', 'nlopt'],
-    ['conda-forge', 'periodictable']
 ]
 
 # Package arguments

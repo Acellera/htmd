@@ -28,6 +28,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def htmdCharmmHome():
+    """ Returns the location of the CHARMM files distributed with HTMD"""
+    return os.path.abspath(os.path.join(home(shareDir=True), 'builder', 'charmmfiles', ''))
+
 def listFiles():
     """ Lists all available Charmm topologies and parameter files
 
@@ -39,7 +43,7 @@ def listFiles():
 
     """
     from natsort import natsorted
-    charmmdir = path.join(home(), 'builder', 'charmmfiles', '')  # maybe just lookup current module?
+    charmmdir = htmdCharmmHome()
     topos = natsorted(glob(path.join(charmmdir, 'top', '*.rtf')))
     params = natsorted(glob(path.join(charmmdir, 'par', '*.prm')))
     streams = natsorted(glob(path.join(charmmdir, 'str', '*', '*.str')))
@@ -71,8 +75,7 @@ def search(key, name):
     --------
     >>> charmm.search(key='RESI', name = 'CHL1')  # doctest: +SKIP
     """
-    charmmdir = path.join(home(), 'builder', 'charmmfiles', '')
-    os.system('find {} -type f -exec grep -n "{} {}" {{}} +'.format(charmmdir, key, name))
+    os.system('find {} -type f -exec grep -n "{} {}" {{}} +'.format(htmdCharmmHome(), key, name))
 
 
 def defaultTopo():
@@ -82,7 +85,7 @@ def defaultTopo():
 
 def defaultParam():
     """ Returns the default parameters used by charmm.build """
-    return ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm', 'par/par_all36_cgenff.prm']
+    return ['par/par_all36_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm', 'par/par_all36_cgenff.prm']
 
 
 def defaultStream():
@@ -91,7 +94,8 @@ def defaultStream():
 
 
 def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, patches=None, noregen=None, aliasresidues=None, psfgen=None, execute=True, _clean=True):
+          saltanion=None, saltcation=None, disulfide=None, regenerate=['angles', 'dihedrals'], patches=None, noregen=None, 
+          aliasresidues=None, psfgen=None, execute=True, _clean=True):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -107,7 +111,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     param : list of str
         A list of parameter `prm` files.
         Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available parameter files.
-        Default: ['par/par_all36_prot_mod.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
+        Default: ['par/par_all36_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
     stream : list of str
         A list of stream `str` files containing topologies and parameters.
         Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available stream files.
@@ -132,6 +136,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     disulfide : list of pairs of atomselection strings
         If None it will guess disulfide bonds. Otherwise provide a list pairs of atomselection strings for each pair of
         residues forming the disulfide bridge.
+    regenerate : None or list of strings of: ['angles', 'dihedrals']
+        Disable angle/dihedral regeneration with `regenerate=None`, or enable it with `regenerate=['angles', 'diheldrals']` 
+        or just one of the two options with `regenerate=['angles']` or `regenerate=['diheldrals']`.
     patches : list of str
         Any further patches the user wants to apply
     noregen : list of str
@@ -159,7 +166,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
                  B: [serial 298 resid 58 resname CYS chain A segid 0]...
     >>> # More complex example
     >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf', 'top/top_water_ions.rtf']
-    >>> params = ['par/par_all36_prot_mod.prm', './benzamidine.prm', 'par/par_water_ions.prm']
+    >>> params = ['par/par_all36_prot.prm', './benzamidine.prm', 'par/par_water_ions.prm']
     >>> disu = [['segid P and resid 157', 'segid P and resid 13'], ['segid K and resid 1', 'segid K and resid 25']]
     >>> ar = {'SAPI24': 'SP24'}  # Alias large resnames to a short-hand version
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu, aliasresidues=ar)  # doctest: +SKIP
@@ -194,7 +201,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     allparam = param.copy()
 
     # Splitting the stream files and adding them to the list of parameter and topology files
-    charmmdir = path.join(home(), 'builder', 'charmmfiles')
+    charmmdir = htmdCharmmHome()
     for s in stream:
         if s[0] != '.' and path.isfile(path.join(charmmdir, s)):
             s = path.join(charmmdir, s)
@@ -293,8 +300,9 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         f.write('\n')
 
     # Regenerate angles and dihedrals
-    f.write('regenerate angles dihedrals\n')
-    f.write('\n')
+    if regenerate is not None:
+        f.write('regenerate {}\n'.format(' '.join(regenerate)))
+        f.write('\n')
 
     # Printing non-regenerable patches
     if len(noregenpatches) != 0:
@@ -347,7 +355,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
             newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
             # Redo the whole build but now with ions included
             return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False,
-                         caps=caps, execute=execute, saltconc=saltconc, disulfide=disulfide, patches=patches,
+                         caps=caps, execute=execute, saltconc=saltconc, disulfide=disulfide, regenerate=regenerate, patches=patches,
                          noregen=noregen, aliasresidues=aliasresidues, psfgen=psfgen, _clean=False)
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
@@ -652,7 +660,7 @@ def combine(prmlist, outfile):
     # Process parameter files
     prm_list = ["!COMMENTS\n", "!ATOMS\n", "BONDS\n", "ANGLES\n", "DIHEDRALS\n", "IMPROPER\n", "CMAP\n", "NONBONDED\n", "NBFIX\n", "HBOND\n"]
 
-    charmmdir = path.join(home(), 'builder', 'charmmfiles')
+    charmmdir = htmdCharmmHome()
     for myfile in prmlist:
         if myfile[0] != '.' and path.isfile(path.join(charmmdir, myfile)):
             myfile = path.join(charmmdir, myfile)
@@ -892,7 +900,7 @@ def _checkFailedAtoms(mol):
                         'Check log file for more details.'.format(idx))
 
 
-class TestCharmmBuild(TestCase):
+class _TestCharmmBuild(TestCase):
     def test_build(self):
         from moleculekit.molecule import Molecule
         from htmd.builder.solvate import solvate
@@ -916,7 +924,7 @@ class TestCharmmBuild(TestCase):
                 np.random.seed(1)  # Needed for ions
                 smol = solvate(mol)
                 topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-                params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+                params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
                 tmpdir = tempname()
                 _ = build(smol, topo=topos, param=params, outdir=tmpdir)
 
@@ -945,7 +953,7 @@ class TestCharmmBuild(TestCase):
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-        params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+        params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
         disu = [['segid 1 and resid 110', 'segid 1 and resid 187'], ['segid 0 and resid 110', 'segid 0 and resid 187']]
         tmpdir = tempname()
         _ = build(smol, topo=topos, param=params, outdir=tmpdir, disulfide=disu)
@@ -985,7 +993,7 @@ class TestCharmmBuild(TestCase):
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-        params = ['par/par_all36_prot_mod.prm', 'par/par_water_ions.prm']
+        params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
 
         smol.insertion[smol.resid == 42] = 'A'  # Adding an insertion to test that disulfide bonds with insertions work
         tmpdir = tempname()

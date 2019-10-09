@@ -55,7 +55,7 @@ def getArgumentParser():
                         help='Number of iterations during the dihedral parameter fitting')
     parser.add_argument('--dihed-fit-type', default='NRS', choices=['iterative', 'NRS'],
                         help='Dihedral fitting method. Can be either iterative or naive random search (NRS).')
-    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF', 'AceCloud'],
+    parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF'],
                         help='QM queue (default: %(default)s)')
     parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
                                                                       'defaults)')
@@ -73,6 +73,10 @@ def getArgumentParser():
     # NNP module name
     parser.add_argument('--nnp', help=argparse.SUPPRESS)
 
+    # PlayQueue arguments
+    parser.add_argument('--pm-token', help=argparse.SUPPRESS)
+    parser.add_argument('--max-jobs', type=int, default=sys.maxsize, help=argparse.SUPPRESS)
+
     # Debug mode
     parser.add_argument('--debug', action='store_true', default=False, dest='debug', help=argparse.SUPPRESS)
 
@@ -88,7 +92,7 @@ def _printArguments(args, filename=None):
 
     logger.info('=== Arguments ===')
     for key, value in sorted(vars(args).items()):
-        if key in ('fake_qm',):  # Hidden
+        if key in ('fake_qm', 'max_jobs', 'pm_token'):  # Hidden
             continue
         logger.info('{:>20s}: {:s}'.format(key, str(value)))
 
@@ -250,11 +254,12 @@ def _get_queue(args):
     elif args.queue == 'PBS':
         from htmd.queues.pbsqueue import PBSQueue
         queue = PBSQueue()  # TODO: configure
-    elif args.queue == 'AceCloud':
-        from htmd.queues.acecloudqueue import AceCloudQueue
-        queue = AceCloudQueue()  # TODO: configure
-        queue.groupname = args.groupname
-        queue.hashnames = True
+    elif args.queue == 'PlayQueue':
+        from htmd.queues.playqueue import PlayQueue
+        queue = PlayQueue()  # TODO: configure
+        queue.token = args.pm_token
+        queue.app = 'Psi4'
+        queue.max_jobs = args.max_jobs
     else:
         raise AssertionError()
 
@@ -386,16 +391,16 @@ def _fit_initial_charges(mol, args, atom_types):
 
             mol = fitGasteigerCharges(mol, atom_types=atom_types)
 
+            charge = int(round(np.sum(mol.charge)))
+            if args.charge != charge:
+                logger.warning(f'Molecular charge is {args.charge}, but Gasteiger atomic charges add up to {charge}!')
+                args.charge = charge
+
             # Print the initial charges
             logger.info('Initial atomic charges:')
             for name, charge in zip(mol.name, mol.charge):
                 logger.info('   {:4s}: {:6.3f}'.format(name, charge))
             logger.info('Molecular charge: {:6.3f}'.format(np.sum(mol.charge)))
-
-            charge = int(round(np.sum(mol.charge)))
-            if args.charge != charge:
-                raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
-                    args.charge, charge))
 
         elif args.min_type in ('None', 'qm'):
             logger.info('Initial atomic charges are not required')
@@ -441,8 +446,8 @@ def _fit_charges(mol, args, qm, atom_types):
 
         charge = int(round(np.sum(mol.charge)))
         if args.charge != charge:
-            raise RuntimeError('Molecular charge is set to {}, but Gasteiger atomic charges add up to {}.'.format(
-                args.charge, charge))
+            logger.warning(f'Molecular charge is {args.charge}, but Gasteiger atomic charges add up to {charge}!')
+            args.charge = charge
 
     elif args.charge_type == 'AM1-BCC':
 
@@ -512,12 +517,12 @@ def _printEnergies(molecule, parameters, filename):
     string = '''
 == Diagnostic Energies ==
 
-Bond     : {BOND_ENERGY:12.6g} kcal/mol
-Angle    : {ANGLE_ENERGY:12.6g} kcal/mol
-Dihedral : {DIHEDRAL_ENERGY:12.6g} kcal/mol
-Improper : {IMPROPER_ENERGY:12.6g} kcal/mol
-Electro  : {ELEC_ENERGY:12.6g} kcal/mol
-VdW      : {VDW_ENERGY:12.6g} kcal/mol
+Bond     : {BOND_ENERGY:12.5f} kcal/mol
+Angle    : {ANGLE_ENERGY:12.5f} kcal/mol
+Dihedral : {DIHEDRAL_ENERGY:12.5f} kcal/mol
+Improper : {IMPROPER_ENERGY:12.5f} kcal/mol
+Electro  : {ELEC_ENERGY:12.5f} kcal/mol
+VdW      : {VDW_ENERGY:12.5f} kcal/mol
 
 '''.format(BOND_ENERGY=energies['bond'],
            ANGLE_ENERGY=energies['angle'],
@@ -561,13 +566,14 @@ def main_parameterize(arguments=None, progress=None):
     from htmd.parameterization.parameterset import recreateParameters, createMultitermDihedralTypes, inventAtomTypes
     from htmd.parameterization.util import detectChiralCenters, scanDihedrals, filterQMResults, minimize
 
-    progress = progress if callable(progress) else lambda x: None
+    progress = progress if callable(progress) else lambda x, **kwds: None
 
     logger.info('===== Parameterize =====')
 
     # Parse arguments
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
+    args.queue = 'PlayQueue' if args.pm_token else args.queue
     _printArguments(args)
 
     # Validate arguments
@@ -587,14 +593,14 @@ def main_parameterize(arguments=None, progress=None):
         raise DeprecationWarning('Use `--scan-type` instead.')
 
     # Get a molecule and check its validity
-    progress('Prepare the molecule')
+    progress('Preparing the molecule')
     mol = _prepare_molecule(args)
 
     # Preserve the initial molecule
     initial_mol = mol.copy()
 
     # Select dihedral angles to parameterize
-    progress('Detect dihedral angles')
+    progress('Detecting dihedral angles')
     selected_dihedrals = _select_dihedrals(mol, args)
 
     # Get a queue
@@ -626,17 +632,17 @@ def main_parameterize(arguments=None, progress=None):
     logger.info('Reference method: {}'.format(ref_name))
 
     # Assign atom types and initial force field parameters
-    progress('Assign atom types and initial parameters')
+    progress('Assigning atom types and initial parameters')
     mol, parameters = _get_initial_parameters(mol, args)
 
     # Assign initial atomic charges, if needed
-    progress('Assign initial atomic charges')
+    progress('Assigning initial atomic charges')
     mol = _fit_initial_charges(mol, args, initial_mol.atomtype)
 
     # Geometry minimization
     # TODO refactor
     if args.min_type != 'None':
-        progress('Optimize geometry')
+        progress('Optimizing geometry')
         logger.info(' === Geometry minimization ===')
 
         if args.min_type == 'mm':
@@ -670,7 +676,7 @@ def main_parameterize(arguments=None, progress=None):
                                '{} --> {}'.format(initial_chiral_centers, chiral_centers))
 
     # Fit charges
-    progress('Assign atomic charges')
+    progress('Assigning atomic charges')
     mol = _fit_charges(mol, args, qm_calculator, initial_mol.atomtype)
 
     # Scan dihedrals and fit parameters
@@ -679,7 +685,8 @@ def main_parameterize(arguments=None, progress=None):
 
         from htmd.parameterization.dihedral import DihedralFitting  # Slow import
 
-        progress('Scan dihedral angles')
+        num_jobs = 0 if args.nnp else 36 * len(selected_dihedrals)
+        progress('Scanning dihedral angles', num_jobs=num_jobs)
         logger.info('=== Dihedral angle scanning ===')
 
         if args.dihed_opt_type == 'None':
@@ -720,7 +727,7 @@ def main_parameterize(arguments=None, progress=None):
         logger.info('=== Dihedral parameter fitting ===')
 
         # Invent new atom types for dihedral atoms
-        progress('Create new atom types')
+        progress('Creating new atom types')
         old_types = mol.atomtype
         mol, initial_types = inventAtomTypes(mol, selected_dihedrals)
         parameters = recreateParameters(mol, initial_types, parameters)
@@ -735,7 +742,7 @@ def main_parameterize(arguments=None, progress=None):
             np.random.seed(args.seed)
 
         # Fit the dihedral parameters
-        progress('Fit dihedral angle parameters')
+        progress('Fitting dihedral angle parameters')
         df = DihedralFitting()
         df.parameters = parameters
         df.molecule = mol
@@ -761,7 +768,7 @@ def main_parameterize(arguments=None, progress=None):
             df.plotDihedralEnergies(idihed, plot_dir, ref_name=ref_name)
 
     # Output the parameters and other results
-    progress('Output results')
+    progress('Outputing results')
     _output_results(mol, parameters, initial_mol.coords, args)
 
 

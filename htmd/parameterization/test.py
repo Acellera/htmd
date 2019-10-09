@@ -15,7 +15,7 @@ from htmd.home import home
 from htmd.util import tempname
 
 
-class TestParameterize(unittest.TestCase):
+class _TestParameterize(unittest.TestCase):
 
     def setUp(self):
 

@@ -3,14 +3,17 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import os
-import numpy as np
 from abc import ABC, abstractmethod
-
-from protocolinterface import ProtocolInterface, val
-from htmd.queues.simqueue import SimQueue
-from htmd.queues.localqueue import LocalCPUQueue
 import logging
+import os
+import re
+
+from moleculekit.periodictable import periodictable
+import numpy as np
+from protocolinterface import ProtocolInterface, val
+
+from htmd.queues.localqueue import LocalCPUQueue
+from htmd.queues.playqueue import PlayQueue
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +69,103 @@ class QMBase(ABC, ProtocolInterface):
                   '6-311G', '6-311G*', '6-311G**', '6-311+G', '6-311+G*', '6-311+G**', '6-311++G', '6-311++G*', '6-311++G**',
                   'cc-pVDZ', 'cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVDZ', 'aug-cc-pVTZ', 'aug-cc-pVQZ')
     SOLVENTS = ('vacuum', 'PCM')
+
+    @staticmethod
+    def substituteBasisSet(element, basis_set):
+        """
+        Substitute basis sets, if a given element does not have a requested basis set.
+
+        Pople (6-31G, etc.) and Dunning (cc-pVDZ, etc.) basis sets are replaced with
+        Ahlrichs-Karlsruhe (def2-SVP, etc.) basis sets for elements heavier than Ar.
+
+        Arguments
+        ---------
+        element : str
+            Element symbol
+        basis_set : str
+            Requested basis set name
+
+        Return
+        ------
+        new_basis_set : str
+            Substituted basis set name
+
+        References
+        ----------
+        https://www.basissetexchange.org
+        http://www.psicode.org/psi4manual/master/basissets_byelement.html
+
+        Examples
+        --------
+
+        >>> from htmd.qm.base import QMBase
+        ffevaluate module is in beta version
+
+        >>> QMBase.substituteBasisSet('F', '3-21G')
+        '3-21G'
+
+        >>> QMBase.substituteBasisSet('F', '6-31+G*')
+        '6-31+G*'
+
+        >>> QMBase.substituteBasisSet('F', '6-311++G**')
+        '6-311++G**'
+
+        >>> QMBase.substituteBasisSet('F', 'cc-pVDZ')
+        'cc-pVDZ'
+
+        >>> QMBase.substituteBasisSet('F', 'aug-cc-pVTZ')
+        'aug-cc-pVTZ'
+
+        >>> QMBase.substituteBasisSet('Br', '3-21G')
+        'def2-SV(P)'
+
+        >>> QMBase.substituteBasisSet('Br', '6-31+G*')
+        'def2-SVPD'
+
+        >>> QMBase.substituteBasisSet('Br', '6-311++G**')
+        'def2-TZVPD'
+
+        >>> QMBase.substituteBasisSet('Br', 'cc-pVDZ')
+        'def2-SVP'
+
+        >>> QMBase.substituteBasisSet('Br', 'aug-cc-pVTZ')
+        'def2-TZVPD'
+        """
+
+        element = periodictable[element]
+        if basis_set not in QMBase.BASIS_SETS:
+            raise ValueError(f'Unrecognized basis sets {basis_set}')
+
+        new_basis_set = basis_set
+
+        match_dunning = re.match('^(|aug-)cc-pV(D|T|Q)Z$', basis_set)
+        match_pople = re.match('^(3-21|6-31|6-311)([\+]{0,2})G[\*]{0,2}$', basis_set)
+
+        if match_dunning:
+            if element.number > 18:
+                core = {'D': 'S', 'T': 'TZ', 'Q':'QZ'}[match_dunning.group(2)]
+                diffuse = 'D' if match_dunning.group(1) else ''
+                new_basis_set = f'def2-{core}VP{diffuse}'
+        elif match_pople:
+            if element.number > 18:
+                if match_pople.group(1) == '3-21':
+                    core = 'S'
+                    polar = '(P)'
+                    diffuse = ''
+                elif match_pople.group(1) in ('6-31', '6-311'):
+                    core = {'6-31': 'S', '6-311': 'TZ'}[match_pople.group(1)]
+                    polar = 'P' if match_pople.group(2) else ''
+                    diffuse = 'D' if match_pople.group(2) and match_pople.group(2) else ''
+                else:
+                    raise ValueError()
+                new_basis_set = f'def2-{core}V{polar}{diffuse}'
+        else:
+            raise RuntimeError()
+
+        if basis_set != new_basis_set:
+            logger.info(f'Basis set substitution for {element.symbol}: {basis_set} --> {new_basis_set}')
+
+        return new_basis_set
 
     def __init__(self):
         from moleculekit.molecule import Molecule
@@ -188,8 +288,8 @@ class QMBase(ABC, ProtocolInterface):
         # Wait only if there is something to wait for
         # TODO: queue object should handle this logic
         if self.queue._dirs:
-            if isinstance(self.queue, LocalCPUQueue):
-                self.queue.wait(sentinel=False) # TODO: sentinel is still broken
+            if isinstance(self.queue, (LocalCPUQueue, PlayQueue)):
+                self.queue.wait(sentinel=False)
             else:
                 self.queue.wait(sentinel=True)
             self.queue.retrieve()
@@ -211,12 +311,12 @@ class QMBase(ABC, ProtocolInterface):
         Example
         -------
 
-        >>> result = qm.run()
+        >>> result = qm.run() # doctest: +SKIP
 
         It is equivalent to:
-        >>> qm.setup()
-        >>> qm.submit()
-        >>> result = qm.retrieve()
+        >>> qm.setup() # doctest: +SKIP
+        >>> qm.submit() # doctest: +SKIP
+        >>> result = qm.retrieve() # doctest: +SKIP
 
         Return
         ------
@@ -224,10 +324,16 @@ class QMBase(ABC, ProtocolInterface):
             List of QMResult objects (one for each molecule frames).
         """
 
-        self.setup()
-        self.submit()
-        return self.retrieve()
+        self.setup() # doctest: +SKIP
+        self.submit() # doctest: +SKIP
+        return self.retrieve() # doctest: +SKIP
 
 
 if __name__ == '__main__':
-    pass
+
+    import doctest
+    import sys
+
+    import htmd
+
+    sys.exit(doctest.testmod().failed)

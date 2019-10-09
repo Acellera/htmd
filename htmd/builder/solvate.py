@@ -71,6 +71,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
     >>> smol = solvate(mol, minmax=[[-20, -20, -20],[20, 20, 20]])
     """
     from tqdm import tqdm
+    from htmd.home import home
 
     mol = mol.copy()
     if mol.numFrames > 1:
@@ -78,7 +79,7 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
         mol.coords = np.atleast_3d(mol.coords[:, :, 0])
 
     if spdb is None:
-        spdb = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'wat.pdb')
+        spdb = os.path.join(home(shareDir=True), 'solvate', 'wat.pdb')
 
     if os.path.isfile(spdb):
         logger.info('Using water pdb file at: ' + spdb)

@@ -7,6 +7,8 @@ import os
 import numpy as np
 from scipy import constants as const
 
+from moleculekit.periodictable import periodictable
+
 from htmd.qm.base import QMBase, QMResult
 
 
@@ -19,7 +21,7 @@ class Psi4(QMBase):
     - Single-point energy calculations with HF and DFT.
     - Electronic properties: dipole and quadrupole monents, Mulliken charges, ESP at given points
     - Geometry optimization with/without dihedral restraints
-    - Can use various queuing systems and on AceCloud
+    - Can use various queuing systems
 
     Attributes
     ----------
@@ -109,13 +111,13 @@ class Psi4(QMBase):
             [ 0.37527978]]])
 
     The QM calculations run using LocalCPUQueue by default, but this can be changed to the others.
-    >>> from htmd.queues.acecloudqueue import AceCloudQueue
-    >>> qm.queue = AceCloudQueue() # doctest: +SKIP
+    >>> from htmd.queues.slurmqueue import SlurmQueue
+    >>> qm.queue = SlurmQueue() # doctest: +SKIP
     """
 
     @property
     def _command(self):
-        return 'export HTMD_PSI4_WORKDIR=$(pwd)\npsi4 -i psi4.in -o psi4.out &> psi4.log'
+        return 'psi4 -i psi4.in -o psi4.out &> psi4.log'
 
     def _completed(self, directory):
         # Abuse "timer.dat" to detect if a Psi4 job has completed.
@@ -127,6 +129,8 @@ class Psi4(QMBase):
 
         with open(os.path.join(directory, 'psi4.in'), 'w') as f:
 
+            f.write('import psi4\n\n')
+
             f.write('set_num_threads(%d)\n' % self.queue.ncpu)
             f.write('set_memory(\'{} MB\')\n\n'.format(self.queue.memory))
 
@@ -135,8 +139,16 @@ class Psi4(QMBase):
 
             reference = 'r' if self.multiplicity == 1 else 'u'
             reference += 'hf' if self.theory == 'HF' else 'ks'
-            f.write('set { reference %s }\n' % reference)
-            f.write('set { basis %s }\n\n' % self.basis)
+            f.write('set { reference %s }\n\n' % reference)
+
+            # Set basis sets
+            atomic_number = lambda element: periodictable[element.capitalize()].number
+            elements = sorted(np.unique(self._molecule.element), key=atomic_number)
+            element_basis = [self.substituteBasisSet(element, self.basis) for element in elements]
+            f.write('basis = \'\'\n')
+            for element, basis in zip(elements, element_basis):
+                f.write(f'basis += \'assign {element} {basis}\\n\'\n')
+            f.write('psi4.basis_helper(basis, name=\'custom\')\n\n')
 
             if self.solvent == 'vacuum':
                 pass
@@ -178,10 +190,6 @@ class Psi4(QMBase):
             theory = 'SCF' if self.theory == 'HF' else self.theory
             theory += '' if self.correction == 'none' else '-%s' % self.correction
             f.write('energy, wfn = %s(\'%s\', return_wfn=True)\n\n' % (function, theory))
-
-            # Psi4 changes directory then PCM is used, so we need to return
-            f.write('import os\n')
-            f.write('os.chdir(os.environ[\'HTMD_PSI4_WORKDIR\'])\n\n')
 
             f.write('oeprop(wfn, \'DIPOLE\', \'QUADRUPOLE\', \'MULLIKEN_CHARGES\')\n')
             if self.esp_points is not None:

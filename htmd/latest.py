@@ -75,16 +75,16 @@ def compareVersions():
 
 def _writeLatestVersionFile(fname):
     import os
-    from binstar_client.utils import get_server_api
-
+    
     try:
         f = open(fname, 'w')
     except:
         print('Unable to open {} file for writing. Will not check for new HTMD versions.'.format(fname))
         return
 
-    api = get_server_api(log_level=0)
     try:
+        from binstar_client.utils import get_server_api
+        api = get_server_api(log_level=0)
         package = api.package('acellera', 'htmd')
     except Exception as err:
         print("Failed at checking latest conda version. ({})".format(type(err).__name__))
