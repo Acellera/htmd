@@ -249,20 +249,22 @@ def _processSim(sim, projectionlist, uqmol, skip):
         logger.debug(pieces[0])
 
         mol.read(pieces, skip=skip)
-        #Gianni testing
-        #_highfreqFilter(mol,10)
  
         data = []
-        for p in projectionlist:
-            pj = _project(p, mol)
-            if pj.ndim == 1:
-                pj = np.atleast_2d(pj).T
-            data.append(pj)
+        for proj in projectionlist:
+            result = _project(proj, mol)
+            if result.ndim == 1:
+                result = np.atleast_2d(result).T
+            if result.size == 0:
+                logger.warning(f'No data was produced by projection {proj.__class__} of simulation id: {sim.simid}')
+            data.append(result)
+
         data = np.hstack(data)
         if data.dtype == np.float64:
             data = data.astype(np.float32)
+
     except Exception as e:
-        logger.warning('Error in simulation with id: ' + str(sim.simid) + '. "' + e.__str__() + '"')
+        logger.warning(f'Error while projecting simulation id: {sim.simid}. "{e}"')
         return None, None, None, True
 
     return data, _calcRef(pieces, mol.fileloc), mol.fstep, False
@@ -314,26 +316,39 @@ def _projectionGenerator(metric, njobs):
 def _projector(metric, i):
     return metric._projectSingle(i)
 
+
+import unittest
+class _TestMetric(unittest.TestCase):
+    def test_set(self):
+        from moleculekit.molecule import Molecule
+        from moleculekit.projections.metricrmsd import MetricRmsd
+
+        # Testing the set method of Metric
+        sims = []
+        ref = Molecule('3PTB')
+        metr = Metric(sims)
+        metr.set(MetricRmsd(ref, 'protein and name CA'))
+        assert len(metr.projectionlist) == 1
+
+        metr.set([MetricRmsd(ref, 'protein and name CA'), MetricRmsd(ref, 'protein and name CA')])
+        assert len(metr.projectionlist) == 2
+
+    def test_function_projections(self):
+        def foo(mol, ref):
+            from moleculekit.util import molRMSD
+            mol.wrap('protein')
+            mol.align('protein and name CA', refmol=ref)
+            return molRMSD(mol, ref, mol.atomselect('protein and name CA'), ref.atomselect('protein and name CA'))
+
+        ref = Molecule('3PTB')
+        sims = []
+        metr = Metric(sims)
+        metr.set((foo, (ref,)))
+        assert len(metr.projectionlist) == 1
+
+
 if __name__ == '__main__':
-    from moleculekit.molecule import Molecule
-    from moleculekit.projections.metricrmsd import MetricRmsd
+    unittest.main(verbosity=2)
 
-    # Testing the set method of Metric
-    sims = []
-    ref = Molecule('3PTB')
-    metr = Metric(sims)
-    metr.set(MetricRmsd(ref, 'protein and name CA'))
-    assert len(metr.projectionlist) == 1
 
-    metr.set([MetricRmsd(ref, 'protein and name CA'), MetricRmsd(ref, 'protein and name CA')])
-    assert len(metr.projectionlist) == 2
 
-    def foo(mol, ref):
-        from moleculekit.util import molRMSD
-        mol.wrap('protein')
-        mol.align('protein and name CA', refmol=ref)
-        return molRMSD(mol, ref, mol.atomselect('protein and name CA'), ref.atomselect('protein and name CA'))
-
-    metr = Metric(sims)
-    metr.set((foo, (ref,)))
-    assert len(metr.projectionlist) == 1

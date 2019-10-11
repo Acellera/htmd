@@ -432,32 +432,43 @@ def _simName(foldername):
     return name
 
 
+import unittest
+class _TestSimlist(unittest.TestCase):
+    def test_simlist_auto_structure(self):
+        from htmd.home import home
+        from htmd.projections.metric import _singleMolfile
+
+        sims = simlist(glob(path.join(home(dataDir='adaptive'), 'data', '*', '')), glob(path.join(home(dataDir='adaptive'), 'input', '*')))
+        x = sims[0].copy()
+        assert x == sims[0]
+        assert x != sims[1]
+        assert len(sims[0].molfile) == 2
+        assert _singleMolfile(sims)[0]
+
+    def test_simlist_many_structures(self):
+        from htmd.home import home
+        from htmd.projections.metric import _singleMolfile
+
+        sims = simlist(glob(path.join(home(dataDir='adaptive'), 'data', '*', '')), glob(path.join(home(dataDir='adaptive'), 'input', '*', 'structure.pdb')))
+        x = sims[0].copy()
+        assert x == sims[0]
+        assert x != sims[1]
+        assert not isinstance(sims[0].molfile, list)
+        assert _singleMolfile(sims)[0]
+
+    def test_simlist_single_structure(self):
+        from htmd.home import home
+        from htmd.projections.metric import _singleMolfile
+
+        sims = simlist(glob(path.join(home(dataDir='adaptive'), 'data', '*', '')), path.join(home(dataDir='adaptive'), 'input', 'e1s1_1', 'structure.pdb'))
+        x = sims[0].copy()
+        assert x == sims[0]
+        assert x != sims[1]
+        assert not isinstance(sims[0].molfile, list)
+        assert _singleMolfile(sims)[0]
+
+
 if __name__ == '__main__':
-    from htmd.home import home
-    from glob import glob
-    from os.path import join
-    from htmd.projections.metric import _singleMolfile
-
-    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*')))
-    x = sims[0].copy()
-    assert x == sims[0]
-    assert x != sims[1]
-    assert len(sims[0].molfile) == 2
-    assert _singleMolfile(sims)[0]
-
-    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*', 'structure.pdb')))
-    x = sims[0].copy()
-    assert x == sims[0]
-    assert x != sims[1]
-    assert not isinstance(sims[0].molfile, list)
-    assert _singleMolfile(sims)[0]
-
-    sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), join(home(dataDir='adaptive'), 'input', 'e1s1_1', 'structure.pdb'))
-    x = sims[0].copy()
-    assert x == sims[0]
-    assert x != sims[1]
-    assert not isinstance(sims[0].molfile, list)
-    assert _singleMolfile(sims)[0]
-
+    unittest.main(verbosity=2)
 
 
