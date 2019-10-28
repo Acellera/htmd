@@ -723,6 +723,10 @@ class MetricData(object):
             import pandas.core.indexes
             sys.modules['pandas.indexes'] = pandas.core.indexes  # Hacky fix for new pandas version
 
+        # Patch for old HTMD versions
+        if type(filename).__name__ == 'MetricData':
+            filename = filename.__dict__
+
         if isinstance(filename, str):
             f = open(filename, 'rb')
             vardict = pickle.load(f)
@@ -769,7 +773,7 @@ class MetricData(object):
         If only x, y are given it will calculate a histogram for the contours. If z is given it will use that instead.
         """
         from matplotlib import pylab as plt
-        from matplotlib.mlab import griddata
+        from scipy.interpolate import griddata
 
         if cmap is None:
             cmap = plt.cm.Greys
@@ -788,7 +792,8 @@ class MetricData(object):
             # Else if z is given interpolate on a grid
             xi = np.linspace(np.min(x), np.max(x), resolution)
             yi = np.linspace(np.min(y), np.max(y), resolution)
-            zi = griddata(x, y, z, xi, yi, interp='linear')
+            xi2, yi2 = np.meshgrid(xi, yi)
+            zi = griddata((x, y), z, (xi2, yi2), method='linear')
         cf = ax.contourf(xi, yi, zi, levels, cmap=cmap)
         _ = ax.axis('equal')
         if title is not None:
