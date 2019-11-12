@@ -62,10 +62,10 @@ clean:
 	rm source/version
 
 publish:
-	ssh software.acellera.com 'rm -rf /var/www/software/source/htmd/$(HTMDBRANCH)/*'
-	scp -r source/* www.acellera.com:/var/www/software/source/htmd/$(HTMDBRANCH)/
-	ssh software.acellera.com 'rm -rf /var/www/software/source/parameterize/*'
-	scp -r source-parameterize/* www.acellera.com:/var/www/software/source/parameterize/
+	ssh software.acellera.com 'rm -rf /var/www/software.acellera.com/source/htmd/$(HTMDBRANCH)/*'
+	scp -r source/* www.acellera.com:/var/www/software.acellera.com/source/htmd/$(HTMDBRANCH)/
+	ssh software.acellera.com 'rm -rf /var/www/software.acellera.com/source/parameterize/*'
+	scp -r source-parameterize/* www.acellera.com:/var/www/software.acellera.com/source/parameterize/
 	#ssh software.acellera.com 'chmod -R g+rwX software.acellera.com/'
 
 # Rule for building .rst from .ipynb
