@@ -16,8 +16,7 @@ from subprocess import call
 from htmd.home import home
 from moleculekit.molecule import Molecule
 from moleculekit.util import _missingChain, _missingSegID
-from htmd.builder.builder import detectDisulfideBonds, convertDisulfide
-from htmd.builder.builder import _checkMixedSegment, _checkLongResnames, UnknownResidueError, BuildError
+from htmd.builder.builder import detectDisulfideBonds, convertDisulfide, detectCisPeptideBonds, _checkMixedSegment, _checkLongResnames, UnknownResidueError, BuildError
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from moleculekit.vmdviewer import getVMDpath
 from glob import glob
@@ -359,6 +358,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
                          noregen=noregen, aliasresidues=aliasresidues, psfgen=psfgen, _clean=False)
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
+    detectCisPeptideBonds(molbuilt) # Warn in case of cis bonds
     return molbuilt
 
 

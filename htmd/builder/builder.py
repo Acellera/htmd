@@ -228,6 +228,29 @@ def detectDisulfideBonds(mol, thresh=3):
     else:
         logger.info('{} disulfide bonds were added'.format(len(disubonds)))
     return sorted(disubonds, key=lambda x: x[0].resid)
+    
+
+def detectCisPeptideBonds(mol):
+    from moleculekit.projections.metricdihedral import MetricDihedral, Dihedral
+    dih = Dihedral.proteinDihedrals(mol, sel='protein', dih=('omega',))
+
+    metr = MetricDihedral(dih=dih, sincos=False)
+    data = metr.project(mol)
+    mapping = metr.getMapping(mol)
+
+    frames, idxs = np.where(np.abs(data) < 120)
+
+    for ii in np.unique(idxs):
+        currframes = frames[idxs == ii]
+        nframes = len(currframes)
+        description = mapping.loc[ii].description
+        atomIndexes = mapping.loc[ii].atomIndexes
+
+        currframes_str = "{}".format(currframes)
+        if nframes> 5:
+            currframes_str = "[{} ... {}]".format(currframes[0], currframes[-1])
+
+        logger.warning("Found cis peptide bond in {} frames: {} in the omega diheral \"{}\" with indexes {}".format(nframes, currframes_str, description, atomIndexes))
 
 
 def _checkMixedSegment(mol):
