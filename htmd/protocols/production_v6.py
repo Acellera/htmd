@@ -279,6 +279,9 @@ proc calcforces_endstep { } { }
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
         inmol = Molecule(pdbfile)
 
+        from htmd.builder.builder import detectCisPeptideBonds
+        detectCisPeptideBonds(inmol)
+
         if np.any(inmol.atomselect('lipids')) and not self.useconstantratio:
             logger.warning('Lipids detected in input structure. We highly recommend setting useconstantratio=True '
                            'for membrane simulations.')
