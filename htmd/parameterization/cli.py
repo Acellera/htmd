@@ -32,29 +32,29 @@ def getArgumentParser():
                         help='Select dihedral angle to parameterize (default: all parameterizable dihedral angles)')
     parser.add_argument('--code', default='Psi4', choices=['Psi4', 'Gaussian'],
                         help='QM code (default: %(default)s)')
-    parser.add_argument('--theory', default='B3LYP', choices=['HF', 'B3LYP', 'wB97X-D'],
+    parser.add_argument('--theory', default='wB97X-D', choices=['HF', 'B3LYP', 'wB97X-D'],
                         help='QM level of theory (default: %(default)s)')
-    parser.add_argument('--basis', default='cc-pVDZ', choices=['6-31G*', '6-31+G*', '6-311G**', '6-311++G**', 'cc-pVDZ',
-                                                               'aug-cc-pVDZ'],
+    parser.add_argument('--basis', default='6-311++G**', choices=['6-31G*', '6-31+G*', '6-311G**', '6-311++G**',
+                                                                  'cc-pVDZ', 'aug-cc-pVDZ'],
                         help='QM basis set (default: %(default)s)')
     parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
                         help='QM environment (default: %(default)s)')
-    parser.add_argument('--min-type', default='qm', dest='min_type', choices=['None', 'qm', 'mm'],
+    parser.add_argument('--min-type', default='mm', dest='min_type', choices=['None', 'qm', 'mm'],
                         help='Type of initial structure optimization (default: %(default)s)')
-    parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'AM1-BCC', 'ESP'],
+    parser.add_argument('--charge-type', default='AM1-BCC', choices=['None', 'Gasteiger', 'AM1-BCC', 'ESP'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
-    parser.add_argument('--scan-type', default='qm', dest='dihed_opt_type', choices=['None', 'qm', 'mm'],
+    parser.add_argument('--scan-type', default='mm', dest='dihed_opt_type', choices=['None', 'qm', 'mm'],
                         help='Type of structure optimization when scanning dihedral angles (default: %(default)s)')
     parser.add_argument('--dihed-num-iterations', default=3, type=int,
                         help='Number of iterations during the dihedral parameter fitting')
-    parser.add_argument('--dihed-fit-type', default='NRS', choices=['iterative', 'NRS'],
+    parser.add_argument('--dihed-fit-type', default='iterative', choices=['iterative', 'NRS'],
                         help='Dihedral fitting method. Can be either iterative or naive random search (NRS).')
     parser.add_argument('-q', '--queue', default='local', choices=['local', 'Slurm', 'LSF'],
                         help='QM queue (default: %(default)s)')
-    parser.add_argument('-n', '--ncpus', default=None, type=int, help='Number of CPU per QM job (default: queue '
-                                                                      'defaults)')
+    parser.add_argument('-n', '--ncpus', default=None, type=int,
+                        help='Number of CPU per QM job (default: queue defaults)')
     parser.add_argument('-m', '--memory', default=None, type=int, help='Maximum amount of memory in MB to use.')
     parser.add_argument('--groupname', default=None, help=argparse.SUPPRESS)
     parser.add_argument('-o', '--outdir', default='./', help='Output directory (default: %(default)s)')
