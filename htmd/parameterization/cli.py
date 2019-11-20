@@ -581,13 +581,6 @@ def main_parameterize(arguments=None, progress=None):
         logger.setLevel(logging.DEBUG)
         logger.debug(sys.argv[1:])
 
-    # Deprecation warnings
-    # TODO remove at some point of time
-    if args.minimize is not parser.get_default('minimize'):
-        raise DeprecationWarning('Use `--min-type` instead.')
-    if args.optimize_dihedral is not parser.get_default('optimize_dihedral'):
-        raise DeprecationWarning('Use `--scan-type` instead.')
-
     # Get a molecule and check its validity
     progress('Preparing the molecule')
     mol = _prepare_molecule(args)
