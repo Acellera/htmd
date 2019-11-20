@@ -232,7 +232,12 @@ def detectDisulfideBonds(mol, thresh=3):
 
 def detectCisPeptideBonds(mol):
     from moleculekit.projections.metricdihedral import MetricDihedral, Dihedral
-    dih = Dihedral.proteinDihedrals(mol, sel='protein', dih=('omega',))
+
+    protsel = mol.atomselect('protein and backbone and name C CA N')
+    if np.sum(protsel) < 4: # Less atoms than dihedral
+        return
+        
+    dih = Dihedral.proteinDihedrals(mol, sel=protsel, dih=('omega',))
 
     metr = MetricDihedral(dih=dih, sincos=False)
     data = metr.project(mol)
