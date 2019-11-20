@@ -566,6 +566,13 @@ def main_parameterize(arguments=None, progress=None):
 
     logger.info('===== Parameterize =====')
 
+    # Citation
+    logger.info('Citation:')
+    logger.info('    R. Galvelis, S. Doerr, J. M. Damas, M. J. Harvey, and G. De Fabritiis')
+    logger.info('    A Scalable Molecular Force Field Parameterization Method Based on Density Functional Theory and Quantum-Level Machine Learning')
+    logger.info('    J. Chem. Inf. Model. 2019, 59, 8, 3485-3493')
+    logger.info('    DOI: 10.1021/acs.jcim.9b00439')
+
     # Parse arguments
     parser = getArgumentParser()
     args = parser.parse_args(args=arguments)
