@@ -39,16 +39,12 @@ def getArgumentParser():
                         help='QM basis set (default: %(default)s)')
     parser.add_argument('--environment', default='vacuum', choices=['vacuum', 'PCM'],
                         help='QM environment (default: %(default)s)')
-    parser.add_argument('--no-min', action='store_false', dest='minimize',
-                        help='DDEPRECATED: use `--min-type` instead')
     parser.add_argument('--min-type', default='qm', dest='min_type', choices=['None', 'qm', 'mm'],
                         help='Type of initial structure optimization (default: %(default)s)')
     parser.add_argument('--charge-type', default='ESP', choices=['None', 'Gasteiger', 'AM1-BCC', 'ESP'],
                         help='Partial atomic charge type (default: %(default)s)')
     parser.add_argument('--no-dihed', action='store_false', dest='fit_dihedral',
                         help='Do not perform QM scanning of dihedral angles')
-    parser.add_argument('--no-dihed-opt', action='store_false', dest='optimize_dihedral',
-                        help='DEPRECATED: use `--scan-type` instead')
     parser.add_argument('--scan-type', default='qm', dest='dihed_opt_type', choices=['None', 'qm', 'mm'],
                         help='Type of structure optimization when scanning dihedral angles (default: %(default)s)')
     parser.add_argument('--dihed-num-iterations', default=3, type=int,
