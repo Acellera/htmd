@@ -10,7 +10,7 @@ import numpy as np
 
 from htmd.home import home
 from htmd.qm.base import QMBase
-from htmd.qm import Psi4, Gaussian
+from htmd.qm import Psi4, TeraChem, Gaussian
 from htmd.queues.localqueue import LocalCPUQueue
 from htmd.queues.slurmqueue import SlurmQueue
 from moleculekit.molecule import Molecule
@@ -356,6 +356,14 @@ class _TestPsi4Slurm(_TestBase, unittest.TestCase):
     def test_queue(self):
 
         self.assertIsInstance(self.qm.queue, SlurmQueue)
+
+
+class _TestTeraChemLocal(_TestBase, unittest.TestCase):
+
+    def setUp(self):
+
+        self.qm = TeraChem()
+        super().setUp()
 
 
 class _TestGaussian(_TestBase, unittest.TestCase):
