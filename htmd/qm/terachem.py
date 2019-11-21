@@ -14,7 +14,12 @@ class TeraChem(QMBase):
 
     @property
     def _command(self):
-        return 'terachem terachem.in &> terachem.out'
+        if 'TeraChem' not in os.environ:
+            raise RuntimeError('Environment variable TeraChem is undefined')
+        if not os.path.exists(os.path.join(os.environ['TeraChem'], 'SetTCVars.sh')):
+            raise RuntimeError('$TeraChem/SetTCVars.sh does not exist')
+        return 'source $TeraChem/SetTCVars.sh && ' \
+               'terachem terachem.in &> terachem.out'
 
     def _completed(self, directory):
 
