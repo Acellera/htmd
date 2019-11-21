@@ -372,6 +372,9 @@ class _TestTeraChemLocal(_TestBase, unittest.TestCase):
 
     def setUp(self):
 
+        if 'TRAVIS' in os.environ:
+           self.skipTest('No TeraChem tests on Travis')
+
         self.qm = TeraChem()
         super().setUp()
 
