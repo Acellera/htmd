@@ -159,68 +159,73 @@ class _TestBase:
     def test_multiplicity(self):
 
         for charge, multiplicity in ((-1, 2), (0, 1), (0, 3), (1, 2)):
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.multiplicity = multiplicity
-                self.qm.theory = 'HF'
-                self.qm.basis = '3-21G'
-                self.qm.directory = tmpDir
-                self.qm.charge = charge
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=(charge, multiplicity))
-                self.assertEqualFloat(REF_CHARGE_MULTIPLICITY_ENERGIES[charge][multiplicity],
-                                      result.energy, msg=(charge, multiplicity))
+            with self.subTest(charge=charge, multiplicity=multiplicity):
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.multiplicity = multiplicity
+                    self.qm.theory = 'HF'
+                    self.qm.basis = '3-21G'
+                    self.qm.directory = tmpDir
+                    self.qm.charge = charge
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=(charge, multiplicity))
+                    self.assertEqualFloat(REF_CHARGE_MULTIPLICITY_ENERGIES[charge][multiplicity],
+                                          result.energy, msg=(charge, multiplicity))
 
     def test_theories(self):
 
         for theory in self.qm.THEORIES:
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.theory = theory
-                self.qm.basis = '3-21G'
-                self.qm.directory = tmpDir
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=theory)
-                self.assertEqualFloat(REF_THEORY_ENERGIES[theory], result.energy, msg=theory)
+            with self.subTest(theory=theory):
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.theory = theory
+                    self.qm.basis = '3-21G'
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=theory)
+                    self.assertEqualFloat(REF_THEORY_ENERGIES[theory], result.energy, msg=theory)
 
     def test_corrections(self):
 
         for correction in self.qm.CORRECTIONS:
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.theory = 'BLYP' # Using BLYP as HF-D isn't available
-                self.qm.correction = correction
-                self.qm.basis = '3-21G'
-                self.qm.directory = tmpDir
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=correction)
-                self.assertEqualFloat(REF_CORRECTION_ENERGIES[correction], result.energy, msg=correction)
+            with self.subTest(correction=correction):
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.theory = 'BLYP' # Using BLYP as HF-D isn't available
+                    self.qm.correction = correction
+                    self.qm.basis = '3-21G'
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=correction)
+                    self.assertEqualFloat(REF_CORRECTION_ENERGIES[correction], result.energy, msg=correction)
 
     def test_basis_sets(self):
 
         for basis in self.qm.BASIS_SETS:
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.theory = 'HF'
-                self.qm.basis = basis
-                self.qm.directory = tmpDir
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=basis)
-                tol = 1e-8 if basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ') else 1e-10 # Large basis sets are unstable
-                self.assertEqualFloat(REF_BASIS_ENERGIES[basis], result.energy, tol=tol, msg=basis)
+            with self.subTest(basis=basis):
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.theory = 'HF'
+                    self.qm.basis = basis
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=basis)
+                    tol = 1e-8 if basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ') else 1e-10 # Large basis sets are unstable
+                    self.assertEqualFloat(REF_BASIS_ENERGIES[basis], result.energy, tol=tol, msg=basis)
 
     def test_solvents(self):
 
         for solvent in self.qm.SOLVENTS:
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.theory = 'HF'
-                self.qm.basis = '3-21G'
-                self.qm.solvent = solvent
-                self.qm.directory = tmpDir
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=solvent)
-                self.assertEqualFloat(REF_SOLVET_ENERGIES[solvent], result.energy, msg=solvent)
+            with self.subTest(solvent=solvent):
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.theory = 'HF'
+                    self.qm.basis = '3-21G'
+                    self.qm.solvent = solvent
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=solvent)
+                    self.assertEqualFloat(REF_SOLVET_ENERGIES[solvent], result.energy, msg=solvent)
 
     def test_properties(self):
 
