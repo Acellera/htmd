@@ -317,7 +317,6 @@ class _TestBase:
         for basis in ('3-21G', '6-31+G*', '6-311++G**', 'cc-pVDZ', 'aug-cc-pVTZ'):
             with self.subTest(basis=basis):
                 with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                    #tmpDir = '.'
                     self.qm.molecule = self.Br
                     self.qm.multiplicity = 2
                     self.qm.theory = 'HF'
@@ -331,9 +330,6 @@ class _TestBase:
 class _TestPsi4Local(_TestBase, unittest.TestCase):
 
     def setUp(self):
-
-        if os.environ.get('TRAVIS_OS_NAME') == 'osx':
-            self.skipTest('Psi4 does not work on Mac')  # TODO fix!
 
         self.qm = Psi4()
         super().setUp()
