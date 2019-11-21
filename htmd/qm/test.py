@@ -114,6 +114,11 @@ REF_BR_ENERGIES['aug-cc-pVTZ'] = -1614204.3952243670
 
 class _TestBase:
 
+    def assertEqualFloat(self, a, b, tol=1e-10, msg=None):
+        message = f'{a} != {b} within rtol = {tol}'
+        message = f'{message} : {msg}' if msg else message
+        self.assertTrue(np.isclose(a, b, atol=0, rtol=tol), msg=message)
+
     def setUp(self):
 
         self.testDir = None
@@ -163,8 +168,8 @@ class _TestBase:
                 self.qm.charge = charge
                 result = self.qm.run()[0]
                 self.assertFalse(result.errored, msg=(charge, multiplicity))
-                self.assertAlmostEqual(REF_CHARGE_MULTIPLICITY_ENERGIES[charge][multiplicity],
-                                       result.energy, msg=(charge, multiplicity))
+                self.assertEqualFloat(REF_CHARGE_MULTIPLICITY_ENERGIES[charge][multiplicity],
+                                      result.energy, msg=(charge, multiplicity))
 
     def test_theories(self):
 
@@ -176,7 +181,7 @@ class _TestBase:
                 self.qm.directory = tmpDir
                 result = self.qm.run()[0]
                 self.assertFalse(result.errored, msg=theory)
-                self.assertAlmostEqual(REF_THEORY_ENERGIES[theory], result.energy, msg=theory)
+                self.assertEqualFloat(REF_THEORY_ENERGIES[theory], result.energy, msg=theory)
 
     def test_corrections(self):
 
@@ -189,7 +194,7 @@ class _TestBase:
                 self.qm.directory = tmpDir
                 result = self.qm.run()[0]
                 self.assertFalse(result.errored, msg=correction)
-                self.assertAlmostEqual(REF_CORRECTION_ENERGIES[correction], result.energy, msg=correction)
+                self.assertEqualFloat(REF_CORRECTION_ENERGIES[correction], result.energy, msg=correction)
 
     def test_basis_sets(self):
 
@@ -201,8 +206,8 @@ class _TestBase:
                 self.qm.directory = tmpDir
                 result = self.qm.run()[0]
                 self.assertFalse(result.errored, msg=basis)
-                places = 5 if basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ') else 7 # Large basis sets are unstable
-                self.assertAlmostEqual(REF_BASIS_ENERGIES[basis], result.energy, places=places, msg=basis)
+                tol = 1e-8 if basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ') else 1e-10 # Large basis sets are unstable
+                self.assertEqualFloat(REF_BASIS_ENERGIES[basis], result.energy, tol=tol, msg=basis)
 
     def test_solvents(self):
 
@@ -215,7 +220,7 @@ class _TestBase:
                 self.qm.directory = tmpDir
                 result = self.qm.run()[0]
                 self.assertFalse(result.errored, msg=solvent)
-                self.assertAlmostEqual(REF_SOLVET_ENERGIES[solvent], result.energy, msg=solvent)
+                self.assertEqualFloat(REF_SOLVET_ENERGIES[solvent], result.energy, msg=solvent)
 
     def test_properties(self):
 
@@ -262,7 +267,7 @@ class _TestBase:
 
         quad = [2, 0, 1, 3]
         angle = np.rad2deg(dihedralAngle(self.h2o2_90.coords[quad, :, 0]))
-        self.assertAlmostEqual(89.999544881803772, angle, places=5)
+        self.assertEqualFloat(89.999544881803772, angle, tol=1e-7)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.molecule = self.h2o2_90
@@ -274,7 +279,7 @@ class _TestBase:
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
             angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
-            self.assertAlmostEqual(89.999541178019271, angle, places=5)
+            self.assertEqualFloat(89.999541178019271, angle, tol=1e-7)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.restrained_dihedrals = None
@@ -282,7 +287,7 @@ class _TestBase:
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
             angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
-            self.assertAlmostEqual(179.51690845119924, angle, places=3) # Unstable results
+            self.assertEqualFloat(179.51690845119924, angle, tol=1e-6) # Unstable results
 
     def test_directory(self):
 
@@ -310,7 +315,7 @@ class _TestBase:
             self.assertEqual(2, len(results))
             for ires, result in enumerate(results):
                 self.assertFalse(result.errored, msg=ires)
-                self.assertAlmostEqual(REF_MULTISTRUCTURE_ENERGIES[ires], result.energy, msg=ires)
+                self.assertEqualFloat(REF_MULTISTRUCTURE_ENERGIES[ires], result.energy, msg=ires)
 
     def test_basis_set_substitution(self):
 
@@ -324,7 +329,7 @@ class _TestBase:
                     self.qm.directory = tmpDir
                     result = self.qm.run()[0]
                     self.assertFalse(result.errored)
-                    self.assertAlmostEqual(REF_BR_ENERGIES[basis], result.energy)
+                    self.assertEqualFloat(REF_BR_ENERGIES[basis], result.energy)
 
 
 class _TestPsi4Local(_TestBase, unittest.TestCase):
