@@ -18,7 +18,12 @@ class TeraChem(QMBase):
 
     def _completed(self, directory):
 
-        with open(os.path.join(directory, 'terachem.out')) as fd:
+        outFile = os.path.join(directory, 'terachem.out')
+
+        if not os.path.exists(outFile):
+            return False
+
+        with open(outFile) as fd:
             for line in fd.readlines():
                 if line.startswith(' Job terminated:'):
                     return True
