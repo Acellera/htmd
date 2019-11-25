@@ -48,8 +48,8 @@ class TeraChem(QMBase):
             f.write(f'basis {self.basis}\n')
             if self.correction != 'none':
                 f.write(f'dispersion {"D2" if self.correction == "D" else self.correction}\n')
-            if self.solvent != 'vacuum':
-                raise NotImplemented(f'Solvent {self.solvent} is not available')
+            if self.solvent == 'PCM':
+                f.write('pcm cosmo\n')
 
             f.write(f'charge {self.charge}\n')
             f.write(f'spinmult {self.multiplicity}\n')
