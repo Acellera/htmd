@@ -7,6 +7,7 @@ import os
 import numpy as np
 from scipy import constants as const
 
+from moleculekit.molecule import Molecule
 from htmd.qm.base import QMBase, QMResult
 
 
@@ -35,10 +36,10 @@ class TeraChem(QMBase):
 
         return False
 
-    def _writeInput(self, directory, iframe):
+    def _writeInput(self, directory, frame):
 
         xyzFile = os.path.join(directory, 'terachem.xyz')
-        self.molecule.iframe = iframe
+        self.molecule.frame = frame
         self.molecule.write(xyzFile)
 
         with open(os.path.join(directory, 'terachem.in'), 'w') as f:
@@ -89,15 +90,17 @@ class TeraChem(QMBase):
                                      float(tokens[3][ :-1]),
                                      float(tokens[4][ :-1]),
                                      float(tokens[7][ :-1])]
+
+        result.mulliken = np.loadtxt(os.path.join(directory, 'scr', 'charge_mull.xls'), usecols=(2,))
+
         if result.energy is None or result.dipole is None:
             result.errored = True
 
-        if self.optimize:
-            geomFile = os.path.join(directory, 'scr', 'terachem.geometry')
-            if os.path.exists(geomFile):
-                result.coords = np.loadtxt(geomFile, skiprows=6, usecols=(1, 2, 3))[:,:,None]
-            else:
-                result.errored = True
+        geomFile = os.path.join(directory, 'scr', 'optim.xyz' if self.optimize else 'xyz.xyz')
+        if os.path.exists(geomFile):
+            result.coords = Molecule(geomFile).coords[:,:,-1][:,:,None]
+        else:
+            result.errored = True
 
         if self.esp_points is not None:
             raise NotImplemented('ESP is not available')
