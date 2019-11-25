@@ -117,7 +117,10 @@ class _TestBase:
     def assertEqualFloat(self, a, b, tol=1e-10, msg=None):
         message = f'{a} != {b} within rtol = {tol}'
         message = f'{message} : {msg}' if msg else message
-        self.assertTrue(np.isclose(a, b, atol=0, rtol=tol), msg=message)
+        if np.abs(a) < tol:
+            self.assertTrue(np.isclose(a, b, atol=tol, rtol=0), msg=message)
+        else:
+            self.assertTrue(np.isclose(a, b, atol=0, rtol=tol), msg=message)
 
     def setUp(self):
 
