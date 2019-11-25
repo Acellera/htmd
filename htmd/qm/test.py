@@ -146,7 +146,6 @@ class _TestBase:
         molFile = os.path.join(home('test-qm'), 'Br.mol2')
         self.Br = Molecule(molFile)
 
-        self.e_tol = 1e-10
         self.e_tol = 1e-5 if isinstance(self.qm, TeraChem) else 1e-10
 
     def test_type(self):
@@ -329,7 +328,10 @@ class _TestBase:
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
             angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
-            self.assertEqualFloat(179.51690845119924, angle, tol=1e-6) # Unstable results
+            if isinstance(self.qm, Psi4):
+                self.assertEqualFloat(179.51690845119924, angle, tol=1e-6) # Unstable results
+            else:
+                self.assertEqualFloat(-168.9488713666722, angle, tol=1e-5) # Unstable results
 
     def test_directory(self):
 
