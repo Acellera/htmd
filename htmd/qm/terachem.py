@@ -91,7 +91,9 @@ class TeraChem(QMBase):
                                      float(tokens[4][ :-1]),
                                      float(tokens[7][ :-1])]
 
-        result.mulliken = np.loadtxt(os.path.join(directory, 'scr', 'charge_mull.xls'), usecols=(2,))
+        mullFile = os.path.join(directory, 'scr', 'charge_mull.xls')
+        if os.path.exists(mullFile):
+            result.mulliken = np.loadtxt(mullFile, usecols=(2,))
 
         if result.energy is None or result.dipole is None:
             result.errored = True
