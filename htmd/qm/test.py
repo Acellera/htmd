@@ -122,6 +122,14 @@ class _TestBase:
         else:
             self.assertTrue(np.isclose(a, b, atol=0, rtol=tol), msg=message)
 
+    def assertEqualFloatList(self, a, b, tol=1e-10, msg=None):
+
+        a = np.array(a).flatten()
+        b = np.array(b).flatten()
+        self.assertEqual(a.size, b.size, msg=msg)
+        for a_, b_ in zip(a, b):
+            self.assertEqualFloat(a_, b_, tol=tol, msg=msg)
+
     def setUp(self):
 
         self.testDir = None
