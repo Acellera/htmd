@@ -146,6 +146,8 @@ class _TestBase:
         molFile = os.path.join(home('test-qm'), 'Br.mol2')
         self.Br = Molecule(molFile)
 
+        self.e_tol = 1e-10
+
     def test_type(self):
 
         self.assertIsInstance(self.qm, QMBase)
@@ -181,7 +183,7 @@ class _TestBase:
                     result = self.qm.run()[0]
                     self.assertFalse(result.errored, msg=(charge, multiplicity))
                     self.assertEqualFloat(REF_CHARGE_MULTIPLICITY_ENERGIES[charge][multiplicity],
-                                          result.energy, msg=(charge, multiplicity))
+                                          result.energy, tol=self.e_tol, msg=(charge, multiplicity))
 
     def test_theories(self):
 
@@ -194,7 +196,7 @@ class _TestBase:
                     self.qm.directory = tmpDir
                     result = self.qm.run()[0]
                     self.assertFalse(result.errored, msg=theory)
-                    self.assertEqualFloat(REF_THEORY_ENERGIES[theory], result.energy, msg=theory)
+                    self.assertEqualFloat(REF_THEORY_ENERGIES[theory], result.energy, tol=self.e_tol, msg=theory)
 
     def test_corrections(self):
 
@@ -208,7 +210,7 @@ class _TestBase:
                     self.qm.directory = tmpDir
                     result = self.qm.run()[0]
                     self.assertFalse(result.errored, msg=correction)
-                    self.assertEqualFloat(REF_CORRECTION_ENERGIES[correction], result.energy, msg=correction)
+                    self.assertEqualFloat(REF_CORRECTION_ENERGIES[correction], result.energy, tol=self.e_tol, msg=correction)
 
     def test_basis_sets(self):
 
@@ -221,8 +223,9 @@ class _TestBase:
                     self.qm.directory = tmpDir
                     result = self.qm.run()[0]
                     self.assertFalse(result.errored, msg=basis)
-                    tol = 1e-8 if basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ') else 1e-10 # Large basis sets are unstable
-                    self.assertEqualFloat(REF_BASIS_ENERGIES[basis], result.energy, tol=tol, msg=basis)
+                    # Large basis sets are unstable
+                    self.e_tol = 100 * self.e_tol if basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ') else self.e_tol
+                    self.assertEqualFloat(REF_BASIS_ENERGIES[basis], result.energy, tol=self.e_tol, msg=basis)
 
     def test_solvents(self):
 
@@ -236,7 +239,7 @@ class _TestBase:
                     self.qm.directory = tmpDir
                     result = self.qm.run()[0]
                     self.assertFalse(result.errored, msg=solvent)
-                    self.assertEqualFloat(REF_SOLVET_ENERGIES[solvent], result.energy, msg=solvent)
+                    self.assertEqualFloat(REF_SOLVET_ENERGIES[solvent], result.energy, tol=self.e_tol, msg=solvent)
 
     def test_properties(self):
 
@@ -248,10 +251,11 @@ class _TestBase:
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
-            self.assertTrue(np.all(np.isclose(REF_DIPOLE, result.dipole)))
-            self.assertTrue(np.all(np.isclose(REF_QUADRUPOLE, result.quadrupole)))
-            self.assertTrue(np.all(np.isclose(REF_MULLIKEN, result.mulliken)))
-            self.assertTrue(np.all(np.isclose(REF_ESP_VALUES, result.esp_values)))
+            tol = 1e-10
+            self.assertEqualFloatList(REF_DIPOLE, result.dipole, tol=tol)
+            self.assertEqualFloatList(REF_MULLIKEN, result.mulliken, tol=tol)
+            self.assertEqualFloatList(REF_QUADRUPOLE, result.quadrupole)
+            self.assertEqualFloatList(REF_ESP_VALUES, result.esp_values)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.esp_points = None
@@ -270,14 +274,15 @@ class _TestBase:
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
-            self.assertTrue(np.all(np.isclose(REF_OPT_COORDS, result.coords)))
+            tol = 1e-5
+            self.assertEqualFloatList(REF_OPT_COORDS, result.coords, tol=tol)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.optimize = False
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
-            self.assertTrue(np.all(np.isclose(REF_INIT_COORDS, result.coords)))
+            self.assertEqualFloatList(REF_INIT_COORDS, result.coords)
 
     def test_restrained_dihedrals(self):
 
@@ -331,7 +336,7 @@ class _TestBase:
             self.assertEqual(2, len(results))
             for ires, result in enumerate(results):
                 self.assertFalse(result.errored, msg=ires)
-                self.assertEqualFloat(REF_MULTISTRUCTURE_ENERGIES[ires], result.energy, msg=ires)
+                self.assertEqualFloat(REF_MULTISTRUCTURE_ENERGIES[ires], result.energy, tol=self.e_tol, msg=ires)
 
     def test_basis_set_substitution(self):
 
@@ -345,7 +350,7 @@ class _TestBase:
                     self.qm.directory = tmpDir
                     result = self.qm.run()[0]
                     self.assertFalse(result.errored)
-                    self.assertEqualFloat(REF_BR_ENERGIES[basis], result.energy)
+                    self.assertEqualFloat(REF_BR_ENERGIES[basis], result.energy, tol=self.e_tol)
 
 
 class _TestPsi4Local(_TestBase, unittest.TestCase):
