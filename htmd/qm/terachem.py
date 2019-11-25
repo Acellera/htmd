@@ -47,7 +47,7 @@ class TeraChem(QMBase):
             f.write(f'method {("R" if self.multiplicity == 1 else "U") + self.theory}\n')
             f.write(f'basis {self.basis}\n')
             if self.correction != 'none':
-                f.write(f'dispersion {"no" if self.correction == "none" else self.correction}')
+                f.write(f'dispersion {"D2" if self.correction == "D" else self.correction}\n')
             if self.solvent != 'vacuum':
                 raise NotImplemented(f'Solvent {self.solvent} is not available')
 
