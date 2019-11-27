@@ -24,7 +24,7 @@ class AdaptiveGoalEG(AdaptiveGoal):
 
     Parameters
     ----------
-    app : :class:`SimQueue <htmd.queues.simqueue.SimQueue>` object, default=None
+    app : :class:`SimQueue <jobqueues.simqueue.SimQueue>` object, default=None
         A SimQueue class object used to retrieve and submit simulations
     project : str, default='adaptive'
         The name of the project
@@ -209,7 +209,7 @@ class AdaptiveGoalEG(AdaptiveGoal):
 if __name__ == '__main__':
     import htmd.home
     from moleculekit.projections.metricdistance import MetricDistance
-    from htmd.queues.localqueue import LocalGPUQueue
+    from jobqueues.localqueue import LocalGPUQueue
     from moleculekit.molecule import Molecule
     import os
     import shutil

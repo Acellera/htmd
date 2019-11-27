@@ -11,8 +11,8 @@ import numpy as np
 from htmd.home import home
 from htmd.qm.base import QMBase
 from htmd.qm import Psi4, Gaussian
-from htmd.queues.localqueue import LocalCPUQueue
-from htmd.queues.slurmqueue import SlurmQueue
+from jobqueues.localqueue import LocalCPUQueue
+from jobqueues.slurmqueue import SlurmQueue
 from moleculekit.molecule import Molecule
 from moleculekit.dihedral import dihedralAngle
 

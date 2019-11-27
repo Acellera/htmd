@@ -37,6 +37,6 @@ Contents:
     :maxdepth: 1
 
     Applications <htmd.apps>
-    Queues <htmd.queues>
+    Queues <../jobqueues/jobqueues.rst>
     Adaptive sampling <adaptive>
     State-of-the-art protocols for molecular simulations <htmd.protocols>
