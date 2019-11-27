@@ -239,16 +239,16 @@ def _get_queue(args):
     # Create a queue
     logger.info('Queue type: {}'.format(args.queue))
     if args.queue == 'local':
-        from htmd.queues.localqueue import LocalCPUQueue
+        from jobqueues.localqueue import LocalCPUQueue
         queue = LocalCPUQueue()
     elif args.queue == 'Slurm':
-        from htmd.queues.slurmqueue import SlurmQueue
+        from jobqueues.slurmqueue import SlurmQueue
         queue = SlurmQueue(_configapp=args.code.lower())
     elif args.queue == 'LSF':
-        from htmd.queues.lsfqueue import LsfQueue
+        from jobqueues.lsfqueue import LsfQueue
         queue = LsfQueue(_configapp=args.code.lower())
     elif args.queue == 'PBS':
-        from htmd.queues.pbsqueue import PBSQueue
+        from jobqueues.pbsqueue import PBSQueue
         queue = PBSQueue()  # TODO: configure
     elif args.queue == 'PlayQueue':
         from htmd.queues.playqueue import PlayQueue

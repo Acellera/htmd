@@ -111,7 +111,7 @@ class Psi4(QMBase):
             [ 0.37527978]]])
 
     The QM calculations run using LocalCPUQueue by default, but this can be changed to the others.
-    >>> from htmd.queues.slurmqueue import SlurmQueue
+    >>> from jobqueues.slurmqueue import SlurmQueue
     >>> qm.queue = SlurmQueue() # doctest: +SKIP
     """
 
