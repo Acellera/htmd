@@ -20,7 +20,7 @@ from protocolinterface import ProtocolInterface, val
 import logging
 logger = logging.getLogger(__name__)
 
-_IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel', '.done')
+_IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel', '.done', '*.chk', '*restart*')
 
 
 class AdaptiveBase(abc.ABC, ProtocolInterface):
