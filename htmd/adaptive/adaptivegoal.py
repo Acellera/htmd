@@ -355,11 +355,11 @@ if __name__ == '__main__':
         return crystal.resid[indexes[:, 1]] - crystal.resid[indexes[:, 0]] > long
 
     def getCrystalSS(crystal):
-        return MetricSecondaryStructure().project(crystal)[0]
+        return MetricSecondaryStructure().project(crystal)[0].flatten()
 
     def getCrystalCO(crystal):
         crystalCO = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).project(
-            crystal)
+            crystal).flatten()
         longCO = getLongContacts(crystal)
         return crystalCO & longCO
 
