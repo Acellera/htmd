@@ -26,7 +26,7 @@ class AdaptiveMD(AdaptiveBase):
 
     Parameters
     ----------
-    app : :class:`SimQueue <htmd.queues.simqueue.SimQueue>` object, default=None
+    app : :class:`SimQueue <jobqueues.simqueue.SimQueue>` object, default=None
         A SimQueue class object used to retrieve and submit simulations
     project : str, default='adaptive'
         The name of the project

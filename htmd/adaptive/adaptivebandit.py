@@ -16,7 +16,7 @@ class AdaptiveBandit(AdaptiveBase):
 
     Parameters
     ----------
-    app : :class:`SimQueue <htmd.queues.simqueue.SimQueue>` object, default=None
+    app : :class:`SimQueue <jobqueues.simqueue.SimQueue>` object, default=None
         A SimQueue class object used to retrieve and submit simulations
     project : str, default='adaptive'
         The name of the project
@@ -400,7 +400,7 @@ class _TestAdaptiveBandit(unittest.TestCase):
 
     def test_adaptive(self):
         from sklearn.cluster import MiniBatchKMeans
-        from htmd.queues.localqueue import LocalCPUQueue
+        from jobqueues.localqueue import LocalCPUQueue
         from moleculekit.projections.metricdistance import MetricDistance
 
         import numpy as np

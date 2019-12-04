@@ -12,7 +12,7 @@ import tempfile
 import time
 import zipfile
 
-from htmd.queues.simqueue import SimQueue
+from jobqueues.simqueue import SimQueue
 from protocolinterface import ProtocolInterface
 from protocolinterface.validators import Number, String
 
