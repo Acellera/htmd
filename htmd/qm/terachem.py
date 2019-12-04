@@ -93,7 +93,7 @@ class TeraChem(QMBase):
 
         mullFile = os.path.join(directory, 'scr', 'charge_mull.xls')
         if os.path.exists(mullFile):
-            result.mulliken = np.loadtxt(mullFile, usecols=(2,))
+            result.mulliken = list(np.loadtxt(mullFile, usecols=(2,)))
 
         if result.energy is None or result.dipole is None:
             result.errored = True
