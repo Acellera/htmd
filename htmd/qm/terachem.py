@@ -69,7 +69,6 @@ class TeraChem(QMBase):
     ...     qm.theory = 'BLYP'
     ...     qm.basis = 'cc-pVDZ'
     ...     qm.directory = tmp
-    ...     qm.directory = '.'
     ...     result = qm.run()
 
     The QM results are returned as a list of htmd.qm.QMResult objects. See htmd.qm.QMResult documentation for details.
