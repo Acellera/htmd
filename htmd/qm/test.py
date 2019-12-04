@@ -275,7 +275,7 @@ class _TestBase:
             self.assertEqualFloatList(REF_MULLIKEN, result.mulliken, tol=tol)
             if isinstance(self.qm, Psi4):
                 self.assertEqualFloatList(REF_QUADRUPOLE, result.quadrupole)
-                self.assertEqualFloatList(REF_ESP_VALUES, result.esp_values)
+                self.assertEqualFloatList(REF_ESP_VALUES, result.esp_values, tol=1e-6)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.esp_points = None
