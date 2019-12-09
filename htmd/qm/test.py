@@ -10,7 +10,7 @@ import numpy as np
 
 from htmd.home import home
 from htmd.qm.base import QMBase
-from htmd.qm import Psi4, Gaussian
+from htmd.qm import Psi4, TeraChem, Gaussian
 from jobqueues.localqueue import LocalCPUQueue
 from jobqueues.slurmqueue import SlurmQueue
 from moleculekit.molecule import Molecule
@@ -114,6 +114,22 @@ REF_BR_ENERGIES['aug-cc-pVTZ'] = -1614204.3952243670
 
 class _TestBase:
 
+    def assertEqualFloat(self, a, b, tol=1e-10, msg=None):
+        message = f'{a} != {b} within rtol = {tol}'
+        message = f'{message} : {msg}' if msg else message
+        if np.abs(a) < tol:
+            self.assertTrue(np.isclose(a, b, atol=tol, rtol=0), msg=message)
+        else:
+            self.assertTrue(np.isclose(a, b, atol=0, rtol=tol), msg=message)
+
+    def assertEqualFloatList(self, a, b, tol=1e-10, msg=None):
+
+        a = np.array(a).flatten()
+        b = np.array(b).flatten()
+        self.assertEqual(a.size, b.size, msg=msg)
+        for a_, b_ in zip(a, b):
+            self.assertEqualFloat(a_, b_, tol=tol, msg=msg)
+
     def setUp(self):
 
         self.testDir = None
@@ -129,6 +145,8 @@ class _TestBase:
 
         molFile = os.path.join(home('test-qm'), 'Br.mol2')
         self.Br = Molecule(molFile)
+
+        self.e_tol = 1e-5 if isinstance(self.qm, TeraChem) else 1e-10
 
     def test_type(self):
 
@@ -154,68 +172,92 @@ class _TestBase:
     def test_multiplicity(self):
 
         for charge, multiplicity in ((-1, 2), (0, 1), (0, 3), (1, 2)):
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.multiplicity = multiplicity
-                self.qm.theory = 'HF'
-                self.qm.basis = '3-21G'
-                self.qm.directory = tmpDir
-                self.qm.charge = charge
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=(charge, multiplicity))
-                self.assertAlmostEqual(REF_CHARGE_MULTIPLICITY_ENERGIES[charge][multiplicity],
-                                       result.energy, msg=(charge, multiplicity))
+            with self.subTest(charge=charge, multiplicity=multiplicity):
+
+                if isinstance(self.qm, TeraChem):
+                    if charge == 0 and multiplicity == 3:
+                        self.skipTest('TeraChem bug')
+                    if charge == 1 and multiplicity == 2:
+                        self.skipTest('TeraChem bug')
+
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.multiplicity = multiplicity
+                    self.qm.theory = 'HF'
+                    self.qm.basis = '3-21G'
+                    self.qm.directory = tmpDir
+                    self.qm.charge = charge
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=(charge, multiplicity))
+                    self.assertEqualFloat(REF_CHARGE_MULTIPLICITY_ENERGIES[charge][multiplicity],
+                                          result.energy, tol=self.e_tol, msg=(charge, multiplicity))
 
     def test_theories(self):
 
         for theory in self.qm.THEORIES:
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.theory = theory
-                self.qm.basis = '3-21G'
-                self.qm.directory = tmpDir
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=theory)
-                self.assertAlmostEqual(REF_THEORY_ENERGIES[theory], result.energy, msg=theory)
+            with self.subTest(theory=theory):
+
+                if isinstance(self.qm, TeraChem) and theory in ('B2PLYP', 'wB97X-D'):
+                    self.skipTest(f'TeraChem does not support: {theory}')
+
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.theory = theory
+                    self.qm.basis = '3-21G'
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=theory)
+                    self.e_tol = 1e-4 if isinstance(self.qm, TeraChem) and theory in ('wB97', 'wB97X') else self.e_tol
+                    self.assertEqualFloat(REF_THEORY_ENERGIES[theory], result.energy, tol=self.e_tol, msg=theory)
 
     def test_corrections(self):
 
         for correction in self.qm.CORRECTIONS:
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.theory = 'BLYP' # Using BLYP as HF-D isn't available
-                self.qm.correction = correction
-                self.qm.basis = '3-21G'
-                self.qm.directory = tmpDir
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=correction)
-                self.assertAlmostEqual(REF_CORRECTION_ENERGIES[correction], result.energy, msg=correction)
+            with self.subTest(correction=correction):
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.theory = 'BLYP' # Using BLYP as HF-D isn't available
+                    self.qm.correction = correction
+                    self.qm.basis = '3-21G'
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=correction)
+                    self.e_tol = 2e-4 if isinstance(self.qm, TeraChem) and correction == 'D3' else self.e_tol
+                    self.assertEqualFloat(REF_CORRECTION_ENERGIES[correction], result.energy, tol=self.e_tol, msg=correction)
 
     def test_basis_sets(self):
 
         for basis in self.qm.BASIS_SETS:
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.theory = 'HF'
-                self.qm.basis = basis
-                self.qm.directory = tmpDir
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=basis)
-                places = 5 if basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ') else 7 # Large basis sets are unstable
-                self.assertAlmostEqual(REF_BASIS_ENERGIES[basis], result.energy, places=places, msg=basis)
+            with self.subTest(basis=basis):
+
+                if isinstance(self.qm, TeraChem) and basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ'):
+                    self.skipTest(f'TeraChem does not support: {basis}')
+
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.theory = 'HF'
+                    self.qm.basis = basis
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=basis)
+                    # Large basis sets are unstable
+                    self.e_tol = 100 * self.e_tol if basis in ('cc-pVTZ', 'aug-cc-pVTZ', 'cc-pVQZ', 'aug-cc-pVQZ') else self.e_tol
+                    self.assertEqualFloat(REF_BASIS_ENERGIES[basis], result.energy, tol=self.e_tol, msg=basis)
 
     def test_solvents(self):
 
         for solvent in self.qm.SOLVENTS:
-            with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                self.qm.molecule = self.h2_074
-                self.qm.theory = 'HF'
-                self.qm.basis = '3-21G'
-                self.qm.solvent = solvent
-                self.qm.directory = tmpDir
-                result = self.qm.run()[0]
-                self.assertFalse(result.errored, msg=solvent)
-                self.assertAlmostEqual(REF_SOLVET_ENERGIES[solvent], result.energy, msg=solvent)
+            with self.subTest(solvent=solvent):
+                with TemporaryDirectory(dir=self.testDir) as tmpDir:
+                    self.qm.molecule = self.h2_074
+                    self.qm.theory = 'HF'
+                    self.qm.basis = '3-21G'
+                    self.qm.solvent = solvent
+                    self.qm.directory = tmpDir
+                    result = self.qm.run()[0]
+                    self.assertFalse(result.errored, msg=solvent)
+                    self.e_tol = 5e-5 if isinstance(self.qm, TeraChem) and solvent == 'PCM' else self.e_tol
+                    self.assertEqualFloat(REF_SOLVET_ENERGIES[solvent], result.energy, tol=self.e_tol, msg=solvent)
 
     def test_properties(self):
 
@@ -223,14 +265,17 @@ class _TestBase:
             self.qm.molecule = self.h2_074
             self.qm.theory = 'HF'
             self.qm.basis = '3-21G'
-            self.qm.esp_points = REF_ESP_POINTS
+            if isinstance(self.qm, Psi4):
+                self.qm.esp_points = REF_ESP_POINTS
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
-            self.assertTrue(np.all(np.isclose(REF_DIPOLE, result.dipole)))
-            self.assertTrue(np.all(np.isclose(REF_QUADRUPOLE, result.quadrupole)))
-            self.assertTrue(np.all(np.isclose(REF_MULLIKEN, result.mulliken)))
-            self.assertTrue(np.all(np.isclose(REF_ESP_VALUES, result.esp_values)))
+            tol = 1e-5 if isinstance(self.qm, TeraChem) else 1e-10
+            self.assertEqualFloatList(REF_DIPOLE, result.dipole, tol=tol)
+            self.assertEqualFloatList(REF_MULLIKEN, result.mulliken, tol=tol)
+            if isinstance(self.qm, Psi4):
+                self.assertEqualFloatList(REF_QUADRUPOLE, result.quadrupole)
+                self.assertEqualFloatList(REF_ESP_VALUES, result.esp_values, tol=1e-6)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.esp_points = None
@@ -249,20 +294,21 @@ class _TestBase:
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
-            self.assertTrue(np.all(np.isclose(REF_OPT_COORDS, result.coords)))
+            tol = 1e-4 if isinstance(self.qm, TeraChem) else 1e-5
+            self.assertEqualFloatList(REF_OPT_COORDS, result.coords, tol=tol)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.optimize = False
             self.qm.directory = tmpDir
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
-            self.assertTrue(np.all(np.isclose(REF_INIT_COORDS, result.coords)))
+            self.assertEqualFloatList(REF_INIT_COORDS, result.coords)
 
     def test_restrained_dihedrals(self):
 
         quad = [2, 0, 1, 3]
         angle = np.rad2deg(dihedralAngle(self.h2o2_90.coords[quad, :, 0]))
-        self.assertAlmostEqual(89.999544881803772, angle, places=5)
+        self.assertEqualFloat(89.999544881803772, angle, tol=1e-7)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.molecule = self.h2o2_90
@@ -274,7 +320,7 @@ class _TestBase:
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
             angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
-            self.assertAlmostEqual(89.999541178019271, angle, places=5)
+            self.assertEqualFloat(89.999541178019271, angle, tol=1e-7)
 
         with TemporaryDirectory(dir=self.testDir) as tmpDir:
             self.qm.restrained_dihedrals = None
@@ -282,7 +328,10 @@ class _TestBase:
             result = self.qm.run()[0]
             self.assertFalse(result.errored)
             angle = np.rad2deg(dihedralAngle(result.coords[quad, :, 0]))
-            self.assertAlmostEqual(179.51690845119924, angle, places=3) # Unstable results
+            if isinstance(self.qm, Psi4):
+                self.assertEqualFloat(179.51690845119924, angle, tol=1e-6) # Unstable results
+            else:
+                self.assertEqualFloat(-168.9488713666722, angle, tol=1e-5) # Unstable results
 
     def test_directory(self):
 
@@ -310,14 +359,16 @@ class _TestBase:
             self.assertEqual(2, len(results))
             for ires, result in enumerate(results):
                 self.assertFalse(result.errored, msg=ires)
-                self.assertAlmostEqual(REF_MULTISTRUCTURE_ENERGIES[ires], result.energy, msg=ires)
+                self.assertEqualFloat(REF_MULTISTRUCTURE_ENERGIES[ires], result.energy, tol=self.e_tol, msg=ires)
 
     def test_basis_set_substitution(self):
+
+        if isinstance(self.qm, TeraChem):
+            self.skipTest('Not implemented')
 
         for basis in ('3-21G', '6-31+G*', '6-311++G**', 'cc-pVDZ', 'aug-cc-pVTZ'):
             with self.subTest(basis=basis):
                 with TemporaryDirectory(dir=self.testDir) as tmpDir:
-                    #tmpDir = '.'
                     self.qm.molecule = self.Br
                     self.qm.multiplicity = 2
                     self.qm.theory = 'HF'
@@ -325,15 +376,12 @@ class _TestBase:
                     self.qm.directory = tmpDir
                     result = self.qm.run()[0]
                     self.assertFalse(result.errored)
-                    self.assertAlmostEqual(REF_BR_ENERGIES[basis], result.energy)
+                    self.assertEqualFloat(REF_BR_ENERGIES[basis], result.energy, tol=self.e_tol)
 
 
 class _TestPsi4Local(_TestBase, unittest.TestCase):
 
     def setUp(self):
-
-        if os.environ.get('TRAVIS_OS_NAME') == 'osx':
-            self.skipTest('Psi4 does not work on Mac')  # TODO fix!
 
         self.qm = Psi4()
         super().setUp()
@@ -360,6 +408,17 @@ class _TestPsi4Slurm(_TestBase, unittest.TestCase):
     def test_queue(self):
 
         self.assertIsInstance(self.qm.queue, SlurmQueue)
+
+
+class _TestTeraChemLocal(_TestBase, unittest.TestCase):
+
+    def setUp(self):
+
+        if 'TRAVIS' in os.environ:
+           self.skipTest('No TeraChem tests on Travis')
+
+        self.qm = TeraChem()
+        super().setUp()
 
 
 class _TestGaussian(_TestBase, unittest.TestCase):
