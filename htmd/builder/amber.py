@@ -13,8 +13,7 @@ from os.path import join
 from glob import glob
 from moleculekit.util import _missingSegID, sequenceID
 import shutil
-from htmd.builder.builder import detectDisulfideBonds, convertDisulfide, BuildError, UnknownResidueError, MissingAngleError, MissingBondError, MissingParameterError, MissingTorsionError, MissingAtomTypeError
-from htmd.builder.builder import _checkMixedSegment
+from htmd.builder.builder import detectDisulfideBonds, detectCisPeptideBonds, convertDisulfide, _checkMixedSegment, BuildError, UnknownResidueError, MissingAngleError, MissingBondError, MissingParameterError, MissingTorsionError, MissingAtomTypeError
 from subprocess import call, check_output, DEVNULL
 from moleculekit.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
@@ -480,10 +479,12 @@ def build(mol, ff=None, topo=None, param=None, prefix='structure', outdir='./bui
             return build(newmol, ff=ff, topo=topo, param=param, prefix=prefix, outdir=outdir, caps={}, ionize=False,
                          execute=execute, saltconc=saltconc, disulfide=disulfide, teleap=teleap, atomtypes=atomtypes,
                          offlibraries=offlibraries)
+
     tmpbonds = molbuilt.bonds
     molbuilt.bonds = []  # Removing the bonds to speed up writing
     molbuilt.write(os.path.join(outdir, 'structure.pdb'))
     molbuilt.bonds = tmpbonds  # Restoring the bonds
+    detectCisPeptideBonds(molbuilt) # Warn in case of cis bonds
     return molbuilt
 
 

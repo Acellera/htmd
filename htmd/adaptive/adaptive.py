@@ -12,7 +12,7 @@ from os import makedirs
 import shutil
 from shutil import copytree, ignore_patterns
 import numpy as np
-from htmd.queues.simqueue import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
+from jobqueues.simqueue import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
 from joblib import Parallel, delayed
 from htmd.simlist import _simName
 from moleculekit.molecule import Molecule
@@ -20,14 +20,14 @@ from protocolinterface import ProtocolInterface, val
 import logging
 logger = logging.getLogger(__name__)
 
-_IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel', '.done')
+_IGNORE_EXTENSIONS = ('*.dcd', '*.xtc', '*.binpos', '*.trr', '*.nc', '*.h5', '*.lh5', '*.netcdf', '*.vel', '.done', '*.chk', '*restart*')
 
 
 class AdaptiveBase(abc.ABC, ProtocolInterface):
     def __init__(self):
         super().__init__()
-        from htmd.queues.simqueue import SimQueue
-        self._arg('app', ':class:`SimQueue <htmd.queues.simqueue.SimQueue>` object', 'A SimQueue class object used to retrieve and submit simulations', None, val.Object((SimQueue,)))
+        from jobqueues.simqueue import SimQueue
+        self._arg('app', ':class:`SimQueue <jobqueues.simqueue.SimQueue>` object', 'A SimQueue class object used to retrieve and submit simulations', None, val.Object((SimQueue,)))
         self._arg('project', 'str', 'The name of the project', 'adaptive', val.String())
         self._arg('nmin', 'int', 'Minimum number of running simulations', 1, val.Number(int, 'POS'))
         self._arg('nmax', 'int', 'Maximum number of running simulations', 1, val.Number(int, 'POS'))
@@ -462,7 +462,7 @@ if __name__ == "__main__":
     import htmd
     import os
     import shutil
-    from htmd.queues.localqueue import LocalGPUQueue
+    from jobqueues.localqueue import LocalGPUQueue
     from htmd.simlist import Frame, simlist
     from htmd.util import tempname
 

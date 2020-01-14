@@ -41,10 +41,10 @@ from htmd.util import tempname
 from htmd.util import testDHFR
 from htmd.clustering.kcenters import KCenter
 from htmd.clustering.regular import RegCluster
-from htmd.queues.localqueue import LocalGPUQueue, LocalCPUQueue
-from htmd.queues.slurmqueue import SlurmQueue
-from htmd.queues.lsfqueue import LsfQueue
-from htmd.queues.pbsqueue import PBSQueue
+from jobqueues.localqueue import LocalGPUQueue, LocalCPUQueue
+from jobqueues.slurmqueue import SlurmQueue
+from jobqueues.lsfqueue import LsfQueue
+from jobqueues.pbsqueue import PBSQueue
 from moleculekit.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
 from moleculekit.tools.autosegment import autoSegment
 from htmd.builder.loopmodeler import loopModeller

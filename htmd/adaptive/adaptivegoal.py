@@ -24,7 +24,7 @@ class AdaptiveGoal(AdaptiveMD):
 
     Parameters
     ----------
-    app : :class:`SimQueue <htmd.queues.simqueue.SimQueue>` object, default=None
+    app : :class:`SimQueue <jobqueues.simqueue.SimQueue>` object, default=None
         A SimQueue class object used to retrieve and submit simulations
     project : str, default='adaptive'
         The name of the project
@@ -308,7 +308,7 @@ if __name__ == '__main__':
     from moleculekit.projections.metricdistance import MetricDistance
     import htmd.home
     from moleculekit.molecule import Molecule
-    from htmd.queues.localqueue import LocalGPUQueue
+    from jobqueues.localqueue import LocalGPUQueue
     import os
     import shutil
     from htmd.util import tempname
@@ -355,11 +355,11 @@ if __name__ == '__main__':
         return crystal.resid[indexes[:, 1]] - crystal.resid[indexes[:, 0]] > long
 
     def getCrystalSS(crystal):
-        return MetricSecondaryStructure().project(crystal)[0]
+        return MetricSecondaryStructure().project(crystal)[0].flatten()
 
     def getCrystalCO(crystal):
         crystalCO = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).project(
-            crystal)
+            crystal).flatten()
         longCO = getLongContacts(crystal)
         return crystalCO & longCO
 

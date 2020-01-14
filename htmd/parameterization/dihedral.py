@@ -433,12 +433,18 @@ class DihedralFitting:
         # Evaluate target energies for fitting
         target_energies = self._calculateTargetEnergies(const_energies)
 
-        # Check self-consistency of computed energies
+        # Evaluate actual energies for fitting
         k0, phi0, offset, n = self._unpackVector(vector)
-        actual_energies = DihedralFitting._evaluateScanEnergies(k0, phi0, offset, n, self._angle_values, self.numDihedrals, np.arange(self.numDihedrals))
-        test_energies = zip(self._initial_energies, const_energies, actual_energies)
-        for initial_energies, const_energies, actual_enegies in test_energies:
-            assert np.allclose(initial_energies, const_energies + actual_enegies, rtol=0, atol=1e-5) # TODO debug
+        actual_energies = DihedralFitting._evaluateScanEnergies(k0, phi0, offset, n, self._angle_values,
+                                                                self.numDihedrals, np.arange(self.numDihedrals))
+
+        # Check self-consistency of the computed energies
+        # NOTE: checks if FFEvaluate.calculateEnergies and DihedralFitting._evaluateScanEnergies
+        #       compute dihedral terms consistently
+        num_atoms = self.molecule.numAtoms
+        for initial, const, actual in zip(self._initial_energies, const_energies, actual_energies):
+            if not np.allclose(initial/num_atoms, (const + actual)/num_atoms, rtol=0, atol=1e-6):
+                raise AssertionError('Energies are not self-consistent')
 
         # Zero the initial parameters, so they are not used to start the parameter fitting
         if self.zeroed_parameters:

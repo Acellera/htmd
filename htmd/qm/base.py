@@ -12,7 +12,7 @@ from moleculekit.periodictable import periodictable
 import numpy as np
 from protocolinterface import ProtocolInterface, val
 
-from htmd.queues.localqueue import LocalCPUQueue
+from jobqueues.localqueue import LocalCPUQueue
 from htmd.queues.playqueue import PlayQueue
 
 logger = logging.getLogger(__name__)
@@ -193,7 +193,7 @@ class QMBase(ABC, ProtocolInterface):
         self._arg('restrained_dihedrals', ':class: `numpy.ndarray`',
                   'List of restrained dihedrals (0-based indices)',
                   default=None, nargs='*')  # TODO implement validator
-        self._arg('queue', ':class:`SimQueue <htmd.queues.simqueue.SimQueue>` object',
+        self._arg('queue', ':class:`SimQueue <jobqueues.simqueue.SimQueue>` object',
                   'Queue object used to run simulations',
                   default=LocalCPUQueue())
         self._arg('directory', 'str', 'Working directory',

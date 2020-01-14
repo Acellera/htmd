@@ -21,11 +21,10 @@ class Psi4(QMBase):
     - Single-point energy calculations with HF and DFT.
     - Electronic properties: dipole and quadrupole monents, Mulliken charges, ESP at given points
     - Geometry optimization with/without dihedral restraints
-    - Can use various queuing systems
 
     Attributes
     ----------
-    molecule : :class:`FFMolecule`
+    molecule : :class:`Molecule`
         Molecule
     multiplity : int, default = 1
         Multiplicity of the molecule (1 = singlet, 2 = doublet, 3 = triplet, etc.)
@@ -111,7 +110,7 @@ class Psi4(QMBase):
             [ 0.37527978]]])
 
     The QM calculations run using LocalCPUQueue by default, but this can be changed to the others.
-    >>> from htmd.queues.slurmqueue import SlurmQueue
+    >>> from jobqueues.slurmqueue import SlurmQueue
     >>> qm.queue = SlurmQueue() # doctest: +SKIP
     """
 
@@ -257,6 +256,4 @@ if __name__ == '__main__':
     import sys
     import doctest
 
-    if os.environ.get('TRAVIS_OS_NAME') != 'osx':  # Psi4 does not work in Mac
-        if doctest.testmod().failed:
-            sys.exit(1)
+    sys.exit(doctest.testmod().failed)

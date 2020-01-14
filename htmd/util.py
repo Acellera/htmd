@@ -169,7 +169,7 @@ def assertSameAsReferenceDir(compareDir, outdir="."):
 def testDHFR():
     import conda
     import shutil
-    from htmd.queues.localqueue import LocalGPUQueue
+    from jobqueues.localqueue import LocalGPUQueue
 
     dhfrdir = os.path.abspath(os.path.join(conda.__file__, '../../../../../acemd-examples/dhfr'))
 

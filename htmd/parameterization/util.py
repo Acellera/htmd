@@ -151,7 +151,7 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
     logger.info('Generate rotamers for:')
     molecules = []
     for idihed, dihedral in enumerate(dihedrals):
-        logger.info('  {:2d}: {}'.format(idihed, '-'.join(mol.name[list(dihedral)])))
+        logger.info('  {:2d}: {}'.format(idihed + 1, '-'.join(mol.name[list(dihedral)])))
 
         # Create a copy of molecule with "nrotamers" frames
         new_mol = mol.copy()
@@ -170,7 +170,7 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
     if scan_type == 'mm':
         logger.info('Minimize rotamers with MM for:')
         for idihed, (dihedral, molecule) in enumerate(zip(dihedrals, molecules)):
-            logger.info('  {:2d}: {}'.format(idihed, '-'.join(mol.name[list(dihedral)])))
+            logger.info('  {:2d}: {}'.format(idihed + 1, '-'.join(mol.name[list(dihedral)])))
             for iframe in range(molecule.numFrames):
                 molecule.coords[:, :, iframe] = mm_minimizer.minimize(molecule.coords[:, :, iframe],
                                                                       restrained_dihedrals=[dihedral])
@@ -198,7 +198,7 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
     scan_results = []
     logger.info('Compute rotamer energies for:')
     for idihed, (molecule, dihedral, directory) in enumerate(zip(molecules, dihedrals, directories)):
-        logger.info('  {:2d}: {}'.format(idihed, '-'.join(mol.name[list(dihedral)])))
+        logger.info('  {:2d}: {}'.format(idihed + 1, '-'.join(mol.name[list(dihedral)])))
         ref.molecule = molecule
         ref.esp_points = None
         ref.optimize = (scan_type == 'qm')
