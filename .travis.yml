@@ -46,10 +46,6 @@ install:
   - echo "python $TRAVIS_PYTHON_VERSION*" > $HOME/miniconda/envs/travis-env/conda-meta/pinned
   - source activate travis-env
 
-  - conda config --set channel_priority true
-  - conda config --add channels acellera
-  - conda config --add channels psi4
-  - conda config --append channels conda-forge
   - conda install anaconda-client -y -q
   - conda update --all -y -q
 
@@ -64,16 +60,18 @@ install:
 
   # Install the Conda dependencies HTMD needs
   - df -h
-  - conda install --file package/htmd-deps/DEPENDENCIES -y
-  - bash -x continuous-integration/travis/conda_build_htmd-data.sh
-  - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
-  # Cleaning to reduce amount of space used on disk
-  - conda clean --all -y
+  - conda install --file package/htmd-deps/DEPENDENCIES -y -c acellera -c psi4 -c conda-forge
 
   # Build and install the HTMD dependencies package
   - python package/htmd-deps/write_meta_yaml.py package/htmd-deps
   - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe
-  - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
+  # - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
+
+  # Build htmd-data
+  - bash -x continuous-integration/travis/conda_build_htmd-data.sh
+  - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
+  # Cleaning to reduce amount of space used on disk
+  - conda clean --all -y
 
   # Build and install HTMD
   - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe
