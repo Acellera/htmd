@@ -78,7 +78,7 @@ class Psi4(QMBase):
     >>> result[0].errored
     False
     >>> result[0].energy # doctest: +ELLIPSIS
-    -728.97083177...
+    -728.97083...
     >>> result[0].mulliken # doctest: +ELLIPSIS
     [...0.0, ...0.0]
 
