@@ -61,9 +61,9 @@ class FakeQM(QMBase):
     >>> result.energy # doctest: +ELLIPSIS
     8.38083...
     >>> result.esp_points
-    array([[ 1.,  1.,  1.]])
+    array([[1., 1., 1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
-    array([ 0.37135...])
+    array([0.37135...])
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     89.99...
 
@@ -96,18 +96,27 @@ class FakeQM(QMBase):
     """
 
     # Fake implementations of the abstract methods
-    def _command(self): pass
-    def _writeInput(self, directory, iframe): pass
-    def _readOutput(self, directory): pass
-    def setup(self): pass
-    def submit(self): pass
+    def _command(self):
+        pass
+
+    def _writeInput(self, directory, iframe):
+        pass
+
+    def _readOutput(self, directory):
+        pass
+
+    def setup(self):
+        pass
+
+    def submit(self):
+        pass
 
     def __init__(self):
         super().__init__()
         self._parameters = None
 
     def _completed(self, directory):
-        return os.path.exists(os.path.join(directory, 'data.pkl'))
+        return os.path.exists(os.path.join(directory, "data.pkl"))
 
     def retrieve(self):
 
@@ -117,53 +126,69 @@ class FakeQM(QMBase):
         for iframe in range(self.molecule.numFrames):
             self.molecule.frame = iframe
 
-            directory = os.path.join(self.directory, '%05d' % iframe)
+            directory = os.path.join(self.directory, "%05d" % iframe)
             os.makedirs(directory, exist_ok=True)
-            pickleFile = os.path.join(directory, 'data.pkl')
+            pickleFile = os.path.join(directory, "data.pkl")
 
             if self._completed(directory):
-                with open(pickleFile, 'rb') as fd:
+                with open(pickleFile, "rb") as fd:
                     result = pickle.load(fd)
-                logger.info('Loading QM data from %s' % pickleFile)
+                logger.info("Loading QM data from %s" % pickleFile)
 
             else:
                 result = QMResult()
                 result.errored = False
-                result.coords = self.molecule.coords[:, :, iframe:iframe + 1].copy()
+                result.coords = self.molecule.coords[:, :, iframe : iframe + 1].copy()
 
                 if self.optimize:
                     opt = nlopt.opt(nlopt.LN_COBYLA, result.coords.size)
-                    opt.set_min_objective(lambda x, _: ff.calculateEnergies(x.reshape((-1, 3)))['total'])
+                    opt.set_min_objective(
+                        lambda x, _: ff.calculateEnergies(x.reshape((-1, 3)))["total"]
+                    )
                     if self.restrained_dihedrals is not None:
                         for dihedral in self.restrained_dihedrals:
                             indices = dihedral.copy()
-                            ref_angle = dihedralAngle(self.molecule.coords[indices, :, iframe])
+                            ref_angle = dihedralAngle(
+                                self.molecule.coords[indices, :, iframe]
+                            )
+
                             def constraint(x, _):
                                 coords = x.reshape((-1, 3))
                                 angle = dihedralAngle(coords[indices])
-                                return np.sin(.5*(angle - ref_angle))
-                            opt.add_equality_constraint(constraint)
-                    opt.set_xtol_abs(1e-3) # Similar to Psi4 default
-                    opt.set_maxeval(1000*opt.get_dimension())
-                    opt.set_initial_step(1e-3)
-                    result.coords = opt.optimize(result.coords.ravel()).reshape((-1, 3, 1))
-                    logger.info('Optimization status: %d' % opt.last_optimize_result())
+                                return np.sin(0.5 * (angle - ref_angle))
 
-                result.energy = ff.calculateEnergies(result.coords[:, :, 0])['total']
+                            opt.add_equality_constraint(constraint)
+                    opt.set_xtol_abs(1e-3)  # Similar to Psi4 default
+                    opt.set_maxeval(1000 * opt.get_dimension())
+                    opt.set_initial_step(1e-3)
+                    result.coords = opt.optimize(result.coords.ravel()).reshape(
+                        (-1, 3, 1)
+                    )
+                    logger.info("Optimization status: %d" % opt.last_optimize_result())
+
+                result.energy = ff.calculateEnergies(result.coords[:, :, 0])["total"]
                 result.dipole = getDipole(self.molecule)
 
                 if self.optimize:
-                    assert opt.last_optimum_value() == result.energy # A self-consistency test
+                    assert (
+                        opt.last_optimum_value() == result.energy
+                    )  # A self-consistency test
 
                 # Compute ESP values
                 if self.esp_points is not None:
                     assert self.molecule.numFrames == 1
                     result.esp_points = self.esp_points
-                    distances = cdist(result.esp_points, result.coords[:, :, 0])  # Angstrom
-                    distances *= const.physical_constants['Bohr radius'][0] / const.angstrom  # Angstrom --> Bohr
-                    result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge)  # Hartree/Bohr
+                    distances = cdist(
+                        result.esp_points, result.coords[:, :, 0]
+                    )  # Angstrom
+                    distances *= (
+                        const.physical_constants["Bohr radius"][0] / const.angstrom
+                    )  # Angstrom --> Bohr
+                    result.esp_values = np.dot(
+                        np.reciprocal(distances), self.molecule.charge
+                    )  # Hartree/Bohr
 
-                with open(pickleFile, 'wb') as fd:
+                with open(pickleFile, "wb") as fd:
                     pickle.dump(result, fd)
 
             results.append(result)
@@ -207,9 +232,9 @@ class FakeQM2(FakeQM):
     >>> result.energy # doctest: +ELLIPSIS
     8.380840...
     >>> result.esp_points
-    array([[ 1.,  1.,  1.]])
+    array([[1., 1., 1.]])
     >>> result.esp_values # doctest: +ELLIPSIS
-    array([ 0.371352...])
+    array([0.371352...])
     >>> np.rad2deg(dihedralAngle(result.coords[[2, 0, 1, 3], :, 0])) # doctest: +ELLIPSIS
     89.99954...
 
@@ -245,24 +270,28 @@ class FakeQM2(FakeQM):
         from htmd.parameterization.writers import writeFRCMOD, getAtomTypeMapping
 
         with TemporaryDirectory() as tmpDir:
-            frcFile = os.path.join(tmpDir, 'mol.frcmod')
+            frcFile = os.path.join(tmpDir, "mol.frcmod")
             mapping = getAtomTypeMapping(self._parameters)
             writeFRCMOD(self.molecule, self._parameters, frcFile, typemap=mapping)
             mol2 = self.molecule.copy()
             mol2.atomtype[:] = np.vectorize(mapping.get)(mol2.atomtype)
-            molFile = os.path.join(tmpDir, 'mol.mol2')
+            molFile = os.path.join(tmpDir, "mol.mol2")
             mol2.write(molFile)
 
-            with open(os.path.join(tmpDir, 'tleap.inp'), 'w') as file:
-                file.writelines(('loadAmberParams %s\n' % frcFile,
-                                 'MOL = loadMol2 %s\n' % molFile,
-                                 'saveAmberParm MOL mol.prmtop mol.inpcrd\n',
-                                 'quit'))
+            with open(os.path.join(tmpDir, "tleap.inp"), "w") as file:
+                file.writelines(
+                    (
+                        "loadAmberParams %s\n" % frcFile,
+                        "MOL = loadMol2 %s\n" % molFile,
+                        "saveAmberParm MOL mol.prmtop mol.inpcrd\n",
+                        "quit",
+                    )
+                )
 
-            with open(os.path.join(tmpDir, 'tleap.out'), 'w') as out:
-                call(('tleap', '-f', 'tleap.inp'), cwd=tmpDir, stdout=out)
+            with open(os.path.join(tmpDir, "tleap.out"), "w") as out:
+                call(("tleap", "-f", "tleap.inp"), cwd=tmpDir, stdout=out)
 
-            prmtop = app.AmberPrmtopFile(os.path.join(tmpDir, 'mol.prmtop'))
+            prmtop = app.AmberPrmtopFile(os.path.join(tmpDir, "mol.prmtop"))
 
         return prmtop
 
@@ -278,14 +307,21 @@ class FakeQM2(FakeQM):
                 restraint.setForceGroup(max(groups) + 1)
 
                 for dihedral in self.restrained_dihedrals:
-                    restraint.addTorsion(*tuple(map(int, dihedral)), periodicity=1, phase=0,
-                                         k=-1000 * unit.kilocalorie_per_mole)
+                    restraint.addTorsion(
+                        *tuple(map(int, dihedral)),
+                        periodicity=1,
+                        phase=0,
+                        k=-1000 * unit.kilocalorie_per_mole
+                    )
 
                 system.addForce(restraint)
 
-        simulation = app.Simulation(prmtop.topology, system,
-                                    openmm.VerletIntegrator(1 * unit.femtosecond),
-                                    openmm.Platform.getPlatformByName('CPU'))
+        simulation = app.Simulation(
+            prmtop.topology,
+            system,
+            openmm.VerletIntegrator(1 * unit.femtosecond),
+            openmm.Platform.getPlatformByName("CPU"),
+        )
 
         results = []
         molecule_copy = self.molecule.copy()
@@ -293,55 +329,73 @@ class FakeQM2(FakeQM):
             self.molecule.frame = iframe
             molecule_copy.frame = iframe
 
-            directory = os.path.join(self.directory, '%05d' % iframe)
+            directory = os.path.join(self.directory, "%05d" % iframe)
             os.makedirs(directory, exist_ok=True)
-            pickleFile = os.path.join(directory, 'data.pkl')
+            pickleFile = os.path.join(directory, "data.pkl")
 
             if self._completed(directory):
-                with open(pickleFile, 'rb') as fd:
+                with open(pickleFile, "rb") as fd:
                     results.append(pickle.load(fd))
-                logger.info('Loading QM data from %s' % pickleFile)
+                logger.info("Loading QM data from %s" % pickleFile)
                 continue
 
-            simulation.context.setPositions(self.molecule.coords[:, :, iframe] * unit.angstrom)
+            simulation.context.setPositions(
+                self.molecule.coords[:, :, iframe] * unit.angstrom
+            )
             if self.optimize:
                 if self.restrained_dihedrals is not None:
                     for i, dihedral in enumerate(self.restrained_dihedrals):
-                        ref_angle = np.rad2deg(dihedralAngle(self.molecule.coords[dihedral, :, iframe]))
+                        ref_angle = np.rad2deg(
+                            dihedralAngle(self.molecule.coords[dihedral, :, iframe])
+                        )
                         parameters = restraint.getTorsionParameters(i)
                         parameters[5] = ref_angle * unit.degree
                         restraint.setTorsionParameters(i, *parameters)
                     restraint.updateParametersInContext(simulation.context)
                 simulation.minimizeEnergy(tolerance=0.001 * unit.kilocalorie_per_mole)
-            state = simulation.context.getState(getEnergy=True, getPositions=True, groups=groups)
+            state = simulation.context.getState(
+                getEnergy=True, getPositions=True, groups=groups
+            )
 
             result = QMResult()
             result.charge = self.charge
             result.errored = False
-            result.energy = state.getPotentialEnergy().value_in_unit(unit.kilocalorie_per_mole)
-            result.coords = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom).reshape((-1, 3, 1))
+            result.energy = state.getPotentialEnergy().value_in_unit(
+                unit.kilocalorie_per_mole
+            )
+            result.coords = (
+                state.getPositions(asNumpy=True)
+                .value_in_unit(unit.angstrom)
+                .reshape((-1, 3, 1))
+            )
             result.dipole = getDipole(self.molecule)
 
             if self.esp_points is not None:
                 assert self.molecule.numFrames == 1
                 result.esp_points = self.esp_points
                 distances = cdist(result.esp_points, result.coords[:, :, 0])  # Angstrom
-                distances *= const.physical_constants['Bohr radius'][0] / const.angstrom  # Angstrom --> Bohr
-                result.esp_values = np.dot(np.reciprocal(distances), self.molecule.charge)  # Hartree/Bohr
+                distances *= (
+                    const.physical_constants["Bohr radius"][0] / const.angstrom
+                )  # Angstrom --> Bohr
+                result.esp_values = np.dot(
+                    np.reciprocal(distances), self.molecule.charge
+                )  # Hartree/Bohr
 
             results.append(result)
 
-            with open(pickleFile, 'wb') as fd:
+            with open(pickleFile, "wb") as fd:
                 pickle.dump(result, fd)
 
-            self.molecule.write(os.path.join(directory, 'mol-init.mol2'))  # Write an optimiz
+            self.molecule.write(
+                os.path.join(directory, "mol-init.mol2")
+            )  # Write an optimiz
             molecule_copy.coords[:, :, iframe] = result.coords[:, :, 0]
-            molecule_copy.write(os.path.join(directory, 'mol.mol2'))  # Write an optimiz
+            molecule_copy.write(os.path.join(directory, "mol.mol2"))  # Write an optimiz
 
         return results
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
     import doctest
 
