@@ -15,7 +15,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-fftypemethods = ('CGenFF_2b6', 'GAFF', 'GAFF2')
+fftypemethods = ("CGenFF_2b6", "GAFF", "GAFF2")
 
 
 def _canonicalizeAtomNames(mol):
@@ -27,10 +27,10 @@ def _canonicalizeAtomNames(mol):
 
     mol = mol.copy()
 
-    mol.segid[:] = 'L'
-    logger.debug('Rename segment to %s' % mol.segid[0])
-    mol.resname[:] = 'MOL'
-    logger.debug('Rename residue to %s' % mol.resname[0])
+    mol.segid[:] = "L"
+    logger.debug("Rename segment to %s" % mol.segid[0])
+    mol.resname[:] = "MOL"
+    logger.debug("Rename residue to %s" % mol.resname[0])
 
     sufices = {}
     for i in range(mol.numAtoms):
@@ -38,13 +38,21 @@ def _canonicalizeAtomNames(mol):
         sufices[name] = sufices.get(name, 0) + 1
         name += str(sufices[name])
 
-        logger.debug('Rename atom %d: %-4s --> %-4s' % (i, mol.name[i], name))
+        logger.debug("Rename atom %d: %-4s --> %-4s" % (i, mol.name[i], name))
         mol.name[i] = name
 
     return mol
 
 
-def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpDir=None, netcharge=None):
+def fftype(
+    mol,
+    rtfFile=None,
+    prmFile=None,
+    method="GAFF2",
+    acCharges=None,
+    tmpDir=None,
+    netcharge=None,
+):
     """
     Assing atom types and force field parameters for a given molecule.
     Additionally, atom masses and improper dihedral are set.
@@ -88,25 +96,33 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
     import parmed
 
     if method not in fftypemethods:
-        raise ValueError('Invalid method {}. Available methods {}'.format(method, ','.join(fftypemethods)))
+        raise ValueError(
+            "Invalid method {}. Available methods {}".format(
+                method, ",".join(fftypemethods)
+            )
+        )
 
-    if method == 'CGenFF_2b6' and acCharges:
-        raise ValueError('acCharges')
+    if method == "CGenFF_2b6" and acCharges:
+        raise ValueError("acCharges")
 
     if netcharge is None:
         netcharge = int(round(np.sum(mol.charge)))
-        logger.warning('Molecular charge is set to {} by adding up the atomic charges'.format(netcharge))
+        logger.warning(
+            "Molecular charge is set to {} by adding up the atomic charges".format(
+                netcharge
+            )
+        )
 
     if rtfFile and prmFile:
 
         from htmd.parameterization.readers import readRTF
 
-        logger.info('Reading FF parameters from {} and {}'.format(rtfFile, prmFile))
+        logger.info("Reading FF parameters from {} and {}".format(rtfFile, prmFile))
         prm = parmed.charmm.CharmmParameterSet(rtfFile, prmFile)
         names, elements, atomtypes, charges, masses, impropers = readRTF(rtfFile)
 
     else:
-        logger.info('Assigning atom types with {}'.format(method))
+        logger.info("Assigning atom types with {}".format(method))
 
         renamed_mol = _canonicalizeAtomNames(mol)
 
@@ -115,96 +131,136 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
 
             # HACK to keep the files
             tmpdir = tmpdir if tmpDir is None else tmpDir
-            logger.debug('Temporary directory: {}'.format(tmpdir))
+            logger.debug("Temporary directory: {}".format(tmpdir))
 
-            if method in ('GAFF', 'GAFF2'):
+            if method in ("GAFF", "GAFF2"):
 
                 from moleculekit.molecule import Molecule
                 from htmd.parameterization.readers import readPREPI, readFRCMOD
 
                 # Write the molecule to a file
-                renamed_mol.write(os.path.join(tmpdir, 'mol.mol2'))
+                renamed_mol.write(os.path.join(tmpdir, "mol.mol2"))
 
                 atomtype = method.lower()
 
                 # Set arguments
-                cmd = ['antechamber',
-                       '-at', atomtype,
-                       '-nc', str(netcharge),
-                       '-fi', 'mol2',
-                       '-i', 'mol.mol2',
-                       '-fo', 'prepi',
-                       '-o', 'mol.prepi']
+                cmd = [
+                    "antechamber",
+                    "-at",
+                    atomtype,
+                    "-nc",
+                    str(netcharge),
+                    "-fi",
+                    "mol2",
+                    "-i",
+                    "mol.mol2",
+                    "-fo",
+                    "prepi",
+                    "-o",
+                    "mol.prepi",
+                ]
                 if acCharges is not None:
-                    cmd += ['-c', acCharges]
+                    cmd += ["-c", acCharges]
 
                 # Run antechamber
                 with TemporaryFile() as stream:
-                    if subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream) != 0:
+                    if (
+                        subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream)
+                        != 0
+                    ):
                         raise RuntimeError('"antechamber" failed')
                     stream.seek(0)
                     for line in stream.readlines():
                         logger.debug(line)
 
                 # Set arguments
-                cmd = ['parmchk2',
-                       '-f', 'prepi',
-                       '-s', atomtype,
-                       '-i', 'mol.prepi',
-                       '-o', 'mol.frcmod',
-                       '-a', 'Y']
+                cmd = [
+                    "parmchk2",
+                    "-f",
+                    "prepi",
+                    "-s",
+                    atomtype,
+                    "-i",
+                    "mol.prepi",
+                    "-o",
+                    "mol.frcmod",
+                    "-a",
+                    "Y",
+                ]
 
                 # Run parmchk2
                 with TemporaryFile() as stream:
-                    if subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream) != 0:
+                    if (
+                        subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream)
+                        != 0
+                    ):
                         raise RuntimeError('"parmchk2" failed')
                     stream.seek(0)
                     for line in stream.readlines():
                         logger.debug(line)
 
                 # Check if antechamber did changes in atom names (and suggest the user to fix the names)
-                acmol = Molecule(os.path.join(tmpdir, 'NEWPDB.PDB'), type='pdb')
+                acmol = Molecule(os.path.join(tmpdir, "NEWPDB.PDB"), type="pdb")
                 acmol.name = np.array([n.upper() for n in acmol.name]).astype(np.object)
                 changed_mol_acmol = np.setdiff1d(renamed_mol.name, acmol.name)
                 changed_acmol_mol = np.setdiff1d(acmol.name, renamed_mol.name)
                 if len(changed_mol_acmol) != 0 or len(changed_acmol_mol) != 0:
-                    raise RuntimeError('Initial atom names {} were changed by antechamber to {}. '
-                                       'This probably means that the start of the atom name does not match '
-                                       'element symbol. '
-                                       'Please check the molecule.'
-                                       ''.format(','.join(changed_mol_acmol), ','.join(changed_acmol_mol)))
+                    raise RuntimeError(
+                        "Initial atom names {} were changed by antechamber to {}. "
+                        "This probably means that the start of the atom name does not match "
+                        "element symbol. "
+                        "Please check the molecule."
+                        "".format(
+                            ",".join(changed_mol_acmol), ",".join(changed_acmol_mol)
+                        )
+                    )
 
                 # Read the results
-                prm = parmed.amber.AmberParameterSet(os.path.join(tmpdir, 'mol.frcmod'))
-                names, atomtypes, charges, impropers = readPREPI(renamed_mol, os.path.join(tmpdir, 'mol.prepi'))
-                masses, elements = readFRCMOD(atomtypes, os.path.join(tmpdir, 'mol.frcmod'))
+                prm = parmed.amber.AmberParameterSet(os.path.join(tmpdir, "mol.frcmod"))
+                names, atomtypes, charges, impropers = readPREPI(
+                    renamed_mol, os.path.join(tmpdir, "mol.prepi")
+                )
+                masses, elements = readFRCMOD(
+                    atomtypes, os.path.join(tmpdir, "mol.frcmod")
+                )
 
-            elif method == 'CGenFF_2b6':
+            elif method == "CGenFF_2b6":
 
                 from htmd.parameterization.readers import readRTF
 
                 # Write the molecule to a file
-                renamed_mol.write(os.path.join(tmpdir, 'mol.pdb'))
+                renamed_mol.write(os.path.join(tmpdir, "mol.pdb"))
 
                 # Set arguments
-                cmd = ['match-typer',
-                       '-charge', str(netcharge),
-                       '-forcefield', 'top_all36_cgenff_new',
-                       'mol.pdb']
+                cmd = [
+                    "match-typer",
+                    "-charge",
+                    str(netcharge),
+                    "-forcefield",
+                    "top_all36_cgenff_new",
+                    "mol.pdb",
+                ]
 
                 # Run match-type
                 with TemporaryFile() as stream:
-                    if subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream) != 0:
+                    if (
+                        subprocess.call(cmd, cwd=tmpdir, stdout=stream, stderr=stream)
+                        != 0
+                    ):
                         raise RuntimeError('"match-typer" failed')
                     stream.seek(0)
                     for line in stream.readlines():
                         logger.debug(line)
 
-                prm = parmed.charmm.CharmmParameterSet(os.path.join(tmpdir, 'mol.rtf'), os.path.join(tmpdir, 'mol.prm'))
-                names, elements, atomtypes, charges, masses, impropers = readRTF(os.path.join(tmpdir, 'mol.rtf'))
+                prm = parmed.charmm.CharmmParameterSet(
+                    os.path.join(tmpdir, "mol.rtf"), os.path.join(tmpdir, "mol.prm")
+                )
+                names, elements, atomtypes, charges, masses, impropers = readRTF(
+                    os.path.join(tmpdir, "mol.rtf")
+                )
 
             else:
-                raise ValueError('Invalid method {}'.format(method))
+                raise ValueError("Invalid method {}".format(method))
 
         assert np.all(renamed_mol.name == names)
 
@@ -221,10 +277,10 @@ def fftype(mol, rtfFile=None, prmFile=None, method='GAFF2', acCharges=None, tmpD
 
 
 class _TestFftypeGAFF(unittest.TestCase):
-
     def setUp(self):
         from htmd.home import home
-        self.refDir = home(dataDir='test-fftype')
+
+        self.refDir = home(dataDir="test-fftype")
 
     def assertListAlmostEqual(self, list1, list2, places=7):
         self.assertEqual(len(list1), len(list2))
@@ -235,9 +291,9 @@ class _TestFftypeGAFF(unittest.TestCase):
 
         from moleculekit.molecule import Molecule
 
-        molFile = os.path.join(self.refDir, '{}.mol2'.format(molName))
+        molFile = os.path.join(self.refDir, "{}.mol2".format(molName))
 
-        if chargetuple == 'None':
+        if chargetuple == "None":
             acCharges = None
             netcharge = None
         else:
@@ -247,11 +303,13 @@ class _TestFftypeGAFF(unittest.TestCase):
         mol = Molecule(molFile)
 
         with TemporaryDirectory() as tmpDir:
-            self.testParameters, self.testMolecule = fftype(mol,
-                                                            method=ffTypeMethod,
-                                                            acCharges=acCharges,
-                                                            netcharge=netcharge,
-                                                            tmpDir=tmpDir)
+            self.testParameters, self.testMolecule = fftype(
+                mol,
+                method=ffTypeMethod,
+                acCharges=acCharges,
+                netcharge=netcharge,
+                tmpDir=tmpDir,
+            )
             self.testIntermediaryFiles = sorted(os.listdir(tmpDir))
 
     def _generate_references(self, name, method):
@@ -261,26 +319,36 @@ class _TestFftypeGAFF(unittest.TestCase):
 
         def mapping(value):
             if isinstance(value, str):
-                return '\'{}\''.format(value)
+                return "'{}'".format(value)
             elif isinstance(value, numbers.Real) or isinstance(value, numbers.Integral):
                 return str(value)
             elif isinstance(value, np.ndarray):
-                return '[{}]'.format(', '.join(map(mapping, list(value))))
+                return "[{}]".format(", ".join(map(mapping, list(value))))
             else:
-                raise Exception('No mapping for type {}'.format(type(value)))
+                raise Exception("No mapping for type {}".format(type(value)))
 
-        print('Copy these to mol_props.yaml')
-        for prop in ['name', 'element', 'atomtype', 'charge', 'impropers']:
-            print('{}: {}'.format(prop if prop.endswith('s') else '{}s'.format(prop),
-                                  '[{}]'.format(', '.join(map(mapping, getattr(self.testMolecule, prop))))))
-        print('\nVerify these. They are already written through pickle')
-        with open(os.path.join(self.refDir, name, method, 'params.p'), 'wb') as outfile:
+        print("Copy these to mol_props.yaml")
+        for prop in ["name", "element", "atomtype", "charge", "impropers"]:
+            print(
+                "{}: {}".format(
+                    prop if prop.endswith("s") else "{}s".format(prop),
+                    "[{}]".format(
+                        ", ".join(map(mapping, getattr(self.testMolecule, prop)))
+                    ),
+                )
+            )
+        print("\nVerify these. They are already written through pickle")
+        with open(os.path.join(self.refDir, name, method, "params.p"), "wb") as outfile:
             for i in self.testParameters.__dict__:
                 print(i, getattr(self.testParameters, i))
             pickle.dump(self.testParameters, outfile)
 
-        print('\nCopy these to intermediary_files.yaml')
-        print('[{}]'.format(', '.join('\'{}\''.format(i) for i in self.testIntermediaryFiles)))
+        print("\nCopy these to intermediary_files.yaml")
+        print(
+            "[{}]".format(
+                ", ".join("'{}'".format(i) for i in self.testIntermediaryFiles)
+            )
+        )
 
     def _test_mol_props(self, names, elements, atomtypes, charges, impropers):
 
@@ -307,10 +375,10 @@ class _TestFftypeGAFF(unittest.TestCase):
         import yaml
 
         toTest = (
-            ('ethanolamine', 'GAFF2', 'None'),
-            ('1o5b_ligand', 'GAFF2', ('gas', 1)),
-            ('1z95_ligand', 'GAFF2', ('gas', 0)),
-            ('4gr0_ligand', 'GAFF2', ('gas', -1))
+            ("ethanolamine", "GAFF2", "None"),
+            ("1o5b_ligand", "GAFF2", ("gas", 1)),
+            ("1z95_ligand", "GAFF2", ("gas", 0)),
+            ("4gr0_ligand", "GAFF2", ("gas", -1)),
         )
 
         for name, method, chargetuple in toTest:
@@ -320,15 +388,16 @@ class _TestFftypeGAFF(unittest.TestCase):
                 self._init_mol(name, method, chargetuple)
                 # self._generate_references(name, method)
 
-                with open(os.path.join(refDir, 'mol_props.yaml')) as infile:
+                with open(os.path.join(refDir, "mol_props.yaml")) as infile:
                     refProps = yaml.load(infile)
                 self._test_mol_props(**refProps)
 
-                with open(os.path.join(refDir, 'params.p'), 'rb') as infile:
+                with open(os.path.join(refDir, "params.p"), "rb") as infile:
                     refParams = pickle.load(infile)
+
                 self._test_params(refParams)
 
-                with open(os.path.join(refDir, 'intermediary_files.yaml')) as infile:
+                with open(os.path.join(refDir, "intermediary_files.yaml")) as infile:
                     refFiles = yaml.load(infile)
                 self._test_intermediary_files(refFiles)
 
@@ -336,20 +405,22 @@ class _TestFftypeGAFF(unittest.TestCase):
 
         from moleculekit.molecule import Molecule
 
-        molFile = os.path.join(self.refDir, 'ethanolamine_wrongnames.mol2')
+        molFile = os.path.join(self.refDir, "ethanolamine_wrongnames.mol2")
 
-        mol = Molecule(molFile, guessNE=['bonds'], guess=[])
+        mol = Molecule(molFile, guessNE=["bonds"], guess=[])
 
         with self.assertRaises(RuntimeError) as cm:
-            fftype(mol, method='GAFF2')
+            fftype(mol, method="GAFF2")
 
-        self.assertEqual(cm.exception.args[0], 'Initial atom names BR1 were changed by antechamber to CR1. '
-                                               'This probably means that the start of the atom name does not '
-                                               'match element symbol. Please check the molecule.')
+        self.assertEqual(
+            cm.exception.args[0],
+            "Initial atom names BR1 were changed by antechamber to CR1. "
+            "This probably means that the start of the atom name does not "
+            "match element symbol. Please check the molecule.",
+        )
 
 
 class _TestFftypeCGenFF(unittest.TestCase):
-
     def setUp(self):
 
         self.maxDiff = None
@@ -357,21 +428,21 @@ class _TestFftypeCGenFF(unittest.TestCase):
         from htmd.home import home
         from moleculekit.molecule import Molecule
 
-        molFile = os.path.join(home('building-protein-ligand'), 'benzamidine.mol2')
-        self.mol = Molecule(molFile, guessNE=['bonds'], guess=['angles', 'dihedrals'])
+        molFile = os.path.join(home("building-protein-ligand"), "benzamidine.mol2")
+        self.mol = Molecule(molFile, guessNE=["bonds"], guess=["angles", "dihedrals"])
 
     def test_rtf_prm(self):
 
         from htmd.home import home
         from htmd.parameterization.writers import writeRTF, writePRM
 
-        refDir = home(dataDir='test-fftype/benzamidine')
+        refDir = home(dataDir="test-fftype/benzamidine")
         with TemporaryDirectory() as resDir:
-            parameters, mol = fftype(self.mol, method='CGenFF_2b6')
-            writeRTF(mol, parameters, 0, os.path.join(resDir, 'cgenff.rtf'))
-            writePRM(mol, parameters, os.path.join(resDir, 'cgenff.prm'))
+            parameters, mol = fftype(self.mol, method="CGenFF_2b6")
+            writeRTF(mol, parameters, 0, os.path.join(resDir, "cgenff.rtf"))
+            writePRM(mol, parameters, os.path.join(resDir, "cgenff.prm"))
 
-            for testFile in ('cgenff.rtf', 'cgenff.prm'):
+            for testFile in ("cgenff.rtf", "cgenff.prm"):
                 with self.subTest(testFile=testFile):
                     # Get rid of the first linw with HTMD version string
                     with open(os.path.join(refDir, testFile)) as refFile:
@@ -383,10 +454,13 @@ class _TestFftypeCGenFF(unittest.TestCase):
     def test_tmp_files(self):
 
         with TemporaryDirectory() as tmpDir:
-            _, _ = fftype(self.mol, method='CGenFF_2b6', tmpDir=tmpDir)
-            self.assertListEqual(sorted(os.listdir(tmpDir)), ['mol.pdb', 'mol.prm', 'mol.rtf', 'top_mol.rtf'])
+            _, _ = fftype(self.mol, method="CGenFF_2b6", tmpDir=tmpDir)
+            self.assertListEqual(
+                sorted(os.listdir(tmpDir)),
+                ["mol.pdb", "mol.prm", "mol.rtf", "top_mol.rtf"],
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     unittest.main(verbosity=2)

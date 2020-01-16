@@ -54,7 +54,9 @@ def fitGasteigerCharges(mol, atom_types=None):
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
     if mol.numFrames != 1:
-        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+        raise ValueError(
+            '"mol" can have just one frame, but it has {}'.format(mol.numFrames)
+        )
 
     # Set atom types to elements, overwise rdkit refuse to read a MOL2 file
     htmd_mol = mol.copy()
@@ -65,12 +67,14 @@ def fitGasteigerCharges(mol, atom_types=None):
     rdkit_mol = _convertMoleculeToRDKitMol(htmd_mol)
     ComputeGasteigerCharges(rdkit_mol, throwOnParamFailure=True)
     mol = mol.copy()
-    mol.charge[:] = [atom.GetDoubleProp('_GasteigerCharge') for atom in rdkit_mol.GetAtoms()]
+    mol.charge[:] = [
+        atom.GetDoubleProp("_GasteigerCharge") for atom in rdkit_mol.GetAtoms()
+    ]
 
     return mol
 
 
-def fitChargesWithAntechamber(mol, type='gas', molCharge=None):
+def fitChargesWithAntechamber(mol, type="gas", molCharge=None):
     """
     Fit atomic charges with Antechamber
 
@@ -125,29 +129,41 @@ def fitChargesWithAntechamber(mol, type='gas', molCharge=None):
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
     if mol.numFrames != 1:
-        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+        raise ValueError(
+            '"mol" can have just one frame, but it has {}'.format(mol.numFrames)
+        )
 
-    if type not in ('gas', 'bcc'):
+    if type not in ("gas", "bcc"):
         raise ValueError('"type" has to be "gas" or "bcc"')
 
     if molCharge is None:
         molCharge = int(round(np.sum(mol.charge)))
-        logger.info('Using partial atomic charges to calculate molecular charge')
+        logger.info("Using partial atomic charges to calculate molecular charge")
 
     mol = mol.copy()
-    mol.charge[:] = molCharge/mol.numAtoms
+    mol.charge[:] = molCharge / mol.numAtoms
 
     with TemporaryDirectory() as tmpDir:
-        old_name = os.path.join(tmpDir, 'old.mol2')
-        new_name = os.path.join(tmpDir, 'new.mol2')
+        old_name = os.path.join(tmpDir, "old.mol2")
+        new_name = os.path.join(tmpDir, "new.mol2")
 
         mol.write(old_name)
 
-        cmd = ['antechamber',
-               '-fi', 'mol2', '-i', old_name,
-               '-nc', str(molCharge),
-               '-c', type,
-               '-fo', 'mol2', '-o', new_name]
+        cmd = [
+            "antechamber",
+            "-fi",
+            "mol2",
+            "-i",
+            old_name,
+            "-nc",
+            str(molCharge),
+            "-c",
+            type,
+            "-fo",
+            "mol2",
+            "-o",
+            new_name,
+        ]
 
         with TemporaryFile() as stream:
             if subprocess.call(cmd, cwd=tmpDir, stdout=stream, stderr=stream) != 0:
@@ -216,7 +232,9 @@ def fitESPCharges(mol, qm, outdir, apply_bounds=True, restraint_factor=0, fixed=
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
     if mol.numFrames != 1:
-        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+        raise ValueError(
+            '"mol" can have just one frame, but it has {}'.format(mol.numFrames)
+        )
 
     if not issubclass(type(qm), QMBase):
         raise ValueError('"qm" has to be instance of {}'.format(QMBase))
@@ -228,11 +246,11 @@ def fitESPCharges(mol, qm, outdir, apply_bounds=True, restraint_factor=0, fixed=
     point_file = os.path.join(outdir, "00000", "grid.dat")
     if os.path.exists(point_file):
         # Load a point file if one exists from a previous job
-        logger.info('Reusing ESP grid from %s' % point_file)
+        logger.info("Reusing ESP grid from %s" % point_file)
         esp_points = np.loadtxt(point_file)
     else:
         # Generate ESP points
-        logger.info('Generating ESP grid')
+        logger.info("Generating ESP grid")
         esp_points = MoleculeGrid(mol).getPoints()
 
     # Run QM simulation
@@ -243,7 +261,7 @@ def fitESPCharges(mol, qm, outdir, apply_bounds=True, restraint_factor=0, fixed=
     qm.directory = outdir
     qm_results = qm.run()
     if qm_results[0].errored:
-        raise RuntimeError('QM calculation failed! Check logs at {}'.format(outdir))
+        raise RuntimeError("QM calculation failed! Check logs at {}".format(outdir))
 
     # Safeguard QM code from changing coordinates :)
     assert np.all(np.isclose(mol.coords, qm_results[0].coords, atol=1e-6))
@@ -259,12 +277,15 @@ def fitESPCharges(mol, qm, outdir, apply_bounds=True, restraint_factor=0, fixed=
 
     # Update the charges
     mol = mol.copy()
-    mol.charge[:] = esp_result['charges']
-    extra = {'qm_dipole': qm_results[0].dipole,
-             'esp_loss': esp_result['loss'],
-             'esp_rmsd': esp_result['RMSD']}
+    mol.charge[:] = esp_result["charges"]
+    extra = {
+        "qm_dipole": qm_results[0].dipole,
+        "esp_loss": esp_result["loss"],
+        "esp_rmsd": esp_result["RMSD"],
+    }
 
     return mol, extra
+
 
 def symmetrizeCharges(mol):
     """
@@ -299,7 +320,9 @@ def symmetrizeCharges(mol):
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
     if mol.numFrames != 1:
-        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+        raise ValueError(
+            '"mol" can have just one frame, but it has {}'.format(mol.numFrames)
+        )
 
     mol = mol.copy()
     molCharge = np.sum(mol.charge)
@@ -314,7 +337,7 @@ def symmetrizeCharges(mol):
     return mol
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     import sys
     import doctest

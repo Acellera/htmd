@@ -19,46 +19,55 @@ def guessElements(mol, method):
     """
 
     elements = {}
-    elements['CGenFF_2b6'] = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
-    elements['GAFF']       = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
-    elements['GAFF2']      = ['H', 'C', 'N', 'O', 'F', 'S', 'P', 'Cl', 'Br', 'I']
-    elements['ANI-1x']     = ['H', 'C', 'N', 'O']
+    elements["CGenFF_2b6"] = ["H", "C", "N", "O", "F", "S", "P", "Cl", "Br", "I"]
+    elements["GAFF"] = ["H", "C", "N", "O", "F", "S", "P", "Cl", "Br", "I"]
+    elements["GAFF2"] = ["H", "C", "N", "O", "F", "S", "P", "Cl", "Br", "I"]
+    elements["ANI-1x"] = ["H", "C", "N", "O"]
 
     if method not in elements.keys():
-        raise ValueError('Invalid "method": {}. Valid methods: {}'
-                         ''.format(method, ','.join(elements.keys())))
+        raise ValueError(
+            'Invalid "method": {}. Valid methods: {}'
+            "".format(method, ",".join(elements.keys()))
+        )
 
     mol = mol.copy()
 
     for i, name in enumerate(mol.name):
 
-        candidates = [element for element in elements[method] if name.capitalize().startswith(element)]
+        candidates = [
+            element
+            for element in elements[method]
+            if name.capitalize().startswith(element)
+        ]
 
         if len(candidates) == 1:
             mol.element[i] = candidates[0]
             continue
 
-        if candidates == ['C', 'Cl']:
+        if candidates == ["C", "Cl"]:
 
             if len(mol.bonds) == 0:
-                raise RuntimeError('No chemical bonds found in the molecule')
+                raise RuntimeError("No chemical bonds found in the molecule")
 
             # Create a molecular graph
             import networkx as nx
+
             graph = nx.Graph()
             graph.add_edges_from(mol.bonds)
 
             if len(graph[i]) in (2, 3, 4):
-                mol.element[i] = 'C'
+                mol.element[i] = "C"
                 continue
 
             if len(graph[i]) == 1:
-                mol.element[i] = 'Cl'
+                mol.element[i] = "Cl"
                 continue
 
-        raise ValueError('Cannot guess element from atom name: {}. '
-                         'It does not match any of the expected elements ({}) for {}.'
-                         ''.format(name, ', '.join(elements[method]), method))
+        raise ValueError(
+            "Cannot guess element from atom name: {}. "
+            "It does not match any of the expected elements ({}) for {}."
+            "".format(name, ", ".join(elements[method]), method)
+        )
 
     return mol
 
@@ -72,24 +81,26 @@ def getDipole(mol):
     from scipy import constants as const
 
     if mol.masses.sum() == 0:
-        logger.warning('No masses found in Molecule. Cannot calculate dipole.')
+        logger.warning("No masses found in Molecule. Cannot calculate dipole.")
         return np.zeros(4)
     else:
         coords = mol.coords[:, :, mol.frame] - centreOfMass(mol)
 
     dipole = np.zeros(4)
     dipole[:3] = np.dot(mol.charge, coords)
-    dipole[3] = np.linalg.norm(dipole[:3]) # Total dipole moment
-    dipole *= 1e11*const.elementary_charge*const.speed_of_light # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
+    dipole[3] = np.linalg.norm(dipole[:3])  # Total dipole moment
+    dipole *= (
+        1e11 * const.elementary_charge * const.speed_of_light
+    )  # e * Ang --> Debye (https://en.wikipedia.org/wiki/Debye)
 
     return dipole
 
 
 def _qm_method_name(qm):
     basis = qm.basis
-    basis = re.sub('\+', 'plus', basis)  # Replace '+' with 'plus'
-    basis = re.sub('\*', 'star', basis)  # Replace '*' with 'star'
-    name = qm.theory + '-' + basis + '-' + qm.solvent
+    basis = re.sub("\+", "plus", basis)  # Replace '+' with 'plus'
+    basis = re.sub("\*", "star", basis)  # Replace '*' with 'star'
+    name = qm.theory + "-" + basis + "-" + qm.solvent
     return name
 
 
@@ -98,21 +109,29 @@ def getFixedChargeAtomIndices(mol, fix_charge):
     for fixed_atom_name in fix_charge:
 
         if fixed_atom_name not in mol.name:
-            raise ValueError('Atom {} is not found. Check --fix-charge arguments'.format(fixed_atom_name))
+            raise ValueError(
+                "Atom {} is not found. Check --fix-charge arguments".format(
+                    fixed_atom_name
+                )
+            )
 
         for aton_index in range(mol.numAtoms):
             if mol.name[aton_index] == fixed_atom_name:
                 fixed_atom_indices.append(aton_index)
-                logger.info('Charge of atom {} is fixed to {}'.format(fixed_atom_name, mol.charge[aton_index]))
+                logger.info(
+                    "Charge of atom {} is fixed to {}".format(
+                        fixed_atom_name, mol.charge[aton_index]
+                    )
+                )
     return fixed_atom_indices
 
 
-def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
+def minimize(mol, qm, outdir, min_type="qm", mm_minimizer=None):
 
     assert mol.numFrames == 1
     mol = mol.copy()
 
-    if min_type == 'qm':
+    if min_type == "qm":
         mindir = os.path.join(outdir, "minimize", _qm_method_name(qm))
         os.makedirs(mindir, exist_ok=True)
 
@@ -123,35 +142,38 @@ def minimize(mol, qm, outdir, min_type='qm', mm_minimizer=None):
         qm.directory = mindir
         results = qm.run()
         if results[0].errored:
-            raise RuntimeError('\nQM minimization failed! Check logs at %s\n' % mindir)
-
+            raise RuntimeError("\nQM minimization failed! Check logs at %s\n" % mindir)
 
         # Replace coordinates with the minimized set
         mol.coords = np.atleast_3d(np.array(results[0].coords, dtype=np.float32))
-    elif min_type == 'mm':
+    elif min_type == "mm":
         mol.coords[:, :, 0] = mm_minimizer.minimize(mol.coords)
-    elif min_type == 'None':
+    elif min_type == "None":
         pass
     else:
-        raise RuntimeError('Invalid minimization mode {}. Check parameterize help.'.format(min_type))
+        raise RuntimeError(
+            "Invalid minimization mode {}. Check parameterize help.".format(min_type)
+        )
 
     return mol
 
 
-def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None):
+def scanDihedrals(mol, ref, dihedrals, outdir, scan_type="qm", mm_minimizer=None):
     """
     Dihedrals passed as 4 atom indices
     """
     num_rotamers = 36  # Number of rotamers for each dihedral to compute
 
-    logger.info('Number of rotamers per dihedral angles: {}'.format(num_rotamers))
+    logger.info("Number of rotamers per dihedral angles: {}".format(num_rotamers))
 
     # Create molecules with rotamers
     # TODO factor out dihedral generation
-    logger.info('Generate rotamers for:')
+    logger.info("Generate rotamers for:")
     molecules = []
     for idihed, dihedral in enumerate(dihedrals):
-        logger.info('  {:2d}: {}'.format(idihed + 1, '-'.join(mol.name[list(dihedral)])))
+        logger.info(
+            "  {:2d}: {}".format(idihed + 1, "-".join(mol.name[list(dihedral)]))
+        )
 
         # Create a copy of molecule with "nrotamers" frames
         new_mol = mol.copy()
@@ -167,20 +189,27 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
         molecules.append(new_mol)
 
     # Minimize with MM if requested
-    if scan_type == 'mm':
-        logger.info('Minimize rotamers with MM for:')
+    if scan_type == "mm":
+        logger.info("Minimize rotamers with MM for:")
         for idihed, (dihedral, molecule) in enumerate(zip(dihedrals, molecules)):
-            logger.info('  {:2d}: {}'.format(idihed + 1, '-'.join(mol.name[list(dihedral)])))
+            logger.info(
+                "  {:2d}: {}".format(idihed + 1, "-".join(mol.name[list(dihedral)]))
+            )
             for iframe in range(molecule.numFrames):
-                molecule.coords[:, :, iframe] = mm_minimizer.minimize(molecule.coords[:, :, iframe],
-                                                                      restrained_dihedrals=[dihedral])
+                molecule.coords[:, :, iframe] = mm_minimizer.minimize(
+                    molecule.coords[:, :, iframe], restrained_dihedrals=[dihedral]
+                )
 
     # Create directories for QM data
     directories = []
-    dihedral_directory = 'dihedral-opt' if scan_type == 'qm' else 'dihedral-single-point'
+    dihedral_directory = (
+        "dihedral-opt" if scan_type == "qm" else "dihedral-single-point"
+    )
     for dihedral in dihedrals:
-        dihedral_name = '-'.join(mol.name[dihedral])
-        directory = os.path.join(outdir, dihedral_directory, dihedral_name, _qm_method_name(ref))
+        dihedral_name = "-".join(mol.name[dihedral])
+        directory = os.path.join(
+            outdir, dihedral_directory, dihedral_name, _qm_method_name(ref)
+        )
         os.makedirs(directory, exist_ok=True)
         directories.append(directory)
 
@@ -188,7 +217,7 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
     for molecule, dihedral, directory in zip(molecules, dihedrals, directories):
         ref.molecule = molecule
         ref.esp_points = None
-        ref.optimize = (scan_type == 'qm')
+        ref.optimize = scan_type == "qm"
         ref.restrained_dihedrals = np.array([dihedral])
         ref.directory = directory
         ref.setup()
@@ -196,12 +225,16 @@ def scanDihedrals(mol, ref, dihedrals, outdir, scan_type='qm', mm_minimizer=None
 
     # Wait and retrieve QM calculation data
     scan_results = []
-    logger.info('Compute rotamer energies for:')
-    for idihed, (molecule, dihedral, directory) in enumerate(zip(molecules, dihedrals, directories)):
-        logger.info('  {:2d}: {}'.format(idihed + 1, '-'.join(mol.name[list(dihedral)])))
+    logger.info("Compute rotamer energies for:")
+    for idihed, (molecule, dihedral, directory) in enumerate(
+        zip(molecules, dihedrals, directories)
+    ):
+        logger.info(
+            "  {:2d}: {}".format(idihed + 1, "-".join(mol.name[list(dihedral)]))
+        )
         ref.molecule = molecule
         ref.esp_points = None
-        ref.optimize = (scan_type == 'qm')
+        ref.optimize = scan_type == "qm"
         ref.restrained_dihedrals = np.array([dihedral])
         ref.directory = directory
         ref.setup()  # QM object is reused, so it has to be properly set up before retrieving.
@@ -265,19 +298,29 @@ def guessBondType(mol):
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
     if mol.numFrames != 1:
-        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+        raise ValueError(
+            '"mol" can have just one frame, but it has {}'.format(mol.numFrames)
+        )
 
     mol = mol.copy()
 
     with TemporaryDirectory() as tmpDir:
-        old_name = os.path.join(tmpDir, 'old.mol2')
-        new_name = os.path.join(tmpDir, 'new.mol2')
+        old_name = os.path.join(tmpDir, "old.mol2")
+        new_name = os.path.join(tmpDir, "new.mol2")
 
         mol.write(old_name)
 
-        cmd = ['antechamber',
-               '-fi', 'mol2', '-i', old_name,
-               '-fo', 'mol2', '-o', new_name]
+        cmd = [
+            "antechamber",
+            "-fi",
+            "mol2",
+            "-i",
+            old_name,
+            "-fo",
+            "mol2",
+            "-o",
+            new_name,
+        ]
 
         with TemporaryFile() as stream:
             if subprocess.call(cmd, cwd=tmpDir, stdout=stream, stderr=stream) != 0:
@@ -352,11 +395,13 @@ def makeAtomNamesUnique(mol):
     mol = mol.copy()
 
     for i, name in enumerate(mol.name):
-        while np.sum(name == mol.name) > 1: # Check for identical names
-            j = np.flatnonzero(name == mol.name)[1] # Get the second identical name index
-            prefix, sufix = re.match('(.*?\D*)(\d*)$', mol.name[j]).groups()
-            sufix = 0 if sufix == '' else int(sufix)
-            while prefix + str(sufix) in mol.name: # Search for a unique name
+        while np.sum(name == mol.name) > 1:  # Check for identical names
+            j = np.flatnonzero(name == mol.name)[
+                1
+            ]  # Get the second identical name index
+            prefix, sufix = re.match("(.*?\D*)(\d*)$", mol.name[j]).groups()
+            sufix = 0 if sufix == "" else int(sufix)
+            while prefix + str(sufix) in mol.name:  # Search for a unique name
                 sufix += 1
             mol.name[j] = prefix + str(sufix)
 
@@ -405,7 +450,9 @@ def detectChiralCenters(mol, atom_types=None):
     if not isinstance(mol, Molecule):
         raise TypeError('"mol" has to be instance of {}'.format(Molecule))
     if mol.numFrames != 1:
-        raise ValueError('"mol" can have just one frame, but it has {}'.format(mol.numFrames))
+        raise ValueError(
+            '"mol" can have just one frame, but it has {}'.format(mol.numFrames)
+        )
 
     # Set atom types, overwise rdkit refuse to read some MOL2 files
     htmd_mol = mol.copy()
@@ -467,7 +514,7 @@ def filterQMResults(all_results, mol=None):
 
     if mol:
         if not isinstance(mol, Molecule):
-             raise TypeError('"mol" has to be instance of {}'.format(Molecule))
+            raise TypeError('"mol" has to be instance of {}'.format(Molecule))
         initial_chiral_centers = detectChiralCenters(mol)
         mol = mol.copy()
 
@@ -479,9 +526,11 @@ def filterQMResults(all_results, mol=None):
 
             # Remove failed calculations
             if not isinstance(result, QMResult):
-                raise TypeError('"results" has to a list of list of {} instance'.format(QMResult))
+                raise TypeError(
+                    '"results" has to a list of list of {} instance'.format(QMResult)
+                )
             if result.errored:
-                logger.warning('Rotamer is removed due to a failed QM calculations')
+                logger.warning("Rotamer is removed due to a failed QM calculations")
                 continue
 
             # Remove results with wrong chiral centers
@@ -489,8 +538,10 @@ def filterQMResults(all_results, mol=None):
                 mol.coords = result.coords
                 chiral_centers = detectChiralCenters(mol)
                 if initial_chiral_centers != chiral_centers:
-                    logger.warning('Rotamer is removed due to a change of chiral centers: '
-                                   '{} --> {}'.format(initial_chiral_centers, chiral_centers))
+                    logger.warning(
+                        "Rotamer is removed due to a change of chiral centers: "
+                        "{} --> {}".format(initial_chiral_centers, chiral_centers)
+                    )
                     continue
 
             valid_results.append(result)
@@ -505,8 +556,10 @@ def filterQMResults(all_results, mol=None):
                 if relative_energy < 20:  # kcal/mol
                     new_results.append(result)
                 else:
-                    logger.warning('Rotamer is removed due to high energy: '
-                                   '{} kcal/mol above minimum'.format(relative_energy))
+                    logger.warning(
+                        "Rotamer is removed due to high energy: "
+                        "{} kcal/mol above minimum".format(relative_energy)
+                    )
             valid_results = new_results
 
         all_valid_results.append(valid_results)
@@ -514,7 +567,7 @@ def filterQMResults(all_results, mol=None):
     return all_valid_results
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     import sys
     import doctest

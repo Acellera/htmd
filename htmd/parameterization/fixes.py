@@ -24,6 +24,7 @@ def _getMolecularGraph(molecule):
 
     return graph
 
+
 def fixPhosphateTypes(molecule):
     """
     >>> from htmd.home import home
@@ -99,7 +100,7 @@ def fixPhosphateTypes(molecule):
     for node in graph.nodes:
 
         # Skip not P atoms
-        if graph.nodes[node]['element'] != 'P':
+        if graph.nodes[node]["element"] != "P":
             continue
 
         # Skip P atom without 4 atoms connected
@@ -108,7 +109,7 @@ def fixPhosphateTypes(molecule):
             continue
 
         # Filter O atoms
-        is_oxygen = lambda node: graph.nodes[node]['element'] == 'O'
+        is_oxygen = lambda node: graph.nodes[node]["element"] == "O"
         neighbors = filter(is_oxygen, neighbors)
 
         # Sort O atoms according to descending charge
@@ -120,20 +121,20 @@ def fixPhosphateTypes(molecule):
 
         # Iterate O atoms
         for neighbor in neighbors:
-            assert graph.nodes[neighbor]['element'] == 'O'
+            assert graph.nodes[neighbor]["element"] == "O"
 
             # Get O atom and P--O bond type
             num_bonds = len(list(graph.neighbors(neighbor)))
             if num_bonds == 2:
-                new_atom = 'O.3'
-                new_bond = '1'
+                new_atom = "O.3"
+                new_bond = "1"
             elif num_bonds == 1 and num_double == 0:
-                new_atom = 'O.2'
-                new_bond = '2'
+                new_atom = "O.2"
+                new_bond = "2"
                 num_double += 1
             elif num_bonds == 1 and num_double == 1:
-                new_atom = 'O.3'
-                new_bond = '1'
+                new_atom = "O.3"
+                new_bond = "1"
             else:
                 raise ValueError()
 
@@ -141,19 +142,27 @@ def fixPhosphateTypes(molecule):
             old_atom = molecule.atomtype[neighbor]
             if old_atom != new_atom:
                 molecule.atomtype[neighbor] = new_atom
-                logger.info('Change atom {} type: {} --> {}'.format(neighbor, old_atom, new_atom))
+                logger.info(
+                    "Change atom {} type: {} --> {}".format(
+                        neighbor, old_atom, new_atom
+                    )
+                )
 
             # Change the P--O bond type
-            bond_index = graph.edges[(node, neighbor)]['index']
+            bond_index = graph.edges[(node, neighbor)]["index"]
             old_bond = molecule.bondtype[bond_index]
             if old_bond != new_bond:
                 molecule.bondtype[bond_index] = new_bond
-                logger.info('Change bond {}--{} type: {} --> {}'.format(*molecule.bonds[bond_index], old_bond, new_bond))
+                logger.info(
+                    "Change bond {}--{} type: {} --> {}".format(
+                        *molecule.bonds[bond_index], old_bond, new_bond
+                    )
+                )
 
     return molecule
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     from moleculekit.molecule import Molecule
     from htmd.charge import fitGasteigerCharges
@@ -163,6 +172,7 @@ if __name__ == '__main__':
 
     # Prevent HTMD importing inside doctest to fail if importing gives text output
     from htmd.home import home
+
     home()
 
     sys.exit(doctest.testmod().failed)

@@ -38,6 +38,7 @@ def randomPointsOnSphere(num_points):
 
     return points
 
+
 class MoleculeGrid:
     """
     Molecular grid for RESP charge fitting
@@ -94,22 +95,33 @@ class MoleculeGrid:
            [ 2.11277479, -1.56282107, -1.2258255 ]])
     >>> grid.writeXYZ('H2O_1_2__50.xyz') # doctest: +SKIP
     """
+
     def __init__(self, molecule, shell_factors=(1.4, 1.6, 1.8, 2.0), density=25):
 
         self._molecule = molecule
         if not isinstance(self._molecule, Molecule):
             raise TypeError('"molecule" has to be instance of {}'.format(Molecule))
         if self._molecule.numFrames != 1:
-            raise ValueError('"molecule" can have just one frame, but it has {}'.format(self._molecule.numFrames))
+            raise ValueError(
+                '"molecule" can have just one frame, but it has {}'.format(
+                    self._molecule.numFrames
+                )
+            )
 
         self._shell_factors = list(map(float, shell_factors))
         for factor in self._shell_factors:
             if factor <= 0:
-                raise ValueError('The elements of "shell_factors" have to be positive, but get {}'.format(factor))
+                raise ValueError(
+                    'The elements of "shell_factors" have to be positive, but get {}'.format(
+                        factor
+                    )
+                )
 
         self._density = density
         if self._density <= 0:
-            raise ValueError('"density" has to be positive, but get {}'.format(self._density))
+            raise ValueError(
+                '"density" has to be positive, but get {}'.format(self._density)
+            )
 
         self._points = self._generatePoints()
         self._points = self._filterPoints(self._points)
@@ -118,13 +130,15 @@ class MoleculeGrid:
 
         all_points = []
 
-        for element, coord in zip(self._molecule.element, self._molecule.coords[:, :, 0]):
+        for element, coord in zip(
+            self._molecule.element, self._molecule.coords[:, :, 0]
+        ):
             vdw_radius = periodictable[element].vdw_radius
             for factor in self._shell_factors:
 
                 # Compute the number of point for each shell
                 radius = factor * vdw_radius
-                area = 4/3 * np.pi * radius**2
+                area = 4 / 3 * np.pi * radius ** 2
                 num_points = int(self._density * area)
 
                 # Generate points
@@ -136,7 +150,9 @@ class MoleculeGrid:
     def _filterPoints(self, points):
 
         # Compute distance threshold for each atom
-        thresholds = np.array([periodictable[element].vdw_radius for element in self._molecule.element])
+        thresholds = np.array(
+            [periodictable[element].vdw_radius for element in self._molecule.element]
+        )
         thresholds *= min(self._shell_factors) - 0.001
 
         # Detect the points further away for each atom than its threshold
@@ -156,14 +172,14 @@ class MoleculeGrid:
         Write the molecular grid in XYZ format
         """
         if isinstance(file, str):
-            with open(file, 'w') as stream:
+            with open(file, "w") as stream:
                 self.writeXYZ(stream)
 
         else:
             points = self.getPoints()
-            file.write('{}\n\n'.format(len(points)))
+            file.write("{}\n\n".format(len(points)))
             for point in points:
-                file.write('X {:10.6f} {:10.6f} {:10.6f}\n'.format(*tuple(point)))
+                file.write("X {:10.6f} {:10.6f} {:10.6f}\n".format(*tuple(point)))
 
 
 class ESP:
@@ -250,6 +266,7 @@ class ESP:
     >>> esp_results['RMSD'] # doctest: +ELLIPSIS
     0.004465...
     """
+
     def __init__(self):
 
         self.molecule = None
@@ -275,7 +292,9 @@ class ESP:
     def _map_groups_to_atoms(self, group_charges):
 
         charges = np.zeros(self.molecule.numAtoms)
-        for atom_group, group_charge in zip(self._equivalent_atom_groups, group_charges):
+        for atom_group, group_charge in zip(
+            self._equivalent_atom_groups, group_charges
+        ):
             charges[list(atom_group)] = group_charge
 
         return charges
@@ -302,7 +321,7 @@ class ESP:
             # Bond hydrogen charges to be positive
             for i in range(self.ngroups):
                 element = self.molecule.element[self._equivalent_atom_groups[i][0]]
-                if element == 'H':
+                if element == "H":
                     lower_bounds[i] = 0
 
         # Fix atom charges considering equivalent groups
@@ -321,12 +340,16 @@ class ESP:
         # Compute the reciprocal distances between ESP points and atomic charges
         if self._reciprocal_distances is None:
             distances = cdist(points, self.molecule.coords[:, :, 0])
-            distances *= const.physical_constants['Bohr radius'][0]/const.angstrom  # Angstrom --> Bohr
+            distances *= (
+                const.physical_constants["Bohr radius"][0] / const.angstrom
+            )  # Angstrom --> Bohr
             self._reciprocal_distances = np.reciprocal(distances)
 
         charges = self._map_groups_to_atoms(group_charges)
         actual_values = np.dot(self._reciprocal_distances, charges)
-        loss = np.mean((actual_values - target_values)**2) + np.mean(self._restraint_factors * charges**2)
+        loss = np.mean((actual_values - target_values) ** 2) + np.mean(
+            self._restraint_factors * charges ** 2
+        )
 
         return loss
 
@@ -339,7 +362,7 @@ class ESP:
         results : dict
             Dictionary with the fitted charges and fitting loss value
         """
-        logger.info('Start RESP charge fitting')
+        logger.info("Start RESP charge fitting")
 
         self._molecular_charge = self.qm_results[0].charge
 
@@ -352,29 +375,33 @@ class ESP:
         self._restraint_factors = np.zeros(self.molecule.numAtoms)
         if self.restraint_factor > 0:
             for i, element in enumerate(self.molecule.element):
-                if element != 'H':
+                if element != "H":
                     self._restraint_factors[i] = self.restraint_factor
 
         # Get charge bounds
         lower_bounds, upper_bounds = self._get_bounds()
 
-        logger.info('Atom charge boundaries and restraint factor:')
+        logger.info("Atom charge boundaries and restraint factor:")
         for i, name in enumerate(self.molecule.name):
             lower = lower_bounds[self._equivalent_group_by_atom[i]]
             upper = upper_bounds[self._equivalent_group_by_atom[i]]
             factor = self._restraint_factors[i]
-            logger.info('  {:4s}: {:7.3f} {:7.3f} {:10.6f}'.format(name, lower, upper, factor))
+            logger.info(
+                "  {:4s}: {:7.3f} {:7.3f} {:10.6f}".format(name, lower, upper, factor)
+            )
 
         # Set up optimizer
         opt = nlopt.opt(nlopt.LN_COBYLA, self.ngroups)
-        logger.info('Optimizer: {}'.format(opt.get_algorithm_name()))
+        logger.info("Optimizer: {}".format(opt.get_algorithm_name()))
         opt.set_min_objective(self._objective)
         opt.add_equality_constraint(self._constraint)
-        logger.info('Molecular charges constraint: {:.3f}'.format(self._molecular_charge))
+        logger.info(
+            "Molecular charges constraint: {:.3f}".format(self._molecular_charge)
+        )
         opt.set_lower_bounds(lower_bounds)
         opt.set_upper_bounds(upper_bounds)
-        opt.set_xtol_rel(1.e-6)
-        opt.set_maxeval(1000*self.ngroups)
+        opt.set_xtol_rel(1.0e-6)
+        opt.set_maxeval(1000 * self.ngroups)
         opt.set_initial_step(0.001)
 
         # Optimize the charges
@@ -382,27 +409,31 @@ class ESP:
         status = opt.last_optimize_result()
         loss = self._objective(group_charges, None)
         charges = self._map_groups_to_atoms(group_charges)
-        logger.info('Optimizer status: {}'.format(status))
-        logger.info('Final loss: {:.6f}'.format(loss))
+        logger.info("Optimizer status: {}".format(status))
+        logger.info("Final loss: {:.6f}".format(loss))
 
         # Compute RMSD
         self._restraint_factors[:] = 0
         msd = self._objective(group_charges, None)
-        logger.info('Final RMSD: {:.6f} au'.format(np.sqrt(msd)))
+        logger.info("Final RMSD: {:.6f} au".format(np.sqrt(msd)))
 
-        logger.info('Finish RESP charge fitting')
+        logger.info("Finish RESP charge fitting")
 
-        return {'charges': charges, 'status': status, 'loss': loss, 'RMSD': np.sqrt(msd)}
+        return {
+            "charges": charges,
+            "status": status,
+            "loss": loss,
+            "RMSD": np.sqrt(msd),
+        }
 
 
 class _TestESP(unittest.TestCase):
-
     def setUp(self):
         from htmd.home import home
         from moleculekit.molecule import Molecule
 
-        molFile = os.path.join(home('test-param'), 'H2O2.mol2')
-        mol = Molecule(molFile, guessNE='bonds', guess=('angles', 'dihedrals'))
+        molFile = os.path.join(home("test-param"), "H2O2.mol2")
+        mol = Molecule(molFile, guessNE="bonds", guess=("angles", "dihedrals"))
         self.mol = mol
         self.esp = ESP()
         self.esp.molecule = self.mol
@@ -478,6 +509,6 @@ def load_tests(loader, tests, ignore):
     return tests
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     unittest.main(verbosity=2)
