@@ -10,7 +10,8 @@ import time
 import unittest
 
 import matplotlib
-matplotlib.use('Agg') # Use Agg to work on Travis
+
+matplotlib.use("Agg")  # Use Agg to work on Travis
 import matplotlib.pyplot as plt
 
 import nlopt
@@ -60,7 +61,7 @@ class DihedralFitting:
         self.result_directory = None
         self.zeroed_parameters = False
         self.num_iterations = 3
-        self.fit_type = 'iterative'
+        self.fit_type = "iterative"
 
         self.parameters = None
         self.loss = None
@@ -84,30 +85,41 @@ class DihedralFitting:
     def _setup(self):
 
         if len(self.dihedrals) != len(self.qm_results):
-            raise ValueError('The number of dihedral and QM result sets has to be the same!')
+            raise ValueError(
+                "The number of dihedral and QM result sets has to be the same!"
+            )
 
         # Get dihedral names
-        self._names = ['-'.join(self.molecule.name[dihedral]) for dihedral in self.dihedrals]
+        self._names = [
+            "-".join(self.molecule.name[dihedral]) for dihedral in self.dihedrals
+        ]
 
         # Get all equivalent dihedrals
         all_equivalent_dihedrals = detectParameterizableDihedrals(self.molecule)
-        all_equivalent_dihedrals = {tuple(dihedrals[0]): dihedrals for dihedrals in all_equivalent_dihedrals}
+        all_equivalent_dihedrals = {
+            tuple(dihedrals[0]): dihedrals for dihedrals in all_equivalent_dihedrals
+        }
 
         # Choose the selected dihedrals
         equivalent_dihedrals = []
         for dihedral, name in zip(self.dihedrals, self._names):
             if tuple(dihedral) not in all_equivalent_dihedrals:
-                raise ValueError('{} is not a parameterizable dihedral!'.format(name))
+                raise ValueError("{} is not a parameterizable dihedral!".format(name))
             equivalent_dihedrals.append(all_equivalent_dihedrals[tuple(dihedral)])
 
         # Get dihedral atom types
-        self._dihedral_atomtypes = [findDihedralType(tuple(self.molecule.atomtype[dihedral]), self.parameters) for dihedral in self.dihedrals]
+        self._dihedral_atomtypes = [
+            findDihedralType(tuple(self.molecule.atomtype[dihedral]), self.parameters)
+            for dihedral in self.dihedrals
+        ]
 
         # Get reference QM energies and rotamer coordinates
         self._reference_energies = []
         self._coords = []
         for results in self.qm_results:
-            self._reference_energies.append(np.array([result.energy for result in results]))
+            self._reference_energies.append(
+                np.array([result.energy for result in results])
+            )
             self._coords.append([result.coords for result in results])
 
         # Calculate dihedral angle values
@@ -118,7 +130,12 @@ class DihedralFitting:
             for equivalent_indices in equivalent_dihedrals:
                 angle_values = []
                 for coords in scan_coords:
-                    angle_values.append([dihedralAngle(coords[indices, :, 0]) for indices in equivalent_indices])
+                    angle_values.append(
+                        [
+                            dihedralAngle(coords[indices, :, 0])
+                            for indices in equivalent_indices
+                        ]
+                    )
                 scan_angle_values.append(np.array(angle_values))
             self._angle_values.append(scan_angle_values)
 
@@ -126,7 +143,9 @@ class DihedralFitting:
         ff = FFEvaluate(self.molecule, self.parameters)
         self._initial_energies = []
         for scan_coords in self._coords:
-            energies = [ff.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
+            energies = [
+                ff.calculateEnergies(coords[:, :, 0])["total"] for coords in scan_coords
+            ]
             self._initial_energies.append(np.array(energies))
 
         # Make result directories
@@ -143,7 +162,7 @@ class DihedralFitting:
 
         # Set force constant and phase bounds
         upper_bounds[:nterms] = 10
-        upper_bounds[nterms:2*nterms] = 2 * np.pi
+        upper_bounds[nterms : 2 * nterms] = 2 * np.pi
 
         # Set offset bounds
         lower_bounds[-1] = -25
@@ -165,7 +184,10 @@ class DihedralFitting:
             energies = 0
             for i, idihed in enumerate(dihedrals):
                 phis = angle_values[iscan][idihed][:, :, None]
-                energies += np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2)) + offset
+                energies += (
+                    np.sum(k0[i] * (1 + np.cos(n * phis - phi0[i])), axis=(1, 2))
+                    + offset
+                )
             actual_energies.append(energies)
 
         return actual_energies
@@ -174,14 +196,18 @@ class DihedralFitting:
         """
         Objective function for the parameter fitting.
         """
-        dihedrals = np.arange(self.numDihedrals) if idihed is None else [idihed,]
+        dihedrals = (
+            np.arange(self.numDihedrals) if idihed is None else [idihed,]
+        )
 
         k0, phi0, offset, n = self._unpackVector(x)
-        actual_energies = DihedralFitting._evaluateScanEnergies(k0, phi0, offset, n, angle_values, self.numDihedrals, dihedrals)
+        actual_energies = DihedralFitting._evaluateScanEnergies(
+            k0, phi0, offset, n, angle_values, self.numDihedrals, dihedrals
+        )
 
         all_actual_energies = np.concatenate([actual_energies[d] for d in dihedrals])
         all_target_energies = np.concatenate([target_energies[d] for d in dihedrals])
-        rmsd = np.sqrt(np.mean((all_actual_energies - all_target_energies)**2))
+        rmsd = np.sqrt(np.mean((all_actual_energies - all_target_energies) ** 2))
 
         if grad is not None:
             if grad.size > 0:
@@ -194,7 +220,7 @@ class DihedralFitting:
 
                     # Compute partial derivatives
                     dL_dV = actual_energies[iscan] - target_energies[iscan]
-                    dL_dV /= rmsd*all_actual_energies.size
+                    dL_dV /= rmsd * all_actual_energies.size
 
                     for k, idihed in enumerate(dihedrals):
                         # Compute partial derivatives
@@ -222,11 +248,16 @@ class DihedralFitting:
         phi_ks = []
         phases = []
 
-        dihedrals = np.arange(self.numDihedrals) if idihed is None else [idihed,]
+        dihedrals = (
+            np.arange(self.numDihedrals) if idihed is None else [idihed,]
+        )
 
         for idih in dihedrals:
             atomtypes = self._dihedral_atomtypes[idih]
-            assert len(parameters.dihedral_types[atomtypes]) == self.MAX_DIHEDRAL_MULTIPLICITY
+            assert (
+                len(parameters.dihedral_types[atomtypes])
+                == self.MAX_DIHEDRAL_MULTIPLICITY
+            )
             for i, term in enumerate(parameters.dihedral_types[atomtypes]):
                 phi_ks.append(term.phi_k)
                 phases.append(np.deg2rad(term.phase))
@@ -239,12 +270,18 @@ class DihedralFitting:
         Convert a vector to a parameter object
         """
 
-        assert vector.size == 2 * len(self._dihedral_atomtypes) * self.MAX_DIHEDRAL_MULTIPLICITY + 1
+        assert (
+            vector.size
+            == 2 * len(self._dihedral_atomtypes) * self.MAX_DIHEDRAL_MULTIPLICITY + 1
+        )
         phi_k, phase = np.reshape(vector[:-1], (2, -1, self.MAX_DIHEDRAL_MULTIPLICITY))
 
         parameters = copy.deepcopy(self.parameters)
         for i, atomtypes in enumerate(self._dihedral_atomtypes):
-            assert len(parameters.dihedral_types[atomtypes]) == self.MAX_DIHEDRAL_MULTIPLICITY
+            assert (
+                len(parameters.dihedral_types[atomtypes])
+                == self.MAX_DIHEDRAL_MULTIPLICITY
+            )
             for j, term in enumerate(parameters.dihedral_types[atomtypes]):
                 term.phi_k = phi_k[i, j]
                 term.phase = np.rad2deg(phase[i, j])
@@ -255,7 +292,9 @@ class DihedralFitting:
     def _getOptimizer(self, numDihedrals):
 
         # Create an optimizer
-        opt = nlopt.opt(nlopt.LD_LBFGS, 2 * numDihedrals * self.MAX_DIHEDRAL_MULTIPLICITY + 1)
+        opt = nlopt.opt(
+            nlopt.LD_LBFGS, 2 * numDihedrals * self.MAX_DIHEDRAL_MULTIPLICITY + 1
+        )
         opt.set_vector_storage(opt.get_dimension())
 
         # Set bounds
@@ -290,80 +329,120 @@ class DihedralFitting:
     def _optimizeWithIterativeScheme(self, vector, target_energies, opt_all, opt_dih):
         best_loss = self._objective(vector, None, self._angle_values, target_energies)
         best_vector = vector
-        logger.info('Number of iterations: {}'.format(self.num_iterations))
-        logger.info('Initial RMSD: {:.6f} kcal/mol'.format(best_loss))
+        logger.info("Number of iterations: {}".format(self.num_iterations))
+        logger.info("Initial RMSD: {:.6f} kcal/mol".format(best_loss))
 
         for i in range(self.num_iterations):
-            logger.info('Iteration: {}'.format(i+1))
+            logger.info("Iteration: {}".format(i + 1))
 
             # Evaluate constant terms for single dihedral fitting
             current_params = self._vectorToParams(vector)
-            const_energies_dihedral = self._evaluateConstTermsPerDihedral(current_params)
-            target_energies_dihedral = self._calculateTargetEnergies(const_energies_dihedral)
+            const_energies_dihedral = self._evaluateConstTermsPerDihedral(
+                current_params
+            )
+            target_energies_dihedral = self._calculateTargetEnergies(
+                const_energies_dihedral
+            )
 
             # Fit individual dihedral parameters
-            logger.info('  Fit individual dihedral angle parameters')
+            logger.info("  Fit individual dihedral angle parameters")
             dihedral_vectors = []
             for idihed in range(self.numDihedrals):
                 subvector = self._paramsToVector(current_params, idihed)
-                opt_dih.set_min_objective(lambda x, grad: self._objective(x, grad, self._angle_values, target_energies_dihedral, idihed))
-                subvector = self._optimizeWithRandomSearch(subvector, target_energies_dihedral, opt_dih, num_searches=20, idihed=idihed, _logger=False)
+                opt_dih.set_min_objective(
+                    lambda x, grad: self._objective(
+                        x, grad, self._angle_values, target_energies_dihedral, idihed
+                    )
+                )
+                subvector = self._optimizeWithRandomSearch(
+                    subvector,
+                    target_energies_dihedral,
+                    opt_dih,
+                    num_searches=20,
+                    idihed=idihed,
+                    _logger=False,
+                )
                 dihedral_vectors.append(subvector)
 
             # Pack the individually fitted parameters into a vector
             vector = DihedralFitting._subvectorsToVector(dihedral_vectors, vector)
 
             # Fit all dihedral parameters
-            logger.info('  Fit all dihedral angle parameters')
-            best_vector, best_loss, _, _ = self._optimize(opt_all, vector, best_vector, best_loss)
-            logger.info('  Current RMSD: {:.6f} kcal/mol'.format(best_loss))
+            logger.info("  Fit all dihedral angle parameters")
+            best_vector, best_loss, _, _ = self._optimize(
+                opt_all, vector, best_vector, best_loss
+            )
+            logger.info("  Current RMSD: {:.6f} kcal/mol".format(best_loss))
 
         self.loss = best_loss
-        logger.info('Final RMSD: {:.6f} kcal/mol'.format(best_loss))
+        logger.info("Final RMSD: {:.6f} kcal/mol".format(best_loss))
 
         return best_vector
 
-    def _optimizeWithRandomSearch(self, vector, target_energies, opt, idihed=None, convergence_rmsd=1e-3, num_searches=None, _logger=True):
+    def _optimizeWithRandomSearch(
+        self,
+        vector,
+        target_energies,
+        opt,
+        idihed=None,
+        convergence_rmsd=1e-3,
+        num_searches=None,
+        _logger=True,
+    ):
         """
         Naive random search
         """
         numDihedrals = self.numDihedrals if idihed is None else 1
 
         # Initialize
-        best_loss = self._objective(vector, None, self._angle_values, target_energies, idihed)
+        best_loss = self._objective(
+            vector, None, self._angle_values, target_energies, idihed
+        )
         best_vector = vector
 
         lower_bounds, upper_bounds = self._getBounds(numDihedrals)
 
         # Decide the number of the random searches
-        num_searches = 10 * opt.get_dimension() if num_searches is None else int(num_searches)
+        num_searches = (
+            10 * opt.get_dimension() if num_searches is None else int(num_searches)
+        )
         if num_searches < 0:
-            raise ValueError('The number of random searches has to be possive, but it is {}'.format(num_searches))
+            raise ValueError(
+                "The number of random searches has to be possive, but it is {}".format(
+                    num_searches
+                )
+            )
         if _logger:
-            logger.info('Number of searches: {}'.format(num_searches))
-            logger.info('Initial RMSD: {:.6f} kcal/mol'.format(best_loss))
+            logger.info("Number of searches: {}".format(num_searches))
+            logger.info("Initial RMSD: {:.6f} kcal/mol".format(best_loss))
 
-        with open(os.path.join(self.result_directory, 'random-search.log'), 'w') as log:
-            log.write('{:6s} {:6s} {:10s} {}\n'.format('# Step', 'Status', 'Loss', 'Vector'))
+        with open(os.path.join(self.result_directory, "random-search.log"), "w") as log:
+            log.write(
+                "{:6s} {:6s} {:10s} {}\n".format("# Step", "Status", "Loss", "Vector")
+            )
             for i in range(num_searches):
                 old_loss = best_loss
-                best_vector, best_loss, status, curr_loss = self._optimize(opt, vector, best_vector, best_loss)
+                best_vector, best_loss, status, curr_loss = self._optimize(
+                    opt, vector, best_vector, best_loss
+                )
                 if _logger and (best_loss < old_loss):
-                    logger.info('Current RMSD: {:.6f} kcal/mol'.format(best_loss))
+                    logger.info("Current RMSD: {:.6f} kcal/mol".format(best_loss))
 
-                string = ' '.join(['{:10.6f}'.format(value) for value in vector])
-                log.write('{:6d} {:6d} {:10.6f} {}\n'.format(i, status, curr_loss, string))
+                string = " ".join(["{:10.6f}".format(value) for value in vector])
+                log.write(
+                    "{:6d} {:6d} {:10.6f} {}\n".format(i, status, curr_loss, string)
+                )
 
                 vector = np.random.uniform(low=lower_bounds, high=upper_bounds)
 
                 if best_loss < convergence_rmsd:
                     if _logger:
-                        logger.info('Finish optimization: small RMSD reached!')
+                        logger.info("Finish optimization: small RMSD reached!")
                     break
 
         self.loss = best_loss
         if _logger:
-            logger.info('Final RMSD: {:.6f} kcal/mol'.format(best_loss))
+            logger.info("Final RMSD: {:.6f} kcal/mol".format(best_loss))
 
         return best_vector
 
@@ -378,13 +457,15 @@ class DihedralFitting:
         for atomtypes in self._dihedral_atomtypes:
             for term in parameters.dihedral_types[atomtypes]:
                 term.phi_k = 0
-                assert term.per > 0 # Guard from messing up with improper dihedrals
+                assert term.per > 0  # Guard from messing up with improper dihedrals
 
         # Evaluate MM energies
         const_energies = []
         ff = FFEvaluate(self.molecule, parameters)
         for scan_coords in self._coords:
-            energies = [ff.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
+            energies = [
+                ff.calculateEnergies(coords[:, :, 0])["total"] for coords in scan_coords
+            ]
             const_energies.append(np.array(energies))
 
         return const_energies
@@ -398,26 +479,32 @@ class DihedralFitting:
             atomtypes = self._dihedral_atomtypes[idihed]
             for term in modified_parameters.dihedral_types[atomtypes]:
                 term.phi_k = 0
-                assert term.per > 0 # Guard from messing up with improp
-                    
+                assert term.per > 0  # Guard from messing up with improp
+
             ff = FFEvaluate(self.molecule, modified_parameters)
             scan_coords = self._coords[idihed]
-            energies = [ff.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
+            energies = [
+                ff.calculateEnergies(coords[:, :, 0])["total"] for coords in scan_coords
+            ]
             const_energies.append(np.array(energies))
 
         return const_energies
 
     @staticmethod
     def _subvectorsToVector(dihedral_vectors, prev_vector):
-        halfsize = int((len(dihedral_vectors[0])-1)/2)
-        vector = np.hstack([vv[:halfsize] for vv in dihedral_vectors] +
-                        [vv[halfsize:-1] for vv in dihedral_vectors] +
-                        [prev_vector[-1]]) # Keep last offset from previous iteration
+        halfsize = int((len(dihedral_vectors[0]) - 1) / 2)
+        vector = np.hstack(
+            [vv[:halfsize] for vv in dihedral_vectors]
+            + [vv[halfsize:-1] for vv in dihedral_vectors]
+            + [prev_vector[-1]]
+        )  # Keep last offset from previous iteration
         return vector
 
     def _calculateTargetEnergies(self, const_energies):
         target_energies = []
-        for ref_energies, const_energies_dih in zip(self._reference_energies, const_energies):
+        for ref_energies, const_energies_dih in zip(
+            self._reference_energies, const_energies
+        ):
             target_energies.append(ref_energies - const_energies_dih)
         shift = np.min(np.concatenate(target_energies))
         target_energies = [energies - shift for energies in target_energies]
@@ -435,44 +522,70 @@ class DihedralFitting:
 
         # Evaluate actual energies for fitting
         k0, phi0, offset, n = self._unpackVector(vector)
-        actual_energies = DihedralFitting._evaluateScanEnergies(k0, phi0, offset, n, self._angle_values,
-                                                                self.numDihedrals, np.arange(self.numDihedrals))
+        actual_energies = DihedralFitting._evaluateScanEnergies(
+            k0,
+            phi0,
+            offset,
+            n,
+            self._angle_values,
+            self.numDihedrals,
+            np.arange(self.numDihedrals),
+        )
 
         # Check self-consistency of the computed energies
         # NOTE: checks if FFEvaluate.calculateEnergies and DihedralFitting._evaluateScanEnergies
         #       compute dihedral terms consistently
         num_atoms = self.molecule.numAtoms
-        for initial, const, actual in zip(self._initial_energies, const_energies, actual_energies):
-            if not np.allclose(initial/num_atoms, (const + actual)/num_atoms, rtol=0, atol=1e-6):
-                raise AssertionError('Energies are not self-consistent')
+        for initial, const, actual in zip(
+            self._initial_energies, const_energies, actual_energies
+        ):
+            if not np.allclose(
+                initial / num_atoms, (const + actual) / num_atoms, rtol=0, atol=1e-6
+            ):
+                raise AssertionError("Energies are not self-consistent")
 
         # Zero the initial parameters, so they are not used to start the parameter fitting
         if self.zeroed_parameters:
             vector[:] = 0
 
-        logger.info('Start parameter fitting')
+        logger.info("Start parameter fitting")
         start = time.clock()
 
         # Initialize local optimizer
         opt_all = self._getOptimizer(self.numDihedrals)
-        opt_all.set_min_objective(lambda x, grad: self._objective(x, grad, self._angle_values, target_energies))
+        opt_all.set_min_objective(
+            lambda x, grad: self._objective(
+                x, grad, self._angle_values, target_energies
+            )
+        )
 
-        if self.fit_type.lower() == 'iterative':
-            logger.info('Global optimizer: iterative')
-            opt_dih = self._getOptimizer(1) # Initialize single-dihedral optimizer needed for the iterative scheme
-            vector = self._optimizeWithIterativeScheme(vector, target_energies, opt_all, opt_dih)
-        elif self.fit_type.lower() == 'nrs':
-            logger.info('Global optimizer: naive random search (NRS)')
-            logger.info('Local optimizer: {} with {} vector storage'.format(opt_all.get_algorithm_name(),
-                                                                            opt_all.get_vector_storage()))
+        if self.fit_type.lower() == "iterative":
+            logger.info("Global optimizer: iterative")
+            opt_dih = self._getOptimizer(
+                1
+            )  # Initialize single-dihedral optimizer needed for the iterative scheme
+            vector = self._optimizeWithIterativeScheme(
+                vector, target_energies, opt_all, opt_dih
+            )
+        elif self.fit_type.lower() == "nrs":
+            logger.info("Global optimizer: naive random search (NRS)")
+            logger.info(
+                "Local optimizer: {} with {} vector storage".format(
+                    opt_all.get_algorithm_name(), opt_all.get_vector_storage()
+                )
+            )
             vector = self._optimizeWithRandomSearch(vector, target_energies, opt_all)
 
         finish = time.clock()
-        logger.info('Finished parameter fitting in %f s' % (finish-start))
+        logger.info("Finished parameter fitting in %f s" % (finish - start))
 
         upper_bounds, lower_bounds = self._getBounds(self.numDihedrals)
-        if np.isclose(vector[-1], upper_bounds[-1], atol=0.01) or np.isclose(vector[-1], lower_bounds[-1], atol=0.01):
-            raise AssertionError('Fitting hit upper/lower bound of the offset. Please report this issue.')
+        if np.isclose(vector[-1], upper_bounds[-1], atol=0.01) or np.isclose(
+            vector[-1], lower_bounds[-1], atol=0.01
+        ):
+            raise AssertionError(
+                "Fitting hit upper/lower bound of the offset. Please report this issue."
+            )
 
         # Update parameters
         self.parameters = self._vectorToParams(vector)
@@ -485,7 +598,10 @@ class DihedralFitting:
         self._fitted_energies = []
         ffeval = FFEvaluate(self.molecule, self.parameters)
         for scan_coords in self._coords:
-            energies = [ffeval.calculateEnergies(coords[:, :, 0])['total'] for coords in scan_coords]
+            energies = [
+                ffeval.calculateEnergies(coords[:, :, 0])["total"]
+                for coords in scan_coords
+            ]
             self._fitted_energies.append(np.array(energies))
 
         # Check the self-consistency of fitting
@@ -493,7 +609,7 @@ class DihedralFitting:
         reference_energies -= np.mean(reference_energies)
         fitted_energies = np.concatenate(self._fitted_energies)
         fitted_energies -= np.mean(fitted_energies)
-        loss = np.sqrt(np.mean((fitted_energies - reference_energies)**2))
+        loss = np.sqrt(np.mean((fitted_energies - reference_energies) ** 2))
         # HACK: without searches, the offset is not computed. So the test will not pass!
         if self.num_iterations != 0:
             assert np.isclose(self.loss, loss, rtol=0, atol=1e-2)
@@ -506,7 +622,9 @@ class DihedralFitting:
 
         return self.parameters
 
-    def plotDihedralEnergies(self, idihed, directory='.', ref_name = 'Ref', write_data=True):
+    def plotDihedralEnergies(
+        self, idihed, directory=".", ref_name="Ref", write_data=True
+    ):
         """
         Plot conformer energies for a specific dihedral angle, including QM, original and fitted MM energies.
         """
@@ -534,35 +652,60 @@ class DihedralFitting:
 
         if write_data:
             fmtsz = 8
-            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# angle', 'ref', 'MM_init', 'MM_fit'])
-            data = np.column_stack((angle_values, reference_energies, initial_energies, fitted_energies))
-            np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
+            header = "".join(
+                "{:{size}}".format(s, size=fmtsz)
+                for s in ["# angle", "ref", "MM_init", "MM_fit"]
+            )
+            data = np.column_stack(
+                (angle_values, reference_energies, initial_energies, fitted_energies)
+            )
+            np.savetxt(
+                path + ".dat",
+                data,
+                fmt="%{size}.3f".format(size=fmtsz),
+                header=header,
+                comments="",
+            )
 
         # Impose periodic boundaries
-        angle_values = np.concatenate([[angle_values[-1] - 360], angle_values, [angle_values[0] + 360]])
-        reference_energies = np.concatenate([[reference_energies[-1]], reference_energies, [reference_energies[0]]])
-        initial_energies = np.concatenate([[initial_energies[-1]], initial_energies, [initial_energies[0]]])
-        fitted_energies = np.concatenate([[fitted_energies[-1]], fitted_energies, [fitted_energies[0]]])
+        angle_values = np.concatenate(
+            [[angle_values[-1] - 360], angle_values, [angle_values[0] + 360]]
+        )
+        reference_energies = np.concatenate(
+            [[reference_energies[-1]], reference_energies, [reference_energies[0]]]
+        )
+        initial_energies = np.concatenate(
+            [[initial_energies[-1]], initial_energies, [initial_energies[0]]]
+        )
+        fitted_energies = np.concatenate(
+            [[fitted_energies[-1]], fitted_energies, [fitted_energies[0]]]
+        )
 
         plt.figure()
-        plt.title('Dihedral angle: {}'.format(self._names[idihed]))
-        plt.xlabel('Dihedral angle [deg]')
+        plt.title("Dihedral angle: {}".format(self._names[idihed]))
+        plt.xlabel("Dihedral angle [deg]")
         plt.xlim(-180, 180)
         plt.xticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
-        plt.ylabel('Energy [kcal/mol]')
-        plt.plot(angle_values, reference_energies, 'r-', marker='o', lw=3, label=ref_name)
-        plt.plot(angle_values, initial_energies, 'g-', marker='o', lw=2, label='MM initial')
-        plt.plot(angle_values, fitted_energies, 'b-', marker='o', lw=2, label='MM fitted')
+        plt.ylabel("Energy [kcal/mol]")
+        plt.plot(
+            angle_values, reference_energies, "r-", marker="o", lw=3, label=ref_name
+        )
+        plt.plot(
+            angle_values, initial_energies, "g-", marker="o", lw=2, label="MM initial"
+        )
+        plt.plot(
+            angle_values, fitted_energies, "b-", marker="o", lw=2, label="MM fitted"
+        )
         plt.legend()
-        plt.savefig(path + '.svg')
+        plt.savefig(path + ".svg")
         plt.close()
 
-    def plotConformerEnergies(self, directory='.', ref_name='Ref', write_data=True):
+    def plotConformerEnergies(self, directory=".", ref_name="Ref", write_data=True):
         """
         Plot all conformer QM energies versus MM energies with the fitted parameters
         """
 
-        path = os.path.join(directory, 'conformer-energies')
+        path = os.path.join(directory, "conformer-energies")
 
         # Get data
         qm_energy = np.concatenate(self._reference_energies)[:, None]
@@ -579,22 +722,27 @@ class DihedralFitting:
 
         if write_data:
             fmtsz = 8
-            header = ''.join('{:{size}}'.format(s, size=fmtsz) for s in ['# ref', 'MM'])
+            header = "".join("{:{size}}".format(s, size=fmtsz) for s in ["# ref", "MM"])
             data = np.column_stack((qm_energy, mm_energy))
-            np.savetxt(path + '.dat', data, fmt='%{size}.3f'.format(size=fmtsz), header=header, comments='')
+            np.savetxt(
+                path + ".dat",
+                data,
+                fmt="%{size}.3f".format(size=fmtsz),
+                header=header,
+                comments="",
+            )
 
         plt.figure()
-        plt.title('{} vs MM energies'.format(ref_name))
-        plt.xlabel('{} energy [kcal/mol]'.format(ref_name))
-        plt.ylabel('MM energy [kcal/mol]')
-        plt.plot(qm_energy, mm_energy, 'ko')
-        plt.plot(qm_energy, prediction, 'r-', lw=2)
-        plt.savefig(path + '.svg')
+        plt.title("{} vs MM energies".format(ref_name))
+        plt.xlabel("{} energy [kcal/mol]".format(ref_name))
+        plt.ylabel("MM energy [kcal/mol]")
+        plt.plot(qm_energy, mm_energy, "ko")
+        plt.plot(qm_energy, prediction, "r-", lw=2)
+        plt.savefig(path + ".svg")
         plt.close()
 
 
 class _TestDihedralFitting(unittest.TestCase):
-
     def setUp(self):
         self.df = DihedralFitting()
 
@@ -611,7 +759,9 @@ class _TestDihedralFitting(unittest.TestCase):
                 self.assertEqual(ndihed, self.df.numDihedrals)
                 lower_bounds, upper_bounds = self.df._getBounds(ndihed)
                 self.assertListEqual(list(lower_bounds), [0] * 2 * nterm + [-25])
-                self.assertListEqual(list(upper_bounds), [10] * nterm + [2*np.pi] * nterm + [25])
+                self.assertListEqual(
+                    list(upper_bounds), [10] * nterm + [2 * np.pi] * nterm + [25]
+                )
 
     def test_paramsToVector(self):
         from parmed.parameters import ParameterSet
@@ -620,16 +770,33 @@ class _TestDihedralFitting(unittest.TestCase):
         params = ParameterSet()
         dihlist = DihedralTypeList()
         for i in range(6):
-            dihtype = DihedralType(float(i)+10, i+1, float(i)+20)
+            dihtype = DihedralType(float(i) + 10, i + 1, float(i) + 20)
             dihlist.append(dihtype)
-        params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
+        params.dihedral_types[("x", "x", "x", "x")] = dihlist
 
-        self.df.dihedrals = [(0, 0, 0, 0),]
-        self.df._dihedral_atomtypes = [('x', 'x', 'x', 'x')]
+        self.df.dihedrals = [
+            (0, 0, 0, 0),
+        ]
+        self.df._dihedral_atomtypes = [("x", "x", "x", "x")]
         vector = self.df._paramsToVector(params)
-        self.assertListEqual(list(vector), [10, 11, 12, 13, 14, 15,
-                                            np.deg2rad(20), np.deg2rad(21), np.deg2rad(22),
-                                            np.deg2rad(23), np.deg2rad(24), np.deg2rad(25), 0.])
+        self.assertListEqual(
+            list(vector),
+            [
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                np.deg2rad(20),
+                np.deg2rad(21),
+                np.deg2rad(22),
+                np.deg2rad(23),
+                np.deg2rad(24),
+                np.deg2rad(25),
+                0.0,
+            ],
+        )
 
     def test_vectorToParams(self):
         from parmed.parameters import ParameterSet
@@ -638,23 +805,23 @@ class _TestDihedralFitting(unittest.TestCase):
         params = ParameterSet()
         dihlist = DihedralTypeList()
         for i in range(6):
-            dihtype = DihedralType(float(i)+10, i+1, float(i)+20)
+            dihtype = DihedralType(float(i) + 10, i + 1, float(i) + 20)
             dihlist.append(dihtype)
-        params.dihedral_types[('x', 'x', 'x', 'x')] = dihlist
+        params.dihedral_types[("x", "x", "x", "x")] = dihlist
 
         self.df.dihedrals = [[0, 1, 2, 3]]
         self.df.parameters = params
-        self.df._dihedral_atomtypes = [('x', 'x', 'x', 'x')]
+        self.df._dihedral_atomtypes = [("x", "x", "x", "x")]
         vector = np.array([30, 31, 32, 33, 34, 35, 40, 41, 42, 43, 44, 45, 50])
 
         new_params = self.df._vectorToParams(vector)
 
         self.assertFalse(params is new_params)
-        self.assertEqual(len(new_params.dihedral_types[('x', 'x', 'x', 'x')]), 6)
-        for i, param in enumerate(new_params.dihedral_types[('x', 'x', 'x', 'x')]):
-            self.assertEqual(param.phi_k, i+30)
-            self.assertEqual(param.per, i+1)
-            self.assertAlmostEqual(np.deg2rad(param.phase), i+40)
+        self.assertEqual(len(new_params.dihedral_types[("x", "x", "x", "x")]), 6)
+        for i, param in enumerate(new_params.dihedral_types[("x", "x", "x", "x")]):
+            self.assertEqual(param.phi_k, i + 30)
+            self.assertEqual(param.per, i + 1)
+            self.assertAlmostEqual(np.deg2rad(param.phase), i + 40)
 
     def test_objective(self):
 
@@ -662,18 +829,20 @@ class _TestDihedralFitting(unittest.TestCase):
 
         np.random.seed(20181010)
 
-        for ndihed, nequiv, nconf, ref_value in [(1, 1, 1, 372.32948041618585),
-                                                 (1, 1, 5, 308.20314159433246),
-                                                 (1, 3, 1, 745.73230831710710),
-                                                 (2, 1, 1, 614.93885227468590),
-                                                 (2, 3, 5, 1972.6738129847004)]:
+        for ndihed, nequiv, nconf, ref_value in [
+            (1, 1, 1, 372.32948041618585),
+            (1, 1, 5, 308.20314159433246),
+            (1, 3, 1, 745.73230831710710),
+            (2, 1, 1, 614.93885227468590),
+            (2, 3, 5, 1972.6738129847004),
+        ]:
             with self.subTest(ndihed=ndihed, nequiv=nequiv, nconf=nconf):
 
-                self.df.dihedrals = [[0]*4]*ndihed
-                angle_values = 100*np.random.random((ndihed, ndihed, nconf, nequiv))
-                target_energies = 100*np.random.random((ndihed, nconf))
+                self.df.dihedrals = [[0] * 4] * ndihed
+                angle_values = 100 * np.random.random((ndihed, ndihed, nconf, nequiv))
+                target_energies = 100 * np.random.random((ndihed, nconf))
 
-                vector = 100*np.random.random(12*ndihed+1)
+                vector = 100 * np.random.random(12 * ndihed + 1)
                 grad = np.zeros_like(vector)
                 value = self.df._objective(vector, grad, angle_values, target_energies)
                 self.assertAlmostEqual(ref_value, value)
@@ -683,7 +852,9 @@ class _TestDihedralFitting(unittest.TestCase):
                     def func(x):
                         v = vector.copy()
                         v[i] = x
-                        return self.df._objective(v, None, angle_values, target_energies)
+                        return self.df._objective(
+                            v, None, angle_values, target_energies
+                        )
 
                     # Compute gradient numerically
                     ref_grad = derivative(func, vector[i], dx=1e-3, order=5)
@@ -693,6 +864,6 @@ class _TestDihedralFitting(unittest.TestCase):
     # Note: the rest methods are tested indirectly via the "parameterize" tests in test.py
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     unittest.main(verbosity=2)

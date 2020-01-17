@@ -22,7 +22,9 @@ def _getMolecularGraph(molecule):
 
     graph = nx.Graph()
     for i, element in enumerate(molecule.element):
-        graph.add_node(i, element=element, number=periodictable[element.capitalize()].number)
+        graph.add_node(
+            i, element=element, number=periodictable[element.capitalize()].number
+        )
     graph.add_edges_from(molecule.bonds)
 
     return graph
@@ -39,7 +41,7 @@ def _getMolecularTree(graph, source):
     assert nx.is_connected(graph)
 
     tree = nx.DiGraph()
-    tree.add_node(0, base=source, element=graph.nodes[source]['element'])
+    tree.add_node(0, base=source, element=graph.nodes[source]["element"])
     current_nodes = list(tree.nodes)
     base_nodes = {source}
 
@@ -47,14 +49,18 @@ def _getMolecularTree(graph, source):
         new_nodes = []
         neighbor_filter = lambda node: node not in base_nodes
         for current_node in current_nodes:
-            for neighbor in filter(neighbor_filter, graph.neighbors(tree.nodes[current_node]['base'])):
+            for neighbor in filter(
+                neighbor_filter, graph.neighbors(tree.nodes[current_node]["base"])
+            ):
                 new_node = len(tree.nodes)
-                tree.add_node(new_node, base=neighbor, element=graph.nodes[neighbor]['element'])
+                tree.add_node(
+                    new_node, base=neighbor, element=graph.nodes[neighbor]["element"]
+                )
                 tree.add_edge(current_node, new_node)
                 new_nodes.append(new_node)
 
         current_nodes = new_nodes
-        base_nodes = {base for _, base in tree.nodes.data('base')}
+        base_nodes = {base for _, base in tree.nodes.data("base")}
         if base_nodes == set(graph.nodes):
             break
 
@@ -66,7 +72,11 @@ def _checkIsomorphism(graph1, graph2):
     Check if two molecular graphs are isomorphic based on topology (bonds) and elements.
     """
 
-    return nx.is_isomorphic(graph1, graph2, node_match=lambda node1, node2: node1['element'] == node2['element'])
+    return nx.is_isomorphic(
+        graph1,
+        graph2,
+        node_match=lambda node1, node2: node1["element"] == node2["element"],
+    )
 
 
 def detectEquivalentAtoms(molecule):
@@ -126,7 +136,10 @@ def detectEquivalentAtoms(molecule):
     graph = _getMolecularGraph(molecule)
     trees = [_getMolecularTree(graph, node) for node in graph.nodes]
 
-    equivalent_atoms = [tuple([i for i, tree1 in enumerate(trees) if _checkIsomorphism(tree1, tree2)]) for tree2 in trees]
+    equivalent_atoms = [
+        tuple([i for i, tree1 in enumerate(trees) if _checkIsomorphism(tree1, tree2)])
+        for tree2 in trees
+    ]
     equivalent_groups = sorted(list(set(equivalent_atoms)))
     equivalent_group_by_atom = list(map(equivalent_groups.index, equivalent_atoms))
 
@@ -139,10 +152,10 @@ def _getMethylGraph():
     """
 
     methyl = nx.Graph()
-    methyl.add_node(0, element='C')
-    methyl.add_node(1, element='H')
-    methyl.add_node(2, element='H')
-    methyl.add_node(3, element='H')
+    methyl.add_node(0, element="C")
+    methyl.add_node(1, element="H")
+    methyl.add_node(2, element="H")
+    methyl.add_node(3, element="H")
     methyl.add_edge(0, 1)
     methyl.add_edge(0, 2)
     methyl.add_edge(0, 3)
@@ -151,7 +164,9 @@ def _getMethylGraph():
 
 
 def connected_component_subgraphs(graph):
-    return (graph.subgraph(component).copy() for component in nx.connected_components(graph))
+    return (
+        graph.subgraph(component).copy() for component in nx.connected_components(graph)
+    )
 
 
 def detectParameterizableCores(graph):
@@ -181,13 +196,15 @@ def detectParameterizableCores(graph):
         assert core[0] in sideGraphs[0] and core[1] in sideGraphs[1]
 
         # Skip if a side graph is a methyl group
-        if _checkIsomorphism(sideGraphs[0], methyl) or _checkIsomorphism(sideGraphs[1], methyl):
+        if _checkIsomorphism(sideGraphs[0], methyl) or _checkIsomorphism(
+            sideGraphs[1], methyl
+        ):
             continue
 
         # Skip if core contains C with sp hybridization
-        if graph.nodes[core[0]]['element'] == 'C' and graph.degree(core[0]) == 2:
+        if graph.nodes[core[0]]["element"] == "C" and graph.degree(core[0]) == 2:
             continue
-        if graph.nodes[core[1]]['element'] == 'C' and graph.degree(core[1]) == 2:
+        if graph.nodes[core[1]]["element"] == "C" and graph.degree(core[1]) == 2:
             continue
 
         all_core_sides.append((core, sideGraphs))
@@ -204,8 +221,14 @@ def _weighted_closeness_centrality(graph, node, weight=None):
 
     lengths = nx.shortest_path_length(graph, source=node)
     del lengths[node]
-    weights = {node_: graph.nodes[node_][weight] for node_ in lengths} if weight else {node_: 1 for node_ in lengths}
-    centrality = sum(weights.values())/sum([lengths[node_]*weights[node_] for node_ in lengths])
+    weights = (
+        {node_: graph.nodes[node_][weight] for node_ in lengths}
+        if weight
+        else {node_: 1 for node_ in lengths}
+    )
+    centrality = sum(weights.values()) / sum(
+        [lengths[node_] * weights[node_] for node_ in lengths]
+    )
 
     return centrality
 
@@ -224,12 +247,21 @@ def _chooseTerminals(graph, centre, sideGraph):
     # Get a subgraph for each terminal
     sideGraph = sideGraph.copy()
     sideGraph.remove_node(centre)
-    terminalGraphs = itertools.product(terminals, connected_component_subgraphs(sideGraph))
-    terminalGraphs = [terminalGraph for terminal, terminalGraph in terminalGraphs if terminal in terminalGraph]
+    terminalGraphs = itertools.product(
+        terminals, connected_component_subgraphs(sideGraph)
+    )
+    terminalGraphs = [
+        terminalGraph
+        for terminal, terminalGraph in terminalGraphs
+        if terminal in terminalGraph
+    ]
 
     # Compute a score for each terminal
     centralities = [nx.closeness_centrality(graph, terminal) for terminal in terminals]
-    weightedCentralities = [_weighted_closeness_centrality(graph, terminal, weight='number') for terminal in terminals]
+    weightedCentralities = [
+        _weighted_closeness_centrality(graph, terminal, weight="number")
+        for terminal in terminals
+    ]
     scores = list(zip(centralities, weightedCentralities))
 
     # Choose the terminals
@@ -247,9 +279,11 @@ def _chooseTerminals(graph, centre, sideGraph):
         if _checkIsomorphism(terminalGraph, refTerminalGraph):
             chosen_terminals.append(terminal)
         else:
-            logger.warn('Molecular scoring function is not sufficient. '
-                        'Dihedal selection depends on the atom order! '
-                        'Redundant dihedrals might be present!')
+            logger.warn(
+                "Molecular scoring function is not sufficient. "
+                "Dihedal selection depends on the atom order! "
+                "Redundant dihedrals might be present!"
+            )
 
     return chosen_terminals
 
@@ -346,35 +380,49 @@ def detectParameterizableDihedrals(molecule):
     for core, sides in detectParameterizableCores(graph):
 
         # Choose the best terminals for each side
-        all_terminals = [_chooseTerminals(graph, centre, side) for centre, side in zip(core, sides)]
+        all_terminals = [
+            _chooseTerminals(graph, centre, side) for centre, side in zip(core, sides)
+        ]
 
         # Generate all terminal combinations
         all_terminals = itertools.product(*all_terminals)
 
         # Generate new dihedral angles
-        new_dihedrals = [(terminals[0], *core, terminals[1]) for terminals in all_terminals]
+        new_dihedrals = [
+            (terminals[0], *core, terminals[1]) for terminals in all_terminals
+        ]
         dihedrals.extend(new_dihedrals)
 
     # Get equivalent groups for each atom for each dihedral
     _, _, equivalent_group_by_atom = detectEquivalentAtoms(molecule)
-    dihedral_groups = [tuple([equivalent_group_by_atom[atom] for atom in dihedral]) for dihedral in dihedrals]
+    dihedral_groups = [
+        tuple([equivalent_group_by_atom[atom] for atom in dihedral])
+        for dihedral in dihedrals
+    ]
 
     # Group equivalent dihedral angles and reverse them that equivalent atoms are matched
     equivalent_dihedrals = OrderedDict()
     for dihedral, groups in zip(dihedrals, dihedral_groups):
-        dihedral, groups = (dihedral[::-1], groups[::-1]) if groups[::-1] < groups else (dihedral, groups)
-        equivalent_dihedrals[groups] = sorted(equivalent_dihedrals.get(groups, []) + [dihedral])
+        dihedral, groups = (
+            (dihedral[::-1], groups[::-1])
+            if groups[::-1] < groups
+            else (dihedral, groups)
+        )
+        equivalent_dihedrals[groups] = sorted(
+            equivalent_dihedrals.get(groups, []) + [dihedral]
+        )
     equivalent_dihedrals = sorted(equivalent_dihedrals.values())
     return equivalent_dihedrals
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     import sys
     import doctest
 
     # Prevent HTMD importing inside doctest to fail if importing gives text output
     from htmd.home import home
+
     home()
 
     if doctest.testmod().failed:

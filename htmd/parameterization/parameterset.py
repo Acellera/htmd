@@ -9,7 +9,7 @@ import unittest
 
 import numpy as np
 
-_ATOM_TYPE_REG_EX = re.compile('^\S+x\d+$')
+_ATOM_TYPE_REG_EX = re.compile("^\S+x\d+$")
 
 
 def getParameter(type, parameterfield):
@@ -18,18 +18,19 @@ def getParameter(type, parameterfield):
     type = tuple(reversed(type))
     if type in parameterfield:
         return parameterfield[type]
-    raise RuntimeError('Could not find parameters for key {}'.format(type))
+    raise RuntimeError("Could not find parameters for key {}".format(type))
 
 
 def findImproperType(type, parameters):
     from itertools import permutations
+
     type = np.array(type)
     perms = np.array([x for x in list(permutations((0, 1, 2, 3))) if x[2] == 2])
     for p in perms:
         if tuple(type[p]) in parameters.improper_types:
-            return tuple(type[p]), 'improper_types'
+            return tuple(type[p]), "improper_types"
         elif tuple(type[p]) in parameters.improper_periodic_types:
-            return tuple(type[p]), 'improper_periodic_types'
+            return tuple(type[p]), "improper_periodic_types"
     return None
 
 
@@ -51,7 +52,9 @@ def recreateParameters(mol, originaltypes, parameters):
     for type in uqtypes:
         newparams.atom_types[type] = copy(parameters.atom_types[originaltypes[type]])
         if type != originaltypes[type]:
-            newparams.atom_types[type].number = newparams.atom_types[type].number + 900 # add a big offset so it doesn't collide with real charm types
+            newparams.atom_types[type].number = (
+                newparams.atom_types[type].number + 900
+            )  # add a big offset so it doesn't collide with real charm types
 
     for idx in mol.bonds:
         newkey = tuple(mol.atomtype[idx])
@@ -65,7 +68,9 @@ def recreateParameters(mol, originaltypes, parameters):
 
     for idx in mol.dihedrals:
         newkey = tuple(mol.atomtype[idx])
-        if findDihedralType(newkey, newparams) is not None:  # A permutation of it already exists
+        if (
+            findDihedralType(newkey, newparams) is not None
+        ):  # A permutation of it already exists
             continue
         oldkey = tuple(np.vectorize(originaltypes.get)(newkey))
         oldkey = findDihedralType(oldkey, parameters)
@@ -73,7 +78,9 @@ def recreateParameters(mol, originaltypes, parameters):
 
     for idx in mol.impropers:
         newkey = tuple(mol.atomtype[idx])
-        if findImproperType(newkey, newparams) is not None:  # A permutation of it already exists
+        if (
+            findImproperType(newkey, newparams) is not None
+        ):  # A permutation of it already exists
             continue
         oldkey = np.vectorize(originaltypes.get)(newkey)
         oldkey, field = findImproperType(oldkey, parameters)
@@ -90,14 +97,14 @@ def createMultitermDihedralTypes(parameters, nterms=6, scee=1.2, scnb=2):
 
     for key, val in parameters.dihedral_types.items():
         dihlist = DihedralTypeList()
-        for i in range(1, nterms+1):
+        for i in range(1, nterms + 1):
             found = False
-            for d in val: # Check if this term already exists in the parameters.
+            for d in val:  # Check if this term already exists in the parameters.
                 if d.per == i:
                     dihlist.append(d)
                     found = True
                     break
-            if not found: # Else create an unparametrized term
+            if not found:  # Else create an unparametrized term
                 dihtype = DihedralType(0, i, 0, scee=scee, scnb=scnb)
                 dihlist.append(dihtype)
         parameters.dihedral_types[key] = dihlist
@@ -129,9 +136,9 @@ def inventAtomTypes(mol, fit_dihedrals):
                 continue
             # Create a new atom type name
             i = 0
-            while ('{}x{}'.format(oldtype, i)) in alltypes:
+            while ("{}x{}".format(oldtype, i)) in alltypes:
                 i += 1
-            newtype = '{}x{}'.format(oldtype, i)
+            newtype = "{}x{}".format(oldtype, i)
             alltypes.append(newtype)
             originaltype[newtype] = oldtype
 
@@ -144,8 +151,12 @@ def inventAtomTypes(mol, fit_dihedrals):
 
         equivalent_dihedrals = _getEquivalentDihedrals(mol, equivalents, np.array(dih))
         if len(equivalent_dihedrals) > 1:
-            raise ValueError("Dihedral term still not unique after duplication. Dihedral {} has {} equivalent "
-                             "dihedrals: {}".format(dih, len(equivalent_dihedrals), equivalent_dihedrals))
+            raise ValueError(
+                "Dihedral term still not unique after duplication. Dihedral {} has {} equivalent "
+                "dihedrals: {}".format(
+                    dih, len(equivalent_dihedrals), equivalent_dihedrals
+                )
+            )
 
     return mol, originaltype
 
@@ -175,38 +186,58 @@ def _getEquivalentDihedrals(mol, equivalents, dihedral):
 
 
 class _Test(unittest.TestCase):
-
     def setUp(self):
         from htmd.home import home
         from moleculekit.molecule import Molecule
         from htmd.parameterization.detect import detectEquivalentAtoms
         from htmd.parameterization.fftype import fftype
 
-        molFile = os.path.join(home('test-param'), 'glycol.mol2')
+        molFile = os.path.join(home("test-param"), "glycol.mol2")
         mol = Molecule(molFile)
         self.equivalents = detectEquivalentAtoms(mol)
-        _, self.mol = fftype(mol, method='GAFF2')
+        _, self.mol = fftype(mol, method="GAFF2")
 
     def test_getEquivalentDihedrals(self):
-        self.assertListEqual(_getEquivalentDihedrals(self.mol, self.equivalents, [0, 1, 2, 3]), [[0, 1, 2, 3]])
-        self.assertListEqual(_getEquivalentDihedrals(self.mol, self.equivalents, [4, 0, 1, 2]), [[4, 0, 1, 2]])
-        self.assertListEqual(_getEquivalentDihedrals(self.mol, self.equivalents, [5, 1, 2, 7]), [[5, 1, 2, 7]])
+        self.assertListEqual(
+            _getEquivalentDihedrals(self.mol, self.equivalents, [0, 1, 2, 3]),
+            [[0, 1, 2, 3]],
+        )
+        self.assertListEqual(
+            _getEquivalentDihedrals(self.mol, self.equivalents, [4, 0, 1, 2]),
+            [[4, 0, 1, 2]],
+        )
+        self.assertListEqual(
+            _getEquivalentDihedrals(self.mol, self.equivalents, [5, 1, 2, 7]),
+            [[5, 1, 2, 7]],
+        )
 
     def test_inventAtomTypes(self):
-        self.assertListEqual(self.mol.atomtype.tolist(), ['oh', 'c3', 'c3', 'oh', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
+        self.assertListEqual(
+            self.mol.atomtype.tolist(),
+            ["oh", "c3", "c3", "oh", "ho", "h1", "h1", "h1", "h1", "ho"],
+        )
 
         mol = self.mol.copy()
         mol, _ = inventAtomTypes(mol, [[0, 1, 2, 3]])
-        self.assertListEqual(mol.atomtype.tolist(), ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'ho', 'h1', 'h1', 'h1', 'h1', 'ho'])
+        self.assertListEqual(
+            mol.atomtype.tolist(),
+            ["ohx0", "c3x0", "c3x0", "ohx0", "ho", "h1", "h1", "h1", "h1", "ho"],
+        )
 
         mol = self.mol.copy()
         mol, _ = inventAtomTypes(mol, [[4, 0, 1, 2]])
-        self.assertListEqual(mol.atomtype.tolist(), ['ohx0', 'c3x0', 'c3x0', 'ohx0', 'hox0', 'h1', 'h1', 'h1', 'h1', 'hox0'])
+        self.assertListEqual(
+            mol.atomtype.tolist(),
+            ["ohx0", "c3x0", "c3x0", "ohx0", "hox0", "h1", "h1", "h1", "h1", "hox0"],
+        )
 
         mol = self.mol.copy()
         mol, _ = inventAtomTypes(mol, [[5, 1, 2, 7]])
-        self.assertListEqual(mol.atomtype.tolist(), ['oh', 'c3x0', 'c3x0', 'oh', 'ho', 'h1x0', 'h1x0', 'h1x0', 'h1x0', 'ho'])
+        self.assertListEqual(
+            mol.atomtype.tolist(),
+            ["oh", "c3x0", "c3x0", "oh", "ho", "h1x0", "h1x0", "h1x0", "h1x0", "ho"],
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)
