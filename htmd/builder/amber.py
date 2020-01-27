@@ -889,8 +889,8 @@ class _TestAmberBuild(unittest.TestCase):
 
     def testProteinLigand(self):
         from htmd.builder.solvate import solvate
-        from htmd.parameterization.fftype import fftype
-        from htmd.parameterization.writers import writeFRCMOD
+        from parameterize.parameterization.fftype import fftype
+        from parameterize.parameterization.writers import writeFRCMOD
 
         # Test protein ligand building with parametrized ligand
         refdir = home(dataDir=join('test-amber-build', 'protLig'))
