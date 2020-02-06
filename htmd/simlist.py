@@ -298,7 +298,7 @@ def _filtSim(i, sims, outFolder, filterSel):
 
     logger.debug('Processing trajectory ' + name)
 
-    fmolfile = path.join(outFolder, 'filtered.pdb')
+    fmolfile = [path.join(outFolder, 'filtered.psf'), path.join(outFolder, 'filtered.pdb')]
     (traj, outtraj) = _renameSims(sims[i].trajectory, name, outFolder)
     if not traj:
         ftrajectory = _autoDetectTrajectories(path.join(outFolder, name))
@@ -380,7 +380,7 @@ def _filterTopology(sim, outfolder, filtsel):
     if mol.coords.size == 0:  # If we read for example psf or prmtop which have no coords, just add 0s everywhere
         mol.coords = np.zeros((mol.numAtoms, 3, 1), dtype=np.float32)
 
-    extensions = ['pdb',]  # Adding pdb to make sure it's always written
+    extensions = ['pdb', 'psf']  # Adding pdb and psf to make sure they are always written
     for m in ensurelist(sim.molfile):
         extensions.append(os.path.splitext(m)[1][1:])
 
