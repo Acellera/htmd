@@ -397,6 +397,7 @@ class _TestAdaptiveBandit(unittest.TestCase):
         tmpdir = tempname()
         shutil.copytree(home(dataDir='adaptive'), tmpdir)
         os.chdir(tmpdir)
+        print(f"Running AdaptiveBandit test in {tmpdir}")
 
     def test_adaptive(self):
         from sklearn.cluster import MiniBatchKMeans
