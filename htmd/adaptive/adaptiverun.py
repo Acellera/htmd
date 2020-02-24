@@ -93,7 +93,7 @@ class AdaptiveMD(AdaptiveBase):
     >>> adapt.ticadim = 3
     >>> adapt.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
     >>> adapt.generatorspath = htmd.home()+'/data/dhfr'
-    >>> adapt.app = AcemdLocal()
+    >>> adapt.app = LocalGPUQueue()
     >>> adapt.run()
     """
 

@@ -105,7 +105,7 @@ E.g. if setting up the simulations with the :class:`~htmd.protocols.production_v
 
 .. code:: python
 
-    from htmd.protocols.production_v5 import Production
+    from htmd.protocols.production_v6 import Production
     md = Production()
     md.adaptive = True
     [...]
