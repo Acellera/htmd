@@ -783,6 +783,8 @@ class Model(object):
         -------
         newmodel :
             A new model object
+        frames : list
+            A list of the frames that were kept in the new model
         """
         if (threshold >= 1) or (threshold <= 0):
             raise AttributeError('threshold argument only accepts values between (0, 1)')
@@ -796,11 +798,11 @@ class Model(object):
                 coreset.append(microofmacro[np.where(prob > tt)[0]])
             return coreset
 
-        def coreDtraj(St, micro_ofcluster, coreset):
+        def coreDtraj(data, micro_ofcluster, coreset):
             corestates = np.concatenate(coreset)
             newmapping = np.ones(corestates.max()+1, dtype=int) * -1
             newmapping[corestates] = np.arange(len(corestates))
-            discretetraj = [st.copy() for st in St]
+            discretetraj = [st.copy() for st in data.St]
             frames = []
             newdiscretetraj = []
             newcounts = np.zeros(len(corestates))
@@ -831,14 +833,14 @@ class Model(object):
                     newcounts[:mappedtraj.max()+1] += np.bincount(mappedtraj)
                 frames.append(np.array(tframes))
             #kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
-            newdiscretetraj = np.array([x for x in newdiscretetraj if len(x) != 0], dtype=object)
-            return newdiscretetraj, len(corestates), newcounts, frames
+            return np.array(newdiscretetraj, dtype=object), len(corestates), newcounts, frames
 
         coreset = calcCoreSet(self.msm.metastable_distributions, self.msm.metastable_assignments, threshold)
         newdata = self.data.copy()
-        St, newdata.K, newdata.N, frames = coreDtraj(self.data.St, self.micro_ofcluster, coreset)
-        for i, s in enumerate(St):
-            newdata.trajectories[i].cluster = s
+        newSt, newdata.K, newdata.N, frames = coreDtraj(self.data, self.micro_ofcluster, coreset)
+        for i, (s, fr) in enumerate(zip(newSt, frames)):
+            if len(s):
+                newdata.trajectories[i].cluster[fr] = s
 
         logger.info('Kept {} microstates from each macrostate.'.format([len(x) for x in coreset]))
 
@@ -849,14 +851,18 @@ class Model(object):
             dat = []
             ref = []
             simstmp = []
+            cluster = []
             for i, fr in enumerate(frames):
                 if len(fr):
                     dat.append(data.trajectories[i].projection[fr, :])
                     ref.append(data.trajectories[i].reference[fr, :])
+                    if len(data.trajectories[i].cluster):
+                        cluster.append(data.trajectories[i].cluster[fr])
                     simstmp.append(data.trajectories[i].sim)
-            data._loadTrajectories(dat, ref, simstmp)
+                    
+            data._loadTrajectories(dat, ref, simstmp, cluster if len(cluster) else None)
 
-        return Model(newdata)
+        return Model(newdata), frames
 
     def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, fescmap=None, statescmap=None, plot=True, save=None, data=None):
         """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.

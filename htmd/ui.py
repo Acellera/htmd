@@ -8,7 +8,11 @@ import htmd.home
 from htmd.session import htmdsave, htmdload
 from htmd.simlist import simlist, simfilter, simmerge
 from htmd.metricdata import MetricData
-from moleculekit.projections.metricdistance import MetricDistance, MetricSelfDistance, reconstructContactMap
+from moleculekit.projections.metricdistance import (
+    MetricDistance,
+    MetricSelfDistance,
+    reconstructContactMap,
+)
 from moleculekit.projections.metricrmsd import MetricRmsd
 from moleculekit.projections.metricfluctuation import MetricFluctuation
 from moleculekit.projections.metriccoordinate import MetricCoordinate
@@ -45,10 +49,16 @@ from jobqueues.localqueue import LocalGPUQueue, LocalCPUQueue
 from jobqueues.slurmqueue import SlurmQueue
 from jobqueues.lsfqueue import LsfQueue
 from jobqueues.pbsqueue import PBSQueue
-from moleculekit.vmdgraphics import VMDConvexHull, VMDBox, VMDIsosurface, VMDSphere, VMDText
+from moleculekit.vmdgraphics import (
+    VMDConvexHull,
+    VMDBox,
+    VMDIsosurface,
+    VMDSphere,
+    VMDText,
+)
 from moleculekit.tools.autosegment import autoSegment
 from htmd.builder.loopmodeler import loopModeller
-from htmd.ffevaluation.ffevaluate import FFEvaluate
+from ffevaluation.ffevaluate import FFEvaluate
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.config import config
@@ -62,7 +72,7 @@ from glob import glob
 from sklearn.cluster import MiniBatchKMeans
 
 if not (os.getenv("HTMD_NONINTERACTIVE")):
-    check_registration(product='htmd')
+    check_registration(product="htmd")
     show_news()
     compareVersions()
 
@@ -76,8 +86,6 @@ import warnings
 
 # Get rid of pyemma version warnings
 with warnings.catch_warnings():
-    warnings.simplefilter('ignore', category=UserWarning)
+    warnings.simplefilter("ignore", category=UserWarning)
     import pyemma
-
-
 

@@ -623,7 +623,7 @@ class Acemd(_Acemd):
         self._arg('parameters', 'str', 'The filename of a CHARMM PAR file', None, val.String(), nargs='*')
         self._arg('parmfile', 'str', 'The filename of an Amber PRMTOP file', None, val.String(), nargs='*')
         self._arg('extendedsystem', 'str', 'Filename of a NAMD XSC format file giving the periodic cell dimensions. '
-                                           'Overrides "celldimension" and any dimensions in the "coordinates" PDB',
+                                           'Overrides "boxsize" and any dimensions in the "coordinates" PDB',
                   None, val.String(), nargs='*')
         self._arg('coordinates', 'str', 'Mandatory initial system geometry in PDB format', None, val.String(),
                   nargs='*')
