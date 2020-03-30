@@ -5,25 +5,29 @@
 #
 import os
 import logging
+from jobqueues.config import config as jqconfig
 
 logger = logging.getLogger(__file__)
 
-_config = {'viewer': 'VMD',
-           'njobs': 1,
-           'acemdversion': 3,
-           'configfile': os.getenv('HTMD_CONFIG') if os.getenv('HTMD_CONFIG') else None,
-           'lsf': None,
-           'slurm': None
-           }
+_config = {
+    "viewer": "VMD",
+    "njobs": 1,
+    "acemdversion": 3,
+    "configfile": os.getenv("HTMD_CONFIG") if os.getenv("HTMD_CONFIG") else None,
+    "lsf": None,
+    "slurm": None,
+}
 
 
-def config(viewer=_config['viewer'],
-           ncpus=None,
-           njobs=_config['njobs'],
-           acemdversion=_config['acemdversion'],
-           configfile=_config['configfile'],
-           lsf=_config['lsf'],
-           slurm=_config['slurm']):
+def config(
+    viewer=_config["viewer"],
+    ncpus=None,
+    njobs=_config["njobs"],
+    acemdversion=_config["acemdversion"],
+    configfile=_config["configfile"],
+    lsf=_config["lsf"],
+    slurm=_config["slurm"],
+):
     """
     Function to change HTMD configuration variables.
 
@@ -42,13 +46,17 @@ def config(viewer=_config['viewer'],
     slurm : str
         Defines a YAML file that can contain default profile configurations for an SlurmQueue
     """
-    _config['viewer'] = viewer
+    _config["viewer"] = viewer
     if ncpus is not None:
-        logger.warning('The ncpus config option has been renamed to njobs. Please use njobs instead.')
-        _config['njobs'] = ncpus
+        logger.warning(
+            "The ncpus config option has been renamed to njobs. Please use njobs instead."
+        )
+        _config["njobs"] = ncpus
     else:
-        _config['njobs'] = njobs
-    _config['acemdversion'] = acemdversion
-    _config['configfile'] = configfile
-    _config['lsf'] = lsf
-    _config['slurm'] = slurm
+        _config["njobs"] = njobs
+    _config["acemdversion"] = acemdversion
+    _config["configfile"] = configfile
+
+    _config["lsf"] = lsf  # DEPRECATE THIS
+    _config["slurm"] = slurm  # DEPRECATE THIS
+    jqconfig(lsf=lsf, slurm=slurm)
