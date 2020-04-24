@@ -1,8 +1,8 @@
-User Guide
-==========
+Tutorials
+=========
 
-The user guide is divided in a set of sections, each containing several tutorial-like guides into HTMD several
-functionalities:
+The tutorials are divided in a set of sections, each containing several guides into several
+functionalities of HTMD:
 
 * The first section focuses on teaching the basics of HTMD, ideal for those starting with the software
 * The second section introduces the HTMD tools available to prepare and build systems for MD simulations

@@ -1,7 +1,7 @@
-HTMD Documentation
-==================
+Documentation
+=============
 
-Here one can find documentation for most of the modules that HTMD provides. One can either explore the tree of contents
+You can find here documentation for most of the modules that HTMD provides. One can either explore the tree of contents
 or, if looking for a particular module/class/function, use the search box on the sidebar.
 
 Contents:
