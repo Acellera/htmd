@@ -28,7 +28,7 @@ For HTMD Documentation, please visit:
 [https://software.acellera.com/docs/latest/htmd/api.html](https://software.acellera.com/docs/latest/htmd/api.html).
 
 For a User Guide (easy to start examples), please visit: 
-[https://software.acellera.com/docs/latest/htmd/userguide.html](https://software.acellera.com/docs/latest/htmd/userguide.html)
+[https://software.acellera.com/docs/latest/htmd/tutorials.html](https://software.acellera.com/docs/latest/htmd/tutorials.html)
 
 ## Support and Development
 
