@@ -9,3 +9,4 @@ Contents:
     Molecular Dynamics in HTMD <../tutorials/md-protocols>
     Adaptive Sampling Explained <adaptive-sampling-explained>
     Adaptive Sampling Tutorial <../tutorials/adaptive-sampling>
+    Adaptive Bandit Tutorial <../tutorials/adaptive-bandit>
