@@ -40,7 +40,7 @@ class Equilibration(ProtocolInterface):
 
         Example
         -------
-        >>> from htmd.protocols.equilibration_v2 import Equilibration
+        >>> from htmd.protocols.equilibration_v3 import Equilibration
         >>> from htmd.mdengine.acemd.acemd import GroupRestraint
         >>> md = Equilibration()
         >>> md.runtime = 4
