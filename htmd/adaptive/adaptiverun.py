@@ -255,11 +255,5 @@ if __name__ == "__main__":
     md.updateperiod = 5
     md.projection = MetricDistance('protein and name CA', 'resname BEN and noh')
     md.projection = [MetricDistance('protein and name CA', 'resname BEN and noh'), MetricDistance('protein and name CA', 'resname BEN and noh')]
-    # md.generatorspath = htmd.home()+'/data/dhfr'
-    # md.datapath = 'input'
-    # md.app = AcemdLocal(inputfile='input.acemd')
-
-    # md.app = AcemdLocal(datadir='data')
-    # md.run()  # Takes too long (2 minutes on 780).
 
 
