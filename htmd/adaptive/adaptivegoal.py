@@ -106,7 +106,7 @@ class AdaptiveGoal(AdaptiveMD):
     >>> ag.nmax = 3
     >>> ag.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
     >>> ag.goalfunction = ssGoal
-    >>> ag.app = AcemdLocal()
+    >>> ag.app = LocalGPUQueue()
     >>> ag.run()
     >>>
     >>> # Or alternatively if we have a multi-argument goal function
@@ -116,7 +116,7 @@ class AdaptiveGoal(AdaptiveMD):
     >>>     return ss_score
     >>> from joblib import delayed
     >>> ag.goalfunction = delayed(ssGoalAlt)(crystalSS)
-    >>> ag.app = AcemdLocal()
+    >>> ag.app = LocalGPUQueue()
     >>> ag.run()
     """
 
@@ -333,7 +333,7 @@ if __name__ == '__main__':
     # md.goalprojection = MetricRmsd(Molecule(htmd.home() + '/data/adaptive/generators/1/structure.pdb'),
     #                               'protein and name CA')
     md.goalfunction = rmsdgoal
-    # md.app = AcemdLocal()
+    # md.app = LocalGPUQueue()
     # md.run()
 
     # Some real testing now
