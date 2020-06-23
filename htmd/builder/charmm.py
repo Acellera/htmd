@@ -16,7 +16,15 @@ from subprocess import call
 from htmd.home import home
 from moleculekit.molecule import Molecule
 from moleculekit.util import _missingChain, _missingSegID
-from htmd.builder.builder import detectDisulfideBonds, convertDisulfide, detectCisPeptideBonds, _checkMixedSegment, _checkLongResnames, UnknownResidueError, BuildError
+from htmd.builder.builder import (
+    detectDisulfideBonds,
+    convertDisulfide,
+    detectCisPeptideBonds,
+    _checkMixedSegment,
+    _checkLongResnames,
+    UnknownResidueError,
+    BuildError,
+)
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from moleculekit.vmdviewer import getVMDpath
 from glob import glob
@@ -24,12 +32,16 @@ from unittest import TestCase
 
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 def htmdCharmmHome():
     """ Returns the location of the CHARMM files distributed with HTMD"""
-    return os.path.abspath(os.path.join(home(shareDir=True), 'builder', 'charmmfiles', ''))
+    return os.path.abspath(
+        os.path.join(home(shareDir=True), "builder", "charmmfiles", "")
+    )
+
 
 def listFiles():
     """ Lists all available Charmm topologies and parameter files
@@ -42,21 +54,22 @@ def listFiles():
 
     """
     from natsort import natsorted
+
     charmmdir = htmdCharmmHome()
-    topos = natsorted(glob(path.join(charmmdir, 'top', '*.rtf')))
-    params = natsorted(glob(path.join(charmmdir, 'par', '*.prm')))
-    streams = natsorted(glob(path.join(charmmdir, 'str', '*', '*.str')))
-    print('---- Topologies files list: ' + path.join(charmmdir, 'top', '') + ' ----')
+    topos = natsorted(glob(path.join(charmmdir, "top", "*.rtf")))
+    params = natsorted(glob(path.join(charmmdir, "par", "*.prm")))
+    streams = natsorted(glob(path.join(charmmdir, "str", "*", "*.str")))
+    print("---- Topologies files list: " + path.join(charmmdir, "top", "") + " ----")
     for t in topos:
-        t = t.replace(charmmdir, '')
+        t = t.replace(charmmdir, "")
         print(t)
-    print('---- Parameters files list: ' + path.join(charmmdir, 'par', '') + ' ----')
+    print("---- Parameters files list: " + path.join(charmmdir, "par", "") + " ----")
     for p in params:
-        p = p.replace(charmmdir, '')
+        p = p.replace(charmmdir, "")
         print(p)
-    print('---- Stream files list: ' + path.join(charmmdir, 'str', '') + ' ----')
+    print("---- Stream files list: " + path.join(charmmdir, "str", "") + " ----")
     for s in streams:
-        s = s.replace(charmmdir, '')
+        s = s.replace(charmmdir, "")
         print(s)
 
 
@@ -74,27 +87,59 @@ def search(key, name):
     --------
     >>> charmm.search(key='RESI', name = 'CHL1')  # doctest: +SKIP
     """
-    os.system('find {} -type f -exec grep -n "{} {}" {{}} +'.format(htmdCharmmHome(), key, name))
+    os.system(
+        'find {} -type f -exec grep -n "{} {}" {{}} +'.format(
+            htmdCharmmHome(), key, name
+        )
+    )
 
 
 def defaultTopo():
     """ Returns the default topologies used by charmm.build """
-    return ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf', 'top/top_all36_cgenff.rtf']
+    return [
+        "top/top_all36_prot.rtf",
+        "top/top_all36_lipid.rtf",
+        "top/top_water_ions.rtf",
+        "top/top_all36_cgenff.rtf",
+    ]
 
 
 def defaultParam():
     """ Returns the default parameters used by charmm.build """
-    return ['par/par_all36m_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm', 'par/par_all36_cgenff.prm']
+    return [
+        "par/par_all36m_prot.prm",
+        "par/par_all36_lipid.prm",
+        "par/par_water_ions.prm",
+        "par/par_all36_cgenff.prm",
+    ]
 
 
 def defaultStream():
     """ Returns the default stream files used by charmm.build """
-    return ['str/prot/toppar_all36_prot_arg0.str', 'str/misc/toppar_ions_won.str']
+    return ["str/prot/toppar_all36_prot_arg0.str", "str/misc/toppar_ions_won.str"]
 
 
-def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='./build', caps=None, ionize=True, saltconc=0,
-          saltanion=None, saltcation=None, disulfide=None, regenerate=['angles', 'dihedrals'], patches=None, noregen=None, 
-          aliasresidues=None, psfgen=None, execute=True, _clean=True):
+def build(
+    mol,
+    topo=None,
+    param=None,
+    stream=None,
+    prefix="structure",
+    outdir="./build",
+    caps=None,
+    ionize=True,
+    saltconc=0,
+    saltanion=None,
+    saltcation=None,
+    disulfide=None,
+    regenerate=["angles", "dihedrals"],
+    patches=None,
+    noregen=None,
+    aliasresidues=None,
+    psfgen=None,
+    execute=True,
+    _clean=True,
+):
     """ Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
@@ -176,10 +221,12 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     _checkMixedSegment(mol)
     _checkLongResnames(mol, aliasresidues)
     if psfgen is None:
-        psfgen = shutil.which('psfgen', mode=os.X_OK)
+        psfgen = shutil.which("psfgen", mode=os.X_OK)
         if not psfgen:
-            raise FileNotFoundError('Could not find psfgen executable, or no execute permissions are given. '
-                                    'Run `conda install psfgen`.')
+            raise FileNotFoundError(
+                "Could not find psfgen executable, or no execute permissions are given. "
+                "Run `conda install psfgen`."
+            )
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
     if _clean:
@@ -194,7 +241,7 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
         caps = _defaultCaps(mol)
     # patches that must _not_ be regenerated
     if noregen is None:
-        noregen = ['FHEM', 'PHEM', 'PLOH', 'PLO2', 'PLIG', 'PSUL']
+        noregen = ["FHEM", "PHEM", "PLOH", "PLO2", "PLIG", "PSUL"]
 
     alltopo = topo.copy()
     allparam = param.copy()
@@ -202,14 +249,14 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     # Splitting the stream files and adding them to the list of parameter and topology files
     charmmdir = htmdCharmmHome()
     for s in stream:
-        if s[0] != '.' and path.isfile(path.join(charmmdir, s)):
+        if s[0] != "." and path.isfile(path.join(charmmdir, s)):
             s = path.join(charmmdir, s)
         outrtf, outprm = _prepareStream(s)
         alltopo.append(outrtf)
         allparam.append(outprm)
 
-    #_missingChain(mol)
-    #_checkProteinGaps(mol)
+    # _missingChain(mol)
+    # _checkProteinGaps(mol)
     if patches is None:
         patches = []
     if isinstance(patches, str):
@@ -219,64 +266,79 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     # Find protonated residues and add patches for them
     allpatches += _protonationPatches(mol)
 
-    f = open(path.join(outdir, 'build.vmd'), 'w')
-    f.write('# psfgen file generated by charmm.build\n')
-    f.write('package require psfgen;\n')
-    f.write('psfcontext reset;\n\n')
+    f = open(path.join(outdir, "build.vmd"), "w")
+    f.write("# psfgen file generated by charmm.build\n")
+    f.write("package require psfgen;\n")
+    f.write("psfcontext reset;\n\n")
 
     # Copying and printing out the topologies
-    if not path.exists(path.join(outdir, 'topologies')):
-        os.makedirs(path.join(outdir, 'topologies'))
+    if not path.exists(path.join(outdir, "topologies")):
+        os.makedirs(path.join(outdir, "topologies"))
     for i in range(len(alltopo)):
-        if alltopo[i][0] != '.' and path.isfile(path.join(charmmdir, alltopo[i])):
+        if alltopo[i][0] != "." and path.isfile(path.join(charmmdir, alltopo[i])):
             alltopo[i] = path.join(charmmdir, alltopo[i])
-        localname = '{}.'.format(i) + path.basename(alltopo[i])
-        shutil.copy(alltopo[i], path.join(outdir, 'topologies', localname))
-        f.write('topology ' + path.join('topologies', localname) + '\n')
-    f.write('\n')
+        localname = "{}.".format(i) + path.basename(alltopo[i])
+        shutil.copy(alltopo[i], path.join(outdir, "topologies", localname))
+        f.write("topology " + path.join("topologies", localname) + "\n")
+    f.write("\n")
 
     _printAliases(f)
     if aliasresidues is not None:  # User defined aliases
         for key, val in aliasresidues.items():
             mol.resname[mol.resname == key] = val
-            f.write('        pdbalias residue {} {}\n'.format(val, key))
+            f.write("        pdbalias residue {} {}\n".format(val, key))
 
     # Printing out segments
-    if not path.exists(path.join(outdir, 'segments')):
-        os.makedirs(path.join(outdir, 'segments'))
-    logger.info('Writing out segments.')
+    if not path.exists(path.join(outdir, "segments")):
+        os.makedirs(path.join(outdir, "segments"))
+    logger.info("Writing out segments.")
     segments = _getSegments(mol)
-    wateratoms = mol.atomselect('water')
+    wateratoms = mol.atomselect("water")
     for seg in segments:
-        pdbname = 'segment' + seg + '.pdb'
+        pdbname = "segment" + seg + ".pdb"
         segatoms = mol.segid == seg
-        mol.write(path.join(outdir, 'segments', pdbname), sel=segatoms)
+        mol.write(path.join(outdir, "segments", pdbname), sel=segatoms)
 
         segwater = wateratoms & segatoms
-        f.write('segment ' + seg + ' {\n')
-        if np.all(segatoms == segwater):  # If segment only contains waters, set: auto none
-            f.write('\tauto none\n')
-        f.write('\tpdb ' + path.join('segments', pdbname) + '\n')
+        f.write("segment " + seg + " {\n")
+        if np.all(
+            segatoms == segwater
+        ):  # If segment only contains waters, set: auto none
+            f.write("\tauto none\n")
+        f.write("\tpdb " + path.join("segments", pdbname) + "\n")
         if caps is not None and seg in caps:
             for c in caps[seg]:
-                f.write('\t' + c + '\n')
-        f.write('}\n')
-        f.write('coordpdb ' + path.join('segments', pdbname) + ' ' + seg + '\n\n')
+                f.write("\t" + c + "\n")
+        f.write("}\n")
+        f.write("coordpdb " + path.join("segments", pdbname) + " " + seg + "\n\n")
 
     # Printing out patches for the disulfide bridges
     # TODO: Remove this once we deprecate the class
     from htmd.builder.builder import DisulfideBridge
     from moleculekit.molecule import UniqueResidueID
-    if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0], DisulfideBridge):
+
+    if (
+        disulfide is not None
+        and len(disulfide) != 0
+        and isinstance(disulfide[0], DisulfideBridge)
+    ):
         newdisu = []
         for d in disulfide:
-            r1 = UniqueResidueID.fromMolecule(mol, 'resid {} and segname {}'.format(d.resid1, d.segid1))
-            r2 = UniqueResidueID.fromMolecule(mol, 'resid {} and segname {}'.format(d.resid2, d.segid2))
+            r1 = UniqueResidueID.fromMolecule(
+                mol, "resid {} and segname {}".format(d.resid1, d.segid1)
+            )
+            r2 = UniqueResidueID.fromMolecule(
+                mol, "resid {} and segname {}".format(d.resid2, d.segid2)
+            )
             newdisu.append([r1, r2])
         disulfide = newdisu
     # TODO: Remove up to here ----------------------
 
-    if disulfide is not None and len(disulfide) != 0 and isinstance(disulfide[0][0], str):
+    if (
+        disulfide is not None
+        and len(disulfide) != 0
+        and isinstance(disulfide[0][0], str)
+    ):
         disulfide = convertDisulfide(mol, disulfide)
 
     if disulfide is None:
@@ -284,10 +346,10 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
 
     if len(disulfide) != 0:
         for d in disulfide:
-            str0 = '{}:{}{}'.format(d[0].segid, d[0].resid, d[0].insertion)
-            str1 = '{}:{}{}'.format(d[1].segid, d[1].resid, d[1].insertion)
-            f.write('patch DISU {} {}\n'.format(str0, str1))
-        f.write('\n')
+            str0 = "{}:{}{}".format(d[0].segid, d[0].resid, d[0].insertion)
+            str1 = "{}:{}{}".format(d[1].segid, d[1].resid, d[1].insertion)
+            f.write("patch DISU {} {}\n".format(str0, str1))
+        f.write("\n")
 
     noregenpatches = [p for p in allpatches if p.split()[1] in noregen]
     regenpatches = [p for p in allpatches if p.split()[1] not in noregen]
@@ -295,88 +357,124 @@ def build(mol, topo=None, param=None, stream=None, prefix='structure', outdir='.
     # Printing regenerable patches
     if len(regenpatches) != 0:
         for p in regenpatches:
-            f.write(p + '\n')
-        f.write('\n')
+            f.write(p + "\n")
+        f.write("\n")
 
     # Regenerate angles and dihedrals
     if regenerate is not None:
-        f.write('regenerate {}\n'.format(' '.join(regenerate)))
-        f.write('\n')
+        f.write("regenerate {}\n".format(" ".join(regenerate)))
+        f.write("\n")
 
     # Printing non-regenerable patches
     if len(noregenpatches) != 0:
         for p in noregenpatches:
-            f.write(p + '\n')
-        f.write('\n')
+            f.write(p + "\n")
+        f.write("\n")
 
-    f.write('guesscoord\n')
-    f.write('writepsf ' + prefix + '.psf\n')
-    f.write('writepdb ' + prefix + '.pdb\n')
-    #f.write('quit\n')
+    f.write("guesscoord\n")
+    f.write("writepsf " + prefix + ".psf\n")
+    f.write("writepdb " + prefix + ".pdb\n")
+    # f.write('quit\n')
     f.close()
 
     if allparam is not None:
-        combine(allparam, path.join(outdir, 'parameters'))
+        combine(allparam, path.join(outdir, "parameters"))
 
     molbuilt = None
     if execute:
-        logpath = os.path.abspath('{}/log.txt'.format(outdir))
-        logger.info('Starting the build.')
+        logpath = os.path.abspath("{}/log.txt".format(outdir))
+        logger.info("Starting the build.")
         currdir = os.getcwd()
         os.chdir(outdir)
-        f = open(logpath, 'w')
-        #call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
+        f = open(logpath, "w")
+        # call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
         my_env = os.environ.copy()
-        my_env['LC_ALL'] = 'C'
-        call([psfgen, './build.vmd'], stdout=f, stderr=f, env=my_env)
+        my_env["LC_ALL"] = "C"
+        call([psfgen, "./build.vmd"], stdout=f, stderr=f, env=my_env)
         f.close()
         errors = _logParser(logpath)
         os.chdir(currdir)
         if errors:
-            raise BuildError(errors + ['Check {} for further information on errors in building.'.format(logpath)])
-        logger.info('Finished building.')
+            raise BuildError(
+                errors
+                + [
+                    "Check {} for further information on errors in building.".format(
+                        logpath
+                    )
+                ]
+            )
+        logger.info("Finished building.")
 
-        if path.isfile(path.join(outdir, 'structure.pdb')) and path.isfile(path.join(outdir, 'structure.psf')):
-            molbuilt = Molecule(path.join(outdir, 'structure.pdb'))
-            molbuilt.read(path.join(outdir, 'structure.psf'))
+        if path.isfile(path.join(outdir, "structure.pdb")) and path.isfile(
+            path.join(outdir, "structure.psf")
+        ):
+            molbuilt = Molecule(path.join(outdir, "structure.pdb"))
+            molbuilt.read(path.join(outdir, "structure.psf"))
         else:
-            raise BuildError('No structure pdb/psf file was generated. Check {} for errors in building.'.format(logpath))
+            raise BuildError(
+                "No structure pdb/psf file was generated. Check {} for errors in building.".format(
+                    logpath
+                )
+            )
 
         if ionize:
-            os.makedirs(path.join(outdir, 'pre-ionize'))
-            data = glob(path.join(outdir, '*'))
+            os.makedirs(path.join(outdir, "pre-ionize"))
+            data = glob(path.join(outdir, "*"))
             for f in data:
-                shutil.move(f, path.join(outdir, 'pre-ionize'))
+                shutil.move(f, path.join(outdir, "pre-ionize"))
             totalcharge = np.sum(molbuilt.charge)
-            nwater = np.sum(molbuilt.atomselect('water and noh'))
-            anion, cation, anionatom, cationatom, nanion, ncation = ionizef(totalcharge, nwater, saltconc=saltconc,
-                                                                            anion=saltanion, cation=saltcation)
-            newmol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
+            nwater = np.sum(molbuilt.atomselect("water and noh"))
+            anion, cation, anionatom, cationatom, nanion, ncation = ionizef(
+                totalcharge,
+                nwater,
+                saltconc=saltconc,
+                anion=saltanion,
+                cation=saltcation,
+            )
+            newmol = ionizePlace(
+                mol, anion, cation, anionatom, cationatom, nanion, ncation
+            )
             # Redo the whole build but now with ions included
-            return build(newmol, topo=alltopo, param=allparam, stream=[], prefix=prefix, outdir=outdir, ionize=False,
-                         caps=caps, execute=execute, saltconc=saltconc, disulfide=disulfide, regenerate=regenerate, patches=patches,
-                         noregen=noregen, aliasresidues=aliasresidues, psfgen=psfgen, _clean=False)
+            return build(
+                newmol,
+                topo=alltopo,
+                param=allparam,
+                stream=[],
+                prefix=prefix,
+                outdir=outdir,
+                ionize=False,
+                caps=caps,
+                execute=execute,
+                saltconc=saltconc,
+                disulfide=disulfide,
+                regenerate=regenerate,
+                patches=patches,
+                noregen=noregen,
+                aliasresidues=aliasresidues,
+                psfgen=psfgen,
+                _clean=False,
+            )
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
-    detectCisPeptideBonds(molbuilt) # Warn in case of cis bonds
+    detectCisPeptideBonds(molbuilt)  # Warn in case of cis bonds
     return molbuilt
 
 
 def _cleanOutDir(outdir):
     from glob import glob
-    files = glob(os.path.join(outdir, 'structure.*'))
-    files += glob(os.path.join(outdir, 'log.*'))
-    files += glob(os.path.join(outdir, '*.log'))
-    files += glob(os.path.join(outdir, '*.vmd'))
-    files += glob(os.path.join(outdir, 'parameters'))
+
+    files = glob(os.path.join(outdir, "structure.*"))
+    files += glob(os.path.join(outdir, "log.*"))
+    files += glob(os.path.join(outdir, "*.log"))
+    files += glob(os.path.join(outdir, "*.vmd"))
+    files += glob(os.path.join(outdir, "parameters"))
     for f in files:
         os.remove(f)
-    folders = glob(os.path.join(outdir, 'segments'))
-    folders += glob(os.path.join(outdir, 'topologies'))
-    folders += glob(os.path.join(outdir, 'pre-ionize'))
+    folders = glob(os.path.join(outdir, "segments"))
+    folders += glob(os.path.join(outdir, "topologies"))
+    folders += glob(os.path.join(outdir, "pre-ionize"))
     for f in folders:
         shutil.rmtree(f)
-
 
 
 def _getSegments(mol):
@@ -387,7 +485,7 @@ def _getSegments(mol):
 
 
 def _printAliases(f):
-    lines = '''
+    lines = """
         # Aliases
         pdbalias residue G GUA
         pdbalias residue C CYT
@@ -432,6 +530,8 @@ def _printAliases(f):
         pdbalias residue CA CAL
         pdbalias atom CA CA CAL
         pdbalias residue ZN ZN2
+        pdbalias residue FE2 Fe2p
+        pdbalias atom Fe2p FE Fe2p 
 
         # Other aliases
         pdbalias atom LYS 1HZ HZ1
@@ -534,38 +634,40 @@ def _printAliases(f):
         pdbalias residue FUC AFUC
         pdbalias residue FUL BFUC
 
-    '''
+    """
     f.write(textwrap.dedent(lines))
-    f.write('\n\n')
+    f.write("\n\n")
 
 
 def _defaultCaps(mol):
     # neutral for protein, nothing for any other segment
     # of course this might not be ideal for protein which require charged terminals
-    prot = mol.atomselect('protein')
+    prot = mol.atomselect("protein")
     segsProt = np.unique(mol.segid[prot])
     segsNonProt = np.unique(mol.segid[~prot])
     caps = dict()
     for s in segsProt:
         if len(np.unique(mol.resid[mol.segid == s])) < 10:
-            logger.warning('Segment {} consists of a peptide with less than 10 residues. It will not be capped by '
-                           'default. If you want to cap it use the caps argument of charmm.build to manually define '
-                           'caps for all segments'.format(s))
+            logger.warning(
+                "Segment {} consists of a peptide with less than 10 residues. It will not be capped by "
+                "default. If you want to cap it use the caps argument of charmm.build to manually define "
+                "caps for all segments".format(s)
+            )
             continue
         nter, cter = _removeCappedResidues(mol, s)
-        caps[s] = ['first {}'.format(nter), 'last {}'.format(cter)]
+        caps[s] = ["first {}".format(nter), "last {}".format(cter)]
     for s in segsNonProt:
-        caps[s] = ['first none', 'last none']
+        caps[s] = ["first none", "last none"]
     return caps
 
 
 def _removeCappedResidues(mol, seg):
     # Default caps for charmm
-    nter = 'ACE'
-    cter = 'CT3'
+    nter = "ACE"
+    cter = "CT3"
 
     # Mapping from various residue caps to charmm patches
-    '''
+    """
     CHARMM patches:
     # N-terminus patches
     NTER         1.00 ! standard N-terminus
@@ -583,10 +685,10 @@ def _removeCappedResidues(mol, seg):
     CT1          0.00 ! methylated C-terminus from methyl acetate
     CT2          0.00 ! amidated C-terminus
     CT3          0.00 ! N-Methylamide C-terminus
-    '''
+    """
 
-    ntercaps = {'ACE': 'ACE'}
-    ctercaps = {'NMA': 'CT3'}
+    ntercaps = {"ACE": "ACE"}
+    ctercaps = {"NMA": "CT3"}
 
     # If caps already exist, remove them and convert them to charmm caps
     for n in ntercaps:
@@ -606,43 +708,59 @@ def _removeCappedResidues(mol, seg):
 
 # Mapping Maestro protonated residue names to CHARMM patches
 def _protonationPatches(mol):
-    protonations = {'GLH': 'GLUP', 'ASH': 'ASPP', 'LYN': 'LSN', 'AR0': 'RN1', 'CYM': 'CYSD'}
+    protonations = {
+        "GLH": "GLUP",
+        "ASH": "ASPP",
+        "LYN": "LSN",
+        "AR0": "RN1",
+        "CYM": "CYSD",
+    }
     aliases = {}  # Some protonations don't exist in CHARMM
     # TODO: Remember to alias all of them before applying patches
     patches = []
 
     for pro in sorted(protonations.keys()):
-        sel = (mol.resname == pro) & (mol.name == 'CA')
+        sel = (mol.resname == pro) & (mol.name == "CA")
         pseg = mol.segid[sel]
         pres = mol.resid[sel]
         if len(pseg) == 0:
             continue
         for r in range(len(pseg)):
-            #from IPython.core.debugger import Tracer
-            #Tracer()()
-            patch = 'patch {} {}:{}'.format(protonations[pro], pseg[r], pres[r])
+            # from IPython.core.debugger import Tracer
+            # Tracer()()
+            patch = "patch {} {}:{}".format(protonations[pro], pseg[r], pres[r])
             patches.append(patch)
 
-    '''for pro in aliases:
+    """for pro in aliases:
         sel = mol.atomselect('resname {}'.format(pro))
         if np.sum(sel) != 0:
             logger.warning('Found resname {}. This protonation state does not exist in CHARMM '
                            'and will be reverted to {}.'.format(pro, aliases[pro]))
-            mol.set('resname', aliases[pro], sel=sel)'''
+            mol.set('resname', aliases[pro], sel=sel)"""
     for pro in aliases:
         sel = mol.resname == pro
         if np.any(sel):
-            raise RuntimeError('Found resname {}. This protonation state does not exist in CHARMM. Cannot build.')
+            raise RuntimeError(
+                "Found resname {}. This protonation state does not exist in CHARMM. Cannot build."
+            )
 
     return patches
 
 
 # Recover protonation states of residues after building (CHARMM renames protonated residues to standard names)
 def _recoverProtonations(mol):
-    mol.set('resname', 'ASH', sel='same residue as (resname ASP and name HD2)')
-    mol.set('resname', 'GLH', sel='same residue as (resname GLU and name HE2)')
-    mol.set('resname', 'LYN', sel='resname LYS and not (same residue as (resname LYS and name HZ3))')  # The LYN patch removes the HZ3 proton
-    mol.set('resname', 'AR0', sel='resname ARG and not (same residue as (resname ARG and name HE))')   # The AR0 patch removes the HE proton
+    mol.set("resname", "ASH", sel="same residue as (resname ASP and name HD2)")
+    mol.set("resname", "GLH", sel="same residue as (resname GLU and name HE2)")
+    mol.set(
+        "resname",
+        "LYN",
+        sel="resname LYS and not (same residue as (resname LYS and name HZ3))",
+    )  # The LYN patch removes the HZ3 proton
+    mol.set(
+        "resname",
+        "AR0",
+        sel="resname ARG and not (same residue as (resname ARG and name HE))",
+    )  # The AR0 patch removes the HE proton
     # Histidine protonations keep their names in CHARMM. No need to rename them
 
 
@@ -659,113 +777,166 @@ def combine(prmlist, outfile):
 
     """
     # Process parameter files
-    prm_list = ["!COMMENTS\n", "!ATOMS\n", "BONDS\n", "ANGLES\n", "DIHEDRALS\n", "IMPROPER\n", "CMAP\n", "NONBONDED\n", "NBFIX\n", "HBOND\n"]
+    prm_list = [
+        "!COMMENTS\n",
+        "!ATOMS\n",
+        "BONDS\n",
+        "ANGLES\n",
+        "DIHEDRALS\n",
+        "IMPROPER\n",
+        "CMAP\n",
+        "NONBONDED\n",
+        "NBFIX\n",
+        "HBOND\n",
+    ]
 
     charmmdir = htmdCharmmHome()
     for myfile in prmlist:
-        if myfile[0] != '.' and path.isfile(path.join(charmmdir, myfile)):
+        if myfile[0] != "." and path.isfile(path.join(charmmdir, myfile)):
             myfile = path.join(charmmdir, myfile)
         if not path.isfile(myfile):
-            raise FileNotFoundError(myfile + ' file does not exist. Cannot create combined parameter file.')
+            raise FileNotFoundError(
+                myfile + " file does not exist. Cannot create combined parameter file."
+            )
         fn = os.path.basename(myfile)
         with open(myfile, "r") as fh:
             context = 0
             for line in fh:
-                if re.search(r'^ATOMS', line):
+                if re.search(r"^ATOMS", line):
                     context = 1
                     prm_list[context] += _sec_name(fn)
-                elif re.search(r'^BOND', line):
+                elif re.search(r"^BOND", line):
                     context = 2
                     prm_list[context] += _sec_name(fn)
-                elif re.search(r'^ANGL', line):
+                elif re.search(r"^ANGL", line):
                     context = 3
                     prm_list[context] += _sec_name(fn)
-                elif re.search(r'^DIHE', line) or re.search(r'^THET', line):
+                elif re.search(r"^DIHE", line) or re.search(r"^THET", line):
                     context = 4
                     prm_list[context] += _sec_name(fn)
-                elif re.search(r'^IMPR', line) or re.search(r'^IMPH', line):
+                elif re.search(r"^IMPR", line) or re.search(r"^IMPH", line):
                     context = 5
                     prm_list[context] += _sec_name(fn)
-                elif re.search(r'^CMAP', line) or re.search(r'^NBON', line):
+                elif re.search(r"^CMAP", line) or re.search(r"^NBON", line):
                     context = 6
                     prm_list[context] += _sec_name(fn)
-                elif re.search(r'^NONB', line):
+                elif re.search(r"^NONB", line):
                     context = 7
                     prm_list[context] += _sec_name(fn)
-                elif re.search(r'^NBFI', line):
+                elif re.search(r"^NBFI", line):
                     context = 8
                     prm_list[context] += _sec_name(fn)
-                elif re.search(r'^HBON', line):
+                elif re.search(r"^HBON", line):
                     context = 9
                     prm_list[context] += _sec_name(fn)
                 else:
-                    if context == 0: # COMMENTS
-                        if re.search(r'^\s*\!+',line,re.I) or re.search(r'^\s*\*+',line,re.I):
+                    if context == 0:  # COMMENTS
+                        if re.search(r"^\s*\!+", line, re.I) or re.search(
+                            r"^\s*\*+", line, re.I
+                        ):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 1: # ATOMS
-                        if re.search(r'^\s*\!+',line,re.I):
+                            prm_list[context] += "!" + line
+                    elif context == 1:  # ATOMS
+                        if re.search(r"^\s*\!+", line, re.I):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 2: # BONDS
-                        if re.search(r'^\s*\!+',line) or \
-                        re.search(r'^\s*$',line) or \
-                        re.search(r'^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+',line):
+                            prm_list[context] += "!" + line
+                    elif context == 2:  # BONDS
+                        if (
+                            re.search(r"^\s*\!+", line)
+                            or re.search(r"^\s*$", line)
+                            or re.search(
+                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
+                                line,
+                            )
+                        ):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 3: # ANGLES
-                        if re.search(r'^\s*\!+',line,re.I) or \
-                        re.search(r'^\s*$',line) or \
-                        re.search(r'^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+',line):
+                            prm_list[context] += "!" + line
+                    elif context == 3:  # ANGLES
+                        if (
+                            re.search(r"^\s*\!+", line, re.I)
+                            or re.search(r"^\s*$", line)
+                            or re.search(
+                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
+                                line,
+                            )
+                        ):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 4: # DIHEDRALS
-                        if re.search(r'^\s*\!+',line,re.I) or \
-                        re.search(r'^\s*$',line) or \
-                        re.search(r'^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+',line):
+                            prm_list[context] += "!" + line
+                    elif context == 4:  # DIHEDRALS
+                        if (
+                            re.search(r"^\s*\!+", line, re.I)
+                            or re.search(r"^\s*$", line)
+                            or re.search(
+                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
+                                line,
+                            )
+                        ):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 5: # IMPROPER
-                        if re.search(r'^\s*\!+',line,re.I) or \
-                        re.search(r'^\s*$',line) or \
-                        re.search(r'^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+',line):
+                            prm_list[context] += "!" + line
+                    elif context == 5:  # IMPROPER
+                        if (
+                            re.search(r"^\s*\!+", line, re.I)
+                            or re.search(r"^\s*$", line)
+                            or re.search(
+                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
+                                line,
+                            )
+                        ):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 6: # CMAP
-                        if re.search(r'^\s*\!+',line,re.I) or \
-                        re.search(r'^\s*$',line) or \
-                        re.search(r'^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+',line) or \
-                        re.search(r'^\s*[0-9\.-]+\s+[0-9\.-]+\s+[0-9\.-]+\s+[0-9\.-]+\s+',line):
+                            prm_list[context] += "!" + line
+                    elif context == 6:  # CMAP
+                        if (
+                            re.search(r"^\s*\!+", line, re.I)
+                            or re.search(r"^\s*$", line)
+                            or re.search(
+                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+",
+                                line,
+                            )
+                            or re.search(
+                                r"^\s*[0-9\.-]+\s+[0-9\.-]+\s+[0-9\.-]+\s+[0-9\.-]+\s+",
+                                line,
+                            )
+                        ):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 7: # NONBONDED
-                        if re.search(r'^\s*\!+',line,re.I) or \
-                        re.search(r'^\s*$',line) or \
-                        re.search(r'^\s*[_A-Z0-9a-z\.]+\s+[0-9\.\-]+\s+[0-9\.\-]+\s+',line):
+                            prm_list[context] += "!" + line
+                    elif context == 7:  # NONBONDED
+                        if (
+                            re.search(r"^\s*\!+", line, re.I)
+                            or re.search(r"^\s*$", line)
+                            or re.search(
+                                r"^\s*[_A-Z0-9a-z\.]+\s+[0-9\.\-]+\s+[0-9\.\-]+\s+",
+                                line,
+                            )
+                        ):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 8: # NBFIX
-                        if re.search(r'^\s*\!+',line,re.I) or \
-                        re.search(r'^\s*$',line) or \
-                        re.search(r'^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+',line):
+                            prm_list[context] += "!" + line
+                    elif context == 8:  # NBFIX
+                        if (
+                            re.search(r"^\s*\!+", line, re.I)
+                            or re.search(r"^\s*$", line)
+                            or re.search(
+                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
+                                line,
+                            )
+                        ):
                             prm_list[context] += line
                         else:
-                            prm_list[context] += "!"+line
-                    elif context == 9: # HBOND
-                        if not re.search(r'^END',line,re.I):
+                            prm_list[context] += "!" + line
+                    elif context == 9:  # HBOND
+                        if not re.search(r"^END", line, re.I):
                             prm_list[context] += line
                     else:
                         continue
 
-    prm = ''.join(map(str, prm_list))+"END"
+    prm = "".join(map(str, prm_list)) + "END"
     prmfh = open(outfile, "w")
     prmfh.write(prm)
     prmfh.close()
@@ -784,59 +955,68 @@ def split(filename, outdir):
     filename : str
         Stream file name
     """
-    regex = re.compile('^(toppar_)?(.*)\.str$')
+    regex = re.compile("^(toppar_)?(.*)\.str$")
     base = os.path.basename(os.path.normpath(filename))
     base = regex.findall(base)[0][1]
-    outrtf = os.path.join(outdir, 'top_{}.rtf'.format(base))
-    outprm = os.path.join(outdir, 'par_{}.prm'.format(base))
+    outrtf = os.path.join(outdir, "top_{}.rtf".format(base))
+    outprm = os.path.join(outdir, "par_{}.prm".format(base))
 
-    startrtf = re.compile('^read rtf card', flags=re.IGNORECASE)
-    startprm = re.compile('^read para\w* card', flags=re.IGNORECASE)
-    endsection = re.compile('^end', flags=re.IGNORECASE)
+    startrtf = re.compile("^read rtf card", flags=re.IGNORECASE)
+    startprm = re.compile("^read para\w* card", flags=re.IGNORECASE)
+    endsection = re.compile("^end", flags=re.IGNORECASE)
 
     rtfsection = 0
     prmsection = 0
-    section = 'junk'
+    section = "junk"
 
-    rtfstr = ''
-    prmstr = ''
+    rtfstr = ""
+    prmstr = ""
 
-    f = open(filename, 'r')
+    f = open(filename, "r")
     for line in f:
         if startrtf.match(line):
             rtfsection += 1
             if rtfsection > 1:
-                rtfstr += '! WARNING -- ANOTHER rtf SECTION FOUND\n'
-            section = 'rtf'
+                rtfstr += "! WARNING -- ANOTHER rtf SECTION FOUND\n"
+            section = "rtf"
         elif startprm.match(line):
             prmsection += 1
             if prmsection > 1:
-                prmstr += '! WARNING -- ANOTHER para SECTION FOUND\n'
-            section = 'prm'
+                prmstr += "! WARNING -- ANOTHER para SECTION FOUND\n"
+            section = "prm"
         elif endsection.match(line):
-            section = 'junk'
-        elif section == 'rtf':
+            section = "junk"
+        elif section == "rtf":
             rtfstr += line
-        elif section == 'prm':
+        elif section == "prm":
             prmstr += line
     f.close()
 
     if rtfsection > 1:
-        raise BuildError('Multiple ({}) rtf topology sections found in {} stream file.'.format(rtfsection, filename))
+        raise BuildError(
+            "Multiple ({}) rtf topology sections found in {} stream file.".format(
+                rtfsection, filename
+            )
+        )
     if prmsection > 1:
-        raise BuildError('Multiple ({}) prm parameter sections found in {} stream file.'.format(prmsection, filename))
+        raise BuildError(
+            "Multiple ({}) prm parameter sections found in {} stream file.".format(
+                prmsection, filename
+            )
+        )
 
-    f = open(outrtf, 'w')
-    f.write(rtfstr + 'END\n')
+    f = open(outrtf, "w")
+    f.write(rtfstr + "END\n")
     f.close()
-    f = open(outprm, 'w')
-    f.write(prmstr + 'END\n')
+    f = open(outprm, "w")
+    f.write(prmstr + "END\n")
     f.close()
     return outrtf, outprm
 
 
 def _prepareStream(filename):
     from htmd.util import tempname
+
     tmpout = tempname()
     os.makedirs(tmpout)
     return split(filename, tmpout)
@@ -844,18 +1024,19 @@ def _prepareStream(filename):
 
 def _logParser(fname):
     import re
-    unknownres_regex = re.compile('unknown residue type (\w+)')
-    failedcoor = re.compile('Warning: failed to set coordinate for atom')
-    failedangle = re.compile('Warning: failed to guess coordinate due to bad angle')
-    poorlycoor = re.compile('Warning: poorly guessed coordinate(s?)')
-    otherwarn = re.compile('Warning')
+
+    unknownres_regex = re.compile("unknown residue type (\w+)")
+    failedcoor = re.compile("Warning: failed to set coordinate for atom")
+    failedangle = re.compile("Warning: failed to guess coordinate due to bad angle")
+    poorlycoor = re.compile("Warning: poorly guessed coordinate(s?)")
+    otherwarn = re.compile("Warning")
 
     failedcoorcount = 0
     failedanglecount = 0
     poorlycoorcount = -1  # Discount the summary report message in the log
     otherwarncount = 0
     unknownres = []
-    with open(fname, 'r') as f:
+    with open(fname, "r") as f:
         for line in f:
             if failedcoor.search(line):
                 failedcoorcount += 1
@@ -872,22 +1053,38 @@ def _logParser(fname):
     errors = []
     if failedcoorcount > 0:
         warnings = True
-        logger.warning('Failed to set coordinates for {} atoms.'.format(failedcoorcount))
+        logger.warning(
+            "Failed to set coordinates for {} atoms.".format(failedcoorcount)
+        )
     if failedanglecount > 0:
         warnings = True
-        logger.warning('Failed to guess coordinates for {} atoms due to bad angles.'.format(failedanglecount))
+        logger.warning(
+            "Failed to guess coordinates for {} atoms due to bad angles.".format(
+                failedanglecount
+            )
+        )
     if poorlycoorcount > 0:
         warnings = True
-        logger.warning('Poorly guessed coordinates for {} atoms.'.format(poorlycoorcount))
+        logger.warning(
+            "Poorly guessed coordinates for {} atoms.".format(poorlycoorcount)
+        )
     if otherwarncount > 0:
         warnings = True
-        logger.warning('{} undefined warnings were produced during building.'.format(otherwarncount))
+        logger.warning(
+            "{} undefined warnings were produced during building.".format(
+                otherwarncount
+            )
+        )
     if len(unknownres):
-        errors.append(UnknownResidueError('Unknown residue(s) {} found in the input structure. '
-                                          'You are either missing a topology definition for the residue or you need to '
-                                          'rename it to the correct residue name'.format(np.unique(unknownres))))
+        errors.append(
+            UnknownResidueError(
+                "Unknown residue(s) {} found in the input structure. "
+                "You are either missing a topology definition for the residue or you need to "
+                "rename it to the correct residue name".format(np.unique(unknownres))
+            )
+        )
     if warnings:
-        logger.warning('Please check {} for further information.'.format(fname))
+        logger.warning("Please check {} for further information.".format(fname))
 
     return errors
 
@@ -897,8 +1094,10 @@ def _checkFailedAtoms(mol):
         return
     idx = np.where(np.sum(mol.coords == 0, axis=1) == 3)[0]
     if len(idx) != 0:
-        logger.critical('Atoms with indexes {} are positioned at [0,0,0]. This can cause simulations to crash. '
-                        'Check log file for more details.'.format(idx))
+        logger.critical(
+            "Atoms with indexes {} are positioned at [0,0,0]. This can cause simulations to crash. "
+            "Check log file for more details.".format(idx)
+        )
 
 
 class _TestCharmmBuild(TestCase):
@@ -912,24 +1111,26 @@ class _TestCharmmBuild(TestCase):
 
         # Use pre-prepared files so we can tell whether the error is in prepare or in build
         # Inputs are reference outputs of proteinprepare.
-        preparedInputDir = home(dataDir='test-proteinprepare')
+        preparedInputDir = home(dataDir="test-proteinprepare")
 
-        pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
+        pdbids = ["3PTB", "1A25", "1GZM", "1U5U"]
         for pdb in pdbids:
             with self.subTest(pdb=pdb):
-                print('Building {}'.format(pdb))
-                inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
+                print("Building {}".format(pdb))
+                inFile = os.path.join(
+                    preparedInputDir, pdb, "{}-prepared.pdb".format(pdb)
+                )
                 mol = Molecule(inFile)
-                mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+                mol.filter("protein")  # Fix for bad proteinPrepare hydrogen placing
 
                 np.random.seed(1)  # Needed for ions
                 smol = solvate(mol)
-                topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-                params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
+                topos = ["top/top_all36_prot.rtf", "top/top_water_ions.rtf"]
+                params = ["par/par_all36_prot.prm", "par/par_water_ions.prm"]
                 tmpdir = tempname()
                 _ = build(smol, topo=topos, param=params, outdir=tmpdir)
 
-                compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
+                compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
                 assertSameAsReferenceDir(compareDir, tmpdir)
 
                 # shutil.rmtree(tmpdir)
@@ -944,31 +1145,38 @@ class _TestCharmmBuild(TestCase):
 
         # Use pre-prepared files so we can tell whether the error is in prepare or in build
         # Inputs are reference outputs of proteinprepare.
-        preparedInputDir = home(dataDir='test-proteinprepare')
+        preparedInputDir = home(dataDir="test-proteinprepare")
 
-        pdb = '1GZM'
+        pdb = "1GZM"
         inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
         mol = Molecule(inFile)
-        mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+        mol.filter("protein")  # Fix for bad proteinPrepare hydrogen placing
 
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
-        topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-        params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
-        disu = [['segid 1 and resid 110', 'segid 1 and resid 187'], ['segid 0 and resid 110', 'segid 0 and resid 187']]
+        topos = ["top/top_all36_prot.rtf", "top/top_water_ions.rtf"]
+        params = ["par/par_all36_prot.prm", "par/par_water_ions.prm"]
+        disu = [
+            ["segid 1 and resid 110", "segid 1 and resid 187"],
+            ["segid 0 and resid 110", "segid 0 and resid 187"],
+        ]
         tmpdir = tempname()
         _ = build(smol, topo=topos, param=params, outdir=tmpdir, disulfide=disu)
 
-        compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
+        compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
 
         # TODO: Remove this after deprecation
         from htmd.builder.builder import DisulfideBridge
+
         np.random.seed(1)  # Needed for ions
-        disu = [DisulfideBridge('1', 110, '1', 187), DisulfideBridge('0', 110, '0', 187)]
+        disu = [
+            DisulfideBridge("1", 110, "1", 187),
+            DisulfideBridge("0", 110, "0", 187),
+        ]
         tmpdir = tempname()
         _ = build(smol, topo=topos, param=params, outdir=tmpdir, disulfide=disu)
-        compareDir = home(dataDir=os.path.join('test-charmm-build', pdb))
+        compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
         # TODO: Remove up to here -----------
 
@@ -982,30 +1190,35 @@ class _TestCharmmBuild(TestCase):
 
         # Use pre-prepared files so we can tell whether the error is in prepare or in build
         # Inputs are reference outputs of proteinprepare.
-        preparedInputDir = home(dataDir='test-proteinprepare')
+        preparedInputDir = home(dataDir="test-proteinprepare")
 
-        pdb = '3PTB'
+        pdb = "3PTB"
 
-        print('Building {}'.format(pdb))
+        print("Building {}".format(pdb))
         inFile = os.path.join(preparedInputDir, pdb, "{}-prepared.pdb".format(pdb))
         mol = Molecule(inFile)
-        mol.filter('protein')  # Fix for bad proteinPrepare hydrogen placing
+        mol.filter("protein")  # Fix for bad proteinPrepare hydrogen placing
 
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
-        topos = ['top/top_all36_prot.rtf', 'top/top_water_ions.rtf']
-        params = ['par/par_all36_prot.prm', 'par/par_water_ions.prm']
+        topos = ["top/top_all36_prot.rtf", "top/top_water_ions.rtf"]
+        params = ["par/par_all36_prot.prm", "par/par_water_ions.prm"]
 
-        smol.insertion[smol.resid == 42] = 'A'  # Adding an insertion to test that disulfide bonds with insertions work
+        smol.insertion[
+            smol.resid == 42
+        ] = "A"  # Adding an insertion to test that disulfide bonds with insertions work
         tmpdir = tempname()
         _ = build(smol, topo=topos, param=params, outdir=tmpdir)
-        compareDir = home(dataDir=os.path.join('test-charmm-build', '3PTB_insertion'))
+        compareDir = home(dataDir=os.path.join("test-charmm-build", "3PTB_insertion"))
         assertSameAsReferenceDir(compareDir, tmpdir)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import unittest
+
     unittest.main()
 
     import doctest
+
     doctest.testmod()
 
