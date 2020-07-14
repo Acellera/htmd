@@ -26,8 +26,6 @@ export BUGFIX
 export MINOR_VERSION="${MAJOR}.${MINOR}"
 export BUGFIX_VERSION="${MAJOR}.${MINOR}.${BUGFIX}"
 
-conda build package/htmd-meta --no-include-recipe
-
 export CHANNEL=acellera
 echo "Uploading to channel: $CHANNEL ; PACKAGE: $PACKAGE_NAME (based on $TRAVIS_BRANCH version $MAJOR.$MINOR.$BUGFIX)"
 
