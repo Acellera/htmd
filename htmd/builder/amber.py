@@ -1094,8 +1094,6 @@ class _TestAmberBuild(unittest.TestCase):
 
     def testProteinLigand(self):
         from htmd.builder.solvate import solvate
-        from parameterize.parameterization.fftype import fftype
-        from parameterize.parameterization.writers import writeFRCMOD
 
         # Test protein ligand building with parametrized ligand
         refdir = home(dataDir=join("test-amber-build", "protLig"))
@@ -1103,11 +1101,7 @@ class _TestAmberBuild(unittest.TestCase):
         os.makedirs(tmpdir)
 
         mol = Molecule(join(refdir, "3ptb_mod.pdb"))
-        lig = Molecule(
-            join(refdir, "benzamidine.pdb"), guess=("bonds", "angles", "dihedrals")
-        )
-        prm, lig = fftype(lig, method="GAFF2")
-        writeFRCMOD(lig, prm, join(tmpdir, "mol.frcmod"))
+        lig = Molecule(join(refdir, "benzamidine.mol2"))
         lig.segid[:] = "L"
 
         # params =
@@ -1117,7 +1111,7 @@ class _TestAmberBuild(unittest.TestCase):
         smol = solvate(newmol)
 
         params = defaultParam() + [
-            join(tmpdir, "mol.frcmod"),
+            join(refdir, "benzamidine.frcmod"),
         ]
 
         _ = build(smol, outdir=tmpdir, param=params, ionize=False)
@@ -1220,3 +1214,4 @@ if __name__ == "__main__":
     unittest.main(verbosity=2)
     # if failure_count != 0:
     #     raise Exception('Doctests failed')
+
