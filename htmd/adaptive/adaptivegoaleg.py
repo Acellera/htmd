@@ -211,7 +211,6 @@ if __name__ == '__main__':
     from moleculekit.projections.metricdistance import MetricDistance
     from jobqueues.localqueue import LocalGPUQueue
     from moleculekit.molecule import Molecule
-    import os
     import shutil
     from htmd.util import tempname
     from joblib import delayed

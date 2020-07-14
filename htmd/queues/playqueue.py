@@ -125,7 +125,7 @@ class PlayQueue(SimQueue, ProtocolInterface):
                     raise ValueError('Unknown job status')
 
     def stop(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     @property
     def ncpu(self):

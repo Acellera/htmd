@@ -328,7 +328,7 @@ class TimestepValidator(Validator):
     def validate(self, value_list, basedir=None):
         if type(value_list) is not list and type(value_list) is not tuple:
             value_list = [value_list]
-        value = value_list[0]
+
         try:
             if len(value_list) == 1:
                 value = int(value_list[0])

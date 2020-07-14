@@ -309,7 +309,6 @@ if __name__ == '__main__':
     import htmd.home
     from moleculekit.molecule import Molecule
     from jobqueues.localqueue import LocalGPUQueue
-    import os
     import shutil
     from htmd.util import tempname
     from joblib import delayed

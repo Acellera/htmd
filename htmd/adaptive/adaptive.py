@@ -12,8 +12,7 @@ from os import makedirs
 import shutil
 from shutil import copytree, ignore_patterns
 import numpy as np
-from jobqueues.simqueue import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
-from joblib import Parallel, delayed
+from jobqueues.simqueue import RetrieveError, InProgressError, ProjectNotExistError
 from htmd.simlist import _simName
 from moleculekit.molecule import Molecule
 from protocolinterface import ProtocolInterface, val
@@ -118,7 +117,6 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
 
     def _setLock(self):
         import datetime
-        import os
 
         if self.lock:
             lockfile = os.path.abspath('./adaptivelock')
@@ -130,7 +128,6 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                 f.write('{}'.format(datetime.datetime.now()))
 
     def _unsetLock(self):
-        import os
         if self.lock:
             lockfile = os.path.abspath('./adaptivelock')
             if os.path.exists(lockfile):
@@ -198,6 +195,8 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
 
         from htmd.parallelprogress import ParallelExecutor
         from htmd.config import _config
+        from joblib import delayed
+
         aprun = ParallelExecutor(n_jobs=_config['njobs'])
         aprun(total=len(simsframes), desc='Writing inputs')(
             delayed(_writeInputsFunction)(i, f, epoch, self.inputpath, self.coorname) for i, f in enumerate(simsframes))
@@ -394,8 +393,6 @@ def _findprevioustraj(simlist, simname):
 if __name__ == "__main__":
     import htmd
     import os
-    import shutil
-    from jobqueues.localqueue import LocalGPUQueue
     from htmd.simlist import Frame, simlist
     from htmd.util import tempname
 

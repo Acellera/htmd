@@ -29,6 +29,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 from __future__ import absolute_import
+
 __author__ = "Peter Eastman"
 __version__ = "1.0"
 
@@ -54,7 +55,7 @@ class PDBReporter(object):
         """
         self._reportInterval = reportInterval
         self._enforcePeriodicBox = enforcePeriodicBox
-        self._out = open(file, 'w')
+        self._out = open(file, "w")
         self._topology = None
         self._nextModel = 0
 
@@ -74,7 +75,7 @@ class PDBReporter(object):
             that report will require positions, velocities, forces, and
             energies respectively.
         """
-        steps = self._reportInterval - simulation.currentStep%self._reportInterval
+        steps = self._reportInterval - simulation.currentStep % self._reportInterval
         return (steps, True, False, False, False)
 
     def report(self, simulation, _):
@@ -87,14 +88,18 @@ class PDBReporter(object):
         _ : State
             The current state of the simulation
         """
-        state = simulation.context.getState(getPositions=True, enforcePeriodicBox=self._enforcePeriodicBox)
+        state = simulation.context.getState(
+            getPositions=True, enforcePeriodicBox=self._enforcePeriodicBox
+        )
         if self._nextModel == 0:
             PDBFile.writeHeader(simulation.topology, self._out)
             self._topology = simulation.topology
             self._nextModel += 1
-        PDBFile.writeModel(simulation.topology, state.getPositions(), self._out, self._nextModel)
+        PDBFile.writeModel(
+            simulation.topology, state.getPositions(), self._out, self._nextModel
+        )
         self._nextModel += 1
-        if hasattr(self._out, 'flush') and callable(self._out.flush):
+        if hasattr(self._out, "flush") and callable(self._out.flush):
             self._out.flush()
 
     def __del__(self):
@@ -119,14 +124,19 @@ class PDBxReporter(PDBReporter):
         _ : State
             The current state of the simulation
         """
-        state = simulation.context.getState(getPositions=True, enforcePeriodicBox=self._enforcePeriodicBox)
+        state = simulation.context.getState(
+            getPositions=True, enforcePeriodicBox=self._enforcePeriodicBox
+        )
         if self._nextModel == 0:
             PDBxFile.writeHeader(simulation.topology, self._out)
             self._nextModel += 1
-        PDBxFile.writeModel(simulation.topology, state.getPositions(), self._out, self._nextModel)
+        PDBxFile.writeModel(
+            simulation.topology, state.getPositions(), self._out, self._nextModel
+        )
         self._nextModel += 1
-        if hasattr(self._out, 'flush') and callable(self._out.flush):
+        if hasattr(self._out, "flush") and callable(self._out.flush):
             self._out.flush()
 
     def __del__(self):
         self._out.close()
+        PDBReporter.__del__(self)
