@@ -33,8 +33,6 @@ class Equilibration(ProtocolInterface):
             A list of restraint objects. See :class:`AtomRestraint <htmd.mdengine.acemd.acemd.AtomRestraint>` and:class:`GroupRestraint<htmd.mdengine.acemd.acemd.GroupRestraint>`)
         useconstantratio : bool, default=False
             For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
-        nvtsteps : int, default=500
-            Number of initial steps to apply NVT in units of 4fs.
         restraintsteps : int, default=None
             Number of initial steps to apply restraints in units of 4fs. Defaults to half the simulation time.
 
@@ -95,13 +93,6 @@ class Equilibration(ProtocolInterface):
             "does not modify the xy aspect ratio.",
             False,
             val.Boolean(),
-        )
-        self._arg(
-            "nvtsteps",
-            "int",
-            "Number of initial steps to apply NVT in units of 4fs.",
-            500,
-            val.Number(int, "ANY"),
         )
         self._arg(
             "restraintsteps",
