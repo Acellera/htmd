@@ -25,7 +25,7 @@ if __name__ == "__main__":
         long_description = fh.read()
 
     setuptools.setup(
-        name="htmd",
+        name="acellera-htmd",
         version=version,
         description="High throughput molecular dynamics (HTMD)",
         long_description=long_description,
