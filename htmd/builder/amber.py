@@ -292,9 +292,7 @@ def build(
     else:
         if shutil.which(teleap) is None:
             raise NameError(
-                "Could not find executable: `{}` in the PATH. Cannot build for AMBER.".format(
-                    teleap
-                )
+                f"Could not find executable: `{teleap}` in the PATH. Cannot build for AMBER. Please install it with `conda install ambermini -c acellera`"
             )
 
     if not os.path.isdir(outdir):
