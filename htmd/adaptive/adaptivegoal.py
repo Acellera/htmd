@@ -104,7 +104,7 @@ class AdaptiveGoal(AdaptiveMD):
     >>> ag.generatorspath = '../generators/'
     >>> ag.nmin = 2
     >>> ag.nmax = 3
-    >>> ag.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
+    >>> ag.projection = [MetricDistance('name CA', 'resname MOL', periodic='selections'), MetricDihedral()]
     >>> ag.goalfunction = ssGoal
     >>> ag.app = LocalGPUQueue()
     >>> ag.run()
@@ -328,7 +328,7 @@ if __name__ == '__main__':
     md.ticalag = 2
     md.ticadim = 3
     md.updateperiod = 5
-    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh')
+    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections')
     # md.goalprojection = MetricRmsd(Molecule(htmd.home() + '/data/adaptive/generators/1/structure.pdb'),
     #                               'protein and name CA')
     md.goalfunction = rmsdgoal

@@ -91,7 +91,7 @@ class AdaptiveMD(AdaptiveBase):
     >>> adapt.nmax = 3
     >>> adapt.nepochs = 2
     >>> adapt.ticadim = 3
-    >>> adapt.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
+    >>> adapt.projection = [MetricDistance('name CA', 'resname MOL', periodic='selections'), MetricDihedral()]
     >>> adapt.generatorspath = htmd.home()+'/data/dhfr'
     >>> adapt.app = LocalGPUQueue()
     >>> adapt.run()
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     md.ticalag = 2
     md.ticadim = 3
     md.updateperiod = 5
-    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh')
-    md.projection = [MetricDistance('protein and name CA', 'resname BEN and noh'), MetricDistance('protein and name CA', 'resname BEN and noh')]
+    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections')
+    md.projection = [MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections'), MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections')]
 
 

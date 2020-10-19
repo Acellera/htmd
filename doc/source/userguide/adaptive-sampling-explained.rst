@@ -128,7 +128,7 @@ The power of adaptive sampling is accessible on HTMD through the :class:`~htmd.a
     md.nmax=10
     md.nepochs = 30
     md.app = app
-    md.projection = MetricDistance('name CA', '(resname BEN) and ((name C7) or (name C6))', metric='contacts')
+    md.projection = MetricDistance('name CA', '(resname BEN) and ((name C7) or (name C6))', periodic='selections', metric='contacts')
     md.ticadim = 3
     md.updateperiod = 14400 # execute every 4 hours
     md.run()

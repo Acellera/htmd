@@ -1208,7 +1208,7 @@ class _TestModel(unittest.TestCase):
         fsims = simfilter(sims, tempname(), 'not water')
 
         metr = Metric(fsims)
-        metr.set(MetricDistance('protein and resid 10 and name CA', 'resname BEN and noh', metric='contacts', groupsel1='residue', threshold=4))
+        metr.set(MetricDistance('protein and resid 10 and name CA', 'resname BEN and noh', periodic='selections', metric='contacts', groupsel1='residue', threshold=4))
         data = metr.project()
         data.cluster(MiniBatchKMeans(n_clusters=4))
 

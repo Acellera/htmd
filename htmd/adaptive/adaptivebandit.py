@@ -373,7 +373,7 @@ class _TestAdaptiveBandit(unittest.TestCase):
         md.filtersel = 'all'
 
         md.clustmethod = MiniBatchKMeans
-        md.projection = MetricDistance('protein resid 173 and name CA', 'resname BEN and name C1 C2 C3 C7')
+        md.projection = MetricDistance('protein resid 173 and name CA', 'resname BEN and name C1 C2 C3 C7', periodic='selections')
         md.ticadim = 2
         md.nmin=1
         md.nmax=2
