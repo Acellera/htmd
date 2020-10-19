@@ -40,6 +40,6 @@ if __name__ == "__main__":
             ]
         },
         packages=setuptools.find_packages(include=["htmd*"], exclude=["data"]),
-        package_data={"htmd": ["share/*/*/*/*"],},
+        package_data={"htmd": ["share/*/*/*/*", "logging.ini"]},
         install_requires=requirements,
     )
