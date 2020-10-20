@@ -30,7 +30,7 @@ class AdaptiveMD(AdaptiveBase):
         A SimQueue class object used to retrieve and submit simulations
     project : str, default='adaptive'
         The name of the project
-    nmin : int, default=1
+    nmin : int, default=0
         Minimum number of running simulations
     nmax : int, default=1
         Maximum number of running simulations

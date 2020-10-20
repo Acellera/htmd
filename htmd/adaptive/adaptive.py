@@ -28,7 +28,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
         from jobqueues.simqueue import SimQueue
         self._arg('app', ':class:`SimQueue <jobqueues.simqueue.SimQueue>` object', 'A SimQueue class object used to retrieve and submit simulations', None, val.Object((SimQueue,)))
         self._arg('project', 'str', 'The name of the project', 'adaptive', val.String())
-        self._arg('nmin', 'int', 'Minimum number of running simulations', 1, val.Number(int, 'POS'))
+        self._arg('nmin', 'int', 'Minimum number of running simulations', 0, val.Number(int, '0POS'))
         self._arg('nmax', 'int', 'Maximum number of running simulations', 1, val.Number(int, 'POS'))
         self._arg('nepochs', 'int', 'Stop adaptive once we have reached this number of epochs', 1000, val.Number(int, 'POS'))
         self._arg('nframes', 'int', 'Stop adaptive once we have simulated this number of aggregate simulation frames.', 0, val.Number(int, '0POS'))
