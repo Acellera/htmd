@@ -12,8 +12,7 @@ from os import makedirs
 import shutil
 from shutil import copytree, ignore_patterns
 import numpy as np
-from jobqueues.simqueue import RetrieveError, SubmitError, InProgressError, ProjectNotExistError
-from joblib import Parallel, delayed
+from jobqueues.simqueue import RetrieveError, InProgressError, ProjectNotExistError
 from htmd.simlist import _simName
 from moleculekit.molecule import Molecule
 from protocolinterface import ProtocolInterface, val
@@ -29,7 +28,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
         from jobqueues.simqueue import SimQueue
         self._arg('app', ':class:`SimQueue <jobqueues.simqueue.SimQueue>` object', 'A SimQueue class object used to retrieve and submit simulations', None, val.Object((SimQueue,)))
         self._arg('project', 'str', 'The name of the project', 'adaptive', val.String())
-        self._arg('nmin', 'int', 'Minimum number of running simulations', 1, val.Number(int, 'POS'))
+        self._arg('nmin', 'int', 'Minimum number of running simulations', 0, val.Number(int, '0POS'))
         self._arg('nmax', 'int', 'Maximum number of running simulations', 1, val.Number(int, 'POS'))
         self._arg('nepochs', 'int', 'Stop adaptive once we have reached this number of epochs', 1000, val.Number(int, 'POS'))
         self._arg('nframes', 'int', 'Stop adaptive once we have simulated this number of aggregate simulation frames.', 0, val.Number(int, '0POS'))
@@ -118,7 +117,6 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
 
     def _setLock(self):
         import datetime
-        import os
 
         if self.lock:
             lockfile = os.path.abspath('./adaptivelock')
@@ -130,7 +128,6 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                 f.write('{}'.format(datetime.datetime.now()))
 
     def _unsetLock(self):
-        import os
         if self.lock:
             lockfile = os.path.abspath('./adaptivelock')
             if os.path.exists(lockfile):
@@ -198,6 +195,8 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
 
         from htmd.parallelprogress import ParallelExecutor
         from htmd.config import _config
+        from joblib import delayed
+
         aprun = ParallelExecutor(n_jobs=_config['njobs'])
         aprun(total=len(simsframes), desc='Writing inputs')(
             delayed(_writeInputsFunction)(i, f, epoch, self.inputpath, self.coorname) for i, f in enumerate(simsframes))
@@ -392,77 +391,8 @@ def _findprevioustraj(simlist, simname):
 
 
 if __name__ == "__main__":
-    """from htmd.apps.acemdlocal import AcemdLocal
-    from htmd.adaptive.adaptiverun import AdaptiveRun
-    import tempfile
-    from htmd.home import home
-    import os.path as path
-    import shutil
-    import logging
-    import os
-    from glob import glob
-    log = logging.getLogger('htmd')
-    log.setLevel('DEBUG')
-
-    # Testing epoch 0
-    tmpfolder = tempfile.mkdtemp()
-    print(tmpfolder)
-    md = _AdaptiveTest()
-    md.nmin = 0
-    md.nmax = 4
-    md.nepochs = 2
-    md.inputpath = path.join(tmpfolder, 'input')
-    md.datapath = path.join(tmpfolder, 'data')
-    md.generatorspath = path.join(home(), 'data', 'adaptive', 'generators')
-    md.app = AcemdLocal(ngpus=4, datadir=md.datapath, acemd='/shared/acemd/bin/acemd')
-    md.dryrun = True
-    md.run()
-    # Testing epoch 1
-    md.inputpath = path.join(home(), 'data', 'adaptive', 'input')
-    md.datapath = path.join(home(), 'data', 'adaptive', 'data')
-    md.run()
-    # Cleaning up
-    inputodel = glob(path.join(home(), 'data', 'adaptive', 'input', 'e2*'))
-    for i in inputodel:
-        shutil.rmtree(i, ignore_errors=True)
-    os.remove(path.join(home(), 'data', 'adaptive', 'input', 'e2_writeinputs.log'))""" # No acemd on Travis :(
-
-    '''########## Testing AdaptiveRun. Doesn't work because I don't have enough frames to pass mergeSmall...
-    # Testing epoch 0
-    tmpfolder = tempfile.mkdtemp()
-    print(tmpfolder)
-    md = AdaptiveRun()
-    md.nmin = 0
-    md.nmax = 4
-    md.nepochs = 2
-    md.metrictype = 'contacts'
-    md.datapath = path.join(tmpfolder, 'data')
-    md.filteredpath = path.join(tmpfolder, 'filtered')
-    md.inputpath = path.join(tmpfolder, 'input')
-    md.resultspath = path.join(tmpfolder, 'results')
-    md.generatorspath = path.join(home(), 'data', 'adaptive', 'generators')
-    md.macronum = 4
-    md.ticadim = 0
-    md.metricsel1 = 'protein and name CA'
-    md.metricsel2 = 'resname BEN and noh'
-    md.app = AcemdLocal(ngpus=4, datadir=md.datapath)
-    md.dryrun = True
-    md.run()
-    log.setLevel('WARNING')
-    # Testing epoch 1
-    md.inputpath = path.join(home(), 'data', 'adaptive', 'input')
-    md.datapath = path.join(home(), 'data', 'adaptive', 'data')
-    md.run()
-    # Cleaning up
-    inputodel = glob(path.join(home(), 'data', 'adaptive', 'input', 'e2*'))
-    for i in inputodel:
-        shutil.rmtree(i, ignore_errors=True, acemd='/shared/acemd/bin/acemd')
-    os.remove(path.join(home(), 'data', 'adaptive', 'input', 'e2_writeinputs.log'))'''
-
     import htmd
     import os
-    import shutil
-    from jobqueues.localqueue import LocalGPUQueue
     from htmd.simlist import Frame, simlist
     from htmd.util import tempname
 

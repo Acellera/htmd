@@ -28,7 +28,7 @@ class AdaptiveGoalEG(AdaptiveGoal):
         A SimQueue class object used to retrieve and submit simulations
     project : str, default='adaptive'
         The name of the project
-    nmin : int, default=1
+    nmin : int, default=0
         Minimum number of running simulations
     nmax : int, default=1
         Maximum number of running simulations
@@ -104,9 +104,9 @@ class AdaptiveGoalEG(AdaptiveGoal):
     >>> ag.generatorspath = '../generators/'
     >>> ag.nmin = 2
     >>> ag.nmax = 3
-    >>> ag.projection = [MetricDistance('name CA', 'name N'), MetricDihedral()]
+    >>> ag.projection = [MetricDistance('name CA', 'resname MOL', periodic='selections'), MetricDihedral()]
     >>> ag.goalfunction = ssGoal
-    >>> ag.app = AcemdLocal()
+    >>> ag.app = LocalGPUQueue()
     >>> ag.run()
     >>>
     >>> # Or alternatively if we have a multi-argument goal function
@@ -116,7 +116,7 @@ class AdaptiveGoalEG(AdaptiveGoal):
     >>>     return ss_score
     >>> from joblib import delayed
     >>> ag.goalfunction = delayed(ssGoalAlt)(crystalSS)
-    >>> ag.app = AcemdLocal()
+    >>> ag.app = LocalGPUQueue()
     >>> ag.run()
     """
 
@@ -211,7 +211,6 @@ if __name__ == '__main__':
     from moleculekit.projections.metricdistance import MetricDistance
     from jobqueues.localqueue import LocalGPUQueue
     from moleculekit.molecule import Molecule
-    import os
     import shutil
     from htmd.util import tempname
     from joblib import delayed
@@ -231,11 +230,11 @@ if __name__ == '__main__':
     md.ticalag = 2
     md.ticadim = 3
     md.updateperiod = 5
-    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh')
+    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections')
     # md.goalprojection = MetricRmsd(Molecule(htmd.home() + '/data/adaptive/generators/1/structure.pdb'),
     #                               'protein and name CA')
     md.goalfunction = rmsdgoal
-    # md.app = AcemdLocal()
+    # md.app = LocalGPUQueue()
     # md.run()
 
     # Some real testing now

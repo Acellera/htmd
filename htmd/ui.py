@@ -3,7 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from __future__ import print_function
+import warnings
 import htmd.home
 from htmd.session import htmdsave, htmdload
 from htmd.simlist import simlist, simfilter, simmerge
@@ -39,7 +39,6 @@ import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
 from moleculekit.util import uniformRandomRotation
 from moleculekit.util import rotationMatrix
-from moleculekit.tools.preparation import proteinPrepare
 from htmd.dock import dock
 from htmd.util import tempname
 from htmd.util import testDHFR
@@ -58,7 +57,20 @@ from moleculekit.vmdgraphics import (
 )
 from moleculekit.tools.autosegment import autoSegment
 from htmd.builder.loopmodeler import loopModeller
-from ffevaluation.ffevaluate import FFEvaluate
+
+try:
+    from ffevaluation.ffevaluate import FFEvaluate
+except ImportError as e:
+    warnings.warn(
+        "Could not find package ffevaluation. If you want to use this library please install it with conda install ffevaluation -c acellera -c conda-forge"
+    )
+
+try:
+    from moleculekit.tools.preparation import proteinPrepare
+except Exception as e:
+    warnings.warn(f"{e}")
+
+
 from htmdx.cli import check_registration, show_news
 from htmd.latest import compareVersions
 from htmd.config import config
@@ -75,14 +87,6 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
     check_registration(product="htmd")
     show_news()
     compareVersions()
-
-# No longer import matplotlib here, as it breaks
-# Parameterise's import and attmept to set alternate
-# render back-end
-
-# from matplotlib import pylab as plt
-# ----------------------------
-import warnings
 
 # Get rid of pyemma version warnings
 with warnings.catch_warnings():

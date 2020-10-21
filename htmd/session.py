@@ -42,7 +42,6 @@ def htmdsave(fname, varnames=None):
                     mydict[k] = maindict[k]
                 except:
                     logger.debug('Skipping variable: {}'.format(k))
-                    pass
     else:
         if not isinstance(varnames, list):
             varnames = [varnames]

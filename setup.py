@@ -3,38 +3,43 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from setuptools import setup, find_packages
-from subprocess import check_output
+import setuptools
+import subprocess
 
-version = check_output(["git", "describe", "--tags"]).decode("utf8").split("-")[0]
+try:
+    version = (
+        subprocess.check_output(["git", "describe", "--abbrev=0", "--tags"])
+        .strip()
+        .decode("utf-8")
+    )
+except Exception as e:
+    print("Could not get version tag. Defaulting to version 0")
+    version = "0"
 
-with open("package/htmd-deps/DEPENDENCIES", "r") as f:
+with open("requirements.txt", "r") as f:
     requirements = f.read().splitlines()
-requirements = None  # Some of them are on conda and cannot work with pip install
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
 
-print("Version [%s]" % (version))
-print("Dependencies:")
-print(requirements)
+if __name__ == "__main__":
+    with open("README.md", "r") as fh:
+        long_description = fh.read()
 
-setup(
-    name="htmd",
-    version=version,
-    description="HTMD",
-    long_description=long_description,
-    zip_safe=False,
-    url="https://www.htmd.org",
-    maintainer="Acellera Ltd",
-    maintainer_email="noreply@acellera.com",
-    entry_points={
-        "console_scripts": [
-            "htmd_register   = htmdx.cli:htmd_do_register",
-            "activate_license  = htmdx.cli:main_activate",
-        ]
-    },
-    install_requires=requirements,
-    packages=find_packages(include=["htmd*"], exclude=["data"]),
-    package_data={"htmd": ["share/*/*/*/*"],},
-)
+    setuptools.setup(
+        name="acellera-htmd",
+        version=version,
+        description="High throughput molecular dynamics (HTMD)",
+        long_description=long_description,
+        zip_safe=False,
+        url="https://www.htmd.org",
+        maintainer="Acellera Ltd",
+        maintainer_email="info@acellera.com",
+        entry_points={
+            "console_scripts": [
+                "htmd_register   = htmdx.cli:htmd_do_register",
+                "activate_license  = htmdx.cli:main_activate",
+            ]
+        },
+        packages=setuptools.find_packages(include=["htmd*"], exclude=["data"]),
+        package_data={"htmd": ["share/*/*/*/*", "logging.ini"]},
+        install_requires=requirements,
+    )

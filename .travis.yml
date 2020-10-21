@@ -39,8 +39,9 @@ install:
   - echo $PACKAGE_NAME
 
   # Set up the Conda environment
-  - conda install conda conda-build anaconda anaconda-client requests pytest -y -q # this has to go into the root environment
+  - conda install conda conda-build anaconda anaconda-client requests -y -q # this has to go into the root environment
   - conda activate test
+  - conda install pytest coverage codecov -y -q
 
   - conda install anaconda-client -y -q
   - conda update --all -y -q
@@ -63,23 +64,26 @@ install:
   - conda build --python $TRAVIS_PYTHON_VERSION package/htmd-deps --no-include-recipe -c acellera -c psi4 -c conda-forge
   # - conda install $HOME/miniconda/conda-bld/*-64/htmd-deps-[0-9]*.tar.bz2  -y -q
 
-  # Build htmd-data
-  - bash -x continuous-integration/travis/conda_build_htmd-data.sh
-  - conda install $HOME/miniconda/conda-bld/*/htmd-data-[0-9]*.tar.bz2  -y -q
-  # Cleaning to reduce amount of space used on disk
-  - conda clean --all -y
-
-  # Build and install HTMD
-  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe -c acellera -c psi4 -c conda-forge
-  - conda install $HOME/miniconda/conda-bld/*-64/htmd-[0-9]*.tar.bz2  -y -q  -c acellera -c psi4 -c conda-forge
-
   # Cleaning to reduce amount of space used on disk
   - conda clean --all -y
 
 script:
   - export HTMD_NONINTERACTIVE=1
-  - python htmd/tests/run_inline_file_tests.py
-  - htmd/tests/run_other_tests.sh
-  # If build did not fail, if it is not PR, it's on Acellera/htmd and a tagged build, do anaconda upload tasks
-  - if [ "$TRAVIS_TEST_RESULT" == "0" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./continuous-integration/travis/conda_upload.sh; bash -x ./continuous-integration/travis/conda_build_upload_meta.sh ; fi
+  - coverage run -m pytest --verbose --durations=10 ./htmd/
 
+after_success:
+  # Upload coverage statistics
+  - codecov
+
+  - conda build --python $TRAVIS_PYTHON_VERSION package/htmd --no-include-recipe -c acellera -c psi4 -c conda-forge
+  # If build did not fail, if it is not PR, it's on Acellera/htmd and a tagged build, do anaconda upload tasks
+  - if [ "$TRAVIS_TEST_RESULT" == "0" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_REPO_SLUG" == "Acellera/htmd" ] && [ "$TRAVIS_BRANCH" == "$TRAVIS_TAG" ]; then bash -x ./continuous-integration/travis/conda_upload.sh; fi
+
+deploy:
+  provider: pypi
+  username: stefdoerr
+  password: $PYPI_PASS
+  on:
+      tags: true
+      branch: master
+      condition: $TRAVIS_PYTHON_VERSION = 3.7

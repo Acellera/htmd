@@ -397,6 +397,8 @@ def _autoDetectTrajectories(folder):
     from moleculekit.readers import _TRAJECTORY_READERS
     import natsort
     for tt in _TRAJECTORY_READERS:
+        if tt in ("xsc",):  # Some trajectory readers don't really load trajectories like xsc
+            continue
         trajectories = glob(path.join(folder, '*.{}'.format(tt)))
         if len(trajectories) > 0:
             return natsort.natsorted(trajectories)
