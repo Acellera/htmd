@@ -1,0 +1,16 @@
+steps:
+- bash: conda create -y -q --name test python=$(python.version)
+  displayName: Create Anaconda test environment
+
+- bash: |
+    source activate test
+    conda install pytest coverage codecov -y -q
+    conda install --file package/htmd-deps/DEPENDENCIES -y -c acellera -c psi4 -c conda-forge  # Installing dependencies for tests
+  displayName: Install Anaconda packages
+
+- bash: |
+    source activate test
+    export HTMD_NONINTERACTIVE=1
+    coverage run -m pytest --verbose --durations=10 ./htmd/
+  condition: succeededOrFailed()
+  displayName: Run tests

@@ -1,0 +1,108 @@
+variables:
+  - group: secrets
+
+trigger:
+  branches:
+    include:
+      - master
+      - azure
+      - refs/tags/*
+
+stages:
+  - stage: Test
+    jobs:
+      - template: test_job.yml
+        parameters:
+          name: TestLinux
+          displayName: Linux tests
+          vmImage: 'ubuntu-16.04'
+          OS: linux
+
+      # - template: test_job.yml
+      #   parameters:
+      #     name: TestMacOSX
+      #     displayName: Mac OSX tests
+      #     vmImage: 'macOS-latest'
+      #     OS: mac
+
+  - stage: Build
+    #condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+    jobs:
+      - template: build_artifact_job.yml
+        parameters:
+          name: BuildLinuxArtifacts
+          displayName: Build Linux Artifacts
+          vmImage: 'ubuntu-16.04'
+          OS: linux
+
+      # - template: build_artifact_job.yml
+      #   parameters:
+      #     name: BuildOSXArtifacts
+      #     displayName: Build OSX Artifacts
+      #     vmImage: 'macOS-latest'
+      #     OS: mac
+
+  - stage: Publish
+    #condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+    jobs:
+      # - job: PublishPyPI
+      #   pool:
+      #     vmImage: "ubuntu-16.04"
+
+      #   steps:
+      #   - task: UsePythonVersion@0
+      #     displayName: "Use Python 3.6"
+      #     inputs:
+      #       versionSpec: 3.6
+      #       addToPath: true
+      #       architecture: "x64"
+          
+      #   - script: 'pip install wheel twine'
+
+      #   - task: TwineAuthenticate@1
+      #     displayName: 'Twine Authenticate'
+      #     inputs:
+      #       pythonUploadServiceConnection: pypi
+
+      #   - task: DownloadPipelineArtifact@2
+      #     inputs:
+      #       artifact: moleculekit_linux_3.6
+
+      #   - script: |
+      #       python -m twine upload -r pypi --config-file $(PYPIRC_PATH) '$(Pipeline.Workspace)/pypi/*.whl'
+      #     displayName: 'Uploading to PyPI'
+
+      - job: PublishConda
+        strategy:
+          matrix:
+            Python36:
+              python.version: '3.6'
+            Python37:
+              python.version: '3.7'
+          maxParallel: 2
+          
+        steps:
+        - template: templates/conda_config.yml
+
+        - bash:  conda install -y -q anaconda-client
+          displayName: Installing conda-build
+
+        - task: DownloadPipelineArtifact@2
+          inputs:
+            artifact: 'htmd_linux_$(python.version)'
+
+        - bash: |
+            anaconda -t $(ANACONDA_TOKEN) upload $(Pipeline.Workspace)/conda/htmd-deps-[0-9]*.tar.bz2 -u acellera
+          displayName: 'Uploading htmd-deps Linux $(python.version) to Anaconda'
+
+        - bash: |
+            anaconda -t $(ANACONDA_TOKEN) upload $(Pipeline.Workspace)/conda/htmd-[0-9]*.tar.bz2 -u acellera
+          displayName: 'Uploading htmd Linux $(python.version) to Anaconda'
+
+        # - task: DownloadPipelineArtifact@2
+        #   inputs:
+        #     artifact: 'htmd_osx_$(python.version)'
+
+        # - bash: |
+        #     anaconda -t $(ANACONDA_TOKEN) upload $(Pipeline.Workspace)/conda/htmd-[0-9]*.tar.bz2 -u acellera
+        #   displayName: 'Uploading OSX $(python.version) to Anaconda'
