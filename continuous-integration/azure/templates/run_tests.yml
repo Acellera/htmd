@@ -9,6 +9,21 @@ steps:
   displayName: Install Anaconda packages
 
 - bash: |
+    python package/htmd-deps/write_meta_yaml.py package/htmd-deps
+  displayName: Dump conda package versions into meta.yaml
+
+- task: CopyFiles@2
+  displayName: 'Copy conda meta.yaml to: $(Build.ArtifactStagingDirectory)'
+  inputs:
+    Contents: |
+      package/htmd-deps/meta.yaml
+    targetFolder: $(Build.ArtifactStagingDirectory)/conda/
+    flattenFolders: true
+
+- publish: $(Build.ArtifactStagingDirectory)
+  artifact: htmd_$(OS)_$(python.version)_metayaml
+
+- bash: |
     source activate test
     export HTMD_NONINTERACTIVE=1
     coverage run -m pytest --verbose --durations=10 ./htmd/
