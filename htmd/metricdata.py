@@ -767,34 +767,62 @@ class MetricData(object):
 
         return np.append(1, np.round(np.linspace(minlag, maxlag, numlags))).astype(int)
 
-    def _contourPlot(self, x, y, z=None, resolution=100, levels=100, logplot=False, cmap=None, title=None, xlabel=None, ylabel=None):
-        """ Plots a contour plot.
+    def _getFEShistogramCounts(self, dimx, dimy, nbins=80, pad=0.5, micro_ofcluster=None, stationary_distribution=None, St=None):
+        from tqdm import tqdm
 
-        If only x, y are given it will calculate a histogram for the contours. If z is given it will use that instead.
-        """
-        from matplotlib import pylab as plt
-        from scipy.interpolate import griddata
+        if St is None:
+            St = self.St
 
-        if cmap is None:
-            cmap = plt.cm.Greys
+        clusters = np.hstack(St)
+        data_dim = []
+        for traj in self.trajectories:
+            data_dim.append(traj.projection[:, [dimx, dimy]])
+        data_dim = np.vstack(data_dim)
 
+        xmin, ymin = data_dim.min(axis=0)
+        xmax, ymax = data_dim.max(axis=0)
+        hist_range = np.array([[xmin-pad, xmax+pad], [ymin-pad, ymax+pad]])
+
+        if micro_ofcluster is None:
+            counts, xbins, ybins = np.histogram2d(data_dim[:, 0], data_dim[:, 1], bins=nbins, range=hist_range)
+            return counts.T, xbins, ybins
+
+        counts = np.zeros((nbins, nbins))
+        for m in tqdm(range(len(stationary_distribution))):
+            frames = micro_ofcluster[clusters] == m
+            if frames.sum():
+                state_mask, xbins, ybins = np.histogram2d(data_dim[frames, 0], data_dim[frames, 1], bins=nbins, range=hist_range)
+                state_mask = state_mask.T > 0
+                counts += state_mask * stationary_distribution[m]
+        return counts, xbins, ybins
+
+    def _contourPlot(self, values, xbins, ybins, levels=7, nonzero=None, cmap="viridis", title=None, xlabel=None, ylabel=None):
+        import matplotlib.pylab as plt
+
+        if nonzero is None:
+            nonzero = np.ones_like(values).astype(bool)
+
+        def getcmap(cmap, bounds):
+            import matplotlib.colors as clr
+            cmap = plt.get_cmap(cmap)
+            cmaplist = [cmap(i) for i in range(cmap.N)]
+            cmap = clr.LinearSegmentedColormap.from_list('Custom cmap', cmaplist, cmap.N)
+            norm = clr.BoundaryNorm(bounds, cmap.N)
+            cmap.set_under(color='white')
+            cmap.set_over(color='white')
+            return cmap, norm
+
+        xcenters = (xbins[:-1] + xbins[1:]) / 2
+        ycenters = (ybins[:-1] + ybins[1:]) / 2
+        meshx, meshy = np.meshgrid(xcenters, ycenters)
+
+        levels = np.linspace(values[nonzero].min(), values[nonzero].max(), levels)
+        cmap, norm = getcmap(cmap, levels)
         f = plt.figure()
+        plt.contour(meshx, meshy, values, levels=levels, colors='black', vmin=0, vmax=levels[-1])
+        cf = plt.contourf(meshx, meshy, values, levels=levels, cmap=cmap, vmin=0, vmax=levels[-1], norm=norm)
+
         ax = f.gca()
-        if z is None:
-            # If no z is given calculate z as a histogram
-            zi, xi, yi = np.histogram2d(x, y, bins=resolution)
-            zi = zi.T
-            if logplot:
-                zi = -np.log(zi)
-            xi = xi[:-1] + (xi[1] - xi[0]) / 2  # Convert edges to bin centers
-            yi = yi[:-1] + (yi[1] - yi[0]) / 2  # Convert edges to bin centers
-        else:
-            # Else if z is given interpolate on a grid
-            xi = np.linspace(np.min(x), np.max(x), resolution)
-            yi = np.linspace(np.min(y), np.max(y), resolution)
-            xi2, yi2 = np.meshgrid(xi, yi)
-            zi = griddata((x, y), z, (xi2, yi2), method='linear')
-        cf = ax.contourf(xi, yi, zi, levels, cmap=cmap)
         _ = ax.axis('equal')
         if title is not None:
             ax.set_title(title)
@@ -815,7 +843,18 @@ class MetricData(object):
         else:
             f.colorbar(mappable, label=label)
 
-    def plotCounts(self, dimX, dimY, resolution=100, logplot=False, plot=True, save=None):
+    def _plotCounts(self, dimX, dimY, resolution=100, logplot=False, levels=7, cmap="viridis", title=None, xlabel=None, ylabel=None):
+        counts, xbins, ybins = self._getFEShistogramCounts(dimX, dimY, nbins=resolution)
+        nonzero = counts != 0
+        if logplot:
+            counts[nonzero] = np.log(counts[nonzero])
+            nonzero = counts != 0
+        f, ax, cf = self._contourPlot(counts, xbins, ybins, levels=levels, nonzero=nonzero, cmap=cmap, title=title, xlabel=xlabel, ylabel=ylabel)
+
+        self._setColorbar(f, cf, 'Counts')
+        return f, ax, cf
+
+    def plotCounts(self, dimX, dimY, resolution=100, logplot=False, plot=True, save=None, levels=7, cmap="viridis"):
         """ Plots a histogram of counts on any two given dimensions.
 
         Parameters
@@ -834,7 +873,6 @@ class MetricData(object):
             Path of the file in which to save the figure
         """
         from matplotlib import pylab as plt
-        dc = np.concatenate(self.dat)
         if self.description is not None:
             xlabel = self.description.description[dimX]
         else:
@@ -844,16 +882,17 @@ class MetricData(object):
         else:
             ylabel = 'Dimension {}'.format(dimY)
         title = 'Counts histogram'
+        if logplot:
+            title = 'Logarithmic counts histogram'
 
-        f, ax, cf = self._contourPlot(dc[:, dimX], dc[:, dimY], resolution=resolution, xlabel=xlabel, ylabel=ylabel, title=title, logplot=logplot)
-        self._setColorbar(f, cf, 'Counts')
+        self._plotCounts(dimX, dimY, resolution=resolution, logplot=logplot, levels=levels, cmap=cmap, title=title, xlabel=xlabel, ylabel=ylabel)
 
         if save is not None:
             plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
         if plot:
             plt.show()
 
-    def plotClusters(self, dimX, dimY, resolution=100, s=4, c=None, cmap=None, logplot=False, plot=True, save=None, data=None):
+    def plotClusters(self, dimX, dimY, resolution=100, s=4, c=None, cmap="Greys", logplot=False, plot=True, save=None, data=None, levels=7):
         """ Plot a scatter-plot of the locations of the clusters on top of the count histogram.
 
         Parameters
@@ -894,9 +933,6 @@ class MetricData(object):
                 raise RuntimeError('The data argument you provided uses a different simlist than this object.')
             centers = np.vstack(getStateStatistic(self, data, range(self.K), statetype='cluster'))
 
-        if cmap is None:
-            cmap = plt.cm.jet
-
         if data.description is not None:
             xlabel = data.description.description[dimX]
         else:
@@ -908,9 +944,11 @@ class MetricData(object):
             ylabel = 'Dimension {}'.format(dimY)
 
         title = 'Clusters plotted onto counts histogram'
-        dc = np.concatenate(data.dat)
-        f, ax, cf = self._contourPlot(dc[:, dimX], dc[:, dimY], resolution=resolution, xlabel=xlabel, ylabel=ylabel, title=title, logplot=logplot)
-        y = ax.scatter(centers[:, dimX], centers[:, dimY], s=s, c=c, cmap=cmap, linewidths=0, marker='o')
+        if logplot:
+            title = 'Clusters plotted onto logarithmic counts histogram'
+        f, ax, cf = self._plotCounts(dimX, dimY, resolution=resolution, logplot=logplot, levels=levels, cmap=cmap, title=title, xlabel=xlabel, ylabel=ylabel)
+
+        y = ax.scatter(centers[:, dimX], centers[:, dimY], s=s, c=c if c is not None else "r", cmap=cmap, linewidths=0, marker='o')
         if c is not None:
             self._setColorbar(f, y, 'Cluster groups')
 
@@ -1185,9 +1223,3 @@ class _TestMetricData(unittest.TestCase):
 if __name__ == '__main__':
     import unittest
     unittest.main(verbosity=2)
-
-
-
-
-
-

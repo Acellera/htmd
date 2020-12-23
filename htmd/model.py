@@ -864,7 +864,33 @@ class Model(object):
 
         return Model(newdata), frames
 
-    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, fescmap=None, statescmap=None, plot=True, save=None, data=None):
+    def _getFEShistogramCounts(self, data, dimx, dimy, nbins=80, pad=0.5, micro_ofcluster=None, stationary_distribution=None):
+        from tqdm import tqdm
+
+        clusters = np.hstack(data.St)
+        data_dim = []
+        for traj in data.trajectories:
+            data_dim.append(traj.projection[:, [dimx, dimy]])
+        data_dim = np.vstack(data_dim)
+
+        xmin, ymin = data_dim.min(axis=0)
+        xmax, ymax = data_dim.max(axis=0)
+        hist_range = np.array([[xmin-pad, xmax+pad], [ymin-pad, ymax+pad]])
+
+        if micro_ofcluster is None:
+            counts, xbins, ybins = np.histogram2d(data_dim[:, 0], data_dim[:, 1], bins=nbins, range=hist_range)
+            return counts.T, xbins, ybins
+
+        counts = np.zeros((nbins, nbins))
+        for m in tqdm(range(len(stationary_distribution))):
+            frames = micro_ofcluster[clusters] == m
+            if frames.sum():
+                state_mask, xbins, ybins = np.histogram2d(data_dim[frames, 0], data_dim[frames, 1], bins=nbins, range=hist_range)
+                state_mask = state_mask.T > 0
+                counts += state_mask * stationary_distribution[m]
+        return counts, xbins, ybins
+
+    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, fescmap=None, statescmap=None, plot=True, save=None, data=None, levels=7):
         """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
         Parameters
@@ -913,31 +939,37 @@ class Model(object):
             microcenters = np.vstack(getStateStatistic(self, data, range(self.micronum), statetype='micro'))
 
         if fescmap is None:
-            fescmap = plt.cm.jet
+            fescmap = "viridis"
         if statescmap is None:
             statescmap = plt.cm.jet
         if cmap is not None:
             fescmap = cmap
             statescmap = cmap
 
+        xlabel = f'Dimension {dimX}'
         if data.description is not None:
             xlabel = data.description.description[dimX]
-        else:
-            xlabel = 'Dimension {}'.format(dimX)
+            
+        ylabel = f'Dimension {dimY}'
         if data.description is not None:
             ylabel = data.description.description[dimY]
-        else:
-            ylabel = 'Dimension {}'.format(dimY)
+ 
         title = 'Free energy surface'
 
-        energy = -Kinetics._kB * temperature * np.log(self.msm.stationary_distribution)
-        f, ax, cf = data._contourPlot(microcenters[:, dimX], microcenters[:, dimY], energy, cmap=fescmap, xlabel=xlabel, ylabel=ylabel, title=title)
+        counts, xbins, ybins = data._getFEShistogramCounts(dimX, dimY, nbins=80, pad=0.5, micro_ofcluster=self.micro_ofcluster, stationary_distribution=self.msm.stationary_distribution)
+        counts /= counts.sum() # Normalize probabilites
+        nonzero = counts != 0
+        energy = counts.copy()
+        energy[nonzero] = -Kinetics._kB * temperature * np.log(counts[nonzero])
+        energy[~nonzero] = energy[nonzero].max() + 100
+        f, ax, cf = data._contourPlot(energy, xbins, ybins, levels=levels, nonzero=nonzero, cmap=fescmap, title=title, xlabel=xlabel, ylabel=ylabel)
+
         data._setColorbar(f, cf, 'kcal/mol', scientific=False)
         if states:
             colors = statescmap(np.linspace(0, 1, self.macronum))
             for m in range(self.macronum):
                 macromicro = microcenters[self.macro_ofmicro == m, :]
-                _ = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, c=colors[m], label='Macro {}'.format(m), edgecolors='none')
+                _ = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, color=colors[m], label=f'Macro {m}', edgecolors='none')
             ax.legend(prop={'size': 8})
 
         if save is not None:
