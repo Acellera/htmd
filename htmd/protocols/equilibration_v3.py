@@ -15,42 +15,43 @@ logger = logging.getLogger(__name__)
 
 
 class Equilibration(ProtocolInterface):
-    """ Equilibration protocol v3
+    """Equilibration protocol v3
 
-        Equilibration protocol for globular and membrane proteins
-        Supporst extra restraints like a flatbottom potential box to retain a ligand
-        for example within this box.
+    Equilibration protocol for globular and membrane proteins
+    Supporst extra restraints like a flatbottom potential box to retain a ligand
+    for example within this box.
 
-        Parameters
-        ----------
-        runtime : float, default=0
-            Running time of the simulation.
-        timeunits : str, default='steps'
-            Units for time arguments. Can be 'steps', 'ns' etc.
-        temperature : float, default=300
-            Temperature of the thermostat in Kelvin
-        restraints : list, default=None
-            A list of restraint objects. See :class:`AtomRestraint <htmd.mdengine.acemd.acemd.AtomRestraint>` and:class:`GroupRestraint<htmd.mdengine.acemd.acemd.GroupRestraint>`)
-        useconstantratio : bool, default=False
-            For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
-        restraintsteps : int, default=None
-            Number of initial steps to apply restraints in units of 4fs. Defaults to half the simulation time.
+    Parameters
+    ----------
+    runtime : float, default=0
+        Running time of the simulation.
+    timeunits : str, default='steps'
+        Units for time arguments. Can be 'steps', 'ns' etc.
+    temperature : float, default=300
+        Temperature of the thermostat in Kelvin
+    restraints : list, default=None
+        A list of restraint objects. See :class:`AtomRestraint <htmd.mdengine.acemd.acemd.AtomRestraint>` and:class:`GroupRestraint<htmd.mdengine.acemd.acemd.GroupRestraint>`)
+    useconstantratio : bool, default=False
+        For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
+    restraintsteps : int, default=None
+        Number of initial steps to apply restraints in units of 4fs. Defaults to half the simulation time.
 
-        Example
-        -------
-        >>> from htmd.protocols.equilibration_v3 import Equilibration
-        >>> from htmd.mdengine.acemd.acemd import GroupRestraint
-        >>> md = Equilibration()
-        >>> md.runtime = 4
-        >>> md.timeunits = 'ns'
-        >>> md.temperature = 300
-        >>> md.useconstantratio = True  # only for membrane sims
-        Use a 10A flat bottom potential to prevent the ligand from diffusing from original position during equilibration
-        >>> width = np.array([10, 10, 10])
-        >>> flatbot = GroupRestraint('segname L and noh', width, [(5, '0ns')])
-        Add also the default restraints for protein
-        >>> md.restraints = [flatbot,] + md.defaultEquilRestraints('2ns')
-        >>> md.write('./build','./equil')
+    Example
+    -------
+    >>> from htmd.protocols.equilibration_v3 import Equilibration
+    >>> from htmd.mdengine.acemd.acemd import GroupRestraint
+    >>> md = Equilibration()
+    >>> md.runtime = 4
+    >>> md.timeunits = 'ns'
+    >>> md.temperature = 300
+    >>> md.useconstantratio = True  # only for membrane sims
+    Use a 10A flat bottom potential to prevent the ligand from diffusing from original position during equilibration
+    >>> width = np.array([10, 10, 10])
+    >>> flatbot = GroupRestraint('segname L and noh', width, [(5, '0ns')])
+    Add also the default restraints for protein
+    >>> mol = Molecule("./build/structure.pdb")
+    >>> md.restraints = [flatbot,] + md.defaultEquilRestraints('2ns', mol)
+    >>> md.write('./build','./equil')
     """
 
     def __init__(self, _version=_config["acemdversion"]):
@@ -178,8 +179,8 @@ class Equilibration(ProtocolInterface):
             self.acemd.parmfile = self.acemd.parameters
             self.acemd.parameters = None
 
-    def defaultEquilRestraints(self, decay):
-        """ Get the default protein restraints
+    def defaultEquilRestraints(self, decay, mol=None):
+        """Get the default equilibration restraints
 
         Parameters
         ----------
@@ -200,10 +201,18 @@ class Equilibration(ProtocolInterface):
         notcaatoms = AtomRestraint(
             "protein and noh and not name CA", 0, [(0.1, 0), (0, decay)]
         )
-        return [caatoms, notcaatoms]
+        nucleic = AtomRestraint("nucleic and backbone", 0, [(1, 0), (0, decay)])
+        nucleicside = AtomRestraint(
+            "nucleic and not backbone and noh", 0, [(0.1, 0), (0, decay)]
+        )
+        restraints = [caatoms, notcaatoms, nucleic, nucleicside]
+        if mol is not None:
+            restraints = [r for r in restraints if mol.atomselect(r.selection).sum()]
+
+        return restraints
 
     def write(self, inputdir, outputdir):
-        """ Write the equilibration protocol
+        """Write the equilibration protocol
 
         Writes the equilibration protocol and files into a folder for execution
         using files inside the inputdir directory
@@ -257,7 +266,7 @@ class Equilibration(ProtocolInterface):
         if self.restraints is not None:
             self.acemd.restraints = self.restraints
         else:
-            self.acemd.restraints = self.defaultEquilRestraints(constrsteps)
+            self.acemd.restraints = self.defaultEquilRestraints(constrsteps, mol=inmol)
 
         if self.acemd.boxsize is None and self.acemd.extendedsystem is None:
             coords = inmol.get("coords", sel="water")
@@ -323,6 +332,7 @@ class _TestEquilibration(unittest.TestCase):
         from htmd.util import tempname
         from htmd.home import home
         from htmd.units import convert
+        from moleculekit.molecule import Molecule
         from glob import glob
         import os
         from htmd.mdengine.acemd.acemd import GroupRestraint
@@ -340,7 +350,14 @@ class _TestEquilibration(unittest.TestCase):
             [(5, 0)],
             fbcentre=[-0.178, -0.178, 29.195],
         )
-        eq.restraints = eq.defaultEquilRestraints(1000000) + [ligres]
+        mol = Molecule(
+            home(
+                dataDir=os.path.join(
+                    "test-protocols", "build", "protLig", "structure.pdb"
+                )
+            )
+        )
+        eq.restraints = eq.defaultEquilRestraints(1000000, mol=mol) + [ligres]
         tmpdir = tempname()
         eq.write(
             home(dataDir=os.path.join("test-protocols", "build", "protLig")), tmpdir
