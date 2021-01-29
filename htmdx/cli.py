@@ -179,43 +179,5 @@ def do_register(product=None):
         print("\nCould not register!\n")
 
 
-def main_activate():
-    import sys
-
-    if len(sys.argv) != 2:
-        print(
-            "\n Acellera License Installation\n\n Syntax: activate [activation token]\n\nPlease contact support@acellera.com for licensing\n\n"
-        )
-        sys.exit(0)
-
-    token = sys.argv[1]
-    response = urllib.request.urlopen(
-        "https://licensing.acellera.com/issue/?token=" + token
-    )
-    text = response.read()
-    if isinstance(text, bytes):
-        text = text.decode("ascii")
-
-    if response.status != 200:
-        print("\n Error: " + text + "(" + str(response.status) + ")\n\n")
-    else:
-        prefix = os.path.join(os.path.expanduser("~"), ".acellera")
-        try:
-            os.mkdir(prefix)
-        except:
-            pass
-
-        with open(os.path.join(prefix, "license.dat"), "a") as f:
-            f.write(text)
-
-        print("\n License installed in ~/.acellera/license.dat\n\n")
-        try:
-            with open(os.path.join("/opt/acellera/license.dat"), "a") as f:
-                f.write(text)
-            print("\n License installed in /opt/acellera/license.dat\n\n")
-        except:
-            pass
-
-
 if __name__ == "__main__":
-    main_activate()
+    pass
