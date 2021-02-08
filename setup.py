@@ -36,7 +36,6 @@ if __name__ == "__main__":
         entry_points={
             "console_scripts": [
                 "htmd_register   = htmdx.cli:htmd_do_register",
-                "activate_license  = htmdx.cli:main_activate",
             ]
         },
         packages=setuptools.find_packages(include=["htmd*"], exclude=["data"]),
