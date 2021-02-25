@@ -276,7 +276,7 @@ class Kinetics(object):
         state_sizes = msm.stationary_distribution ** 0.25  # Scale eq prob down to make states visible
         fig, pos = mplt.plot_markov_model(msm, state_sizes=state_sizes)
 
-    def plotFluxPathways(self, statetype='macro', mode='net_flux', fraction=1.0):
+    def plotFluxPathways(self, statetype='macro', mode='net_flux', fraction=1.0, plot=True, save=None):
         """ Plot flux pathways between source and sink state.
 
         The flux is in units of transition events per lag time used to construct the Markov model.
@@ -289,6 +289,10 @@ class Kinetics(object):
             Type of fluxes to plot
         fraction : float
             Fraction of fluxes for which to report pathways. Doesn't change the plot, only the text output.
+        plot : bool
+            If set it False the plot will not show up in a figure
+        save : str
+            If a path is passed to save, the plot will be saved to the specified file
         """
         # Make mode a radio button with interactive plot
         from pyemma import msm
@@ -317,7 +321,11 @@ class Kinetics(object):
                         continue
             setmap = np.array(setmap)
             fig, pos = plot_flux(tpt, attribute_to_plot=mode, state_labels=setmap)
-        fig.show()
+
+        if save is not None:
+            fig.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+        if plot:
+            fig.show()
 
         paths, pathfluxes = tpt.pathways(fraction=fraction)
         cumflux = 0
