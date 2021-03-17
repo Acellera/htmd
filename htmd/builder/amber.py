@@ -53,7 +53,7 @@ def _findTeLeap():
 
 
 def defaultAmberHome(teleap=None):
-    """ Returns the default AMBERHOME as defined by the location of teLeap binary
+    """Returns the default AMBERHOME as defined by the location of teLeap binary
 
     Parameters:
     -----------
@@ -64,9 +64,7 @@ def defaultAmberHome(teleap=None):
         teleap = _findTeLeap()
     else:
         if shutil.which(teleap) is None:
-            raise NameError(
-                "Could not find executable: `{}` in the PATH.".format(teleap)
-            )
+            raise NameError(f"Could not find executable: `{teleap}` in the PATH.")
 
     return os.path.normpath(os.path.join(os.path.dirname(teleap), "../"))
 
@@ -86,7 +84,7 @@ def htmdAmberHome():
 
 
 def listFiles():
-    """ Lists all AMBER forcefield files available in HTMD
+    """Lists all AMBER forcefield files available in HTMD
 
     Example
     -------
@@ -162,7 +160,7 @@ def _locateFile(fname, ftype, teleap):
     foundfile = glob(os.path.join(htmdamberdir, fname))
     if len(foundfile) != 0:
         return foundfile[0]
-    logger.warning("Was not able to find {} file {}".format(ftype, fname))
+    logger.warning(f"Was not able to find {ftype} file {fname}")
 
 
 def defaultFf():
@@ -210,7 +208,7 @@ def build(
     gbsa=False,
     igb=2,
 ):
-    """ Builds a system for AMBER
+    """Builds a system for AMBER
 
     Uses tleap to build a system for AMBER. Additionally it allows the user to ionize and add disulfide bridges.
 
@@ -323,14 +321,14 @@ def build(
             force = _locateFile(force, "ff", teleap)
             if force is None:
                 continue
-        newname = "ff{}_{}".format(i, os.path.basename(force))
+        newname = f"ff{i}_{os.path.basename(force)}"
         shutil.copy(force, os.path.join(outdir, newname))
-        f.write("source {}\n".format(newname))
+        f.write(f"source {newname}\n")
     f.write("\n")
 
     if gbsa:
         gbmodels = {1: "mbondi", 2: "mbondi2", 5: "mbondi2", 7: "bondi", 8: "mbondi3"}
-        f.write("set default PBradii {}\n\n".format(gbmodels[igb]))
+        f.write(f"set default PBradii {gbmodels[igb]}\n\n")
 
     # Adding custom atom types
     if atomtypes is not None:
@@ -341,7 +339,7 @@ def build(
                 raise RuntimeError(
                     "Atom type definitions have to be triplets. Check the AMBER documentation."
                 )
-            f.write('    {{ "{}" "{}" "{}" }}\n'.format(at[0], at[1], at[2]))
+            f.write(f'    {{ "{at[0]}" "{at[1]}" "{at[2]}" }}\n')
         f.write("}\n\n")
 
     # Loading OFF libraries
@@ -349,12 +347,10 @@ def build(
         offlibraries = ensurelist(offlibraries)
         for i, off in enumerate(offlibraries):
             if not os.path.isfile(off):
-                raise RuntimeError(
-                    "Could not find off-library in location {}".format(off)
-                )
-            newname = "offlib{}_{}".format(i, os.path.basename(off))
+                raise RuntimeError(f"Could not find off-library in location {off}")
+            newname = f"offlib{i}_{os.path.basename(off)}"
             shutil.copy(off, os.path.join(outdir, newname))
-            f.write("loadoff {}\n".format(newname))
+            f.write(f"loadoff {newname}\n")
 
     # Loading frcmod parameters
     f.write("# Loading parameter files\n")
@@ -363,9 +359,9 @@ def build(
             p = _locateFile(p, "param", teleap)
             if p is None:
                 continue
-        newname = "param{}_{}".format(i, os.path.basename(p))
+        newname = f"param{i}_{os.path.basename(p)}"
         shutil.copy(p, os.path.join(outdir, newname))
-        f.write("loadamberparams {}\n".format(newname))
+        f.write(f"loadamberparams {newname}\n")
     f.write("\n")
 
     # Loading prepi topologies
@@ -375,31 +371,32 @@ def build(
             t = _locateFile(t, "topo", teleap)
             if t is None:
                 continue
-        newname = "topo{}_{}".format(i, os.path.basename(t))
+        newname = f"topo{i}_{os.path.basename(t)}"
         shutil.copy(t, os.path.join(outdir, newname))
-        f.write("loadamberprep {}\n".format(newname))
+        f.write(f"loadamberprep {newname}\n")
     f.write("\n")
 
     f.write("# Loading the system\n")
     f.write("mol = loadpdb input.pdb\n\n")
 
     if np.sum(mol.atomtype != "") != 0:
-        logger.debug("Writing mol2 files for input to tleap.")
+        f.write("# Loading the ligands\n")
         segs = np.unique(mol.segid[mol.atomtype != ""])
-        combstr = "mol = combine {mol"
-        for s in segs:
-            name = "segment{}".format(s)
-            mol2name = os.path.join(outdir, "{}.mol2".format(name))
-            mol.write(mol2name, (mol.atomtype != "") & (mol.segid == s))
-            if not os.path.isfile(mol2name):
-                raise NameError(
-                    "Could not write a mol2 file out of the given Molecule."
-                )
-            f.write("# Loading the rest of the system\n")
-            f.write("{} = loadmol2 {}.mol2\n\n".format(name, name))
-            combstr += " {}".format(name)
-        combstr += "}\n\n"
-        f.write(combstr)
+
+        # teLeap crashes if you try to combine too many molecules in a single command so we will do them by 10s
+        for k in range(0, len(segs), 10):
+            segments_string = ""
+            for seg in segs[k : min(k + 10, len(segs))]:
+                name = f"segment{seg}"
+                segments_string += f" {name}"
+
+                mol2name = os.path.join(outdir, f"{name}.mol2")
+                mol.write(mol2name, (mol.atomtype != "") & (mol.segid == seg))
+                if not os.path.isfile(mol2name):
+                    raise NameError("Failed writing ligand mol2 file.")
+
+                f.write(f"{name} = loadmol2 {name}.mol2\n")
+            f.write(f"mol = combine {{mol{segments_string}}}\n\n")
 
     # Write patches for disulfide bonds (only after ionizing)
     if not ionize:
@@ -415,10 +412,10 @@ def build(
             newdisu = []
             for d in disulfide:
                 r1 = UniqueResidueID.fromMolecule(
-                    mol, "resid {} and segname {}".format(d.resid1, d.segid1)
+                    mol, f"resid {d.resid1} and segname {d.segid1}"
                 )
                 r2 = UniqueResidueID.fromMolecule(
-                    mol, "resid {} and segname {}".format(d.resid2, d.segid2)
+                    mol, f"resid {d.resid2} and segname {d.segid2}"
                 )
                 newdisu.append([r1, r2])
             disulfide = newdisu
@@ -453,7 +450,7 @@ def build(
                 )
                 uqres1 = int(np.unique(uqseqid[atoms1]))
                 uqres2 = int(np.unique(uqseqid[atoms2]))
-                f.write("bond mol.{}.SG mol.{}.SG\n".format(uqres1, uqres2))
+                f.write(f"bond mol.{uqres1}.SG mol.{uqres2}.SG\n")
             f.write("\n")
             mol.remove(torem, _logger=False)
 
@@ -461,7 +458,7 @@ def build(
     f.write('setBox mol "vdw"\n\n')
 
     f.write("# Writing out the results\n")
-    f.write("saveamberparm mol " + prefix + ".prmtop " + prefix + ".crd\n")
+    f.write(f"saveamberparm mol {prefix}.prmtop {prefix}.crd\n")
     f.write("quit")
     f.close()
 
@@ -486,9 +483,7 @@ def build(
             ]
             if len(teleapimports) == 0:
                 raise RuntimeWarning(
-                    "No default Amber force-field found. Check teLeap location: {}".format(
-                        teleap
-                    )
+                    f"No default Amber force-field found. Check teLeap location: {teleap}"
                 )
             # Source HTMD Amber paths that contain ffs
             htmdamberdir = htmdAmberHome()
@@ -525,11 +520,7 @@ def build(
         if errors:
             raise BuildError(
                 errors
-                + [
-                    "Check {} for further information on errors in building.".format(
-                        logpath
-                    )
-                ]
+                + [f"Check {logpath} for further information on errors in building."]
             )
         logger.info("Finished building.")
 
@@ -543,15 +534,11 @@ def build(
                 molbuilt.read(os.path.join(outdir, "structure.crd"))
             except Exception as e:
                 raise RuntimeError(
-                    "Failed at reading structure.prmtop/structure.crd due to error: {}".format(
-                        e
-                    )
+                    f"Failed at reading structure.prmtop/structure.crd due to error: {e}"
                 )
         else:
             raise BuildError(
-                "No structure pdb/prmtop file was generated. Check {} for errors in building.".format(
-                    logpath
-                )
+                f"No structure pdb/prmtop file was generated. Check {logpath} for errors in building."
             )
 
         if ionize:
@@ -632,12 +619,10 @@ def _applyProteinCaps(mol, caps):
         segment = np.where(mol.segid == seg)[0]
         # Test segment
         if len(segment) == 0:
-            raise RuntimeError("There is no segment {} in the molecule.".format(seg))
+            raise RuntimeError(f"There is no segment {seg} in the molecule.")
         if not np.any(prot & (mol.segid == seg)):
             raise RuntimeError(
-                "Segment {} is not protein. Capping for non-protein segments is not supported.".format(
-                    seg
-                )
+                f"Segment {seg} is not protein. Capping for non-protein segments is not supported."
             )
         # For each cap
         passed = False
@@ -658,25 +643,19 @@ def _applyProteinCaps(mol, caps):
 
             if cap is None or cap == "":  # In case there is no cap defined
                 logger.warning(
-                    "No cap provided for resid {} on segment {}. Did not apply it.".format(
-                        terminalresids[i], seg
-                    )
+                    f"No cap provided for resid {terminalresids[i]} on segment {seg}. Did not apply it."
                 )
                 continue
             elif cap not in capresname:  # If it is defined, test if supported
                 raise RuntimeError(
-                    "In segment {}, the {} cap is not supported. Try using {} instead.".format(
-                        seg, cap, capresname
-                    )
+                    f"In segment {seg}, the {cap} cap is not supported. Try using {capresname} instead."
                 )
 
             # Test if cap is already applied
             testcap = np.where(segidm & residm & (mol.resname == cap))[0]
             if len(testcap) != 0:
                 logger.warning(
-                    "Cap {} already exists on segment {}. Did not re-apply it.".format(
-                        cap, seg
-                    )
+                    f"Cap {cap} already exists on segment {seg}. Did not re-apply it."
                 )
                 continue
 
@@ -711,10 +690,6 @@ def _applyProteinCaps(mol, caps):
                     mol.coords[termcenterid], mol.coords[termcaid]
                 )
                 mol.insert(atom, terminalids[i])
-                # logger.info('In segment {}, resid {} had none of these atoms: {}. Capping was performed by creating '
-                #             'a new atom for cap construction by tleap.'.format(seg, terminalresids[i],
-                #                                                                ' '.join(terminalatoms[cap])))
-
             else:
                 # Select atom to change, do changes to cap, and change resid
                 newatom = np.max(termatomsids)
@@ -750,9 +725,7 @@ def _applyProteinCaps(mol, caps):
         segididx = np.where(segidm)[0]
         resids = mol.resid[segididx]
         mol.remove(
-            '(resid "{}" "{}") and segid {} and hydrogen'.format(
-                resids[0], resids[-1], seg
-            ),
+            f'(resid "{resids[0]}" "{resids[-1]}") and segid {seg} and hydrogen',
             _logger=False,
         )
 
@@ -773,9 +746,9 @@ def _defaultProteinCaps(mol):
     for s in segsProt:
         if len(np.unique(mol.resid[mol.segid == s])) < 10:
             logger.warning(
-                "Segment {} consists of a peptide with less than 10 residues. It will not be capped by "
+                f"Segment {s} consists of a peptide with less than 10 residues. It will not be capped by "
                 "default. If you want to cap it use the caps argument of amber.build to manually define caps"
-                "for all segments.".format(s)
+                "for all segments."
             )
             continue
         caps[s] = ["ACE", "NME"]
@@ -793,7 +766,7 @@ def _cleanOutDir(outdir):
 
 
 def _charmmLipid2Amber(mol):
-    """ Convert a CHARMM lipid membrane to AMBER format
+    """Convert a CHARMM lipid membrane to AMBER format
 
     Parameters
     ----------
@@ -876,7 +849,7 @@ def _charmmLipid2Amber(mol):
         map = np.zeros(len(mol.resid), dtype=bool)
         map[begters[i] : finters[i] + 1] = True
         mol.set("resid", sequenceID(mol.get("resname", sel=map)), sel=map)
-        mol.set("segid", "L{}".format(i % 2), sel=map)
+        mol.set("segid", f"L{i % 2}", sel=map)
 
     return mol
 
@@ -962,35 +935,27 @@ def _logParser(fname):
     if len(unknownres):
         errors.append(
             UnknownResidueError(
-                "Unknown residue(s) {} found in the input structure. "
+                f"Unknown residue(s) {np.unique(unknownres)} found in the input structure. "
                 "You are either missing a topology definition for the residue or you need to "
-                "rename it to the correct residue name".format(np.unique(unknownres))
+                "rename it to the correct residue name"
             )
         )
     if len(missingparam):
         errors.append(
             MissingParameterError(
-                "Missing parameters for atom {} and type {}".format(
-                    missingparam, missingparam
-                )
+                f"Missing parameters for atom {missingparam} and type {missingparam}"
             )
         )
     if len(missingtorsion):
         errors.append(
-            MissingTorsionError("Missing torsion terms for {}".format(missingtorsion))
+            MissingTorsionError(f"Missing torsion terms for {missingtorsion}")
         )
     if len(missingbond):
-        errors.append(
-            MissingBondError("Missing bond parameters for {}".format(missingbond))
-        )
+        errors.append(MissingBondError(f"Missing bond parameters for {missingbond}"))
     if len(missingangle):
-        errors.append(
-            MissingAngleError("Missing angle parameters for {}".format(missingangle))
-        )
+        errors.append(MissingAngleError(f"Missing angle parameters for {missingangle}"))
     if len(missingatomtype):
-        errors.append(
-            MissingAtomTypeError("Missing atom type for {}".format(missingatomtype))
-        )
+        errors.append(MissingAtomTypeError(f"Missing atom type for {missingatomtype}"))
 
     return errors
 
@@ -1002,7 +967,7 @@ class _TestAmberBuild(unittest.TestCase):
         from htmd.util import tempname
 
         self.testDir = os.environ.get("TESTDIR", tempname())
-        print("Running tests in {}".format(self.testDir))
+        print(f"Running tests in {self.testDir}")
 
     def run(self, result=None):
         self.currentResult = result  # remember result for use in tearDown
@@ -1043,9 +1008,7 @@ class _TestAmberBuild(unittest.TestCase):
         match, mismatch, error = filecmp.cmpfiles(tmpdir, compare, files, shallow=False)
         if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
             raise RuntimeError(
-                "Different results produced by amber.build for test {} between {} and {} in files {}.".format(
-                    pid, compare, tmpdir, mismatch
-                )
+                f"Different results produced by amber.build for test {pid} between {compare} and {tmpdir} in files {mismatch}."
             )
 
         for f in deletefiles:
@@ -1212,4 +1175,3 @@ if __name__ == "__main__":
     unittest.main(verbosity=2)
     # if failure_count != 0:
     #     raise Exception('Doctests failed')
-
