@@ -217,7 +217,7 @@ class Model(object):
         return macro_ofcluster
 
     def plotTimescales(self, lags=None, minlag=None, maxlag=None, numlags=25, units='frames', errors=None, nits=None,
-                       results=False, plot=True, save=None, njobs=-2):
+                       results=False, plot=True, save=None, njobs=-2, ylog=True):
         """ Plot the implied timescales of MSMs of various lag times
 
         Parameters
@@ -245,6 +245,8 @@ class Model(object):
         njobs : int
             Number of parallel jobs to spawn for calculation of timescales. Negative numbers are used for spawning jobs as many as CPU threads. 
             -1: for all CPUs -2: for all except one etc.
+        ylog : bool
+            Set to False to get linear y axis instead of logarithmic
 
         Returns
         -------
@@ -279,7 +281,7 @@ class Model(object):
             plt.ion()
             plt.figure()
             try:
-                mplt.plot_implied_timescales(its, dt=self.data.fstep, units='ns')
+                mplt.plot_implied_timescales(its, ylog=ylog, dt=self.data.fstep, units='ns')
             except ValueError as ve:
                 plt.close()
                 raise ValueError('{} This is probably caused by badly set fstep in the data ({}). '.format(ve, self.data.fstep) +
