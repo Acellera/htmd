@@ -1,4 +1,4 @@
-# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# (c) 2015-2021 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -12,8 +12,6 @@ import json
 import urllib.request
 import urllib.parse
 import platform
-
-has_connection = True
 
 
 def htmd_do_register():
@@ -31,12 +29,6 @@ def show_news():
 
 
 def check_approval(product, reg_file):
-    # TODO: this may come back in other form
-    # from htmdx.license import licenseEntitlements
-    # jj = licenseEntitlements()
-    # if "HTMD" in jj: return True
-    # if "htmd" in jj: return True
-
     registration_data = {}
     try:
         with open(os.path.join(reg_file), "r") as f:
@@ -69,9 +61,6 @@ def check_approval(product, reg_file):
 
 
 def check_registration(product=None):
-    if not product:
-        product = "NA"
-
     reg_file = os.path.join(
         os.path.expanduser("~"), ".htmd", ".registered-htmd", "registration"
     )
