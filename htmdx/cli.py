@@ -9,18 +9,14 @@ from subprocess import call
 import inspect
 import htmdx
 import json
-import urllib.request
-import urllib.parse
 import platform
 import requests
 
 
 def show_news():
     try:
-        response = urllib.request.urlopen(
-            "https://www.htmd.org/news/content", timeout=3.05
-        )
-        print(response.read().decode("ascii"))
+        res = requests.get("https://www.htmd.org/news/content", timeout=10)
+        print(res.text)
     except:
         pass
 
