@@ -12,10 +12,7 @@ import json
 import urllib.request
 import urllib.parse
 import platform
-
-
-def htmd_do_register():
-    do_register("htmd")
+import requests
 
 
 def show_news():
@@ -67,7 +64,7 @@ def check_registration(product=None):
 
     if not (os.path.isfile(reg_file) and check_approval(product, reg_file)):
         accept_license(product=product)
-        do_register(product=product)
+        htmd_register(product=product)
 
 
 def accept_license(product=None):
@@ -103,69 +100,64 @@ def show_license(product=None):
         fh.close()
 
 
-def do_register(product=None):
-    name = ""
-    institution = ""
-    email = ""
-    city = ""
-    country = ""
+def htmd_register(product="htmd"):
 
     print(
-        "\n Welcome to HTMD. We'd like to know who you are so that we can keep in touch!"
-    )
-    print(" Please enter your name, affiliation and institutional email address.\n")
-    print(" Please provide valid information so that it might be verified.\n")
+"""
+  Welcome to the HTMD registration!
 
-    while email == "" or not ("@" in email) or not ("." in email):
-        print(" Institutional Email : ", end="")
-        sys.stdout.flush()
-        email = input().strip()
+  We would like to know about you to keep in touch.
+  Please provide your full name, institutional email,
+  institution name, city, and country.
+""")
 
+    # Get data from a user
+    name = ""
     while name == "":
-        print(" Full name   : ", end="")
+        print("  Full name           : ", end="")
         sys.stdout.flush()
         name = input().strip()
 
+    email = ""
+    while email == "":
+        print("  Institutional email : ", end="")
+        sys.stdout.flush()
+        email = input().strip()
+
+    institution = ""
     while institution == "":
-        print(" Institution : ", end="")
+        print("  Institution name    : ", end="")
         sys.stdout.flush()
         institution = input().strip()
 
+    city = ""
     while city == "":
-        print(" City        : ", end="")
+        print("  City                : ", end="")
         sys.stdout.flush()
         city = input().strip()
 
+    country = ""
     while country == "":
-        print(" Country     : ", end="")
+        print("  Country             : ", end="")
         sys.stdout.flush()
         country = input().strip()
 
-    payload = {
-        "name": name,
-        "institution": institution,
-        "email": email,
-        "product": product,
-        "city": city,
-        "country": country,
-    }
-    try:
-        data = urllib.parse.urlencode(payload).encode("ascii")
-        with urllib.request.urlopen(
-            "https://www.acellera.com/licensing/htmd/register.php", data
-        ) as f:
-            text = f.read().decode("ascii")
+    # Send data to the registration server
+    url = "https://www.acellera.com/licensing/htmd/register.php"
+    data = {"name": name, "email": email, "institution": institution,
+            "city": city, "country": country, "product": product}
+    res = requests.post(url, data=data, timeout=10)
 
-        prefix = os.path.join(
-            os.path.expanduser("~"), ".htmd", ".registered-" + product
-        )
+    # Check the response
+    if res.status_code == 200:
+        prefix = os.path.join(os.path.expanduser("~"), ".htmd", ".registered-" + product)
         os.makedirs(prefix, exist_ok=True)
-        regfile = os.path.join(prefix, "registration")
-        with open(regfile, "w") as fh:
-            fh.write(text)
-        print("")
-    except:
-        print("\nCould not register!\n")
+        reg_file = os.path.join(prefix, "registration")
+        with open(reg_file, "w") as fh:
+            fh.write(res.text)
+        print("\n  Registration completed!\n")
+    else:
+        print("\n  Registration failed: %s\n" % res.text)
 
 
 if __name__ == "__main__":
