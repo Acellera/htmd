@@ -26,41 +26,40 @@ def show_news():
 
 
 def check_approval(product, reg_file):
-    registration_data = {}
+    reg_data = {}
     try:
         with open(os.path.join(reg_file), "r") as f:
-            registration_data = json.load(f)
+            reg_data = json.load(f)
     except:
         # Couldn't read registration file
         return False
 
-    if not registration_data["ret"]:
+    if not reg_data["ret"]:
         # There's no registration code in the file
         return False
 
-    # Do online check
-    try:
-        payload = {"code": registration_data["ret"], "product": product}
-        data = urllib.parse.urlencode(payload).encode("ascii")
-        with urllib.request.urlopen(
-            "https://www.acellera.com/licensing/htmd/check.php", data, timeout=3.05
-        ) as f:
-            ret = json.loads(f.read().decode("ascii"))
+    # Send the registration data
+    data = {"code": reg_data["ret"], "product": product}
+    url = "https://www.acellera.com/licensing/htmd/check.php"
+    res = requests.post(url, data, timeout=10)
 
-        if "approved" in ret:
-            return True
-        if "pending" in ret:
-            return True
-    except:
-        return True
+    # Check the response
+    if res.status_code == 200:
+        status = res.json()
 
+        if "approved" in status:
+            return True
+
+        if "pending" in status:
+            return True
+
+    print('Registration is not approved: %s' % res.text)
     return False
 
 
-def check_registration(product=None):
-    reg_file = os.path.join(
-        os.path.expanduser("~"), ".htmd", ".registered-htmd", "registration"
-    )
+def htmd_registration(product="htmd"):
+
+    reg_file = os.path.join(os.path.expanduser("~"), ".htmd", ".registered-htmd", "registration")
 
     if not (os.path.isfile(reg_file) and check_approval(product, reg_file)):
         accept_license(product=product)
