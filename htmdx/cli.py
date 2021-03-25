@@ -3,14 +3,12 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import os
-import sys
-from subprocess import call
-import inspect
-import htmdx
 import json
+import os
 import platform
 import requests
+from subprocess import call
+import sys
 
 
 def show_news():
@@ -58,41 +56,35 @@ def htmd_registration(product="htmd"):
     reg_file = os.path.join(os.path.expanduser("~"), ".htmd", ".registered-htmd", "registration")
 
     if not (os.path.isfile(reg_file) and check_approval(product, reg_file)):
-        accept_license(product=product)
+        accept_licence(product=product)
         htmd_register(product=product)
 
 
-def accept_license(product=None):
-    show_license(product=product)
-    print("Type 'yes' to accept the license [no] : ", end="")
-    sys.stdout.flush()
-    ret = input().strip()
+def accept_licence(product=None):
+    show_licence(product=product)
+
+    ret = input("Type 'yes' to accept the license [no] : ").strip()
     if ret != "yes":
-        os._exit(1)
+        sys.exit(1)
 
 
-def show_license(product=None):
-    path = os.path.abspath(
-        os.path.dirname(os.path.dirname(inspect.getfile(accept_license)))
-    )
-    if product:
-        path = os.path.join(path, product)
+def show_licence(product):
 
-    path = os.path.join(path, "LICENCE.txt")
+    # Find the licence file
+    path = os.path.join(os.path.dirname(__file__), '..', product, "LICENCE.txt")
     if not os.path.exists(path):
-        print("Could not find license file. Aborting")
-        os._exit(1)
+        print("Cannot find the licence file!")
+        sys.exit(1)
 
-    print(sys.stdin)
+    # Show the licence file
     if sys.stdout.isatty() and sys.stdin:
         if platform.system() == "Windows":
             call(["c:\\Windows\\System32\\more.com", path])
         else:
             call(["more", path])
     else:
-        fh = open(path, "r")
-        print(fh.read())
-        fh.close()
+        with open(path) as fh:
+            print(fh.read())
 
 
 def htmd_register(product="htmd"):
