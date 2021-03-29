@@ -447,7 +447,7 @@ class Acemd(_Acemd):
     """
 
     def __init__(self, config=None):
-        super().__init__(version=3)
+        super().__init__()
         self._arg(
             "temperature",
             "float",
