@@ -41,8 +41,8 @@ def _findTeLeap():
     teleap = shutil.which("teLeap", mode=os.X_OK)
     if not teleap:
         raise FileNotFoundError(
-            "teLeap not found. You should either have AmberTools or ambermini installed "
-            "(to install ambermini do: conda install ambermini -c acellera)"
+            "teLeap not found. You should have AmberTools installed "
+            "(to install AmberTools do: conda install ambertools -c conda-forge)"
         )
     if os.path.islink(teleap):
         if os.path.isabs(os.readlink(teleap)):
@@ -290,7 +290,7 @@ def build(
     else:
         if shutil.which(teleap) is None:
             raise NameError(
-                f"Could not find executable: `{teleap}` in the PATH. Cannot build for AMBER. Please install it with `conda install ambermini -c acellera`"
+                f"Could not find executable: `{teleap}` in the PATH. Cannot build for AMBER. Please install it with `conda install ambertools -c conda-forge`"
             )
 
     if not os.path.isdir(outdir):
