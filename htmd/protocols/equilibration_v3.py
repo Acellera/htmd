@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.apps.acemd import Acemd as Acemd2
 from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
 from htmd.config import _config
 from protocolinterface import ProtocolInterface, val
@@ -54,17 +53,14 @@ class Equilibration(ProtocolInterface):
     >>> md.write('./build','./equil')
     """
 
-    def __init__(self, _version=_config["acemdversion"]):
-        if _version == 2:
-            raise RuntimeError("Equilibration v3 only supports _version=3")
-
+    def __init__(self):
         super().__init__()
         self._arg(
             "acemd",
             ":class:`Acemd <htmd.mdengine.acemd.acemd.Acemd>` object",
             "Acemd class object",
             None,
-            val.Object([Acemd2, Acemd]),
+            val.Object(Acemd),
         )
         self._arg(
             "runtime",

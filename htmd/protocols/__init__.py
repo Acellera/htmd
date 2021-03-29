@@ -8,4 +8,3 @@ constraints for atoms.
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-__author__ = 'gianni'
