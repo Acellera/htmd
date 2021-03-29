@@ -19,7 +19,7 @@ def htmd_show_news():
         pass
 
 
-def get_reg_file(product):
+def _get_reg_file(product):
 
     dir = os.path.join(os.path.expanduser("~"), "." + product, ".registered-" + product)
     os.makedirs(dir, exist_ok=True)
@@ -28,10 +28,10 @@ def get_reg_file(product):
     return file
 
 
-def check_registration(product):
+def _check_registration(product):
 
     # Get a registation file
-    reg_file = get_reg_file(product)
+    reg_file = _get_reg_file(product)
 
     reg_data = {}
     try:
@@ -64,14 +64,14 @@ def check_registration(product):
     return False
 
 
-def accept_licence(product):
+def _accept_licence(product):
 
     ret = input("Type 'yes' to accept the license [no] : ").strip()
     if ret != "yes":
         sys.exit(1)
 
 
-def show_licence(product):
+def _show_licence(product):
 
     # Find the licence file
     path = os.path.join(os.path.dirname(__file__), '..', product, "LICENCE.txt")
@@ -92,13 +92,13 @@ def show_licence(product):
 
 def htmd_registration(product="htmd"):
 
-    if not check_registration(product):
-        show_licence(product)
-        accept_licence(product)
+    if not _check_registration(product):
+        _show_licence(product)
+        _accept_licence(product)
         htmd_register(product)
 
 
-def ask(prompt):
+def _ask(prompt):
 
     value = ""
     while value == "":
@@ -120,11 +120,11 @@ def htmd_register(product="htmd"):
 
     # Ask a user for data
     data = {}
-    data["name"]        = ask("  Full name           : ")
-    data["email"]       = ask("  Institutional email : ")
-    data["institution"] = ask("  Institution name    : ")
-    data["city"]        = ask("  City                : ")
-    data["country"]     = ask("  Country             : ")
+    data["name"]        = _ask("  Full name           : ")
+    data["email"]       = _ask("  Institutional email : ")
+    data["institution"] = _ask("  Institution name    : ")
+    data["city"]        = _ask("  City                : ")
+    data["country"]     = _ask("  Country             : ")
     data["product"]     = product
 
     # Send data to the registration server
@@ -133,7 +133,7 @@ def htmd_register(product="htmd"):
 
     # Check the response
     if res.status_code == 200:
-        reg_file = get_reg_file(product)
+        reg_file = _get_reg_file(product)
         with open(reg_file, "w") as fh:
             fh.write(res.text)
         print("\n  Registration completed!\n")
