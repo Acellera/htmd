@@ -336,7 +336,7 @@ class Production(ProtocolInterface):
                 self.acemd.restraints = restraints
 
         if self.useconstantratio:
-            self.acemd.useconstantratio = "on"
+            self.acemd.barostatconstratio = "on"
 
         if self.adaptive:
             self.acemd.binvelocities = None

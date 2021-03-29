@@ -275,7 +275,7 @@ class Equilibration(ProtocolInterface):
             self.acemd.boxsize = "{} {} {}".format(dim[0], dim[1], dim[2])
 
         if self.useconstantratio:
-            self.acemd.useconstantratio = "on"
+            self.acemd.barostatconstratio = "on"
 
         self.acemd.setup(inputdir, outputdir, overwrite=True)
 

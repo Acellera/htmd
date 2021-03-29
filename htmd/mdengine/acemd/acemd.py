@@ -373,7 +373,7 @@ class Acemd(_Acemd):
         Restart simulation.
     trajectoryfile : str, default=None
         Output file name.
-    trajectoryfreq : int, default=None
+    trajectoryperiod : int, default=None
         Trajectory sampling frequency in steps.
     timestep : int, default=None
         Simulation timestep.
@@ -381,13 +381,13 @@ class Acemd(_Acemd):
         Particle-mesh Ewald summation.
     switching : str, default=None
         Apply switching function to the van der Waals potential.
-    switchdist : float, default=None
+    switchdistance : float, default=None
         Distance in Angstrom at which to begin applying the switching function.
     cutoff : float, default=None
         Real-space cutoff in Angstroms for electrostatics and van der Waals.
     thermostat : str, default=None
         Enable thermostatic control
-    thermostattemp : float, default=None
+    thermostattemperature : float, default=None
         Target temperature (K) for thermostatic control
     thermostatdamping : float, default=None
         Damping constant for the Langevin thermostat in ps^-1
@@ -397,17 +397,17 @@ class Acemd(_Acemd):
         Enable pressure control
     barostatpressure : float, default=None
         The target pressure in bar
-    useflexiblecell : str, default=None
+    barostatanisotropic : str, default=None
         Allow X, Y and Z unit cell dimensions to vary independently
-    useconstantarea : str, default=None
+    barostatconstxy : str, default=None
         Constrain the X,Y dimensions of the unit cell. Allow Z to vary independently.
-    useconstantratio : str, default=None
+    barostatconstratio : str, default=None
         Constrain the X:Y ratio of the unit cell dimensions. Allow Z to vary independently.
     minimize : int, default=None
         The number of energy minimization steps to perform before commencing dynamics.
     run : str, default=None
         The length of simulation ro run. May be specified as a number of steps or as a time if one of the suffices "us", "ns", "ps", "fs" is used.
-    celldimension : str, default=None
+    boxsize : str, default=None
         The dimensions of the unit cell in Angstrom. Note that the unit cell must be cuboid. Overrides any dimension given in the "coordinates" PDB.
     implicit : str, default=None
         Set to True to enable implicit solvent simulations in AMBER.
@@ -427,7 +427,7 @@ class Acemd(_Acemd):
     parmfile : str, default=None
         The filename of an Amber PRMTOP file
     extendedsystem : str, default=None
-        Filename of a NAMD XSC format file giving the periodic cell dimensions. Overrides "celldimension" and any dimensions in the "coordinates" PDB
+        Filename of a NAMD XSC format file giving the periodic cell dimensions. Overrides "boxsize" and any dimensions in the "coordinates" PDB
     coordinates : str, default=None
         Mandatory initial system geometry in PDB format
     velocities : str, default=None
@@ -448,15 +448,6 @@ class Acemd(_Acemd):
 
     def __init__(self, config=None):
         super().__init__(version=3)
-        # ACEMD3 Options
-        self._cmdDeprecated("trajectoryfreq", "trajectoryperiod")
-        self._cmdDeprecated("switchdist", "switchdistance")
-        self._cmdDeprecated("thermostattemp", "thermostattemperature")
-        self._cmdDeprecated("useflexiblecell", "barostatanisotropic")
-        self._cmdDeprecated("useconstantarea", "barostatconstxy")
-        self._cmdDeprecated("useconstantratio", "barostatconstratio")
-        self._cmdDeprecated("celldimension", "boxsize")
-
         self._arg(
             "temperature",
             "float",
@@ -684,19 +675,6 @@ class Acemd(_Acemd):
                 setattr(self, key, config[key]["value"])
 
     def write(self, inputdir=".", outputdir="run", overwrite=False):
-        # if self.adaptive:
-        #     self.binvelocities = None
-
-        # if self.celldimension is None and self.extendedsystem is None:
-        #     inmol = Molecule(os.path.join(inputdir, self.acemd.coordinates))
-        #     coords = inmol.get('coords', sel='water')
-        #     if coords.size == 0:  # It's a vacuum simulation
-        #         coords = inmol.get('coords', sel='all')
-        #         dim = np.max(coords, axis=0) - np.min(coords, axis=0)
-        #         dim = dim + 12.
-        #     else:
-        #         dim = np.max(coords, axis=0) - np.min(coords, axis=0)
-        #     self.celldimension = '{} {} {}'.format(dim[0], dim[1], dim[2])
         super().setup(inputdir, outputdir, overwrite)
 
 
