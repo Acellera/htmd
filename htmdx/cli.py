@@ -11,7 +11,7 @@ from subprocess import call
 import sys
 
 
-def show_news():
+def htmd_show_news():
     try:
         res = requests.get("https://www.htmd.org/news/content", timeout=10)
         print(res.text)
@@ -28,7 +28,11 @@ def get_reg_file(product):
     return file
 
 
-def check_approval(product, reg_file):
+def check_registration(product):
+
+    # Get a registation file
+    reg_file = get_reg_file(product)
+
     reg_data = {}
     try:
         with open(os.path.join(reg_file), "r") as f:
@@ -60,17 +64,7 @@ def check_approval(product, reg_file):
     return False
 
 
-def htmd_registration(product="htmd"):
-
-    reg_file = get_reg_file(product)
-
-    if not (os.path.isfile(reg_file) and check_approval(product, reg_file)):
-        accept_licence(product=product)
-        htmd_register(product=product)
-
-
-def accept_licence(product=None):
-    show_licence(product=product)
+def accept_licence(product):
 
     ret = input("Type 'yes' to accept the license [no] : ").strip()
     if ret != "yes":
@@ -95,6 +89,15 @@ def show_licence(product):
         with open(path) as fh:
             print(fh.read())
 
+
+def htmd_registration(product="htmd"):
+
+    if not check_registration(product):
+        show_licence(product)
+        accept_licence(product)
+        htmd_register(product)
+
+
 def ask(prompt):
 
     value = ""
@@ -102,6 +105,7 @@ def ask(prompt):
         value = input(prompt).strip()
 
     return value
+
 
 def htmd_register(product="htmd"):
 
