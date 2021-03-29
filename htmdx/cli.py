@@ -33,30 +33,32 @@ def _check_registration(product):
     # Get a registation file
     reg_file = _get_reg_file(product)
 
-    reg_data = {}
-    try:
-        with open(os.path.join(reg_file), "r") as f:
-            reg_data = json.load(f)
-    except:
-        # Couldn't read registration file
+    if not os.path.exists(reg_file):
+        print("Registation file does not exist")
         return False
 
-    if not reg_data["ret"]:
-        # There's no registration code in the file
+    data = {"product": product}
+    try:
+        data.update(json.load(open(reg_file)))
+    except:
+        print("Cannot read the registration file")
         return False
+
+    # Note: remove after switching to the new backend
+    if "code" not in data and "ret" in data:
+        data["code"] = data["ret"]
 
     # Send the registration data
-    data = {"code": reg_data["ret"], "product": product}
     url = "https://www.acellera.com/licensing/htmd/check.php"
     res = requests.post(url, data, timeout=10)
 
     # Check the response
     if res.status_code == 200:
         status = res.json()
-
         if "approved" in status:
             return True
 
+        # Note: remove after switching to the new backend
         if "pending" in status:
             return True
 
