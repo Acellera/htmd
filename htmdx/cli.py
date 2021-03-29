@@ -86,6 +86,13 @@ def show_licence(product):
         with open(path) as fh:
             print(fh.read())
 
+def ask(prompt):
+
+    value = ""
+    while value == "":
+        value = input(prompt).strip()
+
+    return value
 
 def htmd_register(product="htmd"):
 
@@ -98,41 +105,17 @@ def htmd_register(product="htmd"):
   institution name, city, and country.
 """)
 
-    # Get data from a user
-    name = ""
-    while name == "":
-        print("  Full name           : ", end="")
-        sys.stdout.flush()
-        name = input().strip()
-
-    email = ""
-    while email == "":
-        print("  Institutional email : ", end="")
-        sys.stdout.flush()
-        email = input().strip()
-
-    institution = ""
-    while institution == "":
-        print("  Institution name    : ", end="")
-        sys.stdout.flush()
-        institution = input().strip()
-
-    city = ""
-    while city == "":
-        print("  City                : ", end="")
-        sys.stdout.flush()
-        city = input().strip()
-
-    country = ""
-    while country == "":
-        print("  Country             : ", end="")
-        sys.stdout.flush()
-        country = input().strip()
+    # Ask a user for data
+    data = {}
+    data["name"]        = ask("  Full name           : ")
+    data["email"]       = ask("  Institutional email : ")
+    data["institution"] = ask("  Institution name    : ")
+    data["city"]        = ask("  City                : ")
+    data["country"]     = ask("  Country             : ")
+    data["product"]     = product
 
     # Send data to the registration server
     url = "https://www.acellera.com/licensing/htmd/register.php"
-    data = {"name": name, "email": email, "institution": institution,
-            "city": city, "country": country, "product": product}
     res = requests.post(url, data=data, timeout=10)
 
     # Check the response
