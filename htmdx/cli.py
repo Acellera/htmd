@@ -19,6 +19,15 @@ def show_news():
         pass
 
 
+def get_reg_file(product):
+
+    dir = os.path.join(os.path.expanduser("~"), "." + product, ".registered-" + product)
+    os.makedirs(dir, exist_ok=True)
+    file = os.path.join(dir, "registration")
+
+    return file
+
+
 def check_approval(product, reg_file):
     reg_data = {}
     try:
@@ -53,7 +62,7 @@ def check_approval(product, reg_file):
 
 def htmd_registration(product="htmd"):
 
-    reg_file = os.path.join(os.path.expanduser("~"), ".htmd", ".registered-htmd", "registration")
+    reg_file = get_reg_file(product)
 
     if not (os.path.isfile(reg_file) and check_approval(product, reg_file)):
         accept_licence(product=product)
@@ -120,9 +129,7 @@ def htmd_register(product="htmd"):
 
     # Check the response
     if res.status_code == 200:
-        prefix = os.path.join(os.path.expanduser("~"), ".htmd", ".registered-" + product)
-        os.makedirs(prefix, exist_ok=True)
-        reg_file = os.path.join(prefix, "registration")
+        reg_file = get_reg_file(product)
         with open(reg_file, "w") as fh:
             fh.write(res.text)
         print("\n  Registration completed!\n")
