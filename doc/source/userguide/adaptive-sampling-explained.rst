@@ -101,7 +101,7 @@ simulations cannot use a velocity file. Velocities are therefore
 reinitialized to the Maxwell Boltzmann distribution at the given
 temperature.
 
-E.g. if setting up the simulations with the :class:`~htmd.protocols.production_v5.Production` class:
+E.g. if setting up the simulations with the :class:`~htmd.protocols.production_v6.Production` class:
 
 .. code:: python
 

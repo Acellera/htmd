@@ -12,7 +12,6 @@ logger = logging.getLogger(__file__)
 _config = {
     "viewer": "VMD",
     "njobs": 1,
-    "acemdversion": 3,
     "configfile": os.getenv("HTMD_CONFIG") if os.getenv("HTMD_CONFIG") else None,
     "lsf": None,
     "slurm": None,
@@ -23,7 +22,6 @@ def config(
     viewer=_config["viewer"],
     ncpus=None,
     njobs=_config["njobs"],
-    acemdversion=_config["acemdversion"],
     configfile=_config["configfile"],
     lsf=_config["lsf"],
     slurm=_config["slurm"],
@@ -37,7 +35,7 @@ def config(
         Defines the backend viewer for molecular visualization
     njobs : int
         Defines the number of parallel jobs spawned for several HTMD operations.
-        Negative numbers are used for spawning jobs as many as CPU threads. 
+        Negative numbers are used for spawning jobs as many as CPU threads.
         -1: for all CPUs -2: for all except one etc.
     configfile : str
         Defines the HTMD configuration file that is called at the beginning of importing
@@ -54,7 +52,6 @@ def config(
         _config["njobs"] = ncpus
     else:
         _config["njobs"] = njobs
-    _config["acemdversion"] = acemdversion
     _config["configfile"] = configfile
 
     _config["lsf"] = lsf  # DEPRECATE THIS
