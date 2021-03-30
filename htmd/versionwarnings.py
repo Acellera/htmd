@@ -22,21 +22,14 @@ def _issueWarnings():
     with open(_warningsfile, "r") as f:
         disabledversions = f.read().splitlines()
 
-    if "1.16" not in disabledversions:
-        warnings.warn(
-            "As of HTMD 1.16 the default number of threads HTMD spawns for calculations is set to 1. "
-            "You can enable parallelism at your own risk using `config(njobs=-2)` in the beginning of your scripts. "
-            "To disable this warning run once: `from htmd import _disableWarnings; _disableWarnings('1.16');`",
-            UserWarning,
-        )
-
-    if "1.21" not in disabledversions:
-        warnings.warn(
-            "As of HTMD 1.21 support for ACEMD v2 has stopped. Please use ACEMD3 instead"
-            " as well as the corresponding equilibration and production protocols. "
-            "To disable this warning run once: `from htmd import _disableWarnings; _disableWarnings('1.21');`",
-            UserWarning,
-        )
+    # # Use this style to add version warnings:
+    # if "1.16" not in disabledversions:
+    #     warnings.warn(
+    #         "As of HTMD 1.16 the default number of threads HTMD spawns for calculations is set to 1. "
+    #         "You can enable parallelism at your own risk using `config(njobs=-2)` in the beginning of your scripts. "
+    #         "To disable this warning run once: `from htmd import _disableWarnings; _disableWarnings('1.16');`",
+    #         UserWarning,
+    #     )
 
 
 def _disableWarnings(version):
@@ -51,4 +44,3 @@ def _disableWarnings(version):
 
     with open(_warningsfile, "w") as f:
         f.write("\n".join(versions))
-

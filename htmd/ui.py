@@ -33,7 +33,7 @@ from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
 from moleculekit.vmdviewer import viewer, getCurrentViewer
 from htmd.builder.solvate import solvate
-from htmd.mdengine.acemd.acemd import Acemd, Acemd2, AtomRestraint, GroupRestraint
+from htmd.mdengine.acemd.acemd import Acemd, AtomRestraint, GroupRestraint
 from htmd.builder.builder import detectDisulfideBonds, embed, DisulfideBridge
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
@@ -92,4 +92,3 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=UserWarning)
     import pyemma
-
