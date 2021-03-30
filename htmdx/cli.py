@@ -63,7 +63,7 @@ def _check_registration(product):
         if "pending" in status:
             return True
 
-    print('Registration is not approved: %s' % res.text)
+    print(f"Registration is not approved: {res.text}")
     return False
 
 
@@ -141,7 +141,7 @@ def htmd_register(product="htmd"):
             fh.write(res.text)
         print("\n  Registration completed!\n")
     else:
-        print("\n  Registration failed: %s\n" % res.text)
+        print(f"\n  Registration failed: {res.text}\n")
 
 
 if __name__ == "__main__":
