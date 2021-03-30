@@ -13,7 +13,7 @@ import sys
 
 def htmd_show_news():
     try:
-        res = requests.get("https://www.htmd.org/news/content", timeout=10)
+        res = requests.get("https://www.htmd.org/news/content", timeout=3)
         print(res.text)
     except:
         pass
