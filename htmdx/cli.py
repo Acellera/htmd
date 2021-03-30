@@ -1,182 +1,147 @@
-# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# (c) 2015-2021 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import os
-import sys
-from subprocess import call
-import inspect
-import htmdx
 import json
-import urllib.request
-import urllib.parse
+import os
 import platform
-
-has_connection = True
-
-
-def htmd_do_register():
-    do_register("htmd")
+import requests
+from subprocess import call
+import sys
 
 
-def show_news():
+def htmd_show_news():
     try:
-        response = urllib.request.urlopen(
-            "https://www.htmd.org/news/content", timeout=3.05
-        )
-        print(response.read().decode("ascii"))
+        res = requests.get("https://www.htmd.org/news/content", timeout=3)
+        print(res.text)
     except:
         pass
 
 
-def check_approval(product, reg_file):
-    # TODO: this may come back in other form
-    # from htmdx.license import licenseEntitlements
-    # jj = licenseEntitlements()
-    # if "HTMD" in jj: return True
-    # if "htmd" in jj: return True
+def _get_reg_file(product):
 
-    registration_data = {}
-    try:
-        with open(os.path.join(reg_file), "r") as f:
-            registration_data = json.load(f)
-    except:
-        # Couldn't read registration file
+    dir = os.path.join(os.path.expanduser("~"), "." + product, ".registered-" + product)
+    os.makedirs(dir, exist_ok=True)
+    file = os.path.join(dir, "registration")
+
+    return file
+
+
+def _check_registration(product):
+
+    # Get a registation file
+    reg_file = _get_reg_file(product)
+
+    if not os.path.exists(reg_file):
+        print("Registation file does not exist")
         return False
 
-    if not registration_data["ret"]:
-        # There's no registration code in the file
+    data = {"product": product}
+    try:
+        with open(reg_file) as fh:
+            data.update(json.load(fh))
+    except:
+        print("Cannot read the registration file")
         return False
 
-    # Do online check
-    try:
-        payload = {"code": registration_data["ret"], "product": product}
-        data = urllib.parse.urlencode(payload).encode("ascii")
-        with urllib.request.urlopen(
-            "https://www.acellera.com/licensing/htmd/check.php", data, timeout=3.05
-        ) as f:
-            ret = json.loads(f.read().decode("ascii"))
+    # Note: remove after switching to the new backend
+    if "code" not in data and "ret" in data:
+        data["code"] = data["ret"]
 
-        if "approved" in ret:
-            return True
-        if "pending" in ret:
-            return True
-    except:
-        return True
+    # Send the registration data
+    url = "https://www.acellera.com/licensing/htmd/check.php"
+    res = requests.post(url, data, timeout=10)
 
+    # Check the response
+    if res.status_code == 200:
+        status = res.json()
+        if "approved" in status:
+            return True
+
+        # Note: remove after switching to the new backend
+        if "pending" in status:
+            return True
+
+    print(f"Registration is not approved: {res.text}")
     return False
 
 
-def check_registration(product=None):
-    if not product:
-        product = "NA"
+def _accept_licence(product):
 
-    reg_file = os.path.join(
-        os.path.expanduser("~"), ".htmd", ".registered-htmd", "registration"
-    )
-
-    if not (os.path.isfile(reg_file) and check_approval(product, reg_file)):
-        accept_license(product=product)
-        do_register(product=product)
-
-
-def accept_license(product=None):
-    show_license(product=product)
-    print("Type 'yes' to accept the license [no] : ", end="")
-    sys.stdout.flush()
-    ret = input().strip()
+    ret = input("Type 'yes' to accept the license [no] : ").strip()
     if ret != "yes":
-        os._exit(1)
+        sys.exit(1)
 
 
-def show_license(product=None):
-    path = os.path.abspath(
-        os.path.dirname(os.path.dirname(inspect.getfile(accept_license)))
-    )
-    if product:
-        path = os.path.join(path, product)
+def _show_licence(product):
 
-    path = os.path.join(path, "LICENCE.txt")
+    # Find the licence file
+    path = os.path.join(os.path.dirname(__file__), '..', product, "LICENCE.txt")
     if not os.path.exists(path):
-        print("Could not find license file. Aborting")
-        os._exit(1)
+        print("Cannot find the licence file!")
+        sys.exit(1)
 
-    print(sys.stdin)
+    # Show the licence file
     if sys.stdout.isatty() and sys.stdin:
         if platform.system() == "Windows":
             call(["c:\\Windows\\System32\\more.com", path])
         else:
             call(["more", path])
     else:
-        fh = open(path, "r")
-        print(fh.read())
-        fh.close()
+        with open(path) as fh:
+            print(fh.read())
 
 
-def do_register(product=None):
-    name = ""
-    institution = ""
-    email = ""
-    city = ""
-    country = ""
+def htmd_registration(product="htmd"):
+
+    if not _check_registration(product):
+        _show_licence(product)
+        _accept_licence(product)
+        htmd_register(product)
+
+
+def _ask(prompt):
+
+    value = ""
+    while value == "":
+        value = input(prompt).strip()
+
+    return value
+
+
+def htmd_register(product="htmd"):
 
     print(
-        "\n Welcome to HTMD. We'd like to know who you are so that we can keep in touch!"
-    )
-    print(" Please enter your name, affiliation and institutional email address.\n")
-    print(" Please provide valid information so that it might be verified.\n")
+"""
+  Welcome to the HTMD registration!
 
-    while email == "" or not ("@" in email) or not ("." in email):
-        print(" Institutional Email : ", end="")
-        sys.stdout.flush()
-        email = input().strip()
+  We would like to know about you to keep in touch.
+  Please provide your full name, institutional email,
+  institution name, city, and country.
+""")
 
-    while name == "":
-        print(" Full name   : ", end="")
-        sys.stdout.flush()
-        name = input().strip()
+    # Ask a user for data
+    data = {}
+    data["name"]        = _ask("  Full name           : ")
+    data["email"]       = _ask("  Institutional email : ")
+    data["institution"] = _ask("  Institution name    : ")
+    data["city"]        = _ask("  City                : ")
+    data["country"]     = _ask("  Country             : ")
+    data["product"]     = product
 
-    while institution == "":
-        print(" Institution : ", end="")
-        sys.stdout.flush()
-        institution = input().strip()
+    # Send data to the registration server
+    url = "https://www.acellera.com/licensing/htmd/register.php"
+    res = requests.post(url, data=data, timeout=10)
 
-    while city == "":
-        print(" City        : ", end="")
-        sys.stdout.flush()
-        city = input().strip()
-
-    while country == "":
-        print(" Country     : ", end="")
-        sys.stdout.flush()
-        country = input().strip()
-
-    payload = {
-        "name": name,
-        "institution": institution,
-        "email": email,
-        "product": product,
-        "city": city,
-        "country": country,
-    }
-    try:
-        data = urllib.parse.urlencode(payload).encode("ascii")
-        with urllib.request.urlopen(
-            "https://www.acellera.com/licensing/htmd/register.php", data
-        ) as f:
-            text = f.read().decode("ascii")
-
-        prefix = os.path.join(
-            os.path.expanduser("~"), ".htmd", ".registered-" + product
-        )
-        os.makedirs(prefix, exist_ok=True)
-        regfile = os.path.join(prefix, "registration")
-        with open(regfile, "w") as fh:
-            fh.write(text)
-        print("")
-    except:
-        print("\nCould not register!\n")
+    # Check the response
+    if res.status_code == 200:
+        reg_file = _get_reg_file(product)
+        with open(reg_file, "w") as fh:
+            fh.write(res.text)
+        print("\n  Registration completed!\n")
+    else:
+        print(f"\n  Registration failed: {res.text}\n")
 
 
 if __name__ == "__main__":

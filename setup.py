@@ -35,7 +35,7 @@ if __name__ == "__main__":
         maintainer_email="info@acellera.com",
         entry_points={
             "console_scripts": [
-                "htmd_register   = htmdx.cli:htmd_do_register",
+                "htmd_register   = htmdx.cli:htmd_register",
             ]
         },
         packages=setuptools.find_packages(include=["htmd*"], exclude=["data"]),

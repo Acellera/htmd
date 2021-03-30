@@ -71,7 +71,7 @@ except Exception as e:
     warnings.warn(f"{e}")
 
 
-from htmdx.cli import check_registration, show_news
+from htmdx.cli import htmd_registration, htmd_show_news
 from htmd.latest import compareVersions
 from htmd.config import config
 
@@ -84,8 +84,8 @@ from glob import glob
 from sklearn.cluster import MiniBatchKMeans
 
 if not (os.getenv("HTMD_NONINTERACTIVE")):
-    check_registration(product="htmd")
-    show_news()
+    htmd_registration()
+    htmd_show_news()
     compareVersions()
 
 # Get rid of pyemma version warnings
