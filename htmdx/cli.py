@@ -39,7 +39,8 @@ def _check_registration(product):
 
     data = {"product": product}
     try:
-        data.update(json.load(open(reg_file)))
+        with open(reg_file) as fh:
+            data.update(json.load(fh))
     except:
         print("Cannot read the registration file")
         return False
