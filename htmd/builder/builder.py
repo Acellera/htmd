@@ -180,7 +180,7 @@ def detectDisulfideBonds(mol, thresh=3):
     Returns
     -------
     disubonds : np.ndarray
-        A list of :class:`DisulfideBridge <htmd.builder.builder.DisulfideBridge>` objects
+        A list of :class:`UniqueResidueID <moleculekit.molecule.UniqueResidueID>` objects
     """
     from scipy.spatial.distance import pdist, squareform
     from moleculekit.molecule import UniqueResidueID
