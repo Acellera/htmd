@@ -165,7 +165,14 @@ def _locateFile(fname, ftype, teleap):
 
 def defaultFf():
     """ Returns the default leaprc forcefield files used by amber.build """
-    return ["leaprc.lipid14", os.path.join("oldff", "leaprc.ff14SB"), "leaprc.gaff"]
+    return [
+        "leaprc.protein.ff19SB",
+        "leaprc.lipid17",
+        "leaprc.gaff2",
+        "leaprc.RNA.Shaw",
+        "leaprc.DNA.bsc1",
+        "leaprc.water.tip3p",
+    ]
 
 
 def defaultTopo():
@@ -175,16 +182,7 @@ def defaultTopo():
 
 def defaultParam():
     """ Returns the default parameter `frcmod` files used by amber.build """
-
-    # Common choices:
-    #  * frcmod.ionsjc_tip3p:  Monovalent ion parameters for Ewald and TIP3P water from Joung & Cheatham JPCB (2008)
-    #  * frcmod.ions1lm_126_tip3p + frcmod.ions234lm_126_tip3p :
-    #       Li/Merz ion parameters of monovalent ions for TIP3P water model (12-6 normal usage set)
-    #       Li/Merz ion parameters of divalent to tetravalent ions for TIP3P water model (12-6 normal usage set)
-    #
-    # See page 50 of Amber16 manual.
-
-    return ["frcmod.ionsjc_tip3p", "frcmod.ions234lm_126_tip3p"]
+    return []
 
 
 def _prepareMolecule(mol, caps, disulfide):
@@ -1162,13 +1160,12 @@ class _TestAmberBuild(unittest.TestCase):
             tmpdir = os.path.join(self.testDir, "withoutProtPrep", pid)
 
             amberhome = defaultAmberHome()
-            teleapimports = []
-            teleapimports.append(
-                os.path.join(amberhome, _defaultAmberSearchPaths["lib"])
-            )
-            teleapimports.append(
-                os.path.join(amberhome, _defaultAmberSearchPaths["param"])
-            )
+            teleapimports = [
+                os.path.join(amberhome, _defaultAmberSearchPaths["ff"]),
+                os.path.join(amberhome, _defaultAmberSearchPaths["lib"]),
+                os.path.join(amberhome, _defaultAmberSearchPaths["param"]),
+            ]
+
             _ = build(smol, ff=ffs, outdir=tmpdir, teleapimports=teleapimports)
 
             refdir = home(dataDir=join("test-amber-build", "nopp", pid))
