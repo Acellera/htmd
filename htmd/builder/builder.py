@@ -253,9 +253,9 @@ def detectCisPeptideBonds(mol):
 
         currframes_str = "{}".format(currframes)
         if nframes> 5:
-            currframes_str = "[{} ... {}]".format(currframes[0], currframes[-1])
+            currframes_str = f"[{currframes[0]} ... {currframes[-1]}]"
 
-        logger.warning("Found cis peptide bond in {} frames: {} in the omega diheral \"{}\" with indexes {}".format(nframes, currframes_str, description, atomIndexes))
+        logger.warning(f"Found cis peptide bond in {nframes} frames: {currframes_str} in the omega diheral \"{description}\" with indexes {atomIndexes}")
 
 
 def _checkMixedSegment(mol):
@@ -267,8 +267,8 @@ def _checkMixedSegment(mol):
     segsNonProt = np.unique(mol.segid[sel2])
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
-        logger.warning('Segments {} contain both protein and non-protein atoms. '
-                       'Please assign separate segments to them or the build procedure might fail.'.format(intersection))
+        logger.warning(f'Segments {intersection} contain both protein and non-protein atoms. '
+                       'Please assign separate segments to them or the build procedure might fail.')
 
 
 def _checkLongResnames(mol, aliasresidues):
