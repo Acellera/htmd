@@ -230,20 +230,24 @@ def detectDisulfideBonds(mol, thresh=3):
     return sorted(disubonds, key=lambda x: x[0].resid)
     
 
-def detectCisPeptideBonds(mol):
+def detectCisPeptideBonds(mol, respect_bonds=False):
     from moleculekit.projections.metricdihedral import MetricDihedral, Dihedral
+    import networkx as nx
 
     protsel = mol.atomselect('protein and backbone and name C CA N')
     if np.sum(protsel) < 4: # Less atoms than dihedral
         return
         
     dih = Dihedral.proteinDihedrals(mol, sel=protsel, dih=('omega',))
-
+            
     metr = MetricDihedral(dih=dih, sincos=False)
     data = metr.project(mol)
     mapping = metr.getMapping(mol)
 
     frames, idxs = np.where(np.abs(data) < 120)
+    if respect_bonds:
+        bond_graph = nx.Graph()
+        bond_graph.add_edges_from(mol.bonds)
 
     for ii in np.unique(idxs):
         currframes = frames[idxs == ii]
@@ -251,6 +255,11 @@ def detectCisPeptideBonds(mol):
         description = mapping.loc[ii].description
         atomIndexes = mapping.loc[ii].atomIndexes
 
+        if respect_bonds:
+            sub_bond_graph = bond_graph.subgraph(atomIndexes)
+            if not nx.is_connected(sub_bond_graph):
+                continue
+        
         currframes_str = "{}".format(currframes)
         if nframes> 5:
             currframes_str = f"[{currframes[0]} ... {currframes[-1]}]"

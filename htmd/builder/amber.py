@@ -91,10 +91,10 @@ def listFiles():
     >>> from htmd.builder import amber
     >>> amber.listFiles()             # doctest: +ELLIPSIS
     ---- Forcefield files list: ... ----
+    leaprc.amberdyes
+    leaprc.conste
     leaprc.constph
     leaprc.DNA.bsc1
-    leaprc.DNA.OL15
-    leaprc.ff14SB.redq
     ...
     """
 
@@ -206,6 +206,18 @@ def _prepareMolecule(mol, caps, disulfide):
 
     # We need to renumber residues to unique numbers for teLeap. It goes up to 9999 and restarts from 0
     mol.resid[:] = (sequenceID((mol.resid, mol.insertion, mol.segid)) + 1) % 10000
+
+    # curr_resid = 0
+    # prev_combo = (None, None, None)
+    # for i in range(mol.numAtoms):
+    #     curr_combo = (mol.resid[i], mol.insertion[i], mol.segid[i])
+    #     if prev_combo != curr_combo:
+    #         curr_resid += 1
+    #         if prev_combo[0] is not None and curr_combo[0] - prev_combo[0] > 1:
+    #             curr_resid += 1  # Insert a resid gap if a gap existed before
+    #         prev_combo = curr_combo
+
+    #     mol.resid[i] = curr_resid % 10000
 
     # Map the old disulfide UniqueResidueIDs to the new ones
     if disulfide is not None and len(disulfide):
@@ -615,7 +627,7 @@ def _build(
         molbuilt.bonds = []  # Removing the bonds to speed up writing
         molbuilt.write(os.path.join(outdir, "structure.pdb"))
         molbuilt.bonds = tmpbonds  # Restoring the bonds
-        detectCisPeptideBonds(molbuilt)  # Warn in case of cis bonds
+        detectCisPeptideBonds(molbuilt, respect_bonds=True)  # Warn in case of cis bonds
         return molbuilt
 
 
@@ -627,6 +639,7 @@ def _applyProteinCaps(mol, caps):
     # For now, this is hardwired for ACE and NME
     # 1. Change one of the hydrogens of the N terminal (H[T]?[123]) to the ACE C atom, giving it a new resid
     # 1a. If no hydrogen present, create the ACE C atom.
+    # 1b. Add the ACE CH3 atom to define the direction of the cap
     # 2. Change one of the oxygens of the C terminal ({O,OT1,OXT}) to the NME N atom, giving it a new resid
     # 2a. If no oxygen present, create the NME N atom.
     # 3. Reorder to put the new atoms first and last
@@ -643,9 +656,8 @@ def _applyProteinCaps(mol, caps):
 
     # For each caps definition
     for seg in caps:
-        prot = mol.atomselect(
-            "protein"
-        )  # Can't move this out since we remove atoms in this loop
+        # Can't move this out since we remove atoms in this loop
+        prot = mol.atomselect("protein")
         # Get the segment
         segment = np.where(mol.segid == seg)[0]
         # Test segment
@@ -663,9 +675,9 @@ def _applyProteinCaps(mol, caps):
             # Get info on segment and its terminals
             segidm = mol.segid == seg  # Mask for segid
             segididx = np.where(segidm)[0]
-            resids = mol.resid[segididx]
             terminalids = [segididx[0], segididx[-1]]
-            terminalresids = [resids[0], resids[-1]]
+            terminalresids = [mol.resid[segididx][0], mol.resid[segididx][-1]]
+            terminalchains = [mol.chain[segididx][0], mol.chain[segididx][-1]]
             residm = mol.resid == terminalresids[i]  # Mask for resid
 
             if not passed:
@@ -691,45 +703,41 @@ def _applyProteinCaps(mol, caps):
                 continue
 
             # Test if the atom to change exists
-            termatomsids = np.zeros(residm.shape, dtype=bool)
-            for atm in terminalatoms[cap]:
-                termatomsids |= mol.name == atm
+            termatomsids = np.isin(mol.name, terminalatoms[cap])
             termatomsids = np.where(termatomsids & segidm & residm)[0]
 
+            # Create new atom if none of the replace atoms exist
             if len(termatomsids) == 0:
-                # Create new atom
                 termcaid = np.where(segidm & residm & (mol.name == "CA"))[0]
                 termcenterid = np.where(
                     segidm & residm & (mol.name == capatomtype[1 - i])
                 )[0]
                 atom = Molecule()
                 atom.empty(1)
-                atom.record[:] = "ATOM"
-                atom.name[:] = capatomtype[i]
-                # if i=0 => resid-1; i=1 => resid+1
-                atom.resid[:] = terminalresids[i] - 1 + 2 * i
-                atom.resname[:] = cap
-                atom.segid[:] = seg
-                atom.element[:] = capatomtype[i]
-                atom.chain[:] = mol.chain[terminalids[i]]
                 atom.coords = mol.coords[termcenterid] + 0.33 * np.subtract(
                     mol.coords[termcenterid], mol.coords[termcaid]
                 )
-                mol.insert(atom, terminalids[i])
-            else:
-                # Select atom to change, do changes to cap, and change resid
-                newatom = np.max(termatomsids)
-                mol.set("resname", cap, sel=newatom)
-                mol.set("name", capatomtype[i], sel=newatom)
-                mol.set("element", capatomtype[i], sel=newatom)
-                # if i=0 => resid-1; i=1 => resid+1
-                mol.set("resid", terminalresids[i] - 1 + 2 * i, sel=newatom)
+                new_idx = terminalids[i] if i == 0 else terminalids[i] + 1
+                mol.insert(atom, new_idx)
+                termatomsids = [new_idx]
 
-                # Swap positions of cap atom with the first atom of the segment
-                neworder = np.arange(mol.numAtoms)
-                neworder[newatom] = terminalids[i]
-                neworder[terminalids[i]] = newatom
-                _reorderMol(mol, neworder)
+            # Select atom to change, do changes to cap, and change resid
+            replace_atom = np.max(termatomsids)
+            mol.record[replace_atom] = "ATOM"
+            mol.name[replace_atom] = capatomtype[i]
+            mol.resname[replace_atom] = cap
+            # if i=0 => resid-1; i=1 => resid+1
+            # TODO: Increase all following resids???
+            mol.resid[replace_atom] = terminalresids[i] - 1 + 2 * i
+            mol.element[replace_atom] = capatomtype[i]
+            mol.segid[replace_atom] = seg
+            mol.chain[replace_atom] = terminalchains[i]
+
+            # Swap positions of cap atom with the first/last atom of the segment
+            neworder = np.arange(mol.numAtoms)
+            neworder[replace_atom] = terminalids[i]
+            neworder[terminalids[i]] = replace_atom
+            _reorderMol(mol, neworder)
 
         # For each cap
         for i, cap in enumerate(caps[seg]):
@@ -1047,7 +1055,7 @@ class _TestAmberBuild(unittest.TestCase):
         for f in deletefiles:
             os.remove(f)
 
-    def testWithProteinPrepare(self):
+    def test_with_protein_prepare(self):
         from moleculekit.tools.preparation import proteinPrepare
         from htmd.builder.solvate import solvate
         from moleculekit.tools.autosegment import autoSegment
@@ -1070,7 +1078,7 @@ class _TestAmberBuild(unittest.TestCase):
             refdir = home(dataDir=join("test-amber-build", "pp", pid))
             _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
-    def testWithoutProteinPrepare(self):
+    def test_without_protein_prepare(self):
         from htmd.builder.solvate import solvate
 
         # Test without proteinPrepare
@@ -1088,7 +1096,7 @@ class _TestAmberBuild(unittest.TestCase):
             refdir = home(dataDir=join("test-amber-build", "nopp", pid))
             _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
-    def testProteinLigand(self):
+    def test_protein_ligand(self):
         from htmd.builder.solvate import solvate
 
         # Test protein ligand building with parametrized ligand
@@ -1115,7 +1123,7 @@ class _TestAmberBuild(unittest.TestCase):
         refdir = home(dataDir=join("test-amber-build", "protLig", "results"))
         _TestAmberBuild._compareResultFolders(refdir, tmpdir, "3PTB")
 
-    def test_customDisulfideBonds(self):
+    def test_custom_disulfide_bonds(self):
         from htmd.builder.solvate import solvate
 
         # Test without proteinPrepare
@@ -1145,7 +1153,7 @@ class _TestAmberBuild(unittest.TestCase):
             refdir = home(dataDir=join("test-amber-build", "nopp", pid))
             _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
 
-    def test_customTeLeapImports(self):
+    def test_custom_teleap_imports(self):
         from htmd.builder.solvate import solvate
 
         # Test without proteinPrepare
@@ -1170,6 +1178,57 @@ class _TestAmberBuild(unittest.TestCase):
 
             refdir = home(dataDir=join("test-amber-build", "nopp", pid))
             _TestAmberBuild._compareResultFolders(refdir, tmpdir, pid)
+
+    def test_rna(self):
+        from htmd.builder.solvate import solvate
+
+        np.random.seed(1)
+
+        mol = Molecule("6VA1")
+        smol = solvate(mol)
+
+        tmpdir = os.path.join(self.testDir, "rna", "6VA1")
+        _ = build(smol, outdir=tmpdir)
+
+        refdir = home(dataDir=join("test-amber-build", "rna", "6VA1"))
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "6VA1")
+
+    def test_dna(self):
+        from htmd.builder.solvate import solvate
+
+        np.random.seed(1)
+
+        mol = Molecule("1BNA")
+        smol = solvate(mol)
+
+        tmpdir = os.path.join(self.testDir, "dna", "1BNA")
+        _ = build(smol, outdir=tmpdir)
+
+        refdir = home(dataDir=join("test-amber-build", "dna", "1BNA"))
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "1BNA")
+
+    def test_protein_rna(self):
+        from htmd.builder.solvate import solvate
+        from moleculekit.tools.preparation import proteinPrepare
+        from moleculekit.tools.autosegment import autoSegment
+
+        np.random.seed(1)
+
+        mol = Molecule("3WBM")
+        mol.filter("not water")
+        mol = autoSegment(mol, field="both")
+        pmol = proteinPrepare(mol)
+        smol = solvate(pmol)
+
+        tmpdir = os.path.join(self.testDir, "protein-rna", "3WBM")
+        _ = build(smol, outdir=tmpdir)
+
+        refdir = home(dataDir=join("test-amber-build", "protein-rna", "3WBM"))
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "3WBM")
+
+    def test_caps(self):
+        # TODO: Add test where I remove all side chain from the termini and force build to reconstruct ACE NME from scratch
+        pass
 
 
 if __name__ == "__main__":
