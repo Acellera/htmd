@@ -180,7 +180,7 @@ def detectDisulfideBonds(mol, thresh=3):
     Returns
     -------
     disubonds : np.ndarray
-        A list of :class:`DisulfideBridge <htmd.builder.builder.DisulfideBridge>` objects
+        A list of :class:`UniqueResidueID <moleculekit.molecule.UniqueResidueID>` objects
     """
     from scipy.spatial.distance import pdist, squareform
     from moleculekit.molecule import UniqueResidueID
@@ -230,20 +230,24 @@ def detectDisulfideBonds(mol, thresh=3):
     return sorted(disubonds, key=lambda x: x[0].resid)
     
 
-def detectCisPeptideBonds(mol):
+def detectCisPeptideBonds(mol, respect_bonds=False):
     from moleculekit.projections.metricdihedral import MetricDihedral, Dihedral
+    import networkx as nx
 
     protsel = mol.atomselect('protein and backbone and name C CA N')
     if np.sum(protsel) < 4: # Less atoms than dihedral
         return
         
     dih = Dihedral.proteinDihedrals(mol, sel=protsel, dih=('omega',))
-
+            
     metr = MetricDihedral(dih=dih, sincos=False)
     data = metr.project(mol)
     mapping = metr.getMapping(mol)
 
     frames, idxs = np.where(np.abs(data) < 120)
+    if respect_bonds:
+        bond_graph = nx.Graph()
+        bond_graph.add_edges_from(mol.bonds)
 
     for ii in np.unique(idxs):
         currframes = frames[idxs == ii]
@@ -251,11 +255,16 @@ def detectCisPeptideBonds(mol):
         description = mapping.loc[ii].description
         atomIndexes = mapping.loc[ii].atomIndexes
 
+        if respect_bonds:
+            sub_bond_graph = bond_graph.subgraph(atomIndexes)
+            if not nx.is_connected(sub_bond_graph):
+                continue
+        
         currframes_str = "{}".format(currframes)
         if nframes> 5:
-            currframes_str = "[{} ... {}]".format(currframes[0], currframes[-1])
+            currframes_str = f"[{currframes[0]} ... {currframes[-1]}]"
 
-        logger.warning("Found cis peptide bond in {} frames: {} in the omega diheral \"{}\" with indexes {}".format(nframes, currframes_str, description, atomIndexes))
+        logger.warning(f"Found cis peptide bond in {nframes} frames: {currframes_str} in the omega diheral \"{description}\" with indexes {atomIndexes}")
 
 
 def _checkMixedSegment(mol):
@@ -267,8 +276,8 @@ def _checkMixedSegment(mol):
     segsNonProt = np.unique(mol.segid[sel2])
     intersection = np.intersect1d(segsProt, segsNonProt)
     if len(intersection) != 0:
-        logger.warning('Segments {} contain both protein and non-protein atoms. '
-                       'Please assign separate segments to them or the build procedure might fail.'.format(intersection))
+        logger.warning(f'Segments {intersection} contain both protein and non-protein atoms. '
+                       'Please assign separate segments to them or the build procedure might fail.')
 
 
 def _checkLongResnames(mol, aliasresidues):
