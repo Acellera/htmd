@@ -632,14 +632,12 @@ def _build(
 
 
 def _applyProteinCaps(mol, caps):
-
     # AMBER capping
     # =============
     # This is the (horrible) way of adding caps in tleap:
     # For now, this is hardwired for ACE and NME
     # 1. Change one of the hydrogens of the N terminal (H[T]?[123]) to the ACE C atom, giving it a new resid
     # 1a. If no hydrogen present, create the ACE C atom.
-    # 1b. Add the ACE CH3 atom to define the direction of the cap
     # 2. Change one of the oxygens of the C terminal ({O,OT1,OXT}) to the NME N atom, giving it a new resid
     # 2a. If no oxygen present, create the NME N atom.
     # 3. Reorder to put the new atoms first and last
@@ -714,6 +712,7 @@ def _applyProteinCaps(mol, caps):
                 )[0]
                 atom = Molecule()
                 atom.empty(1)
+                atom.element[:] = capatomtype[i]
                 atom.coords = mol.coords[termcenterid] + 0.33 * np.subtract(
                     mol.coords[termcenterid], mol.coords[termcaid]
                 )
@@ -1227,8 +1226,37 @@ class _TestAmberBuild(unittest.TestCase):
         _TestAmberBuild._compareResultFolders(refdir, tmpdir, "3WBM")
 
     def test_caps(self):
-        # TODO: Add test where I remove all side chain from the termini and force build to reconstruct ACE NME from scratch
-        pass
+        from htmd.builder.solvate import solvate
+        from moleculekit.tools.preparation import proteinPrepare
+        from moleculekit.tools.autosegment import autoSegment
+
+        np.random.seed(1)
+
+        mol = Molecule("6A5J")
+        pmol = proteinPrepare(mol)
+        smol = solvate(pmol)
+
+        tmpdir = os.path.join(self.testDir, "peptide-cap", "6A5J")
+        _ = build(smol, outdir=tmpdir, ionize=False)
+
+        refdir = home(dataDir=join("test-amber-build", "peptide-cap", "6A5J"))
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "6A5J")
+
+        np.random.seed(1)
+
+        mol = Molecule("6A5J")
+        pmol = proteinPrepare(mol)
+        pmol.remove("(resid 1 13 and not backbone) or (resid 13 and name OXT)")
+        smol = solvate(pmol)
+
+        tmpdir = os.path.join(self.testDir, "peptide-cap-only-backbone", "6A5J")
+        _ = build(smol, outdir=tmpdir, ionize=False)
+
+        refdir = home(
+            dataDir=join("test-amber-build", "peptide-cap-only-backbone", "6A5J")
+        )
+
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "6A5J")
 
 
 if __name__ == "__main__":
