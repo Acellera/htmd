@@ -19,9 +19,7 @@ def compareVersions():
             os.makedirs(__htmdconf)
         except:
             print(
-                "Unable to create {} folder. Will not check for new HTMD versions.".format(
-                    __htmdconf
-                )
+                f"Unable to create {__htmdconf} folder. Will not check for new HTMD versions."
             )
             return
     __file = os.path.join(__htmdconf, ".latestversion")
@@ -38,9 +36,7 @@ def compareVersions():
         f = open(__file, "r")
     except:
         print(
-            "Unable to open {} file for reading. Will not check for new HTMD versions.".format(
-                __file
-            )
+            f"Unable to open {__file} file for reading. Will not check for new HTMD versions."
         )
         return
     latestversions = f.readlines()
@@ -48,9 +44,7 @@ def compareVersions():
 
     if len(latestversions) != 2:
         print(
-            "There is something wrong with your {} file. Will not check for new HTMD versions.".format(
-                __file
-            )
+            f"There is something wrong with your {__file} file. Will not check for new HTMD versions."
         )
         return
 
@@ -66,7 +60,7 @@ def compareVersions():
             verstring = "devel"
         pydeps = ""
         if len(pieces) > 1:
-            pydeps = " python[{}]".format(pieces[1])
+            pydeps = f" python[{pieces[1]}]"
     elif currver == "unpackaged":
         pass
     else:
@@ -74,24 +68,19 @@ def compareVersions():
 
     if currver != "unpackaged" and natsorted((latest, currver))[1] != currver:
         print(
-            "New {verstring} HTMD version ({latest}{pydeps}) is available. You are currently on ({currver})."
+            f"New {verstring} HTMD version ({latest}{pydeps}) is available. You are currently on ({currver})."
             "There are several methods to update:"
-            "    - Create a new conda env. using `conda create -n htmd{latest} htmd={latest} -c acellera -c psi4 -c conda-forge`"
-            "    - Create a brand new conda installation and run `conda install htmd -c acellera -c psi4 -c conda-forge`"
-            "    - Run: `conda update htmd -c acellera -c psi4 -c conda-forge` (NOT RECOMMENDED)"
-            "".format(
-                verstring=verstring, latest=latest, pydeps=pydeps, currver=currver
-            )
+            f"    - Create a new conda env. using `conda create -n htmd{latest} htmd={latest} -c acellera -c conda-forge`"
+            "    - Create a brand new conda installation and run `conda install htmd -c acellera -c conda-forge`"
+            "    - Run: `conda update htmd -c acellera -c conda-forge` (NOT RECOMMENDED!)"
         )
     else:
         if currver != "unpackaged":
-            print("You are on the latest HTMD version ({}).".format(currver))
+            print(f"You are on the latest HTMD version ({currver}).")
         else:
             from htmd.home import home
 
-            print(
-                "You are on the latest HTMD version ({} : {}).".format(currver, home())
-            )
+            print(f"You are on the latest HTMD version ({currver} : {home()}).")
 
     print("")
 
@@ -103,9 +92,7 @@ def _writeLatestVersionFile(fname):
         f = open(fname, "w")
     except:
         print(
-            "Unable to open {} file for writing. Will not check for new HTMD versions.".format(
-                fname
-            )
+            f"Unable to open {fname} file for writing. Will not check for new HTMD versions."
         )
         return
 
@@ -115,9 +102,7 @@ def _writeLatestVersionFile(fname):
         api = get_server_api(log_level=0)
         package = api.package("acellera", "htmd")
     except Exception as err:
-        print(
-            "Failed at checking latest conda version. ({})".format(type(err).__name__)
-        )
+        print(f"Failed at checking latest conda version. ({type(err).__name__})")
         return
 
     stable, dev, stabledeps, devdeps = _release_version(package)
@@ -179,4 +164,3 @@ def _release_python_dep(package, version, opersys=None):
             return " does not exist for your platform. Please create an issue on HTMD git issue tracker."
     except:
         return
-

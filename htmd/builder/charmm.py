@@ -44,7 +44,7 @@ def htmdCharmmHome():
 
 
 def listFiles():
-    """ Lists all available Charmm topologies and parameter files
+    """Lists all available Charmm topologies and parameter files
 
     Examples
     --------
@@ -74,7 +74,7 @@ def listFiles():
 
 
 def search(key, name):
-    """ Searches for CHARMM files containing a given definition.
+    """Searches for CHARMM files containing a given definition.
 
     Parameters
     ----------
@@ -82,7 +82,7 @@ def search(key, name):
         A key
     name : str
         The corresponding name
-        
+
     Examples
     --------
     >>> charmm.search(key='RESI', name = 'CHL1')  # doctest: +SKIP
@@ -140,7 +140,7 @@ def build(
     execute=True,
     _clean=True,
 ):
-    """ Builds a system for CHARMM
+    """Builds a system for CHARMM
 
     Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
 
@@ -167,7 +167,7 @@ def build(
         Default: './build'
     caps : dict
         A dictionary with keys segids and values lists of strings describing the caps of that segment.
-        e.g. caps['P'] = ['first ACE', 'last CT3'] or caps['P'] = ['first none', 'last none']. 
+        e.g. caps['P'] = ['first ACE', 'last CT3'] or caps['P'] = ['first none', 'last none'].
         Default: will apply ACE and CT3 caps to proteins and none caps to the rest.
     ionize : bool
         Enable or disable ionization
@@ -181,7 +181,7 @@ def build(
         If None it will guess disulfide bonds. Otherwise provide a list pairs of atomselection strings for each pair of
         residues forming the disulfide bridge.
     regenerate : None or list of strings of: ['angles', 'dihedrals']
-        Disable angle/dihedral regeneration with `regenerate=None`, or enable it with `regenerate=['angles', 'diheldrals']` 
+        Disable angle/dihedral regeneration with `regenerate=None`, or enable it with `regenerate=['angles', 'diheldrals']`
         or just one of the two options with `regenerate=['angles']` or `regenerate=['diheldrals']`.
     patches : list of str
         Any further patches the user wants to apply
@@ -456,7 +456,7 @@ def build(
             )
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
-    detectCisPeptideBonds(molbuilt)  # Warn in case of cis bonds
+    detectCisPeptideBonds(molbuilt, respect_bonds=True)  # Warn in case of cis bonds
     return molbuilt
 
 
@@ -765,7 +765,7 @@ def _recoverProtonations(mol):
 
 
 def combine(prmlist, outfile):
-    """ Combines CHARMM parameter files
+    """Combines CHARMM parameter files
     Take a list of parameters files and combine them into a single file (useful for acemd)
 
     Parameters
@@ -948,7 +948,7 @@ def _sec_name(filename):
 
 
 def split(filename, outdir):
-    """ Splits a stream file into an rtf and prm file.
+    """Splits a stream file into an rtf and prm file.
 
     Parameters
     ----------
@@ -1221,4 +1221,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
-

@@ -33,7 +33,7 @@ from htmd.model import Model, getStateStatistic
 from htmd.kinetics import Kinetics
 from moleculekit.vmdviewer import viewer, getCurrentViewer
 from htmd.builder.solvate import solvate
-from htmd.mdengine.acemd.acemd import Acemd, Acemd2, AtomRestraint, GroupRestraint
+from htmd.mdengine.acemd.acemd import Acemd, AtomRestraint, GroupRestraint
 from htmd.builder.builder import detectDisulfideBonds, embed, DisulfideBridge
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
@@ -71,7 +71,7 @@ except Exception as e:
     warnings.warn(f"{e}")
 
 
-from htmdx.cli import check_registration, show_news
+from htmdx.cli import htmd_registration, htmd_show_news
 from htmd.latest import compareVersions
 from htmd.config import config
 
@@ -84,12 +84,11 @@ from glob import glob
 from sklearn.cluster import MiniBatchKMeans
 
 if not (os.getenv("HTMD_NONINTERACTIVE")):
-    check_registration(product="htmd")
-    show_news()
+    htmd_registration()
+    htmd_show_news()
     compareVersions()
 
 # Get rid of pyemma version warnings
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=UserWarning)
     import pyemma
-
