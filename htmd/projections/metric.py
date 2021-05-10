@@ -165,19 +165,23 @@ class Metric:
         data = MetricData(dat=metrics, ref=ref, description=mapping, simlist=updlist)
 
         uqfsteps = np.unique(fstep)
-        data.fstep = float(stats.mode(fstep).mode)
-        if len(uqfsteps) != 1:
-            logger.warning('Multiple framesteps [{}] ns were read from the simulations. '
-                           'Taking the statistical mode: {}ns. '
-                           'If it looks wrong, you can modify it by manually '
-                           'setting the MetricData.fstep property.'.format(', '.join(map(str,uqfsteps)), data.fstep))
+        if np.all(np.isnan(uqfsteps)):
+            logger.warning('No framestep could be read from the trajectories. Please manually set the MetricData.fstep'
+                        ' property, otherwise calculations in Model and Kinetics classes can fail.')
         else:
-            if data.fstep == 0:
-                logger.warning('A fstep of 0 was read from the trajectories. Please manually set the MetricData.fstep'
-                               ' property, otherwise calculations in Model and Kinetics classes can fail.')
+            data.fstep = float(stats.mode(fstep).mode)
+            if len(uqfsteps) != 1:
+                logger.warning('Multiple framesteps [{}] ns were read from the simulations. '
+                            'Taking the statistical mode: {}ns. '
+                            'If it looks wrong, you can modify it by manually '
+                            'setting the MetricData.fstep property.'.format(', '.join(map(str,uqfsteps)), data.fstep))
             else:
-                logger.info('Frame step {}ns was read from the trajectories. If it looks wrong, redefine it by manually '
-                            'setting the MetricData.fstep property.'.format(data.fstep))
+                if data.fstep == 0:
+                    logger.warning('A framestep of 0 was read from the trajectories. Please manually set the MetricData.fstep'
+                                ' property, otherwise calculations in Model and Kinetics classes can fail.')
+                else:
+                    logger.info('Frame step {}ns was read from the trajectories. If it looks wrong, redefine it by manually '
+                                'setting the MetricData.fstep property.'.format(data.fstep))
 
         return data
 
