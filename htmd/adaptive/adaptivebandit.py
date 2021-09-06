@@ -231,6 +231,7 @@ class AdaptiveBandit(AdaptiveBase):
             0,
             val.Number(int, "OPOS"),
         )
+        self._arg("savegoal", "bool", "Save the goal values", False, val.Boolean())
 
     def _algorithm(self):
         from htmd.kinetics import Kinetics
@@ -252,7 +253,7 @@ class AdaptiveBandit(AdaptiveBase):
             if self.save:
                 makedirs("saveddata", exist_ok=True)
                 goaldata.save(
-                    path.join("saveddata", "e{}_goaldata.dat".format(self._getEpoch()))
+                    path.join("saveddata", f"e{self._getEpoch()}_goaldata.dat")
                 )
 
         # tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))  # gianni: without project it was tooooo slow
@@ -288,11 +289,11 @@ class AdaptiveBandit(AdaptiveBase):
             data_q.K = self._model.macronum
 
         if self.recluster:
-            print("Reclustering with {}".format(self.reclusterMethod))
+            print(f"Reclustering with {self.reclusterMethod}")
             data_q.cluster(self.reclusterMethod)
 
         numstates = data_q.K
-        print("Numstates: {}".format(numstates))
+        print(f"Numstates: {numstates}")
         currepoch = self._getEpoch()
         q_values = np.zeros(numstates, dtype=np.float32)
         n_values = np.zeros(numstates, dtype=np.int32)
@@ -323,8 +324,8 @@ class AdaptiveBandit(AdaptiveBase):
 
         if self.save_qval:
             makedirs("saveddata", exist_ok=True)
-            np.save(path.join("saveddata", "e{}_qval.npy".format(currepoch)), q_values)
-            np.save(path.join("saveddata", "e{}_nval.npy".format(currepoch)), n_values)
+            np.save(path.join("saveddata", f"e{currepoch}_qval.npy"), q_values)
+            np.save(path.join("saveddata", f"e{currepoch}_nval.npy"), n_values)
 
         ucb_values = np.array(
             [
@@ -337,9 +338,7 @@ class AdaptiveBandit(AdaptiveBase):
 
         if self.save_qval:
             makedirs("saveddata", exist_ok=True)
-            np.save(
-                path.join("saveddata", "e{}_ucbvals.npy".format(currepoch)), ucb_values
-            )
+            np.save(path.join("saveddata", f"e{currepoch}_ucbvals.npy"), ucb_values)
 
         N = self.nmax - self._running
         if self.actionpool <= 0:
@@ -357,9 +356,7 @@ class AdaptiveBandit(AdaptiveBase):
                     break
 
         if self.save_qval:
-            np.save(
-                path.join("saveddata", "e{}_actions.npy".format(currepoch)), action_sel
-            )
+            np.save(path.join("saveddata", f"e{currepoch}_actions.npy"), action_sel)
         relFrames = self._getSpawnFrames_UCB(action_sel, data_q)
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
@@ -422,9 +419,7 @@ class AdaptiveBandit(AdaptiveBase):
                     .values[::-1]
                 )
             else:
-                raise RuntimeError(
-                    "Reward method {} not available".format(rewardmethod)
-                )
+                raise RuntimeError(f"Reward method {rewardmethod} not available")
 
             for st, re in zip(states, windowedreward):
                 rewards[st].append(re)
@@ -447,12 +442,25 @@ class AdaptiveBandit(AdaptiveBase):
 
     def _getGoalData(self, sims):
         from htmd.projections.metric import Metric
+        from htmd.simlist import _simName
+        import pickle
+        import os
 
         logger.debug("Starting projection of directed component")
         metr = Metric(sims, skip=self.skip)
         metr.set(self.goalfunction)
         data = metr.project()
         logger.debug("Finished calculating directed component")
+
+        if self.savegoal:
+            os.makedirs("saveddata", exist_ok=True)
+            savedata = {}
+            for traj in data.trajectories:
+                trajname = _simName(traj.sim.trajectory[0])
+                savedata[trajname] = traj.projection
+            with open(os.path.join("saveddata", "goals.dat"), "wb") as f:
+                pickle.dump(savedata, f)
+
         return data
 
     def _createMSM(self, data):
@@ -473,7 +481,7 @@ class AdaptiveBandit(AdaptiveBase):
         if self.save:
             makedirs("saveddata", exist_ok=True)
             self._model.save(
-                path.join("saveddata", "e{}_adapt_model.dat".format(self._getEpoch()))
+                path.join("saveddata", f"e{self._getEpoch()}_adapt_model.dat")
             )
 
     def _getSpawnFrames_UCB(self, reward, data):
@@ -481,7 +489,7 @@ class AdaptiveBandit(AdaptiveBase):
         _, relFrames = data.sampleClusters(
             stateIdx, reward[stateIdx], replacement=True, allframes=False
         )
-        logger.debug("relFrames {}".format(relFrames))
+        logger.debug(f"relFrames {relFrames}")
         return relFrames
 
     def _numClusters(self, numFrames):
