@@ -409,7 +409,6 @@ class _TestAdaptiveGoal(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             print(tmpdir)
-            os.chdir(tmpdir)
 
             gendir = os.path.join(
                 home(dataDir="test-adaptive"), "test-ions", "generators"
@@ -439,7 +438,7 @@ class _TestAdaptiveGoal(unittest.TestCase):
             md.savegoal = True
             md.run()
 
-            assert os.path.exists(os.path.join(tmpdir, "saveddata", "goals.dat"))
+            assert os.path.exists(os.path.join("saveddata", "goals.dat"))
 
 
 if __name__ == "__main__":
