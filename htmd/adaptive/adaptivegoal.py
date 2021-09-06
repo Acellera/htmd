@@ -175,6 +175,7 @@ class AdaptiveGoal(AdaptiveMD):
             10,
             val.Number(int, "POS"),
         )
+        self._arg("savegoal", "bool", "Save the goal values", False, val.Boolean())
         self._debug = False
 
     def _algorithm(self):
@@ -195,8 +196,7 @@ class AdaptiveGoal(AdaptiveMD):
 
         data = self._getData(sims)
         if self.save:
-            if not path.exists("saveddata"):
-                os.makedirs("saveddata")
+            os.makedirs("saveddata", exist_ok=True)
             np.savetxt(
                 path.join("saveddata", f"e{self._getEpoch()}_report.npy"),
                 [self._getEpoch(), data.numFrames, len(data.dat)],
@@ -258,8 +258,7 @@ class AdaptiveGoal(AdaptiveMD):
         )
 
         if self.save:
-            if not path.exists("saveddata"):
-                os.makedirs("saveddata")
+            os.makedirs("saveddata", exist_ok=True)
             epoch = self._getEpoch()
             tosave = {
                 "ucunscaled": -ucunscaled,
@@ -354,12 +353,24 @@ class AdaptiveGoal(AdaptiveMD):
 
     def _getGoalData(self, sims):
         from htmd.projections.metric import Metric
+        from htmd.simlist import _simName
+        import pickle
 
         logger.debug("Starting projection of directed component")
         metr = Metric(sims, skip=self.skip)
         metr.set(self.goalfunction)
         data = metr.project()
         logger.debug("Finished calculating directed component")
+
+        if self.savegoal:
+            os.makedirs("saveddata", exist_ok=True)
+            savedata = {}
+            for traj in data.trajectories:
+                trajname = _simName(traj.sim.trajectory[0])
+                savedata[trajname] = traj.projection
+            with open(os.path.join("saveddata", "goals.dat"), "wb") as f:
+                pickle.dump(savedata, f)
+
         return data
 
     def _calculateDirectedComponent(self, goaldata, St, mapping=None):
@@ -391,13 +402,15 @@ import unittest
 class _TestAdaptiveGoal(unittest.TestCase):
     def test_adaptive_goal(self):
         from moleculekit.projections.metricdistance import MetricDistance
-        from jobqueues.localqueue import LocalGPUQueue
+        from jobqueues.localqueue import LocalCPUQueue
         from htmd.home import home
         import tempfile
         import shutil
 
         with tempfile.TemporaryDirectory() as tmpdir:
             print(tmpdir)
+            os.chdir(tmpdir)
+
             gendir = os.path.join(
                 home(dataDir="test-adaptive"), "test-ions", "generators"
             )
@@ -408,14 +421,13 @@ class _TestAdaptiveGoal(unittest.TestCase):
 
             dist = MetricDistance("name CL", "name NA", periodic="selections")
 
-            app = LocalGPUQueue()
-            app.ngpu = 2
+            app = LocalCPUQueue()
             app.datadir = datdir
 
             md = AdaptiveGoal()
             md.nmin = 1
             md.nmax = 2
-            md.nepochs = 2
+            md.nepochs = 3
             md.updateperiod = 5
             md.projection = dist
             md.goalfunction = lambda mol: -dist.project(mol).flatten()
@@ -424,7 +436,10 @@ class _TestAdaptiveGoal(unittest.TestCase):
             md.inputpath = inpdir
             md.datapath = datdir
             md.app = app
+            md.savegoal = True
             md.run()
+
+            assert os.path.exists(os.path.join(tmpdir, "saveddata", "goals.dat"))
 
 
 if __name__ == "__main__":
