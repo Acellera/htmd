@@ -13,11 +13,12 @@ from protocolinterface import val
 from htmd.projections.tica import TICA
 from htmd.projections.metric import Metric
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 class AdaptiveMD(AdaptiveBase):
-    """ Adaptive class which uses a Markov state model for respawning
+    """Adaptive class which uses a Markov state model for respawning
 
     AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
     currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
@@ -101,29 +102,112 @@ class AdaptiveMD(AdaptiveBase):
         from sklearn.base import ClusterMixin
         from htmd.clustering.kcenters import KCenter
         from moleculekit.projections.projection import Projection
+
         super().__init__()
-        self._arg('datapath', 'str', 'The directory in which the completed simulations are stored', 'data', val.String())
-        self._arg('filter', 'bool', 'Enable or disable filtering of trajectories.', True, val.Boolean())
-        self._arg('filtersel', 'str', 'Filtering atom selection', 'not water', val.String())
-        self._arg('filteredpath', 'str', 'The directory in which the filtered simulations will be stored', 'filtered', val.String())
-        self._arg('projection', ':class:`Projection <moleculekit.projections.projection.Projection>` object',
-                  'A Projection class object or a list of objects which will be used to project the simulation '
-                   'data before constructing a Markov model', None, val.Object(Projection), nargs='+')
-        self._arg('truncation', 'str', 'Method for truncating the prob distribution (None, \'cumsum\', \'statecut\'', None, val.String())
-        self._arg('statetype', 'str', 'What states (cluster, micro, macro) to use for calculations.', 'micro', val.String(), valid_values=('micro', 'cluster', 'macro'))
-        self._arg('macronum', 'int', 'The number of macrostates to produce', 8, val.Number(int, 'POS'))
-        self._arg('skip', 'int', 'Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame', 1, val.Number(int, 'POS'))
-        self._arg('lag', 'int', 'The lagtime used to create the Markov model', 1, val.Number(int, 'POS'))
-        self._arg('clustmethod', ':class:`ClusterMixin <sklearn.base.ClusterMixin>` class', 'Clustering algorithm used to cluster the contacts or distances', KCenter, val.Class(ClusterMixin))
-        self._arg('method', 'str', 'Criteria used for choosing from which state to respawn from', '1/Mc', val.String())
-        self._arg('ticalag', 'int', 'Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.', 20, val.Number(int, '0POS'))
-        self._arg('ticadim', 'int', 'Number of TICA dimensions to use. When set to 0 it disables TICA', 3, val.Number(int, '0POS'))
-        self._arg('contactsym', 'str', 'Contact symmetry', None, val.String())
-        self._arg('save', 'bool', 'Save the model generated', False, val.Boolean())
+        self._arg(
+            "datapath",
+            "str",
+            "The directory in which the completed simulations are stored",
+            "data",
+            val.String(),
+        )
+        self._arg(
+            "filter",
+            "bool",
+            "Enable or disable filtering of trajectories.",
+            True,
+            val.Boolean(),
+        )
+        self._arg(
+            "filtersel", "str", "Filtering atom selection", "not water", val.String()
+        )
+        self._arg(
+            "filteredpath",
+            "str",
+            "The directory in which the filtered simulations will be stored",
+            "filtered",
+            val.String(),
+        )
+        self._arg(
+            "projection",
+            ":class:`Projection <moleculekit.projections.projection.Projection>` object",
+            "A Projection class object or a list of objects which will be used to project the simulation "
+            "data before constructing a Markov model",
+            None,
+            val.Object(Projection),
+            nargs="+",
+        )
+        self._arg(
+            "truncation",
+            "str",
+            "Method for truncating the prob distribution (None, 'cumsum', 'statecut'",
+            None,
+            val.String(),
+        )
+        self._arg(
+            "statetype",
+            "str",
+            "What states (cluster, micro, macro) to use for calculations.",
+            "micro",
+            val.String(),
+            valid_values=("micro", "cluster", "macro"),
+        )
+        self._arg(
+            "macronum",
+            "int",
+            "The number of macrostates to produce",
+            8,
+            val.Number(int, "POS"),
+        )
+        self._arg(
+            "skip",
+            "int",
+            "Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame",
+            1,
+            val.Number(int, "POS"),
+        )
+        self._arg(
+            "lag",
+            "int",
+            "The lagtime used to create the Markov model",
+            1,
+            val.Number(int, "POS"),
+        )
+        self._arg(
+            "clustmethod",
+            ":class:`ClusterMixin <sklearn.base.ClusterMixin>` class",
+            "Clustering algorithm used to cluster the contacts or distances",
+            KCenter,
+            val.Class(ClusterMixin),
+        )
+        self._arg(
+            "method",
+            "str",
+            "Criteria used for choosing from which state to respawn from",
+            "1/Mc",
+            val.String(),
+        )
+        self._arg(
+            "ticalag",
+            "int",
+            "Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.",
+            20,
+            val.Number(int, "0POS"),
+        )
+        self._arg(
+            "ticadim",
+            "int",
+            "Number of TICA dimensions to use. When set to 0 it disables TICA",
+            3,
+            val.Number(int, "0POS"),
+        )
+        self._arg("contactsym", "str", "Contact symmetry", None, val.String())
+        self._arg("save", "bool", "Save the model generated", False, val.Boolean())
 
     def _algorithm(self):
         data = self._getData(self._getSimlist())
-        if not self._checkNFrames(data): return False
+        if not self._checkNFrames(data):
+            return False
         self._createMSM(data)
 
         N = self.nmax - self._running
@@ -135,14 +219,17 @@ class AdaptiveMD(AdaptiveBase):
 
     def _checkNFrames(self, data):
         if self.nframes != 0 and data.numFrames >= self.nframes:
-            logger.info('Reached maximum number of frames. Stopping adaptive.')
+            logger.info("Reached maximum number of frames. Stopping adaptive.")
             return False
         return True
 
     def _getSimlist(self):
-        logger.info('Postprocessing new data')
-        sims = simlist(glob(path.join(self.datapath, '*', '')), glob(path.join(self.inputpath, '*', '')),
-                       glob(path.join(self.inputpath, '*', '')))
+        logger.info("Postprocessing new data")
+        sims = simlist(
+            glob(path.join(self.datapath, "*", "")),
+            glob(path.join(self.inputpath, "*", "")),
+            glob(path.join(self.inputpath, "*", "")),
+        )
         if self.filter:
             sims = simfilter(sims, self.filteredpath, filtersel=self.filtersel)
         return sims
@@ -159,7 +246,8 @@ class AdaptiveMD(AdaptiveBase):
             data = metr.project()
             data.dropTraj()  # Drop before TICA to avoid broken trajectories
             ticalag = int(
-                np.ceil(max(2, min(np.min(data.trajLengths) / 2, self.ticalag))))  # 1 < ticalag < (trajLen / 2)
+                np.ceil(max(2, min(np.min(data.trajLengths) / 2, self.ticalag)))
+            )  # 1 < ticalag < (trajLen / 2)
             tica = TICA(data, ticalag)
             datadr = tica.project(self.ticadim)
         else:
@@ -172,65 +260,77 @@ class AdaptiveMD(AdaptiveBase):
         self._model = Model(data)
         self._model.markovModel(self.lag, self._numMacrostates(data))
         if self.save:
-            if not path.exists('saveddata'):
-                makedirs('saveddata')
-            self._model.save(path.join('saveddata', 'e{}_adapt_model.dat'.format(self._getEpoch())))
+            if not path.exists("saveddata"):
+                makedirs("saveddata")
+            self._model.save(
+                path.join("saveddata", "e{}_adapt_model.dat".format(self._getEpoch()))
+            )
 
     def _getSpawnFrames(self, reward, model, data, N):
         prob = reward / np.sum(reward)
-        logger.debug('Sampling probabilities {}'.format(prob))
+        logger.debug("Sampling probabilities {}".format(prob))
         spawncounts = np.random.multinomial(N, prob)
-        logger.debug('spawncounts {}'.format(spawncounts))
+        logger.debug("spawncounts {}".format(spawncounts))
 
         stateIdx = np.where(spawncounts > 0)[0]
-        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype='micro', replacement=True)
-        logger.debug('relFrames {}'.format(relFrames))
+        _, relFrames = model.sampleStates(
+            stateIdx, spawncounts[stateIdx], statetype="micro", replacement=True
+        )
+        logger.debug("relFrames {}".format(relFrames))
         return relFrames, spawncounts, prob
 
     def _criteria(self, model, criteria):
-        if criteria == '1/Mc':
+        if criteria == "1/Mc":
             nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
             P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
             P_I = P_I / nMicroPerMacro
             ret = P_I[model.macro_ofmicro]
-        elif criteria == 'pi/Mc':
+        elif criteria == "pi/Mc":
             nMicroPerMacro = macroAccumulate(model, np.ones(model.micronum))
             P_I = 1 / macroAccumulate(model, model.data.N[model.cluster_ofmicro])
             P_I = P_I / nMicroPerMacro
-            ret = P_I[model.macro_ofmicro]*model.msm.stationary_distribution
+            ret = P_I[model.macro_ofmicro] * model.msm.stationary_distribution
         return ret
 
     def _truncate(self, ranking, N):
-        if self.truncation is not None and self.truncation.lower() != 'none':
-            if self.truncation == 'cumsum':
+        if self.truncation is not None and self.truncation.lower() != "none":
+            if self.truncation == "cumsum":
                 idx = np.argsort(ranking)
                 idx = idx[::-1]  # decreasing sort
                 errs = ranking[idx]
                 H = (N * errs / np.cumsum(errs)) < 1
                 ranking[idx[H]] = 0
-            if self.truncation == 'statecut':
+            if self.truncation == "statecut":
                 idx = np.argsort(ranking)
                 idx = idx[::-1]  # decreasing sort
                 ranking[idx[N:]] = 0  # Set all states ranked > N to zero.
         return ranking
 
     def _numClusters(self, numFrames):
-        """ Heuristic that calculates number of clusters from number of frames """
-        K = int(max(np.round(0.6 * np.log10(numFrames / 1000) * 1000 + 50), 100))  # heuristic
+        """Heuristic that calculates number of clusters from number of frames"""
+        K = int(
+            max(np.round(0.6 * np.log10(numFrames / 1000) * 1000 + 50), 100)
+        )  # heuristic
         if K > numFrames / 3:  # Ugly patch for low-data regimes ...
             K = int(numFrames / 3)
         return K
 
     def _numMacrostates(self, data):
-        """ Heuristic for calculating the number of macrostates for the Markov model """
+        """Heuristic for calculating the number of macrostates for the Markov model"""
         macronum = self.macronum
         if data.K < macronum:
             macronum = np.ceil(data.K / 2)
-            logger.warning('Using less macrostates than requested due to lack of microstates. macronum = ' + str(macronum))
+            logger.warning(
+                "Using less macrostates than requested due to lack of microstates. macronum = "
+                + str(macronum)
+            )
 
         # Calculating how many timescales are above the lag time to limit number of macrostates
         from pyemma.msm import timescales_msm
-        timesc = timescales_msm(data.St.tolist(), lags=self.lag, nits=macronum).get_timescales()
+
+        timesc = timescales_msm(
+            data.St.tolist(), lags=self.lag, nits=macronum
+        ).get_timescales()
         macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
         return macronum
 
@@ -243,7 +343,7 @@ if __name__ == "__main__":
     from moleculekit.projections.metricdistance import MetricDistance
 
     tmpdir = tempname()
-    shutil.copytree(htmd.home.home()+'/data/adaptive/', tmpdir)
+    shutil.copytree(htmd.home.home() + "/data/adaptive/", tmpdir)
     os.chdir(tmpdir)
     md = AdaptiveMD()
     # md.dryrun = True
@@ -253,7 +353,14 @@ if __name__ == "__main__":
     md.ticalag = 2
     md.ticadim = 3
     md.updateperiod = 5
-    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections')
-    md.projection = [MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections'), MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections')]
-
-
+    md.projection = MetricDistance(
+        "protein and name CA", "resname BEN and noh", periodic="selections"
+    )
+    md.projection = [
+        MetricDistance(
+            "protein and name CA", "resname BEN and noh", periodic="selections"
+        ),
+        MetricDistance(
+            "protein and name CA", "resname BEN and noh", periodic="selections"
+        ),
+    ]
