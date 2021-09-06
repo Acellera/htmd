@@ -198,23 +198,23 @@ class AdaptiveGoal(AdaptiveMD):
             if not path.exists("saveddata"):
                 os.makedirs("saveddata")
             np.savetxt(
-                path.join("saveddata", "e{}_report.npy".format(self._getEpoch())),
+                path.join("saveddata", f"e{self._getEpoch()}_report.npy"),
                 [self._getEpoch(), data.numFrames, len(data.dat)],
             )
 
         if not self._checkNFrames(data):
             return False
-        goaldata = self._getGoalData(
-            data.simlist
-        )  # Using the simlist of data in case some trajectories were dropped
+
+        # Using the simlist of data in case some trajectories were dropped
+        goaldata = self._getGoalData(data.simlist)
         if len(data.simlist) != len(goaldata.simlist):
             logger.warning(
                 "The goal function was not able to project all trajectories that the MSM projection could."
                 "Check for possible errors in the goal function."
             )
-        data.dropTraj(
-            keepsims=goaldata.simlist
-        )  # Ensuring that I use the intersection of projected simulations
+
+        # Ensuring that I use the intersection of projected simulations
+        data.dropTraj(keepsims=goaldata.simlist)
         self._createMSM(data)
 
         model = self._model
@@ -274,11 +274,9 @@ class AdaptiveGoal(AdaptiveMD):
                 "dcstds": dcstds,
                 "reward": reward,
             }
-            np.save(path.join("saveddata", "e{}_goalreport.npy".format(epoch)), tosave)
-            np.save(
-                path.join("saveddata", "e{}_spawnframes.npy".format(epoch)), relFrames
-            )
-            goaldata.save(path.join("saveddata", "e{}_goaldata.dat".format(epoch)))
+            np.save(path.join("saveddata", f"e{epoch}_goalreport.npy"), tosave)
+            np.save(path.join("saveddata", f"e{epoch}_spawnframes.npy"), relFrames)
+            goaldata.save(path.join("saveddata", f"e{epoch}_goaldata.dat"))
 
         if self._debug:
             np.save("debug.npy", relFrames)
@@ -306,9 +304,8 @@ class AdaptiveGoal(AdaptiveMD):
         rangeG = g.max() - totalmin
 
         # Calculate the dG
-        g = np.hstack(
-            ([g[0]] * epochdiff, g)
-        )  # Prepending the first element epochdiff-times to calculate the dG
+        # Prepending the first element epochdiff-times to calculate the dG
+        g = np.hstack(([g[0]] * epochdiff, g))
         dG = np.abs(g[epochdiff:] - g[:-epochdiff]) / rangeG
 
         # Tolerance is the range of what we consider a significant change on a scale of [0, 1]
@@ -316,9 +313,7 @@ class AdaptiveGoal(AdaptiveMD):
         grad = -multiplier * (dG - tolerance)
         # Euler integration
         tstep = 1
-        y = [
-            0,
-        ]
+        y = [0]
         # print(dG, g, grad)
         for t in range(1, len(dG), tstep):
             y.append(max(min(y[-1] + tstep * grad[t], 1), 0))
@@ -338,15 +333,15 @@ class AdaptiveGoal(AdaptiveMD):
 
     def _getSpawnFrames(self, reward, model, data, N):
         prob = reward / np.sum(reward)
-        logger.debug("Sampling probabilities {}".format(prob))
+        logger.debug(f"Sampling probabilities {prob}")
         spawncounts = np.random.multinomial(N, prob)
-        logger.debug("spawncounts {}".format(spawncounts))
+        logger.debug(f"spawncounts {spawncounts}")
 
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(
             stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=True
         )
-        logger.debug("relFrames {}".format(relFrames))
+        logger.debug(f"relFrames {relFrames}")
         return relFrames, spawncounts, prob
 
     def _featScale(self, feat):
@@ -381,9 +376,8 @@ class AdaptiveGoal(AdaptiveMD):
         means = np.zeros(stconcat.max() + 1)
         stds = np.zeros(stconcat.max() + 1)
         for i in indexes:
-            if (
-                i == -1
-            ):  # Mappings have -1 on disconnected clusters (not used in the MSM)
+            if i == -1:
+                # Mappings have -1 on disconnected clusters (not used in the MSM)
                 continue
             means[i] = np.mean(goalconcat[indexes[i]])
             stds[i] = np.std(goalconcat[indexes[i]])
@@ -524,15 +518,11 @@ if __name__ == "__main__":
 
         if len(crystalCO) != projco.shape[1]:
             raise RuntimeError(
-                "Different lengths between crystal {} and traj {} contacts for fileloc {}".format(
-                    len(crystalCO), projco.shape[1], mol.fileloc
-                )
+                f"Different lengths between crystal {len(crystalCO)} and traj {projco.shape[1]} contacts for fileloc {mol.fileloc}"
             )
         if len(crystalSS) != projss.shape[1]:
             raise RuntimeError(
-                "Different lengths between crystal {} and traj {} SS for fileloc {}".format(
-                    len(crystalSS), projss.shape[1], mol.fileloc
-                )
+                f"Different lengths between crystal {len(crystalSS)} and traj {projss.shape[1]} SS for fileloc {mol.fileloc}"
             )
 
         ss_score = np.sum(projss == crystalSS, axis=1) / projss.shape[1]

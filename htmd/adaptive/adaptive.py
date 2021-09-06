@@ -153,9 +153,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                     self.app.retrieve()
                 except RetrieveError as e:
                     logger.error(
-                        "Quitting adaptive run due to error in retrieving simulations: {}".format(
-                            e
-                        )
+                        f"Quitting adaptive run due to error in retrieving simulations: {e}"
                     )
                     return
                 except ProjectNotExistError:
@@ -168,9 +166,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                     self._running = self.app.inprogress()
                 except InProgressError as e:
                     logger.error(
-                        "Quitting adaptive run due to error in checking number of simulations in progress: {}".format(
-                            e
-                        )
+                        f"Quitting adaptive run due to error in checking number of simulations in progress: {e}"
                     )
                     return
                 except ProjectNotExistError:
@@ -207,7 +203,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
 
             if self.updateperiod <= 0:
                 break
-            logger.info("Sleeping for {} seconds.".format(self.updateperiod))
+            logger.info(f"Sleeping for {self.updateperiod} seconds.")
             time.sleep(self.updateperiod)
         self._unsetLock()
 
@@ -219,9 +215,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
             if os.path.exists(lockfile):
                 raise FileExistsError(
                     "This adaptive folder is locked by a running adaptive application. If this is not"
-                    " the case, delete the {} file and run adaptive again.".format(
-                        lockfile
-                    )
+                    f" the case, delete the {lockfile} file and run adaptive again."
                 )
 
             with open(lockfile, "w") as f:
@@ -284,7 +278,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
         """
         folders = glob(path.join(self.inputpath, "e*", ""))
         epoch = 0
-        regex = re.compile("e(\d+)")
+        regex = re.compile(r"e(\d+)")
         for f in folders:
             res = regex.search(f)
             if res:
@@ -317,7 +311,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
 
 
 def _writeInputsFunction(i, f, epoch, inputpath, coorname):
-    regex = re.compile("(e\d+s\d+)_")
+    regex = re.compile(r"(e\d+s\d+)_")
     frameNum = f.frame
     piece = f.piece
     if f.sim.parent is None:
@@ -339,18 +333,7 @@ def _writeInputsFunction(i, f, epoch, inputpath, coorname):
         wuName = res.group(1)
 
     # create new job directory
-    newName = (
-        "e"
-        + str(epoch)
-        + "s"
-        + str(i + 1)
-        + "_"
-        + wuName
-        + "p"
-        + str(piece)
-        + "f"
-        + str(frameNum)
-    )
+    newName = f"e{epoch}s{i+1}_{wuName}p{piece}f{frameNum}"
     newDir = path.join(inputpath, newName, "")
 
     # copy previous input directory including input files
@@ -363,9 +346,8 @@ def _writeInputsFunction(i, f, epoch, inputpath, coorname):
 
     # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
 
-    mol = Molecule(
-        currSim.molfile
-    )  # Always read the mol file, otherwise it does not work if we need to save a PDB as coorname
+    # Always read the mol file, otherwise it does not work if we need to save a PDB as coorname
+    mol = Molecule(currSim.molfile)
     mol.read(traj)
     mol.dropFrames(keep=frameNum)  # Making sure only specific frame to write is kept
     mol.write(path.join(newDir, coorname))
@@ -413,7 +395,7 @@ def getEpochFromName(name):
     reg = re.compile("/e(\d+)s\d+_")
     matches = reg.findall(name)
     if len(matches) == 0:
-        raise RuntimeError("{} is not an adaptive trajectory".format(name))
+        raise RuntimeError(f"{name} is not an adaptive trajectory")
     return int(matches[0])
 
 
@@ -447,7 +429,7 @@ def reconstructAdaptiveTraj(simlist, trajID):
             sim = s
             break
     if sim is None:
-        raise NameError("Could not find sim with ID {} in the simlist.".format(trajID))
+        raise NameError(f"Could not find sim with ID {trajID} in the simlist.")
 
     pathlist = []
     pathlist.append(sim.trajectory[0])
@@ -492,8 +474,8 @@ def reconstructAdaptiveTraj(simlist, trajID):
 
 
 def _findprevioustraj(simlist, simname):
-    regex = re.compile("_(e\d+s\d+)p(\d+)f(\d+)$")
-    regex2 = re.compile("_(e\d+s\d+)f(\d+)$")
+    regex = re.compile(r"_(e\d+s\d+)p(\d+)f(\d+)$")
+    regex2 = re.compile(r"_(e\d+s\d+)f(\d+)$")
     m = regex.search(simname)
     if m:
         prevname = m.group(1)
@@ -507,15 +489,15 @@ def _findprevioustraj(simlist, simname):
             prevframe = int(m2.group(2))
         else:
             raise NameError(
-                "Could not match simname: {} with regular expressions.".format(simname)
+                f"Could not match simname: {simname} with regular expressions."
             )
-    regex = re.compile("e(\d+)s")
+    regex = re.compile(r"e(\d+)s")
     m = regex.match(prevname)
     if not m:
-        raise NameError("Could not parse epoch number from name: {}.".format(prevname))
+        raise NameError(f"Could not parse epoch number from name: {prevname}.")
     epo = int(m.group(1))
     sim = None
-    regex = re.compile("{}_".format(prevname))
+    regex = re.compile(f"{prevname}_")
     for s in simlist:
         if len(s.trajectory) <= prevpiece:
             continue
@@ -524,7 +506,7 @@ def _findprevioustraj(simlist, simname):
             sim = s
             break
     if sim is None:
-        raise NameError("Could not find parent of simulation {}.".format(simname))
+        raise NameError(f"Could not find parent of simulation {simname}.")
     return sim, prevpiece, prevframe, epo
 
 

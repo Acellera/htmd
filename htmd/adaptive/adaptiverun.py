@@ -245,9 +245,10 @@ class AdaptiveMD(AdaptiveBase):
             # tica = TICA(metr, int(max(2, np.ceil(self.ticalag))))  # gianni: without project it was tooooo slow
             data = metr.project()
             data.dropTraj()  # Drop before TICA to avoid broken trajectories
+            # 1 < ticalag < (trajLen / 2)
             ticalag = int(
                 np.ceil(max(2, min(np.min(data.trajLengths) / 2, self.ticalag)))
-            )  # 1 < ticalag < (trajLen / 2)
+            )
             tica = TICA(data, ticalag)
             datadr = tica.project(self.ticadim)
         else:
@@ -263,20 +264,20 @@ class AdaptiveMD(AdaptiveBase):
             if not path.exists("saveddata"):
                 makedirs("saveddata")
             self._model.save(
-                path.join("saveddata", "e{}_adapt_model.dat".format(self._getEpoch()))
+                path.join("saveddata", f"e{self._getEpoch()}_adapt_model.dat")
             )
 
     def _getSpawnFrames(self, reward, model, data, N):
         prob = reward / np.sum(reward)
-        logger.debug("Sampling probabilities {}".format(prob))
+        logger.debug(f"Sampling probabilities {prob}")
         spawncounts = np.random.multinomial(N, prob)
-        logger.debug("spawncounts {}".format(spawncounts))
+        logger.debug(f"spawncounts {spawncounts}")
 
         stateIdx = np.where(spawncounts > 0)[0]
         _, relFrames = model.sampleStates(
             stateIdx, spawncounts[stateIdx], statetype="micro", replacement=True
         )
-        logger.debug("relFrames {}".format(relFrames))
+        logger.debug(f"relFrames {relFrames}")
         return relFrames, spawncounts, prob
 
     def _criteria(self, model, criteria):
@@ -308,9 +309,7 @@ class AdaptiveMD(AdaptiveBase):
 
     def _numClusters(self, numFrames):
         """Heuristic that calculates number of clusters from number of frames"""
-        K = int(
-            max(np.round(0.6 * np.log10(numFrames / 1000) * 1000 + 50), 100)
-        )  # heuristic
+        K = int(max(np.round(0.6 * np.log10(numFrames / 1000) * 1000 + 50), 100))
         if K > numFrames / 3:  # Ugly patch for low-data regimes ...
             K = int(numFrames / 3)
         return K
@@ -321,8 +320,7 @@ class AdaptiveMD(AdaptiveBase):
         if data.K < macronum:
             macronum = np.ceil(data.K / 2)
             logger.warning(
-                "Using less macrostates than requested due to lack of microstates. macronum = "
-                + str(macronum)
+                f"Using less macrostates than requested due to lack of microstates. macronum = {macronum}"
             )
 
         # Calculating how many timescales are above the lag time to limit number of macrostates
