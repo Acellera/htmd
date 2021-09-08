@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def htmdCharmmHome():
-    """ Returns the location of the CHARMM files distributed with HTMD"""
+    """Returns the location of the CHARMM files distributed with HTMD"""
     return os.path.abspath(
         os.path.join(home(shareDir=True), "builder", "charmmfiles", "")
     )
@@ -95,7 +95,7 @@ def search(key, name):
 
 
 def defaultTopo():
-    """ Returns the default topologies used by charmm.build """
+    """Returns the default topologies used by charmm.build"""
     return [
         "top/top_all36_prot.rtf",
         "top/top_all36_lipid.rtf",
@@ -105,7 +105,7 @@ def defaultTopo():
 
 
 def defaultParam():
-    """ Returns the default parameters used by charmm.build """
+    """Returns the default parameters used by charmm.build"""
     return [
         "par/par_all36m_prot.prm",
         "par/par_all36_lipid.prm",
@@ -115,7 +115,7 @@ def defaultParam():
 
 
 def defaultStream():
-    """ Returns the default stream files used by charmm.build """
+    """Returns the default stream files used by charmm.build"""
     return ["str/prot/toppar_all36_prot_arg0.str", "str/misc/toppar_ions_won.str"]
 
 
@@ -955,15 +955,15 @@ def split(filename, outdir):
     filename : str
         Stream file name
     """
-    regex = re.compile("^(toppar_)?(.*)\.str$")
+    regex = re.compile(r"^(toppar_)?(.*)\.str$")
     base = os.path.basename(os.path.normpath(filename))
     base = regex.findall(base)[0][1]
-    outrtf = os.path.join(outdir, "top_{}.rtf".format(base))
-    outprm = os.path.join(outdir, "par_{}.prm".format(base))
+    outrtf = os.path.join(outdir, f"top_{base}.rtf")
+    outprm = os.path.join(outdir, f"par_{base}.prm")
 
-    startrtf = re.compile("^read rtf card", flags=re.IGNORECASE)
-    startprm = re.compile("^read para\w* card", flags=re.IGNORECASE)
-    endsection = re.compile("^end", flags=re.IGNORECASE)
+    startrtf = re.compile(r"^read rtf card", flags=re.IGNORECASE)
+    startprm = re.compile(r"^read para\w* card", flags=re.IGNORECASE)
+    endsection = re.compile(r"^end", flags=re.IGNORECASE)
 
     rtfsection = 0
     prmsection = 0
@@ -1025,11 +1025,11 @@ def _prepareStream(filename):
 def _logParser(fname):
     import re
 
-    unknownres_regex = re.compile("unknown residue type (\w+)")
-    failedcoor = re.compile("Warning: failed to set coordinate for atom")
-    failedangle = re.compile("Warning: failed to guess coordinate due to bad angle")
-    poorlycoor = re.compile("Warning: poorly guessed coordinate(s?)")
-    otherwarn = re.compile("Warning")
+    unknownres_regex = re.compile(r"unknown residue type (\w+)")
+    failedcoor = re.compile(r"Warning: failed to set coordinate for atom")
+    failedangle = re.compile(r"Warning: failed to guess coordinate due to bad angle")
+    poorlycoor = re.compile(r"Warning: poorly guessed coordinate(s?)")
+    otherwarn = re.compile(r"Warning")
 
     failedcoorcount = 0
     failedanglecount = 0
@@ -1053,38 +1053,30 @@ def _logParser(fname):
     errors = []
     if failedcoorcount > 0:
         warnings = True
-        logger.warning(
-            "Failed to set coordinates for {} atoms.".format(failedcoorcount)
-        )
+        logger.warning(f"Failed to set coordinates for {failedcoorcount} atoms.")
     if failedanglecount > 0:
         warnings = True
         logger.warning(
-            "Failed to guess coordinates for {} atoms due to bad angles.".format(
-                failedanglecount
-            )
+            f"Failed to guess coordinates for {failedanglecount} atoms due to bad angles."
         )
     if poorlycoorcount > 0:
         warnings = True
-        logger.warning(
-            "Poorly guessed coordinates for {} atoms.".format(poorlycoorcount)
-        )
+        logger.warning(f"Poorly guessed coordinates for {poorlycoorcount} atoms.")
     if otherwarncount > 0:
         warnings = True
         logger.warning(
-            "{} undefined warnings were produced during building.".format(
-                otherwarncount
-            )
+            f"{otherwarncount} undefined warnings were produced during building."
         )
     if len(unknownres):
         errors.append(
             UnknownResidueError(
-                "Unknown residue(s) {} found in the input structure. "
+                f"Unknown residue(s) {np.unique(unknownres)} found in the input structure. "
                 "You are either missing a topology definition for the residue or you need to "
-                "rename it to the correct residue name".format(np.unique(unknownres))
+                "rename it to the correct residue name"
             )
         )
     if warnings:
-        logger.warning("Please check {} for further information.".format(fname))
+        logger.warning(f"Please check {fname} for further information.")
 
     return errors
 
@@ -1095,8 +1087,8 @@ def _checkFailedAtoms(mol):
     idx = np.where(np.sum(mol.coords == 0, axis=1) == 3)[0]
     if len(idx) != 0:
         logger.critical(
-            "Atoms with indexes {} are positioned at [0,0,0]. This can cause simulations to crash. "
-            "Check log file for more details.".format(idx)
+            f"Atoms with indexes {idx} are positioned at [0,0,0]. This can cause simulations to crash. "
+            "Check log file for more details."
         )
 
 
