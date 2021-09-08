@@ -231,7 +231,13 @@ class AdaptiveBandit(AdaptiveBase):
             0,
             val.Number(int, "OPOS"),
         )
-        self._arg("savegoal", "bool", "Save the goal values", False, val.Boolean())
+        self._arg(
+            "savegoal",
+            "str",
+            "Save the goal values to the specified file",
+            None,
+            val.String(),
+        )
 
     def _algorithm(self):
         from htmd.kinetics import Kinetics
@@ -452,13 +458,14 @@ class AdaptiveBandit(AdaptiveBase):
         data = metr.project()
         logger.debug("Finished calculating directed component")
 
-        if self.savegoal:
-            os.makedirs("saveddata", exist_ok=True)
+        if self.savegoal is not None:
+            dirname = os.path.dirname(self.savegoal)
+            os.makedirs(dirname, exist_ok=True)
             savedata = {}
             for traj in data.trajectories:
                 trajname = _simName(traj.sim.trajectory[0])
                 savedata[trajname] = traj.projection
-            with open(os.path.join("saveddata", "goals.pkl"), "wb") as f:
+            with open(self.savegoal, "wb") as f:
                 pickle.dump(savedata, f)
 
         return data
