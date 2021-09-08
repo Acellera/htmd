@@ -368,7 +368,7 @@ class AdaptiveGoal(AdaptiveMD):
             for traj in data.trajectories:
                 trajname = _simName(traj.sim.trajectory[0])
                 savedata[trajname] = traj.projection
-            with open(os.path.join("saveddata", "goals.dat"), "wb") as f:
+            with open(os.path.join("saveddata", "goals.pkl"), "wb") as f:
                 pickle.dump(savedata, f)
 
         return data
@@ -438,7 +438,7 @@ class _TestAdaptiveGoal(unittest.TestCase):
             md.savegoal = True
             # md.run()
 
-            # assert os.path.exists(os.path.join("saveddata", "goals.dat"))
+            # assert os.path.exists(os.path.join("saveddata", "goals.pkl"))
 
 
 if __name__ == "__main__":

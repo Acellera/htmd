@@ -458,7 +458,7 @@ class AdaptiveBandit(AdaptiveBase):
             for traj in data.trajectories:
                 trajname = _simName(traj.sim.trajectory[0])
                 savedata[trajname] = traj.projection
-            with open(os.path.join("saveddata", "goals.dat"), "wb") as f:
+            with open(os.path.join("saveddata", "goals.pkl"), "wb") as f:
                 pickle.dump(savedata, f)
 
         return data
