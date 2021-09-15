@@ -203,7 +203,7 @@ class AdaptiveBandit(AdaptiveBase):
             False,
             val.Boolean(),
         )
-        self._arg("actionspace", "str", "The action space", "tica", val.String())
+        self._arg("actionspace", "str", "The action space", "metric", val.String())
         self._arg(
             "recluster",
             "bool",
