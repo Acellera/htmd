@@ -77,7 +77,7 @@ class AdaptiveBandit(AdaptiveBase):
         Save the model generated
     save_qval : bool, default=False
         Save the Q(a) and N values for every epoch
-    actionspace : str, default='metric'
+    actionspace : str, default='tica'
         The action space
     recluster : bool, default=False
         If to recluster the action space.
