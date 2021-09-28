@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class AdaptiveGoal(AdaptiveMD):
-    """ Adaptive class which uses a Markov state model for respawning
+    """Adaptive class which uses a Markov state model for respawning
 
     AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
     currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
@@ -122,44 +122,105 @@ class AdaptiveGoal(AdaptiveMD):
 
     def __init__(self):
         super().__init__()
-        self._arg('goalfunction', 'function',
-                  'This function will be used to convert the goal-projected simulation data to a ranking which'
-                  'can be used for the directed component of FAST.', None, val.Function(), nargs='any')
-        self._arg('ucscale', 'float', 'Scaling factor for undirected component. Directed component scaling '
-                                       'automatically calculated as (1-uscale)', 0.5, val.Number(float, 'ANY'))
-        self._arg('nosampledc', 'bool', 'Spawn only from top DC conformations without sampling', False, val.Boolean())
-        self._arg('autoscale', 'bool', 'Automatically scales exploration and exploitation ratios depending on '
-                                       'how stuck the adaptive is at a given goal score.', False, val.Boolean())
-        self._arg('autoscalemult', 'float', 'Multiplier for the scaling factor.', 1, val.Number(float, '0POS'))
-        self._arg('autoscaletol', 'float', 'Tolerance for the scaling factor.', 0.2, val.Number(float, '0POS'))
-        self._arg('autoscalediff', 'int', 'Diff in epochs to use for scaling factor.', 10, val.Number(int, 'POS'))
+        self._arg(
+            "goalfunction",
+            "function",
+            "This function will be used to convert the goal-projected simulation data to a ranking which"
+            "can be used for the directed component of FAST.",
+            None,
+            val.Function(),
+            nargs="any",
+        )
+        self._arg(
+            "ucscale",
+            "float",
+            "Scaling factor for undirected component. Directed component scaling "
+            "automatically calculated as (1-uscale)",
+            0.5,
+            val.Number(float, "ANY"),
+        )
+        self._arg(
+            "nosampledc",
+            "bool",
+            "Spawn only from top DC conformations without sampling",
+            False,
+            val.Boolean(),
+        )
+        self._arg(
+            "autoscale",
+            "bool",
+            "Automatically scales exploration and exploitation ratios depending on "
+            "how stuck the adaptive is at a given goal score.",
+            False,
+            val.Boolean(),
+        )
+        self._arg(
+            "autoscalemult",
+            "float",
+            "Multiplier for the scaling factor.",
+            1,
+            val.Number(float, "0POS"),
+        )
+        self._arg(
+            "autoscaletol",
+            "float",
+            "Tolerance for the scaling factor.",
+            0.2,
+            val.Number(float, "0POS"),
+        )
+        self._arg(
+            "autoscalediff",
+            "int",
+            "Diff in epochs to use for scaling factor.",
+            10,
+            val.Number(int, "POS"),
+        )
+        self._arg(
+            "savegoal",
+            "str",
+            "Save the goal values to the specified file",
+            None,
+            val.String(),
+        )
         self._debug = False
 
     def _algorithm(self):
         sims = self._getSimlist()
 
         if self.nosampledc:
-            print('Spawning only from top DC conformations without sampling')
+            print("Spawning only from top DC conformations without sampling")
             goaldata = self._getGoalData(sims)
-            if not self._checkNFrames(goaldata): return False
+            if not self._checkNFrames(goaldata):
+                return False
             datconcat = np.concatenate(goaldata.dat).flatten()
             sortedabs = np.argsort(datconcat)[::-1]
-            if self._debug: np.save('debug.npy', sortedabs[:self.nmax - self._running]); return True
-            self._writeInputs(goaldata.abs2sim(sortedabs[:self.nmax - self._running]))
+            if self._debug:
+                np.save("debug.npy", sortedabs[: self.nmax - self._running])
+                return True
+            self._writeInputs(goaldata.abs2sim(sortedabs[: self.nmax - self._running]))
             return True
 
         data = self._getData(sims)
         if self.save:
-            if not path.exists('saveddata'):
-                os.makedirs('saveddata')
-            np.savetxt(path.join('saveddata', 'e{}_report.npy'.format(self._getEpoch())), [self._getEpoch(), data.numFrames, len(data.dat)])
+            os.makedirs("saveddata", exist_ok=True)
+            np.savetxt(
+                path.join("saveddata", f"e{self._getEpoch()}_report.npy"),
+                [self._getEpoch(), data.numFrames, len(data.dat)],
+            )
 
-        if not self._checkNFrames(data): return False
-        goaldata = self._getGoalData(data.simlist)  # Using the simlist of data in case some trajectories were dropped
+        if not self._checkNFrames(data):
+            return False
+
+        # Using the simlist of data in case some trajectories were dropped
+        goaldata = self._getGoalData(data.simlist)
         if len(data.simlist) != len(goaldata.simlist):
-            logger.warning('The goal function was not able to project all trajectories that the MSM projection could.'
-                           'Check for possible errors in the goal function.')
-        data.dropTraj(keepsims=goaldata.simlist)  # Ensuring that I use the intersection of projected simulations
+            logger.warning(
+                "The goal function was not able to project all trajectories that the MSM projection could."
+                "Check for possible errors in the goal function."
+            )
+
+        # Ensuring that I use the intersection of projected simulations
+        data.dropTraj(keepsims=goaldata.simlist)
         self._createMSM(data)
 
         model = self._model
@@ -167,18 +228,22 @@ class AdaptiveGoal(AdaptiveMD):
 
         # Undirected component
         uc = -model.data.N  # Lower counts should give higher score hence the -
-        if self.statetype == 'micro':
+        if self.statetype == "micro":
             uc = uc[model.cluster_ofmicro]
-        if self.statetype == 'macro':
+        if self.statetype == "macro":
             uc = macroAccumulate(model, uc[model.cluster_ofmicro])
 
         # Calculating the directed component
         dcmeans = dcstds = None
-        if self.statetype == 'micro':
-            dcmeans, dcstds = self._calculateDirectedComponent(goaldata, model.data.St, model.micro_ofcluster)
-        elif self.statetype == 'macro':
+        if self.statetype == "micro":
+            dcmeans, dcstds = self._calculateDirectedComponent(
+                goaldata, model.data.St, model.micro_ofcluster
+            )
+        elif self.statetype == "macro":
             # TODO: Should we weigh by equilibrium population?
-            dcmeans, dcstds = self._calculateDirectedComponent(goaldata, model.data.St, model.macro_ofcluster)
+            dcmeans, dcstds = self._calculateDirectedComponent(
+                goaldata, model.data.St, model.macro_ofcluster
+            )
 
         ucunscaled = uc
         dcunscaled = dcmeans
@@ -187,25 +252,40 @@ class AdaptiveGoal(AdaptiveMD):
 
         scale = self.ucscale
         if self.autoscale:
-            scale = AdaptiveGoal._calculateScale(goaldata, self.autoscalediff, self.autoscalemult, self.autoscaletol)
+            scale = AdaptiveGoal._calculateScale(
+                goaldata, self.autoscalediff, self.autoscalemult, self.autoscaletol
+            )
         reward = scale * uc + (1 - scale) * dc
 
         N = self.nmax - self._running
         reward = self._truncate(reward, N)
-        relFrames, spawncounts, truncprob = self._getSpawnFrames(reward, self._model, data, N)
+        relFrames, spawncounts, truncprob = self._getSpawnFrames(
+            reward, self._model, data, N
+        )
 
         if self.save:
-            if not path.exists('saveddata'):
-                os.makedirs('saveddata')
+            os.makedirs("saveddata", exist_ok=True)
             epoch = self._getEpoch()
-            tosave = {'ucunscaled': -ucunscaled, 'dcunscaled': dcunscaled, 'uc': uc, 'dc': dc, 'ucscale': scale,
-                      'spawncounts': spawncounts, 'truncprob': truncprob, 'relFrames': relFrames, 'dcmeans': dcmeans,
-                      'dcstds': dcstds, 'reward': reward}
-            np.save(path.join('saveddata', 'e{}_goalreport.npy'.format(epoch)), tosave)
-            np.save(path.join('saveddata', 'e{}_spawnframes.npy'.format(epoch)), relFrames)
-            goaldata.save(path.join('saveddata', 'e{}_goaldata.dat'.format(epoch)))
+            tosave = {
+                "ucunscaled": -ucunscaled,
+                "dcunscaled": dcunscaled,
+                "uc": uc,
+                "dc": dc,
+                "ucscale": scale,
+                "spawncounts": spawncounts,
+                "truncprob": truncprob,
+                "relFrames": relFrames,
+                "dcmeans": dcmeans,
+                "dcstds": dcstds,
+                "reward": reward,
+            }
+            np.save(path.join("saveddata", f"e{epoch}_goalreport.npy"), tosave)
+            np.save(path.join("saveddata", f"e{epoch}_spawnframes.npy"), relFrames)
+            goaldata.save(path.join("saveddata", f"e{epoch}_goaldata.dat"))
 
-        if self._debug: np.save('debug.npy', relFrames); return True
+        if self._debug:
+            np.save("debug.npy", relFrames)
+            return True
         self._writeInputs(data.rel2sim(np.concatenate(relFrames)))
         return True
 
@@ -229,7 +309,8 @@ class AdaptiveGoal(AdaptiveMD):
         rangeG = g.max() - totalmin
 
         # Calculate the dG
-        g = np.hstack(([g[0]] * epochdiff, g))  # Prepending the first element epochdiff-times to calculate the dG
+        # Prepending the first element epochdiff-times to calculate the dG
+        g = np.hstack(([g[0]] * epochdiff, g))
         dG = np.abs(g[epochdiff:] - g[:-epochdiff]) / rangeG
 
         # Tolerance is the range of what we consider a significant change on a scale of [0, 1]
@@ -237,14 +318,14 @@ class AdaptiveGoal(AdaptiveMD):
         grad = -multiplier * (dG - tolerance)
         # Euler integration
         tstep = 1
-        y = [0, ]
-        #print(dG, g, grad)
+        y = [0]
+        # print(dG, g, grad)
         for t in range(1, len(dG), tstep):
             y.append(max(min(y[-1] + tstep * grad[t], 1), 0))
-            #print('time: {} a: {} gradient: {} rangemax: {} rangemin: {}'.format(t, y[-1], grad[t], g.max(), totalmin))
-        #print("END")
+            # print('time: {} a: {} gradient: {} rangemax: {} rangemin: {}'.format(t, y[-1], grad[t], g.max(), totalmin))
+        # print("END")
 
-        #return y, grad, dG, g
+        # return y, grad, dG, g
         return y[-1]
 
         # dx = np.abs(np.diff(g))
@@ -257,13 +338,15 @@ class AdaptiveGoal(AdaptiveMD):
 
     def _getSpawnFrames(self, reward, model, data, N):
         prob = reward / np.sum(reward)
-        logger.debug('Sampling probabilities {}'.format(prob))
+        logger.debug(f"Sampling probabilities {prob}")
         spawncounts = np.random.multinomial(N, prob)
-        logger.debug('spawncounts {}'.format(spawncounts))
+        logger.debug(f"spawncounts {spawncounts}")
 
         stateIdx = np.where(spawncounts > 0)[0]
-        _, relFrames = model.sampleStates(stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=True)
-        logger.debug('relFrames {}'.format(relFrames))
+        _, relFrames = model.sampleStates(
+            stateIdx, spawncounts[stateIdx], statetype=self.statetype, replacement=True
+        )
+        logger.debug(f"relFrames {relFrames}")
         return relFrames, spawncounts, prob
 
     def _featScale(self, feat):
@@ -276,27 +359,43 @@ class AdaptiveGoal(AdaptiveMD):
 
     def _getGoalData(self, sims):
         from htmd.projections.metric import Metric
-        logger.debug('Starting projection of directed component')
+        from htmd.simlist import _simName
+        import pickle
+
+        logger.debug("Starting projection of directed component")
         metr = Metric(sims, skip=self.skip)
         metr.set(self.goalfunction)
         data = metr.project()
-        logger.debug('Finished calculating directed component')
+        logger.debug("Finished calculating directed component")
+
+        if self.savegoal is not None:
+            dirname = os.path.dirname(self.savegoal)
+            os.makedirs(dirname, exist_ok=True)
+            savedata = {}
+            for traj in data.trajectories:
+                trajname = _simName(traj.sim.trajectory[0])
+                savedata[trajname] = traj.projection
+            with open(self.savegoal, "wb") as f:
+                pickle.dump(savedata, f)
+
         return data
 
     def _calculateDirectedComponent(self, goaldata, St, mapping=None):
         import pandas as pd
+
         goalconcat = np.concatenate(goaldata.dat).flatten()
         stconcat = np.concatenate(St)
         if mapping is not None:
             stconcat = mapping[stconcat]
 
-        x = pd.DataFrame({'a': stconcat})
-        indexes = x.groupby('a').groups
+        x = pd.DataFrame({"a": stconcat})
+        indexes = x.groupby("a").groups
 
         means = np.zeros(stconcat.max() + 1)
         stds = np.zeros(stconcat.max() + 1)
         for i in indexes:
-            if i == -1:  # Mappings have -1 on disconnected clusters (not used in the MSM)
+            if i == -1:
+                # Mappings have -1 on disconnected clusters (not used in the MSM)
                 continue
             means[i] = np.mean(goalconcat[indexes[i]])
             stds[i] = np.std(goalconcat[indexes[i]])
@@ -304,7 +403,54 @@ class AdaptiveGoal(AdaptiveMD):
         return means, stds
 
 
-if __name__ == '__main__':
+import unittest
+
+
+class _TestAdaptiveGoal(unittest.TestCase):
+    def test_adaptive_goal(self):
+        from moleculekit.projections.metricdistance import MetricDistance
+        from jobqueues.localqueue import LocalCPUQueue
+        from htmd.home import home
+        import tempfile
+        import shutil
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            print(tmpdir)
+
+            gendir = os.path.join(
+                home(dataDir="test-adaptive"), "test-ions", "generators"
+            )
+
+            shutil.copytree(gendir, os.path.join(tmpdir, "generators"))
+            inpdir = os.path.join(tmpdir, "input")
+            datdir = os.path.join(tmpdir, "data")
+
+            dist = MetricDistance("name CL", "name NA", periodic="selections")
+
+            app = LocalCPUQueue()
+            app.datadir = datdir
+
+            md = AdaptiveGoal()
+            md.nmin = 1
+            md.nmax = 2
+            md.nepochs = 3
+            md.updateperiod = 5
+            md.projection = dist
+            md.goalfunction = lambda mol: -dist.project(mol).flatten()
+            md.ticadim = 0
+            md.generatorspath = gendir
+            md.inputpath = inpdir
+            md.datapath = datdir
+            md.app = app
+            md.savegoal = os.path.join(tmpdir, "goals.pkl")
+            # md.run()
+
+            # assert os.path.exists(os.path.join(tmpdir, "goals.pkl"))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
+
     from moleculekit.projections.metricdistance import MetricDistance
     import htmd.home
     from moleculekit.molecule import Molecule
@@ -318,7 +464,7 @@ if __name__ == '__main__':
         return -proj  # Lower RMSDs should give higher score
 
     tmpdir = tempname()
-    shutil.copytree(htmd.home.home() + '/data/adaptive/', tmpdir)
+    shutil.copytree(htmd.home.home() + "/data/adaptive/", tmpdir)
     os.chdir(tmpdir)
     md = AdaptiveGoal()
     md.dryrun = True
@@ -328,7 +474,9 @@ if __name__ == '__main__':
     md.ticalag = 2
     md.ticadim = 3
     md.updateperiod = 5
-    md.projection = MetricDistance('protein and name CA', 'resname BEN and noh', periodic='selections')
+    md.projection = MetricDistance(
+        "protein and name CA", "resname BEN and noh", periodic="selections"
+    )
     # md.goalprojection = MetricRmsd(Molecule(htmd.home() + '/data/adaptive/generators/1/structure.pdb'),
     #                               'protein and name CA')
     md.goalfunction = rmsdgoal
@@ -336,20 +484,29 @@ if __name__ == '__main__':
     # md.run()
 
     # Some real testing now
-    from moleculekit.projections.metricsecondarystructure import MetricSecondaryStructure
+    from moleculekit.projections.metricsecondarystructure import (
+        MetricSecondaryStructure,
+    )
     from moleculekit.projections.metricdistance import MetricSelfDistance
     import numpy as np
 
-    os.chdir(path.join(home(), 'data', 'test-adaptive'))
+    os.chdir(path.join(home(), "data", "test-adaptive"))
 
-    goalProjectionDict = {'ss': MetricSecondaryStructure(),
-                          'contacts': MetricSelfDistance('protein and name CA', metric='contacts', threshold=10),
-                          'ss_contacts': [MetricSecondaryStructure(),
-                                          MetricSelfDistance('protein and name CA', metric='contacts', threshold=10)]}
+    goalProjectionDict = {
+        "ss": MetricSecondaryStructure(),
+        "contacts": MetricSelfDistance(
+            "protein and name CA", metric="contacts", threshold=10
+        ),
+        "ss_contacts": [
+            MetricSecondaryStructure(),
+            MetricSelfDistance("protein and name CA", metric="contacts", threshold=10),
+        ],
+    }
 
     def getLongContacts(crystal, long=8):
-        crystalMap = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).getMapping(
-            crystal)
+        crystalMap = MetricSelfDistance(
+            "protein and name CA", metric="contacts", threshold=10, pbc=False
+        ).getMapping(crystal)
         indexes = np.vstack(crystalMap.atomIndexes.values)
         return crystal.resid[indexes[:, 1]] - crystal.resid[indexes[:, 0]] > long
 
@@ -357,8 +514,13 @@ if __name__ == '__main__':
         return MetricSecondaryStructure().project(crystal)[0].flatten()
 
     def getCrystalCO(crystal):
-        crystalCO = MetricSelfDistance('protein and name CA', metric='contacts', threshold=10, pbc=False).project(
-            crystal).flatten()
+        crystalCO = (
+            MetricSelfDistance(
+                "protein and name CA", metric="contacts", threshold=10, pbc=False
+            )
+            .project(crystal)
+            .flatten()
+        )
         longCO = getLongContacts(crystal)
         return crystalCO & longCO
 
@@ -369,28 +531,28 @@ if __name__ == '__main__':
             crystalCO = getCrystalCO(crystal)
 
         if project:
-            projss = goalProjectionDict['ss'].copy().project(mol)
-            projco = goalProjectionDict['contacts'].copy().project(mol)
+            projss = goalProjectionDict["ss"].copy().project(mol)
+            projco = goalProjectionDict["contacts"].copy().project(mol)
         else:
-            projss = mol[:, :len(crystalSS)]
-            projco = mol[:, len(crystalSS):]
+            projss = mol[:, : len(crystalSS)]
+            projco = mol[:, len(crystalSS) :]
 
         if len(crystalCO) != projco.shape[1]:
             raise RuntimeError(
-                'Different lengths between crystal {} and traj {} contacts for fileloc {}'.format(len(crystalCO),
-                                                                                                  projco.shape[1],
-                                                                                                  mol.fileloc))
+                f"Different lengths between crystal {len(crystalCO)} and traj {projco.shape[1]} contacts for fileloc {mol.fileloc}"
+            )
         if len(crystalSS) != projss.shape[1]:
             raise RuntimeError(
-                'Different lengths between crystal {} and traj {} SS for fileloc {}'.format(len(crystalSS),
-                                                                                            projss.shape[1],
-                                                                                            mol.fileloc))
+                f"Different lengths between crystal {len(crystalSS)} and traj {projss.shape[1]} SS for fileloc {mol.fileloc}"
+            )
 
         ss_score = np.sum(projss == crystalSS, axis=1) / projss.shape[1]
-        co_score = np.sum(projco[:, crystalCO] == 1, axis=1) / np.sum(crystalCO)  # Predicted conts are True?
+        co_score = np.sum(projco[:, crystalCO] == 1, axis=1) / np.sum(
+            crystalCO
+        )  # Predicted conts are True?
         return 0.6 * ss_score + 0.4 * co_score
 
-    refmol = Molecule('ntl9_2hbb.pdb')
+    refmol = Molecule("ntl9_2hbb.pdb")
     crystalSS = getCrystalSS(refmol)
     crystalCO = getCrystalCO(refmol)
 
@@ -401,15 +563,15 @@ if __name__ == '__main__':
     ad.nmax = 20
     ad.nepochs = 999999
     # ad.nframes = nframes['ntl9'] test that as well
-    ad.generatorspath = '../../generators/'
-    ad.projection = MetricSelfDistance('protein and name CA')
+    ad.generatorspath = "../../generators/"
+    ad.projection = MetricSelfDistance("protein and name CA")
     ad.goalfunction = delayed(ssContactGoal)(refmol, True, crystalSS, crystalCO)
-    ad.statetype = 'micro'
-    ad.truncation = 'cumsum'
+    ad.statetype = "micro"
+    ad.truncation = "cumsum"
     ad._debug = True
     ad.nosampledc = True
     ad.run()
-    assert np.array_equal(np.load('debug.npy'), np.load('ref_nosampledc.npy'))
+    assert np.array_equal(np.load("debug.npy"), np.load("ref_nosampledc.npy"))
 
     # TODO: Make this test work. Seems to ignore the random seed
     np.random.seed(10)
@@ -418,11 +580,11 @@ if __name__ == '__main__':
     ad.nmin = 10
     ad.nmax = 20
     ad.nepochs = 999999
-    ad.generatorspath = '../../generators/'
-    ad.projection = MetricSelfDistance('protein and name CA')
+    ad.generatorspath = "../../generators/"
+    ad.projection = MetricSelfDistance("protein and name CA")
     ad.goalfunction = delayed(ssContactGoal)(refmol, True, crystalSS, crystalCO)
-    ad.statetype = 'micro'
-    ad.truncation = 'cumsum'
+    ad.statetype = "micro"
+    ad.truncation = "cumsum"
     ad._debug = True
     ad.run()
     # assert np.array_equal(np.concatenate(np.load('debug.npy')), np.concatenate(np.load('ref.npy')))

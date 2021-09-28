@@ -78,7 +78,7 @@ _defaultAmberSearchPaths = {
 
 
 def htmdAmberHome():
-    """ Returns the location of the AMBER files distributed with HTMD"""
+    """Returns the location of the AMBER files distributed with HTMD"""
 
     return os.path.abspath(os.path.join(home(shareDir=True), "builder", "amberfiles"))
 
@@ -164,7 +164,7 @@ def _locateFile(fname, ftype, teleap):
 
 
 def defaultFf():
-    """ Returns the default leaprc forcefield files used by amber.build """
+    """Returns the default leaprc forcefield files used by amber.build"""
     return [
         "leaprc.protein.ff19SB",
         "leaprc.lipid17",
@@ -176,12 +176,12 @@ def defaultFf():
 
 
 def defaultTopo():
-    """ Returns the default topology `prepi` files used by amber.build """
+    """Returns the default topology `prepi` files used by amber.build"""
     return []
 
 
 def defaultParam():
-    """ Returns the default parameter `frcmod` files used by amber.build """
+    """Returns the default parameter `frcmod` files used by amber.build"""
     return []
 
 
@@ -504,8 +504,9 @@ def _build(
             f.write(f"loadamberprep {newname}\n")
         f.write("\n")
 
-        f.write("# Loading the system\n")
-        f.write("mol = loadpdb input.pdb\n\n")
+        if np.any(mol.atomtype == ""):
+            f.write("# Loading the system\n")
+            f.write("mol = loadpdb input.pdb\n\n")
 
         if np.sum(mol.atomtype != "") != 0:
             f.write("# Loading the ligands\n")
@@ -544,15 +545,16 @@ def _build(
         f.write(f"saveamberparm mol {prefix}.prmtop {prefix}.crd\n")
         f.write("quit")
 
-    # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
-    logger.debug("Writing PDB file for input to tleap.")
-    pdbname = os.path.join(outdir, "input.pdb")
-
     # mol2 files have atomtype, here we only write parts not coming from mol2
     # We need to write the input.pdb at the end since we modify the resname for disulfide bridges in mol
-    mol.write(pdbname, mol.atomtype == "")
-    if not os.path.isfile(pdbname):
-        raise NameError("Could not write a PDB file out of the given Molecule.")
+    if np.any(mol.atomtype == ""):
+        # Printing and loading the PDB file. AMBER can work with a single PDB file if the segments are separate by TER
+        logger.debug("Writing PDB file for input to tleap.")
+        pdbname = os.path.join(outdir, "input.pdb")
+
+        mol.write(pdbname, mol.atomtype == "")
+        if not os.path.isfile(pdbname):
+            raise NameError("Could not write a PDB file out of the given Molecule.")
 
     if execute:
         if not teleapimports:

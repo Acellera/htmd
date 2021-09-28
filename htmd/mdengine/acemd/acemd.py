@@ -409,7 +409,7 @@ class Acemd(_Acemd):
         The length of simulation ro run. May be specified as a number of steps or as a time if one of the suffices "us", "ns", "ps", "fs" is used.
     boxsize : str, default=None
         The dimensions of the unit cell in Angstrom. Note that the unit cell must be cuboid. Overrides any dimension given in the "coordinates" PDB.
-    implicit : str, default=None
+    implicitsolvent : str, default=None
         Set to True to enable implicit solvent simulations in AMBER.
 
     Files
@@ -569,7 +569,7 @@ class Acemd(_Acemd):
             val.String(),
         )
         self._arg(
-            "implicit",
+            "implicitsolvent",
             "str",
             "Set to True to enable implicit solvent simulations in AMBER.",
             None,
