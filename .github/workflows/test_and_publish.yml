@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.6", "3.7"]
+        python-version: ["3.6", "3.7", "3.8"]
 
     defaults: # Needed for conda
       run:
@@ -22,31 +22,31 @@ jobs:
         lfs: true
         submodules: true
 
-    # - uses: conda-incubator/setup-miniconda@v2
-    #   with:
-    #     auto-update-conda: true
-    #     python-version: ${{ matrix.python-version }}
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: ${{ matrix.python-version }}
 
-    # - name: Install HTMD conda deps
-    #   run: |
-    #     conda install --file package/htmd-deps/DEPENDENCIES -y -c acellera -c conda-forge
+    - name: Install HTMD conda deps
+      run: |
+        conda install --file package/htmd-deps/DEPENDENCIES -y -c acellera -c conda-forge
 
-    # - name: Install pip dependencies
-    #   run: |
-    #     pip install flake8 pytest coverage codecov
-    #     pip install .
+    - name: Install pip dependencies
+      run: |
+        pip install flake8 pytest coverage codecov
+        pip install .
 
-    # - name: Lint with flake8
-    #   run: |
-    #     # stop the build if there are Python syntax errors or undefined names
-    #     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-    #     # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-    #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-    # - name: Test
-    #   run: |
-    #     export HTMD_NONINTERACTIVE=1
-    #     coverage run -m pytest --verbose --durations=10 ./htmd/
+    - name: Test
+      run: |
+        export HTMD_NONINTERACTIVE=1
+        coverage run -m pytest --verbose --durations=10 ./htmd/
 
   deploy:
     if: startsWith(github.event.ref, 'refs/tags/')
@@ -57,7 +57,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.6", "3.7"]
+        python-version: ["3.6", "3.7", "3.8"]
 
     steps:
     - uses: actions/checkout@v1
@@ -70,20 +70,18 @@ jobs:
     - name: Dump exact dependencies yaml file
       shell: bash -l {0}
       run: |
-        conda info
         conda install --file package/htmd-deps/DEPENDENCIES -y -c acellera -c conda-forge 
         python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
     - uses: conda-incubator/setup-miniconda@v2
       with:
         auto-activate-base: true
-        activate-environment: true
+        activate-environment: base
         python-version: ${{ matrix.python-version }}
 
     - name: Build htmd-deps conda package
       shell: bash -l {0}
       run: |
-        conda info
         export TAG_DESCRIBE=$(git describe)
         export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
         conda install anaconda-client conda-build python=${{ matrix.python-version }}
@@ -99,5 +97,4 @@ jobs:
     - name: Upload to conda
       shell: bash -l {0}
       run: |
-        conda info
         anaconda -t ${{ secrets.ANACONDA_TOKEN_BASIC }} upload -u acellera ./pkg/*/htmd-*.tar.bz2
