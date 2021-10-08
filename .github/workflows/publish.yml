@@ -1,0 +1,48 @@
+name: Release Conda Package
+on:
+  workflow_run:
+    workflows: ["Test code"]
+    branches: [main]
+    types: 
+      - completed
+  push:
+    tags:
+    - '*'
+
+jobs:
+  deploy:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.6", "3.7"]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python
+      uses: actions/setup-python@v1
+      with:
+        python-version: '3.x'
+
+    - name: Dump exact dependencies yaml file
+      run: |
+        $CONDA/bin/conda install --file package/htmd-deps/DEPENDENCIES -y -c acellera -c conda-forge 
+        $CONDA/bin/python package/htmd-deps/write_meta_yaml.py package/htmd-deps
+
+    - name: Build htmd-deps conda package
+      run: |
+        export TAG_DESCRIBE=$(git describe)
+        export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
+        $CONDA/bin/conda build --python ${{ matrix.python-version }} package/htmd-deps --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
+
+    - name: Build htmd conda package
+      run: |
+        export TAG_DESCRIBE=$(git describe)
+        export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
+        $CONDA/bin/conda build --python ${{ matrix.python-version }} package/htmd --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
+    
+    - name: Upload to conda
+      run: |
+        $CONDA/bin/anaconda -t ${{ secrets.ANACONDA_TOKEN_BASIC }} upload -u acellera $CONDA/conda-bld/linux-64/htmd-*.tar.bz2
