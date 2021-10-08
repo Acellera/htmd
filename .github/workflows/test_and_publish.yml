@@ -68,6 +68,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Dump exact dependencies yaml file
+      shell: bash -l {0}
       run: |
         conda info
         conda install --file package/htmd-deps/DEPENDENCIES -y -c acellera -c conda-forge 
@@ -80,6 +81,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Build htmd-deps conda package
+      shell: bash -l {0}
       run: |
         conda info
         export TAG_DESCRIBE=$(git describe)
@@ -88,12 +90,14 @@ jobs:
         conda build --python ${{ matrix.python-version }} package/htmd-deps --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
 
     - name: Build htmd conda package
+      shell: bash -l {0}
       run: |
         export TAG_DESCRIBE=$(git describe)
         export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
         conda build --python ${{ matrix.python-version }} package/htmd --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
     
     - name: Upload to conda
+      shell: bash -l {0}
       run: |
         conda info
         anaconda -t ${{ secrets.ANACONDA_TOKEN_BASIC }} upload -u acellera ./pkg/*/htmd-*.tar.bz2
