@@ -69,17 +69,19 @@ jobs:
 
     - name: Dump exact dependencies yaml file
       run: |
+        conda info
         conda install --file package/htmd-deps/DEPENDENCIES -y -c acellera -c conda-forge 
         python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
     - uses: conda-incubator/setup-miniconda@v2
       with:
         auto-activate-base: true
-        activate-environment: ""
+        activate-environment: true
         python-version: ${{ matrix.python-version }}
 
     - name: Build htmd-deps conda package
       run: |
+        conda info
         export TAG_DESCRIBE=$(git describe)
         export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
         conda install anaconda-client conda-build python=${{ matrix.python-version }}
@@ -93,4 +95,5 @@ jobs:
     
     - name: Upload to conda
       run: |
+        conda info
         anaconda -t ${{ secrets.ANACONDA_TOKEN_BASIC }} upload -u acellera ./pkg/*/htmd-*.tar.bz2
