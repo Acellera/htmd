@@ -35,6 +35,7 @@ jobs:
       run: |
         export TAG_DESCRIBE=$(git describe)
         export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
+        $CONDA/bin/conda install anaconda-client conda-build python=${{ matrix.python-version }}
         $CONDA/bin/conda build --python ${{ matrix.python-version }} package/htmd-deps --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
 
     - name: Build htmd conda package
