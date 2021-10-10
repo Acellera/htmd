@@ -596,7 +596,7 @@ def _build(
             cmd[1:1] = teleapimportflags
             logger.debug(cmd)
             call(cmd, stdout=f)
-        except:
+        except Exception:
             raise NameError("teLeap failed at execution")
         f.close()
         errors = _logParser(logpath)
@@ -1230,7 +1230,6 @@ class _TestAmberBuild(unittest.TestCase):
     def test_caps(self):
         from htmd.builder.solvate import solvate
         from moleculekit.tools.preparation import proteinPrepare
-        from moleculekit.tools.autosegment import autoSegment
 
         np.random.seed(1)
 
