@@ -59,13 +59,6 @@ from moleculekit.tools.autosegment import autoSegment
 from htmd.builder.loopmodeler import loopModeller
 
 try:
-    from ffevaluation.ffevaluate import FFEvaluate
-except ImportError as e:
-    warnings.warn(
-        "Could not find package ffevaluation. If you want to use this library please install it with conda install ffevaluation -c acellera -c conda-forge"
-    )
-
-try:
     from moleculekit.tools.preparation import proteinPrepare
 except Exception as e:
     warnings.warn(f"{e}")
