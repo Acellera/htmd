@@ -1,0 +1,100 @@
+name: Test and deploy code
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
+
+    defaults: # Needed for conda
+      run:
+        shell: bash -l {0}
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        lfs: true
+        submodules: true
+
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install HTMD conda deps
+      run: |
+        conda install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y -c acellera -c conda-forge
+
+    - name: Install pip dependencies
+      run: |
+        pip install flake8 pytest coverage codecov
+        pip install .
+
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Test
+      run: |
+        export HTMD_NONINTERACTIVE=1
+        coverage run -m pytest --verbose --durations=10 ./htmd/
+
+  deploy:
+    if: startsWith(github.event.ref, 'refs/tags/')
+    needs: test
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        activate-environment: writedeps
+        python-version: ${{ matrix.python-version }}
+
+    - name: Dump exact dependencies yaml file
+      shell: bash -l {0}
+      run: |
+        conda install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y -c acellera -c conda-forge 
+        python package/htmd-deps/write_meta_yaml.py package/htmd-deps
+
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-activate-base: true
+        activate-environment: build
+        python-version: ${{ matrix.python-version }}
+
+    - name: Build htmd-deps conda package
+      shell: bash -l {0}
+      run: |
+        export TAG_DESCRIBE=$(git describe)
+        export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
+        conda install anaconda-client conda-build python=${{ matrix.python-version }}
+        conda build --python ${{ matrix.python-version }} package/htmd-deps --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
+
+    - name: Build htmd conda package
+      shell: bash -l {0}
+      run: |
+        export TAG_DESCRIBE=$(git describe)
+        export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
+        conda build --python ${{ matrix.python-version }} package/htmd --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
+    
+    - name: Upload to conda
+      shell: bash -l {0}
+      run: |
+        anaconda -t ${{ secrets.ANACONDA_TOKEN_BASIC }} upload -u acellera ./pkg/*/htmd-*.tar.bz2

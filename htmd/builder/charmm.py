@@ -15,7 +15,7 @@ import textwrap
 from subprocess import call
 from htmd.home import home
 from moleculekit.molecule import Molecule
-from moleculekit.util import _missingChain, _missingSegID
+from moleculekit.util import _missingSegID
 from htmd.builder.builder import (
     detectDisulfideBonds,
     convertDisulfide,
@@ -26,7 +26,6 @@ from htmd.builder.builder import (
     BuildError,
 )
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
-from moleculekit.vmdviewer import getVMDpath
 from glob import glob
 from unittest import TestCase
 
@@ -325,10 +324,10 @@ def build(
         newdisu = []
         for d in disulfide:
             r1 = UniqueResidueID.fromMolecule(
-                mol, "resid {} and segname {}".format(d.resid1, d.segid1)
+                mol, f"resid {d.resid1} and segname {d.segid1}"
             )
             r2 = UniqueResidueID.fromMolecule(
-                mol, "resid {} and segname {}".format(d.resid2, d.segid2)
+                mol, f"resid {d.resid2} and segname {d.segid2}"
             )
             newdisu.append([r1, r2])
         disulfide = newdisu
@@ -345,10 +344,10 @@ def build(
         disulfide = detectDisulfideBonds(mol)
 
     if len(disulfide) != 0:
-        for d in disulfide:
-            str0 = "{}:{}{}".format(d[0].segid, d[0].resid, d[0].insertion)
-            str1 = "{}:{}{}".format(d[1].segid, d[1].resid, d[1].insertion)
-            f.write("patch DISU {} {}\n".format(str0, str1))
+        for d in sorted(disulfide, key=lambda x: x[0].segid):
+            str0 = f"{d[0].segid}:{d[0].resid}{d[0].insertion}"
+            str1 = f"{d[1].segid}:{d[1].resid}{d[1].insertion}"
+            f.write(f"patch DISU {str0} {str1}\n")
         f.write("\n")
 
     noregenpatches = [p for p in allpatches if p.split()[1] in noregen]

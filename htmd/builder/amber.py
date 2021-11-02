@@ -199,7 +199,7 @@ def _prepareMolecule(mol, caps, disulfide):
     # Add caps to termini
     if caps is None:
         caps = _defaultProteinCaps(mol)
-    _applyProteinCaps(mol, caps)
+    _add_caps(mol, caps)
 
     # Before modifying the resids copy the molecule to map back the disulfide bonds
     mol_orig_resid = mol.copy()
@@ -596,7 +596,7 @@ def _build(
             cmd[1:1] = teleapimportflags
             logger.debug(cmd)
             call(cmd, stdout=f)
-        except:
+        except Exception:
             raise NameError("teLeap failed at execution")
         f.close()
         errors = _logParser(logpath)
@@ -633,26 +633,13 @@ def _build(
         return molbuilt
 
 
-def _applyProteinCaps(mol, caps):
-    # AMBER capping
-    # =============
-    # This is the (horrible) way of adding caps in tleap:
-    # For now, this is hardwired for ACE and NME
-    # 1. Change one of the hydrogens of the N terminal (H[T]?[123]) to the ACE C atom, giving it a new resid
-    # 1a. If no hydrogen present, create the ACE C atom.
-    # 2. Change one of the oxygens of the C terminal ({O,OT1,OXT}) to the NME N atom, giving it a new resid
-    # 2a. If no oxygen present, create the NME N atom.
-    # 3. Reorder to put the new atoms first and last
-    # 4. Remove the lingering hydrogens of the N terminal and oxygens of the C terminal.
+def _add_caps(mol: Molecule, caps: dict):
+    capdir = os.path.join(home(shareDir=True), "builder", "caps")
 
-    # Define the atoms to be replaced (0 and 1 corresponds to N- and C-terminal caps)
-    terminalatoms = {
-        "ACE": ["H1", "H2", "H3", "HT1", "HT2", "HT3"],
+    remove_atoms = {
+        "ACE": ["H1", "H2", "H3", "HT1", "HT2", "HT3", "H"],
         "NME": ["OXT", "OT1", "O"],
-    }  # XPLOR names for H[123] and OXT are HT[123]
-    # and OT1, respectively.
-    capresname = ["ACE", "NME"]
-    capatomtype = ["C", "N"]
+    }
 
     # For each caps definition
     for seg in caps:
@@ -668,87 +655,44 @@ def _applyProteinCaps(mol, caps):
                 f"Segment {seg} is not protein. Capping for non-protein segments is not supported."
             )
         # For each cap
-        passed = False
         for i, cap in enumerate(caps[seg]):
             if cap is None or (isinstance(cap, str) and cap == "none"):
                 continue
+
             # Get info on segment and its terminals
-            segidm = mol.segid == seg  # Mask for segid
+            segidm = mol.segid == seg
             segididx = np.where(segidm)[0]
-            terminalids = [segididx[0], segididx[-1]]
             terminalresids = [mol.resid[segididx][0], mol.resid[segididx][-1]]
-            terminalchains = [mol.chain[segididx][0], mol.chain[segididx][-1]]
             residm = mol.resid == terminalresids[i]  # Mask for resid
+            mask = residm & segidm
+            resname = mol.resname[mask][0]
 
-            if not passed:
-                orig_terminalresids = terminalresids
-                passed = True
+            capmol = Molecule(os.path.join(capdir, f"{cap}.pdb"))
+            align_names = capmol.name[capmol.beta == 1]
+            mol_idx = np.where(np.isin(mol.name, align_names) & mask)[0]
+            # Ensuring the atom order matches for the alignment
+            cap_idx = [
+                np.where((capmol.name == nn) & (capmol.resname == "XXX"))[0][0]
+                for nn in mol.name[mol_idx]
+            ]
 
-            if cap is None or cap == "":  # In case there is no cap defined
-                logger.warning(
-                    f"No cap provided for resid {terminalresids[i]} on segment {seg}. Did not apply it."
-                )
-                continue
-            elif cap not in capresname:  # If it is defined, test if supported
-                raise RuntimeError(
-                    f"In segment {seg}, the {cap} cap is not supported. Try using {capresname} instead."
-                )
+            if len(cap_idx) != len(mol_idx):
+                raise RuntimeError("Could not find all required backbone atoms!")
 
-            # Test if cap is already applied
-            testcap = np.where(segidm & residm & (mol.resname == cap))[0]
-            if len(testcap) != 0:
-                logger.warning(
-                    f"Cap {cap} already exists on segment {seg}. Did not re-apply it."
-                )
-                continue
+            capmol.align(cap_idx, refmol=mol, refsel=mol_idx)
+            capmol.resname[capmol.resname == "XXX"] = resname
+            capmol.segid[:] = seg
+            capmol.resid[:] += terminalresids[i]
+            capmol.chain[:] = mol.chain[mask][0]
+            capmol.remove(cap_idx, _logger=False)  # Remove atoms which were aligned
 
-            # Test if the atom to change exists
-            termatomsids = np.isin(mol.name, terminalatoms[cap])
-            termatomsids = np.where(termatomsids & segidm & residm)[0]
-
-            # Create new atom if none of the replace atoms exist
-            if len(termatomsids) == 0:
-                termcaid = np.where(segidm & residm & (mol.name == "CA"))[0]
-                termcenterid = np.where(
-                    segidm & residm & (mol.name == capatomtype[1 - i])
-                )[0]
-                atom = Molecule()
-                atom.empty(1)
-                atom.element[:] = capatomtype[i]
-                atom.coords = mol.coords[termcenterid] + 0.33 * np.subtract(
-                    mol.coords[termcenterid], mol.coords[termcaid]
-                )
-                new_idx = terminalids[i] if i == 0 else terminalids[i] + 1
-                mol.insert(atom, new_idx)
-                termatomsids = [new_idx]
-
-            # Select atom to change, do changes to cap, and change resid
-            replace_atom = np.max(termatomsids)
-            mol.record[replace_atom] = "ATOM"
-            mol.name[replace_atom] = capatomtype[i]
-            mol.resname[replace_atom] = cap
-            # if i=0 => resid-1; i=1 => resid+1
-            # TODO: Increase all following resids???
-            mol.resid[replace_atom] = terminalresids[i] - 1 + 2 * i
-            mol.element[replace_atom] = capatomtype[i]
-            mol.segid[replace_atom] = seg
-            mol.chain[replace_atom] = terminalchains[i]
-
-            # Swap positions of cap atom with the first/last atom of the segment
-            neworder = np.arange(mol.numAtoms)
-            neworder[replace_atom] = terminalids[i]
-            neworder[terminalids[i]] = replace_atom
-            _reorderMol(mol, neworder)
-
-        # For each cap
-        for i, cap in enumerate(caps[seg]):
-            if cap is None or (isinstance(cap, str) and cap == "none"):
-                continue
-            # Remove lingering hydrogens or oxygens in terminals
-            mol.remove(
-                f'segid {seg} and resid "{orig_terminalresids[i]}" and name {" ".join(terminalatoms[cap])}',
-                _logger=False,
+            # Remove the atoms defined in remove_atoms to clean up the termini
+            removed = mol.remove(
+                np.isin(mol.name, remove_atoms[cap]) & mask, _logger=False
             )
+            segidm = np.delete(segidm, removed)
+            segididx = np.where(segidm)[0]
+            mol.insert(capmol, segididx[0] if i == 0 else segididx[-1] + 1)
 
     # Remove terminal hydrogens regardless of caps or no caps. tleap confuses itself when it makes residues into terminals.
     # For example HID has an atom H which in NHID should become H[123] and crashes tleap.
@@ -1230,7 +1174,6 @@ class _TestAmberBuild(unittest.TestCase):
     def test_caps(self):
         from htmd.builder.solvate import solvate
         from moleculekit.tools.preparation import proteinPrepare
-        from moleculekit.tools.autosegment import autoSegment
 
         np.random.seed(1)
 
