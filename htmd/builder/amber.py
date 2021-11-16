@@ -240,7 +240,7 @@ def _prepareMolecule(mol, caps, disulfide):
             d2.resname = "CYX"
             mol.resname[atoms1] = "CYX"
             mol.resname[atoms2] = "CYX"
-            # Remove (eventual) HG hydrogens on these CYS (from proteinPrepare)
+            # Remove (eventual) HG hydrogens on these CYS (from systemPrepare)
             torem |= (atoms1 & (mol.name == "HG")) | (atoms2 & (mol.name == "HG"))
         mol.remove(torem, _logger=False)
 
@@ -1001,19 +1001,19 @@ class _TestAmberBuild(unittest.TestCase):
             os.remove(f)
 
     def test_with_protein_prepare(self):
-        from moleculekit.tools.preparation import proteinPrepare
+        from moleculekit.tools.preparation import systemPrepare
         from htmd.builder.solvate import solvate
         from moleculekit.tools.autosegment import autoSegment
 
-        # Test with proteinPrepare
+        # Test with systemPrepare
         pdbids = ["3PTB"]
         # pdbids = ['3PTB', '1A25', '1GZM']  # '1U5U' out because it has AR0 (no parameters)
         for pid in pdbids:
             np.random.seed(1)
             mol = Molecule(pid)
             mol.filter("protein")
-            mol = proteinPrepare(mol)
-            mol.filter("protein")  # Fix for bad proteinPrepare hydrogen placing
+            mol = systemPrepare(mol)
+            mol.filter("protein")  # Fix for bad systemPrepare hydrogen placing
             mol = autoSegment(mol)
             smol = solvate(mol)
             ffs = defaultFf()
@@ -1026,7 +1026,7 @@ class _TestAmberBuild(unittest.TestCase):
     def test_without_protein_prepare(self):
         from htmd.builder.solvate import solvate
 
-        # Test without proteinPrepare
+        # Test without systemPrepare
         pdbids = ["3PTB"]
         # pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
         for pid in pdbids:
@@ -1071,7 +1071,6 @@ class _TestAmberBuild(unittest.TestCase):
     def test_custom_disulfide_bonds(self):
         from htmd.builder.solvate import solvate
 
-        # Test without proteinPrepare
         pdbids = [
             "1GZM",
         ]
@@ -1101,7 +1100,6 @@ class _TestAmberBuild(unittest.TestCase):
     def test_custom_teleap_imports(self):
         from htmd.builder.solvate import solvate
 
-        # Test without proteinPrepare
         pdbids = ["3PTB"]
         # pdbids = ['3PTB', '1A25', '1GZM', '1U5U']
         for pid in pdbids:
@@ -1154,7 +1152,7 @@ class _TestAmberBuild(unittest.TestCase):
 
     def test_protein_rna(self):
         from htmd.builder.solvate import solvate
-        from moleculekit.tools.preparation import proteinPrepare
+        from moleculekit.tools.preparation import systemPrepare
         from moleculekit.tools.autosegment import autoSegment
 
         np.random.seed(1)
@@ -1162,7 +1160,7 @@ class _TestAmberBuild(unittest.TestCase):
         mol = Molecule("3WBM")
         mol.filter("not water")
         mol = autoSegment(mol, field="both")
-        pmol = proteinPrepare(mol)
+        pmol = systemPrepare(mol)
         smol = solvate(pmol)
 
         tmpdir = os.path.join(self.testDir, "protein-rna", "3WBM")
@@ -1173,12 +1171,12 @@ class _TestAmberBuild(unittest.TestCase):
 
     def test_caps(self):
         from htmd.builder.solvate import solvate
-        from moleculekit.tools.preparation import proteinPrepare
+        from moleculekit.tools.preparation import systemPrepare
 
         np.random.seed(1)
 
         mol = Molecule("6A5J")
-        pmol = proteinPrepare(mol)
+        pmol = systemPrepare(mol)
         smol = solvate(pmol)
 
         tmpdir = os.path.join(self.testDir, "peptide-cap", "6A5J")
@@ -1190,7 +1188,7 @@ class _TestAmberBuild(unittest.TestCase):
         np.random.seed(1)
 
         mol = Molecule("6A5J")
-        pmol = proteinPrepare(mol)
+        pmol = systemPrepare(mol)
         pmol.remove("(resid 1 13 and not backbone) or (resid 13 and name OXT)")
         smol = solvate(pmol)
 

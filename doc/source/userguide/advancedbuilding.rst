@@ -51,7 +51,7 @@ residue is protonated if it is close enough to an electron donor (e.g. a glutami
 Since histidines are frequently present at protein active sites, a correct protonation state is particularly important
 in ligand binding simulations.
 
-In HTMD, one can use :class:`~htmd.builder.preparation.proteinPrepare` to help with protonation.
+In HTMD, one can use :class:`~moleculekit.tools.preparation.systemPrepare` to help with protonation.
 
 List of useful tools
 --------------------
