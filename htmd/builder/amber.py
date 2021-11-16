@@ -1012,7 +1012,7 @@ class _TestAmberBuild(unittest.TestCase):
             np.random.seed(1)
             mol = Molecule(pid)
             mol.filter("protein")
-            mol = systemPrepare(mol)
+            mol = systemPrepare(mol, pH=7.0)
             mol.filter("protein")  # Fix for bad systemPrepare hydrogen placing
             mol = autoSegment(mol)
             smol = solvate(mol)
@@ -1160,7 +1160,7 @@ class _TestAmberBuild(unittest.TestCase):
         mol = Molecule("3WBM")
         mol.filter("not water")
         mol = autoSegment(mol, field="both")
-        pmol = systemPrepare(mol)
+        pmol = systemPrepare(mol, pH=7.0)
         smol = solvate(pmol)
 
         tmpdir = os.path.join(self.testDir, "protein-rna", "3WBM")
@@ -1176,7 +1176,7 @@ class _TestAmberBuild(unittest.TestCase):
         np.random.seed(1)
 
         mol = Molecule("6A5J")
-        pmol = systemPrepare(mol)
+        pmol = systemPrepare(mol, pH=7.0)
         smol = solvate(pmol)
 
         tmpdir = os.path.join(self.testDir, "peptide-cap", "6A5J")
@@ -1188,7 +1188,7 @@ class _TestAmberBuild(unittest.TestCase):
         np.random.seed(1)
 
         mol = Molecule("6A5J")
-        pmol = systemPrepare(mol)
+        pmol = systemPrepare(mol, pH=7.0)
         pmol.remove("(resid 1 13 and not backbone) or (resid 13 and name OXT)")
         smol = solvate(pmol)
 

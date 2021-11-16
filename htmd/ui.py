@@ -59,7 +59,7 @@ from moleculekit.tools.autosegment import autoSegment
 from htmd.builder.loopmodeler import loopModeller
 
 try:
-    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.preparation import systemPrepare, proteinPrepare
 except Exception as e:
     warnings.warn(f"{e}")
 
