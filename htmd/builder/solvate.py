@@ -8,13 +8,53 @@ from moleculekit.molecule import Molecule
 import numpy as np
 import sys
 import logging
+
 logger = logging.getLogger(__name__)
 
 
-def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, posz=0, buffer=2.4, watsize=65.4195,
-            prefix='WT', keysel='name OH2', rotate=False, rotsel='all', rotinc=36, spdb=None,
-            spsf=None, stop=None):
-    """ Solvates the system in a water box
+def _segid_gen(prefix, mol, mode="decimal"):
+    import string
+
+    segids = np.unique(mol.segid)
+    for prefix in [prefix] + list(string.ascii_uppercase + string.digits):
+        i = 0
+        while True:
+            if mode == "decimal":
+                segid = f"{prefix}{i:d}"
+            elif mode == "hex":
+                segid = f"{prefix}{i:X}"
+            elif mode == "alphanum":
+                segid = "{0}{1:c}{2:c}{3:c}".format(
+                    prefix,
+                    int(np.floor(np.floor(i / 26) / 26) + 65),
+                    int(np.mod(np.floor(i / 26), 26) + 65),
+                    int(np.mod(i, 26) + 65),
+                )
+            if len(segid) > 4:
+                break
+            i += 1
+
+            if segid not in segids:
+                yield segid
+
+
+def solvate(
+    mol,
+    pad=None,
+    minmax=None,
+    negx=0,
+    posx=0,
+    negy=0,
+    posy=0,
+    negz=0,
+    posz=0,
+    buffer=2.4,
+    watsize=65.4195,
+    prefix="W",
+    rotate=False,
+    spdb=None,
+):
+    """Solvates the system in a water box
 
 
     Parameters
@@ -75,28 +115,35 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
 
     mol = mol.copy()
     if mol.numFrames > 1:
-        logger.warning('Multiple frames in Molecule. Solvate keeps only frame 0 and discards the rest.')
+        logger.warning(
+            "Multiple frames in Molecule. Solvate keeps only frame 0 and discards the rest."
+        )
         mol.coords = np.atleast_3d(mol.coords[:, :, 0])
 
     if spdb is None:
-        spdb = os.path.join(home(shareDir=True), 'solvate', 'wat.pdb')
+        spdb = os.path.join(home(shareDir=True), "solvate", "wat.pdb")
 
     if os.path.isfile(spdb):
-        logger.info('Using water pdb file at: ' + spdb)
+        logger.info("Using water pdb file at: " + spdb)
         water = Molecule(spdb)
     else:
-        raise NameError('No solvent pdb file found in ' + spdb)
+        raise NameError("No solvent pdb file found in " + spdb)
 
     if pad is not None:
-        negx = pad; posx = pad; negy = pad; posy = pad; negz = pad; posz = pad
+        negx = pad
+        posx = pad
+        negy = pad
+        posy = pad
+        negz = pad
+        posz = pad
 
     if rotate:
-        raise NameError('Rotation not implemented yet')
+        raise NameError("Rotation not implemented yet")
 
     # Calculate min max coordinates from molecule
     if mol.numAtoms > 0:
-        minmol = np.min(mol.get('coords'), axis=0)
-        maxmol = np.max(mol.get('coords'), axis=0)
+        minmol = np.min(mol.get("coords"), axis=0)
+        maxmol = np.max(mol.get("coords"), axis=0)
     else:
         minmol = [np.inf, np.inf, np.inf]
         maxmol = [-np.inf, -np.inf, -np.inf]
@@ -127,30 +174,40 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
 
     # Calculate number of preexisting water segments with given prefix
     if mol.numAtoms > 0:
-        preexist = len(np.unique(mol.get('segid', sel='segid "{}.*"'.format(prefix))))
+        preexist = len(np.unique(mol.get("segid", sel=f'segid "{prefix}.*"')))
     else:
         preexist = 0
 
     numsegs = nx * ny * nz
-    logger.info('Replicating ' + str(numsegs) + ' water segments, ' + str(nx) + ' by ' + str(ny) + ' by ' + str(nz))
+    logger.info(f"Replicating {numsegs} water segments, {nx} by {ny} by {nz}")
 
     # Check that we won't run out of segment name characters, and switch to
     # using hexadecimal or alphanumeric naming schemes in cases where decimal
     # numbered segnames won't fit into the field width.
-    testsegname    = '{0}{1:d}'.format(prefix, numsegs + preexist)
-    testsegnamehex = '{0}{1:X}'.format(prefix, numsegs + preexist)
-    writemode = 'decimal'
+    testsegname = f"{prefix}{numsegs + preexist:d}"
+    testsegnamehex = f"{prefix}{numsegs + preexist:X}"
+    writemode = "decimal"
     if len(testsegname) > 4 and len(testsegnamehex) <= 4:
-        writemode = 'hex'
-        logger.warning('Warning: decimal naming would overrun segname field. Using hexadecimal segnames instead...')
+        writemode = "hex"
+        logger.warning(
+            "Warning: decimal naming would overrun segname field. Using hexadecimal segnames instead..."
+        )
     elif len(testsegnamehex) > 4:
-        writemode = 'alphanum'
-        logger.warning('Warning: decimal or hex naming would overrun segname field. Using alphanumeric segnames instead...')
+        writemode = "alphanum"
+        logger.warning(
+            "Warning: decimal or hex naming would overrun segname field. Using alphanumeric segnames instead..."
+        )
 
-    minx = minmol[0] - buffer; miny = minmol[1] - buffer; minz = minmol[2] - buffer
-    maxx = maxmol[0] + buffer; maxy = maxmol[1] + buffer; maxz = maxmol[2] + buffer
+    segid_gen = _segid_gen(prefix, mol, writemode)
 
-    bar = tqdm(total=nx*ny*nz, desc='Solvating')
+    minx = minmol[0] - buffer
+    miny = minmol[1] - buffer
+    minz = minmol[2] - buffer
+    maxx = maxmol[0] + buffer
+    maxy = maxmol[1] + buffer
+    maxz = maxmol[2] + buffer
+
+    bar = tqdm(total=nx * ny * nz, desc="Solvating")
     waterboxes = np.empty(numsegs, dtype=object)
     n = preexist
     w = 0
@@ -175,31 +232,30 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
                 if movez > maxz or movezmax < minz:
                     zoverlap = False
 
-                if writemode == 'decimal':
-                    segname = '{0}{1:d}'.format(prefix, n)
-                elif writemode == 'hex':
-                    segname = '{0}{1:x}'.format(prefix, n)
-                elif writemode == 'alphanum':
-                    segname = '{0}{1:c}{2:c}{3:c}'.format(prefix, int(np.floor(np.floor(n/26)/26) + 65), int(np.mod(np.floor(n/26), 26) + 65), int(np.mod(n, 26) + 65))
+                segname = next(segid_gen)
 
                 waterboxes[w] = water.copy()
                 waterboxes[w].moveBy([movex, movey, movez])
-                waterboxes[w].set('segid', segname)
+                waterboxes[w].set("segid", segname)
 
                 mol.append(waterboxes[w])
                 watsel = mol.segid == segname
 
                 selover = np.zeros(len(watsel), dtype=bool)
-                if xoverlap and yoverlap and zoverlap:  # Remove water overlapping with other segids
+                if (
+                    xoverlap and yoverlap and zoverlap
+                ):  # Remove water overlapping with other segids
                     selover = _overlapWithOther(mol, segname, buffer)
                 # Remove water outside the boundaries
-                selout = _outOfBoundaries(mol, segname, xmin, xmax, ymin, ymax, zmin, zmax)
+                selout = _outOfBoundaries(
+                    mol, segname, xmin, xmax, ymin, ymax, zmin, zmax
+                )
                 sel = selover | selout
 
-                #mol.write('temp.pdb')
+                # mol.write('temp.pdb')
                 mol.filter(mol.segid != segname, _logger=False)
                 waterboxes[w].filter(np.invert(sel[watsel]), _logger=False)
-                #waterboxes[w].write('wat' + str(w) + '.pdb')
+                # waterboxes[w].write('wat' + str(w) + '.pdb')
                 n += 1
                 w += 1
                 bar.update(1)
@@ -211,17 +267,15 @@ def solvate(mol, pad=None, minmax=None, negx=0, posx=0, negy=0, posy=0, negz=0, 
         if waterboxes[i].numAtoms != 0:
             mol.append(waterboxes[i])
 
-    logger.info('{} water molecules were added to the system.'.format(int(waters/3)))
+    logger.info(f"{int(waters / 3)} water molecules were added to the system.")
     return mol
 
 
 def _overlapWithOther(mol, segname, buffer):
-    sel = 'segid {} and same resid as (segid {} and within {} of not segid {})'.format(segname, segname, buffer, segname)
+    sel = f"segid {segname} and same resid as (segid {segname} and within {buffer} of not segid {segname})"
     return mol.atomselect(sel)
 
 
 def _outOfBoundaries(mol, segname, xmin, xmax, ymin, ymax, zmin, zmax):
-    sel = 'segid {} and same resid as (segid {} and (x < {} or x > {} or y < {} or y > {} or z < {} or z > {}))'.format(
-        segname, segname, xmin, xmax, ymin, ymax, zmin, zmax
-    )
+    sel = f"segid {segname} and same resid as (segid {segname} and (x < {xmin} or x > {xmax} or y < {ymin} or y > {ymax} or z < {zmin} or z > {zmax}))"
     return mol.atomselect(sel)
