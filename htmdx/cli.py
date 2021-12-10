@@ -50,7 +50,7 @@ def _check_registration(product):
         data["code"] = data["ret"]
 
     # Send the registration data
-    url = "https://www.acellera.com/licensing/htmd/check.php"
+    url = "https://www.acellera.com/registration/check"
     res = requests.post(url, data, timeout=10)
 
     # Check the response
@@ -131,7 +131,7 @@ def htmd_register(product="htmd"):
     data["product"]     = product
 
     # Send data to the registration server
-    url = "https://www.acellera.com/licensing/htmd/register.php"
+    url = "https://www.acellera.com/registration/register"
     res = requests.post(url, data=data, timeout=10)
 
     # Check the response
