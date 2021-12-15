@@ -10,7 +10,7 @@ import difflib
 from itertools import tee
 
 # Do not use the triple quote block, as the script can back-fire and remove part of this string
-license_header = ('# (c) 2015-2018 Acellera Ltd http://www.acellera.com\n'
+license_header = ('# (c) 2015-2022 Acellera Ltd http://www.acellera.com\n'
                   '# All Rights Reserved\n'
                   '# Distributed under HTMD Software License Agreement\n'
                   '# No redistribution in whole or part\n'
