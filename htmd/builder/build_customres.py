@@ -1,3 +1,8 @@
+# (c) 2015-2022 Acellera Ltd http://www.acellera.com
+# All Rights Reserved
+# Distributed under HTMD Software License Agreement
+# No redistribution in whole or part
+#
 from parameterize.parameterization.cli import main_parameterize
 from moleculekit.tools.graphalignment import makeMolGraph, compareGraphs
 from moleculekit.molecule import Molecule
