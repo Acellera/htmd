@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from parameterize.parameterization.cli import main_parameterize
 from moleculekit.tools.graphalignment import makeMolGraph, compareGraphs
 from moleculekit.molecule import Molecule
 from htmd.home import home
@@ -12,17 +11,7 @@ import parmed
 import numpy as np
 import tempfile
 import os
-import types
 
-
-def _get_calculator():
-    from energyforcecalculators.torchanicalculator import TorchAniCalculator
-
-    return TorchAniCalculator(model="ANI-2x")
-
-
-mymod = types.ModuleType("wrappers.torchani2x")
-mymod.get_calculator = _get_calculator
 
 ace = Molecule(os.path.join(home(shareDir=True), "builder", "caps", "ACE.cif"))
 nme = Molecule(os.path.join(home(shareDir=True), "builder", "caps", "NME.cif"))
@@ -60,13 +49,20 @@ def _cap_residue(mol):
     return mol
 
 
-def parameterizeCustomResidues(cifs, outdir, method="ani-2x"):
+def parameterizeCustomResidues(cifs, outdir, method="ani-2x", nnp=None):
     for cif in cifs:
         mol = Molecule(cif)
-        _parameterize_custom_residue(mol, outdir, method)
+        _parameterize_custom_residue(mol, outdir, method, nnp=nnp)
 
 
-def _parameterize_custom_residue(mol, outdir, method):
+def _parameterize_custom_residue(mol, outdir, method, nnp=None):
+    try:
+        from parameterize.parameterization.cli import main_parameterize
+    except ImportError:
+        raise ImportError(
+            "You are missing the parameterize library. Please install it with conda install parameterize -c acellera -c conda-forge"
+        )
+
     os.makedirs(outdir, exist_ok=True)
 
     mol = mol.copy()
@@ -79,27 +75,19 @@ def _parameterize_custom_residue(mol, outdir, method):
         sdffile = os.path.join(tmpdir, "mol.sdf")
         cmol.write(sdffile)
 
-        # TODO: Improve it to not parameterize the cap dihedrals!
-        args = [
-            sdffile,
-            "--charge",
-            str(int(cmol.formalcharge.sum())),
-            "--charge-type",
-            "AM1-BCC",
-            "--forcefield",
-            "GAFF2",
-            "--min-type",
-            "mm",
-            "--outdir",
-            tmpdir,
-        ]
-        if method == "ani-2x":
-            args += ["--scan-type", "mm", "--dihed-fit-type", "iterative"]
-            args += ["--nnp", "wrappers.torchani2x"]
-        elif method == "gaff2":
-            args += ["--no-dihed"]
-
-        main_parameterize(args)
+        # TODO: Improve it to not parameterize the cap dihedrals by excluding those dihedrals
+        main_parameterize(
+            mol,
+            user_charge=int(cmol.formalcharge.sum()),
+            forcefield="GAFF2",
+            charge_type="AM1-BCC",
+            min_type="mm",
+            dihed_fit_type="iterative",
+            dihed_opt_type="mm",
+            fit_dihedral=method != "gaff2",
+            nnp=nnp,
+            outdir=tmpdir,
+        )
         shutil.copy(
             os.path.join(tmpdir, "parameters", "GAFF2", "mol-orig.mol2"),
             os.path.join(tmpdir, f"{resn}.mol2"),
