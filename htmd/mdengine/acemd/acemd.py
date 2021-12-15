@@ -747,8 +747,8 @@ run                     1000
 
         import re
 
-        lines = re.sub("\s+", " ", lines)
-        expected_result = re.sub("\s+", " ", expected_result)
+        lines = re.sub(r"\s+", " ", lines)
+        expected_result = re.sub(r"\s+", " ", expected_result)
 
         self.assertTrue(
             expected_result.strip() == lines.strip(),

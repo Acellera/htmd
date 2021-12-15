@@ -392,7 +392,7 @@ def getEpochFromName(name):
     """
     import re
 
-    reg = re.compile("/e(\d+)s\d+_")
+    reg = re.compile(r"/e(\d+)s\d+_")
     matches = reg.findall(name)
     if len(matches) == 0:
         raise RuntimeError(f"{name} is not an adaptive trajectory")

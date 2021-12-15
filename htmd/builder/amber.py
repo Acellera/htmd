@@ -887,14 +887,14 @@ def _mapDisulfide(disulfide, mol, mol_orig):
 def _logParser(fname):
     import re
 
-    unknownres_regex = re.compile("Unknown residue:\s+(\w+)")
+    unknownres_regex = re.compile(r"Unknown residue:\s+(\w+)")
     missingparam_regex = re.compile(
-        "For atom: (.*) Could not find vdW \(or other\) parameters for type:\s+(\w+)"
+        r"For atom: (.*) Could not find vdW \(or other\) parameters for type:\s+(\w+)"
     )
-    missingtorsion_regex = re.compile("No torsion terms for\s+(.*)$")
-    missingbond_regex = re.compile("Could not find bond parameter for:\s+(.*)$")
-    missingangle_regex = re.compile("Could not find angle parameter:\s+(.*)$")
-    missingatomtype_regex = re.compile("FATAL:\s+Atom (.*) does not have a type")
+    missingtorsion_regex = re.compile(r"No torsion terms for\s+(.*)$")
+    missingbond_regex = re.compile(r"Could not find bond parameter for:\s+(.*)$")
+    missingangle_regex = re.compile(r"Could not find angle parameter:\s+(.*)$")
+    missingatomtype_regex = re.compile(r"FATAL:\s+Atom (.*) does not have a type")
 
     unknownres = []
     missingparam = []
