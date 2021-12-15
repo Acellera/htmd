@@ -5,6 +5,7 @@
 #
 import numpy as np
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,7 +16,7 @@ def least_square_fit_plane(coords):
     axes = np.zeros((numatm, 3))
     for i in range(numatm):
         p1 = coords[i]
-        if i == numatm-1:
+        if i == numatm - 1:
             p2 = coords[0]
         else:
             p2 = coords[i + 1]
@@ -45,6 +46,7 @@ def wrap(coor, com2, box):
 
 def moveLipidToPos(mol, lip):
     from moleculekit.util import rotationMatrix
+
     mol = mol.copy()
     headpos = mol.coords[mol.name == lip.headname].flatten()[np.newaxis, :]
     mol.moveBy(-headpos)
@@ -100,14 +102,12 @@ def _checkAtomsPenetrating(coords2, bonds2, ringcoords, axis, ringcom, maxd, box
                 p1 = ringcoords[k] - p
                 try:
                     p2 = ringcoords[k + 1] - p
-                except:
+                except Exception:
                     p2 = ringcoords[0] - p
                 d += np.arccos(np.dot(p1, p2) / np.linalg.norm(p1) / np.linalg.norm(p2))
 
             wn = d / 2 / np.pi
             if 1.1 > wn > 0.9:
-                from IPython.core.debugger import Tracer
-                # Tracer()()
                 penetrating = [i, j]
                 flag = True
                 break
@@ -132,9 +132,15 @@ def _detectRingPenetration(l1, lipids, box):
         for r, ring in enumerate(lip2.rings):
             axis, ringcom, maxd, ringcoords = _getRingProperties(coords2[ring, :])
 
-            pen = _checkAtomsPenetrating(coords1, bonds1, ringcoords, axis, ringcom, maxd, box)
+            pen = _checkAtomsPenetrating(
+                coords1, bonds1, ringcoords, axis, ringcom, maxd, box
+            )
             if pen is not None:
-                logger.info('Lipid {} ring {} is being penetrated by lipid {} atoms {} {}'.format(l2, r, l1, pen[0], pen[1]))
+                logger.info(
+                    "Lipid {} ring {} is being penetrated by lipid {} atoms {} {}".format(
+                        l2, r, l1, pen[0], pen[1]
+                    )
+                )
                 return True
     return False
 
@@ -149,7 +155,6 @@ def resolveRingPenetrations(lipids, box):
         for p in penetrators:
             lipids[p].rot += 10
         if len(penetrators) == 0:
-            logger.info('{} penetrating molecule(s) remaining'.format(len(penetrators)))
+            logger.info("{} penetrating molecule(s) remaining".format(len(penetrators)))
             break
-        logger.info('{} penetrating molecule(s) remaining'.format(len(penetrators)))
-
+        logger.info("{} penetrating molecule(s) remaining".format(len(penetrators)))

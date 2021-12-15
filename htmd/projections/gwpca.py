@@ -6,11 +6,12 @@
 import numpy as np
 from htmd.units import convert as unitconvert
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 class GWPCA(object):
-    """ Class for calculating the globally-weighted PCA projections of a MetricData  object
+    """Class for calculating the globally-weighted PCA projections of a MetricData  object
 
     References
     ----------
@@ -32,10 +33,12 @@ class GWPCA(object):
     >>> dataproj = gw.project(5)
     """
 
-    def __init__(self, data, lag, units='frames'):
-        lag = unitconvert(units, 'frames', lag, data.fstep)
+    def __init__(self, data, lag, units="frames"):
+        lag = unitconvert(units, "frames", lag, data.fstep)
         if lag == 0:
-            raise RuntimeError('Lag time conversion resulted in 0 frames. Please use a larger lag-time for TICA.')
+            raise RuntimeError(
+                "Lag time conversion resulted in 0 frames. Please use a larger lag-time for TICA."
+            )
         self.data = data
 
         datconcat = np.concatenate(self.data.dat)
@@ -49,7 +52,7 @@ class GWPCA(object):
         return np.squeeze(autocorr)
 
     def project(self, ndim=None):
-        """ Projects the data object given to the constructor onto `ndim` dimensions
+        """Projects the data object given to the constructor onto `ndim` dimensions
 
         Parameters
         ----------
@@ -73,10 +76,11 @@ class GWPCA(object):
         for t in tqdm(self.data.trajectories):
             pca.partial_fit(t.projection * self.weights)
 
-
         projdata = self.data.copy()
         for i, t in enumerate(tqdm(self.data.trajectories)):
-            projdata.trajectories[i].projection = pca.transform(t.projection * self.weights)
+            projdata.trajectories[i].projection = pca.transform(
+                t.projection * self.weights
+            )
 
         # projdataconc = pca.fit_transform(self.weighedconcat)
         # projdata.dat = projdata.deconcatenate(projdataconc)

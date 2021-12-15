@@ -26,7 +26,7 @@ from htmd.builder.builder import (
     MissingTorsionError,
     MissingAtomTypeError,
 )
-from subprocess import call, check_output, DEVNULL
+from subprocess import call
 from moleculekit.molecule import Molecule
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist

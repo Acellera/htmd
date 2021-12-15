@@ -1,4 +1,3 @@
-""""""
 # (c) 2015-2018 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
@@ -11,6 +10,7 @@ from scipy import stats
 from moleculekit.projections.projection import Projection
 from joblib import Parallel, delayed
 from htmd.parallelprogress import ParallelExecutor
+import unittest
 import logging
 
 logger = logging.getLogger(__name__)
@@ -383,9 +383,6 @@ def _projectionGenerator(metric, njobs):
 
 def _projector(metric, i):
     return metric._projectSingle(i)
-
-
-import unittest
 
 
 class _TestMetric(unittest.TestCase):

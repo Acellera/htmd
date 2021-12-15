@@ -286,7 +286,6 @@ if __name__ == "__main__":
         MetricSecondaryStructure,
     )
     from moleculekit.projections.metricdistance import MetricSelfDistance
-    import numpy as np
 
     os.chdir(path.join(home(), "data", "test-adaptive"))
 

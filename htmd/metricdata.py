@@ -7,7 +7,9 @@ import numpy as np
 import random
 from copy import deepcopy
 import pickle
+import unittest
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,11 +69,15 @@ class Trajectory(object):
 
     def _checkframes(self, args):
         if len(self._numframes(args)) > 1:
-            raise RuntimeError('projection, reference and cluster must have same lengths')
+            raise RuntimeError(
+                "projection, reference and cluster must have same lengths"
+            )
 
     def dropFrames(self, frames):
         if np.min(frames) < 0 or np.max(frames) >= self.numFrames:
-            raise RuntimeError('Frames to drop must be > 0 and < {}'.format(self.numFrames))
+            raise RuntimeError(
+                "Frames to drop must be > 0 and < {}".format(self.numFrames)
+            )
         if self._projection is not None:
             self._projection = np.delete(self._projection, frames, axis=0)
         if self._reference is not None:
@@ -84,19 +90,30 @@ class Trajectory(object):
         return deepcopy(self)
 
     def __repr__(self):
-        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
-               + self.__str__()
+        return (
+            "<{}.{} object at {}>\n".format(
+                self.__class__.__module__, self.__class__.__name__, hex(id(self))
+            )
+            + self.__str__()
+        )
 
     def __str__(self):
-        return 'sim: {}\nprojection: {}\nreference: {}\ncluster: {}\n'.format(
-            'simid = {}'.format(self.sim.simid) if self.sim is not None else None,
-            'np.array(shape={})'.format(np.shape(self.projection)) if self.projection is not None else None,
-            'np.array(shape={})'.format(np.shape(self.reference)) if self.reference is not None else None,
-            'np.array(shape={})'.format(np.shape(self.cluster)) if self.cluster is not None else None)
+        return "sim: {}\nprojection: {}\nreference: {}\ncluster: {}\n".format(
+            "simid = {}".format(self.sim.simid) if self.sim is not None else None,
+            "np.array(shape={})".format(np.shape(self.projection))
+            if self.projection is not None
+            else None,
+            "np.array(shape={})".format(np.shape(self.reference))
+            if self.reference is not None
+            else None,
+            "np.array(shape={})".format(np.shape(self.cluster))
+            if self.cluster is not None
+            else None,
+        )
 
 
 class MetricData(object):
-    """ Class used for storing projected trajectories, their clustering and state assignments. Objects of this class
+    """Class used for storing projected trajectories, their clustering and state assignments. Objects of this class
     are constructed by the `project` methods of the other projection classes. Only construct this class if you want to
     load saved data.
 
@@ -123,8 +140,19 @@ class MetricData(object):
     Centers : numpy.ndarray
         Centers of clusters
     """
-    
-    def __init__(self, dat=None, ref=None, description=None, simlist=None, fstep=0, parent=None, file=None, trajectories=None, cluster=None):
+
+    def __init__(
+        self,
+        dat=None,
+        ref=None,
+        description=None,
+        simlist=None,
+        fstep=0,
+        parent=None,
+        file=None,
+        trajectories=None,
+        cluster=None,
+    ):
         if trajectories is None:
             self._loadTrajectories(dat, ref, simlist, cluster)
         else:
@@ -144,12 +172,20 @@ class MetricData(object):
         self._clusterid = None
         return
 
-    def _loadTrajectories(self, projection=None, reference=None, simlist=None, cluster=None):
-        size = np.unique([x for x in list(map(_getsizes, (projection, reference, simlist, cluster))) if x is not None])
+    def _loadTrajectories(
+        self, projection=None, reference=None, simlist=None, cluster=None
+    ):
+        size = np.unique(
+            [
+                x
+                for x in list(map(_getsizes, (projection, reference, simlist, cluster)))
+                if x is not None
+            ]
+        )
         if len(size) == 0:
             size = 0
         elif len(size) > 1:
-            raise RuntimeError('dat, ref and simlist must have same lengths')
+            raise RuntimeError("dat, ref and simlist must have same lengths")
         if projection is None:
             projection = np.empty(size, dtype=object)
         if reference is None:
@@ -158,7 +194,10 @@ class MetricData(object):
             simlist = np.empty(size, dtype=object)
         if cluster is None:
             cluster = np.empty(size, dtype=object)
-        self.trajectories = [Trajectory(d, r, s, c) for d, r, s, c in zip(projection, reference, simlist, cluster)]
+        self.trajectories = [
+            Trajectory(d, r, s, c)
+            for d, r, s, c in zip(projection, reference, simlist, cluster)
+        ]
 
     @property
     def dat(self):
@@ -188,7 +227,7 @@ class MetricData(object):
 
     @property
     def trajLengths(self):
-        """ Get the lengths of all trajectories
+        """Get the lengths of all trajectories
 
         Returns
         -------
@@ -203,7 +242,7 @@ class MetricData(object):
 
     @property
     def numFrames(self):
-        """ Get the total number of frames in all trajectories
+        """Get the total number of frames in all trajectories
 
         Returns
         -------
@@ -218,7 +257,7 @@ class MetricData(object):
 
     @property
     def numTrajectories(self):
-        """ The number of trajectories
+        """The number of trajectories
 
         Examples
         --------
@@ -226,10 +265,9 @@ class MetricData(object):
         """
         return len(self.trajectories)
 
-
     @property
     def numDimensions(self):
-        """ The number of dimensions
+        """The number of dimensions
 
         Examples
         --------
@@ -239,7 +277,7 @@ class MetricData(object):
 
     @property
     def aggregateTime(self):
-        """ The total aggregate simulation time
+        """The total aggregate simulation time
 
         Examples
         --------
@@ -249,7 +287,7 @@ class MetricData(object):
             return self.numFrames * self.fstep
 
     def cluster(self, clusterobj, mergesmall=None, batchsize=False):
-        """ Cluster the metrics
+        """Cluster the metrics
 
         Parameters
         ----------
@@ -267,7 +305,7 @@ class MetricData(object):
         >>> data = MetricDistance.project(sims, 'protein and name CA', 'resname MOL')
         >>> data.cluster(MiniBatchKMeans(n_clusters=1000), mergesmall=5)
         """
-        #cluster_obj = coor.cluster_kmeans(self.dat, k=20, stride=1)
+        # cluster_obj = coor.cluster_kmeans(self.dat, k=20, stride=1)
         if batchsize > 0:
             lengths = self.trajLengths
             currsum = 0
@@ -275,11 +313,13 @@ class MetricData(object):
             for i, l in enumerate(lengths):
                 currsum += l
                 if currsum > batchsize:
-                    starts.append(i+1)
+                    starts.append(i + 1)
                     currsum = 0
             starts.append(self.numTrajectories)
             for i in range(len(starts) - 1):
-                clusterobj.partial_fit(np.concatenate(self.dat[starts[i]:starts[i+1]]))
+                clusterobj.partial_fit(
+                    np.concatenate(self.dat[starts[i] : starts[i + 1]])
+                )
             labels = []
             for i in range(self.numTrajectories):
                 labels.append(clusterobj.predict(self.dat[i].astype(np.float32)))
@@ -290,6 +330,7 @@ class MetricData(object):
             if np.ndim(datconcat) == 1:
                 datconcat = np.transpose(np.atleast_2d(datconcat))
             import warnings  # Following 3 lines are BS because sklearn refuse to make releases more often than 1 per year...
+
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 clusterobj.fit(datconcat)
@@ -299,7 +340,7 @@ class MetricData(object):
         self.Centers = clusterobj.cluster_centers_[uqclu, :]
         self.K = len(uqclu)
         # ---- Fixing missing clusters crap...
-        map = np.zeros(np.max(labels)+1, dtype=int) * -1
+        map = np.zeros(np.max(labels) + 1, dtype=int) * -1
         map[uqclu] = range(self.K)
         labels = map[labels]
         # ------------------------------------
@@ -309,16 +350,22 @@ class MetricData(object):
 
         if mergesmall is not None:
             oldK = self.K
-            self.K, St, self.Centers, self.N, xxx = _mergeSmallClusters(mergesmall, datconcat, labels, self.Centers, self.N)
+            self.K, St, self.Centers, self.N, xxx = _mergeSmallClusters(
+                mergesmall, datconcat, labels, self.Centers, self.N
+            )
             for i, s in enumerate(self.deconcatenate(St)):
                 self.trajectories[i].cluster = s
-            logger.info('Mergesmall removed {} clusters. Original ncluster {}, new ncluster {}.'.format(oldK-self.K, oldK, self.K))
+            logger.info(
+                "Mergesmall removed {} clusters. Original ncluster {}, new ncluster {}.".format(
+                    oldK - self.K, oldK, self.K
+                )
+            )
 
         self._dataid = random.random()
         self._clusterid = self._dataid
-    
+
     def combine(self, otherdata):
-        """ Combines two different metrics into one by concatenating them.
+        """Combines two different metrics into one by concatenating them.
 
         Parameters
         ----------
@@ -332,17 +379,23 @@ class MetricData(object):
         >>> dataRMSD.combine(dataDist)
         """
         if not np.array_equal(self.trajLengths, otherdata.trajLengths):
-            raise NameError('Trying to combine MetricData objects with different number/lengths of trajectories. Check the trajLengths property.')
+            raise NameError(
+                "Trying to combine MetricData objects with different number/lengths of trajectories. Check the trajLengths property."
+            )
         for i in range(self.numTrajectories):
             if self.simlist[i].simid != otherdata.simlist[i].simid:
-                raise NameError('Simulation ids do not match. Cannot combine. Please generate both data from the same simlist')
+                raise NameError(
+                    "Simulation ids do not match. Cannot combine. Please generate both data from the same simlist"
+                )
         for t1, t2 in zip(self.trajectories, otherdata.trajectories):
             t1.projection = np.concatenate((t1.projection, t2.projection), axis=1)
-        self.description = self.description.append(otherdata.description, ignore_index=True)
+        self.description = self.description.append(
+            otherdata.description, ignore_index=True
+        )
         self._dataid = random.random()
 
     def dropDimensions(self, drop=None, keep=None):
-        """ Drop some dimensions of the data given their indexes
+        """Drop some dimensions of the data given their indexes
 
         Parameters
         ----------
@@ -361,7 +414,9 @@ class MetricData(object):
         if keep is not None and not isinstance(keep, np.ndarray):
             keep = np.array(keep)
         if drop is not None and keep is not None:
-            raise AttributeError('drop and keep arguments for dropDimensions are mutually exclusive. Pass only one.')
+            raise AttributeError(
+                "drop and keep arguments for dropDimensions are mutually exclusive. Pass only one."
+            )
         if keep is not None:
             keepidx = keep
             dropidx = np.arange(self.numDimensions)
@@ -376,8 +431,10 @@ class MetricData(object):
         self.description = self.description.drop(self.description.index[dropidx])
         self.description = self.description.reset_index(drop=True)
 
-    def dropTraj(self, limits=None, multiple=None, partial=None, idx=None, keepsims=None):
-        """ Drops trajectories based on their lengths
+    def dropTraj(
+        self, limits=None, multiple=None, partial=None, idx=None, keepsims=None
+    ):
+        """Drops trajectories based on their lengths
 
         By default, drops all trajectories which are not of statistical mode (most common) length.
 
@@ -407,7 +464,7 @@ class MetricData(object):
             drop = (trajLengths < limits[0]) | (trajLengths > limits[1])
         elif multiple is not None:
             if partial is not None:
-                raise NameError('TODO')
+                raise NameError("TODO")
                 pass
             idx = range(orgNum)
             for i in range(len(multiple)):
@@ -438,6 +495,7 @@ class MetricData(object):
                         break
         else:
             from scipy import stats
+
             drop = trajLengths != np.array(stats.mode(trajLengths).mode)
 
         keep = np.invert(drop)
@@ -446,10 +504,19 @@ class MetricData(object):
         self.trajectories = [self.trajectories[x] for x in np.where(keep)[0]]
         self._dataid = random.random()
         if self.parent:
-            self.parent.trajectories = [self.parent.trajectories[x] for x in np.where(keep)[0]]
+            self.parent.trajectories = [
+                self.parent.trajectories[x] for x in np.where(keep)[0]
+            ]
             self.parent._dataid = random.random()
 
-        logger.info('Dropped ' + str(np.sum(drop)) + ' trajectories from ' + str(orgNum) + ' resulting in ' + str(self.numTrajectories))
+        logger.info(
+            "Dropped "
+            + str(np.sum(drop))
+            + " trajectories from "
+            + str(orgNum)
+            + " resulting in "
+            + str(self.numTrajectories)
+        )
         return dropIdx
 
     def dropFrames(self, idx, frames):
@@ -459,8 +526,10 @@ class MetricData(object):
             self.parent.trajectories[idx].dropFrames(frames)
             self.parent._dataid = random.random()
 
-    def sampleClusters(self, clusters=None, frames=20, replacement=False, allframes=False):
-        """ Samples frames from a set of clusters
+    def sampleClusters(
+        self, clusters=None, frames=20, replacement=False, allframes=False
+    ):
+        """Samples frames from a set of clusters
 
         Parameters
         ----------
@@ -490,9 +559,11 @@ class MetricData(object):
         if clusters is None:
             clusters = range(self.K)
         if isinstance(clusters, int):
-            clusters = [clusters, ]
+            clusters = [
+                clusters,
+            ]
         if allframes:
-            logger.warning('allframes option is deprecated. Please use frames=None')
+            logger.warning("allframes option is deprecated. Please use frames=None")
             frames = None
         if frames is None or isinstance(frames, int):
             frames = np.repeat(frames, len(clusters))
@@ -506,13 +577,17 @@ class MetricData(object):
             st = clusters[i]
             absFrames.append(_sampleCluster(st, stConcat, frames[i], replacement))
             if len(absFrames[-1]) == 0:
-                raise NameError('No frames could be sampled from cluster {}. Cluster is empty.'.format(st))
+                raise NameError(
+                    "No frames could be sampled from cluster {}. Cluster is empty.".format(
+                        st
+                    )
+                )
 
             relFrames.append(self.abs2rel(absFrames[-1]))
         return absFrames, relFrames
 
     def bootstrap(self, ratio, replacement=False):
-        """ Randomly sample a set of trajectories
+        """Randomly sample a set of trajectories
 
         Parameters
         ----------
@@ -537,18 +612,25 @@ class MetricData(object):
             rndtraj = np.random.randint(numtraj, size=numtokeep)
         else:
             rndtraj = np.random.permutation(numtraj)[0:numtokeep]
-        rndtraj = sorted(rndtraj)  # Important to keep the sorting! i.e. for data.dropTraj(keepsims=sims)
+        rndtraj = sorted(
+            rndtraj
+        )  # Important to keep the sorting! i.e. for data.dropTraj(keepsims=sims)
 
         pp = None
         if self.parent is not None:
             pp = self.parent.copy()
             pp.trajectories = [self.parent.trajectories[x] for x in rndtraj]
             pp._dataid = random.random()
-        bootdata = MetricData(trajectories=[self.trajectories[x].copy() for x in rndtraj], description=self.description, parent=pp, fstep=self.fstep)
+        bootdata = MetricData(
+            trajectories=[self.trajectories[x].copy() for x in rndtraj],
+            description=self.description,
+            parent=pp,
+            fstep=self.fstep,
+        )
         return bootdata
-    
+
     def plotTrajSizes(self):
-        """ Plot the lengths of all trajectories in a sorted bar plot
+        """Plot the lengths of all trajectories in a sorted bar plot
 
         Examples
         --------
@@ -557,16 +639,17 @@ class MetricData(object):
         """
         trajLengths = self.trajLengths * self.fstep
         import matplotlib.pyplot as plt
+
         plt.ion()
         _ = plt.hist(trajLengths)
-        #plt.bar(range(len(trajLengths)), np.sort(trajLengths), color='b', edgecolor='b')
-        plt.ylabel('Num trajectories')
-        plt.xlabel('Length of trajectories (in ns)')
+        # plt.bar(range(len(trajLengths)), np.sort(trajLengths), color='b', edgecolor='b')
+        plt.ylabel("Num trajectories")
+        plt.xlabel("Length of trajectories (in ns)")
         plt.show()
         return
-    
+
     def splitCols(self):
-        raise NameError('Not implemented yet')
+        raise NameError("Not implemented yet")
 
     def deconcatenate(self, array):
         indeces = np.cumsum(self.trajLengths)
@@ -576,7 +659,7 @@ class MetricData(object):
             return np.array(np.vsplit(array, indeces[:-1]))
 
     def abs2rel(self, absFrames):
-        """ Convert absolute frame indexes into trajectory index-frame pairs
+        """Convert absolute frame indexes into trajectory index-frame pairs
 
         Useful when doing calculations on a concatenated data array of all trajectories. When you find a frame of
         interest you can `deconcatenate` the frame index to the corresponding trajectory index-frame pair.
@@ -607,7 +690,7 @@ class MetricData(object):
         return relframe
 
     def rel2sim(self, relFrames, simlist=None):
-        """ Converts trajectory index-frame pairs into Sim-frame pairs
+        """Converts trajectory index-frame pairs into Sim-frame pairs
 
         Parameters
         ----------
@@ -627,11 +710,14 @@ class MetricData(object):
         >>> simframes = data.rel2sim([100, 56])  # 100th simulation frame 56
         """
         from htmd.simlist import Frame
+
         if simlist is None:
             simlist = self.simlist
         else:
             if len(simlist) != len(self.simlist):
-                raise AttributeError('Provided simlist has different number of trajectories than the one used by this object.')
+                raise AttributeError(
+                    "Provided simlist has different number of trajectories than the one used by this object."
+                )
 
         relFrames = np.array(relFrames)
         if relFrames.ndim == 1:
@@ -644,7 +730,7 @@ class MetricData(object):
         return np.array(frames)
 
     def abs2sim(self, absFrames):
-        """ Converts absolute frame indexes into Sim-frame pairs
+        """Converts absolute frame indexes into Sim-frame pairs
 
         Parameters
         ----------
@@ -664,7 +750,7 @@ class MetricData(object):
         return self.rel2sim(self.abs2rel(absFrames))
 
     def copy(self):
-        """ Produces a deep copy of the object
+        """Produces a deep copy of the object
 
         Returns
         -------
@@ -679,7 +765,7 @@ class MetricData(object):
         return deepcopy(self)
 
     def save(self, filename):
-        """ Save a :class:`MetricData` object to disk
+        """Save a :class:`MetricData` object to disk
 
         Parameters
         ----------
@@ -691,12 +777,12 @@ class MetricData(object):
         >>> data = MetricSelfDistance.project(sims, 'protein and name CA')
         >>> data.save('./data.dat')
         """
-        #np.save(filename, [self.__dict__[k] for k in self.__dict__])
+        # np.save(filename, [self.__dict__[k] for k in self.__dict__])
         parentpointer = self.parent
         if self.parent is not None:
             self.parent = self.parent.__dict__
 
-        f = open(filename, 'wb')
+        f = open(filename, "wb")
         pickle.dump(self.__dict__, f)
         f.close()
 
@@ -704,7 +790,7 @@ class MetricData(object):
             self.parent = parentpointer
 
     def load(self, filename):
-        """ Load a :class:`MetricData` object from disk
+        """Load a :class:`MetricData` object from disk
 
         Parameters
         ----------
@@ -717,45 +803,59 @@ class MetricData(object):
         >>> data.load('./data.dat')
         """
         import sys
+
         try:
             import pandas.indexes
         except ImportError:
             import pandas.core.indexes
-            sys.modules['pandas.indexes'] = pandas.core.indexes  # Hacky fix for new pandas version
+
+            sys.modules[
+                "pandas.indexes"
+            ] = pandas.core.indexes  # Hacky fix for new pandas version
 
         # Patch for old HTMD versions
-        if type(filename).__name__ == 'MetricData':
+        if type(filename).__name__ == "MetricData":
             filename = filename.__dict__
 
         if isinstance(filename, str):
-            f = open(filename, 'rb')
+            f = open(filename, "rb")
             vardict = pickle.load(f)
             f.close()
         elif isinstance(filename, dict):
             vardict = filename
 
         for k in self.__dict__:
-            if k == 'description' and 'map' in vardict:  # Patch for loading old data
-                self.description = vardict['map']
-            elif k == 'trajectories' and 'dat' in vardict:  # Patch for loading old data
-                self._loadTrajectories(vardict['dat'], vardict['ref'], vardict['simlist'], vardict['St'])
-            elif k != 'parent':
+            if k == "description" and "map" in vardict:  # Patch for loading old data
+                self.description = vardict["map"]
+            elif k == "trajectories" and "dat" in vardict:  # Patch for loading old data
+                self._loadTrajectories(
+                    vardict["dat"], vardict["ref"], vardict["simlist"], vardict["St"]
+                )
+            elif k != "parent":
                 try:
                     self.__dict__[k] = vardict[k]
-                except:
-                    logger.warning('Could not find class property {} in file {}'.format(k, filename))
+                except Exception:
+                    logger.warning(
+                        "Could not find class property {} in file {}".format(
+                            k, filename
+                        )
+                    )
 
-        if 'parent' in vardict and vardict['parent'] is not None:
+        if "parent" in vardict and vardict["parent"] is not None:
             self.parent = MetricData()
-            self.parent.load(vardict['parent'])
+            self.parent.load(vardict["parent"])
 
-    def _defaultLags(self, minlag=None, maxlag=None, numlags=None, units='frames'):
+    def _defaultLags(self, minlag=None, maxlag=None, numlags=None, units="frames"):
         from htmd.units import convert as unitconvert
+
         if maxlag is None:
             from scipy import stats
-            maxlag = stats.mode(self.trajLengths).mode - 1  # -1 to avoid warnings in timescales calc
+
+            maxlag = (
+                stats.mode(self.trajLengths).mode - 1
+            )  # -1 to avoid warnings in timescales calc
         else:
-            maxlag = unitconvert(units, 'frames', maxlag, fstep=self.fstep)
+            maxlag = unitconvert(units, "frames", maxlag, fstep=self.fstep)
 
         if minlag is None:
             if maxlag > 20:
@@ -763,11 +863,20 @@ class MetricData(object):
             else:
                 minlag = 2
         else:
-            minlag = unitconvert(units, 'frames', minlag, fstep=self.fstep)
+            minlag = unitconvert(units, "frames", minlag, fstep=self.fstep)
 
         return np.append(1, np.round(np.linspace(minlag, maxlag, numlags))).astype(int)
 
-    def _getFEShistogramCounts(self, dimx, dimy, nbins=80, pad=0.5, micro_ofcluster=None, stationary_distribution=None, St=None):
+    def _getFEShistogramCounts(
+        self,
+        dimx,
+        dimy,
+        nbins=80,
+        pad=0.5,
+        micro_ofcluster=None,
+        stationary_distribution=None,
+        St=None,
+    ):
         from tqdm import tqdm
 
         if St is None:
@@ -781,22 +890,40 @@ class MetricData(object):
 
         xmin, ymin = data_dim.min(axis=0)
         xmax, ymax = data_dim.max(axis=0)
-        hist_range = np.array([[xmin-pad, xmax+pad], [ymin-pad, ymax+pad]])
+        hist_range = np.array([[xmin - pad, xmax + pad], [ymin - pad, ymax + pad]])
 
         if micro_ofcluster is None:
-            counts, xbins, ybins = np.histogram2d(data_dim[:, 0], data_dim[:, 1], bins=nbins, range=hist_range)
+            counts, xbins, ybins = np.histogram2d(
+                data_dim[:, 0], data_dim[:, 1], bins=nbins, range=hist_range
+            )
             return counts.T, xbins, ybins
 
         counts = np.zeros((nbins, nbins))
         for m in tqdm(range(len(stationary_distribution))):
             frames = micro_ofcluster[clusters] == m
             if frames.sum():
-                state_mask, xbins, ybins = np.histogram2d(data_dim[frames, 0], data_dim[frames, 1], bins=nbins, range=hist_range)
+                state_mask, xbins, ybins = np.histogram2d(
+                    data_dim[frames, 0],
+                    data_dim[frames, 1],
+                    bins=nbins,
+                    range=hist_range,
+                )
                 state_mask = state_mask.T > 0
                 counts += state_mask * stationary_distribution[m]
         return counts, xbins, ybins
 
-    def _contourPlot(self, values, xbins, ybins, levels=7, nonzero=None, cmap="viridis", title=None, xlabel=None, ylabel=None):
+    def _contourPlot(
+        self,
+        values,
+        xbins,
+        ybins,
+        levels=7,
+        nonzero=None,
+        cmap="viridis",
+        title=None,
+        xlabel=None,
+        ylabel=None,
+    ):
         import matplotlib.pylab as plt
 
         if nonzero is None:
@@ -804,12 +931,15 @@ class MetricData(object):
 
         def getcmap(cmap, bounds):
             import matplotlib.colors as clr
+
             cmap = plt.get_cmap(cmap)
             cmaplist = [cmap(i) for i in range(cmap.N)]
-            cmap = clr.LinearSegmentedColormap.from_list('Custom cmap', cmaplist, cmap.N)
+            cmap = clr.LinearSegmentedColormap.from_list(
+                "Custom cmap", cmaplist, cmap.N
+            )
             norm = clr.BoundaryNorm(bounds, cmap.N)
-            cmap.set_under(color='white')
-            cmap.set_over(color='white')
+            cmap.set_under(color="white")
+            cmap.set_over(color="white")
             return cmap, norm
 
         xcenters = (xbins[:-1] + xbins[1:]) / 2
@@ -819,11 +949,22 @@ class MetricData(object):
         levels = np.linspace(values[nonzero].min(), values[nonzero].max(), levels)
         cmap, norm = getcmap(cmap, levels)
         f = plt.figure()
-        plt.contour(meshx, meshy, values, levels=levels, colors='black', vmin=0, vmax=levels[-1])
-        cf = plt.contourf(meshx, meshy, values, levels=levels, cmap=cmap, vmin=0, vmax=levels[-1], norm=norm)
+        plt.contour(
+            meshx, meshy, values, levels=levels, colors="black", vmin=0, vmax=levels[-1]
+        )
+        cf = plt.contourf(
+            meshx,
+            meshy,
+            values,
+            levels=levels,
+            cmap=cmap,
+            vmin=0,
+            vmax=levels[-1],
+            norm=norm,
+        )
 
         ax = f.gca()
-        _ = ax.axis('equal')
+        _ = ax.axis("equal")
         if title is not None:
             ax.set_title(title)
         if xlabel is not None:
@@ -834,28 +975,61 @@ class MetricData(object):
 
     def _setColorbar(self, f, mappable, label=None, scientific=True):
         import matplotlib.ticker as ticker
+
         def fmt(x, pos):
-            a, b = '{:.2e}'.format(x).split('e')
+            a, b = "{:.2e}".format(x).split("e")
             b = int(b)
-            return r'${} \times 10^{{{}}}$'.format(a, b)
+            return r"${} \times 10^{{{}}}$".format(a, b)
+
         if scientific:
             f.colorbar(mappable, format=ticker.FuncFormatter(fmt), label=label)
         else:
             f.colorbar(mappable, label=label)
 
-    def _plotCounts(self, dimX, dimY, resolution=100, logplot=False, levels=7, cmap="viridis", title=None, xlabel=None, ylabel=None):
+    def _plotCounts(
+        self,
+        dimX,
+        dimY,
+        resolution=100,
+        logplot=False,
+        levels=7,
+        cmap="viridis",
+        title=None,
+        xlabel=None,
+        ylabel=None,
+    ):
         counts, xbins, ybins = self._getFEShistogramCounts(dimX, dimY, nbins=resolution)
         nonzero = counts != 0
         if logplot:
             counts[nonzero] = np.log(counts[nonzero])
             nonzero = counts != 0
-        f, ax, cf = self._contourPlot(counts, xbins, ybins, levels=levels, nonzero=nonzero, cmap=cmap, title=title, xlabel=xlabel, ylabel=ylabel)
+        f, ax, cf = self._contourPlot(
+            counts,
+            xbins,
+            ybins,
+            levels=levels,
+            nonzero=nonzero,
+            cmap=cmap,
+            title=title,
+            xlabel=xlabel,
+            ylabel=ylabel,
+        )
 
-        self._setColorbar(f, cf, 'Counts')
+        self._setColorbar(f, cf, "Counts")
         return f, ax, cf
 
-    def plotCounts(self, dimX, dimY, resolution=100, logplot=False, plot=True, save=None, levels=7, cmap="viridis"):
-        """ Plots a histogram of counts on any two given dimensions.
+    def plotCounts(
+        self,
+        dimX,
+        dimY,
+        resolution=100,
+        logplot=False,
+        plot=True,
+        save=None,
+        levels=7,
+        cmap="viridis",
+    ):
+        """Plots a histogram of counts on any two given dimensions.
 
         Parameters
         ----------
@@ -873,27 +1047,51 @@ class MetricData(object):
             Path of the file in which to save the figure
         """
         from matplotlib import pylab as plt
+
         if self.description is not None:
             xlabel = self.description.description[dimX]
         else:
-            xlabel = 'Dimension {}'.format(dimX)
+            xlabel = "Dimension {}".format(dimX)
         if self.description is not None:
             ylabel = self.description.description[dimY]
         else:
-            ylabel = 'Dimension {}'.format(dimY)
-        title = 'Counts histogram'
+            ylabel = "Dimension {}".format(dimY)
+        title = "Counts histogram"
         if logplot:
-            title = 'Logarithmic counts histogram'
+            title = "Logarithmic counts histogram"
 
-        self._plotCounts(dimX, dimY, resolution=resolution, logplot=logplot, levels=levels, cmap=cmap, title=title, xlabel=xlabel, ylabel=ylabel)
+        self._plotCounts(
+            dimX,
+            dimY,
+            resolution=resolution,
+            logplot=logplot,
+            levels=levels,
+            cmap=cmap,
+            title=title,
+            xlabel=xlabel,
+            ylabel=ylabel,
+        )
 
         if save is not None:
-            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+            plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
         if plot:
             plt.show()
 
-    def plotClusters(self, dimX, dimY, resolution=100, s=4, c=None, cmap="Greys", logplot=False, plot=True, save=None, data=None, levels=7):
-        """ Plot a scatter-plot of the locations of the clusters on top of the count histogram.
+    def plotClusters(
+        self,
+        dimX,
+        dimY,
+        resolution=100,
+        s=4,
+        c=None,
+        cmap="Greys",
+        logplot=False,
+        plot=True,
+        save=None,
+        data=None,
+        levels=7,
+    ):
+        """Plot a scatter-plot of the locations of the clusters on top of the count histogram.
 
         Parameters
         ----------
@@ -921,7 +1119,7 @@ class MetricData(object):
             MetricData object needs to have the same simlist as this object.
         """
         if self.Centers is None:
-            raise RuntimeError('Data has not been clustered yet. Cannot plot clusters.')
+            raise RuntimeError("Data has not been clustered yet. Cannot plot clusters.")
         from matplotlib import pylab as plt
 
         if data is None:
@@ -929,58 +1127,91 @@ class MetricData(object):
             centers = self.Centers
         else:
             from htmd.model import getStateStatistic
-            if self.numFrames != data.numFrames or ~np.all([s1 == s2 for s1, s2 in zip(self.simlist, data.simlist)]):
-                raise RuntimeError('The data argument you provided uses a different simlist than this object.')
-            centers = np.vstack(getStateStatistic(self, data, range(self.K), statetype='cluster'))
+
+            if self.numFrames != data.numFrames or ~np.all(
+                [s1 == s2 for s1, s2 in zip(self.simlist, data.simlist)]
+            ):
+                raise RuntimeError(
+                    "The data argument you provided uses a different simlist than this object."
+                )
+            centers = np.vstack(
+                getStateStatistic(self, data, range(self.K), statetype="cluster")
+            )
 
         if data.description is not None:
             xlabel = data.description.description[dimX]
         else:
-            xlabel = 'Dimension {}'.format(dimX)
+            xlabel = "Dimension {}".format(dimX)
 
         if data.description is not None:
             ylabel = data.description.description[dimY]
         else:
-            ylabel = 'Dimension {}'.format(dimY)
+            ylabel = "Dimension {}".format(dimY)
 
-        title = 'Clusters plotted onto counts histogram'
+        title = "Clusters plotted onto counts histogram"
         if logplot:
-            title = 'Clusters plotted onto logarithmic counts histogram'
-        f, ax, cf = self._plotCounts(dimX, dimY, resolution=resolution, logplot=logplot, levels=levels, cmap=cmap, title=title, xlabel=xlabel, ylabel=ylabel)
+            title = "Clusters plotted onto logarithmic counts histogram"
+        f, ax, cf = self._plotCounts(
+            dimX,
+            dimY,
+            resolution=resolution,
+            logplot=logplot,
+            levels=levels,
+            cmap=cmap,
+            title=title,
+            xlabel=xlabel,
+            ylabel=ylabel,
+        )
 
-        y = ax.scatter(centers[:, dimX], centers[:, dimY], s=s, c=c if c is not None else "r", cmap=cmap, linewidths=0, marker='o')
+        y = ax.scatter(
+            centers[:, dimX],
+            centers[:, dimY],
+            s=s,
+            c=c if c is not None else "r",
+            cmap=cmap,
+            linewidths=0,
+            marker="o",
+        )
         if c is not None:
-            self._setColorbar(f, y, 'Cluster groups')
+            self._setColorbar(f, y, "Cluster groups")
 
         if save is not None:
-            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+            plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
         if plot:
             plt.show()
 
     def __repr__(self):
-        return '<{}.{} object at {}>\n'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self))) \
-               + self.__str__()
+        return (
+            "<{}.{} object at {}>\n".format(
+                self.__class__.__module__, self.__class__.__name__, hex(id(self))
+            )
+            + self.__str__()
+        )
 
     def __str__(self):
         def formatstr(name, field):
             if isinstance(field, np.ndarray) or isinstance(field, list):
-                rep = '{} shape: {}'.format(name, np.shape(field))
+                rep = "{} shape: {}".format(name, np.shape(field))
             else:
-                rep = '{}: {}'.format(name, field)
+                rep = "{}: {}".format(name, field)
             return rep
 
-        rep = 'MetricData object with {} trajectories'.format(self.numTrajectories)
+        rep = "MetricData object with {} trajectories".format(self.numTrajectories)
         if self.fstep > 0:
-            rep += ' of {:.1f}ns aggregate simulation time'.format(self.aggregateTime)
+            rep += " of {:.1f}ns aggregate simulation time".format(self.aggregateTime)
         for j in sorted(self.__dict__.keys()):
-            if j[0] == '_':
+            if j[0] == "_":
                 continue
-            if j == 'parent':
-                rep += '\nparent: {} at {}'.format(type(self.parent), hex(id(self.parent)))
-            elif j == 'description':
-                rep += '\ndescription: {} at {}'.format(type(self.description), hex(id(self.description)))
+            if j == "parent":
+                rep += "\nparent: {} at {}".format(
+                    type(self.parent), hex(id(self.parent))
+                )
+            elif j == "description":
+                rep += "\ndescription: {} at {}".format(
+                    type(self.description), hex(id(self.description))
+                )
             else:
-                rep += '\n'
+                rep += "\n"
                 rep += formatstr(j, self.__dict__[j])
 
         return rep
@@ -1006,8 +1237,10 @@ class MetricData(object):
         self.N = None
         self.Centers = None
 
-    def sampleRegion(self, point=None, radius=None, limits=None, nsamples=20, singlemol=False):
-        """ Samples conformations from a region in the projected space.
+    def sampleRegion(
+        self, point=None, radius=None, limits=None, nsamples=20, singlemol=False
+    ):
+        """Samples conformations from a region in the projected space.
 
         Parameters
         ----------
@@ -1041,21 +1274,27 @@ class MetricData(object):
         >>> abs, rel, mols = data.sampleRegion(limits=np.array([minlims, maxlims]))
         """
         from scipy.spatial.distance import cdist
+
         datconcat = np.concatenate(self.dat)
         numdim = datconcat.shape[1]
         if point is not None:
             if radius is None:
-                raise RuntimeError('You must define a radius with a point.')
+                raise RuntimeError("You must define a radius with a point.")
             point = np.array(point)
             if len(point) != numdim:
                 raise RuntimeError(
-                    'Argument `point` should be same dimensionality as your data ({} dimensions)'.format(numdim))
+                    "Argument `point` should be same dimensionality as your data ({} dimensions)".format(
+                        numdim
+                    )
+                )
             keepdim = np.array([p is not None for p in point])
             dists = cdist(datconcat[:, keepdim], [point[keepdim]])
             confs = np.where(dists < radius)[0]
         elif limits is not None:
             if limits.shape != (2, numdim):
-                raise RuntimeError('Argument `limits` should be of shape (2, {})'.format(numdim))
+                raise RuntimeError(
+                    "Argument `limits` should be of shape (2, {})".format(numdim)
+                )
             mask = np.ones(datconcat.shape[0], dtype=bool)
             for i in range(numdim):
                 if limits[0, i] is not None:
@@ -1069,6 +1308,7 @@ class MetricData(object):
         sims = self.abs2sim(confs)
 
         from moleculekit.molecule import Molecule
+
         if singlemol:
             mol = Molecule(sims[0])
             for i in range(1, len(sims)):
@@ -1097,10 +1337,10 @@ def _randomSample(frames, numFr, replacement):
 
 
 def _mergeSmallClusters(mergesmall, data, stconcat, centers, N, metric=None):
-    if data.dtype == 'bool':
-        metric = 'hamming'
+    if data.dtype == "bool":
+        metric = "hamming"
     else:
-        metric = 'euclidean'
+        metric = "euclidean"
     badclusters = N < mergesmall
     goodclusters = np.invert(badclusters)
     N[badclusters] = 0
@@ -1123,12 +1363,17 @@ def _mergeSmallClusters(mergesmall, data, stconcat, centers, N, metric=None):
 
     # Calculate distance of all frames belonging to bad clusters to the good cluster centers
     from scipy.spatial import distance
-    dists = distance.cdist(np.atleast_2d(data[badframeidx, :]), np.atleast_2d(centers), metric)
-    minidx = np.argmin(dists, axis=1)  # Find closest center. Indexes are relative to goodidx
+
+    dists = distance.cdist(
+        np.atleast_2d(data[badframeidx, :]), np.atleast_2d(centers), metric
+    )
+    minidx = np.argmin(
+        dists, axis=1
+    )  # Find closest center. Indexes are relative to goodidx
     newclu = goodcluidx[minidx]  # Back to absolute cluster indexes
 
     # Reassign bad frames to good clusters
-    stconcat[badframeidx] = newclu    # Assign them to new clusters
+    stconcat[badframeidx] = newclu  # Assign them to new clusters
     stconcat = newidx[stconcat]  # Convert all cluster indexes to the new indexes
 
     N = np.bincount(stconcat)
@@ -1140,10 +1385,10 @@ def _ismember(a, b):
     bind = {}
     for i, elt in enumerate(list(set(b))):
         bind[elt] = i
-    return np.array([bind.get(itm, -1) for itm in a])  # None can be replaced by any other "not in b" value
+    return np.array(
+        [bind.get(itm, -1) for itm in a]
+    )  # None can be replaced by any other "not in b" value
 
-
-import unittest
 
 class _TestMetricData(unittest.TestCase):
     @classmethod
@@ -1157,11 +1402,23 @@ class _TestMetricData(unittest.TestCase):
         from htmd.home import home
         from os.path import join
 
-        sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*')))
-        fsims = simfilter(sims, tempname(), 'not water')
+        sims = simlist(
+            glob(join(home(dataDir="adaptive"), "data", "*", "")),
+            glob(join(home(dataDir="adaptive"), "input", "*")),
+        )
+        fsims = simfilter(sims, tempname(), "not water")
 
         metr = Metric(fsims)
-        metr.set(MetricDistance('protein and resid 10 and name CA', 'resname BEN and noh', periodic='selections', metric='contacts', groupsel1='residue', threshold=4))
+        metr.set(
+            MetricDistance(
+                "protein and resid 10 and name CA",
+                "resname BEN and noh",
+                periodic="selections",
+                metric="contacts",
+                groupsel1="residue",
+                threshold=4,
+            )
+        )
         self.data1 = metr.project()
 
         metr.set(MetricDihedral())
@@ -1173,35 +1430,54 @@ class _TestMetricData(unittest.TestCase):
         data1.combine(self.data2)
 
         # Testing dimensions
-        assert np.array_equal(data1.description.shape, (897, 3)), 'combine not working correct'
-        assert np.array_equal(data1.trajectories[0].projection.shape, (6, 897)), 'combine not working correct'
-        assert np.array_equal(np.where(data1.description.type == 'contact')[0], [0, 1, 2, 3, 4, 5, 6, 7, 8]), 'combine not working correct'
+        assert np.array_equal(
+            data1.description.shape, (897, 3)
+        ), "combine not working correct"
+        assert np.array_equal(
+            data1.trajectories[0].projection.shape, (6, 897)
+        ), "combine not working correct"
+        assert np.array_equal(
+            np.where(data1.description.type == "contact")[0],
+            [0, 1, 2, 3, 4, 5, 6, 7, 8],
+        ), "combine not working correct"
 
     def test_dropping(self):
         # Testing dimension dropping / keeping
         data1 = self.data1.copy()
         assert np.array_equal(data1.description.shape, (9, 3))
         data1.dropDimensions(range(9))
-        assert np.array_equal(data1.description.shape, (0, 3)), 'dropDimensions not working correct'
-        assert np.array_equal(data1.trajectories[0].projection.shape, (6, 0)), 'dropDimensions not working correct'
-        assert len(np.where(data1.description.type == 'contact')[0]) == 0, 'dropDimensions not working correct'
-        
+        assert np.array_equal(
+            data1.description.shape, (0, 3)
+        ), "dropDimensions not working correct"
+        assert np.array_equal(
+            data1.trajectories[0].projection.shape, (6, 0)
+        ), "dropDimensions not working correct"
+        assert (
+            len(np.where(data1.description.type == "contact")[0]) == 0
+        ), "dropDimensions not working correct"
+
         data2 = self.data2.copy()
         assert np.array_equal(data2.description.shape, (888, 3))
         data2.dropDimensions(keep=range(9))
-        assert np.array_equal(data2.description.shape, (9, 3)), 'dropDimensions not working correct'
-        assert np.array_equal(data2.trajectories[0].projection.shape, (6, 9)), 'dropDimensions not working correct'
-        assert len(np.where(data2.description.type == 'dihedral')[0]) == 9, 'dropDimensions not working correct'
+        assert np.array_equal(
+            data2.description.shape, (9, 3)
+        ), "dropDimensions not working correct"
+        assert np.array_equal(
+            data2.trajectories[0].projection.shape, (6, 9)
+        ), "dropDimensions not working correct"
+        assert (
+            len(np.where(data2.description.type == "dihedral")[0]) == 9
+        ), "dropDimensions not working correct"
 
     def test_saving_loading(self):
         from moleculekit.util import tempname
 
         def checkCorrectness(newdata):
-            assert newdata.numTrajectories == 2, 'Failed to load trajectories'
-            assert newdata.description.shape == (9, 3), 'Failed to load pandas data'
-            assert newdata.trajectories[0].projection.shape == (6, 9), 'Wrong data size'
+            assert newdata.numTrajectories == 2, "Failed to load trajectories"
+            assert newdata.description.shape == (9, 3), "Failed to load pandas data"
+            assert newdata.trajectories[0].projection.shape == (6, 9), "Wrong data size"
 
-        savefile = tempname(suffix='.dat')
+        savefile = tempname(suffix=".dat")
         self.data1.save(savefile)
 
         newdata = MetricData(file=savefile)
@@ -1219,7 +1495,7 @@ class _TestMetricData(unittest.TestCase):
         checkCorrectness(newdata)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     import unittest
+
     unittest.main(verbosity=2)

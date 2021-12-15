@@ -16,8 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 class _Lipid:
-    def __init__(self, resname=None, headname=None, mol=None, xyz=None, rot=None, neighbours=None, rings=None,
-                 area=None):
+    def __init__(
+        self,
+        resname=None,
+        headname=None,
+        mol=None,
+        xyz=None,
+        rot=None,
+        neighbours=None,
+        rings=None,
+        area=None,
+    ):
         self.resname = resname
         self.headname = headname
         self.mol = mol
@@ -28,30 +37,34 @@ class _Lipid:
         self.area = area
 
     def __repr__(self):
-        return '<{}.{} object at {} {}>'.format(self.__class__.__module__, self.__class__.__name__, hex(id(self)),
-                                                self.__str__())
+        return "<{}.{} object at {} {}>".format(
+            self.__class__.__module__,
+            self.__class__.__name__,
+            hex(id(self)),
+            self.__str__(),
+        )
 
     def __str__(self):
-        s = ''
+        s = ""
         if self.resname is not None:
-            s += 'resname: {} '.format(self.resname)
+            s += "resname: {} ".format(self.resname)
         if self.headname is not None:
-            s += 'headname: {} '.format(self.headname)
+            s += "headname: {} ".format(self.headname)
         if self.xyz is not None:
-            s += 'xyz: {} '.format(self.xyz)
+            s += "xyz: {} ".format(self.xyz)
         if self.neighbours is not None:
-            s += 'neigh: {} '.format(len(self.neighbours))
+            s += "neigh: {} ".format(len(self.neighbours))
         if self.mol is not None:
-            s += 'mol: {} '.format(id(self.mol))
+            s += "mol: {} ".format(id(self.mol))
         return s[:-1]
 
 
 def listLipids():
-    """ Lists all available lipids
+    """Lists all available lipids
 
     Examples
     --------
-    >>> from htmd.membranebuilder.build_membrane import buildMembrane 
+    >>> from htmd.membranebuilder.build_membrane import buildMembrane
     >>> build_membrane.listLipids()
     ---- Lipids list: ...
 
@@ -61,42 +74,55 @@ def listLipids():
     import os
     from natsort import natsorted
 
-    membranebuilderhome = os.path.join( home(shareDir=True), 'membranebuilder', 'lipids', '' )
-    lipids = natsorted(glob( os.path.join(membranebuilderhome, '*', '')))
-    print('---- Lipids list: ' + membranebuilderhome + ' ----')
-    for l in lipids:
-        print('- ', os.path.basename(os.path.abspath(l)))
-    print('* Lipid DB file: ' + os.path.join(membranebuilderhome, 'lipiddb.csv'))
-
+    membranebuilderhome = os.path.join(
+        home(shareDir=True), "membranebuilder", "lipids", ""
+    )
+    lipids = natsorted(glob(os.path.join(membranebuilderhome, "*", "")))
+    print("---- Lipids list: " + membranebuilderhome + " ----")
+    for ll in lipids:
+        print("- ", os.path.basename(os.path.abspath(ll)))
+    print("* Lipid DB file: " + os.path.join(membranebuilderhome, "lipiddb.csv"))
 
 
 def _createLipids(lipidratio, area, lipiddb, files, leaflet=None):
-    lipiddb = lipiddb.to_dict(orient='index')
+    lipiddb = lipiddb.to_dict(orient="index")
     lipidnames = list(lipidratio.keys())
-    ratiosAPL = np.array([lipidratio[lipn] * lipiddb[lipn]['APL'] for lipn in lipidnames])
+    ratiosAPL = np.array(
+        [lipidratio[lipn] * lipiddb[lipn]["APL"] for lipn in lipidnames]
+    )
     # Calculate the total areas per lipid type
     areaspl = area * (ratiosAPL / ratiosAPL.sum())
     # Calculate the counts from the total areas
-    counts = np.round(areaspl / np.array([lipiddb[lipn]['APL'] for lipn in lipidnames])).astype(int)
+    counts = np.round(
+        areaspl / np.array([lipiddb[lipn]["APL"] for lipn in lipidnames])
+    ).astype(int)
 
     lipids = []
     for i in range(len(lipidnames)):
         resname = lipidnames[i]
         rings = _detectRings(Molecule(files[resname][0]))
         for k in range(counts[i]):
-            if leaflet == 'upper':
-                xyz = np.array([np.nan, np.nan, lipiddb[resname]['Thickness'] / 2])
-            elif leaflet == 'lower':
-                xyz = np.array([np.nan, np.nan, - lipiddb[resname]['Thickness'] / 2])
-            lipids.append(_Lipid(resname=resname, headname=lipiddb[resname]['Head'], rings=rings, area=lipiddb[resname]['APL'], xyz=xyz))
+            if leaflet == "upper":
+                xyz = np.array([np.nan, np.nan, lipiddb[resname]["Thickness"] / 2])
+            elif leaflet == "lower":
+                xyz = np.array([np.nan, np.nan, -lipiddb[resname]["Thickness"] / 2])
+            lipids.append(
+                _Lipid(
+                    resname=resname,
+                    headname=lipiddb[resname]["Head"],
+                    rings=rings,
+                    area=lipiddb[resname]["APL"],
+                    xyz=xyz,
+                )
+            )
     return lipids
 
 
 def _setPositionsLJSim(width, lipids):
     from htmd.membranebuilder.ljfluid import distributeLipids
 
-    sigmas = np.array([2 * np.sqrt(l.area / np.pi) for l in lipids])
-    resnames = [l.resname for l in lipids]
+    sigmas = np.array([2 * np.sqrt(ll.area / np.pi) for ll in lipids])
+    resnames = [ll.resname for ll in lipids]
 
     cutoff = min(np.min(width) / 2, 3 * np.max(sigmas))
     pos = distributeLipids(width + [2 * cutoff], resnames, sigmas, cutoff=cutoff)
@@ -116,7 +142,7 @@ def _createMembraneMolecule(lipids):
         mol.moveBy(l.xyz)
         mol.resid[:] = i
         allmols.append(mol)
-    
+
     def mergeMols(mollist):  # Divide and conquer approach for merging molecules
         while len(mollist) > 1:
             mollist[0].append(mollist[1])
@@ -130,6 +156,7 @@ def _createMembraneMolecule(lipids):
 
 def _detectRings(mol):
     import networkx as nx
+
     bonds = mol._guessBonds()
 
     G = nx.Graph()
@@ -152,38 +179,54 @@ def wrapping_dist_python(coor1, coor2, box):
 
 
 def _findNeighbours(lipids, box):
-    xypos = np.vstack([l.xyz[:2] for l in lipids])
+    xypos = np.vstack([ll.xyz[:2] for ll in lipids])
 
     for i in range(len(lipids)):
-        dist = wrapping_dist_python(xypos[i, :], xypos[i + 1:, :], box)
+        dist = wrapping_dist_python(xypos[i, :], xypos[i + 1 :, :], box)
         lipids[i].neighbours = i + 1 + np.where(dist < 11)[0]
 
 
 def _loadMolecules(lipids, files):
     from moleculekit.util import rotationMatrix
+
     # Create Molecules
-    for l in lipids:
-        randidx = np.random.randint(len(files[l.resname]))
-        mol = Molecule(files[l.resname][randidx])
-        mol.filter('not water', _logger=False)
-        if l.xyz[2] < 0:
-            mol.rotateBy(rotationMatrix([1, 0, 0], np.deg2rad(180)))  # Rotate the lower leaflet lipids upside down
-        l.mol = mol
-        l.rot = np.random.random() * 360 - 180  # Random starting rotation
+    for ll in lipids:
+        randidx = np.random.randint(len(files[ll.resname]))
+        mol = Molecule(files[ll.resname][randidx])
+        mol.filter("not water", _logger=False)
+        if ll.xyz[2] < 0:
+            mol.rotateBy(
+                rotationMatrix([1, 0, 0], np.deg2rad(180))
+            )  # Rotate the lower leaflet lipids upside down
+        ll.mol = mol
+        ll.rot = np.random.random() * 360 - 180  # Random starting rotation
 
 
 def _locateLipidFiles(folder, lipidnames):
     import os
+
     files = {}
-    for m in lipidnames:
-        files[m] = glob(os.path.join(folder, m, '*.pdb'))
-        if len(files[m]) == 0:
-            raise RuntimeError('Could not locate pdb files for lipid "{}" in folder {}'.format(m, folder))
+    for mm in lipidnames:
+        files[mm] = glob(os.path.join(folder, mm, "*.pdb"))
+        if len(files[mm]) == 0:
+            raise RuntimeError(
+                f'Could not locate pdb files for lipid "{mm}" in folder {folder}'
+            )
     return files
 
 
-def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='CPU', equilibrate=True, equilplatform='CUDA', outdir=None, lipidf=None):
-    """ Construct a membrane containing arbitrary lipids and ratios of them.
+def buildMembrane(
+    xysize,
+    ratioupper,
+    ratiolower,
+    waterbuff=20,
+    minimplatform="CPU",
+    equilibrate=True,
+    equilplatform="CUDA",
+    outdir=None,
+    lipidf=None,
+):
+    """Construct a membrane containing arbitrary lipids and ratios of them.
 
     Parameters
     ----------
@@ -228,18 +271,18 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
     import pandas as pd
 
     if lipidf is None:
-        lipidf = os.path.join(home(shareDir=True), 'membranebuilder', 'lipids')
-    lipiddb = pd.read_csv(os.path.join(lipidf, 'lipiddb.csv'), index_col='Name')
+        lipidf = os.path.join(home(shareDir=True), "membranebuilder", "lipids")
+    lipiddb = pd.read_csv(os.path.join(lipidf, "lipiddb.csv"), index_col="Name")
 
     uqlip = np.unique(list(ratioupper.keys()) + list(ratiolower.keys()))
     files = _locateLipidFiles(lipidf, uqlip)
 
     area = np.prod(xysize)
-    lipids = _createLipids(ratioupper, area, lipiddb, files, leaflet='upper')
-    lipids += _createLipids(ratiolower, area, lipiddb, files, leaflet='lower')
+    lipids = _createLipids(ratioupper, area, lipiddb, files, leaflet="upper")
+    lipids += _createLipids(ratiolower, area, lipiddb, files, leaflet="lower")
 
-    _setPositionsLJSim(xysize, [l for l in lipids if l.xyz[2] > 0])
-    _setPositionsLJSim(xysize, [l for l in lipids if l.xyz[2] < 0])
+    _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] > 0])
+    _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] < 0])
 
     _findNeighbours(lipids, xysize)
 
@@ -254,8 +297,8 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
     resolveRingPenetrations(lipids, xysize)
     memb = _createMembraneMolecule(lipids)
 
-    minc = memb.get('coords', 'name P').min(axis=0) - 5
-    maxc = memb.get('coords', 'name P').max(axis=0) + 5
+    minc = memb.get("coords", "name P").min(axis=0) - 5
+    maxc = memb.get("coords", "name P").max(axis=0) + 5
 
     mm = [[0, 0, maxc[2] - 2], [xysize[0], xysize[1], maxc[2] + waterbuff]]
     smemb = solvate(memb, minmax=mm)
@@ -266,20 +309,35 @@ def buildMembrane(xysize, ratioupper, ratiolower, waterbuff=20, minimplatform='C
 
     if outdir is None:
         outdir = tempname()
-        logger.info('Outdir {}'.format(outdir))
-    res = build(smemb, ionize=False, stream=['str/lipid/toppar_all36_lipid_cholesterol_model_1.str'], outdir=outdir)
+        logger.info("Outdir {}".format(outdir))
+    res = build(
+        smemb,
+        ionize=False,
+        stream=["str/lipid/toppar_all36_lipid_cholesterol_model_1.str"],
+        outdir=outdir,
+    )
 
     if equilibrate:
         from htmd.membranebuilder.simulate_openmm import equilibrateSystem
         from shutil import copy, move
-        outpdb = tempname(suffix='.pdb')
-        charmmf = os.path.join(home(shareDir=True), 'membranebuilder', 'charmm-toppar')
-        equilibrateSystem(os.path.join(outdir, 'structure.pdb'), os.path.join(outdir, 'structure.psf'), outpdb,
-                          charmmfolder=charmmf, equilplatform=equilplatform, minimplatform=minimplatform)
+
+        outpdb = tempname(suffix=".pdb")
+        charmmf = os.path.join(home(shareDir=True), "membranebuilder", "charmm-toppar")
+        equilibrateSystem(
+            os.path.join(outdir, "structure.pdb"),
+            os.path.join(outdir, "structure.psf"),
+            outpdb,
+            charmmfolder=charmmf,
+            equilplatform=equilplatform,
+            minimplatform=minimplatform,
+        )
         res = Molecule(outpdb)
         res.center()
-        move(os.path.join(outdir, 'structure.pdb'), os.path.join(outdir, 'starting_structure.pdb'))
-        copy(outpdb, os.path.join(outdir, 'structure.pdb'))
+        move(
+            os.path.join(outdir, "structure.pdb"),
+            os.path.join(outdir, "starting_structure.pdb"),
+        )
+        copy(outpdb, os.path.join(outdir, "structure.pdb"))
 
     return res
 
@@ -290,7 +348,8 @@ def _findLeastAreaLipid(folder):
     """
     from glob import glob
     from scipy.spatial.distance import cdist
-    ff = glob(folder + '/*/*.crd')
+
+    ff = glob(folder + "/*/*.crd")
     maxdist = []
     for f in ff:
         m = Molecule(f)
@@ -300,8 +359,5 @@ def _findLeastAreaLipid(folder):
     return ff[np.argmin(maxdist)], np.min(maxdist)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass
-
-
-

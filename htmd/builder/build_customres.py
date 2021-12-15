@@ -10,17 +10,17 @@ import os
 import types
 
 
-def get_calculator():
+def _get_calculator():
     from energyforcecalculators.torchanicalculator import TorchAniCalculator
 
     return TorchAniCalculator(model="ANI-2x")
 
 
 mymod = types.ModuleType("wrappers.torchani2x")
-mymod.get_calculator = get_calculator
+mymod.get_calculator = _get_calculator
 
-ace = Molecule(os.path.join(home(shareDir="builder"), "caps", "ACE.cif"))
-nme = Molecule(os.path.join(home(shareDir="builder"), "caps", "NME.cif"))
+ace = Molecule(os.path.join(home(shareDir=True), "builder", "caps", "ACE.cif"))
+nme = Molecule(os.path.join(home(shareDir=True), "builder", "caps", "NME.cif"))
 
 
 def _cap_residue(mol):
@@ -55,7 +55,13 @@ def _cap_residue(mol):
     return mol
 
 
-def _parameterize_custom_residue(mol, outdir):
+def parameterizeCustomResidues(cifs, outdir, method="ani-2x"):
+    for cif in cifs:
+        mol = Molecule(cif)
+        _parameterize_custom_residue(mol, outdir, method)
+
+
+def _parameterize_custom_residue(mol, outdir, method):
     os.makedirs(outdir, exist_ok=True)
 
     mol = mol.copy()
@@ -67,28 +73,28 @@ def _parameterize_custom_residue(mol, outdir):
 
         sdffile = os.path.join(tmpdir, "mol.sdf")
         cmol.write(sdffile)
+
         # TODO: Improve it to not parameterize the cap dihedrals!
-        main_parameterize(
-            [
-                sdffile,
-                "--charge",
-                str(int(cmol.formalcharge.sum())),
-                "--nnp",
-                "wrappers.torchani2x",
-                "--charge-type",
-                "AM1-BCC",
-                "--forcefield",
-                "GAFF2",
-                "--min-type",
-                "mm",
-                "--scan-type",
-                "mm",
-                "--dihed-fit-type",
-                "iterative",
-                "--outdir",
-                tmpdir,
-            ]
-        )
+        args = [
+            sdffile,
+            "--charge",
+            str(int(cmol.formalcharge.sum())),
+            "--charge-type",
+            "AM1-BCC",
+            "--forcefield",
+            "GAFF2",
+            "--min-type",
+            "mm",
+            "--outdir",
+            tmpdir,
+        ]
+        if method == "ani-2x":
+            args += ["--scan-type", "mm", "--dihed-fit-type", "iterative"]
+            args += ["--nnp", "wrappers.torchani2x"]
+        elif method == "gaff2":
+            args += ["--no-dihed"]
+
+        main_parameterize(args)
         shutil.copy(
             os.path.join(tmpdir, "parameters", "GAFF2", "mol-orig.mol2"),
             os.path.join(tmpdir, f"{resn}.mol2"),

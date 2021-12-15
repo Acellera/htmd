@@ -13,18 +13,18 @@ References
 # No redistribution in whole or part
 #
 import numpy as np
-from scipy import stats
-import warnings
 import random
 from moleculekit.molecule import Molecule
 from moleculekit.vmdviewer import getCurrentViewer
 from htmd.units import convert as unitconvert
+import unittest
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 class Model(object):
-    """ Constructor for the Model class.
+    """Constructor for the Model class.
 
     Parameters
     ----------
@@ -53,13 +53,17 @@ class Model(object):
         self.hmm = None
         self._modelid = None
         if self.data._clusterid is None:
-            raise NameError('You need to cluster your data before making a Markov model')
+            raise NameError(
+                "You need to cluster your data before making a Markov model"
+            )
         if self.data._dataid != self.data._clusterid:
-            raise NameError('You have modified the data in data.dat after clustering. Please re-cluster.')
+            raise NameError(
+                "You have modified the data in data.dat after clustering. Please re-cluster."
+            )
         self._clusterid = self.data._clusterid
 
-    def markovModel(self, lag, macronum, units='frames', sparse=False, hmm=False):
-        """ Build a Markov model at a given lag time and calculate metastable states
+    def markovModel(self, lag, macronum, units="frames", sparse=False, hmm=False):
+        """Build a Markov model at a given lag time and calculate metastable states
 
         Parameters
         ----------
@@ -78,34 +82,49 @@ class Model(object):
         >>> model.markovModel(150, 4)  # 150 frames lag, 4 macrostates
         """
         import pyemma.msm as msm
+
         self._integrityCheck(markov=True)
 
-        lag = unitconvert(units, 'frames', lag, fstep=self.data.fstep)
+        lag = unitconvert(units, "frames", lag, fstep=self.data.fstep)
 
         self.lag = lag
-        self.msm = msm.estimate_markov_model(self.data.St.tolist(), self.lag, sparse=sparse)
+        self.msm = msm.estimate_markov_model(
+            self.data.St.tolist(), self.lag, sparse=sparse
+        )
         modelflag = False
         while not modelflag:
             self.coarsemsm = self.msm.pcca(macronum)
             if len(np.unique(self.msm.metastable_assignments)) != macronum:
                 macronum -= 1
-                logger.warning('PCCA returned empty macrostates. Reducing the number of macrostates to {}.'.format(macronum))
+                logger.warning(
+                    "PCCA returned empty macrostates. Reducing the number of macrostates to {}.".format(
+                        macronum
+                    )
+                )
             else:
                 modelflag = True
             if macronum < 2:
-                raise RuntimeError('Could not create even two macrostates. Please revise your clustering.')
+                raise RuntimeError(
+                    "Could not create even two macrostates. Please revise your clustering."
+                )
 
         self._modelid = random.random()
 
         if hmm:  # Still in development
             self.hmm = self.msm.coarse_grain(self.macronum)
 
-        logger.info('{:.1f}% of the data was used'.format(self.msm.active_count_fraction * 100))
+        logger.info(
+            "{:.1f}% of the data was used".format(self.msm.active_count_fraction * 100)
+        )
 
-        _macroTrajectoriesReport(self.macronum, _macroTrajSt(self.data.St, self.macro_ofcluster), self.data.simlist)
+        _macroTrajectoriesReport(
+            self.macronum,
+            _macroTrajSt(self.data.St, self.macro_ofcluster),
+            self.data.simlist,
+        )
 
     def createState(self, microstates=None, indexpairs=None):
-        """ Creates a new state. Works both for new clusters and macrostates.
+        """Creates a new state. Works both for new clusters and macrostates.
 
         If creating a new cluster, it just reassigns the given frames to the new cluster.
         If creating a new macrostate, it removes the given microstates from their previous macrostate, creates a new one
@@ -119,13 +138,17 @@ class Model(object):
             List of lists. Each row is a simulation index-frame pair which should be added to a new cluster.
         """
         if microstates is not None and indexpairs is not None:
-            raise AttributeError('microstates and indexpairs arguments are mutually exclusive')
+            raise AttributeError(
+                "microstates and indexpairs arguments are mutually exclusive"
+            )
         if microstates is not None:
             newmacro = self.macronum
 
             # Fixing sets. Remove microstates from previous macrostates and add new set
             for i, metset in enumerate(self.msm.metastable_sets):
-                self.msm.metastable_sets[i] = np.array(np.sort(list(set(metset) - set(microstates))))
+                self.msm.metastable_sets[i] = np.array(
+                    np.sort(list(set(metset) - set(microstates)))
+                )
             self.msm.metastable_sets.append(np.array(microstates, dtype=np.int64))
 
             todelete = np.where([len(x) == 0 for x in self.msm.metastable_sets])[0]
@@ -134,7 +157,12 @@ class Model(object):
             self.msm.metastable_assignments[microstates] = newmacro
 
             # Fixing memberships. Padding the array with 0s for the new macrostate
-            self.msm._metastable_memberships = np.pad(self.msm.metastable_memberships, ((0, 0), (0, 1)), mode='constant', constant_values=(0))
+            self.msm._metastable_memberships = np.pad(
+                self.msm.metastable_memberships,
+                ((0, 0), (0, 1)),
+                mode="constant",
+                constant_values=(0),
+            )
             self.msm._metastable_memberships[microstates, :] = 0
             self.msm._metastable_memberships[microstates, -1] = 1
 
@@ -142,10 +170,17 @@ class Model(object):
             othermicro = np.ones(self.micronum, dtype=bool)
             othermicro[microstates] = False
             othermicro = np.where(othermicro)[0]
-            self.msm._metastable_memberships[othermicro, -1] = np.sum(self.msm._metastable_memberships[othermicro[:, None], todelete], axis=1)
+            self.msm._metastable_memberships[othermicro, -1] = np.sum(
+                self.msm._metastable_memberships[othermicro[:, None], todelete], axis=1
+            )
 
             # Fixing distributions
-            self.msm._metastable_distributions = np.pad(self.msm.metastable_distributions, ((0, 1), (0, 0)), mode='constant', constant_values=(0))
+            self.msm._metastable_distributions = np.pad(
+                self.msm.metastable_distributions,
+                ((0, 1), (0, 0)),
+                mode="constant",
+                constant_values=(0),
+            )
             self.msm._metastable_distributions[-1, microstates] = 1 / len(microstates)
         if indexpairs is not None:
             newcluster = self.data.K
@@ -156,12 +191,12 @@ class Model(object):
 
     @property
     def P(self):
-        """ The transition probability matrix """
+        """The transition probability matrix"""
         return self.msm.transition_matrix
 
     @property
     def micro_ofcluster(self):
-        """ Mapping of clusters to microstates
+        """Mapping of clusters to microstates
 
         Numpy array which at index i has the index of the microstate corresponding to cluster i.
         Clusters which were not connected and thus are not in the model have a microstate value of -1.
@@ -173,7 +208,7 @@ class Model(object):
 
     @property
     def cluster_ofmicro(self):
-        """ Mapping of microstates to clusters
+        """Mapping of microstates to clusters
 
         Numpy array which at index i has the index of the cluster corresponding to microstate i.
         """
@@ -182,19 +217,19 @@ class Model(object):
 
     @property
     def micronum(self):
-        """ Number of microstates """
+        """Number of microstates"""
         self._integrityCheck(postmsm=True)
         return len(self.msm.active_set)
 
     @property
     def macronum(self):
-        """ Number of macrostates """
+        """Number of macrostates"""
         self._integrityCheck(postmsm=True)
         return len(set(self.msm.metastable_assignments))
 
     @property
     def macro_ofmicro(self):
-        """ Mapping of microstates to macrostates
+        """Mapping of microstates to macrostates
 
         Numpy array which at index i has the index of the macrostate corresponding to microstate i.
         """
@@ -206,7 +241,7 @@ class Model(object):
 
     @property
     def macro_ofcluster(self):
-        """ Mapping of clusters to microstates
+        """Mapping of clusters to microstates
 
         Numpy array which at index i has the index of the macrostate corresponding to cluster i.
         Clusters which were not connected and thus are not in the model have a macrostate value of -1.
@@ -216,9 +251,22 @@ class Model(object):
         macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
         return macro_ofcluster
 
-    def plotTimescales(self, lags=None, minlag=None, maxlag=None, numlags=25, units='frames', errors=None, nits=None,
-                       results=False, plot=True, save=None, njobs=-2, ylog=True):
-        """ Plot the implied timescales of MSMs of various lag times
+    def plotTimescales(
+        self,
+        lags=None,
+        minlag=None,
+        maxlag=None,
+        numlags=25,
+        units="frames",
+        errors=None,
+        nits=None,
+        results=False,
+        plot=True,
+        save=None,
+        njobs=-2,
+        ylog=True,
+    ):
+        """Plot the implied timescales of MSMs of various lag times
 
         Parameters
         ----------
@@ -243,7 +291,7 @@ class Model(object):
         save : str
             Path of the file in which to save the figure
         njobs : int
-            Number of parallel jobs to spawn for calculation of timescales. Negative numbers are used for spawning jobs as many as CPU threads. 
+            Number of parallel jobs to spawn for calculation of timescales. Negative numbers are used for spawning jobs as many as CPU threads.
             -1: for all CPUs -2: for all except one etc.
         ylog : bool
             Set to False to get linear y axis instead of logarithmic
@@ -265,36 +313,45 @@ class Model(object):
         """
         import pyemma.plots as mplt
         import pyemma.msm as msm
+
         self._integrityCheck()
         if lags is None:
             lags = self.data._defaultLags(minlag, maxlag, numlags, units)
         else:
-            lags = unitconvert(units, 'frames', lags, fstep=self.data.fstep).tolist()
+            lags = unitconvert(units, "frames", lags, fstep=self.data.fstep).tolist()
 
         if nits is None:
             nits = np.min((self.data.K, 20))
 
-        from htmd.config import _config
-        its = msm.its(self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=njobs) # Use all CPUs minus one
+        its = msm.its(
+            self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=njobs
+        )  # Use all CPUs minus one
         if plot or (save is not None):
             from matplotlib import pylab as plt
+
             plt.ion()
             plt.figure()
             try:
-                mplt.plot_implied_timescales(its, ylog=ylog, dt=self.data.fstep, units='ns')
+                mplt.plot_implied_timescales(
+                    its, ylog=ylog, dt=self.data.fstep, units="ns"
+                )
             except ValueError as ve:
                 plt.close()
-                raise ValueError('{} This is probably caused by badly set fstep in the data ({}). '.format(ve, self.data.fstep) +
-                                 'Please correct the model.data.fstep to correspond to the simulation frame step in nanoseconds.')
+                raise ValueError(
+                    "{} This is probably caused by badly set fstep in the data ({}). ".format(
+                        ve, self.data.fstep
+                    )
+                    + "Please correct the model.data.fstep to correspond to the simulation frame step in nanoseconds."
+                )
             if save is not None:
-                plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+                plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
             if plot:
                 plt.show()
         if results:
             return its.get_timescales(), its.lags
 
     def maxConnectedLag(self, lags):
-        """ Heuristic for getting the lagtime before a timescale drops.
+        """Heuristic for getting the lagtime before a timescale drops.
 
         It calculates the last lagtime before a drop occurs in the first implied timescale due to disconnected states.
         If the top timescale is closer to the second top timescale at the previous lagtime than to itself at the previous
@@ -321,18 +378,27 @@ class Model(object):
             lags = lags.astype(int)
 
         import pyemma.msm as msm
+
         itime = msm.its(self.data.St.tolist(), lags=lags, nits=2).get_timescales()
 
         for i in range(1, np.size(itime, 0)):
-            if abs(itime[i, 0] - itime[i-1, 1]) < abs(itime[i, 0] - itime[i-1, 0]):
-                lagidx = i-1
+            if abs(itime[i, 0] - itime[i - 1, 1]) < abs(itime[i, 0] - itime[i - 1, 0]):
+                lagidx = i - 1
                 break
             else:
                 lagidx = i
         return lags[lagidx], itime
 
-    def sampleStates(self, states=None, frames=20, statetype='macro', replacement=False, samplemode='random', allframes=False):
-        """ Samples frames from a set of states
+    def sampleStates(
+        self,
+        states=None,
+        frames=20,
+        statetype="macro",
+        replacement=False,
+        samplemode="random",
+        allframes=False,
+    ):
+        """Samples frames from a set of states
 
         Parameters
         ----------
@@ -368,27 +434,35 @@ class Model(object):
         >>> model.sampleStates(range(5), [10, 3, 2, 50, 1])  # Sample from all 5 macrostates
         >>> model.sampleStates(range(model.micronum), samplesnum, statetype='micro')  # Sample from all microstates
         """
-        if statetype == 'cluster':
-            if samplemode != 'random':
-                logger.warning("'cluster' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'")
+        if statetype == "cluster":
+            if samplemode != "random":
+                logger.warning(
+                    "'cluster' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'"
+                )
             return self.data.sampleClusters(states, frames, replacement, allframes)
 
         if states is None:
-            if statetype == 'macro':
+            if statetype == "macro":
                 states = range(self.macronum)
-            elif statetype == 'micro':
+            elif statetype == "micro":
                 states = range(self.micronum)
         if isinstance(states, int):
-            states = [states, ]
+            states = [
+                states,
+            ]
 
         if allframes:
-            logger.warning('The allframes option will be deprecated. Use frames=None instead.')
+            logger.warning(
+                "The allframes option will be deprecated. Use frames=None instead."
+            )
             frames = None
 
         self._integrityCheck(postmsm=True)
-        if statetype != 'macro' and samplemode != 'random':
-            samplemode = 'random'
-            logger.warning("'micro' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'")
+        if statetype != "macro" and samplemode != "random":
+            samplemode = "random"
+            logger.warning(
+                "'micro' states incompatible with 'samplemode' other than 'random'. Defaulting to 'random'"
+            )
 
         if frames is None or isinstance(frames, int):
             frames = np.repeat(frames, len(states))
@@ -403,22 +477,30 @@ class Model(object):
                 continue
 
             st = states[i]
-            if statetype == 'macro':
-                (selFr, selMicro) = _sampleMacro(self, st, stConcat, samplemode, frames[i], replacement)
+            if statetype == "macro":
+                (selFr, selMicro) = _sampleMacro(
+                    self, st, stConcat, samplemode, frames[i], replacement
+                )
                 absFrames.append(selFr)
-            elif statetype == 'micro':
-                absFrames.append(_sampleMicro(self, st, stConcat, frames[i], replacement))
+            elif statetype == "micro":
+                absFrames.append(
+                    _sampleMicro(self, st, stConcat, frames[i], replacement)
+                )
             else:
-                raise NameError('No valid state type given (read documentation)')
+                raise NameError("No valid state type given (read documentation)")
 
             if len(absFrames[-1]) == 0:
-                raise NameError('No frames could be sampled from {} state {}. State is empty.'.format(statetype, st))
+                raise NameError(
+                    "No frames could be sampled from {} state {}. State is empty.".format(
+                        statetype, st
+                    )
+                )
 
             relFrames.append(self.data.abs2rel(absFrames[-1]))
         return absFrames, relFrames
 
     def eqDistribution(self, plot=True, save=None):
-        """ Obtain and plot the equilibrium probabilities of each macrostate
+        """Obtain and plot the equilibrium probabilities of each macrostate
 
         Parameters
         ----------
@@ -445,18 +527,22 @@ class Model(object):
         macroindexes = list(set(self.msm.metastable_assignments))
         for i in range(self.macronum):
             # macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
-            macroeq[i] = np.sum(self.msm.metastable_memberships[:, macroindexes[i]] * self.msm.stationary_distribution)
+            macroeq[i] = np.sum(
+                self.msm.metastable_memberships[:, macroindexes[i]]
+                * self.msm.stationary_distribution
+            )
 
         if plot or (save is not None):
             from matplotlib import pylab as plt
+
             plt.ion()
             plt.figure()
-            plt.bar(np.arange(self.macronum)+0.4, macroeq)
-            plt.ylabel('Equilibrium probability')
-            plt.xlabel('Macrostates')
-            plt.xticks(np.arange(self.macronum)+0.4, range(self.macronum))
+            plt.bar(np.arange(self.macronum) + 0.4, macroeq)
+            plt.ylabel("Equilibrium probability")
+            plt.xlabel("Macrostates")
+            plt.xticks(np.arange(self.macronum) + 0.4, range(self.macronum))
             if save is not None:
-                plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+                plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
             if plot:
                 plt.show()
 
@@ -466,11 +552,23 @@ class Model(object):
         M = self.msm.metastable_memberships
         Pcoarse = np.linalg.inv(M.T.dot(M)).dot(M.T).dot(self.P).dot(M)
         if len(np.where(Pcoarse < 0)[0]) != 0:
-            raise NameError('Cannot produce coarse P matrix. Ended up with negative probabilities. Try using less macrostates.')
+            raise NameError(
+                "Cannot produce coarse P matrix. Ended up with negative probabilities. Try using less macrostates."
+            )
         return Pcoarse
 
-    def getStates(self, states=None, statetype='macro', wrapsel='protein', alignsel='name CA', alignmol=None, samplemode='weighted', numsamples=50, simlist=None):
-        """ Get samples of MSM states in Molecule classes
+    def getStates(
+        self,
+        states=None,
+        statetype="macro",
+        wrapsel="protein",
+        alignsel="name CA",
+        alignmol=None,
+        samplemode="weighted",
+        numsamples=50,
+        simlist=None,
+    ):
+        """Get samples of MSM states in Molecule classes
 
         Parameters
         ----------
@@ -507,45 +605,66 @@ class Model(object):
         >>>     m.view()
         """
         from htmd.projections.metric import _singleMolfile
-        self._integrityCheck(postmsm=(statetype != 'cluster'))
+
+        self._integrityCheck(postmsm=(statetype != "cluster"))
         if simlist is None:
             simlist = self.data.simlist
         else:
             if len(simlist) != len(self.data.simlist):
-                raise AttributeError('Provided simlist has different number of trajectories than the one used by the model.')
+                raise AttributeError(
+                    "Provided simlist has different number of trajectories than the one used by the model."
+                )
 
         (single, molfile) = _singleMolfile(simlist)
         if not single:
-            raise NameError('Visualizer does not support yet visualization of systems with different structure files. '
-                            'The simlist should be created with a single molfile (for example a filtered one)')
+            raise NameError(
+                "Visualizer does not support yet visualization of systems with different structure files. "
+                "The simlist should be created with a single molfile (for example a filtered one)"
+            )
         if alignmol is None:
             alignmol = Molecule(molfile)
-        if statetype != 'macro' and statetype != 'micro' and statetype != 'cluster':
+        if statetype != "macro" and statetype != "micro" and statetype != "cluster":
             raise NameError("'statetype' must be either 'macro', 'micro' or ''cluster'")
         if states is None:
-            if statetype == 'macro':
+            if statetype == "macro":
                 states = range(self.macronum)
-            elif statetype == 'micro':
+            elif statetype == "micro":
                 states = range(self.micronum)
-            elif statetype == 'cluster':
+            elif statetype == "cluster":
                 states = range(self.data.K)
         if len(states) == 0:
-            raise NameError('No ' + statetype + ' states exist in the model')
+            raise NameError("No " + statetype + " states exist in the model")
 
-        (tmp, relframes) = self.sampleStates(states, numsamples, statetype=statetype, samplemode=samplemode)
+        (tmp, relframes) = self.sampleStates(
+            states, numsamples, statetype=statetype, samplemode=samplemode
+        )
 
-        from htmd.config import _config
         from htmd.parallelprogress import ParallelExecutor, delayed
+
         # This loop really iterates over states. sampleStates returns an array of arrays
         # Don't increase njobs because it was giving errors on some systems.
         aprun = ParallelExecutor(n_jobs=1)
-        mols = aprun(total=len(relframes), desc='Getting state Molecules')\
-            (delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist) for rel in relframes)
+        mols = aprun(total=len(relframes), desc="Getting state Molecules")(
+            delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist)
+            for rel in relframes
+        )
         return np.array(mols, dtype=object)
 
-    def viewStates(self, states=None, statetype='macro', protein=None, ligand=None, viewer=None, mols=None,
-                   numsamples=50, wrapsel='protein', alignsel='name CA', gui=False, simlist=None):
-        """ Visualize macro/micro/cluster states in VMD
+    def viewStates(
+        self,
+        states=None,
+        statetype="macro",
+        protein=None,
+        ligand=None,
+        viewer=None,
+        mols=None,
+        numsamples=50,
+        wrapsel="protein",
+        alignsel="name CA",
+        gui=False,
+        simlist=None,
+    ):
+        """Visualize macro/micro/cluster states in VMD
 
         Parameters
         ----------
@@ -582,13 +701,18 @@ class Model(object):
         >>> model.viewStates(ligand='resname MOL')
         """
         from htmd.config import _config
-        self._integrityCheck(postmsm=(statetype != 'cluster'))
+
+        self._integrityCheck(postmsm=(statetype != "cluster"))
 
         if protein is None and ligand is None:
-            raise RuntimeError('You need to specify either the `protein` of `ligand` arguments for state visualization.')
+            raise RuntimeError(
+                "You need to specify either the `protein` of `ligand` arguments for state visualization."
+            )
 
-        if _config['viewer'].lower() == 'ngl' or _config['viewer'].lower() == 'webgl':
-            return self._viewStatesNGL(states, statetype, protein, ligand, mols, numsamples, gui=gui)
+        if _config["viewer"].lower() == "ngl" or _config["viewer"].lower() == "webgl":
+            return self._viewStatesNGL(
+                states, statetype, protein, ligand, mols, numsamples, gui=gui
+            )
 
         if viewer is None:
             viewer = getCurrentViewer()
@@ -597,31 +721,54 @@ class Model(object):
         if isinstance(states, int):
             states = [states]
         if mols is None:
-            mols = self.getStates(states, statetype, numsamples=numsamples, wrapsel=wrapsel, alignsel=alignsel, simlist=simlist)
+            mols = self.getStates(
+                states,
+                statetype,
+                numsamples=numsamples,
+                wrapsel=wrapsel,
+                alignsel=alignsel,
+                simlist=simlist,
+            )
         colors = [0, 1, 3, 4, 5, 6, 7, 9]
         for i, s in enumerate(states):
-            viewer.loadMol(mols[i], name=statetype+' '+str(states[i]))
+            viewer.loadMol(mols[i], name=statetype + " " + str(states[i]))
             if ligand is not None:
-                viewer.rep('ligand', sel=ligand, color=colors[np.mod(i, len(colors))])
+                viewer.rep("ligand", sel=ligand, color=colors[np.mod(i, len(colors))])
             if protein is not None:
-                viewer.rep('protein')
-            viewer.send('start_sscache')
+                viewer.rep("protein")
+            viewer.send("start_sscache")
 
-    def _viewStatesNGL(self, states, statetype, protein, ligand, mols, numsamples, gui=False):
+    def _viewStatesNGL(
+        self, states, statetype, protein, ligand, mols, numsamples, gui=False
+    ):
         from moleculekit.util import sequenceID
+
         if states is None:
             states = range(self.macronum)
         if isinstance(states, int):
             states = [states]
         if mols is None:
             mols = self.getStates(states, statetype, numsamples=min(numsamples, 15))
-        colors = [0, 1, 3, 4, 5, 6, 7, 9]
-        hexcolors = {0: '#0000ff', 1: '#ff0000', 2: '#333333', 3: '#ff6600', 4: '#ffff00', 5: '#4c4d00', 6: '#b2b2cc',
-                     7: '#33cc33', 8: '#ffffff', 9: '#ff3399', 10: '#33ccff'}
+        hexcolors = {
+            0: "#0000ff",
+            1: "#ff0000",
+            2: "#333333",
+            3: "#ff6600",
+            4: "#ffff00",
+            5: "#4c4d00",
+            6: "#b2b2cc",
+            7: "#33cc33",
+            8: "#ffffff",
+            9: "#ff3399",
+            10: "#33ccff",
+        }
         if protein is None and ligand is None:
-            raise NameError('Please provide either the "protein" or "ligand" parameter for viewStates.')
+            raise NameError(
+                'Please provide either the "protein" or "ligand" parameter for viewStates.'
+            )
         k = 0
         from nglview import NGLWidget, HTMDTrajectory
+
         view = NGLWidget(gui=gui)
         ref = mols[0].copy()
         for i, s in enumerate(states):
@@ -632,21 +779,23 @@ class Model(object):
                 mol.remove(ligand, _logger=False)
                 mol.dropFrames(keep=0)
                 mols[i].filter(ligand, _logger=False)
-            mols[i].set('chain', '{}'.format(s))
+            mols[i].set("chain", "{}".format(s))
             tmpcoo = mols[i].coords
             for j in range(mols[i].numFrames):
                 mols[i].coords = np.atleast_3d(tmpcoo[:, :, j])
                 if ligand:
-                    mols[i].set('segid', sequenceID(mols[i].resid)+k)
+                    mols[i].set("segid", sequenceID(mols[i].resid) + k)
                     k = int(mols[i].segid[-1])
                 mol.append(mols[i])
             view.add_trajectory(HTMDTrajectory(mol))
             # Setting up representations
             if ligand:
-                view[i].add_cartoon('protein', color='sstruc')
-                view[i].add_hyperball(':{}'.format(s), color=hexcolors[np.mod(i, len(hexcolors))])
+                view[i].add_cartoon("protein", color="sstruc")
+                view[i].add_hyperball(
+                    ":{}".format(s), color=hexcolors[np.mod(i, len(hexcolors))]
+                )
             if protein:
-                view[i].add_cartoon('protein', color='residueindex')
+                view[i].add_cartoon("protein", color="residueindex")
 
         self._nglButtons(view, statetype, states)
         return view
@@ -672,13 +821,13 @@ class Model(object):
         for w in container:
             w.on_trait_change(updateReps, "value")
 
-        #container.append(ipywidgets.Checkbox(description="all"))
+        # container.append(ipywidgets.Checkbox(description="all"))
 
         hb = ipywidgets.HBox(container)
         display(hb)
 
     def save(self, filename):
-        """ Save a :class:`Model <htmd.model.Model>` object to disk
+        """Save a :class:`Model <htmd.model.Model>` object to disk
 
         Parameters
         ----------
@@ -701,7 +850,7 @@ class Model(object):
         self.data = self.data.__dict__
 
         # Dump the dict
-        f = open(filename, 'wb')
+        f = open(filename, "wb")
         pickle.dump(self.__dict__, f)
         f.close()
 
@@ -709,10 +858,9 @@ class Model(object):
         self.data = tmpdata
         if self.data.parent is not None:
             self.data.parent = tmpparentdata
-        
 
     def load(self, filename):
-        """ Load a :class:`MetricData <htmd.metricdata.MetricData>` object from disk
+        """Load a :class:`MetricData <htmd.metricdata.MetricData>` object from disk
 
         Parameters
         ----------
@@ -727,17 +875,21 @@ class Model(object):
         import sys
         import pickle
         from htmd.metricdata import MetricData
+
         try:
             import pandas.indexes
         except ImportError:
             import pandas.core.indexes
-            sys.modules['pandas.indexes'] = pandas.core.indexes  # Hacky fix for new pandas version
 
-        f = open(filename, 'rb')
+            sys.modules[
+                "pandas.indexes"
+            ] = pandas.core.indexes  # Hacky fix for new pandas version
+
+        f = open(filename, "rb")
         z = pickle.load(f)
         f.close()
         for k in z:
-            if k == 'data':
+            if k == "data":
                 m = MetricData()
                 m.load(z[k])
                 self.__dict__[k] = m
@@ -745,7 +897,7 @@ class Model(object):
                 self.__dict__[k] = z[k]
 
     def copy(self):
-        """ Produces a deep copy of the object
+        """Produces a deep copy of the object
 
         Returns
         -------
@@ -757,10 +909,11 @@ class Model(object):
         >>> model2 = model.copy()
         """
         from copy import deepcopy
+
         return deepcopy(self)
 
     def cktest(self):
-        """ Conducts a Chapman-Kolmogorow test.
+        """Conducts a Chapman-Kolmogorow test.
 
         Returns
         -------
@@ -768,12 +921,13 @@ class Model(object):
         """
         from copy import deepcopy
         from pyemma.plots import plot_cktest
+
         msm = deepcopy(self.msm)
         ck = msm.cktest(self.macronum)
         plot_cktest(ck)
 
     def createCoreSetModel(self, threshold=0.5):
-        """ Given an MSM this function detects the states belonging to a core set and returns a new model consisting
+        """Given an MSM this function detects the states belonging to a core set and returns a new model consisting
         only of these states.
 
         Parameters
@@ -789,7 +943,9 @@ class Model(object):
             A list of the frames that were kept in the new model
         """
         if (threshold >= 1) or (threshold <= 0):
-            raise AttributeError('threshold argument only accepts values between (0, 1)')
+            raise AttributeError(
+                "threshold argument only accepts values between (0, 1)"
+            )
 
         def calcCoreSet(distr, assign, threshold):
             coreset = []
@@ -802,7 +958,7 @@ class Model(object):
 
         def coreDtraj(data, micro_ofcluster, coreset):
             corestates = np.concatenate(coreset)
-            newmapping = np.ones(corestates.max()+1, dtype=int) * -1
+            newmapping = np.ones(corestates.max() + 1, dtype=int) * -1
             newmapping[corestates] = np.arange(len(corestates))
             discretetraj = [st.copy() for st in data.St]
             frames = []
@@ -832,19 +988,34 @@ class Model(object):
                 mappedtraj = newmapping[np.array(newtraj, dtype=int)]
                 newdiscretetraj.append(mappedtraj)
                 if len(mappedtraj):
-                    newcounts[:mappedtraj.max()+1] += np.bincount(mappedtraj)
+                    newcounts[: mappedtraj.max() + 1] += np.bincount(mappedtraj)
                 frames.append(np.array(tframes))
-            #kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
-            return np.array(newdiscretetraj, dtype=object), len(corestates), newcounts, frames
+            # kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
+            return (
+                np.array(newdiscretetraj, dtype=object),
+                len(corestates),
+                newcounts,
+                frames,
+            )
 
-        coreset = calcCoreSet(self.msm.metastable_distributions, self.msm.metastable_assignments, threshold)
+        coreset = calcCoreSet(
+            self.msm.metastable_distributions,
+            self.msm.metastable_assignments,
+            threshold,
+        )
         newdata = self.data.copy()
-        newSt, newdata.K, newdata.N, frames = coreDtraj(self.data, self.micro_ofcluster, coreset)
+        newSt, newdata.K, newdata.N, frames = coreDtraj(
+            self.data, self.micro_ofcluster, coreset
+        )
         for i, (s, fr) in enumerate(zip(newSt, frames)):
             if len(s):
                 newdata.trajectories[i].cluster[fr] = s
 
-        logger.info('Kept {} microstates from each macrostate.'.format([len(x) for x in coreset]))
+        logger.info(
+            "Kept {} microstates from each macrostate.".format(
+                [len(x) for x in coreset]
+            )
+        )
 
         dataobjects = [newdata]
         if newdata.parent is not None:
@@ -861,12 +1032,21 @@ class Model(object):
                     if len(data.trajectories[i].cluster):
                         cluster.append(data.trajectories[i].cluster[fr])
                     simstmp.append(data.trajectories[i].sim)
-                    
+
             data._loadTrajectories(dat, ref, simstmp, cluster if len(cluster) else None)
 
         return Model(newdata), frames
 
-    def _getFEShistogramCounts(self, data, dimx, dimy, nbins=80, pad=0.5, micro_ofcluster=None, stationary_distribution=None):
+    def _getFEShistogramCounts(
+        self,
+        data,
+        dimx,
+        dimy,
+        nbins=80,
+        pad=0.5,
+        micro_ofcluster=None,
+        stationary_distribution=None,
+    ):
         from tqdm import tqdm
 
         clusters = np.hstack(data.St)
@@ -877,23 +1057,44 @@ class Model(object):
 
         xmin, ymin = data_dim.min(axis=0)
         xmax, ymax = data_dim.max(axis=0)
-        hist_range = np.array([[xmin-pad, xmax+pad], [ymin-pad, ymax+pad]])
+        hist_range = np.array([[xmin - pad, xmax + pad], [ymin - pad, ymax + pad]])
 
         if micro_ofcluster is None:
-            counts, xbins, ybins = np.histogram2d(data_dim[:, 0], data_dim[:, 1], bins=nbins, range=hist_range)
+            counts, xbins, ybins = np.histogram2d(
+                data_dim[:, 0], data_dim[:, 1], bins=nbins, range=hist_range
+            )
             return counts.T, xbins, ybins
 
         counts = np.zeros((nbins, nbins))
         for m in tqdm(range(len(stationary_distribution))):
             frames = micro_ofcluster[clusters] == m
             if frames.sum():
-                state_mask, xbins, ybins = np.histogram2d(data_dim[frames, 0], data_dim[frames, 1], bins=nbins, range=hist_range)
+                state_mask, xbins, ybins = np.histogram2d(
+                    data_dim[frames, 0],
+                    data_dim[frames, 1],
+                    bins=nbins,
+                    range=hist_range,
+                )
                 state_mask = state_mask.T > 0
                 counts += state_mask * stationary_distribution[m]
         return counts, xbins, ybins
 
-    def plotFES(self, dimX, dimY, temperature, states=False, s=10, cmap=None, fescmap=None, statescmap=None, plot=True, save=None, data=None, levels=7):
-        """ Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
+    def plotFES(
+        self,
+        dimX,
+        dimY,
+        temperature,
+        states=False,
+        s=10,
+        cmap=None,
+        fescmap=None,
+        statescmap=None,
+        plot=True,
+        save=None,
+        data=None,
+        levels=7,
+    ):
+        """Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
         Parameters
         ----------
@@ -936,9 +1137,15 @@ class Model(object):
             data = self.data
             microcenters = self.data.Centers[self.cluster_ofmicro, :]
         else:
-            if self.data.numFrames != data.numFrames or ~np.all([s1 == s2 for s1, s2 in zip(self.data.simlist, data.simlist)]):
-                raise RuntimeError('The data argument you provided uses a different simlist than the Model.')
-            microcenters = np.vstack(getStateStatistic(self, data, range(self.micronum), statetype='micro'))
+            if self.data.numFrames != data.numFrames or ~np.all(
+                [s1 == s2 for s1, s2 in zip(self.data.simlist, data.simlist)]
+            ):
+                raise RuntimeError(
+                    "The data argument you provided uses a different simlist than the Model."
+                )
+            microcenters = np.vstack(
+                getStateStatistic(self, data, range(self.micronum), statetype="micro")
+            )
 
         if fescmap is None:
             fescmap = "viridis"
@@ -948,44 +1155,76 @@ class Model(object):
             fescmap = cmap
             statescmap = cmap
 
-        xlabel = f'Dimension {dimX}'
+        xlabel = f"Dimension {dimX}"
         if data.description is not None:
             xlabel = data.description.description[dimX]
-            
-        ylabel = f'Dimension {dimY}'
+
+        ylabel = f"Dimension {dimY}"
         if data.description is not None:
             ylabel = data.description.description[dimY]
- 
-        title = 'Free energy surface'
 
-        counts, xbins, ybins = data._getFEShistogramCounts(dimX, dimY, nbins=80, pad=0.5, micro_ofcluster=self.micro_ofcluster, stationary_distribution=self.msm.stationary_distribution)
-        counts /= counts.sum() # Normalize probabilites
+        title = "Free energy surface"
+
+        counts, xbins, ybins = data._getFEShistogramCounts(
+            dimX,
+            dimY,
+            nbins=80,
+            pad=0.5,
+            micro_ofcluster=self.micro_ofcluster,
+            stationary_distribution=self.msm.stationary_distribution,
+        )
+        counts /= counts.sum()  # Normalize probabilites
         nonzero = counts != 0
         energy = counts.copy()
         energy[nonzero] = -Kinetics._kB * temperature * np.log(counts[nonzero])
         energy[~nonzero] = energy[nonzero].max() + 100
-        f, ax, cf = data._contourPlot(energy, xbins, ybins, levels=levels, nonzero=nonzero, cmap=fescmap, title=title, xlabel=xlabel, ylabel=ylabel)
+        f, ax, cf = data._contourPlot(
+            energy,
+            xbins,
+            ybins,
+            levels=levels,
+            nonzero=nonzero,
+            cmap=fescmap,
+            title=title,
+            xlabel=xlabel,
+            ylabel=ylabel,
+        )
 
-        data._setColorbar(f, cf, 'kcal/mol', scientific=False)
+        data._setColorbar(f, cf, "kcal/mol", scientific=False)
         if states:
             colors = statescmap(np.linspace(0, 1, self.macronum))
             for m in range(self.macronum):
                 macromicro = microcenters[self.macro_ofmicro == m, :]
-                _ = ax.scatter(macromicro[:, dimX], macromicro[:, dimY], s=s, color=colors[m], label=f'Macro {m}', edgecolors='none')
-            ax.legend(prop={'size': 8})
+                _ = ax.scatter(
+                    macromicro[:, dimX],
+                    macromicro[:, dimY],
+                    s=s,
+                    color=colors[m],
+                    label=f"Macro {m}",
+                    edgecolors="none",
+                )
+            ax.legend(prop={"size": 8})
 
         if save is not None:
-            plt.savefig(save, dpi=300, bbox_inches='tight', pad_inches=0.2)
+            plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
         if plot:
             plt.show()
 
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:
-            raise NameError('You need to call markovModel before calling this command')
-        if not markov and self.data._dataid == self.data._clusterid and self.data._dataid != self._clusterid:
-            raise NameError('After updating the MetricData object you need to call the markovModel command anew.')
+            raise NameError("You need to call markovModel before calling this command")
+        if (
+            not markov
+            and self.data._dataid == self.data._clusterid
+            and self.data._dataid != self._clusterid
+        ):
+            raise NameError(
+                "After updating the MetricData object you need to call the markovModel command anew."
+            )
         if self.data._dataid != self.data._clusterid:
-            raise NameError('After modifying the data in the MetricData object you need to recluster and reconstruct the markov model.')
+            raise NameError(
+                "After modifying the data in the MetricData object you need to recluster and reconstruct the markov model."
+            )
 
 
 def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
@@ -1004,8 +1243,18 @@ def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
     return mol
 
 
-def getStateStatistic(reference, data, states, statetype='macro', weighted=False, method=np.mean, axis=0, existing=False, target=None):
-    """ Calculates properties of the states.
+def getStateStatistic(
+    reference,
+    data,
+    states,
+    statetype="macro",
+    weighted=False,
+    method=np.mean,
+    axis=0,
+    existing=False,
+    target=None,
+):
+    """Calculates properties of the states.
 
     Calculates properties of data corresponding to states. Can calculate for example the mean distances of atoms in a
     state, or the standard deviation of the RMSD in a state.
@@ -1047,36 +1296,43 @@ def getStateStatistic(reference, data, states, statetype='macro', weighted=False
     >>> getStateStatistic(model, data, list(range(5)), method=np.std)
     """
     from htmd.metricdata import MetricData
+
     if axis != 0:
-        logger.warning('Axis different than 0 might not work correctly yet')
+        logger.warning("Axis different than 0 might not work correctly yet")
 
     if isinstance(reference, Model):
         refdata = reference.data
     elif isinstance(reference, MetricData):
         refdata = reference
-        if statetype != 'cluster':
-            raise RuntimeError('You can only use statetype cluster with reference MetricData object. To use other statetypes build a Model.')
+        if statetype != "cluster":
+            raise RuntimeError(
+                "You can only use statetype cluster with reference MetricData object. To use other statetypes build a Model."
+            )
     else:
-        raise RuntimeError('Invalid argument type')
+        raise RuntimeError("Invalid argument type")
 
     if refdata.numTrajectories > 0 and np.any(refdata.trajLengths != data.trajLengths):
-        raise NameError('Data trajectories need to match in size and number to the trajectories in the model')
+        raise NameError(
+            "Data trajectories need to match in size and number to the trajectories in the model"
+        )
     stconcat = np.concatenate(refdata.St)
     datconcat = np.concatenate(data.dat)
 
     statistic = []
     for i, st in enumerate(states):
-        if statetype == 'macro':
+        if statetype == "macro":
             frames = reference.macro_ofcluster[stconcat] == st
-        elif statetype == 'micro':
+        elif statetype == "micro":
             frames = reference.micro_ofcluster[stconcat] == st
-        elif statetype == 'cluster':
+        elif statetype == "cluster":
             frames = stconcat == st
         else:
-            raise NameError('No valid state type given (read documentation)')
+            raise NameError("No valid state type given (read documentation)")
 
-        if statetype == 'macro' and weighted:
-            statistic.append(_weightedMethod(reference, method, stconcat, datconcat, st, axis))
+        if statetype == "macro" and weighted:
+            statistic.append(
+                _weightedMethod(reference, method, stconcat, datconcat, st, axis)
+            )
         else:
             if axis is None:
                 statistic.append(method(datconcat[frames, ...]))
@@ -1101,7 +1357,7 @@ def _weightedMethod(model, method, stconcat, datconcat, st, axis):
 
 
 def macroAccumulate(model, microvalue):
-    """ Accumulate values of macrostates from a microstate array
+    """Accumulate values of macrostates from a microstate array
 
     Parameters
     ----------
@@ -1124,18 +1380,21 @@ def macroAccumulate(model, microvalue):
 
 def _sampleMacro(obj, macro, stConcat, mode, numFrames, replacement):
     from htmd.metricdata import _randomSample
-    if mode == 'random':
+
+    if mode == "random":
         frames = np.where(obj.macro_ofcluster[stConcat] == macro)[0]
         selFrames = _randomSample(frames, numFrames, replacement)
         selMicro = obj.micro_ofcluster[stConcat[selFrames]]
-    elif mode == 'even':
+    elif mode == "even":
         micros = np.where(obj.macro_ofmicro == macro)[0]
         selFrames = []
         selMicro = []
         for i in range(len(micros)):
-            selFrames.append(_sampleMicro(obj, micros[i], stConcat, numFrames, replacement))
+            selFrames.append(
+                _sampleMicro(obj, micros[i], stConcat, numFrames, replacement)
+            )
             selMicro.append(np.ones(numFrames) * micros[i])
-    elif mode == 'weighted':
+    elif mode == "weighted":
         micros = np.where(obj.macro_ofmicro == macro)[0]
         eq = obj.msm.stationary_distribution
         weights = eq[micros] / np.sum(eq[micros])
@@ -1143,9 +1402,12 @@ def _sampleMacro(obj, macro, stConcat, mode, numFrames, replacement):
         selFrames = []
         selMicro = []
         for i in range(len(micros)):
-            selFrames = np.append(selFrames, _sampleMicro(obj, micros[i], stConcat, framespermicro[i], replacement))
+            selFrames = np.append(
+                selFrames,
+                _sampleMicro(obj, micros[i], stConcat, framespermicro[i], replacement),
+            )
             selMicro = np.append(selMicro, [micros[i]] * framespermicro[i])
-    elif mode == 'weightedTrunc':
+    elif mode == "weightedTrunc":
         micros = np.where(obj.macro_ofmicro == macro)[0]
         eq = obj.msm.stationary_distribution
         weights = eq[micros] / np.sum(eq[micros])
@@ -1158,15 +1420,19 @@ def _sampleMacro(obj, macro, stConcat, mode, numFrames, replacement):
         selFrames = []
         selMicro = []
         for i in range(len(micros)):
-            selFrames = np.append(selFrames, _sampleMicro(obj, micros[i], stConcat, framespermicro[i], replacement))
+            selFrames = np.append(
+                selFrames,
+                _sampleMicro(obj, micros[i], stConcat, framespermicro[i], replacement),
+            )
             selMicro = np.append(selMicro, [micros[i]] * framespermicro[i])
     else:
-        raise NameError('No valid mode given (read documentation)')
+        raise NameError("No valid mode given (read documentation)")
     return selFrames, selMicro
 
 
 def _sampleMicro(obj, micro, stConcat, numFrames, replacement):
     from htmd.metricdata import _randomSample
+
     frames = np.where(obj.micro_ofcluster[stConcat] == micro)[0]
     return _randomSample(frames, numFrames, replacement)
 
@@ -1190,14 +1456,16 @@ def _macroTrajectoriesReport(macronum, macrost, simlist=None):
                 macrotraj[m] = []
             macrotraj[m].append(i)
             macrotrajnum[m] += 1
-    logger.info('Number of trajectories that visited each macrostate:')
+    logger.info("Number of trajectories that visited each macrostate:")
     logger.info(macrotrajnum)
 
     for m in range(macronum):
         ratio = macrotrajnum[m] / len(macrost)
         if macrotrajnum[m] <= 3 and ratio <= 0.2:
-            logger.info('Take care! Macro {} has been visited only in {} trajectories'
-                        ' ({:.1f}% of total):'.format(m, macrotrajnum[m], ratio*100))
+            logger.info(
+                "Take care! Macro {} has been visited only in {} trajectories"
+                " ({:.1f}% of total):".format(m, macrotrajnum[m], ratio * 100)
+            )
             if simlist is not None:
                 for s in macrotraj[m]:
                     logger.info(simlist[s])
@@ -1210,7 +1478,7 @@ def _macroTrajSt(St, macro_ofcluster):
     return mst
 
 
-'''def _macroP(C, macro_ofmicro):
+"""def _macroP(C, macro_ofmicro):
     macronum = np.max(macro_ofmicro) + 1
     macroC = np.zeros((macronum, macronum))
 
@@ -1222,9 +1490,9 @@ def _macroTrajSt(St, macro_ofcluster):
             macroC[m1, m2] = np.sum(C[ixgrid].flatten())
 
     from msmtools.estimation import transition_matrix
-    return transition_matrix(macroC, reversible=True)'''
+    return transition_matrix(macroC, reversible=True)"""
 
-import unittest
+
 class _TestModel(unittest.TestCase):
     @classmethod
     def setUpClass(self):
@@ -1232,17 +1500,28 @@ class _TestModel(unittest.TestCase):
         from glob import glob
         from htmd.projections.metric import Metric
         from moleculekit.projections.metricdistance import MetricDistance
-        from moleculekit.projections.metricdihedral import MetricDihedral
         from moleculekit.util import tempname
         from sklearn.cluster import MiniBatchKMeans
         from htmd.home import home
         from os.path import join
 
-        sims = simlist(glob(join(home(dataDir='adaptive'), 'data', '*', '')), glob(join(home(dataDir='adaptive'), 'input', '*')))
-        fsims = simfilter(sims, tempname(), 'not water')
+        sims = simlist(
+            glob(join(home(dataDir="adaptive"), "data", "*", "")),
+            glob(join(home(dataDir="adaptive"), "input", "*")),
+        )
+        fsims = simfilter(sims, tempname(), "not water")
 
         metr = Metric(fsims)
-        metr.set(MetricDistance('protein and resid 10 and name CA', 'resname BEN and noh', periodic='selections', metric='contacts', groupsel1='residue', threshold=4))
+        metr.set(
+            MetricDistance(
+                "protein and resid 10 and name CA",
+                "resname BEN and noh",
+                periodic="selections",
+                metric="contacts",
+                groupsel1="residue",
+                threshold=4,
+            )
+        )
         data = metr.project()
         data.cluster(MiniBatchKMeans(n_clusters=4))
 
@@ -1251,7 +1530,7 @@ class _TestModel(unittest.TestCase):
     def test_model_saving_loading(self):
         from moleculekit.util import tempname
 
-        modelfile = tempname(suffix='.dat')
+        modelfile = tempname(suffix=".dat")
         self.model.save(modelfile)
 
         newmodel = Model(file=modelfile)
@@ -1265,8 +1544,6 @@ class _TestModel(unittest.TestCase):
         assert newmodel.data.parent.numTrajectories == 2
         self.model.data.parent = None
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main(verbosity=2)
-
-
-

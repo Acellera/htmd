@@ -4,15 +4,14 @@
 # No redistribution in whole or part
 #
 import numpy as np
-import random as rd
-from scipy.spatial.distance import cdist
 import logging
 from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
+
 logger = logging.getLogger(__name__)
 
 
 class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
-    """ Class to perform regular clustering of a given data set
+    """Class to perform regular clustering of a given data set
 
     RegCluster can be passed a radius or an approximate number of clusters. If a number of clusters is passed, KCenter
     clustering is used to estimate the necessary radius. RegCluster randomly chooses a point and assigns all points
@@ -42,6 +41,7 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
     clusterSize_ : list
         list with number of frames in each cluster
     """
+
     def __init__(self, radius=None, n_clusters=None):
         if radius is None and n_clusters is None:
             raise RuntimeError("radius or n_clusters needs to be set")
@@ -51,7 +51,7 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
         self.labels_ = []
 
     def fit(self, data):
-        """ performs clustering of data
+        """performs clustering of data
 
         Parameters
         ----------
@@ -63,12 +63,14 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
         # if n_clusters is given and no r, estimate n_clusters
         if self.radius is None:
             from htmd.clustering.kcenters import KCenter
+
             estClust = KCenter(n_clusters=self.n_clusters)
             estClust.fit(data)
             self.radius = estClust.distance.max()
             logger.info("Estimated radius = {}".format(self.radius))
 
         from pyemma.coordinates.clustering.regspace import RegularSpaceClustering
+
         self._reg = RegularSpaceClustering(dmin=self.radius)
         self.labels_ = self._reg.fit_transform(data).flatten()
 
@@ -79,6 +81,7 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
     @property
     def clusterSize(self):
         return np.bincount(self.labels_)
+
 
 #
 # class RegCluster:
@@ -190,8 +193,7 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
 #         dist = np.squeeze(cdist(np.atleast_2d(data), np.atleast_2d(centers)))
 #         return np.atleast_1d(dist)
 
-if __name__ == '__main__':
-    import numpy as np
+if __name__ == "__main__":
     X = np.random.random((100, 2))
     reg = RegCluster(radius=0.4)
     reg.fit(X)

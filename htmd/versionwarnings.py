@@ -1,5 +1,4 @@
 import os
-import warnings
 from pathlib import Path
 
 _htmdconfigfolder = os.path.join(os.path.expanduser("~"), ".htmd")
@@ -8,7 +7,7 @@ try:
     os.makedirs(_htmdconfigfolder, exist_ok=True)
     if not os.path.exists(_warningsfile):
         Path(_warningsfile).touch()
-except:
+except Exception:
     pass
 
 
@@ -19,8 +18,8 @@ def _issueWarnings():
     if ("CI" in os.environ) and os.environ["CI"]:
         return  # Don't issue warnings if running in CI
 
-    with open(_warningsfile, "r") as f:
-        disabledversions = f.read().splitlines()
+    # with open(_warningsfile, "r") as f:
+    #     disabledversions = f.read().splitlines()
 
     # # Use this style to add version warnings:
     # if "1.16" not in disabledversions:

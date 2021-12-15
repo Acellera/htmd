@@ -305,7 +305,7 @@ class AdaptiveBandit(AdaptiveBase):
         n_values = np.zeros(numstates, dtype=np.int32)
 
         if self.goalfunction is not None:
-            ## For every cluster in data_q, get the max score and initialize
+            # For every cluster in data_q, get the max score and initialize
             qstconcat = np.concatenate(data_q.St)
             statemaxes = np.zeros(numstates)
             np.maximum.at(statemaxes, qstconcat, np.squeeze(goaldataconcat))
@@ -314,7 +314,7 @@ class AdaptiveBandit(AdaptiveBase):
             q_values = goalenergies
             n_values += int(
                 (self.nframes / self._numClusters(self.nframes)) * self.goal_init
-            )  ## Needs nframes to be set properly!!!!!!!!
+            )  # Needs nframes to be set properly!!!!!!!!
 
         rewardtraj = np.arange(
             data_q.numTrajectories
@@ -536,7 +536,6 @@ class _TestAdaptiveBandit(unittest.TestCase):
     def setUpClass(self):
         from htmd.util import tempname
         from htmd.home import home
-        from moleculekit.projections.metricdistance import MetricDistance
         import shutil
         import os
 

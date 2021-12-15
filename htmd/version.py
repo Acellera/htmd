@@ -4,6 +4,4 @@
 # No redistribution in whole or part
 #
 def version():
-    return 'unpackaged'
-
-
+    return "unpackaged"

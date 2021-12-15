@@ -9,6 +9,7 @@ from htmd.model import macroAccumulate
 from protocolinterface import val
 import numpy as np
 import os
+import unittest
 import logging
 
 logger = logging.getLogger(__name__)
@@ -403,9 +404,6 @@ class AdaptiveGoal(AdaptiveMD):
         return means, stds
 
 
-import unittest
-
-
 class _TestAdaptiveGoal(unittest.TestCase):
     def test_adaptive_goal(self):
         from moleculekit.projections.metricdistance import MetricDistance
@@ -488,7 +486,6 @@ if __name__ == "__main__":
         MetricSecondaryStructure,
     )
     from moleculekit.projections.metricdistance import MetricSelfDistance
-    import numpy as np
 
     os.chdir(path.join(home(), "data", "test-adaptive"))
 

@@ -8,6 +8,7 @@ from htmd.config import _config
 from protocolinterface import ProtocolInterface, val
 import os
 import numpy as np
+import unittest
 import logging
 
 logger = logging.getLogger(__name__)
@@ -144,9 +145,9 @@ class Equilibration(ProtocolInterface):
                 self.acemd.__dict__[field] = None
 
             if self.acemd.__dict__[field] is None:
-                for val in defaults[field]:
-                    if os.path.exists(os.path.join(inputdir, val)):
-                        self.acemd.__dict__[field] = val
+                for vv in defaults[field]:
+                    if os.path.exists(os.path.join(inputdir, vv)):
+                        self.acemd.__dict__[field] = vv
                         break
 
             if (
@@ -278,9 +279,6 @@ class Equilibration(ProtocolInterface):
             self.acemd.barostatconstratio = "on"
 
         self.acemd.setup(inputdir, outputdir, overwrite=True)
-
-
-import unittest
 
 
 class _TestEquilibration(unittest.TestCase):

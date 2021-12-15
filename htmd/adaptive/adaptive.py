@@ -195,7 +195,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                         )
                         try:
                             self.app.submit(natsorted(newsims))
-                        except:
+                        except Exception:
                             # If submitting fails delete all simulation inputs to not confuse _getEpoch()
                             for ns in newsims:
                                 shutil.rmtree(ns)

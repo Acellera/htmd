@@ -4,21 +4,29 @@
 # No redistribution in whole or part
 #
 import numpy as np
-from tempfile import NamedTemporaryFile
 from os import path
 from htmd.home import home
 import os
 import shutil
-from subprocess import call, check_output
+from subprocess import call
 from htmd.util import tempname
 from moleculekit.molecule import Molecule
 from glob import glob
 import logging
+
 logger = logging.getLogger(__name__)
 
 
-def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabel', vinaexe=None):
-    """ Molecular docking, using Vina
+def dock(
+    protein,
+    ligand,
+    center=None,
+    extent=None,
+    numposes=20,
+    babelexe="obabel",
+    vinaexe=None,
+):
+    """Molecular docking, using Vina
 
     If centre and extent are not provided, docking will be performed over the whole protein
 
@@ -53,9 +61,9 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
 
     """
     if np.size(protein.coords, 2) != 1 or np.size(ligand.coords, 2) != 1:
-        raise NameError('Protein and ligand Molecules should be single frames')
+        raise NameError("Protein and ligand Molecules should be single frames")
 
-    buffer = 10.  # Angstrom buffer around protein for whole-protein docking
+    buffer = 10.0  # Angstrom buffer around protein for whole-protein docking
     c_min = np.min(protein.coords, 0).reshape((1, 3))[0]
     c_max = np.max(protein.coords, 0).reshape((1, 3))[0]
 
@@ -80,65 +88,136 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
 
     protein.write(protein_pdb)
     lig2 = ligand.copy()
-    lig2.atomtype = lig2.element  # babel does not understand mol2 atomtypes and requires elements instead
+    lig2.atomtype = (
+        lig2.element
+    )  # babel does not understand mol2 atomtypes and requires elements instead
     lig2.write(ligand_mol2)
 
     # Dirty hack to remove the 'END' line from the PDBs since babel hates it
-    with open(protein_pdb, 'r') as f:
+    with open(protein_pdb, "r") as f:
         lines = f.readlines()
-    with open(protein_pdb, 'w') as f:
+    with open(protein_pdb, "w") as f:
         f.writelines(lines[:-1])
     # End of dirty hack
 
     try:
         if vinaexe is None:
             import platform
-            suffix = ''
+
+            suffix = ""
             if platform.system() == "Windows":
-                suffix = '.exe'
-            vinaexe = '{}-vina{}'.format(platform.system(), suffix)
+                suffix = ".exe"
+            vinaexe = "{}-vina{}".format(platform.system(), suffix)
 
         vinaexe = shutil.which(vinaexe, mode=os.X_OK)
         if not vinaexe:
-            raise NameError('Could not find vina, or no execute permissions are given')
-    except:
-        raise NameError('Could not find vina, or no execute permissions are given')
+            raise NameError("Could not find vina, or no execute permissions are given")
+    except Exception:
+        raise NameError("Could not find vina, or no execute permissions are given")
     try:
         babelexe = shutil.which(babelexe, mode=os.X_OK)
         if babelexe is None:
-            raise NameError('Could not find babel, or no execute permissions are given')
-    except:
-        raise NameError('Could not find babel, or no execute permissions are given')
+            raise NameError("Could not find babel, or no execute permissions are given")
+    except Exception:
+        raise NameError("Could not find babel, or no execute permissions are given")
 
-    call([babelexe, '-i', 'pdb', protein_pdb, '-o', 'pdbqt', '-O', protein_pdbqt, '-xr'])
+    call(
+        [babelexe, "-i", "pdb", protein_pdb, "-o", "pdbqt", "-O", protein_pdbqt, "-xr"]
+    )
     if np.all(ligand.charge != 0):
-        logger.info('Charges detected in ligand and will be used for docking.')
-        call([babelexe, '-i', 'mol2', ligand_mol2, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xn', '-xh'])
+        logger.info("Charges detected in ligand and will be used for docking.")
+        call(
+            [
+                babelexe,
+                "-i",
+                "mol2",
+                ligand_mol2,
+                "-o",
+                "pdbqt",
+                "-O",
+                ligand_pdbqt,
+                "-xn",
+                "-xh",
+            ]
+        )
     else:
-        logger.info('Charges were not defined for all atoms. Will guess charges anew using gasteiger method.')
-        call([babelexe, '-i', 'mol2', ligand_mol2, '-o', 'pdbqt', '-O', ligand_pdbqt, '-xn', '-xh', '--partialcharge', 'gasteiger'])
+        logger.info(
+            "Charges were not defined for all atoms. Will guess charges anew using gasteiger method."
+        )
+        call(
+            [
+                babelexe,
+                "-i",
+                "mol2",
+                ligand_mol2,
+                "-o",
+                "pdbqt",
+                "-O",
+                ligand_pdbqt,
+                "-xn",
+                "-xh",
+                "--partialcharge",
+                "gasteiger",
+            ]
+        )
 
     if not path.isfile(ligand_pdbqt):
-        raise NameError('Ligand could not be converted to PDBQT')
+        raise NameError("Ligand could not be converted to PDBQT")
     if not path.isfile(protein_pdbqt):
-        raise NameError('Protein could not be converted to PDBQT')
+        raise NameError("Protein could not be converted to PDBQT")
 
-    call([vinaexe, '--receptor', protein_pdbqt, '--ligand', ligand_pdbqt, '--out', output_pdbqt,
-          '--center_x', str(center[0]), '--center_y', str(center[1]), '--center_z', str(center[2]),
-          '--size_x', str(extent[0]), '--size_y', str(extent[1]), '--size_z', str(extent[2]), '--num_modes', str(numposes)])
+    call(
+        [
+            vinaexe,
+            "--receptor",
+            protein_pdbqt,
+            "--ligand",
+            ligand_pdbqt,
+            "--out",
+            output_pdbqt,
+            "--center_x",
+            str(center[0]),
+            "--center_y",
+            str(center[1]),
+            "--center_z",
+            str(center[2]),
+            "--size_x",
+            str(extent[0]),
+            "--size_y",
+            str(extent[1]),
+            "--size_z",
+            str(extent[2]),
+            "--num_modes",
+            str(numposes),
+        ]
+    )
 
-    call([babelexe, '-m', '-i', 'pdbqt', output_pdbqt, '-o', 'pdb', '-O', output_pdb, '-xhn'])
+    call(
+        [
+            babelexe,
+            "-m",
+            "-i",
+            "pdbqt",
+            output_pdbqt,
+            "-o",
+            "pdb",
+            "-O",
+            output_pdb,
+            "-xhn",
+        ]
+    )
 
     from natsort import natsorted
-    outfiles = natsorted(glob('{}*.pdb'.format(output_prefix)))
+
+    outfiles = natsorted(glob("{}*.pdb".format(output_prefix)))
 
     scoring = []
     poses = []
     for i, ligf in enumerate(outfiles):
         scoring.append(_parseScoring(ligf))
-        l = Molecule(ligf)
-        l.viewname = 'Pose {}'.format(i)
-        poses.append(l)
+        ll = Molecule(ligf)
+        ll.viewname = "Pose {}".format(i)
+        poses.append(ll)
 
     os.remove(protein_pdb)
     os.remove(ligand_mol2)
@@ -151,23 +230,20 @@ def dock(protein, ligand, center=None, extent=None, numposes=20, babelexe='obabe
 
 def _parseScoring(outf):
     kcal = rmsdlb = rmsdub = None
-    with open(outf, 'r') as f:
+    with open(outf, "r") as f:
         for line in f:
-            if line.startswith('REMARK VINA RESULT:'):
+            if line.startswith("REMARK VINA RESULT:"):
                 pieces = line.split()
                 kcal = float(pieces[3])
                 rmsdlb = float(pieces[4])
                 rmsdub = float(pieces[5])
                 break
     if kcal is None or rmsdlb is None or rmsdub is None:
-        raise RuntimeError('Could not parse vina output correctly {}'.format(outf))
+        raise RuntimeError("Could not parse vina output correctly {}".format(outf))
     return kcal, rmsdlb, rmsdub
 
-if __name__ == "__main__":
-    from moleculekit.molecule import Molecule
-    from os import path
-    from htmd.home import home
-    protein = Molecule(path.join(home(), 'data', 'docking', 'protein.pdb'))
-    ligand = Molecule(path.join(home(), 'data', 'docking', 'ligand.pdb'))
-    #poses, scoring = dock(protein, ligand)
 
+if __name__ == "__main__":
+    protein = Molecule(path.join(home(), "data", "docking", "protein.pdb"))
+    ligand = Molecule(path.join(home(), "data", "docking", "ligand.pdb"))
+    # poses, scoring = dock(protein, ligand)

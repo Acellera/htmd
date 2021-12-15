@@ -33,7 +33,6 @@ from __future__ import absolute_import
 __author__ = "Peter Eastman"
 __version__ = "1.0"
 
-import simtk.openmm as mm
 from simtk.openmm.app import PDBFile, PDBxFile
 
 

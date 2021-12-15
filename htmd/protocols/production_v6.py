@@ -9,7 +9,6 @@ from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRes
 import os
 import numpy as np
 import logging
-from htmd.config import _config
 
 logger = logging.getLogger(__name__)
 
@@ -189,9 +188,9 @@ class Production(ProtocolInterface):
                 )
 
             if self.acemd.__dict__[field] is None:
-                for val in defaults[field]:
-                    if os.path.exists(os.path.join(inputdir, val)):
-                        self.acemd.__dict__[field] = val
+                for vv in defaults[field]:
+                    if os.path.exists(os.path.join(inputdir, vv)):
+                        self.acemd.__dict__[field] = vv
                         break
 
             if (

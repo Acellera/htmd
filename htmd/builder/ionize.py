@@ -8,30 +8,35 @@ import scipy.spatial.distance as distance
 from moleculekit.molecule import Molecule
 from moleculekit.util import sequenceID
 import logging
+
 logger = logging.getLogger(__name__)
 
 # Info about all ions, with charge, name, amber and charmm names (may
 # need residues too). Only the first column is currently used.
 _ions = {
-    'NA': (1, 'sodium', 'Na+', 'SOD'),
-    'MG': (2, 'magnesium', 'Mg2+', 'MG'),
-    'ZN': (2, 'zinc', 'Zn2+', 'ZN'),
-    'K': (1, 'potassium', 'K+', 'POT'),
-    'CS': (1, 'cesium', 'Cs+', 'CES'),
-    'CA': (2, 'calcium', 'Ca2+', 'CAL'),
-    'CL': (-1, 'chloride', 'Cl-', 'CLA')
+    "NA": (1, "sodium", "Na+", "SOD"),
+    "MG": (2, "magnesium", "Mg2+", "MG"),
+    "ZN": (2, "zinc", "Zn2+", "ZN"),
+    "K": (1, "potassium", "K+", "POT"),
+    "CS": (1, "cesium", "Cs+", "CES"),
+    "CA": (2, "calcium", "Ca2+", "CAL"),
+    "CL": (-1, "chloride", "Cl-", "CLA"),
 }
 
 
-def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion=None, ff=None):
+def ionize(
+    netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion=None, ff=None
+):
     if ff:
-        logger.warning('The ff option is no longer needed and is deprecated. '
-                       'Please use standard names (e.g. NA, CL, K) for `cation` and `anion` arguments.')
-    
+        logger.warning(
+            "The ff option is no longer needed and is deprecated. "
+            "Please use standard names (e.g. NA, CL, K) for `cation` and `anion` arguments."
+        )
+
     if cation is None:
-            cation = 'NA'
+        cation = "NA"
     if anion is None:
-            anion = 'CL'
+        anion = "CL"
 
     if saltconc is not None:
         neutralize = False
@@ -58,7 +63,9 @@ def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion
                     nanion = 1 + int(np.floor(roundnetcharge / 2))
                     ncation = 1
                 else:
-                    raise NameError('Failed to neutralize because the cation and anion charges cannot reach 0')
+                    raise NameError(
+                        "Failed to neutralize because the cation and anion charges cannot reach 0"
+                    )
     elif netcharge < 0:
         roundnetchargeabs = abs(roundnetcharge)
         if cationcharge == 1:
@@ -73,15 +80,17 @@ def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion
                     nanion = 1
                     ncation = 1 + int(np.floor(roundnetchargeabs / 2))
                 else:
-                    raise NameError('Failed to neutralize because the cation and anion charges cannot reach 0')
+                    raise NameError(
+                        "Failed to neutralize because the cation and anion charges cannot reach 0"
+                    )
     else:
-        logger.info('The system is already neutral.')
+        logger.info("The system is already neutral.")
         done = True
 
     if not done:
         newtotalcharge = nanion * anioncharge + ncation * cationcharge + roundnetcharge
         if newtotalcharge != 0:
-            raise NameError('Could not neutralize the system')
+            raise NameError("Could not neutralize the system")
     if neutralize:
         return anion, cation, nanion, ncation
 
@@ -99,10 +108,14 @@ def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion
         cationstoich = 1
         anionstoich = 1
     else:
-        raise NameError('Unsupported ion charge; cannot guess chamical formula.')
+        raise NameError("Unsupported ion charge; cannot guess chamical formula.")
 
     num = int(np.floor(0.5 + 0.0187 * saltconc * nwater))
-    logger.info('Adding {} anions + {} cations for neutralizing and {} ions for the given salt concentration.'.format(nanion, ncation, (cationstoich + anionstoich) * num))
+    logger.info(
+        "Adding {} anions + {} cations for neutralizing and {} ions for the given salt concentration.".format(
+            nanion, ncation, (cationstoich + anionstoich) * num
+        )
+    )
     ncation += cationstoich * num
     nanion += anionstoich * num
     return anion, cation, anion, cation, nanion, ncation
@@ -110,11 +123,22 @@ def ionize(netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion
 
 def _ionGetCharge(ion):
     if ion not in _ions:
-        raise NameError('Ion {:s} not in the database'.format(ion))
+        raise NameError("Ion {:s} not in the database".format(ion))
     return _ions[ion][0]
 
 
-def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nanion, ncation, dfrom=5, dbetween=5, segname=None):
+def ionizePlace(
+    mol,
+    anion_resname,
+    cation_resname,
+    anion_name,
+    cation_name,
+    nanion,
+    ncation,
+    dfrom=5,
+    dbetween=5,
+    segname=None,
+):
     """Place a given number of negative and positive ions in the solvent.
 
     Replaces water molecules al long as they respect the given distance criteria.
@@ -141,7 +165,7 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
         Min distance between ions
     segname : str
         Segment name to add
-        
+
     Returns
     -------
     mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
@@ -150,9 +174,9 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
 
     newmol = mol.copy()
 
-    logger.debug('Min distance of ions from molecule: ' + str(dfrom) + 'A')
-    logger.debug('Min distance between ions: ' + str(dbetween) + 'A')
-    logger.debug('Placing {:d} anions and {:d} cations.'.format(nanion,ncation))
+    logger.debug("Min distance of ions from molecule: " + str(dfrom) + "A")
+    logger.debug("Min distance between ions: " + str(dbetween) + "A")
+    logger.debug("Placing {:d} anions and {:d} cations.".format(nanion, ncation))
 
     if (nanion + ncation) == 0:
         return newmol
@@ -160,18 +184,25 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
     nions = nanion + ncation
 
     betabackup = newmol.beta.copy()
-    newmol.set('beta', sequenceID((newmol.resid, newmol.insertion, newmol.segid)))
+    newmol.set("beta", sequenceID((newmol.resid, newmol.insertion, newmol.segid)))
 
     # Find water oxygens to replace with ions
     ntries = 0
     maxtries = 10
     while True:
         ionlist = []
-        watindex = newmol.atomselect('noh and water and not (within ' + str(dfrom) + ' of not water)', indexes=True)
+        watindex = newmol.atomselect(
+            "noh and water and not (within " + str(dfrom) + " of not water)",
+            indexes=True,
+        )
         watsize = len(watindex)
 
         if watsize == 0:
-            raise NameError('No waters could be found further than ' + str(dfrom) + ' from other molecules to be replaced by ions. You might need to solvate with a bigger box or disable the ionize property when building.')
+            raise NameError(
+                "No waters could be found further than "
+                + str(dfrom)
+                + " from other molecules to be replaced by ions. You might need to solvate with a bigger box or disable the ionize property when building."
+            )
 
         while len(ionlist) < nions:
             if len(watindex) == 0:
@@ -180,9 +211,11 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
             thision = watindex[randwat]
             addit = True
             if len(ionlist) != 0:  # Check for distance from precious ions
-                ionspos = newmol.get('coords', sel=ionlist)
-                thispos = newmol.get('coords', sel=thision)
-                dists = distance.cdist(np.atleast_2d(ionspos), np.atleast_2d(thispos), metric='euclidean')
+                ionspos = newmol.get("coords", sel=ionlist)
+                thispos = newmol.get("coords", sel=thision)
+                dists = distance.cdist(
+                    np.atleast_2d(ionspos), np.atleast_2d(thispos), metric="euclidean"
+                )
 
                 if np.any(dists < dbetween):
                     addit = False
@@ -194,16 +227,22 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
 
         ntries += 1
         if ntries == maxtries:
-            raise NameError('Failed to add ions after ' + str(maxtries) + ' attempts. Try decreasing the ''from'' and ''between'' parameters, decreasing ion concentration or making a larger water box.')
+            raise NameError(
+                "Failed to add ions after "
+                + str(maxtries)
+                + " attempts. Try decreasing the "
+                "from"
+                " and "
+                "between"
+                " parameters, decreasing ion concentration or making a larger water box."
+            )
 
     # Delete waters but keep their coordinates
-    waterpos = np.atleast_2d(newmol.get('coords', ionlist))
+    waterpos = np.atleast_2d(newmol.get("coords", ionlist))
     betasel = np.zeros(newmol.numAtoms, dtype=bool)
     for b in newmol.beta[ionlist]:
         betasel |= newmol.beta == b
-    atmrem = np.sum(betasel)
-    atmput = 3 * len(ionlist)
-    # assert atmrem == atmput, 'Removing {} atoms instead of {}. Report this bug.'.format(atmrem, atmput)
+
     sel = np.where(betasel)[0]
     newmol.remove(sel, _logger=False)
     # assert np.size(sel) == atmput, 'Removed {} atoms instead of {}. Report this bug.'.format(np.size(sel), atmput)
@@ -213,29 +252,48 @@ def ionizePlace(mol, anion_resname, cation_resname, anion_name, cation_name, nan
     randidx = np.random.permutation(np.size(waterpos, 0))
     atom = Molecule()
     atom.empty(1)
-    atom.set('chain', 'I')
-    atom.set('segid', 'I')
+    atom.set("chain", "I")
+    atom.set("segid", "I")
 
     for i in range(nanion):
-        atom.set('name', anion_name)
-        atom.set('resname', anion_resname)
-        atom.set('resid', newmol.resid[-1] + 1)
+        atom.set("name", anion_name)
+        atom.set("resname", anion_resname)
+        atom.set("resid", newmol.resid[-1] + 1)
         atom.coords = waterpos[randidx[i], :]
         newmol.insert(atom, len(newmol.name))
     for i in range(ncation):
-        atom.set('name', cation_name)
-        atom.set('resname', cation_resname)
-        atom.set('resid', newmol.resid[-1] + 1)
-        atom.coords = waterpos[randidx[i+nanion], :]
+        atom.set("name", cation_name)
+        atom.set("resname", cation_resname)
+        atom.set("resid", newmol.resid[-1] + 1)
+        atom.coords = waterpos[randidx[i + nanion], :]
         newmol.insert(atom, len(newmol.name))
 
     # Restoring the original betas
-    newmol.beta[:len(betabackup)] = betabackup
+    newmol.beta[: len(betabackup)] = betabackup
     return newmol
 
 
 def _getSegname(mol, segname):
-    defsegnames = ['ION','ION1','ION3','ION4','ION5','ION6','ION7','ION8','ION9','IN1','IN2','IN3','IN4','IN5','IN6','IN7','IN8','IN9']
+    defsegnames = [
+        "ION",
+        "ION1",
+        "ION3",
+        "ION4",
+        "ION5",
+        "ION6",
+        "ION7",
+        "ION8",
+        "ION9",
+        "IN1",
+        "IN2",
+        "IN3",
+        "IN4",
+        "IN5",
+        "IN6",
+        "IN7",
+        "IN8",
+        "IN9",
+    ]
 
     # Make sure segname is not taken
     if segname is None:
@@ -245,8 +303,8 @@ def _getSegname(mol, segname):
                 segname = defsegnames[i]
                 break
         if segname is None:
-            raise NameError('All default segnames taken! Provide your own.')
+            raise NameError("All default segnames taken! Provide your own.")
     else:
         sel = mol.segid == segname
         if np.any(sel):
-            raise NameError('Segname already taken. Provide a different one.')
+            raise NameError("Segname already taken. Provide a different one.")

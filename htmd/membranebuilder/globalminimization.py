@@ -75,11 +75,11 @@ def minimize(lipids, box, stepxy=0.5, steprot=50, contactthresh=2.6):
     # rotate in 10deg increments
     # translate in a 2x2 box in 0.25A increments
     # swap lipid conformer?
-    headnames = [l.headname for l in lipids]
-    zpos = [l.xyz[2] for l in lipids]
-    neighbours = [l.neighbours for l in lipids]
+    headnames = [ll.headname for ll in lipids]
+    zpos = [ll.xyz[2] for ll in lipids]
+    neighbours = [ll.neighbours for ll in lipids]
 
-    pos = np.vstack([l.xyz[:2] for l in lipids])
+    pos = np.vstack([ll.xyz[:2] for ll in lipids])
     x0 = pos.flatten().tolist()
     numlips = len(lipids)
     bounds = [(x - 1, x + 1) for x in x0]

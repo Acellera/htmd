@@ -4,13 +4,13 @@
 # No redistribution in whole or part
 #
 import numpy as np
-import random
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 class KMeansTri(object):
-    """ Class for calculating the Kmeans-triangle projections of a MetricData  object
+    """Class for calculating the Kmeans-triangle projections of a MetricData  object
 
     Parameters
     ----------
@@ -27,7 +27,7 @@ class KMeansTri(object):
         self.data = data
 
     def project(self, ndim=None):
-        """ Projects the data object given to the constructor onto `ndim` dimensions
+        """Projects the data object given to the constructor onto `ndim` dimensions
 
         Parameters
         ----------
@@ -57,5 +57,10 @@ class KMeansTri(object):
         dist = np.mean(dist, axis=1)[:, np.newaxis] - dist
         dist[dist < 0] = 0
 
-        return MetricData(dat=self.data.deconcatenate(dist), ref=self.data.ref, simlist=self.data.simlist,
-                          fstep=self.data.fstep, parent=self.data)
+        return MetricData(
+            dat=self.data.deconcatenate(dist),
+            ref=self.data.ref,
+            simlist=self.data.simlist,
+            fstep=self.data.fstep,
+            parent=self.data,
+        )

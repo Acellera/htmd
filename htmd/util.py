@@ -16,14 +16,16 @@ logger = logging.getLogger(__name__)
 
 def _getNjobs():
     from htmd.config import _config
-    njobs = _config['njobs']
+
+    njobs = _config["njobs"]
     if njobs < 0:
         import multiprocessing
+
         njobs = multiprocessing.cpu_count() + njobs + 1
     return njobs
 
 
-def tempname(suffix='', create=False):
+def tempname(suffix="", create=False):
     if create:
         file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     else:
@@ -45,7 +47,9 @@ def ensurelist(tocheck, tomod=None):
     if isinstance(tocheck, range):
         return list(tocheck)
     if not isinstance(tocheck, list) and not isinstance(tocheck, tuple):
-        return [tomod, ]
+        return [
+            tomod,
+        ]
     return tomod
 
 
@@ -92,16 +96,22 @@ def diffMolecules(mol1, mol2, sel=None):
     eq_resname = np.equal(m1.resname, m2.resname)
     eq_insertion = np.equal(m1.insertion, m2.insertion)
 
-    eq_all = l_and(eq_name,
-                   l_and(eq_resid,
-                         l_and(eq_resname, eq_insertion)))
+    eq_all = l_and(eq_name, l_and(eq_resid, l_and(eq_resname, eq_insertion)))
 
     neq = np.logical_not(eq_all).nonzero()
     for i in neq[0]:
-        diff.append("{:4s} {:4s} {:4d} {:1s}   vs   {:4s} {:4s} {:4d} {:1s}".format(
-            m1.name[i], m1.resname[i], m1.resid[i], m1.insertion[i],
-            m2.name[i], m2.resname[i], m2.resid[i], m2.insertion[i],
-        ))
+        diff.append(
+            "{:4s} {:4s} {:4d} {:1s}   vs   {:4s} {:4s} {:4d} {:1s}".format(
+                m1.name[i],
+                m1.resname[i],
+                m1.resid[i],
+                m1.insertion[i],
+                m2.name[i],
+                m2.resname[i],
+                m2.resid[i],
+                m2.insertion[i],
+            )
+        )
     return diff
 
 
@@ -156,14 +166,23 @@ def assertSameAsReferenceDir(compareDir, outdir="."):
     import os
 
     toCompare = os.listdir(compareDir)
-    match, mismatch, error = filecmp.cmpfiles(outdir, compareDir, toCompare, shallow=False)
+    match, mismatch, error = filecmp.cmpfiles(
+        outdir, compareDir, toCompare, shallow=False
+    )
     if len(mismatch) != 0 or len(error) != 0 or len(match) != len(toCompare):
-        logger.error("Mismatch while checking directory {} versus reference {}".format(outdir,compareDir))
+        logger.error(
+            "Mismatch while checking directory {} versus reference {}".format(
+                outdir, compareDir
+            )
+        )
         logger.error("Files being checked: {}".format(toCompare))
         for f in mismatch:
-            logger.error("    diff {} {}".format(os.path.join(outdir, f),
-                                                 os.path.join(compareDir, f)   ))
-        raise Exception('Mismatch in regression testing.')
+            logger.error(
+                "    diff {} {}".format(
+                    os.path.join(outdir, f), os.path.join(compareDir, f)
+                )
+            )
+        raise Exception("Mismatch in regression testing.")
 
 
 def testDHFR():
@@ -171,30 +190,34 @@ def testDHFR():
     import shutil
     from jobqueues.localqueue import LocalGPUQueue
 
-    dhfrdir = os.path.abspath(os.path.join(conda.__file__, '../../../../../acemd-examples/dhfr'))
+    dhfrdir = os.path.abspath(
+        os.path.join(conda.__file__, "../../../../../acemd-examples/dhfr")
+    )
 
     if not os.path.isdir(dhfrdir):
-        raise logger.error('Could not find acemd-examples directory. Do `conda install acemd-examples -c acellera`')
+        raise logger.error(
+            "Could not find acemd-examples directory. Do `conda install acemd-examples -c acellera`"
+        )
 
     tmpdir = tempname()
     print(tmpdir)
     shutil.copytree(dhfrdir, tmpdir)
 
-    runsh = os.path.join(tmpdir, 'run.sh')
-    with open(runsh, 'w') as f:
-        f.write('#!/bin/bash\nacemd >log.txt 2>&1')
+    runsh = os.path.join(tmpdir, "run.sh")
+    with open(runsh, "w") as f:
+        f.write("#!/bin/bash\nacemd >log.txt 2>&1")
     os.chmod(runsh, 0o700)
 
-    logger.info('Starting to run the DHFR test')
+    logger.info("Starting to run the DHFR test")
     md = LocalGPUQueue()
     try:
         md.submit(tmpdir)
         md.wait()
-    except:
-        logger.error('Some error occurred. Check {}'.format(tmpdir))
+    except Exception:
+        logger.error("Some error occurred. Check {}".format(tmpdir))
     else:
         shutil.rmtree(tmpdir)
-        logger.info('Successfully ran the DHRF test. Temporary dir cleaned.')
+        logger.info("Successfully ran the DHRF test. Temporary dir cleaned.")
     return
 
 

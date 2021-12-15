@@ -36,6 +36,7 @@ class _Deprecated(object):
     >>> ExampleClass().example_method # doctest:+ELLIPSIS
     <bound method ExampleClass.example_method of <__main__.ExampleClass object ...>>
     """
+
     def __init__(self, version, newname=None):
         self.version = version
         self.newname = newname
@@ -43,24 +44,30 @@ class _Deprecated(object):
     def __call__(self, wrapped):
 
         if inspect.isfunction(wrapped):
-            objtype = 'function/method'
-            docprefix = \
-                """
+            objtype = "function/method"
+            docprefix = """
         .. warning:: Deprecated since version {}. {}
-                """.format(self.version, 'Use :func:`{}` instead.'.format(self.newname) if self.newname else '')
+                """.format(
+                self.version,
+                "Use :func:`{}` instead.".format(self.newname) if self.newname else "",
+            )
         elif inspect.isclass(wrapped):
-            objtype = 'class'
-            docprefix = \
-                """
+            objtype = "class"
+            docprefix = """
     .. warning:: Deprecated since version {}. {}
-                """.format(self.version, 'Use :func:`{}` instead.'.format(self.newname) if self.newname else '')
+                """.format(
+                self.version,
+                "Use :func:`{}` instead.".format(self.newname) if self.newname else "",
+            )
         else:
             raise TypeError(type(wrapped))
 
-        message = "The `{}` {} has been deprecated " \
-                  "since version {}. {}".format(wrapped.__name__, objtype,
-                                                self.version,
-                                                'Use `{}` instead.'.format(self.newname) if self.newname else '')
+        message = "The `{}` {} has been deprecated " "since version {}. {}".format(
+            wrapped.__name__,
+            objtype,
+            self.version,
+            "Use `{}` instead.".format(self.newname) if self.newname else "",
+        )
 
         wrappingclass = isinstance(wrapped, type)
         if wrappingclass:
@@ -68,7 +75,7 @@ class _Deprecated(object):
         else:
             wrappedfunc = wrapped
 
-        wrapped.__doc__ = docprefix + (wrapped.__doc__ or '')
+        wrapped.__doc__ = docprefix + (wrapped.__doc__ or "")
 
         @functools.wraps(wrappedfunc)
         def new_func(*args, **kwargs):
@@ -80,6 +87,7 @@ class _Deprecated(object):
             return wrapped
         else:
             return new_func
+
 
 if __name__ == "__main__":
     import doctest

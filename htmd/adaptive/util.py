@@ -2,8 +2,8 @@ import numpy as np
 import os
 import re
 
-parentregex = re.compile("e\d+s\d+_(e\d+s\d+)p(\d+)f(\d+)")
-epochregex = re.compile("^e(\d+)s")
+parentregex = re.compile(r"e\d+s\d+_(e\d+s\d+)p(\d+)f(\d+)")
+epochregex = re.compile(r"^e(\d+)s")
 
 
 def getEpochTrajectoryDictionary(simlist):

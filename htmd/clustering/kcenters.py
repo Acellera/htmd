@@ -7,11 +7,12 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from sklearn.base import BaseEstimator, ClusterMixin, TransformerMixin
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
-    """ Class to perform KCenter clustering of a given data set
+    """Class to perform KCenter clustering of a given data set
 
     KCenter randomly picks one point from the data, which is now the center of the first cluster. All points are put
     into the first cluster. In general the furthest point from its center is chosen to be the new center. All points,
@@ -51,7 +52,7 @@ class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
         self.distance = []
 
     def fit(self, data):
-        """ Compute the centroids of data.
+        """Compute the centroids of data.
 
         Parameters
         ----------
@@ -59,7 +60,7 @@ class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
             A 2D array of data. Columns are features and rows are data examples.
         """
         if len(self.cluster_centers_) != 0:
-            logger.warning('Clustering already exists. Reclustering data!')
+            logger.warning("Clustering already exists. Reclustering data!")
             self.cluster_centers_ = []
             self.centerFrames = []
             self.clusterSize = []
@@ -107,7 +108,7 @@ class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
         return dist
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     infile = open("../../clusterdata/R15.txt")
     data = []

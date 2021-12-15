@@ -10,8 +10,10 @@ from moleculekit.molecule import Molecule
 import shutil
 
 
-def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modellerexe='mod9.18'):
-    """ Uses the Modeller software to predict missing loops in a Molecule.
+def loopModeller(
+    mol, segid, seq, startresid, movstart=None, movend=None, modellerexe="mod9.18"
+):
+    """Uses the Modeller software to predict missing loops in a Molecule.
 
     Parameters
     ----------
@@ -41,10 +43,12 @@ def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modell
     >>> mol2 = loopModeller(mol, '0', 'ENR', 133)
     """
     if shutil.which(modellerexe) is None:
-        raise NameError('Could not find a Modeller executable called `{}` in the PATH. This might indicate a wrong path'
-                        ' to the executable or a missing installation. To install modeller use `conda install -c '
-                        'salilab modeller` and follow the instructions. To provide the correct path change the '
-                        '`modellerexe` argument'.format(modellerexe))
+        raise NameError(
+            "Could not find a Modeller executable called `{}` in the PATH. This might indicate a wrong path"
+            " to the executable or a missing installation. To install modeller use `conda install -c "
+            "salilab modeller` and follow the instructions. To provide the correct path change the "
+            "`modellerexe` argument".format(modellerexe)
+        )
 
     if movstart is None:
         movstart = startresid
@@ -55,35 +59,42 @@ def loopModeller(mol, segid, seq, startresid, movstart=None, movend=None, modell
     segres = np.unique(mol.resid[segatm])
     chain = np.unique(mol.chain[segatm])
     if len(chain) != 1:
-        raise RuntimeError('More than one chain detected in segment {}'.format(segid))
+        raise RuntimeError("More than one chain detected in segment {}".format(segid))
     pos = np.where(segres == startresid)[0][0]
-    if (segres[pos+1] - segres[pos]) != (len(seq) + 1):
-        raise RuntimeError('Sequence is {} characters long while sequence gap ({}-{}) is {} long. Cannot insert loop.'.format(
-            len(seq), segres[pos], segres[pos+1], (segres[pos+1] - segres[pos])))
+    if (segres[pos + 1] - segres[pos]) != (len(seq) + 1):
+        raise RuntimeError(
+            "Sequence is {} characters long while sequence gap ({}-{}) is {} long. Cannot insert loop.".format(
+                len(seq), segres[pos], segres[pos + 1], (segres[pos + 1] - segres[pos])
+            )
+        )
 
     chain = chain[0]
     segresidstart = np.min(segres)
     segresidend = np.max(segres)
 
     currseq = mol.sequence()[segid]
-    minuses = ''.join(['-'] * len(seq))
+    minuses = "".join(["-"] * len(seq))
     inspos = np.where(segres == startresid)[0][0] + 1
-    gapseq = currseq[:inspos] + minuses + currseq[inspos:] + '*'
-    fullseq = currseq[:inspos] + seq + currseq[inspos:] + '*'
+    gapseq = currseq[:inspos] + minuses + currseq[inspos:] + "*"
+    fullseq = currseq[:inspos] + seq + currseq[inspos:] + "*"
 
     # Get the sequence of the 1qg8 PDB file, and write to an alignment file
-    pdbfile = tempname(suffix='.pdb')
+    pdbfile = tempname(suffix=".pdb")
     mol.write(pdbfile)
 
-    alifile = tempname(suffix='.ali')
-    f = open(alifile, 'w')
-    f.write('>P1;prot\nstructure:{}:{}:{}:{}:{}::::\n'.format(pdbfile, segresidstart, chain, segresidend, chain))
+    alifile = tempname(suffix=".ali")
+    f = open(alifile, "w")
+    f.write(
+        ">P1;prot\nstructure:{}:{}:{}:{}:{}::::\n".format(
+            pdbfile, segresidstart, chain, segresidend, chain
+        )
+    )
     f.write(gapseq)
-    f.write('\n>P1;prot_fill\nsequence:::::::::\n')
+    f.write("\n>P1;prot_fill\nsequence:::::::::\n")
     f.write(fullseq)
     f.close()
 
-    script = '''
+    script = """
 from modeller import *
 from modeller.automodel import *    # Load the automodel class
 
@@ -99,9 +110,11 @@ a.starting_model= 1
 a.ending_model  = 1
 
 a.make()
-    '''.format(movstart+1-segresidstart, movend-segresidstart, alifile)
-    pyfile = tempname(suffix='.py')
-    f = open(pyfile, 'w')
+    """.format(
+        movstart + 1 - segresidstart, movend - segresidstart, alifile
+    )
+    pyfile = tempname(suffix=".py")
+    f = open(pyfile, "w")
     f.write(script)
     f.close()
 
@@ -109,14 +122,16 @@ a.make()
     print(alifile)
     print(pyfile)
 
-    call('{} {}'.format(modellerexe, pyfile), shell=True)
-    newmol = Molecule('./prot_fill.B99990001.pdb')
-    print('You can ignore the `import site` error (https://salilab.org/modeller/release.html#issues).'
-          ' The results should have been returned.')
+    call("{} {}".format(modellerexe, pyfile), shell=True)
+    newmol = Molecule("./prot_fill.B99990001.pdb")
+    print(
+        "You can ignore the `import site` error (https://salilab.org/modeller/release.html#issues)."
+        " The results should have been returned."
+    )
     return newmol
 
 
-'''
+"""
 def loopmodelerFALC(mol, segid, seq, pos, inspos, outname='loop'):
     currseq = mol.sequence()[segid]
     #from IPython.core.debugger import Tracer
@@ -137,9 +152,9 @@ def loopmodelerFALC(mol, segid, seq, pos, inspos, outname='loop'):
     mol.write(pdbfile)
 
     call('/shared/sdoerr/Software/FALC/bin/falc.py -title {} -pdb {} -fa {} -ulr {} -n {}'.format(outname, pdbfile, seqfile, ulrfile, 1))
-'''
+"""
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass
     # from moleculekit.molecule import Molecule
     # mol = Molecule('1qg8')

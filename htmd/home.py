@@ -36,24 +36,24 @@ def home(dataDir=None, libDir=False, shareDir=False):
     '.../data/dhfr/dhfr.pdb'
     """
 
-    homeDir=os.path.dirname(inspect.getfile(htmd))
+    homeDir = os.path.dirname(inspect.getfile(htmd))
     try:
-      if sys._MEIPASS:
-         homeDir = sys._MEIPASS
-    except:
-      pass
+        if sys._MEIPASS:
+            homeDir = sys._MEIPASS
+    except Exception:
+        pass
 
     if dataDir:
-        return os.path.join(homeDir, 'data', dataDir)
+        return os.path.join(homeDir, "data", dataDir)
     elif libDir:
-        libdir = os.path.join(homeDir, 'lib', platform.system())
+        libdir = os.path.join(homeDir, "lib", platform.system())
         if not os.path.exists(libdir):
-            raise FileNotFoundError('Could not find libs.')
+            raise FileNotFoundError("Could not find libs.")
         return libdir
     elif shareDir:
-        sharedir = os.path.join(homeDir, 'share')
+        sharedir = os.path.join(homeDir, "share")
         if not os.path.exists(sharedir):
-            raise FileNotFoundError('Could not find HTMD share directory.')
+            raise FileNotFoundError("Could not find HTMD share directory.")
         return sharedir
     else:
         return homeDir
@@ -61,6 +61,7 @@ def home(dataDir=None, libDir=False, shareDir=False):
 
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod()
 
     h = home()

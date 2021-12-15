@@ -8,7 +8,7 @@ import numpy as np
 
 
 def convert(fromunit, tounit, value, fstep=1, timestep=4):
-    """ Converts values between units
+    """Converts values between units
 
     Parameters
     ----------
@@ -30,12 +30,12 @@ def convert(fromunit, tounit, value, fstep=1, timestep=4):
     """
 
     ureg = UnitRegistry()
-    ureg.define('frame = {} * ns'.format(fstep))
-    ureg.define('step = ({} / 1000000) * ns = timestep'.format(timestep))
+    ureg.define("frame = {} * ns".format(fstep))
+    ureg.define("step = ({} / 1000000) * ns = timestep".format(timestep))
 
     q = ureg.Quantity(value, fromunit)
     convval = q.to(tounit)
-    if convval.units == 'frame' or convval.units == 'step':
+    if convval.units == "frame" or convval.units == "step":
         vals = np.round(convval.magnitude).astype(int)
         if vals.size == 1:  # Fix for PyEMMA tica. remove in future
             return int(vals)

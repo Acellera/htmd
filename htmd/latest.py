@@ -17,7 +17,7 @@ def compareVersions():
     if not os.path.exists(__htmdconf):
         try:
             os.makedirs(__htmdconf)
-        except:
+        except Exception:
             print(
                 f"Unable to create {__htmdconf} folder. Will not check for new HTMD versions."
             )
@@ -34,7 +34,7 @@ def compareVersions():
 
     try:
         f = open(__file, "r")
-    except:
+    except Exception:
         print(
             f"Unable to open {__file} file for reading. Will not check for new HTMD versions."
         )
@@ -90,7 +90,7 @@ def _writeLatestVersionFile(fname):
 
     try:
         f = open(fname, "w")
-    except:
+    except Exception:
         print(
             f"Unable to open {fname} file for writing. Will not check for new HTMD versions."
         )
@@ -162,5 +162,5 @@ def _release_python_dep(package, version, opersys=None):
             return versions
         else:
             return " does not exist for your platform. Please create an issue on HTMD git issue tracker."
-    except:
+    except Exception:
         return
