@@ -6,11 +6,14 @@
 from moleculekit.tools.graphalignment import makeMolGraph, compareGraphs
 from moleculekit.molecule import Molecule
 from htmd.home import home
+import unittest
 import shutil
 import parmed
 import numpy as np
 import tempfile
 import os
+
+from moleculekit.util import ensurelist
 
 
 ace = Molecule(os.path.join(home(shareDir=True), "builder", "caps", "ACE.cif"))
@@ -49,7 +52,18 @@ def _cap_residue(mol):
     return mol
 
 
-def parameterizeCustomResidues(cifs, outdir, method="ani-2x", nnp=None):
+def parameterizeCustomResidues(cifs, outdir, method="gaff2", nnp=None):
+    cifs = ensurelist(cifs)
+    method = method.lower()
+    if method == "ani-2x" and nnp is None:
+        raise RuntimeError(
+            "The user must provide an NNP calculator to user ANI-2x parameterization"
+        )
+    if method not in ("gaff2", "ani-2x"):
+        raise AttributeError(
+            "Parameterization can only be performed with GAFF2 or ANI-2x methods"
+        )
+
     for cif in cifs:
         mol = Molecule(cif)
         _parameterize_custom_residue(mol, outdir, method, nnp=nnp)
@@ -77,7 +91,7 @@ def _parameterize_custom_residue(mol, outdir, method, nnp=None):
 
         # TODO: Improve it to not parameterize the cap dihedrals by excluding those dihedrals
         main_parameterize(
-            mol,
+            cmol,
             user_charge=int(cmol.formalcharge.sum()),
             forcefield="GAFF2",
             charge_type="AM1-BCC",
@@ -299,3 +313,21 @@ def _duplicate_parameters(prm, original):
 
     for bt in new_bt:
         prm.improper_types[bt] = new_bt[bt]
+
+
+class _TestCustomResParam(unittest.TestCase):
+    def test_custom_residue_parameterization(self):
+        from glob import glob
+
+        refdir = home(dataDir=os.path.join("test-custom-residue-param"))
+        cifs = glob(os.path.join(refdir, "*.cif"))
+
+        for cif in cifs:
+            with tempfile.TemporaryDirectory() as tmpdir, self.subTest(cif):
+                parameterizeCustomResidues(cif, tmpdir, method="gaff2")
+                params = glob(os.path.join(tmpdir, "*"))
+                assert len(params) == 2
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
