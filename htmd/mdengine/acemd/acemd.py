@@ -645,6 +645,13 @@ class Acemd(_Acemd):
             val.String(),
             nargs="*",
         )
+        self._arg(
+            "slowperiod",
+            "int",
+            "Slow period",
+            2,
+            val.Number(int, "POS"),
+        )
 
         if config is not None:
             self.readConfig(config)
@@ -732,6 +739,7 @@ class _TestAcemd(TestCase):
 #
 coordinates             structure.pdb
 parameters              parameters
+slowperiod              2
 structure               structure.psf
 temperature             300 
 thermostattemperature   300
