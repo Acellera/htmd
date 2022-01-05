@@ -3,15 +3,18 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import tempfile
 import numpy as np
 from os import path
 from htmd.home import home
 import os
 import shutil
 from subprocess import call
-from htmd.util import tempname
+from natsort import natsorted
 from moleculekit.molecule import Molecule
+from networkx.algorithms import isomorphism
 from glob import glob
+import platform
 import logging
 
 logger = logging.getLogger(__name__)
@@ -77,153 +80,167 @@ def dock(
     # vina --ligand ligand.pdbqt --receptor protein.pdbqt --center_x 0. --center_y 0. --center_z 0. --size_x 60. --size_y 60. --size_z 60 --exhaustiveness 10
     # babel -m -i pdbqt ligand_out.pdbqt -o pdb out_.pdb -xhn
 
-    protein_pdb = tempname(suffix=".pdb")
-    ligand_mol2 = tempname(suffix=".mol2")
-    output_pdb = tempname(suffix="_.pdb")
-    output_prefix = path.splitext(output_pdb)[0]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        protein_pdb = os.path.join(tmpdir, "protein.pdb")
+        ligand_mol2 = os.path.join(tmpdir, "ligand.mol2")
 
-    protein_pdbqt = tempname(suffix=".pdbqt")
-    ligand_pdbqt = tempname(suffix=".pdbqt")
-    output_pdbqt = tempname(suffix=".pdbqt")
+        protein.write(protein_pdb)
+        lig2 = ligand.copy()
+        # babel does not understand mol2 atomtypes and requires elements instead
+        lig2.atomtype = lig2.element
+        lig2.write(ligand_mol2)
 
-    protein.write(protein_pdb)
-    lig2 = ligand.copy()
-    lig2.atomtype = (
-        lig2.element
-    )  # babel does not understand mol2 atomtypes and requires elements instead
-    lig2.write(ligand_mol2)
+        # Dirty hack to remove the 'END' line from the PDBs since babel hates it
+        with open(protein_pdb, "r") as f:
+            lines = f.readlines()
+        with open(protein_pdb, "w") as f:
+            f.writelines(lines[:-1])
+        # End of dirty hack
 
-    # Dirty hack to remove the 'END' line from the PDBs since babel hates it
-    with open(protein_pdb, "r") as f:
-        lines = f.readlines()
-    with open(protein_pdb, "w") as f:
-        f.writelines(lines[:-1])
-    # End of dirty hack
+        try:
+            if vinaexe is None:
+                suffix = ""
+                if platform.system() == "Windows":
+                    suffix = ".exe"
+                vinaexe = f"{platform.system()}-vina{suffix}"
 
-    try:
-        if vinaexe is None:
-            import platform
-
-            suffix = ""
-            if platform.system() == "Windows":
-                suffix = ".exe"
-            vinaexe = "{}-vina{}".format(platform.system(), suffix)
-
-        vinaexe = shutil.which(vinaexe, mode=os.X_OK)
-        if not vinaexe:
+            vinaexe = shutil.which(vinaexe, mode=os.X_OK)
+            if not vinaexe:
+                raise NameError(
+                    "Could not find vina, or no execute permissions are given"
+                )
+        except Exception:
             raise NameError("Could not find vina, or no execute permissions are given")
-    except Exception:
-        raise NameError("Could not find vina, or no execute permissions are given")
-    try:
-        babelexe = shutil.which(babelexe, mode=os.X_OK)
-        if babelexe is None:
+        try:
+            babelexe = shutil.which(babelexe, mode=os.X_OK)
+            if babelexe is None:
+                raise NameError(
+                    "Could not find babel, or no execute permissions are given"
+                )
+        except Exception:
             raise NameError("Could not find babel, or no execute permissions are given")
-    except Exception:
-        raise NameError("Could not find babel, or no execute permissions are given")
 
-    call(
-        [babelexe, "-i", "pdb", protein_pdb, "-o", "pdbqt", "-O", protein_pdbqt, "-xr"]
-    )
-    if np.all(ligand.charge != 0):
-        logger.info("Charges detected in ligand and will be used for docking.")
+        protein_pdbqt = os.path.join(tmpdir, "protein.pdbqt")
         call(
             [
                 babelexe,
                 "-i",
-                "mol2",
-                ligand_mol2,
+                "pdb",
+                protein_pdb,
                 "-o",
                 "pdbqt",
                 "-O",
-                ligand_pdbqt,
-                "-xn",
-                "-xh",
+                protein_pdbqt,
+                "-xr",
             ]
         )
-    else:
-        logger.info(
-            "Charges were not defined for all atoms. Will guess charges anew using gasteiger method."
+
+        ligand_pdbqt = os.path.join(tmpdir, "ligand.pdbqt")
+        if np.all(ligand.charge != 0):
+            logger.info("Charges detected in ligand and will be used for docking.")
+            call(
+                [
+                    babelexe,
+                    "-i",
+                    "mol2",
+                    ligand_mol2,
+                    "-o",
+                    "pdbqt",
+                    "-O",
+                    ligand_pdbqt,
+                    "-xn",
+                    "-xh",
+                ]
+            )
+        else:
+            logger.info(
+                "Charges were not defined for all atoms. Will guess charges anew using gasteiger method."
+            )
+            call(
+                [
+                    babelexe,
+                    "-i",
+                    "mol2",
+                    ligand_mol2,
+                    "-o",
+                    "pdbqt",
+                    "-O",
+                    ligand_pdbqt,
+                    "-xn",
+                    "-xh",
+                    "--partialcharge",
+                    "gasteiger",
+                ]
+            )
+
+        if not path.isfile(ligand_pdbqt):
+            raise NameError("Ligand could not be converted to PDBQT")
+        if not path.isfile(protein_pdbqt):
+            raise NameError("Protein could not be converted to PDBQT")
+
+        output_pdbqt = os.path.join(tmpdir, "output.pdbqt")
+        call(
+            [
+                vinaexe,
+                "--receptor",
+                protein_pdbqt,
+                "--ligand",
+                ligand_pdbqt,
+                "--out",
+                output_pdbqt,
+                "--center_x",
+                str(center[0]),
+                "--center_y",
+                str(center[1]),
+                "--center_z",
+                str(center[2]),
+                "--size_x",
+                str(extent[0]),
+                "--size_y",
+                str(extent[1]),
+                "--size_z",
+                str(extent[2]),
+                "--num_modes",
+                str(numposes),
+            ]
         )
+
         call(
             [
                 babelexe,
+                "-m",
                 "-i",
-                "mol2",
-                ligand_mol2,
-                "-o",
                 "pdbqt",
+                output_pdbqt,
+                "-o",
+                "pdb",
                 "-O",
-                ligand_pdbqt,
-                "-xn",
-                "-xh",
-                "--partialcharge",
-                "gasteiger",
+                os.path.join(tmpdir, "output_.pdb"),
+                "-xhn",
             ]
         )
 
-    if not path.isfile(ligand_pdbqt):
-        raise NameError("Ligand could not be converted to PDBQT")
-    if not path.isfile(protein_pdbqt):
-        raise NameError("Protein could not be converted to PDBQT")
+        outfiles = natsorted(glob(os.path.join(tmpdir, "output_*.pdb")))
 
-    call(
-        [
-            vinaexe,
-            "--receptor",
-            protein_pdbqt,
-            "--ligand",
-            ligand_pdbqt,
-            "--out",
-            output_pdbqt,
-            "--center_x",
-            str(center[0]),
-            "--center_y",
-            str(center[1]),
-            "--center_z",
-            str(center[2]),
-            "--size_x",
-            str(extent[0]),
-            "--size_y",
-            str(extent[1]),
-            "--size_z",
-            str(extent[2]),
-            "--num_modes",
-            str(numposes),
-        ]
-    )
+        lig_g = ligand.toGraph()
+        scoring = []
+        poses = []
+        for i, ligf in enumerate(outfiles):
+            scoring.append(_parseScoring(ligf))
+            pose = Molecule(ligf)
+            pose.viewname = f"Pose {i}"
 
-    call(
-        [
-            babelexe,
-            "-m",
-            "-i",
-            "pdbqt",
-            output_pdbqt,
-            "-o",
-            "pdb",
-            "-O",
-            output_pdb,
-            "-xhn",
-        ]
-    )
+            gm = isomorphism.GraphMatcher(lig_g, pose.toGraph())
+            if not gm.is_isomorphic():
+                raise RuntimeError(
+                    "Ligand molecules were changed and cannot be matched to original molecule"
+                )
 
-    from natsort import natsorted
-
-    outfiles = natsorted(glob("{}*.pdb".format(output_prefix)))
-
-    scoring = []
-    poses = []
-    for i, ligf in enumerate(outfiles):
-        scoring.append(_parseScoring(ligf))
-        ll = Molecule(ligf)
-        ll.viewname = "Pose {}".format(i)
-        poses.append(ll)
-
-    os.remove(protein_pdb)
-    os.remove(ligand_mol2)
-    os.remove(protein_pdbqt)
-    os.remove(ligand_pdbqt)
-    os.remove(output_pdbqt)
+            # Rename atoms in reference molecule and copy formal charges
+            for key, val in gm.mapping.items():
+                pose.name[val] = ligand.name[key]
+                pose.formalcharge[val] = ligand.formalcharge[key]
+            poses.append(pose)
 
     return poses, np.array(scoring)
 
