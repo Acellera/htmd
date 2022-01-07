@@ -116,6 +116,7 @@ def _parameterize_custom_residue(mol, outdir, method, nnp=None):
 
 def _post_process_parameterize(cmol, tmpdir, outdir, resn):
     from subprocess import call
+    from collections import defaultdict
 
     # TODO: Move this to parameterize (?)
     mol = Molecule(os.path.join(tmpdir, f"{resn}.mol2"))
@@ -129,22 +130,17 @@ def _post_process_parameterize(cmol, tmpdir, outdir, resn):
         mol.name[pp[0]] = cmol.name[pp[1]]
         mol.formalcharge[pp[0]] = cmol.formalcharge[pp[1]]
 
-    # Remove the caps
-    mask = np.ones(mol.numAtoms, dtype=bool)
-    mask[:6] = False
-    mask[-6:] = False
-
-    mol.filter(mask, _logger=False)
-
     # Rename backbone atom types
     backbone_at = {"N": "N", "H": "H", "CA": "CT", "HA": "H1", "C": "C", "O": "O"}
-    original = {}
-    for key, val in backbone_at.items():
-        original[mol.atomtype[mol.name == key][0]] = backbone_at[key]
-        mol.atomtype[mol.name == key] = val
+    sidechain = np.zeros(mol.numAtoms, dtype=bool)
+    sidechain[6:-6] = True
+    original = defaultdict(list)
 
-    mol2file = os.path.join(tmpdir, f"{resn}.mol2")
-    mol.write(mol2file)
+    for key, val in backbone_at.items():
+        sel = mol.name == key
+        for at in mol.atomtype[sel]:
+            original[at].append(val)
+        mol.atomtype[sel] = val
 
     frcmod = os.path.join(outdir, f"{resn}.frcmod")
     prm = parmed.amber.AmberParameterSet(frcmod)
@@ -153,8 +149,14 @@ def _post_process_parameterize(cmol, tmpdir, outdir, resn):
     _duplicate_parameters(prm, original)
 
     # Remove unused parameters
-    _clean_prm(prm, mol)
+    _clean_prm(prm, mol, list(backbone_at.values()), sidechain)
     prm.write(frcmod)
+
+    # Remove the caps
+    mol.filter(sidechain, _logger=False)
+
+    mol2file = os.path.join(tmpdir, f"{resn}.mol2")
+    mol.write(mol2file)
 
     acfile = os.path.join(tmpdir, f"{resn}_mod.ac")
     call(
@@ -205,114 +207,78 @@ def _post_process_parameterize(cmol, tmpdir, outdir, resn):
     )
 
 
-def _clean_prm(prm, mol):
+def _clean_prm(prm, mol, backbone_at, sidechain):
     from moleculekit.util import guessAnglesAndDihedrals
 
-    all_at = np.unique(mol.atomtype)
+    all_at = np.unique(mol.atomtype[sidechain]).tolist() + backbone_at
     angles, dihedrals = guessAnglesAndDihedrals(mol.bonds)
-    bond_at = mol.atomtype[mol.bonds].tolist()
-    angle_at = mol.atomtype[angles].tolist()
-    dihed_at = mol.atomtype[dihedrals].tolist()
+
+    at_dict = {
+        "bond_types": mol.atomtype[mol.bonds].tolist(),
+        "angle_types": mol.atomtype[angles].tolist(),
+        "dihedral_types": mol.atomtype[dihedrals].tolist(),
+    }
 
     to_delete = []
     for at in prm.atom_types:
-        if at not in all_at.tolist():
+        if at not in all_at:
             to_delete.append(at)
     for at in to_delete:
         del prm.atom_types[at]
 
-    to_delete = []
-    for bt in prm.bond_types:
-        if not np.any(np.isin(bt, all_at)):
-            to_delete.append(bt)
-        elif list(bt) not in bond_at and list(bt)[::-1] not in bond_at:
-            to_delete.append(bt)
-    for bt in to_delete:
-        del prm.bond_types[bt]
+    for param_t in ("bond_types", "angle_types", "dihedral_types"):
+        to_delete = []
+        seen = []
+        for bt in getattr(prm, param_t):
+            if (
+                not all(np.isin(bt, all_at))
+                or all(np.isin(bt, backbone_at))
+                or (
+                    list(bt) not in at_dict[param_t]
+                    and list(bt)[::-1] not in at_dict[param_t]
+                )
+                or list(bt)[::-1] in seen
+            ):
+                to_delete.append(bt)
+            seen.append(list(bt))
 
-    to_delete = []
-    for bt in prm.angle_types:
-        if not np.any(np.isin(bt, all_at)):
-            to_delete.append(bt)
-        elif list(bt) not in angle_at and list(bt)[::-1] not in angle_at:
-            to_delete.append(bt)
-    for bt in to_delete:
-        del prm.angle_types[bt]
-
-    to_delete = []
-    for bt in prm.dihedral_types:
-        if not np.any(np.isin(bt, all_at)):
-            to_delete.append(bt)
-        elif list(bt) not in dihed_at and list(bt)[::-1] not in dihed_at:
-            to_delete.append(bt)
-    for bt in to_delete:
-        del prm.dihedral_types[bt]
+        for bt in to_delete:
+            del prm.__dict__[param_t][bt]
 
     to_delete = []
     for bt in prm.improper_types:
-        if not np.any(np.isin(bt, all_at)):
+        if not all(np.isin(bt, all_at)) or all(np.isin(bt, backbone_at)):
             to_delete.append(bt)
     for bt in to_delete:
         del prm.improper_types[bt]
 
 
 def _duplicate_parameters(prm, original):
+    from copy import deepcopy
+
+    def _gen_permutations(typ, original):
+        import itertools
+
+        possibles = []
+        for tt in typ:
+            if tt in original:
+                possibles.append(original[tt] + [tt])
+            else:
+                possibles.append([tt])
+        return list(itertools.product(*possibles))
+
     # Duplicate parameters for renamed atoms which don't exist in the backbone
-    new_bt = {}
-    for bt in prm.bond_types:
-        bt = np.array(bt)
-        # If one of the two atom types was replaced duplicate the param
-        replaced = np.isin(bt, list(original.keys()))
-        if replaced.sum() != 1:
-            continue
-        bt_new = bt.copy()
-        bt_new[replaced] = [original[val] for val in bt[replaced]]
-        new_bt[tuple(bt_new)] = prm.bond_types[tuple(bt)]
+    for prm_typ in ("bond_types", "angle_types", "dihedral_types", "improper_types"):
+        new_bt = {}
+        for typ in getattr(prm, prm_typ):
+            perms = _gen_permutations(typ, original)
+            if len(perms) == 1:
+                continue  # No replacements
+            for perm in perms:
+                new_bt[perm] = getattr(prm, prm_typ)[typ]
 
-    for bt in new_bt:
-        prm.bond_types[bt] = new_bt[bt]
-
-    new_bt = {}
-    for bt in prm.angle_types:
-        bt = np.array(bt)
-        # If one of the two atom types was replaced duplicate the param
-        replaced = np.isin(bt, list(original.keys()))
-        if replaced.sum() == 0 or replaced.sum() == 3:
-            continue
-        bt_new = bt.copy()
-        bt_new[replaced] = [original[val] for val in bt[replaced]]
-        new_bt[tuple(bt_new)] = prm.angle_types[tuple(bt)]
-
-    for bt in new_bt:
-        prm.angle_types[bt] = new_bt[bt]
-
-    new_bt = {}
-    for bt in prm.dihedral_types:
-        bt = np.array(bt)
-        # If one of the two atom types was replaced duplicate the param
-        replaced = np.isin(bt, list(original.keys()))
-        if replaced.sum() == 0 or replaced.sum() == 4:
-            continue
-        bt_new = bt.copy()
-        bt_new[replaced] = [original[val] for val in bt[replaced]]
-        new_bt[tuple(bt_new)] = prm.dihedral_types[tuple(bt)]
-
-    for bt in new_bt:
-        prm.dihedral_types[bt] = new_bt[bt]
-
-    new_bt = {}
-    for bt in prm.improper_types:
-        bt = np.array(bt)
-        # If one of the two atom types was replaced duplicate the param
-        replaced = np.isin(bt, list(original.keys()))
-        if replaced.sum() == 0 or replaced.sum() == 4:
-            continue
-        bt_new = bt.copy()
-        bt_new[replaced] = [original[val] for val in bt[replaced]]
-        new_bt[tuple(bt_new)] = prm.improper_types[tuple(bt)]
-
-    for bt in new_bt:
-        prm.improper_types[bt] = new_bt[bt]
+        for bt in new_bt:
+            prm.__dict__[prm_typ][bt] = deepcopy(new_bt[bt])
 
 
 class _TestCustomResParam(unittest.TestCase):
