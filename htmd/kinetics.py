@@ -369,8 +369,6 @@ class Kinetics(object):
             tpt = msm.tpt(
                 self.model.msm, metastable_sets[self.source], metastable_sets[self.sink]
             )
-            # from IPython.core.debugger import Tracer
-            # Tracer()()
             newsets, tpt = tpt.coarse_grain(metastable_sets)
             setmap = []
             # getting the mapping of new sets to old sets

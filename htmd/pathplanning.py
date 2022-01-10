@@ -116,8 +116,6 @@ def _rewire(tree, near, neardist, newidx):
     newcosts = np.squeeze(neardist) + costs[newidx]
     shorter = np.where(newcosts < costs[near])[0]
     for s in shorter:
-        # from IPython.core.debugger import Tracer
-        # Tracer()()
         tree.costs[near[s]] = newcosts[s]
         tree.parent[near[s]] = newidx
 

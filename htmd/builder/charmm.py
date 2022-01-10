@@ -725,8 +725,6 @@ def _protonationPatches(mol):
         if len(pseg) == 0:
             continue
         for r in range(len(pseg)):
-            # from IPython.core.debugger import Tracer
-            # Tracer()()
             patch = "patch {} {}:{}".format(protonations[pro], pseg[r], pres[r])
             patches.append(patch)
 

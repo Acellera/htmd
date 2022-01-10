@@ -134,8 +134,6 @@ a.make()
 """
 def loopmodelerFALC(mol, segid, seq, pos, inspos, outname='loop'):
     currseq = mol.sequence()[segid]
-    #from IPython.core.debugger import Tracer
-    #Tracer()()
     fullseq = currseq[:inspos] + seq + currseq[inspos:]
 
     seqfile = tempname(suffix='.fasta')
