@@ -3,6 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from copy import deepcopy
 from moleculekit.tools.graphalignment import makeMolGraph, compareGraphs
 from moleculekit.molecule import Molecule
 from htmd.home import home
@@ -71,7 +72,7 @@ def parameterizeCustomResidues(cifs, outdir, method="gaff2", nnp=None):
 
 def _parameterize_custom_residue(mol, outdir, method, nnp=None):
     try:
-        from parameterize.parameterization.cli import main_parameterize
+        from parameterize.parameterization.cli import main_parameterize, list_dihedrals
     except ImportError:
         raise ImportError(
             "You are missing the parameterize library. Please install it with conda install parameterize -c acellera -c conda-forge"
@@ -86,10 +87,12 @@ def _parameterize_custom_residue(mol, outdir, method, nnp=None):
     with tempfile.TemporaryDirectory() as tmpdir:
         cmol = _cap_residue(mol)
 
-        sdffile = os.path.join(tmpdir, "mol.sdf")
-        cmol.write(sdffile)
+        dih = list_dihedrals(cmol, cmol.formalcharge.sum(), _logger=False)
+        # Delete pure backbone dihedrals to not reparameterize them and thus waste atomtype names and computation time
+        for dd in ("CH3-C-N-CA", "CA-C-N-CH3"):
+            if dd in dih:
+                del dih[dd]
 
-        # TODO: Improve it to not parameterize the cap dihedrals by excluding those dihedrals
         main_parameterize(
             cmol,
             user_charge=int(cmol.formalcharge.sum()),
@@ -99,12 +102,13 @@ def _parameterize_custom_residue(mol, outdir, method, nnp=None):
             dihed_fit_type="iterative",
             dihed_opt_type="mm",
             fit_dihedral=method != "gaff2",
+            dihedrals=list(dih.values()),
             nnp=nnp,
             outdir=tmpdir,
         )
         shutil.copy(
-            os.path.join(tmpdir, "parameters", "GAFF2", "mol-orig.mol2"),
-            os.path.join(tmpdir, f"{resn}.mol2"),
+            os.path.join(tmpdir, "parameters", "GAFF2", "mol-orig.cif"),
+            os.path.join(tmpdir, f"{resn}.cif"),
         )
         shutil.copy(
             os.path.join(tmpdir, "parameters", "GAFF2", "mol.frcmod"),
@@ -119,14 +123,14 @@ def _post_process_parameterize(cmol, tmpdir, outdir, resn):
     from collections import defaultdict
 
     # TODO: Move this to parameterize (?)
-    mol = Molecule(os.path.join(tmpdir, f"{resn}.mol2"))
+    mol = Molecule(os.path.join(tmpdir, f"{resn}.cif"))
     fields = ("element",)
     g1 = makeMolGraph(cmol, "all", fields)
     g2 = makeMolGraph(mol, "all", fields)
     _, _, matching = compareGraphs(
         g1, g2, fields=fields, tolerance=0.5, returnmatching=True
     )
-    for pp in matching:  # Rename atoms in reference molecule and copy formal charges
+    for pp in matching:  # Rename atoms in reference molecule
         mol.name[pp[0]] = cmol.name[pp[1]]
         mol.formalcharge[pp[0]] = cmol.formalcharge[pp[1]]
 
@@ -176,10 +180,11 @@ def _post_process_parameterize(cmol, tmpdir, outdir, resn):
             "0",
             "-nc",
             str(mol.formalcharge.sum()),
+            "-an",  # adjust atom names
+            "n",  # no
         ]
     )
 
-    # TODO: Recover the lost formal charge!!!
     mainchain = os.path.join(tmpdir, f"mainchain.{resn.lower()}")
     with open(mainchain, "w") as f:
         f.write("HEAD_NAME N\n")
@@ -245,12 +250,13 @@ def _clean_prm(prm, mol, backbone_at, sidechain):
         for bt in to_delete:
             del prm.__dict__[param_t][bt]
 
-    to_delete = []
-    for bt in prm.improper_types:
-        if not all(np.isin(bt, all_at)) or all(np.isin(bt, backbone_at)):
-            to_delete.append(bt)
-    for bt in to_delete:
-        del prm.improper_types[bt]
+    for param_t in ("improper_types", "improper_periodic_types"):
+        to_delete = []
+        for bt in getattr(prm, param_t):
+            if not all(np.isin(bt, all_at)) or all(np.isin(bt, backbone_at)):
+                to_delete.append(bt)
+        for bt in to_delete:
+            del prm.__dict__[param_t][bt]
 
 
 def _duplicate_parameters(prm, original):
