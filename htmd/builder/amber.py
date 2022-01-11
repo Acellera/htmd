@@ -1013,11 +1013,11 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
         with open(fname, "r") as f:
             lines = f.readlines()
 
-        const = ("", "MASS", "BOND", "ANGLE", "DIHE", "IMPROPER", "NONB")
+        const = ("MASS", "BOND", "ANGL", "DIHE", "IMPR", "NONB")
         with open(fname, "w") as f:
             f.write("Created by HTMD\n")
             for line in lines[1:]:
-                if line.strip() in const:
+                if line.strip() == "" or any([line.startswith(x) for x in const]):
                     f.write(line)
                     continue
                 # Split on two white spaces. Some atom types have a white space H - N -zs for example
@@ -1211,9 +1211,7 @@ class _TestAmberBuild(unittest.TestCase):
         newmol.append(lig)
         smol = solvate(newmol)
 
-        params = defaultParam() + [
-            join(refdir, "benzamidine.frcmod"),
-        ]
+        params = defaultParam() + [join(refdir, "BEN.frcmod")]
 
         _ = build(smol, outdir=tmpdir, param=params, ionize=False)
 
