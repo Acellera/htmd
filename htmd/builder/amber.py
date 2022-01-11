@@ -480,28 +480,40 @@ def _build(
                 shutil.copy(off, os.path.join(outdir, newname))
                 f.write(f"loadoff {newname}\n")
 
+        # Copy param and topo files to output folder and rename to unique names
+        newparam = []
+        for i, fname in enumerate(sorted(param)):
+            if not os.path.isfile(fname):
+                fname = _locateFile(fname, "param", teleap)
+                if fname is None:
+                    continue
+            newname = os.path.join(outdir, f"param{i}_{os.path.basename(fname)}")
+            shutil.copy(fname, newname)
+            newparam.append(newname)
+
+        newtopo = []
+        for i, fname in enumerate(sorted(topo)):
+            if not os.path.isfile(fname):
+                fname = _locateFile(fname, "topo", teleap)
+                if fname is None:
+                    continue
+            newname = os.path.join(outdir, f"topo{i}_{os.path.basename(fname)}")
+            shutil.copy(fname, newname)
+            newtopo.append(newname)
+
+        _fix_prepi_atomname_capitalization(mol, newtopo)
+        _fix_parameterize_atomtype_collisions(mol, newparam, newtopo)
+
         # Loading frcmod parameters
         f.write("# Loading parameter files\n")
-        for i, p in enumerate(param):
-            if not os.path.isfile(p):
-                p = _locateFile(p, "param", teleap)
-                if p is None:
-                    continue
-            newname = f"param{i}_{os.path.basename(p)}"
-            shutil.copy(p, os.path.join(outdir, newname))
-            f.write(f"loadamberparams {newname}\n")
+        for fname in newparam:
+            f.write(f"loadamberparams {os.path.basename(fname)}\n")
         f.write("\n")
 
         # Loading prepi topologies
         f.write("# Loading prepi topologies\n")
-        for i, t in enumerate(topo):
-            if not os.path.isfile(t):
-                t = _locateFile(t, "topo", teleap)
-                if t is None:
-                    continue
-            newname = f"topo{i}_{os.path.basename(t)}"
-            shutil.copy(t, os.path.join(outdir, newname))
-            f.write(f"loadamberprep {newname}\n")
+        for fname in newtopo:
+            f.write(f"loadamberprep {os.path.basename(fname)}\n")
         f.write("\n")
 
         if np.any(mol.atomtype == ""):
@@ -946,6 +958,146 @@ def _logParser(fname):
     return errors
 
 
+def _resname_from_fname(ff):
+    return os.path.splitext(os.path.basename(ff))[0].split("_", maxsplit=1)[1]
+
+
+def _fix_prepi_atomname_capitalization(mol, prepis):
+    for fname in prepis:
+        bn = _resname_from_fname(fname)
+        if bn not in mol.resname:
+            raise RuntimeError(
+                f"Could not find residue {bn} in mol to correspond to prepi file {fname}"
+            )
+
+        uqnames = {x.upper(): x for x in np.unique(mol.name[mol.resname == bn])}
+        with open(fname, "r") as f:
+            lines = f.readlines()
+
+        with open(fname, "w") as f:
+            atomregion = None
+            for i in range(len(lines)):
+                line = lines[i]
+                if atomregion is None and i == 8:
+                    atomregion = True
+                if atomregion is None or not atomregion:
+                    f.write(line)
+                else:
+                    if line.strip() == "":
+                        atomregion = False
+                        f.write(line)
+                        continue
+                    if line[6:10] == "DUMM":
+                        f.write(line)
+                        continue
+                    original = line[6:9].strip()
+                    fixedname = uqnames[original.upper()]
+                    if original != fixedname:
+                        logger.info(
+                            f"Fixed residue {bn} atom name {original} -> {fixedname} to match the input structure."
+                        )
+                        ll = f"{line[:6]}{fixedname:4s}{line[10:]}"
+                        f.write(ll)
+                    else:
+                        f.write(line)
+
+
+def _fix_parameterize_atomtype_collisions(mol, params, prepis):
+    import itertools
+    import string
+
+    prefixes = ["z", "x", "y", "w"]
+    gen = itertools.product(*[prefixes, string.ascii_lowercase])
+
+    def _fix_frcmod(fname, repl):
+        with open(fname, "r") as f:
+            lines = f.readlines()
+
+        const = ("", "MASS", "BOND", "ANGLE", "DIHE", "IMPROPER", "NONB")
+        with open(fname, "w") as f:
+            f.write("Created by HTMD\n")
+            for line in lines[1:]:
+                if line.strip() in const:
+                    f.write(line)
+                    continue
+                # Split on two white spaces. Some atom types have a white space H - N -zs for example
+                types, rest = line.split(sep="  ", maxsplit=1)
+                types = types.split("-")
+                for i in range(len(types)):
+                    if types[i] in repl:
+                        types[i] = repl[types[i]]
+                f.write("-".join(types) + "  " + rest)
+
+    def _fix_prepi(fname, repl):
+        with open(fname, "r") as f:
+            lines = f.readlines()
+
+        for i in range(7, len(lines)):
+            if lines[i].strip() == "":
+                break
+            old_at = lines[i][12:14]
+            if old_at in repl:
+                lines[i] = lines[i][:12] + repl[old_at] + lines[i][14:]
+
+        with open(fname, "w") as f:
+            for line in lines:
+                f.write(line)
+
+    def _fix_mol(bn, mol, repl):
+        idx = np.where(mol.resname == bn)[0]
+        for i in idx:
+            if mol.atomtype[i] in repl:
+                mol.atomtype[i] = repl[mol.atomtype[i]]
+
+    # Match prepis to frcmods
+    prepi_bn = {_resname_from_fname(x): x for x in prepis}
+    frcmd_bn = {_resname_from_fname(x): x for x in params}
+    replacements = {}
+    atomtypes = []
+    for bn in frcmd_bn:
+        replacements[bn] = {}
+
+        # Find all parameterize atom types in the frcmod file
+        with open(frcmd_bn[bn], "r") as f:
+            file_at = []
+            for line in f.readlines()[2:]:
+                if line.strip() == "":
+                    break
+                at = line.split()[0]
+                if at[0] not in prefixes:
+                    continue
+                file_at.append(at)
+
+        # Check for collisions with previous frcmod files and invent new type
+        for at in file_at:
+            if at in atomtypes:
+                # Invent new atom type and rename in frcmod
+                new_at = "".join(next(gen))
+                while new_at in atomtypes:
+                    new_at = "".join(next(gen))
+
+                atomtypes.append(new_at)
+                replacements[bn][at] = new_at
+                logger.info(
+                    f"Converting {bn} atom type {at} to {new_at} to avoid collisions."
+                )
+            else:
+                atomtypes.append(at)
+
+    # Correct all atom types to the new ones
+    for bn in replacements:
+        _fix_frcmod(frcmd_bn[bn], replacements[bn])
+        if bn in prepi_bn:
+            _fix_prepi(prepi_bn[bn], replacements[bn])
+
+        if bn in mol.resname:
+            _fix_mol(bn, mol, replacements[bn])
+        else:
+            raise RuntimeError(
+                f"Could not find residue {bn} in the input structure. Please ensure that the frcmod / prepi files are named as RES.frcmod / RES.prepi where RES the residue name to which they correspond."
+            )
+
+
 class _TestAmberBuild(unittest.TestCase):
     currentResult = None  # holds last result object passed to run method
 
@@ -1200,6 +1352,24 @@ class _TestAmberBuild(unittest.TestCase):
         )
 
         _TestAmberBuild._compareResultFolders(refdir, tmpdir, "6A5J")
+
+    def test_non_standard_residue_building(self):
+        import tempfile
+
+        homedir = home(dataDir=join("test-amber-build", "non-standard"))
+
+        with tempfile.TemporaryDirectory() as outdir:
+            pmol = Molecule(os.path.join(homedir, "5VBL_nolig.pdb"))
+            _ = build(
+                pmol,
+                topo=glob(os.path.join(homedir, "*.prepi")),
+                param=glob(os.path.join(homedir, "*.frcmod")),
+                ionize=False,
+                outdir=outdir,
+            )
+            refdir = home(dataDir=join("test-amber-build", "non-standard", "build"))
+
+            _TestAmberBuild._compareResultFolders(refdir, outdir, "5VBL")
 
 
 if __name__ == "__main__":
