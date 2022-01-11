@@ -128,6 +128,7 @@ class Equilibration(ProtocolInterface):
         self.acemd.barostat = "on"
         self.acemd.barostatpressure = 1.01325
         self.acemd.minimize = 500
+        self.acemd.slowperiod = 1
 
     def _findFiles(self, inputdir):
         # Tries to find default files if the given don't exist
