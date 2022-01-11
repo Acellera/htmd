@@ -8,6 +8,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-raise ImportError(
+logger.error(
     "Please do not import htmd.queues.playqueue. This was deprecated. Use playmolecule.playqueue instead."
 )
