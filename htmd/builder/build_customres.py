@@ -287,7 +287,19 @@ def _duplicate_parameters(prm, original):
             prm.__dict__[prm_typ][bt] = deepcopy(new_bt[bt])
 
 
+# The below is used for testing only
+try:
+    from parameterize.parameterization.cli import main_parameterize
+except ImportError:
+    _PARAMETERIZE_INSTALLED = False
+else:
+    _PARAMETERIZE_INSTALLED = True
+
+
 class _TestCustomResParam(unittest.TestCase):
+    @unittest.skipUnless(
+        _PARAMETERIZE_INSTALLED, "Can only run with parameterize installed"
+    )
     def test_custom_residue_parameterization(self):
         from glob import glob
 
