@@ -77,6 +77,89 @@ _defaultAmberSearchPaths = {
 }
 
 
+def _convert_in_file_to_prepis(in_file, outdir):
+    "This was used to convert the .in files in cofactors/ff-ncaa/ff-ptm used in _cofactors_noncanonical_ptm_params to prepi files"
+    with open(in_file, "r") as f:
+        mollines = []
+        name = None
+        for line in f.readlines():
+            mollines.append(line)
+            if line.strip().startswith("CORR"):
+                name = mollines[-2].strip().split()[0]
+                if len(mollines) != 6:
+                    # Add empty lines to start if they don't exist
+                    mollines = ["\n"] * (6 - len(mollines)) + mollines
+            if line.strip() == "DONE":
+                with open(os.path.join(outdir, f"{name.upper()}.prepi"), "w") as fout:
+                    for ll in mollines:
+                        fout.write(ll)
+                    fout.write("STOP")
+
+                name = None
+                mollines = []
+
+
+def _cofactors_ncaa_ptm_params():
+    res_dict = {}
+    htmdamberdir = htmdAmberHome()
+
+    dirs = [os.path.join(htmdamberdir, dd) for dd in ("cofactors", "ff-ncaa", "ff-ptm")]
+    for dir in dirs:
+        for cc in glob(os.path.join(dir, "*.frcmod")):
+            basename = os.path.splitext(os.path.basename(cc))[0]
+            if basename in res_dict:
+                raise AssertionError(
+                    f"Duplicate residue parameters detected for {basename} in {res_dict[basename][0]} and {cc}"
+                )
+            prepi = os.path.join(dir, f"{basename}.prepi")
+            if not os.path.exists(prepi):
+                raise AssertionError(
+                    f"prepi file should exist for frcmod {cc} in folder {os.path.dirname(cc)}"
+                )
+            res_dict[basename] = (cc, prepi, os.path.basename(dir))
+    return res_dict
+
+
+def _detect_cofactors_ncaa_ptm(mol, param, topo):
+    import itertools
+    import string
+
+    names = {
+        "cofactors": "Cofactor",
+        "ff-ncaa": "Non-canonical amino-acid",
+        "ff-ptm": "Post-translational modification",
+    }
+
+    segid_gen = itertools.product(*[["c"], string.digits + string.ascii_lowercase])
+
+    # Detect known cofactors, non-canonical AA and post-translational modifications and add the required files to the build
+    cofactors_etc = _cofactors_ncaa_ptm_params()
+    param_basenames = [os.path.splitext(os.path.basename(ff))[0] for ff in param]
+    uqresid = sequenceID((mol.resid, mol.insertion, mol.segid))
+    for ncres in sorted(cofactors_etc):
+        cof = cofactors_etc[ncres]
+        if any(mol.resname == ncres) and ncres not in param_basenames:
+            logger.info(
+                f"{names[cof[2]]} {ncres} detected in system. Automatically adding parameters and topology for AMBER."
+            )
+            param.append(cof[0])
+            topo.append(cof[1])
+            if cof[2] in ("cofactors", "ff-ptm"):
+                # Remove hydrogens to avoid naming issues
+                h_sel = (mol.resname == ncres) & (mol.element == "H")
+
+            if cof[2] == "cofactors":
+                uqresid = uqresid[~h_sel]
+                mol.remove(h_sel, _logger=False)
+                # Fix segids of cofactors
+                uq_rid = np.unique(uqresid[mol.resname == ncres])
+                for rid in uq_rid:
+                    new_segid = "".join(next(segid_gen))
+                    while new_segid in mol.segid:
+                        new_segid = "".join(next(segid_gen))
+                    mol.segid[(mol.resname == ncres) & (uqresid == rid)] = new_segid
+
+
 def htmdAmberHome():
     """Returns the location of the AMBER files distributed with HTMD"""
 
@@ -207,18 +290,6 @@ def _prepareMolecule(mol, caps, disulfide):
     # We need to renumber residues to unique numbers for teLeap. It goes up to 9999 and restarts from 0
     mol.resid[:] = (sequenceID((mol.resid, mol.insertion, mol.segid)) + 1) % 10000
 
-    # curr_resid = 0
-    # prev_combo = (None, None, None)
-    # for i in range(mol.numAtoms):
-    #     curr_combo = (mol.resid[i], mol.insertion[i], mol.segid[i])
-    #     if prev_combo != curr_combo:
-    #         curr_resid += 1
-    #         if prev_combo[0] is not None and curr_combo[0] - prev_combo[0] > 1:
-    #             curr_resid += 1  # Insert a resid gap if a gap existed before
-    #         prev_combo = curr_combo
-
-    #     mol.resid[i] = curr_resid % 10000
-
     # Map the old disulfide UniqueResidueIDs to the new ones
     if disulfide is not None and len(disulfide):
         if not isinstance(disulfide[0][0], str):
@@ -343,7 +414,15 @@ def build(
     """
     mol = mol.copy()
 
+    if ff is None:
+        ff = defaultFf()
+    if topo is None:
+        topo = defaultTopo()
+    if param is None:
+        param = defaultParam()
+
     disulfide = _prepareMolecule(mol, caps, disulfide)
+    _detect_cofactors_ncaa_ptm(mol, param, topo)
 
     if ionize:
         molbuilt = _build(
@@ -427,12 +506,6 @@ def _build(
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
     _cleanOutDir(outdir)
-    if ff is None:
-        ff = defaultFf()
-    if topo is None:
-        topo = defaultTopo()
-    if param is None:
-        param = defaultParam()
 
     with open(os.path.join(outdir, "tleap.in"), "w") as f:
         f.write("# tleap file generated by amber.build\n")
@@ -501,7 +574,6 @@ def _build(
             shutil.copy(fname, newname)
             newtopo.append(newname)
 
-        _fix_prepi_atomname_capitalization(mol, newtopo)
         _fix_parameterize_atomtype_collisions(mol, newparam, newtopo)
 
         # Loading frcmod parameters
@@ -962,46 +1034,6 @@ def _resname_from_fname(ff):
     return os.path.splitext(os.path.basename(ff))[0].split("_", maxsplit=1)[1]
 
 
-def _fix_prepi_atomname_capitalization(mol, prepis):
-    for fname in prepis:
-        bn = _resname_from_fname(fname)
-        if bn not in mol.resname:
-            raise RuntimeError(
-                f"Could not find residue {bn} in mol to correspond to prepi file {fname}"
-            )
-
-        uqnames = {x.upper(): x for x in np.unique(mol.name[mol.resname == bn])}
-        with open(fname, "r") as f:
-            lines = f.readlines()
-
-        with open(fname, "w") as f:
-            atomregion = None
-            for i in range(len(lines)):
-                line = lines[i]
-                if atomregion is None and i == 8:
-                    atomregion = True
-                if atomregion is None or not atomregion:
-                    f.write(line)
-                else:
-                    if line.strip() == "":
-                        atomregion = False
-                        f.write(line)
-                        continue
-                    if line[6:10] == "DUMM":
-                        f.write(line)
-                        continue
-                    original = line[6:9].strip()
-                    fixedname = uqnames[original.upper()]
-                    if original != fixedname:
-                        logger.info(
-                            f"Fixed residue {bn} atom name {original} -> {fixedname} to match the input structure."
-                        )
-                        ll = f"{line[:6]}{fixedname:4s}{line[10:]}"
-                        f.write(ll)
-                    else:
-                        f.write(line)
-
-
 def _fix_parameterize_atomtype_collisions(mol, params, prepis):
     import itertools
     import string
@@ -1028,16 +1060,32 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
                         types[i] = repl[types[i]]
                 f.write("-".join(types) + "  " + rest)
 
-    def _fix_prepi(fname, repl):
+    def _fix_prepi(bn, fname, repl):
+        uqnames = {x.upper(): x for x in np.unique(mol.name[mol.resname == bn])}
+
         with open(fname, "r") as f:
             lines = f.readlines()
 
-        for i in range(7, len(lines)):
+        for i in range(len(lines)):
+            if lines[i].strip().startswith("CORR"):
+                break
+
+        for i in range(i + 2, len(lines)):
             if lines[i].strip() == "":
                 break
             old_at = lines[i][12:14]
+            old_name = lines[i][6:9].strip()
             if old_at in repl:
                 lines[i] = lines[i][:12] + repl[old_at] + lines[i][14:]
+
+            # Fix wrong prepi atom name capitalization
+            if old_name.upper() in uqnames and uqnames[old_name.upper()] != old_name:
+                logger.info(
+                    f"Fixed residue {bn} atom name {old_name} -> {uqnames[old_name.upper()]} to match the input structure."
+                )
+                lines[
+                    i
+                ] = f"{lines[i][:6]}{uqnames[old_name.upper()]:4s}{lines[i][10:]}"
 
         with open(fname, "w") as f:
             for line in lines:
@@ -1054,6 +1102,7 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
     frcmd_bn = {_resname_from_fname(x): x for x in params}
     replacements = {}
     atomtypes = []
+    has_parameterize_at = []
     for bn in frcmd_bn:
         replacements[bn] = {}
 
@@ -1067,6 +1116,8 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
                 if at[0] not in prefixes:
                     continue
                 file_at.append(at)
+                if bn not in has_parameterize_at:
+                    has_parameterize_at.append(bn)
 
         # Check for collisions with previous frcmod files and invent new type
         for at in file_at:
@@ -1086,9 +1137,11 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
 
     # Correct all atom types to the new ones
     for bn in replacements:
+        if bn not in has_parameterize_at:
+            continue
         _fix_frcmod(frcmd_bn[bn], replacements[bn])
         if bn in prepi_bn:
-            _fix_prepi(prepi_bn[bn], replacements[bn])
+            _fix_prepi(bn, prepi_bn[bn], replacements[bn])
 
         if bn in mol.resname:
             _fix_mol(bn, mol, replacements[bn])
@@ -1368,6 +1421,24 @@ class _TestAmberBuild(unittest.TestCase):
             refdir = home(dataDir=join("test-amber-build", "non-standard", "build"))
 
             _TestAmberBuild._compareResultFolders(refdir, outdir, "5VBL")
+
+    def test_cofactor_building(self):
+        import tempfile
+
+        homedir = home(dataDir=join("test-amber-build", "cofactors"))
+
+        with tempfile.TemporaryDirectory() as outdir:
+            mol = Molecule(os.path.join(homedir, "cofactors.pdb"))
+            _ = build(mol, ionize=False, outdir=outdir)
+            refdir = home(dataDir=join("test-amber-build", "cofactors", "build"))
+
+            _TestAmberBuild._compareResultFolders(refdir, outdir, "Cofactors")
+
+    def test_existing_non_canonical_building(self):
+        raise NotImplementedError("I need to write these")
+
+    def test_post_translational_modifications_building(self):
+        raise NotImplementedError("I need to write these")
 
 
 if __name__ == "__main__":
