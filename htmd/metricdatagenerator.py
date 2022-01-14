@@ -3,7 +3,7 @@ from htmd.metricdata import MetricData
 
 
 class MetricDataGenerator:
-    def __init__(self, fulldata, model=None):
+    def __init__(self, fulldata, model=None, is_adaptive=False):
         self.fulldata = fulldata
         if model:
             self.micronum = model.micronum
@@ -13,6 +13,7 @@ class MetricDataGenerator:
         self.reference = []
         self.stconcat = np.concatenate(fulldata.St)
         self.lengths = fulldata.trajLengths
+        self.is_adaptive = is_adaptive
 
     @staticmethod
     def _collectTrajectory(datasource, traj):
@@ -56,15 +57,27 @@ class MetricDataGenerator:
                 rel.append((sel_clu, len_clu))
         return rel
 
-    def _startingFrames(self, ntraj, startFrames=None, simlen=None, maintainlen=True):
+    def _startingFrames(
+        self,
+        ntraj,
+        startFrames=None,
+        simlen=None,
+        maintainlen=True,
+    ):
         if startFrames is None:
-            from htmd.adaptive.adaptive import epochSimIndexes
+            if self.is_adaptive:
+                from htmd.adaptive.adaptive import epochSimIndexes
 
-            idx = epochSimIndexes(self.fulldata.simlist)
-            startFrames = []
-            # When starting, it picks random starting nmax trajs from epoch 1's trajectories. ntraj == nmax
-            for i in np.random.choice(idx[1], ntraj, replace=False):
-                startFrames.append([i, 0])
+                idx = epochSimIndexes(self.fulldata.simlist)
+                startFrames = []
+                # When starting, it picks random starting nmax trajs from epoch 1's trajectories. ntraj == nmax
+                for i in np.random.choice(idx[1], ntraj, replace=False):
+                    startFrames.append([i, 0])
+            else:
+                traj = np.random.randint(len(self.fulldata.trajectories))
+                nframes = self.fulldata.trajectories[traj].reference.shape[0]
+                frame = np.random.randint(nframes)
+                startFrames = [[traj, frame]]
         else:
             startFrames = self._convertRelFrames(startFrames)
             startFrames = self._pickFromCluster(
