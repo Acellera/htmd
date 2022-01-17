@@ -1423,11 +1423,21 @@ class _TestAmberBuild(unittest.TestCase):
 
             _TestAmberBuild._compareResultFolders(refdir, outdir, "Cofactors")
 
-    def test_existing_non_canonical_building(self):
-        raise NotImplementedError("I need to write these")
-
     def test_post_translational_modifications_building(self):
-        raise NotImplementedError("I need to write these")
+        import tempfile
+
+        homedir = home(dataDir=join("test-amber-build", "post-translational"))
+
+        with tempfile.TemporaryDirectory() as outdir:
+            mol = Molecule(os.path.join(homedir, "4EFP_nolig.pdb"))
+            _ = build(mol, ionize=False, outdir=outdir)
+            refdir = home(
+                dataDir=join("test-amber-build", "post-translational", "build")
+            )
+
+            _TestAmberBuild._compareResultFolders(
+                refdir, outdir, "post-translational modifications"
+            )
 
 
 if __name__ == "__main__":
