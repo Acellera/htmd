@@ -1127,7 +1127,7 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
 
     # Correct all atom types to the new ones
     for bn in replacements:
-        if len(replacements) == 0:
+        if len(replacements[bn]) == 0:
             continue
         _fix_frcmod(frcmd_bn[bn], replacements[bn])
         if bn in prepi_bn:
@@ -1409,7 +1409,6 @@ class _TestAmberBuild(unittest.TestCase):
                 outdir=outdir,
             )
             refdir = home(dataDir=join("test-amber-build", "non-standard", "build"))
-
             _TestAmberBuild._compareResultFolders(refdir, outdir, "5VBL")
 
     def test_cofactor_building(self):
