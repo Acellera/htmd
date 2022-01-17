@@ -74,7 +74,7 @@ def parameterizeCustomResidues(cifs, outdir, method="gaff2", nnp=None):
 
 def _parameterize_custom_residue(mol, outdir, method, nnp=None):
     try:
-        from parameterize.parameterization.cli import main_parameterize, list_dihedrals
+        from parameterize.cli import main_parameterize, list_dihedrals
     except ImportError:
         raise ImportError(
             "You are missing the parameterize library. Please install it with conda install parameterize -c acellera -c conda-forge"
