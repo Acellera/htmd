@@ -125,9 +125,9 @@ def _detect_cofactors_ncaa_ptm(mol, param, topo):
     import string
 
     names = {
-        "cofactors": "Cofactor",
-        "ff-ncaa": "Non-canonical amino-acid",
-        "ff-ptm": "Post-translational modification",
+        "cofactors": "Cofactor(s)",
+        "ff-ncaa": "Non-canonical amino-acid(s)",
+        "ff-ptm": "Post-translational modification(s)",
     }
 
     segid_gen = itertools.product(*[["c"], string.digits + string.ascii_lowercase])
@@ -136,12 +136,11 @@ def _detect_cofactors_ncaa_ptm(mol, param, topo):
     cofactors_etc = _cofactors_ncaa_ptm_params()
     param_basenames = [os.path.splitext(os.path.basename(ff))[0] for ff in param]
     uqresid = sequenceID((mol.resid, mol.insertion, mol.segid))
+    detected = {k: [] for k in names}
     for ncres in sorted(cofactors_etc):
         cof = cofactors_etc[ncres]
         if any(mol.resname == ncres) and ncres not in param_basenames:
-            logger.info(
-                f"{names[cof[2]]} {ncres} detected in system. Automatically adding parameters and topology for AMBER."
-            )
+            detected[cof[2]].append(ncres)
             param.append(cof[0])
             topo.append(cof[1])
             if cof[2] in ("cofactors", "ff-ptm"):
@@ -158,6 +157,12 @@ def _detect_cofactors_ncaa_ptm(mol, param, topo):
                     while new_segid in mol.segid:
                         new_segid = "".join(next(segid_gen))
                     mol.segid[(mol.resname == ncres) & (uqresid == rid)] = new_segid
+
+    for key in names:
+        if len(detected[key]):
+            logger.info(
+                f"{names[key]} {', '.join(detected[key])} detected in system. Automatically adding parameters and topology for AMBER."
+            )
 
 
 def htmdAmberHome():
@@ -1060,9 +1065,7 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
                         types[i] = repl[types[i]]
                 f.write("-".join(types) + "  " + rest)
 
-    def _fix_prepi(bn, fname, repl):
-        uqnames = {x.upper(): x for x in np.unique(mol.name[mol.resname == bn])}
-
+    def _fix_prepi(fname, repl):
         with open(fname, "r") as f:
             lines = f.readlines()
 
@@ -1074,18 +1077,8 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
             if lines[i].strip() == "":
                 break
             old_at = lines[i][12:14]
-            old_name = lines[i][6:9].strip()
             if old_at in repl:
                 lines[i] = lines[i][:12] + repl[old_at] + lines[i][14:]
-
-            # Fix wrong prepi atom name capitalization
-            if old_name.upper() in uqnames and uqnames[old_name.upper()] != old_name:
-                logger.info(
-                    f"Fixed residue {bn} atom name {old_name} -> {uqnames[old_name.upper()]} to match the input structure."
-                )
-                lines[
-                    i
-                ] = f"{lines[i][:6]}{uqnames[old_name.upper()]:4s}{lines[i][10:]}"
 
         with open(fname, "w") as f:
             for line in lines:
@@ -1102,7 +1095,6 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
     frcmd_bn = {_resname_from_fname(x): x for x in params}
     replacements = {}
     atomtypes = []
-    has_parameterize_at = []
     for bn in frcmd_bn:
         replacements[bn] = {}
 
@@ -1116,8 +1108,6 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
                 if at[0] not in prefixes:
                     continue
                 file_at.append(at)
-                if bn not in has_parameterize_at:
-                    has_parameterize_at.append(bn)
 
         # Check for collisions with previous frcmod files and invent new type
         for at in file_at:
@@ -1137,11 +1127,11 @@ def _fix_parameterize_atomtype_collisions(mol, params, prepis):
 
     # Correct all atom types to the new ones
     for bn in replacements:
-        if bn not in has_parameterize_at:
+        if len(replacements) == 0:
             continue
         _fix_frcmod(frcmd_bn[bn], replacements[bn])
         if bn in prepi_bn:
-            _fix_prepi(bn, prepi_bn[bn], replacements[bn])
+            _fix_prepi(prepi_bn[bn], replacements[bn])
 
         if bn in mol.resname:
             _fix_mol(bn, mol, replacements[bn])

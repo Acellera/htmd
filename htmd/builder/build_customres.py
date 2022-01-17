@@ -6,6 +6,7 @@
 from copy import deepcopy
 from moleculekit.tools.graphalignment import makeMolGraph, compareGraphs
 from moleculekit.molecule import Molecule
+from moleculekit.util import ensurelist
 from htmd.home import home
 import unittest
 import shutil
@@ -13,8 +14,9 @@ import parmed
 import numpy as np
 import tempfile
 import os
+import logging
 
-from moleculekit.util import ensurelist
+logger = logging.getLogger(__name__)
 
 
 ace = Molecule(os.path.join(home(shareDir=True), "builder", "caps", "ACE.cif"))
@@ -210,6 +212,37 @@ def _post_process_parameterize(cmol, tmpdir, outdir, resn):
             resn,
         ]
     )
+    print("")  # Add a newline after the output of prepgen
+
+    _fix_prepi_atomname_capitalization(mol, prepi)
+
+
+def _fix_prepi_atomname_capitalization(mol, prepi):
+    # Fix wrong prepi atom name capitalization
+    uqnames = {x.upper(): x for x in np.unique(mol.name)}
+
+    with open(prepi, "r") as f:
+        lines = f.readlines()
+
+    for i in range(len(lines)):
+        if lines[i].strip().startswith("CORR"):
+            break
+
+    for i in range(i + 2, len(lines)):
+        if lines[i].strip() == "":
+            break
+        old_name = lines[i][6:9].strip()
+
+        # Fix wrong prepi atom name capitalization
+        if old_name.upper() in uqnames and uqnames[old_name.upper()] != old_name:
+            logger.info(
+                f"Fixed residue {mol.resname[0]} atom name {old_name} -> {uqnames[old_name.upper()]} to match the input structure."
+            )
+            lines[i] = f"{lines[i][:6]}{uqnames[old_name.upper()]:4s}{lines[i][10:]}"
+
+    with open(prepi, "w") as f:
+        for line in lines:
+            f.write(line)
 
 
 def _clean_prm(prm, mol, backbone_at, sidechain):
