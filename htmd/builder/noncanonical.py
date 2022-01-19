@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from copy import deepcopy
 from moleculekit.tools.graphalignment import makeMolGraph, compareGraphs
 from moleculekit.molecule import Molecule
 from moleculekit.util import ensurelist
@@ -55,7 +54,7 @@ def _cap_residue(mol):
     return mol
 
 
-def parameterizeCustomResidues(cifs, outdir, method="gaff2", nnp=None):
+def parameterizeNonCanonicalResidues(cifs, outdir, method="gaff2", nnp=None):
     cifs = ensurelist(cifs)
     method = method.lower()
     if method == "ani-2x" and nnp is None:
@@ -69,10 +68,10 @@ def parameterizeCustomResidues(cifs, outdir, method="gaff2", nnp=None):
 
     for cif in cifs:
         mol = Molecule(cif)
-        _parameterize_custom_residue(mol, outdir, method, nnp=nnp)
+        _parameterize_non_canonical_residue(mol, outdir, method, nnp=nnp)
 
 
-def _parameterize_custom_residue(mol, outdir, method, nnp=None):
+def _parameterize_non_canonical_residue(mol, outdir, method, nnp=None):
     try:
         from parameterize.cli import main_parameterize, list_dihedrals
     except ImportError:
@@ -329,11 +328,11 @@ else:
     _PARAMETERIZE_INSTALLED = True
 
 
-class _TestCustomResParam(unittest.TestCase):
+class _TestNCAAResParam(unittest.TestCase):
     @unittest.skipUnless(
         _PARAMETERIZE_INSTALLED, "Can only run with parameterize installed"
     )
-    def test_custom_residue_parameterization(self):
+    def test_ncaa_residue_parameterization(self):
         from glob import glob
 
         refdir = home(dataDir=os.path.join("test-custom-residue-param"))
@@ -341,7 +340,7 @@ class _TestCustomResParam(unittest.TestCase):
 
         for cif in cifs:
             with tempfile.TemporaryDirectory() as tmpdir, self.subTest(cif):
-                parameterizeCustomResidues(cif, tmpdir, method="gaff2")
+                parameterizeNonCanonicalResidues(cif, tmpdir, method="gaff2")
                 params = glob(os.path.join(tmpdir, "*"))
                 assert len(params) == 2
 
