@@ -457,6 +457,7 @@ def build(
         totalcharge = np.sum(molbuilt.charge)
         nwater = np.sum(molbuilt.atomselect("water and noh"))
         anion, cation, anionatom, cationatom, nanion, ncation = ionizef(
+            molbuilt,
             totalcharge,
             nwater,
             saltconc=saltconc,

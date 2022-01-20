@@ -25,7 +25,14 @@ _ions = {
 
 
 def ionize(
-    netcharge, nwater, neutralize=True, saltconc=None, cation=None, anion=None, ff=None
+    mol,
+    netcharge,
+    nwater,
+    neutralize=True,
+    saltconc=None,
+    cation=None,
+    anion=None,
+    ff=None,
 ):
     if ff:
         logger.warning(
@@ -110,11 +117,23 @@ def ionize(
     else:
         raise NameError("Unsupported ion charge; cannot guess chamical formula.")
 
+    # Count existing salt concentration to not add on top of existing conc
+    # TODO: This will break on multi-atom ions! Will require a bit fancier code to calculate individual molecules
+    cation_names = [cation, _ions[cation][3]]  # AMBER and CHARMM names
+    anion_names = [anion, _ions[anion][3]]
+    ncations_exist = np.sum(np.in1d(mol.resname, cation_names)) / cationstoich
+    nanions_exist = np.sum(np.in1d(mol.resname, anion_names)) / anionstoich
+    exist = int(min(ncations_exist, nanions_exist))
+
     num = int(np.floor(0.5 + 0.0187 * saltconc * nwater))
-    logger.info(
-        "Adding {} anions + {} cations for neutralizing and {} ions for the given salt concentration.".format(
-            nanion, ncation, (cationstoich + anionstoich) * num
+    num -= exist
+    if num < 0:
+        raise RuntimeError(
+            f"Salt concentration in system is already higher than the requested concentration {saltconc} M. Please remove some ions or change salt concentration and try again."
         )
+
+    logger.info(
+        f"Adding {nanion} anions + {ncation} cations for neutralizing and {(cationstoich + anionstoich) * num} ions for the given salt concentration {saltconc} M."
     )
     ncation += cationstoich * num
     nanion += anionstoich * num
