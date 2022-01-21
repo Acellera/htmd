@@ -326,29 +326,28 @@ def _prepareMolecule(mol: Molecule, caps, disulfide):
 
 def _write_residue_mapping(molbuilt, mol_orig, outdir):
     # Align with original molecule to rename residues back to original resids
-    if mol_orig is not None:
-        try:
-            _, mapping = sequenceStructureAlignment(molbuilt, mol_orig, maxalignments=1)
-            if len(mapping):
-                mol_map, ref_map = mapping[0]  # Top alignment
-                idx_mol = np.where(mol_map)[0]
-                idx_ref = np.where(ref_map)[0]
-                residmap = []
-                for im, ir in zip(idx_mol, idx_ref):
-                    residmap.append(
-                        [
-                            str(molbuilt.resid[im]),
-                            str(mol_orig.resid[ir]),
-                            mol_orig.insertion[ir],
-                            mol_orig.chain[ir],
-                        ]
-                    )
-                with open(os.path.join(outdir, "residue_mapping.csv"), "w") as fcsv:
-                    fcsv.write("new_resid,old_resid,old_insertion,old_chain\n")
-                    for mm in residmap:
-                        fcsv.write(",".join(mm) + "\n")
-        except Exception:
-            pass
+    try:
+        _, mapping = sequenceStructureAlignment(molbuilt, mol_orig, maxalignments=1)
+        if len(mapping):
+            mol_map, ref_map = mapping[0]  # Top alignment
+            idx_mol = np.where(mol_map)[0]
+            idx_ref = np.where(ref_map)[0]
+            residmap = []
+            for im, ir in zip(idx_mol, idx_ref):
+                residmap.append(
+                    [
+                        str(molbuilt.resid[im]),
+                        str(mol_orig.resid[ir]),
+                        mol_orig.insertion[ir],
+                        mol_orig.chain[ir],
+                    ]
+                )
+            with open(os.path.join(outdir, "residue_mapping.csv"), "w") as fcsv:
+                fcsv.write("new_resid,old_resid,old_insertion,old_chain\n")
+                for mm in residmap:
+                    fcsv.write(",".join(mm) + "\n")
+    except Exception:
+        pass
 
 
 def build(
