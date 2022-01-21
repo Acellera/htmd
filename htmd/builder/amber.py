@@ -28,6 +28,7 @@ from htmd.builder.builder import (
 )
 from subprocess import call
 from moleculekit.molecule import Molecule
+from moleculekit.tools.sequencestructuralalignment import sequenceStructureAlignment
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist
 import unittest
@@ -323,6 +324,33 @@ def _prepareMolecule(mol: Molecule, caps, disulfide):
     return disulfide
 
 
+def _write_residue_mapping(molbuilt, mol_orig, outdir):
+    # Align with original molecule to rename residues back to original resids
+    if mol_orig is not None:
+        try:
+            _, mapping = sequenceStructureAlignment(molbuilt, mol_orig, maxalignments=1)
+            if len(mapping):
+                mol_map, ref_map = mapping[0]  # Top alignment
+                idx_mol = np.where(mol_map)[0]
+                idx_ref = np.where(ref_map)[0]
+                residmap = []
+                for im, ir in zip(idx_mol, idx_ref):
+                    residmap.append(
+                        [
+                            str(molbuilt.resid[im]),
+                            str(mol_orig.resid[ir]),
+                            mol_orig.insertion[ir],
+                            mol_orig.chain[ir],
+                        ]
+                    )
+                with open(os.path.join(outdir, "residue_mapping.csv"), "w") as fcsv:
+                    fcsv.write("new_resid,old_resid,old_insertion,old_chain\n")
+                    for mm in residmap:
+                        fcsv.write(",".join(mm) + "\n")
+        except Exception:
+            pass
+
+
 def build(
     mol,
     ff=None,
@@ -417,6 +445,7 @@ def build(
     >>> disu = [['segid P and resid 157', 'segid P and resid 13'], ['segid K and resid 1', 'segid K and resid 25']]
     >>> molbuilt = amber.build(mol, outdir='/tmp/build', saltconc=0.15, disulfide=disu)  # doctest: +SKIP
     """
+    mol_orig = mol
     mol = mol.copy()
 
     if ff is None:
@@ -482,6 +511,7 @@ def build(
         gbsa=gbsa,
         igb=igb,
     )
+    _write_residue_mapping(molbuilt, mol_orig, outdir)
     return molbuilt
 
 
@@ -696,10 +726,7 @@ def _build(
                 f"No structure pdb/prmtop file was generated. Check {logpath} for errors in building."
             )
 
-        tmpbonds = molbuilt.bonds
-        molbuilt.bonds = []  # Removing the bonds to speed up writing
-        molbuilt.write(os.path.join(outdir, "structure.pdb"))
-        molbuilt.bonds = tmpbonds  # Restoring the bonds
+        molbuilt.write(os.path.join(outdir, "structure.pdb"), writebonds=False)
         detectCisPeptideBonds(molbuilt, respect_bonds=True)  # Warn in case of cis bonds
         return molbuilt
 
