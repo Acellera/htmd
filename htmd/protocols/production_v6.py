@@ -269,7 +269,7 @@ class Production(ProtocolInterface):
 
         return restraints
 
-    def write(self, inputdir, outputdir):
+    def write(self, inputdir, outputdir, cisbondcheck=True):
         """Writes the production protocol and files into a folder.
 
         Parameters
@@ -278,6 +278,8 @@ class Production(ProtocolInterface):
             Path to a directory containing the files produced by a equilibration process.
         outputdir : str
             Directory where to write the production setup files.
+        cisbondcheck : bool
+            Set to False to disable the cis peptidic bond checks
         """
         from moleculekit.molecule import Molecule
         from htmd.units import convert
@@ -294,10 +296,12 @@ class Production(ProtocolInterface):
         )
         self.acemd.run = str(numsteps)
 
+        structfile = os.path.join(inputdir, self.acemd.structure)
         pdbfile = os.path.join(inputdir, self.acemd.coordinates)
-        inmol = Molecule(pdbfile)
+        inmol = Molecule([structfile, pdbfile])
 
-        detectCisPeptideBonds(inmol)
+        if cisbondcheck:
+            detectCisPeptideBonds(inmol, respect_bonds=True)
 
         if np.any(inmol.atomselect("lipids")) and not self.useconstantratio:
             logger.warning(
