@@ -48,6 +48,46 @@ jobs:
         export HTMD_NONINTERACTIVE=1
         coverage run -m pytest --verbose --durations=10 ./htmd/
 
+  makedocs:
+    if: startsWith(github.event.ref, 'refs/tags/')
+    needs: test
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.9"]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        lfs: true
+        submodules: true
+
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install conda deps
+      run: |
+        conda install -y -q --file package/htmd-deps/DEPENDENCIES nbconvert sphinx python=${{ matrix.python-version }} -c acellera -c conda-forge
+
+    - name: Generate rst docs
+      run: |
+        cd doc; make rst
+      
+    - name: Archive rst artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: docs
+        path: |
+          doc/source/
+
   deploy:
     if: startsWith(github.event.ref, 'refs/tags/')
     needs: test
