@@ -119,7 +119,24 @@ class GroupRestraint(_Restraint):
 
         Examples
         --------
+        Restrain the COM of resname MOL to a flat bottom potential of 10A around it's original position
+        Restraints start from 20kcal/mol between 0-10ns, then scale to 10kcal/mol between 10-20ns
+        and finally to 0kcal/mol between 20-30ns
         >>> gr = GroupRestraint('resname MOL', 10, [(20, '10ns'), (10, '20ns'), (0, '30ns')])
+
+        Restrain the COM of resname MOL to it's original position along X and y axes, scaling restraints from 20kcal/mol to 0 at 30ns
+        >>> gr = GroupRestraint('resname MOL', 0, [(20, '0ns'), (0, '30ns')], axes="xy")
+
+        To define a flat-bottom potential box which is not centered on the COM of the atoms it applies to we can use the following
+        two options.
+
+        Create a flat-bottom potential box of 10x10x30A centered on protein resid 150 which applies to the COM of resname MOL
+        >>> gr = GroupRestraint('resname MOL', [10, 10, 30], [(20, '0ns'), (0, '30ns')], fbcentresel="protein and resid 150")
+
+        In some simulations like membrane simulations where there is no total drift in the system, it's possible to
+        use absolute coordinates for the center of the flat bottom potential with the fbcentre argument.
+        Generally avoid this in favour of fbcentersel, since the above updates the center of the FB box during the simulation.
+        >>> gr = GroupRestraint('resname MOL', 20, [(20, '0ns'), (0, '30ns')], fbcentre=[14.23, -3.75, 5.41])
         """
         super().__init__(
             "group",
@@ -134,7 +151,7 @@ class GroupRestraint(_Restraint):
 
 class AtomRestraint(_Restraint):
     def __init__(self, selection, width, restraints, axes="xyz"):
-        """A restraint applied individually on each atom in the selection
+        """A restraint applied individually on each atom in the selection.
 
         Parameters
         ----------
@@ -152,7 +169,12 @@ class AtomRestraint(_Restraint):
 
         Examples
         --------
-        >>> gr = AtomRestraint('name CA', 10, [(20, '10ns'), (10, '20ns'), (0, '30ns')])
+        Flat bottom potential of width 10A. Starts from 20kcal/mol between 0-10ns, then scales to 10kcal/mol between 10-20ns
+        and finally to 0kcal/mol between 20-30ns
+        >>> restr = AtomRestraint('name CA', 10, [(20, '10ns'), (10, '20ns'), (0, '30ns')])
+
+        Restrain atoms to a plane on the Z axis with no flat-bottom. Allows them only to move on X Y axes.
+        >>> restr = AtomRestraint('resname MOL', 0, [(20, '10ns'), (0, '30ns')], axes="z")
         """
         super().__init__("atom", selection, width, restraints, axes)
 

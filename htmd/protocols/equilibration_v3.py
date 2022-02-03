@@ -30,7 +30,7 @@ class Equilibration(ProtocolInterface):
     temperature : float, default=300
         Temperature of the thermostat in Kelvin
     restraints : list, default=None
-        A list of restraint objects. See :class:`AtomRestraint <htmd.mdengine.acemd.acemd.AtomRestraint>` and:class:`GroupRestraint<htmd.mdengine.acemd.acemd.GroupRestraint>`)
+        A list of restraint objects. See :class:`AtomRestraint <htmd.mdengine.acemd.acemd.AtomRestraint>` and :class:`GroupRestraint<htmd.mdengine.acemd.acemd.GroupRestraint>`)
     useconstantratio : bool, default=False
         For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
     restraintsteps : int, default=None

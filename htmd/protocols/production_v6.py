@@ -30,22 +30,28 @@ class Production(ProtocolInterface):
         Units for runtime. Can be 'steps', 'ns' etc.
     temperature : float, default=300
         Temperature of the thermostat in Kelvin
-    fb_k : float, default=0
-        Force constant of the flatbottom potential in kcal/mol/A^2. E.g. 5
-    fb_reference : str, default='none'
-        Reference selection to use as dynamic center of the flatbottom box.
-    fb_selection : str, default='none'
-        Selection of atoms to apply the flatbottom potential
-    fb_box : list, default=[0, 0, 0, 0, 0, 0]
-        Position of the flatbottom box in term of the reference center given as [xmin, xmax, ymin, ymax, zmin, zmax]
     useconstantratio : bool, default=False
         For membrane protein simulations set it to true so that the barostat does not modify the xy aspect ratio.
-    useconstraints : bool, default=False
-        Apply constraints to the production simulation, defined by the constraints parameter
-    constraints : dict, default={}
-        A dictionary of atomselections and values of the constraint to be applied (in kcal/mol/A^2). Atomselects must be mutually exclusive.
+    restraints : list, default=None
+        A list of restraint objects. See :class:`AtomRestraint <htmd.mdengine.acemd.acemd.AtomRestraint>` and :class:`GroupRestraint<htmd.mdengine.acemd.acemd.GroupRestraint>`)
     adaptive : bool, default=False
         Set to True if making production runs for adaptive sampling.
+
+    Example
+    -------
+    >>> from htmd.protocols.production_v6 import Production
+    >>> from htmd.mdengine.acemd.acemd import GroupRestraint
+    >>> md = Production()
+    >>> md.runtime = 4
+    >>> md.timeunits = 'ns'
+    >>> md.temperature = 300
+    >>> md.useconstantratio = True  # only for membrane sims
+    Use a 10x10x30A flat bottom potential centered on protein residue 142 to prevent the ligand from crossing periodic boxes
+    ending up on the other side of the membrane.
+    >>> width = [10, 10, 30]
+    >>> flatbot = GroupRestraint('segname L and noh', width, [(5, '0ns')], fbcentersel="protein and resid 142")
+    >>> md.restraints = flatbot
+    >>> md.write('./build','./equil')
     """
 
     def __init__(self):
