@@ -122,7 +122,14 @@ class GroupRestraint(_Restraint):
         Restrain the COM of resname MOL to a flat bottom potential of 10A around it's original position
         Restraints start from 20kcal/mol between 0-10ns, then scale to 10kcal/mol between 10-20ns
         and finally to 0kcal/mol between 20-30ns
+        >>> from htmd.mdengine.acemd.acemd import GroupRestraint
         >>> gr = GroupRestraint('resname MOL', 10, [(20, '10ns'), (10, '20ns'), (0, '30ns')])
+
+        You can visualize the group restraints with .view() (currently only available in VMD viewer)
+        For visualizing please always use as `mol` the initial simulation coordinates.
+        >>> mol = Molecule("./equil/structure.pdb")
+        >>> gr = GroupRestraint("resname BEN", [10, 10, 20], [(20, "0ns")])
+        >>> gr.view(mol)
 
         Restrain the COM of resname MOL to it's original position along X and y axes, scaling restraints from 20kcal/mol to 0 at 30ns
         >>> gr = GroupRestraint('resname MOL', 0, [(20, '0ns'), (0, '30ns')], axes="xy")
@@ -147,6 +154,39 @@ class GroupRestraint(_Restraint):
             fbcentre=fbcentre,
             fbcentresel=fbcentresel,
         )
+
+    def view(self, mol):
+        from moleculekit.vmdgraphics import VMDBox
+
+        if self.fbcentre is not None:
+            center = self.fbcentre
+        elif self.fbcentresel is not None:
+            sel = mol.atomselect(self.fbcentresel)
+            if not np.any(sel):
+                raise RuntimeError(
+                    f'fbcentersel: "{self.fbcentresel}", did not select any atoms in mol'
+                )
+            center = mol.coords[sel, :, 0].mean(axis=0)
+        else:
+            sel = mol.atomselect(self.selection)
+            if not np.any(sel):
+                raise RuntimeError(
+                    f'selection: "{self.selection}", did not select any atoms in mol'
+                )
+            center = mol.coords[sel, :, 0].mean(axis=0)
+
+        width = self.width
+        if len(width) == 1:
+            width = [width[0], width[0], width[0]]
+        width = np.array(width)
+        hfw = width / 2
+
+        center = np.array(center)
+        box_coords = np.vstack((center - hfw, center + hfw)).T.flatten()
+        mol.reps.add("protein", "NewCartoon")
+        mol.reps.add(self.selection, "Licorice", color="1")
+        mol.view()
+        _ = VMDBox(box_coords)
 
 
 class AtomRestraint(_Restraint):
