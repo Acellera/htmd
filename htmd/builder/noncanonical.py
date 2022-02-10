@@ -7,6 +7,7 @@ from moleculekit.tools.graphalignment import makeMolGraph, compareGraphs
 from moleculekit.molecule import Molecule
 from moleculekit.util import ensurelist
 from htmd.home import home
+from glob import glob
 import unittest
 import shutil
 import parmed
@@ -108,11 +109,11 @@ def _parameterize_non_canonical_residue(mol, outdir, method, nnp=None):
             outdir=tmpdir,
         )
         shutil.copy(
-            os.path.join(tmpdir, "parameters", "GAFF2", "mol-orig.cif"),
+            glob(os.path.join(tmpdir, "parameters", "GAFF2", "*-orig.cif"))[0],
             os.path.join(tmpdir, f"{resn}.cif"),
         )
         shutil.copy(
-            os.path.join(tmpdir, "parameters", "GAFF2", "mol.frcmod"),
+            glob(os.path.join(tmpdir, "parameters", "GAFF2", "*.frcmod"))[0],
             os.path.join(outdir, f"{resn}.frcmod"),
         )
 
