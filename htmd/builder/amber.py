@@ -753,14 +753,26 @@ def _add_caps(mol: Molecule, caps: dict):
             )
         # For each cap
         for i, cap in enumerate(caps[seg]):
+            term = "N" if i == 0 else "C"
             if cap is None or (isinstance(cap, str) and cap == "none"):
                 continue
 
             # Get info on segment and its terminals
             segidm = mol.segid == seg
             segididx = np.where(segidm)[0]
-            terminalresids = [mol.resid[segididx][0], mol.resid[segididx][-1]]
-            residm = mol.resid == terminalresids[i]  # Mask for resid
+            terminals = {
+                "N": {
+                    "resid": mol.resid[segididx][0],
+                    "insertion": mol.insertion[segididx][0],
+                },
+                "C": {
+                    "resid": mol.resid[segididx][-1],
+                    "insertion": mol.insertion[segididx][-1],
+                },
+            }
+            residm = (mol.resid == terminals[term]["resid"]) & (
+                mol.insertion == terminals[term]["insertion"]
+            )  # Mask for resid
             mask = residm & segidm
             resname = mol.resname[mask][0]
 
@@ -782,7 +794,7 @@ def _add_caps(mol: Molecule, caps: dict):
             capmol.align(cap_idx, refmol=mol, refsel=mol_idx)
             capmol.resname[capmol.resname == "XXX"] = resname
             capmol.segid[:] = seg
-            capmol.resid[:] += terminalresids[i]
+            capmol.resid[:] += terminals[term]["resid"]
             capmol.chain[:] = mol.chain[mask][0]
             capmol.remove(cap_idx, _logger=False)  # Remove atoms which were aligned
 
@@ -1432,18 +1444,22 @@ class _TestAmberBuild(unittest.TestCase):
         import tempfile
 
         homedir = home(dataDir=join("test-amber-build", "non-standard"))
+        pdbids = ["5VBL", "1AWF"]
 
-        with tempfile.TemporaryDirectory() as outdir:
-            pmol = Molecule(os.path.join(homedir, "5VBL_nolig.pdb"))
-            _ = build(
-                pmol,
-                topo=glob(os.path.join(homedir, "*.prepi")),
-                param=glob(os.path.join(homedir, "*.frcmod")),
-                ionize=False,
-                outdir=outdir,
-            )
-            refdir = home(dataDir=join("test-amber-build", "non-standard", "build"))
-            _TestAmberBuild._compareResultFolders(refdir, outdir, "5VBL")
+        for pdbid in pdbids:
+            protdir = os.path.join(homedir, pdbid)
+            with self.subTest(pdbid=pdbid):
+                with tempfile.TemporaryDirectory() as outdir:
+                    pmol = Molecule(os.path.join(protdir, f"{pdbid}_nolig.pdb"))
+                    _ = build(
+                        pmol,
+                        topo=glob(os.path.join(protdir, "*.prepi")),
+                        param=glob(os.path.join(protdir, "*.frcmod")),
+                        ionize=False,
+                        outdir=outdir,
+                    )
+                    refdir = home(dataDir=join("test-amber-build", "non-standard", pdbid, "build"))
+                    _TestAmberBuild._compareResultFolders(refdir, outdir, pdbid)
 
     def test_cofactor_building(self):
         import tempfile
