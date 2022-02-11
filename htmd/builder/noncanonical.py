@@ -88,6 +88,7 @@ def _parameterize_non_canonical_residue(mol, outdir, method, nnp=None):
     resn = mol.resname[0]
     with tempfile.TemporaryDirectory() as tmpdir:
         cmol = _cap_residue(mol)
+        cmol.resname[:] = resn  # So that CIF is written as smallmol instead of macromol
 
         dih = list_dihedrals(cmol, cmol.formalcharge.sum(), _logger=False)
         # Delete pure backbone dihedrals to not reparameterize them and thus waste atomtype names and computation time
@@ -109,11 +110,11 @@ def _parameterize_non_canonical_residue(mol, outdir, method, nnp=None):
             outdir=tmpdir,
         )
         shutil.copy(
-            glob(os.path.join(tmpdir, "parameters", "GAFF2", "*-orig.cif"))[0],
+            os.path.join(tmpdir, "parameters", "GAFF2", f"{resn}-orig.cif"),
             os.path.join(tmpdir, f"{resn}.cif"),
         )
         shutil.copy(
-            glob(os.path.join(tmpdir, "parameters", "GAFF2", "*.frcmod"))[0],
+            os.path.join(tmpdir, "parameters", "GAFF2", f"{resn}.frcmod"),
             os.path.join(outdir, f"{resn}.frcmod"),
         )
 
@@ -184,6 +185,8 @@ def _post_process_parameterize(cmol, tmpdir, outdir, resn):
             str(mol.formalcharge.sum()),
             "-an",  # adjust atom names
             "n",  # no
+            "-pf",
+            "y",
         ]
     )
 
@@ -322,7 +325,7 @@ def _duplicate_parameters(prm, original):
 
 # The below is used for testing only
 try:
-    from parameterize.parameterization.cli import main_parameterize
+    from parameterize.cli import main_parameterize
 except ImportError:
     _PARAMETERIZE_INSTALLED = False
 else:
