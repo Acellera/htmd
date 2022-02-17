@@ -735,7 +735,8 @@ def _add_caps(mol: Molecule, caps: dict):
 
     remove_atoms = {
         "ACE": ["H1", "H2", "H3", "HT1", "HT2", "HT3", "H"],
-        "NME": ["OXT", "OT1", "O"],
+        "NME": ["OXT", "OT1", "O", "HXT"],
+        "NHE": ["OXT", "OT1", "O", "HXT"],
     }
 
     # For each caps definition
@@ -1458,7 +1459,9 @@ class _TestAmberBuild(unittest.TestCase):
                         ionize=False,
                         outdir=outdir,
                     )
-                    refdir = home(dataDir=join("test-amber-build", "non-standard", pdbid, "build"))
+                    refdir = home(
+                        dataDir=join("test-amber-build", "non-standard", pdbid, "build")
+                    )
                     _TestAmberBuild._compareResultFolders(refdir, outdir, pdbid)
 
     def test_cofactor_building(self):
