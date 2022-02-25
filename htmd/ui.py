@@ -34,7 +34,7 @@ from htmd.kinetics import Kinetics
 from moleculekit.vmdviewer import viewer, getCurrentViewer
 from htmd.builder.solvate import solvate
 from htmd.mdengine.acemd.acemd import Acemd, AtomRestraint, GroupRestraint
-from htmd.builder.builder import detectDisulfideBonds, embed, DisulfideBridge
+from htmd.builder.builder import detectDisulfideBonds, embed
 import htmd.builder.charmm as charmm
 import htmd.builder.amber as amber
 from moleculekit.util import uniformRandomRotation

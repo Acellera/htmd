@@ -311,28 +311,6 @@ def build(
         f.write("}\n")
         f.write("coordpdb " + path.join("segments", pdbname) + " " + seg + "\n\n")
 
-    # Printing out patches for the disulfide bridges
-    # TODO: Remove this once we deprecate the class
-    from htmd.builder.builder import DisulfideBridge
-    from moleculekit.molecule import UniqueResidueID
-
-    if (
-        disulfide is not None
-        and len(disulfide) != 0
-        and isinstance(disulfide[0], DisulfideBridge)
-    ):
-        newdisu = []
-        for d in disulfide:
-            r1 = UniqueResidueID.fromMolecule(
-                mol, f"resid {d.resid1} and segname {d.segid1}"
-            )
-            r2 = UniqueResidueID.fromMolecule(
-                mol, f"resid {d.resid2} and segname {d.segid2}"
-            )
-            newdisu.append([r1, r2])
-        disulfide = newdisu
-    # TODO: Remove up to here ----------------------
-
     if (
         disulfide is not None
         and len(disulfide) != 0
@@ -1156,19 +1134,6 @@ class _TestCharmmBuild(TestCase):
         compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
 
-        # TODO: Remove this after deprecation
-        from htmd.builder.builder import DisulfideBridge
-
-        np.random.seed(1)  # Needed for ions
-        disu = [
-            DisulfideBridge("1", 110, "1", 187),
-            DisulfideBridge("0", 110, "0", 187),
-        ]
-        tmpdir = tempname()
-        _ = build(smol, topo=topos, param=params, outdir=tmpdir, disulfide=disu)
-        compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
-        assertSameAsReferenceDir(compareDir, tmpdir)
-        # TODO: Remove up to here -----------
 
     def test_disulfideWithInsertion(self):
         from moleculekit.molecule import Molecule

@@ -25,90 +25,35 @@ class BuildError(Exception):
 
 
 class MixedSegmentError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class ResidueInsertionError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class UnknownResidueError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class MissingParameterError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class MissingTorsionError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class MissingBondError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class MissingAngleError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class MissingAtomTypeError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
-
-
-@_Deprecated("1.12.0", "<Read builder documentation on argument `disulfide`>")
-class DisulfideBridge(object):
-    def __init__(self, segid1, resid1, segid2, resid2):
-        if not isinstance(segid1, str) or not isinstance(segid2, str):
-            raise NameError("segment1 and segment2 options need to be strings")
-        if not isinstance(resid1, (int, np.int32, np.int64)) or not isinstance(
-            resid2, (int, np.int32, np.int64)
-        ):
-            raise NameError("residue1 and residue2 options need to be integers")
-        self.segid1 = segid1
-        self.resid1 = resid1
-        self.segid2 = segid2
-        self.resid2 = resid2
-
-    def __str__(self):
-        return "Disulfide bridge between (segid, resid) ({}, {}) and ({}, {})".format(
-            self.segid1, self.resid1, self.segid2, self.resid2
-        )
-
-    def __repr__(self):
-        return self.__str__()
+    pass
 
 
 def embed(mol1, mol2, gap=1.3):
@@ -481,7 +426,7 @@ def minimalRotation(prot):
 
     def cart2pol(x, y):
         # Cartesian to polar coordinates. Rho is the rotation angle
-        rho = np.sqrt(x ** 2 + y ** 2)
+        rho = np.sqrt(x**2 + y**2)
         phi = np.arctan2(y, x)
         return rho, phi
 
