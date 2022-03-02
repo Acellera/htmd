@@ -31,55 +31,61 @@ end_map = np.zeros(triala.numAtoms, dtype=bool)
 end_map[triala_comp[2]] = True
 
 
-def _cap_residue(mol):
+def _extend_residue(mol, nterm=True, cterm=True):
+    # Adds ALA on either side of the residue for full parameterization
     mol = mol.copy()
-    mol_g = mol.toGraph()
-
     mol.resid[:] = 3
-    resn = mol.resname[0]
-    n_idx = np.where(mol.name == "N")[0][0]
-    c_idx = np.where(mol.name == "C")[0][0]
-    oxt_idx = np.where(mol.name == "OXT")[0][0]
-    try:
-        hn2_idx = np.where(mol.name == "HN2")[0][0]
-    except Exception:
-        logger.info(
-            "Could not find HN2 atom. Will create peptide link using H atom of backbone N."
-        )
-        hn2_idx = np.where(mol.name == "H")[0][0]
 
-    backbone_idx = nx.shortest_path(mol_g, source=n_idx, target=c_idx)
+    def _ix(mol, name, resid=3):
+        return np.where((mol.name == name) & (mol.resid == resid))[0][0]
 
-    startcap = triala.copy()
-    startcap.align([14, 16, 18], refmol=mol, refsel=[hn2_idx] + backbone_idx[:2])
-    startcap.filter(start_map, _logger=False)
-
-    endcap = triala.copy()
-    endcap.align([18, 24, 26], refmol=mol, refsel=backbone_idx[-2:] + [oxt_idx])
-    endcap.filter(end_map, _logger=False)
-
-    mol.remove(f"index {hn2_idx}", _logger=False)
-    mol.remove("name OXT HXT HN2", _logger=False)
-    mol_natoms = mol.numAtoms
-    mol.insert(startcap, index=0)
-    mol.append(endcap)
-
-    n_idx = np.where((mol.name == "N") & (mol.resname == resn))[0][0]
-    c_idx = np.where((mol.name == "C") & (mol.resname == resn))[0][0]
-    mol.bonds = np.vstack(
-        (
-            mol.bonds,
-            [14, n_idx],
-            [c_idx, startcap.numAtoms + mol_natoms],
-        )
+    backbone_idx = nx.shortest_path(
+        mol.toGraph(), source=_ix(mol, "N"), target=_ix(mol, "C")
     )
-    mol.bondtype = np.hstack((mol.bondtype, ["1"], ["1"]))
+    if nterm:
+        # Remove backbone formal charge since we'll add ALA
+        mol.formalcharge[_ix(mol, "N")] = 0
+        try:
+            hn2_idx = _ix(mol, "HN2")
+        except Exception:
+            logger.info(
+                "Could not find HN2 atom. Will create peptide bond using H atom of backbone N."
+            )
+            hn2_idx = _ix(mol, "H")
+
+        startcap = triala.copy()
+        startcap.align([14, 16, 18], refmol=mol, refsel=[hn2_idx] + backbone_idx[:2])
+        startcap.filter(start_map, _logger=False)
+
+        mol.remove(f"index {hn2_idx} or name HN2", _logger=False)
+        mol.insert(startcap, index=0)
+        mol.bonds = np.vstack((mol.bonds, [14, _ix(mol, "N")]))
+        mol.bondtype = np.hstack((mol.bondtype, ["1"]))
+
+    backbone_idx = nx.shortest_path(
+        mol.toGraph(), source=_ix(mol, "N"), target=_ix(mol, "C")
+    )
+    if cterm:
+        # Remove backbone formal charge since we'll add ALA
+        mol.formalcharge[_ix(mol, "C")] = 0
+        oxt_idx = _ix(mol, "OXT")
+
+        endcap = triala.copy()
+        endcap.align([18, 24, 26], refmol=mol, refsel=backbone_idx[-2:] + [oxt_idx])
+        endcap.filter(end_map, _logger=False)
+
+        mol.remove("name OXT HXT", _logger=False)
+        mol.append(endcap)
+        mol.bonds = np.vstack((mol.bonds, [_ix(mol, "C", 3), _ix(mol, "N", 4)]))
+        mol.bondtype = np.hstack((mol.bondtype, ["1"]))
 
     # TODO: Need to add debumping code
     return mol
 
 
-def parameterizeNonCanonicalResidues(cifs, outdir, method="gaff2", nnp=None):
+def parameterizeNonCanonicalResidues(
+    cifs, outdir, method="gaff2", nnp=None, has_ncap=False, has_ccap=False
+):
     cifs = ensurelist(cifs)
     method = method.lower()
     if method == "ani-2x" and nnp is None:
@@ -93,10 +99,14 @@ def parameterizeNonCanonicalResidues(cifs, outdir, method="gaff2", nnp=None):
 
     for cif in cifs:
         mol = Molecule(cif)
-        _parameterize_non_canonical_residue(mol, outdir, method, nnp=nnp)
+        _parameterize_non_canonical_residue(
+            mol, outdir, method, nnp=nnp, has_ncap=has_ncap, has_ccap=has_ccap
+        )
 
 
-def _parameterize_non_canonical_residue(mol, outdir, method, nnp=None):
+def _parameterize_non_canonical_residue(
+    mol, outdir, method, nnp=None, has_ncap=False, has_ccap=False
+):
     try:
         from parameterize.cli import main_parameterize, list_dihedrals
     except ImportError:
@@ -112,22 +122,19 @@ def _parameterize_non_canonical_residue(mol, outdir, method, nnp=None):
         )
 
     mol = mol.copy()
-    # Remove backbone formal charge from templated molecule
-    mol.formalcharge[mol.name == "N"] = 0
-    mol.formalcharge[mol.name == "C"] = 0
 
     resn = mol.resname[0]
     with tempfile.TemporaryDirectory() as tmpdir:
-        cmol = _cap_residue(mol)
-        exclude_atoms = list(np.where(cmol.resname != resn)[0])
+        xmol = _extend_residue(mol, nterm=not has_ncap, cterm=not has_ccap)
+        exclude_atoms = list(np.where(xmol.resname != resn)[0])
 
-        cmol_c = cmol.copy()
+        cmol = xmol.copy()
         # So that CIF is written as smallmol instead of macromol
-        cmol_c.resname[:] = resn
+        cmol.resname[:] = resn
 
         dih = list_dihedrals(
-            cmol_c,
-            cmol_c.formalcharge.sum(),
+            cmol,
+            cmol.formalcharge.sum(),
             exclude_atoms=exclude_atoms,
             _logger=False,
         )
@@ -138,8 +145,8 @@ def _parameterize_non_canonical_residue(mol, outdir, method, nnp=None):
                 del dih[dd]
 
         main_parameterize(
-            cmol_c,
-            user_charge=int(cmol_c.formalcharge.sum()),
+            cmol,
+            user_charge=int(cmol.formalcharge.sum()),
             forcefield="GAFF2",
             charge_type="AM1-BCC",
             min_type="mm",
@@ -159,30 +166,30 @@ def _parameterize_non_canonical_residue(mol, outdir, method, nnp=None):
             os.path.join(tmpdir, "parameters", "GAFF2", f"{resn}.frcmod"),
             os.path.join(outdir, f"{resn}.frcmod"),
         )
-        _post_process_parameterize(cmol, tmpdir, outdir, resn)
+        _post_process_parameterize(xmol, tmpdir, outdir, resn)
 
 
-def _post_process_parameterize(cmol, tmpdir, outdir, resn):
+def _post_process_parameterize(xmol, tmpdir, outdir, resn):
     from subprocess import call
     from collections import defaultdict
 
     # TODO: Move this to parameterize (?)
     mol = Molecule(os.path.join(tmpdir, f"{resn}.cif"))
     fields = ("element",)
-    g1 = makeMolGraph(cmol, "all", fields)
+    g1 = makeMolGraph(xmol, "all", fields)
     g2 = makeMolGraph(mol, "all", fields)
     _, _, matching = compareGraphs(
         g1, g2, fields=fields, tolerance=0.5, returnmatching=True
     )
     for pp in matching:  # Rename atoms in reference molecule
-        mol.name[pp[0]] = cmol.name[pp[1]]
-        mol.formalcharge[pp[0]] = cmol.formalcharge[pp[1]]
-        mol.resname[pp[0]] = cmol.resname[pp[1]]
+        mol.name[pp[0]] = xmol.name[pp[1]]
+        mol.formalcharge[pp[0]] = xmol.formalcharge[pp[1]]
+        mol.resname[pp[0]] = xmol.resname[pp[1]]
 
     # Rename backbone atom types
     backbone_at = {"N": "N", "H": "H", "CA": "CT", "HA": "H1", "C": "C", "O": "O"}
     padding_atoms = np.zeros(mol.numAtoms, dtype=bool)
-    padding_atoms[cmol.resname != resn] = True
+    padding_atoms[xmol.resname != resn] = True
     original = defaultdict(list)
 
     for key, val in backbone_at.items():
