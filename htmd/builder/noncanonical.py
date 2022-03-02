@@ -84,7 +84,7 @@ def _extend_residue(mol, nterm=True, cterm=True):
 
 
 def parameterizeNonCanonicalResidues(
-    cifs, outdir, method="gaff2", nnp=None, has_ncap=False, has_ccap=False
+    cifs, outdir, method="gaff2", nnp=None, is_nterm=False, is_cterm=False
 ):
     cifs = ensurelist(cifs)
     method = method.lower()
@@ -100,12 +100,12 @@ def parameterizeNonCanonicalResidues(
     for cif in cifs:
         mol = Molecule(cif)
         _parameterize_non_canonical_residue(
-            mol, outdir, method, nnp=nnp, has_ncap=has_ncap, has_ccap=has_ccap
+            mol, outdir, method, nnp=nnp, is_nterm=is_nterm, is_cterm=is_cterm
         )
 
 
 def _parameterize_non_canonical_residue(
-    mol, outdir, method, nnp=None, has_ncap=False, has_ccap=False
+    mol, outdir, method, nnp=None, is_nterm=False, is_cterm=False
 ):
     try:
         from parameterize.cli import main_parameterize, list_dihedrals
@@ -125,7 +125,7 @@ def _parameterize_non_canonical_residue(
 
     resn = mol.resname[0]
     with tempfile.TemporaryDirectory() as tmpdir:
-        xmol = _extend_residue(mol, nterm=not has_ncap, cterm=not has_ccap)
+        xmol = _extend_residue(mol, nterm=not is_nterm, cterm=not is_cterm)
         exclude_atoms = list(np.where(xmol.resname != resn)[0])
 
         cmol = xmol.copy()
@@ -387,6 +387,90 @@ else:
     _PARAMETERIZE_INSTALLED = True
 
 
+def _compare_frcmod(
+    refFile,
+    resFile,
+    dihedralForceConstAbsTol=1e-6,
+    dihedralPhaseAbsTol=1e-6,
+):
+    import difflib
+
+    # Default tolerances
+    defaultAbsTol = 1e-6
+    defaultRelTol = 1e-6
+
+    with open(refFile) as ref, open(resFile) as res:
+        refLines, resLines = ref.readlines(), res.readlines()
+
+    # Removes the first line with the HTMD version
+    refLines = refLines[1:]
+    resLines = resLines[1:]
+
+    if len(refLines) != len(resLines):
+        raise AssertionError(
+            f"Reference file {refFile} has a different number of lines ({len(refLines)}) from file {resFile} ({len(resLines)})"
+        )
+
+    # Iterate over lines in the file
+    for refLine, resLine in zip(refLines, resLines):
+        refFields = refLine.split()
+        resFields = resLine.split()
+
+        # Iterate over fields in the line
+        for iField, (refField, resField) in enumerate(zip(refFields, resFields)):
+
+            # Set tolerance
+            if (
+                len(refFields) == 7 and iField == 2
+            ):  # Detect dihedral force constant column
+                absTol = dihedralForceConstAbsTol
+                relTol = 0
+            elif len(refFields) == 7 and iField == 3:  # Detect dihedral phase column
+                absTol = dihedralPhaseAbsTol
+                relTol = 0
+            else:
+                absTol = defaultAbsTol
+                relTol = defaultRelTol
+
+            try:
+                refField = float(refField)
+                resField = float(resField)
+            except ValueError:
+                # The fields cannot be converted to floats, so compare them directly
+                if refField == resField:
+                    continue
+            else:
+                # The fields can be converted to floats, so compare them with the tolerances
+                if np.isclose(refField, resField, atol=absTol, rtol=relTol):
+                    continue
+
+            # Print in case of failure
+            print(f"Failed: {refField} == {resField}")
+            print(f"Absolute tolerance: {absTol}")
+            print(f"Relative tolernace: {relTol}")
+
+            diff = difflib.unified_diff(
+                refLines, resLines, fromfile=refFile, tofile=resFile, n=1
+            )
+            if len(list(diff)):
+                raise RuntimeError("".join(diff))
+
+
+def _compare_prepis(refFile, resFile):
+    import difflib
+
+    with open(refFile) as f:
+        reflines = f.readlines()
+    with open(resFile) as f:
+        newlines = f.readlines()
+
+    diff = difflib.unified_diff(
+        reflines, newlines, fromfile=refFile, tofile=resFile, n=1
+    )
+    if len(list(diff)):
+        raise RuntimeError("".join(diff))
+
+
 class _TestNCAAResParam(unittest.TestCase):
     @unittest.skipUnless(
         _PARAMETERIZE_INSTALLED, "Can only run with parameterize installed"
@@ -394,14 +478,40 @@ class _TestNCAAResParam(unittest.TestCase):
     def test_ncaa_residue_parameterization(self):
         from glob import glob
 
-        refdir = home(dataDir=os.path.join("test-custom-residue-param"))
-        cifs = glob(os.path.join(refdir, "*.cif"))
+        # import shutil
 
+        refdir = home(dataDir=os.path.join("test-custom-residue-param"))
+        refresdir = os.path.join(refdir, "gaff2-params")
+        cifs = glob(os.path.join(refdir, "*.cif"))
         for cif in cifs:
             with tempfile.TemporaryDirectory() as tmpdir, self.subTest(cif):
                 parameterizeNonCanonicalResidues(cif, tmpdir, method="gaff2")
-                params = glob(os.path.join(tmpdir, "*"))
-                assert len(params) == 2
+
+                frcmod = glob(os.path.join(tmpdir, "*.frcmod"))[0]
+                name = os.path.basename(frcmod)
+                _compare_frcmod(os.path.join(refresdir, name), frcmod)
+
+                prepi = glob(os.path.join(tmpdir, "*.prepi"))[0]
+                name = os.path.basename(prepi)
+                _compare_prepis(os.path.join(refresdir, name), prepi)
+
+        refresdir = os.path.join(refdir, "gaff2-params-terminals")
+        cifs = glob(os.path.join(refdir, "*.cif"))
+        for cif in cifs:
+            with tempfile.TemporaryDirectory() as tmpdir, self.subTest(cif):
+                parameterizeNonCanonicalResidues(
+                    cif, tmpdir, method="gaff2", is_cterm=True, is_nterm=True
+                )
+
+                frcmod = glob(os.path.join(tmpdir, "*.frcmod"))[0]
+                name = os.path.basename(frcmod)
+                # shutil.copy(frcmod, os.path.join(refresdir, name))
+                _compare_frcmod(os.path.join(refresdir, name), frcmod)
+
+                prepi = glob(os.path.join(tmpdir, "*.prepi"))[0]
+                name = os.path.basename(prepi)
+                # shutil.copy(prepi, os.path.join(refresdir, name))
+                _compare_prepis(os.path.join(refresdir, name), prepi)
 
 
 if __name__ == "__main__":
