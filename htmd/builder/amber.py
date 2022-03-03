@@ -285,9 +285,17 @@ def _prepareMolecule(mol: Molecule, caps, disulfide):
     # Convert lipids to AMBER naming
     mol = _charmmLipid2Amber(mol)
 
+    cyclic = _detect_cyclic_segments(mol)
+
     # Add caps to termini
     if caps is None:
         caps = _defaultProteinCaps(mol)
+
+    for cc, _, _ in cyclic:
+        if cc in caps:
+            logger.info(f"Found cyclic segment {cc}. Disabling capping on it.")
+            del caps[cc]
+
     _add_caps(mol, caps)
 
     # Before modifying the resids copy the molecule to map back the disulfide bonds
