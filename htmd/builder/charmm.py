@@ -208,8 +208,8 @@ def build(
     Bond between A: [serial 185 resid 42 resname CYS chain A segid 0]
                  B: [serial 298 resid 58 resname CYS chain A segid 0]...
     >>> # More complex example
-    >>> topos  = ['top/top_all36_prot.rtf', './benzamidine.rtf', 'top/top_water_ions.rtf']
-    >>> params = ['par/par_all36_prot.prm', './benzamidine.prm', 'par/par_water_ions.prm']
+    >>> topos  = ['top/top_all36_prot.rtf', './BEN.rtf', 'top/top_water_ions.rtf']
+    >>> params = ['par/par_all36_prot.prm', './BEN.prm', 'par/par_water_ions.prm']
     >>> disu = [['segid P and resid 157', 'segid P and resid 13'], ['segid K and resid 1', 'segid K and resid 25']]
     >>> ar = {'SAPI24': 'SP24'}  # Alias large resnames to a short-hand version
     >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu, aliasresidues=ar)  # doctest: +SKIP
@@ -1133,7 +1133,6 @@ class _TestCharmmBuild(TestCase):
 
         compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
-
 
     def test_disulfideWithInsertion(self):
         from moleculekit.molecule import Molecule
