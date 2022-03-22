@@ -111,7 +111,7 @@ def _parameterize_non_canonical_residue(
         from parameterize.cli import main_parameterize, list_dihedrals
     except ImportError:
         raise ImportError(
-            "You are missing the parameterize library. Please install it with conda install parameterize -c acellera -c conda-forge"
+            "You are missing the parameterize library. It's only available for private installations. Please contact info@acellera.com"
         )
 
     os.makedirs(outdir, exist_ok=True)
