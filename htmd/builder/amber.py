@@ -256,7 +256,7 @@ def defaultFf():
     """Returns the default leaprc forcefield files used by amber.build"""
     return [
         "leaprc.protein.ff19SB",
-        "leaprc.lipid17",
+        "leaprc.lipid21",
         "leaprc.gaff2",
         "leaprc.RNA.Shaw",
         "leaprc.DNA.bsc1",
