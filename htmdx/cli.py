@@ -15,7 +15,7 @@ def htmd_show_news():
     try:
         res = requests.get("https://www.htmd.org/news/content", timeout=3)
         print(res.text)
-    except:
+    except Exception:
         pass
 
 
@@ -41,7 +41,7 @@ def _check_registration(product):
     try:
         with open(reg_file) as fh:
             data.update(json.load(fh))
-    except:
+    except Exception:
         print("Cannot read the registration file")
         return False
 
@@ -77,7 +77,7 @@ def _accept_licence(product):
 def _show_licence(product):
 
     # Find the licence file
-    path = os.path.join(os.path.dirname(__file__), '..', product, "LICENCE.txt")
+    path = os.path.join(os.path.dirname(__file__), "..", product, "LICENCE.txt")
     if not os.path.exists(path):
         print("Cannot find the licence file!")
         sys.exit(1)
@@ -113,22 +113,23 @@ def _ask(prompt):
 def htmd_register(product="htmd"):
 
     print(
-"""
+        """
   Welcome to the HTMD registration!
 
   We would like to know about you to keep in touch.
   Please provide your full name, institutional email,
   institution name, city, and country.
-""")
+"""
+    )
 
     # Ask a user for data
     data = {}
-    data["name"]        = _ask("  Full name           : ")
-    data["email"]       = _ask("  Institutional email : ")
+    data["name"] = _ask("  Full name           : ")
+    data["email"] = _ask("  Institutional email : ")
     data["institution"] = _ask("  Institution name    : ")
-    data["city"]        = _ask("  City                : ")
-    data["country"]     = _ask("  Country             : ")
-    data["product"]     = product
+    data["city"] = _ask("  City                : ")
+    data["country"] = _ask("  Country             : ")
+    data["product"] = product
 
     # Send data to the registration server
     url = "https://www.acellera.com/registration/register"
