@@ -1510,55 +1510,47 @@ class _TestAmberBuild(unittest.TestCase):
         _TestAmberBuild._compareResultFolders(refdir, tmpdir, "6A5J")
 
     def test_non_standard_residue_building(self):
-        import tempfile
-
         homedir = home(dataDir=join("test-amber-build", "non-standard"))
         pdbids = ["5VBL", "1AWF"]
 
         for pdbid in pdbids:
             protdir = os.path.join(homedir, pdbid)
             with self.subTest(pdbid=pdbid):
-                with tempfile.TemporaryDirectory() as outdir:
-                    pmol = Molecule(os.path.join(protdir, f"{pdbid}_nolig.pdb"))
-                    _ = build(
-                        pmol,
-                        topo=glob(os.path.join(protdir, "*.prepi")),
-                        param=glob(os.path.join(protdir, "*.frcmod")),
-                        ionize=False,
-                        outdir=outdir,
-                    )
-                    refdir = home(
-                        dataDir=join("test-amber-build", "non-standard", pdbid, "build")
-                    )
-                    _TestAmberBuild._compareResultFolders(refdir, outdir, pdbid)
+                tmpdir = os.path.join(self.testDir, f"ns-res-{pdbid}")
+                pmol = Molecule(os.path.join(protdir, f"{pdbid}_nolig.pdb"))
+                _ = build(
+                    pmol,
+                    topo=glob(os.path.join(protdir, "*.prepi")),
+                    param=glob(os.path.join(protdir, "*.frcmod")),
+                    ionize=False,
+                    outdir=tmpdir,
+                )
+                refdir = home(
+                    dataDir=join("test-amber-build", "non-standard", pdbid, "build")
+                )
+                _TestAmberBuild._compareResultFolders(refdir, tmpdir, pdbid)
 
     def test_cofactor_building(self):
-        import tempfile
-
         homedir = home(dataDir=join("test-amber-build", "cofactors"))
+        tmpdir = os.path.join(self.testDir, "cofactor")
 
-        with tempfile.TemporaryDirectory() as outdir:
-            mol = Molecule(os.path.join(homedir, "cofactors.pdb"))
-            _ = build(mol, ionize=False, outdir=outdir)
-            refdir = home(dataDir=join("test-amber-build", "cofactors", "build"))
+        mol = Molecule(os.path.join(homedir, "cofactors.pdb"))
+        _ = build(mol, ionize=False, outdir=tmpdir)
+        refdir = home(dataDir=join("test-amber-build", "cofactors", "build"))
 
-            _TestAmberBuild._compareResultFolders(refdir, outdir, "Cofactors")
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "Cofactors")
 
     def test_post_translational_modifications_building(self):
-        import tempfile
-
         homedir = home(dataDir=join("test-amber-build", "post-translational"))
+        tmpdir = os.path.join(self.testDir, "posttransmod")
 
-        with tempfile.TemporaryDirectory() as outdir:
-            mol = Molecule(os.path.join(homedir, "4EFP_nolig.pdb"))
-            _ = build(mol, ionize=False, outdir=outdir)
-            refdir = home(
-                dataDir=join("test-amber-build", "post-translational", "build")
-            )
+        mol = Molecule(os.path.join(homedir, "4EFP_nolig.pdb"))
+        _ = build(mol, ionize=False, outdir=tmpdir)
+        refdir = home(dataDir=join("test-amber-build", "post-translational", "build"))
 
-            _TestAmberBuild._compareResultFolders(
-                refdir, outdir, "post-translational modifications"
-            )
+        _TestAmberBuild._compareResultFolders(
+            refdir, tmpdir, "post-translational modifications"
+        )
 
     def test_cyclic_peptide_building(self):
         np.random.seed(1)
