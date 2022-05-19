@@ -301,7 +301,9 @@ class AdaptiveBandit(AdaptiveBase):
 
         if self.recluster:
             print(f"Reclustering with {self.reclusterMethod}")
-            data_q.cluster(self.reclusterMethod)
+            data_q.cluster(
+                self.reclusterMethod(n_clusters=self._numClusters(data.numFrames))
+            )
 
         numstates = data_q.K
         print(f"Numstates: {numstates}")
