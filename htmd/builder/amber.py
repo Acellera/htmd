@@ -1571,6 +1571,20 @@ class _TestAmberBuild(unittest.TestCase):
         refdir = home(dataDir=join("test-amber-build", "cyclic-peptide", "5VAV"))
         _TestAmberBuild._compareResultFolders(refdir, tmpdir, "5VAV")
 
+    def test_membrane(self):
+        np.random.seed(1)
+
+        homedir = home(dataDir=join("test-amber-build", "membrane"))
+
+        mol = Molecule(os.path.join(homedir, "structure.psf"))
+        mol.read(os.path.join(homedir, "structure.pdb"))
+
+        tmpdir = os.path.join(self.testDir, "membrane")
+        _ = build(mol, outdir=tmpdir)
+
+        refdir = home(dataDir=join("test-amber-build", "membrane", "build"))
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "Membrane")
+
 
 if __name__ == "__main__":
     import doctest
