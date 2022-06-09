@@ -27,12 +27,14 @@ from htmd.builder.builder import (
 )
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from glob import glob
-from unittest import TestCase
+import unittest
 
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+_psfgen_exists = shutil.which("psfgen", mode=os.X_OK) is not None
 
 
 def htmdCharmmHome():
@@ -1068,7 +1070,8 @@ def _checkFailedAtoms(mol):
         )
 
 
-class _TestCharmmBuild(TestCase):
+class _TestCharmmBuild(unittest.TestCase):
+    @unittest.skipUnless(_psfgen_exists)
     def test_build(self):
         from moleculekit.molecule import Molecule
         from htmd.builder.solvate import solvate
@@ -1103,6 +1106,7 @@ class _TestCharmmBuild(TestCase):
 
                 # shutil.rmtree(tmpdir)
 
+    @unittest.skipUnless(_psfgen_exists)
     def test_customDisulfideBonds(self):
         from moleculekit.molecule import Molecule
         from htmd.builder.solvate import solvate
@@ -1134,6 +1138,7 @@ class _TestCharmmBuild(TestCase):
         compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
 
+    @unittest.skipUnless(_psfgen_exists)
     def test_disulfideWithInsertion(self):
         from moleculekit.molecule import Molecule
         from htmd.builder.solvate import solvate
@@ -1171,7 +1176,3 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
-
-    import doctest
-
-    doctest.testmod()
