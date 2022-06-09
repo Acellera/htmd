@@ -1071,7 +1071,7 @@ def _checkFailedAtoms(mol):
 
 
 class _TestCharmmBuild(unittest.TestCase):
-    @unittest.skipUnless(_psfgen_exists)
+    @unittest.skipUnless(_psfgen_exists, "Requires psfgen")
     def test_build(self):
         from moleculekit.molecule import Molecule
         from htmd.builder.solvate import solvate
@@ -1106,7 +1106,7 @@ class _TestCharmmBuild(unittest.TestCase):
 
                 # shutil.rmtree(tmpdir)
 
-    @unittest.skipUnless(_psfgen_exists)
+    @unittest.skipUnless(_psfgen_exists, "Requires psfgen")
     def test_customDisulfideBonds(self):
         from moleculekit.molecule import Molecule
         from htmd.builder.solvate import solvate
@@ -1138,7 +1138,7 @@ class _TestCharmmBuild(unittest.TestCase):
         compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
 
-    @unittest.skipUnless(_psfgen_exists)
+    @unittest.skipUnless(_psfgen_exists, "Requires psfgen")
     def test_disulfideWithInsertion(self):
         from moleculekit.molecule import Molecule
         from htmd.builder.solvate import solvate
