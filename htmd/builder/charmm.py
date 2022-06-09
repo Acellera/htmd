@@ -226,7 +226,7 @@ def build(
         if not psfgen:
             raise FileNotFoundError(
                 "Could not find psfgen executable, or no execute permissions are given. "
-                "Run `conda install psfgen -c acellera`. FOR NON-COMMERCIAL USE ONLY! PLEASE SEE VMD/NAMD LICENSE."
+                "Run `conda install psfgen -c acellera`."
             )
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
