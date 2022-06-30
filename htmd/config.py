@@ -10,7 +10,7 @@ from jobqueues.config import config as jqconfig
 logger = logging.getLogger(__file__)
 
 _config = {
-    "viewer": "VMD",
+    "viewer": "pymol",
     "njobs": 1,
     "configfile": os.getenv("HTMD_CONFIG") if os.getenv("HTMD_CONFIG") else None,
     "lsf": None,
