@@ -114,7 +114,9 @@ class Metric:
         pandamap = pd.DataFrame(columns=("type", "atomIndexes", "description"))
         for proj in self.projectionlist:
             if isinstance(proj, Projection):
-                pandamap = pandamap.append(proj.getMapping(mol), ignore_index=True)
+                pandamap = pd.concat(
+                    [pandamap, proj.getMapping(mol)], ignore_index=True
+                )
         return pandamap
 
     def project(self, njobs=None):
