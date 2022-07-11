@@ -116,7 +116,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
         self._arg(
             "boxname",
             "str",
-            "Name of the file containing the starting box dimensions for the new simulations",
+            "Name of the file containing the starting box dimensions for the new simulations. Set to 'none' to disable box writing.",
             "input.xsc",
             val.String(),
         )
@@ -363,7 +363,8 @@ def _writeInputsFunction(i, f, epoch, inputpath, coorname, boxname):
     mol.read(traj)
     mol.dropFrames(keep=frameNum)  # Making sure only specific frame to write is kept
     mol.write(path.join(newDir, coorname))
-    mol.write(path.join(newDir, boxname))
+    if boxname.lower() != "none":
+        mol.write(path.join(newDir, boxname))
 
 
 def epochSimIndexes(simlist):
