@@ -17,6 +17,7 @@ from htmd.simlist import _simName
 from moleculekit.molecule import Molecule
 from protocolinterface import ProtocolInterface, val
 import logging
+import unittest
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,13 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
             "str",
             "Name of the file containing the starting coordinates for the new simulations",
             "input.coor",
+            val.String(),
+        )
+        self._arg(
+            "boxname",
+            "str",
+            "Name of the file containing the starting box dimensions for the new simulations",
+            "input.xsc",
             val.String(),
         )
         self._arg(
@@ -301,7 +309,9 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
 
         aprun = ParallelExecutor(n_jobs=_config["njobs"])
         aprun(total=len(simsframes), desc="Writing inputs")(
-            delayed(_writeInputsFunction)(i, f, epoch, self.inputpath, self.coorname)
+            delayed(_writeInputsFunction)(
+                i, f, epoch, self.inputpath, self.coorname, self.boxname
+            )
             for i, f in enumerate(simsframes)
         )
 
@@ -310,7 +320,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
         return
 
 
-def _writeInputsFunction(i, f, epoch, inputpath, coorname):
+def _writeInputsFunction(i, f, epoch, inputpath, coorname, boxname):
     regex = re.compile(r"(e\d+s\d+)_")
     frameNum = f.frame
     piece = f.piece
@@ -341,7 +351,9 @@ def _writeInputsFunction(i, f, epoch, inputpath, coorname):
         currSim.input,
         newDir,
         symlinks=False,
-        ignore=ignore_patterns("*.coor", "*.rst", "*.out", *_IGNORE_EXTENSIONS),
+        ignore=ignore_patterns(
+            "*.coor", "*.rst", "*.out", "*.xsc", *_IGNORE_EXTENSIONS
+        ),
     )
 
     # overwrite input file with new one. frameNum + 1 as catdcd does 1 based indexing
@@ -351,6 +363,7 @@ def _writeInputsFunction(i, f, epoch, inputpath, coorname):
     mol.read(traj)
     mol.dropFrames(keep=frameNum)  # Making sure only specific frame to write is kept
     mol.write(path.join(newDir, coorname))
+    mol.write(path.join(newDir, boxname))
 
 
 def epochSimIndexes(simlist):
@@ -510,26 +523,33 @@ def _findprevioustraj(simlist, simname):
     return sim, prevpiece, prevframe, epo
 
 
+class _TestAdaptive(unittest.TestCase):
+    def test_input_writer(self):
+        from htmd.home import home
+        import os
+        from htmd.simlist import Frame, simlist
+        import tempfile
+
+        filedir = home() + "/data/adaptive/"
+        sims = simlist(
+            glob(os.path.join(filedir, "data", "*", "")),
+            glob(os.path.join(filedir, "input", "*", "")),
+            glob(os.path.join(filedir, "input", "*", "")),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Frame(sims[0], 0, 5)
+            _writeInputsFunction(1, f, 2, tmpdir, "input.coor", "input.xsc")
+
+            ref = Molecule(sims[0])
+            ref.dropFrames(keep=5)
+            mol = Molecule(sims[0].molfile)
+            mol.read(os.path.join(tmpdir, "e2s2_e1s1p0f5", "input.coor"))
+            mol.read(os.path.join(tmpdir, "e2s2_e1s1p0f5", "input.xsc"))
+
+            assert np.array_equal(ref.coords, mol.coords)
+            assert np.array_equal(ref.box, mol.box)
+
+
 if __name__ == "__main__":
-    import htmd
-    import os
-    from htmd.simlist import Frame, simlist
-    from htmd.util import tempname
-
-    filedir = htmd.home.home() + "/data/adaptive/"
-    sims = simlist(
-        glob(os.path.join(filedir, "data", "*", "")),
-        glob(os.path.join(filedir, "input", "*", "")),
-        glob(os.path.join(filedir, "input", "*", "")),
-    )
-
-    outf = tempname()
-    os.makedirs(outf)
-
-    f = Frame(sims[0], 0, 5)
-    _writeInputsFunction(1, f, 2, outf, "input.coor")
-
-    mol = Molecule(sims[0])
-    mol.read(os.path.join(outf, "e2s2_e1s1p0f5", "input.coor"))
-
-    shutil.rmtree(outf)
+    unittest.main(verbosity=2)
