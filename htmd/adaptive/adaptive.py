@@ -18,6 +18,7 @@ from moleculekit.molecule import Molecule
 from protocolinterface import ProtocolInterface, val
 import logging
 import unittest
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -527,7 +528,6 @@ def _findprevioustraj(simlist, simname):
 class _TestAdaptive(unittest.TestCase):
     def test_input_writer(self):
         from htmd.home import home
-        import os
         from htmd.simlist import Frame, simlist
         import tempfile
 
