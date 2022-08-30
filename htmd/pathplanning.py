@@ -77,6 +77,7 @@ def _pointsOnSphere(radius, numsamples=1000):
     for i in range(numsamples):
         point = Molecule()
         point.empty(1)
+        point.coords = np.zeros((1, 3, 1), dtype=np.float32)
         point.moveBy([0, 0, radius])
         point.rotateBy(uniformRandomRotation())
         pointcoords[i, :] = np.squeeze(point.coords)
