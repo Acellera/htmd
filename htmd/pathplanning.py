@@ -387,9 +387,9 @@ def _drawline(viewer, start, end, dashed=True):
 
 
 def _prepareViewer(mol, ligandsel):
-    mol.view(sel="protein", style="lines", hold=True)
-    mol.view(sel=ligandsel, style="licorice", hold=True)
-    mol.view()
+    mol.view(sel="protein", style="lines", hold=True, viewer="vmd")
+    mol.view(sel=ligandsel, style="licorice", hold=True, viewer="vmd")
+    mol.view(viewer="vmd")
 
     viewer = getCurrentViewer()
     viewer.send("draw color red")
@@ -402,4 +402,4 @@ def _viewSphere(spherecoor):
     spheremol = Molecule()
     spheremol.empty(spherecoor.shape[0])
     spheremol.coords = np.atleast_3d(spherecoor)
-    spheremol.view(guessBonds=False)
+    spheremol.view(guessBonds=False, viewer="vmd")
