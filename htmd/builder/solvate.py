@@ -94,10 +94,6 @@ def solvate(
         The increment in degrees to rotate
     spdb : str
         The path to the water pdb file
-    spsf : str
-        The path to the water psf file
-    stop : str
-        The path to the water topology file
 
     Returns
     -------
