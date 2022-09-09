@@ -10,6 +10,7 @@ perform any type of analysis.
 #
 from moleculekit.readers import _TOPOLOGY_READERS
 import os
+import h5py
 import os.path as path
 from os import makedirs
 from glob import glob as glob
@@ -80,6 +81,30 @@ class Sim(object):
         self.trajectory = trajectory
         self.molfile = molfile
         self.numframes = numframes
+
+    def toHDF5(self, h5group: h5py.Group):
+        from moleculekit.util import ensurelist
+
+        h5group.attrs["simid"] = self.simid
+        h5group.create_dataset("input", data=ensurelist(self.input))
+        h5group.create_dataset("trajectory", data=ensurelist(self.trajectory))
+        h5group.create_dataset("molfile", data=ensurelist(self.molfile))
+        h5group.create_dataset("numframes", data=ensurelist(self.numframes))
+        if self.parent:
+            parentgroup = h5group.create_group("parent")
+            self.parent.toHDF5(parentgroup)
+
+    @staticmethod
+    def fromHDF5(h5group: h5py.Group):
+        self = Sim(None, None, None, None, None)
+        self.simid = int(h5group.attrs["simid"])
+        self.input = [x.decode("utf-8") for x in h5group["input"]]
+        self.trajectory = [x.decode("utf-8") for x in h5group["trajectory"]]
+        self.molfile = [x.decode("utf-8") for x in h5group["molfile"]]
+        self.numframes = list(h5group["numframes"])
+        if "parent" in h5group:
+            self.parent.fromHDF5(h5group["parent"])
+        return self
 
     def __repr__(self):
         parent = self.parent

@@ -4,8 +4,9 @@
 # No redistribution in whole or part
 #
 import numpy as np
-import random
 from copy import deepcopy
+import uuid
+import h5py
 import pickle
 import unittest
 import logging
@@ -28,6 +29,27 @@ class Trajectory(object):
         self._cluster = cluster
         self.sim = sim
         self._checkframes((self.projection, self.reference, self.cluster))
+
+    def toHDF5(self, h5group: h5py.Group):
+        h5group.create_dataset("_projection", data=self._projection)
+        h5group.create_dataset("_reference", data=self._reference)
+        if self._cluster is not None:
+            h5group.create_dataset("_cluster", data=self._cluster)
+        simgroup = h5group.create_group("sim")
+        self.sim.toHDF5(simgroup)
+
+    @staticmethod
+    def fromHDF5(h5group: h5py.Group):
+        from htmd.simlist import Sim
+
+        self = Trajectory()
+        self._projection = np.array(h5group["_projection"])
+        self._reference = np.array(h5group["_reference"])
+        if "_cluster" in h5group:
+            self._cluster = np.array(h5group["_cluster"])
+        if "sim" in h5group:
+            self.sim = Sim.fromHDF5(h5group["sim"])
+        return self
 
     @property
     def projection(self):
@@ -168,7 +190,7 @@ class MetricData(object):
         if file is not None:
             self.load(file)
 
-        self._dataid = random.random()
+        self._dataid = str(uuid.uuid4())
         self._clusterid = None
         return
 
@@ -361,7 +383,7 @@ class MetricData(object):
                 )
             )
 
-        self._dataid = random.random()
+        self._dataid = str(uuid.uuid4())
         self._clusterid = self._dataid
 
     def combine(self, otherdata):
@@ -392,7 +414,7 @@ class MetricData(object):
         self.description = self.description.append(
             otherdata.description, ignore_index=True
         )
-        self._dataid = random.random()
+        self._dataid = str(uuid.uuid4())
 
     def dropDimensions(self, drop=None, keep=None):
         """Drop some dimensions of the data given their indexes
@@ -496,18 +518,18 @@ class MetricData(object):
         else:
             from scipy import stats
 
-            drop = trajLengths != np.array(stats.mode(trajLengths).mode)
+            drop = trajLengths != np.array(stats.mode(trajLengths, keepdims=False).mode)
 
         keep = np.invert(drop)
         dropIdx = np.where(drop)[0]
 
         self.trajectories = [self.trajectories[x] for x in np.where(keep)[0]]
-        self._dataid = random.random()
+        self._dataid = str(uuid.uuid4())
         if self.parent:
             self.parent.trajectories = [
                 self.parent.trajectories[x] for x in np.where(keep)[0]
             ]
-            self.parent._dataid = random.random()
+            self.parent._dataid = str(uuid.uuid4())
 
         logger.info(
             "Dropped "
@@ -521,10 +543,10 @@ class MetricData(object):
 
     def dropFrames(self, idx, frames):
         self.trajectories[idx].dropFrames(frames)
-        self._dataid = random.random()
+        self._dataid = str(uuid.uuid4())
         if self.parent:
             self.parent.trajectories[idx].dropFrames(frames)
-            self.parent._dataid = random.random()
+            self.parent._dataid = str(uuid.uuid4())
 
     def sampleClusters(
         self, clusters=None, frames=20, replacement=False, allframes=False
@@ -620,7 +642,7 @@ class MetricData(object):
         if self.parent is not None:
             pp = self.parent.copy()
             pp.trajectories = [self.parent.trajectories[x] for x in rndtraj]
-            pp._dataid = random.random()
+            pp._dataid = str(uuid.uuid4())
         bootdata = MetricData(
             trajectories=[self.trajectories[x].copy() for x in rndtraj],
             description=self.description,
@@ -764,6 +786,82 @@ class MetricData(object):
         """
         return deepcopy(self)
 
+    def toHDF5(self, filename=None, h5group=None):
+        import h5py
+
+        if h5group is None and filename is None:
+            raise RuntimeError("Either h5group or filename has to be set")
+
+        h5f = None
+        if h5group is None:
+            h5f = h5py.File(filename, "w")
+            h5group = h5f.create_group("MetricData")
+
+        def _set_attrs(grp, keys, attr=True):
+            for key in keys:
+                if getattr(self, key):
+                    if attr:
+                        grp.attrs[key] = getattr(self, key)
+                    else:
+                        grp.create_dataset(key, data=getattr(self, key))
+
+        _set_attrs(h5group, ["K", "_dataid", "_clusterid", "fstep"])
+        h5group.attrs["description"] = self.description.to_json()
+        _set_attrs(h5group, ["N", "Centers"], False)
+
+        trajgrp = h5group.create_group("trajectories")
+        for i in range(len(self.trajectories)):
+            trajg = trajgrp.create_group(str(i))
+            self.trajectories[i].toHDF5(trajg)
+
+        if self.parent is not None:
+            parentgroup = h5group.create_group("parent")
+            self.parent.toHDF5(h5group=parentgroup)
+
+        if h5f is not None:
+            h5f.close()
+
+    @staticmethod
+    def fromHDF5(filename=None, h5group=None):
+        import pandas as pd
+        from natsort import natsorted
+
+        if h5group is None and filename is None:
+            raise RuntimeError("Either h5group or filename has to be set")
+
+        data = MetricData()
+
+        h5f = None
+        if h5group is None:
+            h5f = h5py.File(filename, "r")
+            h5group = h5f["MetricData"]
+
+        def _get_attrs(grp, keys, attr=True):
+            for key in keys:
+                if attr and key in grp.attrs:
+                    setattr(data, key, grp.attrs[key])
+                elif key in grp:
+                    setattr(data, key, np.array(grp[key]))
+
+        _get_attrs(h5group, ["K", "_dataid", "_clusterid", "fstep"])
+        data.description = pd.read_json(h5group.attrs["description"])
+        _get_attrs(h5group, ["N", "Centers"], False)
+
+        data.trajectories = []
+        if "trajectories" in h5group:
+            for key in natsorted(h5group["trajectories"]):
+                data.trajectories.append(
+                    Trajectory.fromHDF5(h5group["trajectories"][key])
+                )
+
+        if "parent" in h5group:
+            data.parent = MetricData.fromHDF5(h5group=h5group["parent"])
+
+        if h5f is not None:
+            h5f.close()
+
+        return data
+
     def save(self, filename):
         """Save a :class:`MetricData` object to disk
 
@@ -852,7 +950,7 @@ class MetricData(object):
             from scipy import stats
 
             maxlag = (
-                stats.mode(self.trajLengths).mode - 1
+                stats.mode(self.trajLengths, keepdims=False).mode - 1
             )  # -1 to avoid warnings in timescales calc
         else:
             maxlag = unitconvert(units, "frames", maxlag, fstep=self.fstep)
@@ -1226,7 +1324,7 @@ class MetricData(object):
             for i, t in enumerate(self.parent.trajectories):
                 t.sim.simid = i
 
-        self._dataid = random.random()
+        self._dataid = str(uuid.uuid4())
         self._resetClustering()
         return self
 
