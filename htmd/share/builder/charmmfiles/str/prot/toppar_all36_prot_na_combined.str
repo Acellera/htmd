@@ -12,7 +12,6 @@
 
 !Testcase
 !test_all36_prot_na_combined.inp
-
 !all patches must be followed by AUTOGENERATE ANGLES DIHEDRALS
 
 !PHOSPHOTYROSINE
@@ -30,6 +29,23 @@ read rtf card append
 
 MASS  -1  ON2B      15.99940 O ! Nucleic acid phosphate ester oxygen (pres tp1/tp2, toppar_tyr_ser_thr_phosphate.str)
 MASS  -1  SP        32.06000 S ! positive Sulphur, S-adenosylmethionine (SAM)
+
+
+DECL -CA  
+DECL -C  
+DECL -O  
+DECL +N  
+DECL +HN  
+DECL +CA  
+!
+DECL  +P
+DECL  +O1P
+DECL  +O2P
+DECL  +O5'
+DECL  -O3'
+
+DEFA FIRS NTER LAST CTER   
+AUTO ANGLE DIHE
 
 !IMIDAZOLE ANALOGS FROM toppar_all27_na_model.str
 
@@ -742,6 +758,82 @@ IC O2    CH   *P1 O4     0.0000  000.00  115.90   000.00   0.0000
 IC CZ    P1   *CH FH1    0.0000  000.00  120.00   000.00   0.0000
 IC CZ    P1   *CH FH2    0.0000  000.00 -120.00   000.00   0.0000
 
+RESI PTR         -1.00  !phosphorylated Tyr, monoanionic, see PRES TP1A
+GROUP   
+ATOM N    NH1    -0.47  !     |        HD1  HE1    
+ATOM HN   H       0.31  !  HN-N         |    |   
+ATOM CA   CT1     0.07  !     |   HB1  CD1--CE1
+ATOM HA   HB1     0.09  !     |   |   //      \\
+GROUP                   !  HA-CA--CB--CG      CZ--OH  O1P
+ATOM CB   CT2    -0.18  !     |   |    \  __  /     \ //
+ATOM HB1  HA2     0.09  !     |   HB2  CD2--CE2       P (-)
+ATOM HB2  HA2     0.09  !   O=C         |    |      / \\
+GROUP                   !     |        HD2  HE2   O3P O2P
+ATOM CG   CA      0.00  !                           |
+GROUP                   !                         H3T
+ATOM CD1  CA     -0.115
+ATOM HD1  HP      0.115
+GROUP   
+ATOM CE1  CA     -0.21
+ATOM HE1  HP      0.21
+GROUP
+ATOM CZ   CA     -0.16
+ATOM OH  ON2B    -0.36   ! NA ATOM TYPE
+ATOM P   P        1.40   ! NA ATOM TYPE
+ATOM O3P ON4     -0.76   ! NA ATOM TYPE
+ATOM H3T HN4      0.40   ! NA ATOM TYPE
+ATOM O1P ON3     -0.76   ! NA ATOM TYPE
+ATOM O2P ON3     -0.76   ! NA ATOM TYPE
+GROUP
+ATOM CD2  CA     -0.115
+ATOM HD2  HP      0.115
+GROUP
+ATOM CE2  CA     -0.21
+ATOM HE2  HP      0.21
+GROUP   
+ATOM C    C       0.51
+ATOM O    O      -0.51
+BOND CB  CA   CG  CB   CD2 CG   CE1 CD1   
+BOND CZ  CE2  OH  CZ   
+BOND N   HN   N   CA    C   CA   C   +N   
+BOND CA  HA   CB  HB1  CB  HB2  CD1 HD1  CD2 HD2   
+BOND CE1 HE1  CE2 HE2  
+DOUBLE   O   C   CD1 CG  CE1  CZ  CE2 CD2      
+BOND P    OH     P   O1P   P   O2P    P   O3P
+BOND O3P  H3T
+IMPR N -C CA HN  C CA +N O   
+CMAP -C  N  CA  C   N  CA  C  +N
+DONOR HN N   
+!DONOR HH OH   
+ACCEPTOR OH   
+ACCEPTOR O C   
+IC -C   CA   *N   HN    1.3476 123.8100  180.0000 114.5400  0.9986
+IC -C   N    CA   C     1.3476 123.8100  180.0000 106.5200  1.5232
+IC N    CA   C    +N    1.4501 106.5200  180.0000 117.3300  1.3484
+IC +N   CA   *C   O     1.3484 117.3300  180.0000 120.6700  1.2287
+IC CA   C    +N   +CA   1.5232 117.3300  180.0000 124.3100  1.4513
+IC N    C    *CA  CB    1.4501 106.5200  122.2700 112.3400  1.5606
+IC N    C    *CA  HA    1.4501 106.5200 -116.0400 107.1500  1.0833
+IC N    CA   CB   CG    1.4501 111.4300  180.0000 112.9400  1.5113
+IC CG   CA   *CB  HB1   1.5113 112.9400  118.8900 109.1200  1.1119
+IC CG   CA   *CB  HB2   1.5113 112.9400 -123.3600 110.7000  1.1115
+IC CA   CB   CG   CD1   1.5606 112.9400   90.0000 120.4900  1.4064
+IC CD1  CB   *CG  CD2   1.4064 120.4900 -176.4600 120.4600  1.4068
+IC CB   CG   CD1  CE1   1.5113 120.4900 -175.4900 120.4000  1.4026
+IC CE1  CG   *CD1 HD1   1.4026 120.4000  178.9400 119.8000  1.0814
+IC CB   CG   CD2  CE2   1.5113 120.4600  175.3200 120.5600  1.4022
+IC CE2  CG   *CD2 HD2   1.4022 120.5600 -177.5700 119.9800  1.0813
+IC CG   CD1  CE1  CZ    1.4064 120.4000   -0.1900 120.0900  1.3978
+IC CZ   CD1  *CE1 HE1   1.3978 120.0900  179.6400 120.5800  1.0799
+IC CZ   CD2  *CE2 HE2   1.3979 119.9200 -178.6900 119.7600  1.0798
+IC CE1  CE2  *CZ  OH    1.3978 120.0500 -178.9800 120.2500  1.4063
+IC CE1  CZ   OH   HH    1.3978 119.6800  175.4500 107.4700  0.9594
+IC CE1  CZ   OH   P     0.0000 000.00      0.00   000.00    0.0000
+IC CZ   OH   P    O3P   0.0000 000.00    180.00   000.00    0.0000
+IC O3P  OH   *P   O1P   0.0000 000.00   -115.82   000.00    0.0000
+IC O3P  OH   *P   O2P   0.0000 000.00    115.90   000.00    0.0000
+IC H3T  O3P  P    OH    0.0000 000.00    180.00   000.00    0.0000
+
 RESI PPH1      -1.00   ! phenol-phosphate residue
 GROUP
 ATOM CG  CA    -0.115  !
@@ -1076,6 +1168,57 @@ BILD CB    OG   P   OT     0.0000  000.00  180.00   000.00   0.0000
 BILD OG    OT   *P  O1P    0.0000  000.00 -120.00   000.00   0.0000
 BILD OG    OT   *P  O2P    0.0000  000.00  120.00   000.00   0.0000
 
+RESI SEP         -1.00  !phosphorylated serine, monoanionic
+GROUP   
+ATOM N    NH1    -0.47  !     |       
+ATOM HN   H       0.31  !  HN-N       
+ATOM CA   CT1     0.07  !     |   HB1
+ATOM HA   HB1     0.09  !     |   |  
+GROUP                   !  HA-CA--CB--OG  O1P
+ATOM CB   CT2    -0.08  !     |   |     \ //
+ATOM HB1  HA2     0.09  !     |   HB2    P
+ATOM HB2  HA2     0.09  !   O=C         / \\ 
+                        !     |       O3P  O2P   
+                        !              |
+                        !             H3T
+ATOM OG   ON2    -0.62  !maintain NA atom type
+ATOM P    P       1.50
+ATOM O1P  ON3    -0.82
+ATOM O2P  ON3    -0.82
+ATOM O3P  ON4    -0.68
+ATOM H3T  HN4     0.34
+
+ATOM C    C       0.51
+ATOM O    O      -0.51
+BOND CB CA   OG CB  N HN  N  CA   
+BOND C  CA   C +N  CA HA  CB HB1   
+BOND CB HB2 
+BOND OG P    P   O3P  O3P  H3T
+BOND P  O1P  P   O2P
+DOUBLE   O  C      
+IMPR N -C CA HN  C CA +N O   
+CMAP -C  N  CA  C   N  CA  C  +N
+DONOR HN N   
+!DONOR HG1 OG   
+ACCEPTOR OG   
+ACCEPTOR O C   
+IC -C   CA   *N   HN    1.3474 124.3700  180.0000 114.1800  0.9999
+IC -C   N    CA   C     1.3474 124.3700  180.0000 105.8100  1.5166
+IC N    CA   C    +N    1.4579 105.8100  180.0000 117.7200  1.3448
+IC +N   CA   *C   O     1.3448 117.7200  180.0000 120.2500  1.2290
+IC CA   C    +N   +CA   1.5166 117.7200  180.0000 124.6300  1.4529
+IC N    C    *CA  CB    1.4579 105.8100  124.7500 111.4000  1.5585
+IC N    C    *CA  HA    1.4579 105.8100 -115.5600 107.3000  1.0821
+IC N    CA   CB   OG    1.4579 114.2800  180.0000 112.4500  1.4341
+IC OG   CA   *CB  HB1   1.4341 112.4500  119.3200 108.1000  1.1140
+IC OG   CA   *CB  HB2   1.4341 112.4500 -123.8600 110.3800  1.1136
+!IC CA  CB   OG   HG1   1.5585 112.4500  165.9600 107.0800  0.9655
+IC CA   CB   OG   P     0.0000 000.00    180.00   000.00    0.0000
+IC CB   OG   P    O3P   0.0000 000.00    180.00   000.00    0.0000
+IC OG   P    O3P  H3T   0.0000 000.00    180.00   000.00    0.0000
+IC OG   O3P  *P   O1P   0.0000 000.00   -120.00   000.00    0.0000
+IC OG   O3P  *P   O2P   0.0000 000.00    120.00   000.00    0.0000
+
 PRES THP1       -1.00  ! convert threonine to monoanionic phosphothreonine
                        ! use in a patch statement
 DELE ATOM 1HG1
@@ -1096,8 +1239,8 @@ BILD OG1   P    OT  HT     0.0000  000.00  180.00   000.00   0.0000
 BILD OG1   OT   *P  O1P    0.0000  000.00 -120.00   000.00   0.0000
 BILD OG1   OT   *P  O2P    0.0000  000.00  120.00   000.00   0.0000
 
-PRES THP2        -2.00  ! convert threonine to dianionic phosphothreonine
-                        ! use in a patch statement
+PRES THPB        -2.00  ! convert threonine to dianionic phosphothreonine
+                        ! use in a patch statement, previously THP2
 DELE ATOM 1HG1
 GROUP
 ATOM CB   CT1    -0.09  !
@@ -1188,6 +1331,63 @@ IC H21 C1  *C2   H23    0.0000    0.00 -120.00    0.00   0.0000
 IC O1  C1  C3    H31    0.0000    0.00  180.00    0.00   0.0000
 IC H31 C1  *C3   H32    0.0000    0.00  120.00    0.00   0.0000
 IC H31 C1  *C3   H33    0.0000    0.00 -120.00    0.00   0.0000
+
+RESI TPO         -1.00  !phosphorylated Threonine, monoanionic
+GROUP   
+ATOM N    NH1    -0.47  !     |          O1P   H3T
+ATOM HN   H       0.31  !  HN-N          ||   /
+ATOM CA   CT1     0.07  !     |     OG1--P--O3P
+ATOM HA   HB1     0.09  !     |    /     ||
+GROUP                   !  HA-CA--CB-HB  O2P
+ATOM CB   CT1     0.01  !     |    \     
+ATOM HB   HA1     0.09  !     |     CG2--HG21
+                        !   O=C    / \    
+                        !     | HG21 HG22 
+ATOM OG1  ON2    -0.62  !maintain NA atom type
+ATOM P    P       1.50
+ATOM O1P  ON3    -0.82
+ATOM O2P  ON3    -0.82
+ATOM O3P  ON4    -0.68
+ATOM H3T  HN4     0.34
+GROUP                 
+ATOM CG2  CT3    -0.27
+ATOM HG21 HA3     0.09
+ATOM HG22 HA3     0.09
+ATOM HG23 HA3     0.09
+GROUP   
+ATOM C    C       0.51
+ATOM O    O      -0.51
+BOND CB CA  OG1 CB   CG2 CB    N   HN   
+BOND N  CA    C   CA    C   +N    CA  HA   
+BOND CB HB  CG2 HG21  CG2 HG22  CG2 HG23
+DOUBLE  O   C    
+BOND OG1  P    P   O3P   O3P  H3T
+BOND P    O1P  P   O2P
+IMPR N -C CA HN  C CA +N O   
+CMAP -C  N  CA  C   N  CA  C  +N
+DONOR HN N   
+!DONOR HG1 OG1   
+ACCEPTOR OG1   
+ACCEPTOR O C   
+IC -C   CA   *N   HN    1.3471 124.1200  180.0000 114.2600  0.9995
+IC -C   N    CA   C     1.3471 124.1200  180.0000 106.0900  1.5162
+IC N    CA   C    +N    1.4607 106.0900  180.0000 117.6900  1.3449
+IC +N   CA   *C   O     1.3449 117.6900  180.0000 120.3000  1.2294
+IC CA   C    +N   +CA   1.5162 117.6900  180.0000 124.6600  1.4525
+IC N    C    *CA  CB    1.4607 106.0900  126.4600 112.7400  1.5693
+IC N    C    *CA  HA    1.4607 106.0900 -114.9200 106.5300  1.0817
+IC N    CA   CB   OG1   1.4607 114.8100  180.0000 112.1600  1.4252
+IC OG1  CA   *CB  HB    1.4252 112.1600  116.3900 106.1100  1.1174
+IC OG1  CA   *CB  CG2   1.4252 112.1600 -124.1300 115.9100  1.5324
+!IC CA   CB   OG1  HG1   1.5693 112.1600 -179.2800 105.4500  0.9633
+IC CA   CB   CG2  HG21  1.5693 115.9100 -173.6500 110.8500  1.1104
+IC HG21 CB   *CG2 HG22  1.1104 110.8500  119.5100 110.4100  1.1109
+IC HG21 CB   *CG2 HG23  1.1104 110.8500 -120.3900 111.1100  1.1113
+IC CA   CB   OG1  P     0.0000 000.00    180.00   000.00    0.0000
+IC CB   OG1  P    O3P   0.0000 000.00    180.00   000.00    0.0000
+IC OG1  P    O3P  H3T   0.0000 000.00    180.00   000.00    0.0000
+IC OG1  O3P  *P   O1P   0.0000 000.00   -120.00   000.00    0.0000
+IC OG1  O3P  *P   O2P   0.0000 000.00    120.00   000.00    0.0000
  
 PRES SAHC   0.00        ! Patch for ade to get S-adenosyl-homocysteine
                         ! ade has to be generated prior to application of
@@ -1280,132 +1480,340 @@ IC C3'   C1'   *C2'  H2''   1.5132   95.49 -116.10  112.79   1.1120
 IC C1'   C2'   O2'   H2'    1.5135  113.17  177.31  109.89   0.9633
 IC C4'   C3'   O3'   H3T    1.5499  116.35  167.44  110.25   0.9629
 
-PRES SAM   1.00        ! Patch for ade to get S-adenosyl-methionine
-                        ! ade has to be generated prior to application of
-                        ! this patch in a separate patch command
-DELETE ATOM P
-DELETE ATOM O1P
-DELETE ATOM O2P
-DELETE ATOM O5'
 
-GROUP   
-ATOM N    NH3    -0.30  ! 
-ATOM HT1  HC      0.33  !    (2)    HT1
-ATOM HT2  HC      0.33  !     |    /
-ATOM HT3  HC      0.33  !(1)--CA--N--HT2 (+)
-ATOM CA   CT1     0.21  !     |    \
-ATOM HA   HB1     0.10  !     HA    HT3
-GROUP                   !                      HGP2
-ATOM CB   CT2    -0.18  !                 HGP1 | HGP3
-ATOM HB1  HA2     0.09  !                    \ | /  
-ATOM HB2  HA2     0.09  !           HB1 HG1   CGP  H5'  H4'  O4'   Adenine
-GROUP                   !            |   |    |   |      \ /  \  /
-ATOM CG   CT2     0.03  !       (1)--CB--CG--SDP--C5'----C4'  C1'-H1'
-ATOM HG1  HA2     0.09  !            |   |        |       |    |
-ATOM HG2  HA2     0.09  !          HB2  HG2      H5'' H3'-C3'--C2'-H21'
-ATOM SDP  SP      0.36  !                                 |    | 
-ATOM C5'  CN8B    0.03  !                             H3T--O3'  O2'-H2'
-ATOM H5'  HN8     0.09  !
-ATOM H5'' HN8     0.09  !
-ATOM CGP  CT3    -0.05
-ATOM HGP1 HA3     0.09
-ATOM HGP2 HA3     0.09
-ATOM HGP3 HA3     0.09
-GROUP   
-ATOM C    CC      0.34  !      OT2(-)
-ATOM OT1  OC     -0.67  !     /
-ATOM OT2  OC     -0.67  !(2)-C
-                        !    \\
-                        !     OT1
+RESI SAM          1.00  ! 12/2021, Ade and PSAM patch     HN62 HN61
+ATOM N    NH3    -0.30  ! combined, AAO                     \ /
+ATOM HN1  HC      0.33  !    (2)    HN1                      N6
+ATOM HN2  HC      0.33  !     |    /                         |
+ATOM HN3  HC      0.33  !(1)--CA--N--HN2 (+)                 C6
+ATOM CA   CT1     0.21  !     |    \                       //  \
+ATOM HA   HB1     0.10  !     HA    HN3                    N1   C5--N7\\
+GROUP                   !                                  |    ||     C8-H8
+ATOM CB   CT2    -0.18  !                                  C2   C4--N9/
+ATOM HB1  HA2     0.09  !                    HE2          / \\ /     /
+ATOM HB2  HA2     0.09  !                 HE1 | HE3     H2   N3     /
+GROUP                   !                   \ | /                  /
+ATOM CG   CT2     0.03  !           HB1 HG1  CE   H5'1  H4' O4'   /
+ATOM HG1  HA2     0.09  !            |   |    |   |      \ /  \  /
+ATOM HG2  HA2     0.09  !       (1)--CB--CG--SD--C5'-----C4'  C1'-H1'
+ATOM SD   SP      0.36  !            |   |        |       |    |
+ATOM C5'  CN8B    0.03  !          HB2  HG2      H5'2 H3'-C3'--C2'-H2'
+ATOM H5'1 HN8     0.09  !                                 |    |
+ATOM H5'2 HN8     0.09  !                           HO3'--O3'  O2'-HO2'
+ATOM CE   CT3    -0.05  !
+ATOM HE1  HA3     0.09  !
+ATOM HE2  HA3     0.09  !
+ATOM HE3  HA3     0.09  !      OXT(-)
+GROUP                   !     /
+ATOM C    CC      0.34  !(2)-C
+ATOM O    OC     -0.67  !    \\
+ATOM OXT  OC     -0.67  !     O
 GROUP
 ATOM  C3'  CN7     0.14
 ATOM  H3'  HN7     0.09
 ATOM  O3'  ON5    -0.66
-ATOM  H3T  HN5     0.43
+ATOM  HO3' HN5     0.43
+GROUP
+ATOM C4'  CN7     0.16 
+ATOM H4'  HN7     0.09 
+ATOM O4'  ON6B   -0.50 
+ATOM C1'  CN7B    0.16 
+ATOM H1'  HN7     0.09 
+GROUP                  
+ATOM N9   NN2    -0.05 
+ATOM C5   CN5     0.28 
+ATOM N7   NN4    -0.71 
+ATOM C8   CN4     0.34 
+ATOM H8   HN3     0.12 
+ATOM N1   NN3A   -0.74 
+ATOM C2   CN4     0.50 
+ATOM H2   HN3     0.13 
+ATOM N3   NN3A   -0.75 
+ATOM C4   CN5     0.43 
+ATOM C6   CN2     0.46 
+ATOM N6   NN1    -0.77 
+ATOM HN61 HN1     0.38 
+ATOM HN62 HN1     0.38 
+GROUP                  
+ATOM C2'  CN7B    0.14 
+ATOM H2'  HN7     0.09 
+ATOM O2'  ON5    -0.66 
+ATOM HO2' HN5     0.43 
+BOND C5'  C4'       C4'  O4'       C4'  C3'       O4'  C1'                 
+BOND C1'  N9        C1'  C2'       N9   C4        N9   C8        C4   N3   
+BOND C2   N1        C6   N6                                                
+BOND N6   HN61      N6   HN62      C6   C5        C5   N7                  
+BOND C2'  C3'       C2'  O2'       O2'  HO2'      C3'  O3'                 
+BOND C1'  H1'       C2'  H2'       C3'  H3'       C4'  H4'       C5'  H5'1 
+BOND C5'  H5'2      C8   H8        C2   H2                                 
+BOND N   CA   O3' HO3'                                                     
+BOND CB  CA   CG  CB   SD   CG   C5' SD   C  CA                            
+BOND SD  CE   CE  HE1  CE   HE2  CE  HE3                                   
+BOND CA  HA   CB  HB1  CB   HB2  CG  HG1  CG HG2                           
+BOND HN1 N    HN2 N    HN3  N    OXT C                                     
+DOUB C   O                                                                 
+DOUBLE  N1  C6      C2   N3        C4   C5        N7   C8                  
+IMPR O  CA  OXT C                                                          
+IMPR N6  C6  HN61  HN62        C6   N1   C5   N6                           
+DONO HN61 N6                                                               
+DONO HN62 N6                                                               
+DONO HO2' O2'                                                              
+ACCE N3                                                                    
+ACCE N7                                                                    
+ACCE N1                                                                    
+ACCE O2'                                                                   
+ACCE O3'                                                                   
+ACCE O4'
+IC ??   ??   C5'  C4'    0.0000    0.00    0.00    0.00   1.5359
+IC ??   C5'  C4'  C3'    0.0000    0.00    0.00  119.93   1.5334
+IC C5'  C4'  C3'  O3'    1.5359  119.93   85.01  111.17   1.4331
+IC C4'  C3'  O3'  ??     1.5334  111.17    0.00    0.00   0.0000
+IC C3'  O3'  ??   ??     1.4331    0.00    0.00    0.00   0.0000
+IC O4'  C3'  *C4' C5'    1.4355  102.50 -120.49  119.93   1.5359
+IC C2'  C4'  *C3' O3'    1.5460  104.70 -125.62  111.17   1.4331
+IC C4'  C3'  C2'  C1'    1.5334  104.70    9.51  103.41   1.5218
+IC C3'  C2'  C1'  N9     1.5460  103.41  136.13  113.22   1.4645
+IC O4'  C1'  N9   C4     1.4081  110.94 -105.15  125.48   1.3728
+IC C1'  C4   *N9  C8     1.4645  125.48 -177.66  105.77   1.3753
+IC C4   N9   C8   N7     1.3728  105.77   -1.09  113.74   1.3057
+IC C8   N9   C4   C5     1.3753  105.77    0.91  105.82   1.3831
+IC C8   N7   C5   C6     1.3057  104.06  179.25  132.32   1.4095
+IC N7   C5   C6   N1     1.3876  132.32 -179.61  117.49   1.3554
+IC C5   C6   N1   C2     1.4095  117.49   -0.04  118.54   1.3357
+IC N9   C5   *C4  N3     1.3728  105.82 -179.34  126.99   1.3404
+IC C5   N1   *C6  N6     1.4095  117.49 -179.97  119.34   1.3465
+IC N1   C6   N6   ??     1.3554  119.34    0.00    0.00   0.0000
+IC C5   N1   *C6  N6     1.4095  117.49 -179.97  119.34   1.3465
+IC N1   C6   N6   ??     1.3554  119.34    0.00    0.00   0.0000
+IC N9   N7   *C8  H8     1.3753  113.74  179.84  124.29   1.0915
+IC N1   N3   *C2  H2     1.3357  129.41  179.83  115.40   1.0938
+IC C1'  C3'  *C2' O2'    1.5218  103.41 -120.76  113.13   1.4145
+IC H2'  O2'  C2'  C3'    2.0597   30.79 -120.37  113.13   1.5460
+IC O4'  C2'  *C1' H1'    1.4081  106.73 -114.20  109.98   1.1155
+IC C1'  C3'  *C2' ??     1.5218  103.41    0.00    0.00   0.0000
+IC C2'  C4'  *C3' H3'    1.5460  104.70  114.17  107.15   1.1134
+IC C3'  O4'  *C4' H4'    1.5334  102.50 -112.71  107.20   1.1140
+IC C4'  ??   *C5' ??     1.5359    0.00    0.00    0.00   0.0000
+IC C4'  ??   *C5' ??     1.5359    0.00    0.00    0.00   0.0000
+IC HN1  CA   *N   HN2    1.0358  112.01 -129.41  113.47   1.0327
+IC HN1  CA   *N   HN3    1.0358  112.01  114.15   99.24   1.0618
+IC HN1  N    CA   CB     1.0358  112.01  132.63  110.87   1.5670
+IC CB   N    *CA  C      1.5670  110.87  120.29  106.99   1.5409
+IC CB   N    *CA  HA     1.5670  110.87 -123.82  109.11   1.0820
+IC N    CA   CB   CG     1.4961  110.87  174.23  113.75   1.5578
+IC CG   CA   *CB  HB1    1.5578  113.75 -120.93  108.79   1.1133
+IC CG   CA   *CB  HB2    1.5578  113.75  121.42  107.97   1.1124
+IC CA   CB   CG   SD     1.5670  113.75  172.74  117.94   1.8259
+IC SD   CB   *CG  HG1    1.8259  117.94 -123.92  107.45   1.1134
+IC SD   CB   *CG  HG2    1.8259  117.94  121.41  108.35   1.1115
+IC CB   CG   SD   C5'    1.5578  117.94  176.19   96.52   1.8291
+IC C5'  CG   *SD  CE     1.8291   96.52 -100.84   99.17   1.8221
+IC CG   SD   C5'  C4'    1.8259   96.52 -176.49  117.77   1.5359
+IC C4'  SD   *C5' H5'1   1.5359  117.77 -121.42  106.95   1.1143
+IC C4'  SD   *C5' H5'2   1.5359  117.77  124.22  110.32   1.1133
+IC CG   SD   CE   HE1    1.8259   99.17  169.11  111.02   1.1120
+IC HE1  SD   *CE  HE2    1.1120  111.02 -120.38  111.73   1.1117
+IC HE1  SD   *CE  HE3    1.1120  111.02  119.27  111.03   1.1112
+IC N    CA   C    OXT    1.4961  106.99  170.42  117.62   1.2527
+IC OXT  CA   *C   O      1.2527  117.62  179.89  117.79   1.2607
+IC SD   C5'  C4'  O4'    1.8291  117.77 -148.73  108.74   1.4355
+IC O4'  C5'  *C4' C3'    1.4355  108.74  117.33  119.93   1.5334
+IC O4'  C5'  *C4' H4'    1.4355  108.74 -117.34  110.38   1.1140
+IC C5'  C4'  C3'  C2'    1.5359  119.93 -149.37  104.70   1.5460
+IC C4'  C3'  O3'  HO3'   1.5334  111.17  163.03  108.72   0.9694
+IC C5'  C4'  O4'  C1'    1.5359  108.74  167.46  108.05   1.4081
+IC C2'  O4'  *C1' N9     1.5218  106.73 -123.77  110.94   1.4645
+IC N9   O4'  *C1' H1'    1.4645  110.94 -119.17  105.70   1.1155
+IC C4   C1'  *N9  C8     1.3728  125.48  177.11  128.70   1.3753
+IC C1'  N9   C4   C5     1.4645  125.48  178.56  105.82   1.3831
+IC C5   N9   *C4  N3     1.3831  105.82  179.34  127.18   1.3404
+IC N9   C4   C5   C6     1.3728  105.82 -179.99  117.09   1.4095
+IC C6   C4   *C5  N7     1.4095  117.09  179.49  110.59   1.3876
+IC N7   N9   *C8  H8     1.3057  113.74 -179.84  121.97   1.0915
+IC C4   C5   C6   N1     1.3831  117.09   -0.25  117.49   1.3554
+IC N1   C5   *C6  N6     1.3554  117.49  179.97  123.17   1.3465
+IC N3   N1   *C2  H2     1.3389  129.41 -179.83  115.19   1.0938
+IC C5   C6   N6   HN61   1.4095  123.17   -1.21  121.32   0.9968
+IC HN61 C6   *N6  HN62   0.9968  121.32 -177.55  117.66   0.9954
+IC C1'  C3'  *C2' H2'    1.5218  103.41  118.74  108.38   1.1124
+IC C3'  C2'  O2'  HO2'   1.5460  113.13   59.05  110.95   0.9639
 
-DOUB C   OT1
-BOND N   CA   O3' H3T
-BOND CB  CA   CG  CB   SDP  CG   C5' SDP  C  CA
-BOND SDP CGP  CGP HGP1 CGP  HGP2 CGP HGP3
+PRES PSAM   1.76        ! Patch for ade to get S-adenosyl-methionine
+                        ! ade has to be generated prior to application of
+                        ! this patch in a separate patch command
+DELETE ATOM P           ! 12/2021, renamed atoms (consistency with the PDB), AAO
+DELETE ATOM O1P
+DELETE ATOM O2P
+DELETE ATOM O5'
+DELETE ATOM H2'' ! deleted for the sake of renaming atoms
+DELETE ATOM H61
+DELETE ATOM H62
+DELETE ATOM H5'
+DELETE ATOM H5''
+DELETE BOND O2' H2'
+
+GROUP   
+ATOM N    NH3    -0.30  ! 
+ATOM HN1  HC      0.33  !    (2)    HN1
+ATOM HN2  HC      0.33  !     |    /
+ATOM HN3  HC      0.33  !(1)--CA--N--HN2 (+)
+ATOM CA   CT1     0.21  !     |    \
+ATOM HA   HB1     0.10  !     HA    HN3
+GROUP                   !                     HE2
+ATOM CB   CT2    -0.18  !                 HE1 | HE3
+ATOM HB1  HA2     0.09  !                   \ | /  
+ATOM HB2  HA2     0.09  !           HB1 HG1   CE  H5'1 H4'  O4'   Adenine
+GROUP                   !            |   |    |   |      \ /  \  /
+ATOM CG   CT2     0.03  !       (1)--CB--CG--SD---C5'----C4'  C1'-H1'
+ATOM HG1  HA2     0.09  !            |   |        |       |    |
+ATOM HG2  HA2     0.09  !          HB2  HG2      H5'2 H3'-C3'--C2'-H2'
+ATOM SD   SP      0.36  !                                 |    | 
+ATOM C5'  CN8B    0.03  !                           HO3'--O3'  O2'-HO2'
+ATOM H5'1 HN8     0.09  !
+ATOM H5'2 HN8     0.09  !
+ATOM CE   CT3    -0.05
+ATOM HE1  HA3     0.09
+ATOM HE2  HA3     0.09
+ATOM HE3  HA3     0.09
+GROUP                  
+ATOM C2'  CN7B    0.14 
+ATOM H2'  HN7     0.09 
+ATOM O2'  ON5    -0.66 
+ATOM HO2' HN5     0.43 
+GROUP   
+ATOM C    CC      0.34  !      OXT(-)
+ATOM O    OC     -0.67  !     /
+ATOM OXT  OC     -0.67  !(2)-C
+                        !    \\
+                        !     O
+GROUP
+ATOM  C3'  CN7     0.14
+ATOM  H3'  HN7     0.09
+ATOM  O3'  ON5    -0.66
+ATOM  HO3' HN5     0.43
+GROUP
+ATOM HN61 HN1     0.38 
+ATOM HN62 HN1     0.38 
+
+DOUB C   O
+BOND N   CA   
+BOND O3' HO3'
+BOND CB  CA   CG  CB   SD  CG   C5' SD  C  CA
+BOND SD  CE   CE  HE1  CE  HE2  CE  HE3
 BOND CA  HA   CB  HB1  CB   HB2  CG  HG1  CG HG2   
-BOND HT1 N    HT2 N    HT3  N    OT2 C
-IMPR OT1 CA OT2 C
+BOND HN1 N    HN2 N    HN3  N    OXT C
+BOND C1'  C2'       
+BOND N6   HN61     
+BOND N6   HN62 
+BOND C2'  C3'      
+BOND C2'  O2'      
+BOND O2'  HO2' 
+BOND C2'  H2'     
+BOND C5'  H5'1 
+BOND C5'  H5'2      
+IMPR O CA OXT C
+IC    ??      ??      C5'     C4'         0.0000    0.00    0.00    0.00   1.5359
+IC    ??      C5'     C4'     C3'         0.0000    0.00    0.00  119.93   1.5334
+IC    C5'     C4'     C3'     O3'         1.5359  119.93   85.01  111.17   1.4331
+IC    C4'     C3'     O3'     ??          1.5334  111.17    0.00    0.00   0.0000
+IC    C3'     O3'     ??      ??          1.4331    0.00    0.00    0.00   0.0000
+IC    O4'     C3'     *C4'    C5'         1.4355  102.50 -120.49  119.93   1.5359
+IC    C2'     C4'     *C3'    O3'         1.5460  104.70 -125.62  111.17   1.4331
+IC    C4'     C3'     C2'     C1'         1.5334  104.70    9.51  103.41   1.5218
+IC    C3'     C2'     C1'     N9          1.5460  103.41  136.13  113.22   1.4645
+IC    O4'     C1'     N9      C4          1.4081  110.94 -105.15  125.48   1.3728
+IC    C1'     C4      *N9     C8          1.4645  125.48 -177.66  105.77   1.3753
+IC    C4      N9      C8      N7          1.3728  105.77   -1.09  113.74   1.3057
+IC    C8      N9      C4      C5          1.3753  105.77    0.91  105.82   1.3831
+IC    C8      N7      C5      C6          1.3057  104.06  179.25  132.32   1.4095
+IC    N7      C5      C6      N1          1.3876  132.32 -179.61  117.49   1.3554
+IC    C5      C6      N1      C2          1.4095  117.49   -0.04  118.54   1.3357
+IC    N9      C5      *C4     N3          1.3728  105.82 -179.34  126.99   1.3404
+IC    C5      N1      *C6     N6          1.4095  117.49 -179.97  119.34   1.3465
+IC    N1      C6      N6      ??          1.3554  119.34    0.00    0.00   0.0000
+IC    C5      N1      *C6     N6          1.4095  117.49 -179.97  119.34   1.3465
+IC    N1      C6      N6      ??          1.3554  119.34    0.00    0.00   0.0000
+IC    N9      N7      *C8     H8          1.3753  113.74  179.84  124.29   1.0915
+IC    N1      N3      *C2     H2          1.3357  129.41  179.83  115.40   1.0938
+IC    C1'     C3'     *C2'    O2'         1.5218  103.41 -120.76  113.13   1.4145
+IC    H2'     O2'     C2'     C3'         2.0597   30.79 -120.37  113.13   1.5460
+IC    O4'     C2'     *C1'    H1'         1.4081  106.73 -114.20  109.98   1.1155
+IC    C1'     C3'     *C2'    ??          1.5218  103.41    0.00    0.00   0.0000
+IC    C2'     C4'     *C3'    H3'         1.5460  104.70  114.17  107.15   1.1134
+IC    C3'     O4'     *C4'    H4'         1.5334  102.50 -112.71  107.20   1.1140
+IC    C4'     ??      *C5'    ??          1.5359    0.00    0.00    0.00   0.0000
+IC    C4'     ??      *C5'    ??          1.5359    0.00    0.00    0.00   0.0000
+IC    HN1     CA      *N      HN2         1.0358  112.01 -129.41  113.47   1.0327
+IC    HN1     CA      *N      HN3         1.0358  112.01  114.15   99.24   1.0618
+IC    HN1     N       CA      CB          1.0358  112.01  132.63  110.87   1.5670
+IC    CB      N       *CA     C           1.5670  110.87  120.29  106.99   1.5409
+IC    CB      N       *CA     HA          1.5670  110.87 -123.82  109.11   1.0820
+IC    N       CA      CB      CG          1.4961  110.87  174.23  113.75   1.5578
+IC    CG      CA      *CB     HB1         1.5578  113.75 -120.93  108.79   1.1133
+IC    CG      CA      *CB     HB2         1.5578  113.75  121.42  107.97   1.1124
+IC    CA      CB      CG      SD          1.5670  113.75  172.74  117.94   1.8259
+IC    SD      CB      *CG     HG1         1.8259  117.94 -123.92  107.45   1.1134
+IC    SD      CB      *CG     HG2         1.8259  117.94  121.41  108.35   1.1115
+IC    CB      CG      SD      C5'         1.5578  117.94  176.19   96.52   1.8291
+IC    C5'     CG      *SD     CE          1.8291   96.52 -100.84   99.17   1.8221
+IC    CG      SD      C5'     C4'         1.8259   96.52 -176.49  117.77   1.5359
+IC    C4'     SD      *C5'    H5'1        1.5359  117.77 -121.42  106.95   1.1143
+IC    C4'     SD      *C5'    H5'2        1.5359  117.77  124.22  110.32   1.1133
+IC    CG      SD      CE      HE1         1.8259   99.17  169.11  111.02   1.1120
+IC    HE1     SD      *CE     HE2         1.1120  111.02 -120.38  111.73   1.1117
+IC    HE1     SD      *CE     HE3         1.1120  111.02  119.27  111.03   1.1112
+IC    N       CA      C       OXT         1.4961  106.99  170.42  117.62   1.2527
+IC    OXT     CA      *C      O           1.2527  117.62  179.89  117.79   1.2607
+IC    SD      C5'     C4'     O4'         1.8291  117.77 -148.73  108.74   1.4355
+IC    O4'     C5'     *C4'    C3'         1.4355  108.74  117.33  119.93   1.5334
+IC    O4'     C5'     *C4'    H4'         1.4355  108.74 -117.34  110.38   1.1140
+IC    C5'     C4'     C3'     C2'         1.5359  119.93 -149.37  104.70   1.5460
+IC    C4'     C3'     O3'     HO3'        1.5334  111.17  163.03  108.72   0.9694
+IC    C5'     C4'     O4'     C1'         1.5359  108.74  167.46  108.05   1.4081
+IC    C2'     O4'     *C1'    N9          1.5218  106.73 -123.77  110.94   1.4645
+IC    N9      O4'     *C1'    H1'         1.4645  110.94 -119.17  105.70   1.1155
+IC    C4      C1'     *N9     C8          1.3728  125.48  177.11  128.70   1.3753
+IC    C1'     N9      C4      C5          1.4645  125.48  178.56  105.82   1.3831
+IC    C5      N9      *C4     N3          1.3831  105.82  179.34  127.18   1.3404
+IC    N9      C4      C5      C6          1.3728  105.82 -179.99  117.09   1.4095
+IC    C6      C4      *C5     N7          1.4095  117.09  179.49  110.59   1.3876
+IC    N7      N9      *C8     H8          1.3057  113.74 -179.84  121.97   1.0915
+IC    C4      C5      C6      N1          1.3831  117.09   -0.25  117.49   1.3554
+IC    N1      C5      *C6     N6          1.3554  117.49  179.97  123.17   1.3465
+IC    N3      N1      *C2     H2          1.3389  129.41 -179.83  115.19   1.0938
+IC    C5      C6      N6      HN61        1.4095  123.17   -1.21  121.32   0.9968
+IC    HN61    C6      *N6     HN62        0.9968  121.32 -177.55  117.66   0.9954
+IC    C1'     C3'     *C2'    H2'         1.5218  103.41  118.74  108.38   1.1124
+IC    C3'     C2'     O2'     HO2'        1.5460  113.13   59.05  110.95   0.9639
 
-IC C5'   C4'   C3'   O3'    1.5234  115.91   79.93  110.37   1.4304
-IC O4'   C3'   *C4'  C5'    1.4346  102.61 -120.58  115.91   1.5234
-IC C2'   C4'   *C3'  O3'    1.5424  104.09 -125.57  110.37   1.4304
-IC C4'   C3'   C2'   C1'    1.5226  104.09   14.37  102.90   1.5288
-IC C3'   C2'   C1'   N9     1.5424  102.90  133.87  112.82   1.4650
-IC O4'   C1'   N9    C4     1.4153  111.80 -107.70  125.37   1.3732
-IC C1'   C4    *N9   C8     1.4650  125.37 -179.62  105.88   1.3752
-IC C4    N9    C8    N7     1.3732  105.88   -0.81  113.71   1.3064
-IC C8    N9    C4    C5     1.3752  105.88    0.94  105.77   1.3832
-IC C8    N7    C5    C6     1.3064  104.03 -179.04  132.57   1.4111
-IC N7    C5    C6    N1     1.3896  132.57  179.89  117.63   1.3541
-IC C5    C6    N1    C2     1.4111  117.63   -0.28  118.64   1.3350
-IC N9    C5    *C4   N3     1.3732  105.77 -179.43  127.11   1.3405
-IC C5    N1    *C6   N6     1.4111  117.63  179.31  118.77   1.3451
-IC N1    C6    N6    H61    1.3541  118.77 -176.12  121.71   0.9960
-IC H61   C6    *N6   H62    0.9960  121.71  174.12  117.26   0.9963
-IC C5    N1    *C6   N6     1.4111  117.63  179.31  118.77   1.3451
-IC N1    C6    N6    H61    1.3541  118.77 -176.12  121.71   0.9960
-IC H61   C6    *N6   H62    0.9960  121.71  174.12  117.26   0.9963
-IC N9    N7    *C8   H8     1.3752  113.71  179.99  124.30   1.0920
-IC N1    N3    *C2   H2     1.3350  129.24 -179.89  115.49   1.0944
-IC C1'   C3'   *C2'  O2'    1.5288  102.90 -120.08  112.64   1.4131
-IC H2'   O2'   C2'   C3'    0.9653  110.72   44.95  112.64   1.5424
-IC O4'   C2'   *C1'  H1'    1.4153  107.09 -114.14  109.33   1.1164
-IC C1'   C3'   *C2'  H2''   1.5288  102.90  119.13  108.86   1.1116
-IC C2'   C4'   *C3'  H3'    1.5424  104.09  114.80  107.09   1.1125
-IC C3'   O4'   *C4'  H4'    1.5226  102.61 -113.93  106.25   1.1143
-IC HT1   CA    *N    HT2    1.0601   99.87 -113.55  111.45   1.0368
-IC HT1   CA    *N    HT3    1.0601   99.87  117.42  113.82   1.0324
-IC HT1   N     CA    CB     1.0601   99.87 -104.71  109.96   1.5670
-IC CB    N     *CA   C      1.5670  109.96  118.39  106.87   1.5345
-IC CB    N     *CA   HA     1.5670  109.96 -124.81  109.65   1.0831
-IC N     CA    CB    CG     1.4972  109.96  169.87  116.31   1.5650
-IC CG    CA    *CB   HB1    1.5650  116.31 -123.65  109.54   1.1114
-IC CG    CA    *CB   HB2    1.5650  116.31  120.05  107.16   1.1129
-IC CA    CB    CG    SDP    1.5670  116.31  -86.15  117.87   1.8507
-IC SDP   CB    *CG   HG1    1.8507  117.87 -122.43  107.08   1.1125
-IC SDP   CB    *CG   HG2    1.8507  117.87  123.34  107.23   1.1142
-IC CB    CG    SDP   C5'    1.5650  117.87 -174.35   99.89   1.8255
-IC C5'   CG    *SDP  CGP    1.8255   99.89  102.18   99.84   1.8185
-IC CG    SDP   C5'   C4'    1.8507   99.89  -93.23  113.36   1.5234
-IC C4'   SDP   *C5'  H5'    1.5234  113.36 -120.73  109.93   1.1118
-IC C4'   SDP   *C5'  H5''   1.5234  113.36  122.28  109.47   1.1127
-IC CG    SDP   CGP   HGP1   1.8507   99.84   71.44  110.85   1.1114
-IC HGP1  SDP   *CGP  HGP2   1.1114  110.85 -120.86  111.89   1.1101
-IC HGP1  SDP   *CGP  HGP3   1.1114  110.85  118.89  110.59   1.1120
-IC N     CA    C     OT1    1.4972  106.87  -17.54  117.69   1.2603
-IC OT1   CA    *C    OT2    1.2603  117.69 -177.96  117.51   1.2519
-IC SDP   C5'   C4'   O4'    1.8255  113.36  153.27  110.56   1.4346
-IC O4'   C5'   *C4'  C3'    1.4346  110.56  116.19  115.91   1.5226
-IC O4'   C5'   *C4'  H4'    1.4346  110.56 -118.35  112.11   1.1143
-IC C5'   C4'   O4'   C1'    1.5234  110.56  166.29  106.58   1.4153
-IC C4'   O4'   C1'   N9     1.4346  106.58 -157.41  111.80   1.4650
-IC N9    O4'   *C1'  C2'    1.4650  111.80  124.06  107.09   1.5288
-IC N9    O4'   *C1'  H1'    1.4650  111.80 -119.42  105.76   1.1164
-IC O4'   C1'   N9    C4     1.4153  111.80 -107.70  125.37   1.3732
-IC C4    C1'   *N9   C8     1.3732  125.37  179.53  128.76   1.3752
-IC C1'   N9    C4    C5     1.4650  125.37 -179.45  105.77   1.3832
-IC C5    N9    *C4   N3     1.3832  105.77  179.43  127.12   1.3405
-IC N9    C4    C5    C6     1.3732  105.77  178.67  116.82   1.4111
-IC C6    C4    *C5   N7     1.4111  116.82 -179.47  110.61   1.3896
-IC N7    N9    *C8   H8     1.3064  113.71 -179.99  121.99   1.0920
-IC C4    C5    C6    N1     1.3832  116.82    0.56  117.63   1.3541
-IC N1    C5    *C6   N6     1.3541  117.63 -179.27  123.61   1.3451
-IC C5    C6    N1    C2     1.4111  117.63   -0.28  118.64   1.3350
-IC N3    N1    *C2   H2     1.3387  129.24  179.89  115.26   1.0944
-IC C5    C6    N6    H61    1.4111  123.61    3.15  121.71   0.9960
-IC H61   C6    *N6   H62    0.9960  121.71  174.12  117.26   0.9963
-IC C3'   C1'   *C2'  O2'    1.5424  102.90  120.94  111.41   1.4131
-IC C3'   C1'   *C2'  H2''   1.5424  102.90 -116.83  112.14   1.1116
-IC C1'   C2'   O2'   H2'    1.5288  111.41  -70.10  110.72   0.9653
-IC C2'   C4'   *C3'  O3'    1.5424  104.09 -125.57  110.37   1.4304
-IC C2'   C4'   *C3'  H3'    1.5424  104.09  114.80  107.09   1.1125
-IC C4'   C3'   O3'   H3T    1.5226  110.37  165.88  110.05   0.9672
+PRES NSAM         0.00  ! Neutral "N-terminus" of SAM
+GROUP                   ! Based on NNEU patch
+ATOM N    NH2    -0.96  !
+ATOM HN1  H       0.34  !
+ATOM HN2  H       0.34  !
+ATOM CA   CT1     0.19  !
+ATOM HA   HB1     0.09  !
+DELETE ATOM HN3
+BOND HN1 N HN2 N
+DONOR HN1 N
+DONOR HN2 N
+IC HN1  N    CA   C      0.0000  0.0000  180.0000  0.0000  0.0000
+IC HN2  CA   *N   HN1    0.0000  0.0000  120.0000  0.0000  0.0000
 
+
+PRES CE1X        -0.18  ! Patch to link Cys sidechain to E1X (NA base: N1,O6-ethanoxanthine)
+                        ! PATCH CE1X PROA 145 DNAA 7 SETUP WARN: 
+DELETE ATOM 1HG1
+DELETE ATOM 2H111
+GROUP   
+ATOM 1CB  CT2    -0.10 !
+ATOM 1SG  S      -0.08 !     1SG--1CB--2C11-2C10, Methione S type
+GROUP                  !                       
+ATOM 2C11  CN8   -0.18 !
+ATOM 2H112 HN8    0.09 !
+ATOM 2H113 HN8    0.09 !
+
+BOND 1SG 2C11
 
 end
 
@@ -1440,9 +1848,10 @@ CN8B S      240.000     1.8160 ! sahc
 CN8B SP     198.000     1.8160
 CT2  SP     198.000     1.8160
 CT3  SP     240.000     1.8160
-
 ! C1'-ND1 in imidazole model compound
 CN7B NR1    220.000     1.4620  ! From crystal nucleosides A/G (NF)
+!E1X-Cys link parameters
+S    CN8     198.000     1.8180  !fitted to C-S
  
 ANGLES
 !
@@ -1500,6 +1909,7 @@ SP   CT3   HA3    46.100   111.3000
 CT3  SP    CN8B   34.000    95.0000
 SP   CN8B  CN7    58.000   114.5000
 SP   CN8B  HN8    46.100   111.3000
+!NH2  CT1   CC     50.000   107.00              ! From ALA Dipep. NH1-CT2-C, for nsam
 !-- For imidazole, from imidazole alone:
 !-- and for link between sugar and imidazole
 ON6  CN7B NR1     140.0    108.00  ! k guessed, theta from ribo./desox. xtal (NF)
@@ -1508,8 +1918,11 @@ CN8  CN7B NR1     140.0    113.70  ! k guessed, theta from ribo./desox. xtal (NF
 CN7B CN7B NR1     140.0    113.70  ! RNUS
 CN7B NR1  CPH2    130.0    127.00  ! k guessed, theta from A/G xtal (NF)
 CN7B NR1  CPH1    130.0    126.00  ! k guessed, theta from A/G xtal (NF)
-HN7  CN7B NR1      30.0    106.3  ! k guessed, theta from ai (NF)
-!CPH2 NR1  CPH1    130.0    107.0000 ! From imidazole (NF). Nonstandard; modified for 360 deg. condition. Generates "Error: Repeated ANGLE".
+HN7  CN7B NR1      30.0    106.3   ! k guessed, theta from ai (NF)
+!E1X-Cys link parameters
+CT2  S    CN8      34.0     95.00  !Methione
+S    CN8  CN8      58.000   114.5  !Methione
+S    CN8  HN8      46.100   111.3  !Methione
 
 DIHEDRALS
 !
@@ -1614,6 +2027,7 @@ CN7  CN7  CN8B SP        2.50    1       180.0 ! sahc, nilesh, from gam
 HN7  CN7  CN8B SP        0.195   3         0.0 ! sahc, nilesh, from gam H-C4'-C5'-O5'
 CT2  SP   CN8B HN8       0.28    3         0.0 ! sahc, nilesh, from ALLOW   ALI SUL ION
 HA2  CT2  SP   CN8B      0.28    3         0.0 ! sahc, nilesh, from ALLOW   ALI SUL ION
+!H    NH2  CT1  CC       0.0000   1         0.00  ! From neutral N-termini
 
 !============ new parameters for sugar model compounds ===============
 !---------------- added for thf-imidazole ------------------
@@ -1657,6 +2071,13 @@ CN7B ON6  CN7  CN8      0.0     3     0.0 ! 25P1
 CN7  ON6  CN7B NR1      0.0     3     0.0
 CN7  ON6B CN7B NR1      0.0     3     0.0 ! RNUS
 NR1  CN7B CN8  CN7      0.0     3     0.0
+!E1X-Cys link parameters
+CT1  CT2  S    CN8     0.2400  1   180.00 ! PROT expt. MeEtS
+CT1  CT2  S    CN8     0.3700  3     0.00 ! PROT expt. MeEtS
+CT2  S    CN8  CN8     0.2400  1   180.00 ! PROT expt. MeEtS
+CT2  S    CN8  CN8     0.3700  3     0.00 ! PROT expt. MeEtS
+CT2  S    CN8  HN8     0.2800  3     0.00 ! PROT DTN
+HA2  CT2  S    CN8     0.2800  3     0.00 ! PROT DTN
 
 IMPROPER
 !
