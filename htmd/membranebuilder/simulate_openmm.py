@@ -12,7 +12,7 @@ from simtk.openmm import app
 
 defaultCharmmFiles = [
     "top_all36_prot.rtf",
-    "par_all36_prot.prm",
+    "par_all36m_prot.prm",
     "top_all36_na.rtf",
     "par_all36_na.prm",
     "top_all36_carb.rtf",
