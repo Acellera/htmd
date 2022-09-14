@@ -100,6 +100,7 @@ def defaultTopo():
     return [
         "top/top_all36_prot.rtf",
         "top/top_all36_lipid.rtf",
+        "top/top_water_ions.rtf",
         "top/top_all36_cgenff.rtf",
     ]
 
@@ -109,17 +110,14 @@ def defaultParam():
     return [
         "par/par_all36m_prot.prm",
         "par/par_all36_lipid.prm",
+        "par/par_water_ions.prm",
         "par/par_all36_cgenff.prm",
     ]
 
 
 def defaultStream():
     """Returns the default stream files used by charmm.build"""
-    return [
-        "str/prot/toppar_all36_prot_arg0.str",
-        "str/misc/toppar_ions_won.str",
-        "str/toppar_water_ions.str",
-    ]
+    return ["str/prot/toppar_all36_prot_arg0.str", "str/misc/toppar_ions_won.str"]
 
 
 def build(

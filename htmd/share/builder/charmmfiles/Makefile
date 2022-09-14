@@ -38,3 +38,6 @@ toppar_$(VERSION) : toppar_$(VERSION)_source
 	cp -rPp $</toppar_water_ions.str $@/str
 	mkdir $@/top &&	cp -rPp $</*.rtf $@/top
 	mkdir $@/par &&	cp -rPp $</*.prm $@/par
+# hacky split the water file
+	awk '/read rtf card \@app/,/END/{if (!/read rtf card \@app/){print}}' $</toppar_water_ions.str > $@/top/top_water_ions.rtf
+	awk '/read para card flex \@app/,NR==325{if (!/read para card flex \@app/){print}}' $</toppar_water_ions.str > $@/par/par_water_ions.prm
