@@ -912,19 +912,27 @@ class Model(object):
 
         return deepcopy(self)
 
-    def cktest(self):
+    def cktest(self, plot=True, save=None):
         """Conducts a Chapman-Kolmogorow test.
 
-        Returns
-        -------
-
+        Parameters
+        ----------
+        plot : bool
+            If the method should display the plot of the CK test
+        save : str
+            Path of the file in which to save the figure
         """
         from copy import deepcopy
         from pyemma.plots import plot_cktest
+        from matplotlib import pylab as plt
 
         msm = deepcopy(self.msm)
         ck = msm.cktest(self.macronum)
-        plot_cktest(ck)
+        fig, axes = plot_cktest(ck)
+        if save is not None:
+            plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
+        if plot:
+            plt.show()
 
     def createCoreSetModel(self, threshold=0.5):
         """Given an MSM this function detects the states belonging to a core set and returns a new model consisting
@@ -1251,8 +1259,6 @@ def getStateStatistic(
     weighted=False,
     method=np.mean,
     axis=0,
-    existing=False,
-    target=None,
 ):
     """Calculates properties of the states.
 
@@ -1277,10 +1283,6 @@ def getStateStatistic(
         A function pointer for the method that calculates our desired property. e.g. np.mean, np.std
     axis : int
         On which axis of the data the method should operate on
-    existing : bool
-        Not used
-    target :
-        Not used
 
     Returns
     -------
@@ -1493,6 +1495,49 @@ def _macroTrajSt(St, macro_ofcluster):
     return transition_matrix(macroC, reversible=True)"""
 
 
+def _generate_toy_data(trans_prob, n_traj=1000, n_frames=1000, seed=None, cluster=True):
+    from htmd.metricdata import MetricData
+
+    assert np.all((np.sum(trans_prob, axis=1)) - 1 < 1e-15)
+
+    # Create real transition probability matrix
+    n_states = trans_prob.shape[0]
+
+    # Generate fake trajectories from it
+    dat = []
+    ref = []
+    if seed is not None:
+        np.random.seed(seed)
+
+    for i in range(n_traj):  # ntraj
+        trajref = np.zeros((n_frames, 2), dtype=np.int32)
+        trajref[:, 0] = i
+        trajref[:, 1] = np.arange(n_frames)
+        trajdat = np.zeros((n_frames, n_states), dtype=np.int32)
+        curr_state = np.random.randint(0, n_states)
+        trajdat[0, curr_state] = 1
+        for j in range(1, n_frames):  # nsteps
+            curr_state = np.random.choice(n_states, p=trans_prob[curr_state])
+            trajdat[j, curr_state] = 1
+        dat.append(trajdat)
+        ref.append(trajref)
+
+    # Create fake test data
+    data = MetricData(dat=dat, ref=ref)
+    data._dataid = "fake"
+    data.fstep = 1
+
+    if cluster:
+        for traj in data.trajectories:
+            traj.cluster = np.where(traj.projection)[1].copy()
+        data._clusterid = "fake"
+        data.K = n_states
+        data.N = np.bincount(np.concatenate(data.St))
+        data.Centers = np.zeros((n_states, n_states), dtype=np.int32)
+
+    return data
+
+
 class _TestModel(unittest.TestCase):
     @classmethod
     def setUpClass(self):
@@ -1543,6 +1588,177 @@ class _TestModel(unittest.TestCase):
         assert newmodel.data.numTrajectories == 2
         assert newmodel.data.parent.numTrajectories == 2
         self.model.data.parent = None
+
+    def test_msm(self):
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+
+        assert np.allclose(trans_prob, model.P, atol=1e-1)
+
+        eq_dist = np.array([0.28912558, 0.32754596, 0.38332846])
+        assert np.allclose(eq_dist, model.eqDistribution(plot=False), atol=1e-3)
+
+        assert np.array_equal(model.micro_ofcluster, [0, 1, 2])
+        assert np.array_equal(model.cluster_ofmicro, [0, 1, 2])
+        assert np.array_equal(model.macro_ofmicro, [2, 0, 1])
+        assert model.micronum == 3
+        assert model.macronum == 3
+
+    def test_create_state(self):
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        # Create a new macrostate assigning microstates 0 and 1 to it
+        model.createState(microstates=[0, 1])
+        assert model.macronum == 2
+        assert np.array_equal(model.macro_ofmicro, [1, 1, 0])
+        model.markovModel(1, 3)  # Revert changes
+
+        # Create a new cluster out of the first frames of the first trajectory
+        model.createState(indexpairs=[[0, 0], [0, 5], [0, 10]])
+        model.markovModel(1, 3)
+        assert np.array_equal(model.micro_ofcluster, [0, 1, 2, 3])
+        assert np.array_equal(model.cluster_ofmicro, [0, 1, 2, 3])
+        assert np.array_equal(model.macro_ofmicro, [2, 0, 1, 2])
+
+        # Create a new cluster out of the first frames of the first trajectory without back transitions
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        model.createState(indexpairs=[[0, 0], [0, 1], [0, 2]])  # No back transitions
+        assert np.array_equal(model.micro_ofcluster, [0, 1, 2, -1])
+        assert np.array_equal(model.cluster_ofmicro, [0, 1, 2])
+        assert np.array_equal(model.macro_ofmicro, [2, 0, 1])
+
+    def test_core_set_model(self):
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.createState(indexpairs=[[0, 0], [0, 5], [0, 10]])  # Create a rare state
+        model.markovModel(1, 3)
+        assert np.array_equal(model.micro_ofcluster, [0, 1, 2, 3])
+        assert np.array_equal(model.cluster_ofmicro, [0, 1, 2, 3])
+        assert np.array_equal(model.macro_ofmicro, [2, 0, 1, 2])
+
+        coremodel, _ = model.createCoreSetModel(threshold=0.5)
+        coremodel.markovModel(1, 3)
+        assert np.array_equal(coremodel.micro_ofcluster, [0, 1, 2])
+        assert np.array_equal(coremodel.cluster_ofmicro, [0, 1, 2])
+        assert np.array_equal(coremodel.macro_ofmicro, [0, 1, 2])
+
+    def test_plot_fes(self):
+        from matplotlib import pylab as plt
+        import tempfile
+        import os
+
+        plt.ioff()
+
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outplot = os.path.join(tmpdir, "test.png")
+            model.plotFES(0, 1, 300, states=True, s=10, plot=False, save=outplot)
+            assert os.path.exists(outplot)
+
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata2 = _generate_toy_data(trans_prob, n_traj=100, seed=0, cluster=False)
+
+        # Plot with second data object
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outplot = os.path.join(tmpdir, "test.png")
+            model.plotFES(
+                0, 1, 300, states=True, s=10, plot=False, data=fakedata2, save=outplot
+            )
+            assert os.path.exists(outplot)
+
+    def test_max_connected_lag(self):
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        maxlag = model.maxConnectedLag([100, 500, 999])
+        assert maxlag == 500
+
+    def test_sample_states(self):
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        np.random.seed(0)
+        model.sampleStates(states=[0, 1])
+
+    def test_plot_timescales(self):
+        from matplotlib import pylab as plt
+        import tempfile
+        import os
+
+        plt.ioff()
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outplot = os.path.join(tmpdir, "test.png")
+            model.plotTimescales(lags=[1, 50, 100, 500, 800], plot=False, save=outplot)
+            assert os.path.exists(outplot)
+
+    def test_ck_test(self):
+        from matplotlib import pylab as plt
+        import tempfile
+        import os
+
+        plt.ioff()
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outplot = os.path.join(tmpdir, "test.png")
+            model.cktest(plot=False, save=outplot)
+            assert os.path.exists(outplot)
+
+    def test_get_state_statistic(self):
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        statestats = getStateStatistic(
+            model, fakedata, states=[0, 1], statetype="micro", method=np.mean
+        )
+        assert np.allclose(statestats[0], [1, 0, 0])
+        assert np.allclose(statestats[1], [0, 1, 0])
+
+        statestats = getStateStatistic(
+            model, fakedata, states=[0, 1, 2], statetype="cluster", method=np.mean
+        )
+        assert np.allclose(statestats[0], [1, 0, 0])
+        assert np.allclose(statestats[1], [0, 1, 0])
+        assert np.allclose(statestats[2], [0, 0, 1])
+
+        model.createState(microstates=[0, 1])
+        statestats = getStateStatistic(
+            model, fakedata, states=[0, 1], statetype="macro", method=np.mean
+        )
+        assert np.allclose(statestats[0], [0, 0, 1])
+        assert np.allclose(statestats[1], [0.56985649, 0.43014351, 0])
+
+    def test_macro_accumulate(self):
+        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        acc = macroAccumulate(model, [1.5, 3.7, 4.5])
+        assert np.array_equal(acc, np.array([3.7, 4.5, 1.5]))
+
+        model.createState(microstates=[0, 1])
+        acc = macroAccumulate(model, [1.5, 3.7, 4.5])
+        assert np.array_equal(acc, np.array([4.5, 5.2]))
 
 
 if __name__ == "__main__":
