@@ -472,7 +472,7 @@ class Acemd(_Acemd):
     boxsize : str, default=None
         The dimensions of the unit cell in Angstrom. Note that the unit cell must be cuboid. Overrides any dimension given in the "coordinates" PDB.
     implicitsolvent : str, default=None
-        Set to True to enable implicit solvent simulations in AMBER.
+        Set to "on" to enable implicit solvent simulations in AMBER.
 
     Files
     -----

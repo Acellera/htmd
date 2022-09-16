@@ -105,7 +105,11 @@ def _writeLatestVersionFile(fname):
         print(f"Failed at checking latest conda version. ({type(err).__name__})")
         return
 
-    stable, dev, stabledeps, devdeps = _release_version(package)
+    try:
+        stable, dev, stabledeps, devdeps = _release_version(package)
+    except Exception as err:
+        print(f"Failed at gettin latest package versions. ({type(err).__name__})")
+        return
 
     f.write("{} {}\n{} {}".format(stable, ",".join(stabledeps), dev, ",".join(devdeps)))
     os.utime(fname, None)
@@ -155,9 +159,14 @@ def _release_python_dep(package, version, opersys=None):
             if f["version"] == version and f["attrs"][
                 "operatingsystem"
             ].lower().startswith(opersys.lower()):
-                for d in f["dependencies"]["depends"]:
-                    if d["name"].lower() == "python":
-                        versions.append(d["specs"][0][1])
+                if len(f["dependencies"]):
+                    for d in f["dependencies"]["depends"]:
+                        if d["name"].lower() == "python":
+                            versions.append(d["specs"][0][1])
+                else:
+                    for d in f["attrs"]["depends"]:
+                        if d.lower().startswith("python "):
+                            versions.append(d.replace("python ", "")[2:])
         if len(versions):
             return versions
         else:
