@@ -263,7 +263,7 @@ class Model(object):
         results=False,
         plot=True,
         save=None,
-        njobs=-2,
+        njobs=1,
         ylog=True,
     ):
         """Plot the implied timescales of MSMs of various lag times
@@ -329,7 +329,8 @@ class Model(object):
         if plot or (save is not None):
             from matplotlib import pylab as plt
 
-            plt.ion()
+            if plot:
+                plt.ion()
             plt.figure()
             try:
                 mplt.plot_implied_timescales(
@@ -350,7 +351,7 @@ class Model(object):
         if results:
             return its.get_timescales(), its.lags
 
-    def maxConnectedLag(self, lags):
+    def maxConnectedLag(self, lags, njobs=1):
         """Heuristic for getting the lagtime before a timescale drops.
 
         It calculates the last lagtime before a drop occurs in the first implied timescale due to disconnected states.
@@ -379,7 +380,9 @@ class Model(object):
 
         import pyemma.msm as msm
 
-        itime = msm.its(self.data.St.tolist(), lags=lags, nits=2).get_timescales()
+        itime = msm.its(
+            self.data.St.tolist(), lags=lags, nits=2, n_jobs=njobs
+        ).get_timescales()
 
         for i in range(1, np.size(itime, 0)):
             if abs(itime[i, 0] - itime[i - 1, 1]) < abs(itime[i, 0] - itime[i - 1, 0]):
@@ -535,7 +538,8 @@ class Model(object):
         if plot or (save is not None):
             from matplotlib import pylab as plt
 
-            plt.ion()
+            if plot:
+                plt.ion()
             plt.figure()
             plt.bar(np.arange(self.macronum) + 0.4, macroeq)
             plt.ylabel("Equilibrium probability")
@@ -912,7 +916,7 @@ class Model(object):
 
         return deepcopy(self)
 
-    def cktest(self, plot=True, save=None):
+    def cktest(self, plot=True, save=None, njobs=1):
         """Conducts a Chapman-Kolmogorow test.
 
         Parameters
@@ -927,7 +931,7 @@ class Model(object):
         from matplotlib import pylab as plt
 
         msm = deepcopy(self.msm)
-        ck = msm.cktest(self.macronum)
+        ck = msm.cktest(self.macronum, n_jobs=njobs)
         fig, axes = plot_cktest(ck)
         if save is not None:
             plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
@@ -1180,6 +1184,7 @@ class Model(object):
             pad=0.5,
             micro_ofcluster=self.micro_ofcluster,
             stationary_distribution=self.msm.stationary_distribution,
+            St=self.data.St,
         )
         counts /= counts.sum()  # Normalize probabilites
         nonzero = counts != 0
@@ -1572,6 +1577,8 @@ class _TestModel(unittest.TestCase):
 
         self.model = Model(data)
 
+        self.trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+
     def test_model_saving_loading(self):
         from moleculekit.util import tempname
 
@@ -1589,13 +1596,77 @@ class _TestModel(unittest.TestCase):
         assert newmodel.data.parent.numTrajectories == 2
         self.model.data.parent = None
 
+    def test_max_connected_lag(self):
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        maxlag, its = model.maxConnectedLag([100, 500, 999], njobs=1)
+        assert maxlag == 999
+        assert np.allclose(
+            its,
+            np.array(
+                [
+                    [19.86198189, 15.92237368],
+                    [81.7366474, 68.67389378],
+                    [490.97275421, 330.52311174],
+                ]
+            ),
+        )
+
+    def test_plot_timescales(self):
+        from matplotlib import pylab as plt
+        import tempfile
+        import os
+
+        plt.ioff()
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outplot = os.path.join(tmpdir, "test.png")
+            its, lags = model.plotTimescales(
+                lags=[1, 50, 100, 500, 800],
+                plot=False,
+                save=outplot,
+                njobs=1,
+                results=True,
+            )
+            assert os.path.exists(outplot)
+
+        assert np.allclose(
+            its,
+            np.array(
+                [
+                    [0.98644281, 0.50313423],
+                    [8.96353244, 8.72125828],
+                    [19.86198189, 15.92237368],
+                    [81.7366474, 68.67389378],
+                    [183.99300253, 150.92253294],
+                ]
+            ),
+        )
+        assert np.array_equal(lags, np.array([1, 50, 100, 500, 800]))
+
+    def test_ck_test(self):
+        from matplotlib import pylab as plt
+        import tempfile
+        import os
+
+        plt.ioff()
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outplot = os.path.join(tmpdir, "test.png")
+            model.cktest(plot=False, save=outplot)
+            assert os.path.exists(outplot)
+
     def test_msm(self):
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
 
-        assert np.allclose(trans_prob, model.P, atol=1e-1)
+        assert np.allclose(self.trans_prob, model.P, atol=1e-1)
 
         eq_dist = np.array([0.28912558, 0.32754596, 0.38332846])
         assert np.allclose(eq_dist, model.eqDistribution(plot=False), atol=1e-3)
@@ -1607,8 +1678,7 @@ class _TestModel(unittest.TestCase):
         assert model.macronum == 3
 
     def test_create_state(self):
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
         # Create a new macrostate assigning microstates 0 and 1 to it
@@ -1625,7 +1695,7 @@ class _TestModel(unittest.TestCase):
         assert np.array_equal(model.macro_ofmicro, [2, 0, 1, 2])
 
         # Create a new cluster out of the first frames of the first trajectory without back transitions
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
         model.createState(indexpairs=[[0, 0], [0, 1], [0, 2]])  # No back transitions
@@ -1634,8 +1704,7 @@ class _TestModel(unittest.TestCase):
         assert np.array_equal(model.macro_ofmicro, [2, 0, 1])
 
     def test_core_set_model(self):
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.createState(indexpairs=[[0, 0], [0, 5], [0, 10]])  # Create a rare state
         model.markovModel(1, 3)
@@ -1656,8 +1725,7 @@ class _TestModel(unittest.TestCase):
 
         plt.ioff()
 
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
 
@@ -1666,9 +1734,9 @@ class _TestModel(unittest.TestCase):
             model.plotFES(0, 1, 300, states=True, s=10, plot=False, save=outplot)
             assert os.path.exists(outplot)
 
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata2 = _generate_toy_data(trans_prob, n_traj=100, seed=0, cluster=False)
-
+        fakedata2 = _generate_toy_data(
+            self.trans_prob, n_traj=100, seed=0, cluster=False
+        )
         # Plot with second data object
         with tempfile.TemporaryDirectory() as tmpdir:
             outplot = os.path.join(tmpdir, "test.png")
@@ -1677,55 +1745,15 @@ class _TestModel(unittest.TestCase):
             )
             assert os.path.exists(outplot)
 
-    def test_max_connected_lag(self):
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
-        model = Model(fakedata)
-        model.markovModel(1, 3)
-        maxlag = model.maxConnectedLag([100, 500, 999])
-        assert maxlag == 500
-
     def test_sample_states(self):
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
         np.random.seed(0)
         model.sampleStates(states=[0, 1])
 
-    def test_plot_timescales(self):
-        from matplotlib import pylab as plt
-        import tempfile
-        import os
-
-        plt.ioff()
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
-        model = Model(fakedata)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            outplot = os.path.join(tmpdir, "test.png")
-            model.plotTimescales(lags=[1, 50, 100, 500, 800], plot=False, save=outplot)
-            assert os.path.exists(outplot)
-
-    def test_ck_test(self):
-        from matplotlib import pylab as plt
-        import tempfile
-        import os
-
-        plt.ioff()
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
-        model = Model(fakedata)
-        model.markovModel(1, 3)
-        with tempfile.TemporaryDirectory() as tmpdir:
-            outplot = os.path.join(tmpdir, "test.png")
-            model.cktest(plot=False, save=outplot)
-            assert os.path.exists(outplot)
-
     def test_get_state_statistic(self):
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
         statestats = getStateStatistic(
@@ -1749,8 +1777,7 @@ class _TestModel(unittest.TestCase):
         assert np.allclose(statestats[1], [0.56985649, 0.43014351, 0])
 
     def test_macro_accumulate(self):
-        trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
-        fakedata = _generate_toy_data(trans_prob, n_traj=100, seed=0)
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
         acc = macroAccumulate(model, [1.5, 3.7, 4.5])
