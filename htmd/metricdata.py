@@ -1488,6 +1488,57 @@ def _ismember(a, b):
     )  # None can be replaced by any other "not in b" value
 
 
+def _generate_toy_data(trans_prob, n_traj=1000, n_frames=1000, seed=None, cluster=True):
+    from htmd.metricdata import MetricData
+    from pandas import DataFrame
+
+    assert np.all((np.sum(trans_prob, axis=1)) - 1 < 1e-15)
+
+    # Create real transition probability matrix
+    n_states = trans_prob.shape[0]
+
+    # Generate fake trajectories from it
+    dat = []
+    ref = []
+    if seed is not None:
+        np.random.seed(seed)
+
+    for i in range(n_traj):  # ntraj
+        trajref = np.zeros((n_frames, 2), dtype=np.int32)
+        trajref[:, 0] = i
+        trajref[:, 1] = np.arange(n_frames)
+        trajdat = np.zeros((n_frames, n_states), dtype=np.int32)
+        curr_state = np.random.randint(0, n_states)
+        trajdat[0, curr_state] = 1
+        for j in range(1, n_frames):  # nsteps
+            curr_state = np.random.choice(n_states, p=trans_prob[curr_state])
+            trajdat[j, curr_state] = 1
+        dat.append(trajdat)
+        ref.append(trajref)
+
+    # Create fake test data
+    data = MetricData(dat=dat, ref=ref)
+    data._dataid = "fake"
+    data.fstep = 1
+
+    if cluster:
+        for traj in data.trajectories:
+            traj.cluster = np.where(traj.projection)[1].copy()
+        data._clusterid = "fake"
+        data.K = n_states
+        data.N = np.bincount(np.concatenate(data.St))
+        data.Centers = np.zeros((n_states, n_states), dtype=np.int32)
+
+    types = ["coordinate"] * n_states
+    indexes = np.arange(n_states)
+    description = ["coordinate"] * n_states
+    data.description = DataFrame(
+        {"type": types, "atomIndexes": indexes, "description": description}
+    )
+
+    return data
+
+
 class _TestMetricData(unittest.TestCase):
     @classmethod
     def setUpClass(self):

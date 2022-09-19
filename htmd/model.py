@@ -1500,49 +1500,6 @@ def _macroTrajSt(St, macro_ofcluster):
     return transition_matrix(macroC, reversible=True)"""
 
 
-def _generate_toy_data(trans_prob, n_traj=1000, n_frames=1000, seed=None, cluster=True):
-    from htmd.metricdata import MetricData
-
-    assert np.all((np.sum(trans_prob, axis=1)) - 1 < 1e-15)
-
-    # Create real transition probability matrix
-    n_states = trans_prob.shape[0]
-
-    # Generate fake trajectories from it
-    dat = []
-    ref = []
-    if seed is not None:
-        np.random.seed(seed)
-
-    for i in range(n_traj):  # ntraj
-        trajref = np.zeros((n_frames, 2), dtype=np.int32)
-        trajref[:, 0] = i
-        trajref[:, 1] = np.arange(n_frames)
-        trajdat = np.zeros((n_frames, n_states), dtype=np.int32)
-        curr_state = np.random.randint(0, n_states)
-        trajdat[0, curr_state] = 1
-        for j in range(1, n_frames):  # nsteps
-            curr_state = np.random.choice(n_states, p=trans_prob[curr_state])
-            trajdat[j, curr_state] = 1
-        dat.append(trajdat)
-        ref.append(trajref)
-
-    # Create fake test data
-    data = MetricData(dat=dat, ref=ref)
-    data._dataid = "fake"
-    data.fstep = 1
-
-    if cluster:
-        for traj in data.trajectories:
-            traj.cluster = np.where(traj.projection)[1].copy()
-        data._clusterid = "fake"
-        data.K = n_states
-        data.N = np.bincount(np.concatenate(data.St))
-        data.Centers = np.zeros((n_states, n_states), dtype=np.int32)
-
-    return data
-
-
 class _TestModel(unittest.TestCase):
     @classmethod
     def setUpClass(self):
@@ -1597,6 +1554,8 @@ class _TestModel(unittest.TestCase):
         self.model.data.parent = None
 
     def test_max_connected_lag(self):
+        from htmd.metricdata import _generate_toy_data
+
         fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
@@ -1614,6 +1573,7 @@ class _TestModel(unittest.TestCase):
         )
 
     def test_plot_timescales(self):
+        from htmd.metricdata import _generate_toy_data
         from matplotlib import pylab as plt
         import tempfile
         import os
@@ -1648,6 +1608,7 @@ class _TestModel(unittest.TestCase):
         assert np.array_equal(lags, np.array([1, 50, 100, 500, 800]))
 
     def test_ck_test(self):
+        from htmd.metricdata import _generate_toy_data
         from matplotlib import pylab as plt
         import tempfile
         import os
@@ -1662,6 +1623,8 @@ class _TestModel(unittest.TestCase):
             assert os.path.exists(outplot)
 
     def test_msm(self):
+        from htmd.metricdata import _generate_toy_data
+
         fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
@@ -1678,6 +1641,8 @@ class _TestModel(unittest.TestCase):
         assert model.macronum == 3
 
     def test_create_state(self):
+        from htmd.metricdata import _generate_toy_data
+
         fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
@@ -1704,6 +1669,8 @@ class _TestModel(unittest.TestCase):
         assert np.array_equal(model.macro_ofmicro, [2, 0, 1])
 
     def test_core_set_model(self):
+        from htmd.metricdata import _generate_toy_data
+
         fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.createState(indexpairs=[[0, 0], [0, 5], [0, 10]])  # Create a rare state
@@ -1719,6 +1686,7 @@ class _TestModel(unittest.TestCase):
         assert np.array_equal(coremodel.macro_ofmicro, [0, 1, 2])
 
     def test_plot_fes(self):
+        from htmd.metricdata import _generate_toy_data
         from matplotlib import pylab as plt
         import tempfile
         import os
@@ -1746,6 +1714,8 @@ class _TestModel(unittest.TestCase):
             assert os.path.exists(outplot)
 
     def test_sample_states(self):
+        from htmd.metricdata import _generate_toy_data
+
         fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
@@ -1753,6 +1723,8 @@ class _TestModel(unittest.TestCase):
         model.sampleStates(states=[0, 1])
 
     def test_get_state_statistic(self):
+        from htmd.metricdata import _generate_toy_data
+
         fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
@@ -1777,6 +1749,8 @@ class _TestModel(unittest.TestCase):
         assert np.allclose(statestats[1], [0.56985649, 0.43014351, 0])
 
     def test_macro_accumulate(self):
+        from htmd.metricdata import _generate_toy_data
+
         fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
         model = Model(fakedata)
         model.markovModel(1, 3)
