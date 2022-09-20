@@ -9,9 +9,9 @@ from htmd.adaptive.adaptive import AdaptiveBase
 from protocolinterface import val
 from htmd.projections.tica import TICA
 from htmd.projections.metric import Metric
-from htmd.clustering.regular import RegCluster
-from htmd.adaptive.util import getParentSimIdxFrame, updatingMean
+from htmd.adaptive.util import updatingMean
 from sklearn.cluster import MiniBatchKMeans
+import unittest
 import logging
 
 logger = logging.getLogger(__name__)
@@ -521,21 +521,19 @@ class AdaptiveBandit(AdaptiveBase):
         if data.K < macronum:
             macronum = np.ceil(data.K / 2)
             logger.warning(
-                "Using less macrostates than requested due to lack of microstates. macronum = "
-                + str(macronum)
+                f"Using less macrostates than requested due to lack of microstates. macronum = {macronum}"
             )
 
         # Calculating how many timescales are above the lag time to limit number of macrostates
-        from pyemma.msm import timescales_msm
+        from deeptime.util.validation import implied_timescales
+        from htmd.model import Model
 
-        timesc = timescales_msm(
-            data.St.tolist(), lags=self.lag, nits=macronum
-        ).get_timescales()
+        statelist = [traj.cluster for traj in data.trajectories]
+        model = Model._get_model(statelist, self.lag)
+        its_data = implied_timescales(model, n_its=macronum)
+        timesc = its_data._its
         macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
         return macronum
-
-
-import unittest
 
 
 class _TestAdaptiveBandit(unittest.TestCase):

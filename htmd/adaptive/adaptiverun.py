@@ -324,11 +324,13 @@ class AdaptiveMD(AdaptiveBase):
             )
 
         # Calculating how many timescales are above the lag time to limit number of macrostates
-        from pyemma.msm import timescales_msm
+        from deeptime.util.validation import implied_timescales
+        from htmd.model import Model
 
-        timesc = timescales_msm(
-            data.St.tolist(), lags=self.lag, nits=macronum
-        ).get_timescales()
+        statelist = [traj.cluster for traj in data.trajectories]
+        model = Model._get_model(statelist, self.lag)
+        its_data = implied_timescales(model, n_its=macronum)
+        timesc = its_data._its
         macronum = min(self.macronum, max(np.sum(timesc > self.lag), 2))
         return macronum
 

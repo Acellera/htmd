@@ -62,7 +62,8 @@ class Model(object):
             )
         self._clusterid = self.data._clusterid
 
-    def _get_model(self, statelist, lagtime, bayesian_samples=None):
+    @staticmethod
+    def _get_model(statelist, lagtime, bayesian_samples=None):
         from deeptime.markov.msm import MaximumLikelihoodMSM, BayesianMSM
         from deeptime.markov import TransitionCountEstimator
 

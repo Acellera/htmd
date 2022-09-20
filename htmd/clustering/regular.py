@@ -67,16 +67,16 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
             estClust = KCenter(n_clusters=self.n_clusters)
             estClust.fit(data)
             self.radius = estClust.distance.max()
-            logger.info("Estimated radius = {}".format(self.radius))
+            logger.info(f"Estimated radius = {self.radius}")
 
-        from pyemma.coordinates.clustering.regspace import RegularSpaceClustering
+        from deeptime.clustering import RegularSpace
 
-        self._reg = RegularSpaceClustering(dmin=self.radius)
-        self.labels_ = self._reg.fit_transform(data).flatten()
+        self._reg = RegularSpace(dmin=self.radius)
+        self.labels_ = self._reg.fit_fetch(data).transform(data).flatten()
 
     @property
     def cluster_centers_(self):
-        return self._reg.clustercenters
+        return self._reg.model.cluster_centers
 
     @property
     def clusterSize(self):

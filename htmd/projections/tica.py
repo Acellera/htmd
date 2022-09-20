@@ -55,7 +55,7 @@ class TICA(object):
     """
 
     def __init__(self, data, lag, units="frames", dimensions=None, njobs=None):
-        from pyemma.coordinates.transform.tica import TICA as TICApyemma
+        from deeptime.decomposition import TICA as TICAdt
         from tqdm import tqdm
         from htmd.util import _getNjobs
 
@@ -70,7 +70,7 @@ class TICA(object):
                 raise RuntimeError(
                     "Cannot use delayed projection TICA with units other than frames for now. Report this to HTMD issues."
                 )
-            self.tic = TICApyemma(lag)
+            tic = TICAdt(lagtime=lag)
             metr = data
 
             pbar = tqdm(total=len(metr.simulations))
@@ -79,9 +79,9 @@ class TICA(object):
                     if pro is None:
                         continue
                     if self.dimensions is None:
-                        self.tic.partial_fit(pro[0])
+                        tic.partial_fit(pro[0])
                     else:  # Sub-select dimensions for fitting
-                        self.tic.partial_fit(pro[0][:, self.dimensions])
+                        tic.partial_fit(pro[0][:, self.dimensions])
                 pbar.update(len(proj))
             pbar.close()
         else:  # In-memory TICA
@@ -91,21 +91,23 @@ class TICA(object):
                     "Lag time conversion resulted in 0 frames. Please use a larger lag-time for TICA."
                 )
 
-            self.tic = TICApyemma(lag)
+            tic = TICAdt(lagtime=lag)
             if self.dimensions is None:
                 datalist = data.dat.tolist()
             else:  # Sub-select dimensions for fitting
                 datalist = [x[:, self.dimensions].copy() for x in data.dat]
-            self.tic.fit(datalist)
+            tic.fit(datalist)
+        self.model = tic.fetch_model()
 
-    def project(self, ndim=None):
+    def project(self, ndim=None, var_cutoff=0.95):
         """Projects the data object given to the constructor onto the top `ndim` TICA dimensions
 
         Parameters
         ----------
         ndim : int
-            The number of TICA dimensions we want to project the data on. If None is given it will use choose a number
-            of dimensions to cover 95% of the kinetic variance.
+            The number of TICA dimensions we want to project the data on. If None is given it will use `var_cutoff`
+        var_cutoff : float
+            Variance cutoff used for automatically determining the number of dimensions
 
         Returns
         -------
@@ -121,7 +123,13 @@ class TICA(object):
         from tqdm import tqdm
 
         if ndim is not None:
-            self.tic.set_params(dim=ndim)
+            self.model.dim = ndim
+            # Replace the following lines in future deeptime versions with self.model.var_cutoff = None
+            self.model._var_cutoff = None
+            self.model._update_output_dimension()
+            # End of hack
+        elif var_cutoff is not None:
+            self.model.var_cutoff = var_cutoff
 
         keepdata = []
         keepdim = None
@@ -148,12 +156,12 @@ class TICA(object):
                         keepdim = np.setdiff1d(range(numDimensions), self.dimensions)
                         keepdata.append(pro[0][:, keepdim])
                         proj.append(
-                            self.tic.transform(pro[0][:, self.dimensions]).astype(
+                            self.model.transform(pro[0][:, self.dimensions]).astype(
                                 np.float32
                             )
                         )  # Sub-select dimensions for projecting
                     else:
-                        proj.append(self.tic.transform(pro[0]).astype(np.float32))
+                        proj.append(self.model.transform(pro[0]).astype(np.float32))
                     refs.append(pro[1])
                     if fstep is None:
                         fstep = pro[2]
@@ -175,9 +183,7 @@ class TICA(object):
         else:
             if ndim is not None and self.data.numDimensions < ndim:
                 raise RuntimeError(
-                    "TICA cannot increase the dimensionality of your data. Your data has {} dimensions and you requested {} TICA dimensions".format(
-                        self.data.numDimensions, ndim
-                    )
+                    f"TICA cannot increase the dimensionality of your data. Your data has {self.data.numDimensions} dimensions and you requested {ndim} TICA dimensions"
                 )
 
             if self.dimensions is not None:
@@ -185,7 +191,7 @@ class TICA(object):
                 keepdata = [x[:, keepdim] for x in self.data.dat]
                 if self.data.description is not None:
                     keepdimdesc = self.data.description.iloc[keepdim]
-            proj = self.tic.get_output()
+            proj = self.model.transform(self.data.dat.tolist())
             simlist = self.data.simlist
             ref = self.data.ref
             fstep = self.data.fstep
@@ -199,9 +205,9 @@ class TICA(object):
             proj = newproj
 
         if ndim is None:
-            ndim = self.tic.dimension()
+            ndim = proj[0].shape[1]
             logger.info(
-                "Kept {} dimension(s) to cover 95% of kinetic variance.".format(ndim)
+                f"Kept {ndim} dimension(s) to cover {var_cutoff * 100:.1f}% of kinetic variance."
             )
 
         from htmd.metricdata import MetricData
@@ -218,7 +224,7 @@ class TICA(object):
         for i in range(ndim):
             types += ["tica"]
             indexes += [-1]
-            description += ["TICA dimension {}".format(i + 1)]
+            description += [f"TICA dimension {i + 1}"]
         datatica.description = DataFrame(
             {"type": types, "atomIndexes": indexes, "description": description}
         )
