@@ -127,7 +127,7 @@ class Kinetics(object):
             sourcemicro = np.argmax(avg)
         # TODO: I could also detect the source by largest variance
         self.source = self.model.macro_ofmicro[sourcemicro]
-        self.sourcemicro = sourcemicro
+        self.sourcemicro = np.array([sourcemicro])
 
     def _detectSink(self):
         if self.source is None:
@@ -137,9 +137,9 @@ class Kinetics(object):
         idx = np.delete(idx, np.where(idx == self.source))
         self.sink = idx[-1]
         nonsource = np.where(idx != self.source)[0]
-        self.sinkmicro = nonsource[
-            np.argmax(self.model.msm.stationary_distribution[nonsource])
-        ]
+        self.sinkmicro = np.array(
+            [nonsource[np.argmax(self.model.msm.stationary_distribution[nonsource])]]
+        )
 
     def getRates(self, source=None, sink=None, states="macro", _logger=True):
         """Get the rates between two (sets of) states
@@ -167,6 +167,7 @@ class Kinetics(object):
         >>> r = kin.getRates(source=4, sink=[0,1,2,3])
         """
         import numbers
+        from deeptime.markov.tools.analysis import mfpt
 
         self._intergrityCheck()
         if source is None:
@@ -226,8 +227,6 @@ class Kinetics(object):
             sourceeq = np.sum(eq[source])
             sourcemicros = source
             sinkmicros = sink
-
-        from msmtools.analysis import mfpt
 
         r = Rates()
         r.mfpton = (
@@ -316,8 +315,8 @@ class Kinetics(object):
             plt.ylim(ymin=1)
         plt.show()
 
-    def mfptGraph(self, plot=True, save=None):
-        """Plot graph of mean first passage times
+    def plotMarkovModel(self, plot=True, save=None):
+        """Plot graph of transition probabilities
 
         Parameters
         ----------
@@ -326,7 +325,8 @@ class Kinetics(object):
         save : str
             If a path is passed to save, the plot will be saved to the specified file
         """
-        import pyemma.plots as mplt
+        from deeptime.plots import plot_markov_model
+        from matplotlib import pylab as plt
 
         self._intergrityCheck()
         # pos = np.array([[3,3],[4.25,0],[0,1],[1.75,0],[6,1.0]])
@@ -336,12 +336,12 @@ class Kinetics(object):
         state_sizes = (
             msm.stationary_distribution**0.25
         )  # Scale eq prob down to make states visible
-        fig, pos = mplt.plot_markov_model(msm, state_sizes=state_sizes)
+        plot_markov_model(msm, state_sizes=state_sizes)
 
         if save is not None:
-            fig.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
+            plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
         if plot:
-            fig.show()
+            plt.show()
 
     def plotFluxPathways(
         self, statetype="macro", mode="net_flux", fraction=1.0, plot=True, save=None
@@ -364,24 +364,24 @@ class Kinetics(object):
             If a path is passed to save, the plot will be saved to the specified file
         """
         # Make mode a radio button with interactive plot
-        from pyemma import msm
-        from pyemma.plots import plot_flux
+        from deeptime.plots import plot_flux
         from matplotlib import pylab as plt
 
         self._intergrityCheck()
 
         plt.figure()
+
         if statetype == "micro":
-            tpt = msm.tpt(self.model.msm, [self.sourcemicro], [self.sinkmicro])
-            fig, pos = plot_flux(tpt, attribute_to_plot=mode)
+            setmap = np.arange(self.model.micronum)
+            flux = self.model.msm.reactive_flux(self.sourcemicro, self.sinkmicro)
         elif statetype == "macro" or statetype == "coarse":
             metastable_sets = []
             for i in range(self.model.macronum):
                 metastable_sets.append(np.where(self.model.macro_ofmicro == i)[0])
-            tpt = msm.tpt(
-                self.model.msm, metastable_sets[self.source], metastable_sets[self.sink]
+            flux = self.model.msm.reactive_flux(
+                metastable_sets[self.source], metastable_sets[self.sink]
             )
-            newsets, tpt = tpt.coarse_grain(metastable_sets)
+            newsets, flux = flux.coarse_grain(metastable_sets)
             setmap = []
             # getting the mapping of new sets to old sets
             for set1 in newsets:
@@ -390,14 +390,15 @@ class Kinetics(object):
                         setmap.append(idx2)
                         continue
             setmap = np.array(setmap)
-            fig, pos = plot_flux(tpt, attribute_to_plot=mode, state_labels=setmap)
 
+        ax, _ = plot_flux(flux, attribute_to_plot=mode, state_labels=setmap)
+        ax.set_aspect("equal")
         if save is not None:
-            fig.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
+            plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
         if plot:
-            fig.show()
+            plt.show()
 
-        paths, pathfluxes = tpt.pathways(fraction=fraction)
+        paths, pathfluxes = flux.pathways(fraction=fraction)
         cumflux = 0
         print("Path flux\t\t%path\t%of total\tpath")
         for i in range(len(paths)):
@@ -405,15 +406,12 @@ class Kinetics(object):
             print(
                 "{}\t{:3.1f}%\t{:3.1f}%\t\t{}".format(
                     pathfluxes[i],
-                    100.0 * pathfluxes[i] / tpt.total_flux,
-                    100.0 * cumflux / tpt.total_flux,
+                    100.0 * pathfluxes[i] / flux.total_flux,
+                    100.0 * cumflux / flux.total_flux,
                     setmap[paths[i]],
                 )
             )
-            # print(pathfluxes[i],'\t','%3.1f'%(100.0*pathfluxes[i]/tpt.total_flux),'%\t','%3.1f'%(100.0*cumflux/tpt.total_flux),'%\t\t',paths[i])
-
-        # transition rates
-        # plot_markov_model(P)
+        return flux, paths, pathfluxes
 
     @property
     def _kBT(self):
@@ -507,7 +505,7 @@ class _TestKinetics(unittest.TestCase):
 
         kin = Kinetics(model, 300, source=0)
         assert kin.sink == 2
-        assert kin.sinkmicro == 0
+        assert np.array_equal(kin.sinkmicro, [0])
         assert kin.source == 0
         assert np.array_equal(kin.sourcemicro, [1])
 
@@ -539,7 +537,7 @@ class _TestKinetics(unittest.TestCase):
             assert os.path.exists(outplot)
 
             outplot = os.path.join(tmpdir, "mfpt.png")
-            kin.mfptGraph(plot=False, save=outplot)
+            kin.plotMarkovModel(plot=False, save=outplot)
             assert os.path.exists(outplot)
 
 

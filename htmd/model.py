@@ -1,11 +1,11 @@
 """
 Markov state models are a statistical tool for analysing molecular simulations which has met with lots of success.
 The Model class here, encapsulates all functionallity for the calculation of Markov models while hiding unnecessary
-details under the hood. It uses PyEMMA [1] internally to calculate Markov models.
+details under the hood. It uses DeepTime [1] internally to calculate Markov models.
 
 References
 ----------
-.. [1] PyEMMA 2: A Software Package for Estimation, Validation, and Analysis of Markov Models. Martin K. Scherer et al. JCTC 2015.
+.. [1] Deeptime: a Python library for machine learning dynamical models from time series data. Moritz Hoffmann et al 2022 Mach. Learn.: Sci. Technol. 3 015009
 """
 # (c) 2015-2022 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
@@ -62,7 +62,24 @@ class Model(object):
             )
         self._clusterid = self.data._clusterid
 
-    def markovModel(self, lag, macronum, units="frames", sparse=False, hmm=False):
+    def _get_model(self, statelist, lagtime, bayesian_samples=None):
+        from deeptime.markov.msm import MaximumLikelihoodMSM, BayesianMSM
+        from deeptime.markov import TransitionCountEstimator
+
+        if bayesian_samples is not None:
+            counts = TransitionCountEstimator(
+                lagtime=lagtime, count_mode="effective"
+            ).fit_fetch(statelist)
+            return BayesianMSM(n_samples=bayesian_samples).fit_fetch(counts)
+        else:
+            counts = TransitionCountEstimator(
+                lagtime=lagtime, count_mode="sliding"
+            ).fit_fetch(statelist)
+            return MaximumLikelihoodMSM(
+                allow_disconnected=True, use_lcc=True
+            ).fit_fetch(counts)
+
+    def markovModel(self, lag, macronum, units="frames", sparse=False):
         """Build a Markov model at a given lag time and calculate metastable states
 
         Parameters
@@ -81,25 +98,20 @@ class Model(object):
         >>> model = Model(data)
         >>> model.markovModel(150, 4)  # 150 frames lag, 4 macrostates
         """
-        import pyemma.msm as msm
-
         self._integrityCheck(markov=True)
 
         lag = unitconvert(units, "frames", lag, fstep=self.data.fstep)
 
+        statelist = [traj.cluster for traj in self.data.trajectories]
         self.lag = lag
-        self.msm = msm.estimate_markov_model(
-            self.data.St.tolist(), self.lag, sparse=sparse
-        )
+        self.msm = self._get_model(statelist, lag, bayesian_samples=None)
         modelflag = False
         while not modelflag:
             self.coarsemsm = self.msm.pcca(macronum)
-            if len(np.unique(self.msm.metastable_assignments)) != macronum:
+            if len(np.unique(self.coarsemsm.assignments)) != macronum:
                 macronum -= 1
                 logger.warning(
-                    "PCCA returned empty macrostates. Reducing the number of macrostates to {}.".format(
-                        macronum
-                    )
+                    f"PCCA returned empty macrostates. Reducing the number of macrostates to {macronum}."
                 )
             else:
                 modelflag = True
@@ -110,12 +122,7 @@ class Model(object):
 
         self._modelid = random.random()
 
-        if hmm:  # Still in development
-            self.hmm = self.msm.coarse_grain(self.macronum)
-
-        logger.info(
-            "{:.1f}% of the data was used".format(self.msm.active_count_fraction * 100)
-        )
+        logger.info(f"{self.msm.count_fraction * 100:.1f}% of the data was used")
 
         _macroTrajectoriesReport(
             self.macronum,
@@ -144,50 +151,49 @@ class Model(object):
         if microstates is not None:
             newmacro = self.macronum
 
-            # Fixing sets. Remove microstates from previous macrostates and add new set
-            for i, metset in enumerate(self.msm.metastable_sets):
-                self.msm.metastable_sets[i] = np.array(
-                    np.sort(list(set(metset) - set(microstates)))
-                )
-            self.msm.metastable_sets.append(np.array(microstates, dtype=np.int64))
-
-            todelete = np.where([len(x) == 0 for x in self.msm.metastable_sets])[0]
-
             # Fixing hard assignments
-            self.msm.metastable_assignments[microstates] = newmacro
+            self.coarsemsm.assignments[microstates] = newmacro
+
+            todelete = np.setdiff1d(np.arange(newmacro), self.coarsemsm.assignments)
 
             # Fixing memberships. Padding the array with 0s for the new macrostate
-            self.msm._metastable_memberships = np.pad(
-                self.msm.metastable_memberships,
+            self.coarsemsm._memberships = np.pad(
+                self.coarsemsm.memberships,
                 ((0, 0), (0, 1)),
                 mode="constant",
                 constant_values=(0),
             )
-            self.msm._metastable_memberships[microstates, :] = 0
-            self.msm._metastable_memberships[microstates, -1] = 1
+            self.coarsemsm._memberships[microstates, :] = 0
+            self.coarsemsm._memberships[microstates, -1] = 1
 
             # Moving probabilities of empty states to new one
             othermicro = np.ones(self.micronum, dtype=bool)
             othermicro[microstates] = False
             othermicro = np.where(othermicro)[0]
-            self.msm._metastable_memberships[othermicro, -1] = np.sum(
-                self.msm._metastable_memberships[othermicro[:, None], todelete], axis=1
+            self.coarsemsm._memberships[othermicro, -1] = np.sum(
+                self.coarsemsm.memberships[othermicro[:, None], todelete], axis=1
             )
 
             # Fixing distributions
-            self.msm._metastable_distributions = np.pad(
-                self.msm.metastable_distributions,
+            self.coarsemsm._metastable_distributions = np.pad(
+                self.coarsemsm.metastable_distributions,
                 ((0, 1), (0, 0)),
                 mode="constant",
                 constant_values=(0),
             )
-            self.msm._metastable_distributions[-1, microstates] = 1 / len(microstates)
-        if indexpairs is not None:
+            self.coarsemsm.metastable_distributions[-1, microstates] = 1 / len(
+                microstates
+            )
+        elif indexpairs is not None:
             newcluster = self.data.K
             for ip in indexpairs:
                 self.data.trajectories[ip[0]].cluster[ip[1]] = newcluster
             self.data.K += 1
             self.data.N = np.bincount(np.concatenate(self.data.St))
+
+    @property
+    def _active_set(self):
+        return self.msm.count_model.visited_set
 
     @property
     def P(self):
@@ -203,7 +209,7 @@ class Model(object):
         """
         self._integrityCheck(postmsm=True)
         micro_ofcluster = -np.ones(self.data.K, dtype=int)
-        micro_ofcluster[self.msm.active_set] = np.arange(len(self.msm.active_set))
+        micro_ofcluster[self._active_set] = np.arange(len(self._active_set))
         return micro_ofcluster
 
     @property
@@ -213,19 +219,19 @@ class Model(object):
         Numpy array which at index i has the index of the cluster corresponding to microstate i.
         """
         self._integrityCheck(postmsm=True)
-        return self.msm.active_set
+        return self._active_set
 
     @property
     def micronum(self):
         """Number of microstates"""
         self._integrityCheck(postmsm=True)
-        return len(self.msm.active_set)
+        return len(self._active_set)
 
     @property
     def macronum(self):
         """Number of macrostates"""
         self._integrityCheck(postmsm=True)
-        return len(set(self.msm.metastable_assignments))
+        return len(set(self.coarsemsm.assignments))
 
     @property
     def macro_ofmicro(self):
@@ -234,10 +240,10 @@ class Model(object):
         Numpy array which at index i has the index of the macrostate corresponding to microstate i.
         """
         self._integrityCheck(postmsm=True)
-        # Fixing pyemma macrostate numbering
-        mask = np.ones(np.max(self.msm.metastable_assignments) + 1, dtype=int) * -1
-        mask[list(set(self.msm.metastable_assignments))] = range(self.macronum)
-        return mask[self.msm.metastable_assignments]
+        # Fixing deeptime macrostate numbering
+        mask = np.ones(np.max(self.coarsemsm.assignments) + 1, dtype=int) * -1
+        mask[list(set(self.coarsemsm.assignments))] = range(self.macronum)
+        return mask[self.coarsemsm.assignments]
 
     @property
     def macro_ofcluster(self):
@@ -248,8 +254,138 @@ class Model(object):
         """
         self._integrityCheck(postmsm=True)
         macro_ofcluster = -np.ones(self.data.K, dtype=int)
-        macro_ofcluster[self.msm.active_set] = self.macro_ofmicro
+        macro_ofcluster[self._active_set] = self.macro_ofmicro
         return macro_ofcluster
+
+    def _plot_implied_timescales(
+        self,
+        fstep,
+        data,
+        n_its=None,
+        process=None,
+        show_mle: bool = True,
+        show_samples: bool = True,
+        show_sample_mean: bool = True,
+        show_sample_confidence: bool = True,
+        show_cutoff: bool = True,
+        sample_confidence: float = 0.95,
+        colors=None,
+        ax=None,
+        ylog=False,
+        **kwargs,
+    ):
+        r"""Creates an implied timescales plot inside exising matplotlib axes.
+
+        ! Taken from deeptime !
+        .. plot:: examples/plot_implied_timescales.py
+
+        Parameters
+        ----------
+        ax : matplotlib.axes.Axes
+            The matplotlib axes to use for plotting.
+        data : ImpliedTimescales
+            A timescales data container object, can be obtained, e.g., via :meth:`ImpliedTimescales.from_models`.
+        n_its : int, optional, default=None
+            Maximum number of timescales to plot.
+        process : int, optional, default=None
+            A particular process to plot. This is mutually exclusive with n_its.
+        show_mle : bool, default=True
+            Whether to show the timescale of the maximum-likelihood estimate.
+        show_samples : bool, default=True
+            Whether to show sample means and/or confidences.
+        show_sample_mean : bool, default=True
+            Whether to show the sample mean. Only has an effect if show_samples is True and there are samples in the data.
+        show_sample_confidence : bool, default=True
+            Whether to show the sample confidence. Only has an effect if show_samples is True and there are samples
+            in the data.
+        show_cutoff : bool, default=True
+            Whether to show the model resolution cutoff as grey filled area.
+        sample_confidence : float, default=0.95
+            The confidence to plot. The default amounts to a shaded area containing 95% of the sampled values.
+        colors : list of colors, optional, default=None
+            The colors that should be used for timescales. By default uses the matplotlib default colors as per
+            rc-config value "axes.prop_cycle".
+        **kwargs
+            Keyword arguments which are forwarded into the matplotlib plotting function for timescales.
+
+        Returns
+        -------
+        ax : matplotlib.axes.Axes
+            The matplotlib axes that were used to plot the timescales.
+
+        See Also
+        --------
+        ImpliedTimescales
+        """
+        from deeptime.plots.util import default_colors
+        from deeptime.util import confidence_interval
+
+        if ax is None:
+            import matplotlib.pyplot as plt
+
+            ax = plt.gca()
+        if n_its is not None and process is not None:
+            raise ValueError("n_its and process are mutually exclusive.")
+        if process is not None and process >= data.max_n_processes:
+            raise ValueError(
+                f"Requested process {process} when only {data.max_n_processes} are available."
+            )
+
+        if process is None and n_its is None:
+            n_its = data.max_n_processes
+        it_indices = [process] if process is not None else np.arange(n_its)
+        if colors is None:
+            colors = default_colors()
+        for it_index in it_indices:
+            color = colors[it_index % len(colors)]
+            if show_mle:
+                ax.plot(
+                    data.lagtimes * fstep,
+                    data.timescales_for_process(it_index) * fstep,
+                    color=color,
+                    **kwargs,
+                )
+            if data.has_samples and show_samples:
+                its_samples = data.samples_for_process(it_index)
+                if show_sample_mean:
+                    sample_mean = np.nanmean(its_samples, axis=1)
+                    ax.plot(
+                        data.lagtimes * fstep,
+                        sample_mean * fstep,
+                        marker="o",
+                        linestyle="dashed",
+                        color=color,
+                    )
+                if show_sample_confidence:
+                    l_conf, r_conf = confidence_interval(
+                        its_samples.T, conf=sample_confidence, remove_nans=True
+                    )
+                    ax.fill_between(
+                        data.lagtimes * fstep,
+                        l_conf * fstep,
+                        r_conf * fstep,
+                        alpha=0.2,
+                        color=color,
+                    )
+
+        if show_cutoff:
+            ax.plot(
+                data.lagtimes * fstep, data.lagtimes * fstep, linewidth=2, color="black"
+            )
+            ax.fill_between(
+                data.lagtimes * fstep,
+                np.full((data.n_lagtimes,), fill_value=ax.get_ylim()[0]) * fstep,
+                data.lagtimes * fstep,
+                alpha=0.5,
+                color="grey",
+            )
+        if ylog:
+            ax.set_yscale("log")
+
+        ax.set_title("Implied timescales")
+        ax.set_xlabel("Lag time (ns)")
+        ax.set_ylabel("Timescale (ns)")
+        return ax
 
     def plotTimescales(
         self,
@@ -281,7 +417,7 @@ class Model(object):
         units : str
             The units of lag. Can be 'frames' or any time unit given as a string.
         errors : errors
-            Calculate errors using Bayes (Refer to pyEMMA documentation)
+            Calculate errors using Bayesian MSMs
         nits : int
             Number of implied timescales to calculate. Default: all
         results : bool
@@ -291,7 +427,7 @@ class Model(object):
         save : str
             Path of the file in which to save the figure
         njobs : int
-            Number of parallel jobs to spawn for calculation of timescales. Negative numbers are used for spawning jobs as many as CPU threads.
+            DEPRECATED: Number of parallel jobs to spawn for calculation of timescales. Negative numbers are used for spawning jobs as many as CPU threads.
             -1: for all CPUs -2: for all except one etc.
         ylog : bool
             Set to False to get linear y axis instead of logarithmic
@@ -311,8 +447,8 @@ class Model(object):
         >>> model.plotTimescales(lags=list(range(1,100,5)))
         >>> model.plotTimescales(minlag=0.1, maxlag=20, numlags=25, units='ns')
         """
-        import pyemma.plots as mplt
-        import pyemma.msm as msm
+        from deeptime.util.validation import implied_timescales
+        from tqdm import tqdm
 
         self._integrityCheck()
         if lags is None:
@@ -321,27 +457,29 @@ class Model(object):
             lags = unitconvert(units, "frames", lags, fstep=self.data.fstep).tolist()
 
         if nits is None:
-            nits = np.min((self.data.K, 20))
+            nits = np.min((self.data.K - 1, 20))
 
-        its = msm.its(
-            self.data.St.tolist(), lags=lags, errors=errors, nits=nits, n_jobs=njobs
-        )  # Use all CPUs minus one
+        statelist = [traj.cluster for traj in self.data.trajectories]
+        models = []
+        for lagtime in tqdm(lags, desc="Estimating Timescales"):
+            models.append(self._get_model(statelist, lagtime, bayesian_samples=errors))
+
+        its_data = implied_timescales(models, n_its=nits)
         if plot or (save is not None):
             from matplotlib import pylab as plt
 
             if plot:
                 plt.ion()
             plt.figure()
+            ax = plt.gca()
             try:
-                mplt.plot_implied_timescales(
-                    its, ylog=ylog, dt=self.data.fstep, units="ns"
+                self._plot_implied_timescales(
+                    self.data.fstep, data=its_data, n_its=nits, ax=ax, ylog=ylog
                 )
             except ValueError as ve:
                 plt.close()
                 raise ValueError(
-                    "{} This is probably caused by badly set fstep in the data ({}). ".format(
-                        ve, self.data.fstep
-                    )
+                    f"{ve} This is probably caused by badly set fstep in the data ({self.data.fstep}). "
                     + "Please correct the model.data.fstep to correspond to the simulation frame step in nanoseconds."
                 )
             if save is not None:
@@ -349,7 +487,7 @@ class Model(object):
             if plot:
                 plt.show()
         if results:
-            return its.get_timescales(), its.lags
+            return its_data._its, its_data.lagtimes
 
     def maxConnectedLag(self, lags, njobs=1):
         """Heuristic for getting the lagtime before a timescale drops.
@@ -373,16 +511,21 @@ class Model(object):
         >>> model = Model(data)
         >>> model.maxConnectedLag(list(range(1, 100, 5)))
         """
+        from deeptime.util.validation import implied_timescales
+        from tqdm import tqdm
+
         if len(lags) == 1:
             return lags
         if isinstance(lags, np.ndarray):
             lags = lags.astype(int)
 
-        import pyemma.msm as msm
+        statelist = [traj.cluster for traj in self.data.trajectories]
+        models = []
+        for lagtime in tqdm(lags, desc="Estimating Timescales"):
+            models.append(self._get_model(statelist, lagtime, bayesian_samples=None))
 
-        itime = msm.its(
-            self.data.St.tolist(), lags=lags, nits=2, n_jobs=njobs
-        ).get_timescales()
+        its_data = implied_timescales(models, n_its=2)
+        itime = its_data._its
 
         for i in range(1, np.size(itime, 0)):
             if abs(itime[i, 0] - itime[i - 1, 1]) < abs(itime[i, 0] - itime[i - 1, 0]):
@@ -527,11 +670,11 @@ class Model(object):
         #                'probabilities and hence your results might differ from analyses done before this change.')
         self._integrityCheck(postmsm=True)
         macroeq = np.ones(self.macronum) * -1
-        macroindexes = list(set(self.msm.metastable_assignments))
+        macroindexes = list(set(self.coarsemsm.assignments))
         for i in range(self.macronum):
             # macroeq[i] = np.sum(self.msm.stationary_distribution[self.macro_ofmicro == i])
             macroeq[i] = np.sum(
-                self.msm.metastable_memberships[:, macroindexes[i]]
+                self.coarsemsm.memberships[:, macroindexes[i]]
                 * self.msm.stationary_distribution
             )
 
@@ -553,7 +696,7 @@ class Model(object):
         return macroeq
 
     def _coarseP(self):
-        M = self.msm.metastable_memberships
+        M = self.coarsemsm.memberships
         Pcoarse = np.linalg.inv(M.T.dot(M)).dot(M.T).dot(self.P).dot(M)
         if len(np.where(Pcoarse < 0)[0]) != 0:
             raise NameError(
@@ -916,8 +1059,18 @@ class Model(object):
 
         return deepcopy(self)
 
-    def cktest(self, plot=True, save=None, njobs=1):
-        """Conducts a Chapman-Kolmogorow test.
+    def cktest(
+        self,
+        lags=None,
+        minlag=None,
+        maxlag=None,
+        numlags=25,
+        units="frames",
+        plot=True,
+        save=None,
+        errors=None,
+    ):
+        """Conducts a Chapman-Kolmogorov test.
 
         Parameters
         ----------
@@ -926,13 +1079,25 @@ class Model(object):
         save : str
             Path of the file in which to save the figure
         """
-        from copy import deepcopy
-        from pyemma.plots import plot_cktest
+        from deeptime.plots.chapman_kolmogorov import plot_ck_test
         from matplotlib import pylab as plt
 
-        msm = deepcopy(self.msm)
-        ck = msm.cktest(self.macronum, n_jobs=njobs)
-        fig, axes = plot_cktest(ck)
+        if lags is None:
+            lags = self.data._defaultLags(minlag, maxlag, numlags, units)
+        else:
+            lags = unitconvert(units, "frames", lags, fstep=self.data.fstep).tolist()
+
+        statelist = [traj.cluster for traj in self.data.trajectories]
+        models = []
+        for lag in lags:
+            models.append(self._get_model(statelist, lag, bayesian_samples=errors))
+
+        ck_test = self.msm.ck_test(models, n_metastable_sets=self.macronum)
+        plot_ck_test(ck_test, legend=True)
+
+        # msm = deepcopy(self.msm)
+        # ck = msm.cktest(self.macronum, n_jobs=njobs)
+        # fig, axes = plot_cktest(ck)
         if save is not None:
             plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
         if plot:
@@ -1011,8 +1176,8 @@ class Model(object):
             )
 
         coreset = calcCoreSet(
-            self.msm.metastable_distributions,
-            self.msm.metastable_assignments,
+            self.coarsemsm.metastable_distributions,
+            self.coarsemsm.assignments,
             threshold,
         )
         newdata = self.data.copy()
@@ -1024,9 +1189,7 @@ class Model(object):
                 newdata.trajectories[i].cluster[fr] = s
 
         logger.info(
-            "Kept {} microstates from each macrostate.".format(
-                [len(x) for x in coreset]
-            )
+            f"Kept {[len(x) for x in coreset]} microstates from each macrostate."
         )
 
         dataobjects = [newdata]
@@ -1496,7 +1659,7 @@ def _macroTrajSt(St, macro_ofcluster):
             ixgrid = np.ix_(sourcemicros, sinkmicros)
             macroC[m1, m2] = np.sum(C[ixgrid].flatten())
 
-    from msmtools.estimation import transition_matrix
+    from deeptime.estimation import transition_matrix
     return transition_matrix(macroC, reversible=True)"""
 
 
@@ -1535,6 +1698,16 @@ class _TestModel(unittest.TestCase):
         self.model = Model(data)
 
         self.trans_prob = np.array([[0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.2, 0.3, 0.5]])
+
+        self.trans_prob2 = np.array(
+            [
+                [0.8, 0.15, 0.05, 0.0, 0.0],
+                [0.1, 0.75, 0.05, 0.05, 0.05],
+                [0.05, 0.1, 0.8, 0.0, 0.05],
+                [0.0, 0.2, 0.0, 0.8, 0.0],
+                [1e-7, 0.02 - 1e-7, 0.02, 0.0, 0.96],
+            ]
+        )
 
     def test_model_saving_loading(self):
         from moleculekit.util import tempname
@@ -1607,6 +1780,32 @@ class _TestModel(unittest.TestCase):
         )
         assert np.array_equal(lags, np.array([1, 50, 100, 500, 800]))
 
+        # Second probability matrix test
+        fakedata = _generate_toy_data(self.trans_prob2, n_traj=100, seed=0)
+        model = Model(fakedata)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outplot = os.path.join(tmpdir, "test.png")
+            its, lags = model.plotTimescales(
+                lags=range(1, 4),
+                plot=False,
+                save=outplot,
+                njobs=1,
+                results=True,
+            )
+            assert os.path.exists(outplot)
+
+        assert np.allclose(
+            its,
+            np.array(
+                [
+                    [14.83314609, 4.8958021, 3.53366645, 2.01939226],
+                    [14.82089692, 4.86804921, 3.49197211, 2.00651665],
+                    [14.81046561, 4.8277952, 3.47217915, 2.02697621],
+                ]
+            ),
+        )
+
     def test_ck_test(self):
         from htmd.metricdata import _generate_toy_data
         from matplotlib import pylab as plt
@@ -1638,6 +1837,22 @@ class _TestModel(unittest.TestCase):
         assert np.array_equal(model.cluster_ofmicro, [0, 1, 2])
         assert np.array_equal(model.macro_ofmicro, [2, 0, 1])
         assert model.micronum == 3
+        assert model.macronum == 3
+
+        # Second probability matrix test
+        fakedata = _generate_toy_data(self.trans_prob2, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3)
+
+        assert np.allclose(self.trans_prob2, model.P, atol=1e-1)
+
+        eq_dist = np.array([0.14541275, 0.33704423, 0.51754301])
+        assert np.allclose(eq_dist, model.eqDistribution(plot=False), atol=1e-3)
+
+        assert np.array_equal(model.micro_ofcluster, [0, 1, 2, 3, 4])
+        assert np.array_equal(model.cluster_ofmicro, [0, 1, 2, 3, 4])
+        assert np.array_equal(model.macro_ofmicro, [1, 1, 1, 0, 2])
+        assert model.micronum == 5
         assert model.macronum == 3
 
     def test_create_state(self):

@@ -80,8 +80,3 @@ if not (os.getenv("HTMD_NONINTERACTIVE")):
     htmd_registration()
     htmd_show_news()
     compareVersions()
-
-# Get rid of pyemma version warnings
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", category=UserWarning)
-    import pyemma
