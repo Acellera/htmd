@@ -344,7 +344,13 @@ class Kinetics(object):
             plt.show()
 
     def plotFluxPathways(
-        self, statetype="macro", mode="net_flux", fraction=1.0, plot=True, save=None
+        self,
+        statetype="macro",
+        mode="net_flux",
+        fraction=1.0,
+        plot=True,
+        save=None,
+        results=False,
     ):
         """Plot flux pathways between source and sink state.
 
@@ -362,6 +368,8 @@ class Kinetics(object):
             If set it False the plot will not show up in a figure
         save : str
             If a path is passed to save, the plot will be saved to the specified file
+        results : bool
+            Set to True to return fluxes, paths and path_fluxes
         """
         # Make mode a radio button with interactive plot
         from deeptime.plots import plot_flux
@@ -411,7 +419,8 @@ class Kinetics(object):
                     setmap[paths[i]],
                 )
             )
-        return flux, paths, pathfluxes
+        if results:
+            return flux, paths, pathfluxes
 
     @property
     def _kBT(self):
