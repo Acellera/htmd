@@ -19,4 +19,4 @@ Contents:
 .. toctree::
     :maxdepth: 1
 
-    Molecule module <moleculekit.molecule>
+    Molecule module <../moleculekit/moleculekit.molecule.rst>

@@ -57,13 +57,13 @@ List of useful tools
 --------------------
 
 ====================================================== ==================
-:class:`~moleculekit.molecule.Molecule` class        Building functions
+:class:`~moleculekit.molecule.Molecule` class          Building functions
 ====================================================== ==================
-:func:`~moleculekit.molecule.Molecule.append`        :func:`~moleculekit.util.maxDistance`
-:func:`~moleculekit.molecule.Molecule.center`        :func:`~moleculekit.util.uniformRandomRotation`
-:func:`~moleculekit.molecule.Molecule.mutateResidue` :func:`~moleculekit.util.boundingBox`
-:func:`~moleculekit.molecule.Molecule.moveBy`        :func:`~moleculekit.util.sequenceID`
-:func:`~moleculekit.molecule.Molecule.rotateBy`      :func:`~htmd.builder.builder.embed`
+:func:`~moleculekit.molecule.Molecule.append`          :func:`~moleculekit.util.maxDistance`
+:func:`~moleculekit.molecule.Molecule.center`          :func:`~moleculekit.util.uniformRandomRotation`
+:func:`~moleculekit.molecule.Molecule.mutateResidue`   :func:`~moleculekit.util.boundingBox`
+:func:`~moleculekit.molecule.Molecule.moveBy`          :func:`~moleculekit.util.sequenceID`
+:func:`~moleculekit.molecule.Molecule.rotateBy`        :func:`~htmd.builder.builder.embed`
 ---                                                    :func:`~moleculekit.tools.autosegment.autoSegment`
 ====================================================== ==================
 

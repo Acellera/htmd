@@ -18,6 +18,5 @@ Contents:
     Clustering <clustering>
     Markov state models <htmd.model>
     Kinetics <htmd.kinetics>
-    Molecular viewer <htmd.vmdviewer>
 
 

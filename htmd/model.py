@@ -1,7 +1,7 @@
 """
 Markov state models are a statistical tool for analysing molecular simulations which has met with lots of success.
 The Model class here, encapsulates all functionallity for the calculation of Markov models while hiding unnecessary
-details under the hood. It uses DeepTime [1] internally to calculate Markov models.
+details under the hood. It uses DeepTime [1]_ internally to calculate Markov models.
 
 References
 ----------

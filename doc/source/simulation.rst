@@ -36,7 +36,7 @@ Contents:
 .. toctree::
     :maxdepth: 1
 
-    MD Engines <htmd.mdengines>
+    MD Engines <htmd.mdengine>
     Queues <../jobqueues/jobqueues.rst>
     Adaptive sampling <adaptive>
     State-of-the-art protocols for molecular simulations <htmd.protocols>

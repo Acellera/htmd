@@ -74,7 +74,7 @@ class AdaptiveBandit(AdaptiveBase):
         Lagtime to use for TICA in frames. When using `skip` remember to change this accordinly.
     ticadim : int, default=3
         Number of TICA dimensions to use. When set to 0 it disables TICA
-    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` class, default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
+    clustmethod : :class:`ClusterMixin <sklearn.base.ClusterMixin>` class, default=<class 'sklearn.cluster._kmeans.MiniBatchKMeans'>
         Clustering algorithm used to cluster the contacts or distances
     macronum : int, default=8
         The number of macrostates to produce
@@ -86,7 +86,7 @@ class AdaptiveBandit(AdaptiveBase):
         The action space
     recluster : bool, default=False
         If to recluster the action space.
-    reclusterMethod : , default=<class 'sklearn.cluster.k_means_.MiniBatchKMeans'>
+    reclusterMethod : , default=<class 'sklearn.cluster._kmeans.MiniBatchKMeans'>
         Clustering method for reclustering.
     goal_init : float, default=0.3
         The proportional ratio of goal initialization compared to max frames set by nframes

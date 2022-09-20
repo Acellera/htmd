@@ -26,13 +26,12 @@ If you are using HTMD in your publications please cite following papers:
 The user guide is a good place to start playing around.
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 5
 
     Installation <https://software.acellera.com/install-htmd.html>
     tutorials
     documentation
     API <htmd.rst>
-    developers
 
 
 
