@@ -3,10 +3,13 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from subprocess import check_output
+import os
 
 
 def compareVersions():
     from htmd.version import version
+    from htmd.home import home
     from natsort import natsorted
     import os
     import time
@@ -33,143 +36,53 @@ def compareVersions():
         _writeLatestVersionFile(__file)
 
     try:
-        f = open(__file, "r")
+        with open(__file, "r") as f:
+            latest = f.read().strip()
     except Exception:
         print(
             f"Unable to open {__file} file for reading. Will not check for new HTMD versions."
         )
         return
-    latestversions = f.readlines()
-    f.close()
-
-    if len(latestversions) != 2:
-        print(
-            f"There is something wrong with your {__file} file. Will not check for new HTMD versions."
-        )
-        return
 
     currver = version()
-    if currver != "unpackaged":
-        if _is_stable(currver):
-            pieces = latestversions[0].split()
-            latest = pieces[0].strip()
-            verstring = "stable"
-        else:
-            pieces = latestversions[1].split()
-            latest = pieces[0].strip()
-            verstring = "devel"
-        pydeps = ""
-        if len(pieces) > 1:
-            pydeps = f" python[{pieces[1]}]"
-    elif currver == "unpackaged":
-        pass
-    else:
-        return
-
-    if currver != "unpackaged" and natsorted((latest, currver))[1] != currver:
+    if currver == "unpackaged":
+        print(f"You are on the latest HTMD version ({currver} : {home()}).")
+    elif natsorted((latest, currver))[1] != currver:
         print(
-            f"New {verstring} HTMD version ({latest}{pydeps}) is available. You are currently on ({currver})."
+            f"New HTMD version ({latest}) is available. You are currently on ({currver})."
             "There are several methods to update:"
             f"    - Create a new conda env. using `conda create -n htmd{latest} htmd={latest} -c acellera -c conda-forge`"
             "    - Create a brand new conda installation and run `conda install htmd -c acellera -c conda-forge`"
             "    - Run: `conda update htmd -c acellera -c conda-forge` (NOT RECOMMENDED!)"
         )
     else:
-        if currver != "unpackaged":
-            print(f"You are on the latest HTMD version ({currver}).")
-        else:
-            from htmd.home import home
-
-            print(f"You are on the latest HTMD version ({currver} : {home()}).")
+        print(f"You are on the latest HTMD version ({currver}).")
 
     print("")
 
 
 def _writeLatestVersionFile(fname):
-    import os
+    version = None
+    try:
+        ret = check_output(
+            [
+                "conda",
+                "search",
+                "acellera::*[name=htmd, subdir=linux-64]",  # , build=*py39*
+            ]
+        )
+        lastline = ret.decode("utf-8").splitlines()[-1]
+        version = lastline.split()[1]
+    except Exception:
+        return
 
     try:
-        f = open(fname, "w")
+        with open(fname, "w") as f:
+            f.write(version)
     except Exception:
         print(
             f"Unable to open {fname} file for writing. Will not check for new HTMD versions."
         )
         return
 
-    try:
-        from binstar_client.utils import get_server_api
-
-        api = get_server_api(log_level=0)
-        package = api.package("acellera", "htmd")
-    except Exception as err:
-        print(f"Failed at checking latest conda version. ({type(err).__name__})")
-        return
-
-    try:
-        stable, dev, stabledeps, devdeps = _release_version(package)
-    except Exception as err:
-        print(f"Failed at gettin latest package versions. ({type(err).__name__})")
-        return
-
-    f.write("{} {}\n{} {}".format(stable, ",".join(stabledeps), dev, ",".join(devdeps)))
     os.utime(fname, None)
-    f.close()
-
-
-def _release_version(package):
-
-    versionlist = package["versions"]
-    laststable = None
-    lastdev = None
-    for ver in versionlist[::-1]:  # Iterate in reverse due to sorting of conda versions
-        if laststable is None and _is_stable(ver):
-            laststable = ver
-        elif lastdev is None:
-            lastdev = ver
-        if laststable and lastdev:
-            break
-
-    stabledeps = _release_python_dep(package, laststable)
-    devdeps = _release_python_dep(package, lastdev)
-
-    return laststable, lastdev, stabledeps, devdeps
-
-
-def _is_stable(ver):
-    import numpy as np
-
-    if (
-        np.mod(int(ver.split(".")[1]), 2) == 0
-    ):  # Even versions are stable (i.e. 1.2.x 3.4.x etc)
-        return True
-    else:
-        return False
-
-
-def _release_python_dep(package, version, opersys=None):
-    import platform
-
-    if opersys is None:
-        opersys = platform.system().lower()
-        if opersys == "windows":
-            opersys = "win"
-    try:
-        versions = []
-        for f in package["files"]:
-            if f["version"] == version and f["attrs"][
-                "operatingsystem"
-            ].lower().startswith(opersys.lower()):
-                if len(f["dependencies"]):
-                    for d in f["dependencies"]["depends"]:
-                        if d["name"].lower() == "python":
-                            versions.append(d["specs"][0][1])
-                else:
-                    for d in f["attrs"]["depends"]:
-                        if d.lower().startswith("python "):
-                            versions.append(d.replace("python ", "")[2:])
-        if len(versions):
-            return versions
-        else:
-            return " does not exist for your platform. Please create an issue on HTMD git issue tracker."
-    except Exception:
-        return

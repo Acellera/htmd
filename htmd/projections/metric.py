@@ -203,7 +203,7 @@ class Metric:
                 " property, otherwise calculations in Model and Kinetics classes can fail."
             )
         else:
-            data.fstep = float(stats.mode(fstep).mode)
+            data.fstep = float(stats.mode(fstep, keepdims=False).mode)
             if len(uqfsteps) != 1:
                 logger.warning(
                     "Multiple framesteps [{}] ns were read from the simulations. "
