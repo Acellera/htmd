@@ -67,18 +67,20 @@ class Model(object):
         from deeptime.markov.msm import MaximumLikelihoodMSM, BayesianMSM
         from deeptime.markov import TransitionCountEstimator
 
+        count_mode = "sliding" if bayesian_samples is None else "effective"
+
+        counts = TransitionCountEstimator(
+            lagtime=lagtime, count_mode=count_mode
+        ).fit_fetch(statelist)
+
         if bayesian_samples is not None:
-            counts = TransitionCountEstimator(
-                lagtime=lagtime, count_mode="effective"
-            ).fit_fetch(statelist)
-            return BayesianMSM(n_samples=bayesian_samples).fit_fetch(counts)
+            return BayesianMSM(n_samples=bayesian_samples).fit_fetch(
+                counts.submodel_largest()
+            )
         else:
-            counts = TransitionCountEstimator(
-                lagtime=lagtime, count_mode="sliding"
-            ).fit_fetch(statelist)
             return MaximumLikelihoodMSM(
-                allow_disconnected=True, use_lcc=True
-            ).fit_fetch(counts)
+                allow_disconnected=False, use_lcc=False
+            ).fit_fetch(counts.submodel_largest())
 
     def markovModel(self, lag, macronum, units="frames", sparse=False):
         """Build a Markov model at a given lag time and calculate metastable states
@@ -108,7 +110,19 @@ class Model(object):
         self.msm = self._get_model(statelist, lag, bayesian_samples=None)
         modelflag = False
         while not modelflag:
-            self.coarsemsm = self.msm.pcca(macronum)
+            try:
+                self.coarsemsm = self.msm.pcca(macronum)
+            except Exception as e:
+                macronum -= 1
+                if macronum < 2:
+                    raise RuntimeError(
+                        "Could not create even two macrostates. Please revise your clustering."
+                    )
+                logger.warning(
+                    f"PCCA failed with following error. Reducing the number of macrostates to {macronum}. Error: {e}"
+                )
+                continue
+
             if len(np.unique(self.coarsemsm.assignments)) != macronum:
                 macronum -= 1
                 logger.warning(
@@ -194,7 +208,7 @@ class Model(object):
 
     @property
     def _active_set(self):
-        return self.msm.count_model.visited_set
+        return self.msm.count_model.state_symbols
 
     @property
     def P(self):
