@@ -64,7 +64,7 @@ except Exception as e:
     warnings.warn(f"{e}")
 
 
-from htmdx.cli import htmd_registration, htmd_show_news
+from htmd.license import htmd_registration, htmd_show_news, htmd_register
 from htmd.latest import compareVersions
 from htmd.config import config
 
@@ -77,6 +77,6 @@ from glob import glob
 from sklearn.cluster import MiniBatchKMeans
 
 if not (os.getenv("HTMD_NONINTERACTIVE")):
-    htmd_registration()
     htmd_show_news()
     compareVersions()
+    htmd_registration()

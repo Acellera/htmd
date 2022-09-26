@@ -25,11 +25,9 @@ if [ -e "$DIR" ]; then
     pwd
     ls
     cp -r htmd  $DIR/
-    cp -r htmdx  $DIR/
     rm -rf $(find "$DIR" -name .git -type d)
     rm -rf $DIR/htmd/data
     rm -rf $DIR/htmd/.idea
-    rm -rf $DIR/htmdx/.idea
     rm -rf $DIR/htmd/.ipynb_checkpoints
     rm -rf $DIR/htmd/Untitled*
     echo "def version():" > $DIR/htmd/version.py
@@ -37,17 +35,6 @@ if [ -e "$DIR" ]; then
 else
     echo "Error: PREFIX not defined"
     exit 1
-fi
-
-# Delete compiled libs from other OS
-find $DIR/htmd/lib -maxdepth 1 ! -name "$OSNAME" ! -path $DIR/htmd/lib -type d -exec rm -rf {} \; -print || true
-
-# copy compiled libs
-if [ -e "$STARTDIR/htmd/lib/$OSNAME" ]; then
-    if [ -e "$DIR/htmd/lib/$OSNAME" ]; then
-        rm -R "$DIR/htmd/lib/$OSNAME"
-    fi
-    cp -R $STARTDIR/htmd/lib/$OSNAME "$DIR/htmd/lib/"
 fi
 
 cd "$DIR/../../"
