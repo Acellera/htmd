@@ -3,12 +3,10 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from __future__ import print_function
-
 from moleculekit.util import sequenceID
 import numpy as np
 import logging
-from htmd.decorators import _Deprecated
+import unittest
 
 logger = logging.getLogger(__name__)
 
@@ -79,31 +77,17 @@ def embed(mol1, mol2, gap=1.3):
     -------
     >>> all = embed(memb, prot)
     """
-    mol1 = mol1.copy()
+    from scipy.spatial.distance import cdist
+
+    dists = cdist(mol2.coords[:, :, 0], mol1.coords[:, :, 0])
+    s2close = np.where(dists < gap)[0]
+
+    mol2res = sequenceID(mol2.resid)
+    s2closeres = np.isin(mol2res, np.unique(mol2res[s2close]))
+
     mol2 = mol2.copy()
-    # Set different occupancy to separate atoms of mol1 and mol2
-    occ1 = mol1.get("occupancy")
-    occ2 = mol2.get("occupancy")
-    mol1.set("occupancy", 1)
-    mol2.set("occupancy", 2)
-
+    mol2.remove(s2closeres, _logger=False)
     mol2.append(mol1)
-    s1 = mol2.atomselect("occupancy 1")
-    s2 = mol2.atomselect("occupancy 2")
-    # Give unique "residue" beta number to all resids
-    beta = mol2.get("beta")
-    mol2.set("beta", sequenceID(mol2.resid))
-    # Calculate overlapping atoms
-    overlaps = mol2.atomselect(
-        "(occupancy 2) and same beta as exwithin " + str(gap) + " of (occupancy 1)"
-    )
-    # Restore original beta and occupancy
-    mol2.set("beta", beta)
-    mol2.set("occupancy", occ1, s1)
-    mol2.set("occupancy", occ2, s2)
-
-    # Remove the overlaps
-    mol2.remove(overlaps, _logger=False)
     return mol2
 
 
@@ -434,29 +418,42 @@ def minimalRotation(prot):
     return angle + np.radians(45)
 
 
+class _TestBuilder(unittest.TestCase):
+    def test_embed(self):
+        from moleculekit.molecule import Molecule, mol_equal
+        from moleculekit.tools.autosegment import autoSegment
+        from htmd.home import home
+        from os import path
+
+        testdir = path.join(home(), "data", "building-protein-membrane")
+
+        p = Molecule(path.join(testdir, "4dkl.pdb"))
+        p.filter("(chain B and protein) or water")
+        p = autoSegment(p, "protein", "P")
+        m = Molecule(path.join(testdir, "membrane.pdb"))
+        a = embed(p, m)
+
+        ref = Molecule(path.join(testdir, "embedded.pdb"))
+        assert mol_equal(a, ref, exceptFields=("serial"))
+
+    def test_autosegment(self):
+        from moleculekit.molecule import Molecule
+        from moleculekit.tools.autosegment import autoSegment
+        from htmd.home import home
+        from os import path
+
+        testdir = path.join(home(), "data", "building-protein-membrane")
+
+        mol = Molecule(path.join(testdir, "1ITG_clean.pdb"))
+        ref = Molecule(path.join(testdir, "1ITG.pdb"))
+        mol = autoSegment(mol, sel="protein")
+        assert np.all(mol.segid == ref.segid)
+
+        mol = Molecule(path.join(testdir, "3PTB_clean.pdb"))
+        ref = Molecule(path.join(testdir, "3PTB.pdb"))
+        mol = autoSegment(mol, sel="protein")
+        assert np.all(mol.segid == ref.segid)
+
+
 if __name__ == "__main__":
-    from moleculekit.molecule import Molecule
-    from moleculekit.tools.autosegment import autoSegment
-    from htmd.home import home
-    from os import path
-
-    p = Molecule(path.join(home(), "data", "building-protein-membrane", "4dkl.pdb"))
-    p.filter("(chain B and protein) or water")
-    p = autoSegment(p, "protein", "P")
-    m = Molecule(path.join(home(), "data", "building-protein-membrane", "membrane.pdb"))
-    a = embed(p, m)
-    print(np.unique(m.get("segid")))
-
-    mol = Molecule(
-        path.join(home(), "data", "building-protein-membrane", "1ITG_clean.pdb")
-    )
-    ref = Molecule(path.join(home(), "data", "building-protein-membrane", "1ITG.pdb"))
-    mol = autoSegment(mol, sel="protein")
-    assert np.all(mol.segid == ref.segid)
-
-    mol = Molecule(
-        path.join(home(), "data", "building-protein-membrane", "3PTB_clean.pdb")
-    )
-    ref = Molecule(path.join(home(), "data", "building-protein-membrane", "3PTB.pdb"))
-    mol = autoSegment(mol, sel="protein")
-    assert np.all(mol.segid == ref.segid)
+    unittest.main(verbosity=2)
