@@ -93,7 +93,48 @@ def _show_licence(product):
         print(fh.read())
 
 
+def check_for_license():
+    from pathlib import Path
+
+    envvars = [
+        "ACELLERA_LICENCE_SERVER",
+        "ACELLERA_LICENSE_SERVER",
+        "ACELLERA_LICENCE_FILE",
+        "ACELLERA_LICENSE_FILE",
+    ]
+    user_home = str(Path.home())
+    locations = [
+        "/opt/acellera/licence.dat",
+        "/opt/acellera/license.dat",
+        os.path.join(user_home, ".acellera/licence.dat"),
+        os.path.join(user_home, ".acellera/license.dat"),
+    ]
+
+    if any([envv in os.environ for envv in envvars]) or any(
+        [os.path.exists(ll) for ll in locations]
+    ):
+        from htmd.home import home
+        import subprocess
+
+        try:
+            ret = subprocess.Popen(
+                os.path.join(home(shareDir=True), "license-checker"),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            ret.wait()
+            if ret.returncode == 0:
+                return True
+            else:  # Only print if license check failed
+                print(ret.communicate()[0].decode("utf-8"))
+        except Exception:
+            pass
+    return False
+
+
 def htmd_registration(product="htmd"):
+    if check_for_license():
+        return
 
     if not _check_registration(product):
         _show_licence(product)
