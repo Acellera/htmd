@@ -133,10 +133,9 @@ def check_for_license():
 
 
 def htmd_registration(product="htmd"):
-    if check_for_license():
-        return
-
     if not _check_registration(product):
+        if check_for_license():
+            return
         _show_licence(product)
         print(
             "By continuing to use HTMD you are automatically accepting the above license agreement.\n"
