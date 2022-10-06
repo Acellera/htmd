@@ -737,7 +737,9 @@ def _build(
             and os.path.getsize(os.path.join(outdir, "structure.prmtop")) != 0
         ):
             try:
-                molbuilt = Molecule(os.path.join(outdir, "structure.prmtop"))
+                molbuilt = Molecule(
+                    os.path.join(outdir, "structure.prmtop"), validateElements=False
+                )
                 molbuilt.read(os.path.join(outdir, "structure.crd"))
             except Exception as e:
                 raise RuntimeError(
