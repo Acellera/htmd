@@ -12,14 +12,26 @@ logger = logging.getLogger(__name__)
 
 
 class BuildError(Exception):
-    def __init__(self, value):
-        self.value = value
+    def __init__(self, text, errors=()):
+        self.text = text
+        self.errors = errors
 
     def __str__(self):
-        if isinstance(self.value, str):
-            return repr(self.value)
-        elif isinstance(self.value, list):
-            return "\n".join([v if isinstance(v, str) else repr(v) for v in self.value])
+        if isinstance(self.text, str):
+            return repr(self.text)
+        elif isinstance(self.text, list):
+            return "\n".join([v if isinstance(v, str) else repr(v) for v in self.text])
+
+
+class _MissingErrorType(Exception):
+    def __init__(self, text, values=()):
+        self.text = text
+        self.values = values
+        if isinstance(self.values, np.ndarray):
+            self.values = self.values.tolist()
+
+    def __str__(self):
+        return self.text
 
 
 class MixedSegmentError(Exception):
@@ -30,27 +42,27 @@ class ResidueInsertionError(Exception):
     pass
 
 
-class UnknownResidueError(Exception):
+class MissingResidueError(_MissingErrorType):
     pass
 
 
-class MissingParameterError(Exception):
+class MissingParameterError(_MissingErrorType):
     pass
 
 
-class MissingTorsionError(Exception):
+class MissingTorsionError(_MissingErrorType):
     pass
 
 
-class MissingBondError(Exception):
+class MissingBondError(_MissingErrorType):
     pass
 
 
-class MissingAngleError(Exception):
+class MissingAngleError(_MissingErrorType):
     pass
 
 
-class MissingAtomTypeError(Exception):
+class MissingAtomTypeError(_MissingErrorType):
     pass
 
 

@@ -19,7 +19,7 @@ from htmd.builder.builder import (
     convertDisulfide,
     _checkMixedSegment,
     BuildError,
-    UnknownResidueError,
+    MissingResidueError,
     MissingAngleError,
     MissingBondError,
     MissingParameterError,
@@ -250,6 +250,105 @@ def _locateFile(fname, ftype, teleap):
     if len(foundfile) != 0:
         return foundfile[0]
     logger.warning(f"Was not able to find {ftype} file {fname}")
+
+
+def _getTeLeapImportFlags(teleap=None, ff=None, teleapimports=()):
+    if not teleapimports:
+        teleapimports = []
+        # Source default Amber (i.e. the same paths tleap imports)
+        amberhome = defaultAmberHome(teleap=teleap)
+        teleapimports += [
+            os.path.join(amberhome, s) for s in _defaultAmberSearchPaths.values()
+        ]
+        if len(teleapimports) == 0:
+            raise RuntimeWarning(
+                f"No default Amber force-field found. Check teLeap location: {teleap}"
+            )
+        # Source HTMD Amber paths that contain ffs
+        htmdamberdir = htmdAmberHome()
+        teleapimports += [
+            os.path.join(htmdamberdir, os.path.dirname(f))
+            for f in ff
+            if os.path.isfile(os.path.join(htmdamberdir, f))
+        ]
+        if len(teleapimports) == 0:
+            raise RuntimeError(
+                "No default Amber force-field imports found. Check "
+                "`htmd.builder.amber.defaultAmberHome()` and `htmd.builder.amber.htmdAmberHome()`"
+            )
+
+    # Set import flags for teLeap
+    teleapimportflags = []
+    for p in teleapimports:
+        teleapimportflags.append("-I")
+        teleapimportflags.append(str(p))
+    return teleapimportflags
+
+
+def _getResiduesInAllFFs():
+    amberhome = defaultAmberHome()
+    # Original AMBER FFs
+    ffdir = join(amberhome, _defaultAmberSearchPaths["ff"])
+    ffs = [
+        os.path.relpath(ff, ffdir)
+        for ff in glob(join(ffdir, "*"))
+        if os.path.isfile(ff)
+    ]
+
+    htmdamberdir = htmdAmberHome()
+    # Extra AMBER FFs on HTMD
+    ffs += [
+        os.path.relpath(ff, htmdamberdir)
+        for ff in glob(join(htmdamberdir, "*", "leaprc.*"))
+        if os.path.isfile(ff)
+    ]
+
+    residues = {}
+    for ff in ffs:
+        residues[ff] = _getResiduesInFF(ff)
+
+    return residues
+
+
+def _getResiduesInFF(ff, teleap=None):
+    import tempfile
+
+    if teleap is None:
+        teleap = _findTeLeap()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ff = _locateFile(ff, "ff", teleap)
+        shutil.copy(ff, tmpdir)
+
+        importflgs = _getTeLeapImportFlags(teleap, [ff])
+
+        with open(os.path.join(tmpdir, "tleap.in"), "w") as f:
+            f.write(f"logFile leap.log\nsource {os.path.basename(ff)}\nlist\nquit")
+
+        logpath = os.path.join(tmpdir, "log.txt")
+        outlog = os.path.join(tmpdir, "leap.log")
+        with open(logpath, "w") as f:
+            try:
+                cmd = [teleap, "-f", "./tleap.in"]
+                cmd[1:1] = importflgs
+                logger.debug(cmd)
+                call(cmd, stdout=f, cwd=tmpdir)
+            except Exception:
+                raise NameError("teLeap failed at execution")
+
+        residues = []
+        starting = False
+
+        with open(outlog, "r") as f:
+            for line in f:
+                if line.strip() == "> list":
+                    starting = True
+                    continue
+                if line.strip() == "quit":
+                    break
+                if starting:
+                    residues += line.strip().split()
+    return residues
 
 
 def defaultFf():
@@ -680,35 +779,7 @@ def _build(
         f.write("quit")
 
     if execute:
-        if not teleapimports:
-            teleapimports = []
-            # Source default Amber (i.e. the same paths tleap imports)
-            amberhome = defaultAmberHome(teleap=teleap)
-            teleapimports += [
-                os.path.join(amberhome, s) for s in _defaultAmberSearchPaths.values()
-            ]
-            if len(teleapimports) == 0:
-                raise RuntimeWarning(
-                    f"No default Amber force-field found. Check teLeap location: {teleap}"
-                )
-            # Source HTMD Amber paths that contain ffs
-            htmdamberdir = htmdAmberHome()
-            teleapimports += [
-                os.path.join(htmdamberdir, os.path.dirname(f))
-                for f in ff
-                if os.path.isfile(os.path.join(htmdamberdir, f))
-            ]
-            if len(teleapimports) == 0:
-                raise RuntimeError(
-                    "No default Amber force-field imports found. Check "
-                    "`htmd.builder.amber.defaultAmberHome()` and `htmd.builder.amber.htmdAmberHome()`"
-                )
-
-        # Set import flags for teLeap
-        teleapimportflags = []
-        for p in teleapimports:
-            teleapimportflags.append("-I")
-            teleapimportflags.append(str(p))
+        teleapimportflags = _getTeLeapImportFlags(teleap, ff, teleapimports)
         logpath = os.path.abspath(os.path.join(outdir, "log.txt"))
         logger.info("Starting the build.")
         currdir = os.getcwd()
@@ -727,7 +798,8 @@ def _build(
         if errors:
             raise BuildError(
                 errors
-                + [f"Check {logpath} for further information on errors in building."]
+                + [f"Check {logpath} for further information on errors in building."],
+                errors,
             )
         logger.info("Finished building.")
 
@@ -1095,28 +1167,42 @@ def _logParser(fname):
     errors = []
     if len(unknownres):
         errors.append(
-            UnknownResidueError(
+            MissingResidueError(
                 f"Unknown residue(s) {np.unique(unknownres)} found in the input structure. "
                 "You are either missing a topology definition for the residue or you need to "
-                "rename it to the correct residue name"
+                "rename it to the correct residue name",
+                np.unique(unknownres),
             )
         )
     if len(missingparam):
         errors.append(
             MissingParameterError(
-                f"Missing parameters for atom {missingparam} and type {missingparam}"
+                f"Missing parameters for atom {missingparam} and type {missingparam}",
+                missingparam,
             )
         )
     if len(missingtorsion):
         errors.append(
-            MissingTorsionError(f"Missing torsion terms for {missingtorsion}")
+            MissingTorsionError(
+                f"Missing torsion terms for {missingtorsion}", missingtorsion
+            )
         )
     if len(missingbond):
-        errors.append(MissingBondError(f"Missing bond parameters for {missingbond}"))
+        errors.append(
+            MissingBondError(f"Missing bond parameters for {missingbond}", missingbond)
+        )
     if len(missingangle):
-        errors.append(MissingAngleError(f"Missing angle parameters for {missingangle}"))
+        errors.append(
+            MissingAngleError(
+                f"Missing angle parameters for {missingangle}", missingangle
+            )
+        )
     if len(missingatomtype):
-        errors.append(MissingAtomTypeError(f"Missing atom type for {missingatomtype}"))
+        errors.append(
+            MissingAtomTypeError(
+                f"Missing atom type for {missingatomtype}", missingatomtype
+            )
+        )
 
     return errors
 

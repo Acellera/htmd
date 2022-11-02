@@ -22,7 +22,7 @@ from htmd.builder.builder import (
     detectCisPeptideBonds,
     _checkMixedSegment,
     _checkLongResnames,
-    UnknownResidueError,
+    MissingResidueError,
     BuildError,
 )
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
@@ -380,7 +380,8 @@ def build(
                     "Check {} for further information on errors in building.".format(
                         logpath
                     )
-                ]
+                ],
+                errors,
             )
         logger.info("Finished building.")
 
@@ -1047,10 +1048,11 @@ def _logParser(fname):
         )
     if len(unknownres):
         errors.append(
-            UnknownResidueError(
+            MissingResidueError(
                 f"Unknown residue(s) {np.unique(unknownres)} found in the input structure. "
                 "You are either missing a topology definition for the residue or you need to "
-                "rename it to the correct residue name"
+                "rename it to the correct residue name",
+                unknownres,
             )
         )
     if warnings:
