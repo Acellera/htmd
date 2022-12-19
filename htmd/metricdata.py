@@ -676,9 +676,9 @@ class MetricData(object):
     def deconcatenate(self, array):
         indeces = np.cumsum(self.trajLengths)
         if np.ndim(array) == 1:
-            return np.array(np.split(array, indeces[:-1]))
+            return np.array(np.split(array, indeces[:-1]), dtype=object)
         else:
-            return np.array(np.vsplit(array, indeces[:-1]))
+            return np.array(np.vsplit(array, indeces[:-1]), dtype=object)
 
     def abs2rel(self, absFrames):
         """Convert absolute frame indexes into trajectory index-frame pairs

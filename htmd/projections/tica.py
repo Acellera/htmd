@@ -191,7 +191,9 @@ class TICA(object):
                 keepdata = [x[:, keepdim] for x in self.data.dat]
                 if self.data.description is not None:
                     keepdimdesc = self.data.description.iloc[keepdim]
-            proj = self.model.transform(self.data.dat.tolist())
+            proj = [
+                self.model.transform(tr.projection) for tr in self.data.trajectories
+            ]
             simlist = self.data.simlist
             ref = self.data.ref
             fstep = self.data.fstep
@@ -213,7 +215,11 @@ class TICA(object):
         from htmd.metricdata import MetricData
 
         datatica = MetricData(
-            dat=np.array(proj), simlist=simlist, ref=ref, fstep=fstep, parent=parent
+            dat=np.array(proj, dtype=object),
+            simlist=simlist,
+            ref=ref,
+            fstep=fstep,
+            parent=parent,
         )
         from pandas import DataFrame
 
