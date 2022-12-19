@@ -26,11 +26,13 @@ jobs:
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
+          channels: acellera,conda-forge,defaults
 
       - name: Install HTMD conda deps # psfgen should not be included by default in HTMD due to licensing
         run: |
-          conda install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y -c acellera -c conda-forge
-          conda install psfgen -c acellera
+          mamba install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y
+          mamba install psfgen
 
       - name: Install pip dependencies
         run: |
@@ -73,10 +75,12 @@ jobs:
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
+          channels: acellera,conda-forge,defaults
 
       - name: Install conda deps
         run: |
-          conda install -y -q --file package/htmd-deps/DEPENDENCIES nbconvert sphinx python=${{ matrix.python-version }} -c acellera -c conda-forge
+          mamba install -y -q --file package/htmd-deps/DEPENDENCIES nbconvert sphinx python=${{ matrix.python-version }} -c acellera -c conda-forge
 
       - name: Generate rst docs
         run: |
@@ -109,12 +113,15 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: writedeps
+          auto-update-conda: true
           python-version: ${{ matrix.python-version }}
+          mamba-version: "*"
+          channels: acellera,conda-forge,defaults
 
       - name: Dump exact dependencies yaml file
         shell: bash -l {0}
         run: |
-          conda install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y -c acellera -c conda-forge 
+          mamba install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y
           python package/htmd-deps/write_meta_yaml.py package/htmd-deps
 
       - uses: conda-incubator/setup-miniconda@v2
