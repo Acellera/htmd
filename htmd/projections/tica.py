@@ -93,7 +93,7 @@ class TICA(object):
 
             tic = TICAdt(lagtime=lag)
             if self.dimensions is None:
-                datalist = data.dat.tolist()
+                datalist = data.dat
             else:  # Sub-select dimensions for fitting
                 datalist = [x[:, self.dimensions].copy() for x in data.dat]
             tic.fit(datalist)
@@ -138,7 +138,7 @@ class TICA(object):
             self.data, Metric
         ):  # Memory efficient TICA projecting trajectories on the fly
             proj = []
-            refs = []
+            ref = []
             fstep = None
 
             metr = self.data
@@ -162,7 +162,7 @@ class TICA(object):
                         )  # Sub-select dimensions for projecting
                     else:
                         proj.append(self.model.transform(pro[0]).astype(np.float32))
-                    refs.append(pro[1])
+                    ref.append(pro[1])
                     if fstep is None:
                         fstep = pro[2]
                 pbar.update(len(projecteddata))
@@ -170,7 +170,6 @@ class TICA(object):
 
             simlist = self.data.simulations
             simlist = np.delete(simlist, droppedsims)
-            ref = np.array(refs, dtype=object)
             parent = None
             if self.dimensions is not None:
                 from htmd.projections.metric import _singleMolfile
@@ -215,11 +214,7 @@ class TICA(object):
         from htmd.metricdata import MetricData
 
         datatica = MetricData(
-            dat=np.array(proj, dtype=object),
-            simlist=simlist,
-            ref=ref,
-            fstep=fstep,
-            parent=parent,
+            dat=proj, simlist=simlist, ref=ref, fstep=fstep, parent=parent
         )
         from pandas import DataFrame
 

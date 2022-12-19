@@ -176,13 +176,13 @@ class Metric:
             for i in range(numSim)
         )
 
-        metrics = np.empty(numSim, dtype=object)
-        ref = np.empty(numSim, dtype=object)
+        metrics = []
+        ref = []
         deletesims = np.zeros(numSim, dtype=bool)
         fstep = np.zeros(numSim)
         for i in range(len(results)):
-            metrics[i] = results[i][0]
-            ref[i] = results[i][1]
+            metrics.append(results[i][0])
+            ref.append(results[i][1])
             fstep[i] = results[i][2]
             deletesims[i] = results[i][3]
 
@@ -238,10 +238,14 @@ class Metric:
         emptyR = np.array([True if x is None else False for x in ref], dtype=bool)
         assert np.all(deletesims == emptyM) and np.all(emptyR == emptyM)
 
-        metrics = np.delete(metrics, np.where(emptyM)[0])
-        ref = np.delete(ref, np.where(emptyM)[0])
-        updlist = np.delete(self.simulations, np.where(emptyM)[0])
-        fstep = np.delete(fstep, np.where(emptyM)[0])
+        idx = np.where(emptyM)[0]
+
+        metrics = [metrics[i] for i in range(len(metrics)) if i not in idx]
+        ref = [ref[i] for i in range(len(ref)) if i not in idx]
+        updlist = [
+            self.simulations[i] for i in range(len(self.simulations)) if i not in idx
+        ]
+        fstep = [fstep[i] for i in range(len(fstep)) if i not in idx]
 
         if len(metrics) == 0:
             raise NameError(
@@ -336,7 +340,7 @@ def _processSim(sim, projectionlist, uqmol, skip):
 
 
 def _calcRef(pieces, fileloc):
-    locs = np.array(list([x[0] for x in fileloc]))
+    locs = np.array([x[0] for x in fileloc])
     frames = list([x[1] for x in fileloc])
     ref = np.zeros((len(frames), 2), dtype="u4")
     ref[:, 1] = frames
@@ -351,7 +355,7 @@ def _singleMolfile(sims):
 
     if isinstance(sims, Molecule):
         return False, []
-    elif isinstance(sims, np.ndarray):
+    elif isinstance(sims, (list, tuple, np.ndarray)):
         molfiles = []
         for s in sims:
             molfiles.append(tuple(ensurelist(s.molfile)))

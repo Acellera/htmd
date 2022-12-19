@@ -267,7 +267,7 @@ def simlist(datafolders, topologies, inputfolders=None):
         )
         i += 1
     logger.debug("Finished listing of simulations.")
-    return np.array(sims, dtype=object)
+    return sims
 
 
 def simfilter(sims, outfolder, filtersel, njobs=None):

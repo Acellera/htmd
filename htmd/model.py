@@ -810,7 +810,7 @@ class Model(object):
             delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist)
             for rel in relframes
         )
-        return np.array(mols, dtype=object)
+        return mols
 
     def viewStates(
         self,
@@ -1184,7 +1184,7 @@ class Model(object):
                 frames.append(np.array(tframes))
             # kept = np.array([i for i, x in enumerate(newdiscretetraj) if len(x) != 0])
             return (
-                np.array(newdiscretetraj, dtype=object),
+                newdiscretetraj,
                 len(corestates),
                 newcounts,
                 frames,
@@ -1657,9 +1657,9 @@ def _macroTrajectoriesReport(macronum, macrost, simlist=None):
 
 
 def _macroTrajSt(St, macro_ofcluster):
-    mst = np.empty(np.shape(St), dtype=object)
+    mst = []
     for i in range(len(St)):
-        mst[i] = macro_ofcluster[St[i]]
+        mst.append(macro_ofcluster[St[i]])
     return mst
 
 

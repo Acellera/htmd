@@ -223,25 +223,19 @@ class MetricData(object):
 
     @property
     def dat(self):
-        ret = np.empty(self.numTrajectories, dtype=object)
-        ret[:] = [t.projection for t in self.trajectories]
-        return ret
+        return [t.projection for t in self.trajectories]
 
     @property
     def ref(self):
-        ret = np.empty(self.numTrajectories, dtype=object)
-        ret[:] = [t.reference for t in self.trajectories]
-        return ret
+        return [t.reference for t in self.trajectories]
 
     @property
     def St(self):
-        ret = np.empty(self.numTrajectories, dtype=object)
-        ret[:] = [t.cluster for t in self.trajectories]
-        return ret
+        return [t.cluster for t in self.trajectories]
 
     @property
     def simlist(self):
-        return np.array([x.sim for x in self.trajectories], dtype=object)
+        return [x.sim for x in self.trajectories]
 
     @property
     def map(self):
@@ -676,9 +670,9 @@ class MetricData(object):
     def deconcatenate(self, array):
         indeces = np.cumsum(self.trajLengths)
         if np.ndim(array) == 1:
-            return np.array(np.split(array, indeces[:-1]), dtype=object)
+            return np.split(array, indeces[:-1])
         else:
-            return np.array(np.vsplit(array, indeces[:-1]), dtype=object)
+            return np.vsplit(array, indeces[:-1])
 
     def abs2rel(self, absFrames):
         """Convert absolute frame indexes into trajectory index-frame pairs
