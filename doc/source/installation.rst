@@ -10,7 +10,7 @@ If you do not have a license, please contact us. If you already have a license, 
 Installing HTMD
 ---------------
 
-If you do not have conda installed please first install Miniconda by downloading and installing the latest installer from the following URL https://docs.conda.io/en/latest/miniconda.html
+If you do not have conda installed please first install Miniconda by downloading and running the latest installer from the following URL https://docs.conda.io/en/latest/miniconda.html
 
 After installing conda create a new environment for HTMD and activate it.
 
@@ -20,7 +20,7 @@ After installing conda create a new environment for HTMD and activate it.
     conda create -n htmd
     conda activate htmd
 
-With the `htmd` environment active (you should see `(htmd)` on the left) run the following command to install the HTMD python package
+With the ``htmd`` environment active (you should see ``(htmd)`` on the left) run the following command to install the HTMD python package
 
 .. code-block:: bash
     :linenos:
