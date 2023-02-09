@@ -75,6 +75,8 @@ def distributeLipids(
     epsilon=0.238 * unit.kilocalories_per_mole,  # argon,
     switch_width=3.4 * unit.angstrom,  # argon
 ):
+    from moleculekit.periodictable import periodictable
+
     nparticles = len(resnames)
 
     # Determine Lennard-Jones cutoff.
@@ -130,7 +132,7 @@ def distributeLipids(
     # Create topology.
     topology = app.Topology()
     chain = topology.addChain()
-    elems = ["Ar", "Cl", "Na"]
+    elems = list(periodictable.keys())  # Just create residues of random dummy elements
     _, idx = np.unique(resnames, return_inverse=True)
     for i in idx:
         element = app.Element.getBySymbol(elems[i])
