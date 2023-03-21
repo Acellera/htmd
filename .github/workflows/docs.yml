@@ -14,10 +14,13 @@ jobs:
         shell: bash -l {0}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/auth@v1
         with:
-          lfs: true
-          submodules: true
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_DOCS }}
+          service_account: ${{ secrets.GCP_DOC_SERVICE_ACCOUNT }}
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
