@@ -178,7 +178,17 @@ class Equilibration(ProtocolInterface):
             self.acemd.parameters = None
 
     def defaultEquilRestraints(self, decay, mol=None):
-        """Get the default equilibration restraints
+        """Get the default equilibration restraints.
+
+        This function applies restraints on proteins and nucleic acids
+        from the start of the equilibration run up to the time specified
+        with the `decay` argument, scaling down linearly from X to 0.
+        The rest the equilibration will be run without restraints.
+
+        For protein carbon-alpha (CA) atoms, X is equal to 1 kcal/mol.
+        For protein heavy non-CA atoms, X is equal to 0.1 kcal/mol.
+        For nucleic backbone atoms, X is equal to 1 kcal/mol.
+        For nucleic non-backbone heavy atoms, X is equal to 0.1 kcal/mol.
 
         Parameters
         ----------
