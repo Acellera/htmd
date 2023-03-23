@@ -7,6 +7,7 @@ from moleculekit.tools.graphalignment import makeMolGraph, compareGraphs
 from moleculekit.molecule import Molecule
 from moleculekit.util import ensurelist
 from htmd.home import home
+from glob import glob
 import networkx as nx
 import unittest
 import shutil
@@ -84,28 +85,23 @@ def _extend_residue(mol, nterm=True, cterm=True):
 
 
 def parameterizeNonCanonicalResidues(
-    cifs, outdir, method="gaff2", nnp=None, is_nterm=False, is_cterm=False
+    cifs, outdir, forcefield="Sage", calculator="xTB", is_nterm=False, is_cterm=False
 ):
     cifs = ensurelist(cifs)
-    method = method.lower()
-    if method == "ani-2x" and nnp is None:
-        raise RuntimeError(
-            "The user must provide an NNP calculator to user ANI-2x parameterization"
-        )
-    if method not in ("gaff2", "ani-2x"):
+    if forcefield.lower() not in ("sage", "gaff2"):
         raise AttributeError(
-            "Parameterization can only be performed with GAFF2 or ANI-2x methods"
+            "Parameterization can only be performed with SAGE or GAFF2 forcefields"
         )
 
     for cif in cifs:
         mol = Molecule(cif)
         _parameterize_non_canonical_residue(
-            mol, outdir, method, nnp=nnp, is_nterm=is_nterm, is_cterm=is_cterm
+            mol, outdir, forcefield, calculator, is_nterm=is_nterm, is_cterm=is_cterm
         )
 
 
 def _parameterize_non_canonical_residue(
-    mol, outdir, method, nnp=None, is_nterm=False, is_cterm=False
+    mol, outdir, forcefield, calculator, is_nterm=False, is_cterm=False
 ):
     try:
         from parameterize.cli import main_parameterize, list_dihedrals
@@ -147,23 +143,23 @@ def _parameterize_non_canonical_residue(
         main_parameterize(
             cmol,
             user_charge=int(cmol.formalcharge.sum()),
-            forcefield="GAFF2",
+            forcefield=forcefield,
             charge_type="AM1-BCC",
             min_type="mm",
             dihed_fit_type="iterative",
             dihed_opt_type="mm",
-            fit_dihedral=method != "gaff2",
+            fit_dihedral=calculator is not None,
             dihedrals=list(dih.values()),
-            nnp=nnp,
+            calculator=calculator,
             outdir=tmpdir,
             exclude_atoms=exclude_atoms,
         )
         shutil.copy(
-            os.path.join(tmpdir, "parameters", "GAFF2", f"{resn}-orig.cif"),
+            glob(os.path.join(tmpdir, "parameters", "*", f"{resn}-orig.cif"))[0],
             os.path.join(tmpdir, f"{resn}.cif"),
         )
         shutil.copy(
-            os.path.join(tmpdir, "parameters", "GAFF2", f"{resn}.frcmod"),
+            glob(os.path.join(tmpdir, "parameters", "*", f"{resn}.frcmod"))[0],
             os.path.join(outdir, f"{resn}.frcmod"),
         )
         _post_process_parameterize(xmol, tmpdir, outdir, resn)
@@ -476,8 +472,6 @@ class _TestNCAAResParam(unittest.TestCase):
         _PARAMETERIZE_INSTALLED, "Can only run with parameterize installed"
     )
     def test_ncaa_residue_parameterization(self):
-        from glob import glob
-
         # import shutil
 
         refdir = home(dataDir=os.path.join("test-custom-residue-param"))
@@ -485,7 +479,9 @@ class _TestNCAAResParam(unittest.TestCase):
         cifs = glob(os.path.join(refdir, "*.cif"))
         for cif in cifs:
             with tempfile.TemporaryDirectory() as tmpdir, self.subTest(cif):
-                parameterizeNonCanonicalResidues(cif, tmpdir, method="gaff2")
+                parameterizeNonCanonicalResidues(
+                    cif, tmpdir, forcefield="GAFF2", calculator=None
+                )
 
                 frcmod = glob(os.path.join(tmpdir, "*.frcmod"))[0]
                 name = os.path.basename(frcmod)
@@ -500,7 +496,12 @@ class _TestNCAAResParam(unittest.TestCase):
         for cif in cifs:
             with tempfile.TemporaryDirectory() as tmpdir, self.subTest(cif):
                 parameterizeNonCanonicalResidues(
-                    cif, tmpdir, method="gaff2", is_cterm=True, is_nterm=True
+                    cif,
+                    tmpdir,
+                    forcefield="GAFF2",
+                    is_cterm=True,
+                    is_nterm=True,
+                    calculator=None,
                 )
 
                 frcmod = glob(os.path.join(tmpdir, "*.frcmod"))[0]
@@ -512,6 +513,25 @@ class _TestNCAAResParam(unittest.TestCase):
                 name = os.path.basename(prepi)
                 # shutil.copy(prepi, os.path.join(refresdir, name))
                 _compare_prepis(os.path.join(refresdir, name), prepi)
+
+    @unittest.skipUnless(
+        _PARAMETERIZE_INSTALLED, "Can only run with parameterize installed"
+    )
+    def test_ncaa_residue_parameterization_xTB(self):
+        refdir = home(dataDir=os.path.join("test-custom-residue-param"))
+        refresdir = os.path.join(refdir, "xtb-params")
+        cif = os.path.join(refdir, "33X.cif")
+        with tempfile.TemporaryDirectory() as tmpdir, self.subTest(cif):
+            parameterizeNonCanonicalResidues(
+                cif, tmpdir, forcefield="GAFF2", calculator="xTB"
+            )
+            frcmod = glob(os.path.join(tmpdir, "*.frcmod"))[0]
+            name = os.path.basename(frcmod)
+            _compare_frcmod(os.path.join(refresdir, name), frcmod)
+
+            prepi = glob(os.path.join(tmpdir, "*.prepi"))[0]
+            name = os.path.basename(prepi)
+            _compare_prepis(os.path.join(refresdir, name), prepi)
 
 
 if __name__ == "__main__":
