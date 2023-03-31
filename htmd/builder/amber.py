@@ -697,7 +697,7 @@ def _build(
 
         # Copy param and topo files to output folder and rename to unique names
         newparam = []
-        for i, fname in enumerate(sorted(param)):
+        for i, fname in enumerate(sorted(param, key=lambda x: os.path.basename(x))):
             if not os.path.isfile(fname):
                 fname = _locateFile(fname, "param", teleap)
                 if fname is None:
@@ -707,7 +707,7 @@ def _build(
             newparam.append(newname)
 
         newtopo = []
-        for i, fname in enumerate(sorted(topo)):
+        for i, fname in enumerate(sorted(topo, key=lambda x: os.path.basename(x))):
             if not os.path.isfile(fname):
                 fname = _locateFile(fname, "topo", teleap)
                 if fname is None:
