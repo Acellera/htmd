@@ -394,6 +394,8 @@ class MetricData(object):
         >>> dataDist = MetricSelfDistance.project(sims, 'protein and name CA')
         >>> dataRMSD.combine(dataDist)
         """
+        import pandas as pd
+
         if not np.array_equal(self.trajLengths, otherdata.trajLengths):
             raise NameError(
                 "Trying to combine MetricData objects with different number/lengths of trajectories. Check the trajLengths property."
@@ -405,8 +407,8 @@ class MetricData(object):
                 )
         for t1, t2 in zip(self.trajectories, otherdata.trajectories):
             t1.projection = np.concatenate((t1.projection, t2.projection), axis=1)
-        self.description = self.description.append(
-            otherdata.description, ignore_index=True
+        self.description = pd.concat(
+            [self.description, otherdata.description], ignore_index=True
         )
         self._dataid = str(uuid.uuid4())
 
