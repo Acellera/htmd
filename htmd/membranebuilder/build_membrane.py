@@ -161,13 +161,11 @@ def _detectRings(mol):
 
     G = nx.Graph()
     G.add_edges_from(bonds)
-    cycles = np.array(nx.cycle_basis(G))
+    cycles = nx.cycle_basis(G)
     if len(cycles) == 0:
         return None
 
-    cyclelen = np.array([len(c) for c in cycles])
-    fivesix = cycles[np.where((cyclelen == 5) | (cyclelen == 6))[0]]
-
+    fivesix = [c for c in cycles if len(c) in (5, 6)]
     return fivesix
 
 
