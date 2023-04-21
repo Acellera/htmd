@@ -37,6 +37,131 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# All atom types reserved by GAFF2. We will use all other low caps for parameterize
+gaff2_at = [
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "ha",
+    "hc",
+    "hn",
+    "ho",
+    "hp",
+    "hs",
+    "hw",
+    "hx",
+    "o",
+    "o2",
+    "oh",
+    "op",
+    "oq",
+    "os",
+    "ow",
+    "c",
+    "c1",
+    "c2",
+    "c3",
+    "ca",
+    "cc",
+    "cd",
+    "ce",
+    "cf",
+    "cg",
+    "ch",
+    "cp",
+    "cs",
+    "cq",
+    "cu",
+    "cv",
+    "cx",
+    "cy",
+    "cz",
+    "n",
+    "n1",
+    "n2",
+    "n3",
+    "n4",
+    "n5",
+    "n6",
+    "n7",
+    "n8",
+    "n9",
+    "na",
+    "nb",
+    "nc",
+    "nd",
+    "ne",
+    "nf",
+    "nh",
+    "ni",
+    "nj",
+    "nk",
+    "nl",
+    "nm",
+    "nn",
+    "no",
+    "np",
+    "nq",
+    "ns",
+    "nt",
+    "nu",
+    "nv",
+    "nx",
+    "ny",
+    "nz",
+    "n+",
+    "s",
+    "s2",
+    "s3",
+    "s4",
+    "s6",
+    "sh",
+    "sp",
+    "sq",
+    "ss",
+    "sx",
+    "sy",
+    "p2",
+    "p3",
+    "p4",
+    "p5",
+    "pb",
+    "pc",
+    "pd",
+    "pe",
+    "pf",
+    "px",
+    "py",
+    "f",
+    "cl",
+    "br",
+    "i",
+]
+
+
+def _get_parameterize_at():
+    """The GAFF and GAFF2 atom types are in lower case.
+    This is the mechanism by which the GAFF force field is kept independent from the macromolecular AMBER force fields.
+    All of the traditional AMBER force fields use uppercase atom types.
+    In this way the GAFF and traditional force fields can be mixed in the same calculation.
+    Taken from: http://ambermd.org/tutorials/basic/tutorial4b/
+    """
+    import string
+
+    for x in string.ascii_lowercase[::-1]:
+        for y in string.ascii_lowercase + string.digits:
+            if x + y not in gaff2_at:
+                yield x + y
+
+    for x in string.ascii_lowercase[::-1]:
+        if x not in gaff2_at:
+            yield x
+
+
+parameterize_types = list(_get_parameterize_at())
+
 
 def _findTeLeap():
     teleap = shutil.which("teLeap", mode=os.X_OK)
@@ -491,9 +616,10 @@ def build(
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available forcefield files.
         Default: :func:`amber.defaultFf <htmd.builder.amber.defaultFf>`
     topo : list of str
-        A list of topology `prepi/prep/in` files.
+        A list of topology `prepi/prep/in/mol2/cif` files.
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available topology files.
         Default: :func:`amber.defaultTopo <htmd.builder.amber.defaultTopo>`
+        When passing residues parameterized with the `parameterize` tool, please pass the .cif file.
     param : list of str
         A list of parameter `frcmod` files.
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available parameter files.
@@ -621,6 +747,15 @@ def build(
     return molbuilt
 
 
+def _create_atomtype_section(mol):
+    atypes_str = "addAtomTypes {\n"
+    for at in sorted(np.unique(mol.atomtype)):
+        el = mol.element[mol.atomtype == at][0]
+        atypes_str += f'	{{ "{at}"  "{el}" "sp3" }}\n'
+    atypes_str += "}\n"
+    return atypes_str
+
+
 def _build(
     mol,
     ff=None,
@@ -730,8 +865,17 @@ def _build(
         f.write("# Loading topologies\n")
         for fname in newtopo:
             if fname.lower().endswith(".mol2"):
+                logger.warning(
+                    "Please refrain from using MOL2 files as topologies as they are missing crucial information. Use `parameterize` .cif files or .prepi files instead."
+                )
                 resname = Molecule(fname).resname[0]
                 f.write(f"{resname} = loadmol2 {os.path.basename(fname)}\n")
+            elif fname.lower().endswith(".cif"):
+                _resmol = Molecule(fname)
+                _mol2f = os.path.join(fname.replace(".cif", ".mol2"))
+                _resmol.write(_mol2f)
+                f.write(_create_atomtype_section(_resmol))
+                f.write(f"{_resmol.resname[0]} = loadmol2 {os.path.basename(_mol2f)}\n")
             else:
                 f.write(f"loadamberprep {os.path.basename(fname)}\n")
         f.write("\n")
@@ -1212,11 +1356,11 @@ def _resname_from_fname(ff):
 
 
 def _fix_parameterize_atomtype_collisions(mol, params, topos):
-    import itertools
-    import string
+    def _gen_atomtypes():
+        for x in parameterize_types:
+            yield x
 
-    prefixes = ["z", "x", "y", "w"]
-    gen = itertools.product(*[prefixes, string.ascii_lowercase])
+    gen = _gen_atomtypes()
 
     def _fix_frcmod(fname, repl):
         with open(fname, "r") as f:
@@ -1283,7 +1427,7 @@ def _fix_parameterize_atomtype_collisions(mol, params, topos):
                 if line.strip() == "":
                     break
                 at = line.split()[0]
-                if at[0] not in prefixes:
+                if at not in parameterize_types:
                     continue
                 file_at.append(at)
 
@@ -1291,9 +1435,9 @@ def _fix_parameterize_atomtype_collisions(mol, params, topos):
         for at in file_at:
             if at in atomtypes:
                 # Invent new atom type and rename in frcmod
-                new_at = "".join(next(gen))
+                new_at = next(gen)
                 while new_at in atomtypes:
-                    new_at = "".join(next(gen))
+                    new_at = next(gen)
 
                 atomtypes.append(new_at)
                 replacements[bn][at] = new_at
@@ -1310,7 +1454,7 @@ def _fix_parameterize_atomtype_collisions(mol, params, topos):
         _fix_frcmod(frcmd_bn[bn], replacements[bn])
         if bn in topos_bn:
             ext = os.path.splitext(topos_bn[bn])[1].lower()
-            if ext in (".mol2", ".mol"):
+            if ext in (".mol2", ".mol", ".cif"):
                 _fix_mol2(topos_bn[bn], replacements[bn])
             elif ext in (".prepi", ".prep"):
                 _fix_prepi(topos_bn[bn], replacements[bn])
@@ -1664,6 +1808,35 @@ class _TestAmberBuild(unittest.TestCase):
 
         refdir = home(dataDir=join("test-amber-build", "membrane", "build"))
         _TestAmberBuild._compareResultFolders(refdir, tmpdir, "Membrane")
+
+    def test_cif_building(self):
+        # Tests that mol2 and cif building produce same results
+        np.random.seed(1)
+
+        homedir = home(dataDir=join("test-amber-build", "parameterize-cif"))
+        mol2f = os.path.join(homedir, "MOL-orig.mol2")
+        ciff = os.path.join(homedir, "MOL-orig.cif")
+        fmod = os.path.join(homedir, "MOL.frcmod")
+
+        mol = Molecule("3ptb")
+        mol.remove("resname BEN")
+        mol2 = Molecule(mol2f)
+        mol2.segid[:] = "L"
+        mol.append(mol2)
+
+        tmpdir = os.path.join(self.testDir, "parameterize-cif", "3PTB")
+        refdir = home(dataDir=join("test-amber-build", "parameterize-cif", "build"))
+
+        build(mol, ionize=False, outdir=tmpdir, topo=[mol2f], param=[fmod])
+        _TestAmberBuild._compareResultFolders(
+            refdir,
+            tmpdir,
+            "3PTB",
+            ignore_ftypes=(".log", ".txt", ".frcmod", ".in", ".mol2", ".cif"),
+        )
+
+        build(mol, ionize=False, outdir=tmpdir, topo=[ciff], param=[fmod])
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "3PTB")
 
 
 if __name__ == "__main__":
