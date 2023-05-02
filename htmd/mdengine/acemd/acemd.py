@@ -52,7 +52,7 @@ class _Restraint:
                 type=self.type + "Restraint", maxwidth=maxwidth
             )
 
-        res += '"{}" '.format(self.selection)
+        res += '"{}" '.format(self.selection.replace("'", "''"))
 
         if self.fbcentre is not None:
             res += 'fbcentre "{}" '.format(" ".join(map(str, self.fbcentre)))
@@ -233,10 +233,11 @@ class _Acemd(ProtocolInterface):
         "parmfile": "parameters",
     }
 
-    def __init__(self):
+    def __init__(self, yaml=False):
         super().__init__()
         self._file_data = {}
         self._outnames = {}
+        self._yaml = yaml
 
     def _amberConfig(self):
         # AMBER specific fixes
@@ -331,7 +332,10 @@ class _Acemd(ProtocolInterface):
 
         self._file_data = {}  # empty file dictionary after writing
 
-        self.writeConf(os.path.join(path, "input"))
+        if self._yaml:
+            self.writeConf(os.path.join(path, "input.yaml"))
+        else:
+            self.writeConf(os.path.join(path, "input"))
 
     def setup(self, indir=".", outdir="run", overwrite=False):
         """Convenience method performing load and save.
@@ -361,38 +365,41 @@ class _Acemd(ProtocolInterface):
         conf : str
             The string of the configuration file
         """
-        text = ""
-        if "TCL" in self.__dict__ and self.__dict__["TCL"] is not None:
-            text = self.__dict__["TCL"]
+        if self._yaml:
+            raise NotImplementedError()
+        else:
+            text = ""
+            if "TCL" in self.__dict__ and self.__dict__["TCL"] is not None:
+                text = self.__dict__["TCL"]
 
-        text += "#\n"
+            text += "#\n"
 
-        maxwidth = np.max([len(k) for k in self.__dict__.keys()])
+            maxwidth = np.max([len(k) for k in self.__dict__.keys()])
 
-        keys = sorted(list(self.__dict__.keys()))
-        if "restraints" in keys:
-            keys += [keys.pop(keys.index("restraints"))]
-        keys += [keys.pop(keys.index("run"))]  # Move the run command to the end
-        for cmd in keys:
-            if cmd == "restraints" and self.restraints is not None:
-                for r in ensurelist(self.restraints):
-                    text += "{}\n".format(r.format(maxwidth))
-            elif (
-                not cmd.startswith("_")
-                and self.__dict__[cmd] is not None
-                and cmd != "TCL"
-            ):
-                val = self.__dict__[cmd]
-                if cmd in self._outnames:
-                    val = self._outnames[cmd]
-                name = cmd
-                if (
-                    cmd == "scaling14"
-                ):  # variables cannot start with numbers. We need to rename it here for acemd
-                    name = "1-4scaling"
-                text += "{name: <{maxwidth}}\t{val:}\n".format(
-                    name=name, val=val, maxwidth=maxwidth
-                )
+            keys = sorted(list(self.__dict__.keys()))
+            if "restraints" in keys:
+                keys += [keys.pop(keys.index("restraints"))]
+            keys += [keys.pop(keys.index("run"))]  # Move the run command to the end
+            for cmd in keys:
+                if cmd == "restraints" and self.restraints is not None:
+                    for r in ensurelist(self.restraints):
+                        text += "{}\n".format(r.format(maxwidth))
+                elif (
+                    not cmd.startswith("_")
+                    and self.__dict__[cmd] is not None
+                    and cmd != "TCL"
+                ):
+                    val = self.__dict__[cmd]
+                    if cmd in self._outnames:
+                        val = self._outnames[cmd]
+                    name = cmd
+                    if (
+                        cmd == "scaling14"
+                    ):  # variables cannot start with numbers. We need to rename it here for acemd
+                        name = "1-4scaling"
+                    text += "{name: <{maxwidth}}\t{val:}\n".format(
+                        name=name, val=val, maxwidth=maxwidth
+                    )
 
         if not quiet:
             print(text)
@@ -508,8 +515,8 @@ class Acemd(_Acemd):
     >>> prod.write('./equil/', './prod/')
     """
 
-    def __init__(self, config=None):
-        super().__init__()
+    def __init__(self, config=None, yaml=False):
+        super().__init__(yaml=yaml)
         self._arg(
             "temperature",
             "float",
@@ -618,7 +625,7 @@ class Acemd(_Acemd):
             "run",
             "str",
             "The length of simulation to run. May be specified as a number of steps or as a time "
-            'if one of the suffices "us", "ns", "ps", "fs" is used.',
+            'if one of the suffixes "us", "ns", "ps", "fs" is used.',
             None,
             val.String(),
         )
@@ -876,6 +883,47 @@ run                     1000
 
         # Compare with reference
         refdir = home(dataDir=os.path.join("test-acemd", pdbid, "equil"))
+        files = [os.path.basename(f) for f in glob(os.path.join(refdir, "*"))]
+        match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
+
+        if len(mismatch) != 0 or len(error) != 0 or len(match) != len(files):
+            raise RuntimeError(
+                "Different results produced by Acemd equilibration for "
+                "test {} between {} and {} in files {}.".format(
+                    pdbid, refdir, tmpdir, mismatch
+                )
+            )
+
+    def test_equilibration_quoted_atomselections(self):
+        from htmd.home import home
+        import filecmp
+        from htmd.util import tempname
+        from glob import glob
+        from moleculekit.molecule import Molecule
+
+        tmpdir = tempname()
+        pdbid = "3PTB"
+        builddir = home(dataDir=os.path.join("test-acemd", pdbid, "build"))
+
+        equil = Acemd("equilibration")
+        mol = Molecule(os.path.join(builddir, "structure.pdb"))
+        celldim = mol.coords.max(axis=0) - mol.coords.min(axis=0)
+        equil.boxsize = " ".join(["{:3.1f}".format(val) for val in celldim.squeeze()])
+        equil.run = "2000"
+        equil.trajectoryperiod = 200
+        equil.temperature = 300
+        equil.restraints = [
+            AtomRestraint(
+                "resname 'LEU' and name CA",
+                0.1,
+                [(10, "10ns"), (5, "15ns"), (0, "20ns")],
+            )
+        ]
+
+        equil.write(builddir, tmpdir)
+
+        # Compare with reference
+        refdir = home(dataDir=os.path.join("test-acemd", "quoted_selections"))
         files = [os.path.basename(f) for f in glob(os.path.join(refdir, "*"))]
         match, mismatch, error = filecmp.cmpfiles(refdir, tmpdir, files, shallow=False)
 
