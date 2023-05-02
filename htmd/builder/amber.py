@@ -855,12 +855,6 @@ def _build(
 
         _fix_parameterize_atomtype_collisions(mol, newparam, newtopo)
 
-        # Loading frcmod parameters
-        f.write("# Loading parameter files\n")
-        for fname in newparam:
-            f.write(f"loadamberparams {os.path.basename(fname)}\n")
-        f.write("\n")
-
         # Loading prepi topologies
         f.write("# Loading topologies\n")
         for fname in newtopo:
@@ -878,6 +872,12 @@ def _build(
                 f.write(f"{_resmol.resname[0]} = loadmol2 {os.path.basename(_mol2f)}\n")
             else:
                 f.write(f"loadamberprep {os.path.basename(fname)}\n")
+        f.write("\n")
+
+        # Loading frcmod parameters
+        f.write("# Loading parameter files\n")
+        for fname in newparam:
+            f.write(f"loadamberparams {os.path.basename(fname)}\n")
         f.write("\n")
 
         cyclic = _detect_cyclic_segments(mol)
@@ -1352,7 +1352,11 @@ def _logParser(fname):
 
 
 def _resname_from_fname(ff):
-    return os.path.splitext(os.path.basename(ff))[0].split("_", maxsplit=1)[1]
+    return (
+        os.path.splitext(os.path.basename(ff))[0]
+        .split("_", maxsplit=1)[1]
+        .replace("-orig", "")
+    )
 
 
 def _fix_parameterize_atomtype_collisions(mol, params, topos):
@@ -1436,7 +1440,7 @@ def _fix_parameterize_atomtype_collisions(mol, params, topos):
             if at in atomtypes:
                 # Invent new atom type and rename in frcmod
                 new_at = next(gen)
-                while new_at in atomtypes:
+                while new_at in atomtypes + file_at:
                     new_at = next(gen)
 
                 atomtypes.append(new_at)
@@ -1814,29 +1818,53 @@ class _TestAmberBuild(unittest.TestCase):
         np.random.seed(1)
 
         homedir = home(dataDir=join("test-amber-build", "parameterize-cif"))
-        mol2f = os.path.join(homedir, "MOL-orig.mol2")
         ciff = os.path.join(homedir, "MOL-orig.cif")
         fmod = os.path.join(homedir, "MOL.frcmod")
 
         mol = Molecule("3ptb")
         mol.remove("resname BEN")
-        mol2 = Molecule(mol2f)
+        mol2 = Molecule(ciff)
         mol2.segid[:] = "L"
         mol.append(mol2)
 
         tmpdir = os.path.join(self.testDir, "parameterize-cif", "3PTB")
         refdir = home(dataDir=join("test-amber-build", "parameterize-cif", "build"))
 
-        build(mol, ionize=False, outdir=tmpdir, topo=[mol2f], param=[fmod])
+        build(mol, ionize=False, outdir=tmpdir, topo=[ciff], param=[fmod])
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "3PTB")
+
+    def test_atomtype_decollisioning(self):
+        # Tests that mol2 and cif building produce same results
+        np.random.seed(1)
+
+        homedir = home(dataDir=join("test-amber-build", "atomtype-decollisioning"))
+        mol1f = os.path.join(homedir, "m42.cif")
+        mol2f = os.path.join(homedir, "m48.cif")
+        fmod1 = os.path.join(homedir, "m42.frcmod")
+        fmod2 = os.path.join(homedir, "m48.frcmod")
+
+        mol1 = Molecule(mol1f)
+        mol1.resname[:] = "m42"
+        mol1.segid[:] = "L1"
+        mol2 = Molecule(mol2f)
+        mol2.resname[:] = "m48"
+        mol2.segid[:] = "L2"
+        mol1.append(mol2)
+
+        tmpdir = os.path.join(self.testDir, "atomtype-decollisioning", "decollisioning")
+        refdir = home(
+            dataDir=join("test-amber-build", "atomtype-decollisioning", "build")
+        )
+
+        build(
+            mol1, ionize=False, outdir=tmpdir, topo=[mol1f, mol2f], param=[fmod1, fmod2]
+        )
         _TestAmberBuild._compareResultFolders(
             refdir,
             tmpdir,
-            "3PTB",
+            "decollisioning",
             ignore_ftypes=(".log", ".txt", ".frcmod", ".in", ".mol2", ".cif"),
         )
-
-        build(mol, ionize=False, outdir=tmpdir, topo=[ciff], param=[fmod])
-        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "3PTB")
 
 
 if __name__ == "__main__":
