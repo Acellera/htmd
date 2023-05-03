@@ -1,5 +1,4 @@
 [![Build Status](https://dev.azure.com/stefdoerr/htmd/_apis/build/status/Acellera.htmd?branchName=master)](https://dev.azure.com/stefdoerr/htmd/_build/latest?definitionId=3&branchName=master)
-[![Language Grade: Python](https://img.shields.io/lgtm/grade/python/g/Acellera/htmd.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Acellera/htmd/context:python)
 [![Conda](https://anaconda.org/acellera/htmd/badges/version.svg)](https://anaconda.org/acellera/HTMD)
 
 <!---[![Build status](https://ci.appveyor.com/api/projects/status/m1bxrop34b2qw68x/branch/master?svg=true)](https://ci.appveyor.com/project/acelleraci/htmd/branch/master)--->
