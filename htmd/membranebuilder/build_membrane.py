@@ -223,6 +223,9 @@ def buildMembrane(
     equilplatform="CUDA",
     outdir=None,
     lipidf=None,
+    ff=None,
+    topo=None,
+    param=None,
 ):
     """Construct a membrane containing arbitrary lipids and ratios of them.
 
@@ -246,6 +249,12 @@ def buildMembrane(
         A folder in which to store the psf and pdb files
     lipidf : str
         The path to the folder containing the single-lipid PDB structures as well as the lipid DB file
+    ff : list[str]
+        AMBER forcefield files for lipids
+    topo : list[str]
+        AMBER topologies for lipids
+    param : list[str]
+        AMBER parameters for lipids
 
     Returns
     -------
@@ -261,7 +270,7 @@ def buildMembrane(
     """
     from htmd.membranebuilder.ringpenetration import resolveRingPenetrations
     from htmd.builder.solvate import solvate
-    from htmd.builder.charmm import build
+    from htmd.builder.amber import build
     from htmd.util import tempname
     from moleculekit.molecule import Molecule
     from htmd.home import home
@@ -307,12 +316,15 @@ def buildMembrane(
 
     if outdir is None:
         outdir = tempname()
-        logger.info("Outdir {}".format(outdir))
+        logger.info(f"Outdir {outdir}")
+
     res = build(
         smemb,
         ionize=False,
-        stream=["str/lipid/toppar_all36_lipid_cholesterol_model_1.str"],
         outdir=outdir,
+        ff=ff,
+        topo=topo,
+        param=param,
     )
 
     if equilibrate:
@@ -320,12 +332,10 @@ def buildMembrane(
         from shutil import copy, move
 
         outpdb = tempname(suffix=".pdb")
-        charmmf = os.path.join(home(shareDir=True), "membranebuilder", "charmm-toppar")
         equilibrateSystem(
             os.path.join(outdir, "structure.pdb"),
-            os.path.join(outdir, "structure.psf"),
+            os.path.join(outdir, "structure.prmtop"),
             outpdb,
-            charmmfolder=charmmf,
             equilplatform=equilplatform,
             minimplatform=minimplatform,
         )
