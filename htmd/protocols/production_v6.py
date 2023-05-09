@@ -268,7 +268,6 @@ class Production(ProtocolInterface):
         return restraints
 
     def _constraints2restraints(self):
-
         restraints = list()
         for constr in sorted(self.constraints):
             restraints.append(AtomRestraint(constr, 0, [(self.constraints[constr], 0)]))
@@ -461,11 +460,9 @@ class _TestProduction(unittest.TestCase):
         import shutil
         import os
 
-        acemd3exe = shutil.which("acemd3", mode=os.X_OK)
+        acemd3exe = shutil.which("acemd", mode=os.X_OK)
         if not acemd3exe:
-            raise NameError(
-                "Could not find acemd3, or no execute permissions are given"
-            )
+            raise NameError("Could not find acemd, or no execute permissions are given")
 
         for system in ["amber-equil-completed", "charmm-equil-completed"]:
             pd = Production()
@@ -483,7 +480,7 @@ class _TestProduction(unittest.TestCase):
             )
             try:
                 res = check_output(
-                    ["acemd3", "--platform", "CPU", os.getenv("ACE3ARG")], cwd=tmpdir
+                    ["acemd", "--platform", "CPU", os.getenv("ACE3ARG")], cwd=tmpdir
                 )
             except subprocess.CalledProcessError as exc:
                 assert (

@@ -389,11 +389,9 @@ class _TestEquilibration(unittest.TestCase):
         import shutil
         import os
 
-        acemd3exe = shutil.which("acemd3", mode=os.X_OK)
+        acemd3exe = shutil.which("acemd", mode=os.X_OK)
         if not acemd3exe:
-            raise NameError(
-                "Could not find acemd3, or no execute permissions are given"
-            )
+            raise NameError("Could not find acemd, or no execute permissions are given")
 
         for system in ["amber-build", "charmm-build"]:
             eq = Equilibration()
@@ -413,7 +411,7 @@ class _TestEquilibration(unittest.TestCase):
             print(tmpdir)
             try:
                 res = check_output(
-                    ["acemd3", "--platform", "CPU", os.getenv("ACE3ARG")], cwd=tmpdir
+                    ["acemd", "--platform", "CPU", os.getenv("ACE3ARG")], cwd=tmpdir
                 )
             except subprocess.CalledProcessError as exc:
                 assert (

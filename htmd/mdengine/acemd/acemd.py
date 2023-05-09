@@ -408,7 +408,7 @@ class _Acemd(ProtocolInterface):
 
     def _writeBashRun(self, fname):
         with open(fname, "w") as f:
-            f.write("#!/bin/bash\nacemd3 >log.txt 2>&1")
+            f.write("#!/bin/bash\nacemd >log.txt 2>&1")
         os.chmod(fname, 0o700)
 
     def __repr__(self):
