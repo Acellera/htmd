@@ -479,7 +479,7 @@ def _getResiduesInFF(ff, teleap=None):
 def defaultFf():
     """Returns the default leaprc forcefield files used by amber.build"""
     return [
-        "leaprc.protein.ff19SB",
+        "leaprc.protein.ff14SB",
         "leaprc.lipid21",
         "leaprc.gaff2",
         "leaprc.RNA.Shaw",
@@ -686,6 +686,19 @@ def build(
         topo = defaultTopo()
     if param is None:
         param = defaultParam()
+
+    # Warning for bad FF combination
+    ff19tip3p = [False, False]
+    for x in ff:
+        if "ff19SB" in x:
+            ff19tip3p[0] = True
+        if "tip3p" in x:
+            ff19tip3p[1] = True
+    if all(ff19tip3p):
+        logger.warning(
+            "CAUTION: AMBER Forcefield ff19SB is NOT compatible with TIP3P water model."
+            " Consider using ff14SB instead or using the OPC water model."
+        )
 
     disulfide = _prepareMolecule(mol, caps, disulfide)
     _detect_cofactors_ncaa_ptm(mol, param, topo)
