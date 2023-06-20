@@ -219,13 +219,14 @@ def buildMembrane(
     ratiolower,
     waterbuff=20,
     minimplatform="CPU",
-    equilibrate=True,
+    equilibrate=False,
     equilplatform="CUDA",
     outdir=None,
     lipidf=None,
     ff=None,
     topo=None,
     param=None,
+    build=False,
 ):
     """Construct a membrane containing arbitrary lipids and ratios of them.
 
@@ -255,6 +256,8 @@ def buildMembrane(
         AMBER topologies for lipids
     param : list[str]
         AMBER parameters for lipids
+    build : bool
+        Build system with teLeap. Disable if you want to build the system yourself.
 
     Returns
     -------
@@ -270,12 +273,15 @@ def buildMembrane(
     """
     from htmd.membranebuilder.ringpenetration import resolveRingPenetrations
     from htmd.builder.solvate import solvate
-    from htmd.builder.amber import build
+    from htmd.builder import amber
     from htmd.util import tempname
     from moleculekit.molecule import Molecule
     from htmd.home import home
     import os
     import pandas as pd
+
+    if equilibrate:
+        build = True
 
     if lipidf is None:
         lipidf = os.path.join(home(shareDir=True), "membranebuilder", "lipids")
@@ -318,14 +324,19 @@ def buildMembrane(
         outdir = tempname()
         logger.info(f"Outdir {outdir}")
 
-    res = build(
-        smemb,
-        ionize=False,
-        outdir=outdir,
-        ff=ff,
-        topo=topo,
-        param=param,
-    )
+    if build:
+        res = amber.build(
+            smemb,
+            ionize=False,
+            outdir=outdir,
+            ff=ff,
+            topo=topo,
+            param=param,
+        )
+    else:
+        os.makedirs(outdir, exist_ok=True)
+        smemb.write(os.path.join(outdir, "structure.pdb"))
+        return smemb
 
     if equilibrate:
         from htmd.membranebuilder.simulate_openmm import equilibrateSystem
