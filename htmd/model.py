@@ -862,7 +862,7 @@ class Model(object):
 
         >>> model.viewStates(ligand='resname MOL')
         """
-        from htmd.config import _config
+        from moleculekit.config import _config
 
         self._integrityCheck(postmsm=(statetype != "cluster"))
 
@@ -871,7 +871,7 @@ class Model(object):
                 "You need to specify either the `protein` of `ligand` arguments for state visualization."
             )
 
-        if _config["viewer"].lower() == "ngl" or _config["viewer"].lower() == "webgl":
+        if _config["viewer"].lower() in ("ngl", "webgl"):
             return self._viewStatesNGL(
                 states, statetype, protein, ligand, mols, numsamples, gui=gui
             )
