@@ -10,7 +10,6 @@ from jobqueues.config import config as jqconfig
 logger = logging.getLogger(__file__)
 
 _config = {
-    "viewer": "pymol",
     "njobs": 1,
     "configfile": os.getenv("HTMD_CONFIG") if os.getenv("HTMD_CONFIG") else None,
     "lsf": None,
@@ -19,7 +18,6 @@ _config = {
 
 
 def config(
-    viewer=_config["viewer"],
     ncpus=None,
     njobs=_config["njobs"],
     configfile=_config["configfile"],
@@ -31,8 +29,6 @@ def config(
 
     Parameters
     ----------
-    viewer : str
-        Defines the backend viewer for molecular visualization
     njobs : int
         Defines the number of parallel jobs spawned for several HTMD operations.
         Negative numbers are used for spawning jobs as many as CPU threads.
@@ -44,7 +40,6 @@ def config(
     slurm : str
         Defines a YAML file that can contain default profile configurations for an SlurmQueue
     """
-    _config["viewer"] = viewer
     if ncpus is not None:
         logger.warning(
             "The ncpus config option has been renamed to njobs. Please use njobs instead."
