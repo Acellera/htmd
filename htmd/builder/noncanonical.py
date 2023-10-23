@@ -128,12 +128,7 @@ def _parameterize_non_canonical_residue(
         # So that CIF is written as smallmol instead of macromol
         cmol.resname[:] = resn
 
-        dih = list_dihedrals(
-            cmol,
-            cmol.formalcharge.sum(),
-            exclude_atoms=exclude_atoms,
-            _logger=False,
-        )
+        dih = list_dihedrals(cmol, exclude_atoms=exclude_atoms, _logger=False)
 
         # Delete pure backbone dihedrals to not reparameterize them and thus waste atomtype names and computation time
         for dd in ("CH3-C-N-CA", "CA-C-N-CH3", "C-N-CA-C", "N-CA-C-N", "CA-C-N-CA"):
@@ -142,7 +137,6 @@ def _parameterize_non_canonical_residue(
 
         main_parameterize(
             cmol,
-            user_charge=int(cmol.formalcharge.sum()),
             forcefield=forcefield,
             charge_type="AM1-BCC",
             min_type="mm",
@@ -414,7 +408,6 @@ def _compare_frcmod(
 
         # Iterate over fields in the line
         for iField, (refField, resField) in enumerate(zip(refFields, resFields)):
-
             # Set tolerance
             if (
                 len(refFields) == 7 and iField == 2
