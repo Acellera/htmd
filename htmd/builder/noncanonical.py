@@ -85,7 +85,12 @@ def _extend_residue(mol, nterm=True, cterm=True):
 
 
 def parameterizeNonCanonicalResidues(
-    cifs, outdir, forcefield="Sage", calculator="xTB", is_nterm=False, is_cterm=False
+    cifs,
+    outdir,
+    forcefield="GAFF2",
+    calculator="AIMNet2",
+    is_nterm=False,
+    is_cterm=False,
 ):
     cifs = ensurelist(cifs)
     if forcefield.lower() not in ("sage", "gaff2"):
