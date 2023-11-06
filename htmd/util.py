@@ -170,19 +170,9 @@ def assertSameAsReferenceDir(compareDir, outdir="."):
         outdir, compareDir, toCompare, shallow=False
     )
     if len(mismatch) != 0 or len(error) != 0 or len(match) != len(toCompare):
-        logger.error(
-            "Mismatch while checking directory {} versus reference {}".format(
-                outdir, compareDir
-            )
+        raise Exception(
+            f"Different results in files {mismatch}: Compare {outdir} and {compareDir}"
         )
-        logger.error("Files being checked: {}".format(toCompare))
-        for f in mismatch:
-            logger.error(
-                "    diff {} {}".format(
-                    os.path.join(outdir, f), os.path.join(compareDir, f)
-                )
-            )
-        raise Exception("Mismatch in regression testing.")
 
 
 def testDHFR():

@@ -758,7 +758,7 @@ def combine(prmlist, outfile):
     # Process parameter files
     prm_list = [
         "!COMMENTS\n",
-        "!ATOMS\n",
+        "ATOMS\n",
         "BONDS\n",
         "ANGLES\n",
         "DIHEDRALS\n",
@@ -810,110 +810,16 @@ def combine(prmlist, outfile):
                     prm_list[context] += _sec_name(fn)
                 else:
                     if context == 0:  # COMMENTS
-                        if re.search(r"^\s*\!+", line, re.I) or re.search(
-                            r"^\s*\*+", line, re.I
-                        ):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif context == 1:  # ATOMS
-                        if re.search(r"^\s*\!+", line, re.I):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif context == 2:  # BONDS
-                        if (
-                            re.search(r"^\s*\!+", line)
-                            or re.search(r"^\s*$", line)
-                            or re.search(
-                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
-                                line,
-                            )
-                        ):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif context == 3:  # ANGLES
                         if (
                             re.search(r"^\s*\!+", line, re.I)
-                            or re.search(r"^\s*$", line)
-                            or re.search(
-                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
-                                line,
-                            )
+                            or re.search(r"^\s*\*+", line, re.I)
+                            or len(line.strip()) == 0
                         ):
                             prm_list[context] += line
                         else:
                             prm_list[context] += "!" + line
-                    elif context == 4:  # DIHEDRALS
-                        if (
-                            re.search(r"^\s*\!+", line, re.I)
-                            or re.search(r"^\s*$", line)
-                            or re.search(
-                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
-                                line,
-                            )
-                        ):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif context == 5:  # IMPROPER
-                        if (
-                            re.search(r"^\s*\!+", line, re.I)
-                            or re.search(r"^\s*$", line)
-                            or re.search(
-                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
-                                line,
-                            )
-                        ):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif context == 6:  # CMAP
-                        if (
-                            re.search(r"^\s*\!+", line, re.I)
-                            or re.search(r"^\s*$", line)
-                            or re.search(
-                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+",
-                                line,
-                            )
-                            or re.search(
-                                r"^\s*[0-9\.-]+\s+[0-9\.-]+\s+[0-9\.-]+\s+[0-9\.-]+\s+",
-                                line,
-                            )
-                        ):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif context == 7:  # NONBONDED
-                        if (
-                            re.search(r"^\s*\!+", line, re.I)
-                            or re.search(r"^\s*$", line)
-                            or re.search(
-                                r"^\s*[_A-Z0-9a-z\.]+\s+[0-9\.\-]+\s+[0-9\.\-]+\s+",
-                                line,
-                            )
-                        ):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif context == 8:  # NBFIX
-                        if (
-                            re.search(r"^\s*\!+", line, re.I)
-                            or re.search(r"^\s*$", line)
-                            or re.search(
-                                r"^\s*[A-Z0-9a-z_]+\s+[A-Z0-9a-z_]+\s+[0-9\.\-]+\s+",
-                                line,
-                            )
-                        ):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif context == 9:  # HBOND
-                        if not re.search(r"^END", line, re.I):
-                            prm_list[context] += line
-                    else:
-                        continue
+                    elif not line.lower().startswith("end"):
+                        prm_list[context] += line
 
     prm = "".join(map(str, prm_list)) + "END"
     prmfh = open(outfile, "w")
