@@ -55,6 +55,9 @@ jobs:
     if: startsWith(github.event.ref, 'refs/tags/')
     needs: test
     runs-on: ${{ matrix.os }}
+    defaults: # Needed for conda
+      run:
+        shell: bash -l {0}
 
     strategy:
       fail-fast: false
@@ -64,6 +67,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Set version envvar
+        run: echo "BUILD_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Check version envvar
+        run: echo "Building version $BUILD_VERSION"
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -75,7 +84,6 @@ jobs:
           channels: acellera,conda-forge,defaults
 
       - name: Dump exact dependencies yaml file
-        shell: bash -l {0}
         run: |
           mamba install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y
           python package/htmd-deps/write_meta_yaml.py package/htmd-deps
@@ -89,21 +97,16 @@ jobs:
           miniforge-variant: Mambaforge
 
       - name: Build htmd-deps conda package
-        shell: bash -l {0}
         run: |
-          export TAG_DESCRIBE=$(git describe)
-          export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
+          echo "Building version $BUILD_VERSION"
           mamba install anaconda-client conda-build python=${{ matrix.python-version }} boa
           conda mambabuild --python ${{ matrix.python-version }} package/htmd-deps --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
 
       - name: Build htmd conda package
-        shell: bash -l {0}
         run: |
-          export TAG_DESCRIBE=$(git describe)
-          export BUILD_VERSION=$(echo $TAG_DESCRIBE | sed 's/-/ /g'  | awk '{print $1}')
+          echo "Building version $BUILD_VERSION"
           conda mambabuild --python ${{ matrix.python-version }} package/htmd --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
 
       - name: Upload to conda
-        shell: bash -l {0}
         run: |
           anaconda -t ${{ secrets.ANACONDA_TOKEN_BASIC }} upload -u acellera ./pkg/*/htmd-*.tar.bz2
