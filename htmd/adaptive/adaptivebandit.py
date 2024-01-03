@@ -10,6 +10,7 @@ from protocolinterface import val
 from htmd.projections.tica import TICA
 from htmd.projections.metric import Metric
 from htmd.adaptive.util import updatingMean
+from htmd.clustering.regular import RegCluster
 from sklearn.cluster import MiniBatchKMeans
 import unittest
 import logging
@@ -62,6 +63,8 @@ class AdaptiveBandit(AdaptiveBase):
         directed component of FAST.
     reward_method : str, default='max'
         The reward method
+    statetype : ('cluster', 'micro', 'macro'), str, default='micro'
+        State type (cluster, micro, macro) to use for reward calculations.
     skip : int, default=1
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
@@ -82,16 +85,14 @@ class AdaptiveBandit(AdaptiveBase):
         Save the model generated
     save_qval : bool, default=False
         Save the Q(a) and N values for every epoch
-    actionspace : str, default='tica'
-        The action space
+    actionspace : ('metric', 'goal', 'tica', 'ticapcca'), str, default='tica'
+        The projected space which will be clustered and used to define our action space
     recluster : bool, default=False
-        If to recluster the action space.
-    reclusterMethod : , default=<class 'sklearn.cluster._kmeans.MiniBatchKMeans'>
+        If to recluster the projected space used in MSM estimation with a different clustering.
+    reclusterMethod : , default=<class 'htmd.clustering.regular.RegCluster'>
         Clustering method for reclustering.
     goal_init : float, default=0.3
         The proportional ratio of goal initialization compared to max frames set by nframes
-    actionpool : int, default=0
-        The number of top scoring actions used to randomly select respawning simulations
     """
 
     def __init__(self):
@@ -141,9 +142,7 @@ class AdaptiveBandit(AdaptiveBase):
             val.Function(),
             nargs="any",
         )
-        self._arg(
-            "reward_method", "str", "The reward method", "mean", val.String()
-        )  # Default should be mean
+        self._arg("reward_method", "str", "The reward method", "mean", val.String())
         self._arg(
             "skip",
             "int",
@@ -164,7 +163,7 @@ class AdaptiveBandit(AdaptiveBase):
             "Exploration is the coefficient used in UCB algorithm to weight the exploration value",
             0.01,
             val.Number(float, "OPOS"),
-        )  # Default changed to 0.01
+        )
         self._arg(
             "temperature",
             "int",
@@ -208,19 +207,26 @@ class AdaptiveBandit(AdaptiveBase):
             False,
             val.Boolean(),
         )
-        self._arg("actionspace", "str", "The action space", "tica", val.String())
+        self._arg(
+            "actionspace",
+            "str",
+            "The projected space used to define actions",
+            "tica",
+            val.String(),
+            valid_values=("metric", "goal", "tica", "ticapcca"),
+        )
         self._arg(
             "recluster",
             "bool",
-            "If to recluster the action space.",
+            "If to recluster the projected space used in MSM estimation with a different clustering method.",
             False,
             val.Boolean(),
         )
         self._arg(
             "reclusterMethod",
             "",
-            "Clustering method for reclustering.",
-            MiniBatchKMeans,
+            "Clustering method used for reclustering.",
+            RegCluster,
         )
         self._arg(
             "goal_init",
@@ -228,13 +234,6 @@ class AdaptiveBandit(AdaptiveBase):
             "The proportional ratio of goal initialization compared to max frames set by nframes",
             0.3,
             val.Number(float, "POS"),
-        )
-        self._arg(
-            "actionpool",
-            "int",
-            "The number of top scoring actions used to randomly select respawning simulations",
-            0,
-            val.Number(int, "OPOS"),
         )
         self._arg(
             "savegoal",
@@ -255,6 +254,10 @@ class AdaptiveBandit(AdaptiveBase):
         data.dropTraj()  # Drop before TICA to avoid broken trajectories
 
         if self.goalfunction is not None:
+            if self.nframes <= 0:
+                raise RuntimeError(
+                    "When using a goal function, nframes needs to be set to a value greater than 0"
+                )
             goaldata = self._getGoalData(data.simlist)
             if len(data.simlist) != len(goaldata.simlist):
                 raise RuntimeError(
@@ -316,8 +319,8 @@ class AdaptiveBandit(AdaptiveBase):
             qstconcat = np.concatenate(data_q.St)
             statemaxes = np.zeros(numstates)
             np.maximum.at(statemaxes, qstconcat, np.squeeze(goaldataconcat))
-
-            goalenergies = -Kinetics._kB * self.temperature * np.log(1 - statemaxes)
+            goalscale = self._featScale(statemaxes)
+            goalenergies = -Kinetics._kB * self.temperature * np.log(1 - goalscale)
             q_values = goalenergies
             n_values += int(
                 (self.nframes / self._numClusters(self.nframes)) * self.goal_init
@@ -340,10 +343,11 @@ class AdaptiveBandit(AdaptiveBase):
             np.save(path.join("saveddata", f"e{currepoch}_qval.npy"), q_values)
             np.save(path.join("saveddata", f"e{currepoch}_nval.npy"), n_values)
 
+        total_steps = np.sum(n_values)
         ucb_values = np.array(
             [
                 self.count_ucb(
-                    q_values[clust], self.exploration, currepoch + 1, n_values[clust]
+                    q_values[clust], self.exploration, total_steps + 1, n_values[clust]
                 )
                 for clust in range(numstates)
             ]
@@ -354,14 +358,11 @@ class AdaptiveBandit(AdaptiveBase):
             np.save(path.join("saveddata", f"e{currepoch}_ucbvals.npy"), ucb_values)
 
         N = self.nmax - self._running
-        if self.actionpool <= 0:
-            self.actionpool = N
 
-        topactions = np.argsort(-ucb_values)[: self.actionpool]
-        action = np.random.choice(topactions, N, replace=False)
-
+        action = np.argsort(-ucb_values)[:N]
         action_sel = np.zeros(numstates, dtype=int)
         action_sel[action] += 1
+
         while np.sum(action_sel) < N:  # When K is lower than N repeat some actions
             for a in action:
                 action_sel[a] += 1
@@ -412,7 +413,6 @@ class AdaptiveBandit(AdaptiveBase):
                 continue
             states = states[connected]
             statprob = statprob[connected]
-            # energies = Kinetics._kB * self.temperature * np.log(statprob)
             energies = -Kinetics._kB * self.temperature * np.log(1 - statprob)
 
             ww = len(energies)
@@ -442,9 +442,14 @@ class AdaptiveBandit(AdaptiveBase):
     def conformationStationaryDistribution(self, model):
         statdist = np.zeros(model.data.numFrames)  # zero for disconnected set
         dataconcatSt = np.concatenate(model.data.St)
-        for i in range(model.micronum):
-            microframes = np.where(model.micro_ofcluster[dataconcatSt] == i)[0]
-            statdist[microframes] = model.msm.stationary_distribution[i]
+        if self.statetype == "macro":
+            for i in range(model.macronum):
+                macroframes = np.where(model.macro_ofcluster[dataconcatSt] == i)[0]
+                statdist[macroframes] = model.eqDistribution(plot=False)[i]
+        elif self.statetype == "micro":
+            for i in range(model.micronum):
+                microframes = np.where(model.micro_ofcluster[dataconcatSt] == i)[0]
+                statdist[microframes] = model.msm.stationary_distribution[i]
         return model.data.deconcatenate(statdist)
 
     def _checkNFrames(self, data):
@@ -476,6 +481,14 @@ class AdaptiveBandit(AdaptiveBase):
                 pickle.dump(savedata, f)
 
         return data
+
+    def _featScale(self, feat):
+        denom = np.max(feat) - np.min(feat)
+        if denom == 0:  # Handling the trivial case where all states have equal features
+            res = np.zeros(len(feat))
+            res[:] = 1 / len(feat)
+            return res
+        return (feat - np.min(feat)) / denom
 
     def _createMSM(self, data):
         from htmd.model import Model
