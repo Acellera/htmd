@@ -630,9 +630,12 @@ def build(
         The path to the output directory
         Default: './build'
     caps : dict
-        A dictionary with keys segids and values lists of strings describing the caps for a particular protein segment.
+        A dictionary specifying the caps. It accepts two different formats.
+        One with keys segids and values lists of strings describing the caps for a particular protein segment.
         e.g. caps['P'] = ['ACE', 'NME'] or caps['P'] = ['none', 'none']. Default: will apply ACE and NME caps to every
         protein segment.
+        The second format is more manual and uses as keys an atomselection of a residue and as values the cap
+        to apply to that residue. e.g. caps = {"chain A and resid 5": "ACE", "chain A and resid 10": "NME"}
     ionize : bool
         Enable or disable ionization
     saltconc : float
@@ -1030,6 +1033,8 @@ def _detect_cyclic_segments(mol: Molecule):
 
 
 def _add_caps(mol: Molecule, caps: dict):
+    from moleculekit.molecule import UniqueResidueID
+
     capdir = os.path.join(home(shareDir=True), "builder", "caps")
 
     remove_atoms = {
@@ -1038,84 +1043,72 @@ def _add_caps(mol: Molecule, caps: dict):
         "NHE": ["OXT", "OT1", "O", "HXT"],
     }
 
+    uqres_caps = []
+    if (
+        caps is not None
+        and len(caps)
+        and isinstance(caps[list(caps.keys())[0]], (list, tuple))
+    ):
+        # Converting from segment caps to residue caps
+        for segid in caps:
+            # Keep first and last indexes of the segment
+            segidx = np.where(mol.segid == segid)[0][[0, -1]]
+            for i in range(2):
+                cap = caps[segid][i]
+                if cap is not None and cap != "none":
+                    uqres_caps.append(
+                        (UniqueResidueID.fromMolecule(mol, idx=segidx[i]), cap)
+                    )
+    else:
+        # Converting from cap residue selections to unique residue IDs
+        for sel, cap in caps.items():
+            uqres_caps.append((UniqueResidueID.fromMolecule(mol, sel), cap))
+
     # For each caps definition
-    for seg in caps:
-        # Can't move this out since we remove atoms in this loop
-        prot = mol.atomselect("protein")
-        # Get the segment
-        segment = np.where(mol.segid == seg)[0]
-        # Test segment
-        if len(segment) == 0:
-            raise RuntimeError(f"There is no segment {seg} in the molecule.")
-        if not np.any(prot & (mol.segid == seg)):
-            raise RuntimeError(
-                f"Segment {seg} is not protein. Capping for non-protein segments is not supported."
-            )
-        # For each cap
-        for i, cap in enumerate(caps[seg]):
-            term = "N" if i == 0 else "C"
-            if cap is None or (isinstance(cap, str) and cap == "none"):
-                continue
+    for uqres, cap in uqres_caps:
+        # Get info on segment and its terminals
+        mask = uqres.selectAtoms(mol, indexes=False)
 
-            # Get info on segment and its terminals
-            segidm = mol.segid == seg
-            segididx = np.where(segidm)[0]
-            terminals = {
-                "N": {
-                    "resid": mol.resid[segididx][0],
-                    "insertion": mol.insertion[segididx][0],
-                },
-                "C": {
-                    "resid": mol.resid[segididx][-1],
-                    "insertion": mol.insertion[segididx][-1],
-                },
-            }
-            residm = (mol.resid == terminals[term]["resid"]) & (
-                mol.insertion == terminals[term]["insertion"]
-            )  # Mask for resid
-            mask = residm & segidm
-            resname = mol.resname[mask][0]
+        if uqres.resname == cap:  # Cap already exists
+            continue
 
-            if resname == cap:  # Cap already exists
-                continue
+        capmol = Molecule(os.path.join(capdir, f"{cap}.pdb"))
+        align_names = capmol.name[capmol.beta == 1]
+        mol_idx = np.where(np.isin(mol.name, align_names) & mask)[0]
+        # Ensuring the atom order matches for the alignment
+        cap_idx = [
+            np.where((capmol.name == nn) & (capmol.resname == "XXX"))[0][0]
+            for nn in mol.name[mol_idx]
+        ]
 
-            capmol = Molecule(os.path.join(capdir, f"{cap}.pdb"))
-            align_names = capmol.name[capmol.beta == 1]
-            mol_idx = np.where(np.isin(mol.name, align_names) & mask)[0]
-            # Ensuring the atom order matches for the alignment
-            cap_idx = [
-                np.where((capmol.name == nn) & (capmol.resname == "XXX"))[0][0]
-                for nn in mol.name[mol_idx]
-            ]
+        if len(cap_idx) != len(mol_idx):
+            raise RuntimeError("Could not find all required backbone atoms!")
 
-            if len(cap_idx) != len(mol_idx):
-                raise RuntimeError("Could not find all required backbone atoms!")
+        capmol.align(cap_idx, refmol=mol, refsel=mol_idx)
+        capmol.resname[capmol.resname == "XXX"] = uqres.resname
+        capmol.segid[:] = uqres.segid
+        capmol.chain[:] = uqres.chain
+        capmol.resid[:] += uqres.resid
+        capmol.remove(cap_idx, _logger=False)  # Remove atoms which were aligned
 
-            capmol.align(cap_idx, refmol=mol, refsel=mol_idx)
-            capmol.resname[capmol.resname == "XXX"] = resname
-            capmol.segid[:] = seg
-            capmol.resid[:] += terminals[term]["resid"]
-            capmol.chain[:] = mol.chain[mask][0]
-            capmol.remove(cap_idx, _logger=False)  # Remove atoms which were aligned
+        # Remove the atoms defined in remove_atoms to clean up the termini
+        mol.remove(np.isin(mol.name, remove_atoms[cap]) & mask, _logger=False)
 
-            # Remove the atoms defined in remove_atoms to clean up the termini
-            removed = mol.remove(
-                np.isin(mol.name, remove_atoms[cap]) & mask, _logger=False
-            )
-            segidm = np.delete(segidm, removed)
-            segididx = np.where(segidm)[0]
-            mol.insert(capmol, segididx[0] if i == 0 else segididx[-1] + 1)
+        # Insert the cap into the mol
+        res_idx = uqres.selectAtoms(mol, indexes=True)
+        mol.insert(capmol, res_idx[0] if cap == "ACE" else res_idx[-1] + 1)
 
     # Remove terminal hydrogens regardless of caps or no caps. tleap confuses itself when it makes residues into terminals.
     # For example HID has an atom H which in NHID should become H[123] and crashes tleap.
     for seg in np.unique(mol.get("segid", "protein")):
-        segidm = mol.segid == seg  # Mask for segid
-        segididx = np.where(segidm)[0]
-        resids = mol.resid[segididx]
-        mol.remove(
-            f'(resid "{resids[0]}" "{resids[-1]}") and segid {seg} and hydrogen',
-            _logger=False,
+        seg_mask = mol.segid == seg
+        resids = mol.resid[seg_mask]
+        mask = (
+            ((mol.resid == resids[0]) | (mol.resid == resids[-1]))
+            & seg_mask
+            & (mol.element == "H")
         )
+        mol.remove(mask, _logger=False)
 
 
 def _defaultProteinCaps(mol):
@@ -1756,6 +1749,21 @@ class _TestAmberBuild(unittest.TestCase):
             dataDir=join("test-amber-build", "peptide-cap-only-backbone", "6A5J")
         )
 
+        _TestAmberBuild._compareResultFolders(refdir, tmpdir, "6A5J")
+
+        tmpdir = os.path.join(
+            self.testDir, "peptide-cap-only-backbone-manual-caps", "6A5J"
+        )
+        _ = build(
+            smol,
+            outdir=tmpdir,
+            ionize=False,
+            caps={"resid 1": "ACE", "resid 13": "NME"},
+        )
+
+        refdir = home(
+            dataDir=join("test-amber-build", "peptide-cap-only-backbone", "6A5J")
+        )
         _TestAmberBuild._compareResultFolders(refdir, tmpdir, "6A5J")
 
     def test_non_standard_residue_building(self):
