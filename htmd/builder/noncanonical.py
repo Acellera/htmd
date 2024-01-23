@@ -277,21 +277,45 @@ def _fix_prepi_atomname_capitalization(mol, prepi):
     with open(prepi, "r") as f:
         lines = f.readlines()
 
+    section = None
     for i in range(len(lines)):
-        if lines[i].strip().startswith("CORR"):
-            break
-
-    for i in range(i + 2, len(lines)):
         if lines[i].strip() == "":
-            break
-        old_name = lines[i][6:9].strip()
+            section = None
 
-        # Fix wrong prepi atom name capitalization
-        if old_name.upper() in uqnames and uqnames[old_name.upper()] != old_name:
-            logger.info(
-                f"Fixed residue {mol.resname[0]} atom name {old_name} -> {uqnames[old_name.upper()]} to match the input structure."
-            )
-            lines[i] = f"{lines[i][:6]}{uqnames[old_name.upper()]:4s}{lines[i][10:]}"
+        if section == "atoms":
+            if len(lines[i].strip().split()) < 4:
+                continue
+            old_name = lines[i][6:9].strip()
+            # Fix wrong prepi atom name capitalization
+            if old_name.upper() in uqnames and uqnames[old_name.upper()] != old_name:
+                logger.info(
+                    f"Fixed residue {mol.resname[0]} atom name {old_name} -> {uqnames[old_name.upper()]}"
+                    " to match the input structure."
+                )
+                lines[
+                    i
+                ] = f"{lines[i][:6]}{uqnames[old_name.upper()]:4s}{lines[i][10:]}"
+            continue
+        if section in ("loop", "improper"):
+            n_pieces = len(lines[i].strip().split())
+            for j in range(n_pieces):
+                piece = lines[i][j * 5 : (j + 1) * 5].strip()
+                if piece.upper() in uqnames and uqnames[piece.upper()] != piece:
+                    logger.info(
+                        f"Fixed residue {mol.resname[0]} atom name {piece} -> {uqnames[piece.upper()]}"
+                        " to match the input structure."
+                    )
+                    lines[
+                        i
+                    ] = f"{lines[i][:j*5]}{uqnames[piece.upper()] : >5}{lines[i][(j+1)*5:]}"
+            continue
+
+        if lines[i].strip().startswith("CORR"):
+            section = "atoms"
+        if lines[i].strip().startswith("LOOP"):
+            section = "loop"
+        if lines[i].strip().startswith("IMPROPER"):
+            section = "improper"
 
     with open(prepi, "w") as f:
         for line in lines:
