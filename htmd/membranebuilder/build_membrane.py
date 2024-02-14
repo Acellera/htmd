@@ -134,6 +134,7 @@ def _createMembraneMolecule(lipids):
     from moleculekit.util import rotationMatrix
 
     allmols = []
+    numAtoms = 0
     for i, l in enumerate(lipids):
         mol = l.mol.copy()
         headpos = mol.coords[mol.name == l.headname].flatten()[np.newaxis, :]
@@ -141,17 +142,19 @@ def _createMembraneMolecule(lipids):
         mol.rotateBy(rotationMatrix([0, 0, 1], np.deg2rad(l.rot)))
         mol.moveBy(l.xyz)
         mol.resid[:] = i
+        numAtoms += mol.numAtoms
         allmols.append(mol)
 
-    def mergeMols(mollist):  # Divide and conquer approach for merging molecules
-        while len(mollist) > 1:
-            mollist[0].append(mollist[1])
-            mollist = [mollist[0]] + mergeMols(mollist[2:])
-        if len(mollist) == 1:
-            return mollist
-        return []
+    # Merge all the lipids into a single Molecule
+    mol = Molecule().empty(numAtoms)
+    mol.coords = np.zeros((numAtoms, 3, 1), dtype=np.float32)
+    start_idx = 0
+    for mm in allmols:
+        for prop in ["name", "resname", "resid", "segid", "chain", "element", "coords"]:
+            mol.__dict__[prop][start_idx : start_idx + mm.numAtoms] = getattr(mm, prop)
+        start_idx += mm.numAtoms
 
-    return mergeMols(allmols)[0]
+    return mol
 
 
 def _detectRings(mol):
