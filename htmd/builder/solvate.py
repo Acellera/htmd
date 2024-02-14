@@ -267,8 +267,28 @@ def solvate(
 
 
 def _overlapWithOther(mol, segname, buffer):
-    sel = f"segid {segname} and same resid as (segid {segname} and within {buffer} of not segid {segname})"
-    return mol.atomselect(sel)
+    # Optimized version of this atomselection:
+    # segid {segname} and same resid as (segid {segname} and within {buffer} of not segid {segname})
+    from moleculekit.atomselect_utils import within_distance
+
+    segmask = mol.segid == segname
+    segidx = np.where(segmask)[0].astype(np.uint32)
+    notsegidx = np.where(~segmask)[0].astype(np.uint32)
+
+    contacts = np.zeros(len(segidx), dtype=bool)
+    within_distance(
+        mol.coords[:, :, 0],
+        buffer,
+        sel1=segidx,
+        sel2=notsegidx,
+        sel2_min_coords=mol.coords[notsegidx, :, 0].min(axis=0),
+        sel2_max_coords=mol.coords[notsegidx, :, 0].max(axis=0),
+        results=contacts,
+    )
+
+    close_resid = np.unique(mol.resid[segidx[contacts]])
+    res = segmask & np.isin(mol.resid, close_resid)
+    return res
 
 
 def _outOfBoundaries(mol, segname, xmin, xmax, ymin, ymax, zmin, zmax):
