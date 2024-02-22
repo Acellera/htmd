@@ -818,7 +818,9 @@ def combine(prmlist, outfile):
                             prm_list[context] += line
                         else:
                             prm_list[context] += "!" + line
-                    elif line.strip().split()[0].lower() not in ["end", "return"]:
+                    elif not line.lower().startswith(
+                        "end"
+                    ) and not line.lower().startswith("return"):
                         prm_list[context] += line
 
     prm = "".join(map(str, prm_list)) + "END"
