@@ -818,7 +818,7 @@ def combine(prmlist, outfile):
                             prm_list[context] += line
                         else:
                             prm_list[context] += "!" + line
-                    elif not line.lower().startswith("end"):
+                    elif line.strip().split()[0].lower() not in ["end", "return"]:
                         prm_list[context] += line
 
     prm = "".join(map(str, prm_list)) + "END"
@@ -1071,9 +1071,9 @@ class _TestCharmmBuild(unittest.TestCase):
         topos = ["top/top_all36_prot.rtf", "top/top_water_ions.rtf"]
         params = ["par/par_all36m_prot.prm", "par/par_water_ions.prm"]
 
-        smol.insertion[
-            smol.resid == 42
-        ] = "A"  # Adding an insertion to test that disulfide bonds with insertions work
+        smol.insertion[smol.resid == 42] = (
+            "A"  # Adding an insertion to test that disulfide bonds with insertions work
+        )
         tmpdir = tempname()
         _ = build(smol, topo=topos, param=params, outdir=tmpdir)
         compareDir = home(dataDir=os.path.join("test-charmm-build", "3PTB_insertion"))
