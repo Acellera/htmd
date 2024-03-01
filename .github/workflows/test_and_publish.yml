@@ -30,9 +30,20 @@ jobs:
           miniforge-variant: Mambaforge
           channels: acellera,conda-forge,defaults
 
-      - name: Install HTMD conda deps # psfgen should not be included by default in HTMD due to licensing
+      - name: Install HTMD conda deps
+        if: matrix.os == 'ubuntu-latest'
         run: |
           mamba install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y
+
+      - name: Install HTMD conda deps
+        if: matrix.os == 'macos-latest'
+        run: |
+          mamba install --file package/htmd-deps/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
+
+      - name: Install HTMD conda deps
+        if: matrix.os == 'windows-latest'
+        run: |
+          mamba install --file package/htmd-deps/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
 
       - name: Install pip dependencies
         run: |
