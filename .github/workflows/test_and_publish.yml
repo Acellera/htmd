@@ -33,17 +33,17 @@ jobs:
       - name: Install Linux HTMD conda deps
         if: matrix.os == 'ubuntu-latest'
         run: |
-          mamba install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y
+          mamba install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
 
       - name: Install MacOS HTMD conda deps
         if: matrix.os == 'macos-latest'
         run: |
-          mamba install --file package/htmd-deps/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
+          mamba install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
 
       - name: Install Windows HTMD conda deps
         if: matrix.os == 'windows-latest'
         run: |
-          mamba install --file package/htmd-deps/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
+          mamba install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
 
       - name: Install pip dependencies
         run: |
@@ -79,12 +79,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set version envvar
-        run: echo "BUILD_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
-
-      - name: Check version envvar
-        run: echo "Building version $BUILD_VERSION"
-
       - uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: writedeps
@@ -94,23 +88,20 @@ jobs:
           miniforge-variant: Mambaforge
           channels: acellera,conda-forge,defaults
 
-      - name: Dump exact Linux dependencies yaml file
+      - name: Dump Linux dependencies yaml file
         if: matrix.os == 'ubuntu-latest'
         run: |
-          mamba install --file package/htmd-deps/DEPENDENCIES python=${{ matrix.python-version }} -y
-          python package/htmd-deps/write_meta_yaml.py package/htmd-deps
+          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES
 
-      - name: Dump exact MacOS dependencies yaml file
+      - name: Dump MacOS dependencies yaml file
         if: matrix.os == 'macos-latest'
         run: |
-          mamba install --file package/htmd-deps/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
-          python package/htmd-deps/write_meta_yaml.py package/htmd-deps
+          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_MAC
 
-      - name: Dump exact Windows dependencies yaml file
+      - name: Dump Windows dependencies yaml file
         if: matrix.os == 'windows-latest'
         run: |
-          mamba install --file package/htmd-deps/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
-          python package/htmd-deps/write_meta_yaml.py package/htmd-deps
+          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_WIN
 
       - uses: conda-incubator/setup-miniconda@v3
         with:
@@ -120,15 +111,9 @@ jobs:
           mamba-version: "*"
           miniforge-variant: Mambaforge
 
-      - name: Build htmd-deps conda package
-        run: |
-          echo "Building version $BUILD_VERSION"
-          mamba install anaconda-client conda-build python=${{ matrix.python-version }} boa
-          conda mambabuild --python ${{ matrix.python-version }} package/htmd-deps --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
-
       - name: Build htmd conda package
         run: |
-          echo "Building version $BUILD_VERSION"
+          mamba install anaconda-client conda-build python=${{ matrix.python-version }} boa
           conda mambabuild --python ${{ matrix.python-version }} package/htmd --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
 
       - name: Upload to conda
