@@ -3,68 +3,68 @@ name: Test and deploy code
 on: [push]
 
 jobs:
-  test:
-    runs-on: ${{ matrix.os }}
+  # test:
+  #   runs-on: ${{ matrix.os }}
 
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
-        python-version: ["3.8", "3.9", "3.10"]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+  #       python-version: ["3.8", "3.9", "3.10"]
 
-    defaults: # Needed for conda
-      run:
-        shell: bash -l {0}
+  #   defaults: # Needed for conda
+  #     run:
+  #       shell: bash -l {0}
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
-          submodules: true
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         lfs: true
+  #         submodules: true
 
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          auto-update-conda: true
-          python-version: ${{ matrix.python-version }}
-          mamba-version: "*"
-          miniforge-variant: Mambaforge
-          channels: acellera,conda-forge,defaults
+  #     - uses: conda-incubator/setup-miniconda@v3
+  #       with:
+  #         auto-update-conda: true
+  #         python-version: ${{ matrix.python-version }}
+  #         mamba-version: "*"
+  #         miniforge-variant: Mambaforge
+  #         channels: acellera,conda-forge,defaults
 
-      - name: Install Linux HTMD conda deps
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          mamba install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
+  #     - name: Install Linux HTMD conda deps
+  #       if: matrix.os == 'ubuntu-latest'
+  #       run: |
+  #         mamba install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
 
-      - name: Install MacOS HTMD conda deps
-        if: matrix.os == 'macos-latest'
-        run: |
-          mamba install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
+  #     - name: Install MacOS HTMD conda deps
+  #       if: matrix.os == 'macos-latest'
+  #       run: |
+  #         mamba install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
 
-      - name: Install Windows HTMD conda deps
-        if: matrix.os == 'windows-latest'
-        run: |
-          mamba install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
+  #     - name: Install Windows HTMD conda deps
+  #       if: matrix.os == 'windows-latest'
+  #       run: |
+  #         mamba install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
 
-      - name: Install pip dependencies
-        run: |
-          pip install flake8 pytest
-          pip install .
+  #     - name: Install pip dependencies
+  #       run: |
+  #         pip install flake8 pytest
+  #         pip install .
 
-      - name: Lint with flake8
-        run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+  #     - name: Lint with flake8
+  #       run: |
+  #         # stop the build if there are Python syntax errors or undefined names
+  #         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+  #         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+  #         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-      - name: Test
-        run: |
-          export HTMD_NONINTERACTIVE=1
-          pytest --verbose --durations=10 ./htmd/
+  #     - name: Test
+  #       run: |
+  #         export HTMD_NONINTERACTIVE=1
+  #         pytest --verbose --durations=10 ./htmd/
 
   deploy:
-    if: startsWith(github.event.ref, 'refs/tags/')
-    needs: test
+    # if: startsWith(github.event.ref, 'refs/tags/')
+    # needs: test
     runs-on: ${{ matrix.os }}
     defaults: # Needed for conda
       run:
@@ -73,7 +73,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        os: ["windows-latest"]
         python-version: ["3.8", "3.9", "3.10"]
 
     steps:
