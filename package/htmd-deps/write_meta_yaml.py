@@ -22,6 +22,7 @@ requirements:
   build:
     - python
     - requests
+    - versioneer==0.28
 
   run:
 {run}
@@ -32,36 +33,36 @@ requirements:
 
 # Read in all dependencies
 deps = []
-with open(os.path.join(workdir, 'DEPENDENCIES'), 'r') as f:
+with open(os.path.join(workdir, "DEPENDENCIES"), "r") as f:
     for line in f:
         # Remove comments and split
-        packagematch = line.split('#')[0].split()
+        packagematch = line.split("#")[0].split()
         # Append dict of the conda package match specification
         if packagematch:
-            deps.append(dict(zip(['name', 'version', 'build_string'], packagematch)))
+            deps.append(dict(zip(["name", "version", "build_string"], packagematch)))
 
 # Get all installed packages from conda
-packages = check_output(['conda', 'list', '--json']).decode('utf8')
+packages = check_output(["conda", "list", "--json"]).decode("utf8")
 packages = json.loads(packages)
 
 # Find the version of each dependency and add them to the meta.yaml file
-rundeps = ''
-runconstdeps = ''
-depnames = [dep['name'] for dep in deps]
+rundeps = ""
+runconstdeps = ""
+depnames = [dep["name"] for dep in deps]
 found = dict(zip(depnames, [False] * len(depnames)))
 for p in packages:
-    name = p['name'].lower()
+    name = p["name"].lower()
     if name in depnames:
-        dep = next(dep for dep in deps if dep['name'] == name)
-        if 'version' not in dep:
-            if name == 'htmd-data':
-                text = '    - {} =={}\n'.format(name, p['version'])
+        dep = next(dep for dep in deps if dep["name"] == name)
+        if "version" not in dep:
+            if name == "htmd-data":
+                text = "    - {} =={}\n".format(name, p["version"])
             else:
-                text = '    - {} >={}\n'.format(name, p['version'])
+                text = "    - {} >={}\n".format(name, p["version"])
         else:
-            text = '    - {} {}\n'.format(name, dep['version'])
+            text = "    - {} {}\n".format(name, dep["version"])
 
-        if name == 'htmd-data':
+        if name == "htmd-data":
             runconstdeps += text
         else:
             rundeps += text
@@ -77,5 +78,5 @@ if not all(found):
     sys.exit(1)
 
 # Write htmd-deps meta.yaml file
-with open(os.path.join(workdir, 'meta.yaml'), 'w') as f:
+with open(os.path.join(workdir, "meta.yaml"), "w") as f:
     f.write(metatemplate)

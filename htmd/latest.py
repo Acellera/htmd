@@ -8,8 +8,7 @@ import os
 
 
 def compareVersions():
-    from htmd.version import version
-    from htmd.home import home
+    from htmd import __version__ as currver
     from natsort import natsorted
     import os
     import time
@@ -44,10 +43,7 @@ def compareVersions():
         )
         return
 
-    currver = version()
-    if currver == "unpackaged":
-        print(f"You are on the latest HTMD version ({currver} : {home()}).")
-    elif natsorted((latest, currver))[1] != currver:
+    if natsorted((latest, currver))[1] != currver:
         print(
             f"New HTMD version ({latest}) is available. You are currently on ({currver})."
             "There are several methods to update:"

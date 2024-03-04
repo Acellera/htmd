@@ -3,15 +3,16 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.version import version as _version
 from htmd.versionwarnings import _issueWarnings, _disableWarnings
 import __main__ as main
 import os.path
 from htmd.config import _config
 import htmd.home
 import logging.config
+from htmd import _version
 
-__version__ = _version()
+
+__version__ = _version.get_versions()["version"]
 
 try:
     logging.config.fileConfig(
