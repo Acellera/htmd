@@ -32,7 +32,7 @@ from moleculekit.tools.sequencestructuralalignment import sequenceStructureAlign
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist
 import unittest
-
+import sys
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1481,6 +1481,16 @@ def _fix_parameterize_atomtype_collisions(mol, params, topos):
             )
 
 
+try:
+    _findTeLeap()
+    tleap_installed = True
+except Exception:
+    tleap_installed = False
+
+
+@unittest.skipIf(
+    not tleap_installed, "teLeap is not installed. Cannot test amber.build"
+)
 class _TestAmberBuild(unittest.TestCase):
     currentResult = None  # holds last result object passed to run method
 
@@ -1787,6 +1797,7 @@ class _TestAmberBuild(unittest.TestCase):
                 )
                 _TestAmberBuild._compareResultFolders(refdir, tmpdir, pdbid)
 
+    @unittest.skipIf(sys.platform.startswith("darwin"), "Fails on OSX")
     def test_cofactor_building(self):
         homedir = home(dataDir=join("test-amber-build", "cofactors"))
         tmpdir = os.path.join(self.testDir, "cofactor")

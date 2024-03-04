@@ -381,11 +381,16 @@ class Kinetics(object):
 
         if statetype == "micro":
             setmap = np.arange(self.model.micronum)
-            flux = self.model.msm.reactive_flux(self.sourcemicro, self.sinkmicro)
+            flux = self.model.msm.reactive_flux(
+                self.sourcemicro.tolist(), self.sinkmicro.tolist()
+            )
         elif statetype == "macro" or statetype == "coarse":
             metastable_sets = []
             for i in range(self.model.macronum):
-                metastable_sets.append(np.where(self.model.macro_ofmicro == i)[0])
+                metastable_sets.append(
+                    np.where(self.model.macro_ofmicro == i)[0].tolist()
+                )
+
             flux = self.model.msm.reactive_flux(
                 metastable_sets[self.source], metastable_sets[self.sink]
             )
