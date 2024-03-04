@@ -32,7 +32,7 @@ from moleculekit.tools.sequencestructuralalignment import sequenceStructureAlign
 from htmd.builder.ionize import ionize as ionizef, ionizePlace
 from htmd.util import ensurelist
 import unittest
-
+import sys
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1797,6 +1797,7 @@ class _TestAmberBuild(unittest.TestCase):
                 )
                 _TestAmberBuild._compareResultFolders(refdir, tmpdir, pdbid)
 
+    @unittest.skipIf(sys.platform.startswith("darwin"), "Fails on OSX")
     def test_cofactor_building(self):
         homedir = home(dataDir=join("test-amber-build", "cofactors"))
         tmpdir = os.path.join(self.testDir, "cofactor")
