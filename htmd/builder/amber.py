@@ -1488,7 +1488,9 @@ except Exception:
     tleap_installed = False
 
 
-@unittest.skip(not tleap_installed, "teLeap is not installed. Cannot test amber.build")
+@unittest.skipIf(
+    not tleap_installed, "teLeap is not installed. Cannot test amber.build"
+)
 class _TestAmberBuild(unittest.TestCase):
     currentResult = None  # holds last result object passed to run method
 
