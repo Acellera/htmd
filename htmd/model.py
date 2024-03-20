@@ -833,6 +833,8 @@ class Model(object):
             A list of states to visualize
         statetype : ['macro','micro','cluster'], optional
             The type of state to visualize
+        protein : bool, optional
+            Set to True to enable pure protein system visualization
         ligand : str, optional
             Atom selection string for the ligand.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
