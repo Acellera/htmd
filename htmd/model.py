@@ -7,6 +7,7 @@ References
 ----------
 .. [1] Deeptime: a Python library for machine learning dynamical models from time series data. Moritz Hoffmann et al 2022 Mach. Learn.: Sci. Technol. 3 015009
 """
+
 # (c) 2015-2022 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
@@ -15,7 +16,6 @@ References
 import numpy as np
 import random
 from moleculekit.molecule import Molecule
-from moleculekit.vmdviewer import getCurrentViewer
 from htmd.units import convert as unitconvert
 import unittest
 import logging
@@ -818,7 +818,6 @@ class Model(object):
         statetype="macro",
         protein=None,
         ligand=None,
-        viewer=None,
         mols=None,
         numsamples=50,
         wrapsel="protein",
@@ -834,13 +833,9 @@ class Model(object):
             A list of states to visualize
         statetype : ['macro','micro','cluster'], optional
             The type of state to visualize
-        protein : bool, optional
-            Set to True to enable pure protein system visualization
         ligand : str, optional
             Atom selection string for the ligand.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-        viewer : :class:`VMD <moleculekit.vmdviewer.VMD>` object, optional
-            A viewer in which to visualize the states
         mols : ndarray, optional
             An array of :class:`Molecule <moleculekit.molecule.Molecule>` objects to visualize
         numsamples : int
@@ -866,18 +861,19 @@ class Model(object):
 
         self._integrityCheck(postmsm=(statetype != "cluster"))
 
-        if protein is None and ligand is None:
-            raise RuntimeError(
-                "You need to specify either the `protein` of `ligand` arguments for state visualization."
-            )
+        if _config["viewer"] is not None and _config["viewer"].lower() in (
+            "ngl",
+            "webgl",
+        ):
+            if protein is None and ligand is None:
+                raise RuntimeError(
+                    "You need to specify either the `protein` of `ligand` arguments for state visualization."
+                )
 
-        if _config["viewer"].lower() in ("ngl", "webgl"):
             return self._viewStatesNGL(
                 states, statetype, protein, ligand, mols, numsamples, gui=gui
             )
 
-        if viewer is None:
-            viewer = getCurrentViewer()
         if states is None:
             states = range(self.macronum)
         if isinstance(states, int):
@@ -893,12 +889,20 @@ class Model(object):
             )
         colors = [0, 1, 3, 4, 5, 6, 7, 9]
         for i, s in enumerate(states):
-            viewer.loadMol(mols[i], name=statetype + " " + str(states[i]))
+            mols[i].viewname = f"{statetype} {s}"
+            mols[i].reps.add(
+                sel="protein or nucleic",
+                style="NewCartoon",
+                frames=range(mols[i].numFrames) if ligand is None else None,
+            )
             if ligand is not None:
-                viewer.rep("ligand", sel=ligand, color=colors[np.mod(i, len(colors))])
-            if protein is not None:
-                viewer.rep("protein")
-            viewer.send("start_sscache")
+                mols[i].reps.add(
+                    sel=ligand,
+                    style="Lines",
+                    color=colors[np.mod(i, len(colors))],
+                    frames=range(mols[i].numFrames),
+                )
+            mols[i].view()
 
     def _viewStatesNGL(
         self, states, statetype, protein, ligand, mols, numsamples, gui=False
@@ -1043,9 +1047,9 @@ class Model(object):
         except ImportError:
             import pandas.core.indexes
 
-            sys.modules[
-                "pandas.indexes"
-            ] = pandas.core.indexes  # Hacky fix for new pandas version
+            sys.modules["pandas.indexes"] = (
+                pandas.core.indexes
+            )  # Hacky fix for new pandas version
 
         f = open(filename, "rb")
         z = pickle.load(f)
@@ -1427,9 +1431,9 @@ def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
         trajs.append(f.sim.trajectory[f.piece])
         frs.append(f.frame)
     mol.read(np.array(trajs), frames=np.array(frs))
-    if len(wrapsel) > 0:
+    if wrapsel is not None and len(wrapsel):
         mol.wrap(wrapsel)
-    if (refmol is not None) and (alignsel is not None):
+    if alignsel is not None and len(alignsel):
         mol.align(alignsel, refmol=refmol)
     return mol
 
