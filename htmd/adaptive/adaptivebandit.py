@@ -242,6 +242,14 @@ class AdaptiveBandit(AdaptiveBase):
             None,
             val.String(),
         )
+        self._arg(
+            "statetype",
+            "str",
+            "What states (cluster, micro, macro) to use for calculations.",
+            "micro",
+            val.String(),
+            valid_values=("micro", "cluster", "macro"),
+        )
 
     def _algorithm(self):
         from htmd.kinetics import Kinetics
