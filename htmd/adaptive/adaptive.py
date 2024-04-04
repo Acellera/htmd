@@ -464,7 +464,7 @@ def reconstructAdaptiveTraj(simlist, trajID):
     mol = Molecule(sim.molfile)
     mol.coords = np.zeros((mol.numAtoms, 3, 0), dtype=np.float32)
     mol.fileloc = []
-    mol.box = np.zeros((3, 0))
+    mol.box = np.zeros((3, 0), dtype=np.float32)
     for i, c in enumerate(chain):
         tmpmol = Molecule(sim.molfile)
         tmpmol.read(c[0].trajectory)
