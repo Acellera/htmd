@@ -40,6 +40,11 @@ jobs:
         run: |
           mamba install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
 
+      - name: Install MacOS HTMD conda deps
+        if: matrix.os == 'macos-latest-large'
+        run: |
+          mamba install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
+
       - name: Install Windows HTMD conda deps
         if: matrix.os == 'windows-latest'
         run: |
@@ -96,6 +101,12 @@ jobs:
 
       - name: Dump MacOS dependencies yaml file
         if: matrix.os == 'macos-latest'
+        run: |
+          pip install versioneer==0.28
+          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_MAC
+
+      - name: Dump MacOS dependencies yaml file
+        if: matrix.os == 'macos-latest-large'
         run: |
           pip install versioneer==0.28
           python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_MAC
