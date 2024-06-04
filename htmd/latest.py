@@ -3,7 +3,6 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from subprocess import check_output
 import os
 
 
@@ -58,17 +57,14 @@ def compareVersions():
 
 
 def _writeLatestVersionFile(fname):
+    import urllib.request
+    import json
+
     version = None
     try:
-        ret = check_output(
-            [
-                "conda",
-                "search",
-                "acellera::*[name=htmd, subdir=linux-64]",  # , build=*py39*
-            ]
-        )
-        lastline = ret.decode("utf-8").splitlines()[-1]
-        version = lastline.split()[1]
+        url = "https://api.anaconda.org/package/acellera/htmd"
+        with urllib.request.urlopen(url) as r:
+            version = json.loads(r.read())["latest_version"]
     except Exception:
         return
 

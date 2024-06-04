@@ -23,18 +23,6 @@ def _issueWarnings():
     if ("CI" in os.environ) and os.environ["CI"]:
         return  # Don't issue warnings if running in CI
 
-    # with open(_warningsfile, "r") as f:
-    #     disabledversions = f.read().splitlines()
-
-    # # Use this style to add version warnings:
-    # if "1.16" not in disabledversions:
-    #     warnings.warn(
-    #         "As of HTMD 1.16 the default number of threads HTMD spawns for calculations is set to 1. "
-    #         "You can enable parallelism at your own risk using `config(njobs=-2)` in the beginning of your scripts. "
-    #         "To disable this warning run once: `from htmd import _disableWarnings; _disableWarnings('1.16');`",
-    #         UserWarning,
-    #     )
-
 
 def _disableWarnings(version):
     if not os.path.exists(_warningsfile):
