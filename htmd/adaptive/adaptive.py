@@ -170,9 +170,12 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                             )
                         input_dirs = natsorted(glob(path.join(self.inputpath, "e1s*")))
                         for i in range(0, len(input_dirs), self.mps):
-                            self.app.submit(
-                                input_dirs[i : i + self.mps], nvidia_mps=True
-                            )
+                            if len(input_dirs[i : i + self.mps]) > 1:
+                                self.app.submit(
+                                    input_dirs[i : i + self.mps], nvidia_mps=True
+                                )
+                            else:
+                                self.app.submit(input_dirs[i])
                     else:
                         self.app.submit(
                             natsorted(glob(path.join(self.inputpath, "e1s*")))
