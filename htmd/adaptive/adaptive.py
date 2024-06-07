@@ -162,10 +162,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                 self._init()
                 input_dirs = natsorted(glob(path.join(self.inputpath, "e1s*")))
                 if not self.dryrun:
-                    if self.mps > 0:
-                        self._submit_mps(input_dirs)
-                    else:
-                        self.app.submit(input_dirs)
+                    self.app.submit(input_dirs)
             else:
                 # Retrieving simulations
                 logger.info("Retrieving simulations.")
@@ -214,10 +211,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                             path.join(self.inputpath, "e" + str(epoch + 1) + "s*")
                         )
                         try:
-                            if self.mps > 0:
-                                self._submit_mps(newsims)
-                            else:
-                                self.app.submit(natsorted(newsims))
+                            self.app.submit(natsorted(newsims))
                         except Exception:
                             # If submitting fails delete all simulation inputs to not confuse _getEpoch()
                             for ns in newsims:
@@ -250,8 +244,12 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
             if os.path.exists(lockfile):
                 os.remove(lockfile)
 
-    def _submit_mps(self, newsims):
+    def _submit(self, newsims):
         from jobqueues.slurmqueue import SlurmQueue
+
+        if self.mps == 0:
+            self.app.submit(newsims)
+            return
 
         if not isinstance(self.app, SlurmQueue):
             raise ValueError(
