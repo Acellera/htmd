@@ -162,7 +162,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                 self._init()
                 input_dirs = natsorted(glob(path.join(self.inputpath, "e1s*")))
                 if not self.dryrun:
-                    self.app.submit(input_dirs)
+                    self._submit(input_dirs)
             else:
                 # Retrieving simulations
                 logger.info("Retrieving simulations.")
@@ -211,7 +211,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                             path.join(self.inputpath, "e" + str(epoch + 1) + "s*")
                         )
                         try:
-                            self.app.submit(natsorted(newsims))
+                            self._submit(natsorted(newsims))
                         except Exception:
                             # If submitting fails delete all simulation inputs to not confuse _getEpoch()
                             for ns in newsims:
