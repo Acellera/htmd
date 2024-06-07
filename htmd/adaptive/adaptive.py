@@ -128,6 +128,13 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
             False,
             val.Boolean(),
         )
+        self._arg(
+            "mps",
+            "int",
+            "If mps > 0, it will run simulations using the Multi-Process Service (MPS) with the number of processes specified. If set to 0, mps is disabled",
+            0,
+            val.Number(int, "0POS"),
+        )
         self._running = None
 
     def run(self):
@@ -154,7 +161,22 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                 logger.info("Epoch 0, generating first batch")
                 self._init()
                 if not self.dryrun:
-                    self.app.submit(natsorted(glob(path.join(self.inputpath, "e1s*"))))
+                    if self.mps > 0:
+                        from jobqueues.slurmqueue import SlurmQueue
+
+                        if not isinstance(self.app, SlurmQueue):
+                            raise ValueError(
+                                "Multiple processes per simulation only supported with SlurmQueue."
+                            )
+                        input_dirs = natsorted(glob(path.join(self.inputpath, "e1s*")))
+                        for i in range(0, len(input_dirs), self.mps):
+                            self.app.submit(
+                                input_dirs[i : i + self.mps], nvidia_mps=True
+                            )
+                    else:
+                        self.app.submit(
+                            natsorted(glob(path.join(self.inputpath, "e1s*")))
+                        )
             else:
                 # Retrieving simulations
                 logger.info("Retrieving simulations.")
