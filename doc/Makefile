@@ -71,6 +71,7 @@ $(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
 	mkdir -p $(TUTORIALSDIR)
 	$(IPYTHON) nbconvert $< --to rst --output-dir=$(TUTORIALSDIR)/
 	cp -R ../tutorials/wrapping_img/ $(TUTORIALSDIR)/
+	cp -R ../tutorials/img/ $(TUTORIALSDIR)/
 
 tutorials: $(RST_FILES)
 
