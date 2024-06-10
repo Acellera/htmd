@@ -32,6 +32,7 @@ The user guide is a good place to start playing around.
     tutorials
     documentation
     API <htmd.rst>
+    Developers <developers/index>
 
 
 
