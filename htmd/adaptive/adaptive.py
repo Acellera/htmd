@@ -128,6 +128,13 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
             False,
             val.Boolean(),
         )
+        self._arg(
+            "mps",
+            "int",
+            "If mps > 0, it will run simulations using the Multi-Process Service (MPS) with the number of processes specified. If set to 0, mps is disabled",
+            0,
+            val.Number(int, "0POS"),
+        )
         self._running = None
 
     def run(self):
@@ -153,8 +160,9 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
             if epoch == 0 and self.generatorspath:
                 logger.info("Epoch 0, generating first batch")
                 self._init()
+                input_dirs = natsorted(glob(path.join(self.inputpath, "e1s*")))
                 if not self.dryrun:
-                    self.app.submit(natsorted(glob(path.join(self.inputpath, "e1s*"))))
+                    self._submit(input_dirs)
             else:
                 # Retrieving simulations
                 logger.info("Retrieving simulations.")
@@ -203,7 +211,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
                             path.join(self.inputpath, "e" + str(epoch + 1) + "s*")
                         )
                         try:
-                            self.app.submit(natsorted(newsims))
+                            self._submit(natsorted(newsims))
                         except Exception:
                             # If submitting fails delete all simulation inputs to not confuse _getEpoch()
                             for ns in newsims:
@@ -235,6 +243,21 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
             lockfile = os.path.abspath("./adaptivelock")
             if os.path.exists(lockfile):
                 os.remove(lockfile)
+
+    def _submit(self, newsims):
+        from jobqueues.slurmqueue import SlurmQueue
+
+        if self.mps == 0:
+            self.app.submit(newsims)
+            return
+
+        if not isinstance(self.app, SlurmQueue):
+            raise ValueError(
+                "Multiple processes per simulation only supported with SlurmQueue."
+            )
+        for i in range(0, len(newsims), self.mps):
+            batch = newsims[i : min(i + self.mps, len(newsims))]
+            self.app.submit(batch, nvidia_mps=len(batch) > 1)
 
     def _init(self):
         from natsort import natsorted
