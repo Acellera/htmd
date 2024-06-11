@@ -318,7 +318,7 @@ class AdaptiveMD(AdaptiveBase):
         """Heuristic for calculating the number of macrostates for the Markov model"""
         macronum = self.macronum
         if data.K < macronum:
-            macronum = np.ceil(data.K / 2)
+            macronum = int(np.ceil(data.K / 2))
             logger.warning(
                 f"Using less macrostates than requested due to lack of microstates. macronum = {macronum}"
             )
