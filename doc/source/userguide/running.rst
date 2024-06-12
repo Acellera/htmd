@@ -11,3 +11,4 @@ Contents:
     Adaptive Sampling Explained <adaptive-sampling-explained>
     Adaptive Sampling Tutorial <../tutorials/adaptive-sampling>
     Adaptive Bandit Tutorial <../tutorials/adaptive-bandit>
+    Equilibration protocol for the mu opioid GPCR <../tutorials/mu-opioid-receptor-gpcr-equilibration>

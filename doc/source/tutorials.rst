@@ -21,7 +21,6 @@ Contents:
     Building with HTMD <userguide/building>
     Simulations in HTMD <userguide/running>
     Analysis in HTMD <userguide/analysing>
-    Advanced uses <userguide/applications>
     Tools <userguide/tools>
     Changelog <userguide/changelog>
 
