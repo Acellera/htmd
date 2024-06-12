@@ -801,15 +801,15 @@ class Model(object):
             states, numsamples, statetype=statetype, samplemode=samplemode
         )
 
-        from htmd.parallelprogress import ParallelExecutor, delayed
+        from tqdm import tqdm
 
         # This loop really iterates over states. sampleStates returns an array of arrays
-        # Don't increase njobs because it was giving errors on some systems.
-        aprun = ParallelExecutor(n_jobs=1)
-        mols = aprun(total=len(relframes), desc="Getting state Molecules")(
-            delayed(_loadMols)(self, rel, molfile, wrapsel, alignsel, alignmol, simlist)
-            for rel in relframes
-        )
+        mols = []
+        for rel in tqdm(relframes, desc="Getting state Molecules"):
+            mols.append(
+                self._loadMols(rel, molfile, wrapsel, alignsel, alignmol, simlist)
+            )
+
         return mols
 
     def viewStates(
@@ -1423,21 +1423,20 @@ class Model(object):
                 "After modifying the data in the MetricData object you need to recluster and reconstruct the markov model."
             )
 
-
-def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
-    frames = self.data.rel2sim(rel, simlist=simlist)
-    mol = Molecule(molfile)
-    trajs = []
-    frs = []
-    for f in frames:
-        trajs.append(f.sim.trajectory[f.piece])
-        frs.append(f.frame)
-    mol.read(np.array(trajs), frames=np.array(frs))
-    if wrapsel is not None and len(wrapsel):
-        mol.wrap(wrapsel)
-    if alignsel is not None and len(alignsel):
-        mol.align(alignsel, refmol=refmol)
-    return mol
+    def _loadMols(self, rel, molfile, wrapsel, alignsel, refmol, simlist):
+        frames = self.data.rel2sim(rel, simlist=simlist)
+        mol = Molecule(molfile)
+        trajs = []
+        frs = []
+        for f in frames:
+            trajs.append(f.sim.trajectory[f.piece])
+            frs.append(f.frame)
+        mol.read(np.array(trajs), frames=np.array(frs))
+        if wrapsel is not None and len(wrapsel):
+            mol.wrap(wrapsel)
+        if alignsel is not None and len(alignsel):
+            mol.align(alignsel, refmol=refmol)
+        return mol
 
 
 def getStateStatistic(
