@@ -196,6 +196,7 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
 
                 if epoch >= self.nepochs and self._running == 0:
                     logger.info("Reached maximum number of epochs " + str(self.nepochs))
+                    self._on_complete()
                     self._unsetLock()
                     return
 
@@ -342,6 +343,9 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
     @abc.abstractmethod
     def _algorithm(self):
         return
+
+    def _on_complete(self):
+        pass
 
 
 def _writeInputsFunction(i, f, epoch, inputpath, coorname, boxname):
