@@ -381,59 +381,63 @@ class _TestAdaptiveRun(unittest.TestCase):
         import tempfile
         import shutil
 
-        # with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = "/tmp/test"
-        os.chdir(tmpdir)
-        source = os.path.join(tmpdir, "adaptivemd")
-        shutil.copytree(os.path.join(home(dataDir="adaptivemd")), source)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.chdir(tmpdir)
+            source = os.path.join(tmpdir, "adaptivemd")
+            shutil.copytree(os.path.join(home(dataDir="adaptivemd")), source)
 
-        class FakeQueue(SimQueue):
-            def __init__(self, source, datadir):
-                super().__init__()
-                self._source = source
-                self._datadir = datadir
-                self._dirs = []
+            class FakeQueue(SimQueue):
+                def __init__(self, source, datadir):
+                    super().__init__()
+                    self._source = source
+                    self._datadir = datadir
+                    self._dirs = []
 
-            def retrieve(self):
-                basename = os.path.basename(os.path.abspath(self._dirs[0]))
-                regex = re.compile(r"e(\d+)")
-                epoch = int(regex.search(basename).group(1))
-                for ed, dd in zip(
-                    glob(os.path.join(self._source, "data", f"e{epoch}s*")), self._dirs
-                ):
-                    basename = os.path.basename(os.path.abspath(dd))
-                    shutil.copytree(ed, os.path.join(self._datadir, basename))
+                def retrieve(self):
+                    basename = os.path.basename(os.path.abspath(self._dirs[0]))
+                    regex = re.compile(r"e(\d+)")
+                    epoch = int(regex.search(basename).group(1))
+                    for ed, dd in zip(
+                        glob(os.path.join(self._source, "data", f"e{epoch}s*")),
+                        self._dirs,
+                    ):
+                        basename = os.path.basename(os.path.abspath(dd))
+                        shutil.copytree(ed, os.path.join(self._datadir, basename))
 
-            def submit(self, dirs):
-                self._dirs = dirs
+                def submit(self, dirs):
+                    self._dirs = dirs
 
-            def inprogress(self):
-                return 0
+                def inprogress(self):
+                    return 0
 
-            def memory(self):
-                return 0
+                def memory(self):
+                    return 0
 
-            def ncpu(self):
-                return 1
+                def ncpu(self):
+                    return 1
 
-            def ngpu(self):
-                return 0
+                def ngpu(self):
+                    return 0
 
-            def stop(self):
-                pass
+                def stop(self):
+                    pass
 
-        queue = FakeQueue(source, "./data")
+            queue = FakeQueue(source, "./data")
 
-        ad = AdaptiveMD()
-        ad.app = queue
-        ad.nmin = 1
-        ad.nmax = 3
-        ad.nepochs = 3
-        ad.generatorspath = os.path.join(source, "generators")
-        protsel = "protein and name CA"
-        ad.projection = MetricSelfDistance(protsel)
-        ad.updateperiod = 1  # execute every 1 sec
-        ad.run()
+            ad = AdaptiveMD()
+            ad.app = queue
+            ad.nmin = 1
+            ad.nmax = 3
+            ad.nepochs = 3
+            ad.generatorspath = os.path.join(source, "generators")
+            protsel = "protein and name CA"
+            ad.projection = MetricSelfDistance(protsel)
+            ad.updateperiod = 1  # execute every 1 sec
+            ad.run()
+
+            assert len(glob(os.path.join(tmpdir, "filtered", "e1*", ""))) == 3
+            assert len(glob(os.path.join(tmpdir, "filtered", "e2*", ""))) == 2
+            assert len(glob(os.path.join(tmpdir, "filtered", "e3*", ""))) == 2
 
 
 if __name__ == "__main__":
