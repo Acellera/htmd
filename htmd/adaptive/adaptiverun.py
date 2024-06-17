@@ -378,6 +378,7 @@ class _TestAdaptiveRun(unittest.TestCase):
         from htmd.home import home
         from glob import glob
         import re
+        import os
         import tempfile
         import shutil
 
