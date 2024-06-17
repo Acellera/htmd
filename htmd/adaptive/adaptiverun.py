@@ -383,7 +383,6 @@ class _TestAdaptiveRun(unittest.TestCase):
         import shutil
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            os.chdir(tmpdir)
             source = os.path.join(tmpdir, "adaptivemd")
             shutil.copytree(os.path.join(home(dataDir="adaptivemd")), source)
 
@@ -423,7 +422,7 @@ class _TestAdaptiveRun(unittest.TestCase):
                 def stop(self):
                     pass
 
-            queue = FakeQueue(source, "./data")
+            queue = FakeQueue(source, os.path.join(tmpdir, "data"))
 
             ad = AdaptiveMD()
             ad.app = queue
@@ -431,6 +430,9 @@ class _TestAdaptiveRun(unittest.TestCase):
             ad.nmax = 3
             ad.nepochs = 3
             ad.generatorspath = os.path.join(source, "generators")
+            ad.inputpath = os.path.join(tmpdir, "input")
+            ad.datapath = os.path.join(tmpdir, "data")
+            ad.filteredpath = os.path.join(tmpdir, "filtered")
             protsel = "protein and name CA"
             ad.projection = MetricSelfDistance(protsel)
             ad.updateperiod = 1  # execute every 1 sec
