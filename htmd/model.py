@@ -1311,13 +1311,20 @@ class Model(object):
         statescmap:
             Matplotlib colormap for the states
         plot : bool
-            If the method should display the plot of the FES
+            If the method should display the plot of the FES. If both plot=False and save=None, the method will return the figure and axes.
         save : str
-            Path of the file in which to save the figure
+            Path of the file in which to save the figure. If both plot=False and save=None, the method will return the figure and axes.
         data : :class:`MetricData` object
             Optionally you can pass a different MetricData object than the one used to build the model. For example
             if the user wants to build a model on distances but wants to plot the FES on top of RMSD values. The
             MetricData object needs to have the same simlist as the Model.
+
+        Returns
+        -------
+        f : matplotlib.figure.Figure
+            The matplotlib figure object
+        ax : matplotlib.axes.Axes
+            The matplotlib axes object
 
         Examples
         --------
@@ -1404,8 +1411,11 @@ class Model(object):
 
         if save is not None:
             plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
-        if plot:
+            plt.close()
+        elif plot:
             plt.show()
+        else:
+            return f, ax
 
     def _integrityCheck(self, postmsm=False, markov=False):
         if postmsm and self._modelid is None:
