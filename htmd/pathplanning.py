@@ -282,6 +282,8 @@ def raytracing(
     ratioexposed=0,
     vmd=True,
 ):
+    from tqdm import tqdm
+
     protcoor, ligcoor = _getCoordinates(mol, ligandsel, ligcom)
 
     spherecoor = _pointsOnSphere(maxDistance(mol) + 5, numsamples=numsamples)
@@ -291,21 +293,20 @@ def raytracing(
 
     distances = _dist(ligcoor, spherecoor)
 
-    from joblib import Parallel, delayed
-
-    results = Parallel(n_jobs=-2, verbose=11)(
-        delayed(parallelfunc)(
-            j,
-            spherecoor[j, :],
-            ligcoor,
-            protcoor,
-            step,
-            colldist,
-            outdist,
-            distances[:, j],
+    results = []
+    for j in tqdm(range(spherecoor.shape[0]), desc="Searching for pathway"):
+        results.append(
+            parallelfunc(
+                j,
+                spherecoor[j, :],
+                ligcoor,
+                protcoor,
+                step,
+                colldist,
+                outdist,
+                distances[:, j],
+            )
         )
-        for j in range(spherecoor.shape[0])
-    )
 
     points = []
     pointdist = []
@@ -317,7 +318,7 @@ def raytracing(
 
     if len(points) == 0:
         raise RuntimeError(
-            "No ligand atoms can exit the pocket without {}A clashes.".format(colldist)
+            f"No ligand atoms can exit the pocket without {colldist}A clashes."
         )
 
     points = np.array(points)
@@ -325,20 +326,16 @@ def raytracing(
     percentexposed = (numexposed / ligcoor.shape[0]) * 100
     if numexposed < (ratioexposed * ligcoor.shape[0]):
         raise RuntimeError(
-            "Only {:.1f}% ligand atoms can exit the pocket without {}A clashes. "
-            "This collides with the user-defined required {:.1f}% exposed ligand atoms.".format(
-                percentexposed, colldist, ratioexposed * 100
-            )
+            f"Only {percentexposed:.1f}% ligand atoms can exit the pocket without {colldist}A clashes. "
+            f"This collides with the user-defined required {ratioexposed * 100:.1f}% exposed ligand atoms."
         )
     print(
-        "{:.1f}% ligand atoms can exit the pocket without {}A clashes.".format(
-            percentexposed, colldist
-        )
+        f"{percentexposed:.1f}% ligand atoms can exit the pocket without {colldist}A clashes."
     )
 
     from scipy.stats import mode
 
-    modesphere = mode(points[:, 1]).mode[0]
+    modesphere = mode(points[:, 1], keepdims=False).mode
     idx = points[:, 1] == modesphere
     meanlig = np.mean(ligcoor[points[idx, 0], :], axis=0)
 
@@ -367,10 +364,13 @@ def parallelfunc(j, spherecoor, ligcoor, protcoor, step, colldist, outdist, dist
         collisions = _dist(linepoints, protcoor)
         if not np.any(collisions <= colldist):
             linep_mincoll = np.min(collisions, axis=1)
-            idx = np.min(np.where(linep_mincoll >= outdist)[0])
+            idx = np.where(linep_mincoll >= outdist)[0]
+            if len(idx) == 0:
+                continue
+            min_idx = np.min(idx)
             points.append([i, j])
-            pointdist.append(step * (idx + 1))
-            shortpoints.append(linepoints[idx, :])
+            pointdist.append(step * (min_idx + 1))
+            shortpoints.append(linepoints[min_idx, :])
     return points, pointdist, shortpoints
 
 
