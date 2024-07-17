@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-triala = Molecule(os.path.join(home(shareDir=True), "builder", "triala_capped.mmtf"))
+triala = Molecule(os.path.join(home(shareDir=True), "builder", "triala_capped.cif"))
 triala_g = triala.toGraph()
 triala_bb = nx.shortest_path(triala_g, source=1, target=38)
 triala_g.remove_edge(14, 16)
