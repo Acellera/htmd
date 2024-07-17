@@ -1722,11 +1722,12 @@ class _TestAmberBuild(unittest.TestCase):
             np.random.seed(1)
             mol = Molecule(pid)
             mol.filter("protein")
+            mol.segid = mol.chain
             smol = solvate(mol)
             ffs = defaultFf()
             disu = [
-                ["segid 1 and resid 110", "segid 1 and resid 187"],
-                ["segid 2 and resid 110", "segid 2 and resid 187"],
+                ["chain A and resid 110", "chain A and resid 187"],
+                ["chain B and resid 110", "chain B and resid 187"],
             ]
             tmpdir = os.path.join(self.testDir, "withoutProtPrep", pid)
             _ = build(smol, ff=ffs, outdir=tmpdir, disulfide=disu)
@@ -1908,9 +1909,10 @@ class _TestAmberBuild(unittest.TestCase):
         np.random.seed(1)
 
         mol = Molecule("5VAV")
+        mol.segid = mol.chain
 
         tmpdir = os.path.join(self.testDir, "cyclic-peptide", "5VAV")
-        _ = build(mol, outdir=tmpdir, ionize=False, caps={"1": ("none", "none")})
+        _ = build(mol, outdir=tmpdir, ionize=False, caps={"A": ("none", "none")})
 
         refdir = home(dataDir=join("test-amber-build", "cyclic-peptide", "5VAV"))
         _TestAmberBuild._compareResultFolders(refdir, tmpdir, "5VAV")
