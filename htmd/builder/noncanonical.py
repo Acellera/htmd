@@ -292,9 +292,9 @@ def _fix_prepi_atomname_capitalization(mol, prepi):
                     f"Fixed residue {mol.resname[0]} atom name {old_name} -> {uqnames[old_name.upper()]}"
                     " to match the input structure."
                 )
-                lines[
-                    i
-                ] = f"{lines[i][:6]}{uqnames[old_name.upper()]:4s}{lines[i][10:]}"
+                lines[i] = (
+                    f"{lines[i][:6]}{uqnames[old_name.upper()]:4s}{lines[i][10:]}"
+                )
             continue
         if section in ("loop", "improper"):
             n_pieces = len(lines[i].strip().split())
@@ -305,9 +305,9 @@ def _fix_prepi_atomname_capitalization(mol, prepi):
                         f"Fixed residue {mol.resname[0]} atom name {piece} -> {uqnames[piece.upper()]}"
                         " to match the input structure."
                     )
-                    lines[
-                        i
-                    ] = f"{lines[i][:j*5]}{uqnames[piece.upper()] : >5}{lines[i][(j+1)*5:]}"
+                    lines[i] = (
+                        f"{lines[i][:j*5]}{uqnames[piece.upper()] : >5}{lines[i][(j+1)*5:]}"
+                    )
             continue
 
         if lines[i].strip().startswith("CORR"):
