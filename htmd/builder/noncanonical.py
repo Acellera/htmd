@@ -323,10 +323,10 @@ def _fix_prepi_atomname_capitalization(mol, prepi):
 
 
 def _clean_prm(prm, mol, backbone_at, padding_atoms):
-    from moleculekit.util import guessAnglesAndDihedrals
+    from moleculekit.util import calculateAnglesAndDihedrals
 
     all_at = np.unique(mol.atomtype[~padding_atoms]).tolist() + backbone_at
-    angles, dihedrals = guessAnglesAndDihedrals(mol.bonds)
+    angles, dihedrals = calculateAnglesAndDihedrals(mol.bonds)
 
     at_dict = {
         "bond_types": mol.atomtype[mol.bonds].tolist(),
