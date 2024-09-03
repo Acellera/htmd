@@ -31,14 +31,14 @@ class Tree:
         self.costs.append(self.costs[parent] + dist)
 
 
-def _getCoordinates(mol, ligandsel, ligcom):
-    mol.center(sel="protein")
-    protcoor = mol.get("coords", sel="protein and not {}".format(ligandsel))
+def _getCoordinates(mol, ligandsel, ligcom, othersel="protein"):
+    mol.center(sel=othersel)
+    othercoor = mol.get("coords", sel=f"({othersel}) and not ({ligandsel})")
     if ligcom:
         ligcoor = np.mean(mol.get("coords", sel=ligandsel), axis=0)[np.newaxis, :]
     else:
         ligcoor = mol.get("coords", sel=ligandsel)
-    return protcoor, ligcoor
+    return othercoor, ligcoor
 
 
 def _newPoint(p_target, p_begin, step):
@@ -274,6 +274,7 @@ def rrt(mol, ligandsel, step=1, maxiter=int(1e6), ligcom=False, colldist=2, outd
 def raytracing(
     mol,
     ligandsel,
+    othersel="protein",
     step=1,
     colldist=2,
     outdist=8,
@@ -284,7 +285,7 @@ def raytracing(
 ):
     from tqdm import tqdm
 
-    protcoor, ligcoor = _getCoordinates(mol, ligandsel, ligcom)
+    protcoor, ligcoor = _getCoordinates(mol, ligandsel, ligcom, othersel)
 
     spherecoor = _pointsOnSphere(maxDistance(mol) + 5, numsamples=numsamples)
     if vmd:
