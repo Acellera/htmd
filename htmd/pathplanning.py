@@ -31,14 +31,15 @@ class Tree:
         self.costs.append(self.costs[parent] + dist)
 
 
-def _getCoordinates(mol, ligandsel, ligcom, othersel="protein"):
-    mol.center(sel=othersel)
-    othercoor = mol.get("coords", sel=f"({othersel}) and not ({ligandsel})")
+def _getCoordinates(mol: Molecule, ligandsel, ligcom, othersel="protein"):
+    othersel = f"({othersel}) and not ({ligandsel})"
+    translation = mol.center(sel=othersel)
+    othercoor = mol.get("coords", sel=othersel)
     if ligcom:
         ligcoor = np.mean(mol.get("coords", sel=ligandsel), axis=0)[np.newaxis, :]
     else:
         ligcoor = mol.get("coords", sel=ligandsel)
-    return othercoor, ligcoor
+    return othercoor, ligcoor, translation
 
 
 def _newPoint(p_target, p_begin, step):
@@ -188,7 +189,7 @@ def rrtstarsmart(
     outdist=8,
     radius=2.5,
 ):
-    protcoor, ligcoor = _getCoordinates(mol, ligandsel, ligcom)
+    protcoor, ligcoor, translation = _getCoordinates(mol, ligandsel, ligcom)
     viewer = _prepareViewer(mol, ligandsel)
 
     mincoor = np.squeeze(np.min(mol.coords, axis=0) - 10)
@@ -239,7 +240,7 @@ def rrtstarsmart(
 
 
 def rrt(mol, ligandsel, step=1, maxiter=int(1e6), ligcom=False, colldist=2, outdist=8):
-    protcoor, ligcoor = _getCoordinates(mol, ligandsel, ligcom)
+    protcoor, ligcoor, translation = _getCoordinates(mol, ligandsel, ligcom)
     viewer = _prepareViewer(mol, ligandsel)
 
     spherecoor = _pointsOnSphere(maxDistance(mol) + 5)
@@ -285,7 +286,8 @@ def raytracing(
 ):
     from tqdm import tqdm
 
-    protcoor, ligcoor = _getCoordinates(mol, ligandsel, ligcom, othersel)
+    mol = mol.copy()
+    protcoor, ligcoor, translation = _getCoordinates(mol, ligandsel, ligcom, othersel)
 
     spherecoor = _pointsOnSphere(maxDistance(mol) + 5, numsamples=numsamples)
     if vmd:
@@ -351,7 +353,7 @@ def raytracing(
                 viewer.send("draw color green")
                 _drawline(viewer, ligcoor[p[0], :], shortpoints[idx])
 
-    return spherecoor[modesphere, :] - meanlig
+    return translation, spherecoor[modesphere, :] - meanlig
 
 
 def parallelfunc(j, spherecoor, ligcoor, protcoor, step, colldist, outdist, distances):
