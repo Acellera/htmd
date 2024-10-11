@@ -284,6 +284,63 @@ def raytracing(
     ratioexposed=0,
     vmd=True,
 ):
+    """Find the escape vector of a ligand from a pocket.
+
+    This function creates a sphere of points around the `othersel` atoms and traces a
+    line from each atom of the ligand to each point on the sphere. If the line does not
+    hit any `othersel` atoms within `colldist` it is checked if it exits the pocket by
+    checking if any point on the line is outside the pocket.
+    Thus we can calculate all the unimpeded vectors with which the ligand can reach the
+    solvent.
+    We then select the point of the surrounding sphere to which most ligand atoms can
+    reach without hitting any `othersel` atoms within `colldist` and we consider this
+    as the escape vector.
+
+    Parameters
+    ----------
+    mol : Molecule
+        The molecule to analyze.
+    ligandsel : str
+        The selection string to use to identify the ligand.
+    othersel : str, optional
+        The selection string to use to identify the other molecules which impede the
+        escape of the ligand.
+    step : float, optional
+        The step size to use for the line tracing.
+    colldist : float, optional
+        The collision distance threshold to use for the line tracing.
+    outdist : float, optional
+        The distance threshold to use to check if the line exits the pocket.
+    ligcom : bool, optional
+        Whether to use the center of mass of the ligand or its individual atoms to
+        trace the line.
+    numsamples : int, optional
+        The number of points to sample on the surrounding sphere.
+    ratioexposed : float, optional
+        The ratio of exposed ligand atoms that should be present on the escape vector.
+        If set to a value greater than 0, the function will check if the number of
+        exposed ligand atoms on the escape vector is greater than the specified ratio
+        and raise an error if it is not.
+    vmd : bool, optional
+        Whether to visualize the results using VMD.
+
+    Returns
+    -------
+    translation : np.ndarray
+        The translation vector to apply if we want to align the molecule to the
+        escape vector.
+    escape_vector : np.ndarray
+        The escape vector, i.e. the vector which the ligand can use to reach the
+        solvent without hitting any `othersel` atoms within `colldist`.
+
+    Examples
+    --------
+    >>> from moleculekit.util import rotation_matrix_from_vectors
+    >>> translation, escape_vector = raytracing(mol, "resname LIG", "protein")
+    >>> rotmat = rotation_matrix_from_vectors(np.array([0, 0, 1]), escape_vector) # align z-axis with escape vector
+    >>> mol.moveBy(translation)
+    >>> mol.rotateBy(rotmat)
+    """
     from tqdm import tqdm
 
     mol = mol.copy()
