@@ -15,7 +15,7 @@ jobs:
             "macos-13",
             "windows-2019",
           ]
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10"] #, "3.11"] No ACEMD for 3.11 yet
 
     defaults: # Needed for conda
       run:
@@ -49,7 +49,7 @@ jobs:
           mamba install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
 
       - name: Install Windows HTMD conda deps
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-2019'
         run: |
           mamba install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
 
@@ -121,7 +121,7 @@ jobs:
           python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_MAC
 
       - name: Dump Windows dependencies yaml file
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-2019'
         run: |
           pip install versioneer==0.28
           python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_WIN
