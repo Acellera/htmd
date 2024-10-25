@@ -44,11 +44,9 @@ def compareVersions():
 
     if natsorted((latest, currver))[1] != currver:
         print(
-            f"New HTMD version ({latest}) is available. You are currently on ({currver})."
-            "There are several methods to update:"
-            f"    - Create a new conda env. using `conda create -n htmd{latest} htmd={latest} -c acellera -c conda-forge`"
-            "    - Create a brand new conda installation and run `conda install htmd -c acellera -c conda-forge`"
-            "    - Run: `conda update htmd -c acellera -c conda-forge` (NOT RECOMMENDED!)"
+            f"New HTMD version ({latest}) is available. You are currently on ({currver}).\n"
+            "We recommend you create a new conda environment with the latest HTMD version.\n"
+            f"Run: `conda create -n htmd{latest} htmd={latest} -c acellera -c conda-forge`\n"
         )
     else:
         print(f"You are on the latest HTMD version ({currver}).")
