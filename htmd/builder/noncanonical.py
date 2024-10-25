@@ -88,10 +88,31 @@ def parameterizeNonCanonicalResidues(
     cifs,
     outdir,
     forcefield="GAFF2",
-    calculator="AIMNet2",
+    calculator=None,
+    charge_model="AM1-BCC",
     is_nterm=False,
     is_cterm=False,
 ):
+    """Parameterize non-canonical residues.
+
+    Parameters
+    ----------
+    cifs : str or list of str
+        Path to the CIF file(s) containing the non-canonical residues.
+    outdir : str
+        Path to the output directory.
+    forcefield : str, optional
+        Force field to use for parameterization. Default is "GAFF2".
+    calculator : str, optional, choices: ["xTB", "AIMNet2", "ANI-1x", "ANI-2x", "ANI-1ccx", "None"]
+        Energy calculator to use for fitting dihedral profiles
+    charge_model : str, optional, choices: ["AM1-BCC", "Gasteiger", "Espaloma", "ESP", "RESP-PSI4", "None"]
+        Charge model to use for parameterization
+    is_nterm : bool, optional
+        Whether the residue is a terminal N-term
+    is_cterm : bool, optional
+        Whether the residue is a terminal C-term
+
+    """
     cifs = ensurelist(cifs)
     if forcefield.lower() not in ("sage", "gaff2"):
         raise AttributeError(
@@ -101,12 +122,24 @@ def parameterizeNonCanonicalResidues(
     for cif in cifs:
         mol = Molecule(cif)
         _parameterize_non_canonical_residue(
-            mol, outdir, forcefield, calculator, is_nterm=is_nterm, is_cterm=is_cterm
+            mol,
+            outdir,
+            forcefield,
+            calculator,
+            is_nterm=is_nterm,
+            is_cterm=is_cterm,
+            charge_model=charge_model,
         )
 
 
 def _parameterize_non_canonical_residue(
-    mol, outdir, forcefield, calculator, is_nterm=False, is_cterm=False
+    mol,
+    outdir,
+    forcefield,
+    calculator,
+    charge_model,
+    is_nterm=False,
+    is_cterm=False,
 ):
     try:
         from parameterize.cli import main_parameterize, list_dihedrals
@@ -143,7 +176,7 @@ def _parameterize_non_canonical_residue(
         main_parameterize(
             cmol,
             forcefield=forcefield,
-            charge_type="AM1-BCC",
+            charge_type=charge_model,
             min_type="mm",
             dihed_fit_type="iterative",
             dihed_opt_type="mm",
