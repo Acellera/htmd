@@ -12,6 +12,7 @@ from htmd.model import Model, macroAccumulate
 from protocolinterface import val
 from htmd.projections.tica import TICA
 from htmd.projections.metric import Metric
+import sys
 import unittest
 import logging
 
@@ -372,6 +373,7 @@ if __name__ == "__main__":
 
 
 class _TestAdaptiveRun(unittest.TestCase):
+    @unittest.skipIf(sys.platform == "win32", "Windows is not supported")
     def test_adaptive_run(self):
         from moleculekit.projections.metricdistance import MetricSelfDistance
         from jobqueues.simqueue import SimQueue
