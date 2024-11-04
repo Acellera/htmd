@@ -30,31 +30,30 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
-          mamba-version: "*"
           channels: acellera,conda-forge,defaults
 
       - name: Install Linux HTMD conda deps
         if: matrix.os == 'ubuntu-latest'
         run: |
-          mamba install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
+          conda install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
 
       - name: Install MacOS HTMD conda deps
         if: matrix.os == 'macos-latest'
         run: |
-          mamba install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
+          conda install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
 
       - name: Install MacOS HTMD conda deps
         if: matrix.os == 'macos-13'
         run: |
-          mamba install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
+          conda install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
 
       - name: Install Windows HTMD conda deps
         if: matrix.os == 'windows-2019'
         run: |
-          mamba install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
+          conda install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
 
       - name: List installed packages
-        run: mamba list
+        run: conda list
 
       - name: Install pip dependencies
         run: |
@@ -99,7 +98,6 @@ jobs:
         with:
           activate-environment: writedeps
           python-version: ${{ matrix.python-version }}
-          mamba-version: "*"
           channels: acellera,conda-forge,defaults
 
       - name: Dump Linux dependencies yaml file
@@ -128,7 +126,7 @@ jobs:
 
       - name: Build htmd conda package
         run: |
-          mamba install anaconda-client conda-build python=${{ matrix.python-version }} boa
+          conda install anaconda-client conda-build python=${{ matrix.python-version }} boa
           conda mambabuild --python ${{ matrix.python-version }} package/htmd --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
 
       - name: Upload to conda
