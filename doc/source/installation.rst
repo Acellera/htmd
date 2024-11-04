@@ -25,8 +25,7 @@ With the ``htmd`` environment active (you should see ``(htmd)`` on the left) run
 .. code-block:: bash
     :linenos:
 
-    conda install mamba python=3.10 -c conda-forge
-    mamba install htmd -c acellera -c conda-forge
+    conda install python=3.10 htmd -c acellera -c conda-forge
 
 Before using HTMD, please read the EULA and register using the command
 
