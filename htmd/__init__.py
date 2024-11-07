@@ -27,7 +27,7 @@ reg_file = os.path.join(
 if (not hasattr(main, "__file__")) and (
     (not os.path.isfile(reg_file))
     or os.getenv("LICENCE_ACCEPTED") == "YES"
-    or os.getenv("CI")
+    or os.getenv("TRAVIS_REPO_SLUG")
 ):
     print(
         "\nCopyright by Acellera Ltd. By executing you are accepting the License. In order to register, "
