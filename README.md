@@ -5,14 +5,14 @@
 
 # HTMD: Programming Environment for Molecular Discovery
 
-[HTMD](https://www.htmd.org) (acronym for High-Throughput Molecular Dynamics) is a programmable, extensible platform
+[HTMD](https://www.htmd.org) (an acronym for High-Throughput Molecular Dynamics) is a programmable, extensible platform
 written in Python. It provides a complete workspace for simulation-based discovery through molecular simulations while
-aiming to solve the data generation and analysis problem as well as increase reproducibility.
+aiming to solve the data generation and analysis problem and increase reproducibility.
 
 ## Licensing
 
-HTMD Community Edition is free to use for not-for-profit work. Contact Acellera
-[www.acellera.com/contact](https://www.acellera.com/contact/) for information on the full version HTMD Pro or if you need a different license.
+HTMD Community Edition is free to use for not-for-profit work(see HTMD_LICENCE.txt). Contact Acellera
+[www.acellera.com/contact](https://www.acellera.com/contact/) for information on the full version of HTMD Pro or if you need a different license.
 
 ## Download HTMD
 
@@ -23,7 +23,7 @@ HTMD is distributed through conda package manager. The instructions for download
 
 ### Using this repository
 
-If you want to use this repository, we recommend to still download a released version of HTMD to have all dependencies
+If you want to use this repository, we recommend to download a released version of HTMD still to have all dependencies
 and then set PYTHONPATH to the git directory.
 
 ## HTMD Documentation and User Guide
@@ -31,7 +31,7 @@ and then set PYTHONPATH to the git directory.
 For HTMD Documentation, please visit:
 [https://software.acellera.com/htmd/api.html](https://software.acellera.com/htmd/api.html).
 
-For a User Guide (easy to start examples), please visit:
+For a User Guide (easy-to-start examples), please visit:
 [https://software.acellera.com/htmd/tutorials.html](https://software.acellera.com/htmd/tutorials.html)
 
 ## Support and Development
