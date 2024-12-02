@@ -224,7 +224,7 @@ def buildMembrane(
     waterbuff=20,
     platform="CUDA",
     minimize=0,
-    equilibrate=None,
+    equilibrate=0,
     outdir=None,
     lipidf=None,
     ff=None,
@@ -247,9 +247,9 @@ def buildMembrane(
     platform : str
         The platform on which to run the minimization ('CUDA' or 'CPU')
     minimize : int
-        The number of minimization steps to run
+        If not 0 it minimizes the membrane for the given number of steps
     equilibrate : float
-        If not None it equilibrates the membrane for the given number of nanoseconds
+        If not 0 it equilibrates the membrane for the given number of nanoseconds
     outdir : str
         A folder in which to store the psf and pdb files
     lipidf : str
@@ -285,10 +285,7 @@ def buildMembrane(
     import pandas as pd
 
     if isinstance(equilibrate, bool):
-        raise ValueError("equilibrate must be a float or None")
-
-    equilibrate = equilibrate if equilibrate is not None else 0
-    minimize = minimize if minimize is not None else 0
+        raise ValueError("equilibrate must be a float")
 
     if equilibrate > 0 or minimize > 0:
         build = True
@@ -431,7 +428,7 @@ class _TestBuildMembrane(unittest.TestCase):
                 [20, 20],
                 ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
                 ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                equilibrate=None,
+                equilibrate=0,
                 minimize=0,
                 outdir=tmpdir,
                 platform="CPU",
@@ -450,7 +447,7 @@ class _TestBuildMembrane(unittest.TestCase):
                 [20, 20],
                 ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
                 ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                equilibrate=None,
+                equilibrate=0,
                 minimize=100,
                 outdir=tmpdir,
                 platform="CPU",
