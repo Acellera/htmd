@@ -292,5 +292,17 @@ def _overlapWithOther(mol, segname, buffer):
 
 
 def _outOfBoundaries(mol, segname, xmin, xmax, ymin, ymax, zmin, zmax):
-    sel = f"segid {segname} and same resid as (segid {segname} and (x < {xmin} or x > {xmax} or y < {ymin} or y > {ymax} or z < {zmin} or z > {zmax}))"
-    return mol.atomselect(sel)
+    # Implementing the following atomselection
+    # segid {segname} and same resid as (segid {segname} and (x < {xmin} or x > {xmax} or y < {ymin} or y > {ymax} or z < {zmin} or z > {zmax}))
+
+    segnamesel = mol.segid == segname
+    oob = (
+        (mol.x < xmin)
+        | (mol.x > xmax)
+        | (mol.y < ymin)
+        | (mol.y > ymax)
+        | (mol.z < zmin)
+        | (mol.z > zmax)
+    )
+    residsel = np.isin(mol.resid, mol.resid[segnamesel & oob])
+    return segnamesel & residsel
