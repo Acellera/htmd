@@ -6,6 +6,7 @@
 from moleculekit.molecule import Molecule
 from glob import glob
 import numpy as np
+import unittest
 import logging
 
 logger = logging.getLogger(__name__)
@@ -221,9 +222,9 @@ def buildMembrane(
     ratioupper,
     ratiolower,
     waterbuff=20,
-    minimplatform="CPU",
-    equilibrate=False,
-    equilplatform="CUDA",
+    platform="CUDA",
+    minimize=1000,
+    equilibrate=None,
     outdir=None,
     lipidf=None,
     ff=None,
@@ -243,12 +244,12 @@ def buildMembrane(
         Same as ratioupper but for the lower layer
     waterbuff : float
         The z-dimension size of the water box above and below the membrane
-    minimplatform : str
+    platform : str
         The platform on which to run the minimization ('CUDA' or 'CPU')
-    equilibrate : bool
-        If True it equilibrates the membrane
-    equilplatform : str
-        The platform on which to run the equilibration ('CUDA' or 'CPU')
+    minimize : int
+        The number of minimization steps to run
+    equilibrate : float
+        If not None it equilibrates the membrane for the given number of nanoseconds
     outdir : str
         A folder in which to store the psf and pdb files
     lipidf : str
@@ -283,7 +284,10 @@ def buildMembrane(
     import os
     import pandas as pd
 
-    if equilibrate:
+    if isinstance(equilibrate, bool):
+        raise ValueError("equilibrate must be a float or None")
+
+    if equilibrate is not None:
         build = True
 
     if lipidf is None:
@@ -341,25 +345,56 @@ def buildMembrane(
         smemb.write(os.path.join(outdir, "structure.pdb"))
         return smemb
 
-    if equilibrate:
-        from htmd.membranebuilder.simulate_openmm import equilibrateSystem
-        from shutil import copy, move
+    if equilibrate is not None or minimize is not None:
+        from shutil import move
+        import yaml
+        from acemd import acemd
 
-        outpdb = tempname(suffix=".pdb")
-        equilibrateSystem(
-            os.path.join(outdir, "structure.pdb"),
-            os.path.join(outdir, "structure.prmtop"),
-            outpdb,
-            equilplatform=equilplatform,
-            minimplatform=minimplatform,
-        )
-        res = Molecule(outpdb)
+        equilibrate = equilibrate if equilibrate is not None else 0
+
+        equildir = os.path.join(outdir, "equil")
+        os.makedirs(equildir, exist_ok=True)
+
+        watcoo = res.get("coords", "water")
+        celld = (watcoo.max(axis=0) - watcoo.min(axis=0)).squeeze()
+
+        # TODO: I need to figure out the resnames+atom names after building
+        # lipid_heads = list(set([(lipid.resname, lipid.headname) for lipid in lipids]))
+
+        input_dict = {
+            "structure": os.path.join(outdir, "structure.prmtop"),
+            "coordinates": os.path.join(outdir, "structure.pdb"),
+            "boxsize": celld.tolist(),
+            "barostatconstratio": True,
+            "minimize": minimize,
+            "run": f"{equilibrate}ns",
+            "velocities": 300,
+            "thermostat": True,
+            "barostat": True,
+            # "extforces": [
+            #     {
+            #         "type": "positionalrestraint",
+            #         "sel": " and ".join(
+            #             [f"(resname {x[0]} and name {x[1]})" for x in lipid_heads]
+            #         ),
+            #         "setpoints": ["1@0"],
+            #     }
+            # ],
+        }
+        with open(os.path.join(equildir, "input.yaml"), "w") as f:
+            yaml.dump(input_dict, f)
+        acemd(equildir, platform="CPU")
+
+        res = Molecule(os.path.join(outdir, "structure.prmtop"))
+        res.read(os.path.join(equildir, "output.coor"))
+        res.read(os.path.join(equildir, "output.xsc"))
+        res.wrap("lipids", guessBonds=False)
         res.center()
         move(
             os.path.join(outdir, "structure.pdb"),
             os.path.join(outdir, "starting_structure.pdb"),
         )
-        copy(outpdb, os.path.join(outdir, "structure.pdb"))
+        res.write(os.path.join(outdir, "structure.pdb"))
 
     return res
 
@@ -381,5 +416,25 @@ def _findLeastAreaLipid(folder):
     return ff[np.argmin(maxdist)], np.min(maxdist)
 
 
+class _TestBuildMembrane(unittest.TestCase):
+    def test_build_membrane(self):
+        import tempfile
+        import os
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            buildMembrane(
+                [20, 20],
+                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
+                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
+                equilibrate=0.01,
+                minimize=100,
+                outdir=tmpdir,
+            )
+            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
+            self.assertTrue(
+                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
+            )
+
+
 if __name__ == "__main__":
-    pass
+    unittest.main()
