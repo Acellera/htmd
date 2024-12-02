@@ -223,7 +223,7 @@ def buildMembrane(
     ratiolower,
     waterbuff=20,
     platform="CUDA",
-    minimize=1000,
+    minimize=0,
     equilibrate=None,
     outdir=None,
     lipidf=None,
@@ -287,7 +287,10 @@ def buildMembrane(
     if isinstance(equilibrate, bool):
         raise ValueError("equilibrate must be a float or None")
 
-    if equilibrate is not None:
+    equilibrate = equilibrate if equilibrate is not None else 0
+    minimize = minimize if minimize is not None else 0
+
+    if equilibrate > 0 or minimize > 0:
         build = True
 
     if lipidf is None:
@@ -345,12 +348,10 @@ def buildMembrane(
         smemb.write(os.path.join(outdir, "structure.pdb"))
         return smemb
 
-    if equilibrate is not None or minimize is not None:
+    if equilibrate > 0 or minimize > 0:
         from shutil import move
         import yaml
         from acemd import acemd
-
-        equilibrate = equilibrate if equilibrate is not None else 0
 
         equildir = os.path.join(outdir, "equil")
         os.makedirs(equildir, exist_ok=True)
@@ -383,13 +384,17 @@ def buildMembrane(
         }
         with open(os.path.join(equildir, "input.yaml"), "w") as f:
             yaml.dump(input_dict, f)
-        acemd(equildir, platform="CPU")
+        acemd(equildir, platform=platform)
 
-        res = Molecule(os.path.join(outdir, "structure.prmtop"))
-        res.read(os.path.join(equildir, "output.coor"))
-        res.read(os.path.join(equildir, "output.xsc"))
-        res.wrap("lipids", guessBonds=False)
-        res.center()
+        if equilibrate > 0:
+            res = Molecule(os.path.join(outdir, "structure.prmtop"))
+            res.read(os.path.join(equildir, "output.coor"))
+            res.read(os.path.join(equildir, "output.xsc"))
+            res.wrap("lipids", guessBonds=False)
+        else:
+            res = Molecule(os.path.join(outdir, "structure.prmtop"))
+            res.read(os.path.join(equildir, "minimized.coor"))
+
         move(
             os.path.join(outdir, "structure.pdb"),
             os.path.join(outdir, "starting_structure.pdb"),
@@ -426,9 +431,48 @@ class _TestBuildMembrane(unittest.TestCase):
                 [20, 20],
                 ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
                 ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
+                equilibrate=None,
+                minimize=0,
+                outdir=tmpdir,
+                platform="CPU",
+            )
+            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
+            self.assertFalse(
+                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
+            )
+
+    def test_build_membrane_minimize(self):
+        import tempfile
+        import os
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            buildMembrane(
+                [20, 20],
+                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
+                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
+                equilibrate=None,
+                minimize=100,
+                outdir=tmpdir,
+                platform="CPU",
+            )
+            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
+            self.assertTrue(
+                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
+            )
+
+    def test_build_membrane_equil(self):
+        import tempfile
+        import os
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            buildMembrane(
+                [20, 20],
+                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
+                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
                 equilibrate=0.01,
                 minimize=100,
                 outdir=tmpdir,
+                platform="CPU",
             )
             self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
             self.assertTrue(
