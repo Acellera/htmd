@@ -11,7 +11,7 @@ aiming to solve the data generation and analysis problem and increase reproducib
 
 ## Licensing
 
-HTMD Community Edition is free to use for not-for-profit work(see HTMD_LICENCE.txt). Contact Acellera
+HTMD Community Edition is free to use for not-for-profit work(see LICENSE). Contact Acellera
 [www.acellera.com/contact](https://www.acellera.com/contact/) for information on the full version of HTMD Pro or if you need a different license.
 
 ## Download HTMD

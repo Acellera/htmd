@@ -15,7 +15,7 @@ with open(dep_file, "r") as f:
     deps = [line for line in f if not line.startswith("#") and len(line.strip())]
 
 # Fix conda meta.yaml
-with open("package/htmd/meta.yaml", "r") as f:
+with open("package/htmd/recipe_template.yaml", "r") as f:
     text = f.read()
 
 text = text.replace("BUILD_VERSION_PLACEHOLDER", __version__)
@@ -25,5 +25,5 @@ text = text.replace(
     "".join(["    - {}\n".format(dep.strip()) for dep in deps]),
 )
 
-with open("package/htmd/meta.yaml", "w") as f:
+with open("package/htmd/recipe.yaml", "w") as f:
     f.write(text)

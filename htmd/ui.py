@@ -76,7 +76,11 @@ import shutil
 from glob import glob
 from sklearn.cluster import MiniBatchKMeans
 
-if not (os.getenv("HTMD_NONINTERACTIVE")):
+if (
+    not (os.getenv("HTMD_NONINTERACTIVE"))
+    and (not os.getenv("CI"))
+    and (not os.getenv("APPTAINER_CONTAINER"))
+):
     htmd_show_news()
     compareVersions()
     htmd_registration()

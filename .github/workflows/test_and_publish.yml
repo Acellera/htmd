@@ -15,7 +15,7 @@ jobs:
             "macos-13",
             "windows-2019",
           ]
-        python-version: ["3.9", "3.10"] #, "3.11"] No ACEMD for 3.11 yet
+        python-version: ["3.9", "3.10", "3.11"]
 
     defaults: # Needed for conda
       run:
@@ -33,21 +33,11 @@ jobs:
           channels: acellera,conda-forge,defaults
 
       - name: Install Linux HTMD conda deps
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os != 'windows-2019'
         run: |
           conda install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
 
-      - name: Install MacOS HTMD conda deps
-        if: matrix.os == 'macos-latest'
-        run: |
-          conda install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
-
-      - name: Install MacOS HTMD conda deps
-        if: matrix.os == 'macos-13'
-        run: |
-          conda install --file package/htmd/DEPENDENCIES_MAC python=${{ matrix.python-version }} -y
-
-      - name: Install Windows HTMD conda deps
+      - name: Install Linux HTMD conda deps
         if: matrix.os == 'windows-2019'
         run: |
           conda install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
@@ -83,52 +73,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [
-            "ubuntu-latest",
-            # "macos-latest",
-            "macos-13",
-            "windows-2019",
-          ]
-        python-version: ["3.9", "3.10", "3.11"]
+        os: ["ubuntu-latest"]
+        python-version: ["3.9"]
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: conda-incubator/setup-miniconda@v3
         with:
-          activate-environment: writedeps
+          activate-environment: test
           python-version: ${{ matrix.python-version }}
           channels: acellera,conda-forge,defaults
 
       - name: Dump Linux dependencies yaml file
-        if: matrix.os == 'ubuntu-latest'
         run: |
           pip install versioneer==0.28
           python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES
 
-      - name: Dump MacOS dependencies yaml file
-        if: matrix.os == 'macos-latest'
-        run: |
-          pip install versioneer==0.28
-          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_MAC
-
-      - name: Dump MacOS dependencies yaml file
-        if: matrix.os == 'macos-13'
-        run: |
-          pip install versioneer==0.28
-          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_MAC
-
-      - name: Dump Windows dependencies yaml file
-        if: matrix.os == 'windows-2019'
-        run: |
-          pip install versioneer==0.28
-          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_WIN
-
       - name: Build htmd conda package
         run: |
-          conda install anaconda-client conda-build python=${{ matrix.python-version }} boa
-          conda mambabuild --python ${{ matrix.python-version }} package/htmd --output-folder ./pkg/ --no-include-recipe --no-anaconda-upload -c acellera -c conda-forge
+          conda install anaconda-client rattler-build python=${{ matrix.python-version }}
+          rattler-build build --recipe ./package/htmd/recipe.yaml --output-dir /tmp/pkg/ --no-include-recipe -c acellera -c conda-forge
 
       - name: Upload to conda
         run: |
-          anaconda -t ${{ secrets.ANACONDA_TOKEN_BASIC }} upload -u acellera ./pkg/*/htmd-*.tar.bz2
+          anaconda -t ${{ secrets.ANACONDA_TOKEN_BASIC }} upload -u acellera ./pkg/noarch/htmd-*.conda
