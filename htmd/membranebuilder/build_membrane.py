@@ -417,6 +417,13 @@ def _findLeastAreaLipid(folder):
         maxdist.append(dists.max())
     return ff[np.argmin(maxdist)], np.min(maxdist)
 
+from htmd.builder.amber import _findTeLeap
+try:
+    _findTeLeap()
+    tleap_installed = True
+except Exception:
+    tleap_installed = False
+
 
 class _TestBuildMembrane(unittest.TestCase):
     def test_build_membrane(self):
@@ -438,6 +445,9 @@ class _TestBuildMembrane(unittest.TestCase):
                 os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
             )
 
+    @unittest.skipIf(
+        not tleap_installed, "teLeap is not installed. Cannot test"
+    )
     def test_build_membrane_minimize(self):
         import tempfile
         import os
@@ -457,6 +467,9 @@ class _TestBuildMembrane(unittest.TestCase):
                 os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
             )
 
+    @unittest.skipIf(
+        not tleap_installed, "teLeap is not installed. Cannot test"
+    )
     def test_build_membrane_equil(self):
         import tempfile
         import os
