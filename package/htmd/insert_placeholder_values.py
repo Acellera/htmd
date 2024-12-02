@@ -1,6 +1,7 @@
 import traceback
 import versioneer
 import yaml
+import sys
 
 dep_file = sys.argv[1]
 
@@ -12,7 +13,7 @@ except Exception:
     __version__ = "0"
 
 with open(dep_file, "r") as f:
-    deps = [line.strip() for line in f if not line.startswith("#")]
+    deps = [line.strip() for line in f if not line.startswith("#") and len(line.strip()) > 0]
 
 for i, dep in enumerate(deps):
     parts = [part.strip() for part in dep.split("#")]
