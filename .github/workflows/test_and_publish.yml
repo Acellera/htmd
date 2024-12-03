@@ -37,7 +37,7 @@ jobs:
         run: |
           conda install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
 
-      - name: Install Linux HTMD conda deps
+      - name: Install Windows HTMD conda deps
         if: matrix.os == 'windows-2019'
         run: |
           conda install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
@@ -86,9 +86,16 @@ jobs:
           channels: acellera,conda-forge,defaults
 
       - name: Dump Linux dependencies yaml file
+        if: matrix.os != 'windows-2019'
         run: |
           pip install versioneer==0.28
           python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES
+
+      - name: Dump Windows dependencies yaml file
+        if: matrix.os == 'windows-2019'
+        run: |
+          pip install versioneer==0.28
+          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_WIN
 
       - name: Build htmd conda package
         run: |
