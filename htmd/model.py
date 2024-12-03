@@ -1095,10 +1095,25 @@ class Model(object):
 
         Parameters
         ----------
+        lags: list, optional
+            List of lag times to test
+        minlag : int, optional
+            Minimum lag time to test. Used if lags is None. By default it will
+            use 10 if maxlag is greater than 20, otherwise it will use 2.
+        maxlag : int, optional
+            Maximum lag time to test. Used if lags is None. By default it will
+            use the mode of the trajectory lengths.
+        numlags : int, optional
+            Number of lag times to test between minlag and maxlag. Used if lags is None.
+        units : str, optional
+            Units of the lag times. By default it will use frames.
         plot : bool
             If the method should display the plot of the CK test
         save : str
             Path of the file in which to save the figure
+        errors : int, optional
+            Number of Bayesian samples to use for the error bars. If set to None,
+            it will not plot error bars and use a Maximum Likelihood MSM.
         """
         from deeptime.plots.chapman_kolmogorov import plot_ck_test
         from matplotlib import pylab as plt
