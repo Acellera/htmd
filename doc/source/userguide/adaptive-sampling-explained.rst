@@ -101,17 +101,6 @@ simulations cannot use a velocity file. Velocities are therefore
 reinitialized to the Maxwell Boltzmann distribution at the given
 temperature.
 
-E.g. if setting up the simulations with the :class:`~htmd.protocols.production_v6.Production` class:
-
-.. code:: python
-
-    from htmd.protocols.production_v6 import Production
-    md = Production()
-    md.adaptive = True
-    [...]
-
-or directly modifying the ACEMD ``input`` file of the simulations and
-removing the binvelocities line.
 
 Adaptive script example
 -----------------------

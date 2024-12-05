@@ -20,7 +20,7 @@ logger.warning(
 
 
 class Production(ProtocolInterface):
-    """Production protocol v6
+    """DEPRECATED:Production protocol v6
 
     Production protocol for globular and membrane proteins. You can optionally define a flatbottom potential box and
     atom constraints for the production run.

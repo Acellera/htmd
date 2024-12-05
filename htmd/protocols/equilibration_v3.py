@@ -19,7 +19,7 @@ logger.warning(
 
 
 class Equilibration(ProtocolInterface):
-    """Equilibration protocol v3
+    """DEPRECATED: Equilibration protocol v3
 
     Equilibration protocol for globular and membrane proteins
     Supporst extra restraints like a flatbottom potential box to retain a ligand

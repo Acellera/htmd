@@ -38,4 +38,4 @@ Contents:
 
     Queues <../jobqueues/jobqueues.rst>
     Adaptive sampling <adaptive>
-    State-of-the-art protocols for molecular simulations <htmd.protocols>
+    State-of-the-art protocols for molecular simulations <acemd.protocols>
