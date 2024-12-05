@@ -3,3 +3,12 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+logger.warning(
+    "The mdengine module is deprecated and will be removed in a future release. "
+    "Please refer to the MD tutorials of HTMD for the latest MD protocols."
+)

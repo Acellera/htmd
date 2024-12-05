@@ -8,9 +8,15 @@ from protocolinterface import ProtocolInterface, val
 from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
 import os
 import numpy as np
+import unittest
 import logging
 
 logger = logging.getLogger(__name__)
+
+logger.warning(
+    "Production v6 is deprecated and will be removed in a future release. "
+    "Please refer to the MD tutorials of HTMD for the latest production protocols."
+)
 
 
 class Production(ProtocolInterface):
@@ -368,9 +374,6 @@ class Production(ProtocolInterface):
         self.constraints[atomselect] = factor
 
 
-import unittest
-
-
 class _TestProduction(unittest.TestCase):
     def _cutfirstline(self, infile, outfile):
         # Cut out the first line of prmtop which has a build date in it
@@ -415,7 +418,6 @@ class _TestProduction(unittest.TestCase):
     def test_acemd3(self):
         from htmd.util import tempname
         from htmd.home import home
-        from glob import glob
         import os
 
         pd = Production()
@@ -447,14 +449,12 @@ class _TestProduction(unittest.TestCase):
                 "test-protocols", "production", "acemd3", "protLig", "prerun"
             )
         )
-        files = [os.path.basename(f) for f in glob(os.path.join(refdir, "*"))]
         self._compareResultFolders(refdir, tmpdir, "protLig")
 
     @unittest.skipUnless("ACE3ARG" in os.environ, "Untrusted PR")
     def test_run_water(self):
         from htmd.util import tempname
         from htmd.home import home
-        from glob import glob
         from subprocess import check_output
         import subprocess
         import shutil

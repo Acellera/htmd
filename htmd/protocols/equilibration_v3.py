@@ -3,8 +3,7 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from htmd.mdengine.acemd.acemd import Acemd, _Restraint, GroupRestraint, AtomRestraint
-from htmd.config import _config
+from htmd.mdengine.acemd.acemd import Acemd, _Restraint, AtomRestraint
 from protocolinterface import ProtocolInterface, val
 import os
 import numpy as np
@@ -12,6 +11,11 @@ import unittest
 import logging
 
 logger = logging.getLogger(__name__)
+
+logger.warning(
+    "Equilibration v3 is deprecated and will be removed in a future release. "
+    "Please refer to the MD tutorials of HTMD for the latest equilibration protocols."
+)
 
 
 class Equilibration(ProtocolInterface):
