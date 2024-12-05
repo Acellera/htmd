@@ -229,6 +229,7 @@ def dock(
             scoring.append(_parseScoring(ligf))
             pose = Molecule(ligf)
             pose.viewname = f"Pose {i}"
+            pose.resname[:] = ligand.resname[0]
 
             gm = isomorphism.GraphMatcher(lig_g, pose.toGraph())
             if not gm.is_isomorphic():
