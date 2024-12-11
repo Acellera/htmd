@@ -1128,12 +1128,9 @@ class Model(object):
         for lag in lags:
             models.append(self._get_model(statelist, lag, bayesian_samples=errors))
 
-        ck_test = self.msm.ck_test(models, n_metastable_sets=self.macronum)
-        plot_ck_test(ck_test, legend=True)
+        res = models[0].ck_test(models, n_metastable_sets=self.macronum)
+        plot_ck_test(res, legend=True)
 
-        # msm = deepcopy(self.msm)
-        # ck = msm.cktest(self.macronum, n_jobs=njobs)
-        # fig, axes = plot_cktest(ck)
         if save is not None:
             plt.savefig(save, dpi=300, bbox_inches="tight", pad_inches=0.2)
         if plot:
