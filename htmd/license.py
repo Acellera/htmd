@@ -50,8 +50,14 @@ def _check_registration(product):
         data["code"] = data["ret"]
 
     # Send the registration data
-    url = "https://registration.acellera.com/check"
-    res = requests.post(url, data, timeout=10)
+    try:
+        url = "https://registration.acellera.com/check"
+        res = requests.post(url, data, timeout=10)
+    except Exception as e:
+        print(
+            f"Could not contact registration server: {e}. Registration is not approved."
+        )
+        return False
 
     # Check the response
     if res.status_code == 200:
