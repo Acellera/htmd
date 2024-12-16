@@ -781,7 +781,7 @@ def combine(prmlist, outfile):
                 myfile + " file does not exist. Cannot create combined parameter file."
             )
         fn = os.path.basename(myfile)
-        with open(myfile, "r") as fh:
+        with open(myfile, "r", encoding="utf-8") as fh:
             context = 0
             for line in fh:
                 if re.search(r"^ATOMS", line):
