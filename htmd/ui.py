@@ -6,7 +6,7 @@
 import warnings
 import htmd.home
 from htmd.session import htmdsave, htmdload
-from htmd.simlist import simlist, simfilter, simmerge
+from htmd.simlist import simlist, simfilter, simmerge, Sim
 from htmd.metricdata import MetricData
 from moleculekit.projections.metricdistance import (
     MetricDistance,

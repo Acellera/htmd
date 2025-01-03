@@ -3,6 +3,7 @@ HTMD can handle a large amount of simulations.
 Simulation lists allow to create a simple list containing all relevant information about the simulations to later
 perform any type of analysis.
 """
+
 # (c) 2015-2022 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
@@ -42,45 +43,68 @@ class Frame(object):
         self.frame = frame
 
     def __repr__(self):
-        return "sim = {}\npiece = {}\nframe = {}".format(
-            self.sim, self.piece, self.frame
-        )
+        return f"sim = {self.sim}\npiece = {self.piece}\nframe = {self.frame}"
 
 
 class Sim(object):
-    """Information class for a single simulation.
+    """Information on a single simulation trajectory.
 
-    Do not use directly. Objects of this class are constructed by the :func:`simlist` and :func:`simfilter` functions.
-    This class is used for storing information on simulations. This information includes the path to the simulation,
+    This class is used for storing information related to simulations. This information includes the path to the simulation,
     the path to a structure file (pdb) which corresponds to the simulation, the folder containing the input files used
     to generate the simulation (useful for adaptive), the parent of the simulation (if it was filtered it will point to
     the original simulation) and a unique simulation id.
-
-    Attributes
-    ----------
-    simid : int
-        A unique simulation ID
-    parent : :class:`Sim <htmd.simlist.Sim>` object
-        The parent of the simulations
-    input : str
-        The path to the input folder which generated this simulation
-    trajectory : list
-        A list of trajectory files
-    molfile : str
-        The path to the structural information about the simulation. Usually a PDB file
-    numframes : list
-        Number of frames in trajectories
     """
 
-    # __slots__ = ['simid', 'parent', 'input', 'trajectory', 'molfile']
+    def __init__(
+        self,
+        trajf,
+        topology=None,
+        inputf=None,
+        _simid=None,
+        _parent=None,
+        _input=None,
+        _trajectory=None,
+        _molfile=None,
+        _numframes=None,
+    ):
+        import uuid
+        from htmd.util import ensurelist
 
-    def __init__(self, simid, parent, input, trajectory, molfile, numframes=None):
-        self.simid = simid
-        self.parent = parent
-        self.input = input
-        self.trajectory = trajectory
-        self.molfile = molfile
-        self.numframes = numframes
+        if trajf is not None:
+            if os.path.isdir(trajf):
+                _trajectory = _autoDetectTrajectories(trajf)
+            elif os.path.isfile(trajf):
+                _trajectory = [trajf]
+            elif isinstance(trajf, (list, tuple, np.ndarray)):
+                _trajectory = [f for f in trajf]
+            else:
+                raise ValueError(f"Invalid input structure: {trajf}")
+
+            if topology is None:
+                if os.path.isfile(trajf):
+                    trajf = os.path.dirname(os.path.abspath(trajf))
+                _molfile = _autoDetectTopology(trajf)
+            else:
+                if os.path.isdir(topology):
+                    _molfile = _autoDetectTopology(topology)
+                else:
+                    _molfile = ensurelist(topology)
+
+            if inputf is not None:
+                _input = inputf
+            else:
+                _input = os.path.dirname(os.path.abspath(_molfile[0]))
+
+            _numframes = [_readNumFrames(f) for f in _trajectory]
+            if _simid is None:
+                _simid = str(uuid.uuid4())
+
+        self.simid = str(_simid)
+        self.parent = _parent
+        self.input = _input
+        self.trajectory = _trajectory
+        self.molfile = _molfile
+        self.numframes = _numframes
 
     def toHDF5(self, h5group: h5py.Group):
         from moleculekit.util import ensurelist
@@ -96,27 +120,25 @@ class Sim(object):
 
     @staticmethod
     def fromHDF5(h5group: h5py.Group):
-        self = Sim(None, None, None, None, None)
-        self.simid = int(h5group.attrs["simid"])
-        self.input = [x.decode("utf-8") for x in h5group["input"]]
-        self.trajectory = [x.decode("utf-8") for x in h5group["trajectory"]]
-        self.molfile = [x.decode("utf-8") for x in h5group["molfile"]]
-        self.numframes = list(h5group["numframes"])
-        if "parent" in h5group:
-            self.parent.fromHDF5(h5group["parent"])
-        return self
+        return Sim(
+            trajf=None,
+            _simid=str(h5group.attrs["simid"]),
+            _input=[x.decode("utf-8") for x in h5group["input"]],
+            _trajectory=[x.decode("utf-8") for x in h5group["trajectory"]],
+            _molfile=[x.decode("utf-8") for x in h5group["molfile"]],
+            _numframes=list(h5group["numframes"]),
+            _parent=(
+                None if "parent" not in h5group else Sim.fromHDF5(h5group["parent"])
+            ),
+        )
 
     def __repr__(self):
         parent = self.parent
         if self.parent is not None:
             parent = self.parent.simid
-        return "\nsimid = {}\nparent = {}\ninput = {}\ntrajectory = {}\nmolfile = {}\nnumframes = {}\n".format(
-            self.simid,
-            parent,
-            self.input,
-            self.trajectory,
-            self.molfile,
-            self.numframes,
+        return (
+            f"\nsimid = {self.simid}\nparent = {parent}\ninput = {self.input}\ntrajectory = {self.trajectory}"
+            f"\nmolfile = {self.molfile}\nnumframes = {self.numframes}\n"
         )
 
     def __eq__(self, other):
@@ -138,23 +160,6 @@ class Sim(object):
         return deepcopy(self)
 
 
-class _simlist2(np.ndarray):
-    def __new__(cls, datafolders, topologies, inputfolders=None):
-        obj = simlist(datafolders, topologies, inputfolders).view(cls)
-        return obj
-
-    # def __array_finalize__(self, obj):
-    #     # see InfoArray.__array_finalize__ for comments
-    #     if obj is None: return
-    #     self.info = getattr(obj, 'info', None)
-
-    def numFrames(self):
-        return [x.numframes for x in self]
-
-    def append(self):
-        pass
-
-
 def simlist(datafolders, topologies, inputfolders=None):
     """Creates a list of simulations
 
@@ -164,7 +169,8 @@ def simlist(datafolders, topologies, inputfolders=None):
         A list of directories, each containing a single trajectory
     topologies : str list
         A list of topology files or folders containing a topology file corresponding to the trajectories in dataFolders.
-        Can also be a single string to a single structure which corresponds to all trajectories.
+        Can also be a single path to a single structure which corresponds to all trajectories.
+        If the single path is a folder, topology files will be auto-detected in that folder.
     inputfolders : optional, str list
         A list of directories, each containing the input files used to produce the trajectories in dataFolders
 
@@ -175,6 +181,7 @@ def simlist(datafolders, topologies, inputfolders=None):
 
     Examples
     --------
+    >>> simlist(glob('./test/data/*/'), './test/data/0/')
     >>> simlist(glob('./test/data/*/'), glob('./test/input/*/'), glob('./test/input/*/'))
     >>> simlist(glob('./test/data/*/'), glob('./test/input/*/*.pdb'), glob('./test/input/*/'))
     """
@@ -189,12 +196,12 @@ def simlist(datafolders, topologies, inputfolders=None):
     datafolders = ensurelist(datafolders)
     for folder in datafolders:
         if not os.path.isdir(folder):
-            raise NotADirectoryError("{}".format(folder))
+            raise NotADirectoryError(folder)
     if inputfolders:
         inputfolders = ensurelist(inputfolders)
         for folder in inputfolders:
             if not os.path.isdir(folder):
-                raise NotADirectoryError("{}".format(folder))
+                raise NotADirectoryError(folder)
 
     # I need to match the simulation names inside the globs given. The
     # reason is that there can be more input folders in the glob than in
@@ -213,7 +220,7 @@ def simlist(datafolders, topologies, inputfolders=None):
     molnames = dict()
     for mol in topologies:
         if not os.path.exists(mol):
-            raise FileNotFoundError("File {} does not exist".format(mol))
+            raise FileNotFoundError(f"File {mol} does not exist")
         molnames[_simName(mol)] = mol
 
     if inputfolders:
@@ -237,7 +244,7 @@ def simlist(datafolders, topologies, inputfolders=None):
         if len(topologies) > 1:
             if k not in molnames:
                 raise FileNotFoundError(
-                    "Did not find molfile with folder name " + k + " in the given glob"
+                    f"Did not find molfile with folder name {k} in the given glob"
                 )
             molfile = molnames[k]
         else:
@@ -250,19 +257,20 @@ def simlist(datafolders, topologies, inputfolders=None):
         if inputfolders:
             if k not in inputnames:
                 raise FileNotFoundError(
-                    "Did not find input with folder name " + k + " in the given glob"
+                    f"Did not find input with folder name {k} in the given glob"
                 )
             inputf = inputnames[k]
 
         numframes = [_readNumFrames(f) for f in trajectories]
         sims.append(
             Sim(
-                simid=i,
-                parent=None,
-                input=inputf,
-                trajectory=trajectories,
-                molfile=molfile,
-                numframes=numframes,
+                trajf=None,
+                _simid=i,
+                _parent=None,
+                _input=inputf,
+                _trajectory=trajectories,
+                _molfile=molfile,
+                _numframes=numframes,
             )
         )
         i += 1
@@ -350,7 +358,7 @@ def _filtSim(i, sims, outFolder, filterSel):
     if not path.exists(directory):
         makedirs(directory)
 
-    logger.debug("Processing trajectory " + name)
+    logger.debug(f"Processing trajectory {name}")
 
     fmolfile = [
         path.join(outFolder, "filtered.psf"),
@@ -361,12 +369,13 @@ def _filtSim(i, sims, outFolder, filterSel):
         ftrajectory = _autoDetectTrajectories(path.join(outFolder, name))
         numframes = _getNumFrames(sims[i], ftrajectory)
         return Sim(
-            simid=sims[i].simid,
-            parent=sims[i],
-            input=None,
-            trajectory=ftrajectory,
-            molfile=fmolfile,
-            numframes=numframes,
+            trajf=None,
+            _simid=sims[i].simid,
+            _parent=sims[i],
+            _input=None,
+            _trajectory=ftrajectory,
+            _molfile=fmolfile,
+            _numframes=numframes,
         )
 
     try:
@@ -374,9 +383,7 @@ def _filtSim(i, sims, outFolder, filterSel):
 
         mol = Molecule(sims[i].molfile)
     except Exception as e:
-        logger.warning(
-            "Error! Skipping simulation " + name + " due to error: " + str(e)
-        )
+        logger.warning(f"Error! Skipping simulation {name} due to error: {e}")
         return
 
     sel = mol.atomselect(filterSel)
@@ -385,7 +392,7 @@ def _filtSim(i, sims, outFolder, filterSel):
         try:
             mol.read(traj[j])
         except IOError as e:
-            logger.warning("{}, skipping trajectory".format(e))
+            logger.warning(f"{e}, skipping trajectory")
             break
 
         mol.write(outtraj[j], sel)
@@ -393,12 +400,13 @@ def _filtSim(i, sims, outFolder, filterSel):
     ftrajectory = _autoDetectTrajectories(path.join(outFolder, name))
     numframes = _getNumFrames(sims[i], ftrajectory)
     return Sim(
-        simid=sims[i].simid,
-        parent=sims[i],
-        input=None,
-        trajectory=ftrajectory,
-        molfile=fmolfile,
-        numframes=numframes,
+        trajf=None,
+        _simid=sims[i].simid,
+        _parent=sims[i],
+        _input=None,
+        _trajectory=ftrajectory,
+        _molfile=fmolfile,
+        _numframes=numframes,
     )
 
 
@@ -415,7 +423,7 @@ def _readNumFrames(filepath):
     filepath = os.path.abspath(filepath)
     filedir = os.path.dirname(filepath)
     basename = os.path.basename(filepath)
-    numframefile = os.path.join(filedir, ".{}.numframes".format(basename))
+    numframefile = os.path.join(filedir, f".{basename}.numframes")
     numframes = None
     if os.path.exists(numframefile):
         with open(numframefile, "r") as f:
@@ -423,8 +431,7 @@ def _readNumFrames(filepath):
                 numframes = int(f.readline())
             except Exception:
                 raise RuntimeError(
-                    "{} does not contain an integer number of frames. "
-                    "Please delete this file.".format(numframefile)
+                    f"{numframefile} does not contain an integer number of frames. Please delete this file."
                 )
     return numframes
 
@@ -434,9 +441,9 @@ def _renameSims(trajectory, simname, outfolder):
     outtraj = list()
 
     for t in range(0, len(trajectory)):
-        (tmp, fname) = path.split(trajectory[t])
+        (_, fname) = path.split(trajectory[t])
         (fname, ext) = path.splitext(fname)
-        outname = path.join(outfolder, simname, fname + ".filtered{}".format(ext))
+        outname = path.join(outfolder, simname, f"{fname}.filtered{ext}")
 
         if not path.isfile(outname) or (
             path.getmtime(outname) < path.getmtime(trajectory[t])
@@ -455,9 +462,7 @@ def _filterTopology(sim, outfolder, filtsel):
 
         mol = Molecule(sim.molfile)
     except IOError as e:
-        raise RuntimeError(
-            "simFilter: {}. Cannot read topology file {}".format(e, sim.molfile)
-        )
+        raise RuntimeError(f"simFilter: {e}. Cannot read topology file {sim.molfile}")
 
     if (
         mol.coords.size == 0
@@ -472,15 +477,13 @@ def _filterTopology(sim, outfolder, filtsel):
         extensions.append(os.path.splitext(m)[1][1:])
 
     for ext in list(set(extensions)):
-        filttopo = path.join(outfolder, "filtered.{}".format(ext))
+        filttopo = path.join(outfolder, f"filtered.{ext}")
         if not path.isfile(filttopo):
             try:
                 mol.write(filttopo, filtsel)
             except Exception as e:
                 logger.warning(
-                    "Filtering was not able to write {} due to error: {}".format(
-                        filttopo, e
-                    )
+                    f"Filtering was not able to write {filttopo} due to error: {e}"
                 )
 
 
@@ -489,39 +492,42 @@ def _autoDetectTrajectories(folder):
     import natsort
 
     for tt in _TRAJECTORY_READERS:
-        if tt in (
-            "xsc",
-        ):  # Some trajectory readers don't really load trajectories like xsc
+        if tt in ("xsc",):
+            # Some trajectory readers don't actually load trajectories (i.e. xsc files)
             continue
-        trajectories = glob(path.join(folder, "*.{}".format(tt)))
+        trajectories = glob(path.join(folder, f"*.{tt}"))
         if len(trajectories) > 0:
             return natsort.natsorted(trajectories)
 
 
-__readers = list(_TOPOLOGY_READERS.keys())
-__defaultReaders = ["pdb", "prmtop", "psf"]
-__otherReaders = list(np.setdiff1d(__readers, __defaultReaders))
-__topotypes = (
-    __defaultReaders + __otherReaders
-)  # Prepending PDB, PSF, PRMTOP so that they are the default
-
-
 def _autoDetectTopology(folder):
     topo = {}
-    for tt in __topotypes:
-        files = glob(path.join(folder, "*.{}".format(tt)))
+    for tt in ("prmtop", "psf", "mae", "pdb"):
+        files = glob(path.join(folder, f"*.{tt}"))
         if len(files) > 0:
             if len(files) > 1:
                 logger.warning(
-                    'Multiple "{}" files were found in folder {}. '
-                    "Picking {} as the topology".format(tt, folder, files[0])
+                    f'Multiple "{tt}" files were found in folder {folder}. Picking {files[0]} as the topology'
                 )
             topo[tt] = files[0]
+            break
+
     if len(topo) == 0:
         raise RuntimeError(
-            "No topology file found in folder {}. "
-            "Supported extensions are {}".format(folder, list(_TOPOLOGY_READERS.keys()))
+            f"No topology file found in folder {folder}. "
+            f"Supported extensions are {list(_TOPOLOGY_READERS.keys())}"
         )
+
+    for tt in ("pdb", "coor"):
+        files = glob(path.join(folder, f"*.{tt}"))
+        if len(files) > 0:
+            if len(files) > 1:
+                logger.warning(
+                    f'Multiple "{tt}" files were found in folder {folder}. Picking {files[0]} as the topology'
+                )
+            topo[tt] = files[0]
+            break
+
     return list(topo.values())
 
 
@@ -576,6 +582,108 @@ class _TestSimlist(unittest.TestCase):
         assert x != sims[1]
         assert not isinstance(sims[0].molfile, list)
         assert _singleMolfile(sims)[0]
+
+    def test_autodetect(self):
+        from htmd.home import home
+        from htmd.projections.metric import _singleMolfile
+        from natsort import natsorted
+
+        datafolders = natsorted(
+            glob(path.join(home(dataDir="adaptive"), "data", "*", ""))
+        )
+        inputfolders = natsorted(
+            glob(path.join(home(dataDir="adaptive"), "input", "*"))
+        )
+        sims = []
+        for ff in zip(datafolders, inputfolders):
+            sims.append(Sim(ff[0], ff[1], ff[1]))
+
+        x = sims[0].copy()
+        assert x == sims[0]
+        assert x != sims[1]
+        assert len(sims[0].molfile) == 2
+        assert _singleMolfile(sims)[0]
+
+        sims2 = []
+        for ff in zip(datafolders, inputfolders):
+            sims2.append(Sim(ff[0], ff[1]))
+
+        for s1, s2 in zip(sims, sims2):
+            assert s1.parent == s2.parent
+            assert s1.input == s2.input
+            assert s1.trajectory == s2.trajectory
+            assert s1.molfile == s2.molfile
+            assert s1.numframes == s2.numframes
+
+    def test_sim(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(path.join(tmpdir, "test.pdb"), "w") as f:
+                f.write("fake")
+            with open(path.join(tmpdir, "test.psf"), "w") as f:
+                f.write("fake")
+            with open(path.join(tmpdir, "test.prmtop"), "w") as f:
+                f.write("fake")
+            with open(path.join(tmpdir, "test.mae"), "w") as f:
+                f.write("fake")
+            with open(path.join(tmpdir, "test.coor"), "w") as f:
+                f.write("fake")
+            for i in range(11):
+                with open(path.join(tmpdir, f"test_{i}.xtc"), "w") as f:
+                    f.write("fake")
+
+            # Passing a single directory
+            sim = Sim(tmpdir)
+            assert sim.molfile == [
+                path.join(tmpdir, "test.prmtop"),
+                path.join(tmpdir, "test.pdb"),
+            ]
+            assert sim.trajectory == [
+                path.join(tmpdir, f"test_{i}.xtc") for i in range(11)
+            ]
+            assert sim.input == tmpdir
+
+            # Passing same directory to all arguments
+            sim = Sim(tmpdir, tmpdir, tmpdir)
+            assert sim.molfile == [
+                path.join(tmpdir, "test.prmtop"),
+                path.join(tmpdir, "test.pdb"),
+            ]
+            assert sim.trajectory == [
+                path.join(tmpdir, f"test_{i}.xtc") for i in range(11)
+            ]
+            assert sim.input == tmpdir
+
+            # Passing single topology file and arbitrary input folder
+            sim = Sim(tmpdir, path.join(tmpdir, "test.pdb"), "/tmp")
+            assert sim.molfile == [path.join(tmpdir, "test.pdb")]
+            assert sim.trajectory == [
+                path.join(tmpdir, f"test_{i}.xtc") for i in range(11)
+            ]
+            assert sim.input == "/tmp"
+
+        # Coor file reading
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(path.join(tmpdir, "test.psf"), "w") as f:
+                f.write("fake")
+            with open(path.join(tmpdir, "test.mae"), "w") as f:
+                f.write("fake")
+            with open(path.join(tmpdir, "test.coor"), "w") as f:
+                f.write("fake")
+            for i in range(11):
+                with open(path.join(tmpdir, f"test_{i}.xtc"), "w") as f:
+                    f.write("fake")
+
+            sim = Sim(tmpdir)
+            assert sim.molfile == [
+                path.join(tmpdir, "test.psf"),
+                path.join(tmpdir, "test.coor"),
+            ]
+            assert sim.trajectory == [
+                path.join(tmpdir, f"test_{i}.xtc") for i in range(11)
+            ]
+            assert sim.input == tmpdir
 
 
 if __name__ == "__main__":
