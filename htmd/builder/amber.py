@@ -1204,7 +1204,7 @@ def _defaultProteinCaps(mol):
         if len(np.unique(mol.resid[mol.segid == s])) < 10:
             logger.warning(
                 f"Segment {s} consists of a peptide with less than 10 residues. It will not be capped by "
-                "default. If you want to cap it use the caps argument of amber.build to manually define caps"
+                "default. If you want to cap it use the caps argument of amber.build to manually define caps "
                 "for all segments."
             )
             continue
