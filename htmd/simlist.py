@@ -71,12 +71,12 @@ class Sim(object):
         from htmd.util import ensurelist
 
         if trajf is not None:
-            if os.path.isdir(trajf):
+            if isinstance(trajf, (list, tuple, np.ndarray)):
+                _trajectory = [f for f in trajf]
+            elif os.path.isdir(trajf):
                 _trajectory = _autoDetectTrajectories(trajf)
             elif os.path.isfile(trajf):
                 _trajectory = [trajf]
-            elif isinstance(trajf, (list, tuple, np.ndarray)):
-                _trajectory = [f for f in trajf]
             else:
                 raise ValueError(f"Invalid input structure: {trajf}")
 
@@ -85,10 +85,12 @@ class Sim(object):
                     trajf = os.path.dirname(os.path.abspath(trajf))
                 _molfile = _autoDetectTopology(trajf)
             else:
-                if os.path.isdir(topology):
+                if isinstance(topology, (list, tuple, np.ndarray)):
+                    _molfile = [f for f in topology]
+                elif os.path.isdir(topology):
                     _molfile = _autoDetectTopology(topology)
                 else:
-                    _molfile = ensurelist(topology)
+                    _molfile = [topology]
 
             if inputf is not None:
                 _input = inputf
