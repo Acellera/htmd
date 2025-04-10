@@ -9,10 +9,13 @@ import os.path
 from htmd.config import _config
 import htmd.home
 import logging.config
-from htmd import _version
+from importlib.metadata import version, PackageNotFoundError
 
 
-__version__ = _version.get_versions()["version"]
+try:
+    __version__ = version("htmd")
+except PackageNotFoundError:
+    pass
 
 try:
     logging.config.fileConfig(

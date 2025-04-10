@@ -1,19 +1,19 @@
-import traceback
-import versioneer
 import yaml
 import sys
-
-dep_file = sys.argv[1]
+import setuptools_scm
 
 try:
-    __version__ = versioneer.get_version()
+    __version__ = setuptools_scm.get_version()
 except Exception:
-    print(traceback.format_exc())
     print("Could not get version. Defaulting to version 0")
     __version__ = "0"
 
+dep_file = sys.argv[1]
+
 with open(dep_file, "r") as f:
-    deps = [line.strip() for line in f if not line.startswith("#") and len(line.strip()) > 0]
+    deps = [
+        line.strip() for line in f if not line.startswith("#") and len(line.strip()) > 0
+    ]
 
 for i, dep in enumerate(deps):
     parts = [part.strip() for part in dep.split("#")]
