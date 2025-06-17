@@ -13,7 +13,7 @@ jobs:
             "ubuntu-latest",
             # "macos-latest",
             "macos-13",
-            "windows-2019",
+            "windows-2022",
           ]
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
@@ -33,17 +33,17 @@ jobs:
           channels: acellera,conda-forge,defaults
 
       - name: Install Linux HTMD conda deps
-        if: matrix.os != 'windows-2019'
+        if: matrix.os != 'windows-2022'
         run: |
           conda install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
 
       - name: Install Windows HTMD conda deps
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         run: |
           conda install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
 
       - name: Override ambertools version for the tests. To be removed when python 3.9 reaches EOL
-        if: matrix.os != 'windows-2019'
+        if: matrix.os != 'windows-2022'
         run: |
           conda install ambertools=23.6 -y
 
@@ -78,7 +78,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest", "windows-2019", "macos-13"]
+        os: ["ubuntu-latest", "windows-2022", "macos-13"]
         python-version: ["3.10"]
 
     steps:
@@ -91,13 +91,13 @@ jobs:
           channels: acellera,conda-forge,defaults
 
       - name: Dump Linux dependencies yaml file
-        if: matrix.os != 'windows-2019'
+        if: matrix.os != 'windows-2022'
         run: |
           pip install pyyaml "setuptools-scm>=8"
           python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES
 
       - name: Dump Windows dependencies yaml file
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         run: |
           pip install pyyaml "setuptools-scm>=8"
           python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_WIN
