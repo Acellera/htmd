@@ -88,7 +88,6 @@ def parameterizeNonCanonicalResidues(
     cifs,
     outdir,
     forcefield="GAFF2",
-    calculator=None,
     charge_model="AM1-BCC",
     is_nterm=False,
     is_cterm=False,
@@ -103,8 +102,6 @@ def parameterizeNonCanonicalResidues(
         Path to the output directory.
     forcefield : str, optional
         Force field to use for parameterization. Default is "GAFF2".
-    calculator : str, optional, choices: ["xTB", "AIMNet2", "ANI-1x", "ANI-2x", "ANI-1ccx", "None"]
-        Energy calculator to use for fitting dihedral profiles
     charge_model : str, optional, choices: ["AM1-BCC", "Gasteiger", "Espaloma", "ESP", "RESP-PSI4", "None"]
         Charge model to use for parameterization
     is_nterm : bool, optional
@@ -125,7 +122,6 @@ def parameterizeNonCanonicalResidues(
             mol,
             outdir,
             forcefield,
-            calculator,
             is_nterm=is_nterm,
             is_cterm=is_cterm,
             charge_model=charge_model,
@@ -133,16 +129,10 @@ def parameterizeNonCanonicalResidues(
 
 
 def _parameterize_non_canonical_residue(
-    mol,
-    outdir,
-    forcefield,
-    calculator,
-    charge_model,
-    is_nterm=False,
-    is_cterm=False,
+    mol, outdir, forcefield, charge_model, is_nterm=False, is_cterm=False
 ):
     try:
-        from parameterize.cli import main_parameterize, list_dihedrals
+        from parameterize.main import parameterize_molecule
     except ImportError:
         raise ImportError(
             "You are missing the parameterize library. It's only available for private installations. Please contact info@acellera.com"
@@ -165,68 +155,54 @@ def _parameterize_non_canonical_residue(
         cmol = xmol.copy()
         # So that CIF is written as smallmol instead of macromol
         cmol.resname[:] = resn
+        cmol.resid[:] = 1
+        cmol.write(os.path.join(tmpdir, f"{resn}.cif"))
 
-        dih = list_dihedrals(cmol, exclude_atoms=exclude_atoms, _logger=False)
-
-        # Delete pure backbone dihedrals to not reparameterize them and thus waste atomtype names and computation time
-        for dd in ("CH3-C-N-CA", "CA-C-N-CH3", "C-N-CA-C", "N-CA-C-N", "CA-C-N-CA"):
-            if dd in dih:
-                del dih[dd]
-
-        main_parameterize(
-            cmol,
-            forcefield=forcefield,
-            charge_type=charge_model,
-            min_type="mm",
-            dihed_fit_type="iterative",
-            dihed_opt_type="mm",
-            fit_dihedral=calculator is not None,
-            dihedrals=list(dih.values()),
-            calculator=calculator,
+        parameterize_molecule(
             outdir=tmpdir,
+            molfile=os.path.join(tmpdir, f"{resn}.cif"),
+            forcefield=forcefield,
+            minimizer="ffeval",
+            charge_type=charge_model,
+            keep_atomnames=True,
             exclude_atoms=exclude_atoms,
         )
-        shutil.copy(
-            glob(os.path.join(tmpdir, "parameters", "*", f"{resn}-orig.cif"))[0],
-            os.path.join(tmpdir, f"{resn}.cif"),
-        )
-        shutil.copy(
-            glob(os.path.join(tmpdir, "parameters", "*", f"{resn}.frcmod"))[0],
-            os.path.join(outdir, f"{resn}.frcmod"),
-        )
-        _post_process_parameterize(xmol, tmpdir, outdir, resn)
+
+        cifmol = Molecule(os.path.join(tmpdir, "parameters", f"{resn}-orig.cif"))
+        frcmod = os.path.join(tmpdir, "parameters", f"{resn}.frcmod")
+        shutil.copy(frcmod, outdir)
+        _post_process_parameterize(outdir, cifmol, frcmod, resn, refmol=xmol)
 
 
-def _post_process_parameterize(xmol, tmpdir, outdir, resn):
+def _post_process_parameterize(outdir, mol, frcmod, resn, refmol=None):
     from subprocess import call
     from collections import defaultdict
 
-    # TODO: Move this to parameterize (?)
-    mol = Molecule(os.path.join(tmpdir, f"{resn}.cif"))
-    fields = ("element",)
-    g1 = makeMolGraph(xmol, "all", fields)
-    g2 = makeMolGraph(mol, "all", fields)
-    _, _, matching = compareGraphs(
-        g1, g2, fields=fields, tolerance=0.5, returnmatching=True
-    )
-    for pp in matching:  # Rename atoms in reference molecule
-        mol.name[pp[0]] = xmol.name[pp[1]]
-        mol.formalcharge[pp[0]] = xmol.formalcharge[pp[1]]
-        mol.resname[pp[0]] = xmol.resname[pp[1]]
+    padding_atoms = np.zeros(mol.numAtoms, dtype=bool)
+    if refmol is not None:
+        # TODO: Move this to parameterize (?)
+        fields = ("element",)
+        g1 = makeMolGraph(refmol, "all", fields)
+        g2 = makeMolGraph(mol, "all", fields)
+        _, _, matching = compareGraphs(
+            g1, g2, fields=fields, tolerance=0.5, returnmatching=True
+        )
+        for pp in matching:  # Rename atoms in reference molecule
+            mol.name[pp[0]] = refmol.name[pp[1]]
+            mol.formalcharge[pp[0]] = refmol.formalcharge[pp[1]]
+            mol.resname[pp[0]] = refmol.resname[pp[1]]
+
+        padding_atoms[refmol.resname != resn] = True
 
     # Rename backbone atom types
-    backbone_at = {"N": "N", "H": "H", "CA": "CT", "HA": "H1", "C": "C", "O": "O"}
-    padding_atoms = np.zeros(mol.numAtoms, dtype=bool)
-    padding_atoms[xmol.resname != resn] = True
     original = defaultdict(list)
-
+    backbone_at = {"N": "N", "H": "H", "CA": "CT", "HA": "H1", "C": "C", "O": "O"}
     for key, val in backbone_at.items():
         sel = mol.name == key
         for at in mol.atomtype[sel]:
             original[at].append(val)
         mol.atomtype[sel] = val
 
-    frcmod = os.path.join(outdir, f"{resn}.frcmod")
     prm = parmed.amber.AmberParameterSet(frcmod)
 
     # Duplicate parameters for renamed atoms which don't exist in the backbone
@@ -234,73 +210,74 @@ def _post_process_parameterize(xmol, tmpdir, outdir, resn):
 
     # Remove unused parameters
     _clean_prm(prm, mol, list(backbone_at.values()), padding_atoms)
-    prm.write(frcmod)
+    prm.write(os.path.join(outdir, f"{resn}.frcmod"))
 
     # Remove the caps
     mol.remove(padding_atoms, _logger=False)
 
-    mol2file = os.path.join(tmpdir, f"{resn}.mol2")
-    mol.write(mol2file)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        mol2file = os.path.join(tmpdir, f"{resn}.mol2")
+        mol.write(mol2file)
 
-    acfile = os.path.join(tmpdir, f"{resn}_mod.ac")
-    call(
-        [
-            "antechamber",
-            "-fi",
-            "mol2",
-            "-fo",
-            "ac",
-            "-i",
-            mol2file,
-            "-o",
-            acfile,
-            "-dr",
-            "n",
-            "-j",
-            "0",
-            "-nc",
-            str(mol.formalcharge.sum()),
-            "-an",  # adjust atom names
-            "n",  # no
-            "-pf",
-            "y",
-        ]
-    )
+        acfile = os.path.join(tmpdir, f"{resn}_mod.ac")
+        call(
+            [
+                "antechamber",
+                "-fi",
+                "mol2",
+                "-fo",
+                "ac",
+                "-i",
+                mol2file,
+                "-o",
+                acfile,
+                "-dr",
+                "n",
+                "-j",
+                "0",
+                "-nc",
+                str(mol.formalcharge.sum()),
+                "-an",  # adjust atom names
+                "n",  # no
+                "-pf",
+                "y",
+            ]
+        )
 
-    mol_g = mol.toGraph()
-    n_idx = np.where(mol.name == "N")[0][0]
-    c_idx = np.where(mol.name == "C")[0][0]
-    backbone = nx.shortest_path(mol_g, source=n_idx, target=c_idx)
+        mol_g = mol.toGraph()
+        n_idx = np.where(mol.name == "N")[0][0]
+        c_idx = np.where(mol.name == "C")[0][0]
+        backbone = nx.shortest_path(mol_g, source=n_idx, target=c_idx)
 
-    mainchain = os.path.join(tmpdir, f"mainchain.{resn.lower()}")
-    with open(mainchain, "w") as f:
-        f.write("HEAD_NAME N\n")
-        f.write("TAIL_NAME C\n")
-        for bb_idx in backbone[1:-1]:
-            f.write(f"MAIN_CHAIN {mol.name[bb_idx]}\n")
-        f.write("PRE_HEAD_TYPE C\n")
-        f.write("POST_TAIL_TYPE N\n")
-        f.write(f"CHARGE {mol.formalcharge.sum():.1f}\n")
+        mainchain = os.path.join(tmpdir, f"mainchain.{resn.lower()}")
+        with open(mainchain, "w") as f:
+            f.write("HEAD_NAME N\n")
+            f.write("TAIL_NAME C\n")
+            for bb_idx in backbone[1:-1]:
+                f.write(f"MAIN_CHAIN {mol.name[bb_idx]}\n")
+            f.write("PRE_HEAD_TYPE C\n")
+            f.write("POST_TAIL_TYPE N\n")
+            f.write(f"CHARGE {mol.formalcharge.sum():.1f}\n")
 
-    prepi = os.path.join(outdir, f"{resn}.prepi")
-    call(
-        [
-            "prepgen",
-            "-i",
-            acfile,
-            "-o",
-            prepi,
-            "-f",
-            "prepi",
-            "-m",
-            mainchain,
-            "-rn",
-            resn,
-        ]
-    )
-    print("")  # Add a newline after the output of prepgen
+        prepi = os.path.join(outdir, f"{resn}.prepi")
+        call(
+            [
+                "prepgen",
+                "-i",
+                acfile,
+                "-o",
+                prepi,
+                "-f",
+                "prepi",
+                "-m",
+                mainchain,
+                "-rn",
+                resn,
+            ]
+        )
+        print("")  # Add a newline after the output of prepgen
 
-    _fix_prepi_atomname_capitalization(mol, prepi)
+        _fix_prepi_atomname_capitalization(mol, prepi)
 
 
 def _fix_prepi_atomname_capitalization(mol, prepi):
