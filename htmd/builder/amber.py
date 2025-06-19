@@ -995,8 +995,8 @@ def _build(
             for d in disulfide:
                 atoms1 = d[0].selectAtoms(mol, indexes=False)
                 atoms2 = d[1].selectAtoms(mol, indexes=False)
-                uqres1 = int(np.unique(mol.resid[atoms1]))
-                uqres2 = int(np.unique(mol.resid[atoms2]))
+                uqres1 = int(np.unique(mol.resid[atoms1])[0])
+                uqres2 = int(np.unique(mol.resid[atoms2])[0])
                 f.write(f"bond mol.{uqres1}.SG mol.{uqres2}.SG\n")
             f.write("\n")
 
