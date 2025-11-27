@@ -1,0 +1,45 @@
+#VARIABLES DECLARATION
+
+set input   input
+set output  output
+set structure   structure
+set parameters  parameters
+set temperature 298
+set runtimens 20
+
+amber 		on
+parmfile        parameters
+coordinates     $structure.pdb 
+bincoordinates  $input.coor
+#binvelocities   $input.vel
+#binindex        $input.idx
+temperature	$temperature
+
+extendedsystem	$input.xsc
+
+restart		off
+restartfreq     5000
+outputname      $output
+xtcfile         $output.xtc
+xtcfreq         5000
+
+timestep        4
+rigidbonds      all 
+hydrogenscale   4
+switching       on
+switchdist      7.5
+cutoff          9
+exclude         scaled1-4
+1-4scaling      0.83333
+
+langevin        on
+langevintemp    $temperature
+langevindamping 0.1
+
+pme             on
+pmegridspacing  1.0
+fullelectfrequency 2
+energyfreq      1000
+
+run 30000
+
