@@ -31,6 +31,7 @@ if (not hasattr(main, "__file__")) and (
     (not os.path.isfile(reg_file))
     or os.getenv("LICENCE_ACCEPTED") == "YES"
     or os.getenv("CI")
+    or os.getenv("APPTAINER_CONTAINER")
 ):
     print(
         "\nCopyright by Acellera Ltd. By executing you are accepting the License. In order to register, "
