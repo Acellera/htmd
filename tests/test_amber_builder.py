@@ -1,4 +1,4 @@
-from moleculekit.molecule import Molecule
+from moleculekit.molecule import Molecule, mol_equal
 from htmd.builder.amber import (
     build,
     defaultFf,
@@ -27,7 +27,7 @@ curr_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def _compareResultFolders(
-    compare, tmpdir, pid, ignore_ftypes=(".log", ".txt", ".frcmod")
+    compare, tmpdir, pid, ignore_ftypes=(".log", ".txt", ".frcmod", ".crd")
 ):
     import filecmp
 
@@ -38,18 +38,20 @@ def _compareResultFolders(
         with open(outfile, "w") as fout:
             fout.writelines(data[1:])
 
+    mol2 = Molecule(os.path.join(compare, "structure.prmtop"))
+    mol2.read(os.path.join(compare, "structure.pdb"))
+    mol = Molecule(os.path.join(tmpdir, "structure.prmtop"))
+    mol.read(os.path.join(tmpdir, "structure.pdb"))
+    assert mol_equal(mol, mol2, fieldPrecision={"coords": 2e-3})
+
     try:
         from ffevaluation.ffevaluate import FFEvaluate, loadParameters
 
         prm2 = loadParameters(os.path.join(compare, "structure.prmtop"))
-        mol2 = Molecule(os.path.join(compare, "structure.prmtop"))
-        mol2.read(os.path.join(compare, "structure.pdb"))
         ffev2 = FFEvaluate(mol2, prm2)
         energies2, _, _ = ffev2.calculate(mol2.coords)
 
         prm = loadParameters(os.path.join(tmpdir, "structure.prmtop"))
-        mol = Molecule(os.path.join(tmpdir, "structure.prmtop"))
-        mol.read(os.path.join(tmpdir, "structure.pdb"))
         ffev = FFEvaluate(mol, prm)
         energies, _, _ = ffev.calculate(mol.coords)
         ene_diff = np.abs(energies - energies2)
