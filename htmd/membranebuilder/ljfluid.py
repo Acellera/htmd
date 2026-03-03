@@ -3,7 +3,12 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-import openmm
+try:
+    import openmm
+except ImportError:
+    raise ImportError(
+        "openmm is not installed. Please install it using `pip install openmm`."
+    )
 from openmm import unit
 from openmm import app
 import numpy as np
