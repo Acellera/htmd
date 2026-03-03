@@ -3,9 +3,9 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
-from simtk import openmm
-from simtk import unit
-from simtk.openmm import app
+import openmm
+from openmm import unit
+from openmm import app
 import numpy as np
 
 
@@ -142,9 +142,9 @@ def distributeLipids(
     topology.setUnitCellDimensions(unit.Quantity(boxsize, unit.angstrom))
 
     # Simulate it
-    from simtk.openmm import VerletIntegrator
-    from simtk.openmm.app import Simulation
-    from simtk.unit import picoseconds, angstrom
+    from openmm import VerletIntegrator
+    from openmm.app import Simulation
+    from openmm.unit import picoseconds, angstrom
 
     nsteps = 10000
 
