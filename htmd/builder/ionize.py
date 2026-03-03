@@ -121,8 +121,8 @@ def ionize(
     # TODO: This will break on multi-atom ions! Will require a bit fancier code to calculate individual molecules
     cation_names = [cation, _ions[cation][3]]  # AMBER and CHARMM names
     anion_names = [anion, _ions[anion][3]]
-    ncations_exist = np.sum(np.in1d(mol.resname, cation_names)) / cationstoich
-    nanions_exist = np.sum(np.in1d(mol.resname, anion_names)) / anionstoich
+    ncations_exist = np.sum(np.isin(mol.resname, cation_names)) / cationstoich
+    nanions_exist = np.sum(np.isin(mol.resname, anion_names)) / anionstoich
     exist = int(min(ncations_exist, nanions_exist))
 
     num = int(np.floor(0.5 + 0.0187 * saltconc * nwater))
