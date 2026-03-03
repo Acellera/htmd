@@ -53,16 +53,10 @@ jobs:
   deploy:
     if: startsWith(github.event.ref, 'refs/tags/')
     needs: test
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     defaults: # Needed for conda
       run:
         shell: bash -l {0}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu-latest", "macos-latest", "windows-2022"]
-        python-version: ["3.10"]
 
     steps:
       - uses: actions/checkout@v4
@@ -70,24 +64,17 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: test
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.10"
           channels: acellera,conda-forge,defaults
 
-      - name: Dump Linux dependencies yaml file
-        if: matrix.os != 'windows-2022'
+      - name: Generate recipe.yaml
         run: |
           pip install pyyaml "setuptools-scm>=8"
           python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES
 
-      - name: Dump Windows dependencies yaml file
-        if: matrix.os == 'windows-2022'
-        run: |
-          pip install pyyaml "setuptools-scm>=8"
-          python package/htmd/insert_placeholder_values.py package/htmd/DEPENDENCIES_WIN
-
       - name: Build htmd conda package
         run: |
-          conda install anaconda-client rattler-build python=${{ matrix.python-version }}
+          conda install anaconda-client rattler-build
           rattler-build build --recipe ./package/htmd/recipe.yaml --output-dir /tmp/pkg/ --no-include-recipe -c acellera -c conda-forge
 
       - name: Upload to conda
