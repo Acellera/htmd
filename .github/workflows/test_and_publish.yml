@@ -50,6 +50,31 @@ jobs:
           export HTMD_NONINTERACTIVE=1
           pytest --verbose --durations=10 ./tests/
 
+  deploy-pypi:
+    if: startsWith(github.event.ref, 'refs/tags/')
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Build sdist
+        run: |
+          pip install build "setuptools-scm>=8"
+          python -m build --sdist
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PUBLIC_PYPI_API_TOKEN }}
+          skip-existing: true
+
   deploy:
     if: startsWith(github.event.ref, 'refs/tags/')
     needs: test
