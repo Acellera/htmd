@@ -26,31 +26,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           channels: acellera,conda-forge,defaults
 
-      - name: Install Linux HTMD conda deps
-        if: matrix.os != 'windows-2022'
+      - name: Install pip dependencies
         run: |
-          conda install --file package/htmd/DEPENDENCIES python=${{ matrix.python-version }} -y
-
-      - name: Install Windows HTMD conda deps
-        if: matrix.os == 'windows-2022'
-        run: |
-          conda install --file package/htmd/DEPENDENCIES_WIN python=${{ matrix.python-version }} -y
-
-      - name: Override ambertools version for the tests. To be removed when python 3.9 reaches EOL
-        if: matrix.os != 'windows-2022'
-        run: |
-          conda install ambertools=23.6 -y
-
-      - name: Override scipy version for the tests. To be removed when scipy 1.16 comes out
-        run: conda install "scipy<1.15" -y
+          pip install ".[dev]" openmm
 
       - name: List installed packages
         run: conda list
-
-      - name: Install pip dependencies
-        run: |
-          pip install flake8 pytest
-          pip install .
 
       - name: Lint with flake8
         run: |
