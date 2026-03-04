@@ -1,8 +1,10 @@
 [project]
-name = "htmd"
+name = "acellera-htmd"
 description = "High throughput molecular dynamics (HTMD)"
 authors = [{ name = "Acellera", email = "info@acellera.com" }]
 readme = "README.md"
+license = "LicenseRef-Acellera-Not-for-Profit"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dynamic = ["version"]
 classifiers = [
@@ -46,16 +48,29 @@ pymol = ["pymol-open-source"]
 [project.scripts]
 htmd_register = "htmd.license:htmd_register"
 
+[tool.setuptools]
+include-package-data = false
+
 [tool.setuptools.packages.find]
 where = [""]
 include = ["htmd*"]
+exclude = ["htmd.share*"]
 namespaces = false
+
+[tool.setuptools.package-data]
+htmd = ["share/**/*"]
 
 [tool.setuptools_scm]
 
 [build-system]
 requires = ["setuptools", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+python_functions = "_test*"
+python_classes = "_Test"
+python_files = "*.py"
+norecursedirs = ["data"]
 
 [dependency-groups]
 dev = ["flake8>=7.3.0", "pytest>=9.0.2"]

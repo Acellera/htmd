@@ -15,7 +15,11 @@ from importlib.metadata import version, PackageNotFoundError
 try:
     __version__ = version("htmd")
 except PackageNotFoundError:
-    pass
+    try:
+        __version__ = version("acellera-htmd")
+    except PackageNotFoundError:
+        __version__ = "0.0.0"
+
 
 try:
     logging.config.fileConfig(
