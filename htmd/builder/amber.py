@@ -1036,25 +1036,10 @@ def _build(
         logger.info("Starting the build.")
 
         with open(logpath, "w") as f:
-            try:
-                cmd = [teleap, "-f", "./tleap.in"]
-                cmd[1:1] = teleapimportflags
-                logger.debug(cmd)
-                result = subprocess.run(
-                    cmd,
-                    stdout=f,
-                    stderr=subprocess.PIPE,
-                    cwd=outdir,
-                )
-            except Exception as e:
-                raise BuildError(f"teLeap failed at execution: {e}")
-
-            if result.returncode != 0:
-                stderr_msg = result.stderr.decode(errors="replace").strip()
-                raise BuildError(
-                    f"teLeap exited with code {result.returncode}. "
-                    f"stderr: {stderr_msg}\nCheck {logpath} for details."
-                )
+            cmd = [teleap, "-f", "./tleap.in"]
+            cmd[1:1] = teleapimportflags
+            logger.debug(cmd)
+            result = subprocess.run(cmd, stdout=f, stderr=f, cwd=outdir)
 
         if not os.path.exists(logpath) or os.path.getsize(logpath) == 0:
             raise BuildError(
@@ -1069,6 +1054,10 @@ def _build(
                 errors,
             )
         logger.info("Finished building.")
+        if result.returncode != 0:
+            raise BuildError(
+                f"teLeap exited with code {result.returncode}.\nCheck {logpath} for details."
+            )
 
         if (
             os.path.exists(os.path.join(outdir, f"{prefix}.crd"))
