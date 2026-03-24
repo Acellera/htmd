@@ -219,7 +219,7 @@ def detectCisPeptideBonds(mol, respect_bonds=False):
         currframes = frames[idxs == ii]
         nframes = len(currframes)
         description = mapping.loc[ii].description
-        atomIndexes = mapping.loc[ii].atomIndexes
+        atomIndexes = [int(x) for x in mapping.loc[ii].atomIndexes]
 
         if respect_bonds:
             sub_bond_graph = bond_graph.subgraph(atomIndexes)
