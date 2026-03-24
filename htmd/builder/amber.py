@@ -23,6 +23,7 @@ from htmd.builder.builder import (
     MissingTorsionError,
     MissingAtomTypeError,
 )
+import subprocess
 from subprocess import call
 from moleculekit.molecule import Molecule
 from moleculekit.tools.sequencestructuralalignment import sequenceStructureAlignment
@@ -1021,15 +1022,31 @@ def _build(
         logger.info("Starting the build.")
         currdir = os.getcwd()
         os.chdir(outdir)
-        f = open(logpath, "w")
-        try:
-            cmd = [teleap, "-f", "./tleap.in"]
-            cmd[1:1] = teleapimportflags
-            logger.debug(cmd)
-            call(cmd, stdout=f)
-        except Exception:
-            raise NameError("teLeap failed at execution")
-        f.close()
+        with open(logpath, "w") as f:
+            try:
+                cmd = [teleap, "-f", "./tleap.in"]
+                cmd[1:1] = teleapimportflags
+                logger.debug(cmd)
+                result = subprocess.run(
+                    cmd,
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    cwd=outdir,
+                )
+                if result.returncode != 0:
+                    stderr_msg = result.stderr.decode(errors="replace").strip()
+                    raise BuildError(
+                        f"teLeap exited with code {result.returncode}. "
+                        f"stderr: {stderr_msg}\nCheck {logpath} for details."
+                    )
+            except Exception as e:
+                raise NameError(f"teLeap failed at execution: {e}")
+
+        if not os.path.exists(logpath) or os.path.getsize(logpath) == 0:
+            raise BuildError(
+                "teLeap produced no output log. It likely crashed before initialization. "
+            )
+
         errors = _logParser(logpath)
         os.chdir(currdir)
         if errors:
