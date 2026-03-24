@@ -186,8 +186,10 @@ def defaultAmberHome(teleap=None):
     if teleap is None:
         teleap = _findTeLeap()
     else:
-        if shutil.which(teleap) is None:
-            raise NameError(f"Could not find executable: `{teleap}` in the PATH.")
+        resolved = shutil.which(teleap)
+        if resolved is None:
+            raise RuntimeError(f"Could not find executable: `{teleap}` in the PATH.")
+        teleap = resolved
 
     return os.path.normpath(os.path.join(os.path.dirname(teleap), "../"))
 
@@ -383,7 +385,7 @@ def _getTeLeapImportFlags(teleap=None, ff=None, teleapimports=()):
             os.path.join(amberhome, s) for s in _defaultAmberSearchPaths.values()
         ]
         if len(teleapimports) == 0:
-            raise RuntimeWarning(
+            raise RuntimeError(
                 f"No default Amber force-field found. Check teLeap location: {teleap}"
             )
         # Source HTMD Amber paths that contain ffs
@@ -440,6 +442,10 @@ def _getResiduesInFF(ff, teleap=None):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         ff = _locateFile(ff, "ff", teleap)
+        if ff is None:
+            raise FileNotFoundError(
+                f"Could not find forcefield file. Check that AmberTools is installed correctly."
+            )
         shutil.copy(ff, tmpdir)
 
         importflgs = _getTeLeapImportFlags(teleap, [ff])
@@ -748,7 +754,7 @@ def build(
     )
     _detect_cofactors_ncaa_ptm(mol, param, topo)
 
-    if ionize:
+    if ionize and execute:
         molbuilt = _build(
             mol,
             ff=ff,
@@ -759,7 +765,7 @@ def build(
             disulfide=disulfide,
             teleap=teleap,
             teleapimports=teleapimports,
-            execute=execute,
+            execute=True,
             atomtypes=atomtypes,
             offlibraries=offlibraries,
             gbsa=gbsa,
@@ -805,7 +811,8 @@ def build(
         custombonds=custombonds,
         remove=remove,
     )
-    _write_residue_mapping(molbuilt, mol_orig, outdir)
+    if molbuilt is not None:
+        _write_residue_mapping(molbuilt, mol_orig, outdir)
     return molbuilt
 
 
@@ -870,6 +877,10 @@ def _build(
                 7: "bondi",
                 8: "mbondi3",
             }
+            if igb not in gbmodels:
+                raise ValueError(
+                    f"Invalid igb value {igb}. Supported values are: {list(gbmodels.keys())}"
+                )
             f.write(f"set default PBradii {gbmodels[igb]}\n\n")
 
         # Adding custom atom types
@@ -930,7 +941,7 @@ def _build(
                 f.write(f"{resname} = loadmol2 {os.path.basename(fname)}\n")
             elif fname.lower().endswith(".cif"):
                 _resmol = Molecule(fname)
-                _mol2f = os.path.join(fname.replace(".cif", ".mol2"))
+                _mol2f = f"{os.path.splitext(fname)[0]}.mol2"
                 _resmol.write(_mol2f)
                 f.write(_create_atomtype_section(_resmol))
                 f.write(f"{_resmol.resname[0]} = loadmol2 {os.path.basename(_mol2f)}\n")
@@ -966,7 +977,10 @@ def _build(
             f.write("cyc = loadpdb cyclic.pdb\n")
             for seg, res_start, res_end in cyclic:
                 f.write(f"bond cyc.{res_start}.N cyc.{res_end}.C\n")
-            f.write("mol = combine {mol cyc}\n\n")
+            if nonc_mol.numAtoms != 0:
+                f.write("mol = combine {mol cyc}\n\n")
+            else:
+                f.write("mol = cyc\n\n")
 
         # Remove atoms
         if remove is not None and len(remove) != 0:
@@ -986,7 +1000,7 @@ def _build(
             f.write("\n")
 
         # Write disulfide patches
-        if len(disulfide) != 0:
+        if disulfide is not None and len(disulfide) != 0:
             f.write("# Adding disulfide bonds\n")
             for d in disulfide:
                 atoms1 = d[0].selectAtoms(mol, indexes=False)
@@ -1334,10 +1348,8 @@ def _readcsvdict(filename):
     import csv
     from collections import namedtuple
 
-    if os.path.isfile(filename):
-        csvfile = open(filename, "r")
-    else:
-        raise NameError("File " + filename + " does not exist")
+    if not os.path.isfile(filename):
+        raise FileNotFoundError(f"File {filename} does not exist")
 
     resdict = dict()
 
@@ -1345,22 +1357,22 @@ def _readcsvdict(filename):
         "Rule", ["replaceresname", "replaceatom", "order", "natoms", "ter"]
     )
 
-    # Skip header line of csv file. Line 2 contains dictionary keys:
-    csvfile.readline()
-    csvreader = csv.DictReader(csvfile)
-    for line in csvreader:
-        searchres = line["search"].split()[1]
-        searchatm = line["search"].split()[0]
-        if searchres not in resdict:
-            resdict[searchres] = dict()
-        resdict[searchres][searchatm] = Rule(
-            line["replace"].split()[1],
-            line["replace"].split()[0],
-            int(line["order"]),
-            int(line["num_atom"]),
-            line["TER"] == "True",
-        )
-    csvfile.close()
+    with open(filename, "r") as csvfile:
+        # Skip header line of csv file. Line 2 contains dictionary keys:
+        csvfile.readline()
+        csvreader = csv.DictReader(csvfile)
+        for line in csvreader:
+            searchres = line["search"].split()[1]
+            searchatm = line["search"].split()[0]
+            if searchres not in resdict:
+                resdict[searchres] = dict()
+            resdict[searchres][searchatm] = Rule(
+                line["replace"].split()[1],
+                line["replace"].split()[0],
+                int(line["order"]),
+                int(line["num_atom"]),
+                line["TER"] == "True",
+            )
 
     return resdict
 
@@ -1477,7 +1489,7 @@ def _fix_parameterize_atomtype_collisions(mol, params, topos):
         with open(fname, "w") as f:
             f.write("Created by HTMD\n")
             for line in lines[1:]:
-                if line.strip() == "" or any([line.startswith(x) for x in const]):
+                if line.strip() == "" or any(line.startswith(x) for x in const):
                     f.write(line)
                     continue
                 # Split on two white spaces. Some atom types have a white space H - N -zs for example
