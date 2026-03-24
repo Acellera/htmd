@@ -1,10 +1,8 @@
-ifndef version
-$(error version variable is not set. Call with `make release version=XXX`)
-endif
+.PHONY: release
 
 release:
-	git checkout master
-	git fetch
-	git pull
-	git tag -a $(version) -m "$(version) release"
-	git push --tags origin $(version)
+ifndef version
+	$(error usage: make release version=X.Y.Z)
+endif
+	git tag -fa "$(version)" -m "Release $(version)"
+	git push origin "$(version)" --force
