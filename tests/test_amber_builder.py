@@ -26,6 +26,30 @@ except Exception:
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 
 
+def _standardize_angles_and_dihedrals(mol):
+    # 1. STANDARDIZE ANGLES (i - Central - k)
+    # Rule: (i, j, k) is the same as (k, j, i).
+    # We flip the row if the first index is larger than the last.
+    angle_mask = mol.angles[:, 0] > mol.angles[:, 2]
+    mol.angles[angle_mask] = mol.angles[angle_mask, ::-1]
+
+    # 2. STANDARDIZE PROPERS (i - j - k - l)
+    # Rule: Entire sequence can be reversed (l, k, j, i).
+    di_mask = mol.dihedrals[:, 0] > mol.dihedrals[:, 3]
+    mol.dihedrals[di_mask] = mol.dihedrals[di_mask, ::-1]
+
+    # 3. STANDARDIZE IMPROPERS (i - j - Central - l)
+    # Rule: Central atom (index 2) stays fixed; others are interchangeable.
+    periph = [0, 1, 3]
+    mol.impropers[:, periph] = np.sort(mol.impropers[:, periph], axis=1)
+
+    # 4. GLOBAL LEXSORT (Deterministic row ordering)
+    # We use [:, ::-1].T so lexsort prioritizes Column 0, then 1, etc.
+    mol.angles = mol.angles[np.lexsort(mol.angles[:, ::-1].T)]
+    mol.dihedrals = mol.dihedrals[np.lexsort(mol.dihedrals[:, ::-1].T)]
+    mol.impropers = mol.impropers[np.lexsort(mol.impropers[:, ::-1].T)]
+
+
 def _compareResultFolders(
     compare, tmpdir, pid, ignore_ftypes=(".log", ".txt", ".frcmod", ".crd")
 ):
@@ -42,7 +66,22 @@ def _compareResultFolders(
     mol2.read(os.path.join(compare, "structure.pdb"))
     mol = Molecule(os.path.join(tmpdir, "structure.prmtop"))
     mol.read(os.path.join(tmpdir, "structure.pdb"))
-    assert mol_equal(mol, mol2, fieldPrecision={"coords": 2e-3})
+
+    _standardize_angles_and_dihedrals(mol)
+    _standardize_angles_and_dihedrals(mol2)
+    assert mol_equal(
+        mol, mol2, checkFields=Molecule._connectivity_fields, uqBonds=True
+    ), "Bonding structure has changed"
+    assert mol_equal(
+        mol, mol2, checkFields=Molecule._atom_fields
+    ), "Atom fields have changed"
+    assert mol_equal(
+        mol,
+        mol2,
+        fieldPrecision={"coords": 2e-3},
+        checkFields=Molecule._traj_fields,
+        exceptFields=("fileloc"),
+    ), "Traj fields have changed"
 
     try:
         from ffevaluation.ffevaluate import FFEvaluate, loadParameters
