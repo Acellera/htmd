@@ -438,6 +438,30 @@ def _test_cif_building(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
+def _test_ionize_salt(tmp_path):
+    from htmd.builder.solvate import solvate
+
+    np.random.seed(1)
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    smol = solvate(mol, pad=5)
+    molbuilt = build(smol, outdir=tmp_path, ionize=True, saltconc=0.15)
+
+    assert molbuilt is not None
+    assert molbuilt.numAtoms > 0
+
+    ncl = np.sum(molbuilt.resname == "CL")
+    nna = np.sum(molbuilt.resname == "NA")
+    assert ncl == 15, f"Expected 15 CL ions, got {ncl}"
+    assert nna == 9, f"Expected 9 NA ions, got {nna}"
+
+    assert not os.path.exists(
+        os.path.join(tmp_path, "solute_charge.prmtop")
+    ), "Temp solute_charge files not cleaned up"
+    assert os.path.exists(os.path.join(tmp_path, "tleap_solute.in"))
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
 def _test_atomtype_decollisioning(tmp_path):
     # Tests that mol2 and cif building produce same results
     np.random.seed(1)
