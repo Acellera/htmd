@@ -994,16 +994,23 @@ def _prepare_build(
                 "# Writing cyclic peptide segments. clearPdbResMap stops terminal patching\n"
             )
             f.write("clearPdbResMap\n")
-            cyc_mol = mol.copy()
-            cyc_mol.filter(np.isin(mol.segid, cyclic_segs), _logger=False)
-            cyc_mol.write(os.path.join(outdir, "cyclic.pdb"))
-            f.write("cyc = loadpdb cyclic.pdb\n")
+            cyc_vars = []
             for seg, res_start, res_end in cyclic:
-                f.write(f"bond cyc.{res_start}.N cyc.{res_end}.C\n")
+                seg_mol = mol.copy(sel=mol.segid == seg)
+                fname = f"cyclic_{seg}.pdb"
+                seg_mol.write(os.path.join(outdir, fname))
+                cyc_var = f"cyc_{seg}"
+                cyc_vars.append(cyc_var)
+                f.write(f"{cyc_var} = loadpdb {fname}\n")
+                local_end = res_end - res_start + 1
+                f.write(f"bond {cyc_var}.1.N {cyc_var}.{local_end}.C\n")
+            cyc_list = " ".join(cyc_vars)
             if has_solute or has_water:
-                f.write("mol = combine {mol cyc}\n\n")
+                f.write(f"mol = combine {{mol {cyc_list}}}\n\n")
+            elif len(cyc_vars) == 1:
+                f.write(f"mol = {cyc_vars[0]}\n\n")
             else:
-                f.write("mol = cyc\n\n")
+                f.write(f"mol = combine {{{cyc_list}}}\n\n")
 
         # Remove atoms
         if remove is not None and len(remove) != 0:
