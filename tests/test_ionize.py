@@ -209,6 +209,36 @@ class _TestIonizePlace:
         result = ionizePlace(solvent, None, "Cl-", "Na+", "Cl-", "Na+", 2, 2)
         assert result.numAtoms == solvent.numAtoms - 4 * 3 + 4
 
+    def _test_empty_solute(self):
+        solvent = _make_water_box(nwaters=100)
+        solute = Molecule()
+        solute.empty(0)
+        result = ionizePlace(solvent, solute, "Cl-", "Na+", "Cl-", "Na+", 2, 2)
+        assert result.numAtoms == solvent.numAtoms - 4 * 3 + 4
+
+    def _test_ion_types_spatially_mixed(self):
+        """Anions and cations should be spatially interleaved, not clustered."""
+        solvent, solute = _make_water_and_solute(nwaters=500, solute_atoms=5, box_size=50)
+        nanion, ncation = 5, 5
+        result = ionizePlace(
+            solvent, solute, "Cl-", "Na+", "Cl-", "Na+", nanion, ncation, dbetween=5
+        )
+        ion_mask = result.segid == "I"
+        ion_coords = result.coords[ion_mask, :, 0]
+        ion_resnames = result.resname[ion_mask]
+
+        # For each ion, find its nearest neighbor and check it's not always the same type
+        pdists = dist.cdist(ion_coords, ion_coords)
+        np.fill_diagonal(pdists, np.inf)
+        nearest = np.argmin(pdists, axis=1)
+
+        same_type_neighbor = sum(
+            ion_resnames[i] == ion_resnames[nearest[i]]
+            for i in range(len(ion_resnames))
+        )
+        # With good mixing, fewer than 80% of ions should have a same-type nearest neighbor
+        assert same_type_neighbor < 0.8 * (nanion + ncation)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
