@@ -4,7 +4,7 @@
 # No redistribution in whole or part
 #
 import numpy as np
-import scipy.spatial.distance as distance
+from scipy.spatial import cKDTree
 from moleculekit.molecule import Molecule
 from moleculekit.util import sequenceID
 import logging
@@ -142,7 +142,7 @@ def ionize(
 
 def _ionGetCharge(ion):
     if ion not in _ions:
-        raise NameError("Ion {:s} not in the database".format(ion))
+        raise NameError(f"Ion {ion} not in the database")
     return _ions[ion][0]
 
 
@@ -161,6 +161,8 @@ def ionizePlace(
 ):
     """Place a given number of negative and positive ions in the solvent.
 
+    Uses farthest point sampling to produce well-spaced ion positions and
+    randomly assigns ion types for uniform spatial mixing.
     Replaces water molecules as long as they respect the given distance criteria.
 
     Parameters
@@ -197,9 +199,9 @@ def ionizePlace(
 
     newmol = solvent_mol.copy()
 
-    logger.debug("Min distance of ions from molecule: " + str(dfrom) + "A")
-    logger.debug("Min distance between ions: " + str(dbetween) + "A")
-    logger.debug("Placing {:d} anions and {:d} cations.".format(nanion, ncation))
+    logger.debug(f"Min distance of ions from molecule: {dfrom}A")
+    logger.debug(f"Min distance between ions: {dbetween}A")
+    logger.debug(f"Placing {nanion} anions and {ncation} cations.")
 
     if (nanion + ncation) == 0:
         return newmol
@@ -210,61 +212,60 @@ def ionizePlace(
     newmol.set("beta", sequenceID((newmol.resid, newmol.insertion, newmol.segid)))
 
     # Find water oxygens to replace with ions
-    ntries = 0
-    maxtries = 10
-    while True:
-        ionlist = []
-        wat_oh = newmol.atomselect("noh and water", indexes=True)
+    wat_oh = newmol.atomselect("noh and water", indexes=True)
 
-        if solute_mol is not None and solute_mol.numAtoms > 0:
-            wat_coords = newmol.coords[wat_oh, :, 0]
-            solute_coords = solute_mol.coords[:, :, 0]
-            min_dists = distance.cdist(wat_coords, solute_coords).min(axis=1)
-            watindex = wat_oh[min_dists >= dfrom]
-        else:
-            watindex = wat_oh
+    if len(wat_oh) == 0:
+        raise NameError("No water molecules found in the solvent to replace with ions.")
 
-        watsize = len(watindex)
+    wat_coords = newmol.coords[wat_oh, :, 0]
 
-        if watsize == 0:
+    # Filter by minimum distance from solute using KD-tree
+    if solute_mol is not None and solute_mol.numAtoms > 0:
+        solute_tree = cKDTree(solute_mol.coords[:, :, 0])
+        dists_to_solute, _ = solute_tree.query(wat_coords)
+        valid_mask = dists_to_solute >= dfrom
+        valid_local = np.where(valid_mask)[0]
+    else:
+        valid_local = np.arange(len(wat_oh))
+
+    if len(valid_local) == 0:
+        raise NameError(
+            f"No waters could be found further than {dfrom} from other molecules to be replaced by ions. You might need to "
+            "solvate with a bigger box or disable the ionize property when building."
+        )
+
+    valid_coords = wat_coords[valid_local]
+
+    # Farthest point sampling: iteratively pick the water farthest from all
+    # previously placed ions.  This is deterministic, requires no retries,
+    # and naturally maximises the minimum inter-ion distance.
+    min_dists = np.full(len(valid_coords), np.inf)
+    selected = []
+    used = np.zeros(len(valid_coords), dtype=bool)
+
+    for i in range(nions):
+        idx = np.argmax(min_dists)
+        if i > 0 and min_dists[idx] < dbetween:
             raise NameError(
-                "No waters could be found further than "
-                + str(dfrom)
-                + " from other molecules to be replaced by ions. You might need to solvate with a bigger box or disable the ionize property when building."
+                f"Could not place all ions while maintaining minimum distance of {dbetween} A between ions. Try decreasing the between parameter, "
+                "decreasing ion concentration or making a larger water box."
             )
+        selected.append(idx)
+        used[idx] = True
 
-        while len(ionlist) < nions:
-            if len(watindex) == 0:
-                break
-            randwat = np.random.randint(len(watindex))
-            thision = watindex[randwat]
-            addit = True
-            if len(ionlist) != 0:  # Check for distance from precious ions
-                ionspos = newmol.get("coords", sel=ionlist)
-                thispos = newmol.get("coords", sel=thision)
-                dists = distance.cdist(
-                    np.atleast_2d(ionspos), np.atleast_2d(thispos), metric="euclidean"
-                )
+        # Update min distances from the newly placed ion
+        dists_to_new = np.linalg.norm(valid_coords - valid_coords[idx], axis=1)
+        min_dists = np.minimum(min_dists, dists_to_new)
+        min_dists[used] = -np.inf
 
-                if np.any(dists < dbetween):
-                    addit = False
-            if addit:
-                ionlist.append(thision)
-                watindex = np.delete(watindex, randwat)
-        if len(ionlist) == nions:
-            break
+    # Map selected indices back to atom indices in newmol
+    ionlist = [wat_oh[valid_local[s]] for s in selected]
 
-        ntries += 1
-        if ntries == maxtries:
-            raise NameError(
-                "Failed to add ions after "
-                + str(maxtries)
-                + " attempts. Try decreasing the "
-                "from"
-                " and "
-                "between"
-                " parameters, decreasing ion concentration or making a larger water box."
-            )
+    # Randomly assign ion types to FPS positions.  Since FPS guarantees
+    # well-spaced positions regardless of type, random labelling gives
+    # uniform spatial mixing independent of the anion/cation ratio.
+    type_labels = np.array(["anion"] * nanion + ["cation"] * ncation)
+    np.random.shuffle(type_labels)
 
     # Delete waters but keep their coordinates
     waterpos = np.atleast_2d(newmol.get("coords", ionlist))
@@ -274,28 +275,25 @@ def ionizePlace(
 
     sel = np.where(betasel)[0]
     newmol.remove(sel, _logger=False)
-    # assert np.size(sel) == atmput, 'Removed {} atoms instead of {}. Report this bug.'.format(np.size(sel), atmput)
     betabackup = np.delete(betabackup, sel)
 
-    # Add the ions
-    randidx = np.random.permutation(np.size(waterpos, 0))
-    atom = Molecule()
-    atom.empty(1)
-    atom.set("chain", "I")
-    atom.set("segid", "I")
+    # Build all ions as a single Molecule and append once
+    ions_mol = Molecule()
+    ions_mol.empty(nions)
+    ions_mol.chain[:] = "I"
+    ions_mol.segid[:] = "I"
+    ions_mol.coords = waterpos[:, :, np.newaxis]
 
-    for i in range(nanion):
-        atom.set("name", anion_name)
-        atom.set("resname", anion_resname)
-        atom.set("resid", newmol.resid[-1] + 1)
-        atom.coords = waterpos[randidx[i], :]
-        newmol.insert(atom, len(newmol.name))
-    for i in range(ncation):
-        atom.set("name", cation_name)
-        atom.set("resname", cation_resname)
-        atom.set("resid", newmol.resid[-1] + 1)
-        atom.coords = waterpos[randidx[i + nanion], :]
-        newmol.insert(atom, len(newmol.name))
+    anion_mask = type_labels == "anion"
+    ions_mol.name[anion_mask] = anion_name
+    ions_mol.resname[anion_mask] = anion_resname
+    ions_mol.name[~anion_mask] = cation_name
+    ions_mol.resname[~anion_mask] = cation_resname
+
+    base_resid = newmol.resid[-1] + 1
+    ions_mol.resid[:] = np.arange(base_resid, base_resid + nions)
+
+    newmol.append(ions_mol)
 
     # Restoring the original betas
     newmol.beta[: len(betabackup)] = betabackup
