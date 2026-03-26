@@ -157,8 +157,8 @@ def detectDisulfideBonds(mol, thresh=3):
         for r2 in range(r1 + 1, len(residues)):
             if residues[r1] == residues[r2]:
                 raise RuntimeError(
-                    "Multiple SG atoms detected in the same residue {}. "
-                    "Can't guess disulfide bridges.".format(residues[r1])
+                    f"Multiple SG atoms detected in the same residue {residues[r1]}. "
+                    "Can't guess disulfide bridges."
                 )
 
     sd = squareform(pdist(mol.coords[idx, :, mol.frame]))
@@ -177,22 +177,23 @@ def detectDisulfideBonds(mol, thresh=3):
             for r, c in zip(multibonded_idx1, multibonded_idx2)
         ]
         raise RuntimeError(
-            "Sulphur atoms between pairs {} have multiple possible bonds. Cannot guess disulfide bonds. "
-            "Please specify them manually.".format(pairs)
+            f"Sulphur atoms between pairs {pairs} have multiple possible bonds. Cannot guess disulfide bonds. "
+            "Please specify them manually."
         )
 
     uniquerowcols = list(set([tuple(sorted((r, c))) for r, c in zip(rows, cols)]))
     for rc in uniquerowcols:
         disubonds.append([residues[rc[0]], residues[rc[1]]])
-        msg = "Disulfide Bond between: {}\n" "                   and: {}\n".format(
-            residues[rc[0]], residues[rc[1]]
+        msg = (
+            f"Disulfide Bond between: {residues[rc[0]]}\n"
+            f"                   and: {residues[rc[1]]}\n"
         )
         print(msg)
 
     if len(disubonds) == 1:
         logger.info("One disulfide bond was added")
     else:
-        logger.info("{} disulfide bonds were added".format(len(disubonds)))
+        logger.info(f"{len(disubonds)} disulfide bonds were added")
     return sorted(disubonds, key=lambda x: x[0].resid)
 
 
