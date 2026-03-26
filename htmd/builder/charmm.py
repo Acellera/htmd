@@ -412,9 +412,21 @@ def build(
                 anion=saltanion,
                 cation=saltcation,
             )
-            newmol = ionizePlace(
-                mol, anion, cation, anionatom, cationatom, nanion, ncation
+            water_sel = mol.atomselect("water")
+            solvent_mol = mol.copy(sel=water_sel)
+            solute_mol = mol.copy(sel=~water_sel)
+            solvent_mol = ionizePlace(
+                solvent_mol,
+                solute_mol,
+                anion,
+                cation,
+                anionatom,
+                cationatom,
+                nanion,
+                ncation,
             )
+            newmol = solute_mol.copy()
+            newmol.append(solvent_mol)
             # Redo the whole build but now with ions included
             return build(
                 newmol,

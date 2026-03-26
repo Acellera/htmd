@@ -754,33 +754,30 @@ def build(
     )
     _detect_cofactors_ncaa_ptm(mol, param, topo)
 
+    _prepare_build(
+        mol,
+        ff=ff,
+        topo=topo,
+        param=param,
+        prefix=prefix,
+        outdir=outdir,
+        disulfide=disulfide,
+        teleap=teleap,
+        atomtypes=atomtypes,
+        offlibraries=offlibraries,
+        gbsa=gbsa,
+        igb=igb,
+        custombonds=custombonds,
+        remove=remove,
+    )
+
     if ionize and execute:
-        molbuilt = _build(
-            mol,
-            ff=ff,
-            topo=topo,
-            param=param,
-            prefix=prefix,
-            outdir=outdir,
-            disulfide=disulfide,
-            teleap=teleap,
-            teleapimports=teleapimports,
-            execute=True,
-            atomtypes=atomtypes,
-            offlibraries=offlibraries,
-            gbsa=gbsa,
-            igb=igb,
-            custombonds=custombonds,
-            remove=remove,
+        molbuilt = _run_tleap(
+            outdir, prefix, teleap=teleap, ff=ff, teleapimports=teleapimports
         )
-        shutil.move(
-            os.path.join(outdir, f"{prefix}.crd"),
-            os.path.join(outdir, f"{prefix}.noions.crd"),
-        )
-        shutil.move(
-            os.path.join(outdir, f"{prefix}.prmtop"),
-            os.path.join(outdir, f"{prefix}.noions.prmtop"),
-        )
+        os.remove(os.path.join(outdir, f"{prefix}.crd"))
+        os.remove(os.path.join(outdir, f"{prefix}.pdb"))
+        os.remove(os.path.join(outdir, f"{prefix}.prmtop"))
         totalcharge = np.sum(molbuilt.charge)
         nwater = np.sum(molbuilt.atomselect("water and noh"))
         anion, cation, anionatom, cationatom, nanion, ncation = ionizef(
@@ -791,26 +788,29 @@ def build(
             anion=saltanion,
             cation=saltcation,
         )
-        mol = ionizePlace(mol, anion, cation, anionatom, cationatom, nanion, ncation)
 
-    molbuilt = _build(
-        mol,
-        ff=ff,
-        topo=topo,
-        param=param,
-        prefix=prefix,
-        outdir=outdir,
-        disulfide=disulfide,
-        teleap=teleap,
-        teleapimports=teleapimports,
-        execute=execute,
-        atomtypes=atomtypes,
-        offlibraries=offlibraries,
-        gbsa=gbsa,
-        igb=igb,
-        custombonds=custombonds,
-        remove=remove,
-    )
+        water_sel = mol.atomselect("water")
+        solvent_mol = mol.copy(sel=water_sel)
+        solute_mol = mol.copy(sel=~water_sel)
+        solvent_mol = ionizePlace(
+            solvent_mol,
+            solute_mol,
+            anion,
+            cation,
+            anionatom,
+            cationatom,
+            nanion,
+            ncation,
+        )
+        solvent_mol.write(os.path.join(outdir, "solvent.pdb"))
+
+    if execute:
+        molbuilt = _run_tleap(
+            outdir, prefix, teleap=teleap, ff=ff, teleapimports=teleapimports
+        )
+    else:
+        molbuilt = None
+
     if molbuilt is not None:
         _write_residue_mapping(molbuilt, mol_orig, outdir)
     return molbuilt
@@ -825,7 +825,7 @@ def _create_atomtype_section(mol):
     return atypes_str
 
 
-def _build(
+def _prepare_build(
     mol,
     ff=None,
     topo=None,
@@ -834,8 +834,6 @@ def _build(
     outdir="./build",
     disulfide=None,
     teleap=None,
-    teleapimports=None,
-    execute=True,
     atomtypes=None,
     offlibraries=None,
     gbsa=False,
@@ -843,6 +841,13 @@ def _build(
     custombonds=None,
     remove=None,
 ):
+    """Generate tleap.in, write PDB files, and copy forcefield/param/topo files.
+
+    Splits the molecule into up to three PDB files:
+    - input.pdb: non-water, non-cyclic solute atoms
+    - solvent.pdb: water molecules
+    - cyclic.pdb: cyclic peptide segments (if any)
+    """
     if teleap is None:
         teleap = _findTeLeap()
     else:
@@ -958,13 +963,31 @@ def _build(
         cyclic = _detect_cyclic_segments(mol)
         cyclic_segs = [c[0] for c in cyclic]
 
-        f.write("# Loading the system\n")
+        # Split molecule into solute (non-water, non-cyclic), solvent (water), cyclic
         nonc_mol = mol.copy()
         if len(cyclic):
             nonc_mol.remove(np.isin(mol.segid, cyclic_segs), _logger=False)
-        if nonc_mol.numAtoms != 0:
-            nonc_mol.write(os.path.join(outdir, "input.pdb"))
-            f.write("mol = loadpdb input.pdb\n\n")
+
+        water_sel = nonc_mol.atomselect("water")
+        has_water = np.any(water_sel)
+        has_solute = np.any(~water_sel)
+
+        f.write("# Loading the system\n")
+        if has_solute:
+            solute_mol = nonc_mol.copy(sel=~water_sel)
+            solute_mol.write(os.path.join(outdir, "input.pdb"))
+            f.write("mol = loadpdb input.pdb\n")
+
+        if has_water:
+            water_mol = nonc_mol.copy(sel=water_sel)
+            water_mol.write(os.path.join(outdir, "solvent.pdb"))
+            f.write("wat = loadpdb solvent.pdb\n")
+            if has_solute:
+                f.write("mol = combine {mol wat}\n")
+            else:
+                f.write("mol = wat\n")
+
+        f.write("\n")
 
         if len(cyclic):
             f.write(
@@ -977,7 +1000,7 @@ def _build(
             f.write("cyc = loadpdb cyclic.pdb\n")
             for seg, res_start, res_end in cyclic:
                 f.write(f"bond cyc.{res_start}.N cyc.{res_end}.C\n")
-            if nonc_mol.numAtoms != 0:
+            if has_solute or has_water:
                 f.write("mol = combine {mol cyc}\n\n")
             else:
                 f.write("mol = cyc\n\n")
@@ -1030,57 +1053,62 @@ def _build(
         f.write(f"saveamberparm mol {prefix}.prmtop {prefix}.crd\n")
         f.write("quit")
 
-    if execute:
-        teleapimportflags = _getTeLeapImportFlags(teleap, ff, teleapimports)
-        logpath = os.path.abspath(os.path.join(outdir, "log.txt"))
-        logger.info("Starting the build.")
 
-        with open(logpath, "w") as f:
-            cmd = [teleap, "-f", "./tleap.in"]
-            cmd[1:1] = teleapimportflags
-            logger.debug(cmd)
-            result = subprocess.run(cmd, stdout=f, stderr=f, cwd=outdir)
+def _run_tleap(outdir, prefix, teleap=None, ff=None, teleapimports=None):
+    """Execute tleap, parse the log, read the output, and return the built Molecule."""
+    if teleap is None:
+        teleap = _findTeLeap()
 
-        if not os.path.exists(logpath) or os.path.getsize(logpath) == 0:
-            raise BuildError(
-                "teLeap produced no output log. It likely crashed before initialization. "
+    teleapimportflags = _getTeLeapImportFlags(teleap, ff, teleapimports)
+    logpath = os.path.abspath(os.path.join(outdir, "log.txt"))
+    logger.info("Starting the build.")
+
+    with open(logpath, "w") as f:
+        cmd = [teleap, "-f", "./tleap.in"]
+        cmd[1:1] = teleapimportflags
+        logger.debug(cmd)
+        result = subprocess.run(cmd, stdout=f, stderr=f, cwd=outdir)
+
+    if not os.path.exists(logpath) or os.path.getsize(logpath) == 0:
+        raise BuildError(
+            "teLeap produced no output log. It likely crashed before initialization. "
+        )
+
+    errors = _logParser(logpath)
+    if errors:
+        raise BuildError(
+            errors
+            + [f"Check {logpath} for further information on errors in building."],
+            errors,
+        )
+    logger.info("Finished building.")
+    if result.returncode != 0:
+        raise BuildError(
+            f"teLeap exited with code {result.returncode}.\nCheck {logpath} for details."
+        )
+
+    if (
+        os.path.exists(os.path.join(outdir, f"{prefix}.crd"))
+        and os.path.getsize(os.path.join(outdir, f"{prefix}.crd")) != 0
+        and os.path.getsize(os.path.join(outdir, f"{prefix}.prmtop")) != 0
+    ):
+        try:
+            molbuilt = Molecule(
+                os.path.join(outdir, f"{prefix}.prmtop"), validateElements=False
             )
-
-        errors = _logParser(logpath)
-        if errors:
-            raise BuildError(
-                errors
-                + [f"Check {logpath} for further information on errors in building."],
-                errors,
+            molbuilt.read(os.path.join(outdir, f"{prefix}.crd"))
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed at reading {prefix}.prmtop/{prefix}.crd due to error: {e}"
             )
-        logger.info("Finished building.")
-        if result.returncode != 0:
-            raise BuildError(
-                f"teLeap exited with code {result.returncode}.\nCheck {logpath} for details."
-            )
+    else:
+        raise BuildError(
+            f"No {prefix} pdb/prmtop file was generated. Check {logpath} for errors in building."
+        )
 
-        if (
-            os.path.exists(os.path.join(outdir, f"{prefix}.crd"))
-            and os.path.getsize(os.path.join(outdir, f"{prefix}.crd")) != 0
-            and os.path.getsize(os.path.join(outdir, f"{prefix}.prmtop")) != 0
-        ):
-            try:
-                molbuilt = Molecule(
-                    os.path.join(outdir, f"{prefix}.prmtop"), validateElements=False
-                )
-                molbuilt.read(os.path.join(outdir, f"{prefix}.crd"))
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed at reading {prefix}.prmtop/{prefix}.crd due to error: {e}"
-                )
-        else:
-            raise BuildError(
-                f"No {prefix} pdb/prmtop file was generated. Check {logpath} for errors in building."
-            )
-
-        molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"), writebonds=False)
-        detectCisPeptideBonds(molbuilt, respect_bonds=True)  # Warn in case of cis bonds
-        return molbuilt
+    molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"), writebonds=False)
+    detectCisPeptideBonds(molbuilt, respect_bonds=True)
+    return molbuilt
 
 
 def _detect_cyclic_segments(mol: Molecule):

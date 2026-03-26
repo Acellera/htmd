@@ -147,7 +147,8 @@ def _ionGetCharge(ion):
 
 
 def ionizePlace(
-    mol,
+    solvent_mol,
+    solute_mol,
     anion_resname,
     cation_resname,
     anion_name,
@@ -160,12 +161,15 @@ def ionizePlace(
 ):
     """Place a given number of negative and positive ions in the solvent.
 
-    Replaces water molecules al long as they respect the given distance criteria.
+    Replaces water molecules as long as they respect the given distance criteria.
 
     Parameters
     ----------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The Molecule object
+    solvent_mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
+        The solvent (water) molecule
+    solute_mol : :class:`Molecule <moleculekit.molecule.Molecule>` object or None
+        The solute molecule used for minimum-distance filtering. If None or
+        empty, no minimum distance from solute is enforced.
     anion_resname : str
         Resname of the added anions
     cation_resname : str
@@ -179,7 +183,7 @@ def ionizePlace(
     ncation : int
         Number of cations to add
     dfrom : float
-        Min distance of ions from molecule
+        Min distance of ions from solute molecule
     dbetween : float
         Min distance between ions
     segname : str
@@ -188,10 +192,10 @@ def ionizePlace(
     Returns
     -------
     mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The molecule with the ions added
+        The solvent molecule with ions replacing some water molecules
     """
 
-    newmol = mol.copy()
+    newmol = solvent_mol.copy()
 
     logger.debug("Min distance of ions from molecule: " + str(dfrom) + "A")
     logger.debug("Min distance between ions: " + str(dbetween) + "A")
@@ -210,10 +214,16 @@ def ionizePlace(
     maxtries = 10
     while True:
         ionlist = []
-        watindex = newmol.atomselect(
-            "noh and water and not (within " + str(dfrom) + " of not water)",
-            indexes=True,
-        )
+        wat_oh = newmol.atomselect("noh and water", indexes=True)
+
+        if solute_mol is not None and solute_mol.numAtoms > 0:
+            wat_coords = newmol.coords[wat_oh, :, 0]
+            solute_coords = solute_mol.coords[:, :, 0]
+            min_dists = distance.cdist(wat_coords, solute_coords).min(axis=1)
+            watindex = wat_oh[min_dists >= dfrom]
+        else:
+            watindex = wat_oh
+
         watsize = len(watindex)
 
         if watsize == 0:
