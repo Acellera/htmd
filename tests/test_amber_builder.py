@@ -71,17 +71,17 @@ def _compareResultFolders(
     _standardize_angles_and_dihedrals(mol2)
     assert mol_equal(
         mol, mol2, checkFields=Molecule._connectivity_fields, uqBonds=True
-    ), "Bonding structure has changed"
+    ), f"Bonding structure has changed in {compare} and {tmpdir}"
     assert mol_equal(
         mol, mol2, checkFields=Molecule._atom_fields
-    ), "Atom fields have changed"
+    ), f"Atom fields have changed in {compare} and {tmpdir}"
     assert mol_equal(
         mol,
         mol2,
         fieldPrecision={"coords": 2e-3},
         checkFields=Molecule._traj_fields,
         exceptFields=("fileloc"),
-    ), "Traj fields have changed"
+    ), f"Traj fields have changed in {compare} and {tmpdir}"
 
     try:
         from ffevaluation.ffevaluate import FFEvaluate, loadParameters
