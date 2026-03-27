@@ -409,7 +409,7 @@ def _duplicate_parameters(prm, original):
 
 # The below is used for testing only
 try:
-    from parameterize.cli import main_parameterize
+    from parameterize.main import parameterize_molecule
 except ImportError:
     _PARAMETERIZE_INSTALLED = False
 else:
