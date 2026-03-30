@@ -5,7 +5,6 @@
 #
 import os
 import logging
-from jobqueues.config import config as jqconfig
 
 logger = logging.getLogger(__file__)
 
@@ -40,6 +39,8 @@ def config(
     slurm : str
         Defines a YAML file that can contain default profile configurations for an SlurmQueue
     """
+    from jobqueues.config import config as jqconfig
+
     if ncpus is not None:
         logger.warning(
             "The ncpus config option has been renamed to njobs. Please use njobs instead."

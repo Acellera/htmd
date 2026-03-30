@@ -23,6 +23,11 @@ _ions = {
     "CL": (-1, "chloride", "Cl-", "CLA"),
 }
 
+_ion_aliases = {}
+for _key, (_charge, _fullname, _ambername, _charmmname) in _ions.items():
+    for _alias in (_key, _fullname, _ambername, _charmmname):
+        _ion_aliases[_alias.upper()] = _key
+
 
 def ionize(
     mol,
@@ -42,8 +47,12 @@ def ionize(
 
     if cation is None:
         cation = "NA"
+    else:
+        cation = _resolve_ion(cation)
     if anion is None:
         anion = "CL"
+    else:
+        anion = _resolve_ion(anion)
 
     if saltconc is not None:
         neutralize = False
@@ -140,9 +149,21 @@ def ionize(
     return anion, cation, anion, cation, nanion, ncation
 
 
+def _resolve_ion(name):
+    """Resolve any ion alias (canonical key, full name, AMBER name, CHARMM name) to the canonical key."""
+    key = _ion_aliases.get(name.upper())
+    if key is None:
+        valid = ", ".join(
+            f"{k} ({v[1]}, {v[2]}, {v[3]})" for k, v in _ions.items()
+        )
+        raise NameError(
+            f"Ion '{name}' not recognized. Valid ions and their aliases: {valid}"
+        )
+    return key
+
+
 def _ionGetCharge(ion):
-    if ion not in _ions:
-        raise NameError(f"Ion {ion} not in the database")
+    ion = _resolve_ion(ion)
     return _ions[ion][0]
 
 

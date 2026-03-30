@@ -41,6 +41,8 @@ def solvate(
     mol,
     pad=None,
     minmax=None,
+    centersel=None,
+    boxsize=None,
     negx=0,
     posx=0,
     negy=0,
@@ -66,6 +68,13 @@ def solvate(
     minmax : list
         Min and max dimensions. Should be a 2D matrix of the form [[minx, miny, minz], [maxx, maxy, maxz]]. If none is
         given, it is calculated from the minimum and maximum coordinates in the mol.
+    centersel : str
+        An atom selection string defining the center of the solvation box. The geometric center of the selected atoms is
+        used. Must be combined with `boxsize`.
+    boxsize : float or list of 3 floats
+        The dimensions of the solvation box. If a single float, a cubic box of that side length is created. If a
+        3-element iterable [sx, sy, sz], an axis-aligned box of those dimensions is created. The box extends from
+        center - boxsize/2 to center + boxsize/2 in each dimension. Must be combined with `centersel`.
     negx : float
         The padding in the -x dimension
     posx : float
@@ -104,6 +113,8 @@ def solvate(
     --------
     >>> smol = solvate(mol, pad=10)
     >>> smol = solvate(mol, minmax=[[-20, -20, -20],[20, 20, 20]])
+    >>> smol = solvate(mol, centersel="protein", boxsize=100)
+    >>> smol = solvate(mol, centersel="protein", boxsize=[80, 80, 120])
     """
     from tqdm import tqdm
     from htmd.home import home
@@ -114,6 +125,28 @@ def solvate(
             "Multiple frames in Molecule. Solvate keeps only frame 0 and discards the rest."
         )
         mol.coords = np.atleast_3d(mol.coords[:, :, 0])
+
+    if (centersel is None) != (boxsize is None):
+        raise ValueError("centersel and boxsize must both be specified together.")
+
+    if centersel is not None:
+        if minmax is not None or pad is not None:
+            raise ValueError("centersel/boxsize cannot be combined with minmax or pad.")
+        selatoms = mol.atomselect(centersel)
+        if not np.any(selatoms):
+            raise ValueError(f"Atom selection '{centersel}' matched no atoms.")
+        center = mol.get("coords", sel=selatoms).mean(axis=0)
+        boxsize = np.atleast_1d(np.array(boxsize, dtype=float))
+        if boxsize.shape == (1,):
+            boxsize = np.repeat(boxsize, 3)
+        elif boxsize.shape != (3,):
+            raise ValueError("boxsize must be a scalar or a 3-element iterable.")
+        half = boxsize / 2.0
+        minmax = np.array([center - half, center + half])
+        logger.info(
+            f"Box center from selection '{centersel}': [{center[0]:.2f}, {center[1]:.2f}, {center[2]:.2f}], "
+            f"box size: [{boxsize[0]:.2f}, {boxsize[1]:.2f}, {boxsize[2]:.2f}]"
+        )
 
     if spdb is None:
         spdb = os.path.join(home(shareDir=True), "solvate", "wat.pdb")

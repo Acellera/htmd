@@ -163,10 +163,7 @@ parameterize_types = list(_get_parameterize_at())
 def _findTeLeap():
     teleap = shutil.which("teLeap", mode=os.X_OK)
     if not teleap:
-        raise FileNotFoundError(
-            "teLeap not found. You should have AmberTools installed "
-            "(to install AmberTools do: conda install ambertools -c conda-forge)"
-        )
+        return None
     if os.path.islink(teleap):
         if os.path.isabs(os.readlink(teleap)):
             teleap = os.readlink(teleap)
@@ -175,23 +172,70 @@ def _findTeLeap():
     return teleap
 
 
+def _pyodideAmberHome():
+    """Returns the AMBERHOME-equivalent path from the tleap_pyodide package.
+
+    The tleap_pyodide package bundles dat/leap/{cmd,prep,lib,parm} under its
+    package directory, mirroring the $AMBERHOME layout.
+    """
+    try:
+        import tleap_pyodide
+
+        return tleap_pyodide._PACKAGE_DIR
+    except ImportError:
+        return None
+
+
+def _resolve_backend(teleap=None):
+    """Determine whether to use native teLeap or tleap_pyodide.
+
+    Returns
+    -------
+    tuple of (str, str)
+        ("native", teleap_path) or ("pyodide", amberhome_path).
+
+    Raises
+    ------
+    FileNotFoundError
+        If neither native teLeap nor tleap_pyodide is available.
+    """
+    if teleap is not None:
+        resolved = shutil.which(teleap)
+        if resolved is None:
+            raise FileNotFoundError(
+                f"Could not find executable: `{teleap}` in the PATH."
+            )
+        return ("native", resolved)
+
+    native = _findTeLeap()
+    if native is not None:
+        return ("native", native)
+
+    pyodide_home = _pyodideAmberHome()
+    if pyodide_home is not None:
+        return ("pyodide", pyodide_home)
+
+    raise FileNotFoundError(
+        "Neither native teLeap nor tleap_pyodide found. "
+        "Install AmberTools (conda install ambertools -c conda-forge) "
+        "or install tleap_pyodide for browser/pyodide environments."
+    )
+
+
 def defaultAmberHome(teleap=None):
-    """Returns the default AMBERHOME as defined by the location of teLeap binary
+    """Returns the default AMBERHOME as defined by the location of teLeap binary,
+    or the tleap_pyodide package directory if running in pyodide.
 
     Parameters:
     -----------
     teleap : str
         Path to teLeap executable used to build the system for AMBER
     """
-    if teleap is None:
-        teleap = _findTeLeap()
-    else:
-        resolved = shutil.which(teleap)
-        if resolved is None:
-            raise RuntimeError(f"Could not find executable: `{teleap}` in the PATH.")
-        teleap = resolved
+    backend, value = _resolve_backend(teleap)
+    if backend == "pyodide":
+        return value
 
-    return os.path.normpath(os.path.join(os.path.dirname(teleap), "../"))
+    return os.path.normpath(os.path.join(os.path.dirname(value), "../"))
 
 
 _defaultAmberSearchPaths = {
@@ -363,8 +407,7 @@ def listFiles():
         print(f.replace(join(htmdamberdir, ""), ""))
 
 
-def _locateFile(fname, ftype, teleap):
-    amberhome = defaultAmberHome(teleap=teleap)
+def _locateFile(fname, ftype, amberhome):
     htmdamberdir = htmdAmberHome()
     searchdir = os.path.join(amberhome, _defaultAmberSearchPaths[ftype])
     foundfile = glob(os.path.join(searchdir, fname))
@@ -376,19 +419,18 @@ def _locateFile(fname, ftype, teleap):
     logger.warning(f"Was not able to find {ftype} file {fname}")
 
 
-def _getTeLeapImportFlags(teleap=None, ff=None, teleapimports=()):
+def _getTeLeapImportFlags(amberhome=None, ff=None, teleapimports=()):
     if not teleapimports:
+        if amberhome is None:
+            amberhome = defaultAmberHome()
         teleapimports = []
-        # Source default Amber (i.e. the same paths tleap imports)
-        amberhome = defaultAmberHome(teleap=teleap)
         teleapimports += [
             os.path.join(amberhome, s) for s in _defaultAmberSearchPaths.values()
         ]
         if len(teleapimports) == 0:
             raise RuntimeError(
-                f"No default Amber force-field found. Check teLeap location: {teleap}"
+                "No default Amber force-field found. Check AMBERHOME location."
             )
-        # Source HTMD Amber paths that contain ffs
         htmdamberdir = htmdAmberHome()
         teleapimports += [
             os.path.join(htmdamberdir, os.path.dirname(f))
@@ -401,7 +443,6 @@ def _getTeLeapImportFlags(teleap=None, ff=None, teleapimports=()):
                 "`htmd.builder.amber.defaultAmberHome()` and `htmd.builder.amber.htmdAmberHome()`"
             )
 
-    # Set import flags for teLeap
     teleapimportflags = []
     for p in teleapimports:
         teleapimportflags.append("-I")
@@ -409,9 +450,20 @@ def _getTeLeapImportFlags(teleap=None, ff=None, teleapimports=()):
     return teleapimportflags
 
 
+def _getHtmdExtraImports(ff=None):
+    """Return extra import directories from htmdAmberHome for tleap_pyodide."""
+    htmdamberdir = htmdAmberHome()
+    extra = []
+    if ff is not None:
+        for f in ff:
+            dirpath = os.path.join(htmdamberdir, os.path.dirname(f))
+            if os.path.isdir(dirpath) and dirpath not in extra:
+                extra.append(dirpath)
+    return extra
+
+
 def _getResiduesInAllFFs():
     amberhome = defaultAmberHome()
-    # Original AMBER FFs
     ffdir = join(amberhome, _defaultAmberSearchPaths["ff"])
     ffs = [
         os.path.relpath(ff, ffdir)
@@ -420,7 +472,6 @@ def _getResiduesInAllFFs():
     ]
 
     htmdamberdir = htmdAmberHome()
-    # Extra AMBER FFs on HTMD
     ffs += [
         os.path.relpath(ff, htmdamberdir)
         for ff in glob(join(htmdamberdir, "*", "leaprc.*"))
@@ -434,49 +485,77 @@ def _getResiduesInAllFFs():
     return residues
 
 
+def _parseResidueList(log_text):
+    """Parse the output of tleap 'list' command to extract residue names."""
+    residues = []
+    starting = False
+    for line in log_text.splitlines():
+        stripped = line.strip()
+        if stripped == "> list":
+            starting = True
+            continue
+        if stripped == "quit":
+            break
+        if starting:
+            residues += stripped.split()
+    return residues
+
+
 def _getResiduesInFF(ff, teleap=None):
     import tempfile
 
-    if teleap is None:
-        teleap = _findTeLeap()
+    backend, value = _resolve_backend(teleap)
+    if backend == "native":
+        amberhome = os.path.normpath(
+            os.path.join(os.path.dirname(value), "../")
+        )
+    else:
+        amberhome = value
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        ff = _locateFile(ff, "ff", teleap)
+        ff = _locateFile(ff, "ff", amberhome)
         if ff is None:
             raise FileNotFoundError(
-                f"Could not find forcefield file. Check that AmberTools is installed correctly."
+                "Could not find forcefield file. Check that AmberTools "
+                "or tleap_pyodide is installed correctly."
             )
         shutil.copy(ff, tmpdir)
 
-        importflgs = _getTeLeapImportFlags(teleap, [ff])
+        script = f"logFile leap.log\nsource {os.path.basename(ff)}\nlist\nquit"
 
-        with open(os.path.join(tmpdir, "tleap.in"), "w") as f:
-            f.write(f"logFile leap.log\nsource {os.path.basename(ff)}\nlist\nquit")
+        if backend == "pyodide":
+            from tleap_pyodide import run_tleap as _pyodide_run
 
-        logpath = os.path.join(tmpdir, "log.txt")
-        outlog = os.path.join(tmpdir, "leap.log")
-        with open(logpath, "w") as f:
-            try:
-                cmd = [teleap, "-f", "./tleap.in"]
-                cmd[1:1] = importflgs
-                logger.debug(cmd)
-                call(cmd, stdout=f, cwd=tmpdir)
-            except Exception:
-                raise BuildError("teLeap failed at execution")
+            with open(os.path.join(tmpdir, "tleap.in"), "w") as f:
+                f.write(script)
+            result = _pyodide_run(work_dir=tmpdir, script_file="tleap.in")
+            outlog = os.path.join(tmpdir, "leap.log")
+            if not os.path.exists(outlog):
+                if "leap.log" in result:
+                    with open(outlog, "wb") as f:
+                        f.write(result["leap.log"])
+                else:
+                    raise BuildError("tleap_pyodide did not produce leap.log")
+            with open(outlog, "r") as f:
+                log_text = f.read()
+        else:
+            importflgs = _getTeLeapImportFlags(amberhome, [ff])
+            with open(os.path.join(tmpdir, "tleap.in"), "w") as f:
+                f.write(script)
+            logpath = os.path.join(tmpdir, "log.txt")
+            with open(logpath, "w") as f:
+                try:
+                    cmd = [value, "-f", "./tleap.in"]
+                    cmd[1:1] = importflgs
+                    logger.debug(cmd)
+                    call(cmd, stdout=f, cwd=tmpdir)
+                except Exception:
+                    raise BuildError("teLeap failed at execution")
+            outlog = os.path.join(tmpdir, "leap.log")
+            with open(outlog, "r") as f:
+                log_text = f.read()
 
-        residues = []
-        starting = False
-
-        with open(outlog, "r") as f:
-            for line in f:
-                if line.strip() == "> list":
-                    starting = True
-                    continue
-                if line.strip() == "quit":
-                    break
-                if starting:
-                    residues += line.strip().split()
-    return residues
+        return _parseResidueList(log_text)
 
 
 def defaultFf():
@@ -682,10 +761,12 @@ def build(
         Enable or disable ionization
     saltconc : float
         Salt concentration to add to the system after neutralization.
-    saltanion : {'Cl-'}
-        The anion type. Please use only AMBER ion atom names.
-    saltcation : {'Na+', 'K+', 'Cs+'}
-        The cation type. Please use only AMBER ion atom names.
+    saltanion : str
+        The anion type. Default: 'Cl-'. Available: 'Cl-'. Also accepts other formats such as 'CL',
+        'chloride', or 'CLA'.
+    saltcation : str
+        The cation type. Default: 'Na+'. Available: 'Na+', 'K+', 'Cs+', 'Mg2+', 'Ca2+', 'Zn2+'.
+        Also accepts other formats such as 'NA', 'sodium', or 'SOD'.
     disulfide : list of pairs of atomselection strings
         If None it will guess disulfide bonds. Otherwise provide a list pairs of atomselection strings for each pair of
         residues forming the disulfide bridge.
@@ -754,7 +835,7 @@ def build(
     )
     _detect_cofactors_ncaa_ptm(mol, param, topo)
 
-    _prepare_build(
+    backend, backend_value = _prepare_build(
         mol,
         ff=ff,
         topo=topo,
@@ -772,11 +853,11 @@ def build(
     )
 
     if ionize and execute and np.any(mol.atomselect("water")):
-        # Fast solute-only build to get total charge without building water
         molbuilt_solute = _run_tleap(
             outdir,
             "solute_charge",
-            teleap=teleap,
+            backend=backend,
+            backend_value=backend_value,
             ff=ff,
             teleapimports=teleapimports,
             script="tleap_solute.in",
@@ -815,7 +896,12 @@ def build(
 
     if execute:
         molbuilt = _run_tleap(
-            outdir, prefix, teleap=teleap, ff=ff, teleapimports=teleapimports
+            outdir,
+            prefix,
+            backend=backend,
+            backend_value=backend_value,
+            ff=ff,
+            teleapimports=teleapimports,
         )
     else:
         molbuilt = None
@@ -1002,14 +1088,17 @@ def _prepare_build(
     Generates two tleap scripts:
     - tleap.in: full build (solute + solvent + cyclic)
     - tleap_solute.in: solute-only build for fast charge calculation (only when water is present)
+
+    Returns
+    -------
+    tuple of (str, str)
+        The (backend, value) tuple from _resolve_backend.
     """
-    if teleap is None:
-        teleap = _findTeLeap()
+    backend, value = _resolve_backend(teleap)
+    if backend == "native":
+        amberhome = os.path.normpath(os.path.join(os.path.dirname(value), "../"))
     else:
-        if shutil.which(teleap) is None:
-            raise BuildError(
-                f"Could not find executable: `{teleap}` in the PATH. Cannot build for AMBER. Please install it with `conda install ambertools -c conda-forge`"
-            )
+        amberhome = value
 
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
@@ -1018,7 +1107,7 @@ def _prepare_build(
     ff_sources = []
     for i, force in enumerate(ensurelist(ff)):
         if not os.path.isfile(force):
-            force = _locateFile(force, "ff", teleap)
+            force = _locateFile(force, "ff", amberhome)
             if force is None:
                 continue
         newname = f"ff{i}_{os.path.basename(force)}"
@@ -1046,7 +1135,7 @@ def _prepare_build(
     newparam = []
     for i, fname in enumerate(sorted(param, key=lambda x: os.path.basename(x))):
         if not os.path.isfile(fname):
-            fname = _locateFile(fname, "param", teleap)
+            fname = _locateFile(fname, "param", amberhome)
             if fname is None:
                 continue
         newname = os.path.join(outdir, f"param{i}_{os.path.basename(fname)}")
@@ -1057,7 +1146,7 @@ def _prepare_build(
     newtopo = []
     for i, fname in enumerate(sorted(topo, key=lambda x: os.path.basename(x))):
         if not os.path.isfile(fname):
-            fname = _locateFile(fname, "topo", teleap)
+            fname = _locateFile(fname, "topo", amberhome)
             if fname is None:
                 continue
         bn = os.path.basename(fname)
@@ -1152,27 +1241,14 @@ def _prepare_build(
             **script_kwargs,
         )
 
+    return backend, value
 
-def _run_tleap(
-    outdir, prefix, teleap=None, ff=None, teleapimports=None, script="tleap.in"
-):
-    """Execute tleap, parse the log, read the output, and return the built Molecule."""
-    if teleap is None:
-        teleap = _findTeLeap()
 
-    teleapimportflags = _getTeLeapImportFlags(teleap, ff, teleapimports)
-    logpath = os.path.abspath(os.path.join(outdir, "log.txt"))
-    logger.info("Starting the build.")
-
-    with open(logpath, "w") as f:
-        cmd = [teleap, "-f", f"./{script}"]
-        cmd[1:1] = teleapimportflags
-        logger.debug(cmd)
-        result = subprocess.run(cmd, stdout=f, stderr=f, cwd=outdir)
-
+def _read_tleap_output(outdir, prefix, logpath):
+    """Shared post-processing: parse log, read prmtop/crd, return Molecule."""
     if not os.path.exists(logpath) or os.path.getsize(logpath) == 0:
         raise BuildError(
-            "teLeap produced no output log. It likely crashed before initialization. "
+            "teLeap produced no output log. It likely crashed before initialization."
         )
 
     errors = _logParser(logpath)
@@ -1183,21 +1259,18 @@ def _run_tleap(
             errors,
         )
     logger.info("Finished building.")
-    if result.returncode != 0:
-        raise BuildError(
-            f"teLeap exited with code {result.returncode}.\nCheck {logpath} for details."
-        )
 
+    crd_path = os.path.join(outdir, f"{prefix}.crd")
+    prmtop_path = os.path.join(outdir, f"{prefix}.prmtop")
     if (
-        os.path.exists(os.path.join(outdir, f"{prefix}.crd"))
-        and os.path.getsize(os.path.join(outdir, f"{prefix}.crd")) != 0
-        and os.path.getsize(os.path.join(outdir, f"{prefix}.prmtop")) != 0
+        os.path.exists(crd_path)
+        and os.path.getsize(crd_path) != 0
+        and os.path.exists(prmtop_path)
+        and os.path.getsize(prmtop_path) != 0
     ):
         try:
-            molbuilt = Molecule(
-                os.path.join(outdir, f"{prefix}.prmtop"), validateElements=False
-            )
-            molbuilt.read(os.path.join(outdir, f"{prefix}.crd"))
+            molbuilt = Molecule(prmtop_path, validateElements=False)
+            molbuilt.read(crd_path)
         except Exception as e:
             raise RuntimeError(
                 f"Failed at reading {prefix}.prmtop/{prefix}.crd due to error: {e}"
@@ -1210,6 +1283,87 @@ def _run_tleap(
     molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"), writebonds=False)
     detectCisPeptideBonds(molbuilt, respect_bonds=True)
     return molbuilt
+
+
+def _run_tleap_native(
+    outdir, prefix, teleap, amberhome, ff=None, teleapimports=None, script="tleap.in"
+):
+    """Execute native teLeap binary as a subprocess."""
+    teleapimportflags = _getTeLeapImportFlags(amberhome, ff, teleapimports)
+    logpath = os.path.abspath(os.path.join(outdir, "log.txt"))
+    logger.info("Starting the build.")
+
+    with open(logpath, "w") as f:
+        cmd = [teleap, "-f", f"./{script}"]
+        cmd[1:1] = teleapimportflags
+        logger.debug(cmd)
+        result = subprocess.run(cmd, stdout=f, stderr=f, cwd=outdir)
+
+    if result.returncode != 0:
+        errors = _logParser(logpath)
+        if errors:
+            raise BuildError(
+                errors
+                + [f"Check {logpath} for further information on errors in building."],
+                errors,
+            )
+        raise BuildError(
+            f"teLeap exited with code {result.returncode}.\n"
+            f"Check {logpath} for details."
+        )
+
+    return _read_tleap_output(outdir, prefix, logpath)
+
+
+def _run_tleap_pyodide(outdir, prefix, ff=None, script="tleap.in"):
+    """Execute tleap via tleap_pyodide.run_tleap using the work_dir parameter."""
+    from tleap_pyodide import run_tleap as _pyodide_run
+
+    logger.info("Starting the build (pyodide).")
+
+    extra_imports = _getHtmdExtraImports(ff)
+
+    result = _pyodide_run(
+        work_dir=outdir,
+        script_file=script,
+        extra_imports=extra_imports if extra_imports else None,
+    )
+
+    logpath = os.path.abspath(os.path.join(outdir, "log.txt"))
+    with open(logpath, "wb") as f:
+        f.write(result.get("stdout", b""))
+
+    return _read_tleap_output(outdir, prefix, logpath)
+
+
+def _run_tleap(
+    outdir,
+    prefix,
+    backend="native",
+    backend_value=None,
+    ff=None,
+    teleapimports=None,
+    script="tleap.in",
+):
+    """Dispatch tleap execution to native or pyodide backend."""
+    if backend == "pyodide":
+        return _run_tleap_pyodide(outdir, prefix, ff=ff, script=script)
+    else:
+        teleap = backend_value
+        if teleap is None:
+            teleap = _findTeLeap()
+        amberhome = os.path.normpath(
+            os.path.join(os.path.dirname(teleap), "../")
+        )
+        return _run_tleap_native(
+            outdir,
+            prefix,
+            teleap,
+            amberhome,
+            ff=ff,
+            teleapimports=teleapimports,
+            script=script,
+        )
 
 
 def _detect_cyclic_segments(mol: Molecule):

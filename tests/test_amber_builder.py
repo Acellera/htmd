@@ -16,11 +16,7 @@ import shutil
 import os
 
 reason = "teLeap is not installed. Cannot test amber.build"
-try:
-    _findTeLeap()
-    tleap_installed = True
-except Exception:
-    tleap_installed = False
+tleap_installed = _findTeLeap() is not None
 
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
