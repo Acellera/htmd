@@ -458,6 +458,71 @@ def _test_ionize_salt(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
+def _test_5vbl_noncanonical_full_pipeline(tmp_path):
+    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.autosegment import autoSegment
+    from htmd.builder.noncanonical import parameterizeNonCanonicalResidues
+
+    if not shutil.which("antechamber", mode=os.X_OK):
+        pytest.skip("antechamber (AmberTools) is not installed")
+
+    residue_smiles = {
+        "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
+        "ALC": "C1CCC(CC1)C[C@@H](C(=O)O)N",
+        "HRG": "C(CCNC(=N)N)C[C@@H](C(=O)O)N",
+        "NLE": "CCCC[C@@H](C(=O)O)N",
+        "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C(=O)O",
+        # "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
+    }
+
+    mol = Molecule("5VBL")
+    for res in residue_smiles:
+        mol.templateResidueFromSmiles(
+            f'resname "{res}"', residue_smiles[res], addHs=True
+        )
+    # del residue_smiles["OLC"]
+    mol.remove("resname OLC")
+
+    mol = autoSegment(mol, fields=("chain", "segid"))
+
+    prepdir = os.path.join(tmp_path, "prepared")
+    pmol = systemPrepare(
+        mol, residue_smiles=residue_smiles, outdir=prepdir, _molkit_ff=False
+    )
+
+    cifs = glob(os.path.join(prepdir, "*.cif"))
+    assert len(cifs) > 0, "No CIF files produced by systemPrepare"
+
+    paramdir = os.path.join(tmp_path, "params")
+    for cif in cifs:
+        parameterizeNonCanonicalResidues(
+            cif,
+            paramdir,
+            forcefield="GAFF2",
+            charge_model="Gasteiger",
+            is_nterm=False,
+            is_cterm=True if "200" in cif else False,
+        )
+
+    topos = glob(os.path.join(paramdir, "*.prepi"))
+    params = glob(os.path.join(paramdir, "*.frcmod"))
+    assert len(topos) > 0, "No prepi files produced by parameterizeNonCanonicalResidues"
+    assert (
+        len(params) > 0
+    ), "No frcmod files produced by parameterizeNonCanonicalResidues"
+
+    builddir = os.path.join(tmp_path, "build")
+    caps = {"P0": ("none", "none"), "P1": ("none", "none")}
+    molbuilt = build(
+        pmol, topo=topos, param=params, outdir=builddir, ionize=False, caps=caps
+    )
+    assert molbuilt is not None
+    assert molbuilt.numAtoms > 0
+    assert os.path.exists(os.path.join(builddir, "structure.prmtop"))
+    assert os.path.exists(os.path.join(builddir, "structure.pdb"))
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
 def _test_atomtype_decollisioning(tmp_path):
     # Tests that mol2 and cif building produce same results
     np.random.seed(1)
