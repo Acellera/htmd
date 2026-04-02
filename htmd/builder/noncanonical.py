@@ -106,101 +106,157 @@ def _find_antechamber():
     return shutil.which("antechamber", mode=os.X_OK)
 
 
-def _fftype_antechamber_native(
-    mol, tmpdir, method="gaff2", netcharge=0, charge_method=None
-):
-    """Assign GAFF2 atom types and generate frcmod using native antechamber/parmchk2.
+def _run_ambertools(program, cmd, cwd, use_pyodide=False, input_files=None):
+    """Run an AmberTools command via native subprocess or antechamber_pyodide.
 
-    Writes ``typed.mol2`` and ``mol.frcmod`` into *tmpdir*.
-    Returns ``(typed_mol, frcmod_path)``.
+    Parameters
+    ----------
+    program : str
+        The program name (e.g. "antechamber", "parmchk2", "prepgen").
+    cmd : list of str
+        Full command-line arguments (program name first).
+    cwd : str
+        Working directory. Native runs with cwd; pyodide ignores it.
+    use_pyodide : bool
+        If True, dispatch via antechamber_pyodide.run.
+    input_files : dict or None
+        For pyodide: mapping of filename -> bytes content.
+
+    Returns
+    -------
+    dict or None
+        Pyodide returns a dict of output filename -> bytes.
+        Native returns None (outputs are written to disk).
     """
-    import subprocess
+    if use_pyodide:
+        from antechamber_pyodide import run as _ac_run
 
-    mol2path = os.path.join(tmpdir, "mol.mol2")
+        return _ac_run(program, cmd, input_files=input_files or {})
+    else:
+        import subprocess
+
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"{program} failed (exit {result.returncode}):\n{result.stderr}"
+            )
+        return None
+
+
+def _fftype_antechamber(
+    mol,
+    tmpdir,
+    method="gaff2",
+    netcharge=0,
+    charge_method=None,
+    use_pyodide=False,
+    output_mol2="typed.mol2",
+    output_frcmod="mol.frcmod",
+):
+    """Assign GAFF2 atom types and generate frcmod using antechamber/parmchk2.
+
+    Parameters
+    ----------
+    mol : Molecule
+        Input molecule.
+    tmpdir : str
+        Working directory for intermediate files.
+    method : str
+        Force-field atom-type method ("gaff" or "gaff2").
+    netcharge : int
+        Net formal charge of the molecule.
+    charge_method : str or None
+        Charge model passed to antechamber's ``-c`` flag.
+    use_pyodide : bool
+        Dispatch via antechamber_pyodide instead of subprocess.
+    output_mol2 : str
+        Basename for the typed mol2 file written into *tmpdir*.
+    output_frcmod : str
+        Basename for the frcmod file written into *tmpdir*.
+
+    Returns
+    -------
+    typed_mol : Molecule
+        Molecule with GAFF2 atom types assigned.
+    frcmod_path : str
+        Absolute path to the generated frcmod file.
+    """
+    input_mol2 = "input.mol2"
+    mol2path = os.path.join(tmpdir, input_mol2)
     mol.write(mol2path)
 
     ac_charge = _CHARGE_METHOD_MAP.get(charge_method.lower() if charge_method else None)
 
-    typed_path = os.path.join(tmpdir, "typed.mol2")
     cmd = [
         "antechamber",
-        "-i", mol2path,
-        "-fi", "mol2",
-        "-o", typed_path,
-        "-fo", "mol2",
-        "-at", method.lower(),
-        "-nc", str(netcharge),
-        "-pf", "y",
-        "-dr", "n",
+        "-i",
+        input_mol2,
+        "-fi",
+        "mol2",
+        "-o",
+        output_mol2,
+        "-fo",
+        "mol2",
+        "-at",
+        method.lower(),
+        "-nc",
+        str(netcharge),
+        "-dr",
+        "n",
+        "-j",
+        "1",
     ]
     if ac_charge is not None:
         cmd += ["-c", ac_charge]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmpdir)
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"antechamber failed (exit {result.returncode}):\n{result.stderr}"
-        )
+    input_files = None
+    if use_pyodide:
+        with open(mol2path, "rb") as f:
+            input_files = {input_mol2: f.read()}
 
-    frcmod_path = os.path.join(tmpdir, "mol.frcmod")
+    result = _run_ambertools(
+        "antechamber",
+        cmd,
+        cwd=tmpdir,
+        use_pyodide=use_pyodide,
+        input_files=input_files,
+    )
+
+    typed_path = os.path.join(tmpdir, output_mol2)
+    frcmod_path = os.path.join(tmpdir, output_frcmod)
+
+    if use_pyodide:
+        typed_mol2_data = result[output_mol2]
+        _write_pyodide_output(typed_path, typed_mol2_data)
+        input_files = {output_mol2: typed_mol2_data}
+    else:
+        with open(typed_path, "rb") as f:
+            input_files = {output_mol2: f.read()}
+
     cmd = [
         "parmchk2",
-        "-i", typed_path,
-        "-f", "mol2",
-        "-o", frcmod_path,
-        "-s", method.lower(),
+        "-i",
+        output_mol2,
+        "-f",
+        "mol2",
+        "-o",
+        output_frcmod,
+        "-s",
+        {"gaff": "1", "gaff2": "2"}[method.lower()],
+        "-a",
+        "Y",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmpdir)
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"parmchk2 failed (exit {result.returncode}):\n{result.stderr}"
-        )
 
-    typed_mol = Molecule(typed_path)
-    return typed_mol, frcmod_path
-
-
-def _fftype_antechamber_pyodide(
-    mol, tmpdir, method="gaff2", netcharge=0, charge_method=None
-):
-    """Assign GAFF2 atom types and generate frcmod using antechamber_pyodide.
-
-    Writes ``typed.mol2`` and ``mol.frcmod`` into *tmpdir*.
-    Returns ``(typed_mol, frcmod_path)``.
-    """
-    from antechamber_pyodide import run_antechamber, run_parmchk2
-
-    mol2path = os.path.join(tmpdir, "mol.mol2")
-    mol.write(mol2path)
-    with open(mol2path, "rb") as f:
-        mol2_bytes = f.read()
-
-    ac_charge = _CHARGE_METHOD_MAP.get(charge_method.lower() if charge_method else None)
-
-    ac_result = run_antechamber(
-        input_file="mol.mol2",
-        input_format="mol2",
-        output_file="typed.mol2",
-        output_format="mol2",
-        charge_method=ac_charge,
-        atom_type=method.lower(),
-        net_charge=netcharge,
-        input_files={"mol.mol2": mol2_bytes},
-    )
-    typed_mol2 = ac_result["typed.mol2"]
-
-    pc_result = run_parmchk2(
-        input_file="typed.mol2",
-        input_format="mol2",
-        output_file="mol.frcmod",
-        force_field=method.lower(),
-        input_files={"typed.mol2": typed_mol2},
+    result = _run_ambertools(
+        "parmchk2",
+        cmd,
+        cwd=tmpdir,
+        use_pyodide=use_pyodide,
+        input_files=input_files,
     )
 
-    typed_path = os.path.join(tmpdir, "typed.mol2")
-    frcmod_path = os.path.join(tmpdir, "mol.frcmod")
-    _write_pyodide_output(typed_path, typed_mol2)
-    _write_pyodide_output(frcmod_path, pc_result["mol.frcmod"])
+    if use_pyodide:
+        _write_pyodide_output(frcmod_path, result[output_frcmod])
 
     typed_mol = Molecule(typed_path)
     return typed_mol, frcmod_path
@@ -213,6 +269,7 @@ def parameterizeNonCanonicalResidues(
     charge_model="AM1-BCC",
     is_nterm=False,
     is_cterm=False,
+    backend=None,
 ):
     """Parameterize non-canonical residues.
 
@@ -230,6 +287,10 @@ def parameterizeNonCanonicalResidues(
         Whether the residue is a terminal N-term
     is_cterm : bool, optional
         Whether the residue is a terminal C-term
+    backend : str or None, optional
+        Force a specific backend: "parameterize", "antechamber_pyodide", or
+        "antechamber_native".  When None (default) the first available backend
+        is selected automatically.
 
     """
     cifs = ensurelist(cifs)
@@ -247,32 +308,42 @@ def parameterizeNonCanonicalResidues(
             is_nterm=is_nterm,
             is_cterm=is_cterm,
             charge_model=charge_model,
+            backend=backend,
         )
 
 
 def _parameterize_non_canonical_residue(
-    mol, outdir, forcefield, charge_model, is_nterm=False, is_cterm=False
+    mol,
+    outdir,
+    forcefield,
+    charge_model,
+    is_nterm=False,
+    is_cterm=False,
+    backend=None,
 ):
-    try:
-        from parameterize.main import parameterize_molecule
-
-        _backend = "parameterize"
-    except ImportError:
+    if backend is not None:
+        _backend = backend
+    else:
         try:
-            import antechamber_pyodide  # noqa: F401
+            from parameterize.main import parameterize_molecule  # noqa: F401
 
-            _backend = "antechamber_pyodide"
+            _backend = "parameterize"
         except ImportError:
-            if _find_antechamber() is not None:
-                _backend = "antechamber_native"
-            else:
-                raise ImportError(
-                    "No parameterization backend available. Install one of: "
-                    "parameterize (private, contact info@acellera.com), "
-                    "antechamber_pyodide (for Pyodide environments), "
-                    "or AmberTools (conda install ambertools -c conda-forge) "
-                    "which provides the antechamber command."
-                )
+            try:
+                import antechamber_pyodide  # noqa: F401
+
+                _backend = "antechamber_pyodide"
+            except ImportError:
+                if _find_antechamber() is not None:
+                    _backend = "antechamber_native"
+                else:
+                    raise ImportError(
+                        "No parameterization backend available. Install one of: "
+                        "parameterize (private, contact info@acellera.com), "
+                        "antechamber_pyodide (for Pyodide environments), "
+                        "or AmberTools (conda install ambertools -c conda-forge) "
+                        "which provides the antechamber command."
+                    )
 
     os.makedirs(outdir, exist_ok=True)
 
@@ -292,6 +363,8 @@ def _parameterize_non_canonical_residue(
         cmol.resid[:] = 1
 
         if _backend == "parameterize":
+            from parameterize.main import parameterize_molecule
+
             exclude_atoms = list(np.where(xmol.resname != resn)[0])
             cmol.write(os.path.join(tmpdir, f"{resn}.cif"))
 
@@ -307,23 +380,15 @@ def _parameterize_non_canonical_residue(
 
             typed_mol = Molecule(os.path.join(tmpdir, "parameters", f"{resn}-orig.cif"))
             frcmod = os.path.join(tmpdir, "parameters", f"{resn}.frcmod")
-        elif _backend == "antechamber_pyodide":
+        else:
             netcharge = int(np.sum(cmol.formalcharge))
-            typed_mol, frcmod = _fftype_antechamber_pyodide(
+            typed_mol, frcmod = _fftype_antechamber(
                 cmol,
                 tmpdir,
                 method=forcefield,
                 netcharge=netcharge,
                 charge_method=charge_model,
-            )
-        else:  # antechamber_native
-            netcharge = int(np.sum(cmol.formalcharge))
-            typed_mol, frcmod = _fftype_antechamber_native(
-                cmol,
-                tmpdir,
-                method=forcefield,
-                netcharge=netcharge,
-                charge_method=charge_model,
+                use_pyodide=_backend == "antechamber_pyodide",
             )
 
         shutil.copy(frcmod, outdir)
@@ -357,6 +422,15 @@ def _post_process_parameterize(
             mol.formalcharge[pp[0]] = refmol.formalcharge[pp[1]]
             mol.resname[pp[0]] = refmol.resname[pp[1]]
 
+        # Antechamber can change the case of atom names (e.g. "CL" -> "Cl").
+        # The graph matching above may not cover every atom, so fix any
+        # remaining case mismatches using the reference molecule's names.
+        ref_name_case = {n.upper(): n for n in np.unique(refmol.name)}
+        for i in range(mol.numAtoms):
+            upper = mol.name[i].upper()
+            if upper in ref_name_case and mol.name[i] != ref_name_case[upper]:
+                mol.name[i] = ref_name_case[upper]
+
         padding_atoms[mol.resname != resn] = True
 
     # Rename backbone atom types
@@ -385,65 +459,42 @@ def _post_process_parameterize(
         mol.write(mol2file)
 
         acfile = os.path.join(tmpdir, f"{resn}_mod.ac")
+        ac_cmd = [
+            "antechamber",
+            "-i",
+            f"{resn}.mol2",
+            "-fi",
+            "mol2",
+            "-o",
+            f"{resn}_mod.ac",
+            "-fo",
+            "ac",
+            "-nc",
+            str(mol.formalcharge.sum()),
+            "-pf",
+            "y",
+            "-dr",
+            "n",
+            "-j",
+            "0",
+            "-an",
+            "n",
+        ]
 
+        input_files = None
         if use_pyodide:
-            from antechamber_pyodide import run as _ac_run
-
             with open(mol2file, "rb") as f:
-                mol2_bytes = f.read()
+                input_files = {f"{resn}.mol2": f.read()}
 
-            ac_result = _ac_run(
-                "antechamber",
-                [
-                    "antechamber",
-                    "-fi",
-                    "mol2",
-                    "-fo",
-                    "ac",
-                    "-i",
-                    f"{resn}.mol2",
-                    "-o",
-                    f"{resn}_mod.ac",
-                    "-dr",
-                    "n",
-                    "-j",
-                    "0",
-                    "-nc",
-                    str(mol.formalcharge.sum()),
-                    "-an",
-                    "n",
-                    "-pf",
-                    "y",
-                ],
-                input_files={f"{resn}.mol2": mol2_bytes},
-            )
-            _write_pyodide_output(acfile, ac_result[f"{resn}_mod.ac"])
-        else:
-            from subprocess import call
-
-            call(
-                [
-                    "antechamber",
-                    "-fi",
-                    "mol2",
-                    "-fo",
-                    "ac",
-                    "-i",
-                    mol2file,
-                    "-o",
-                    acfile,
-                    "-dr",
-                    "n",
-                    "-j",
-                    "0",
-                    "-nc",
-                    str(mol.formalcharge.sum()),
-                    "-an",
-                    "n",
-                    "-pf",
-                    "y",
-                ]
-            )
+        result = _run_ambertools(
+            "antechamber",
+            ac_cmd,
+            cwd=tmpdir,
+            use_pyodide=use_pyodide,
+            input_files=input_files,
+        )
+        if use_pyodide:
+            _write_pyodide_output(acfile, result[f"{resn}_mod.ac"])
 
         mol_g = mol.toGraph()
         n_idx = np.where(mol.name == "N")[0][0]
@@ -461,51 +512,42 @@ def _post_process_parameterize(
             f.write(f"CHARGE {mol.formalcharge.sum():.1f}\n")
 
         prepi = os.path.join(outdir, f"{resn}.prepi")
+        pg_cmd = [
+            "prepgen",
+            "-i",
+            f"{resn}_mod.ac",
+            "-o",
+            f"{resn}.prepi",
+            "-f",
+            "prepi",
+            "-m",
+            f"mainchain.{resn.lower()}",
+            "-rn",
+            resn,
+        ]
 
+        input_files = None
         if use_pyodide:
             with open(acfile, "rb") as f:
                 ac_bytes = f.read()
             with open(mainchain, "rb") as f:
                 mc_bytes = f.read()
+            input_files = {
+                f"{resn}_mod.ac": ac_bytes,
+                f"mainchain.{resn.lower()}": mc_bytes,
+            }
 
-            pg_result = _ac_run(
-                "prepgen",
-                [
-                    "prepgen",
-                    "-i",
-                    f"{resn}_mod.ac",
-                    "-o",
-                    f"{resn}.prepi",
-                    "-f",
-                    "int",
-                    "-m",
-                    f"mainchain.{resn.lower()}",
-                    "-rn",
-                    resn,
-                ],
-                input_files={
-                    f"{resn}_mod.ac": ac_bytes,
-                    f"mainchain.{resn.lower()}": mc_bytes,
-                },
-            )
-            _write_pyodide_output(prepi, pg_result[f"{resn}.prepi"])
+        result = _run_ambertools(
+            "prepgen",
+            pg_cmd,
+            cwd=tmpdir,
+            use_pyodide=use_pyodide,
+            input_files=input_files,
+        )
+        if use_pyodide:
+            _write_pyodide_output(prepi, result[f"{resn}.prepi"])
         else:
-            call(
-                [
-                    "prepgen",
-                    "-i",
-                    acfile,
-                    "-o",
-                    prepi,
-                    "-f",
-                    "prepi",
-                    "-m",
-                    mainchain,
-                    "-rn",
-                    resn,
-                ]
-            )
-            print("")  # Add a newline after the output of prepgen
+            shutil.copy(os.path.join(tmpdir, f"{resn}.prepi"), prepi)
 
         _fix_prepi_atomname_capitalization(mol, prepi)
 
@@ -635,4 +677,3 @@ def _duplicate_parameters(prm, original):
 
         for bt in new_bt:
             prm.__dict__[prm_typ][bt] = deepcopy(new_bt[bt])
-

@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import shutil
-import tempfile
 import os
 from glob import glob
 
@@ -346,24 +345,23 @@ NCAA_CIF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "noncano
     not _antechamber_installed, reason="Requires native antechamber (AmberTools)"
 )
 class _TestNCAAResParamNativeAntechamber:
-    def _test_ncaa_native_antechamber_produces_output(self):
+    def _test_ncaa_native_antechamber_produces_output(self, tmp_path):
         """Smoke test: native antechamber backend produces frcmod and prepi."""
 
         cif = os.path.join(DATA_DIR, "test-custom-residue-param", "33X.cif")
-        with tempfile.TemporaryDirectory() as tmpdir:
-            parameterizeNonCanonicalResidues(
-                cif,
-                tmpdir,
-                forcefield="GAFF2",
-                charge_model="AM1-BCC",
-                backend="antechamber_native",
-            )
-            frcmods = glob(os.path.join(tmpdir, "*.frcmod"))
-            prepis = glob(os.path.join(tmpdir, "*.prepi"))
-            assert len(frcmods) >= 1, "No frcmod file produced"
-            assert len(prepis) == 1, "Expected exactly one prepi file"
-            assert os.path.getsize(prepis[0]) > 0, "prepi file is empty"
-            assert os.path.getsize(frcmods[0]) > 0, "frcmod file is empty"
+        parameterizeNonCanonicalResidues(
+            cif,
+            tmp_path,
+            forcefield="GAFF2",
+            charge_model="AM1-BCC",
+            backend="antechamber_native",
+        )
+        frcmods = glob(os.path.join(tmp_path, "*.frcmod"))
+        prepis = glob(os.path.join(tmp_path, "*.prepi"))
+        assert len(frcmods) >= 1, "No frcmod file produced"
+        assert len(prepis) == 1, "Expected exactly one prepi file"
+        assert os.path.getsize(prepis[0]) > 0, "prepi file is empty"
+        assert os.path.getsize(frcmods[0]) > 0, "frcmod file is empty"
 
     @pytest.mark.parametrize(
         "cif_file",
@@ -401,59 +399,59 @@ class _TestNCAAResParamNativeAntechamber:
     not _PARAMETERIZE_INSTALLED, reason="Can only run with parameterize installed"
 )
 class _TestNCAAResParam:
-    def _test_ncaa_residue_parameterization(self):
+    @pytest.mark.parametrize(
+        "cif_file",
+        sorted(glob(os.path.join(DATA_DIR, "test-custom-residue-param", "*.cif"))),
+        ids=lambda p: os.path.splitext(os.path.basename(p))[0],
+    )
+    def _test_ncaa_residue_parameterization(self, cif_file, tmp_path):
         refdir = os.path.join(DATA_DIR, "test-custom-residue-param")
         refresdir = os.path.join(refdir, "gaff2-params")
-        cifs = glob(os.path.join(refdir, "*.cif"))
-        for cif in cifs:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                parameterizeNonCanonicalResidues(
-                    cif, tmpdir, forcefield="GAFF2", calculator=None
-                )
+        parameterizeNonCanonicalResidues(cif_file, tmp_path, forcefield="GAFF2")
 
-                frcmod = glob(os.path.join(tmpdir, "*.frcmod"))[0]
-                name = os.path.basename(frcmod)
-                _compare_frcmod(os.path.join(refresdir, name), frcmod)
+        frcmod = glob(os.path.join(tmp_path, "*.frcmod"))[0]
+        name = os.path.basename(frcmod)
+        _compare_frcmod(os.path.join(refresdir, name), frcmod)
 
-                prepi = glob(os.path.join(tmpdir, "*.prepi"))[0]
-                name = os.path.basename(prepi)
-                _compare_prepis(os.path.join(refresdir, name), prepi)
+        prepi = glob(os.path.join(tmp_path, "*.prepi"))[0]
+        name = os.path.basename(prepi)
+        _compare_prepis(os.path.join(refresdir, name), prepi)
 
-    def _test_ncaa_residue_parameterization_terminals(self):
-        refdir = home(dataDir="test-custom-residue-param")
+    @pytest.mark.parametrize(
+        "cif_file",
+        sorted(glob(os.path.join(DATA_DIR, "test-custom-residue-param", "*.cif"))),
+        ids=lambda p: os.path.splitext(os.path.basename(p))[0],
+    )
+    def _test_ncaa_residue_parameterization_terminals(self, cif_file, tmp_path):
+        refdir = os.path.join(DATA_DIR, "test-custom-residue-param")
         refresdir = os.path.join(refdir, "gaff2-params-terminals")
-        cifs = glob(os.path.join(refdir, "*.cif"))
-        for cif in cifs:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                parameterizeNonCanonicalResidues(
-                    cif,
-                    tmpdir,
-                    forcefield="GAFF2",
-                    is_cterm=True,
-                    is_nterm=True,
-                    calculator=None,
-                )
+        parameterizeNonCanonicalResidues(
+            cif_file,
+            tmp_path,
+            forcefield="GAFF2",
+            is_cterm=True,
+            is_nterm=True,
+        )
 
-                frcmod = glob(os.path.join(tmpdir, "*.frcmod"))[0]
-                name = os.path.basename(frcmod)
-                _compare_frcmod(os.path.join(refresdir, name), frcmod)
+        frcmod = glob(os.path.join(tmp_path, "*.frcmod"))[0]
+        name = os.path.basename(frcmod)
+        _compare_frcmod(os.path.join(refresdir, name), frcmod)
 
-                prepi = glob(os.path.join(tmpdir, "*.prepi"))[0]
-                name = os.path.basename(prepi)
-                _compare_prepis(os.path.join(refresdir, name), prepi)
+        prepi = glob(os.path.join(tmp_path, "*.prepi"))[0]
+        name = os.path.basename(prepi)
+        _compare_prepis(os.path.join(refresdir, name), prepi)
 
-    # def _test_ncaa_residue_parameterization_xTB(self):
-    #     refdir = home(dataDir="test-custom-residue-param")
+    # def _test_ncaa_residue_parameterization_xTB(self, tmp_path):
+    #     refdir = os.path.join(DATA_DIR, "test-custom-residue-param")
     #     refresdir = os.path.join(refdir, "xtb-params")
     #     cif = os.path.join(refdir, "33X.cif")
-    #     with tempfile.TemporaryDirectory() as tmpdir:
-    #         parameterizeNonCanonicalResidues(
-    #             cif, tmpdir, forcefield="GAFF2", calculator="xTB"
-    #         )
-    #         frcmod = glob(os.path.join(tmpdir, "*.frcmod"))[0]
-    #         name = os.path.basename(frcmod)
-    #         _compare_frcmod(os.path.join(refresdir, name), frcmod)
+    #     parameterizeNonCanonicalResidues(
+    #         cif, tmp_path, forcefield="GAFF2", calculator="xTB"
+    #     )
+    #     frcmod = glob(os.path.join(tmp_path, "*.frcmod"))[0]
+    #     name = os.path.basename(frcmod)
+    #     _compare_frcmod(os.path.join(refresdir, name), frcmod)
 
-    #         prepi = glob(os.path.join(tmpdir, "*.prepi"))[0]
-    #         name = os.path.basename(prepi)
-    #         _compare_prepis(os.path.join(refresdir, name), prepi)
+    #     prepi = glob(os.path.join(tmp_path, "*.prepi"))[0]
+    #     name = os.path.basename(prepi)
+    #     _compare_prepis(os.path.join(refresdir, name), prepi)
