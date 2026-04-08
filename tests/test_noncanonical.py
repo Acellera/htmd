@@ -90,7 +90,9 @@ def _compare_frcmod(
                 refLines, resLines, fromfile=refFile, tofile=resFile, n=1
             )
             if len(list(diff)):
-                raise RuntimeError("".join(diff))
+                assert (
+                    False
+                ), f"Differences found in {refFile} and {resFile}: {''.join(diff)}"
 
 
 def _compare_prepis(refFile, resFile):
