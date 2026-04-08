@@ -20,7 +20,7 @@ class _TestIonGetCharge:
         assert _ionGetCharge("CL") == -1
 
     def _test_unknown_ion_raises(self):
-        with pytest.raises(NameError, match="not in the database"):
+        with pytest.raises(NameError, match="not recognized"):
             _ionGetCharge("XX")
 
 

@@ -417,9 +417,9 @@ def _findLeastAreaLipid(folder):
         maxdist.append(dists.max())
     return ff[np.argmin(maxdist)], np.min(maxdist)
 
-from htmd.builder.amber import _findTeLeap
+from htmd.builder.amber import _resolve_backend
 try:
-    _findTeLeap()
+    _resolve_backend()
     tleap_installed = True
 except Exception:
     tleap_installed = False
