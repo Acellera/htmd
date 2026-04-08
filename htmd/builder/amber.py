@@ -737,7 +737,8 @@ def build(
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available forcefield files.
         Default: :func:`amber.defaultFf <htmd.builder.amber.defaultFf>`
     topo : list of str
-        A list of topology `prepi/prep/in/mol2/cif` files.
+        A list of topology `prepi/prep/in/cif` files.
+        CIF and MOL2 files are automatically converted to prepi via prepgen.
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available topology files.
         Default: :func:`amber.defaultTopo <htmd.builder.amber.defaultTopo>`
         When passing residues parameterized with the `parameterize` tool, please pass the .cif file.
@@ -918,6 +919,102 @@ def _create_atomtype_section(mol):
         atypes_str += f'	{{ "{at}"  "{el}" "sp3" }}\n'
     atypes_str += "}\n"
     return atypes_str
+
+
+_AC_BONDORDER_MAP = {"1": 1, "2": 2, "3": 3, "ar": 7, "am": 1, "un": 1}
+
+
+def _molecule_to_ac(mol):
+    """Convert a Molecule to AMBER AC format string for use with prepgen.
+
+    Writes atom coordinates, partial charges, atom types, and bond
+    connectivity in the AC (antechamber intermediate) format so that
+    prepgen can convert it to a prepi file without running antechamber.
+    """
+    from collections import Counter
+
+    total_charge = float(np.sum(mol.charge))
+    resname = mol.resname[0]
+
+    elem_counts = Counter(mol.element)
+    formula = " ".join(f"{el}{c}" for el, c in sorted(elem_counts.items()))
+
+    lines = [f"CHARGE   {total_charge:10.4f}", f"Formula: {formula}"]
+
+    for i in range(mol.numAtoms):
+        x, y, z = mol.coords[i, :, 0]
+        lines.append(
+            f"ATOM  {i + 1:>5d}  {mol.name[i]:<4s} {resname:<4s}"
+            f"    1    {x:10.4f}{y:10.4f}{z:10.4f}"
+            f" {mol.charge[i]:12.6f}       {mol.atomtype[i]}"
+        )
+
+    for i in range(len(mol.bonds)):
+        a1, a2 = int(mol.bonds[i, 0]), int(mol.bonds[i, 1])
+        bt = str(mol.bondtype[i]).lower() if i < len(mol.bondtype) else "1"
+        order = _AC_BONDORDER_MAP.get(bt, 1)
+        lines.append(
+            f"BOND {i + 1:>4d}  {a1 + 1:>4d}  {a2 + 1:>4d}  {order:>2d}"
+            f"    {mol.name[a1]:<4s}  {mol.name[a2]:<4s}"
+        )
+
+    return "\n".join(lines) + "\n"
+
+
+def _convert_topo_to_prepi(mol, prepi_path, use_pyodide=False):
+    """Convert a Molecule to prepi format via AC file and prepgen.
+
+    Writes the Molecule as an AC file, runs prepgen without a mainchain
+    file (letting it auto-detect chain ordering), and saves the resulting
+    prepi to *prepi_path*.
+    """
+    import tempfile
+
+    resname = mol.resname[0]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ac_content = _molecule_to_ac(mol)
+        ac_basename = f"{resname}.ac"
+        ac_path = os.path.join(tmpdir, ac_basename)
+        with open(ac_path, "w") as f:
+            f.write(ac_content)
+
+        prepi_basename = f"{resname}.prepi"
+        cmd = [
+            "prepgen",
+            "-i",
+            ac_basename,
+            "-o",
+            prepi_basename,
+            "-f",
+            "prepi",
+            "-rn",
+            resname,
+        ]
+
+        if use_pyodide:
+            from antechamber_pyodide import run as _ac_run
+
+            with open(ac_path, "rb") as f:
+                ac_bytes = f.read()
+
+            result = _ac_run(
+                "prepgen",
+                cmd,
+                input_files={ac_basename: ac_bytes},
+            )
+            prepi_data = result[prepi_basename]
+            with open(prepi_path, "wb") as f:
+                f.write(
+                    prepi_data if isinstance(prepi_data, bytes) else prepi_data.encode()
+                )
+        else:
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmpdir)
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"prepgen failed (exit {result.returncode}):\n{result.stderr}"
+                )
+            shutil.copy(os.path.join(tmpdir, prepi_basename), prepi_path)
 
 
 def _write_tleap_script(
@@ -1158,21 +1255,20 @@ def _prepare_build(
 
     # --- Generate topology loading commands ---
     topo_cmds = []
+    use_pyodide = backend == "pyodide"
     for fname in newtopo:
-        if fname.lower().endswith(".mol2"):
-            logger.warning(
-                "Please refrain from using MOL2 files as topologies as they are missing crucial information. Use `parameterize` .cif files or .prepi files instead."
-            )
-            resname = Molecule(fname).resname[0]
-            topo_cmds.append(f"{resname} = loadmol2 {os.path.basename(fname)}\n")
-        elif fname.lower().endswith(".cif"):
+        ext = os.path.splitext(fname)[1].lower()
+        if ext in (".mol2", ".cif"):
+            if ext == ".mol2":
+                logger.warning(
+                    "MOL2 topologies can cause tleap to guess wrong elements. "
+                    "Converting to prepi. Consider using .cif or .prepi files instead."
+                )
             _resmol = Molecule(fname)
-            _mol2f = f"{os.path.splitext(fname)[0]}.mol2"
-            _resmol.write(_mol2f)
+            prepi_path = f"{os.path.splitext(fname)[0]}.prepi"
+            _convert_topo_to_prepi(_resmol, prepi_path, use_pyodide=use_pyodide)
             topo_cmds.append(_create_atomtype_section(_resmol))
-            topo_cmds.append(
-                f"{_resmol.resname[0]} = loadmol2 {os.path.basename(_mol2f)}\n"
-            )
+            topo_cmds.append(f"loadamberprep {os.path.basename(prepi_path)}\n")
         else:
             topo_cmds.append(f"loadamberprep {os.path.basename(fname)}\n")
 
