@@ -921,100 +921,174 @@ def _create_atomtype_section(mol):
     return atypes_str
 
 
-_AC_BONDORDER_MAP = {"1": 1, "2": 2, "3": 3, "ar": 7, "am": 1, "un": 1}
+def _molecule_to_prepi(mol, frame=0):
+    """Convert a Molecule to AMBER prepi format string (Cartesian coords).
 
+    Generates a prepi file directly in Python, bypassing antechamber and
+    prepgen.  Uses Cartesian coordinate format so that:
 
-def _molecule_to_ac(mol):
-    """Convert a Molecule to AMBER AC format string for use with prepgen.
+    - Atom names are never renamed (prepgen renames based on atom types)
+    - No external tools are needed
 
-    Writes atom coordinates, partial charges, atom types, and bond
-    connectivity in the AC (antechamber intermediate) format so that
-    prepgen can convert it to a prepi file without running antechamber.
+    tleap's prepi reader builds connectivity from a tree encoded by
+    M/E/S/B/3-6 chain flags processed via an internal stack.  Each atom
+    bonds to the current stack top, then the top's unfilled count
+    decreases; when it reaches zero the top is popped.  This requires
+    **DFS (depth-first)** atom ordering — each node's entire subtree
+    must appear before moving to the next sibling.
+
+    Additional ring-closing bonds are listed in the LOOP section.
+    The IMPROPER section is left empty — tleap auto-detects impropers
+    by matching atom type quartets against loaded force field parameters.
     """
-    from collections import Counter
+    from collections import defaultdict
 
+    n = mol.numAtoms
+    resname = mol.resname[0] if len(mol.resname) > 0 else "MOL"
+    coords = mol.coords[:, :, frame]
     total_charge = float(np.sum(mol.charge))
-    resname = mol.resname[0]
 
-    elem_counts = Counter(mol.element)
-    formula = " ".join(f"{el}{c}" for el, c in sorted(elem_counts.items()))
+    # Validate: atom names must be unique (LOOP section uses names)
+    # and ≤4 chars (tleap limit), atom types must be ≤2 chars
+    names = list(mol.name)
+    if len(set(names)) != len(names):
+        from collections import Counter
 
-    lines = [f"CHARGE   {total_charge:10.4f}", f"Formula: {formula}"]
+        dupes = [n for n, c in Counter(names).items() if c > 1]
+        raise ValueError(
+            f"Duplicate atom names in residue {resname}: {dupes}. "
+            f"tleap's prepi LOOP section identifies atoms by name."
+        )
+    for i in range(n):
+        if len(mol.name[i]) > 4:
+            raise ValueError(
+                f"Atom name '{mol.name[i]}' exceeds 4 characters (tleap limit)."
+            )
+        if len(mol.atomtype[i]) > 2:
+            raise ValueError(
+                f"Atom type '{mol.atomtype[i]}' exceeds 2 characters (tleap limit)."
+            )
 
-    for i in range(mol.numAtoms):
-        x, y, z = mol.coords[i, :, 0]
+    # Build adjacency list from bonds
+    adj = defaultdict(set)
+    bond_set = set()
+    for b in mol.bonds:
+        a, c = int(b[0]), int(b[1])
+        adj[a].add(c)
+        adj[c].add(a)
+        bond_set.add((min(a, c), max(a, c)))
+
+    # DFS spanning tree from atom 0 (iterative to avoid recursion limits)
+    parent = [-1] * n
+    visited = [False] * n
+    children = defaultdict(list)  # parent -> [children in visit order]
+    dfs_order = []
+    stack = [0]
+    visited[0] = True
+
+    while stack:
+        node = stack.pop()
+        dfs_order.append(node)
+        # Push neighbors in reverse sorted order so smallest is visited first
+        for nb in sorted(adj[node], reverse=True):
+            if not visited[nb]:
+                visited[nb] = True
+                parent[nb] = node
+                children[node].append(nb)
+                stack.append(nb)
+
+    # Children were appended in reverse visit order due to stack; fix that
+    for node in children:
+        children[node].sort()
+
+    # Handle disconnected atoms
+    for i in range(n):
+        if not visited[i]:
+            dfs_order.append(i)
+
+    # Tree bonds and loop-closing bonds
+    tree_bonds = set()
+    for i in range(n):
+        if parent[i] >= 0:
+            tree_bonds.add((min(i, parent[i]), max(i, parent[i])))
+    loop_bonds = bond_set - tree_bonds
+
+    # Chain flags based on number of children in DFS tree
+    # M = root (unlimited unfilled), E = leaf (0), S = 1, B = 2, 3-6 = N
+    def chain_flag(idx):
+        nc = len(children[idx])
+        if idx == dfs_order[0]:
+            return "M"
+        if nc == 0:
+            return "E"
+        if nc == 1:
+            return "S"
+        if nc == 2:
+            return "B"
+        if nc <= 6:
+            return str(nc)
+        return "M"  # >6 children (unlikely for chemistry)
+
+    lines = []
+    lines.append("    0    0    2")               # header (skipped)
+    lines.append(f"{resname}")                     # remark (skipped)
+    lines.append(f"{resname}")                     # description (read)
+    lines.append(f"{resname}.res")                 # skipped by tleap
+    lines.append(f"{resname:<6s}XYZ  0")           # short name + format
+    lines.append("CORRECT     OMIT DU   BEG")     # flags
+    lines.append("  0.0000")                       # cutoff (legacy, unused)
+
+    # Dummy atoms required by tleap's prepi reader
+    lines.append(
+        "   1  DUMM  DU    M      999.000   999.000  -999.000      .00000"
+    )
+    lines.append(
+        "   2  DUMM  DU    M      999.000  -999.000   999.000      .00000"
+    )
+    lines.append(
+        "   3  DUMM  DU    M     -999.000   999.000   999.000      .00000"
+    )
+
+    # Atom records in DFS order (8 fields = Cartesian with charge)
+    for rank, orig_idx in enumerate(dfs_order):
+        idx = rank + 4  # after 3 dummy atoms
+        name = mol.name[orig_idx]
+        atype = mol.atomtype[orig_idx]
+        flag = chain_flag(orig_idx)
+        x, y, z = coords[orig_idx]
+        charge = float(mol.charge[orig_idx])
         lines.append(
-            f"ATOM  {i + 1:>5d}  {mol.name[i]:<4s} {resname:<4s}"
-            f"    1    {x:10.4f}{y:10.4f}{z:10.4f}"
-            f" {mol.charge[i]:12.6f}       {mol.atomtype[i]}"
+            f"{idx:4d}  {name:<5s}{atype:<5s}{flag}"
+            f"    {x:12.6f}{y:12.6f}{z:12.6f}{charge:12.6f}"
         )
 
-    for i in range(len(mol.bonds)):
-        a1, a2 = int(mol.bonds[i, 0]), int(mol.bonds[i, 1])
-        bt = str(mol.bondtype[i]).lower() if i < len(mol.bondtype) else "1"
-        order = _AC_BONDORDER_MAP.get(bt, 1)
-        lines.append(
-            f"BOND {i + 1:>4d}  {a1 + 1:>4d}  {a2 + 1:>4d}  {order:>2d}"
-            f"    {mol.name[a1]:<4s}  {mol.name[a2]:<4s}"
-        )
+    # LOOP — ring-closing bonds not in spanning tree
+    lines.append("")
+    lines.append("LOOP")
+    for a, b in sorted(loop_bonds):
+        lines.append(f"   {mol.name[a]:<5s}{mol.name[b]:<5s}")
 
-    return "\n".join(lines) + "\n"
+    # IMPROPER — left empty; tleap auto-detects from frcmod parameters
+    lines.append("")
+    lines.append("IMPROPER")
+
+    lines.append("")
+    lines.append("DONE")
+    lines.append("STOP")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _convert_topo_to_prepi(mol, prepi_path, use_pyodide=False):
-    """Convert a Molecule to prepi format via AC file and prepgen.
+    """Convert a Molecule to prepi format (Cartesian coordinates).
 
-    Writes the Molecule as an AC file, runs prepgen without a mainchain
-    file (letting it auto-detect chain ordering), and saves the resulting
-    prepi to *prepi_path*.
+    Generates the prepi directly in Python — no antechamber or prepgen
+    needed.  The *use_pyodide* parameter is accepted for API
+    compatibility but ignored (no external tools are called).
     """
-    import tempfile
-
-    resname = mol.resname[0]
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        ac_content = _molecule_to_ac(mol)
-        ac_basename = f"{resname}.ac"
-        ac_path = os.path.join(tmpdir, ac_basename)
-        with open(ac_path, "w") as f:
-            f.write(ac_content)
-
-        prepi_basename = f"{resname}.prepi"
-        cmd = [
-            "prepgen",
-            "-i",
-            ac_basename,
-            "-o",
-            prepi_basename,
-            "-f",
-            "prepi",
-            "-rn",
-            resname,
-        ]
-
-        if use_pyodide:
-            from antechamber_pyodide import run as _ac_run
-
-            with open(ac_path, "rb") as f:
-                ac_bytes = f.read()
-
-            result = _ac_run(
-                "prepgen",
-                cmd,
-                input_files={ac_basename: ac_bytes},
-            )
-            prepi_data = result[prepi_basename]
-            with open(prepi_path, "wb") as f:
-                f.write(
-                    prepi_data if isinstance(prepi_data, bytes) else prepi_data.encode()
-                )
-        else:
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmpdir)
-            if result.returncode != 0:
-                raise RuntimeError(
-                    f"prepgen failed (exit {result.returncode}):\n{result.stderr}"
-                )
-            shutil.copy(os.path.join(tmpdir, prepi_basename), prepi_path)
+    prepi_content = _molecule_to_prepi(mol)
+    with open(prepi_path, "w") as f:
+        f.write(prepi_content)
 
 
 def _write_tleap_script(
