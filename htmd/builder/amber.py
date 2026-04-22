@@ -921,174 +921,49 @@ def _create_atomtype_section(mol):
     return atypes_str
 
 
-def _molecule_to_prepi(mol, frame=0):
-    """Convert a Molecule to AMBER prepi format string (Cartesian coords).
+def _build_load_mol2_commands(mol, mol2_path, unit_name="_lig"):
+    """Generate tleap commands to load a ligand from mol2 correctly.
 
-    Generates a prepi file directly in Python, bypassing antechamber and
-    prepgen.  Uses Cartesian coordinate format so that:
+    Produces:
+      1. `addAtomTypes` block mapping every unique atom type to its element
+         (needed so parameter lookups resolve the correct element).
+      2. `<unit> = loadmol2 <mol2_path>`.
+      3. `set <unit>.1.<name> element "<Element>"` for every atom.
 
-    - Atom names are never renamed (prepgen renames based on atom types)
-    - No external tools are needed
-
-    tleap's prepi reader builds connectivity from a tree encoded by
-    M/E/S/B/3-6 chain flags processed via an internal stack.  Each atom
-    bonds to the current stack top, then the top's unfilled count
-    decreases; when it reaches zero the top is popped.  This requires
-    **DFS (depth-first)** atom ordering — each node's entire subtree
-    must appear before moving to the next sibling.
-
-    Additional ring-closing bonds are listed in the LOOP section.
-    The IMPROPER section is left empty — tleap auto-detects impropers
-    by matching atom type quartets against loaded force field parameters.
+    The explicit `set element` commands are required because tleap's
+    `loadmol2` reader derives the atom element from only the first
+    character of the atom type string (see `tripos.c` line 209-211 in
+    AmberTools).  For standard GAFF2 types (c3, ca, h1, oh, …) this
+    happens to work, but for custom types from parameterize (za, zb …)
+    or OpenFF outputs it would misclassify hydrogens and produce an
+    empty BONDS_INC_HYDROGEN list, breaking SHAKE.  Writing
+    `set .element` after `loadmol2` unconditionally corrects this.
     """
-    from collections import defaultdict
+    # addAtomTypes block
+    lines = ["addAtomTypes {"]
+    for at in sorted(np.unique(mol.atomtype)):
+        el = mol.element[mol.atomtype == at][0]
+        # pick a sensible hybridization default — tleap only uses this
+        # for coordinate-building, which we never invoke for a ligand
+        # whose geometry is already given.
+        lines.append(f'    {{ "{at}"  "{el}" "sp3" }}')
+    lines.append("}")
 
-    n = mol.numAtoms
-    resname = mol.resname[0] if len(mol.resname) > 0 else "MOL"
-    coords = mol.coords[:, :, frame]
-    total_charge = float(np.sum(mol.charge))
+    # load mol2
+    lines.append(f"{unit_name} = loadmol2 {os.path.basename(mol2_path)}")
 
-    # Validate: atom names must be unique (LOOP section uses names)
-    # and ≤4 chars (tleap limit), atom types must be ≤2 chars
-    names = list(mol.name)
-    if len(set(names)) != len(names):
-        from collections import Counter
-
-        dupes = [n for n, c in Counter(names).items() if c > 1]
-        raise ValueError(
-            f"Duplicate atom names in residue {resname}: {dupes}. "
-            f"tleap's prepi LOOP section identifies atoms by name."
-        )
-    for i in range(n):
-        if len(mol.name[i]) > 4:
+    # per-atom element override
+    for i in range(mol.numAtoms):
+        name = mol.name[i]
+        el = mol.element[i]
+        if not el:
             raise ValueError(
-                f"Atom name '{mol.name[i]}' exceeds 4 characters (tleap limit)."
+                f"Atom {i} ({name}) has no element; cannot build mol2 load script."
             )
-        if len(mol.atomtype[i]) > 2:
-            raise ValueError(
-                f"Atom type '{mol.atomtype[i]}' exceeds 2 characters (tleap limit)."
-            )
+        lines.append(f'set {unit_name}.1.{name} element "{el}"')
 
-    # Build adjacency list from bonds
-    adj = defaultdict(set)
-    bond_set = set()
-    for b in mol.bonds:
-        a, c = int(b[0]), int(b[1])
-        adj[a].add(c)
-        adj[c].add(a)
-        bond_set.add((min(a, c), max(a, c)))
-
-    # DFS spanning tree from atom 0 (iterative to avoid recursion limits)
-    parent = [-1] * n
-    visited = [False] * n
-    children = defaultdict(list)  # parent -> [children in visit order]
-    dfs_order = []
-    stack = [0]
-    visited[0] = True
-
-    while stack:
-        node = stack.pop()
-        dfs_order.append(node)
-        # Push neighbors in reverse sorted order so smallest is visited first
-        for nb in sorted(adj[node], reverse=True):
-            if not visited[nb]:
-                visited[nb] = True
-                parent[nb] = node
-                children[node].append(nb)
-                stack.append(nb)
-
-    # Children were appended in reverse visit order due to stack; fix that
-    for node in children:
-        children[node].sort()
-
-    # Handle disconnected atoms
-    for i in range(n):
-        if not visited[i]:
-            dfs_order.append(i)
-
-    # Tree bonds and loop-closing bonds
-    tree_bonds = set()
-    for i in range(n):
-        if parent[i] >= 0:
-            tree_bonds.add((min(i, parent[i]), max(i, parent[i])))
-    loop_bonds = bond_set - tree_bonds
-
-    # Chain flags based on number of children in DFS tree
-    # M = root (unlimited unfilled), E = leaf (0), S = 1, B = 2, 3-6 = N
-    def chain_flag(idx):
-        nc = len(children[idx])
-        if idx == dfs_order[0]:
-            return "M"
-        if nc == 0:
-            return "E"
-        if nc == 1:
-            return "S"
-        if nc == 2:
-            return "B"
-        if nc <= 6:
-            return str(nc)
-        return "M"  # >6 children (unlikely for chemistry)
-
-    lines = []
-    lines.append("    0    0    2")               # header (skipped)
-    lines.append(f"{resname}")                     # remark (skipped)
-    lines.append(f"{resname}")                     # description (read)
-    lines.append(f"{resname}.res")                 # skipped by tleap
-    lines.append(f"{resname:<6s}XYZ  0")           # short name + format
-    lines.append("CORRECT     OMIT DU   BEG")     # flags
-    lines.append("  0.0000")                       # cutoff (legacy, unused)
-
-    # Dummy atoms required by tleap's prepi reader
-    lines.append(
-        "   1  DUMM  DU    M      999.000   999.000  -999.000      .00000"
-    )
-    lines.append(
-        "   2  DUMM  DU    M      999.000  -999.000   999.000      .00000"
-    )
-    lines.append(
-        "   3  DUMM  DU    M     -999.000   999.000   999.000      .00000"
-    )
-
-    # Atom records in DFS order (8 fields = Cartesian with charge)
-    for rank, orig_idx in enumerate(dfs_order):
-        idx = rank + 4  # after 3 dummy atoms
-        name = mol.name[orig_idx]
-        atype = mol.atomtype[orig_idx]
-        flag = chain_flag(orig_idx)
-        x, y, z = coords[orig_idx]
-        charge = float(mol.charge[orig_idx])
-        lines.append(
-            f"{idx:4d}  {name:<5s}{atype:<5s}{flag}"
-            f"    {x:12.6f}{y:12.6f}{z:12.6f}{charge:12.6f}"
-        )
-
-    # LOOP — ring-closing bonds not in spanning tree
-    lines.append("")
-    lines.append("LOOP")
-    for a, b in sorted(loop_bonds):
-        lines.append(f"   {mol.name[a]:<5s}{mol.name[b]:<5s}")
-
-    # IMPROPER — left empty; tleap auto-detects from frcmod parameters
-    lines.append("")
-    lines.append("IMPROPER")
-
-    lines.append("")
-    lines.append("DONE")
-    lines.append("STOP")
     lines.append("")
     return "\n".join(lines)
-
-
-def _convert_topo_to_prepi(mol, prepi_path, use_pyodide=False):
-    """Convert a Molecule to prepi format (Cartesian coordinates).
-
-    Generates the prepi directly in Python — no antechamber or prepgen
-    needed.  The *use_pyodide* parameter is accepted for API
-    compatibility but ignored (no external tools are called).
-    """
-    prepi_content = _molecule_to_prepi(mol)
-    with open(prepi_path, "w") as f:
-        f.write(prepi_content)
 
 
 def _write_tleap_script(
@@ -1329,20 +1204,27 @@ def _prepare_build(
 
     # --- Generate topology loading commands ---
     topo_cmds = []
-    use_pyodide = backend == "pyodide"
     for fname in newtopo:
         ext = os.path.splitext(fname)[1].lower()
         if ext in (".mol2", ".cif"):
-            if ext == ".mol2":
-                logger.warning(
-                    "MOL2 topologies can cause tleap to guess wrong elements. "
-                    "Converting to prepi. Consider using .cif or .prepi files instead."
-                )
+            # Load the ligand via mol2 (AMBER's officially recommended format
+            # for small molecules).  CIFs are converted to mol2 first since
+            # tleap only reads mol2/mol3.  The loader emits explicit
+            # `set .element` commands for every atom so that custom atom
+            # types (OpenFF, parameterize collision-avoidance types, etc.)
+            # don't break the BONDS_INC_HYDROGEN split.
             _resmol = Molecule(fname)
-            prepi_path = f"{os.path.splitext(fname)[0]}.prepi"
-            _convert_topo_to_prepi(_resmol, prepi_path, use_pyodide=use_pyodide)
-            topo_cmds.append(_create_atomtype_section(_resmol))
-            topo_cmds.append(f"loadamberprep {os.path.basename(prepi_path)}\n")
+            mol2_path = f"{os.path.splitext(fname)[0]}.mol2"
+            if ext == ".cif":
+                _resmol.write(mol2_path)
+            # Use the residue name as the tleap variable name — tleap's
+            # `loadpdb` looks up residue templates in the global variable
+            # dictionary by residue name, so the unit must be registered
+            # under that exact name.
+            unit_name = _resmol.resname[0]
+            topo_cmds.append(
+                _build_load_mol2_commands(_resmol, mol2_path, unit_name=unit_name)
+            )
         else:
             topo_cmds.append(f"loadamberprep {os.path.basename(fname)}\n")
 
