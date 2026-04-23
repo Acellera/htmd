@@ -8,7 +8,6 @@ from __future__ import print_function
 import numpy as np
 import os.path as path
 import os
-import re
 import shutil
 import textwrap
 
@@ -45,7 +44,11 @@ def htmdCharmmHome():
 
 
 def listFiles():
-    """Lists all available Charmm topologies and parameter files
+    """Lists all available Charmm topology, parameter and stream files.
+
+    charmm.build only consumes topology/stream files, but parameter files are
+    listed too since the user typically needs to copy them (or equivalent
+    stream files) into their simulation directory to run MD afterwards.
 
     Examples
     --------
@@ -96,35 +99,19 @@ def search(key, name):
 
 
 def defaultTopo():
-    """Returns the default topologies used by charmm.build"""
+    """Returns the default topology/stream files used by charmm.build."""
     return [
         "top/top_all36_prot.rtf",
         "top/top_all36_lipid.rtf",
         "top/top_water_ions.rtf",
         "top/top_all36_cgenff.rtf",
+        "str/prot/toppar_all36_prot_arg0.str",
     ]
-
-
-def defaultParam():
-    """Returns the default parameters used by charmm.build"""
-    return [
-        "par/par_all36m_prot.prm",
-        "par/par_all36_lipid.prm",
-        "par/par_water_ions.prm",
-        "par/par_all36_cgenff.prm",
-    ]
-
-
-def defaultStream():
-    """Returns the default stream files used by charmm.build"""
-    return ["str/prot/toppar_all36_prot_arg0.str", "str/misc/toppar_ions_won.str"]
 
 
 def build(
     mol,
     topo=None,
-    param=None,
-    stream=None,
     prefix="structure",
     outdir="./build",
     caps=None,
@@ -150,17 +137,11 @@ def build(
     mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
         The Molecule object containing the system
     topo : list of str
-        A list of topology `rtf` files.
-        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available topology files.
-        Default: ['top/top_all36_prot.rtf', 'top/top_all36_lipid.rtf', 'top/top_water_ions.rtf']
-    param : list of str
-        A list of parameter `prm` files.
-        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available parameter files.
-        Default: ['par/par_all36m_prot.prm', 'par/par_all36_lipid.prm', 'par/par_water_ions.prm']
-    stream : list of str
-        A list of stream `str` files containing topologies and parameters.
-        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available stream files.
-        Default: ['str/prot/toppar_all36_prot_arg0.str']
+        A list of topology files (``.rtf`` or CHARMM ``.str`` stream files).
+        Stream files are passed straight to psfgen's ``topology`` command —
+        psfgen parses the RTF portion and ignores the ``PARAMETER`` sections.
+        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available topology/stream files.
+        Default: :func:`defaultTopo <htmd.builder.charmm.defaultTopo>`
     prefix : str
         The prefix for the generated pdb and psf files
     outdir : str
@@ -210,17 +191,16 @@ def build(
     Bond between A: [serial 185 resid 42 resname CYS chain A segid 0]
                  B: [serial 298 resid 58 resname CYS chain A segid 0]...
     >>> # More complex example
-    >>> topos  = ['top/top_all36_prot.rtf', './BEN.rtf', 'top/top_water_ions.rtf']
-    >>> params = ['par/par_all36m_prot.prm', './BEN.prm', 'par/par_water_ions.prm']
+    >>> topos = ['top/top_all36_prot.rtf', './BEN.rtf', 'top/top_water_ions.rtf']
     >>> disu = [['segid P and resid 157', 'segid P and resid 13'], ['segid K and resid 1', 'segid K and resid 25']]
     >>> ar = {'SAPI24': 'SP24'}  # Alias large resnames to a short-hand version
-    >>> molbuilt = charmm.build(mol, topo=topos, param=params, outdir='/tmp/build', saltconc=0.15, disulfide=disu, aliasresidues=ar)  # doctest: +SKIP
+    >>> molbuilt = charmm.build(mol, topo=topos, outdir='/tmp/build', saltconc=0.15, disulfide=disu, aliasresidues=ar)  # doctest: +SKIP
     """
-
     mol = mol.copy()
     _missingSegID(mol)
     _checkMixedSegment(mol)
     _checkLongResnames(mol, aliasresidues)
+
     if psfgen is None:
         psfgen = shutil.which("psfgen", mode=os.X_OK)
         if not psfgen:
@@ -228,231 +208,280 @@ def build(
                 "Could not find psfgen executable, or no execute permissions are given. "
                 "Run `conda install psfgen -c acellera`."
             )
+
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
     if _clean:
         _cleanOutDir(outdir)
+
     if topo is None:
         topo = defaultTopo()
-    if param is None:
-        param = defaultParam()
-    if stream is None:
-        stream = defaultStream()
     if caps is None:
         caps = _defaultCaps(mol)
-    # patches that must _not_ be regenerated
     if noregen is None:
         noregen = ["FHEM", "PHEM", "PLOH", "PLO2", "PLIG", "PSUL"]
-
-    alltopo = topo.copy()
-    allparam = param.copy()
-
-    # Splitting the stream files and adding them to the list of parameter and topology files
-    charmmdir = htmdCharmmHome()
-    for s in stream:
-        if s[0] != "." and path.isfile(path.join(charmmdir, s)):
-            s = path.join(charmmdir, s)
-        outrtf, outprm = _prepareStream(s)
-        alltopo.append(outrtf)
-        allparam.append(outprm)
-
-    # _missingChain(mol)
-    # _checkProteinGaps(mol)
     if patches is None:
         patches = []
     if isinstance(patches, str):
         patches = [patches]
-    allpatches = []
-    allpatches += patches
-    # Find protonated residues and add patches for them
-    allpatches += _protonationPatches(mol)
 
-    f = open(path.join(outdir, "build.vmd"), "w")
-    f.write("# psfgen file generated by charmm.build\n")
-    f.write("package require psfgen;\n")
-    f.write("psfcontext reset;\n\n")
+    # Stage topology/stream files for psfgen. Stream files are handed to
+    # psfgen directly via its `topology` command — psfgen parses the RTF
+    # section and ignores the parameter section. Parameter files are *not*
+    # staged here; the user is responsible for copying the parameter/stream
+    # files they need into their simulation directory afterwards.
+    topology_local_paths = _stage_files(list(topo), outdir, "topologies")
 
-    # Copying and printing out the topologies
-    if not path.exists(path.join(outdir, "topologies")):
-        os.makedirs(path.join(outdir, "topologies"))
-    for i in range(len(alltopo)):
-        if alltopo[i][0] != "." and path.isfile(path.join(charmmdir, alltopo[i])):
-            alltopo[i] = path.join(charmmdir, alltopo[i])
-        localname = "{}.".format(i) + path.basename(alltopo[i])
-        shutil.copy(alltopo[i], path.join(outdir, "topologies", localname))
-        f.write("topology " + path.join("topologies", localname) + "\n")
-    f.write("\n")
-
-    _printAliases(f)
-    if aliasresidues is not None:  # User defined aliases
+    # Apply user-requested residue aliases up-front so every subsequent step
+    # (segment writing, psfgen script, protonation-patch detection) sees the
+    # aliased names.
+    if aliasresidues is not None:
         for key, val in aliasresidues.items():
             mol.resname[mol.resname == key] = val
-            f.write("        pdbalias residue {} {}\n".format(val, key))
 
-    # Printing out segments
-    if not path.exists(path.join(outdir, "segments")):
-        os.makedirs(path.join(outdir, "segments"))
-    logger.info("Writing out segments.")
-    segments = _getSegments(mol)
-    wateratoms = mol.atomselect("water")
-    for seg in segments:
-        pdbname = "segment" + seg + ".pdb"
-        segatoms = mol.segid == seg
-        mol.write(path.join(outdir, "segments", pdbname), sel=segatoms)
+    allpatches = list(patches) + _protonationPatches(mol)
 
-        segwater = wateratoms & segatoms
-        f.write("segment " + seg + " {\n")
-        if np.all(
-            segatoms == segwater
-        ):  # If segment only contains waters, set: auto none
-            f.write("\tauto none\n")
-        f.write("\tpdb " + path.join("segments", pdbname) + "\n")
-        if caps is not None and seg in caps:
-            for c in caps[seg]:
-                f.write("\t" + c + "\n")
-        f.write("}\n")
-        f.write("coordpdb " + path.join("segments", pdbname) + " " + seg + "\n\n")
-
+    # Resolve disulfide bonds once against the full mol (residues that take
+    # part in disulfides are always in the solute).
     if (
         disulfide is not None
         and len(disulfide) != 0
         and isinstance(disulfide[0][0], str)
     ):
         disulfide = convertDisulfide(mol, disulfide)
-
     if disulfide is None:
         disulfide = detectDisulfideBonds(mol)
 
-    if len(disulfide) != 0:
-        for d in sorted(disulfide, key=lambda x: x[0].segid):
-            str0 = f"{d[0].segid}:{d[0].resid}{d[0].insertion}"
-            str1 = f"{d[1].segid}:{d[1].resid}{d[1].insertion}"
-            f.write(f"patch DISU {str0} {str1}\n")
-        f.write("\n")
+    water_sel = mol.atomselect("water")
+    has_water = bool(np.any(water_sel))
+    do_ionize = ionize and execute and has_water
 
-    noregenpatches = [p for p in allpatches if p.split()[1] in noregen]
-    regenpatches = [p for p in allpatches if p.split()[1] not in noregen]
+    # Fast solute-only psfgen pass to compute the total charge, mirroring the
+    # amber.build flow. This avoids running the expensive full build twice
+    # (once for charge, once for the ionized system).
+    if do_ionize:
+        logger.info("Running solute-only psfgen pass to compute total charge.")
+        solute_mol = mol.copy(sel=~water_sel)
+        solvent_mol = mol.copy(sel=water_sel)
 
-    # Printing regenerable patches
-    if len(regenpatches) != 0:
-        for p in regenpatches:
-            f.write(p + "\n")
-        f.write("\n")
+        _write_segments(solute_mol, outdir)
+        _write_psfgen_script(
+            outdir,
+            "build_solute.vmd",
+            topology_local_paths,
+            solute_mol,
+            caps=caps,
+            disulfide=disulfide,
+            allpatches=allpatches,
+            noregen=noregen,
+            regenerate=regenerate,
+            aliasresidues=aliasresidues,
+            prefix="solute_charge",
+        )
+        molbuilt_solute = _run_psfgen(
+            psfgen, outdir, "build_solute.vmd", "solute_charge"
+        )
 
-    # Regenerate angles and dihedrals
-    if regenerate is not None:
-        f.write("regenerate {}\n".format(" ".join(regenerate)))
-        f.write("\n")
+        totalcharge = float(np.sum(molbuilt_solute.charge))
+        nwater = int(np.sum(solvent_mol.atomselect("water and noh")))
 
-    # Printing non-regenerable patches
-    if len(noregenpatches) != 0:
-        for p in noregenpatches:
-            f.write(p + "\n")
-        f.write("\n")
+        # Remove solute-only build artifacts so the final build writes clean.
+        for ext in ("psf", "pdb"):
+            fpath = path.join(outdir, f"solute_charge.{ext}")
+            if path.exists(fpath):
+                os.remove(fpath)
 
-    f.write("guesscoord\n")
-    f.write("writepsf " + prefix + ".psf\n")
-    f.write("writepdb " + prefix + ".pdb\n")
-    # f.write('quit\n')
-    f.close()
+        anion, cation, anionatom, cationatom, nanion, ncation = ionizef(
+            molbuilt_solute,
+            totalcharge,
+            nwater,
+            saltconc=saltconc,
+            anion=saltanion,
+            cation=saltcation,
+        )
+        solvent_mol = ionizePlace(
+            solvent_mol,
+            solute_mol,
+            anion,
+            cation,
+            anionatom,
+            cationatom,
+            nanion,
+            ncation,
+        )
+        mol = solute_mol.copy()
+        mol.append(solvent_mol)
 
-    if allparam is not None:
-        combine(allparam, path.join(outdir, "parameters"))
+    # Write segments and the full build script for the (possibly ionized) mol.
+    _write_segments(mol, outdir)
+    _write_psfgen_script(
+        outdir,
+        "build.vmd",
+        topology_local_paths,
+        mol,
+        caps=caps,
+        disulfide=disulfide,
+        allpatches=allpatches,
+        noregen=noregen,
+        regenerate=regenerate,
+        aliasresidues=aliasresidues,
+        prefix=prefix,
+    )
 
-    molbuilt = None
-    if execute:
-        logpath = os.path.abspath("{}/log.txt".format(outdir))
-        logger.info("Starting the build.")
-        currdir = os.getcwd()
-        os.chdir(outdir)
-        f = open(logpath, "w")
-        # call([vmd, '-dispdev', 'text', '-e', './build.vmd'], stdout=f)
-        my_env = os.environ.copy()
-        my_env["LC_ALL"] = "C"
-        call([psfgen, "./build.vmd"], stdout=f, stderr=f, env=my_env)
-        f.close()
-        errors = _logParser(logpath)
-        os.chdir(currdir)
-        if errors:
-            raise BuildError(
-                errors
-                + [
-                    "Check {} for further information on errors in building.".format(
-                        logpath
-                    )
-                ],
-                errors,
-            )
-        logger.info("Finished building.")
+    if not execute:
+        return None
 
-        if path.isfile(path.join(outdir, "structure.pdb")) and path.isfile(
-            path.join(outdir, "structure.psf")
-        ):
-            molbuilt = Molecule(path.join(outdir, "structure.pdb"))
-            molbuilt.read(path.join(outdir, "structure.psf"))
-        else:
-            raise BuildError(
-                "No structure pdb/psf file was generated. Check {} for errors in building.".format(
-                    logpath
-                )
-            )
-
-        if ionize:
-            os.makedirs(path.join(outdir, "pre-ionize"))
-            data = glob(path.join(outdir, "*"))
-            for f in data:
-                shutil.move(f, path.join(outdir, "pre-ionize"))
-            totalcharge = np.sum(molbuilt.charge)
-            nwater = np.sum(molbuilt.atomselect("water and noh"))
-            anion, cation, anionatom, cationatom, nanion, ncation = ionizef(
-                molbuilt,
-                totalcharge,
-                nwater,
-                saltconc=saltconc,
-                anion=saltanion,
-                cation=saltcation,
-            )
-            water_sel = mol.atomselect("water")
-            solvent_mol = mol.copy(sel=water_sel)
-            solute_mol = mol.copy(sel=~water_sel)
-            solvent_mol = ionizePlace(
-                solvent_mol,
-                solute_mol,
-                anion,
-                cation,
-                anionatom,
-                cationatom,
-                nanion,
-                ncation,
-            )
-            newmol = solute_mol.copy()
-            newmol.append(solvent_mol)
-            # Redo the whole build but now with ions included
-            return build(
-                newmol,
-                topo=alltopo,
-                param=allparam,
-                stream=[],
-                prefix=prefix,
-                outdir=outdir,
-                ionize=False,
-                caps=caps,
-                execute=execute,
-                saltconc=saltconc,
-                disulfide=disulfide,
-                regenerate=regenerate,
-                patches=patches,
-                noregen=noregen,
-                aliasresidues=aliasresidues,
-                psfgen=psfgen,
-                _clean=False,
-            )
+    molbuilt = _run_psfgen(psfgen, outdir, "build.vmd", prefix)
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
-    detectCisPeptideBonds(molbuilt, respect_bonds=True)  # Warn in case of cis bonds
-    cleanup_charmm_prm(
-        molbuilt, path.join(outdir, "parameters"), path.join(outdir, "parameters.prm")
-    )
+    detectCisPeptideBonds(molbuilt, respect_bonds=True)
+    return molbuilt
+
+
+def _stage_files(files, outdir, subdir):
+    """Copy a list of CHARMM topology/parameter/stream files into ``outdir/subdir``.
+
+    Each file is resolved against ``htmdCharmmHome()`` when it isn't an absolute
+    path / doesn't start with ".", and copied with a numeric-prefixed basename
+    so that order is preserved and collisions avoided.
+
+    Returns a list of paths relative to ``outdir`` (e.g. ``topologies/0.top_all36_prot.rtf``).
+    """
+    charmmdir = htmdCharmmHome()
+    target = path.join(outdir, subdir)
+    if not path.exists(target):
+        os.makedirs(target)
+
+    local_paths = []
+    for i, f in enumerate(files):
+        if f[0] != "." and path.isfile(path.join(charmmdir, f)):
+            f = path.join(charmmdir, f)
+        if not path.isfile(f):
+            raise FileNotFoundError(
+                f"File {f} does not exist. Cannot stage to {target}."
+            )
+        localname = f"{i}.{path.basename(f)}"
+        shutil.copy(f, path.join(target, localname))
+        local_paths.append(path.join(subdir, localname))
+    return local_paths
+
+
+def _write_segments(mol, outdir):
+    """Write one segment PDB per unique segid into ``outdir/segments/``."""
+    segdir = path.join(outdir, "segments")
+    if not path.exists(segdir):
+        os.makedirs(segdir)
+    logger.info("Writing out segments.")
+    for seg in _getSegments(mol):
+        pdbname = f"segment{seg}.pdb"
+        mol.write(path.join(segdir, pdbname), sel=mol.segid == seg)
+
+
+def _write_psfgen_script(
+    outdir,
+    script_name,
+    topology_local_paths,
+    mol,
+    caps,
+    disulfide,
+    allpatches,
+    noregen,
+    regenerate,
+    aliasresidues,
+    prefix,
+):
+    """Write a psfgen input script that rebuilds the structure contained in ``mol``."""
+    wateratoms = mol.atomselect("water")
+    with open(path.join(outdir, script_name), "w") as f:
+        f.write("# psfgen file generated by charmm.build\n")
+        f.write("package require psfgen;\n")
+        f.write("psfcontext reset;\n\n")
+
+        for p in topology_local_paths:
+            f.write(f"topology {p}\n")
+        f.write("\n")
+
+        _printAliases(f)
+        if aliasresidues is not None:
+            for key, val in aliasresidues.items():
+                f.write(f"        pdbalias residue {val} {key}\n")
+
+        for seg in _getSegments(mol):
+            pdbname = f"segment{seg}.pdb"
+            segatoms = mol.segid == seg
+            segwater = wateratoms & segatoms
+            f.write(f"segment {seg} {{\n")
+            if np.all(segatoms == segwater):
+                # Pure-water segments disable psfgen's angle/dihedral autogen
+                # (TIP3 residues carry their own topology).
+                f.write("\tauto none\n")
+            f.write(f"\tpdb {path.join('segments', pdbname)}\n")
+            if caps is not None and seg in caps:
+                for c in caps[seg]:
+                    f.write(f"\t{c}\n")
+            f.write("}\n")
+            f.write(f"coordpdb {path.join('segments', pdbname)} {seg}\n\n")
+
+        if disulfide is not None and len(disulfide):
+            for d in sorted(disulfide, key=lambda x: x[0].segid):
+                str0 = f"{d[0].segid}:{d[0].resid}{d[0].insertion}"
+                str1 = f"{d[1].segid}:{d[1].resid}{d[1].insertion}"
+                f.write(f"patch DISU {str0} {str1}\n")
+            f.write("\n")
+
+        noregenpatches = [p for p in allpatches if p.split()[1] in noregen]
+        regenpatches = [p for p in allpatches if p.split()[1] not in noregen]
+
+        if regenpatches:
+            for p in regenpatches:
+                f.write(p + "\n")
+            f.write("\n")
+
+        if regenerate is not None:
+            f.write("regenerate {}\n\n".format(" ".join(regenerate)))
+
+        if noregenpatches:
+            for p in noregenpatches:
+                f.write(p + "\n")
+            f.write("\n")
+
+        f.write("guesscoord\n")
+        f.write(f"writepsf {prefix}.psf\n")
+        f.write(f"writepdb {prefix}.pdb\n")
+
+
+def _run_psfgen(psfgen, outdir, script_name, prefix):
+    """Invoke psfgen on ``outdir/script_name`` and return the resulting Molecule."""
+    logpath = os.path.abspath(path.join(outdir, "log.txt"))
+    logger.info("Starting the build.")
+    currdir = os.getcwd()
+    os.chdir(outdir)
+    try:
+        my_env = os.environ.copy()
+        my_env["LC_ALL"] = "C"
+        with open(logpath, "w") as f:
+            call([psfgen, f"./{script_name}"], stdout=f, stderr=f, env=my_env)
+        errors = _logParser(logpath)
+    finally:
+        os.chdir(currdir)
+
+    if errors:
+        raise BuildError(
+            errors
+            + [f"Check {logpath} for further information on errors in building."],
+            errors,
+        )
+    logger.info("Finished building.")
+
+    pdb_path = path.join(outdir, f"{prefix}.pdb")
+    psf_path = path.join(outdir, f"{prefix}.psf")
+    if not (path.isfile(pdb_path) and path.isfile(psf_path)):
+        raise BuildError(
+            f"No {prefix} pdb/psf file was generated. Check {logpath} for errors in building."
+        )
+
+    molbuilt = Molecule(pdb_path)
+    molbuilt.read(psf_path)
     return molbuilt
 
 
@@ -463,12 +492,12 @@ def _cleanOutDir(outdir):
     files += glob(os.path.join(outdir, "log.*"))
     files += glob(os.path.join(outdir, "*.log"))
     files += glob(os.path.join(outdir, "*.vmd"))
-    files += glob(os.path.join(outdir, "parameters"))
     for f in files:
         os.remove(f)
     folders = glob(os.path.join(outdir, "segments"))
     folders += glob(os.path.join(outdir, "topologies"))
     folders += glob(os.path.join(outdir, "pre-ionize"))
+
     for f in folders:
         shutil.rmtree(f)
 
@@ -758,172 +787,6 @@ def _recoverProtonations(mol):
     # Histidine protonations keep their names in CHARMM. No need to rename them
 
 
-def combine(prmlist, outfile):
-    """Combines CHARMM parameter files
-    Take a list of parameters files and combine them into a single file (useful for acemd)
-
-    Parameters
-    ----------
-    prmlist: list
-        List of parameter files to combine
-    outfile: str
-        Output filename of combined parameter files
-
-    """
-    # Process parameter files
-    prm_list = [
-        "!COMMENTS\n",
-        "ATOMS\n",
-        "BONDS\n",
-        "ANGLES\n",
-        "DIHEDRALS\n",
-        "IMPROPER\n",
-        "CMAP\n",
-        "NONBONDED\n",
-        "NBFIX\n",
-        "HBOND\n",
-    ]
-
-    charmmdir = htmdCharmmHome()
-    for myfile in prmlist:
-        if myfile[0] != "." and path.isfile(path.join(charmmdir, myfile)):
-            myfile = path.join(charmmdir, myfile)
-        if not path.isfile(myfile):
-            raise FileNotFoundError(
-                myfile + " file does not exist. Cannot create combined parameter file."
-            )
-        fn = os.path.basename(myfile)
-        with open(myfile, "r", encoding="utf-8") as fh:
-            context = 0
-            for line in fh:
-                if re.search(r"^ATOMS", line):
-                    context = 1
-                    prm_list[context] += _sec_name(fn)
-                elif re.search(r"^BOND", line):
-                    context = 2
-                    prm_list[context] += _sec_name(fn)
-                elif re.search(r"^ANGL", line):
-                    context = 3
-                    prm_list[context] += _sec_name(fn)
-                elif re.search(r"^DIHE", line) or re.search(r"^THET", line):
-                    context = 4
-                    prm_list[context] += _sec_name(fn)
-                elif re.search(r"^IMPR", line) or re.search(r"^IMPH", line):
-                    context = 5
-                    prm_list[context] += _sec_name(fn)
-                elif re.search(r"^CMAP", line) or re.search(r"^NBON", line):
-                    context = 6
-                    prm_list[context] += _sec_name(fn)
-                elif re.search(r"^NONB", line):
-                    context = 7
-                    prm_list[context] += _sec_name(fn)
-                elif re.search(r"^NBFI", line):
-                    context = 8
-                    prm_list[context] += _sec_name(fn)
-                elif re.search(r"^HBON", line):
-                    context = 9
-                    prm_list[context] += _sec_name(fn)
-                else:
-                    if context == 0:  # COMMENTS
-                        if (
-                            re.search(r"^\s*\!+", line, re.I)
-                            or re.search(r"^\s*\*+", line, re.I)
-                            or len(line.strip()) == 0
-                        ):
-                            prm_list[context] += line
-                        else:
-                            prm_list[context] += "!" + line
-                    elif not line.lower().startswith(
-                        "end"
-                    ) and not line.lower().startswith("return"):
-                        prm_list[context] += line
-
-    prm = "".join(map(str, prm_list)) + "END"
-    prmfh = open(outfile, "w")
-    prmfh.write(prm)
-    prmfh.close()
-
-
-# Create string to indicate source of section
-def _sec_name(filename):
-    return "!Following lines added from %s\n" % (filename)
-
-
-def split(filename, outdir):
-    """Splits a stream file into an rtf and prm file.
-
-    Parameters
-    ----------
-    filename : str
-        Stream file name
-    """
-    regex = re.compile(r"^(toppar_)?(.*)\.str$")
-    base = os.path.basename(os.path.normpath(filename))
-    base = regex.findall(base)[0][1]
-    outrtf = os.path.join(outdir, f"top_{base}.rtf")
-    outprm = os.path.join(outdir, f"par_{base}.prm")
-
-    startrtf = re.compile(r"^read rtf card", flags=re.IGNORECASE)
-    startprm = re.compile(r"^read para\w* card", flags=re.IGNORECASE)
-    endsection = re.compile(r"^end", flags=re.IGNORECASE)
-
-    rtfsection = 0
-    prmsection = 0
-    section = "junk"
-
-    rtfstr = ""
-    prmstr = ""
-
-    f = open(filename, "r")
-    for line in f:
-        if startrtf.match(line):
-            rtfsection += 1
-            if rtfsection > 1:
-                rtfstr += "! WARNING -- ANOTHER rtf SECTION FOUND\n"
-            section = "rtf"
-        elif startprm.match(line):
-            prmsection += 1
-            if prmsection > 1:
-                prmstr += "! WARNING -- ANOTHER para SECTION FOUND\n"
-            section = "prm"
-        elif endsection.match(line):
-            section = "junk"
-        elif section == "rtf":
-            rtfstr += line
-        elif section == "prm":
-            prmstr += line
-    f.close()
-
-    if rtfsection > 1:
-        raise BuildError(
-            "Multiple ({}) rtf topology sections found in {} stream file.".format(
-                rtfsection, filename
-            )
-        )
-    if prmsection > 1:
-        raise BuildError(
-            "Multiple ({}) prm parameter sections found in {} stream file.".format(
-                prmsection, filename
-            )
-        )
-
-    f = open(outrtf, "w")
-    f.write(rtfstr + "END\n")
-    f.close()
-    f = open(outprm, "w")
-    f.write(prmstr + "END\n")
-    f.close()
-    return outrtf, outprm
-
-
-def _prepareStream(filename):
-    from htmd.util import tempname
-
-    tmpout = tempname()
-    os.makedirs(tmpout)
-    return split(filename, tmpout)
-
-
 def _logParser(fname):
     import re
 
@@ -995,174 +858,6 @@ def _checkFailedAtoms(mol):
         )
 
 
-HEADERS = {
-    "^ATOMS": """ """,
-    "^BOND": """!
-!V(bond) = Kb(b - b0)**2
-!
-!Kb: kcal/mole/A**2
-!b0: A
-!
-!atom type Kb          b0
-!
-""",
-    "^ANGL": """!
-!V(angle) = Ktheta(Theta - Theta0)**2
-!
-!V(Urey-Bradley) = Kub(S - S0)**2
-!
-!Ktheta: kcal/mole/rad**2
-!Theta0: degrees
-!Kub: kcal/mole/A**2 (Urey-Bradley)
-!S0: A
-!
-!atom types     Ktheta    Theta0   Kub     S0
-!
-""",
-    "^DIHE": """!
-!V(dihedral) = Kchi(1 + cos(n(chi) - delta))
-!
-!Kchi: kcal/mole
-!n: multiplicity
-!delta: degrees
-!
-!atom types             Kchi    n   delta
-!
-""",
-    "^IMPR": """!
-!V(improper) = Kpsi(psi - psi0)**2
-!
-!Kpsi: kcal/mole/rad**2
-!psi0: degrees
-!note that the second column of numbers (0) is ignored
-!
-!atom types           Kpsi                   psi0
-!
-""",
-    "^CMAP": """! 2D grid correction data. 
-! Finalfix3, Feig/Best/MacKerell 2010
-
-! Jing Huang/Alex MacKerell adjustments to correct for 
-! oversampling of alpha L conformation.  2016/1
-""",
-    "^NONB": """cutnb 14.0 ctofnb 12.0 ctonnb 10.0 eps 1.0 e14fac 1.0 wmin 1.5 
-                !adm jr., 5/08/91, suggested cutoff scheme
-!
-!V(Lennard-Jones) = Eps,i,j[(Rmin,i,j/ri,j)**12 - 2(Rmin,i,j/ri,j)**6]
-!
-!epsilon: kcal/mole, Eps,i,j = sqrt(eps,i * eps,j)
-!Rmin/2: A, Rmin,i,j = Rmin/2,i + Rmin/2,j
-!
-!atom  ignored    epsilon      Rmin/2   ignored   eps,1-4       Rmin/2,1-4
-!
-""",
-    "^NBON": """cutnb 14.0 ctofnb 12.0 ctonnb 10.0 eps 1.0 e14fac 1.0 wmin 1.5 
-                !adm jr., 5/08/91, suggested cutoff scheme
-!
-!V(Lennard-Jones) = Eps,i,j[(Rmin,i,j/ri,j)**12 - 2(Rmin,i,j/ri,j)**6]
-!
-!epsilon: kcal/mole, Eps,i,j = sqrt(eps,i * eps,j)
-!Rmin/2: A, Rmin,i,j = Rmin/2,i + Rmin/2,j
-!
-!atom  ignored    epsilon      Rmin/2   ignored   eps,1-4       Rmin/2,1-4
-!
-""",
-    "^HBON": """! READ PARAM APPEND CARD
-! to append hbond parameters from the file: par_hbond.inp
-""",
-    "^NBFI": """!               Emin        Rmin
-!            (kcal/mol)     (A)
-!
-""",
-}
-
-
-def cleanup_charmm_prm(mol, parameters, outfile):
-    import re
-
-    def _is_number(x):
-        try:
-            float(x)
-            return True
-        except ValueError:
-            return False
-
-    sections = (
-        "^ATOMS",
-        "^BOND",
-        "^ANGL",
-        "^DIHE",
-        "^THET",
-        "^IMPR",
-        "^IMPH",
-        "^CMAP",
-        "^NBON",
-        "^NONB",
-        "^NBFI",
-        "^HBON",
-    )
-
-    atom_masses = {
-        at.upper(): mol.masses[mol.atomtype == at][0] for at in set(mol.atomtype)
-    }
-    atom_masses["X"] = 0
-
-    in_section = None
-
-    with open(parameters, encoding="utf-8") as f:
-        lines = f.readlines()
-
-    newlines = []
-    newlines.append("ATOMS\n")
-    for at, mass in sorted(atom_masses.items(), key=lambda x: x[0]):
-        newlines.append(f"MASS  -1  {at: >5} {mass:>8.5f}\n")
-    newlines.append("\n")
-
-    wrote_newline = False
-    for line in lines:
-        line = line.strip()
-        if line.startswith("*") or line.startswith("!"):
-            continue
-        if line.startswith("ATOMS") or line.startswith("MASS"):
-            continue
-
-        if len(line) == 0:
-            if not wrote_newline:
-                newlines.append("\n")
-            wrote_newline = True
-            continue
-
-        # Get stuff before inline comments
-        pre_comment = line.split("!")[0].strip()
-        if len(pre_comment) == 0:
-            continue
-
-        is_section = [re.search(s, pre_comment) is not None for s in sections]
-        if any(is_section):
-            newlines.append(f"\n{line}\n")
-            newlines.append(HEADERS[sections[is_section.index(True)]])
-            in_section = sections[is_section.index(True)]
-            wrote_newline = False
-            continue
-
-        non_numbers = [pp.strip() for pp in pre_comment.split() if not _is_number(pp)]
-        types_in_system = [pp.upper() in atom_masses for pp in non_numbers]
-        type_line = len(types_in_system)
-        if type_line and not all(types_in_system):
-            if in_section == "^CMAP":
-                skip_cmap_terms = True
-            continue
-        if type_line and all(types_in_system) and in_section == "^CMAP":
-            skip_cmap_terms = False
-        if in_section == "^CMAP" and skip_cmap_terms and not type_line:
-            continue
-        newlines.append(f"{line}\n")
-        wrote_newline = False
-
-    with open(outfile, "w", encoding="utf-8") as f:
-        f.writelines(newlines)
-
-
 class _TestCharmmBuild(unittest.TestCase):
     @unittest.skipUnless(_psfgen_exists, "Requires psfgen")
     def test_build(self):
@@ -1190,9 +885,15 @@ class _TestCharmmBuild(unittest.TestCase):
                 np.random.seed(1)  # Needed for ions
                 smol = solvate(mol)
                 topos = ["top/top_all36_prot.rtf", "top/top_water_ions.rtf"]
-                params = ["par/par_all36m_prot.prm", "par/par_water_ions.prm"]
+                # 1U5U contains deprotonated arginines (AR0 → patch RN1),
+                # which are only defined in the arg0 stream file.
+                if pdb == "1U5U":
+                    topos += [
+                        "str/prot/toppar_all36_prot_arg0.str",
+                        "str/misc/toppar_ions_won.str",
+                    ]
                 tmpdir = tempname()
-                _ = build(smol, topo=topos, param=params, outdir=tmpdir)
+                _ = build(smol, topo=topos, outdir=tmpdir)
 
                 compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
                 assertSameAsReferenceDir(compareDir, tmpdir)
@@ -1220,13 +921,12 @@ class _TestCharmmBuild(unittest.TestCase):
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ["top/top_all36_prot.rtf", "top/top_water_ions.rtf"]
-        params = ["par/par_all36m_prot.prm", "par/par_water_ions.prm"]
         disu = [
             ["segid 1 and resid 110", "segid 1 and resid 187"],
             ["segid 0 and resid 110", "segid 0 and resid 187"],
         ]
         tmpdir = tempname()
-        _ = build(smol, topo=topos, param=params, outdir=tmpdir, disulfide=disu)
+        _ = build(smol, topo=topos, outdir=tmpdir, disulfide=disu)
 
         compareDir = home(dataDir=os.path.join("test-charmm-build", pdb))
         assertSameAsReferenceDir(compareDir, tmpdir)
@@ -1254,13 +954,12 @@ class _TestCharmmBuild(unittest.TestCase):
         np.random.seed(1)  # Needed for ions
         smol = solvate(mol)
         topos = ["top/top_all36_prot.rtf", "top/top_water_ions.rtf"]
-        params = ["par/par_all36m_prot.prm", "par/par_water_ions.prm"]
 
         smol.insertion[smol.resid == 42] = (
             "A"  # Adding an insertion to test that disulfide bonds with insertions work
         )
         tmpdir = tempname()
-        _ = build(smol, topo=topos, param=params, outdir=tmpdir)
+        _ = build(smol, topo=topos, outdir=tmpdir)
         compareDir = home(dataDir=os.path.join("test-charmm-build", "3PTB_insertion"))
         assertSameAsReferenceDir(compareDir, tmpdir)
 

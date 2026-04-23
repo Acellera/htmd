@@ -160,18 +160,36 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
 def assertSameAsReferenceDir(compareDir, outdir="."):
     """Check if files in refdir are present in the directory given as second argument AND their content matches.
 
-    Raise an exception if not."""
+    Subdirectories are compared recursively. Raise an exception if not."""
 
     import filecmp
     import os
 
-    toCompare = os.listdir(compareDir)
-    match, mismatch, error = filecmp.cmpfiles(
-        outdir, compareDir, toCompare, shallow=False
-    )
-    if len(mismatch) != 0 or len(error) != 0 or len(match) != len(toCompare):
+    def _compare(ref, out, prefix=""):
+        entries = os.listdir(ref)
+        files = [e for e in entries if os.path.isfile(os.path.join(ref, e))]
+        subdirs = [e for e in entries if os.path.isdir(os.path.join(ref, e))]
+
+        match, mismatch, error = filecmp.cmpfiles(out, ref, files, shallow=False)
+        bad = [os.path.join(prefix, m) for m in mismatch]
+        bad += [os.path.join(prefix, e) for e in error]
+        if len(match) != len(files):
+            missing = set(files) - set(match) - set(mismatch) - set(error)
+            bad += [os.path.join(prefix, m) for m in missing]
+
+        for d in subdirs:
+            ref_sub = os.path.join(ref, d)
+            out_sub = os.path.join(out, d)
+            if not os.path.isdir(out_sub):
+                bad.append(os.path.join(prefix, d) + "/")
+                continue
+            bad += _compare(ref_sub, out_sub, prefix=os.path.join(prefix, d))
+        return bad
+
+    bad = _compare(compareDir, outdir)
+    if bad:
         raise Exception(
-            f"Different results in files {mismatch}: Compare {outdir} and {compareDir}"
+            f"Different results in files {bad}: Compare {outdir} and {compareDir}"
         )
 
 
