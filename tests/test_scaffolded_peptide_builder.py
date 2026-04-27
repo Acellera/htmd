@@ -331,3 +331,128 @@ def _test_8qfz_chainB_end_to_end(tmp_path):
     assert (
         n_cys_lfi_bonds == 3
     ), f"expected 3 Cys-SG <-> LFI-C bonds, found {n_cys_lfi_bonds}"
+
+
+QU4_A_CIF = os.path.join(DATA_DIR, "8QU4_A.cif")
+R1J_GLYCO_CIF = os.path.join(DATA_DIR, "1R1J_glyco.cif")
+
+
+def _test_amber_handles_stapled_peptide_custombond(tmp_path):
+    """Pattern-B stapled peptide: PDB 8QU4 chain A has an i, i+4
+    NLE.CE - MK8.CE hydrocarbon staple. detectNonStandardResidues
+    returns a PeptideCrosslinkSpec; custombondsFromSpecs emits the staple
+    bond; amber._prepareMolecule processes it without applying any anchor
+    rename (CE is not in ANCHOR_VARIANTS).
+
+    The bond emit itself is identical to the scaffolded-peptide path that
+    the 8QFZ end-to-end test covers, so we verify only the
+    moleculekit/htmd integration here, not the full prmtop."""
+    from htmd.builder.amber import _prepareMolecule
+    from moleculekit.tools.nonstandard_residues import (
+        detectNonStandardResidues,
+        custombondsFromSpecs,
+        PeptideCrosslinkSpec,
+    )
+
+    mol = Molecule(QU4_A_CIF)
+    mol.segid[:] = "P"
+
+    specs = detectNonStandardResidues(mol, write_models=False, include_known=True)
+    crosslinks = [s for s in specs if isinstance(s, PeptideCrosslinkSpec)]
+    assert len(crosslinks) == 1
+    cb = custombondsFromSpecs(specs)
+    assert len(cb) == 1
+
+    _prepareMolecule(mol, caps={}, disulfide=None, custombonds=cb, remove=None)
+
+    # CE is not in ANCHOR_VARIANTS so neither stapled NCAA was renamed.
+    # (Plain LYS also has a CE atom; restrict the check to the NLE/MK8
+    # residues only.)
+    stapled_resnames = set(
+        mol.resname[
+            (mol.name == "CE") & np.isin(mol.resname, ["NLE", "MK8"])
+        ].tolist()
+    )
+    assert stapled_resnames == {"NLE", "MK8"}
+    # No CYX rename since neither endpoint is a Cys SG.
+    assert "CYX" not in set(mol.resname.tolist())
+
+
+def _test_amber_handles_glycoprotein_asn_to_nln_rename(tmp_path):
+    """Verify the new ASN -> NLN entry in ANCHOR_VARIANTS fires: a slim
+    1R1J slice has Asn144.ND2 covalently bonded to NAG752.C1
+    (N-glycosylation). detectNonStandardResidues returns a
+    CovalentLigandSpec; forceProtonationFromSpecs emits an Asn -> NLN
+    rename; amber._prepareMolecule's defense-in-depth path applies the
+    rename and drops HD22 (the displaced amide hydrogen).
+
+    Note: a full tleap build of glycoproteins additionally needs GLYCAM
+    loaded with the right NAG-residue naming (0YB / 4YB / ...). Here we
+    only verify the moleculekit-side spec plumbing and the htmd-side
+    rename machinery - the bond emit itself is identical to the
+    scaffolded-peptide path that the 8QFZ end-to-end test covers."""
+    from htmd.builder.amber import _prepareMolecule
+    from moleculekit.molecule import UniqueAtomID
+    from moleculekit.tools.nonstandard_residues import (
+        detectNonStandardResidues,
+        custombondsFromSpecs,
+        forceProtonationFromSpecs,
+        CovalentLigandSpec,
+    )
+
+    mol = Molecule(R1J_GLYCO_CIF)
+    mol.segid[:] = "P"
+
+    # Inject a fake HD22 on the anchored ASN so we can verify the H-drop.
+    # (1R1J's PDB lacks Hs.) ASN144.ND2 is the glycosylation anchor.
+    nd2_idx = int(mol.atomselect("resid 144 and name ND2", indexes=True)[0])
+    fake_h = Molecule().empty(1)
+    fake_h.name[:] = "HD22"
+    fake_h.element[:] = "H"
+    fake_h.resname[:] = "ASN"
+    fake_h.resid[:] = 144
+    fake_h.chain[:] = mol.chain[nd2_idx]
+    fake_h.segid[:] = mol.segid[nd2_idx]
+    fake_h.coords = (
+        mol.coords[nd2_idx, :, mol.frame] + np.array([0.0, 1.0, 0.0])
+    ).reshape(1, 3, 1).astype(np.float32)
+    fake_h.record[:] = "ATOM"
+    mol.insert(fake_h, index=nd2_idx + 1, collisions=False)
+
+    specs = detectNonStandardResidues(mol, write_models=False, include_known=True)
+    nag_specs = [s for s in specs if isinstance(s, CovalentLigandSpec)]
+    assert len(nag_specs) == 1
+    cb = custombondsFromSpecs(specs)
+    assert len(cb) == 1
+    fp = forceProtonationFromSpecs(specs)
+    assert ("ASN ND2 -> NLN" or True) and any(variant == "NLN" for _, variant in fp), fp
+
+    # Track ND2 by UniqueAtomID so we can find it after _prepareMolecule
+    # renumbers residues.
+    nd2_uid = UniqueAtomID.fromMolecule(mol, "resid 144 and name ND2")
+
+    _prepareMolecule(mol, caps={}, disulfide=None, custombonds=cb, remove=None)
+
+    # The Asn144 residue should now be NLN, and HD22 should be gone.
+    sel = (
+        (mol.chain == nd2_uid.chain)
+        & (mol.segid == nd2_uid.segid)
+        & (mol.insertion == nd2_uid.insertion)
+        & (mol.name == "ND2")
+    )
+    nd2_after = np.where(sel)[0]
+    assert len(nd2_after) >= 1
+    nln_nd2 = nd2_after[mol.resname[nd2_after] == "NLN"]
+    assert len(nln_nd2) == 1, (
+        "expected Asn144 to be renamed to NLN, "
+        f"found resnames {set(mol.resname[nd2_after])}"
+    )
+
+    # HD22 must be absent in the renamed residue.
+    resid_val = mol.resid[nln_nd2[0]]
+    res_mask = (
+        (mol.resid == resid_val)
+        & (mol.chain == nd2_uid.chain)
+        & (mol.segid == nd2_uid.segid)
+    )
+    assert ((mol.name == "HD22") & res_mask).sum() == 0
