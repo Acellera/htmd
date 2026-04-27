@@ -337,6 +337,110 @@ QU4_A_CIF = os.path.join(DATA_DIR, "8QU4_A.cif")
 R1J_GLYCO_CIF = os.path.join(DATA_DIR, "1R1J_glyco.cif")
 
 
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end build needs antechamber + teLeap",
+)
+def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
+    """Pattern-B stapled peptide end-to-end: PDB 8QU4 chain A is a 13-mer
+    NF-Y-derived peptide stapled by olefin metathesis between NLE272 and
+    MK8276 (the NLE.CE - MK8.CE single bond closes the ring after RCM).
+
+    Pipeline:
+      1. SMILES-template both NCAAs to set bond orders.
+      2. systemPrepare with residue_smiles to add AMBER-named hydrogens
+         (PDB2PQR uses canonical H names; RDKit's addHs alone produces
+         generic H1/H2/... that parameterizeNonCanonicalResidues rejects).
+      3. parameterizeNonCanonicalResidues on each NCAA CIF that
+         systemPrepare wrote.
+      4. detectNonStandardResidues on the prepared molecule -> 1
+         PeptideCrosslinkSpec.
+      5. amber.build with the staple custombond + the antechamber prepi/
+         frcmod for NLE and MK8.
+      6. Verify the NLE.CE - MK8.CE bond is in the built Molecule's bonds.
+    """
+    from glob import glob
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.noncanonical import parameterizeNonCanonicalResidues
+    from htmd.builder.amber import build as amber_build
+    from moleculekit.tools.nonstandard_residues import (
+        detectNonStandardResidues,
+        custombondsFromSpecs,
+        PeptideCrosslinkSpec,
+    )
+
+    mol = Molecule(QU4_A_CIF)
+    mol.segid[:] = "P"
+
+    residue_smiles = {
+        "NLE": "CCCC[C@@H](C(=O)O)N",
+        "MK8": "CCCC[C@](C)(C(=O)O)N",
+    }
+    for resname, smi in residue_smiles.items():
+        mol.templateResidueFromSmiles(f"resname {resname}", smi, addHs=True)
+
+    # Detect on the templated molecule (PDB-derived bonds intact). systemPrepare
+    # downstream rebuilds the bond list and would force the detector into
+    # distance-based bond guessing, which over-bonds atoms that are close in
+    # the stapled region.
+    specs = detectNonStandardResidues(mol, write_models=False, include_known=True)
+    cb = custombondsFromSpecs(specs)
+    assert len(cb) == 1
+    assert any(isinstance(s, PeptideCrosslinkSpec) for s in specs)
+
+    # systemPrepare populates AMBER-conventional H names (HA, HB2, HB3, H,
+    # ...) and writes one CIF per non-canonical residue under outdir.
+    prepdir = str(tmp_path / "prepared")
+    pmol = systemPrepare(
+        mol, residue_smiles=residue_smiles, outdir=prepdir, _molkit_ff=False
+    )
+
+    cifs = glob(os.path.join(prepdir, "*.cif"))
+    assert len(cifs) >= 2, cifs
+
+    # Parameterize each non-canonical residue with antechamber + parmchk2.
+    paramdir = str(tmp_path / "params")
+    for cif in cifs:
+        parameterizeNonCanonicalResidues(
+            cif, paramdir, forcefield="GAFF2", charge_model="Gasteiger"
+        )
+    topos = glob(os.path.join(paramdir, "*.prepi"))
+    params = glob(os.path.join(paramdir, "*.frcmod"))
+    assert topos and params
+
+    # Build (no solvent, no ions). The peptide is ACE/NH2-capped already so
+    # disable amber's automatic terminal capping.
+    builddir = str(tmp_path / "build")
+    built = amber_build(
+        pmol,
+        outdir=builddir,
+        ionize=False,
+        custombonds=cb,
+        topo=topos,
+        param=params,
+        caps={"P": ("none", "none")},
+    )
+    assert built is not None
+
+    # The staple bond NLE.CE <-> MK8.CE must survive into the built mol.
+    nle_ce = set(
+        np.where((built.resname == "NLE") & (built.name == "CE"))[0].tolist()
+    )
+    mk8_ce = set(
+        np.where((built.resname == "MK8") & (built.name == "CE"))[0].tolist()
+    )
+    assert nle_ce and mk8_ce
+    n_staple = sum(
+        1
+        for a, b in built.bonds
+        if (int(a) in nle_ce and int(b) in mk8_ce)
+        or (int(b) in nle_ce and int(a) in mk8_ce)
+    )
+    assert n_staple == 1, (
+        f"expected one NLE.CE <-> MK8.CE bond in the built prmtop, found {n_staple}"
+    )
+
+
 def _test_amber_handles_stapled_peptide_custombond(tmp_path):
     """Pattern-B stapled peptide: PDB 8QU4 chain A has an i, i+4
     NLE.CE - MK8.CE hydrocarbon staple. detectNonStandardResidues

@@ -593,6 +593,11 @@ def _prepareMolecule(mol: Molecule, caps, disulfide, custombonds, remove):
     # Convert lipids to AMBER naming
     mol = _charmmLipid2Amber(mol)
 
+    # PDB stores the C-terminal amide cap as "NH2" but AMBER ff14SB calls it
+    # "NHE"; the residue is otherwise the same. Rename so tLeap recognises it.
+    if np.any(mol.resname == "NH2"):
+        mol.resname[mol.resname == "NH2"] = "NHE"
+
     cyclic = _detect_cyclic_segments(mol)
 
     # Add caps to termini
