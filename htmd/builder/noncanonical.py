@@ -178,6 +178,8 @@ def _fftype_antechamber(
     -------
     typed_mol : Molecule
         Molecule with GAFF2 atom types assigned.
+    typed_path : str
+        Absolute path to the typed mol2 file written into ``tmpdir``.
     frcmod_path : str
         Absolute path to the generated frcmod file.
     """
@@ -259,7 +261,7 @@ def _fftype_antechamber(
         _write_pyodide_output(frcmod_path, result[output_frcmod])
 
     typed_mol = Molecule(typed_path)
-    return typed_mol, frcmod_path
+    return typed_mol, typed_path, frcmod_path
 
 
 def parameterizeNonCanonicalResidues(
@@ -382,7 +384,7 @@ def _parameterize_non_canonical_residue(
             frcmod = os.path.join(tmpdir, "parameters", f"{resn}.frcmod")
         else:
             netcharge = int(np.sum(cmol.formalcharge))
-            typed_mol, frcmod = _fftype_antechamber(
+            typed_mol, _, frcmod = _fftype_antechamber(
                 cmol,
                 tmpdir,
                 method=forcefield,

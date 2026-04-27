@@ -672,6 +672,40 @@ def _prepareMolecule(mol: Molecule, caps, disulfide, custombonds, remove):
             torem |= (atoms1 & (mol.name == "HG")) | (atoms2 & (mol.name == "HG"))
         mol.remove(torem, _logger=False)
 
+    # Apply anchor renames + H-drop for atoms that participate in custombonds
+    # (defense-in-depth for scaffolded peptides; idempotent with
+    # systemPrepare's force_protonation path). For each endpoint of a
+    # custombond, look up its (resname, atom_name) in ANCHOR_VARIANTS; if a
+    # variant residue is defined, rename the residue and drop the displaced
+    # hydrogens. No-op for endpoints that aren't canonical-residue anchors
+    # (e.g. the scaffold side of a scaffolded-peptide bond).
+    if custombonds is not None and len(custombonds):
+        from moleculekit.tools._anchor_variants import lookup_anchor_variant
+
+        torem = np.zeros(mol.numAtoms, dtype=bool)
+        for a1, a2 in custombonds:
+            for atom_id in (a1, a2):
+                idx = atom_id.selectAtom(mol)
+                resname = str(mol.resname[idx])
+                atom_name = str(mol.name[idx])
+                entry = lookup_anchor_variant(resname, atom_name)
+                if entry is None:
+                    continue
+                # Mask of all atoms in this residue.
+                res_mask = (
+                    (mol.resid == mol.resid[idx])
+                    & (mol.segid == mol.segid[idx])
+                    & (mol.insertion == mol.insertion[idx])
+                    & (mol.chain == mol.chain[idx])
+                )
+                if entry["variant"] is not None and resname != entry["variant"]:
+                    mol.resname[res_mask] = entry["variant"]
+                    atom_id.resname = entry["variant"]
+                for h_name in entry["drop_h"]:
+                    torem |= res_mask & (mol.name == h_name)
+        if np.any(torem):
+            mol.remove(torem, _logger=False)
+
     return disulfide, custombonds, remove
 
 
@@ -1094,8 +1128,8 @@ def _write_tleap_script(
             for d in custombonds:
                 atom1 = d[0].selectAtom(mol, indexes=False)
                 atom2 = d[1].selectAtom(mol, indexes=False)
-                uqres1 = int(mol.resid[atom1])
-                uqres2 = int(mol.resid[atom2])
+                uqres1 = int(mol.resid[atom1][0])
+                uqres2 = int(mol.resid[atom2][0])
                 name1 = mol.name[atom1][0]
                 name2 = mol.name[atom2][0]
                 f.write(f"bond mol.{uqres1}.{name1} mol.{uqres2}.{name2}\n")
