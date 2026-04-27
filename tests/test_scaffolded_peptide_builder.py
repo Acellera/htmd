@@ -15,19 +15,23 @@ from htmd.builder.scaffolded_peptide import prepareScaffoldedResidue
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(curr_dir, "test_scaffolded_peptide_builder")
+QFZ_B_CIF = os.path.join(DATA_DIR, "8QFZ_B.cif")
+
+# Pre-reaction LFI warhead: 1,3,5-triazinane core with three bromoacetyl arms.
+# After reaction with the three Cys SG atoms, the Br leaving groups are
+# displaced and replaced by S-Cys connections.
+LFI_SMILES = "C1N(CN(CN1C(=O)CCBr)C(=O)CCBr)C(=O)CCBr"
 
 _antechamber = shutil.which("antechamber") is not None
 _tleap = _findTeLeap() is not None
 
 
 def _load_8qfz_chainB():
-    mol = Molecule(os.path.join(DATA_DIR, "8QFZ.cif"))
-    mol.filter("chain B", _logger=False)
-    return mol
+    return Molecule(QFZ_B_CIF)
 
 
 @pytest.mark.skipif(not _antechamber, reason="antechamber not available")
-def _test_prepare_scaffolded_residue_params(tmp_path):
+def _test_prepare_scaffolded_residue(tmp_path):
     """End-to-end: detect, antechamber, prepareScaffoldedResidue.
     The function should produce a matched <RESNAME>.cif + <RESNAME>.frcmod
     pair, with the frcmod containing both antechamber's scaffold-internal
@@ -84,14 +88,12 @@ def _test_prepare_scaffolded_residue_params(tmp_path):
     assert ("c3", "c3") in pset.bond_types or ("c", "n") in pset.bond_types
 
 
-def _test_prepare_scaffolded_residue_params_default_outdir(tmp_path):
+@pytest.mark.skipif(not _antechamber, reason="antechamber not available")
+def _test_prepare_scaffolded_residue_default_outdir(tmp_path):
     """When outdir=None, prepareScaffoldedResidue should fall back to
     a tempdir and still return matched <RESNAME>.cif + <RESNAME>.frcmod
     paths."""
     from htmd.builder.noncanonical import _fftype_antechamber
-
-    if not _antechamber:
-        pytest.skip("antechamber not available")
 
     mol = _load_8qfz_chainB()
     specs = detectNonStandardResidues(
@@ -121,8 +123,6 @@ def _test_amber_anchor_rename_via_custombonds(tmp_path):
     """Defense-in-depth: amber._prepareMolecule should auto-rename anchored
     Cys to CYX and drop HG when the user passes a custombond from CYS SG to
     a scaffold atom, even without going through systemPrepare first."""
-    from moleculekit.molecule import UniqueAtomID
-
     mol = _load_8qfz_chainB()
 
     # Make sure the Cys residues have an HG to drop. Add a dummy HG to one of
@@ -130,7 +130,6 @@ def _test_amber_anchor_rename_via_custombonds(tmp_path):
     sg_idx = int(mol.atomselect("resid 11 and name SG", indexes=True)[0])
     sg_pos = mol.coords[sg_idx, :, mol.frame]
     hg_pos = sg_pos + np.array([0.0, 0.0, 1.34])
-    n_before = mol.numAtoms
     new = Molecule().empty(1)
     new.name[:] = "HG"
     new.element[:] = "H"
@@ -196,11 +195,6 @@ def _test_disulfide_path_unchanged(tmp_path):
     """Sanity check: an isolated Cys-Cys disulfide pair still gets renamed
     CYX with HG dropped, i.e. the rename logic is unchanged for the disulfide
     path even after generalisation."""
-    # Build a tiny molecule with two cysteines bonded by their SGs.
-    from moleculekit.molecule import Molecule
-
-    mol = Molecule().empty(0)
-    coords = []
     rows = [
         # (name, element, resid, x, y, z)
         ("N", "N", 1, 0.0, 0.0, 0.0),
@@ -218,28 +212,24 @@ def _test_disulfide_path_unchanged(tmp_path):
         ("SG", "S", 2, 4.0, -3.0, 0.0),
         ("HG", "H", 2, 4.0, -3.5, 0.8),
     ]
-    n = len(rows)
-    add = Molecule().empty(n)
-    for i, (name, el, rid, x, y, z) in enumerate(rows):
-        add.name[i] = name
-        add.element[i] = el
-        add.resid[i] = rid
-        add.resname[i] = "CYS"
-        coords.append([x, y, z])
-    add.coords = np.array(coords, dtype=np.float32)[:, :, np.newaxis]
-    add.segid[:] = "P"
-    add.chain[:] = "A"
-    add.record[:] = "ATOM"
-    mol.append(add, collisions=False)
+    mol = Molecule().empty(len(rows))
+    mol.name[:] = [r[0] for r in rows]
+    mol.element[:] = [r[1] for r in rows]
+    mol.resid[:] = [r[2] for r in rows]
+    mol.resname[:] = "CYS"
+    mol.segid[:] = "P"
+    mol.chain[:] = "A"
+    mol.record[:] = "ATOM"
+    mol.coords = np.array([r[3:] for r in rows], dtype=np.float32)[:, :, np.newaxis]
 
-    # Add the SG-SG disulfide bond explicitly: too far apart for distance-
-    # based detection, so we hand it as the disulfide kw.
-    sg1 = int(mol.atomselect("resid 1 and name SG", indexes=True)[0])
-    sg2 = int(mol.atomselect("resid 2 and name SG", indexes=True)[0])
-    disulfide_input = [["resid 1 and name SG", "resid 2 and name SG"]]
-
+    # The two SG atoms are too far apart for distance-based disulfide
+    # detection, so we hand it explicitly via the disulfide kw.
     disulfide, _, _ = _prepareMolecule(
-        mol, caps={}, disulfide=disulfide_input, custombonds=None, remove=None
+        mol,
+        caps={},
+        disulfide=[["resid 1 and name SG", "resid 2 and name SG"]],
+        custombonds=None,
+        remove=None,
     )
 
     assert len(disulfide) == 1
@@ -268,7 +258,6 @@ def _test_8qfz_chainB_end_to_end(tmp_path):
     mol = _load_8qfz_chainB()
     mol.filter("not resname HOH", _logger=False)
 
-    LFI_SMILES = "C1N(CN(CN1C(=O)CCBr)C(=O)CCBr)C(=O)CCBr"
     # User templating step (sets bond orders, formal charges, adds Hs).
     mol.templateResidueFromSmiles("resname LFI", LFI_SMILES, addHs=True)
 

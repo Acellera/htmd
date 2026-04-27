@@ -113,21 +113,50 @@ def prepareScaffoldedResidue(typed_path, frcmod_path, spec, outdir=None):
 def _write_scaffold_only_cif(typed_mol, spec, out_path):
     """Drop stub atoms from ``typed_mol`` and write the result as a CIF named
     after the scaffold's resname (so tLeap registers it as the right unit)."""
+    _, is_stub, _ = _atom_arrays_for_spec(typed_mol, spec)
+    scaffold_only = typed_mol.copy()
+    if is_stub.any():
+        scaffold_only.remove(is_stub, _logger=False)
+    scaffold_only.resname[:] = spec.resname
+    scaffold_only.resid[:] = 1
+    scaffold_only.write(out_path)
+
+
+def _atom_arrays_for_spec(typed_mol, spec):
+    """Return ``(atom_types, is_stub, ff_types)`` parallel arrays indexed by
+    atom for ``typed_mol`` according to ``spec.model_atom_map``."""
     atom_map = spec.model_atom_map
     if atom_map is None:
         raise ValueError(
             "spec.model_atom_map is None; was the spec produced with write_models=True?"
         )
-    scaffold_only = typed_mol.copy()
-    stub_mask = np.array(
-        [atom_map[str(n)].role == "stub" for n in scaffold_only.name],
+    atom_types = np.asarray(typed_mol.atomtype)
+    is_stub = np.asarray(
+        [atom_map[str(n)].role == "stub" for n in typed_mol.name],
         dtype=bool,
     )
-    if stub_mask.any():
-        scaffold_only.remove(stub_mask, _logger=False)
-    scaffold_only.resname[:] = spec.resname
-    scaffold_only.resid[:] = 1
-    scaffold_only.write(out_path)
+    ff_types = np.asarray(
+        [atom_map[str(n)].ff_type or "" for n in typed_mol.name],
+        dtype=object,
+    )
+    return atom_types, is_stub, ff_types
+
+
+def _live_key(idxs, atom_types, is_stub, ff_types):
+    """Build the atom-type tuple a model-compound instance maps to in the
+    *live* AMBER system: scaffold atoms keep their GAFF2 types; stub atoms
+    are replaced by their canonical-FF type from ANCHOR_VARIANTS. Returns
+    ``None`` if any stub atom is missing a canonical-FF mapping."""
+    out = []
+    for i in idxs:
+        if is_stub[i]:
+            ff = ff_types[i]
+            if not ff:
+                return None
+            out.append(str(ff))
+        else:
+            out.append(str(atom_types[i]))
+    return tuple(out)
 
 
 def _add_junction_terms(pset, typed_mol, spec):
@@ -138,60 +167,38 @@ def _add_junction_terms(pset, typed_mol, spec):
     Parameter values are looked up in ``pset`` itself by the instance's GAFF2
     type signature (antechamber/parmchk2 emitted them) and copied; parmed
     deduplicates types by ``id()`` when writing, so the junction entry must
-    be a distinct object.  Impropers are left as-is (antechamber's
-    empirical impropers apply by atom type and don't need rewriting at the
-    junction).
+    be a distinct object. Impropers are left as-is (antechamber's empirical
+    impropers apply by atom type and don't need rewriting at the junction).
 
     Angles and dihedrals come from
     :func:`moleculekit.util.calculateAnglesAndDihedrals`, the same helper
     used by :mod:`htmd.builder.noncanonical`."""
-    atom_map = spec.model_atom_map
-    if atom_map is None:
-        raise ValueError(
-            "spec.model_atom_map is None; was the spec produced with write_models=True?"
-        )
-
-    atom_types = np.asarray(typed_mol.atomtype)
-    is_stub = np.asarray(
-        [atom_map[str(n)].role == "stub" for n in typed_mol.name],
-        dtype=bool,
-    )
-    ff_types = np.asarray(
-        [atom_map[str(n)].ff_type or "" for n in typed_mol.name],
-        dtype=object,
-    )
-
+    atom_types, is_stub, ff_types = _atom_arrays_for_spec(typed_mol, spec)
     angles, dihedrals = calculateAnglesAndDihedrals(typed_mol.bonds)
-
-    _splice_into(
-        pset.bond_types, typed_mol.bonds, atom_types, is_stub, ff_types
-    )
-    _splice_into(
-        pset.angle_types, angles, atom_types, is_stub, ff_types
-    )
-    _splice_into(
-        pset.dihedral_types, dihedrals, atom_types, is_stub, ff_types
-    )
+    for param_dict, instances in (
+        (pset.bond_types, typed_mol.bonds),
+        (pset.angle_types, angles),
+        (pset.dihedral_types, dihedrals),
+    ):
+        _splice_into(param_dict, instances, atom_types, is_stub, ff_types)
 
 
 def _splice_into(param_dict, instances, atom_types, is_stub, ff_types):
     """For each instance (an array of atom indices) that spans stub+scaffold,
     look up the parameter value at the GAFF2 key, derive the rewritten
-    canonical-FF key, and write the value (deep-copied) under the new key.
+    canonical-FF key, and write the value (copied) under the new key.
 
     ``param_dict`` is mutated in place. ``instances`` is an ``(N, k)``
     integer array of atom indices (k=2 for bonds, 3 for angles, 4 for
     dihedrals)."""
     for idxs in instances:
-        idxs = tuple(int(i) for i in idxs)
-        roles = is_stub[list(idxs)]
+        roles = is_stub[idxs]
         if not (roles.any() and (~roles).any()):
             continue  # not a mixed junction instance
-
-        gaff_key = tuple(atom_types[list(idxs)])
+        gaff_key = tuple(atom_types[idxs])
         if gaff_key not in param_dict:
             continue
-        new_key = _live_key(idxs, roles, atom_types, ff_types)
+        new_key = _live_key(idxs, atom_types, is_stub, ff_types)
         if new_key is None or new_key in param_dict:
             continue
         # parmed.write deduplicates types by id(); copy so the junction entry
@@ -199,23 +206,6 @@ def _splice_into(param_dict, instances, atom_types, is_stub, ff_types):
         val_copy = copy.copy(param_dict[gaff_key])
         param_dict[new_key] = val_copy
         param_dict[new_key[::-1]] = val_copy
-
-
-def _live_key(idxs, roles, atom_types, ff_types):
-    """Build the atom-type tuple a model-compound instance maps to in the
-    *live* AMBER system: scaffold atoms keep their GAFF2 types; stub atoms
-    are replaced by their canonical-FF type from ANCHOR_VARIANTS. Returns
-    ``None`` if any stub atom is missing a canonical-FF mapping."""
-    out = []
-    for i, stub in zip(idxs, roles):
-        if stub:
-            ff = ff_types[i]
-            if not ff:
-                return None
-            out.append(str(ff))
-        else:
-            out.append(str(atom_types[i]))
-    return tuple(out)
 
 
 def _drop_unused_terms(pset, typed_mol, spec):
@@ -232,36 +222,27 @@ def _drop_unused_terms(pset, typed_mol, spec):
 
     Mirrors the cleanup pattern in :func:`htmd.builder.noncanonical._clean_prm`.
     """
-    atom_map = spec.model_atom_map
-    is_stub = np.asarray(
-        [atom_map[str(n)].role == "stub" for n in typed_mol.name],
-        dtype=bool,
-    )
-    atom_types = np.asarray(typed_mol.atomtype)
-    ff_types = np.asarray(
-        [atom_map[str(n)].ff_type or "" for n in typed_mol.name],
-        dtype=object,
-    )
-
+    atom_types, is_stub, ff_types = _atom_arrays_for_spec(typed_mol, spec)
     angles, dihedrals = calculateAnglesAndDihedrals(typed_mol.bonds)
 
     def _live_keys(instances):
         keys = set()
         for idxs in instances:
-            idxs = tuple(int(i) for i in idxs)
-            roles = is_stub[list(idxs)]
+            roles = is_stub[idxs]
             if roles.all():
                 continue  # stub-only instance; absent from live system
-            k = _live_key(idxs, roles, atom_types, ff_types)
+            k = _live_key(idxs, atom_types, is_stub, ff_types)
             if k is None:
                 continue
             keys.add(k)
             keys.add(k[::-1])
         return keys
 
-    keep_bonds = _live_keys(typed_mol.bonds)
-    keep_angles = _live_keys(angles)
-    keep_dihedrals = _live_keys(dihedrals)
+    keep = {
+        id(pset.bond_types): _live_keys(typed_mol.bonds),
+        id(pset.angle_types): _live_keys(angles),
+        id(pset.dihedral_types): _live_keys(dihedrals),
+    }
 
     # Atom types kept in MASS/NONB: GAFF2 types worn by scaffold atoms only.
     allowed_atom_types = set(str(t) for t in atom_types[~is_stub].tolist())
@@ -270,13 +251,9 @@ def _drop_unused_terms(pset, typed_mol, spec):
         if at not in allowed_atom_types:
             del pset.atom_types[at]
 
-    for d, keep in (
-        (pset.bond_types, keep_bonds),
-        (pset.angle_types, keep_angles),
-        (pset.dihedral_types, keep_dihedrals),
-    ):
+    for d in (pset.bond_types, pset.angle_types, pset.dihedral_types):
         for key in list(d):
-            if key not in keep:
+            if key not in keep[id(d)]:
                 del d[key]
 
     # Impropers: drop entries that reference any deleted atom type.
