@@ -480,7 +480,7 @@ def _run_psfgen(psfgen, outdir, script_name, prefix):
             f"No {prefix} pdb/psf file was generated. Check {logpath} for errors in building."
         )
 
-    molbuilt = Molecule(pdb_path)
+    molbuilt = Molecule(pdb_path, validateElements=False)
     molbuilt.read(psf_path)
     return molbuilt
 
