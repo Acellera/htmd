@@ -354,7 +354,7 @@ def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
       3. parameterizeNonCanonicalResidues on each NCAA CIF that
          systemPrepare wrote.
       4. detectNonStandardResidues on the prepared molecule -> 1
-         PeptideCrosslinkSpec.
+         CrosslinkSpec.
       5. amber.build with the staple custombond + the antechamber prepi/
          frcmod for NLE and MK8.
       6. Verify the NLE.CE - MK8.CE bond is in the built Molecule's bonds.
@@ -366,7 +366,7 @@ def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
     from moleculekit.tools.nonstandard_residues import (
         detectNonStandardResidues,
         custombondsFromSpecs,
-        PeptideCrosslinkSpec,
+        CrosslinkSpec,
     )
 
     mol = Molecule(QU4_A_CIF)
@@ -386,7 +386,7 @@ def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
     specs = detectNonStandardResidues(mol, write_models=False, include_known=True)
     cb = custombondsFromSpecs(specs)
     assert len(cb) == 1
-    assert any(isinstance(s, PeptideCrosslinkSpec) for s in specs)
+    assert any(isinstance(s, CrosslinkSpec) for s in specs)
 
     # systemPrepare populates AMBER-conventional H names (HA, HB2, HB3, H,
     # ...) and writes one CIF per non-canonical residue under outdir.
@@ -441,10 +441,107 @@ def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
     )
 
 
+def _pdb_nag_to_glycam_0yb(mol):
+    """Convert a PDB-named NAG residue to its GLYCAM 0YB equivalent in
+    place. Renames the residue and the three acetyl-group atom names that
+    differ between PDB and GLYCAM (C7 -> C2N, C8 -> CME, O7 -> O2N)."""
+    nag_mask = mol.resname == "NAG"
+    if not nag_mask.any():
+        return
+    mol.resname[nag_mask] = "0YB"
+    pdb_to_glycam = {"C7": "C2N", "C8": "CME", "O7": "O2N"}
+    for pdb_name, glycam_name in pdb_to_glycam.items():
+        sel = nag_mask & (mol.name == pdb_name)
+        if sel.any():
+            mol.name[sel] = glycam_name
+
+
+@pytest.mark.skipif(
+    not _tleap, reason="end-to-end build needs teLeap"
+)
+def _test_1r1j_glycoprotein_end_to_end(tmp_path):
+    """Glycoprotein covalent ligand end-to-end: a slim slice of PDB 1R1J
+    around the ASN144 N-glycosylation site (5 protein residues + 1 NAG).
+
+    Pipeline:
+      1. Load the slim slice; set segids (P for protein, G for the glycan).
+      2. detectNonStandardResidues -> CovalentLigandSpec(ASN.ND2 -> NAG.C1).
+      3. forceProtonationFromSpecs -> ASN -> NLN via the new ANCHOR_VARIANTS
+         entry; custombondsFromSpecs -> the glycosidic ND2-C1 bond.
+      4. systemPrepare with force_protonation: renames ASN144 to NLN and
+         adds AMBER-named Hs (NLN's template has no HD22, so the displaced
+         amide hydrogen is correctly absent).
+      5. Convert PDB NAG to GLYCAM 0YB (residue + 3 atom-name renames).
+      6. amber.build with leaprc.GLYCAM_06j-1 added to the FF list.
+      7. Verify NLN.ND2 - 0YB.C1 bond is in the built Molecule.
+
+    No antechamber is needed: GLYCAM provides the 0YB sugar parameters and
+    the NLN amino-acid template (Asn with HD22 removed and the C1-ND2
+    junction parameters)."""
+    from htmd.builder.amber import build as amber_build, defaultFf
+    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.nonstandard_residues import (
+        detectNonStandardResidues,
+        custombondsFromSpecs,
+        forceProtonationFromSpecs,
+        CovalentLigandSpec,
+    )
+
+    mol = Molecule(R1J_GLYCO_CIF)
+    mol.segid[mol.resname == "NAG"] = "G"  # glycan segment
+    mol.segid[mol.segid != "G"] = "P"  # protein segment
+
+    specs = detectNonStandardResidues(mol, write_models=False, include_known=True)
+    nag_specs = [s for s in specs if isinstance(s, CovalentLigandSpec)]
+    assert len(nag_specs) == 1
+    cb = custombondsFromSpecs(specs)
+    assert len(cb) == 1
+    fp = forceProtonationFromSpecs(specs)
+    assert any(variant == "NLN" for _, variant in fp), fp
+
+    # systemPrepare adds AMBER-named Hs and applies the ASN -> NLN rename
+    # via force_protonation; PDB2PQR places Hs from the NLN template, so
+    # HD22 is absent in the output.
+    mol = systemPrepare(mol, force_protonation=fp)
+
+    # Convert PDB NAG naming to GLYCAM 0YB. The custombond's atomselect
+    # strings target atoms by segid+chain+resid+name (no resname filter),
+    # so the rename doesn't break the bond resolution.
+    _pdb_nag_to_glycam_0yb(mol)
+
+    builddir = str(tmp_path / "build")
+    built = amber_build(
+        mol,
+        outdir=builddir,
+        ionize=False,
+        custombonds=cb,
+        ff=defaultFf() + ["leaprc.GLYCAM_06j-1"],
+    )
+    assert built is not None
+
+    # The glycosidic NLN.ND2 <-> 0YB.C1 bond must be in the built mol.
+    nln_nd2 = set(
+        np.where((built.resname == "NLN") & (built.name == "ND2"))[0].tolist()
+    )
+    yb_c1 = set(
+        np.where((built.resname == "0YB") & (built.name == "C1"))[0].tolist()
+    )
+    assert nln_nd2 and yb_c1
+    n_glyco = sum(
+        1
+        for a, b in built.bonds
+        if (int(a) in nln_nd2 and int(b) in yb_c1)
+        or (int(b) in nln_nd2 and int(a) in yb_c1)
+    )
+    assert n_glyco == 1, (
+        f"expected one NLN.ND2 <-> 0YB.C1 bond in the prmtop, found {n_glyco}"
+    )
+
+
 def _test_amber_handles_stapled_peptide_custombond(tmp_path):
     """Pattern-B stapled peptide: PDB 8QU4 chain A has an i, i+4
     NLE.CE - MK8.CE hydrocarbon staple. detectNonStandardResidues
-    returns a PeptideCrosslinkSpec; custombondsFromSpecs emits the staple
+    returns a CrosslinkSpec; custombondsFromSpecs emits the staple
     bond; amber._prepareMolecule processes it without applying any anchor
     rename (CE is not in ANCHOR_VARIANTS).
 
@@ -455,14 +552,14 @@ def _test_amber_handles_stapled_peptide_custombond(tmp_path):
     from moleculekit.tools.nonstandard_residues import (
         detectNonStandardResidues,
         custombondsFromSpecs,
-        PeptideCrosslinkSpec,
+        CrosslinkSpec,
     )
 
     mol = Molecule(QU4_A_CIF)
     mol.segid[:] = "P"
 
     specs = detectNonStandardResidues(mol, write_models=False, include_known=True)
-    crosslinks = [s for s in specs if isinstance(s, PeptideCrosslinkSpec)]
+    crosslinks = [s for s in specs if isinstance(s, CrosslinkSpec)]
     assert len(crosslinks) == 1
     cb = custombondsFromSpecs(specs)
     assert len(cb) == 1
@@ -497,6 +594,7 @@ def _test_amber_handles_glycoprotein_asn_to_nln_rename(tmp_path):
     scaffolded-peptide path that the 8QFZ end-to-end test covers."""
     from htmd.builder.amber import _prepareMolecule
     from moleculekit.molecule import UniqueAtomID
+    from moleculekit.tools.preparation import systemPrepare
     from moleculekit.tools.nonstandard_residues import (
         detectNonStandardResidues,
         custombondsFromSpecs,
@@ -507,29 +605,26 @@ def _test_amber_handles_glycoprotein_asn_to_nln_rename(tmp_path):
     mol = Molecule(R1J_GLYCO_CIF)
     mol.segid[:] = "P"
 
-    # Inject a fake HD22 on the anchored ASN so we can verify the H-drop.
-    # (1R1J's PDB lacks Hs.) ASN144.ND2 is the glycosylation anchor.
-    nd2_idx = int(mol.atomselect("resid 144 and name ND2", indexes=True)[0])
-    fake_h = Molecule().empty(1)
-    fake_h.name[:] = "HD22"
-    fake_h.element[:] = "H"
-    fake_h.resname[:] = "ASN"
-    fake_h.resid[:] = 144
-    fake_h.chain[:] = mol.chain[nd2_idx]
-    fake_h.segid[:] = mol.segid[nd2_idx]
-    fake_h.coords = (
-        mol.coords[nd2_idx, :, mol.frame] + np.array([0.0, 1.0, 0.0])
-    ).reshape(1, 3, 1).astype(np.float32)
-    fake_h.record[:] = "ATOM"
-    mol.insert(fake_h, index=nd2_idx + 1, collisions=False)
-
+    # Detect on the raw mol (PDB-derived bonds intact). systemPrepare will
+    # rebuild the bond list and would force the detector into distance-based
+    # guessing.
     specs = detectNonStandardResidues(mol, write_models=False, include_known=True)
     nag_specs = [s for s in specs if isinstance(s, CovalentLigandSpec)]
     assert len(nag_specs) == 1
     cb = custombondsFromSpecs(specs)
     assert len(cb) == 1
     fp = forceProtonationFromSpecs(specs)
-    assert ("ASN ND2 -> NLN" or True) and any(variant == "NLN" for _, variant in fp), fp
+    assert any(variant == "NLN" for _, variant in fp), fp
+
+    # systemPrepare adds AMBER-named Hs (HD21 / HD22 on Asn144's amide).
+    # We deliberately do *not* pass force_protonation here, so the residue
+    # stays ASN with HD22 intact and lets us verify amber._prepareMolecule's
+    # defense-in-depth path applies the ASN -> NLN rename and drops HD22.
+    # hold_nonpeptidic_bonds=False so PDB2PQR doesn't freeze Asn144 (which
+    # would skip H-addition on the anchored residue).
+    mol = systemPrepare(mol, hold_nonpeptidic_bonds=False)
+    # Sanity: HD22 is present before the defense-in-depth rename runs.
+    assert mol.atomselect("resid 144 and name HD22").sum() == 1
 
     # Track ND2 by UniqueAtomID so we can find it after _prepareMolecule
     # renumbers residues.
