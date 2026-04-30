@@ -190,8 +190,16 @@ class ClusterOutputs:
     custombonds: list = field(default_factory=list)
 
 
+def _in_pyodide():
+    """Detect Pyodide so AmberTools dispatch can swap subprocess for
+    ``antechamber_pyodide.run`` automatically."""
+    import sys
+
+    return sys.platform == "emscripten"
+
+
 def _write_chain_residue_prepi(
-    sub, prepi_path, resname, is_n_term=False, is_c_term=False
+    sub, prepi_path, resname, is_n_term=False, is_c_term=False, use_pyodide=None
 ):
     """Convert a single chain-resident residue (already typed and named)
     into an AMBER ``.prepi`` topology so tLeap can splice it into a
@@ -205,29 +213,49 @@ def _write_chain_residue_prepi(
     from htmd.builder.noncanonical import (
         _run_ambertools,
         _fix_prepi_atomname_capitalization,
+        _write_pyodide_output,
     )
 
+    if use_pyodide is None:
+        use_pyodide = _in_pyodide()
+
     with tempfile.TemporaryDirectory() as tmpdir:
-        mol2_path = os.path.join(tmpdir, f"{resname}.mol2")
+        mol2_name = f"{resname}.mol2"
+        ac_name = f"{resname}_mod.ac"
+        prepi_name = f"{resname}.prepi"
+        mc_name = f"mainchain.{resname.lower()}"
+
+        mol2_path = os.path.join(tmpdir, mol2_name)
         sub.write(mol2_path)
 
-        _run_ambertools(
+        input_files = None
+        if use_pyodide:
+            with open(mol2_path, "rb") as f:
+                input_files = {mol2_name: f.read()}
+
+        result = _run_ambertools(
             "antechamber",
             [
                 "antechamber",
-                "-i", f"{resname}.mol2", "-fi", "mol2",
-                "-o", f"{resname}_mod.ac", "-fo", "ac",
+                "-i", mol2_name, "-fi", "mol2",
+                "-o", ac_name, "-fo", "ac",
                 "-nc", str(int(round(float(np.sum(sub.formalcharge))))),
                 "-pf", "y", "-dr", "n", "-j", "0", "-an", "n",
             ],
             cwd=tmpdir,
+            use_pyodide=use_pyodide,
+            input_files=input_files,
         )
+
+        ac_path = os.path.join(tmpdir, ac_name)
+        if use_pyodide:
+            _write_pyodide_output(ac_path, result[ac_name])
 
         n_idx = int(np.where(sub.name == "N")[0][0])
         c_idx = int(np.where(sub.name == "C")[0][0])
         backbone = nx.shortest_path(sub.toGraph(), source=n_idx, target=c_idx)
 
-        mainchain_path = os.path.join(tmpdir, f"mainchain.{resname.lower()}")
+        mainchain_path = os.path.join(tmpdir, mc_name)
         with open(mainchain_path, "w") as f:
             if not is_n_term:
                 f.write("HEAD_NAME N\n")
@@ -239,21 +267,35 @@ def _write_chain_residue_prepi(
                 f.write(f"MAIN_CHAIN {sub.name[bb_idx]}\n")
             f.write(f"CHARGE {float(np.sum(sub.formalcharge)):.1f}\n")
 
-        _run_ambertools(
+        prepgen_inputs = None
+        if use_pyodide:
+            with open(ac_path, "rb") as f:
+                ac_data = f.read()
+            with open(mainchain_path, "rb") as f:
+                mc_data = f.read()
+            prepgen_inputs = {ac_name: ac_data, mc_name: mc_data}
+
+        result = _run_ambertools(
             "prepgen",
             [
                 "prepgen",
-                "-i", f"{resname}_mod.ac",
-                "-o", f"{resname}.prepi", "-f", "prepi",
-                "-m", f"mainchain.{resname.lower()}",
+                "-i", ac_name,
+                "-o", prepi_name, "-f", "prepi",
+                "-m", mc_name,
                 "-rn", resname,
             ],
             cwd=tmpdir,
+            use_pyodide=use_pyodide,
+            input_files=prepgen_inputs,
         )
+
+        prepi_tmp = os.path.join(tmpdir, prepi_name)
+        if use_pyodide:
+            _write_pyodide_output(prepi_tmp, result[prepi_name])
 
         import shutil as _shutil
 
-        _shutil.copy(os.path.join(tmpdir, f"{resname}.prepi"), prepi_path)
+        _shutil.copy(prepi_tmp, prepi_path)
         _fix_prepi_atomname_capitalization(sub, prepi_path)
 
 
@@ -440,7 +482,9 @@ def _add_cluster_junction_terms(pset, typed_mol, model, ff14sb_amino_lib):
         _splice_into(param_dict, instances, gaff2_types, is_canonical, ff14sb_types)
 
 
-def prepareClusterResidues(typed_path, frcmod_path, model, outdir=None):
+def prepareClusterResidues(
+    typed_path, frcmod_path, model, outdir=None, use_pyodide=None
+):
     """Split antechamber output for a cluster model compound into per-
     residue topology files and emit the matching custombonds list.
 
@@ -475,6 +519,9 @@ def prepareClusterResidues(typed_path, frcmod_path, model, outdir=None):
         outdir = tempfile.mkdtemp(prefix="cluster_params_")
     else:
         os.makedirs(outdir, exist_ok=True)
+
+    if use_pyodide is None:
+        use_pyodide = _in_pyodide()
 
     typed_mol = Molecule(typed_path)
 
@@ -562,6 +609,7 @@ def prepareClusterResidues(typed_path, frcmod_path, model, outdir=None):
                     new_resname,
                     is_n_term=model.spec.is_n_term[cidx],
                     is_c_term=model.spec.is_c_term[cidx],
+                    use_pyodide=use_pyodide,
                 )
                 out.topo_paths.append(topo_path)
         else:
@@ -808,7 +856,9 @@ def _write_free_residue_cif(mol, group, out_path):
     return sub
 
 
-def parameterizeFromSpecs(specs, mol, outdir, charge_method="gasteiger"):
+def parameterizeFromSpecs(
+    specs, mol, outdir, charge_method="gasteiger", use_pyodide=None
+):
     """Parameterize every non-canonical residue in ``specs`` and return
     paths plus custombonds ready to feed :func:`htmd.builder.amber.build`.
 
@@ -833,6 +883,10 @@ def parameterizeFromSpecs(specs, mol, outdir, charge_method="gasteiger"):
         Charge method passed to antechamber's ``-c`` flag (``"gasteiger"``
         by default; ``"am1-bcc"`` available for higher accuracy at
         significant runtime cost).
+    use_pyodide : bool or None, optional
+        Force the AmberTools dispatch path (``True`` -> dispatch via
+        ``antechamber_pyodide.run``; ``False`` -> native subprocess).
+        ``None`` (default) auto-detects Pyodide via ``sys.platform``.
 
     Returns
     -------
@@ -896,6 +950,9 @@ def parameterizeFromSpecs(specs, mol, outdir, charge_method="gasteiger"):
         _fftype_antechamber,
         parameterizeNonCanonicalResidues,
     )
+
+    if use_pyodide is None:
+        use_pyodide = _in_pyodide()
 
     os.makedirs(outdir, exist_ok=True)
     a2r, groups = _residue_groups_with_index(mol)
@@ -990,10 +1047,15 @@ def parameterizeFromSpecs(specs, mol, outdir, charge_method="gasteiger"):
             method="gaff2",
             netcharge=netcharge,
             charge_method=charge_method,
+            use_pyodide=use_pyodide,
         )
         del typed_mol  # we re-load it inside prepareClusterResidues
         cluster_out = prepareClusterResidues(
-            typed_path, frcmod_path, cluster_model, outdir=cluster_outdir
+            typed_path,
+            frcmod_path,
+            cluster_model,
+            outdir=cluster_outdir,
+            use_pyodide=use_pyodide,
         )
         out.topo_paths.extend(cluster_out.topo_paths)
         out.frcmod_paths.extend(cluster_out.frcmod_paths)
@@ -1031,6 +1093,7 @@ def parameterizeFromSpecs(specs, mol, outdir, charge_method="gasteiger"):
             method="gaff2",
             netcharge=netcharge,
             charge_method=charge_method,
+            use_pyodide=use_pyodide,
         )
         out_cif = os.path.join(outdir, f"{g['resname']}.cif")
         out_frcmod = os.path.join(outdir, f"{g['resname']}.frcmod")
