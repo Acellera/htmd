@@ -1089,10 +1089,10 @@ def _write_tleap_script(
             )
             f.write("clearPdbResMap\n")
             cyc_vars = []
-            for cyc_var, fname, local_end in cyc_info:
+            for cyc_var, fname, res_start, res_end in cyc_info:
                 cyc_vars.append(cyc_var)
                 f.write(f"{cyc_var} = loadpdb {fname}\n")
-                f.write(f"bond {cyc_var}.1.N {cyc_var}.{local_end}.C\n")
+                f.write(f"bond {cyc_var}.{res_start}.N {cyc_var}.{res_end}.C\n")
             cyc_list = " ".join(cyc_vars)
             has_non_cyclic = has_solute or (include_solvent and has_water)
             if has_non_cyclic:
@@ -1296,8 +1296,7 @@ def _prepare_build(
             fname = f"cyclic_{seg}.pdb"
             seg_mol.write(os.path.join(outdir, fname))
             cyc_var = f"cyc_{seg}"
-            local_end = res_end - res_start + 1
-            cyc_info.append((cyc_var, fname, local_end))
+            cyc_info.append((cyc_var, fname, res_start, res_end))
 
     # --- Write tleap scripts ---
     script_kwargs = dict(
