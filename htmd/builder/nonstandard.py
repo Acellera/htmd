@@ -335,12 +335,18 @@ def _load_ff14sb_amino_lib():
     import shutil
 
     tleap_path = shutil.which("tleap") or shutil.which("teLeap")
-    if tleap_path is None:
-        raise RuntimeError(
-            "ff14SB amino lib lookup needs tleap on PATH (to locate the "
-            "AmberTools data dir)."
-        )
-    amber_home = os.path.dirname(os.path.dirname(tleap_path))
+    if tleap_path is not None:
+        amber_home = os.path.dirname(os.path.dirname(tleap_path))
+    else:
+        from htmd.builder.amber import _pyodideAmberHome
+
+        amber_home = _pyodideAmberHome()
+        if amber_home is None:
+            raise RuntimeError(
+                "ff14SB amino lib lookup needs tleap on PATH or the "
+                "tleap_pyodide package installed (to locate the AmberTools "
+                "data dir)."
+            )
     libdir = os.path.join(amber_home, "dat", "leap", "lib")
     merged = {}
     main_lib_path = os.path.join(libdir, "amino12.lib")
@@ -1030,8 +1036,29 @@ def parameterizeFromSpecs(
 
     out = ClusterOutputs()
 
+    # Singleton NCAA clusters (one chain-resident NCAA, no cluster bonds)
+    # that share resname + terminal flags are chemically identical model
+    # compounds, so antechamber output is identical too. tLeap loads only
+    # one unit per resname anyway. Dedup by (resname, is_n_term, is_c_term)
+    # to skip the redundant antechamber runs and avoid emitting N copies
+    # of the same prepi.
+    seen_singleton_keys = set()
+
     # Run the cluster pipeline once per connected component.
     for ci, (members, cbonds) in enumerate(cluster_membership):
+        if len(members) == 1 and not cbonds:
+            spec = spec_by_res_idx[members[0]]
+            if isinstance(spec, NCAASpec):
+                g = groups[members[0]]
+                key = (
+                    g["resname"],
+                    bool(spec.is_n_term),
+                    bool(spec.is_c_term),
+                )
+                if key in seen_singleton_keys:
+                    continue
+                seen_singleton_keys.add(key)
+
         cluster_spec = _build_internal_cluster_spec(
             members, cbonds, mol, groups, spec_by_res_idx
         )
@@ -1071,6 +1098,7 @@ def parameterizeFromSpecs(
     # cluster shouldn't happen because those are promoted to singleton
     # clusters earlier; if one slips through it's an input bug.
     standalone_types = (LigandSpec, ScaffoldSpec, CovalentLigandSpec)
+    seen_ligand_resnames = set()
     for r_idx, spec in spec_by_res_idx.items():
         if r_idx in in_cluster_set:
             continue
@@ -1082,6 +1110,12 @@ def parameterizeFromSpecs(
                 f"in mol.bonds. Check that mol carries the relevant covalent "
                 f"bonds."
             )
+        # Identical free residues (same resname) yield identical antechamber
+        # output, and tLeap only loads one unit per resname. Skip the
+        # redundant runs.
+        if g["resname"] in seen_ligand_resnames:
+            continue
+        seen_ligand_resnames.add(g["resname"])
         ligand_dir = os.path.join(outdir, f"ligand_{g['resname']}")
         os.makedirs(ligand_dir, exist_ok=True)
         ligand_cif = os.path.join(ligand_dir, f"{g['resname']}.cif")
