@@ -22,6 +22,7 @@ custombonds without going through detect.
 
 import os
 import shutil
+from collections import Counter
 
 import numpy as np
 import pytest
@@ -534,3 +535,76 @@ def _test_full_pipeline_1r1j(tmp_path):
     built = _run_pipeline(mol, smiles, tmp_path)
     assert built is not None
     _check_no_overvalent_atoms(built)
+
+
+@pytest.mark.skipif(
+    not _antechamber,
+    reason="dedup test calls parameterizeFromSpecs which needs antechamber",
+)
+def _test_parameterize_from_specs_dedup_4tot(tmp_path):
+    """4TOT carries cyclosporin chains with three MLE residues per
+    chain across multiple chains. parameterizeFromSpecs should run
+    antechamber once per unique ``(resname, is_n_term, is_c_term)`` and
+    emit one prepi/frcmod per unique NCAA, not one per occurrence:
+    tLeap loads a single unit per resname anyway, and a duplicate
+    ``loadamberprep MLE.prepi`` would silently overwrite the previous."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
+    from moleculekit.tools.preparation import systemPrepare
+
+    smiles = {
+        "33X": "CC(C=O)NC",
+        "34E": "CN[C@@H]([C@H](C)CN1CCN(CCOC)CC1)C=O",
+        "ABA": "CC[C@H](C=O)N",
+        "BMT": "C/C=C/C[C@@H](C)[C@H]([C@@H](C=O)NC)O",
+        "DAL": "C[C@H](C=O)N",
+        "MLE": "CC(C)C[C@@H](C=O)NC",
+        "MVA": "CC(C)[C@@H](C=O)NC",
+    }
+    mol = Molecule("4TOT")
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+
+    specs = detectNonStandardResidues(mol)
+    spec_counts = Counter(s.residue.resname for s in specs)
+    # 4TOT carries 4 cyclosporin chains (each with 3 MLE plus one each
+    # of 33X / 34E / ABA / BMT / DAL / MVA), 4 free P6G ligands, and
+    # 2 free SO4 ligands. Without dedup that's 42 antechamber runs.
+    expected_spec_counts = {
+        "33X": 4, "34E": 4, "ABA": 4, "BMT": 4, "DAL": 4,
+        "MLE": 12, "MVA": 4, "P6G": 4, "SO4": 2,
+    }
+    assert dict(spec_counts) == expected_spec_counts, (
+        f"unexpected spec counts: {dict(spec_counts)}"
+    )
+
+    for resname, smi in smiles.items():
+        if (mol.resname == resname).any():
+            mol.templateResidueFromSmiles(
+                f'resname "{resname}"', smi, addHs=True, _logger=False
+            )
+    pmol = systemPrepare(
+        mol,
+        outdir=str(tmp_path / "prep"),
+        ignore_ns=True,
+        detect_specs=specs,
+    )
+    out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
+
+    topo_basenames = sorted(
+        os.path.splitext(os.path.basename(p))[0] for p in out.topo_paths
+    )
+    frcmod_basenames = sorted(
+        os.path.splitext(os.path.basename(p))[0] for p in out.frcmod_paths
+    )
+    # 42 specs collapse to 9 unique-resname prepi/frcmod files: 7 NCAA
+    # singletons (one per unique resname) plus 2 free ligands (P6G, SO4).
+    expected_basenames = [
+        "33X", "34E", "ABA", "BMT", "DAL", "MLE", "MVA", "P6G", "SO4"
+    ]
+    assert topo_basenames == expected_basenames, (
+        f"topo basenames {topo_basenames} != {expected_basenames}"
+    )
+    assert frcmod_basenames == expected_basenames, (
+        f"frcmod basenames {frcmod_basenames} != {expected_basenames}"
+    )
