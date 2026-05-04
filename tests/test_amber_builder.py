@@ -461,6 +461,7 @@ def _test_ionize_salt(tmp_path):
 def _test_5vbl_noncanonical_full_pipeline(tmp_path):
     from moleculekit.tools.preparation import systemPrepare
     from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
     from htmd.builder.noncanonical import parameterizeNonCanonicalResidues
 
     if not shutil.which("antechamber", mode=os.X_OK):
@@ -472,22 +473,20 @@ def _test_5vbl_noncanonical_full_pipeline(tmp_path):
         "HRG": "C(CCNC(=N)N)C[C@@H](C(=O)O)N",
         "NLE": "CCCC[C@@H](C(=O)O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C(=O)O",
-        # "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
     }
 
     mol = Molecule("5VBL")
-    for res in residue_smiles:
-        mol.templateResidueFromSmiles(
-            f'resname "{res}"', residue_smiles[res], addHs=True
-        )
-    # del residue_smiles["OLC"]
     mol.remove("resname OLC")
-
-    mol = autoSegment(mol, fields=("chain", "segid"))
+    mol = autoSegment(mol, fields=("segid", "chain"))
+    mol.remove("element H")
+    specs = detectNonStandardResidues(mol)
+    for resn, smi in residue_smiles.items():
+        if (mol.resname == resn).any():
+            mol.templateResidueFromSmiles(f"resname '{resn}'", smi, addHs=True)
 
     prepdir = os.path.join(tmp_path, "prepared")
     pmol = systemPrepare(
-        mol, residue_smiles=residue_smiles, outdir=prepdir, _molkit_ff=False
+        mol, ignore_ns=False, detect_specs=specs, outdir=prepdir
     )
 
     cifs = glob(os.path.join(prepdir, "*.cif"))
