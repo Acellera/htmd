@@ -145,16 +145,21 @@ def _detectRingPenetration(l1, lipids, box):
     return False
 
 
-def resolveRingPenetrations(lipids, box):
+def resolveRingPenetrations(lipids, box, max_iterations=50):
     lipids = np.array(lipids)
-    while True:
+    penetrators = []
+    for _ in range(max_iterations):
         penetrators = []
         for l1 in range(len(lipids)):
             if _detectRingPenetration(l1, lipids, box):
                 penetrators.append(l1)
+        if len(penetrators) == 0:
+            logger.info("0 penetrating molecule(s) remaining")
+            return
         for p in penetrators:
             lipids[p].rot += 10
-        if len(penetrators) == 0:
-            logger.info("{} penetrating molecule(s) remaining".format(len(penetrators)))
-            break
         logger.info("{} penetrating molecule(s) remaining".format(len(penetrators)))
+    logger.warning(
+        "Could not resolve ring penetrations after {} iterations; "
+        "{} lipid(s) still penetrating".format(max_iterations, len(penetrators))
+    )

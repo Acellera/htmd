@@ -181,10 +181,12 @@ def wrapping_dist_python(coor1, coor2, box):
 
 def _findNeighbours(lipids, box):
     xypos = np.vstack([ll.xyz[:2] for ll in lipids])
+    leaflet = np.array([np.sign(ll.xyz[2]) for ll in lipids])
 
     for i in range(len(lipids)):
         dist = wrapping_dist_python(xypos[i, :], xypos[i + 1 :, :], box)
-        lipids[i].neighbours = i + 1 + np.where(dist < 11)[0]
+        same_leaflet = leaflet[i + 1 :] == leaflet[i]
+        lipids[i].neighbours = i + 1 + np.where((dist < 11) & same_leaflet)[0]
 
 
 def _loadMolecules(lipids, files):

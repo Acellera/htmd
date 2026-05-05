@@ -57,18 +57,16 @@ def _halton_sequence(p, n):
 
 def _subrandom_particle_positions(nparticles, box_vectors, ndim, method="halton"):
     """Generate a deterministic list of subrandom particle positions."""
-    # Create positions array.
     positions = np.zeros([nparticles, 3], np.float32)
 
-    # Fill in each dimension.
-    primes = [2, 3, 5]  # prime bases for Halton sequence
+    primes = [2, 3, 5]
     for dim in range(ndim):
         x = _halton_sequence(primes[dim], nparticles)
-        ll = box_vectors[dim][dim]
-        positions[:, dim] = x - 0.5
+        ll = box_vectors[dim][dim].value_in_unit(unit.angstrom)
+        positions[:, dim] = (x - 0.5) * ll
 
     np.random.shuffle(positions)
-    return unit.Quantity(positions * ll / ll.unit, ll.unit)
+    return unit.Quantity(positions, unit.angstrom)
 
 
 def distributeLipids(
