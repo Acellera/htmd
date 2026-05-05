@@ -1,12 +1,6 @@
 import os
-import pytest
 
-from htmd.builder.amber import _findTeLeap
 from htmd.membranebuilder.build_membrane import buildMembrane
-
-
-reason = "teLeap is not installed. Cannot test membrane builder build/equil paths"
-tleap_installed = _findTeLeap() is not None
 
 
 def _test_subrandom_positions_scale_each_axis():
@@ -49,7 +43,6 @@ def _test_build_membrane(tmp_path):
     assert not os.path.exists(tmp_path / "starting_structure.pdb")
 
 
-@pytest.mark.skipif(not tleap_installed, reason=reason)
 def _test_build_membrane_minimize(tmp_path):
     buildMembrane(
         [20, 20],
@@ -65,7 +58,6 @@ def _test_build_membrane_minimize(tmp_path):
     assert os.path.exists(tmp_path / "starting_structure.pdb")
 
 
-@pytest.mark.skipif(not tleap_installed, reason=reason)
 def _test_build_membrane_equil(tmp_path):
     buildMembrane(
         [20, 20],

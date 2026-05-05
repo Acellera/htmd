@@ -148,6 +148,7 @@ def _createMembraneMolecule(lipids):
 
     allmols = []
     numAtoms = 0
+    numBonds = 0
     for i, l in enumerate(lipids):
         mol = l.mol.copy()
         headpos = mol.coords[mol.name == l.headname].flatten()[np.newaxis, :]
@@ -156,15 +157,24 @@ def _createMembraneMolecule(lipids):
         mol.moveBy(l.xyz)
         mol.resid[:] = i
         numAtoms += mol.numAtoms
+        numBonds += len(mol.bonds)
         allmols.append(mol)
 
     # Merge all the lipids into a single Molecule
     mol = Molecule().empty(numAtoms)
     mol.coords = np.zeros((numAtoms, 3, 1), dtype=np.float32)
+    mol.bonds = np.zeros((numBonds, 2), dtype=np.uint32)
+    mol.bondtype = np.empty(numBonds, dtype=object)
     start_idx = 0
+    bond_idx = 0
     for mm in allmols:
         for prop in ["name", "resname", "resid", "segid", "chain", "element", "coords"]:
             mol.__dict__[prop][start_idx : start_idx + mm.numAtoms] = getattr(mm, prop)
+        nb = len(mm.bonds)
+        if nb:
+            mol.bonds[bond_idx : bond_idx + nb] = mm.bonds + start_idx
+            mol.bondtype[bond_idx : bond_idx + nb] = mm.bondtype
+            bond_idx += nb
         start_idx += mm.numAtoms
 
     return mol
@@ -223,12 +233,114 @@ def _locateLipidFiles(folder, lipidnames):
 
     files = {}
     for mm in lipidnames:
-        files[mm] = glob(os.path.join(folder, mm, "*.pdb"))
+        files[mm] = glob(os.path.join(folder, mm, "*.cif"))
         if len(files[mm]) == 0:
             raise RuntimeError(
-                f'Could not locate pdb files for lipid "{mm}" in folder {folder}'
+                f'Could not locate cif files for lipid "{mm}" in folder {folder}'
             )
     return files
+
+
+def _equilibrateOpenMM(
+    smemb,
+    minimize=0,
+    equilibrate_ns=0,
+    platform_name="CUDA",
+    forcefield_files=None,
+    temperature=300,
+):
+    """Minimize and/or equilibrate ``smemb`` with OpenMM.
+
+    The htmd lipid library uses Lipid17-compatible atom names on merged
+    single-residue lipids (POPC, POPE, CHL1, ...), which match the AMBER
+    Lipid17 OpenMM XML directly. Water from htmd.solvate uses CHARMM names
+    (TIP3 / OH2), so on a working copy we rename TIP3 -> HOH and OH2 -> O so
+    the AMBER tip3p XML matches. Equilibrated coordinates and the final box
+    are written back into the original Molecule.
+    """
+    import os
+    from openmm import app, unit, Platform
+    from openmm import LangevinMiddleIntegrator, MonteCarloMembraneBarostat
+    from htmd.util import tempname
+
+    if forcefield_files is None:
+        forcefield_files = ["amber14/lipid17.xml", "amber14/tip3p.xml"]
+
+    work = smemb.copy()
+    is_water = work.resname == "TIP3"
+    work.resname[is_water] = "HOH"
+    work.name[is_water & (work.name == "OH2")] = "O"
+
+    # Make sure the box is set so PDB CRYST1 gets written and OpenMM can do PME.
+    coord_min = work.coords[:, :, 0].min(axis=0)
+    coord_max = work.coords[:, :, 0].max(axis=0)
+    box = (coord_max - coord_min).astype(np.float32)
+    work.box = box.reshape(3, 1)
+    work.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
+
+    pdb_path = tempname(suffix=".pdb")
+    work.write(pdb_path)
+    try:
+        pdb = app.PDBFile(pdb_path)
+    finally:
+        os.remove(pdb_path)
+
+    pdb.topology.setPeriodicBoxVectors(
+        [
+            (box[0], 0, 0) * unit.angstrom,
+            (0, box[1], 0) * unit.angstrom,
+            (0, 0, box[2]) * unit.angstrom,
+        ]
+    )
+
+    ff = app.ForceField(*forcefield_files)
+    system = ff.createSystem(
+        pdb.topology,
+        nonbondedMethod=app.PME,
+        nonbondedCutoff=10 * unit.angstrom,
+        constraints=app.HBonds,
+    )
+
+    if equilibrate_ns > 0:
+        barostat = MonteCarloMembraneBarostat(
+            1 * unit.bar,
+            0 * unit.bar * unit.nanometer,
+            temperature * unit.kelvin,
+            MonteCarloMembraneBarostat.XYIsotropic,
+            MonteCarloMembraneBarostat.ZFree,
+        )
+        system.addForce(barostat)
+
+    integrator = LangevinMiddleIntegrator(
+        temperature * unit.kelvin,
+        1 / unit.picosecond,
+        2 * unit.femtoseconds,
+    )
+    platform = Platform.getPlatformByName(platform_name)
+    simulation = app.Simulation(pdb.topology, system, integrator, platform)
+    simulation.context.setPositions(pdb.positions)
+
+    if minimize > 0:
+        simulation.minimizeEnergy(maxIterations=int(minimize))
+
+    if equilibrate_ns > 0:
+        simulation.context.setVelocitiesToTemperature(temperature * unit.kelvin)
+        nsteps = int(round(equilibrate_ns * 1_000_000 / 2))  # ns -> fs / 2 fs per step
+        simulation.step(nsteps)
+
+    state = simulation.context.getState(getPositions=True, enforcePeriodicBox=True)
+    positions = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom)
+    smemb.coords[:, :, 0] = positions.astype(np.float32)
+
+    a, b, c = state.getPeriodicBoxVectors(asNumpy=True)
+    smemb.box = np.array(
+        [
+            [a[0].value_in_unit(unit.angstrom)],
+            [b[1].value_in_unit(unit.angstrom)],
+            [c[2].value_in_unit(unit.angstrom)],
+        ],
+        dtype=np.float32,
+    )
 
 
 def buildMembrane(
@@ -241,10 +353,7 @@ def buildMembrane(
     equilibrate=0,
     outdir=None,
     lipidf=None,
-    ff=None,
-    topo=None,
-    param=None,
-    build=False,
+    forcefield_files=None,
     seed=None,
 ):
     """Construct a membrane containing arbitrary lipids and ratios of them.
@@ -260,23 +369,20 @@ def buildMembrane(
     waterbuff : float
         The z-dimension size of the water box above and below the membrane
     platform : str
-        The platform on which to run the minimization ('CUDA' or 'CPU')
+        OpenMM platform on which to run the minimization/equilibration
+        ('CUDA', 'OpenCL', 'CPU', or 'Reference')
     minimize : int
         If not 0 it minimizes the membrane for the given number of steps
     equilibrate : float
         If not 0 it equilibrates the membrane for the given number of nanoseconds
     outdir : str
-        A folder in which to store the psf and pdb files
+        A folder in which to store the output PDB files
     lipidf : str
         The path to the folder containing the single-lipid PDB structures as well as the lipid DB file
-    ff : list[str]
-        AMBER forcefield files for lipids
-    topo : list[str]
-        AMBER topologies for lipids
-    param : list[str]
-        AMBER parameters for lipids
-    build : bool
-        Build system with teLeap. Disable if you want to build the system yourself.
+    forcefield_files : list[str] or None
+        OpenMM ForceField XML files used to parameterize the membrane during
+        minimization/equilibration. Defaults to AMBER Lipid17 + TIP3P
+        (``["amber14/lipid17.xml", "amber14/tip3p.xml"]``).
     seed : int or None
         Seed for the numpy global RNG. If provided, the build is reproducible
         (lipid conformer choice, initial rotations, and the LJ-fluid Halton
@@ -296,9 +402,7 @@ def buildMembrane(
     """
     from htmd.membranebuilder.ringpenetration import resolveRingPenetrations
     from htmd.builder.solvate import solvate
-    from htmd.builder import amber
     from htmd.util import tempname
-    from moleculekit.molecule import Molecule
     from htmd.home import home
     import os
     import pandas as pd
@@ -308,9 +412,6 @@ def buildMembrane(
 
     if seed is not None:
         np.random.seed(seed)
-
-    if equilibrate > 0 or minimize > 0:
-        build = True
 
     if lipidf is None:
         lipidf = os.path.join(home(shareDir=True), "membranebuilder", "lipids")
@@ -329,12 +430,6 @@ def buildMembrane(
     _findNeighbours(lipids, xysize)
 
     _loadMolecules(lipids, files)
-
-    # from globalminimization import minimize
-    # newpos, newrot = minimize(lipids, xysize + [100], stepxy=0.5, steprot=50, contactthresh=1)
-    # for i in range(len(lipids)):
-    #     lipids[i].xyz[:2] = newpos[i]
-    #     lipids[i].rot = newrot[i]
 
     resolveRingPenetrations(lipids, xysize)
     memb = _createMembraneMolecule(lipids)
@@ -356,75 +451,20 @@ def buildMembrane(
     if outdir is None:
         outdir = tempname()
         logger.info(f"Outdir {outdir}")
-
-    if build:
-        res = amber.build(
-            smemb,
-            ionize=False,
-            outdir=outdir,
-            ff=ff,
-            topo=topo,
-            param=param,
-        )
-    else:
-        os.makedirs(outdir, exist_ok=True)
-        smemb.write(os.path.join(outdir, "structure.pdb"))
-        return smemb
+    os.makedirs(outdir, exist_ok=True)
 
     if equilibrate > 0 or minimize > 0:
-        from shutil import move
-        import yaml
-        from acemd import acemd
-
-        equildir = os.path.join(outdir, "equil")
-        os.makedirs(equildir, exist_ok=True)
-
-        watcoo = res.get("coords", "water")
-        celld = (watcoo.max(axis=0) - watcoo.min(axis=0)).squeeze()
-
-        # TODO: I need to figure out the resnames+atom names after building
-        # lipid_heads = list(set([(lipid.resname, lipid.headname) for lipid in lipids]))
-
-        input_dict = {
-            "structure": os.path.join(outdir, "structure.prmtop"),
-            "coordinates": os.path.join(outdir, "structure.pdb"),
-            "boxsize": celld.tolist(),
-            "barostatconstratio": True,
-            "minimize": minimize,
-            "run": f"{equilibrate}ns",
-            "velocities": 300,
-            "thermostat": True,
-            "barostat": True,
-            # "extforces": [
-            #     {
-            #         "type": "positionalrestraint",
-            #         "sel": " and ".join(
-            #             [f"(resname {x[0]} and name {x[1]})" for x in lipid_heads]
-            #         ),
-            #         "setpoints": ["1@0"],
-            #     }
-            # ],
-        }
-        with open(os.path.join(equildir, "input.yaml"), "w") as f:
-            yaml.dump(input_dict, f)
-        acemd(equildir, platform=platform)
-
-        if equilibrate > 0:
-            res = Molecule(os.path.join(outdir, "structure.prmtop"))
-            res.read(os.path.join(equildir, "output.coor"))
-            res.read(os.path.join(equildir, "output.xsc"))
-            res.wrap("lipids", guessBonds=False)
-        else:
-            res = Molecule(os.path.join(outdir, "structure.prmtop"))
-            res.read(os.path.join(equildir, "minimized.coor"))
-
-        move(
-            os.path.join(outdir, "structure.pdb"),
-            os.path.join(outdir, "starting_structure.pdb"),
+        smemb.write(os.path.join(outdir, "starting_structure.pdb"))
+        _equilibrateOpenMM(
+            smemb,
+            minimize=minimize,
+            equilibrate_ns=equilibrate,
+            platform_name=platform,
+            forcefield_files=forcefield_files,
         )
-        res.write(os.path.join(outdir, "structure.pdb"))
 
-    return res
+    smemb.write(os.path.join(outdir, "structure.pdb"))
+    return smemb
 
 
 def _findLeastAreaLipid(folder):
