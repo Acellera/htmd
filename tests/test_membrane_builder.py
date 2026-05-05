@@ -43,6 +43,7 @@ def _test_build_membrane(tmp_path):
         minimize=0,
         outdir=str(tmp_path),
         platform="CPU",
+        seed=42,
     )
     assert os.path.exists(tmp_path / "structure.pdb")
     assert not os.path.exists(tmp_path / "starting_structure.pdb")
@@ -58,6 +59,7 @@ def _test_build_membrane_minimize(tmp_path):
         minimize=100,
         outdir=str(tmp_path),
         platform="CPU",
+        seed=42,
     )
     assert os.path.exists(tmp_path / "structure.pdb")
     assert os.path.exists(tmp_path / "starting_structure.pdb")
@@ -73,6 +75,7 @@ def _test_build_membrane_equil(tmp_path):
         minimize=100,
         outdir=str(tmp_path),
         platform="CPU",
+        seed=42,
     )
     assert os.path.exists(tmp_path / "structure.pdb")
     assert os.path.exists(tmp_path / "starting_structure.pdb")

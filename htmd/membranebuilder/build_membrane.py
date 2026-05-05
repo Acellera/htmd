@@ -85,6 +85,11 @@ def listLipids():
 
 
 def _createLipids(lipidratio, area, lipiddb, files, leaflet=None):
+    if leaflet not in ("upper", "lower"):
+        raise ValueError(
+            f"leaflet must be 'upper' or 'lower', got {leaflet!r}"
+        )
+
     lipiddb = lipiddb.to_dict(orient="index")
     lipidnames = list(lipidratio.keys())
     ratiosAPL = np.array(
@@ -97,15 +102,23 @@ def _createLipids(lipidratio, area, lipiddb, files, leaflet=None):
         areaspl / np.array([lipiddb[lipn]["APL"] for lipn in lipidnames])
     ).astype(int)
 
+    if (counts == 0).any():
+        zero_lipids = [lipidnames[i] for i in range(len(counts)) if counts[i] == 0]
+        raise RuntimeError(
+            f"Computed lipid count is 0 for {zero_lipids} in {leaflet} leaflet "
+            f"given the requested xysize and ratios. Increase the membrane size "
+            f"or adjust the ratios."
+        )
+
+    z_sign = 1 if leaflet == "upper" else -1
     lipids = []
     for i in range(len(lipidnames)):
         resname = lipidnames[i]
         rings = _detectRings(Molecule(files[resname][0]))
         for k in range(counts[i]):
-            if leaflet == "upper":
-                xyz = np.array([np.nan, np.nan, lipiddb[resname]["Thickness"] / 2])
-            elif leaflet == "lower":
-                xyz = np.array([np.nan, np.nan, -lipiddb[resname]["Thickness"] / 2])
+            xyz = np.array(
+                [np.nan, np.nan, z_sign * lipiddb[resname]["Thickness"] / 2]
+            )
             lipids.append(
                 _Lipid(
                     resname=resname,
@@ -232,6 +245,7 @@ def buildMembrane(
     topo=None,
     param=None,
     build=False,
+    seed=None,
 ):
     """Construct a membrane containing arbitrary lipids and ratios of them.
 
@@ -263,6 +277,10 @@ def buildMembrane(
         AMBER parameters for lipids
     build : bool
         Build system with teLeap. Disable if you want to build the system yourself.
+    seed : int or None
+        Seed for the numpy global RNG. If provided, the build is reproducible
+        (lipid conformer choice, initial rotations, and the LJ-fluid Halton
+        shuffle). The OpenMM minimization/dynamics step is not seeded here.
 
     Returns
     -------
@@ -287,6 +305,9 @@ def buildMembrane(
 
     if isinstance(equilibrate, bool):
         raise ValueError("equilibrate must be a float")
+
+    if seed is not None:
+        np.random.seed(seed)
 
     if equilibrate > 0 or minimize > 0:
         build = True
@@ -318,8 +339,12 @@ def buildMembrane(
     resolveRingPenetrations(lipids, xysize)
     memb = _createMembraneMolecule(lipids)
 
-    minc = memb.get("coords", "name P").min(axis=0) - 5
-    maxc = memb.get("coords", "name P").max(axis=0) + 5
+    head_mask = np.zeros(memb.numAtoms, dtype=bool)
+    for resname, headname in {(ll.resname.upper(), ll.headname) for ll in lipids}:
+        head_mask |= (memb.resname == resname) & (memb.name == headname)
+    head_coords = memb.coords[head_mask, :, 0]
+    minc = head_coords.min(axis=0) - 5
+    maxc = head_coords.max(axis=0) + 5
 
     mm = [[0, 0, maxc[2] - 2], [xysize[0], xysize[1], maxc[2] + waterbuff]]
     smemb = solvate(memb, minmax=mm)
