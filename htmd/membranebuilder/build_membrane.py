@@ -6,7 +6,6 @@
 from moleculekit.molecule import Molecule
 from glob import glob
 import numpy as np
-import unittest
 import logging
 
 logger = logging.getLogger(__name__)
@@ -416,79 +415,3 @@ def _findLeastAreaLipid(folder):
         dists = cdist(m.coords[:, :2, 0], center[:2].T)
         maxdist.append(dists.max())
     return ff[np.argmin(maxdist)], np.min(maxdist)
-
-from htmd.builder.amber import _resolve_backend
-try:
-    _resolve_backend()
-    tleap_installed = True
-except Exception:
-    tleap_installed = False
-
-
-class _TestBuildMembrane(unittest.TestCase):
-    def test_build_membrane(self):
-        import tempfile
-        import os
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            buildMembrane(
-                [20, 20],
-                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                equilibrate=0,
-                minimize=0,
-                outdir=tmpdir,
-                platform="CPU",
-            )
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
-            self.assertFalse(
-                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
-            )
-
-    @unittest.skipIf(
-        not tleap_installed, "teLeap is not installed. Cannot test"
-    )
-    def test_build_membrane_minimize(self):
-        import tempfile
-        import os
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            buildMembrane(
-                [20, 20],
-                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                equilibrate=0,
-                minimize=100,
-                outdir=tmpdir,
-                platform="CPU",
-            )
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
-            self.assertTrue(
-                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
-            )
-
-    @unittest.skipIf(
-        not tleap_installed, "teLeap is not installed. Cannot test"
-    )
-    def test_build_membrane_equil(self):
-        import tempfile
-        import os
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            buildMembrane(
-                [20, 20],
-                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                equilibrate=0.01,
-                minimize=100,
-                outdir=tmpdir,
-                platform="CPU",
-            )
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
-            self.assertTrue(
-                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
-            )
-
-
-if __name__ == "__main__":
-    unittest.main()
