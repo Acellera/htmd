@@ -189,10 +189,10 @@ def _test_solute_footprint_2kdc():
 
     f_u = _solute_area_fraction(fp_u, [60, 60])
     f_l = _solute_area_fraction(fp_l, [60, 60])
-    # Default buffer of 3 A is added to vdw radii so the forbidden disks are
-    # large enough to keep lipid head centers outside protein pores.
-    assert 0.35 < f_u < 0.55, f"upper fraction out of range: {f_u}"
-    assert 0.50 < f_l < 0.70, f"lower fraction out of range: {f_l}"
+    # The default buffer (5 A) is added to vdw radii so the forbidden disks
+    # are large enough to keep lipid head centers outside protein pores.
+    assert 0.45 < f_u < 0.70, f"upper fraction out of range: {f_u}"
+    assert 0.60 < f_l < 0.80, f"lower fraction out of range: {f_l}"
     # The TM bundle is broadly symmetric but the per-disk overlap differs
     # between leaflets (lower atoms are more spread), so absolute fractions
     # differ more than at zero buffer.

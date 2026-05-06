@@ -153,7 +153,10 @@ def _solute_area_fraction(footprint, xysize, n_samples=10000):
     return float(inside.mean())
 
 
-def _createLipids(lipidratio, area, lipiddb, files, leaflet=None, area_fraction_used=0.0):
+def _createLipids(
+    lipidratio, area, lipiddb, files, leaflet=None,
+    area_fraction_used=0.0, head_z=15.0,
+):
     if leaflet not in ("upper", "lower"):
         raise ValueError(
             f"leaflet must be 'upper' or 'lower', got {leaflet!r}"
@@ -192,15 +195,19 @@ def _createLipids(lipidratio, area, lipiddb, files, leaflet=None, area_fraction_
             f"or adjust the ratios."
         )
 
+    # All lipids in a leaflet sit at the same head plane (z = +-head_z).
+    # The per-lipid Thickness column in lipiddb is the equilibrium
+    # head-to-head distance for a *pure* bilayer of that lipid; using it
+    # per-lipid in a mixed bilayer gives a stepped initial surface that's
+    # worse than just picking a common plane and letting NPT settle each
+    # species to its own depth.
     z_sign = 1 if leaflet == "upper" else -1
     lipids = []
     for i in range(len(lipidnames)):
         resname = lipidnames[i]
         rings = _detectRings(Molecule(files[resname][0]))
         for k in range(counts[i]):
-            xyz = np.array(
-                [np.nan, np.nan, z_sign * lipiddb[resname]["Thickness"] / 2]
-            )
+            xyz = np.array([np.nan, np.nan, z_sign * head_z])
             lipids.append(
                 _Lipid(
                     resname=resname,
@@ -648,6 +655,7 @@ def buildMembrane(
     seed=None,
     solute=None,
     timestep_fs=2.0,
+    head_z=15.0,
 ):
     """Construct a membrane containing arbitrary lipids and ratios of them.
 
@@ -744,14 +752,8 @@ def buildMembrane(
         anchor_mask = embedded if embedded.any() else np.ones(solute.numAtoms, bool)
         com_xy = solute.coords[anchor_mask, :2, 0].mean(axis=0).astype(np.float32)
 
-        upper_head_z = np.mean(
-            [lipiddb.loc[name, "Thickness"] for name in ratioupper.keys()]
-        ) / 2
-        lower_head_z = -np.mean(
-            [lipiddb.loc[name, "Thickness"] for name in ratiolower.keys()]
-        ) / 2
-        upper_fp = _solute_footprint(solute, upper_head_z)
-        lower_fp = _solute_footprint(solute, lower_head_z)
+        upper_fp = _solute_footprint(solute, head_z)
+        lower_fp = _solute_footprint(solute, -head_z)
         # Translate footprint xy from the user's frame to the centered LJ
         # frame so Halton/obstacles see the protein at the box origin.
         if upper_fp is not None:
@@ -763,11 +765,11 @@ def buildMembrane(
 
     lipids = _createLipids(
         ratioupper, area, lipiddb, files, leaflet="upper",
-        area_fraction_used=upper_fraction,
+        area_fraction_used=upper_fraction, head_z=head_z,
     )
     lipids += _createLipids(
         ratiolower, area, lipiddb, files, leaflet="lower",
-        area_fraction_used=lower_fraction,
+        area_fraction_used=lower_fraction, head_z=head_z,
     )
 
     _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] > 0], footprint=upper_fp)
@@ -821,8 +823,8 @@ def buildMembrane(
         upper_fp,
         lower_fp,
         com_xy,
-        upper_head_z if solute is not None else None,
-        lower_head_z if solute is not None else None,
+        head_z if solute is not None else None,
+        -head_z if solute is not None else None,
         use_initial=True,
     )
     _writeLJDebugPDB(
@@ -831,8 +833,8 @@ def buildMembrane(
         upper_fp,
         lower_fp,
         com_xy,
-        upper_head_z if solute is not None else None,
-        lower_head_z if solute is not None else None,
+        head_z if solute is not None else None,
+        -head_z if solute is not None else None,
     )
 
     if equilibrate > 0 or minimize > 0:
