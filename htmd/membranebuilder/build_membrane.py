@@ -466,11 +466,13 @@ def _equilibrateOpenMM(
     ``O`` to match the AMBER tip3p XML. Equilibrated coordinates and the
     final box are written back into the original Molecule.
 
-    When ``solute`` is provided, its heavy atoms are appended to the
-    OpenMM System as frozen ``mass=0`` particles in the standard
-    ``NonbondedForce`` so the lipids relax around them. The ghost atoms
-    are discarded before writing equilibrated coordinates back, so they
-    never appear in the output Molecule.
+    When ``solute`` is provided, the heavy atoms of its membrane-spanning
+    slab (lipid Z range +- a small buffer) are appended to the OpenMM
+    System as frozen ``mass=0`` particles in the standard ``NonbondedForce``
+    so the lipids relax around the TM region. Extramembrane atoms are
+    skipped since they have no lipids nearby. The ghost atoms are
+    discarded before writing equilibrated coordinates back, so they never
+    appear in the output Molecule.
     """
     import os
     import openmm
@@ -522,9 +524,27 @@ def _equilibrateOpenMM(
     n_lipid_atoms = system.getNumParticles()
     ghost_xyz = None
     if solute is not None:
+        # Restrict ghost atoms to the membrane-spanning slab so we only
+        # equilibrate lipids around the protein's TM region. Extramembrane
+        # domains add atoms with no nearby lipids to influence.
+        is_lipid = work.resname != "HOH"
+        lipid_z = work.coords[is_lipid, 2, 0]
+        # Buffer of a few angstrom so that if the membrane expands a bit
+        # during equilibration the lipids still feel the solute and don't
+        # spill past its TM edge.
+        z_buffer = 5.0
+        z_lo = float(lipid_z.min()) - z_buffer
+        z_hi = float(lipid_z.max()) + z_buffer
+
         heavy = solute.element != "H"
-        ghost_xyz = solute.coords[heavy, :, 0]
-        ghost_elements = solute.element[heavy]
+        in_slab = (solute.coords[:, 2, 0] >= z_lo) & (solute.coords[:, 2, 0] <= z_hi)
+        mask = heavy & in_slab
+        ghost_xyz = solute.coords[mask, :, 0]
+        ghost_elements = solute.element[mask]
+        logger.info(
+            f"Ghost atoms: {mask.sum()}/{heavy.sum()} solute heavy atoms in "
+            f"lipid Z range [{z_lo:.1f}, {z_hi:.1f}]"
+        )
         # Find the standard NonbondedForce so we can add ghost particles.
         nb = next(
             f for f in (system.getForce(i) for i in range(system.getNumForces()))
