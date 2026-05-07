@@ -6,7 +6,17 @@ import pytest
 from htmd.membranebuilder.build_membrane import buildMembrane
 
 
+curr_dir = os.path.dirname(os.path.abspath(__file__))
+
+
 PLATFORM = "CPU"
+# OPM-aligned reference structures (bilayer center at z=0, TM axis along z).
+# Hydrophobic thicknesses are taken from OPM at the time the files were
+# saved so the tests don't require network access.
+OPM_2KDC = os.path.join(curr_dir, "2kdc_opm.pdb")
+OPM_2KDC_THICKNESS = 25.6
+OPM_1BL8 = os.path.join(curr_dir, "1bl8_opm.pdb")
+OPM_1BL8_THICKNESS = 32.4
 
 
 def _test_subrandom_positions_scale_each_axis():
@@ -128,9 +138,8 @@ def _test_build_membrane_with_solute_2kdc_lj_only(tmp_path):
     file has both lipid heads and obstacles in the user's coordinate frame.
     """
     from moleculekit.molecule import Molecule
-    from moleculekit.opm import get_opm_pdb
 
-    ref, _ = get_opm_pdb("2kdc", validateElements=False)
+    ref = Molecule(OPM_2KDC, validateElements=False)
 
     buildMembrane(
         [70, 70],
@@ -156,12 +165,12 @@ def _test_build_membrane_with_solute_2kdc_lj_only(tmp_path):
     sol_com_xy = ref.coords[heavy, :2, 0].mean(axis=0)
     head_com_xy = debug.coords[debug.resname != "OBS", :2, 0].mean(axis=0)
     obs_com_xy = debug.coords[debug.resname == "OBS", :2, 0].mean(axis=0)
-    assert np.allclose(head_com_xy, sol_com_xy, atol=10.0), (
-        f"lipid heads not aligned with solute: heads={head_com_xy}, solute={sol_com_xy}"
-    )
-    assert np.allclose(obs_com_xy, sol_com_xy, atol=10.0), (
-        f"obstacles not aligned with solute: obs={obs_com_xy}, solute={sol_com_xy}"
-    )
+    assert np.allclose(
+        head_com_xy, sol_com_xy, atol=10.0
+    ), f"lipid heads not aligned with solute: heads={head_com_xy}, solute={sol_com_xy}"
+    assert np.allclose(
+        obs_com_xy, sol_com_xy, atol=10.0
+    ), f"obstacles not aligned with solute: obs={obs_com_xy}, solute={sol_com_xy}"
 
 
 @pytest.mark.skip(reason="slow on CPU")
@@ -175,10 +184,10 @@ def _test_build_membrane_with_solute_1bl8(tmp_path):
     baseline. Uses minimize=100 + 5 ps equilibrate to keep runtime short
     while still exercising the OpenMM minimization+MD path.
     """
-    from moleculekit.opm import get_opm_pdb
+    from moleculekit.molecule import Molecule
     from scipy.spatial import cKDTree
 
-    ref, _ = get_opm_pdb("1bl8", validateElements=False)
+    ref = Molecule(OPM_1BL8, validateElements=False)
     membrane = buildMembrane(
         [80, 80],
         ratioupper={"popc": 1.0},
@@ -201,9 +210,9 @@ def _test_build_membrane_with_solute_1bl8(tmp_path):
     # After minimization+5ps NPT we still expect some clashes from the
     # severe inter-leaflet tail packing on a thin bilayer; assert nothing
     # NaN'd and the worst clash isn't catastrophic.
-    assert dists.min() >= 0.5, (
-        f"membrane heavy atom impossibly close to solute: min={dists.min():.2f}"
-    )
+    assert (
+        dists.min() >= 0.5
+    ), f"membrane heavy atom impossibly close to solute: min={dists.min():.2f}"
 
 
 def _test_solute_footprint_2kdc():
@@ -216,15 +225,15 @@ def _test_solute_footprint_2kdc():
     and the lower amphipathic helix that lies flat at the membrane surface.
     The two leaflets should give comparable fractions for this protein.
     """
-    from moleculekit.opm import get_opm_pdb
+    from moleculekit.molecule import Molecule
     from htmd.membranebuilder.build_membrane import (
         _solute_footprint,
         _solute_area_fraction,
     )
 
     np.random.seed(0)
-    ref, thickness = get_opm_pdb("2kdc", validateElements=False)
-    head_z = thickness / 2
+    ref = Molecule(OPM_2KDC, validateElements=False)
+    head_z = OPM_2KDC_THICKNESS / 2
 
     fp_u = _solute_footprint(ref, head_z)
     fp_l = _solute_footprint(ref, -head_z)
