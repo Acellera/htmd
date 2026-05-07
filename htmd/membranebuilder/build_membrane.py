@@ -465,6 +465,8 @@ def _equilibrateOpenMM(
     temperature=300,
     timestep_fs=2.0,
     solute=None,
+    head_anchors=None,
+    head_restraint_k=0.0,
 ):
     """Minimize and/or equilibrate ``smemb`` with OpenMM.
 
@@ -525,6 +527,7 @@ def _equilibrateOpenMM(
         nonbondedMethod=app.PME,
         nonbondedCutoff=10 * unit.angstrom,
         constraints=app.HBonds,
+        flexibleConstraints=True,
     )
 
     n_lipid_atoms = system.getNumParticles()
@@ -550,6 +553,18 @@ def _equilibrateOpenMM(
                 sigma * 0.1 * unit.nanometer,
                 0.4 * unit.kilojoule_per_mole,  # typical LJ strength
             )
+
+    if head_anchors and head_restraint_k > 0:
+        # Harmonic z-restraint on each lipid head atom toward its target
+        # head plane (+head_z for upper, -head_z for lower). Lets tails
+        # relax around the protein during minimization without dragging
+        # heads off their chosen plane.
+        anchor = openmm.CustomExternalForce("k_h * (z - z0)^2")
+        anchor.addGlobalParameter("k_h", float(head_restraint_k) * 100.0)
+        anchor.addPerParticleParameter("z0")
+        for atom_idx, z_target in head_anchors:
+            anchor.addParticle(int(atom_idx), [float(z_target) * 0.1])
+        system.addForce(anchor)
 
     if equilibrate_ns > 0:
         barostat = MonteCarloMembraneBarostat(
@@ -656,6 +671,7 @@ def buildMembrane(
     solute=None,
     timestep_fs=2.0,
     head_z=15.0,
+    head_restraint_k=0.0,
 ):
     """Construct a membrane containing arbitrary lipids and ratios of them.
 
@@ -839,6 +855,18 @@ def buildMembrane(
 
     if equilibrate > 0 or minimize > 0:
         smemb.write(os.path.join(outdir, "starting_structure.pdb"))
+
+        head_anchors = None
+        if head_restraint_k > 0:
+            head_anchors = []
+            for i, ll in enumerate(lipids):
+                m = (smemb.resid == i) & (smemb.name == ll.headname)
+                idx = np.where(m)[0]
+                if len(idx) != 1:
+                    continue
+                z_target = head_z if ll.xyz[2] > 0 else -head_z
+                head_anchors.append((int(idx[0]), float(z_target)))
+
         _equilibrateOpenMM(
             smemb,
             minimize=minimize,
@@ -847,6 +875,8 @@ def buildMembrane(
             forcefield_files=forcefield_files,
             timestep_fs=timestep_fs,
             solute=solute,
+            head_anchors=head_anchors,
+            head_restraint_k=head_restraint_k,
         )
 
     smemb.write(os.path.join(outdir, "structure.pdb"))
