@@ -89,16 +89,14 @@ def _solute_footprint(solute, head_z, slab=5.0, offset=4.0, buffer=5.0):
 
     The slab is one-sided (extends toward the bilayer center), starting
     ``offset`` Angstrom inward from the head plane and continuing for
-    ``slab`` Angstrom. The semantics is "TM structure that lipids must
-    pack around inside this leaflet", not "anything near the head plane":
+    ``slab`` Angstrom. The slab samples the membrane-embedded part of the
+    solute that lipids must pack around, not extramembrane structure:
 
-    - Atoms above the upper head plane (or below the lower head plane)
-      are excluded, so extramembrane domains (cytoplasmic tails,
-      extracellular loops, helices on top of the membrane, ...) do not
-      contribute.
-    - With ``offset`` ~ 4 A the slab also misses amphipathic helices
-      that lie flat on the membrane surface. Lipid heads still sit
-      under such helices, so they should not displace lipid placement.
+    - Atoms beyond the head plane (cytoplasmic tails, extracellular
+      loops, helices on top of the membrane) are excluded.
+    - With ``offset`` ~ 4 A the slab is set inside the hydrophobic core
+      and misses amphipathic helices that lie flat on the membrane
+      surface; lipid heads still sit under such helices.
 
     For the upper leaflet (``head_z > 0``): atoms in
     ``z in [head_z - offset - slab, head_z - offset]``. For the lower
@@ -107,9 +105,9 @@ def _solute_footprint(solute, head_z, slab=5.0, offset=4.0, buffer=5.0):
 
     The returned per-atom radii are ``vdw_radius + buffer``. The buffer
     accounts for the finite size of the lipid head: with the Halton seed
-    representing the head center, a seed must be at least ~one head-radius
-    away from any solute atom to keep the head atoms outside protein pores
-    or near surfaces.
+    representing the head center, a seed must be at least one head-radius
+    away from any solute atom to keep the head atoms outside protein
+    pores or near surfaces.
     """
     from moleculekit.periodictable import periodictable
 
@@ -195,12 +193,9 @@ def _createLipids(
             f"or adjust the ratios."
         )
 
-    # All lipids in a leaflet sit at the same head plane (z = +-head_z).
-    # The per-lipid Thickness column in lipiddb is the equilibrium
-    # head-to-head distance for a *pure* bilayer of that lipid; using it
-    # per-lipid in a mixed bilayer gives a stepped initial surface that's
-    # worse than just picking a common plane and letting NPT settle each
-    # species to its own depth.
+    # All lipids in a leaflet share the same head plane (z = +-head_z) so
+    # mixed bilayers start with a flat surface. Per-species depths emerge
+    # naturally during NPT equilibration.
     z_sign = 1 if leaflet == "upper" else -1
     lipids = []
     for i in range(len(lipidnames)):
@@ -225,12 +220,9 @@ def _setPositionsLJSim(width, lipids, footprint=None):
 
     # Sigma is chosen so a hex-packed monolayer at the LJ minimum spacing
     # gives exactly the requested area-per-lipid (APL). For nearest-neighbor
-    # distance a in a hex lattice the cell area is a^2 * sqrt(3)/2 = APL, so
-    # a = sqrt(2*APL/sqrt(3)). The LJ minimum sits at a = 2^(1/6) * sigma,
-    # giving sigma = sqrt(2*APL/sqrt(3)) / 2^(1/6). Setting sigma as the
-    # disk diameter for a circle of area APL (the previous formula) is too
-    # large by ~18% and makes the LJ sim try to space lipids ~40% further
-    # apart than APL allows, which then squeezes them onto protein obstacles.
+    # distance a in a hex lattice the cell area is a^2 * sqrt(3)/2 = APL,
+    # so a = sqrt(2*APL/sqrt(3)). The LJ minimum sits at a = 2^(1/6) * sigma,
+    # giving sigma = sqrt(2*APL/sqrt(3)) / 2^(1/6).
     sigmas = np.array(
         [np.sqrt(2 * ll.area / np.sqrt(3)) / (2 ** (1 / 6)) for ll in lipids]
     )
@@ -470,18 +462,17 @@ def _equilibrateOpenMM(
 ):
     """Minimize and/or equilibrate ``smemb`` with OpenMM.
 
-    The htmd lipid library uses Lipid17-compatible atom names on merged
-    single-residue lipids (POPC, POPE, CHL1, ...), which match the AMBER
-    Lipid17 OpenMM XML directly. Water from htmd.solvate uses CHARMM names
-    (TIP3 / OH2), so on a working copy we rename TIP3 -> HOH and OH2 -> O so
-    the AMBER tip3p XML matches. Equilibrated coordinates and the final box
-    are written back into the original Molecule.
+    The lipid library uses single-residue lipids whose atom names match
+    the AMBER Lipid17 OpenMM XML. Water from ``htmd.solvate`` ships as
+    ``TIP3`` / ``OH2``; on a working copy these are renamed to ``HOH`` /
+    ``O`` to match the AMBER tip3p XML. Equilibrated coordinates and the
+    final box are written back into the original Molecule.
 
-    When ``solute`` is provided, its heavy atoms are appended to the OpenMM
-    System as frozen ``mass=0`` particles in the standard ``NonbondedForce``
-    so the lipids relax around them. The ghost atoms are discarded before
-    writing equilibrated coordinates back, so they never appear in the
-    output Molecule.
+    When ``solute`` is provided, its heavy atoms are appended to the
+    OpenMM System as frozen ``mass=0`` particles in the standard
+    ``NonbondedForce`` so the lipids relax around them. The ghost atoms
+    are discarded before writing equilibrated coordinates back, so they
+    never appear in the output Molecule.
     """
     import os
     import openmm
@@ -547,18 +538,16 @@ def _equilibrateOpenMM(
                 periodictable[el].vdw_radius if el in periodictable else 1.7
             )
             sigma = 2.0 * r_vdw / (2 ** (1 / 6))
-            system.addParticle(0.0)  # mass=0 -> frozen
+            system.addParticle(0.0)  # frozen
             nb.addParticle(
                 0.0 * unit.elementary_charge,
                 sigma * 0.1 * unit.nanometer,
-                0.4 * unit.kilojoule_per_mole,  # typical LJ strength
+                0.4 * unit.kilojoule_per_mole,
             )
 
     if head_anchors and head_restraint_k > 0:
         # Harmonic z-restraint on each lipid head atom toward its target
-        # head plane (+head_z for upper, -head_z for lower). Lets tails
-        # relax around the protein during minimization without dragging
-        # heads off their chosen plane.
+        # head plane (+head_z for upper, -head_z for lower).
         anchor = openmm.CustomExternalForce("k_h * (z - z0)^2")
         anchor.addGlobalParameter("k_h", float(head_restraint_k) * 100.0)
         anchor.addPerParticleParameter("z0")
@@ -608,9 +597,8 @@ def _equilibrateOpenMM(
             return simulation.context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(kcal)
 
         e_initial = _e()
-        # CG handles catastrophic starting energies (severe clashes that make
-        # L-BFGS plateau); then L-BFGS to convergence cleans up the residual
-        # large forces that would otherwise blow up MD on the first timestep.
+        # CG copes with catastrophic starting energies; L-BFGS then drives
+        # forces low enough that the first MD timestep is stable.
         _acemd_cg_minimize(system, simulation.context, int(minimize))
         e_after_cg = _e()
         simulation.minimizeEnergy()
@@ -626,9 +614,8 @@ def _equilibrateOpenMM(
         nsteps = int(round(equilibrate_ns * 1_000_000 / timestep_fs))
         simulation.step(nsteps)
 
-    # enforcePeriodicBox=False keeps molecules intact across the PBC; we
-    # wrap with moleculekit afterwards which knows about the bonds set on
-    # smemb and won't split lipid molecules across the box edge.
+    # enforcePeriodicBox=False keeps molecules intact across the PBC;
+    # smemb.wrap() afterwards uses the bonds on smemb to wrap whole lipids.
     state = simulation.context.getState(
         getPositions=True, enforcePeriodicBox=False
     )
@@ -646,9 +633,8 @@ def _equilibrateOpenMM(
     )
     smemb.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
 
-    # Wrap. With a solute, center wrapping on the (equilibrated) solute COM
-    # so lipids/water cluster around the protein in the periodic image
-    # rather than the box origin.
+    # With a solute, center the wrap on the solute COM so lipids/water
+    # cluster around the protein rather than the box origin.
     if solute is not None:
         solute_com = positions[n_lipid_atoms:].mean(axis=0)
         smemb.wrap(wrapcenter=solute_com)
@@ -706,14 +692,21 @@ def buildMembrane(
         shuffle). The OpenMM minimization/dynamics step is not seeded here.
     solute : :class:`Molecule <moleculekit.molecule.Molecule>` or None
         Optional pre-positioned solute (typically a protein) around which the
-        membrane is built. Coordinates must already be in the membrane frame:
-        XY centered on the origin (i.e. spanning ``[-Lx/2, Lx/2] x [-Ly/2,
-        Ly/2]``) and bilayer center at z=0. The XY footprint of the solute in
-        each leaflet's head plane is used to reduce per-leaflet lipid counts
-        proportionally so the resulting membrane has the correct area-per-lipid.
+        membrane is built. The solute must be aligned with bilayer center at
+        z=0; the membrane is shifted in XY to follow the solute's
+        membrane-embedded COM. The user's Molecule is not modified.
     timestep_fs : float
         Integrator timestep in femtoseconds for the OpenMM equilibration.
         Default 2.0 (compatible with ``constraints=HBonds``).
+    head_z : float
+        Half-bilayer head-plane Z (Angstrom). Every lipid head is placed at
+        ``+head_z`` (upper leaflet) or ``-head_z`` (lower) regardless of
+        species, so a mixed bilayer starts with a flat head plane that NPT
+        relaxes to per-species depths. Default 15.0.
+    head_restraint_k : float
+        If > 0, apply a harmonic z-restraint of strength ``head_restraint_k``
+        (kJ/mol/A^2) to each lipid head atom toward its initial head plane
+        during minimization and equilibration. Default 0.0 (no restraint).
 
     Returns
     -------
@@ -754,12 +747,9 @@ def buildMembrane(
     lower_fp = None
     com_xy = np.zeros(2, dtype=np.float32)
     if solute is not None:
-        # The solute defines where the membrane should sit in XY: take the
-        # COM of its membrane-embedded heavy atoms (|z| < mean_thickness/2),
-        # falling back to the full COM for peripheral solutes lying on top
-        # of a bilayer. The membrane below is built in the centered frame
-        # [-Lx/2, Lx/2] and only the footprint xy is translated; the user's
-        # Molecule is never modified.
+        # XY anchor for the membrane: the COM of solute heavy atoms inside
+        # the bilayer (|z| < mean_thickness/2). Falls back to the full COM
+        # for peripheral solutes that don't span the bilayer.
         mean_thickness = float(
             np.mean([lipiddb.loc[name, "Thickness"] for name in uqlip])
         )
@@ -770,8 +760,8 @@ def buildMembrane(
 
         upper_fp = _solute_footprint(solute, head_z)
         lower_fp = _solute_footprint(solute, -head_z)
-        # Translate footprint xy from the user's frame to the centered LJ
-        # frame so Halton/obstacles see the protein at the box origin.
+        # Lipid placement (Halton/obstacles) happens in the box-centered
+        # frame, so translate the footprint by -com_xy.
         if upper_fp is not None:
             upper_fp = (upper_fp[0] - com_xy, upper_fp[1])
         if lower_fp is not None:
@@ -791,10 +781,9 @@ def buildMembrane(
     _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] > 0], footprint=upper_fp)
     _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] < 0], footprint=lower_fp)
 
-    # Translate lipid xy from the centered LJ frame to the user's frame
-    # (shifting by the solute's COM) so everything downstream - rotation
-    # optimization, ring penetration, membrane assembly, solvation - already
-    # lives in the user's frame and the user's solute can be appended as is.
+    # Move lipids into the solute's frame so everything downstream
+    # (rotation optimization, ring penetration, assembly, solvation) lives
+    # in the user's coordinate frame.
     if solute is not None:
         for ll in lipids:
             ll.xyz[:2] += com_xy
@@ -884,9 +873,8 @@ def buildMembrane(
 
 
 def _findLeastAreaLipid(folder):
-    """
-    Use this to select the single least stretched conformation from a CHARMM-GUI lipid library
-    """
+    """Select the single least-stretched conformation from a folder of
+    per-conformer ``.crd`` files (one subfolder per lipid)."""
     from glob import glob
     from scipy.spatial.distance import cdist
 

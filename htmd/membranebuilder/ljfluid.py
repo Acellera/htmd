@@ -175,10 +175,10 @@ def distributeLipids(
         forbidden_radii=forbidden_radii,
     ).value_in_unit(unit.angstrom)
 
-    # Add obstacle particles (frozen) and a CustomNonbondedForce that only
-    # evaluates lipid-obstacle pairs (interaction group). This keeps lipids
-    # away from the protein during equilibration without producing
-    # astronomical obstacle-obstacle clashes from in-plane projection.
+    # Obstacles are added as frozen particles plus a CustomNonbondedForce
+    # restricted to lipid-obstacle pairs via an interaction group. Excluding
+    # obstacle-obstacle pairs avoids astronomical clashes between protein
+    # atoms collapsed onto the same z=0 plane.
     n_obstacles = 0 if forbidden_xy is None else len(forbidden_xy)
     obstacle_indices = []
     if n_obstacles > 0:
@@ -198,12 +198,9 @@ def distributeLipids(
                 0.0 * unit.kilocalories_per_mole,
             )
 
-        # Match the obstacle WCA wall strength to the lipid-lipid LJ
-        # epsilon. A stronger wall sounds appealing as a "harder barrier"
-        # but kicks lipids violently and can fling them across the box
-        # into other obstacles via PBC; a weaker wall lets lipids drift
-        # onto obstacles. Matching the lipid-lipid eps keeps the two
-        # potentials on the same scale.
+        # WCA repulsion between lipids and obstacles. Wall strength is
+        # matched to the lipid-lipid LJ epsilon so the two potentials live
+        # on the same scale.
         wca = openmm.CustomNonbondedForce(
             "step(1.122462048309373*sig - r) * 4*eps*("
             "(sig/r)^12 - (sig/r)^6 + 0.25);"
@@ -278,10 +275,9 @@ def distributeLipids(
 
     box_xy = np.array([boxsize[0], boxsize[1]])
     if n_obstacles > 0:
-        # Obstacles are mass=0 so they cannot have moved. Any change in their
-        # XY centroid between input and OpenMM's output is purely due to
-        # OpenMM's wrapping conventions, so we use it to recover the original
-        # (caller's) frame.
+        # Obstacles have mass=0 so they cannot have moved. The shift of
+        # their XY centroid relative to the input is purely OpenMM's
+        # internal wrapping; subtract it to recover the caller's frame.
         initial_obs_com = obstacle_positions[:, :2].mean(axis=0)
         final_obs_com = allfinalpos[nparticles:nparticles + n_obstacles, :2].mean(axis=0)
         allfinalpos[:, :2] -= final_obs_com - initial_obs_com
@@ -290,17 +286,14 @@ def distributeLipids(
         anchor_xy = np.zeros(2)
 
     # Wrap each particle's XY into the periodic image closest to the
-    # solute / box center, so lipids that drifted across a boundary during
-    # the LJ sim end up in the same image as the obstacles.
+    # box center so lipids that drifted across a boundary during the
+    # LJ sim end up in the same image as the obstacles.
     delta = allfinalpos[:, :2] - anchor_xy
     delta -= box_xy * np.round(delta / box_xy)
     allfinalpos[:, :2] = anchor_xy + delta
 
-    # Return final and initial (pre-sim, Halton-filtered) lipid positions.
-    # Initial positions come straight from the Halton filter so they sit
-    # outside the forbidden disks; the final ones are what the LJ sim
-    # relaxed to, which can drift back into obstacles when the WCA wall is
-    # weaker than thermal kinetic energy from the minimization.
+    # Return both the final positions (after LJ relaxation) and the initial
+    # ones (Halton filter output, guaranteed outside the forbidden disks).
     return allfinalpos[:nparticles], np.asarray(positions[:nparticles])
 
 
