@@ -37,25 +37,23 @@ class _Lipid:
         self.area = area
 
     def __repr__(self):
-        return "<{}.{} object at {} {}>".format(
-            self.__class__.__module__,
-            self.__class__.__name__,
-            hex(id(self)),
-            self.__str__(),
+        return (
+            f"<{self.__class__.__module__}.{self.__class__.__name__} "
+            f"object at {hex(id(self))} {self.__str__()}>"
         )
 
     def __str__(self):
         s = ""
         if self.resname is not None:
-            s += "resname: {} ".format(self.resname)
+            s += f"resname: {self.resname} "
         if self.headname is not None:
-            s += "headname: {} ".format(self.headname)
+            s += f"headname: {self.headname} "
         if self.xyz is not None:
-            s += "xyz: {} ".format(self.xyz)
+            s += f"xyz: {self.xyz} "
         if self.neighbours is not None:
-            s += "neigh: {} ".format(len(self.neighbours))
+            s += f"neigh: {len(self.neighbours)} "
         if self.mol is not None:
-            s += "mol: {} ".format(id(self.mol))
+            s += f"mol: {id(self.mol)} "
         return s[:-1]
 
 
