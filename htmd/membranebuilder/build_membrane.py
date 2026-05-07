@@ -6,7 +6,6 @@
 from moleculekit.molecule import Molecule
 from glob import glob
 import numpy as np
-import unittest
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,25 +37,23 @@ class _Lipid:
         self.area = area
 
     def __repr__(self):
-        return "<{}.{} object at {} {}>".format(
-            self.__class__.__module__,
-            self.__class__.__name__,
-            hex(id(self)),
-            self.__str__(),
+        return (
+            f"<{self.__class__.__module__}.{self.__class__.__name__} "
+            f"object at {hex(id(self))} {self.__str__()}>"
         )
 
     def __str__(self):
         s = ""
         if self.resname is not None:
-            s += "resname: {} ".format(self.resname)
+            s += f"resname: {self.resname} "
         if self.headname is not None:
-            s += "headname: {} ".format(self.headname)
+            s += f"headname: {self.headname} "
         if self.xyz is not None:
-            s += "xyz: {} ".format(self.xyz)
+            s += f"xyz: {self.xyz} "
         if self.neighbours is not None:
-            s += "neigh: {} ".format(len(self.neighbours))
+            s += f"neigh: {len(self.neighbours)} "
         if self.mol is not None:
-            s += "mol: {} ".format(id(self.mol))
+            s += f"mol: {id(self.mol)} "
         return s[:-1]
 
 
@@ -85,28 +82,125 @@ def listLipids():
     print("* Lipid DB file: " + os.path.join(membranebuilderhome, "lipiddb.csv"))
 
 
-def _createLipids(lipidratio, area, lipiddb, files, leaflet=None):
+def _solute_footprint(solute, head_z, slab=5.0, offset=4.0, buffer=5.0):
+    """XY footprint of solute heavy atoms in a slab inside the leaflet.
+
+    The slab is one-sided (extends toward the bilayer center), starting
+    ``offset`` Angstrom inward from the head plane and continuing for
+    ``slab`` Angstrom. The slab samples the membrane-embedded part of the
+    solute that lipids must pack around, not extramembrane structure:
+
+    - Atoms beyond the head plane (cytoplasmic tails, extracellular
+      loops, helices on top of the membrane) are excluded.
+    - With ``offset`` ~ 4 A the slab is set inside the hydrophobic core
+      and misses amphipathic helices that lie flat on the membrane
+      surface; lipid heads still sit under such helices.
+
+    For the upper leaflet (``head_z > 0``): atoms in
+    ``z in [head_z - offset - slab, head_z - offset]``. For the lower
+    leaflet (``head_z < 0``): atoms in
+    ``z in [head_z + offset, head_z + offset + slab]``.
+
+    The returned per-atom radii are ``vdw_radius + buffer``. The buffer
+    accounts for the finite size of the lipid head: with the Halton seed
+    representing the head center, a seed must be at least one head-radius
+    away from any solute atom to keep the head atoms outside protein
+    pores or near surfaces.
+    """
+    from moleculekit.periodictable import periodictable
+
+    coords = solute.coords[:, :, 0]
+    is_heavy = solute.element != "H"
+    z = coords[:, 2]
+    if head_z >= 0:
+        in_slab = (z >= head_z - offset - slab) & (z <= head_z - offset)
+    else:
+        in_slab = (z >= head_z + offset) & (z <= head_z + offset + slab)
+    mask = is_heavy & in_slab
+    if not mask.any():
+        return None
+    xy = coords[mask, :2]
+    vdw = np.array(
+        [
+            periodictable[el].vdw_radius if el in periodictable else 1.7
+            for el in solute.element[mask]
+        ]
+    )
+    return xy, vdw + buffer
+
+
+def _solute_area_fraction(footprint, xysize, n_samples=10000):
+    """Monte Carlo estimate of the box-area fraction occupied by the footprint.
+
+    Samples the centered XY box ``[-Lx/2, Lx/2] x [-Ly/2, Ly/2]`` uniformly and
+    returns the fraction of points falling within any per-atom disk.
+    """
+    if footprint is None:
+        return 0.0
+    xy, radii = footprint
+    samples = np.random.uniform(
+        low=[-xysize[0] / 2, -xysize[1] / 2],
+        high=[xysize[0] / 2, xysize[1] / 2],
+        size=(n_samples, 2),
+    )
+    diffs = samples[:, None, :] - xy[None, :, :]
+    dists2 = np.sum(diffs * diffs, axis=2)
+    inside = (dists2 < (radii * radii)[None, :]).any(axis=1)
+    return float(inside.mean())
+
+
+def _createLipids(
+    lipidratio, area, lipiddb, files, leaflet=None,
+    area_fraction_used=0.0, head_z=15.0,
+):
+    if leaflet not in ("upper", "lower"):
+        raise ValueError(
+            f"leaflet must be 'upper' or 'lower', got {leaflet!r}"
+        )
+    if area_fraction_used >= 1.0:
+        raise RuntimeError(
+            f"Solute occupies the entire {leaflet} leaflet area "
+            f"(fraction={area_fraction_used:.3f}); cannot place any lipids."
+        )
+
     lipiddb = lipiddb.to_dict(orient="index")
     lipidnames = list(lipidratio.keys())
     ratiosAPL = np.array(
         [lipidratio[lipn] * lipiddb[lipn]["APL"] for lipn in lipidnames]
     )
-    # Calculate the total areas per lipid type
-    areaspl = area * (ratiosAPL / ratiosAPL.sum())
+    # Calculate the total areas per lipid type, scaled by the available area
+    available_area = area * (1.0 - area_fraction_used)
+    areaspl = available_area * (ratiosAPL / ratiosAPL.sum())
     # Calculate the counts from the total areas
     counts = np.round(
         areaspl / np.array([lipiddb[lipn]["APL"] for lipn in lipidnames])
     ).astype(int)
 
+    if area_fraction_used > 0:
+        logger.info(
+            f"{leaflet} leaflet: solute occupies {area_fraction_used:.1%} of XY "
+            f"area; placing {counts.sum()} lipids "
+            f"({dict(zip(lipidnames, counts.tolist()))})."
+        )
+
+    if (counts == 0).any():
+        zero_lipids = [lipidnames[i] for i in range(len(counts)) if counts[i] == 0]
+        raise RuntimeError(
+            f"Computed lipid count is 0 for {zero_lipids} in {leaflet} leaflet "
+            f"given the requested xysize and ratios. Increase the membrane size "
+            f"or adjust the ratios."
+        )
+
+    # All lipids in a leaflet share the same head plane (z = +-head_z) so
+    # mixed bilayers start with a flat surface. Per-species depths emerge
+    # naturally during NPT equilibration.
+    z_sign = 1 if leaflet == "upper" else -1
     lipids = []
     for i in range(len(lipidnames)):
         resname = lipidnames[i]
         rings = _detectRings(Molecule(files[resname][0]))
         for k in range(counts[i]):
-            if leaflet == "upper":
-                xyz = np.array([np.nan, np.nan, lipiddb[resname]["Thickness"] / 2])
-            elif leaflet == "lower":
-                xyz = np.array([np.nan, np.nan, -lipiddb[resname]["Thickness"] / 2])
+            xyz = np.array([np.nan, np.nan, z_sign * head_z])
             lipids.append(
                 _Lipid(
                     resname=resname,
@@ -119,16 +213,33 @@ def _createLipids(lipidratio, area, lipiddb, files, leaflet=None):
     return lipids
 
 
-def _setPositionsLJSim(width, lipids):
+def _setPositionsLJSim(width, lipids, footprint=None):
     from htmd.membranebuilder.ljfluid import distributeLipids
 
-    sigmas = np.array([2 * np.sqrt(ll.area / np.pi) for ll in lipids])
+    # Sigma is chosen so a hex-packed monolayer at the LJ minimum spacing
+    # gives exactly the requested area-per-lipid (APL). For nearest-neighbor
+    # distance a in a hex lattice the cell area is a^2 * sqrt(3)/2 = APL,
+    # so a = sqrt(2*APL/sqrt(3)). The LJ minimum sits at a = 2^(1/6) * sigma,
+    # giving sigma = sqrt(2*APL/sqrt(3)) / 2^(1/6).
+    sigmas = np.array(
+        [np.sqrt(2 * ll.area / np.sqrt(3)) / (2 ** (1 / 6)) for ll in lipids]
+    )
     resnames = [ll.resname for ll in lipids]
 
     cutoff = min(np.min(width) / 2, 3 * np.max(sigmas))
-    pos = distributeLipids(width + [2 * cutoff], resnames, sigmas, cutoff=cutoff)
+    forbidden_xy = footprint[0] if footprint is not None else None
+    forbidden_radii = footprint[1] if footprint is not None else None
+    pos, pos_initial = distributeLipids(
+        width + [2 * cutoff],
+        resnames,
+        sigmas,
+        cutoff=cutoff,
+        forbidden_xy=forbidden_xy,
+        forbidden_radii=forbidden_radii,
+    )
     for i in range(len(lipids)):
         lipids[i].xyz[:2] = pos[i, :2]
+        lipids[i].xyz_initial = pos_initial[i, :2].copy()
 
 
 def _createMembraneMolecule(lipids):
@@ -136,6 +247,7 @@ def _createMembraneMolecule(lipids):
 
     allmols = []
     numAtoms = 0
+    numBonds = 0
     for i, l in enumerate(lipids):
         mol = l.mol.copy()
         headpos = mol.coords[mol.name == l.headname].flatten()[np.newaxis, :]
@@ -144,15 +256,24 @@ def _createMembraneMolecule(lipids):
         mol.moveBy(l.xyz)
         mol.resid[:] = i
         numAtoms += mol.numAtoms
+        numBonds += len(mol.bonds)
         allmols.append(mol)
 
     # Merge all the lipids into a single Molecule
     mol = Molecule().empty(numAtoms)
     mol.coords = np.zeros((numAtoms, 3, 1), dtype=np.float32)
+    mol.bonds = np.zeros((numBonds, 2), dtype=np.uint32)
+    mol.bondtype = np.empty(numBonds, dtype=object)
     start_idx = 0
+    bond_idx = 0
     for mm in allmols:
         for prop in ["name", "resname", "resid", "segid", "chain", "element", "coords"]:
             mol.__dict__[prop][start_idx : start_idx + mm.numAtoms] = getattr(mm, prop)
+        nb = len(mm.bonds)
+        if nb:
+            mol.bonds[bond_idx : bond_idx + nb] = mm.bonds + start_idx
+            mol.bondtype[bond_idx : bond_idx + nb] = mm.bondtype
+            bond_idx += nb
         start_idx += mm.numAtoms
 
     return mol
@@ -182,10 +303,12 @@ def wrapping_dist_python(coor1, coor2, box):
 
 def _findNeighbours(lipids, box):
     xypos = np.vstack([ll.xyz[:2] for ll in lipids])
+    leaflet = np.array([np.sign(ll.xyz[2]) for ll in lipids])
 
     for i in range(len(lipids)):
         dist = wrapping_dist_python(xypos[i, :], xypos[i + 1 :, :], box)
-        lipids[i].neighbours = i + 1 + np.where(dist < 11)[0]
+        same_leaflet = leaflet[i + 1 :] == leaflet[i]
+        lipids[i].neighbours = i + 1 + np.where((dist < 11) & same_leaflet)[0]
 
 
 def _loadMolecules(lipids, files):
@@ -204,17 +327,317 @@ def _loadMolecules(lipids, files):
         ll.rot = np.random.random() * 360 - 180  # Random starting rotation
 
 
+def _optimizeLipidRotations(lipids, solute, n_angles=24, search_radius=15.0):
+    """Replace per-lipid random z-rotations with the rotation that maximizes
+    the minimum distance to any solute heavy atom.
+
+    Only lipids whose head is within ``search_radius`` of the solute (in 3D)
+    are optimized; the rest keep their initial random rotation. The lipid is
+    rotated around the z-axis in place (the same operation
+    :func:`_createMembraneMolecule` later applies based on ``ll.rot``).
+    """
+    from scipy.spatial import cKDTree
+    from moleculekit.util import rotationMatrix
+
+    heavy = solute.element != "H"
+    sxyz = solute.coords[heavy, :, 0]
+    if len(sxyz) == 0:
+        return
+    tree = cKDTree(sxyz)
+
+    angles = np.linspace(-180, 180, n_angles, endpoint=False)
+    R = np.array(
+        [rotationMatrix([0, 0, 1], np.deg2rad(a)) for a in angles]
+    )  # (n_angles, 3, 3)
+
+    n_optimized = 0
+    for ll in lipids:
+        head_d, _ = tree.query(ll.xyz[None, :], k=1)
+        if head_d[0] > search_radius:
+            continue
+
+        mol = ll.mol
+        lipid_heavy = mol.element != "H"
+        head = mol.coords[mol.name == ll.headname].flatten()
+        local = mol.coords[lipid_heavy, :, 0] - head  # (N, 3)
+
+        # Rotate all-at-once: (n_angles, N, 3) = einsum(local @ R.T)
+        rotated = np.einsum("nij,kj->nki", R, local)  # (n_angles, N, 3)
+        placed = rotated + ll.xyz  # (n_angles, N, 3)
+
+        # KDTree only queries 2D; flatten to (n_angles*N, 3) and reshape.
+        flat = placed.reshape(-1, 3)
+        d, _ = tree.query(flat, k=1, distance_upper_bound=search_radius)
+        d = d.reshape(len(angles), -1)
+        per_angle_min = d.min(axis=1)
+
+        best = int(np.argmax(per_angle_min))
+        ll.rot = float(angles[best])
+        n_optimized += 1
+
+    if n_optimized:
+        logger.info(
+            f"Optimized rotation for {n_optimized} lipids near solute "
+            f"(within {search_radius:.1f} A)."
+        )
+
+
 def _locateLipidFiles(folder, lipidnames):
     import os
 
     files = {}
     for mm in lipidnames:
-        files[mm] = glob(os.path.join(folder, mm, "*.pdb"))
+        files[mm] = glob(os.path.join(folder, mm, "*.cif"))
         if len(files[mm]) == 0:
             raise RuntimeError(
-                f'Could not locate pdb files for lipid "{mm}" in folder {folder}'
+                f'Could not locate cif files for lipid "{mm}" in folder {folder}'
             )
     return files
+
+
+def _writeLJDebugPDB(
+    path, lipids, upper_fp, lower_fp, com_xy, upper_z, lower_z,
+    use_initial=False,
+):
+    """Write the lipid head positions and per-leaflet obstacle positions to a
+    single PDB for visual inspection.
+
+    With ``use_initial=False`` the post-LJ-sim head positions
+    (``ll.xyz``) are written; with ``use_initial=True`` the pre-sim
+    Halton-filter positions (``ll.xyz_initial``) are written. Lipid heads
+    use the lipid's own resname/headname; obstacle pseudo-atoms use ``Au``
+    so they're easy to pick out in a viewer.
+    """
+    n_lipids = len(lipids)
+    n_upper = 0 if upper_fp is None else len(upper_fp[0])
+    n_lower = 0 if lower_fp is None else len(lower_fp[0])
+    n_total = n_lipids + n_upper + n_lower
+
+    mol = Molecule().empty(n_total)
+    mol.coords = np.zeros((n_total, 3, 1), dtype=np.float32)
+
+    for i, ll in enumerate(lipids):
+        if use_initial:
+            mol.coords[i, :2, 0] = ll.xyz_initial
+            mol.coords[i, 2, 0] = ll.xyz[2]
+        else:
+            mol.coords[i, :, 0] = ll.xyz
+        mol.name[i] = ll.headname
+        mol.resname[i] = ll.resname.upper()
+        mol.resid[i] = i
+        mol.element[i] = ll.headname[0]
+        mol.segid[i] = "M"
+
+    idx = n_lipids
+    for fp, z, segid in [(upper_fp, upper_z, "U"), (lower_fp, lower_z, "L")]:
+        if fp is None:
+            continue
+        xy, _ = fp
+        for j in range(len(xy)):
+            mol.coords[idx, :2, 0] = xy[j] + com_xy
+            mol.coords[idx, 2, 0] = z if z is not None else 0.0
+            mol.name[idx] = "X"
+            mol.resname[idx] = "OBS"
+            mol.resid[idx] = idx
+            mol.element[idx] = "Au"
+            mol.segid[idx] = segid
+            idx += 1
+
+    mol.write(path)
+
+
+def _equilibrateOpenMM(
+    smemb,
+    minimize=0,
+    equilibrate_ns=0,
+    platform_name="CUDA",
+    forcefield_files=None,
+    temperature=300,
+    timestep_fs=2.0,
+    solute=None,
+    head_anchors=None,
+    head_restraint_k=0.0,
+):
+    """Minimize and/or equilibrate ``smemb`` with OpenMM.
+
+    The lipid library uses single-residue lipids whose atom names match
+    the AMBER Lipid17 OpenMM XML. Water from ``htmd.solvate`` ships as
+    ``TIP3`` / ``OH2``; on a working copy these are renamed to ``HOH`` /
+    ``O`` to match the AMBER tip3p XML. Equilibrated coordinates and the
+    final box are written back into the original Molecule.
+
+    When ``solute`` is provided, its heavy atoms are appended to the
+    OpenMM System as frozen ``mass=0`` particles in the standard
+    ``NonbondedForce`` so the lipids relax around them. The ghost atoms
+    are discarded before writing equilibrated coordinates back, so they
+    never appear in the output Molecule.
+    """
+    import os
+    import openmm
+    from openmm import app, unit, Platform
+    from openmm import LangevinMiddleIntegrator, MonteCarloMembraneBarostat
+    from moleculekit.periodictable import periodictable
+
+    from htmd.util import tempname
+
+    if forcefield_files is None:
+        forcefield_files = ["amber14/lipid17.xml", "amber14/tip3p.xml"]
+
+    work = smemb.copy()
+    is_water = work.resname == "TIP3"
+    work.resname[is_water] = "HOH"
+    work.name[is_water & (work.name == "OH2")] = "O"
+
+    # Make sure the box is set so PDB CRYST1 gets written and OpenMM can do PME.
+    coord_min = work.coords[:, :, 0].min(axis=0)
+    coord_max = work.coords[:, :, 0].max(axis=0)
+    box = (coord_max - coord_min).astype(np.float32)
+    work.box = box.reshape(3, 1)
+    work.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
+
+    pdb_path = tempname(suffix=".pdb")
+    work.write(pdb_path)
+    try:
+        pdb = app.PDBFile(pdb_path)
+    finally:
+        os.remove(pdb_path)
+
+    pdb.topology.setPeriodicBoxVectors(
+        [
+            (box[0], 0, 0) * unit.angstrom,
+            (0, box[1], 0) * unit.angstrom,
+            (0, 0, box[2]) * unit.angstrom,
+        ]
+    )
+
+    ff = app.ForceField(*forcefield_files)
+    system = ff.createSystem(
+        pdb.topology,
+        nonbondedMethod=app.PME,
+        nonbondedCutoff=10 * unit.angstrom,
+        constraints=app.HBonds,
+        flexibleConstraints=True,
+    )
+
+    n_lipid_atoms = system.getNumParticles()
+    ghost_xyz = None
+    if solute is not None:
+        heavy = solute.element != "H"
+        ghost_xyz = solute.coords[heavy, :, 0]
+        ghost_elements = solute.element[heavy]
+        # Find the standard NonbondedForce so we can add ghost particles.
+        nb = next(
+            f for f in (system.getForce(i) for i in range(system.getNumForces()))
+            if isinstance(f, openmm.NonbondedForce)
+        )
+        for el in ghost_elements:
+            # vdW radius is r_min/2; AMBER sigma = r_min / 2^(1/6).
+            r_vdw = (
+                periodictable[el].vdw_radius if el in periodictable else 1.7
+            )
+            sigma = 2.0 * r_vdw / (2 ** (1 / 6))
+            system.addParticle(0.0)  # frozen
+            nb.addParticle(
+                0.0 * unit.elementary_charge,
+                sigma * 0.1 * unit.nanometer,
+                0.4 * unit.kilojoule_per_mole,
+            )
+
+    if head_anchors and head_restraint_k > 0:
+        # Harmonic z-restraint on each lipid head atom toward its target
+        # head plane (+head_z for upper, -head_z for lower).
+        anchor = openmm.CustomExternalForce("k_h * (z - z0)^2")
+        anchor.addGlobalParameter("k_h", float(head_restraint_k) * 100.0)
+        anchor.addPerParticleParameter("z0")
+        for atom_idx, z_target in head_anchors:
+            anchor.addParticle(int(atom_idx), [float(z_target) * 0.1])
+        system.addForce(anchor)
+
+    if equilibrate_ns > 0:
+        barostat = MonteCarloMembraneBarostat(
+            1 * unit.bar,
+            0 * unit.bar * unit.nanometer,
+            temperature * unit.kelvin,
+            MonteCarloMembraneBarostat.XYIsotropic,
+            MonteCarloMembraneBarostat.ZFree,
+        )
+        system.addForce(barostat)
+
+    integrator = LangevinMiddleIntegrator(
+        temperature * unit.kelvin,
+        1 / unit.picosecond,
+        timestep_fs * unit.femtoseconds,
+    )
+    platform = Platform.getPlatformByName(platform_name)
+    # Topology atom count must match System particle count; extend topology
+    # with a dummy chain for the ghost atoms so OpenMM accepts the positions.
+    if ghost_xyz is not None:
+        ghost_chain = pdb.topology.addChain()
+        carbon = app.Element.getBySymbol("C")
+        for _ in range(len(ghost_xyz)):
+            res = pdb.topology.addResidue("GHOST", ghost_chain)
+            pdb.topology.addAtom("X", carbon, res)
+        all_positions = np.vstack(
+            [np.asarray(pdb.positions.value_in_unit(unit.angstrom)), ghost_xyz]
+        ) * unit.angstrom
+    else:
+        all_positions = pdb.positions
+
+    simulation = app.Simulation(pdb.topology, system, integrator, platform)
+    simulation.context.setPositions(all_positions)
+
+    if minimize > 0:
+        from acemd.minimizer import minimize as _acemd_cg_minimize
+
+        kcal = unit.kilocalorie_per_mole
+
+        def _e():
+            return simulation.context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(kcal)
+
+        e_initial = _e()
+        # CG copes with catastrophic starting energies; L-BFGS then drives
+        # forces low enough that the first MD timestep is stable.
+        _acemd_cg_minimize(system, simulation.context, int(minimize))
+        e_after_cg = _e()
+        simulation.minimizeEnergy()
+        e_final = _e()
+        logger.info(
+            f"Minimization: {e_initial:.4g} -> {e_after_cg:.4g} "
+            f"(CG, {int(minimize)} steps) -> {e_final:.4g} "
+            f"(L-BFGS to convergence) [kcal/mol]"
+        )
+
+    if equilibrate_ns > 0:
+        simulation.context.setVelocitiesToTemperature(temperature * unit.kelvin)
+        nsteps = int(round(equilibrate_ns * 1_000_000 / timestep_fs))
+        simulation.step(nsteps)
+
+    # enforcePeriodicBox=False keeps molecules intact across the PBC;
+    # smemb.wrap() afterwards uses the bonds on smemb to wrap whole lipids.
+    state = simulation.context.getState(
+        getPositions=True, enforcePeriodicBox=False
+    )
+    positions = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom)
+    smemb.coords[:, :, 0] = positions[:n_lipid_atoms].astype(np.float32)
+
+    a, b, c = state.getPeriodicBoxVectors(asNumpy=True)
+    smemb.box = np.array(
+        [
+            [a[0].value_in_unit(unit.angstrom)],
+            [b[1].value_in_unit(unit.angstrom)],
+            [c[2].value_in_unit(unit.angstrom)],
+        ],
+        dtype=np.float32,
+    )
+    smemb.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
+
+    # With a solute, center the wrap on the solute COM so lipids/water
+    # cluster around the protein rather than the box origin.
+    if solute is not None:
+        solute_com = positions[n_lipid_atoms:].mean(axis=0)
+        smemb.wrap(wrapcenter=solute_com)
+    else:
+        smemb.wrap()
 
 
 def buildMembrane(
@@ -227,10 +650,12 @@ def buildMembrane(
     equilibrate=0,
     outdir=None,
     lipidf=None,
-    ff=None,
-    topo=None,
-    param=None,
-    build=False,
+    forcefield_files=None,
+    seed=None,
+    solute=None,
+    timestep_fs=2.0,
+    head_z=15.0,
+    head_restraint_k=0.0,
 ):
     """Construct a membrane containing arbitrary lipids and ratios of them.
 
@@ -245,23 +670,41 @@ def buildMembrane(
     waterbuff : float
         The z-dimension size of the water box above and below the membrane
     platform : str
-        The platform on which to run the minimization ('CUDA' or 'CPU')
+        OpenMM platform on which to run the minimization/equilibration
+        ('CUDA', 'OpenCL', 'CPU', or 'Reference')
     minimize : int
         If not 0 it minimizes the membrane for the given number of steps
     equilibrate : float
         If not 0 it equilibrates the membrane for the given number of nanoseconds
     outdir : str
-        A folder in which to store the psf and pdb files
+        A folder in which to store the output PDB files
     lipidf : str
         The path to the folder containing the single-lipid PDB structures as well as the lipid DB file
-    ff : list[str]
-        AMBER forcefield files for lipids
-    topo : list[str]
-        AMBER topologies for lipids
-    param : list[str]
-        AMBER parameters for lipids
-    build : bool
-        Build system with teLeap. Disable if you want to build the system yourself.
+    forcefield_files : list[str] or None
+        OpenMM ForceField XML files used to parameterize the membrane during
+        minimization/equilibration. Defaults to AMBER Lipid17 + TIP3P
+        (``["amber14/lipid17.xml", "amber14/tip3p.xml"]``).
+    seed : int or None
+        Seed for the numpy global RNG. If provided, the build is reproducible
+        (lipid conformer choice, initial rotations, and the LJ-fluid Halton
+        shuffle). The OpenMM minimization/dynamics step is not seeded here.
+    solute : :class:`Molecule <moleculekit.molecule.Molecule>` or None
+        Optional pre-positioned solute (typically a protein) around which the
+        membrane is built. The solute must be aligned with bilayer center at
+        z=0; the membrane is shifted in XY to follow the solute's
+        membrane-embedded COM. The user's Molecule is not modified.
+    timestep_fs : float
+        Integrator timestep in femtoseconds for the OpenMM equilibration.
+        Default 2.0 (compatible with ``constraints=HBonds``).
+    head_z : float
+        Half-bilayer head-plane Z (Angstrom). Every lipid head is placed at
+        ``+head_z`` (upper leaflet) or ``-head_z`` (lower) regardless of
+        species, so a mixed bilayer starts with a flat head plane that NPT
+        relaxes to per-species depths. Default 15.0.
+    head_restraint_k : float
+        If > 0, apply a harmonic z-restraint of strength ``head_restraint_k``
+        (kJ/mol/A^2) to each lipid head atom toward its initial head plane
+        during minimization and equilibration. Default 0.0 (no restraint).
 
     Returns
     -------
@@ -277,9 +720,7 @@ def buildMembrane(
     """
     from htmd.membranebuilder.ringpenetration import resolveRingPenetrations
     from htmd.builder.solvate import solvate
-    from htmd.builder import amber
     from htmd.util import tempname
-    from moleculekit.molecule import Molecule
     from htmd.home import home
     import os
     import pandas as pd
@@ -287,8 +728,8 @@ def buildMembrane(
     if isinstance(equilibrate, bool):
         raise ValueError("equilibrate must be a float")
 
-    if equilibrate > 0 or minimize > 0:
-        build = True
+    if seed is not None:
+        np.random.seed(seed)
 
     if lipidf is None:
         lipidf = os.path.join(home(shareDir=True), "membranebuilder", "lipids")
@@ -298,113 +739,140 @@ def buildMembrane(
     files = _locateLipidFiles(lipidf, uqlip)
 
     area = np.prod(xysize)
-    lipids = _createLipids(ratioupper, area, lipiddb, files, leaflet="upper")
-    lipids += _createLipids(ratiolower, area, lipiddb, files, leaflet="lower")
+    upper_fraction = 0.0
+    lower_fraction = 0.0
+    upper_fp = None
+    lower_fp = None
+    com_xy = np.zeros(2, dtype=np.float32)
+    if solute is not None:
+        # XY anchor for the membrane: the COM of solute heavy atoms inside
+        # the bilayer (|z| < mean_thickness/2). Falls back to the full COM
+        # for peripheral solutes that don't span the bilayer.
+        mean_thickness = float(
+            np.mean([lipiddb.loc[name, "Thickness"] for name in uqlip])
+        )
+        z_solute = solute.coords[:, 2, 0]
+        embedded = np.abs(z_solute) < mean_thickness / 2
+        anchor_mask = embedded if embedded.any() else np.ones(solute.numAtoms, bool)
+        com_xy = solute.coords[anchor_mask, :2, 0].mean(axis=0).astype(np.float32)
 
-    _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] > 0])
-    _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] < 0])
+        upper_fp = _solute_footprint(solute, head_z)
+        lower_fp = _solute_footprint(solute, -head_z)
+        # Lipid placement (Halton/obstacles) happens in the box-centered
+        # frame, so translate the footprint by -com_xy.
+        if upper_fp is not None:
+            upper_fp = (upper_fp[0] - com_xy, upper_fp[1])
+        if lower_fp is not None:
+            lower_fp = (lower_fp[0] - com_xy, lower_fp[1])
+        upper_fraction = _solute_area_fraction(upper_fp, xysize)
+        lower_fraction = _solute_area_fraction(lower_fp, xysize)
+
+    lipids = _createLipids(
+        ratioupper, area, lipiddb, files, leaflet="upper",
+        area_fraction_used=upper_fraction, head_z=head_z,
+    )
+    lipids += _createLipids(
+        ratiolower, area, lipiddb, files, leaflet="lower",
+        area_fraction_used=lower_fraction, head_z=head_z,
+    )
+
+    _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] > 0], footprint=upper_fp)
+    _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] < 0], footprint=lower_fp)
+
+    # Move lipids into the solute's frame so everything downstream
+    # (rotation optimization, ring penetration, assembly, solvation) lives
+    # in the user's coordinate frame.
+    if solute is not None:
+        for ll in lipids:
+            ll.xyz[:2] += com_xy
+            ll.xyz_initial += com_xy
 
     _findNeighbours(lipids, xysize)
 
     _loadMolecules(lipids, files)
 
-    # from globalminimization import minimize
-    # newpos, newrot = minimize(lipids, xysize + [100], stepxy=0.5, steprot=50, contactthresh=1)
-    # for i in range(len(lipids)):
-    #     lipids[i].xyz[:2] = newpos[i]
-    #     lipids[i].rot = newrot[i]
+    if solute is not None:
+        _optimizeLipidRotations(lipids, solute)
 
     resolveRingPenetrations(lipids, xysize)
     memb = _createMembraneMolecule(lipids)
 
-    minc = memb.get("coords", "name P").min(axis=0) - 5
-    maxc = memb.get("coords", "name P").max(axis=0) + 5
+    head_mask = np.zeros(memb.numAtoms, dtype=bool)
+    for resname, headname in {(ll.resname.upper(), ll.headname) for ll in lipids}:
+        head_mask |= (memb.resname == resname) & (memb.name == headname)
+    head_coords = memb.coords[head_mask, :, 0]
+    minc = head_coords.min(axis=0) - 5
+    maxc = head_coords.max(axis=0) + 5
 
-    mm = [[0, 0, maxc[2] - 2], [xysize[0], xysize[1], maxc[2] + waterbuff]]
+    mm = [
+        [minc[0] - 5, minc[1] - 5, maxc[2] - 2],
+        [maxc[0] + 5, maxc[1] + 5, maxc[2] + waterbuff],
+    ]
     smemb = solvate(memb, minmax=mm)
-    mm = [[0, 0, minc[2] - waterbuff], [xysize[0], xysize[1], minc[2] + 2]]
+    mm = [
+        [minc[0] - 5, minc[1] - 5, minc[2] - waterbuff],
+        [maxc[0] + 5, maxc[1] + 5, minc[2] + 2],
+    ]
     smemb = solvate(smemb, minmax=mm)
-
-    smemb.moveBy([0, 0, -smemb.coords[:, 2, 0].min()])
 
     if outdir is None:
         outdir = tempname()
         logger.info(f"Outdir {outdir}")
+    os.makedirs(outdir, exist_ok=True)
 
-    if build:
-        res = amber.build(
-            smemb,
-            ionize=False,
-            outdir=outdir,
-            ff=ff,
-            topo=topo,
-            param=param,
-        )
-    else:
-        os.makedirs(outdir, exist_ok=True)
-        smemb.write(os.path.join(outdir, "structure.pdb"))
-        return smemb
+    _writeLJDebugPDB(
+        os.path.join(outdir, "lj_packing_initial.pdb"),
+        lipids,
+        upper_fp,
+        lower_fp,
+        com_xy,
+        head_z if solute is not None else None,
+        -head_z if solute is not None else None,
+        use_initial=True,
+    )
+    _writeLJDebugPDB(
+        os.path.join(outdir, "lj_packing.pdb"),
+        lipids,
+        upper_fp,
+        lower_fp,
+        com_xy,
+        head_z if solute is not None else None,
+        -head_z if solute is not None else None,
+    )
 
     if equilibrate > 0 or minimize > 0:
-        from shutil import move
-        import yaml
-        from acemd import acemd
+        smemb.write(os.path.join(outdir, "starting_structure.pdb"))
 
-        equildir = os.path.join(outdir, "equil")
-        os.makedirs(equildir, exist_ok=True)
+        head_anchors = None
+        if head_restraint_k > 0:
+            head_anchors = []
+            for i, ll in enumerate(lipids):
+                m = (smemb.resid == i) & (smemb.name == ll.headname)
+                idx = np.where(m)[0]
+                if len(idx) != 1:
+                    continue
+                z_target = head_z if ll.xyz[2] > 0 else -head_z
+                head_anchors.append((int(idx[0]), float(z_target)))
 
-        watcoo = res.get("coords", "water")
-        celld = (watcoo.max(axis=0) - watcoo.min(axis=0)).squeeze()
-
-        # TODO: I need to figure out the resnames+atom names after building
-        # lipid_heads = list(set([(lipid.resname, lipid.headname) for lipid in lipids]))
-
-        input_dict = {
-            "structure": os.path.join(outdir, "structure.prmtop"),
-            "coordinates": os.path.join(outdir, "structure.pdb"),
-            "boxsize": celld.tolist(),
-            "barostatconstratio": True,
-            "minimize": minimize,
-            "run": f"{equilibrate}ns",
-            "velocities": 300,
-            "thermostat": True,
-            "barostat": True,
-            # "extforces": [
-            #     {
-            #         "type": "positionalrestraint",
-            #         "sel": " and ".join(
-            #             [f"(resname {x[0]} and name {x[1]})" for x in lipid_heads]
-            #         ),
-            #         "setpoints": ["1@0"],
-            #     }
-            # ],
-        }
-        with open(os.path.join(equildir, "input.yaml"), "w") as f:
-            yaml.dump(input_dict, f)
-        acemd(equildir, platform=platform)
-
-        if equilibrate > 0:
-            res = Molecule(os.path.join(outdir, "structure.prmtop"))
-            res.read(os.path.join(equildir, "output.coor"))
-            res.read(os.path.join(equildir, "output.xsc"))
-            res.wrap("lipids", guessBonds=False)
-        else:
-            res = Molecule(os.path.join(outdir, "structure.prmtop"))
-            res.read(os.path.join(equildir, "minimized.coor"))
-
-        move(
-            os.path.join(outdir, "structure.pdb"),
-            os.path.join(outdir, "starting_structure.pdb"),
+        _equilibrateOpenMM(
+            smemb,
+            minimize=minimize,
+            equilibrate_ns=equilibrate,
+            platform_name=platform,
+            forcefield_files=forcefield_files,
+            timestep_fs=timestep_fs,
+            solute=solute,
+            head_anchors=head_anchors,
+            head_restraint_k=head_restraint_k,
         )
-        res.write(os.path.join(outdir, "structure.pdb"))
 
-    return res
+    smemb.write(os.path.join(outdir, "structure.pdb"))
+    return smemb
 
 
 def _findLeastAreaLipid(folder):
-    """
-    Use this to select the single least stretched conformation from a CHARMM-GUI lipid library
-    """
+    """Select the single least-stretched conformation from a folder of
+    per-conformer ``.crd`` files (one subfolder per lipid)."""
     from glob import glob
     from scipy.spatial.distance import cdist
 
@@ -416,79 +884,3 @@ def _findLeastAreaLipid(folder):
         dists = cdist(m.coords[:, :2, 0], center[:2].T)
         maxdist.append(dists.max())
     return ff[np.argmin(maxdist)], np.min(maxdist)
-
-from htmd.builder.amber import _resolve_backend
-try:
-    _resolve_backend()
-    tleap_installed = True
-except Exception:
-    tleap_installed = False
-
-
-class _TestBuildMembrane(unittest.TestCase):
-    def test_build_membrane(self):
-        import tempfile
-        import os
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            buildMembrane(
-                [20, 20],
-                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                equilibrate=0,
-                minimize=0,
-                outdir=tmpdir,
-                platform="CPU",
-            )
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
-            self.assertFalse(
-                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
-            )
-
-    @unittest.skipIf(
-        not tleap_installed, "teLeap is not installed. Cannot test"
-    )
-    def test_build_membrane_minimize(self):
-        import tempfile
-        import os
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            buildMembrane(
-                [20, 20],
-                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                equilibrate=0,
-                minimize=100,
-                outdir=tmpdir,
-                platform="CPU",
-            )
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
-            self.assertTrue(
-                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
-            )
-
-    @unittest.skipIf(
-        not tleap_installed, "teLeap is not installed. Cannot test"
-    )
-    def test_build_membrane_equil(self):
-        import tempfile
-        import os
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            buildMembrane(
-                [20, 20],
-                ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
-                equilibrate=0.01,
-                minimize=100,
-                outdir=tmpdir,
-                platform="CPU",
-            )
-            self.assertTrue(os.path.exists(os.path.join(tmpdir, "structure.pdb")))
-            self.assertTrue(
-                os.path.exists(os.path.join(tmpdir, "starting_structure.pdb"))
-            )
-
-
-if __name__ == "__main__":
-    unittest.main()
