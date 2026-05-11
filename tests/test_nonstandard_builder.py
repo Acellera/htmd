@@ -35,7 +35,11 @@ from moleculekit.tools.nonstandard_residues import (
     CanonicalRenamedSpec,
 )
 from htmd.builder.amber import _findTeLeap, _prepareMolecule
-from htmd.builder.nonstandard import parameterizeFromSpecs
+from htmd.builder.nonstandard import (
+    parameterizeFromSpecs,
+    _check_specs_protonated,
+    _residue_groups_with_index,
+)
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(curr_dir, "test_nonstandard_builder")
@@ -608,3 +612,140 @@ def _test_parameterize_from_specs_dedup_4tot(tmp_path):
     assert frcmod_basenames == expected_basenames, (
         f"frcmod basenames {frcmod_basenames} != {expected_basenames}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for the protonation sanity check (_check_specs_protonated).
+# These build tiny synthetic molecules; no antechamber / tleap needed.
+# ---------------------------------------------------------------------------
+
+
+def _toy_mol(residues):
+    """Build a multi-residue Molecule from a compact description and return
+    ``(mol, groups)``.
+
+    ``residues`` is a list of ``(resname, atoms, bonds, formalcharges)``:
+      - ``atoms``    : list of element strings (one per atom in the residue)
+      - ``bonds``    : list of ``(i, j)`` index pairs *local* to the residue
+      - ``formalcharges`` : optional list of ints (defaults to all zero)
+    """
+    elements, names, resnames, resids, fcs = [], [], [], [], []
+    bonds = []
+    offset = 0
+    for resid, (resname, atoms, res_bonds, *rest) in enumerate(residues, start=1):
+        res_fc = rest[0] if rest else [0] * len(atoms)
+        for k, el in enumerate(atoms):
+            elements.append(el)
+            names.append(f"{el}{offset + k}")
+            resnames.append(resname)
+            resids.append(resid)
+            fcs.append(int(res_fc[k]))
+        for i, j in res_bonds:
+            bonds.append((offset + i, offset + j))
+        offset += len(atoms)
+
+    n = len(elements)
+    mol = Molecule().empty(n)
+    mol.element[:] = elements
+    mol.name[:] = names
+    mol.resname[:] = resnames
+    mol.resid[:] = resids
+    mol.formalcharge[:] = fcs
+    mol.coords = np.zeros((n, 3, 1), dtype=np.float32)
+    mol.bonds = (
+        np.array(bonds, dtype=np.uint32).reshape(-1, 2)
+        if bonds
+        else np.zeros((0, 2), dtype=np.uint32)
+    )
+    _, groups = _residue_groups_with_index(mol)
+    return mol, groups
+
+
+def _alkane(resname, n_carbon):
+    """Fully protonated straight-chain alkane CnH(2n+2) as a residue tuple."""
+    atoms = ["C"] * n_carbon
+    bonds = [(i, i + 1) for i in range(n_carbon - 1)]
+    h = n_carbon
+    for c in range(n_carbon):
+        n_h = 3 if c in (0, n_carbon - 1) else 2
+        for _ in range(n_h):
+            atoms.append("H")
+            bonds.append((c, h))
+            h += 1
+    return (resname, atoms, bonds)
+
+
+# Reusable residue fragments.
+_HEXANE = _alkane("HEX", 6)          # fully protonated, exercises the H-count path
+_BARE_C4 = ("BC4", ["C"] * 4, [(0, 1), (1, 2), (2, 3)])  # 4-carbon chain, no H
+_BENZENE = ("BNZ", ["C"] * 6 + ["H"] * 6,
+            [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
+            + [(i, 6 + i) for i in range(6)])
+_ZINC = ("ZN", ["Zn"], [])
+_SULFATE = ("SO4", ["S", "O", "O", "O", "O"], [(0, 1), (0, 2), (0, 3), (0, 4)],
+            [0, 0, 0, -1, -1])
+_SMALL_CO2 = ("CO2", ["C", "O", "O"], [(0, 1), (0, 2)])  # H-free, below the gate
+# Lysine-ish heavy skeleton with only the backbone N-H / CA-HA present.
+_LYS_STRIPPED = (
+    "LYX",
+    ["N", "C", "C", "O", "C", "C", "C", "C", "N", "H", "H"],
+    [(0, 1), (1, 2), (2, 3), (1, 4), (4, 5), (5, 6), (6, 7), (7, 8),
+     (0, 9), (1, 10)],
+)
+
+
+def _test_check_specs_protonated_passes_aliphatic():
+    mol, groups = _toy_mol([_HEXANE])
+    _check_specs_protonated(mol, {0: None}, groups)  # must not raise
+
+
+def _test_check_specs_protonated_passes_aromatic():
+    # The estimator treats the ring as all single bonds, so benzene's 6 H sit
+    # well above the 0.2 * 12 threshold.
+    mol, groups = _toy_mol([_BENZENE])
+    _check_specs_protonated(mol, {0: None}, groups)  # must not raise
+
+
+def _test_check_specs_protonated_zero_hydrogens_raises():
+    mol, groups = _toy_mol([_BARE_C4, _HEXANE])
+    with pytest.raises(RuntimeError, match=r"under-protonated"):
+        _check_specs_protonated(mol, {0: None}, groups)
+
+
+def _test_check_specs_protonated_stripped_sidechain_raises():
+    # Backbone H present, every sidechain H missing -> still flagged.
+    mol, groups = _toy_mol([_LYS_STRIPPED])
+    with pytest.raises(RuntimeError) as exc:
+        _check_specs_protonated(mol, {0: None}, groups)
+    assert "LYX" in str(exc.value)
+    assert "2 hydrogen(s) present" in str(exc.value)
+
+
+def _test_check_specs_protonated_ignores_carbonless_residues():
+    # A metal ion and an oxo-anion carry no expected H even with 0 H present.
+    mol, groups = _toy_mol([_HEXANE, _ZINC, _SULFATE])
+    _check_specs_protonated(mol, {1: None, 2: None}, groups)  # must not raise
+
+
+def _test_check_specs_protonated_ignores_tiny_carbon_species():
+    # CO2 estimates only ~4 expected H -> below _MIN_EXPECTED_HYDROGENS, so
+    # being H-free does not trip the check.
+    mol, groups = _toy_mol([_HEXANE, _SMALL_CO2])
+    _check_specs_protonated(mol, {1: None}, groups)  # must not raise
+
+
+def _test_check_specs_protonated_reports_every_bad_residue():
+    mol, groups = _toy_mol([_BARE_C4, _HEXANE, _LYS_STRIPPED])
+    with pytest.raises(RuntimeError) as exc:
+        _check_specs_protonated(mol, {0: None, 2: None}, groups)
+    msg = str(exc.value)
+    assert "BC4" in msg and "LYX" in msg
+    # The fully protonated residue (index 1) is not in the spec set and must
+    # not appear regardless.
+    assert "HEX" not in msg
+
+
+def _test_check_specs_protonated_no_bonds_is_noop():
+    # Defensive guard: without connectivity there is nothing to check.
+    mol, groups = _toy_mol([("LIG", ["C", "C", "C"], [])])
+    _check_specs_protonated(mol, {0: None}, groups)  # must not raise

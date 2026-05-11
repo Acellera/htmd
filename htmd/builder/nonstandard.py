@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
 import os
 import tempfile
 from dataclasses import dataclass, field
@@ -862,6 +863,114 @@ def _write_free_residue_cif(mol, group, out_path):
     return sub
 
 
+# Typical (neutral) valence per element, used for the protonation sanity
+# check below. Anything not listed (metals, etc.) contributes no expected
+# hydrogens and never trips the check on its own.
+_TYPICAL_VALENCE = {
+    "H": 1, "B": 3, "C": 4, "N": 3, "O": 2, "F": 1, "SI": 4, "P": 3,
+    "S": 2, "CL": 1, "AS": 3, "SE": 2, "BR": 1, "I": 1,
+}
+
+# Fraction of the all-single-bonds hydrogen count a residue must reach to be
+# considered protonated. Even densely fused aromatics keep a real-H /
+# sp3-estimate ratio around 0.33 (benzene 0.5, pyrene ~0.38, coronene ~0.33),
+# so 0.2 leaves a comfortable margin while still flagging a residue whose
+# sidechain hydrogens were never added.
+_MIN_HYDROGEN_FRACTION = 0.2
+
+# Don't apply the under-protonation check below this many estimated hydrogens.
+# Genuinely H-free small carbon species exist in that range (CO2, CN-, urea,
+# hexafluorobenzene, ...) and "stripped of H" is not a realistic failure mode
+# for residues that small; real NCAAs / drug-like ligands estimate well above
+# it (alanine-sized sidechains already give ~9).
+_MIN_EXPECTED_HYDROGENS = 7
+
+
+def _estimate_sp3_hydrogens(elem_upper, formalcharge, heavy_degree, atom_idx):
+    """Upper bound on a residue's hydrogen count, assuming every heavy-heavy
+    bond is a single bond: for each heavy atom, ``valence + formal_charge``
+    minus the number of bonds it makes to other heavy atoms. Unsaturation
+    only lowers the real count, so this stays an over-estimate; the caller
+    compares against a small fraction of it."""
+    total = 0
+    for i in atom_idx:
+        el = elem_upper[i]
+        if el == "H":
+            continue
+        val = _TYPICAL_VALENCE.get(el)
+        if val is None:
+            continue
+        eff_val = max(0, val + int(formalcharge[i]))
+        total += max(0, eff_val - int(heavy_degree[i]))
+    return total
+
+
+def _check_specs_protonated(mol, spec_by_res_idx, groups):
+    """Refuse to parameterize a carbon-bearing residue that is missing its
+    hydrogens (entirely, or e.g. a sidechain stripped of H while the backbone
+    H survived).
+
+    A residue taken straight from a PDB without explicit hydrogens
+    parameterizes into a prepi/frcmod missing those H, which is silently
+    wrong. Protonate first - template the residue with
+    ``mol.templateResidueFromSmiles(<sel>, <smiles>, addHs=True)`` or
+    protonate the whole structure with
+    ``moleculekit.tools.preparation.systemPrepare`` - before calling here.
+
+    The test is heuristic: count current H per residue, compare against
+    ``_MIN_HYDROGEN_FRACTION`` of the all-single-bonds estimate
+    (:func:`_estimate_sp3_hydrogens`). Residues without carbon (monatomic
+    ions, oxo-anions such as sulfate/phosphate) and residues whose estimate
+    is below ``_MIN_EXPECTED_HYDROGENS`` (small species that are often H-free
+    anyway) are left alone.
+    """
+    if mol.bonds is None or len(mol.bonds) == 0:
+        return  # no connectivity to reason about; clustering will fail later
+
+    elem_upper = np.char.upper(np.asarray(mol.element, dtype="U3"))
+    is_h = elem_upper == "H"
+    bonds = np.asarray(mol.bonds)
+    heavy_bonds = bonds[~is_h[bonds[:, 0]] & ~is_h[bonds[:, 1]]]
+    heavy_degree = np.zeros(mol.numAtoms, dtype=int)
+    np.add.at(heavy_degree, heavy_bonds[:, 0], 1)
+    np.add.at(heavy_degree, heavy_bonds[:, 1], 1)
+    formalcharge = (
+        mol.formalcharge
+        if mol.formalcharge is not None and len(mol.formalcharge) == mol.numAtoms
+        else np.zeros(mol.numAtoms, dtype=int)
+    )
+
+    bad = []
+    for r_idx in sorted(spec_by_res_idx):
+        g = groups[r_idx]
+        atom_idx = np.asarray(g["atom_idx"])
+        if "C" not in set(elem_upper[atom_idx]):
+            continue
+        expected = _estimate_sp3_hydrogens(
+            elem_upper, formalcharge, heavy_degree, atom_idx
+        )
+        if expected < _MIN_EXPECTED_HYDROGENS:
+            continue
+        h_now = int(is_h[atom_idx].sum())
+        if h_now >= math.ceil(_MIN_HYDROGEN_FRACTION * expected):
+            continue
+        res = (
+            f"{g['resname']}:{g['resid']}{g['insertion']}"
+            f" (segid {g['segid']!r}, chain {g['chain']!r}): "
+            f"{h_now} hydrogen(s) present, ~{expected} expected"
+        )
+        bad.append(res)
+    if bad:
+        raise RuntimeError(
+            "Residue(s) look under-protonated, refusing to parameterize:\n  "
+            + "\n  ".join(bad)
+            + "\nAdd hydrogens first - e.g. template the residue with "
+            "mol.templateResidueFromSmiles(<sel>, <smiles>, addHs=True), or "
+            "protonate the structure with "
+            "moleculekit.tools.preparation.systemPrepare - then re-run."
+        )
+
+
 def parameterizeFromSpecs(
     specs, mol, outdir, charge_method="gasteiger", use_pyodide=None
 ):
@@ -978,6 +1087,8 @@ def parameterizeFromSpecs(
                 f"insertion={key[3]!r})"
             )
         spec_by_res_idx[res_key_to_idx[key]] = s
+
+    _check_specs_protonated(mol, spec_by_res_idx, groups)
 
     # Walk mol.bonds for non-peptide inter-residue bonds among spec'd residues.
     spec_indices = set(spec_by_res_idx)
