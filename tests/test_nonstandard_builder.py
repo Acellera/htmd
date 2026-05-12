@@ -38,6 +38,7 @@ from htmd.builder.amber import _findTeLeap, _prepareMolecule
 from htmd.builder.nonstandard import (
     parameterizeFromSpecs,
     _check_specs_protonated,
+    _clean_frcmod_params,
     _residue_groups_with_index,
 )
 
@@ -535,7 +536,12 @@ def _test_full_pipeline_1r1j(tmp_path):
     mid-chain) bucket so they collapse to a single per-bucket prepi."""
     mol = Molecule(R1J_PDB)
 
-    smiles = {"NAG": "CC(=O)N[C@@H]1[C@@H](O)O[C@H](CO)[C@@H](O)[C@@H]1O"}
+    smiles = {
+        "NAG": "CC(=O)N[C@@H]1[C@@H](O)O[C@H](CO)[C@@H](O)[C@@H]1O",
+        # OIR: N-(3-phenyl-2-sulfanylpropanoyl)phenylalanylalanine, the
+        # zinc-bound peptidic inhibitor (RCSB chem-comp OIR).
+        "OIR": "CC(C(=O)O)NC(=O)C(Cc1ccccc1)NC(=O)C(Cc2ccccc2)S",
+    }
     built = _run_pipeline(mol, smiles, tmp_path)
     assert built is not None
     _check_no_overvalent_atoms(built)
@@ -564,6 +570,10 @@ def _test_parameterize_from_specs_dedup_4tot(tmp_path):
         "DAL": "C[C@H](C=O)N",
         "MLE": "CC(C)C[C@@H](C=O)NC",
         "MVA": "CC(C)[C@@H](C=O)NC",
+        # P6G: hexaethylene glycol, a free crystallisation-additive ligand
+        # (RCSB chem-comp P6G). SO4 has no carbon, so the protonation guard
+        # in parameterizeFromSpecs skips it.
+        "P6G": "OCCOCCOCCOCCOCCOCCO",
     }
     mol = Molecule("4TOT")
     mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
@@ -749,3 +759,173 @@ def _test_check_specs_protonated_no_bonds_is_noop():
     # Defensive guard: without connectivity there is nothing to check.
     mol, groups = _toy_mol([("LIG", ["C", "C", "C"], [])])
     _check_specs_protonated(mol, {0: None}, groups)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for the frcmod parameter cleanup (_clean_frcmod_params).
+# ---------------------------------------------------------------------------
+
+# A parmchk2-style frcmod with deliberate cruft: an atom type used by nothing
+# (xx), a type only present on a "cap" atom (cc), a backbone-only bond/angle
+# (the protein FF provides those), and bond/angle/dihedral entries the test
+# molecule's connectivity never realizes (c3-c3-c3 angle, c3-c3-c3-c3 dihe).
+_DIRTY_FRCMOD = """test frcmod
+MASS
+c3 12.010
+ca 12.010
+hc 1.008
+cc 12.010
+N  14.010
+CT 12.010
+xx 99.000
+
+BOND
+c3-c3   300.0   1.526
+c3-ca   300.0   1.510
+ca-hc   340.0   1.090
+c3-cc   300.0   1.500
+N-CT    300.0   1.460
+N-c3    300.0   1.470
+xx-xx   100.0   1.500
+
+ANGLE
+c3-c3-ca   50.0   109.5
+ca-ca-hc   50.0   120.0
+c3-c3-c3   50.0   109.5
+N-CT-c3    50.0   110.0
+xx-xx-xx   50.0   109.5
+
+DIHE
+c3-c3-ca-ca   1   0.156   0.0   3.0
+c3-c3-c3-c3   1   0.180   0.0   3.0
+N-CT-c3-c3    1   0.100   0.0   3.0
+xx-xx-xx-xx   1   0.000   0.0   2.0
+
+IMPROPER
+ca-ca-ca-ca   1.1   180.0   2.0
+N-CT-c3-cc    1.0   180.0   2.0
+xx-xx-xx-xx   1.0   180.0   2.0
+
+NONBON
+c3   1.9080   0.1094
+ca   1.9080   0.0860
+hc   1.4870   0.0157
+cc   1.9080   0.0860
+N    1.8240   0.1700
+CT   1.9080   0.1094
+xx   1.0000   0.0000
+"""
+
+
+def _typed_mol(elements, atomtypes, bonds):
+    """Single-residue Molecule with explicit atom types + bonds."""
+    n = len(elements)
+    mol = Molecule().empty(n)
+    mol.element[:] = elements
+    mol.name[:] = [f"{e}{i}" for i, e in enumerate(elements)]
+    mol.atomtype[:] = atomtypes
+    mol.resname[:] = "LIG"
+    mol.resid[:] = 1
+    mol.coords = np.zeros((n, 3, 1), dtype=np.float32)
+    mol.bonds = (
+        np.array(bonds, dtype=np.uint32).reshape(-1, 2)
+        if bonds
+        else np.zeros((0, 2), dtype=np.uint32)
+    )
+    return mol
+
+
+def _parse_frcmod(tmp_path, text=_DIRTY_FRCMOD):
+    from parmed.amber import AmberParameterSet
+
+    fp = tmp_path / "in.frcmod"
+    fp.write_text(text)
+    return AmberParameterSet(str(fp))
+
+
+def _test_clean_frcmod_free_residue(tmp_path):
+    # ca-ca-ca-ca-... straight chain: c3(0)-c3(1)-ca(2)-ca(3)-hc(4).
+    mol = _typed_mol(
+        ["C", "C", "C", "C", "H"],
+        ["c3", "c3", "ca", "ca", "hc"],
+        [(0, 1), (1, 2), (2, 3), (3, 4)],
+    )
+    pset = _parse_frcmod(tmp_path)
+    _clean_frcmod_params(pset, mol, [], np.zeros(mol.numAtoms, dtype=bool))
+
+    # Only types the molecule actually carries survive.
+    assert set(pset.atom_types) == {"c3", "ca", "hc"}
+    # Realized bonds kept; unused-type and unrealized ones gone.
+    assert ("c3", "c3") in pset.bond_types
+    assert ("c3", "ca") in pset.bond_types
+    assert ("ca", "hc") in pset.bond_types
+    assert ("c3", "cc") not in pset.bond_types  # cc absent from mol
+    assert ("xx", "xx") not in pset.bond_types
+    assert ("N", "c3") not in pset.bond_types  # N absent from mol
+    # Realized angles/dihedrals only.
+    assert ("c3", "c3", "ca") in pset.angle_types
+    assert ("c3", "c3", "c3") not in pset.angle_types  # not realized
+    assert ("c3", "c3", "ca", "ca") in pset.dihedral_types
+    assert ("c3", "c3", "c3", "c3") not in pset.dihedral_types
+    # Impropers: kept if all types present, dropped otherwise.
+    assert ("ca", "ca", "ca", "ca") in pset.improper_periodic_types
+    assert ("xx", "xx", "xx", "xx") not in pset.improper_periodic_types
+    assert ("N", "CT", "c3", "cc") not in pset.improper_periodic_types
+
+    # Each kept dihedral key has no reversed-duplicate sibling.
+    for kind in ("bond_types", "angle_types", "dihedral_types"):
+        keys = list(getattr(pset, kind))
+        for k in keys:
+            assert tuple(reversed(k)) == k or tuple(reversed(k)) not in keys
+
+    # The result must still serialize as a valid frcmod.
+    from parmed.amber import AmberParameterSet
+
+    out = tmp_path / "out.frcmod"
+    pset.write(str(out), title="cleaned", style="frcmod")
+    AmberParameterSet(str(out))  # re-parse, must not raise
+
+
+def _test_clean_frcmod_backbone_terms_dropped(tmp_path):
+    # A chain-resident-NCAA-ish skeleton: N(0)-CT(1)-c3(2)-c3(3). N-CT is
+    # purely backbone (the protein FF provides it) and must go; N-CT-c3 /
+    # N-CT-c3-c3 span the backbone-sidechain boundary, are realized here, and
+    # must stay; N-c3 is not realized in this fragment but touches a backbone
+    # type, so it is kept conservatively (in the built system a proline-like
+    # NCAA does bond N to a sidechain c3, and that torsion is realized over a
+    # cap atom in the model compound).
+    mol = _typed_mol(
+        ["N", "C", "C", "C"],
+        ["N", "CT", "c3", "c3"],
+        [(0, 1), (1, 2), (2, 3)],
+    )
+    pset = _parse_frcmod(tmp_path)
+    backbone = ["N", "H", "CT", "H1", "C", "O"]
+    _clean_frcmod_params(pset, mol, backbone, np.zeros(mol.numAtoms, dtype=bool))
+
+    assert ("N", "CT") not in pset.bond_types  # all-backbone -> dropped
+    assert ("N", "c3") in pset.bond_types  # backbone-touching -> kept
+    assert ("N", "CT", "c3") in pset.angle_types  # realized, mixed -> kept
+    assert ("N", "CT", "c3", "c3") in pset.dihedral_types
+    assert ("c3", "c3", "c3") not in pset.angle_types  # not realized, no bb
+    assert ("c3", "c3", "c3", "c3") not in pset.dihedral_types
+    # Backbone atom types themselves stay (referenced by mixed terms / atoms);
+    # types absent from the fragment and not backbone go.
+    assert "CT" in pset.atom_types and "N" in pset.atom_types and "c3" in pset.atom_types
+    assert "ca" not in pset.atom_types and "xx" not in pset.atom_types
+
+
+def _test_clean_frcmod_cap_atoms_excluded(tmp_path):
+    # cc sits only on a "cap"/padding atom -> every cc parameter must go.
+    mol = _typed_mol(
+        ["C", "C", "C"],
+        ["c3", "c3", "cc"],
+        [(0, 1), (1, 2)],
+    )
+    padding = np.array([False, False, True])
+    pset = _parse_frcmod(tmp_path)
+    _clean_frcmod_params(pset, mol, [], padding)
+
+    assert "cc" not in pset.atom_types
+    assert ("c3", "cc") not in pset.bond_types
+    assert ("c3", "c3") in pset.bond_types

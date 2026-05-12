@@ -489,6 +489,99 @@ def _add_cluster_junction_terms(pset, typed_mol, model, ff14sb_amino_lib):
         _splice_into(param_dict, instances, gaff2_types, is_canonical, ff14sb_types)
 
 
+def _clean_frcmod_params(pset, mol, backbone_types, padding_mask):
+    """Drop parameters from ``pset`` (a :class:`parmed.amber.AmberParameterSet`)
+    that the kept residues never use, mutating it in place:
+
+    - atom (MASS / NONBON) types absent from ``mol`` once ``padding_mask`` atoms
+      (cluster caps, neighbour stubs) are excluded;
+    - bond / angle / dihedral types referencing an absent type, built entirely
+      from ``backbone_types`` (the protein force field tLeap loads provides
+      those), or - for purely non-backbone terms - not realized by ``mol``'s
+      connectivity. Terms that touch a ``backbone_types`` entry are kept even
+      when not realized in ``mol`` itself: in cluster model compounds the chain
+      neighbours are ACE/NME-style caps, so a torsion that spans the
+      residue/neighbour boundary in the built system is realized over a cap
+      atom here and would otherwise be pruned.
+    - reversed-duplicate bond / angle / dihedral entries;
+    - improper types referencing only absent or backbone types.
+
+    Mirrors the cleanup the legacy noncanonical builder applied to its frcmod
+    files; without it parmchk2's full type-combination dump (caps included) is
+    carried into every per-residue frcmod.
+    """
+    backbone_types = list(backbone_types)
+    all_at = np.unique(mol.atomtype[~padding_mask]).tolist() + backbone_types
+    angles, dihedrals = calculateAnglesAndDihedrals(mol.bonds)
+    realized = {
+        "bond_types": mol.atomtype[mol.bonds].tolist(),
+        "angle_types": mol.atomtype[angles].tolist(),
+        "dihedral_types": mol.atomtype[dihedrals].tolist(),
+    }
+
+    for at in [t for t in pset.atom_types if t not in all_at]:
+        del pset.atom_types[at]
+
+    for param_t in ("bond_types", "angle_types", "dihedral_types"):
+        to_delete, seen = [], []
+        for bt in getattr(pset, param_t):
+            if (
+                not all(np.isin(bt, all_at))
+                or all(np.isin(bt, backbone_types))
+                or (
+                    not any(np.isin(bt, backbone_types))
+                    and list(bt) not in realized[param_t]
+                    and list(bt)[::-1] not in realized[param_t]
+                )
+                or list(bt)[::-1] in seen
+            ):
+                to_delete.append(bt)
+            seen.append(list(bt))
+        for bt in to_delete:
+            del pset.__dict__[param_t][bt]
+
+    for param_t in ("improper_types", "improper_periodic_types"):
+        to_delete = [
+            bt
+            for bt in getattr(pset, param_t)
+            if not all(np.isin(bt, all_at)) or all(np.isin(bt, backbone_types))
+        ]
+        for bt in to_delete:
+            del pset.__dict__[param_t][bt]
+
+
+def _retyped_cluster_mol(typed_mol, model, ff14sb_amino_lib, backbone_at):
+    """Return ``(retyped, cap_mask)`` where ``retyped`` is a copy of
+    ``typed_mol`` whose ``atomtype`` array matches the per-residue topology
+    files written by :func:`prepareClusterResidues` - canonical-anchor atoms
+    carry their ff14SB variant-template type, chain-resident NCAA backbone
+    atoms carry the ff14SB backbone type, everything else keeps antechamber's
+    GAFF2 type - and ``cap_mask`` flags the cluster-cap atoms (those not in
+    ``model.atom_to_residue``). This is the molecule :func:`_clean_frcmod_params`
+    needs so it keeps the junction / backbone-rename entries that reference
+    ff14SB types."""
+    retyped = typed_mol.copy()
+    cap_mask = np.zeros(retyped.numAtoms, dtype=bool)
+    canonical_template = {
+        cidx: _canonical_variant_template(model.spec, cidx, ff14sb_amino_lib)
+        for cidx in model.canonical_renames
+    }
+    for i, name in enumerate(typed_mol.name):
+        name = str(name)
+        cidx = model.atom_to_residue.get(name)
+        if cidx is None:
+            cap_mask[i] = True
+            continue
+        orig_name = model.atom_to_orig_name.get(name, name)
+        if cidx in model.canonical_renames:
+            t = canonical_template[cidx].get(orig_name)
+            if t is not None:
+                retyped.atomtype[i] = t
+        elif model.spec.is_chain_resident[cidx] and orig_name in backbone_at:
+            retyped.atomtype[i] = backbone_at[orig_name]
+    return retyped, cap_mask
+
+
 def prepareClusterResidues(
     typed_path, frcmod_path, model, outdir=None, use_pyodide=None
 ):
@@ -625,48 +718,43 @@ def prepareClusterResidues(
                 sub.write(topo_path)
                 out.topo_paths.append(topo_path)
 
-    # Copy the parmchk2 frcmod, then for canonical-anchored clusters add
+    # Load the parmchk2 frcmod, then for canonical-anchored clusters add
     # cross-FF junction terms (bond/angle/dihedral entries spanning a
     # canonical-residue atom and a non-canonical one, with the canonical-
     # side atom types rewritten from antechamber's GAFF2 to ff14SB so
     # tLeap can resolve them when the canonical residue is loaded with
-    # ff14SB types). Pure-NCAA clusters get the antechamber frcmod
-    # verbatim (no FF crossing).
+    # ff14SB types) and, for chain-resident NCAAs whose backbone we retyped,
+    # duplicate entries under the ff14SB backbone names. Finally prune the
+    # parameters none of the kept residues use (parmchk2 emits the full
+    # type-combination dump, caps included).
     #
-    # Write the merged frcmod under the basename of EACH per-residue CIF
-    # rather than a single shared name. amber.build's auto-handler for
-    # known NCAAs / cofactors / PTMs (``_detect_cofactors_ncaa_ptm``)
-    # checks ``param`` basenames against the bundled-resname registry to
-    # decide whether to layer in its own prepi - if a cluster residue's
-    # resname is in the registry (NLE, MSE, NAG via PTM, ...) but no
-    # ``<RESNAME>.frcmod`` is in ``param``, the auto-handler kicks in and
-    # collides with our cluster prepi. Naming the frcmod ``<RESNAME>.frcmod``
-    # for each cluster residue suppresses the auto-add.
-    needs_merged = bool(model.canonical_renames) or bool(backbone_type_renames)
-    if needs_merged:
-        pset = AmberParameterSet(frcmod_path)
-        if model.canonical_renames:
-            _add_cluster_junction_terms(pset, typed_mol, model, ff14sb_amino_lib)
-        if backbone_type_renames:
-            # Duplicate every frcmod entry that mentions an original
-            # GAFF2 backbone type under its ff14SB rename so torsions
-            # spanning the backbone-sidechain boundary still resolve
-            # at build time.
-            from htmd.builder.noncanonical import _duplicate_parameters
+    # Write the result under the basename of EACH per-residue CIF / prepi
+    # rather than a single shared name. amber.build's auto-handler for known
+    # NCAAs / cofactors / PTMs (``_detect_cofactors_ncaa_ptm``) checks
+    # ``param`` basenames against the bundled-resname registry to decide
+    # whether to layer in its own prepi - if a cluster residue's resname is
+    # in the registry (NLE, MSE, NAG via PTM, ...) but no ``<RESNAME>.frcmod``
+    # is in ``param``, the auto-handler kicks in and collides with our
+    # cluster prepi. Naming the frcmod ``<RESNAME>.frcmod`` for each cluster
+    # residue suppresses the auto-add.
+    pset = AmberParameterSet(frcmod_path)
+    if model.canonical_renames:
+        _add_cluster_junction_terms(pset, typed_mol, model, ff14sb_amino_lib)
+    if backbone_type_renames:
+        # Duplicate every frcmod entry that mentions an original GAFF2
+        # backbone type under its ff14SB rename so torsions spanning the
+        # backbone-sidechain boundary still resolve at build time.
+        from htmd.builder.noncanonical import _duplicate_parameters
 
-            _duplicate_parameters(
-                pset,
-                {orig: list(news) for orig, news in backbone_type_renames.items()},
-            )
-        canonical_frcmod = os.path.join(outdir, "_cluster_merged.frcmod")
-        pset.write(
-            canonical_frcmod,
-            title="cluster: scaffold + junction parameters",
-            style="frcmod",
+        _duplicate_parameters(
+            pset,
+            {orig: list(news) for orig, news in backbone_type_renames.items()},
         )
-        frcmod_source = canonical_frcmod
-    else:
-        frcmod_source = frcmod_path
+    retyped_mol, cap_mask = _retyped_cluster_mol(
+        typed_mol, model, ff14sb_amino_lib, backbone_at
+    )
+    _clean_frcmod_params(pset, retyped_mol, list(backbone_at.values()), cap_mask)
+
     seen_basenames = set()
     for cif_path in out.topo_paths:
         basename = os.path.splitext(os.path.basename(cif_path))[0]
@@ -674,8 +762,11 @@ def prepareClusterResidues(
             continue
         seen_basenames.add(basename)
         per_res_frcmod = os.path.join(outdir, f"{basename}.frcmod")
-        with open(frcmod_source) as fr, open(per_res_frcmod, "w") as fw:
-            fw.write(fr.read())
+        pset.write(
+            per_res_frcmod,
+            title=f"cluster parameters for {basename}",
+            style="frcmod",
+        )
         out.frcmod_paths.append(per_res_frcmod)
 
     # custombonds: one pair per cluster bond.
@@ -1244,8 +1335,15 @@ def parameterizeFromSpecs(
         out_frcmod = os.path.join(outdir, f"{g['resname']}.frcmod")
         typed_mol.resname[:] = g["resname"]
         typed_mol.write(out_cif)
-        with open(frcmod_path) as fr, open(out_frcmod, "w") as fw:
-            fw.write(fr.read())
+        # Free ligand: no peptide backbone and no caps, so prune purely
+        # against the residue's own atom types / connectivity.
+        pset = AmberParameterSet(frcmod_path)
+        _clean_frcmod_params(
+            pset, typed_mol, [], np.zeros(typed_mol.numAtoms, dtype=bool)
+        )
+        pset.write(
+            out_frcmod, title=f"parameters for {g['resname']}", style="frcmod"
+        )
         out.topo_paths.append(out_cif)
         out.frcmod_paths.append(out_frcmod)
 
