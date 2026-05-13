@@ -8,8 +8,7 @@ inter-residue bonds), builds a combined antechamber model compound per
 cluster (full residues + ACE/NME-style backbone caps), runs antechamber +
 parmchk2 once per cluster, and splits the output into per-residue
 CIF / frcmod pairs. Free residues (no cluster bonds) are parameterized
-standalone via :func:`htmd.builder.noncanonical.parameterizeNonCanonicalResidues`
-or :func:`htmd.builder.noncanonical._fftype_antechamber`.
+standalone via :func:`htmd.builder._ambertools._fftype_antechamber`.
 
 The result :class:`ClusterOutputs` carries the topology paths, frcmod
 paths, and ``custombonds`` list in the shape that
@@ -204,14 +203,13 @@ def _write_chain_residue_prepi(
 ):
     """Convert a single chain-resident residue (already typed and named)
     into an AMBER ``.prepi`` topology so tLeap can splice it into a
-    peptide chain. Mirrors :func:`htmd.builder.noncanonical._post_process_parameterize`'s
-    prepgen step: write mol2, run ``antechamber -fo ac`` to convert it
-    to AC format without re-typing, build a mainchain config, then run
+    peptide chain. Write mol2, run ``antechamber -fo ac`` to convert it to
+    AC format without re-typing, build a mainchain config, then run
     ``prepgen``. ``is_n_term`` / ``is_c_term`` omit the matching
     ``HEAD_NAME`` / ``TAIL_NAME`` lines so tLeap does not try to bond
     that side to a phantom neighbour."""
     import networkx as nx
-    from htmd.builder.noncanonical import (
+    from htmd.builder._ambertools import (
         _run_ambertools,
         _fix_prepi_atomname_capitalization,
         _write_pyodide_output,
@@ -744,7 +742,7 @@ def prepareClusterResidues(
         # Duplicate every frcmod entry that mentions an original GAFF2
         # backbone type under its ff14SB rename so torsions spanning the
         # backbone-sidechain boundary still resolve at build time.
-        from htmd.builder.noncanonical import _duplicate_parameters
+        from htmd.builder._ambertools import _duplicate_parameters
 
         _duplicate_parameters(
             pset,
@@ -1152,10 +1150,7 @@ def parameterizeFromSpecs(
         LigandSpec,
         CanonicalRenamedSpec,
     )
-    from htmd.builder.noncanonical import (
-        _fftype_antechamber,
-        parameterizeNonCanonicalResidues,
-    )
+    from htmd.builder._ambertools import _fftype_antechamber
 
     if use_pyodide is None:
         use_pyodide = _in_pyodide()
@@ -1273,7 +1268,6 @@ def parameterizeFromSpecs(
         typed_mol, typed_path, frcmod_path = _fftype_antechamber(
             cluster_mol,
             tmpdir=cluster_outdir,
-            method="gaff2",
             netcharge=netcharge,
             charge_method=charge_method,
             use_pyodide=use_pyodide,
@@ -1326,7 +1320,6 @@ def parameterizeFromSpecs(
         typed_mol, _, frcmod_path = _fftype_antechamber(
             sub,
             tmpdir=ligand_dir,
-            method="gaff2",
             netcharge=netcharge,
             charge_method=charge_method,
             use_pyodide=use_pyodide,
