@@ -40,7 +40,9 @@ import numpy as np
 from parmed.amber import AmberParameterSet
 
 from moleculekit.molecule import Molecule, UniqueAtomID, UniqueResidueID
-from moleculekit.tools._anchor_variants import ANCHOR_VARIANTS  # noqa: F401  (re-exported)
+from moleculekit.tools._anchor_variants import (
+    ANCHOR_VARIANTS,
+)  # noqa: F401  (re-exported)
 from moleculekit.util import calculateAnglesAndDihedrals
 
 logger = logging.getLogger(__name__)
@@ -188,6 +190,32 @@ class ClusterOutputs:
     frcmod_paths: list = field(default_factory=list)
     # Custombonds to feed via ``custombonds=``. One pair per cluster bond.
     custombonds: list = field(default_factory=list)
+    # Path to a single OpenMM ForceField XML covering every residue and
+    # parameter the run produced. Drop it into
+    # ``openmm.app.ForceField(*defaultFf(), xml_path)`` alongside ff14SB
+    # and tip3p; the peptide bonds resolve through ff14SB (NCAA backbones
+    # are renamed to ff14SB classes) and the GAFF2 sidechain / junction
+    # terms come from this file.
+    xml_path: Optional[str] = None
+
+
+@dataclass
+class _ResidueTemplateData:
+    """Per-residue OpenMM ``<Residue>`` template input collected as the
+    cluster / free-residue pipeline writes per-residue topology files.
+
+    ``mol`` is the typed-mol slice for this residue (atom name / atom
+    type / partial charge / element / intra-residue bonds).
+    ``external_bond_atom_names`` lists every atom that should appear as
+    an ``<ExternalBond>`` in the emitted template: the N- and C-side
+    peptide neighbours for chain-resident NCAAs (skipped on the matching
+    side for terminal residues) plus every cluster-bond atom (anchor SG,
+    scaffold C, crosslink CG, ...). Deduplication by ``resname`` happens
+    at emit time."""
+
+    resname: str
+    mol: Molecule
+    external_bond_atom_names: list = field(default_factory=list)
 
 
 def _in_pyodide():
@@ -236,10 +264,24 @@ def _write_chain_residue_prepi(
             "antechamber",
             [
                 "antechamber",
-                "-i", mol2_name, "-fi", "mol2",
-                "-o", ac_name, "-fo", "ac",
-                "-nc", str(int(round(float(np.sum(sub.formalcharge))))),
-                "-pf", "y", "-dr", "n", "-j", "0", "-an", "n",
+                "-i",
+                mol2_name,
+                "-fi",
+                "mol2",
+                "-o",
+                ac_name,
+                "-fo",
+                "ac",
+                "-nc",
+                str(int(round(float(np.sum(sub.formalcharge))))),
+                "-pf",
+                "y",
+                "-dr",
+                "n",
+                "-j",
+                "0",
+                "-an",
+                "n",
             ],
             cwd=tmpdir,
             use_pyodide=use_pyodide,
@@ -278,10 +320,16 @@ def _write_chain_residue_prepi(
             "prepgen",
             [
                 "prepgen",
-                "-i", ac_name,
-                "-o", prepi_name, "-f", "prepi",
-                "-m", mc_name,
-                "-rn", resname,
+                "-i",
+                ac_name,
+                "-o",
+                prepi_name,
+                "-f",
+                "prepi",
+                "-m",
+                mc_name,
+                "-rn",
+                resname,
             ],
             cwd=tmpdir,
             use_pyodide=use_pyodide,
@@ -312,7 +360,6 @@ def _atom_sel_for_unique(uaid):
         parts.append(f'insertion "{uaid.insertion}"')
     parts.append(f'name "{uaid.name}"')
     return " and ".join(parts)
-
 
 
 # Cached ff14SB amino-acid lib (atom name -> (type, default charge) per resname).
@@ -364,7 +411,6 @@ def _load_ff14sb_amino_lib():
     return _FF14SB_AMINO_LIB
 
 
-
 def _canonical_variant_template(spec, cidx, ff14sb_amino_lib):
     """Pick the ff14SB atom-name -> type map to use for canonical residue
     ``cidx`` of ``spec``. Looks up the residue's original resname (carried
@@ -384,9 +430,7 @@ def _canonical_variant_template(spec, cidx, ff14sb_amino_lib):
         else ""
     )
     terminus = (
-        spec.canonical_terminus[cidx]
-        if cidx < len(spec.canonical_terminus)
-        else ""
+        spec.canonical_terminus[cidx] if cidx < len(spec.canonical_terminus) else ""
     )
     variant_resname = None
     for bond in spec.bonds:
@@ -580,8 +624,107 @@ def _retyped_cluster_mol(typed_mol, model, ff14sb_amino_lib, backbone_at):
     return retyped, cap_mask
 
 
+# OpenMM's amber14/protein.ff14SB.xml declares ff14SB AMBER atom classes
+# under type names of the form ``protein-<class>`` (e.g. ``protein-N``,
+# ``protein-CT``, ``protein-S``). Our cluster pipeline renames NCAA
+# backbone atoms and canonical-anchor atoms to those AMBER classes
+# (``N``, ``CT``, ``S``, ...), but OpenMM's ``ForceField`` resolves
+# ``<Atom type="X">`` via the ``<Type name=...>`` lookup, not by class.
+# Rewriting the type strings to ``protein-<class>`` at XML-emit time
+# lets OpenMM find the ff14SB ``<Type>`` entries directly so the
+# residue templates load cleanly. GAFF2 sidechain types stay as-is.
+_FF14SB_OMM_TYPE_PREFIX = "protein-"
+
+
+def _emit_openmm_xml(residue_templates, parameter_sets, xml_path):
+    """Combine cluster + free-residue outputs into one OpenMM ForceField XML.
+
+    Walks every cluster's :class:`AmberParameterSet` (post junction-term
+    injection, post backbone-rename duplication, post
+    :func:`_clean_frcmod_params`) and unions the bond / angle / dihedral /
+    improper / atom-type entries by class tuple. GAFF2 derivations are
+    deterministic per type tuple, so collisions across clusters carry the
+    same value and last-write-wins is safe. Then builds one parmed
+    :class:`ResidueTemplate` per unique resname from the per-residue
+    typed Molecule slices and writes the merged set as a single OpenMM
+    XML.
+
+    The result is a self-contained ``<ForceField>`` document loadable
+    via ``openmm.app.ForceField(*defaultFf(), xml_path)``. Peptide bonds
+    resolve through ff14SB (NCAA backbones are renamed to ff14SB classes
+    upstream); GAFF2 sidechain parameters and cross-FF junction terms
+    come from this file. Per-atom charges live in the residue templates
+    so two instances of the same resname could in principle carry
+    different antechamber charges, but :func:`parameterizeFromSpecs`
+    deduplicates by ``(resname, is_n_term, is_c_term)`` upstream, so the
+    first template wins.
+    """
+    from parmed.amber import AmberParameterSet
+    from parmed.modeller import ResidueTemplate
+    from parmed.openmm import OpenMMParameterSet
+    from parmed import Atom as PmdAtom
+
+    merged = AmberParameterSet()
+    for pset in parameter_sets:
+        merged.atom_types.update(pset.atom_types)
+        merged.bond_types.update(pset.bond_types)
+        merged.angle_types.update(pset.angle_types)
+        merged.dihedral_types.update(pset.dihedral_types)
+        merged.improper_types.update(pset.improper_types)
+        merged.improper_periodic_types.update(pset.improper_periodic_types)
+
+    # Set of AMBER atom-type names ff14SB owns: every type any residue in
+    # the ff14SB amino libraries (mid-chain + N/C-terminal variants) uses.
+    # An atomtype string in our cluster output that belongs to this set is
+    # an ff14SB type (backbone rename or canonical-anchor template) and
+    # has to be rewritten to ``protein-<class>`` so OpenMM finds the
+    # corresponding ``<Type>`` declaration via the ff14SB XML.
+    ff14sb_lib = _load_ff14sb_amino_lib()
+    ff14sb_classes = set()
+    for resname_atoms in ff14sb_lib.values():
+        ff14sb_classes.update(resname_atoms.values())
+
+    omm = OpenMMParameterSet.from_parameterset(merged, remediate_residues=False)
+
+    seen_resnames = set()
+    for rtd in residue_templates:
+        if rtd.resname in seen_resnames:
+            continue
+        seen_resnames.add(rtd.resname)
+        template = ResidueTemplate(name=rtd.resname)
+        sub = rtd.mol
+        name_to_atom = {}
+        for i in range(sub.numAtoms):
+            atomtype = str(sub.atomtype[i])
+            if atomtype in ff14sb_classes:
+                atomtype = f"{_FF14SB_OMM_TYPE_PREFIX}{atomtype}"
+            atom = PmdAtom(
+                name=str(sub.name[i]), type=atomtype, charge=float(sub.charge[i])
+            )
+            template.add_atom(atom)
+            name_to_atom[atom.name] = atom
+        for a, b in sub.bonds:
+            template.add_bond(int(a), int(b))
+        for ext_name in rtd.external_bond_atom_names:
+            atom = name_to_atom.get(ext_name)
+            if atom is not None:
+                template.connections.append(atom)
+        omm.residues[rtd.resname] = template
+
+    omm.write(
+        xml_path,
+        provenance={"Source": ["htmd parameterizeFromSpecs"]},
+    )
+
+
 def prepareClusterResidues(
-    typed_path, frcmod_path, model, outdir=None, use_pyodide=None
+    typed_path,
+    frcmod_path,
+    model,
+    outdir=None,
+    use_pyodide=None,
+    residue_templates=None,
+    parameter_sets=None,
 ):
     """Split antechamber output for a cluster model compound into per-
     residue topology files and emit the matching custombonds list.
@@ -608,6 +751,14 @@ def prepareClusterResidues(
     outdir : str or None
         Output directory; created if missing. If ``None``, a fresh tempdir
         is used.
+    residue_templates : list or None
+        If provided, every per-residue typed-mol slice this function
+        writes is appended as a :class:`_ResidueTemplateData` for the
+        downstream OpenMM XML emitter.
+    parameter_sets : list or None
+        If provided, the cluster's final :class:`AmberParameterSet`
+        (post junction-term injection and backbone-rename duplication,
+        pre clean-up) is appended for the downstream XML emitter.
 
     Returns
     -------
@@ -656,9 +807,7 @@ def prepareClusterResidues(
             continue
         atom_idxs = np.asarray(per_residue_atom_idxs[cidx], dtype=np.int64)
         sub = typed_mol.copy(sel=atom_idxs)
-        new_names = [
-            model.atom_to_orig_name[str(typed_mol.name[i])] for i in atom_idxs
-        ]
+        new_names = [model.atom_to_orig_name[str(typed_mol.name[i])] for i in atom_idxs]
         sub.name[:] = new_names
 
         if cidx in model.canonical_renames:
@@ -698,6 +847,7 @@ def prepareClusterResidues(
         # atoms) so tLeap can stitch them into their flanking residues
         # via standard peptide bonds. Free / scaffold residues are
         # written as CIF and converted to mol2 internally by amber.build.
+        wrote_topo = False
         if model.spec.is_chain_resident[cidx]:
             topo_path = os.path.join(outdir, f"{new_resname}.prepi")
             if not os.path.isfile(topo_path):
@@ -710,11 +860,43 @@ def prepareClusterResidues(
                     use_pyodide=use_pyodide,
                 )
                 out.topo_paths.append(topo_path)
+                wrote_topo = True
         else:
             topo_path = os.path.join(outdir, f"{new_resname}.cif")
             if not os.path.isfile(topo_path):
                 sub.write(topo_path)
                 out.topo_paths.append(topo_path)
+                wrote_topo = True
+
+        # Collect a parallel _ResidueTemplateData for the OpenMM XML
+        # emitter. ``sub`` carries the antechamber per-atom charges plus
+        # the right atom types (ff14SB on the backbone / canonical
+        # anchor template; GAFF2 on the sidechain).
+        if residue_templates is not None and wrote_topo:
+            ext_atoms = []
+            if model.spec.is_chain_resident[cidx]:
+                if not model.spec.is_n_term[cidx]:
+                    ext_atoms.append("N")
+                if not model.spec.is_c_term[cidx]:
+                    ext_atoms.append("C")
+            for cb in model.spec.bonds:
+                for atom_id in (cb.atom_a, cb.atom_b):
+                    if (
+                        str(atom_id.segid) == str(residue_id.segid)
+                        and str(atom_id.chain) == str(residue_id.chain)
+                        and int(atom_id.resid) == int(residue_id.resid)
+                        and str(atom_id.insertion) == str(residue_id.insertion)
+                    ):
+                        name = str(atom_id.name)
+                        if name not in ext_atoms:
+                            ext_atoms.append(name)
+            residue_templates.append(
+                _ResidueTemplateData(
+                    resname=new_resname,
+                    mol=sub.copy(),
+                    external_bond_atom_names=ext_atoms,
+                )
+            )
 
     # Load the parmchk2 frcmod, then for canonical-anchored clusters add
     # cross-FF junction terms (bond/angle/dihedral entries spanning a
@@ -752,6 +934,9 @@ def prepareClusterResidues(
         typed_mol, model, ff14sb_amino_lib, backbone_at
     )
     _clean_frcmod_params(pset, retyped_mol, list(backbone_at.values()), cap_mask)
+
+    if parameter_sets is not None:
+        parameter_sets.append(copy.deepcopy(pset))
 
     seen_basenames = set()
     for cif_path in out.topo_paths:
@@ -804,14 +989,19 @@ def _spec_residue_key(uid):
     return (str(uid.segid), str(uid.chain), int(uid.resid), str(uid.insertion))
 
 
-def _build_internal_cluster_spec(member_indices, cluster_bonds, mol, groups, spec_by_res_idx):
+def _build_internal_cluster_spec(
+    member_indices, cluster_bonds, mol, groups, spec_by_res_idx
+):
     """Construct a ClusterSpec for the cluster pipeline from the per-residue
     specs that fall inside one connected component of non-peptide bonds.
     A singleton component containing just one chain-resident NCAA is also
     valid - it gets its own 1-residue cluster with peptide-neighbour caps
     drawn from the live mol."""
     from moleculekit.tools.nonstandard_residues import (
-        NCAASpec, CrosslinkedNCAASpec, ScaffoldSpec, CovalentLigandSpec,
+        NCAASpec,
+        CrosslinkedNCAASpec,
+        ScaffoldSpec,
+        CovalentLigandSpec,
         CanonicalRenamedSpec,
     )
 
@@ -851,9 +1041,7 @@ def _build_internal_cluster_spec(member_indices, cluster_bonds, mol, groups, spe
             # the residue effectively mid-chain at build time and the
             # mid-chain ff14SB template (CYX, NLN, ...) is the right
             # match instead of the terminal variant (CCYX, NCYX, ...).
-            res_atoms = set(
-                str(n) for n in mol.name[groups[r_idx]["atom_idx"]]
-            )
+            res_atoms = set(str(n) for n in mol.name[groups[r_idx]["atom_idx"]])
             n_term_eff = spec.is_n_term and bool({"H1", "H2", "H3"} & res_atoms)
             c_term_eff = spec.is_c_term and "OXT" in res_atoms
             canonical_terminus.append(
@@ -956,8 +1144,20 @@ def _write_free_residue_cif(mol, group, out_path):
 # check below. Anything not listed (metals, etc.) contributes no expected
 # hydrogens and never trips the check on its own.
 _TYPICAL_VALENCE = {
-    "H": 1, "B": 3, "C": 4, "N": 3, "O": 2, "F": 1, "SI": 4, "P": 3,
-    "S": 2, "CL": 1, "AS": 3, "SE": 2, "BR": 1, "I": 1,
+    "H": 1,
+    "B": 3,
+    "C": 4,
+    "N": 3,
+    "O": 2,
+    "F": 1,
+    "SI": 4,
+    "P": 3,
+    "S": 2,
+    "CL": 1,
+    "AS": 3,
+    "SE": 2,
+    "BR": 1,
+    "I": 1,
 }
 
 # Fraction of the all-single-bonds hydrogen count a residue must reach to be
@@ -1232,6 +1432,13 @@ def parameterizeFromSpecs(
             in_cluster_set.add(r_idx)
 
     out = ClusterOutputs()
+    # Accumulators for the OpenMM XML emitter: one entry per per-residue
+    # topology file written (resname / typed mol slice / external-bond atom
+    # names), one entry per cluster / free-residue AmberParameterSet. The
+    # XML emitter dedupes templates by resname and parameter entries by class
+    # tuple, so accumulating raw entries here is fine.
+    residue_templates = []
+    parameter_sets = []
 
     # Singleton NCAA clusters (one chain-resident NCAA, no cluster bonds)
     # that share resname + terminal flags are chemically identical model
@@ -1279,6 +1486,8 @@ def parameterizeFromSpecs(
             cluster_model,
             outdir=cluster_outdir,
             use_pyodide=use_pyodide,
+            residue_templates=residue_templates,
+            parameter_sets=parameter_sets,
         )
         out.topo_paths.extend(cluster_out.topo_paths)
         out.frcmod_paths.extend(cluster_out.frcmod_paths)
@@ -1334,11 +1543,23 @@ def parameterizeFromSpecs(
         _clean_frcmod_params(
             pset, typed_mol, [], np.zeros(typed_mol.numAtoms, dtype=bool)
         )
-        pset.write(
-            out_frcmod, title=f"parameters for {g['resname']}", style="frcmod"
-        )
+        pset.write(out_frcmod, title=f"parameters for {g['resname']}", style="frcmod")
         out.topo_paths.append(out_cif)
         out.frcmod_paths.append(out_frcmod)
+        # Free residues have no peptide / cluster external bonds.
+        residue_templates.append(
+            _ResidueTemplateData(
+                resname=g["resname"],
+                mol=typed_mol.copy(),
+                external_bond_atom_names=[],
+            )
+        )
+        parameter_sets.append(copy.deepcopy(pset))
+
+    if residue_templates:
+        xml_path = os.path.join(outdir, "parameters.xml")
+        _emit_openmm_xml(residue_templates, parameter_sets, xml_path)
+        out.xml_path = xml_path
 
     return out
 
@@ -1565,12 +1786,8 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
                 new_bondtypes.append("1")
                 existing.add(key)
     if new_bonds:
-        model.bonds = np.vstack(
-            [model.bonds, np.asarray(new_bonds, dtype=np.uint32)]
-        )
-        model.bondtype = np.hstack(
-            [model.bondtype, np.asarray(new_bondtypes)]
-        )
+        model.bonds = np.vstack([model.bonds, np.asarray(new_bonds, dtype=np.uint32)])
+        model.bondtype = np.hstack([model.bondtype, np.asarray(new_bondtypes)])
 
     role_per_pos = []
     cluster_residue_per_pos = []
@@ -1595,8 +1812,16 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
     for bi, (a, b) in enumerate(model.bonds):
         a, b = int(a), int(b)
         if role_per_pos[a] == "cap" and role_per_pos[b] == "cap":
-            allowed = {("C", "O"), ("O", "C"), ("C", "CH3"), ("CH3", "C"),
-                       ("N", "H"), ("H", "N"), ("N", "CH3"), ("CH3", "N")}
+            allowed = {
+                ("C", "O"),
+                ("O", "C"),
+                ("C", "CH3"),
+                ("CH3", "C"),
+                ("N", "H"),
+                ("H", "N"),
+                ("N", "CH3"),
+                ("CH3", "N"),
+            }
             if (cap_role_per_pos[a], cap_role_per_pos[b]) not in allowed:
                 continue
         keep_bonds.append([a, b])
@@ -1673,7 +1898,8 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
         ch3_pos = model.coords[i, :, model.frame].copy()
         neighbour_idx = next(
             (
-                int(nb) for nb in model.getNeighbors(i)
+                int(nb)
+                for nb in model.getNeighbors(i)
                 if str(model.element[int(nb)]) != "H"
             ),
             None,
@@ -1737,15 +1963,11 @@ def buildClusterModel(mol, spec, outdir):
     chain neighbours, written as a CIF ready to feed to antechamber."""
     os.makedirs(outdir, exist_ok=True)
     nc_resnames = "_".join(
-        sorted(
-            r.resname
-            for r, c in zip(spec.residues, spec.is_canonical)
-            if not c
-        )
+        sorted(r.resname for r, c in zip(spec.residues, spec.is_canonical) if not c)
     )
     cif_path = os.path.join(outdir, f"cluster_{spec.subtype}_{nc_resnames}.cif")
-    model, atom_map, atom_to_residue, atom_to_orig_name = (
-        _build_cluster_model_accurate(mol, spec, cif_path)
+    model, atom_map, atom_to_residue, atom_to_orig_name = _build_cluster_model_accurate(
+        mol, spec, cif_path
     )
     canonical_renames = {
         cidx: spec.residues[cidx].resname
@@ -1760,5 +1982,3 @@ def buildClusterModel(mol, spec, outdir):
         atom_to_orig_name=atom_to_orig_name,
         canonical_renames=canonical_renames,
     )
-
-

@@ -497,6 +497,76 @@ def _test_full_pipeline_5vbl(tmp_path):
     _check_no_overvalent_atoms(built)
 
 
+try:
+    import openmm  # noqa: F401
+
+    _openmm = True
+except ImportError:
+    _openmm = False
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _openmm),
+    reason="OpenMM XML test needs antechamber + openmm",
+)
+def _test_parameterize_from_specs_emits_openmm_xml(tmp_path):
+    """parameterizeFromSpecs should also emit a single OpenMM ForceField
+    XML covering every residue in the run. Loading it alongside ff14SB
+    must produce a ForceField whose residue templates include every
+    NCAA / free ligand we parameterized."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
+    from moleculekit.tools.preparation import systemPrepare
+    import openmm.app as app
+
+    mol = Molecule(VBL_PDB)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    specs = detectNonStandardResidues(mol)
+    smiles = {
+        "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
+        "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "NLE": "CCCC[C@@H](C=O)N",
+        "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
+        "OLC": "CCCCCCCC(O)OC[C@H](O)CO",
+    }
+    for resname, smi in smiles.items():
+        if (mol.resname == resname).any():
+            mol.templateResidueFromSmiles(
+                f'resname "{resname}"', smi, addHs=True, _logger=False
+            )
+    pmol = systemPrepare(
+        mol,
+        outdir=str(tmp_path / "prep"),
+        ignore_ns=False,
+        detect_specs=specs,
+    )
+    out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
+
+    assert out.xml_path is not None
+    assert os.path.isfile(out.xml_path)
+    assert os.path.getsize(out.xml_path) > 0
+
+    ff = app.ForceField(
+        "amber14/protein.ff14SB.xml",
+        "amber14/tip3p.xml",
+        out.xml_path,
+    )
+
+    # Each per-residue topo file should correspond to a residue template
+    # in the loaded ForceField - check the resnames match.
+    expected_resnames = {
+        os.path.splitext(os.path.basename(p))[0] for p in out.topo_paths
+    }
+    loaded_resnames = set(ff._templates)
+    missing = expected_resnames - loaded_resnames
+    assert not missing, (
+        f"Residue templates missing from the loaded ForceField: {missing}. "
+        f"Loaded: {sorted(loaded_resnames & expected_resnames)}"
+    )
+
+
 @pytest.mark.skipif(
     not (_antechamber and _tleap),
     reason="end-to-end build needs antechamber + teLeap",
