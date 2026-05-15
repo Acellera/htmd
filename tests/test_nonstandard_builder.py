@@ -506,6 +506,85 @@ except ImportError:
 
 
 @pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="OpenMM build comparison needs antechamber + teLeap + openmm",
+)
+def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
+    """5VBL: build the prepared mol twice, once via amber.build (tLeap
+    consuming the prepi/frcmod outputs) and once via openff.build (OpenMM
+    consuming the emitted ForceField XML), with solvation and ionization
+    off so the two systems should carry the same atoms. Compares numAtoms
+    and resname distributions to verify the XML emitter produces
+    something openff.build can actually consume."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+    from htmd.builder.openff import build as openff_build
+    from collections import Counter
+
+    mol = Molecule(VBL_PDB)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    specs = detectNonStandardResidues(mol)
+    smiles = {
+        "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
+        "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "NLE": "CCCC[C@@H](C=O)N",
+        "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
+        "OLC": "CCCCCCCC(O)OC[C@H](O)CO",
+    }
+    for resname, smi in smiles.items():
+        if (mol.resname == resname).any():
+            mol.templateResidueFromSmiles(
+                f'resname "{resname}"', smi, addHs=True, _logger=False
+            )
+    pmol = systemPrepare(
+        mol,
+        outdir=str(tmp_path / "prep"),
+        ignore_ns=False,
+        detect_specs=specs,
+    )
+    out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
+
+    # Same cap override as _test_full_pipeline_5vbl: the C-terminal NCAA
+    # (residue 200) carries its own OXT via the prepi/XML template, so an
+    # NME cap on top would clash. P0 is the inhibitor segment.
+    caps = {"P0": ("none", "none")}
+
+    amber_built = amber_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "amber"),
+        ionize=False,
+        custombonds=out.custombonds,
+        topo=out.topo_paths,
+        param=out.frcmod_paths,
+        caps=caps,
+    )
+    openmm_built, _ = openff_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "openmm"),
+        extra_xml=[out.xml_path],
+        ionize=False,
+        solvate=False,
+        caps=caps,
+    )
+
+    assert openmm_built.numAtoms == amber_built.numAtoms, (
+        f"OpenMM build has {openmm_built.numAtoms} atoms, "
+        f"amber build has {amber_built.numAtoms}"
+    )
+    amber_counts = Counter(amber_built.resname.tolist())
+    openmm_counts = Counter(openmm_built.resname.tolist())
+    assert amber_counts == openmm_counts, (
+        f"resname distributions differ.\n"
+        f"  amber only: {amber_counts - openmm_counts}\n"
+        f"  openmm only: {openmm_counts - amber_counts}"
+    )
+
+
+@pytest.mark.skipif(
     not (_antechamber and _openmm),
     reason="OpenMM XML test needs antechamber + openmm",
 )
