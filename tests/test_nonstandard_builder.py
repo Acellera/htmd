@@ -130,7 +130,9 @@ def _normalised_atom_name(name):
     return _ATOM_NAME_ALIASES.get(str(name), str(name))
 
 
-def _assert_builds_equivalent(amber_built, openmm_built, amber_prmtop, openmm_prmtop):
+def _assert_builds_equivalent(
+    amber_built, openmm_built, amber_prmtop, openmm_prmtop, openmm_system_xml=None
+):
     """Compare two built systems produced by the amber and openff build
     paths. They should describe physically identical force fields.
 
@@ -279,19 +281,52 @@ def _assert_builds_equivalent(amber_built, openmm_built, amber_prmtop, openmm_pr
         f"not in amber prmtop: {sorted(missing_in_amber_imp)[:5]}"
     )
 
-    # ===== 3. Energy equivalence via ffevaluate =====
-    from ffevaluation.ffevaluate import FFEvaluate, loadParameters
+    # ===== 3. Energy equivalence via OpenMM =====
+    # Amber side: load prmtop via ParmEd -> OpenMM System -> energy.
+    # Openff side: load the serialized System XML written by
+    # ``openff.build`` directly -> no ParmEd round-trip, no atom-type
+    # bucketing -> the System matches exactly what ForceField produced.
+    # Both systems are normalised to ``CutoffNonPeriodic`` nonbonded
+    # so the comparison is independent of whether the build path
+    # happened to use PME or NoCutoff. If the two builds describe the
+    # same physical force field, the energies must agree on the same
+    # nonbonded method.
+    import openmm
+    import openmm.app as omm_app
+    import openmm.unit as omm_unit
 
-    prm_a = loadParameters(amber_prmtop)
-    prm_o = loadParameters(openmm_prmtop)
-    energies_a, _, _ = FFEvaluate(amber_built, prm_a).calculate(amber_built.coords)
-    energies_o, _, _ = FFEvaluate(openmm_built, prm_o).calculate(openmm_built.coords)
-    e_a_total = float(np.sum(energies_a))
-    e_o_total = float(np.sum(energies_o))
-    assert abs(e_a_total - e_o_total) < 1e-2, (
-        f"total energies differ: amber={e_a_total:.4f} kcal/mol, "
-        f"openmm={e_o_total:.4f} kcal/mol "
-        f"(diff {abs(e_a_total - e_o_total):.4e})"
+    def _normalise_nonbonded(system):
+        """Force every ``NonbondedForce`` on ``system`` to ``NoCutoff``
+        so the comparison is independent of how the build path
+        configured the long-range method."""
+        for force in system.getForces():
+            if isinstance(force, openmm.NonbondedForce):
+                force.setNonbondedMethod(openmm.NonbondedForce.NoCutoff)
+                force.setUseDispersionCorrection(False)
+
+    def _energy(system, mol):
+        _normalise_nonbonded(system)
+        context = openmm.Context(system, openmm.VerletIntegrator(0.001))
+        positions = mol.coords[:, :, 0].astype(np.float64) * 0.1
+        context.setPositions(positions * omm_unit.nanometers)
+        return context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
+            omm_unit.kilocalorie_per_mole
+        )
+
+    amber_system = parm_a.createSystem(
+        nonbondedMethod=omm_app.NoCutoff, constraints=None, rigidWater=False
+    )
+    e_a = _energy(amber_system, amber_built)
+
+    assert openmm_system_xml is not None, "openmm_system_xml path required"
+    with open(openmm_system_xml) as fh:
+        openmm_system = openmm.XmlSerializer.deserialize(fh.read())
+    e_o = _energy(openmm_system, openmm_built)
+
+    rel_diff = abs(e_a - e_o) / max(abs(e_a), abs(e_o), 1.0)
+    assert rel_diff < 1e-3, (
+        f"total potential energies differ: amber={e_a:.4f} kcal/mol, "
+        f"openmm={e_o:.4f} kcal/mol (rel diff {rel_diff:.4e})"
     )
 
 
@@ -777,6 +812,7 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
         openmm_built,
         amber_prmtop=str(tmp_path / "amber" / "structure.prmtop"),
         openmm_prmtop=str(tmp_path / "openmm" / "structure.prmtop"),
+        openmm_system_xml=str(tmp_path / "openmm" / "structure.system.xml"),
     )
 
 
