@@ -30,9 +30,11 @@ import pytest
 from moleculekit.molecule import Molecule, UniqueAtomID
 from moleculekit.tools.nonstandard_residues import (
     detectNonStandardResidues,
-    CrosslinkedNCAASpec,
+    ChainResidueSpec,
     ScaffoldSpec,
-    CanonicalRenamedSpec,
+    CovalentLigandSpec,
+    LigandSpec,
+    PROTEIN_RESNAMES,
 )
 from htmd.builder.amber import _findTeLeap, _prepareMolecule
 from htmd.builder.nonstandard import (
@@ -97,8 +99,204 @@ def _check_no_overvalent_atoms(built):
     assert not bad, "over-valent atoms in built mol:\n" + "\n".join(bad)
 
 
+# Resnames that are equivalent across builders: amber.build emits the
+# AMBER protonation variant name; openff.build keeps the canonical PDB
+# resname. The two are the same residue topologically.
+_RESNAME_ALIASES = {
+    "HID": "HIS", "HIE": "HIS", "HIP": "HIS",
+    "CYX": "CYS", "CYM": "CYS",
+    "ASH": "ASP",
+    "GLH": "GLU",
+    "LYN": "LYS",
+    "TYM": "TYR",
+    "AR0": "ARG",
+    "WAT": "HOH", "TIP3": "HOH",
+}
+
+
+def _normalised_resname(name):
+    return _RESNAME_ALIASES.get(str(name), str(name))
+
+
+# N-terminal NH3+ first-hydrogen naming convention differs between
+# builders: amber.build emits ``H1`` / ``H2`` / ``H3``; openff.build
+# emits ``H`` / ``H2`` / ``H3``. Topologically identical.
+_ATOM_NAME_ALIASES = {
+    "H1": "H",
+}
+
+
+def _normalised_atom_name(name):
+    return _ATOM_NAME_ALIASES.get(str(name), str(name))
+
+
+def _assert_builds_equivalent(amber_built, openmm_built, amber_prmtop, openmm_prmtop):
+    """Compare two built systems produced by the amber and openff build
+    paths. They should describe physically identical force fields.
+
+    Three layers of check, increasing in strength:
+
+    1. Atom-level identity: same atom count, same resname distribution
+       (after aliasing AMBER protonation variants to canonical PDB
+       resnames), same (chain, resid, insertion, atom-name) identity
+       set. Catches gross topology differences.
+    2. Parameter set: load both prmtops as
+       :class:`parmed.amber.AmberParm` and compare their bonds /
+       angles / dihedrals **as parameterised topology** (atom-name
+       tuples + parameter values). Catches force-field-level diffs
+       that don't show up in plain bond enumeration.
+    3. Force-field energy via :class:`ffevaluation.ffevaluate.FFEvaluate`.
+       Both prmtops applied to their respective ``Molecule`` and the
+       total energies compared. The tightest physical check: if the
+       two systems compute the same energy on the same coordinates,
+       they are equivalent regardless of bookkeeping differences
+       (e.g. zero-force torsions that ParmEd drops vs tLeap retains).
+    """
+    import parmed
+
+    # ===== 1. Atom-level identity =====
+    assert openmm_built.numAtoms == amber_built.numAtoms, (
+        f"atom count differs: amber={amber_built.numAtoms}, "
+        f"openmm={openmm_built.numAtoms}"
+    )
+
+    amber_resn = Counter(_normalised_resname(r) for r in amber_built.resname)
+    openmm_resn = Counter(_normalised_resname(r) for r in openmm_built.resname)
+    assert amber_resn == openmm_resn, (
+        f"resname distributions differ (after alias normalisation).\n"
+        f"  amber only: {amber_resn - openmm_resn}\n"
+        f"  openmm only: {openmm_resn - amber_resn}"
+    )
+
+    def _atom_keys(mol):
+        return Counter(
+            (str(mol.chain[i]), int(mol.resid[i]), str(mol.insertion[i]), _normalised_atom_name(mol.name[i]))
+            for i in range(mol.numAtoms)
+        )
+
+    assert _atom_keys(amber_built) == _atom_keys(openmm_built), (
+        "per-atom identity (chain, resid, insertion, name) differs"
+    )
+
+    # ===== 2. ParmEd-level parameter set comparison =====
+    # Drop water H-H bonds before comparing: AMBER's TIP3P prmtop
+    # stores the SHAKE-constrained H-H as a bond, OpenMM's emitted
+    # prmtop does not. Both produce physically identical rigid water.
+    # Dihedrals: the OpenMM/ParmEd export drops zero-force terms (e.g.
+    # the wildcard PRO ring torsion ``"" CX N ""`` with k=0), so we
+    # check that ``openmm ⊆ amber`` rather than strict equality.
+    def _canonical(tup):
+        return min(tup, tup[::-1])
+
+    def _atom_label(parm_atom):
+        return (
+            str(parm_atom.residue.chain),
+            int(parm_atom.residue.number),
+            str(parm_atom.residue.insertion_code or ""),
+            _normalised_atom_name(parm_atom.name),
+        )
+
+    def _is_water(*atoms):
+        # AMBER's TIP3P prmtop stores water as O + 2H + the
+        # SHAKE-constrained H-H "bond"; OpenMM's emits O + 2H + an
+        # H-O-H angle. Same rigid water under the hood. Exclude
+        # all-water bond / angle / dihedral terms from the comparison
+        # so the topology-bookkeeping difference doesn't show up.
+        return all(a.residue.name in ("WAT", "HOH", "TIP3") for a in atoms)
+
+    parm_a = parmed.amber.AmberParm(amber_prmtop)
+    parm_o = parmed.amber.AmberParm(openmm_prmtop)
+
+    def _bond_keys(parm):
+        out = set()
+        for b in parm.bonds:
+            if _is_water(b.atom1, b.atom2):
+                continue
+            out.add(_canonical((_atom_label(b.atom1), _atom_label(b.atom2))))
+        return out
+
+    def _angle_keys(parm):
+        out = set()
+        for a in parm.angles:
+            if _is_water(a.atom1, a.atom2, a.atom3):
+                continue
+            out.add(_canonical((_atom_label(a.atom1), _atom_label(a.atom2), _atom_label(a.atom3))))
+        return out
+
+    def _dihedral_keys(parm, impropers=False):
+        out = set()
+        for d in parm.dihedrals:
+            if bool(d.improper) != impropers:
+                continue
+            if _is_water(d.atom1, d.atom2, d.atom3, d.atom4):
+                continue
+            labels = (
+                _atom_label(d.atom1), _atom_label(d.atom2),
+                _atom_label(d.atom3), _atom_label(d.atom4),
+            )
+            if impropers:
+                # AMBER convention: position 3 is the central atom for
+                # an improper; the other 3 are the substituents. Both
+                # AMBER and OpenMM follow this, but the substituent
+                # order varies. Canonicalise as
+                # ``(central, sorted(substituents))`` so the three
+                # representations of the same improper collapse.
+                central = labels[2]
+                others = tuple(sorted(labels[:2] + labels[3:]))
+                out.add((central,) + others)
+            else:
+                out.add(_canonical(labels))
+        return out
+
+    a_bonds, o_bonds = _bond_keys(parm_a), _bond_keys(parm_o)
+    assert a_bonds == o_bonds, (
+        f"prmtop bonds differ ({len(a_bonds ^ o_bonds)} symmetric diff)"
+    )
+
+    a_ang, o_ang = _angle_keys(parm_a), _angle_keys(parm_o)
+    assert a_ang == o_ang, (
+        f"prmtop angles differ ({len(a_ang ^ o_ang)} symmetric diff)"
+    )
+
+    # Proper dihedrals: loose check (openmm ⊆ amber). AMBER tLeap
+    # retains zero-force ring-closure torsions (e.g. PRO CA-N-CD-CG
+    # via the wildcard ``"" CX N ""`` term) that ParmEd omits from
+    # the OpenMM-exported prmtop. Those zero-k entries don't
+    # contribute to the potential.
+    a_prop, o_prop = _dihedral_keys(parm_a, impropers=False), _dihedral_keys(parm_o, impropers=False)
+    missing_in_amber = o_prop - a_prop
+    assert not missing_in_amber, (
+        f"openmm prmtop has {len(missing_in_amber)} proper dihedrals "
+        f"not in amber prmtop: {sorted(missing_in_amber)[:5]}"
+    )
+
+    # Impropers: similar loose check. Differences here come from how
+    # each builder enumerates planarity restraints for sp2 centres.
+    a_imp, o_imp = _dihedral_keys(parm_a, impropers=True), _dihedral_keys(parm_o, impropers=True)
+    missing_in_amber_imp = o_imp - a_imp
+    assert not missing_in_amber_imp, (
+        f"openmm prmtop has {len(missing_in_amber_imp)} impropers "
+        f"not in amber prmtop: {sorted(missing_in_amber_imp)[:5]}"
+    )
+
+    # ===== 3. Energy equivalence via ffevaluate =====
+    from ffevaluation.ffevaluate import FFEvaluate, loadParameters
+
+    prm_a = loadParameters(amber_prmtop)
+    prm_o = loadParameters(openmm_prmtop)
+    energies_a, _, _ = FFEvaluate(amber_built, prm_a).calculate(amber_built.coords)
+    energies_o, _, _ = FFEvaluate(openmm_built, prm_o).calculate(openmm_built.coords)
+    e_a_total = float(np.sum(energies_a))
+    e_o_total = float(np.sum(energies_o))
+    assert abs(e_a_total - e_o_total) < 1e-2, (
+        f"total energies differ: amber={e_a_total:.4f} kcal/mol, "
+        f"openmm={e_o_total:.4f} kcal/mol "
+        f"(diff {abs(e_a_total - e_o_total):.4e})"
+    )
+
+
 def _run_pipeline(
-    mol, smiles, tmp_path, build_kwargs=None, ignore_ns=True
+    mol, smiles, tmp_path, build_kwargs=None
 ):
     """Drive the full autoSegment -> detect -> template -> systemPrepare ->
     parameterize -> amber.build pipeline and return the built Molecule.
@@ -124,10 +322,8 @@ def _run_pipeline(
             mol.templateResidueFromSmiles(
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
-    pmol = systemPrepare(
+    pmol, _ = systemPrepare(
         mol,
-        outdir=str(tmp_path / "prep"),
-        ignore_ns=ignore_ns,
         detect_specs=specs,
     )
     out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
@@ -278,15 +474,15 @@ def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
 
     # 1. Detect (no canonical anchors here, so no mutation).
     specs = detectNonStandardResidues(mol)
-    assert sum(isinstance(s, CrosslinkedNCAASpec) for s in specs) == 2
-    assert sum(isinstance(s, CanonicalRenamedSpec) for s in specs) == 0
+    assert sum(isinstance(s, ChainResidueSpec) and s.resname not in PROTEIN_RESNAMES and s.anchor_atom is not None for s in specs) == 2
+    assert sum(isinstance(s, ChainResidueSpec) and s.resname in PROTEIN_RESNAMES for s in specs) == 0
 
     # 2. Template the two NCAAs from SMILES.
     mol.templateResidueFromSmiles("resname NLE", NLE_SMILES, addHs=True)
     mol.templateResidueFromSmiles("resname MK8", MK8_SMILES, addHs=True)
 
     # 3. systemPrepare (preserves bonds across PDB2PQR via bond-capture).
-    pmol = systemPrepare(mol, outdir=str(tmp_path / "prep"), ignore_ns=True)
+    pmol, _ = systemPrepare(mol, detect_specs=[])
 
     # 4. Parameterize.
     out = parameterizeFromSpecs(
@@ -372,7 +568,7 @@ def _test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
     # three CYS get distinct rename targets. HG drops where present.
     specs = detectNonStandardResidues(mol)
     scaffolds = [s for s in specs if isinstance(s, ScaffoldSpec)]
-    renames = [s for s in specs if isinstance(s, CanonicalRenamedSpec)]
+    renames = [s for s in specs if isinstance(s, ChainResidueSpec) and s.resname in PROTEIN_RESNAMES]
     assert len(scaffolds) == 1 and scaffolds[0].resname == "LFI"
     assert len(renames) == 3
     cys_rename_set = {r.new_resname for r in renames}
@@ -380,17 +576,15 @@ def _test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
         f"expected three distinct CYS rename targets, got {cys_rename_set}"
     )
     for cys_new in cys_rename_set:
-        assert len(cys_new) == 3 and cys_new.startswith("CY")
+        assert len(cys_new) == 3 and cys_new.startswith("XX")
 
     # 2. Template LFI from SMILES.
     mol.templateResidueFromSmiles("resname LFI", LFI_SMILES, addHs=True)
 
     # 3. systemPrepare runs PDB2PQR on the canonical naming, then applies
     # the rename + displaced-H drop from the spec list at the end.
-    pmol = systemPrepare(
+    pmol, _ = systemPrepare(
         mol,
-        outdir=str(tmp_path / "prep"),
-        ignore_ns=True,
         detect_specs=specs,
     )
 
@@ -409,16 +603,25 @@ def _test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
     assert any(str(t).islower() for t in lfi_mol.atomtype)
 
     # Junction frcmod must contain at least one cross-FF bond entry
-    # (ff14SB type on one side, GAFF2 on the other).
+    # for the backbone-sidechain boundary: backbone atoms (N, CA, C,
+    # O, H, HA) carry ff14SB types (``N``, ``CT``, ``C``, ``O``,
+    # ``H``, ``H1``); the sidechain (including SG) stays GAFF2
+    # (lowercase). The cluster pipeline must emit bond entries that
+    # bridge the two type families so tLeap can resolve the
+    # backbone-sidechain bonds.
     pset = AmberParameterSet(out.frcmod_paths[0])
-    canonical_types = {"S", "2C", "CT", "CX", "C", "N", "O", "H", "H1"}
+    ff14sb_backbone_types = {"N", "H", "CT", "H1", "C", "O"}
     cross_ff_bonds = [
         k for k in pset.bond_types
-        if any(t in canonical_types for t in k)
+        if any(t in ff14sb_backbone_types for t in k)
         and any(str(t).islower() for t in k)
     ]
     assert cross_ff_bonds, "junction frcmod missing cross-FF bond entries"
-    assert any("S" in k for k in cross_ff_bonds)
+    # The N-CA and CA-CB bonds in particular must span the FF boundary
+    # since CA is backbone (CT) and CB is sidechain (lowercase GAFF2).
+    assert any(
+        "CT" in k and any(str(t).islower() for t in k) for k in cross_ff_bonds
+    ), "expected at least one CT-<gaff2> bond from the CA-CB junction"
 
     # 5. Build. Both ends of the protein chain are real terminal
     # residues (the N-terminal CYS is bonded to LFI, the C-terminal
@@ -483,7 +686,7 @@ def _test_full_pipeline_5vbl(tmp_path):
     # Disable amber.build's auto-capping for the inhibitor segment - its
     # C-terminal NCAA (200) is parameterized with its own prepi (which
     # already includes the OXT atom), so an NME cap on top would clash.
-    # ``ignore_ns=False`` lets systemPrepare build a PDB2PQR template for
+    # ```` lets systemPrepare build a PDB2PQR template for
     # residue 200 from the spec, which stops PDB2PQR from C-terminal-capping
     # PRO 16 with a phantom OXT.
     built = _run_pipeline(
@@ -491,7 +694,6 @@ def _test_full_pipeline_5vbl(tmp_path):
         smiles,
         tmp_path,
         build_kwargs={"caps": {"P0": ("none", "none")}},
-        ignore_ns=False,
     )
     assert built is not None
     _check_no_overvalent_atoms(built)
@@ -540,10 +742,8 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
             mol.templateResidueFromSmiles(
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
-    pmol = systemPrepare(
+    pmol, _ = systemPrepare(
         mol,
-        outdir=str(tmp_path / "prep"),
-        ignore_ns=False,
         detect_specs=specs,
     )
     out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
@@ -566,21 +766,17 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
         pmol.copy(),
         outdir=str(tmp_path / "openmm"),
         extra_xml=[out.xml_path],
+        custombonds=out.custombonds,
         ionize=False,
         solvate=False,
         caps=caps,
     )
 
-    assert openmm_built.numAtoms == amber_built.numAtoms, (
-        f"OpenMM build has {openmm_built.numAtoms} atoms, "
-        f"amber build has {amber_built.numAtoms}"
-    )
-    amber_counts = Counter(amber_built.resname.tolist())
-    openmm_counts = Counter(openmm_built.resname.tolist())
-    assert amber_counts == openmm_counts, (
-        f"resname distributions differ.\n"
-        f"  amber only: {amber_counts - openmm_counts}\n"
-        f"  openmm only: {openmm_counts - amber_counts}"
+    _assert_builds_equivalent(
+        amber_built,
+        openmm_built,
+        amber_prmtop=str(tmp_path / "amber" / "structure.prmtop"),
+        openmm_prmtop=str(tmp_path / "openmm" / "structure.prmtop"),
     )
 
 
@@ -615,10 +811,8 @@ def _test_parameterize_from_specs_emits_openmm_xml(tmp_path):
             mol.templateResidueFromSmiles(
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
-    pmol = systemPrepare(
+    pmol, _ = systemPrepare(
         mol,
-        outdir=str(tmp_path / "prep"),
-        ignore_ns=False,
         detect_specs=specs,
     )
     out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
@@ -746,10 +940,8 @@ def _test_parameterize_from_specs_dedup_4tot(tmp_path):
             mol.templateResidueFromSmiles(
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
-    pmol = systemPrepare(
+    pmol, _ = systemPrepare(
         mol,
-        outdir=str(tmp_path / "prep"),
-        ignore_ns=True,
         detect_specs=specs,
     )
     out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))

@@ -136,7 +136,7 @@ def _test_with_protein_prepare(tmp_path, pid):
     np.random.seed(1)
     mol = Molecule(pid)
     mol.filter("protein")
-    mol = systemPrepare(mol, pH=7.0)
+    mol, _ = systemPrepare(mol, pH=7.0)
     mol.filter("protein")  # Fix for bad systemPrepare hydrogen placing
     mol = autoSegment(mol)
     smol = solvate(mol)
@@ -281,7 +281,7 @@ def _test_protein_rna(tmp_path):
     mol = Molecule("3WBM")
     mol.filter("not water")
     mol = autoSegment(mol, field="both")
-    pmol = systemPrepare(mol, pH=7.0)
+    pmol, _ = systemPrepare(mol, pH=7.0)
     smol = solvate(pmol)
 
     _ = build(smol, outdir=tmp_path)
@@ -298,7 +298,7 @@ def _test_caps(tmp_path):
     np.random.seed(1)
 
     mol = Molecule("6A5J")
-    pmol = systemPrepare(mol, pH=7.0)
+    pmol, _ = systemPrepare(mol, pH=7.0)
     smol = solvate(pmol)
 
     outdir = os.path.join(tmp_path, "out")
@@ -311,7 +311,7 @@ def _test_caps(tmp_path):
     np.random.seed(1)
 
     mol = Molecule("6A5J")
-    pmol = systemPrepare(mol, pH=7.0)
+    pmol, _ = systemPrepare(mol, pH=7.0)
     pmol.remove("(resid 1 13 and not backbone) or (resid 13 and name OXT)")
     smol = solvate(pmol)
 

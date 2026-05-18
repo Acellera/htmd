@@ -685,7 +685,7 @@ def _prepareMolecule(mol: Molecule, caps, disulfide, custombonds, remove):
     # hydrogens. No-op for endpoints that aren't canonical-residue anchors
     # (e.g. the scaffold side of a scaffolded-peptide bond).
     if custombonds is not None and len(custombonds):
-        from moleculekit.tools._anchor_variants import lookup_anchor_variant
+        from moleculekit.tools._anchor_variants import lookup_anchor
 
         torem = np.zeros(mol.numAtoms, dtype=bool)
         for a1, a2 in custombonds:
@@ -693,7 +693,7 @@ def _prepareMolecule(mol: Molecule, caps, disulfide, custombonds, remove):
                 idx = atom_id.selectAtom(mol)
                 resname = str(mol.resname[idx])
                 atom_name = str(mol.name[idx])
-                entry = lookup_anchor_variant(resname, atom_name)
+                entry = lookup_anchor(resname, atom_name)
                 if entry is None:
                     continue
                 # Mask of all atoms in this residue.
@@ -703,9 +703,9 @@ def _prepareMolecule(mol: Molecule, caps, disulfide, custombonds, remove):
                     & (mol.insertion == mol.insertion[idx])
                     & (mol.chain == mol.chain[idx])
                 )
-                if entry["variant"] is not None and resname != entry["variant"]:
-                    mol.resname[res_mask] = entry["variant"]
-                    atom_id.resname = entry["variant"]
+                if entry["ff_variant"] is not None and resname != entry["ff_variant"]:
+                    mol.resname[res_mask] = entry["ff_variant"]
+                    atom_id.resname = entry["ff_variant"]
                 for h_name in entry["drop_h"]:
                     torem |= res_mask & (mol.name == h_name)
         if np.any(torem):

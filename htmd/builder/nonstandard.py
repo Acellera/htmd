@@ -41,7 +41,7 @@ from parmed.amber import AmberParameterSet
 
 from moleculekit.molecule import Molecule, UniqueAtomID, UniqueResidueID
 from moleculekit.tools._anchor_variants import (
-    ANCHOR_VARIANTS,
+    ANCHOR_TABLE,
 )  # noqa: F401  (re-exported)
 from moleculekit.util import calculateAnglesAndDihedrals
 
@@ -95,7 +95,7 @@ class ClusterSpec:
     is_canonical: list  # list[bool]
     roles: list  # list[str]: "scaffold" | "covalent_ligand" | "stapled_ncaa" | "anchor"
     bonds: list  # list[ClusterBond]
-    canonical_original_resnames: list = field(default_factory=list)
+    canonical_resnames: list = field(default_factory=list)
     # Parallel to ``residues``: one of ``""`` (mid-chain or non-canonical),
     # ``"n"`` (N-terminal canonical anchor), or ``"c"`` (C-terminal). Drives
     # the AMBER terminal-template lookup (``CCYX`` / ``NCYX`` / ...) when
@@ -108,8 +108,8 @@ class ClusterSpec:
     is_c_term: list = field(default_factory=list)
 
     def __post_init__(self):
-        if not self.canonical_original_resnames:
-            self.canonical_original_resnames = ["" for _ in self.residues]
+        if not self.canonical_resnames:
+            self.canonical_resnames = ["" for _ in self.residues]
         if not self.canonical_terminus:
             self.canonical_terminus = ["" for _ in self.residues]
         if not self.is_n_term:
@@ -130,48 +130,6 @@ class ClusterModel:
     atom_to_residue: dict  # {final_atom_name: cluster_residue_index}
     atom_to_orig_name: dict  # {final_atom_name: original_pdb_atom_name}
     canonical_renames: dict  # {cluster_residue_index: new_resname}
-
-
-def _live_key(idxs, atom_types, is_stub, ff_types):
-    """Build the atom-type tuple a model-compound instance maps to in the
-    *live* AMBER system: scaffold atoms keep their GAFF2 types; stub atoms
-    are replaced by their canonical-FF type from ANCHOR_VARIANTS. Returns
-    ``None`` if any stub atom is missing a canonical-FF mapping."""
-    out = []
-    for i in idxs:
-        if is_stub[i]:
-            ff = ff_types[i]
-            if not ff:
-                return None
-            out.append(str(ff))
-        else:
-            out.append(str(atom_types[i]))
-    return tuple(out)
-
-
-def _splice_into(param_dict, instances, atom_types, is_stub, ff_types):
-    """For each instance (an array of atom indices) that spans stub+scaffold,
-    look up the parameter value at the GAFF2 key, derive the rewritten
-    canonical-FF key, and write the value (copied) under the new key.
-
-    ``param_dict`` is mutated in place. ``instances`` is an ``(N, k)``
-    integer array of atom indices (k=2 for bonds, 3 for angles, 4 for
-    dihedrals)."""
-    for idxs in instances:
-        roles = is_stub[idxs]
-        if not (roles.any() and (~roles).any()):
-            continue  # not a mixed junction instance
-        gaff_key = tuple(atom_types[idxs])
-        if gaff_key not in param_dict:
-            continue
-        new_key = _live_key(idxs, atom_types, is_stub, ff_types)
-        if new_key is None or new_key in param_dict:
-            continue
-        # parmed.write deduplicates types by id(); copy so the junction entry
-        # is written as a distinct line and not skipped as a "duplicate".
-        val_copy = copy.copy(param_dict[gaff_key])
-        param_dict[new_key] = val_copy
-        param_dict[new_key[::-1]] = val_copy
 
 
 @dataclass
@@ -411,126 +369,6 @@ def _load_ff14sb_amino_lib():
     return _FF14SB_AMINO_LIB
 
 
-def _canonical_variant_template(spec, cidx, ff14sb_amino_lib):
-    """Pick the ff14SB atom-name -> type map to use for canonical residue
-    ``cidx`` of ``spec``. Looks up the residue's original resname (carried
-    on ``spec.canonical_original_resnames``) plus the anchor atom name
-    found by walking ``spec.bonds`` against :data:`ANCHOR_VARIANTS` to
-    decide which deprotonated variant template applies (CYS+SG -> CYX,
-    ASN+ND2 -> NLN, ...). When the residue is at a chain terminus
-    (``spec.canonical_terminus[cidx]`` is ``"n"`` or ``"c"``) the
-    AMBER terminal variant (``NCYX`` / ``CCYX`` / ...) is preferred so
-    OXT and the extra N-terminal hydrogens get the right ff14SB types."""
-    from moleculekit.tools._anchor_variants import lookup_anchor_variant
-
-    residue_id = spec.residues[cidx]
-    original_resname = (
-        spec.canonical_original_resnames[cidx]
-        if cidx < len(spec.canonical_original_resnames)
-        else ""
-    )
-    terminus = (
-        spec.canonical_terminus[cidx] if cidx < len(spec.canonical_terminus) else ""
-    )
-    variant_resname = None
-    for bond in spec.bonds:
-        for atom_id in (bond.atom_a, bond.atom_b):
-            if (
-                atom_id.resname == residue_id.resname
-                and int(atom_id.resid) == int(residue_id.resid)
-                and atom_id.chain == residue_id.chain
-                and atom_id.segid == residue_id.segid
-            ):
-                entry = lookup_anchor_variant(
-                    original_resname or atom_id.resname, atom_id.name
-                )
-                if entry is not None and entry["variant"] is not None:
-                    variant_resname = entry["variant"]
-                    break
-        if variant_resname:
-            break
-
-    # Try terminal variants first when the residue is at a chain terminus.
-    candidates = []
-    if terminus == "n":
-        if variant_resname:
-            candidates.append("N" + variant_resname)
-        if original_resname:
-            candidates.append("N" + original_resname)
-    elif terminus == "c":
-        if variant_resname:
-            candidates.append("C" + variant_resname)
-        if original_resname:
-            candidates.append("C" + original_resname)
-    candidates.extend([variant_resname, original_resname, residue_id.resname])
-    for cand in candidates:
-        if cand and cand in ff14sb_amino_lib:
-            return ff14sb_amino_lib[cand]
-    return {}
-
-
-def _cluster_atom_arrays(typed_mol, model, ff14sb_amino_lib):
-    """Return ``(gaff2_types, is_canonical_residue, ff14sb_types)`` parallel
-    arrays over ``typed_mol`` atoms for cluster-mode junction-frcmod
-    rewriting. Cap atoms (not in ``model.atom_to_residue``) get
-    ``is_canonical=False`` and empty ``ff14sb_type``. Atoms in canonical
-    residues get ``is_canonical=True`` and their ff14SB type from the
-    variant template; atoms in non-canonical residues stay GAFF2-typed."""
-    spec = model.spec
-    n = typed_mol.numAtoms
-    gaff2_types = np.asarray(typed_mol.atomtype, dtype=object)
-    is_canonical = np.zeros(n, dtype=bool)
-    ff14sb_types = np.full(n, "", dtype=object)
-
-    canonical_template = {
-        cidx: _canonical_variant_template(spec, cidx, ff14sb_amino_lib)
-        for cidx in range(len(spec.residues))
-        if spec.is_canonical[cidx]
-    }
-
-    for i, name in enumerate(typed_mol.name):
-        cidx = model.atom_to_residue.get(str(name))
-        if cidx is None:
-            continue  # cap atom
-        if not spec.is_canonical[cidx]:
-            continue  # non-canonical residue
-        is_canonical[i] = True
-        # Map the model-compound atom name back to the original PDB atom name
-        # (via model.atom_to_orig_name) and look up its ff14SB type.
-        orig_name = model.atom_to_orig_name.get(str(name))
-        if orig_name is None:
-            continue
-        t = canonical_template[cidx].get(orig_name)
-        if t is not None:
-            ff14sb_types[i] = t
-
-    return gaff2_types, is_canonical, ff14sb_types
-
-
-def _add_cluster_junction_terms(pset, typed_mol, model, ff14sb_amino_lib):
-    """For every bond/angle/dihedral in ``typed_mol`` that spans both a
-    canonical-residue atom and a non-canonical one (or a cap atom),
-    rewrite the canonical-side atom types from antechamber GAFF2 to
-    ff14SB and add the rewritten entry to the frcmod's parameter dicts.
-
-    This is what makes tLeap able to resolve the canonical-side cluster
-    bonds (e.g. the ff14SB ``S`` atom type on CYX SG bonded to a GAFF2
-    ``c3`` carbon on the scaffold side)."""
-    gaff2_types, is_canonical, ff14sb_types = _cluster_atom_arrays(
-        typed_mol, model, ff14sb_amino_lib
-    )
-    angles, dihedrals = calculateAnglesAndDihedrals(typed_mol.bonds)
-    # Reuse the existing splice_into helper - it treats `is_stub` as
-    # "atom whose live-system type differs from its antechamber GAFF2
-    # type", which is exactly our `is_canonical` semantics here.
-    for param_dict, instances in (
-        (pset.bond_types, typed_mol.bonds),
-        (pset.angle_types, angles),
-        (pset.dihedral_types, dihedrals),
-    ):
-        _splice_into(param_dict, instances, gaff2_types, is_canonical, ff14sb_types)
-
-
 def _clean_frcmod_params(pset, mol, backbone_types, padding_mask):
     """Drop parameters from ``pset`` (a :class:`parmed.amber.AmberParameterSet`)
     that the kept residues never use, mutating it in place:
@@ -592,34 +430,34 @@ def _clean_frcmod_params(pset, mol, backbone_types, padding_mask):
             del pset.__dict__[param_t][bt]
 
 
-def _retyped_cluster_mol(typed_mol, model, ff14sb_amino_lib, backbone_at):
+def _retyped_cluster_mol(typed_mol, model, backbone_at):
     """Return ``(retyped, cap_mask)`` where ``retyped`` is a copy of
-    ``typed_mol`` whose ``atomtype`` array matches the per-residue topology
-    files written by :func:`prepareClusterResidues` - canonical-anchor atoms
-    carry their ff14SB variant-template type, chain-resident NCAA backbone
-    atoms carry the ff14SB backbone type, everything else keeps antechamber's
-    GAFF2 type - and ``cap_mask`` flags the cluster-cap atoms (those not in
-    ``model.atom_to_residue``). This is the molecule :func:`_clean_frcmod_params`
-    needs so it keeps the junction / backbone-rename entries that reference
-    ff14SB types."""
+    ``typed_mol`` whose ``atomtype`` array matches the per-residue
+    topology files written by :func:`prepareClusterResidues`: every
+    chain-resident residue's backbone atoms (N, CA, C, O, H, HA) carry
+    their ff14SB type, everything else (sidechain atoms, cap atoms,
+    free residues) keeps antechamber's GAFF2 type. ``cap_mask`` flags
+    the cluster-cap atoms (those not in ``model.atom_to_residue``).
+
+    No per-residue template lookup is needed: systemPrepare guarantees
+    canonical backbone atom names, so the mapping is a fixed dict.
+    Sidechain atoms intentionally keep GAFF2 types - the frcmod
+    duplication pass in :func:`_clean_frcmod_params` extends the
+    GAFF2-typed bond / angle / dihedral entries that span the
+    sidechain-backbone boundary so they resolve under the
+    backbone-rewritten ff14SB types too."""
     retyped = typed_mol.copy()
     cap_mask = np.zeros(retyped.numAtoms, dtype=bool)
-    canonical_template = {
-        cidx: _canonical_variant_template(model.spec, cidx, ff14sb_amino_lib)
-        for cidx in model.canonical_renames
-    }
     for i, name in enumerate(typed_mol.name):
         name = str(name)
         cidx = model.atom_to_residue.get(name)
         if cidx is None:
             cap_mask[i] = True
             continue
+        if not model.spec.is_chain_resident[cidx]:
+            continue
         orig_name = model.atom_to_orig_name.get(name, name)
-        if cidx in model.canonical_renames:
-            t = canonical_template[cidx].get(orig_name)
-            if t is not None:
-                retyped.atomtype[i] = t
-        elif model.spec.is_chain_resident[cidx] and orig_name in backbone_at:
+        if orig_name in backbone_at:
             retyped.atomtype[i] = backbone_at[orig_name]
     return retyped, cap_mask
 
@@ -783,12 +621,6 @@ def prepareClusterResidues(
             continue
         per_residue_atom_idxs.setdefault(cidx, []).append(i)
 
-    # Lazy-load the ff14SB amino lib only if we have canonical anchors that
-    # need ff14SB type rebuilding.
-    ff14sb_amino_lib = None
-    if model.canonical_renames:
-        ff14sb_amino_lib = _load_ff14sb_amino_lib()
-
     out = ClusterOutputs()
 
     # Backbone atom-type rename map applied to chain-resident NCAAs whose
@@ -811,32 +643,26 @@ def prepareClusterResidues(
         sub.name[:] = new_names
 
         if cidx in model.canonical_renames:
-            # Canonical anchor: pull ff14SB atom types from the matching
-            # variant template (CYX / NLN / ... or the N-/C-terminal
-            # variant). Charges stay as antechamber computed them on the
-            # combined model.
             new_resname = model.canonical_renames[cidx]
-            template_atoms = _canonical_variant_template(
-                model.spec, cidx, ff14sb_amino_lib
-            )
-            sub.atomtype[:] = [
-                template_atoms.get(n, str(sub.atomtype[i]))
-                for i, n in enumerate(new_names)
-            ]
-            sub.resname[:] = new_resname
         else:
             new_resname = residue_id.resname
-            sub.resname[:] = new_resname
-            # NCAA backbone: rewrite the standard backbone GAFF2 types
-            # to ff14SB so the peptide bonds at the chain neighbours
-            # type correctly in tLeap. Track each original GAFF2 type so
-            # we can duplicate the frcmod entries below.
-            if model.spec.is_chain_resident[cidx]:
-                for name, ff_type in backbone_at.items():
-                    sel = sub.name == name
-                    for orig in sub.atomtype[sel]:
-                        backbone_type_renames.setdefault(str(orig), set()).add(ff_type)
-                    sub.atomtype[sel] = ff_type
+        sub.resname[:] = new_resname
+        # Chain-resident backbones (canonical and non-canonical alike)
+        # must carry ff14SB atom types on N / CA / C / O / H / HA so
+        # the peptide bond at the chain neighbour resolves through the
+        # ff14SB tables. systemPrepare guarantees the backbone names,
+        # so a plain dict suffices - no canonical-template lookup, no
+        # sidechain retyping. Sidechain atoms keep antechamber's GAFF2
+        # types; the frcmod-duplication pass below extends bond /
+        # angle / dihedral entries that span the boundary so they
+        # resolve under both the original GAFF2 type and the
+        # backbone-rewritten ff14SB type.
+        if model.spec.is_chain_resident[cidx]:
+            for name, ff_type in backbone_at.items():
+                sel = sub.name == name
+                for orig in sub.atomtype[sel]:
+                    backbone_type_renames.setdefault(str(orig), set()).add(ff_type)
+                sub.atomtype[sel] = ff_type
 
         sub.resid[:] = 1
         sub.segid[:] = "A"
@@ -918,8 +744,6 @@ def prepareClusterResidues(
     # cluster prepi. Naming the frcmod ``<RESNAME>.frcmod`` for each cluster
     # residue suppresses the auto-add.
     pset = AmberParameterSet(frcmod_path)
-    if model.canonical_renames:
-        _add_cluster_junction_terms(pset, typed_mol, model, ff14sb_amino_lib)
     if backbone_type_renames:
         # Duplicate every frcmod entry that mentions an original GAFF2
         # backbone type under its ff14SB rename so torsions spanning the
@@ -930,9 +754,7 @@ def prepareClusterResidues(
             pset,
             {orig: list(news) for orig, news in backbone_type_renames.items()},
         )
-    retyped_mol, cap_mask = _retyped_cluster_mol(
-        typed_mol, model, ff14sb_amino_lib, backbone_at
-    )
+    retyped_mol, cap_mask = _retyped_cluster_mol(typed_mol, model, backbone_at)
     _clean_frcmod_params(pset, retyped_mol, list(backbone_at.values()), cap_mask)
 
     if parameter_sets is not None:
@@ -998,18 +820,17 @@ def _build_internal_cluster_spec(
     valid - it gets its own 1-residue cluster with peptide-neighbour caps
     drawn from the live mol."""
     from moleculekit.tools.nonstandard_residues import (
-        NCAASpec,
-        CrosslinkedNCAASpec,
+        ChainResidueSpec,
         ScaffoldSpec,
         CovalentLigandSpec,
-        CanonicalRenamedSpec,
+        PROTEIN_RESNAMES,
     )
 
     residues = []
     is_canonical = []
     is_chain_resident = []
     roles = []
-    canonical_original_resnames = []
+    canonical_resnames = []
     canonical_terminus = []
     is_n_term = []
     is_c_term = []
@@ -1029,52 +850,46 @@ def _build_internal_cluster_spec(
                 segid=g["segid"],
             )
         )
-        if isinstance(spec, CanonicalRenamedSpec):
-            is_canonical.append(True)
-            is_chain_resident.append(True)
-            roles.append("anchor")
-            canonical_original_resnames.append(spec.residue.resname)
-            # Pick the terminal-variant template only if the residue in
-            # the prepared mol actually carries the terminal atoms
-            # (OXT for C-term, H1/H2/H3 for N-term). Without those
-            # atoms ``amber.build`` will add an ACE/NME cap, which makes
-            # the residue effectively mid-chain at build time and the
-            # mid-chain ff14SB template (CYX, NLN, ...) is the right
-            # match instead of the terminal variant (CCYX, NCYX, ...).
-            res_atoms = set(str(n) for n in mol.name[groups[r_idx]["atom_idx"]])
-            n_term_eff = spec.is_n_term and bool({"H1", "H2", "H3"} & res_atoms)
-            c_term_eff = spec.is_c_term and "OXT" in res_atoms
-            canonical_terminus.append(
-                "n" if n_term_eff else ("c" if c_term_eff else "")
-            )
-            is_n_term.append(n_term_eff)
-            is_c_term.append(c_term_eff)
-            has_canonical = True
-        elif isinstance(spec, CrosslinkedNCAASpec):
-            is_canonical.append(False)
-            is_chain_resident.append(True)
-            roles.append("stapled_ncaa")
-            canonical_original_resnames.append("")
-            canonical_terminus.append("")
-            is_n_term.append(spec.is_n_term)
-            is_c_term.append(spec.is_c_term)
-            n_chain_resident_nc += 1
-            n_nc += 1
-        elif isinstance(spec, NCAASpec):
-            is_canonical.append(False)
-            is_chain_resident.append(True)
-            roles.append("ncaa")
-            canonical_original_resnames.append("")
-            canonical_terminus.append("")
-            is_n_term.append(spec.is_n_term)
-            is_c_term.append(spec.is_c_term)
-            n_chain_resident_nc += 1
-            n_nc += 1
+        if isinstance(spec, ChainResidueSpec):
+            # Role: anchor (canonical at junction) | stapled_ncaa (NCAA at
+            # junction) | ncaa (plain NCAA). Canonical-vs-NCAA comes from
+            # resname; junction-or-not is on the spec already
+            # (anchor_atom is not None).
+            is_canonical_origin = spec.resname in PROTEIN_RESNAMES
+            if is_canonical_origin:
+                is_canonical.append(True)
+                is_chain_resident.append(True)
+                roles.append("anchor")
+                canonical_resnames.append(spec.resname)
+                # Trust spec.is_n_term / spec.is_c_term directly: these
+                # come from whether the residue has an outgoing peptide bond
+                # on each side, which is what matters for the prepi template.
+                # An additional atom-presence check (OXT for c-term,
+                # H1/H2/H3 for n-term) is too strict because CIF structures
+                # often omit OXT from the C-terminal residue, and
+                # templateResidueFromSmiles may not have been called on
+                # the canonical residue (so H1/H2/H3 might be absent too).
+                canonical_terminus.append(
+                    "n" if spec.is_n_term else ("c" if spec.is_c_term else "")
+                )
+                is_n_term.append(spec.is_n_term)
+                is_c_term.append(spec.is_c_term)
+                has_canonical = True
+            else:
+                is_canonical.append(False)
+                is_chain_resident.append(True)
+                roles.append("stapled_ncaa" if spec.anchor_atom is not None else "ncaa")
+                canonical_resnames.append("")
+                canonical_terminus.append("")
+                is_n_term.append(spec.is_n_term)
+                is_c_term.append(spec.is_c_term)
+                n_chain_resident_nc += 1
+                n_nc += 1
         elif isinstance(spec, ScaffoldSpec):
             is_canonical.append(False)
             is_chain_resident.append(False)
             roles.append("scaffold")
-            canonical_original_resnames.append("")
+            canonical_resnames.append("")
             canonical_terminus.append("")
             is_n_term.append(False)
             is_c_term.append(False)
@@ -1084,7 +899,7 @@ def _build_internal_cluster_spec(
             is_canonical.append(False)
             is_chain_resident.append(False)
             roles.append("covalent_ligand")
-            canonical_original_resnames.append("")
+            canonical_resnames.append("")
             canonical_terminus.append("")
             is_n_term.append(False)
             is_c_term.append(False)
@@ -1120,7 +935,7 @@ def _build_internal_cluster_spec(
         is_canonical=is_canonical,
         roles=roles,
         bonds=bonds,
-        canonical_original_resnames=canonical_original_resnames,
+        canonical_resnames=canonical_resnames,
         canonical_terminus=canonical_terminus,
         is_n_term=is_n_term,
         is_c_term=is_c_term,
@@ -1328,7 +1143,7 @@ def parameterizeFromSpecs(
 
         # 3. Protonate the canonical part and apply the spec renames /
         #    displaced-H drops in one step.
-        pmol = systemPrepare(mol, detect_specs=specs)
+        pmol, _ = systemPrepare(mol, detect_specs=specs)
 
         # 4. Run antechamber per cluster and split per-residue.
         out = parameterizeFromSpecs(specs, pmol, outdir="./params")
@@ -1343,12 +1158,11 @@ def parameterizeFromSpecs(
         )
     """
     from moleculekit.tools.nonstandard_residues import (
-        NCAASpec,
-        CrosslinkedNCAASpec,
+        ChainResidueSpec,
         ScaffoldSpec,
         CovalentLigandSpec,
         LigandSpec,
-        CanonicalRenamedSpec,
+        PROTEIN_RESNAMES,
     )
     from htmd.builder._ambertools import _fftype_antechamber
 
@@ -1365,6 +1179,14 @@ def parameterizeFromSpecs(
     }
     spec_by_res_idx = {}
     for s in specs:
+        # CYS-CYS disulfides are detected as ChainResidueSpec with
+        # ``new_resname="CYX"``. ff14SB has a native CYX template and
+        # tLeap stitches the S-S bond via amber.build's disulfide
+        # detection, so the cluster pipeline must not see them - they
+        # would otherwise be wrongly clustered through their non-peptide
+        # SG-SG bond.
+        if isinstance(s, ChainResidueSpec) and s.new_resname == "CYX":
+            continue
         key = _spec_residue_key(s.residue)
         if key not in res_key_to_idx:
             raise ValueError(
@@ -1427,7 +1249,10 @@ def parameterizeFromSpecs(
     for r_idx, spec in spec_by_res_idx.items():
         if r_idx in in_cluster_set:
             continue
-        if isinstance(spec, NCAASpec):
+        if (
+            isinstance(spec, ChainResidueSpec)
+            and spec.resname not in PROTEIN_RESNAMES
+        ):
             cluster_membership.append(([r_idx], []))
             in_cluster_set.add(r_idx)
 
@@ -1452,7 +1277,10 @@ def parameterizeFromSpecs(
     for ci, (members, cbonds) in enumerate(cluster_membership):
         if len(members) == 1 and not cbonds:
             spec = spec_by_res_idx[members[0]]
-            if isinstance(spec, NCAASpec):
+            if (
+                isinstance(spec, ChainResidueSpec)
+                and spec.resname not in PROTEIN_RESNAMES
+            ):
                 g = groups[members[0]]
                 key = (
                     g["resname"],
@@ -1751,44 +1579,6 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
     model = mol.copy(sel=np.asarray(all_orig_idxs, dtype=np.int64))
     orig_to_new = {orig: new for new, orig in enumerate(all_orig_idxs)}
 
-    # Re-guess intra-residue bonds for cap residues (always sliced down to
-    # a few atoms) and for cluster residues that have any atom missing
-    # bonds (e.g. an OXT that systemPrepare added without re-attaching the
-    # C-OXT bond). Scoped one residue at a time so we don't over-bond near
-    # residue boundaries.
-    existing = {tuple(sorted((int(a), int(b)))) for a, b in model.bonds}
-    new_bonds, new_bondtypes = [], []
-    residues_to_guess = dict(cap_atoms)
-    cluster_atoms_by_residue = {}
-    for orig in orig_to_cluster_idx:
-        live_res = int(a2r[orig])
-        cluster_atoms_by_residue.setdefault(live_res, {})[orig] = None
-    has_neighbor = np.zeros(model.numAtoms, dtype=bool)
-    for a, b in model.bonds:
-        has_neighbor[int(a)] = True
-        has_neighbor[int(b)] = True
-    for live_res, atoms_dict in cluster_atoms_by_residue.items():
-        if any(not has_neighbor[orig_to_new[o]] for o in atoms_dict):
-            residues_to_guess.setdefault(live_res, {}).update(atoms_dict)
-    for residx_in_mol, atoms_dict in residues_to_guess.items():
-        cap_orig_idxs_local = list(atoms_dict.keys())
-        sub = mol.copy(sel=np.asarray(cap_orig_idxs_local, dtype=np.int64))
-        sorted_cap_orig = sorted(cap_orig_idxs_local)
-        local_to_new = {
-            local: orig_to_new[orig] for local, orig in enumerate(sorted_cap_orig)
-        }
-        guessed = sub._guessBonds(rdkit=False)
-        for la, lb in guessed:
-            ga, gb = local_to_new[int(la)], local_to_new[int(lb)]
-            key = tuple(sorted((ga, gb)))
-            if key not in existing:
-                new_bonds.append([ga, gb])
-                new_bondtypes.append("1")
-                existing.add(key)
-    if new_bonds:
-        model.bonds = np.vstack([model.bonds, np.asarray(new_bonds, dtype=np.uint32)])
-        model.bondtype = np.hstack([model.bondtype, np.asarray(new_bondtypes)])
-
     role_per_pos = []
     cluster_residue_per_pos = []
     orig_name_per_pos = []
@@ -1832,6 +1622,40 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
         else np.zeros((0, 2), dtype=np.uint32)
     )
     model.bondtype = np.asarray(keep_bondtypes)
+
+    # Add cap topology bonds explicitly from the known role mapping. The
+    # slice from mol may not have brought these bonds along - e.g. when
+    # the neighbour residue's amide H was added by PDB2PQR after capture
+    # so the N-H bond never landed in mol.bonds. The cap topology is
+    # deterministic (NME: N-CH3, N-H; ACE: C-CH3, C=O), so adding the
+    # bonds by role is not bond guessing.
+    cap_bond_pairs = (
+        ("N", "H", "1"),
+        ("N", "CH3", "1"),
+        ("C", "O", "2"),
+        ("C", "CH3", "1"),
+    )
+    existing_pairs = {tuple(sorted((int(a), int(b)))) for a, b in model.bonds}
+    new_cap_bonds, new_cap_bondtypes = [], []
+    for cap_orig_dict in cap_atoms.values():
+        role_to_new = {role: orig_to_new[orig] for orig, role in cap_orig_dict.items()}
+        for role_a, role_b, btype in cap_bond_pairs:
+            if role_a not in role_to_new or role_b not in role_to_new:
+                continue
+            a, b = role_to_new[role_a], role_to_new[role_b]
+            key = tuple(sorted((int(a), int(b))))
+            if key in existing_pairs:
+                continue
+            new_cap_bonds.append([a, b])
+            new_cap_bondtypes.append(btype)
+            existing_pairs.add(key)
+    if new_cap_bonds:
+        model.bonds = np.vstack(
+            [model.bonds, np.asarray(new_cap_bonds, dtype=np.uint32)]
+        )
+        model.bondtype = np.hstack(
+            [model.bondtype, np.asarray(new_cap_bondtypes)]
+        )
 
     for bond in spec.bonds:
         a_orig = int(bond.atom_a.selectAtom(mol))
