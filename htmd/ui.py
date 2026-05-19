@@ -62,6 +62,9 @@ try:
 except Exception as e:
     warnings.warn(f"{e}")
 
+from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
+from htmd.builder.nonstandard import parameterizeFromSpecs
+
 
 from htmd.license import htmd_registration, htmd_show_news, htmd_register
 from htmd.latest import compareVersions

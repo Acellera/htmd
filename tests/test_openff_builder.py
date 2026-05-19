@@ -4,6 +4,7 @@
 # No redistribution in whole or part
 #
 import os
+import sys
 import pytest
 import numpy as np
 
@@ -496,6 +497,10 @@ class _TestOpenFFComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "5VAV cyclic")
 
+    @pytest.mark.skipif(
+        sys.platform.startswith("win"),
+        reason="AM1-BCC charge model unavailable on Windows",
+    )
     def _test_protein_ligand(self, tmpdir):
         """3PTB protein + benzamidine ligand with GAFF2 small-molecule FF."""
         from htmd.builder.openff import build as openff_build
