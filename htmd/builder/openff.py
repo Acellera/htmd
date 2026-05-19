@@ -455,6 +455,20 @@ def _fix_water_naming(mol):
     mol.name[water & (mol.name == "OH2")] = "O"
     mol.name[water & (mol.name == "OW")] = "O"
 
+    # CHARMM PSFs encode the rigid-water SHAKE constraint as an explicit
+    # H1-H2 bond. OpenMM's HOH template only has O-H bonds, so emitting
+    # the H-H bond via CONECT trips "1 H-H bond too many" at template
+    # matching. Drop them here.
+    if len(mol.bonds) == 0:
+        return
+    is_h = mol.element == "H"
+    i, j = mol.bonds[:, 0].astype(int), mol.bonds[:, 1].astype(int)
+    hh_water = water[i] & water[j] & is_h[i] & is_h[j]
+    if np.any(hh_water):
+        mol.bonds = mol.bonds[~hh_water]
+        if mol.bondtype is not None and len(mol.bondtype) == len(hh_water):
+            mol.bondtype = mol.bondtype[~hh_water]
+
 
 _AMBER_TO_OPENMM_RNA = {
     "RG5": "G5",
@@ -543,7 +557,7 @@ def _mol_to_openmm(mol, outdir, extra_xml=None):
     _register_amber_variant_bond_defs()
 
     pdb_path = os.path.join(outdir, "input.pdb")
-    mol.write(pdb_path, writebonds=False)
+    mol.write(pdb_path, writebonds=True)
     with _temporary_residue_bond_defs(extra_xml):
         pdb = app.PDBFile(pdb_path)
 
@@ -665,28 +679,28 @@ def _register_amber_variant_bond_defs():
     # the peptide N-C bonds at the residue boundary).
     base_to_variants = {
         "CYS": {
-            "CYM": {"HG"},        # deprotonated thiolate
-            "CYX": {"HG"},        # disulfide-bonded
+            "CYM": {"HG"},  # deprotonated thiolate
+            "CYX": {"HG"},  # disulfide-bonded
         },
         "HIS": {
-            "HID": {"HE2"},       # delta-protonated
-            "HIE": {"HD1"},       # epsilon-protonated
-            "HIP": set(),         # doubly protonated
+            "HID": {"HE2"},  # delta-protonated
+            "HIE": {"HD1"},  # epsilon-protonated
+            "HIP": set(),  # doubly protonated
         },
         "LYS": {
-            "LYN": {"HZ3"},       # neutral amine
+            "LYN": {"HZ3"},  # neutral amine
         },
         "ASP": {
-            "ASH": set(),         # protonated carboxyl (HD2 already in base?)
+            "ASH": set(),  # protonated carboxyl (HD2 already in base?)
         },
         "GLU": {
-            "GLH": set(),         # protonated carboxyl
+            "GLH": set(),  # protonated carboxyl
         },
         "TYR": {
-            "TYM": {"HH"},        # deprotonated phenolate
+            "TYM": {"HH"},  # deprotonated phenolate
         },
         "ARG": {
-            "AR0": {"HE"},        # neutral arginine (one variant)
+            "AR0": {"HE"},  # neutral arginine (one variant)
         },
     }
 
@@ -698,7 +712,8 @@ def _register_amber_variant_bond_defs():
             if variant in Topology._standardBonds:
                 continue
             kept = [
-                (a, b) for a, b in base_bonds
+                (a, b)
+                for a, b in base_bonds
                 if a.lstrip("-+") not in dropped_atoms
                 and b.lstrip("-+") not in dropped_atoms
             ]
@@ -741,9 +756,7 @@ def _add_missing_bonds(mol, topology):
 
     atoms_list = list(topology.atoms())
     n_atoms = len(atoms_list)
-    existing = {
-        frozenset((b[0].index, b[1].index)) for b in topology.bonds()
-    }
+    existing = {frozenset((b[0].index, b[1].index)) for b in topology.bonds()}
     for row in mol.bonds:
         i, j = int(row[0]), int(row[1])
         if i >= n_atoms or j >= n_atoms:
@@ -1205,18 +1218,6 @@ def _export_amber(topology, system, positions, outdir, prefix, forcefield=None):
     carries an explicit force constant (AMBER's prmtop format requires
     that). ParmEd's ``openmm.load_topology`` then turns the OpenMM
     System into an ``AmberParm`` and writes prmtop / inpcrd.
-
-    Note: ``parmed.openmm.load_topology`` synthesises AMBER atom types
-    by bucketing on ``(element, sigma, epsilon)``, which collapses
-    ff14SB's ``CT`` / ``CX`` into a single prmtop type. The resulting
-    prmtop is still well-formed for OpenMM (per-instance bond / angle
-    / dihedral params), so loading it back via ``parmed.amber.AmberParm``
-    and computing energy through OpenMM is fine. Tools that consolidate
-    parameters per atom-type pair (e.g. ``ffevaluation.loadParameters``)
-    cannot consume this output. ``openff.interchange.Interchange``
-    preserves the original atom-type names but its ``to_prmtop`` is
-    prohibitively slow (pint unit-string re-parsing per parameter) on
-    protein-sized systems, so it's not used here.
     """
     import openmm.app as app
     import openmm.unit as unit
@@ -1240,21 +1241,7 @@ def _export_amber(topology, system, positions, outdir, prefix, forcefield=None):
                 rigidWater=False,
             )
 
-        # ``condense_atom_types=False`` keeps a unique atom type per
-        # atom (rather than bucketing on (element, sigma, epsilon)).
-        # The default bucketing collapses ff14SB's ``CT`` / ``CX``
-        # into a single prmtop type, which produces multiple distinct
-        # bond / angle / dihedral parameter values for the same
-        # collapsed type pair - breaking ``ffevaluation.loadParameters``
-        # which assumes one parameter set per type pair. With
-        # condense disabled each bond / angle / dihedral instance has
-        # a unique type tuple, so the prmtop satisfies that invariant.
-        struct = parmed.openmm.load_topology(
-            topology,
-            export_system,
-            xyz=positions,
-            condense_atom_types=False,
-        )
+        struct = parmed.openmm.load_topology(topology, export_system, xyz=positions)
         struct.save(prmtop, overwrite=True)
         struct.save(inpcrd, overwrite=True)
         logger.info(f"Wrote {prmtop} and {inpcrd} via ParmEd")
