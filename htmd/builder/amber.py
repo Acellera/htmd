@@ -564,7 +564,7 @@ def defaultFf():
         "leaprc.protein.ff14SB",
         "leaprc.lipid21",
         "leaprc.gaff2",
-        "leaprc.RNA.Shaw",
+        "leaprc.RNA.OL3",
         "leaprc.DNA.bsc1",
         "leaprc.water.tip3p",
     ]
