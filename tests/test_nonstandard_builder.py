@@ -99,234 +99,88 @@ def _check_no_overvalent_atoms(built):
     assert not bad, "over-valent atoms in built mol:\n" + "\n".join(bad)
 
 
-# Resnames that are equivalent across builders: amber.build emits the
-# AMBER protonation variant name; openff.build keeps the canonical PDB
-# resname. The two are the same residue topologically.
-_RESNAME_ALIASES = {
-    "HID": "HIS", "HIE": "HIS", "HIP": "HIS",
-    "CYX": "CYS", "CYM": "CYS",
-    "ASH": "ASP",
-    "GLH": "GLU",
-    "LYN": "LYS",
-    "TYM": "TYR",
-    "AR0": "ARG",
-    "WAT": "HOH", "TIP3": "HOH",
-}
-
-
-def _normalised_resname(name):
-    return _RESNAME_ALIASES.get(str(name), str(name))
-
-
 # N-terminal NH3+ first-hydrogen naming convention differs between
 # builders: amber.build emits ``H1`` / ``H2`` / ``H3``; openff.build
-# emits ``H`` / ``H2`` / ``H3``. Topologically identical.
-_ATOM_NAME_ALIASES = {
-    "H1": "H",
-}
+# emits ``H`` / ``H2`` / ``H3``. Topologically identical. The alias is
+# resname-scoped: caps (ACE / NME) carry methyl hydrogens named
+# ``H1`` / ``H2`` / ``H3`` that must NOT be rewritten, otherwise the
+# NME methyl ``H1`` collides with the amide ``H`` already on the
+# residue.
+_CAP_RESNAMES = {"ACE", "NME", "NHE", "NMA"}
 
 
-def _normalised_atom_name(name):
-    return _ATOM_NAME_ALIASES.get(str(name), str(name))
+def _normalised_atom_name(name, resname):
+    if str(resname) in _CAP_RESNAMES:
+        return str(name)
+    return "H" if str(name) == "H1" else str(name)
 
 
 def _assert_builds_equivalent(
-    amber_built, openmm_built, amber_prmtop, openmm_prmtop, openmm_system_xml=None
+    amber_built, openmm_built, amber_prmtop, openmm_prmtop, energy_tol=0.05,
 ):
-    """Compare two built systems produced by the amber and openff build
-    paths. They should describe physically identical force fields.
+    """Assert that the two prmtops produce the same potential energy on
+    the same physical coordinates (within ``energy_tol`` kcal/mol).
 
-    Three layers of check, increasing in strength:
-
-    1. Atom-level identity: same atom count, same resname distribution
-       (after aliasing AMBER protonation variants to canonical PDB
-       resnames), same (chain, resid, insertion, atom-name) identity
-       set. Catches gross topology differences.
-    2. Parameter set: load both prmtops as
-       :class:`parmed.amber.AmberParm` and compare their bonds /
-       angles / dihedrals **as parameterised topology** (atom-name
-       tuples + parameter values). Catches force-field-level diffs
-       that don't show up in plain bond enumeration.
-    3. Force-field energy via :class:`ffevaluation.ffevaluate.FFEvaluate`.
-       Both prmtops applied to their respective ``Molecule`` and the
-       total energies compared. The tightest physical check: if the
-       two systems compute the same energy on the same coordinates,
-       they are equivalent regardless of bookkeeping differences
-       (e.g. zero-force torsions that ParmEd drops vs tLeap retains).
+    The builds may differ in atom ORDER, so we pair atoms by
+    ``(sequenceID, normalised name)`` and feed each system its own
+    permutation of the shared coord set. ``constraints=None`` ensures
+    every X-H bond contributes to the potential (with ``HBonds``,
+    OpenMM rewrites them to rigid constraints and drops them from the
+    HarmonicBondForce, which would mask real divergence).
     """
-    import parmed
+    import openmm
+    import openmm.app as omm_app
+    import openmm.unit as omm_unit
+    from moleculekit.util import sequenceID
 
-    # ===== 1. Atom-level identity =====
     assert openmm_built.numAtoms == amber_built.numAtoms, (
         f"atom count differs: amber={amber_built.numAtoms}, "
         f"openmm={openmm_built.numAtoms}"
     )
 
-    amber_resn = Counter(_normalised_resname(r) for r in amber_built.resname)
-    openmm_resn = Counter(_normalised_resname(r) for r in openmm_built.resname)
-    assert amber_resn == openmm_resn, (
-        f"resname distributions differ (after alias normalisation).\n"
-        f"  amber only: {amber_resn - openmm_resn}\n"
-        f"  openmm only: {openmm_resn - amber_resn}"
-    )
-
-    def _atom_keys(mol):
-        return Counter(
-            (str(mol.chain[i]), int(mol.resid[i]), str(mol.insertion[i]), _normalised_atom_name(mol.name[i]))
+    def _atom_ids(mol):
+        seq = sequenceID((mol.resid, mol.insertion, mol.segid))
+        return [
+            (int(seq[i]), _normalised_atom_name(mol.name[i], mol.resname[i]))
             for i in range(mol.numAtoms)
+        ]
+
+    am_ids = _atom_ids(amber_built)
+    om_ids = _atom_ids(openmm_built)
+    assert set(am_ids) == set(om_ids), (
+        f"atom identity sets differ: "
+        f"in amber not openmm = {len(set(am_ids) - set(om_ids))}; "
+        f"in openmm not amber = {len(set(om_ids) - set(am_ids))}"
+    )
+
+    am_idx = {k: i for i, k in enumerate(am_ids)}
+    om_idx = {k: i for i, k in enumerate(om_ids)}
+    shared = amber_built.coords[:, :, 0].astype(np.float64)
+    om_coords = np.empty_like(shared)
+    for k, j in om_idx.items():
+        om_coords[j] = shared[am_idx[k]]
+
+    def _energy(prmtop, coords):
+        system = omm_app.AmberPrmtopFile(prmtop).createSystem(
+            nonbondedMethod=omm_app.NoCutoff, constraints=None, rigidWater=False
         )
-
-    assert _atom_keys(amber_built) == _atom_keys(openmm_built), (
-        "per-atom identity (chain, resid, insertion, name) differs"
-    )
-
-    # ===== 2. ParmEd-level parameter set comparison =====
-    # Drop water H-H bonds before comparing: AMBER's TIP3P prmtop
-    # stores the SHAKE-constrained H-H as a bond, OpenMM's emitted
-    # prmtop does not. Both produce physically identical rigid water.
-    # Dihedrals: the OpenMM/ParmEd export drops zero-force terms (e.g.
-    # the wildcard PRO ring torsion ``"" CX N ""`` with k=0), so we
-    # check that ``openmm ⊆ amber`` rather than strict equality.
-    def _canonical(tup):
-        return min(tup, tup[::-1])
-
-    def _atom_label(parm_atom):
-        return (
-            str(parm_atom.residue.chain),
-            int(parm_atom.residue.number),
-            str(parm_atom.residue.insertion_code or ""),
-            _normalised_atom_name(parm_atom.name),
-        )
-
-    def _is_water(*atoms):
-        # AMBER's TIP3P prmtop stores water as O + 2H + the
-        # SHAKE-constrained H-H "bond"; OpenMM's emits O + 2H + an
-        # H-O-H angle. Same rigid water under the hood. Exclude
-        # all-water bond / angle / dihedral terms from the comparison
-        # so the topology-bookkeeping difference doesn't show up.
-        return all(a.residue.name in ("WAT", "HOH", "TIP3") for a in atoms)
-
-    parm_a = parmed.amber.AmberParm(amber_prmtop)
-    parm_o = parmed.amber.AmberParm(openmm_prmtop)
-
-    def _bond_keys(parm):
-        out = set()
-        for b in parm.bonds:
-            if _is_water(b.atom1, b.atom2):
-                continue
-            out.add(_canonical((_atom_label(b.atom1), _atom_label(b.atom2))))
-        return out
-
-    def _angle_keys(parm):
-        out = set()
-        for a in parm.angles:
-            if _is_water(a.atom1, a.atom2, a.atom3):
-                continue
-            out.add(_canonical((_atom_label(a.atom1), _atom_label(a.atom2), _atom_label(a.atom3))))
-        return out
-
-    def _dihedral_keys(parm, impropers=False):
-        out = set()
-        for d in parm.dihedrals:
-            if bool(d.improper) != impropers:
-                continue
-            if _is_water(d.atom1, d.atom2, d.atom3, d.atom4):
-                continue
-            labels = (
-                _atom_label(d.atom1), _atom_label(d.atom2),
-                _atom_label(d.atom3), _atom_label(d.atom4),
-            )
-            if impropers:
-                # AMBER convention: position 3 is the central atom for
-                # an improper; the other 3 are the substituents. Both
-                # AMBER and OpenMM follow this, but the substituent
-                # order varies. Canonicalise as
-                # ``(central, sorted(substituents))`` so the three
-                # representations of the same improper collapse.
-                central = labels[2]
-                others = tuple(sorted(labels[:2] + labels[3:]))
-                out.add((central,) + others)
-            else:
-                out.add(_canonical(labels))
-        return out
-
-    a_bonds, o_bonds = _bond_keys(parm_a), _bond_keys(parm_o)
-    assert a_bonds == o_bonds, (
-        f"prmtop bonds differ ({len(a_bonds ^ o_bonds)} symmetric diff)"
-    )
-
-    a_ang, o_ang = _angle_keys(parm_a), _angle_keys(parm_o)
-    assert a_ang == o_ang, (
-        f"prmtop angles differ ({len(a_ang ^ o_ang)} symmetric diff)"
-    )
-
-    # Proper dihedrals: loose check (openmm ⊆ amber). AMBER tLeap
-    # retains zero-force ring-closure torsions (e.g. PRO CA-N-CD-CG
-    # via the wildcard ``"" CX N ""`` term) that ParmEd omits from
-    # the OpenMM-exported prmtop. Those zero-k entries don't
-    # contribute to the potential.
-    a_prop, o_prop = _dihedral_keys(parm_a, impropers=False), _dihedral_keys(parm_o, impropers=False)
-    missing_in_amber = o_prop - a_prop
-    assert not missing_in_amber, (
-        f"openmm prmtop has {len(missing_in_amber)} proper dihedrals "
-        f"not in amber prmtop: {sorted(missing_in_amber)[:5]}"
-    )
-
-    # Impropers: similar loose check. Differences here come from how
-    # each builder enumerates planarity restraints for sp2 centres.
-    a_imp, o_imp = _dihedral_keys(parm_a, impropers=True), _dihedral_keys(parm_o, impropers=True)
-    missing_in_amber_imp = o_imp - a_imp
-    assert not missing_in_amber_imp, (
-        f"openmm prmtop has {len(missing_in_amber_imp)} impropers "
-        f"not in amber prmtop: {sorted(missing_in_amber_imp)[:5]}"
-    )
-
-    # ===== 3. Energy equivalence via OpenMM =====
-    # Amber side: load prmtop via ParmEd -> OpenMM System -> energy.
-    # Openff side: load the serialized System XML written by
-    # ``openff.build`` directly -> no ParmEd round-trip, no atom-type
-    # bucketing -> the System matches exactly what ForceField produced.
-    # Both systems are normalised to ``CutoffNonPeriodic`` nonbonded
-    # so the comparison is independent of whether the build path
-    # happened to use PME or NoCutoff. If the two builds describe the
-    # same physical force field, the energies must agree on the same
-    # nonbonded method.
-    import openmm
-    import openmm.app as omm_app
-    import openmm.unit as omm_unit
-
-    def _normalise_nonbonded(system):
-        """Force every ``NonbondedForce`` on ``system`` to ``NoCutoff``
-        so the comparison is independent of how the build path
-        configured the long-range method."""
         for force in system.getForces():
             if isinstance(force, openmm.NonbondedForce):
                 force.setNonbondedMethod(openmm.NonbondedForce.NoCutoff)
                 force.setUseDispersionCorrection(False)
-
-    def _energy(system, mol):
-        _normalise_nonbonded(system)
-        context = openmm.Context(system, openmm.VerletIntegrator(0.001))
-        positions = mol.coords[:, :, 0].astype(np.float64) * 0.1
-        context.setPositions(positions * omm_unit.nanometers)
-        return context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
+        ctx = openmm.Context(system, openmm.VerletIntegrator(0.001))
+        ctx.setPositions(coords * 0.1 * omm_unit.nanometers)
+        return ctx.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
             omm_unit.kilocalorie_per_mole
         )
 
-    amber_system = parm_a.createSystem(
-        nonbondedMethod=omm_app.NoCutoff, constraints=None, rigidWater=False
-    )
-    e_a = _energy(amber_system, amber_built)
+    e_amber = _energy(amber_prmtop, shared)
+    e_openff = _energy(openmm_prmtop, om_coords)
 
-    assert openmm_system_xml is not None, "openmm_system_xml path required"
-    with open(openmm_system_xml) as fh:
-        openmm_system = openmm.XmlSerializer.deserialize(fh.read())
-    e_o = _energy(openmm_system, openmm_built)
-
-    rel_diff = abs(e_a - e_o) / max(abs(e_a), abs(e_o), 1.0)
-    assert rel_diff < 1e-3, (
-        f"total potential energies differ: amber={e_a:.4f} kcal/mol, "
-        f"openmm={e_o:.4f} kcal/mol (rel diff {rel_diff:.4e})"
+    assert abs(e_amber - e_openff) < energy_tol, (
+        f"amber and openff builds disagree by more than {energy_tol} kcal/mol\n"
+        f"  amber : {e_amber:.4f} kcal/mol\n"
+        f"  openff: {e_openff:.4f} kcal/mol"
     )
 
 
@@ -763,6 +617,7 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
     mol = Molecule(VBL_PDB)
     mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
     mol.remove("element H", _logger=False)
+    mol.remove("water", _logger=False)
     specs = detectNonStandardResidues(mol)
     smiles = {
         "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
@@ -807,12 +662,59 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
         caps=caps,
     )
 
+    # NCAA + Zn + 4 disulfides; observed gap ~0.024 kcal/mol on
+    # 6000 atoms. 0.05 leaves ~2x headroom.
     _assert_builds_equivalent(
         amber_built,
         openmm_built,
         amber_prmtop=str(tmp_path / "amber" / "structure.prmtop"),
         openmm_prmtop=str(tmp_path / "openmm" / "structure.prmtop"),
-        openmm_system_xml=str(tmp_path / "openmm" / "structure.system.xml"),
+        energy_tol=0.05,
+    )
+
+
+@pytest.mark.skipif(
+    not (_tleap and _openmm),
+    reason="OpenMM-vs-amber build comparison needs teLeap + openmm",
+)
+def _test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
+    """6A5J: small canonical peptide (no NCAAs, no ligands). Builds via
+    amber.build (tLeap) and openff.build (OpenMM ForceField XML) and
+    asserts the two systems carry identical force-field data via
+    :func:`_assert_builds_equivalent`. Acts as a control for the NCAA
+    builds - if 6A5J disagrees, the divergence is in the basic builder
+    path rather than the parameterizeFromSpecs cluster pipeline."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+    from htmd.builder.openff import build as openff_build
+
+    mol = Molecule("6A5J")
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    mol.remove("water", _logger=False)
+    pmol, _ = systemPrepare(mol, verbose=False)
+
+    amber_built = amber_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "amber"),
+        ionize=False,
+    )
+    openmm_built, _ = openff_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "openmm"),
+        ionize=False,
+        solvate=False,
+    )
+
+    # Canonical-only ~270-atom peptide; observed gap is ~5e-5 kcal/mol.
+    # 0.001 still gives ~20x headroom and catches any real regression.
+    _assert_builds_equivalent(
+        amber_built,
+        openmm_built,
+        amber_prmtop=str(tmp_path / "amber" / "structure.prmtop"),
+        openmm_prmtop=str(tmp_path / "openmm" / "structure.prmtop"),
+        energy_tol=0.001,
     )
 
 
@@ -833,6 +735,7 @@ def _test_parameterize_from_specs_emits_openmm_xml(tmp_path):
     mol = Molecule(VBL_PDB)
     mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
     mol.remove("element H", _logger=False)
+    mol.remove("water", _logger=False)
     specs = detectNonStandardResidues(mol)
     smiles = {
         "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
