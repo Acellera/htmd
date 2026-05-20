@@ -27,7 +27,7 @@ from collections import Counter
 import numpy as np
 import pytest
 
-from moleculekit.molecule import Molecule, UniqueAtomID
+from moleculekit.molecule import Molecule, UniqueAtomID, mol_equal
 from moleculekit.tools.nonstandard_residues import (
     detectNonStandardResidues,
     ChainResidueSpec,
@@ -42,6 +42,9 @@ from htmd.builder.nonstandard import (
     _check_specs_protonated,
     _clean_frcmod_params,
     _residue_groups_with_index,
+    _pin_backbone_charges,
+    _backbone_charge_map,
+    _FF14SB_BACKBONE_CHARGES_BY_CLASS,
 )
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
@@ -59,6 +62,8 @@ LFI_SMILES = "C1N(CN(CN1C(=O)CCBr)C(=O)CCBr)C(=O)CCBr"
 
 NLE_SMILES = "CCCC[C@@H](C(=O)O)N"
 MK8_SMILES = "CCCC[C@](C)(C(=O)O)N"
+# Protonated benzamidine, the 3PTB ligand (from moleculekit's rdkittools docs).
+BEN_SMILES = "[NH2+]=C(N)c1ccccc1"
 
 _antechamber = shutil.which("antechamber") is not None
 _tleap = _findTeLeap() is not None
@@ -1213,3 +1218,239 @@ def _test_clean_frcmod_cap_atoms_excluded(tmp_path):
     assert "cc" not in pset.atom_types
     assert ("c3", "cc") not in pset.bond_types
     assert ("c3", "c3") in pset.bond_types
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for the backbone charge pin (_pin_backbone_charges) and the
+# ff14SB backbone charge lookup (_backbone_charge_map).
+# ---------------------------------------------------------------------------
+
+
+def _charge_mol(names, charges):
+    """Single-residue Molecule with explicit atom names and partial
+    charges - the inputs _pin_backbone_charges reads."""
+    n = len(names)
+    mol = Molecule().empty(n)
+    mol.name[:] = names
+    mol.element[:] = [str(nm)[0] for nm in names]
+    mol.charge[:] = charges
+    mol.resname[:] = "XX1"
+    mol.resid[:] = 1
+    mol.coords = np.zeros((n, 3, 1), dtype=np.float32)
+    return mol
+
+
+# Mid-chain backbone (N, H, CA, HA, C, O) plus a short sidechain.
+_BACKBONE_PLUS_SIDECHAIN = ["N", "H", "CA", "HA", "C", "O", "CB", "HB2", "HB3", "SG"]
+# ff14SB neutral-class backbone amide charges, used as a sample map.
+_NEUTRAL_BACKBONE = _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
+
+
+def _test_pin_backbone_charges_pins_map_and_rebalances():
+    # The charge_map atoms carry the pinned values and the residue sums
+    # to its integer formal charge.
+    sub = _charge_mol(_BACKBONE_PLUS_SIDECHAIN, [0.3] * len(_BACKBONE_PLUS_SIDECHAIN))
+    _pin_backbone_charges(sub, net_charge=0, charge_map=_NEUTRAL_BACKBONE)
+    for name, q in _NEUTRAL_BACKBONE.items():
+        assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
+    assert float(np.sum(sub.charge)) == pytest.approx(0.0, abs=1e-4)
+
+
+def _test_pin_backbone_charges_targets_integer_formal_charge():
+    # A residue with a non-zero formal charge is rebalanced to that
+    # integer, not to zero.
+    sub = _charge_mol(_BACKBONE_PLUS_SIDECHAIN, [-0.05] * len(_BACKBONE_PLUS_SIDECHAIN))
+    _pin_backbone_charges(sub, net_charge=-1, charge_map=_NEUTRAL_BACKBONE)
+    for name, q in _NEUTRAL_BACKBONE.items():
+        assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
+    assert float(np.sum(sub.charge)) == pytest.approx(-1.0, abs=1e-4)
+
+
+def _test_pin_backbone_charges_residual_spares_pinned_atoms():
+    # The residual lands only on the non-pinned atoms, equally (the
+    # minimum-L2 redistribution): pinned atoms keep exactly their value.
+    names = _BACKBONE_PLUS_SIDECHAIN
+    sub = _charge_mol(names, [0.7] * len(names))
+    _pin_backbone_charges(sub, net_charge=0, charge_map=_NEUTRAL_BACKBONE)
+    for name, q in _NEUTRAL_BACKBONE.items():
+        assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
+    free = ~np.isin(np.array(names), list(_NEUTRAL_BACKBONE))
+    shifts = np.array(sub.charge)[free] - 0.7
+    assert np.allclose(shifts, shifts[0], atol=1e-5)
+    assert float(np.sum(sub.charge)) == pytest.approx(0.0, abs=1e-4)
+
+
+def _test_pin_backbone_charges_empty_map_is_noop():
+    # No atoms to pin -> charges are left exactly as they were.
+    names = _BACKBONE_PLUS_SIDECHAIN
+    original = [0.123] * len(names)
+    sub = _charge_mol(names, original)
+    _pin_backbone_charges(sub, net_charge=0, charge_map={})
+    assert np.allclose(np.array(sub.charge), original, atol=1e-5)
+
+
+def _test_backbone_charge_map_ncaa_charge_classes():
+    # An NCAA is absent from the libraries, so the amide charges come
+    # from the charge class the residue's net charge selects.
+    present = {"N", "H", "CA", "HA", "C", "O", "CB", "CG"}
+    assert _backbone_charge_map("", "", present, 0) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
+    assert _backbone_charge_map("", "", present, 1) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[1]
+    assert _backbone_charge_map("", "", present, -1) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[-1]
+    # A net charge with no standard backbone class pins nothing.
+    assert _backbone_charge_map("", "", present, 2) == {}
+
+
+def _test_backbone_charge_map_terminal_ncaa_is_empty():
+    # A terminal NCAA has no library entry and no universal terminal
+    # charges, so nothing is pinned.
+    present = {"N", "H", "CA", "HA", "C", "O", "OXT"}
+    assert _backbone_charge_map("", "c", present, -1) == {}
+
+
+def _test_backbone_charge_map_proline_like_ncaa_is_empty():
+    # A proline-like NCAA (no amide H) does not match the amide set.
+    present = {"N", "CA", "HA", "C", "O", "CB", "CG", "CD"}
+    assert _backbone_charge_map("", "", present, 0) == {}
+
+
+@pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
+def _test_backbone_charge_map_canonical_midchain():
+    # A mid-chain canonical CYS gets its whole backbone - residue-specific
+    # CA / HA included - from the ff14SB CYS library entry; the sidechain
+    # is left to antechamber.
+    present = {"N", "H", "CA", "HA", "C", "O", "CB", "HB2", "HB3", "SG"}
+    cmap = _backbone_charge_map("CYS", "", present, 0)
+    assert set(cmap) == {"N", "H", "CA", "HA", "C", "O"}
+    for name, q in _NEUTRAL_BACKBONE.items():
+        assert cmap[name] == pytest.approx(q, abs=1e-4)
+
+
+@pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
+def _test_backbone_charge_map_canonical_terminal_variants():
+    # The N-terminal variant pins the NH3+ hydrogens; the C-terminal
+    # variant pins OXT. Sidechain atoms are never pinned.
+    n_present = {"N", "H1", "H2", "H3", "CA", "HA", "C", "O", "CB"}
+    n_map = _backbone_charge_map("ALA", "n", n_present, 1)
+    assert {"H1", "H2", "H3"} <= set(n_map)
+    assert "CB" not in n_map
+
+    c_present = {"N", "H", "CA", "HA", "C", "O", "OXT", "CB"}
+    c_map = _backbone_charge_map("ALA", "c", c_present, -1)
+    assert "OXT" in c_map
+    assert "CB" not in c_map
+
+
+@pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
+def _test_backbone_charge_map_his_name_falls_through_to_charge_class():
+    # "HIS" is not a library key (the libraries use HID / HIE / HIP), so
+    # a His anchor falls through to the charge-class fallback: a neutral
+    # His gets the neutral amide, a protonated (+1) His the cationic one.
+    present = {"N", "H", "CA", "HA", "C", "O", "CB", "CG", "ND1", "CE1", "NE2"}
+    assert (
+        _backbone_charge_map("HIS", "", present, 0)
+        == _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
+    )
+    assert (
+        _backbone_charge_map("HIS", "", present, 1)
+        == _FF14SB_BACKBONE_CHARGES_BY_CLASS[1]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Golden test: parameterize fixed inputs and compare the per-residue
+# parameterization files against committed reference copies.
+# ---------------------------------------------------------------------------
+
+_CUSTOM_PARAM_DIR = os.path.join(curr_dir, "test-custom-residue-param")
+
+
+def _check_against_reference(generated_paths, ref_dir, label, regenerate):
+    """Compare each generated parameterization file against a committed
+    copy in ``ref_dir``, matched by basename. CIF topologies (free
+    residues and scaffolds) are compared as Molecules with moleculekit's
+    ``mol_equal``; prepi topologies (chain-resident residues) and frcmod
+    parameter files are compared verbatim. With ``regenerate`` true,
+    (re)write the references from the generated files instead."""
+    generated = {os.path.basename(p): p for p in generated_paths}
+
+    if regenerate:
+        if os.path.isdir(ref_dir):
+            shutil.rmtree(ref_dir)
+        os.makedirs(ref_dir)
+        for name, path in generated.items():
+            shutil.copyfile(path, os.path.join(ref_dir, name))
+        return
+
+    assert os.path.isdir(ref_dir), f"{label}: missing reference dir {ref_dir}"
+    assert set(generated) == set(os.listdir(ref_dir)), (
+        f"{label}: produced files {sorted(generated)} != "
+        f"reference files {sorted(os.listdir(ref_dir))}"
+    )
+    for name, path in sorted(generated.items()):
+        ref_path = os.path.join(ref_dir, name)
+        if name.endswith(".cif"):
+            assert mol_equal(
+                Molecule(path), Molecule(ref_path)
+            ), f"{label}: {name} differs from its reference"
+        else:
+            with open(path) as fh:
+                got = fh.read()
+            with open(ref_path) as fh:
+                ref = fh.read()
+            assert got == ref, f"{label}: {name} differs from its reference"
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="custom-residue parameterization needs antechamber + teLeap",
+)
+def _test_custom_residue_param_reference(tmp_path):
+    """Golden test for the non-canonical parameterization pipeline.
+
+    Runs detect -> template -> (systemPrepare) -> parameterizeFromSpecs on
+    two fixed inputs and compares every per-residue file it produces (CIF
+    or prepi topologies and the frcmod parameter files) against committed
+    reference copies, locking down the cluster pipeline and the ff14SB
+    backbone-charge pinning end to end. CIF topologies are compared with
+    mol_equal; prepi and frcmod files are compared verbatim.
+
+      - 3PTB_BEN.cif: a free, +1 benzamidine ligand. systemPrepare is
+        skipped here - it wraps PDB2PQR, which needs a biomolecule and
+        rejects a lone ligand, and templateResidueFromSmiles has already
+        added hydrogens and the formal charge.
+      - 8QFZ_B_bicycle.cif: a scaffolded cyclic peptide whose three Cys
+        anchors bond an LFI scaffold (one mid-chain, one at each chain
+        terminus), exercising the canonical-anchor backbone pin and its
+        N- and C-terminal variants.
+
+    The reference files depend on the installed antechamber / AmberTools
+    / PDB2PQR versions. After an intentional parameterization change or a
+    tool update, regenerate them by running this test with the
+    environment variable HTMD_REGEN_REFERENCES=1 set.
+    """
+    from moleculekit.tools.preparation import systemPrepare
+
+    regenerate = bool(os.environ.get("HTMD_REGEN_REFERENCES"))
+    cases = [
+        ("3PTB_BEN.cif", {"BEN": BEN_SMILES}, False),
+        ("8QFZ_B_bicycle.cif", {"LFI": LFI_SMILES}, True),
+    ]
+    for cif_name, smiles, run_prepare in cases:
+        stem = os.path.splitext(cif_name)[0]
+        mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, cif_name))
+        # systemPrepare and the bonded bookkeeping need a chain/segid; a
+        # bare-ligand CIF may carry neither.
+        if not np.any(mol.chain != ""):
+            mol.chain[:] = "A"
+            mol.segid[:] = "A"
+        specs = detectNonStandardResidues(mol)
+        for resname, smi in smiles.items():
+            mol.templateResidueFromSmiles(f'resname "{resname}"', smi, addHs=True)
+        pmol = systemPrepare(mol, detect_specs=specs)[0] if run_prepare else mol
+        out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / stem))
+        _check_against_reference(
+            out.topo_paths + out.frcmod_paths,
+            os.path.join(_CUSTOM_PARAM_DIR, "reference", stem),
+            stem,
+            regenerate,
+        )

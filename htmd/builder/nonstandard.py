@@ -19,9 +19,13 @@ scaffold, ASN glycosylated by a sugar, ...), the per-residue CIF carries
 ff14SB atom types pulled from the right AMBER residue template (mid-chain
 ``CYX`` / N-terminal ``NCYX`` / C-terminal ``CCYX`` and the analogous
 forms for LYS/HIS/ASN/...) so that backbone bonds resolve against
-ff14SB while sidechain charges come from the antechamber compute on the
-combined model. The frcmod carries cross-FF junction terms (bond / angle
-/ dihedral entries spanning a canonical-residue atom and a non-canonical
+ff14SB. Per-atom charges come from the antechamber compute on the
+combined model, except the backbone atoms of chain-resident residues,
+which are pinned to ff14SB: the whole backbone from the ff14SB libraries
+for canonical residues, the charge-class amide charges for NCAAs
+(see :func:`_backbone_charge_map`). The frcmod carries cross-FF
+junction terms (bond / angle / dihedral entries spanning a
+canonical-residue atom and a non-canonical
 one) with the canonical-side atom types rewritten from antechamber's
 GAFF2 to ff14SB.
 """
@@ -185,7 +189,13 @@ def _in_pyodide():
 
 
 def _write_chain_residue_prepi(
-    sub, prepi_path, resname, is_n_term=False, is_c_term=False, use_pyodide=None
+    sub,
+    prepi_path,
+    resname,
+    is_n_term=False,
+    is_c_term=False,
+    use_pyodide=None,
+    netcharge=0,
 ):
     """Convert a single chain-resident residue (already typed and named)
     into an AMBER ``.prepi`` topology so tLeap can splice it into a
@@ -193,7 +203,12 @@ def _write_chain_residue_prepi(
     AC format without re-typing, build a mainchain config, then run
     ``prepgen``. ``is_n_term`` / ``is_c_term`` omit the matching
     ``HEAD_NAME`` / ``TAIL_NAME`` lines so tLeap does not try to bond
-    that side to a phantom neighbour."""
+    that side to a phantom neighbour.
+
+    ``netcharge`` is the residue's integer formal charge, used for the
+    antechamber ``-nc`` flag and the prepgen ``CHARGE`` field. It is
+    passed in rather than summed from ``sub``: ``sub`` is sliced from an
+    antechamber-typed mol2, which cannot round-trip formal charge."""
     import networkx as nx
     from htmd.builder._ambertools import (
         _run_ambertools,
@@ -231,7 +246,7 @@ def _write_chain_residue_prepi(
                 "-fo",
                 "ac",
                 "-nc",
-                str(int(round(float(np.sum(sub.formalcharge))))),
+                str(int(netcharge)),
                 "-pf",
                 "y",
                 "-dr",
@@ -264,7 +279,7 @@ def _write_chain_residue_prepi(
                 f.write("POST_TAIL_TYPE N\n")
             for bb_idx in backbone[1:-1]:
                 f.write(f"MAIN_CHAIN {sub.name[bb_idx]}\n")
-            f.write(f"CHARGE {float(np.sum(sub.formalcharge)):.1f}\n")
+            f.write(f"CHARGE {float(netcharge):.1f}\n")
 
         prepgen_inputs = None
         if use_pyodide:
@@ -331,7 +346,7 @@ def _load_ff14sb_amino_lib():
     residue. Terminal-variant entries (``CCYX``, ``NCYX``, ...) sit
     alongside the mid-chain ones in the returned dict.
 
-    Returns a dict ``{resname: {atom_name: type}}``."""
+    Returns a dict ``{resname: {atom_name: (type, charge)}}``."""
     global _FF14SB_AMINO_LIB
     if _FF14SB_AMINO_LIB is not None:
         return _FF14SB_AMINO_LIB
@@ -364,7 +379,9 @@ def _load_ff14sb_amino_lib():
         if not os.path.isfile(path):
             continue
         for resname, residue in AmberOFFLibrary.parse(path).items():
-            merged[resname] = {a.name: a.type for a in residue.atoms}
+            merged[resname] = {
+                a.name: (a.type, a.charge) for a in residue.atoms
+            }
     _FF14SB_AMINO_LIB = merged
     return _FF14SB_AMINO_LIB
 
@@ -520,7 +537,7 @@ def _emit_openmm_xml(residue_templates, parameter_sets, xml_path):
     ff14sb_lib = _load_ff14sb_amino_lib()
     ff14sb_classes = set()
     for resname_atoms in ff14sb_lib.values():
-        ff14sb_classes.update(resname_atoms.values())
+        ff14sb_classes.update(t for t, _charge in resname_atoms.values())
 
     omm = OpenMMParameterSet.from_parameterset(merged, remediate_residues=False)
 
@@ -555,6 +572,105 @@ def _emit_openmm_xml(residue_templates, parameter_sets, xml_path):
     )
 
 
+# ff14SB backbone amide charges (N, H, C, O), keyed by the residue's
+# integer net charge. ff14SB constrains these four equal across all
+# standard residues of one charge class - neutral, cationic (+1, e.g.
+# LYS / ARG / HIP), anionic (-1, e.g. ASP / GLU) - so they are the safe
+# fallback for an NCAA, which is absent from the ff14SB libraries.
+# CA / HA are residue specific and cannot be set this way; canonical
+# residues instead get their full per-residue backbone from the
+# libraries via _backbone_charge_map.
+_FF14SB_BACKBONE_CHARGES_BY_CLASS = {
+    0: {"N": -0.4157, "H": 0.2719, "C": 0.5973, "O": -0.5679},
+    1: {"N": -0.3479, "H": 0.2747, "C": 0.7341, "O": -0.5894},
+    -1: {"N": -0.5163, "H": 0.2936, "C": 0.5366, "O": -0.5819},
+}
+
+# Atom names treated as backbone when a canonical residue is pinned to
+# its ff14SB charges: the peptide backbone plus the terminal-variant
+# atoms (N-terminal H1 / H2 / H3, C-terminal OXT).
+_BACKBONE_ATOM_NAMES = frozenset(
+    {"N", "H", "H1", "H2", "H3", "CA", "HA", "HA2", "HA3", "C", "O", "OXT"}
+)
+
+
+def _backbone_charge_map(canonical_resname, terminus, present_names, net_charge):
+    """Return ``{atom_name: ff14SB charge}`` for the backbone atoms to pin
+    on one chain-resident cluster residue.
+
+    For a canonical residue (``canonical_resname`` is its standard
+    resname, e.g. ``"CYS"``) the ff14SB amino libraries supply the whole
+    backbone: residue-specific CA / HA included, and the N-terminal /
+    C-terminal variants (looked up as ``N`` / ``C`` + resname), so a
+    terminal residue is pinned correctly too. ``terminus`` is ``"n"``,
+    ``"c"`` or ``""``.
+
+    For an NCAA (``canonical_resname`` empty, or a canonical residue
+    whose name is absent from the libraries, e.g. ``HIS`` - the libraries
+    are keyed ``HID`` / ``HIE`` / ``HIP``) the libraries have no entry,
+    so only the amide atoms N / H / C / O can be pinned, taken from the
+    charge class ``net_charge`` selects (a mid-chain residue's net charge
+    equals its sidechain charge class). The map is non-empty only for a
+    mid-chain residue carrying all four - a proline-like residue with no
+    amide H is left untouched - and only for a net charge in
+    ``{-1, 0, +1}``, the classes ff14SB defines.
+
+    ``present_names`` is the set of atom names the residue actually has.
+    """
+    if canonical_resname:
+        prefix = {"n": "N", "c": "C"}.get(terminus, "")
+        entry = _load_ff14sb_amino_lib().get(f"{prefix}{canonical_resname}")
+        if entry is not None:
+            return {
+                name: entry[name][1]
+                for name in present_names
+                if name in _BACKBONE_ATOM_NAMES and name in entry
+            }
+
+    if terminus:
+        return {}
+    classed = _FF14SB_BACKBONE_CHARGES_BY_CLASS.get(net_charge)
+    if classed is None or not classed.keys() <= present_names:
+        return {}
+    return dict(classed)
+
+
+def _pin_backbone_charges(sub, net_charge, charge_map):
+    """Pin the partial charges in ``charge_map`` (``{atom_name: charge}``)
+    onto ``sub``, then spread the residual equally over the remaining
+    atoms so the residue sums to its integer formal charge ``net_charge``.
+
+    Antechamber charges the whole cluster model compound on one scale
+    (Gasteiger by default), which leaves the backbone far from the ff14SB
+    charges every neighbouring standard residue carries. Restoring the
+    backbone charges (``charge_map`` comes from :func:`_backbone_charge_map`)
+    fixes the backbone electrostatics that drive backbone H-bonding.
+    Spreading the residual equally over the remaining atoms is the
+    minimum-L2 redistribution and, by targeting ``net_charge``, also
+    corrects the non-integer per-residue drift left by slicing one
+    residue out of a jointly-charged compound.
+
+    ``net_charge`` is the residue's integer formal charge; the caller
+    sources it from the cluster CIF, since a mol2 cannot round-trip
+    formal charge. No-op when ``charge_map`` is empty or none of its
+    atoms are present. Mutates ``sub.charge`` in place.
+    """
+    pinned = np.zeros(sub.numAtoms, dtype=bool)
+    for name, charge in charge_map.items():
+        sel = sub.name == name
+        if not sel.any():
+            continue
+        sub.charge[sel] = charge
+        pinned |= sel
+
+    free = ~pinned
+    n_free = int(free.sum())
+    if not pinned.any() or n_free == 0:
+        return
+    residual = float(net_charge) - float(np.sum(sub.charge))
+    sub.charge[free] += residual / n_free
+
+
 def prepareClusterResidues(
     typed_path,
     frcmod_path,
@@ -572,8 +688,11 @@ def prepareClusterResidues(
     For each canonical anchor the CIF uses the appropriate AMBER residue
     template's ff14SB atom types (mid-chain ``CYX`` / ``NLN`` / ... or
     the matching N- or C-terminal variant ``NCYX`` / ``CCYX`` / ...
-    when the residue is at a chain terminus), with charges taken from
-    the antechamber compute on the combined model. Each canonical
+    when the residue is at a chain terminus), with per-atom charges from
+    the antechamber compute on the combined model. For chain-resident
+    residues the backbone charges are pinned to ff14SB and the residue
+    rebalanced to its integer formal charge (see
+    :func:`_backbone_charge_map`). Each canonical
     residue's bucket resname (assigned by detect, e.g. ``CY1``) keeps
     the residue out of tLeap's built-in libraries so our prepi loads
     instead of the standard template.
@@ -611,6 +730,23 @@ def prepareClusterResidues(
         use_pyodide = _in_pyodide()
 
     typed_mol = Molecule(typed_path)
+
+    # Per-cluster-residue integer formal charge. The antechamber-typed
+    # mol2 carries none (mol2 has no formal-charge field), so read it
+    # from the cluster CIF, which does round-trip formal charge, mapping
+    # atoms to residues via model.atom_to_residue.
+    cif_mol = Molecule(model.cif_path)
+    residue_formal_charge = {}
+    for i in range(cif_mol.numAtoms):
+        cidx = model.atom_to_residue.get(str(cif_mol.name[i]))
+        if cidx is None:
+            continue
+        residue_formal_charge[cidx] = (
+            residue_formal_charge.get(cidx, 0.0) + float(cif_mol.formalcharge[i])
+        )
+    residue_formal_charge = {
+        cidx: int(round(v)) for cidx, v in residue_formal_charge.items()
+    }
 
     # Group atom indices by cluster_residue_index using model.atom_to_residue.
     # Cap atoms (not in atom_to_residue) are dropped from per-residue files.
@@ -663,6 +799,27 @@ def prepareClusterResidues(
                 for orig in sub.atomtype[sel]:
                     backbone_type_renames.setdefault(str(orig), set()).add(ff_type)
                 sub.atomtype[sel] = ff_type
+            # Pin the backbone charges to ff14SB so the modified residue's
+            # backbone electrostatics match the standard residues it is
+            # peptide-bonded to. Canonical residues get their whole
+            # backbone (residue-specific, terminal variants included) from
+            # the ff14SB libraries; NCAAs, absent from the libraries, get
+            # the universal mid-chain amide charges.
+            canonical_resname = (
+                model.spec.canonical_resnames[cidx]
+                if model.spec.is_canonical[cidx]
+                else ""
+            )
+            terminus = (
+                "n"
+                if model.spec.is_n_term[cidx]
+                else ("c" if model.spec.is_c_term[cidx] else "")
+            )
+            net_charge = residue_formal_charge.get(cidx, 0)
+            charge_map = _backbone_charge_map(
+                canonical_resname, terminus, {str(n) for n in sub.name}, net_charge
+            )
+            _pin_backbone_charges(sub, net_charge, charge_map)
 
         sub.resid[:] = 1
         sub.segid[:] = "A"
@@ -684,6 +841,7 @@ def prepareClusterResidues(
                     is_n_term=model.spec.is_n_term[cidx],
                     is_c_term=model.spec.is_c_term[cidx],
                     use_pyodide=use_pyodide,
+                    netcharge=residue_formal_charge.get(cidx, 0),
                 )
                 out.topo_paths.append(topo_path)
                 wrote_topo = True
