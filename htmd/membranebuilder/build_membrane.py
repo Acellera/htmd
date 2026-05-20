@@ -213,7 +213,7 @@ def _createLipids(
     return lipids
 
 
-def _setPositionsLJSim(width, lipids, footprint=None):
+def _setPositionsLJSim(width, lipids, footprint=None, platform_name=None):
     from htmd.membranebuilder.ljfluid import distributeLipids
 
     # Sigma is chosen so a hex-packed monolayer at the LJ minimum spacing
@@ -236,6 +236,7 @@ def _setPositionsLJSim(width, lipids, footprint=None):
         cutoff=cutoff,
         forbidden_xy=forbidden_xy,
         forbidden_radii=forbidden_radii,
+        platform_name=platform_name,
     )
     for i in range(len(lipids)):
         lipids[i].xyz[:2] = pos[i, :2]
@@ -690,8 +691,8 @@ def buildMembrane(
     waterbuff : float
         The z-dimension size of the water box above and below the membrane
     platform : str
-        OpenMM platform on which to run the minimization/equilibration
-        ('CUDA', 'OpenCL', 'CPU', or 'Reference')
+        OpenMM platform on which to run the LJ-fluid lipid placement and the
+        minimization/equilibration ('CUDA', 'OpenCL', 'CPU', or 'Reference')
     minimize : int
         If not 0 it minimizes the membrane for the given number of steps
     equilibrate : float
@@ -796,8 +797,18 @@ def buildMembrane(
         area_fraction_used=lower_fraction, head_z=head_z,
     )
 
-    _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] > 0], footprint=upper_fp)
-    _setPositionsLJSim(xysize, [ll for ll in lipids if ll.xyz[2] < 0], footprint=lower_fp)
+    _setPositionsLJSim(
+        xysize,
+        [ll for ll in lipids if ll.xyz[2] > 0],
+        footprint=upper_fp,
+        platform_name=platform,
+    )
+    _setPositionsLJSim(
+        xysize,
+        [ll for ll in lipids if ll.xyz[2] < 0],
+        footprint=lower_fp,
+        platform_name=platform,
+    )
 
     # Move lipids into the solute's frame so everything downstream
     # (rotation optimization, ring penetration, assembly, solvation) lives

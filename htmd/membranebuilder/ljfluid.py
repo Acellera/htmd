@@ -127,6 +127,7 @@ def distributeLipids(
     switch_width=3.4 * unit.angstrom,  # argon
     forbidden_xy=None,
     forbidden_radii=None,
+    platform_name=None,
 ):
     from moleculekit.periodictable import periodictable
 
@@ -258,14 +259,22 @@ def distributeLipids(
     topology.setUnitCellDimensions(unit.Quantity(boxsize, unit.angstrom))
 
     # Simulate it
-    from openmm import VerletIntegrator
+    from openmm import VerletIntegrator, Platform
     from openmm.app import Simulation
     from openmm.unit import picoseconds, angstrom
 
     nsteps = 10000
 
     integrator = VerletIntegrator(0.002 * picoseconds)
-    simulation = Simulation(topology, system, integrator)
+    if platform_name is not None:
+        simulation = Simulation(
+            topology,
+            system,
+            integrator,
+            Platform.getPlatformByName(platform_name),
+        )
+    else:
+        simulation = Simulation(topology, system, integrator)
     simulation.context.setPositions(positions * angstrom)
     simulation.minimizeEnergy()
     simulation.step(nsteps)
