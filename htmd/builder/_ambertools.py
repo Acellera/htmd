@@ -85,6 +85,33 @@ def _run_ambertools(program, cmd, cwd, use_pyodide=False, input_files=None):
     return None
 
 
+def _assign_rdkit_gasteiger_charges(mol):
+    """Compute Gasteiger (PEOE) partial charges with RDKit and write them
+    onto ``mol.charge`` in place.
+
+    antechamber's own ``-c gas`` ignores the net charge and produces a
+    charge set summing to zero even for an ion. RDKit's Gasteiger seeds
+    from the per-atom formal charges, so the charges sum to the actual
+    net charge - it handles charged species correctly. RDKit is already a
+    moleculekit dependency and is available under Pyodide.
+    """
+    from moleculekit.rdkittools import molecule_to_rdkitmol
+    from rdkit.Chem import AllChem
+
+    rdmol = molecule_to_rdkitmol(mol, sanitize=True, _logger=False)
+    AllChem.ComputeGasteigerCharges(rdmol)
+    charges = np.array(
+        [float(a.GetDoubleProp("_GasteigerCharge")) for a in rdmol.GetAtoms()],
+        dtype=np.float32,
+    )
+    if not np.all(np.isfinite(charges)):
+        raise RuntimeError(
+            "RDKit Gasteiger produced non-finite charges; the molecule may "
+            "have an atom in an environment its parameters do not cover."
+        )
+    mol.charge = charges
+
+
 def _fftype_antechamber(
     mol,
     tmpdir,
@@ -109,9 +136,10 @@ def _fftype_antechamber(
     netcharge : int
         Net formal charge of the molecule.
     charge_method : str or None
-        Charge model passed to antechamber's ``-c`` flag. One of
-        ``"AM1-BCC"``, ``"Gasteiger"``, ``"ABCG2"``, or ``None`` to skip
-        charge assignment (case-insensitive). Under Pyodide only
+        Charge model. ``"Gasteiger"`` is computed with RDKit (it honours
+        the net charge, unlike antechamber's own Gasteiger); ``"AM1-BCC"``
+        and ``"ABCG2"`` are passed to antechamber's ``-c`` flag. ``None``
+        skips charge assignment. Case-insensitive. Under Pyodide only
         ``"Gasteiger"`` (or ``None``) is supported.
     use_pyodide : bool
         Dispatch via antechamber_pyodide instead of subprocess.
@@ -149,6 +177,15 @@ def _fftype_antechamber(
             f"Use 'Gasteiger' or None."
         )
     ac_charge = _CHARGE_METHOD_MAP[charge_key]
+
+    if charge_key == "gasteiger":
+        # antechamber's '-c gas' ignores the net charge (its charges sum
+        # to zero even for an ion). Compute Gasteiger with RDKit instead,
+        # which seeds from formal charges, and let antechamber only assign
+        # atom types, carrying these charges through unchanged.
+        mol = mol.copy()
+        _assign_rdkit_gasteiger_charges(mol)
+        ac_charge = None
 
     input_mol2 = "input.mol2"
     mol2path = os.path.join(tmpdir, input_mol2)
@@ -213,6 +250,20 @@ def _fftype_antechamber(
         _write_pyodide_output(frcmod_path, result[output_frcmod])
 
     typed_mol = Molecule(typed_path)
+
+    # Verify the assigned charges sum to the requested net charge. This
+    # catches a charge method that silently ignores it - antechamber's
+    # own Gasteiger does, summing to zero even for an ion. The tolerance
+    # absorbs antechamber's per-atom charge rounding.
+    if charge_key is not None:
+        total = float(np.sum(typed_mol.charge))
+        if abs(total - netcharge) > 0.02:
+            raise RuntimeError(
+                f"{charge_method} charges sum to {total:.4f}, but the net "
+                f"charge of the molecule is {netcharge} - the charge method "
+                f"did not honour the net charge."
+            )
+
     return typed_mol, typed_path, frcmod_path
 
 

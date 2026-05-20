@@ -1234,7 +1234,7 @@ def _check_specs_protonated(mol, spec_by_res_idx, groups):
 
 
 def parameterizeFromSpecs(
-    specs, mol, outdir, charge_method="gasteiger", use_pyodide=None
+    specs, mol, outdir, charge_method="am1-bcc", use_pyodide=None
 ):
     """Parameterize every non-canonical residue in ``specs`` and return
     paths plus custombonds ready to feed :func:`htmd.builder.amber.build`.
@@ -1257,9 +1257,11 @@ def parameterizeFromSpecs(
     outdir : str
         Output directory for all generated CIF / frcmod files.
     charge_method : str, optional
-        Charge method passed to antechamber's ``-c`` flag (``"gasteiger"``
-        by default; ``"am1-bcc"`` available for higher accuracy at
-        significant runtime cost).
+        Charge model for the non-canonical atoms. ``"am1-bcc"`` (the
+        default) is the most accurate and honours the net charge.
+        ``"gasteiger"`` is faster, is computed via RDKit so it also
+        honours the net charge, and is the automatic fallback under
+        Pyodide where AM1-BCC's SQM backend is unavailable.
     use_pyodide : bool or None, optional
         Force the AmberTools dispatch path (``True`` -> dispatch via
         ``antechamber_pyodide.run``; ``False`` -> native subprocess).
@@ -1326,6 +1328,12 @@ def parameterizeFromSpecs(
 
     if use_pyodide is None:
         use_pyodide = _in_pyodide()
+    if use_pyodide and str(charge_method).lower() == "am1-bcc":
+        logger.info(
+            "AM1-BCC needs the SQM backend, unavailable under Pyodide; "
+            "falling back to Gasteiger charges."
+        )
+        charge_method = "gasteiger"
 
     os.makedirs(outdir, exist_ok=True)
     a2r, groups = _residue_groups_with_index(mol)
