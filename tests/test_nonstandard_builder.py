@@ -1414,10 +1414,11 @@ def _test_custom_residue_param_reference(tmp_path):
     backbone-charge pinning end to end. CIF topologies are compared with
     mol_equal; prepi and frcmod files are compared verbatim.
 
-      - 3PTB_BEN.cif: a free, +1 benzamidine ligand. systemPrepare is
-        skipped here - it wraps PDB2PQR, which needs a biomolecule and
-        rejects a lone ligand, and templateResidueFromSmiles has already
-        added hydrogens and the formal charge.
+      - 3PTB_BEN.cif: a free, +1 benzamidine ligand, parameterized with
+        AM1-BCC. systemPrepare is skipped - it wraps PDB2PQR, which needs
+        a biomolecule and rejects a lone ligand, and
+        templateResidueFromSmiles has already added hydrogens and the
+        formal charge.
       - 8QFZ_B_bicycle.cif: a scaffolded cyclic peptide whose three Cys
         anchors bond an LFI scaffold (one mid-chain, one at each chain
         terminus), exercising the canonical-anchor backbone pin and its
@@ -1432,10 +1433,12 @@ def _test_custom_residue_param_reference(tmp_path):
 
     regenerate = bool(os.environ.get("HTMD_REGEN_REFERENCES"))
     cases = [
-        ("3PTB_BEN.cif", {"BEN": BEN_SMILES}, False),
-        ("8QFZ_B_bicycle.cif", {"LFI": LFI_SMILES}, True),
+        # Exercise both charge methods: AM1-BCC for BEN, Gasteiger
+        # (RDKit-computed, so it also honours the net charge) for 8QFZ.
+        ("3PTB_BEN.cif", {"BEN": BEN_SMILES}, False, "am1-bcc"),
+        ("8QFZ_B_bicycle.cif", {"LFI": LFI_SMILES}, True, "gasteiger"),
     ]
-    for cif_name, smiles, run_prepare in cases:
+    for cif_name, smiles, run_prepare, charge_method in cases:
         stem = os.path.splitext(cif_name)[0]
         mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, cif_name))
         # systemPrepare and the bonded bookkeeping need a chain/segid; a
@@ -1447,7 +1450,9 @@ def _test_custom_residue_param_reference(tmp_path):
         for resname, smi in smiles.items():
             mol.templateResidueFromSmiles(f'resname "{resname}"', smi, addHs=True)
         pmol = systemPrepare(mol, detect_specs=specs)[0] if run_prepare else mol
-        out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / stem))
+        out = parameterizeFromSpecs(
+            specs, pmol, outdir=str(tmp_path / stem), charge_method=charge_method
+        )
         _check_against_reference(
             out.topo_paths + out.frcmod_paths,
             os.path.join(_CUSTOM_PARAM_DIR, "reference", stem),
