@@ -379,9 +379,7 @@ def _load_ff14sb_amino_lib():
         if not os.path.isfile(path):
             continue
         for resname, residue in AmberOFFLibrary.parse(path).items():
-            merged[resname] = {
-                a.name: (a.type, a.charge) for a in residue.atoms
-            }
+            merged[resname] = {a.name: (a.type, a.charge) for a in residue.atoms}
     _FF14SB_AMINO_LIB = merged
     return _FF14SB_AMINO_LIB
 
@@ -594,7 +592,13 @@ _BACKBONE_ATOM_NAMES = frozenset(
 )
 
 
-def _backbone_charge_map(canonical_resname, terminus, present_names, net_charge):
+def _backbone_charge_map(
+    canonical_resname,
+    terminus,
+    present_names,
+    net_charge,
+    n_has_bonded_h=True,
+):
     """Return ``{atom_name: ff14SB charge}`` for the backbone atoms to pin
     on one chain-resident cluster residue.
 
@@ -611,9 +615,22 @@ def _backbone_charge_map(canonical_resname, terminus, present_names, net_charge)
     so only the amide atoms N / H / C / O can be pinned, taken from the
     charge class ``net_charge`` selects (a mid-chain residue's net charge
     equals its sidechain charge class). The map is non-empty only for a
-    mid-chain residue carrying all four - a proline-like residue with no
-    amide H is left untouched - and only for a net charge in
+    mid-chain residue carrying all four, and only for a net charge in
     ``{-1, 0, +1}``, the classes ff14SB defines.
+
+    For a **proline-analogue** NCAA (e.g. OIC, pipecolic acid, HYP-style
+    residues) the amide N has no bonded H - it is ring-closed to a
+    sidechain CD instead - and the universal non-PRO amide-N fallback
+    would mis-charge N (which assumes an N-H bond partner). For these
+    residues the backbone is pinned to **ff14SB PRO** values for
+    ``N / CA / C / O / HA``. PRO is the only canonical residue with this
+    topology, so it is the right anchor per the Cornell/Cieplak 1995
+    convention (proline is its own equivalence class) and the Betz /
+    Ramos practitioner convention (freeze backbone to the
+    chemically-matching canonical residue's ff14SB values). CD and any
+    extra ring carbons refit because their chemistry varies by ring
+    size (5-membered pyrrolidine in PRO vs. fused bicyclic in OIC vs.
+    6-membered piperidine in pipecolic, ...).
 
     ``present_names`` is the set of atom names the residue actually has.
     """
@@ -629,46 +646,98 @@ def _backbone_charge_map(canonical_resname, terminus, present_names, net_charge)
 
     if terminus:
         return {}
+
+    # Proline-analogue NCAA: the backbone N has no bonded H (ring-
+    # closed to a sidechain CD/CE instead of an amide H). Typical of
+    # OIC, pipecolic acid, HYP analogues, ... The caller computes
+    # ``n_has_bonded_h`` from the actual bond graph - an N-terminal
+    # residue with NH3+ atoms named H1/H2/H3 has bonded H and is
+    # *not* proline-like even though "H" is absent from the name
+    # set. Pin to ff14SB PRO charges for N / CA / C / O / HA; CD and
+    # any extra ring atoms refit per the ff15ipq-m / Betz convention.
+    # Only fires for net_charge == 0 (ff14SB has no charged-PRO).
+    if "N" in present_names and not n_has_bonded_h and net_charge == 0:
+        pro_entry = _load_ff14sb_amino_lib().get("PRO")
+        if pro_entry is not None:
+            return {
+                name: pro_entry[name][1]
+                for name in ("N", "CA", "C", "O", "HA")
+                if name in present_names and name in pro_entry
+            }
+
     classed = _FF14SB_BACKBONE_CHARGES_BY_CLASS.get(net_charge)
     if classed is None or not classed.keys() <= present_names:
         return {}
     return dict(classed)
 
 
-def _pin_backbone_charges(sub, net_charge, charge_map):
-    """Pin the partial charges in ``charge_map`` (``{atom_name: charge}``)
-    onto ``sub``, then spread the residual equally over the remaining
-    atoms so the residue sums to its integer formal charge ``net_charge``.
+def _normalize_residue_charges(sub, net_charge, charge_map=None):
+    """Pin atoms named in ``charge_map`` (if provided) to those fixed
+    charges, then - if ``net_charge`` is not ``None`` - rebalance
+    ``sub.charge`` so it sums to ``net_charge`` by spreading the
+    residual equally over the remaining (non-pinned) atoms. Returns a
+    boolean mask of which atoms were pinned (useful for downstream
+    cluster-level redistributions over the same non-pinned set).
 
-    Antechamber charges the whole cluster model compound on one scale
-    (Gasteiger by default), which leaves the backbone far from the ff14SB
-    charges every neighbouring standard residue carries. Restoring the
-    backbone charges (``charge_map`` comes from :func:`_backbone_charge_map`)
-    fixes the backbone electrostatics that drive backbone H-bonding.
-    Spreading the residual equally over the remaining atoms is the
-    minimum-L2 redistribution and, by targeting ``net_charge``, also
-    corrects the non-integer per-residue drift left by slicing one
-    residue out of a jointly-charged compound.
+    Two roles in one helper:
 
-    ``net_charge`` is the residue's integer formal charge; the caller
-    sources it from the cluster CIF, since a mol2 cannot round-trip
-    formal charge. No-op when ``charge_map`` is empty or none of its
-    atoms are present. Mutates ``sub.charge`` in place.
+    * **Backbone pin** (``charge_map`` non-empty, ``net_charge`` given).
+      Atoms named in ``charge_map = {atom_name: charge}`` are first set
+      to those exact values - typically the ff14SB backbone partial
+      charges from :func:`_backbone_charge_map`. The residual relative
+      to ``net_charge`` is then spread equally over the remaining
+      atoms. Fixes backbone electrostatics for chain-resident residues
+      so the modified residue matches the standard ff14SB residues it
+      is peptide-bonded to. This is the Robin Betz / R.E.D. / Carlos
+      Ramos tutorial convention.
+
+    * **Per-residue total normalization** (``charge_map`` empty / ``None``,
+      ``net_charge`` given). No atoms are pinned; the residual is
+      spread equally over all atoms. Brings scaffolds and free
+      residues to their integer formal charge after a cluster-wide
+      charge computation has left them with a small fractional total
+      (the smear at C-S / C-N junctions across the cluster), so each
+      emitted ``.prepi`` / ``.cif`` is an integer-charged unit - the
+      AMBER convention for tLeap.
+
+    * **Pin-only** (``net_charge=None``). Only the ``charge_map`` atoms
+      are written; no rebalancing. Used by the cluster-level
+      normalization path, which combines per-residue pinning with a
+      single cluster-wide residual distribution after all subs are
+      pinned.
+
+    Equal distribution of the residual is the minimum-L2 correction
+    and is what tutorials like R.E.D. (Cieplak / Dupradeau) achieve
+    implicitly through the constrained RESP fit.
+
+    Mutates ``sub.charge`` in place. ``net_charge`` is the residue's
+    integer formal charge; the caller sources it from the cluster CIF,
+    since a mol2 cannot round-trip formal charge.
     """
     pinned = np.zeros(sub.numAtoms, dtype=bool)
-    for name, charge in charge_map.items():
-        sel = sub.name == name
-        if not sel.any():
-            continue
-        sub.charge[sel] = charge
-        pinned |= sel
+    if charge_map:
+        for name, charge in charge_map.items():
+            sel = sub.name == name
+            if not sel.any():
+                continue
+            sub.charge[sel] = charge
+            pinned |= sel
+
+    if net_charge is None:
+        return pinned
 
     free = ~pinned
     n_free = int(free.sum())
-    if not pinned.any() or n_free == 0:
-        return
+    if n_free == 0:
+        return pinned
     residual = float(net_charge) - float(np.sum(sub.charge))
     sub.charge[free] += residual / n_free
+    return pinned
+
+
+# Valid values for the ``normalize`` argument of :func:`parameterizeFromSpecs`
+# and :func:`prepareClusterResidues`. See the parameter docstring.
+NORMALIZE_MODES = ("per_residue", "cluster", None)
 
 
 def prepareClusterResidues(
@@ -679,6 +748,8 @@ def prepareClusterResidues(
     use_pyodide=None,
     residue_templates=None,
     parameter_sets=None,
+    pin_backbone_charges=True,
+    normalize="cluster",
 ):
     """Split antechamber output for a cluster model compound into per-
     residue topology files and emit the matching custombonds list.
@@ -690,12 +761,15 @@ def prepareClusterResidues(
     the matching N- or C-terminal variant ``NCYX`` / ``CCYX`` / ...
     when the residue is at a chain terminus), with per-atom charges from
     the antechamber compute on the combined model. For chain-resident
-    residues the backbone charges are pinned to ff14SB and the residue
-    rebalanced to its integer formal charge (see
-    :func:`_backbone_charge_map`). Each canonical
-    residue's bucket resname (assigned by detect, e.g. ``CY1``) keeps
-    the residue out of tLeap's built-in libraries so our prepi loads
-    instead of the standard template.
+    residues the backbone charges are pinned to ff14SB by default and
+    the residue rebalanced to its integer formal charge (see
+    :func:`_backbone_charge_map`); set ``pin_backbone_charges=False``
+    to skip the pin and keep the cluster-computed backbone charges. In
+    both cases every per-residue file (chain-resident and scaffold) is
+    rebalanced to its integer formal charge, so each emitted unit is
+    integer-charged. Each canonical residue's bucket resname (assigned
+    by detect, e.g. ``CY1``) keeps the residue out of tLeap's built-in
+    libraries so our prepi loads instead of the standard template.
 
     Parameters
     ----------
@@ -741,8 +815,8 @@ def prepareClusterResidues(
         cidx = model.atom_to_residue.get(str(cif_mol.name[i]))
         if cidx is None:
             continue
-        residue_formal_charge[cidx] = (
-            residue_formal_charge.get(cidx, 0.0) + float(cif_mol.formalcharge[i])
+        residue_formal_charge[cidx] = residue_formal_charge.get(cidx, 0.0) + float(
+            cif_mol.formalcharge[i]
         )
     residue_formal_charge = {
         cidx: int(round(v)) for cidx, v in residue_formal_charge.items()
@@ -770,6 +844,11 @@ def prepareClusterResidues(
     # spanning the backbone-sidechain boundary still resolve.
     backbone_type_renames = {}
 
+    # Pass 1: build per-residue ``sub`` Molecules and apply the backbone
+    # pin (if requested). Defer total-charge normalization to after the
+    # loop so the ``normalize=='cluster'`` mode can run a single
+    # cluster-wide residual distribution over all the non-pinned atoms.
+    per_residue_data = []
     for cidx, residue_id in enumerate(model.spec.residues):
         if cidx not in per_residue_atom_idxs:
             continue
@@ -783,6 +862,7 @@ def prepareClusterResidues(
         else:
             new_resname = residue_id.resname
         sub.resname[:] = new_resname
+
         # Chain-resident backbones (canonical and non-canonical alike)
         # must carry ff14SB atom types on N / CA / C / O / H / HA so
         # the peptide bond at the chain neighbour resolves through the
@@ -793,38 +873,129 @@ def prepareClusterResidues(
         # angle / dihedral entries that span the boundary so they
         # resolve under both the original GAFF2 type and the
         # backbone-rewritten ff14SB type.
+        net_charge = residue_formal_charge.get(cidx, 0)
+        charge_map = {}
         if model.spec.is_chain_resident[cidx]:
             for name, ff_type in backbone_at.items():
                 sel = sub.name == name
                 for orig in sub.atomtype[sel]:
                     backbone_type_renames.setdefault(str(orig), set()).add(ff_type)
                 sub.atomtype[sel] = ff_type
-            # Pin the backbone charges to ff14SB so the modified residue's
-            # backbone electrostatics match the standard residues it is
-            # peptide-bonded to. Canonical residues get their whole
-            # backbone (residue-specific, terminal variants included) from
-            # the ff14SB libraries; NCAAs, absent from the libraries, get
-            # the universal mid-chain amide charges.
-            canonical_resname = (
-                model.spec.canonical_resnames[cidx]
-                if model.spec.is_canonical[cidx]
-                else ""
-            )
-            terminus = (
-                "n"
-                if model.spec.is_n_term[cidx]
-                else ("c" if model.spec.is_c_term[cidx] else "")
-            )
-            net_charge = residue_formal_charge.get(cidx, 0)
-            charge_map = _backbone_charge_map(
-                canonical_resname, terminus, {str(n) for n in sub.name}, net_charge
-            )
-            _pin_backbone_charges(sub, net_charge, charge_map)
+            # Optionally pin the backbone charges to ff14SB so the
+            # modified residue's backbone electrostatics match the
+            # standard residues it is peptide-bonded to. Canonical
+            # residues get their whole backbone (residue-specific,
+            # terminal variants included) from the ff14SB libraries;
+            # NCAAs, absent from the libraries, get the universal
+            # mid-chain amide charges. Disable via
+            # ``pin_backbone_charges=False`` (Forcefield_PTM convention).
+            if pin_backbone_charges:
+                canonical_resname = (
+                    model.spec.canonical_resnames[cidx]
+                    if model.spec.is_canonical[cidx]
+                    else ""
+                )
+                terminus = (
+                    "n"
+                    if model.spec.is_n_term[cidx]
+                    else ("c" if model.spec.is_c_term[cidx] else "")
+                )
+                # Walk sub.bonds for actual H neighbors of N rather
+                # than relying on atom-name heuristics (an N-terminal
+                # NH3+ has H1/H2/H3, no atom named "H", but it is not
+                # proline-like - it has bonded Hs).
+                n_idx = np.where(sub.name == "N")[0]
+                n_has_bonded_h = False
+                if len(n_idx):
+                    for nb in sub.getNeighbors(int(n_idx[0])):
+                        if str(sub.element[nb]) == "H":
+                            n_has_bonded_h = True
+                            break
+                charge_map = _backbone_charge_map(
+                    canonical_resname,
+                    terminus,
+                    {str(n) for n in sub.name},
+                    net_charge,
+                    n_has_bonded_h=n_has_bonded_h,
+                )
+
+        # Apply the pin but defer the residual rebalance (net_charge=None).
+        pinned_mask = _normalize_residue_charges(
+            sub, net_charge=None, charge_map=charge_map
+        )
 
         sub.resid[:] = 1
         sub.segid[:] = "A"
         sub.chain[:] = "A"
         sub.insertion[:] = ""
+
+        per_residue_data.append(
+            {
+                "cidx": cidx,
+                "sub": sub,
+                "new_resname": new_resname,
+                "residue_id": residue_id,
+                "pinned_mask": pinned_mask,
+                "net_charge": net_charge,
+            }
+        )
+
+    # Normalization pass. Cluster-wide charge methods (RDKit Gasteiger
+    # PEOE, antechamber AM1-BCC) sum the cluster total to the cluster's
+    # net formal charge exactly, but two things move per-residue (and
+    # potentially cluster) totals off-integer afterwards:
+    #   1. The C-S / C-N smear at residue junctions: per-residue slices
+    #      get a small fraction of charge that "belongs" to a
+    #      neighbouring residue, and vice versa. The cluster sum is
+    #      preserved; per-residue sums are not.
+    #   2. The backbone pin (when enabled): replacing per-atom Gasteiger
+    #      backbone charges with ff14SB values shifts the cluster total
+    #      by sum(ff14SB - gasteiger) over all pinned atoms.
+    # The "cluster" mode absorbs only (2)'s effect by spreading one
+    # residual cluster-wide; "per_residue" mode absorbs both (1) and
+    # (2)'s effects into each residue's free atoms; None leaves both.
+    #
+    #   "cluster" (default): one residual is computed over the whole
+    #       cluster and distributed equally across every non-pinned
+    #       atom across all residues. The cluster total is integer but
+    #       individual residue totals stay at their charge-method
+    #       values (modulo a uniform shift). Preserves the natural
+    #       per-atom charges better; per-residue totals are fractional.
+    #   "per_residue": each residue's free atoms absorb that residue's
+    #       residual so the residue sums to its integer formal charge.
+    #       AMBER's tLeap convention, used by Betz / R.E.D. / Ramos.
+    #       Safer if the same residue might recur in different bonding
+    #       contexts.
+    #   None: no rebalance at all. Each per-residue file carries the
+    #       charge-method's per-atom charges with the backbone-pin
+    #       shift left in.
+    if normalize == "per_residue":
+        for d in per_residue_data:
+            sub = d["sub"]
+            free = ~d["pinned_mask"]
+            n_free = int(free.sum())
+            if n_free == 0:
+                continue
+            residual = float(d["net_charge"]) - float(np.sum(sub.charge))
+            sub.charge[free] += residual / n_free
+    elif normalize == "cluster":
+        cluster_total = sum(float(np.sum(d["sub"].charge)) for d in per_residue_data)
+        cluster_target = sum(int(d["net_charge"]) for d in per_residue_data)
+        cluster_residual = float(cluster_target) - cluster_total
+        n_free_cluster = sum(int((~d["pinned_mask"]).sum()) for d in per_residue_data)
+        if n_free_cluster:
+            shift = cluster_residual / n_free_cluster
+            for d in per_residue_data:
+                d["sub"].charge[~d["pinned_mask"]] += shift
+    # else normalize is None: leave charges as-is after pin.
+
+    # Pass 2: emit per-residue topology files and (optionally) collect
+    # OpenMM XML template data using the now-normalized ``sub``s.
+    for d in per_residue_data:
+        cidx = d["cidx"]
+        sub = d["sub"]
+        new_resname = d["new_resname"]
+        residue_id = d["residue_id"]
 
         # Chain-resident residues need a prepi (with HEAD / TAIL / connect
         # atoms) so tLeap can stitch them into their flanking residues
@@ -1234,7 +1405,13 @@ def _check_specs_protonated(mol, spec_by_res_idx, groups):
 
 
 def parameterizeFromSpecs(
-    specs, mol, outdir, charge_method="am1-bcc", use_pyodide=None
+    specs,
+    mol,
+    outdir,
+    charge_method="am1-bcc",
+    pin_backbone_charges=True,
+    normalize="cluster",
+    use_pyodide=None,
 ):
     """Parameterize every non-canonical residue in ``specs`` and return
     paths plus custombonds ready to feed :func:`htmd.builder.amber.build`.
@@ -1262,6 +1439,28 @@ def parameterizeFromSpecs(
         ``"gasteiger"`` is faster, is computed via RDKit so it also
         honours the net charge, and is the automatic fallback under
         Pyodide where AM1-BCC's SQM backend is unavailable.
+    pin_backbone_charges : bool, optional
+        If ``True`` (default), the backbone partial charges of every
+        chain-resident residue are pinned to ff14SB (residue-specific
+        for canonical residues, charge-class fallback for NCAAs).
+        Matches the Robin Betz / R.E.D. / Carlos Ramos tutorial
+        convention. Set ``False`` to keep the cluster-computed
+        backbone charges (the Forcefield_PTM / Khoury et al. 2014
+        convention, which argues backbone freezing can hurt fit
+        quality).
+    normalize : {"cluster", "per_residue", None}, optional
+        How to absorb the small per-residue drift left by slicing one
+        residue out of a jointly-charged cluster (RDKit Gasteiger PEOE
+        or antechamber AM1-BCC) and any shift the backbone pin
+        introduces on the cluster total. Default ``"cluster"``: only
+        the cluster total is normalised to integer; per-residue totals
+        are left at their natural (fractional) values, preserving the
+        per-atom charges the charge method computed. ``"per_residue"``:
+        each emitted unit is integer-charged - AMBER's tLeap
+        convention, used by Betz / R.E.D. / Ramos, the safer choice if
+        the same residue might recur in different bonding contexts.
+        ``None``: no rebalance at all (charges are exactly what the
+        charge method produced, modulo the backbone pin).
     use_pyodide : bool or None, optional
         Force the AmberTools dispatch path (``True`` -> dispatch via
         ``antechamber_pyodide.run``; ``False`` -> native subprocess).
@@ -1325,6 +1524,18 @@ def parameterizeFromSpecs(
         PROTEIN_RESNAMES,
     )
     from htmd.builder._ambertools import _fftype_antechamber
+
+    if normalize not in NORMALIZE_MODES:
+        raise ValueError(f"normalize={normalize!r}: expected one of {NORMALIZE_MODES}")
+    if pin_backbone_charges and normalize is None:
+        raise ValueError(
+            "pin_backbone_charges=True with normalize=None is inconsistent: "
+            "pinning shifts the cluster total off-integer (by "
+            "sum(ff14SB_backbone - charge_method_backbone)), and refusing to "
+            "rebalance leaves the system with a non-integer total charge. "
+            "Pick one of: pin_backbone_charges=False (raw charges, no shift) "
+            "or normalize='cluster' / 'per_residue' (absorb the shift)."
+        )
 
     if use_pyodide is None:
         use_pyodide = _in_pyodide()
@@ -1415,10 +1626,7 @@ def parameterizeFromSpecs(
     for r_idx, spec in spec_by_res_idx.items():
         if r_idx in in_cluster_set:
             continue
-        if (
-            isinstance(spec, ChainResidueSpec)
-            and spec.resname not in PROTEIN_RESNAMES
-        ):
+        if isinstance(spec, ChainResidueSpec) and spec.resname not in PROTEIN_RESNAMES:
             cluster_membership.append(([r_idx], []))
             in_cluster_set.add(r_idx)
 
@@ -1482,6 +1690,8 @@ def parameterizeFromSpecs(
             use_pyodide=use_pyodide,
             residue_templates=residue_templates,
             parameter_sets=parameter_sets,
+            pin_backbone_charges=pin_backbone_charges,
+            normalize=normalize,
         )
         out.topo_paths.extend(cluster_out.topo_paths)
         out.frcmod_paths.extend(cluster_out.frcmod_paths)
@@ -1530,6 +1740,13 @@ def parameterizeFromSpecs(
         out_cif = os.path.join(outdir, f"{g['resname']}.cif")
         out_frcmod = os.path.join(outdir, f"{g['resname']}.frcmod")
         typed_mol.resname[:] = g["resname"]
+        # Antechamber's mol2 rounds charges to 4 decimals; with many
+        # atoms the sum drifts a few thousandths off the integer net
+        # charge. Renormalize the standalone unit unless the user has
+        # opted out via ``normalize=None``. (For a single-residue
+        # ligand, "cluster" and "per_residue" are identical.)
+        if normalize is not None:
+            _normalize_residue_charges(typed_mol, netcharge)
         typed_mol.write(out_cif)
         # Free ligand: no peptide backbone and no caps, so prune purely
         # against the residue's own atom types / connectivity.
@@ -1819,9 +2036,7 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
         model.bonds = np.vstack(
             [model.bonds, np.asarray(new_cap_bonds, dtype=np.uint32)]
         )
-        model.bondtype = np.hstack(
-            [model.bondtype, np.asarray(new_cap_bondtypes)]
-        )
+        model.bondtype = np.hstack([model.bondtype, np.asarray(new_cap_bondtypes)])
 
     for bond in spec.bonds:
         a_orig = int(bond.atom_a.selectAtom(mol))

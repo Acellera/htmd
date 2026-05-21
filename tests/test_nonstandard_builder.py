@@ -42,7 +42,7 @@ from htmd.builder.nonstandard import (
     _check_specs_protonated,
     _clean_frcmod_params,
     _residue_groups_with_index,
-    _pin_backbone_charges,
+    _normalize_residue_charges,
     _backbone_charge_map,
     _FF14SB_BACKBONE_CHARGES_BY_CLASS,
 )
@@ -1221,14 +1221,14 @@ def _test_clean_frcmod_cap_atoms_excluded(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Unit tests for the backbone charge pin (_pin_backbone_charges) and the
+# Unit tests for the backbone charge pin (_normalize_residue_charges) and the
 # ff14SB backbone charge lookup (_backbone_charge_map).
 # ---------------------------------------------------------------------------
 
 
 def _charge_mol(names, charges):
     """Single-residue Molecule with explicit atom names and partial
-    charges - the inputs _pin_backbone_charges reads."""
+    charges - the inputs _normalize_residue_charges reads."""
     n = len(names)
     mol = Molecule().empty(n)
     mol.name[:] = names
@@ -1246,32 +1246,32 @@ _BACKBONE_PLUS_SIDECHAIN = ["N", "H", "CA", "HA", "C", "O", "CB", "HB2", "HB3", 
 _NEUTRAL_BACKBONE = _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
 
 
-def _test_pin_backbone_charges_pins_map_and_rebalances():
+def _test_normalize_residue_charges_pins_map_and_rebalances():
     # The charge_map atoms carry the pinned values and the residue sums
     # to its integer formal charge.
     sub = _charge_mol(_BACKBONE_PLUS_SIDECHAIN, [0.3] * len(_BACKBONE_PLUS_SIDECHAIN))
-    _pin_backbone_charges(sub, net_charge=0, charge_map=_NEUTRAL_BACKBONE)
+    _normalize_residue_charges(sub, net_charge=0, charge_map=_NEUTRAL_BACKBONE)
     for name, q in _NEUTRAL_BACKBONE.items():
         assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
     assert float(np.sum(sub.charge)) == pytest.approx(0.0, abs=1e-4)
 
 
-def _test_pin_backbone_charges_targets_integer_formal_charge():
+def _test_normalize_residue_charges_targets_integer_formal_charge():
     # A residue with a non-zero formal charge is rebalanced to that
     # integer, not to zero.
     sub = _charge_mol(_BACKBONE_PLUS_SIDECHAIN, [-0.05] * len(_BACKBONE_PLUS_SIDECHAIN))
-    _pin_backbone_charges(sub, net_charge=-1, charge_map=_NEUTRAL_BACKBONE)
+    _normalize_residue_charges(sub, net_charge=-1, charge_map=_NEUTRAL_BACKBONE)
     for name, q in _NEUTRAL_BACKBONE.items():
         assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
     assert float(np.sum(sub.charge)) == pytest.approx(-1.0, abs=1e-4)
 
 
-def _test_pin_backbone_charges_residual_spares_pinned_atoms():
+def _test_normalize_residue_charges_residual_spares_pinned_atoms():
     # The residual lands only on the non-pinned atoms, equally (the
     # minimum-L2 redistribution): pinned atoms keep exactly their value.
     names = _BACKBONE_PLUS_SIDECHAIN
     sub = _charge_mol(names, [0.7] * len(names))
-    _pin_backbone_charges(sub, net_charge=0, charge_map=_NEUTRAL_BACKBONE)
+    _normalize_residue_charges(sub, net_charge=0, charge_map=_NEUTRAL_BACKBONE)
     for name, q in _NEUTRAL_BACKBONE.items():
         assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
     free = ~np.isin(np.array(names), list(_NEUTRAL_BACKBONE))
@@ -1280,13 +1280,48 @@ def _test_pin_backbone_charges_residual_spares_pinned_atoms():
     assert float(np.sum(sub.charge)) == pytest.approx(0.0, abs=1e-4)
 
 
-def _test_pin_backbone_charges_empty_map_is_noop():
-    # No atoms to pin -> charges are left exactly as they were.
+def _test_normalize_residue_charges_empty_map_normalises_total():
+    # No atoms to pin -> the residual relative to net_charge is spread
+    # equally across all atoms so the residue sums to net_charge.
+    # This is the scaffold path: no backbone to pin, but the per-residue
+    # total still has to be its integer formal charge.
     names = _BACKBONE_PLUS_SIDECHAIN
-    original = [0.123] * len(names)
-    sub = _charge_mol(names, original)
-    _pin_backbone_charges(sub, net_charge=0, charge_map={})
-    assert np.allclose(np.array(sub.charge), original, atol=1e-5)
+    n = len(names)
+    sub = _charge_mol(names, [0.05] * n)  # sums to 0.5
+    _normalize_residue_charges(sub, net_charge=0, charge_map={})
+    # 0.5 of residual spread across n=10 atoms -> -0.05 per atom -> 0.0
+    assert float(np.sum(sub.charge)) == pytest.approx(0.0, abs=1e-5)
+    assert np.allclose(np.array(sub.charge), 0.0, atol=1e-5)
+
+
+def _test_normalize_residue_charges_empty_map_targets_integer():
+    # Empty map + non-zero target: same equal-share redistribution,
+    # rebalances to the residue's integer formal charge.
+    names = _BACKBONE_PLUS_SIDECHAIN
+    n = len(names)
+    sub = _charge_mol(names, [0.0] * n)
+    _normalize_residue_charges(sub, net_charge=-1, charge_map={})
+    assert float(np.sum(sub.charge)) == pytest.approx(-1.0, abs=1e-5)
+    assert np.allclose(np.array(sub.charge), -1.0 / n, atol=1e-5)
+
+
+def _test_normalize_residue_charges_pin_only_skips_normalization():
+    # net_charge=None applies the pin (backbone atoms get the charge_map
+    # values) but does NOT redistribute the residual onto the free
+    # atoms. Used by the cluster-level normalize path, which combines
+    # per-residue pinning with one cluster-wide shift at the end.
+    names = _BACKBONE_PLUS_SIDECHAIN
+    sub = _charge_mol(names, [0.3] * len(names))
+    pinned = _normalize_residue_charges(sub, net_charge=None, charge_map=_NEUTRAL_BACKBONE)
+    # Pinned atoms got the map values.
+    for name, q in _NEUTRAL_BACKBONE.items():
+        assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
+    # Free atoms kept their original Gasteiger charges (no residual spread).
+    free_mask = ~np.isin(np.array(names), list(_NEUTRAL_BACKBONE))
+    assert np.allclose(np.array(sub.charge)[free_mask], 0.3, atol=1e-5)
+    # Returned pinned-mask matches the names in _NEUTRAL_BACKBONE.
+    expected_pinned = np.isin(np.array(names), list(_NEUTRAL_BACKBONE))
+    assert np.array_equal(pinned, expected_pinned)
 
 
 def _test_backbone_charge_map_ncaa_charge_classes():
@@ -1307,10 +1342,48 @@ def _test_backbone_charge_map_terminal_ncaa_is_empty():
     assert _backbone_charge_map("", "c", present, -1) == {}
 
 
-def _test_backbone_charge_map_proline_like_ncaa_is_empty():
-    # A proline-like NCAA (no amide H) does not match the amide set.
+@pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
+def _test_backbone_charge_map_proline_like_ncaa_uses_pro():
+    # A proline-like NCAA (N with no bonded H) gets its backbone
+    # pinned to ff14SB PRO charges - the only canonical residue with
+    # this topology - per the Cornell/Cieplak + Betz/Ramos
+    # convention. CD is left to refit because ring chemistry varies
+    # (OIC vs. pipecolic vs. true PRO).
     present = {"N", "CA", "HA", "C", "O", "CB", "CG", "CD"}
-    assert _backbone_charge_map("", "", present, 0) == {}
+    cmap = _backbone_charge_map("", "", present, 0, n_has_bonded_h=False)
+    assert set(cmap) == {"N", "CA", "C", "O", "HA"}
+    # ff14SB PRO library values (Maier 2015 / Cornell 1995).
+    assert cmap["N"] == pytest.approx(-0.2548, abs=1e-4)
+    assert cmap["CA"] == pytest.approx(-0.0266, abs=1e-4)
+    assert cmap["C"] == pytest.approx(0.5896, abs=1e-4)
+    assert cmap["O"] == pytest.approx(-0.5748, abs=1e-4)
+    assert cmap["HA"] == pytest.approx(0.0641, abs=1e-4)
+
+
+def _test_backbone_charge_map_proline_like_terminal_is_empty():
+    # A proline-like NCAA at a chain terminus is left untouched -
+    # ff14SB has no terminal-PRO entry that strips H, and applying
+    # the mid-chain PRO charges to a terminal residue would mismatch
+    # the terminal ionisation. Falls through to the safe empty map.
+    present = {"N", "CA", "HA", "C", "O", "OXT", "CB", "CG", "CD"}
+    assert (
+        _backbone_charge_map("", "c", present, -1, n_has_bonded_h=False) == {}
+    )
+
+
+def _test_backbone_charge_map_nterm_with_nh3_not_proline_like():
+    # An N-terminal residue with NH3+ atoms named H1/H2/H3 has bonded
+    # H atoms but no atom literally named "H" in present_names. The
+    # name-based "H absent" check would mis-classify it as proline-
+    # like; the bond-based ``n_has_bonded_h`` flag does not.
+    present = {"N", "CA", "HA", "C", "O", "H1", "H2", "H3", "CB", "CG", "CD"}
+    cmap = _backbone_charge_map("", "", present, 0, n_has_bonded_h=True)
+    # Without the n_has_bonded_h flag, this could have wrongly fallen
+    # into the proline-like PRO map; with it, the residue is treated
+    # as a normal amide NCAA and the universal charge-class fallback
+    # decides the map (empty here because "H" is not in present_names
+    # so the {N, H, C, O} set isn't satisfied).
+    assert cmap == {}
 
 
 @pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
@@ -1398,6 +1471,241 @@ def _check_against_reference(generated_paths, ref_dir, label, regenerate):
             with open(ref_path) as fh:
                 ref = fh.read()
             assert got == ref, f"{label}: {name} differs from its reference"
+
+
+def _run_8qfz_bicycle_param_reference(
+    tmp_path, normalize, ref_subdir, pin_backbone_charges=True,
+):
+    """Shared driver for the 8QFZ_B_bicycle scaffolded cyclic peptide
+    golden test under each ``normalize`` / ``pin_backbone_charges``
+    combination. Templates LFI, runs systemPrepare +
+    parameterizeFromSpecs with the given modes, and compares the
+    emitted CIF/prepi/frcmod files against the committed references in
+    ``ref_subdir``."""
+    from moleculekit.tools.preparation import systemPrepare
+
+    regenerate = bool(os.environ.get("HTMD_REGEN_REFERENCES"))
+    mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, "8QFZ_B_bicycle.cif"))
+    if not np.any(mol.chain != ""):
+        mol.chain[:] = "A"
+        mol.segid[:] = "A"
+    specs = detectNonStandardResidues(mol)
+    mol.templateResidueFromSmiles('resname "LFI"', LFI_SMILES, addHs=True)
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
+    out = parameterizeFromSpecs(
+        specs,
+        pmol,
+        outdir=str(tmp_path / ref_subdir),
+        charge_method="gasteiger",
+        normalize=normalize,
+        pin_backbone_charges=pin_backbone_charges,
+    )
+    _check_against_reference(
+        out.topo_paths + out.frcmod_paths,
+        os.path.join(_CUSTOM_PARAM_DIR, "reference", ref_subdir),
+        ref_subdir,
+        regenerate,
+    )
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="custom-residue parameterization needs antechamber + teLeap",
+)
+def _test_custom_residue_param_reference_8qfz_per_residue(tmp_path):
+    """8QFZ_B_bicycle under ``normalize='per_residue'``: every emitted
+    per-residue unit (XX1/XX2/XX3 prepi, LFI cif) sums to its integer
+    formal charge - the AMBER tLeap convention (Betz / R.E.D. / Ramos).
+    """
+    _run_8qfz_bicycle_param_reference(
+        tmp_path,
+        normalize="per_residue",
+        ref_subdir="8QFZ_B_bicycle_per_residue",
+    )
+
+
+def _run_5vbl_param_reference(
+    tmp_path, normalize, ref_subdir, pin_backbone_charges=True,
+):
+    """Shared driver for the 5VBL_A peptide reference tests. The
+    fixture covers five chain-resident NCAAs (HRG, ALC, OIC, NLE, 200)
+    plus an isopeptide GLU(CD)-LYS(NZ) crosslink that exercises the
+    canonical-anchor rename path. 200 is C-terminal."""
+    from moleculekit.tools.preparation import systemPrepare
+
+    regenerate = bool(os.environ.get("HTMD_REGEN_REFERENCES"))
+    mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, "5VBL_A.cif"))
+    specs = detectNonStandardResidues(mol)
+    # SMILES are the mid-chain "C=O" form for the NCAAs that sit
+    # between peptide bonds, and the explicit "C(=O)O" carboxyl for
+    # residue 200 at the C-terminus. Same set as the existing 5VBL
+    # full-pipeline tests but minus OLC (a chain-B free ligand absent
+    # from the chain-A fixture).
+    smiles = {
+        "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
+        "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "NLE": "CCCC[C@@H](C=O)N",
+        "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
+    }
+    for resname, smi in smiles.items():
+        mol.templateResidueFromSmiles(
+            f'resname "{resname}"', smi, addHs=True, _logger=False
+        )
+    # The chain-A peptide inhibitor in 5VBL_A.cif is missing the
+    # sidechain atoms of LYS1 / PHE2 / ARG3 / ARG4 / LYS12 (only
+    # backbone + CB), so PDB2PQR's 10%-missing-atom threshold would
+    # reject the structure. ``restore_missing_sidechains=True`` runs
+    # moleculekit's Dunbrack-rotamer mutator pre-PDB2PQR to fill them
+    # in at canonical coordinates.
+    pmol = systemPrepare(
+        mol, detect_specs=specs, restore_missing_sidechains=True,
+    )[0]
+    out = parameterizeFromSpecs(
+        specs,
+        pmol,
+        outdir=str(tmp_path / ref_subdir),
+        charge_method="gasteiger",
+        normalize=normalize,
+        pin_backbone_charges=pin_backbone_charges,
+    )
+    _check_against_reference(
+        out.topo_paths + out.frcmod_paths,
+        os.path.join(_CUSTOM_PARAM_DIR, "reference", ref_subdir),
+        ref_subdir,
+        regenerate,
+    )
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="custom-residue parameterization needs antechamber + teLeap",
+)
+def _test_custom_residue_param_reference_5vbl_cluster(tmp_path):
+    """5VBL_A under the default ``normalize='cluster'``: the cluster
+    total is normalised to integer; per-residue totals stay at their
+    natural Gasteiger values modulo a uniform shift."""
+    _run_5vbl_param_reference(
+        tmp_path, normalize="cluster", ref_subdir="5VBL_A_cluster",
+    )
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="custom-residue parameterization needs antechamber + teLeap",
+)
+def _test_custom_residue_param_reference_5vbl_per_residue(tmp_path):
+    """5VBL_A under ``normalize='per_residue'``: every emitted unit
+    sums to its integer formal charge (AMBER tLeap convention)."""
+    _run_5vbl_param_reference(
+        tmp_path, normalize="per_residue", ref_subdir="5VBL_A_per_residue",
+    )
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="custom-residue parameterization needs antechamber + teLeap",
+)
+def _test_custom_residue_param_reference_5vbl_no_pin_no_normalize(tmp_path):
+    """5VBL_A under ``pin_backbone_charges=False`` and
+    ``normalize=None``: no backbone pin, no rebalance. The per-atom
+    charges are exactly the RDKit Gasteiger output and the cluster
+    total should land near the formal-charge sum modulo antechamber's
+    4-decimal mol2 rounding."""
+    _run_5vbl_param_reference(
+        tmp_path,
+        normalize=None,
+        pin_backbone_charges=False,
+        ref_subdir="5VBL_A_no_pin_no_normalize",
+    )
+    refdir = os.path.join(
+        _CUSTOM_PARAM_DIR, "reference", "5VBL_A_no_pin_no_normalize"
+    )
+
+    def _prepi_total(p):
+        s = 0.0
+        ina = False
+        for line in open(p):
+            ls = line.strip()
+            if ls.startswith("CORR"):
+                ina = True
+                continue
+            if ls.startswith(("LOOP", "IMPROPER", "DONE", "CHARGE")):
+                ina = False
+            if ina and len(line.split()) >= 10:
+                s += float(line.split()[-1])
+        return s
+
+    # Sum every emitted unit (.prepi for chain-resident; .cif for any
+    # free residues - 5VBL_A has no scaffolds, all units are .prepi).
+    cluster_total = 0.0
+    for fname in os.listdir(refdir):
+        path = os.path.join(refdir, fname)
+        if fname.endswith(".prepi"):
+            cluster_total += _prepi_total(path)
+        elif fname.endswith(".cif"):
+            cluster_total += float(Molecule(path).charge.sum())
+    # 5VBL has 7 chain-resident specs which split into 6 separate
+    # antechamber runs (one XX1+XX2 multi-cluster + 5 singletons), so
+    # the natural Gasteiger smear into the (discarded) ACE/NME-style
+    # cap atoms compounds across clusters. With no pin and no
+    # normalize, expect drift up to ~0.1; the reference-file diff
+    # locks each per-atom charge, so this side-check just guards
+    # against gross regressions (e.g. a future change silently
+    # turning normalize back on).
+    assert abs(cluster_total) < 0.15, (
+        f"5VBL_A unpinned + unnormalised cluster total drifted by "
+        f"{cluster_total:+.4f} (expected within rounding + cap smear)"
+    )
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="custom-residue parameterization needs antechamber + teLeap",
+)
+def _test_custom_residue_param_reference_8qfz_no_pin_no_normalize(tmp_path):
+    """8QFZ_B_bicycle under ``pin_backbone_charges=False`` and
+    ``normalize=None``: no backbone pin, no rebalance. The per-atom
+    charges are exactly the RDKit Gasteiger output and the cluster
+    total should land near the integer formal-charge sum (~0) modulo
+    antechamber's 4-decimal mol2 rounding. Verifies that the rounding
+    drift is small (< 0.05) and locks the raw charges down as a
+    reference."""
+    _run_8qfz_bicycle_param_reference(
+        tmp_path,
+        normalize=None,
+        pin_backbone_charges=False,
+        ref_subdir="8QFZ_B_bicycle_no_pin_no_normalize",
+    )
+    # Side-check: with neither backbone pin nor normalization, the
+    # cluster total drift is only antechamber's mol2 rounding (a few
+    # thousandths) - well below the looser bound we assert here.
+    refdir = os.path.join(
+        _CUSTOM_PARAM_DIR, "reference", "8QFZ_B_bicycle_no_pin_no_normalize"
+    )
+
+    def _prepi_total(p):
+        s = 0.0
+        ina = False
+        for line in open(p):
+            ls = line.strip()
+            if ls.startswith("CORR"):
+                ina = True
+                continue
+            if ls.startswith(("LOOP", "IMPROPER", "DONE", "CHARGE")):
+                ina = False
+            if ina and len(line.split()) >= 10:
+                s += float(line.split()[-1])
+        return s
+
+    cluster_total = sum(
+        _prepi_total(os.path.join(refdir, f"{r}.prepi")) for r in ("XX1", "XX2", "XX3")
+    )
+    cluster_total += float(Molecule(os.path.join(refdir, "LFI.cif")).charge.sum())
+    assert abs(cluster_total) < 0.05, (
+        f"unpinned + unnormalised cluster total drifted by {cluster_total:+.4f} "
+        f"(expected near 0 from mol2 rounding only)"
+    )
 
 
 @pytest.mark.skipif(
