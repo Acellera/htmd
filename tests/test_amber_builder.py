@@ -82,13 +82,20 @@ def _compareResultFolders(
     try:
         from ffevaluation.ffevaluate import FFEvaluate, loadParameters
 
+        # Strip waters to keep energy evaluation tractable for solvated systems.
+        water_resnames = ("WAT", "HOH", "TIP3", "TIP4", "SPC")
+        mol_e = mol.copy()
+        mol_e.filter(~np.isin(mol_e.resname, water_resnames), _logger=False)
+        mol2_e = mol2.copy()
+        mol2_e.filter(~np.isin(mol2_e.resname, water_resnames), _logger=False)
+
         prm2 = loadParameters(os.path.join(compare, "structure.prmtop"))
-        ffev2 = FFEvaluate(mol2, prm2)
-        energies2, _, _ = ffev2.calculate(mol2.coords)
+        ffev2 = FFEvaluate(mol2_e, prm2)
+        energies2, _, _ = ffev2.calculate(mol2_e.coords)
 
         prm = loadParameters(os.path.join(tmpdir, "structure.prmtop"))
-        ffev = FFEvaluate(mol, prm)
-        energies, _, _ = ffev.calculate(mol.coords)
+        ffev = FFEvaluate(mol_e, prm)
+        energies, _, _ = ffev.calculate(mol_e.coords)
         ene_diff = np.abs(energies - energies2)
         if any(ene_diff > 1e-3):
             print(f"ENERGY DIFF:\n{ene_diff}")
