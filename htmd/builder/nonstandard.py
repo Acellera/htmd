@@ -522,7 +522,22 @@ def _emit_openmm_xml(residue_templates, parameter_sets, xml_path):
         merged.atom_types.update(pset.atom_types)
         merged.bond_types.update(pset.bond_types)
         merged.angle_types.update(pset.angle_types)
-        merged.dihedral_types.update(pset.dihedral_types)
+        # dihedral_types maps a class tuple to a DihedralTypeList (a list of
+        # DihedralType objects, one per Fourier term). dict.update would
+        # replace the existing list when two clusters both define the same
+        # class tuple with different periodicities, dropping terms. Extend
+        # the term list instead, deduping by periodicity so identical
+        # entries across clusters don't double-count.
+        for key, new_list in pset.dihedral_types.items():
+            existing = merged.dihedral_types.get(key)
+            if existing is None:
+                merged.dihedral_types[key] = new_list
+                continue
+            seen_per = {dt.per for dt in existing}
+            for dt in new_list:
+                if dt.per not in seen_per:
+                    existing.append(dt)
+                    seen_per.add(dt.per)
         merged.improper_types.update(pset.improper_types)
         merged.improper_periodic_types.update(pset.improper_periodic_types)
 
