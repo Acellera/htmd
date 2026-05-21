@@ -447,8 +447,93 @@ def _writeLJDebugPDB(
     mol.write(path)
 
 
-def _equilibrateOpenMM(
-    smemb,
+# Common water residue and oxygen atom names across the major force fields.
+# Used by _detectWaterNaming to identify water in arbitrary input Molecules
+# (e.g. CHARMM-GUI output uses TIP3/OH2, AMBER/PDB uses HOH/O, GROMACS uses
+# SOL/OW).
+_WATER_RESNAMES = (
+    "TIP3", "TIP3P", "TIP4", "TIP4P", "TIP5", "TIP5P",
+    "HOH", "WAT", "SOL", "H2O", "T3P", "T4P",
+)
+_WATER_OXYGEN_NAMES = ("OH2", "O", "OW")
+
+
+def _detectWaterNaming(mol):
+    """Detect the (resname, oxygen_atom_name) used for water in ``mol``.
+
+    Returns ``(resname, oxygen_name)`` or ``(None, None)`` if no water is
+    found. When multiple water resnames are present, the most common one
+    wins; the oxygen name is the most common atom name within that resname
+    whose element is O.
+    """
+    is_water = np.isin(mol.resname, _WATER_RESNAMES)
+    if not is_water.any():
+        return None, None
+    resnames, counts = np.unique(mol.resname[is_water], return_counts=True)
+    water_resname = str(resnames[counts.argmax()])
+    sel = (mol.resname == water_resname) & np.isin(mol.name, _WATER_OXYGEN_NAMES)
+    if not sel.any():
+        sel = (mol.resname == water_resname) & (mol.element == "O")
+    if not sel.any():
+        return water_resname, None
+    names, counts = np.unique(mol.name[sel], return_counts=True)
+    return water_resname, str(names[counts.argmax()])
+
+
+def _defaultHeadAtoms():
+    """Default ``{resname: head_atom_name}`` map from the shipped lipiddb.csv."""
+    from htmd.home import home
+    import os
+    import pandas as pd
+
+    csv = os.path.join(
+        home(shareDir=True), "membranebuilder", "lipids", "lipiddb.csv"
+    )
+    db = pd.read_csv(csv, index_col="Name")
+    return {name.upper(): str(db.loc[name, "Head"]) for name in db.index}
+
+
+def _headAnchorsFromMolecule(mol, head_atoms=None, head_z=None, midplane_z=None):
+    """Internal: build head-atom z-restraint anchors for a membrane Molecule.
+
+    Returns ``[(atom_idx, z_target_A), ...]``. Upper/lower leaflet is split
+    at ``midplane_z`` (median head-atom z by default). Each anchor targets
+    either the per-leaflet mean head z (when ``head_z`` is None) or
+    ``midplane_z +- |head_z|``.
+    """
+    if head_atoms is None:
+        head_atoms = _defaultHeadAtoms()
+
+    head_mask = np.zeros(mol.numAtoms, dtype=bool)
+    for resname, atomname in head_atoms.items():
+        head_mask |= (mol.resname == resname.upper()) & (mol.name == atomname)
+
+    if not head_mask.any():
+        return []
+
+    head_idx = np.where(head_mask)[0]
+    head_z_coords = mol.coords[head_idx, 2, 0]
+
+    if midplane_z is None:
+        midplane_z = float(np.median(head_z_coords))
+    upper = head_z_coords >= midplane_z
+
+    if head_z is None:
+        z_upper = float(head_z_coords[upper].mean()) if upper.any() else midplane_z
+        z_lower = float(head_z_coords[~upper].mean()) if (~upper).any() else midplane_z
+    else:
+        z_upper = midplane_z + abs(float(head_z))
+        z_lower = midplane_z - abs(float(head_z))
+
+    anchors = []
+    for idx, z in zip(head_idx, head_z_coords):
+        target = z_upper if z >= midplane_z else z_lower
+        anchors.append((int(idx), float(target)))
+    return anchors
+
+
+def equilibrateMembrane(
+    mol,
     minimize=0,
     equilibrate_ns=0,
     platform_name="CUDA",
@@ -458,22 +543,58 @@ def _equilibrateOpenMM(
     solute=None,
     head_anchors=None,
     head_restraint_k=0.0,
+    head_atoms=None,
+    water_resname="HOH",
+    water_oxygen_name="O",
 ):
-    """Minimize and/or equilibrate ``smemb`` with OpenMM.
+    """Minimize and/or equilibrate a solvated membrane ``mol`` with OpenMM.
 
-    The lipid library uses single-residue lipids whose atom names match
-    the AMBER Lipid17 OpenMM XML. Water from ``htmd.solvate`` ships as
-    ``TIP3`` / ``OH2``; on a working copy these are renamed to ``HOH`` /
-    ``O`` to match the AMBER tip3p XML. Equilibrated coordinates and the
-    final box are written back into the original Molecule.
+    Works both for membranes built by :func:`buildMembrane` and for
+    user-supplied membranes (e.g. from CHARMM-GUI or another tool). The
+    function detects the water naming used by ``mol`` and renames it to
+    match the chosen force field XMLs. When ``head_restraint_k > 0`` and
+    no explicit ``head_anchors`` are given, anchors are auto-derived via
+    :func:`_headAnchorsFromMolecule`.
 
-    When ``solute`` is provided, the heavy atoms of its membrane-spanning
-    slab (lipid Z range +- a small buffer) are appended to the OpenMM
-    System as frozen ``mass=0`` particles in the standard ``NonbondedForce``
-    so the lipids relax around the TM region. Extramembrane atoms are
-    skipped since they have no lipids nearby. The ghost atoms are
-    discarded before writing equilibrated coordinates back, so they never
-    appear in the output Molecule.
+    Equilibrated coordinates and the final box are written back into
+    ``mol`` in place.
+
+    Parameters
+    ----------
+    mol : moleculekit.molecule.Molecule
+        Solvated membrane. Modified in place.
+    minimize : int
+        Conjugate-gradient minimization steps before L-BFGS. 0 to skip.
+    equilibrate_ns : float
+        Length of NPT equilibration in nanoseconds. 0 to skip.
+    platform_name : str
+        OpenMM platform name (``CUDA``, ``OpenCL``, ``CPU``, ``Reference``).
+    forcefield_files : list of str, optional
+        Force field XMLs. Defaults to ``["amber14/lipid17.xml",
+        "amber14/tip3p.xml"]``.
+    temperature : float
+        Temperature in kelvin.
+    timestep_fs : float
+        Integrator timestep in fs.
+    solute : moleculekit.molecule.Molecule, optional
+        If given, heavy atoms of its membrane-spanning slab are added to
+        the OpenMM System as frozen ``mass=0`` particles so the lipids
+        relax around the solute. The solute Molecule itself is not
+        modified and ghost atoms are discarded before writing back.
+    head_anchors : list of (int, float), optional
+        Explicit ``(atom_idx, z_target_A)`` anchors. If ``None`` and
+        ``head_restraint_k > 0``, anchors are auto-derived from ``mol``.
+    head_restraint_k : float
+        Harmonic z-restraint constant (kcal/mol/A^2) on head atoms.
+        0 disables the restraint.
+    head_atoms : dict, optional
+        ``{resname: head_atom_name}`` used when auto-deriving anchors.
+        Defaults to the htmd lipid library map.
+    water_resname, water_oxygen_name : str
+        Target water resname and oxygen atom name expected by the chosen
+        force field XML. Defaults match AMBER ``tip3p.xml`` (``HOH``/``O``).
+        Whatever water naming is detected in ``mol`` is renamed to these
+        on a working copy; ``mol`` itself is not renamed.
     """
     import os
     import openmm
@@ -486,17 +607,32 @@ def _equilibrateOpenMM(
     if forcefield_files is None:
         forcefield_files = ["amber14/lipid17.xml", "amber14/tip3p.xml"]
 
-    work = smemb.copy()
-    is_water = work.resname == "TIP3"
-    work.resname[is_water] = "HOH"
-    work.name[is_water & (work.name == "OH2")] = "O"
+    work = mol.copy()
+    detected_resname, detected_oxygen = _detectWaterNaming(work)
+    if detected_resname is not None and detected_resname != water_resname:
+        is_water = work.resname == detected_resname
+        work.resname[is_water] = water_resname
+        if detected_oxygen is not None and detected_oxygen != water_oxygen_name:
+            work.name[is_water & (work.name == detected_oxygen)] = water_oxygen_name
 
-    # Make sure the box is set so PDB CRYST1 gets written and OpenMM can do PME.
-    coord_min = work.coords[:, :, 0].min(axis=0)
-    coord_max = work.coords[:, :, 0].max(axis=0)
-    box = (coord_max - coord_min).astype(np.float32)
-    work.box = box.reshape(3, 1)
+    # buildMembrane leaves mol.box as all zeros (solvate does not set it),
+    # so we fall back to coord extents in that case. For user-supplied
+    # membranes that already have a valid box, respect it.
+    if (
+        work.box is not None
+        and work.box.size == 3
+        and np.all(work.box > 0)
+    ):
+        box = work.box[:, 0].astype(np.float32)
+    else:
+        coord_min = work.coords[:, :, 0].min(axis=0)
+        coord_max = work.coords[:, :, 0].max(axis=0)
+        box = (coord_max - coord_min).astype(np.float32)
+        work.box = box.reshape(3, 1)
     work.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
+
+    if head_anchors is None and head_restraint_k > 0:
+        head_anchors = _headAnchorsFromMolecule(work, head_atoms=head_atoms)
 
     pdb_path = tempname(suffix=".pdb")
     work.write(pdb_path)
@@ -528,7 +664,15 @@ def _equilibrateOpenMM(
         # Restrict ghost atoms to the membrane-spanning slab so we only
         # equilibrate lipids around the protein's TM region. Extramembrane
         # domains add atoms with no nearby lipids to influence.
-        is_lipid = work.resname != "HOH"
+        known_lipid_resnames = [
+            r.upper() for r in (head_atoms or _defaultHeadAtoms()).keys()
+        ]
+        is_lipid = np.isin(work.resname, known_lipid_resnames)
+        if not is_lipid.any():
+            raise ValueError(
+                "No lipid residues found in mol; pass head_atoms with the "
+                "lipid resnames present in your membrane."
+            )
         lipid_z = work.coords[is_lipid, 2, 0]
         # Buffer of a few angstrom so that if the membrane expands a bit
         # during equilibration the lipids still feel the solute and don't
@@ -634,15 +778,15 @@ def _equilibrateOpenMM(
         simulation.step(nsteps)
 
     # enforcePeriodicBox=False keeps molecules intact across the PBC;
-    # smemb.wrap() afterwards uses the bonds on smemb to wrap whole lipids.
+    # mol.wrap() afterwards uses the bonds on mol to wrap whole lipids.
     state = simulation.context.getState(
         getPositions=True, enforcePeriodicBox=False
     )
     positions = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom)
-    smemb.coords[:, :, 0] = positions[:n_lipid_atoms].astype(np.float32)
+    mol.coords[:, :, 0] = positions[:n_lipid_atoms].astype(np.float32)
 
     a, b, c = state.getPeriodicBoxVectors(asNumpy=True)
-    smemb.box = np.array(
+    mol.box = np.array(
         [
             [a[0].value_in_unit(unit.angstrom)],
             [b[1].value_in_unit(unit.angstrom)],
@@ -650,15 +794,15 @@ def _equilibrateOpenMM(
         ],
         dtype=np.float32,
     )
-    smemb.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
+    mol.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
 
     # With a solute, center the wrap on the solute COM so lipids/water
     # cluster around the protein rather than the box origin.
     if solute is not None:
         solute_com = positions[n_lipid_atoms:].mean(axis=0)
-        smemb.wrap(wrapcenter=solute_com)
+        mol.wrap(wrapcenter=solute_com)
     else:
-        smemb.wrap()
+        mol.wrap()
 
 
 def buildMembrane(
@@ -846,6 +990,20 @@ def buildMembrane(
     ]
     smemb = solvate(smemb, minmax=mm)
 
+    # Set the PBC cell explicitly so it is preserved when equilibration is
+    # off or the Molecule is written out. Use the requested xysize in xy
+    # (the design intent and what the XY barostat will converge near) and
+    # the water-padded lipid extent in z.
+    smemb.box = np.array(
+        [
+            [float(xysize[0])],
+            [float(xysize[1])],
+            [maxc[2] - minc[2] + 2.0 * waterbuff],
+        ],
+        dtype=np.float32,
+    )
+    smemb.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
+
     if outdir is None:
         outdir = tempname()
         logger.info(f"Outdir {outdir}")
@@ -874,6 +1032,10 @@ def buildMembrane(
     if equilibrate > 0 or minimize > 0:
         smemb.write(os.path.join(outdir, "starting_structure.pdb"))
 
+        # Use the lipid placement's design intent (xyz[2] sign) to assign
+        # leaflets, not the current head z. This is more robust than the
+        # generic helper for membranes fresh out of LJ packing, where a
+        # head could occasionally cross the midplane.
         head_anchors = None
         if head_restraint_k > 0:
             head_anchors = []
@@ -885,7 +1047,7 @@ def buildMembrane(
                 z_target = head_z if ll.xyz[2] > 0 else -head_z
                 head_anchors.append((int(idx[0]), float(z_target)))
 
-        _equilibrateOpenMM(
+        equilibrateMembrane(
             smemb,
             minimize=minimize,
             equilibrate_ns=equilibrate,
