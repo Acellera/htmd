@@ -1708,6 +1708,252 @@ def _test_custom_residue_param_reference_8qfz_no_pin_no_normalize(tmp_path):
     )
 
 
+def _read_residue_template_atoms(path):
+    """Parse ``path`` (a ``.prepi`` or ``.cif`` residue template emitted
+    by parameterizeFromSpecs) and return ``{atom_name: (atom_type, charge)}``
+    for every real atom (dummies excluded)."""
+    out = {}
+    if path.endswith(".cif"):
+        mol = Molecule(path)
+        for i in range(mol.numAtoms):
+            out[str(mol.name[i])] = (
+                str(mol.atomtype[i]),
+                float(mol.charge[i]),
+            )
+        return out
+    # prepi atom block lives between ``CORR`` and the next section header
+    in_atoms = False
+    for line in open(path):
+        ls = line.strip()
+        if ls.startswith("CORR"):
+            in_atoms = True
+            continue
+        if ls.startswith(("LOOP", "IMPROPER", "DONE", "CHARGE")):
+            in_atoms = False
+        if not in_atoms:
+            continue
+        parts = line.split()
+        if len(parts) < 10:
+            continue
+        name, atype = parts[1], parts[2]
+        if name == "DUMM":
+            continue
+        out[name] = (atype, float(parts[-1]))
+    return out
+
+
+def _read_prepi_intra_residue_impropers(path):
+    """Parse the ``IMPROPER`` section of a prepi: return a set of
+    4-atom-name frozensets, restricted to **intra-residue** impropers.
+    AMBER prepi uses ``-M`` / ``+M`` placeholders for main-chain atoms
+    of the previous / next residue - those are cross-residue
+    impropers (backbone amide / carbonyl planarity at the peptide
+    bond) and naturally don't show up in our intra-residue scan of
+    the built prmtop, so we drop them here. Frozenset is the right
+    comparator because AMBER impropers (a,b,c,d) and (d,c,b,a) refer
+    to the same torsion around the central atom."""
+    out = set()
+    section = None
+    for line in open(path):
+        ls = line.strip()
+        if ls.startswith("IMPROPER"):
+            section = "improper"
+            continue
+        if ls.startswith(("CORR", "LOOP", "DONE", "CHARGE")) or not ls:
+            section = None
+            continue
+        if section == "improper":
+            parts = line.split()
+            if len(parts) == 4 and not any(p in ("-M", "+M") for p in parts):
+                out.add(frozenset(parts))
+    return out
+
+
+def _intra_residue_impropers(built, resname):
+    """All impropers in ``built`` whose four atoms lie inside the same
+    residue with name ``resname``, as a set of 4-atom-name frozensets.
+    Multi-instance resnames are pooled (every copy uses the same
+    template, so the union over copies must equal the reference set).
+    Returns ``None`` if the resname is not present."""
+    if built.impropers is None or len(built.impropers) == 0:
+        return None
+    sel = built.resname == resname
+    if not sel.any():
+        return None
+    out = set()
+    for row in built.impropers:
+        idxs = [int(x) for x in row]
+        if not all(sel[i] for i in idxs):
+            continue
+        # Require all four atoms in the SAME residue (the prepi defines
+        # one residue; cross-residue impropers are tLeap's business).
+        keys = {
+            (
+                str(built.segid[i]),
+                str(built.chain[i]),
+                int(built.resid[i]),
+                str(built.insertion[i]),
+            )
+            for i in idxs
+        }
+        if len(keys) != 1:
+            continue
+        out.add(frozenset(str(built.name[i]) for i in idxs))
+    return out
+
+
+def _assert_built_matches_references(built, refdir, charge_tol=1e-3):
+    """For every per-residue reference file in ``refdir``, check that
+    each atom carries the same ``atomtype`` and ``charge`` in the
+    AMBER-built Molecule, and (for prepi templates) that the
+    intra-residue impropers in the built prmtop match the prepi's
+    ``IMPROPER`` block. Bonds / angles / dihedrals are not compared
+    explicitly because tLeap derives them deterministically from the
+    bond graph the prepi defines - if any bond were wrong, the build
+    would fail or the angle/dihedral counts would diverge, but the
+    direct round-trip check is on impropers (explicit in prepi)."""
+    bad = []
+    for fname in sorted(os.listdir(refdir)):
+        name, ext = os.path.splitext(fname)
+        if ext not in (".prepi", ".cif"):
+            continue
+        path = os.path.join(refdir, fname)
+        ref = _read_residue_template_atoms(path)
+        sel = built.resname == name
+        if not sel.any():
+            bad.append(f"{name}: not present in built mol")
+            continue
+        # Per-atom atomtype / charge check.
+        for atom_name, (ref_type, ref_charge) in ref.items():
+            mask = sel & (built.name == atom_name)
+            if not mask.any():
+                bad.append(f"{name}.{atom_name}: not found in built mol")
+                continue
+            for idx in np.where(mask)[0]:
+                bt = str(built.atomtype[idx])
+                bq = float(built.charge[idx])
+                if bt != ref_type:
+                    bad.append(
+                        f"{name}.{atom_name}: atomtype {bt!r} != ref {ref_type!r}"
+                    )
+                if abs(bq - ref_charge) > charge_tol:
+                    bad.append(
+                        f"{name}.{atom_name}: charge {bq:+.4f} != ref "
+                        f"{ref_charge:+.4f} (|Δ|>{charge_tol})"
+                    )
+        # Improper check (prepi only): every prepi-listed
+        # intra-residue improper must appear in the built mol. The
+        # converse is not required - tLeap adds extra impropers from
+        # the ff14SB / GAFF frcmods (notably around terminal NH3+ Ns
+        # and sp2 ring atoms) that the prepi doesn't list.
+        if ext == ".prepi":
+            ref_imp = _read_prepi_intra_residue_impropers(path)
+            built_imp = _intra_residue_impropers(built, name) or set()
+            for fs in sorted(ref_imp - built_imp, key=sorted):
+                bad.append(
+                    f"{name}: improper {sorted(fs)} in prepi but not in built"
+                )
+    assert not bad, "built mol disagrees with references:\n  " + "\n  ".join(bad)
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end build verification needs antechamber + teLeap",
+)
+def _test_amber_build_8qfz_matches_reference(tmp_path):
+    """8QFZ_B_bicycle: run the full detect -> template -> systemPrepare ->
+    parameterizeFromSpecs (default ``cluster`` mode + ``pin=True``) ->
+    amber.build pipeline, then check that every atom of every spec'd
+    residue in the built Molecule (XX1/XX2/XX3 prepi + LFI cif)
+    carries the same ``atomtype`` and ``charge`` as our committed
+    reference files. Locks the end-to-end charge / type round-trip
+    through tLeap."""
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, "8QFZ_B_bicycle.cif"))
+    mol.chain[:] = "A"
+    mol.segid[:] = "A"
+    specs = detectNonStandardResidues(mol)
+    mol.templateResidueFromSmiles('resname "LFI"', LFI_SMILES, addHs=True, _logger=False)
+    pmol, _ = systemPrepare(mol, detect_specs=specs)
+
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"),
+        charge_method="gasteiger",
+    )
+    # Disable auto-capping on the protein segment: the N-terminal CYS
+    # is covalently bonded to LFI and the C-terminal CYS already
+    # carries an OXT from systemPrepare, so an ACE/NME cap would clash.
+    protein_seg = sorted(set(pmol.segid[pmol.atomselect("protein")]))[0]
+    built = amber_build(
+        pmol,
+        outdir=str(tmp_path / "build"),
+        ionize=False,
+        custombonds=out.custombonds,
+        topo=out.topo_paths,
+        param=out.frcmod_paths,
+        caps={protein_seg: ("none", "none")},
+    )
+
+    _assert_built_matches_references(
+        built,
+        os.path.join(_CUSTOM_PARAM_DIR, "reference", "8QFZ_B_bicycle"),
+    )
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end build verification needs antechamber + teLeap",
+)
+def _test_amber_build_5vbl_matches_reference(tmp_path):
+    """5VBL_A: same as the 8QFZ end-to-end build check but on the
+    chain-A peptide inhibitor with 5 chain-resident NCAAs (HRG, ALC,
+    OIC, NLE, 200) + GLU(CD)-LYS(NZ) isopeptide (XX1/XX2 renames).
+    Exercises the prolinoid backbone pin (OIC) and the
+    canonical-anchor rename path end to end."""
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, "5VBL_A.cif"))
+    specs = detectNonStandardResidues(mol)
+    smiles = {
+        "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
+        "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "NLE": "CCCC[C@@H](C=O)N",
+        "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
+    }
+    for resname, smi in smiles.items():
+        mol.templateResidueFromSmiles(f'resname "{resname}"', smi, addHs=True, _logger=False)
+    pmol = systemPrepare(
+        mol, detect_specs=specs, restore_missing_sidechains=True,
+    )[0]
+
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"),
+        charge_method="gasteiger",
+    )
+    # The C-terminal NCAA (residue 200) carries its own OXT via the
+    # emitted prepi template; disable amber.build auto-capping so it
+    # does not stack an NME on top.
+    protein_seg = sorted(set(pmol.segid[pmol.atomselect("protein")]))[0]
+    built = amber_build(
+        pmol,
+        outdir=str(tmp_path / "build"),
+        ionize=False,
+        custombonds=out.custombonds,
+        topo=out.topo_paths,
+        param=out.frcmod_paths,
+        caps={protein_seg: ("none", "none")},
+    )
+
+    _assert_built_matches_references(
+        built,
+        os.path.join(_CUSTOM_PARAM_DIR, "reference", "5VBL_A_cluster"),
+    )
+
+
 @pytest.mark.skipif(
     not (_antechamber and _tleap),
     reason="custom-residue parameterization needs antechamber + teLeap",
