@@ -990,14 +990,15 @@ def buildMembrane(
     ]
     smemb = solvate(smemb, minmax=mm)
 
-    # Set the PBC cell explicitly so it is preserved when equilibration is
-    # off or the Molecule is written out. Use the requested xysize in xy
-    # (the design intent and what the XY barostat will converge near) and
-    # the water-padded lipid extent in z.
+    # Set the PBC cell to the lipid head bbox (minc/maxc already include
+    # a +-5 A tail-buffer) in xy and the water-padded lipid extent in z.
+    # solvate fills [minc-5, maxc+5] in xy, so the outer ~5 A of water
+    # wraps to the opposite edge at startup; the MonteCarloMembraneBarostat
+    # (XYIsotropic, ZFree) then converges the cell to the natural APL.
     smemb.box = np.array(
         [
-            [float(xysize[0])],
-            [float(xysize[1])],
+            [maxc[0] - minc[0]],
+            [maxc[1] - minc[1]],
             [maxc[2] - minc[2] + 2.0 * waterbuff],
         ],
         dtype=np.float32,
