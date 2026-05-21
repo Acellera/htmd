@@ -868,9 +868,15 @@ def _test_parameterize_from_specs_dedup_4tot(tmp_path):
         "MLE": "CC(C)C[C@@H](C=O)NC",
         "MVA": "CC(C)[C@@H](C=O)NC",
         # P6G: hexaethylene glycol, a free crystallisation-additive ligand
-        # (RCSB chem-comp P6G). SO4 has no carbon, so the protonation guard
-        # in parameterizeFromSpecs skips it.
+        # (RCSB chem-comp P6G). SO4: free sulfate dianion (also a
+        # crystallisation additive, not coordinating anything in 4TOT);
+        # templated with explicit -1 on each terminal O so the residue's
+        # net charge is the correct -2. Without the template the PDB
+        # records the four S-O bonds with no formal charges set, leaving
+        # RDKit Gasteiger summing ~-0.5 and tripping the netcharge sanity
+        # check.
         "P6G": "OCCOCCOCCOCCOCCOCCO",
+        "SO4": "[O-]S(=O)(=O)[O-]",
     }
     mol = Molecule("4TOT")
     mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
