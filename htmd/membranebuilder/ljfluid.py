@@ -78,9 +78,14 @@ def _subrandom_particle_positions(
 
     If ``forbidden_xy`` (shape ``(K, 2)``) and ``forbidden_radii`` (shape
     ``(K,)``) are provided, candidates whose XY position falls inside any
-    per-atom disk are excluded. The Halton sequence is regenerated at growing
-    length until ``nparticles`` non-forbidden positions are available, with a
-    10x cap.
+    per-atom disk are excluded under the periodic box's minimum-image
+    convention -- the downstream LJ-fluid sim is periodic, so a candidate
+    whose *direct* XY distance to an obstacle is large but whose *min-image*
+    distance is small must be rejected here, otherwise the candidate starts
+    inside an obstacle in the periodic frame and the WCA repulsion at sub-A
+    separations destabilises the integrator (especially in single precision,
+    e.g. WebGPU). The Halton sequence is regenerated at growing length until
+    ``nparticles`` non-forbidden positions are available, with a 10x cap.
     """
     box_lengths = [
         box_vectors[d][d].value_in_unit(unit.angstrom) for d in range(3)
@@ -94,6 +99,7 @@ def _subrandom_particle_positions(
     forbidden_xy = np.asarray(forbidden_xy)
     forbidden_radii = np.asarray(forbidden_radii)
     radii2 = forbidden_radii * forbidden_radii
+    box_xy = np.asarray(box_lengths[:2], dtype=float)
 
     n_needed = int(np.ceil(nparticles * 1.3))
     max_factor = 10
@@ -101,6 +107,10 @@ def _subrandom_particle_positions(
     while True:
         positions = _generate_halton_positions(n_needed, box_lengths, ndim)
         diffs = positions[:, None, :2] - forbidden_xy[None, :, :]
+        # Wrap to the minimum-image vector under XY periodicity so wrap-around
+        # candidates (e.g. lipid near +Lx/2, obstacle near -Lx/2) are also
+        # excluded; without this, those candidates start in deep WCA clash.
+        diffs -= box_xy * np.round(diffs / box_xy)
         dists2 = np.sum(diffs * diffs, axis=2)
         in_forbidden = (dists2 < radii2[None, :]).any(axis=1)
         kept = positions[~in_forbidden]
