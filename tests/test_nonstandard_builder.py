@@ -220,7 +220,9 @@ def _run_pipeline(
         mol,
         detect_specs=specs,
     )
-    out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+    )
     return amber_build(
         pmol,
         outdir=str(tmp_path / "build"),
@@ -380,7 +382,7 @@ def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
 
     # 4. Parameterize.
     out = parameterizeFromSpecs(
-        specs, pmol, outdir=str(tmp_path / "params")
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
     )
     topo_basenames = {os.path.basename(p) for p in out.topo_paths}
     frcmod_basenames = {os.path.basename(p) for p in out.frcmod_paths}
@@ -484,7 +486,7 @@ def _test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
 
     # 4. Parameterize.
     out = parameterizeFromSpecs(
-        specs, pmol, outdir=str(tmp_path / "params")
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
     )
     topo_basenames = sorted(os.path.basename(p) for p in out.topo_paths)
     expected = sorted([f"{n}.prepi" for n in cys_rename_set] + ["LFI.cif"])
@@ -645,7 +647,9 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
         mol,
         detect_specs=specs,
     )
-    out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+    )
 
     # Same cap override as _test_full_pipeline_5vbl: the C-terminal NCAA
     # (residue 200) carries its own OXT via the prepi/XML template, so an
@@ -763,7 +767,9 @@ def _test_parameterize_from_specs_emits_openmm_xml(tmp_path):
         mol,
         detect_specs=specs,
     )
-    out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+    )
 
     assert out.xml_path is not None
     assert os.path.isfile(out.xml_path)
@@ -892,7 +898,9 @@ def _test_parameterize_from_specs_dedup_4tot(tmp_path):
         mol,
         detect_specs=specs,
     )
-    out = parameterizeFromSpecs(specs, pmol, outdir=str(tmp_path / "params"))
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+    )
 
     topo_basenames = sorted(
         os.path.splitext(os.path.basename(p))[0] for p in out.topo_paths
