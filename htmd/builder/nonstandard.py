@@ -1409,6 +1409,7 @@ def parameterizeFromSpecs(
     mol,
     outdir,
     charge_method="am1-bcc",
+    am1_path_length=15,
     pin_backbone_charges=True,
     normalize="cluster",
     use_pyodide=None,
@@ -1439,6 +1440,13 @@ def parameterizeFromSpecs(
         ``"gasteiger"`` is faster, is computed via RDKit so it also
         honours the net charge, and is the automatic fallback under
         Pyodide where AM1-BCC's SQM backend is unavailable.
+    am1_path_length : int or None, optional
+        Maximum path length for AM1-BCC charge equivalence determination,
+        passed to antechamber's ``-pl`` flag. Caps antechamber's atom-
+        equivalence search so it doesn't hang on cyclic or large
+        molecules. Only used for ``charge_method="am1-bcc"`` /
+        ``"abcg2"``; ignored for Gasteiger. ``None`` keeps antechamber's
+        own default.
     pin_backbone_charges : bool, optional
         If ``True`` (default), the backbone partial charges of every
         chain-resident residue are pinned to ff14SB (residue-specific
@@ -1679,6 +1687,7 @@ def parameterizeFromSpecs(
             tmpdir=cluster_outdir,
             netcharge=netcharge,
             charge_method=charge_method,
+            am1_path_length=am1_path_length,
             use_pyodide=use_pyodide,
         )
         del typed_mol  # we re-load it inside prepareClusterResidues
@@ -1735,6 +1744,7 @@ def parameterizeFromSpecs(
             tmpdir=ligand_dir,
             netcharge=netcharge,
             charge_method=charge_method,
+            am1_path_length=am1_path_length,
             use_pyodide=use_pyodide,
         )
         out_cif = os.path.join(outdir, f"{g['resname']}.cif")

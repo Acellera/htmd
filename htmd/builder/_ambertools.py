@@ -118,6 +118,7 @@ def _fftype_antechamber(
     forcefield="GAFF2",
     netcharge=0,
     charge_method=None,
+    am1_path_length=15,
     use_pyodide=False,
     output_mol2="typed.mol2",
     output_frcmod="mol.frcmod",
@@ -141,6 +142,13 @@ def _fftype_antechamber(
         and ``"ABCG2"`` are passed to antechamber's ``-c`` flag. ``None``
         skips charge assignment. Case-insensitive. Under Pyodide only
         ``"Gasteiger"`` (or ``None``) is supported.
+    am1_path_length : int or None
+        Maximum path length for AM1-BCC charge equivalence determination,
+        passed to antechamber's ``-pl`` flag. Caps antechamber's atom-
+        equivalence search so it doesn't hang on highly cyclic or large
+        molecules. Only used when ``charge_method`` runs antechamber's
+        ``-c`` (``"AM1-BCC"`` / ``"ABCG2"``). ``None`` leaves antechamber's
+        own default in place.
     use_pyodide : bool
         Dispatch via antechamber_pyodide instead of subprocess.
     output_mol2 : str
@@ -204,6 +212,10 @@ def _fftype_antechamber(
     ]
     if ac_charge is not None:
         cmd += ["-c", ac_charge]
+        if am1_path_length is not None:
+            # Cap antechamber's atom-equivalence search so it doesn't hang
+            # on cyclic / large molecules. Matches parameterize's default.
+            cmd += ["-pl", str(am1_path_length)]
 
     input_files = None
     if use_pyodide:
