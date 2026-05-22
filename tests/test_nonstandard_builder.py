@@ -1968,6 +1968,78 @@ def _test_amber_build_5vbl_matches_reference(tmp_path):
     )
 
 
+# Disabled until the parameterization pipeline can handle transition-metal
+# ligands. RDKit's PEOE Gasteiger has no parameters for Fe (or any 3d
+# metal), so a HEM-bearing residue runs the whole molecule to NaN partial
+# charges and the gasteiger pathway aborts. Re-enable (remove the skip and
+# run with HTMD_REGEN_REFERENCES=1 to populate the
+# reference/1U5U_A_cluster directory) once the pipeline either (a) detaches
+# the metal for the PEOE step and restores it with its formal charge, or
+# (b) plugs in a metal-aware charge method.
+@pytest.mark.skip(
+    reason="HEM contains Fe; RDKit Gasteiger PEOE has no parameters for "
+    "transition metals. Re-enable once parameterizeFromSpecs supports "
+    "metal-containing ligands."
+)
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end build verification needs antechamber + teLeap",
+)
+def _test_amber_build_1u5u_hem_matches_reference(tmp_path):
+    """1U5U_A: human catalase chain A with a heme-b (HEM) cofactor.
+    The catalytic Fe is in the resting Fe(III) state, axially coordinated
+    on the proximal side by a deprotonated tyrosinate (TYR-O-, -1 on the
+    sidechain OH) - the canonical catalase proximal ligand. The Fe(III)
+    charge in the HEM SMILES is set to +3 to match this resting state.
+    Exercises a metal-bearing standalone ligand through the
+    detect -> template -> systemPrepare -> parameterizeFromSpecs ->
+    amber.build pipeline.
+
+    HEM SMILES carries explicit formal charges: -1 on each of the two
+    propionate oxygens, -1 on two of the four porphyrin nitrogens,
+    +3 on Fe (square-planar), and dative ``->``/``<-`` bonds on the
+    Fe-N coordination so RDKit perceives the porphyrin as a single
+    macrocycle without inferring spurious aromatic bonds across Fe. Net
+    charge of HEM as templated: -1. The active-site total (HEM -1 plus
+    proximal TYR-O- -1) is -2.
+
+    Builds against the reference in
+    ``test-custom-residue-param/reference/1U5U_A_cluster`` (populated by
+    running this test with ``HTMD_REGEN_REFERENCES=1``).
+    """
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    HEM_SMILES = (
+        "C=CC1=C(C)c2cc3c(C)c(CCC(=O)[O-])c4cc5[n]6->[Fe@SP2+3]7"
+        "(<-[n]2c1cc1c(C)c(C=C)c(cc6C(C)=C5CCC(=O)[O-])[n-]->71)<-[n-]34"
+    )
+    mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, "1U5U_A.cif"))
+    specs = detectNonStandardResidues(mol)
+    mol.templateResidueFromSmiles(
+        'resname "HEM"', HEM_SMILES, addHs=True, _logger=False
+    )
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
+
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"),
+        charge_method="gasteiger",
+    )
+    built = amber_build(
+        pmol,
+        outdir=str(tmp_path / "build"),
+        ionize=False,
+        custombonds=out.custombonds,
+        topo=out.topo_paths,
+        param=out.frcmod_paths,
+    )
+
+    _assert_built_matches_references(
+        built,
+        os.path.join(_CUSTOM_PARAM_DIR, "reference", "1U5U_A_cluster"),
+    )
+
+
 @pytest.mark.skipif(
     not (_antechamber and _tleap),
     reason="custom-residue parameterization needs antechamber + teLeap",
