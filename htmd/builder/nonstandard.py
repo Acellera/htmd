@@ -755,6 +755,257 @@ def _normalize_residue_charges(sub, net_charge, charge_map=None):
 NORMALIZE_MODES = ("per_residue", "cluster", None)
 
 
+@dataclass
+class _ClusterDispatch:
+    """Output of :func:`_detect_clusters`. Bundles the per-residue spec map
+    plus the multi-residue cluster groupings the parameterise step iterates
+    over.
+
+    ``cluster_membership`` is a list of ``(member_residue_indices, bonds)``
+    tuples covering every NCAA cluster (cross-linked or singleton). Free
+    residues outside any cluster are referenced by ``standalone_residues``
+    (residue indices that need standalone parameterisation), with
+    ``in_cluster_set`` recording which residue indices are already covered
+    by ``cluster_membership``.
+    """
+    # All residue groups in mol, indexed 0..N-1 (output of
+    # :func:`_residue_groups_with_index`).
+    groups: list = field(default_factory=list)
+    # Per-atom residue index (output of :func:`_residue_groups_with_index`).
+    a2r: object = None
+    # Map: residue index in mol -> spec for the residues we'll parameterise.
+    spec_by_res_idx: dict = field(default_factory=dict)
+    # Per-cluster (member residue indices, inter-residue bond tuples).
+    cluster_membership: list = field(default_factory=list)
+    # Residue indices already absorbed by ``cluster_membership``.
+    in_cluster_set: set = field(default_factory=set)
+
+
+def _detect_clusters(mol, specs):
+    """Walk ``specs`` and ``mol.bonds`` to group residues into clusters.
+
+    Two responsibilities:
+      1. Map every spec to its residue index in ``mol`` and validate that
+         the spec'd residues are protonated (delegated to
+         :func:`_check_specs_protonated`).
+      2. Group spec'd residues into clusters by union-find over non-peptide
+         inter-residue bonds. Chain-resident non-canonical residues that
+         end up outside any cluster are promoted to singleton clusters so
+         the cluster pipeline still runs for them.
+
+    CYS-CYS disulfides (``ChainResidueSpec`` with ``new_resname="CYX"``)
+    are filtered out - they have a native ff14SB template and tLeap stitches
+    the S-S bond via ``amber.build``'s disulfide detection.
+
+    Returns
+    -------
+    :class:`_ClusterDispatch`
+        Bundles the cluster layout that the parameterise loop iterates
+        over.
+    """
+    from moleculekit.tools.nonstandard_residues import (
+        ChainResidueSpec,
+        PROTEIN_RESNAMES,
+    )
+
+    a2r, groups = _residue_groups_with_index(mol)
+
+    res_key_to_idx = {
+        (g["segid"], g["chain"], int(g["resid"]), g["insertion"]): ri
+        for ri, g in enumerate(groups)
+    }
+    spec_by_res_idx = {}
+    for s in specs:
+        # CYS-CYS disulfides are detected as ChainResidueSpec with
+        # ``new_resname="CYX"``. ff14SB has a native CYX template and
+        # tLeap stitches the S-S bond via amber.build's disulfide
+        # detection, so the cluster pipeline must not see them - they
+        # would otherwise be wrongly clustered through their non-peptide
+        # SG-SG bond.
+        if isinstance(s, ChainResidueSpec) and s.new_resname == "CYX":
+            continue
+        key = _spec_residue_key(s.residue)
+        if key not in res_key_to_idx:
+            raise ValueError(
+                f"Spec residue {s.residue} does not map to any residue in mol "
+                f"(segid={key[0]!r}, chain={key[1]!r}, resid={key[2]}, "
+                f"insertion={key[3]!r})"
+            )
+        spec_by_res_idx[res_key_to_idx[key]] = s
+
+    _check_specs_protonated(mol, spec_by_res_idx, groups)
+
+    # Walk mol.bonds for non-peptide inter-residue bonds among spec'd residues.
+    spec_indices = set(spec_by_res_idx)
+    inter_bonds = []
+    for a1, a2 in mol.bonds:
+        a1, a2 = int(a1), int(a2)
+        r1, r2 = int(a2r[a1]), int(a2r[a2])
+        if r1 == r2 or r1 < 0 or r2 < 0:
+            continue
+        if r1 not in spec_indices or r2 not in spec_indices:
+            continue
+        if {str(mol.name[a1]), str(mol.name[a2])} == {"N", "C"}:
+            continue
+        inter_bonds.append((a1, a2, r1, r2))
+
+    # Union-find clusters over the spec'd residues.
+    parent = {r: r for r in spec_indices}
+
+    def _find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def _union(a, b):
+        ra, rb = _find(a), _find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for a1, a2, r1, r2 in inter_bonds:
+        _union(r1, r2)
+
+    components = {}
+    for r in spec_indices:
+        components.setdefault(_find(r), set()).add(r)
+
+    in_cluster_set = set()
+    cluster_membership = []
+    for members in components.values():
+        cbonds = [b for b in inter_bonds if b[2] in members and b[3] in members]
+        if cbonds:
+            cluster_membership.append((sorted(members), cbonds))
+            in_cluster_set.update(members)
+
+    # Promote each chain-resident NCAA that didn't end up in a multi-
+    # residue cluster into a singleton cluster of its own. The cluster
+    # pipeline picks up ACE/NME-style backbone caps from the live mol
+    # automatically; that's what gives free NCAAs the same combined-
+    # parameterization treatment as crosslinked ones.
+    for r_idx, spec in spec_by_res_idx.items():
+        if r_idx in in_cluster_set:
+            continue
+        if isinstance(spec, ChainResidueSpec) and spec.resname not in PROTEIN_RESNAMES:
+            cluster_membership.append(([r_idx], []))
+            in_cluster_set.add(r_idx)
+
+    return _ClusterDispatch(
+        groups=groups,
+        a2r=a2r,
+        spec_by_res_idx=spec_by_res_idx,
+        cluster_membership=cluster_membership,
+        in_cluster_set=in_cluster_set,
+    )
+
+
+def _parameterize_cluster_antechamber(
+    cluster_model,
+    cluster_outdir,
+    *,
+    charge_method,
+    am1_path_length,
+    use_pyodide,
+    pin_backbone_charges,
+    normalize,
+    residue_templates,
+    parameter_sets,
+):
+    """Antechamber backend for one cluster: type the combined model compound
+    via :func:`_fftype_antechamber`, then split per-residue via
+    :func:`prepareClusterResidues`. Mutates ``residue_templates`` and
+    ``parameter_sets`` in place with the per-residue contributions for the
+    final XML emit.
+
+    Returns the :class:`ClusterOutputs`-shaped artifact bundle for this
+    cluster (topo, frcmod, custombonds path lists).
+    """
+    from htmd.builder._ambertools import _fftype_antechamber
+
+    cluster_mol = Molecule(cluster_model.cif_path)
+    netcharge = int(round(float(np.sum(cluster_mol.formalcharge))))
+    typed_mol, typed_path, frcmod_path = _fftype_antechamber(
+        cluster_mol,
+        tmpdir=cluster_outdir,
+        netcharge=netcharge,
+        charge_method=charge_method,
+        am1_path_length=am1_path_length,
+        use_pyodide=use_pyodide,
+    )
+    del typed_mol  # re-loaded inside prepareClusterResidues
+    return prepareClusterResidues(
+        typed_path,
+        frcmod_path,
+        cluster_model,
+        outdir=cluster_outdir,
+        use_pyodide=use_pyodide,
+        residue_templates=residue_templates,
+        parameter_sets=parameter_sets,
+        pin_backbone_charges=pin_backbone_charges,
+        normalize=normalize,
+    )
+
+
+def _parameterize_free_residue_antechamber(
+    mol,
+    group,
+    ligand_dir,
+    outdir,
+    *,
+    charge_method,
+    am1_path_length,
+    use_pyodide,
+    normalize,
+    residue_templates,
+    parameter_sets,
+):
+    """Antechamber backend for one free residue: write a per-residue CIF,
+    type and charge it via :func:`_fftype_antechamber`, clean the frcmod,
+    and append to the residue-template / parameter-set accumulators.
+
+    Returns ``(out_cif_path, out_frcmod_path)`` for the per-residue
+    ``ClusterOutputs.topo_paths`` / ``ClusterOutputs.frcmod_paths`` lists.
+    """
+    from htmd.builder._ambertools import _fftype_antechamber
+
+    ligand_cif = os.path.join(ligand_dir, f"{group['resname']}.cif")
+    sub = _write_free_residue_cif(mol, group, ligand_cif)
+    netcharge = int(round(float(np.sum(sub.formalcharge))))
+    typed_mol, _, frcmod_path = _fftype_antechamber(
+        sub,
+        tmpdir=ligand_dir,
+        netcharge=netcharge,
+        charge_method=charge_method,
+        am1_path_length=am1_path_length,
+        use_pyodide=use_pyodide,
+    )
+    out_cif = os.path.join(outdir, f"{group['resname']}.cif")
+    out_frcmod = os.path.join(outdir, f"{group['resname']}.frcmod")
+    typed_mol.resname[:] = group["resname"]
+    # Antechamber's mol2 rounds charges to 4 decimals; with many atoms the
+    # sum drifts a few thousandths off the integer net charge. Renormalize
+    # the standalone unit unless the user has opted out via
+    # ``normalize=None``. (For a single-residue ligand, "cluster" and
+    # "per_residue" are identical.)
+    if normalize is not None:
+        _normalize_residue_charges(typed_mol, netcharge)
+    typed_mol.write(out_cif)
+    pset = AmberParameterSet(frcmod_path)
+    _clean_frcmod_params(
+        pset, typed_mol, [], np.zeros(typed_mol.numAtoms, dtype=bool)
+    )
+    pset.write(out_frcmod, title=f"parameters for {group['resname']}", style="frcmod")
+    residue_templates.append(
+        _ResidueTemplateData(
+            resname=group["resname"],
+            mol=typed_mol.copy(),
+            external_bond_atom_names=[],
+        )
+    )
+    parameter_sets.append(copy.deepcopy(pset))
+    return out_cif, out_frcmod
+
+
 def prepareClusterResidues(
     typed_path,
     frcmod_path,
@@ -1546,7 +1797,6 @@ def parameterizeFromSpecs(
         LigandSpec,
         PROTEIN_RESNAMES,
     )
-    from htmd.builder._ambertools import _fftype_antechamber
 
     if normalize not in NORMALIZE_MODES:
         raise ValueError(f"normalize={normalize!r}: expected one of {NORMALIZE_MODES}")
@@ -1570,88 +1820,7 @@ def parameterizeFromSpecs(
         charge_method = "gasteiger"
 
     os.makedirs(outdir, exist_ok=True)
-    a2r, groups = _residue_groups_with_index(mol)
-
-    # Map each spec to its residue index in mol.
-    res_key_to_idx = {
-        (g["segid"], g["chain"], int(g["resid"]), g["insertion"]): ri
-        for ri, g in enumerate(groups)
-    }
-    spec_by_res_idx = {}
-    for s in specs:
-        # CYS-CYS disulfides are detected as ChainResidueSpec with
-        # ``new_resname="CYX"``. ff14SB has a native CYX template and
-        # tLeap stitches the S-S bond via amber.build's disulfide
-        # detection, so the cluster pipeline must not see them - they
-        # would otherwise be wrongly clustered through their non-peptide
-        # SG-SG bond.
-        if isinstance(s, ChainResidueSpec) and s.new_resname == "CYX":
-            continue
-        key = _spec_residue_key(s.residue)
-        if key not in res_key_to_idx:
-            raise ValueError(
-                f"Spec residue {s.residue} does not map to any residue in mol "
-                f"(segid={key[0]!r}, chain={key[1]!r}, resid={key[2]}, "
-                f"insertion={key[3]!r})"
-            )
-        spec_by_res_idx[res_key_to_idx[key]] = s
-
-    _check_specs_protonated(mol, spec_by_res_idx, groups)
-
-    # Walk mol.bonds for non-peptide inter-residue bonds among spec'd residues.
-    spec_indices = set(spec_by_res_idx)
-    inter_bonds = []  # (a1, a2, r1, r2) for non-peptide bonds inside the spec'd set
-    for a1, a2 in mol.bonds:
-        a1, a2 = int(a1), int(a2)
-        r1, r2 = int(a2r[a1]), int(a2r[a2])
-        if r1 == r2 or r1 < 0 or r2 < 0:
-            continue
-        if r1 not in spec_indices or r2 not in spec_indices:
-            continue
-        if {str(mol.name[a1]), str(mol.name[a2])} == {"N", "C"}:
-            continue
-        inter_bonds.append((a1, a2, r1, r2))
-
-    # Union-find clusters over the spec'd residues.
-    parent = {r: r for r in spec_indices}
-
-    def _find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    def _union(a, b):
-        ra, rb = _find(a), _find(b)
-        if ra != rb:
-            parent[ra] = rb
-
-    for a1, a2, r1, r2 in inter_bonds:
-        _union(r1, r2)
-
-    components = {}
-    for r in spec_indices:
-        components.setdefault(_find(r), set()).add(r)
-
-    in_cluster_set = set()
-    cluster_membership = []  # list of (sorted member_indices, bonds)
-    for members in components.values():
-        cbonds = [b for b in inter_bonds if b[2] in members and b[3] in members]
-        if cbonds:
-            cluster_membership.append((sorted(members), cbonds))
-            in_cluster_set.update(members)
-
-    # Promote each chain-resident NCAA that didn't end up in a multi-
-    # residue cluster into a singleton cluster of its own. The cluster
-    # pipeline picks up ACE/NME-style backbone caps from the live mol
-    # automatically; that's what gives free NCAAs the same combined-
-    # parameterization treatment as crosslinked ones.
-    for r_idx, spec in spec_by_res_idx.items():
-        if r_idx in in_cluster_set:
-            continue
-        if isinstance(spec, ChainResidueSpec) and spec.resname not in PROTEIN_RESNAMES:
-            cluster_membership.append(([r_idx], []))
-            in_cluster_set.add(r_idx)
+    dispatch = _detect_clusters(mol, specs)
 
     out = ClusterOutputs()
     # Accumulators for the OpenMM XML emitter: one entry per per-residue
@@ -1671,14 +1840,14 @@ def parameterizeFromSpecs(
     seen_singleton_keys = set()
 
     # Run the cluster pipeline once per connected component.
-    for ci, (members, cbonds) in enumerate(cluster_membership):
+    for ci, (members, cbonds) in enumerate(dispatch.cluster_membership):
         if len(members) == 1 and not cbonds:
-            spec = spec_by_res_idx[members[0]]
+            spec = dispatch.spec_by_res_idx[members[0]]
             if (
                 isinstance(spec, ChainResidueSpec)
                 and spec.resname not in PROTEIN_RESNAMES
             ):
-                g = groups[members[0]]
+                g = dispatch.groups[members[0]]
                 key = (
                     g["resname"],
                     bool(spec.is_n_term),
@@ -1689,53 +1858,42 @@ def parameterizeFromSpecs(
                 seen_singleton_keys.add(key)
 
         cluster_spec = _build_internal_cluster_spec(
-            members, cbonds, mol, groups, spec_by_res_idx
+            members, cbonds, mol, dispatch.groups, dispatch.spec_by_res_idx
         )
         cluster_outdir = os.path.join(outdir, f"cluster_{ci:03d}")
         os.makedirs(cluster_outdir, exist_ok=True)
 
         cluster_model = buildClusterModel(mol, cluster_spec, cluster_outdir)
-        cluster_mol = Molecule(cluster_model.cif_path)
-        netcharge = int(round(float(np.sum(cluster_mol.formalcharge))))
-        typed_mol, typed_path, frcmod_path = _fftype_antechamber(
-            cluster_mol,
-            tmpdir=cluster_outdir,
-            netcharge=netcharge,
+        cluster_out = _parameterize_cluster_antechamber(
+            cluster_model,
+            cluster_outdir,
             charge_method=charge_method,
             am1_path_length=am1_path_length,
             use_pyodide=use_pyodide,
-        )
-        del typed_mol  # we re-load it inside prepareClusterResidues
-        cluster_out = prepareClusterResidues(
-            typed_path,
-            frcmod_path,
-            cluster_model,
-            outdir=cluster_outdir,
-            use_pyodide=use_pyodide,
-            residue_templates=residue_templates,
-            parameter_sets=parameter_sets,
             pin_backbone_charges=pin_backbone_charges,
             normalize=normalize,
+            residue_templates=residue_templates,
+            parameter_sets=parameter_sets,
         )
         out.topo_paths.extend(cluster_out.topo_paths)
         out.frcmod_paths.extend(cluster_out.frcmod_paths)
         out.custombonds.extend(cluster_out.custombonds)
 
-    # Non-chain residues that ended up outside any cluster: run
-    # antechamber standalone and write a per-resname CIF + frcmod pair.
-    # ``LigandSpec`` is the natural case (no covalent bonds at all);
-    # ``ScaffoldSpec`` / ``CovalentLigandSpec`` can also land here when
-    # their only inter-residue bonds go to canonical residues that
-    # aren't spec'd themselves (e.g. a metal-coordinating ligand whose
-    # only neighbours are zinc ions). Chain-resident specs without a
-    # cluster shouldn't happen because those are promoted to singleton
-    # clusters earlier; if one slips through it's an input bug.
+    # Non-chain residues that ended up outside any cluster: run antechamber
+    # standalone and write a per-resname CIF + frcmod pair. ``LigandSpec``
+    # is the natural case (no covalent bonds at all); ``ScaffoldSpec`` /
+    # ``CovalentLigandSpec`` can also land here when their only inter-
+    # residue bonds go to canonical residues that aren't spec'd themselves
+    # (e.g. a metal-coordinating ligand whose only neighbours are zinc
+    # ions). Chain-resident specs without a cluster shouldn't happen
+    # because those are promoted to singleton clusters earlier; if one
+    # slips through it's an input bug.
     standalone_types = (LigandSpec, ScaffoldSpec, CovalentLigandSpec)
     seen_ligand_resnames = set()
-    for r_idx, spec in spec_by_res_idx.items():
-        if r_idx in in_cluster_set:
+    for r_idx, spec in dispatch.spec_by_res_idx.items():
+        if r_idx in dispatch.in_cluster_set:
             continue
-        g = groups[r_idx]
+        g = dispatch.groups[r_idx]
         if not isinstance(spec, standalone_types):
             raise RuntimeError(
                 f"Spec {type(spec).__name__} for residue {spec.residue} expected "
@@ -1751,46 +1909,20 @@ def parameterizeFromSpecs(
         seen_ligand_resnames.add(g["resname"])
         ligand_dir = os.path.join(outdir, f"ligand_{g['resname']}")
         os.makedirs(ligand_dir, exist_ok=True)
-        ligand_cif = os.path.join(ligand_dir, f"{g['resname']}.cif")
-        sub = _write_free_residue_cif(mol, g, ligand_cif)
-        netcharge = int(round(float(np.sum(sub.formalcharge))))
-        typed_mol, _, frcmod_path = _fftype_antechamber(
-            sub,
-            tmpdir=ligand_dir,
-            netcharge=netcharge,
+        out_cif, out_frcmod = _parameterize_free_residue_antechamber(
+            mol,
+            g,
+            ligand_dir,
+            outdir,
             charge_method=charge_method,
             am1_path_length=am1_path_length,
             use_pyodide=use_pyodide,
+            normalize=normalize,
+            residue_templates=residue_templates,
+            parameter_sets=parameter_sets,
         )
-        out_cif = os.path.join(outdir, f"{g['resname']}.cif")
-        out_frcmod = os.path.join(outdir, f"{g['resname']}.frcmod")
-        typed_mol.resname[:] = g["resname"]
-        # Antechamber's mol2 rounds charges to 4 decimals; with many
-        # atoms the sum drifts a few thousandths off the integer net
-        # charge. Renormalize the standalone unit unless the user has
-        # opted out via ``normalize=None``. (For a single-residue
-        # ligand, "cluster" and "per_residue" are identical.)
-        if normalize is not None:
-            _normalize_residue_charges(typed_mol, netcharge)
-        typed_mol.write(out_cif)
-        # Free ligand: no peptide backbone and no caps, so prune purely
-        # against the residue's own atom types / connectivity.
-        pset = AmberParameterSet(frcmod_path)
-        _clean_frcmod_params(
-            pset, typed_mol, [], np.zeros(typed_mol.numAtoms, dtype=bool)
-        )
-        pset.write(out_frcmod, title=f"parameters for {g['resname']}", style="frcmod")
         out.topo_paths.append(out_cif)
         out.frcmod_paths.append(out_frcmod)
-        # Free residues have no peptide / cluster external bonds.
-        residue_templates.append(
-            _ResidueTemplateData(
-                resname=g["resname"],
-                mol=typed_mol.copy(),
-                external_bond_atom_names=[],
-            )
-        )
-        parameter_sets.append(copy.deepcopy(pset))
 
     if residue_templates:
         xml_path = os.path.join(outdir, "parameters.xml")
