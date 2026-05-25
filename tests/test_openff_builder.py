@@ -24,6 +24,14 @@ try:
 except Exception:
     _tleap_installed = False
 
+try:
+    import openff.toolkit  # noqa: F401
+    import openff.interchange  # noqa: F401
+
+    _openff_installed = True
+except ImportError:
+    _openff_installed = False
+
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -615,3 +623,148 @@ class _TestOpenFFComparative:
                 break
 
         print(f"[3PTB ionize] atoms={molbuilt.numAtoms}, charge={total_q:.4f}")
+
+
+# ====================================================================
+# Phase 1: parameterizeLigandsOpenFF (free ligands via Interchange)
+# ====================================================================
+
+
+_PARAM_TEST_DIR = os.path.join(
+    curr_dir, "test-custom-residue-param"
+)
+BEN_SMILES = "[NH2+]=C(N)c1ccccc1"
+
+
+# Reference values produced by running Sage 2.3.0 (unconstrained) on the
+# protonated benzamidine ligand of 3PTB with RDKit Gasteiger preset charges.
+# Re-run probe_off_phase1.py to refresh these numbers if the toolkit version
+# changes.
+_BEN_EXPECTED_ATOMS = 18
+_BEN_EXPECTED_BONDS = 18
+_BEN_EXPECTED_ANGLES = 27
+_BEN_EXPECTED_PROPER_KEYS = 40
+_BEN_EXPECTED_IMPROPER_KEYS = 27
+_BEN_EXPECTED_TORSIONS_IN_SYSTEM = 67
+_BEN_EXPECTED_ATOM_NAMES = [
+    "C1", "C2", "C3", "C4", "C5", "C6", "C", "N1", "N2",
+    "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9",
+]
+_BEN_EXPECTED_CHARGES = [
+    0.062728, -0.046778, -0.061366, -0.062216, -0.061366, -0.046778,
+    0.270171, -0.287040, -0.287040, 0.063213, 0.062295, 0.062269,
+    0.062295, 0.063213, 0.301600, 0.301600, 0.301600, 0.301600,
+]
+
+
+@pytest.mark.skipif(
+    not (_openmm_installed and _openff_installed),
+    reason="OpenMM + OpenFF Interchange required",
+)
+def _test_parameterize_ligands_openff_ben():
+    """Build an Interchange for BEN via Sage 2.3 with RDKit Gasteiger charges
+    and check the result against pre-recorded reference counts and per-atom
+    charges. Acts as a regression baseline for the free-ligand path."""
+    from moleculekit.molecule import Molecule
+    from htmd.builder.openff import parameterizeLigandsOpenFF
+
+    mol = Molecule(os.path.join(_PARAM_TEST_DIR, "3PTB_BEN.cif"))
+    mol.filter("resname BEN", _logger=False)
+    mol.templateResidueFromSmiles("resname BEN", BEN_SMILES, addHs=True)
+
+    out = parameterizeLigandsOpenFF(
+        mol,
+        ligand_ff="openff_unconstrained-2.3.0.offxml",
+        charge_method="gasteiger",
+    )
+
+    assert set(out) == {"BEN"}
+    ic = out["BEN"]
+
+    # Topology shape.
+    assert ic.topology.n_atoms == _BEN_EXPECTED_ATOMS
+    assert ic.topology.n_bonds == _BEN_EXPECTED_BONDS
+    assert mol.numAtoms == _BEN_EXPECTED_ATOMS
+    assert mol.bonds.shape[0] == _BEN_EXPECTED_BONDS
+
+    # Atom names roundtripped through the RDKit / OFFMolecule conversion.
+    off_names = [a.name for a in ic.topology.molecule(0).atoms]
+    assert off_names == _BEN_EXPECTED_ATOM_NAMES
+
+    # Per-collection key counts from the SMIRNOFF resolution.
+    assert len(ic["Bonds"].key_map) == _BEN_EXPECTED_BONDS
+    assert len(ic["Angles"].key_map) == _BEN_EXPECTED_ANGLES
+    assert len(ic["ProperTorsions"].key_map) == _BEN_EXPECTED_PROPER_KEYS
+    assert len(ic["ImproperTorsions"].key_map) == _BEN_EXPECTED_IMPROPER_KEYS
+
+    # Per-atom Gasteiger charges, ordered by atom index. Compare to 4 dp
+    # since RDKit's PEOE iteration converges per platform with that precision.
+    charges = []
+    for key in sorted(
+        ic["Electrostatics"].charges.keys(), key=lambda k: k.atom_indices[0]
+    ):
+        charges.append(float(ic["Electrostatics"].charges[key].m))
+    assert len(charges) == _BEN_EXPECTED_ATOMS
+    for actual, expected in zip(charges, _BEN_EXPECTED_CHARGES):
+        assert abs(actual - expected) < 1e-4, (
+            f"charge mismatch: actual={actual:.6f} expected={expected:.6f}"
+        )
+    # Charges must sum to the integer net formal charge (+1, protonated
+    # amidinium). Gasteiger via RDKit seeds from formal charges, so this is
+    # an exactness property of the charge model, not a tolerance check.
+    assert abs(sum(charges) - 1.0) < 1e-3
+
+    # Exported OpenMM System: per-force term counts.
+    system = ic.to_openmm_system()
+    assert system.getNumParticles() == _BEN_EXPECTED_ATOMS
+    force_counts = {}
+    for force in system.getForces():
+        name = force.__class__.__name__
+        if name == "HarmonicBondForce":
+            force_counts[name] = force.getNumBonds()
+        elif name == "HarmonicAngleForce":
+            force_counts[name] = force.getNumAngles()
+        elif name == "PeriodicTorsionForce":
+            force_counts[name] = force.getNumTorsions()
+        elif name == "NonbondedForce":
+            force_counts[name] = force.getNumParticles()
+    assert force_counts == {
+        "HarmonicBondForce": _BEN_EXPECTED_BONDS,
+        "HarmonicAngleForce": _BEN_EXPECTED_ANGLES,
+        "PeriodicTorsionForce": _BEN_EXPECTED_TORSIONS_IN_SYSTEM,
+        "NonbondedForce": _BEN_EXPECTED_ATOMS,
+    }
+
+
+@pytest.mark.skipif(
+    not (_openmm_installed and _openff_installed),
+    reason="OpenMM + OpenFF Interchange required",
+)
+def _test_parameterize_ligands_openff_multi_resname():
+    """Parameterise two different ligand resnames in one call (BEN + a
+    renamed copy). Both should produce identical reference counts since
+    XBEN is structurally identical to BEN."""
+    from moleculekit.molecule import Molecule
+    from htmd.builder.openff import parameterizeLigandsOpenFF
+
+    mol = Molecule(os.path.join(_PARAM_TEST_DIR, "3PTB_BEN.cif"))
+    mol.filter("resname BEN", _logger=False)
+    mol.templateResidueFromSmiles("resname BEN", BEN_SMILES, addHs=True)
+    mol2 = mol.copy()
+    mol2.resname[:] = "XBEN"
+    mol.append(mol2)
+
+    out = parameterizeLigandsOpenFF(
+        mol,
+        ligand_ff="openff_unconstrained-2.3.0.offxml",
+        charge_method="gasteiger",
+        resnames=["BEN", "XBEN"],
+    )
+    assert set(out) == {"BEN", "XBEN"}
+    for resname in ("BEN", "XBEN"):
+        ic = out[resname]
+        assert ic.topology.n_atoms == _BEN_EXPECTED_ATOMS
+        assert ic.topology.n_bonds == _BEN_EXPECTED_BONDS
+        assert len(ic["Angles"].key_map) == _BEN_EXPECTED_ANGLES
+        assert len(ic["ProperTorsions"].key_map) == _BEN_EXPECTED_PROPER_KEYS
+        assert len(ic["ImproperTorsions"].key_map) == _BEN_EXPECTED_IMPROPER_KEYS

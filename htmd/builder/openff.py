@@ -297,6 +297,103 @@ def build(
 
 
 # ====================================================================
+# OpenFF Interchange parameterisation (free ligands)
+# ====================================================================
+
+
+def parameterizeLigandsOpenFF(
+    mol,
+    ligand_ff="openff_unconstrained-2.3.0.offxml",
+    charge_method="gasteiger",
+    resnames=None,
+):
+    """Parameterise free ligand residues via OpenFF Interchange.
+
+    Slices each ligand residue out of *mol*, assigns partial charges
+    (default RDKit Gasteiger, which honours the net formal charge unlike
+    antechamber's ``-c gas``), applies the chosen SMIRNOFF force field
+    via :func:`openff.interchange.Interchange.from_smirnoff`, and returns
+    one :class:`Interchange` per resname. The returned objects can be
+    combined with other Interchanges via ``ic.combine(other)`` and
+    exported to OpenMM via ``ic.to_openmm()``.
+
+    Mirrors the OpenFF protein-ligand tutorial pattern::
+
+        ligand_ic = Interchange.from_smirnoff(
+            force_field=ForceField("openff_unconstrained-2.3.0.offxml"),
+            topology=[ligand_offmol],
+        )
+
+    Parameters
+    ----------
+    mol : :class:`moleculekit.molecule.Molecule`
+        Molecule containing one or more free ligand residues. Each ligand
+        must already have explicit hydrogens and explicit integer bond
+        orders, e.g. via
+        :meth:`moleculekit.molecule.Molecule.templateResidueFromSmiles`.
+    ligand_ff : str, optional
+        Name of an OpenFF force field offxml. ``"openff_unconstrained-*"``
+        variants are recommended when the final system will be
+        energy-minimised; constrained variants are only correct for
+        rigid-water MD.
+    charge_method : str or None, optional
+        ``"gasteiger"`` (default) - compute Gasteiger PEOE charges with
+        RDKit before SMIRNOFF application and pass them through
+        ``charge_from_molecules`` so SMIRNOFF does not overwrite them.
+        Honours the net formal charge.
+        ``None`` - let SMIRNOFF assign its own charges (e.g. AM1-BCC for
+        Sage). Requires sqm from AmberTools at runtime.
+    resnames : list[str] or None, optional
+        Subset of resnames to parameterise. ``None`` parameterises every
+        unique resname in *mol*.
+
+    Returns
+    -------
+    dict[str, openff.interchange.Interchange]
+        One Interchange per resname.
+    """
+    from openff.toolkit import ForceField
+    from openff.interchange import Interchange
+    from htmd.builder._ambertools import _assign_rdkit_gasteiger_charges
+
+    if resnames is None:
+        resnames = [str(r) for r in np.unique(mol.resname) if str(r)]
+    if not resnames:
+        raise ValueError("No ligand resnames found in mol")
+
+    ff = ForceField(ligand_ff)
+    out = {}
+    for resname in resnames:
+        sub = mol.copy()
+        sub.filter(f'resname "{resname}"', _logger=False)
+        if sub.numAtoms == 0:
+            raise ValueError(f"resname {resname!r} matched no atoms in mol")
+
+        if charge_method == "gasteiger":
+            _assign_rdkit_gasteiger_charges(sub)
+        elif charge_method is None:
+            pass
+        else:
+            raise ValueError(
+                f"Unsupported charge_method {charge_method!r}. "
+                f"Supported: 'gasteiger', None."
+            )
+
+        off_mol = sub.toOpenFFMolecule(sanitize=True, assignStereo=True)
+
+        kwargs = {"force_field": ff, "topology": [off_mol]}
+        if charge_method is not None:
+            kwargs["charge_from_molecules"] = [off_mol]
+        ic = Interchange.from_smirnoff(**kwargs)
+        out[resname] = ic
+        logger.info(
+            f"Parameterised ligand {resname!r} with {ligand_ff} ({charge_method=}): "
+            f"{off_mol.n_atoms} atoms, {off_mol.n_bonds} bonds"
+        )
+    return out
+
+
+# ====================================================================
 # Molecule preparation
 # ====================================================================
 
