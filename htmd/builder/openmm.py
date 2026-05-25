@@ -393,6 +393,432 @@ def parameterizeLigandsOpenFF(
     return out
 
 
+# OpenMM XML expects kJ/mol, nm, and radians. openff.units handles the
+# conversion natively via Quantity.m_as(target_unit); call sites just
+# ask for the right target. No manual conversion factors needed.
+
+
+def _emit_openmm_xml_from_interchange(
+    ic,
+    resname,
+    external_bond_atom_names,
+    xml_path,
+    *,
+    class_prefix=None,
+):
+    """Free-residue (single-template) wrapper around the multi-residue
+    XML emitter. Builds a one-residue ``residue_assignment`` and forwards.
+
+    See :func:`_emit_openmm_xml_from_cluster_interchange` for the general
+    multi-residue API and full parameter notes.
+    """
+    n_atoms = ic.topology.molecule(0).n_atoms
+    residue_assignment = [(resname, list(range(n_atoms)))]
+    cap_atoms = set()
+    external_bonds = {resname: list(external_bond_atom_names)}
+    return _emit_openmm_xml_from_cluster_interchange(
+        ic=ic,
+        residue_assignment=residue_assignment,
+        cap_atoms=cap_atoms,
+        external_bonds=external_bonds,
+        xml_path=xml_path,
+        class_prefix=class_prefix,
+    )
+
+
+def _emit_openmm_xml_from_cluster_interchange(
+    ic,
+    residue_assignment,
+    cap_atoms,
+    external_bonds,
+    xml_path,
+    *,
+    class_prefix=None,
+    atom_names=None,
+    class_overrides=None,
+    type_overrides=None,
+):
+    """Multi-residue OpenMM ``<ForceField>`` XML emitter.
+
+    Splits one cluster :class:`Interchange` (covering several residues
+    plus optional ACE/NME cap atoms) into a single XML document
+    containing one ``<Residue>`` per cluster residue and global force
+    sections that reference synthesised per-atom classes.
+
+    Cap atoms (``cap_atoms``) are excluded from the emitted residue
+    templates AND from all force-section entries. Cap atoms typically
+    parameterise the cluster boundary in context (ACE/NME on chain
+    residues, neighbour-residue stubs for cross-linked clusters); after
+    parameterisation they are no longer relevant in the final peptide,
+    so their parameters get dropped at emission time. The peptide-bond
+    parameters at the canonical-NCAA junction in the final peptide come
+    from ff14SB's protein XML (loaded alongside our output).
+
+    Parameters
+    ----------
+    ic : :class:`openff.interchange.Interchange`
+        Interchange resolved via :func:`Interchange.from_smirnoff` on a
+        cluster topology (full residues + caps).
+    residue_assignment : list[tuple[str, list[int]]]
+        Per-cluster-residue ``(resname, atom_indices)`` pairs. Atom
+        indices index into the Interchange topology. The order
+        determines the order of ``<Residue>`` elements in the output.
+    cap_atoms : set[int]
+        Topology-atom indices for ACE/NME-style cap atoms - dropped at
+        emit time.
+    external_bonds : dict[str, list[str]]
+        Per-resname list of atom NAMES that need ``<ExternalBond>``
+        markers. For chain residues this is typically ``["N", "C"]``
+        (or one of them on a terminal residue).
+    xml_path : str
+        File path to write the XML to.
+    class_prefix : str or None
+        Class-name prefix for synthesised atom classes. Defaults to
+        ``OFF_<first_resname>`` for backward compatibility with the
+        single-residue path. Pass an explicit prefix to disambiguate
+        across multiple clusters that share a resname.
+
+    Returns
+    -------
+    str
+        ``xml_path`` (the file written).
+    """
+    import xml.etree.ElementTree as ET
+    from openff.units import unit
+
+    if class_prefix is None:
+        first_resname = residue_assignment[0][0]
+        class_prefix = f"OFF_{first_resname}"
+
+    off_mol = ic.topology.molecule(0)
+    n_atoms = off_mol.n_atoms
+
+    if class_overrides is None:
+        class_overrides = {}
+    if type_overrides is None:
+        # Default: type == class (true for our synthesised OFF_ classes
+        # and for backward compatibility callers that pass only
+        # class_overrides). For ff14SB overrides callers should pass
+        # type_overrides separately: ff14SB's "protein-CT" is a TYPE
+        # whose CLASS is "CT" - force entries match by class, residue
+        # templates carry the type, so the two strings differ.
+        type_overrides = dict(class_overrides)
+
+    # Per-atom class names (used in force-section entries). Default to
+    # synthesised unique ``OFF_<prefix>_<i>``; atoms in ``class_overrides``
+    # get the ff14SB class (e.g. "CT" for backbone CA).
+    classes = [
+        class_overrides.get(i, f"{class_prefix}_{i}") for i in range(n_atoms)
+    ]
+    # Per-atom type names (used in <Residue><Atom type=...> attributes).
+    # Default to the same as the class; backbone atoms get the ff14SB
+    # type (e.g. "protein-CT" for CA).
+    types_per_atom = [
+        type_overrides.get(i, f"{class_prefix}_{i}") for i in range(n_atoms)
+    ]
+    is_overridden = [i in class_overrides for i in range(n_atoms)]
+
+    if atom_names is None:
+        atom_names = [a.name for a in off_mol.atoms]
+    else:
+        assert len(atom_names) == n_atoms, (
+            f"atom_names length {len(atom_names)} != topology n_atoms "
+            f"{n_atoms}"
+        )
+    elements = [_element_symbol_from_atomic_number(a.atomic_number) for a in off_mol.atoms]
+    masses = [float(a.mass.m_as(unit.dalton)) for a in off_mol.atoms]
+    is_kept = [i not in cap_atoms for i in range(n_atoms)]
+
+    # Per-atom partial charges from the Electrostatics collection.
+    charges = [0.0] * n_atoms
+    for key, q in ic["Electrostatics"].charges.items():
+        idx = key.atom_indices[0]
+        if idx < n_atoms:
+            charges[idx] = float(q.m_as(unit.elementary_charge))
+
+    # Build the root <ForceField> element.
+    root = ET.Element("ForceField")
+    resnames = ",".join(r for r, _ in residue_assignment)
+    root.append(ET.Comment(
+        f" Auto-generated from OpenFF Interchange. Residues: {resnames}. "
+        f"Cap atoms dropped: {len(cap_atoms)}. Do not edit by hand. "
+    ))
+
+    # <AtomTypes>: one entry per kept atom. Atoms with a class override
+    # are skipped because their class is declared by a different XML
+    # (typically ff14SB's protein.ff14SB.xml).
+    atom_types_el = ET.SubElement(root, "AtomTypes")
+    for i, (cls, elem, mass) in enumerate(zip(classes, elements, masses)):
+        if not is_kept[i] or is_overridden[i]:
+            continue
+        ET.SubElement(
+            atom_types_el,
+            "Type",
+            {"name": cls, "class": cls, "element": elem, "mass": f"{mass:.6f}"},
+        )
+
+    # <Residues>: one <Residue> per cluster residue. Bonds within the
+    # residue go in the residue template; bonds crossing the residue
+    # boundary become implicit (recognized via <ExternalBond> markers).
+    residues_el = ET.SubElement(root, "Residues")
+    atom_residue = {}  # atom_idx -> position in residue_assignment
+    for ri, (_resname, atom_indices) in enumerate(residue_assignment):
+        for ai in atom_indices:
+            atom_residue[ai] = ri
+
+    for ri, (resname, atom_indices) in enumerate(residue_assignment):
+        residue_el = ET.SubElement(residues_el, "Residue", {"name": resname})
+        for ai in atom_indices:
+            ET.SubElement(
+                residue_el,
+                "Atom",
+                {
+                    "name": atom_names[ai],
+                    "type": types_per_atom[ai],
+                    "charge": f"{charges[ai]:.6f}",
+                },
+            )
+        # Intra-residue bonds.
+        for bond in off_mol.bonds:
+            a, b = bond.atom1_index, bond.atom2_index
+            if a in cap_atoms or b in cap_atoms:
+                continue
+            if atom_residue.get(a) == ri and atom_residue.get(b) == ri:
+                ET.SubElement(
+                    residue_el,
+                    "Bond",
+                    {
+                        "atomName1": atom_names[a],
+                        "atomName2": atom_names[b],
+                    },
+                )
+        # External bonds: from the per-resname mapping the caller supplied
+        # (chain N/C, scaffolded-peptide cross bonds, etc).
+        for ext_name in external_bonds.get(resname, []):
+            ET.SubElement(residue_el, "ExternalBond", {"atomName": ext_name})
+
+    # Global force sections - dropping any entry that touches a cap atom,
+    # and any entry where ALL atoms have a class override (ff14SB owns
+    # those parameters, our XML should not redeclare them).
+    overridden_atoms = {i for i in range(n_atoms) if is_overridden[i]}
+    _write_bond_force(
+        root, ic, classes,
+        drop_atoms=cap_atoms, all_overridden_drop=overridden_atoms,
+    )
+    _write_angle_force(
+        root, ic, classes,
+        drop_atoms=cap_atoms, all_overridden_drop=overridden_atoms,
+    )
+    _write_torsion_force(
+        root, ic, classes,
+        drop_atoms=cap_atoms, all_overridden_drop=overridden_atoms,
+    )
+    _write_nonbonded_force(
+        root, ic, classes,
+        drop_atoms=cap_atoms | overridden_atoms,
+    )
+
+    ET.indent(root, space="  ")
+    tree = ET.ElementTree(root)
+    tree.write(xml_path, encoding="utf-8", xml_declaration=True)
+    n_kept = sum(is_kept)
+    logger.info(
+        f"Wrote OpenMM XML fragment to {xml_path} - "
+        f"{len(residue_assignment)} residue(s) [{resnames}], "
+        f"{n_kept}/{n_atoms} atoms kept ({len(cap_atoms)} cap atoms dropped)"
+    )
+    return xml_path
+
+
+def _element_symbol_from_atomic_number(atomic_number):
+    """Atomic number -> element symbol via RDKit's PeriodicTable.
+
+    RDKit is already a hard moleculekit dep so this stays self-contained.
+    """
+    from rdkit.Chem import GetPeriodicTable
+
+    return GetPeriodicTable().GetElementSymbol(int(atomic_number))
+
+
+def _write_bond_force(root, ic, classes, drop_atoms=frozenset(),
+                      all_overridden_drop=frozenset()):
+    import xml.etree.ElementTree as ET
+    from openff.units import unit
+
+    bonds_el = ET.SubElement(root, "HarmonicBondForce")
+    for top_key, pot_key in ic["Bonds"].key_map.items():
+        i, j = top_key.atom_indices
+        if i in drop_atoms or j in drop_atoms:
+            continue
+        # Drop if ALL atoms are class-overridden (ff14SB owns the param).
+        if i in all_overridden_drop and j in all_overridden_drop:
+            continue
+        pot = ic["Bonds"].potentials[pot_key]
+        length_nm = float(pot.parameters["length"].m_as(unit.nanometer))
+        k_kj = float(pot.parameters["k"].m_as(
+            unit.kilojoule_per_mole / unit.nanometer**2,
+        ))
+        ET.SubElement(
+            bonds_el,
+            "Bond",
+            {
+                "class1": classes[i],
+                "class2": classes[j],
+                "length": f"{length_nm:.8f}",
+                "k": f"{k_kj:.6f}",
+            },
+        )
+
+
+def _write_angle_force(root, ic, classes, drop_atoms=frozenset(),
+                       all_overridden_drop=frozenset()):
+    import xml.etree.ElementTree as ET
+    from openff.units import unit
+
+    angles_el = ET.SubElement(root, "HarmonicAngleForce")
+    for top_key, pot_key in ic["Angles"].key_map.items():
+        i, j, k = top_key.atom_indices
+        if i in drop_atoms or j in drop_atoms or k in drop_atoms:
+            continue
+        if (
+            i in all_overridden_drop
+            and j in all_overridden_drop
+            and k in all_overridden_drop
+        ):
+            continue
+        pot = ic["Angles"].potentials[pot_key]
+        angle_rad = float(pot.parameters["angle"].m_as(unit.radian))
+        k_kj = float(pot.parameters["k"].m_as(
+            unit.kilojoule_per_mole / unit.radian**2,
+        ))
+        ET.SubElement(
+            angles_el,
+            "Angle",
+            {
+                "class1": classes[i],
+                "class2": classes[j],
+                "class3": classes[k],
+                "angle": f"{angle_rad:.8f}",
+                "k": f"{k_kj:.6f}",
+            },
+        )
+
+
+def _write_torsion_force(root, ic, classes, drop_atoms=frozenset(),
+                         all_overridden_drop=frozenset()):
+    """Write proper + improper torsions. SMIRNOFF spreads multi-term
+    dihedrals across `mult`-indexed entries with the same atom tuple; we
+    merge them back into one ``<Proper>``/``<Improper>`` element with
+    periodicity1/k1/phase1, periodicity2/..., etc. so the OpenMM XML
+    schema is compact.
+    """
+    import xml.etree.ElementTree as ET
+    from collections import defaultdict
+    from openff.units import unit
+
+    # OpenMM expands SMIRNOFF impropers in trefoil symmetry (3 terms per
+    # <Improper> entry, one per permutation of the non-central atoms);
+    # the AMBER ordering applies each <Improper> as a single term. Since
+    # the Interchange's stored impropers come from SMIRNOFF's SMARTS-based
+    # assignment, we want SMIRNOFF ordering to match Interchange.to_openmm.
+    pt_el = ET.SubElement(root, "PeriodicTorsionForce", {"ordering": "smirnoff"})
+
+    def _emit(collection_name, xml_tag):
+        # Group multi-term entries by atom tuple.
+        grouped = defaultdict(list)
+        for top_key, pot_key in ic[collection_name].key_map.items():
+            atoms = tuple(top_key.atom_indices)
+            if any(a in drop_atoms for a in atoms):
+                continue
+            if all(a in all_overridden_drop for a in atoms):
+                continue
+            pot = ic[collection_name].potentials[pot_key]
+            periodicity = int(pot.parameters["periodicity"].m_as(unit.dimensionless))
+            phase_rad = float(pot.parameters["phase"].m_as(unit.radian))
+            # SMIRNOFF stores improper k undivided: the per-term
+            # contribution is k/idivf (idivf=3 by SMIRNOFF convention so
+            # the three trefoil-permuted entries sum to k). OpenMM applies
+            # each <Improper> as a single term, so we bake the divide in
+            # here. Propers carry idivf=1 (no division).
+            idivf = 1.0
+            if "idivf" in pot.parameters:
+                idivf = float(pot.parameters["idivf"].m_as(unit.dimensionless))
+            k_kj = float(
+                pot.parameters["k"].m_as(unit.kilojoule_per_mole) / idivf
+            )
+            grouped[atoms].append((periodicity, phase_rad, k_kj))
+
+        for atoms, terms in grouped.items():
+            attrs = {
+                "class1": classes[atoms[0]],
+                "class2": classes[atoms[1]],
+                "class3": classes[atoms[2]],
+                "class4": classes[atoms[3]],
+            }
+            for idx, (per, phase, k) in enumerate(terms, start=1):
+                attrs[f"periodicity{idx}"] = str(per)
+                attrs[f"phase{idx}"] = f"{phase:.8f}"
+                attrs[f"k{idx}"] = f"{k:.6f}"
+            ET.SubElement(pt_el, xml_tag, attrs)
+
+    _emit("ProperTorsions", "Proper")
+    _emit("ImproperTorsions", "Improper")
+
+
+def _write_nonbonded_force(root, ic, classes, drop_atoms=frozenset()):
+    """Emit ``<NonbondedForce>`` with per-class sigma/epsilon. Charges
+    live on the ``<Residue><Atom>`` entries so we don't repeat them here.
+    """
+    import xml.etree.ElementTree as ET
+    from openff.units import unit
+
+    # SMIRNOFF 1-4 scaling. OpenFF Sage uses 1.0 / (1/0.833333) for
+    # coulomb (which is 0.833...) and 0.5 for LJ. Read them from the
+    # vdW collection's metadata when available, fall back to AMBER
+    # defaults otherwise.
+    coulomb14_scale = 0.833333
+    lj14_scale = 0.5
+    if hasattr(ic.collections.get("vdW", None), "scale_14"):
+        lj14_scale = float(ic["vdW"].scale_14)
+    if hasattr(ic.collections.get("Electrostatics", None), "scale_14"):
+        coulomb14_scale = float(ic["Electrostatics"].scale_14)
+
+    nb_el = ET.SubElement(
+        root,
+        "NonbondedForce",
+        {
+            "coulomb14scale": f"{coulomb14_scale:.6f}",
+            "lj14scale": f"{lj14_scale:.6f}",
+        },
+    )
+    # UseAttributeFromResidue: tell OpenMM that per-atom charges come
+    # from the <Residue> template, not from the NonbondedForce entries.
+    ET.SubElement(nb_el, "UseAttributeFromResidue", {"name": "charge"})
+
+    n_atoms = ic.topology.n_atoms
+    sigmas = [0.0] * n_atoms
+    epsilons = [0.0] * n_atoms
+    for top_key, pot_key in ic["vdW"].key_map.items():
+        (idx,) = top_key.atom_indices
+        pot = ic["vdW"].potentials[pot_key]
+        sigmas[idx] = float(pot.parameters["sigma"].m_as(unit.nanometer))
+        epsilons[idx] = float(
+            pot.parameters["epsilon"].m_as(unit.kilojoule_per_mole)
+        )
+    for i, (cls, sigma, epsilon) in enumerate(zip(classes, sigmas, epsilons)):
+        if i in drop_atoms:
+            continue
+        ET.SubElement(
+            nb_el,
+            "Atom",
+            {
+                "type": cls,
+                "sigma": f"{sigma:.8f}",
+                "epsilon": f"{epsilon:.6f}",
+            },
+        )
+
+
 # ====================================================================
 # Molecule preparation
 # ====================================================================
@@ -785,7 +1211,10 @@ def _register_amber_variant_bond_defs():
             "HIP": set(),  # doubly protonated
         },
         "LYS": {
-            "LYN": {"HZ3"},  # neutral amine
+            # Neutral lysine. ff14SB / systemPrepare emit LYN with
+            # HZ2 + HZ3 on NZ (dropping HZ1), not HZ1 + HZ2 (dropping
+            # HZ3). Keep both Hs that ff14SB defines.
+            "LYN": {"HZ1"},
         },
         "ASP": {
             "ASH": set(),  # protonated carboxyl (HD2 already in base?)
@@ -875,6 +1304,82 @@ def _add_missing_bonds(mol, topology):
         existing.add(key)
 
 
+def _register_extra_xml_template_matcher(forcefield, extra_xml):
+    """Register a template matcher that prefers the template whose NAME
+    matches the topology residue's name, whenever such a same-named
+    template exists and actually matches the residue's atoms.
+
+    Why this is safe and necessary:
+
+    The default OpenMM matcher selects templates by atom-element +
+    bond-graph signature, which can return multiple matches when two
+    templates are topologically indistinguishable. Two failure modes
+    we hit in this codebase:
+
+    1. *Same atom set, different bonded partners on an ExternalBond.*
+       Our XX1 (Cys-renamed, S-C scaffold thio-ether) vs ff14SB's NCYX
+       (Cys-disulfide-to-another-CYX): identical atom set, identical
+       ExternalBond count on SG, but chemically different. The default
+       matcher reports both and errors.
+    2. *Stereoisomer NCAAs.* DAL (D-Ala) and ff14SB ALA (L-Ala) have
+       identical atom topology because chirality isn't in the bond
+       graph. A topology residue named "ALA" gets matched by both.
+
+    Resolving by NAME is the right call because:
+    - The user / pipeline emitted the topology residue with a specific
+      NAME for a reason. If they wanted ff14SB's ALA they named the
+      residue ALA; if they wanted our DAL they named it DAL.
+    - We only return the same-named template when it ACTUALLY matches
+      the residue's atoms - otherwise we fall through to default logic.
+
+    The matcher does NOT replace e.g. NCYX residues with our XX1
+    parameters: it looks up ``_templates[residue.name]``, so a real
+    NCYX residue still gets ff14SB's NCYX (assuming no other XML
+    redefined it).
+    """
+    import xml.etree.ElementTree as ET
+    from openmm.app.internal import compiled
+
+    if isinstance(extra_xml, str):
+        extra_xml = [extra_xml]
+
+    # We only need to ARM the matcher when extra_xml exists - if there's
+    # no extra XML the default OpenMM logic already produces the right
+    # answer everywhere. Collecting the resname set is just a sanity
+    # check that something was loaded.
+    extra_resnames = set()
+    for path in extra_xml:
+        try:
+            root = ET.parse(path).getroot()
+        except (ET.ParseError, FileNotFoundError):
+            continue
+        for res in root.findall("./Residues/Residue"):
+            name = res.attrib.get("name")
+            if name:
+                extra_resnames.add(name)
+
+    if not extra_resnames:
+        return
+
+    def _matcher(forcefield, residue, bonded_to_atom, ignore_external, ignore_extra):
+        template = forcefield._templates.get(residue.name)
+        if template is None:
+            return None
+        # Verify the same-named template actually matches before
+        # returning it - registerTemplateMatcher raises if a returned
+        # template doesn't match. This guards against unusual cases
+        # where a residue is renamed (e.g. HIS->HID at apply time) but
+        # the topology still carries the input name.
+        match = compiled.matchResidueToTemplate(
+            residue, template, bonded_to_atom, ignore_external, ignore_extra,
+        )
+        if match is None:
+            return None
+        return template
+
+    forcefield.registerTemplateMatcher(_matcher)
+
+
 def _setup_forcefield(ff, extra_xml, small_molecule_ff, molecules):
     """Create an ``openmm.app.ForceField`` with optional template generators.
 
@@ -898,6 +1403,19 @@ def _setup_forcefield(ff, extra_xml, small_molecule_ff, molecules):
         ff_args.extend(extra_xml)
 
     forcefield = app.ForceField(*ff_args)
+
+    # Templates from ``extra_xml`` take priority over the base ff14SB / GAFF2
+    # templates when the topology residue NAME matches the extra_xml
+    # template name. This disambiguates structurally-equivalent residues
+    # whose chemistry differs only in *what's on the other end of an
+    # ExternalBond* - the classic case being CYS-renamed XX1 (S-C scaffold
+    # bond) vs ff14SB's NCYX (S-S disulfide bond): identical atom set, same
+    # ExternalBond count on SG, but different bond partners. OpenMM's
+    # default signature-based matcher can't tell them apart and raises
+    # "Multiple non-identical matching templates"; the matcher below short-
+    # circuits the choice by name.
+    if extra_xml:
+        _register_extra_xml_template_matcher(forcefield, extra_xml)
 
     if small_molecule_ff and molecules:
         if not isinstance(molecules, (list, tuple)):

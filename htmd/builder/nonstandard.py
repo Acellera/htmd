@@ -153,12 +153,19 @@ class ClusterOutputs:
     # Custombonds to feed via ``custombonds=``. One pair per cluster bond.
     custombonds: list = field(default_factory=list)
     # Path to a single OpenMM ForceField XML covering every residue and
-    # parameter the run produced. Drop it into
+    # parameter the run produced via the antechamber backend. Drop it into
     # ``openmm.app.ForceField(*defaultFf(), xml_path)`` alongside ff14SB
     # and tip3p; the peptide bonds resolve through ff14SB (NCAA backbones
     # are renamed to ff14SB classes) and the GAFF2 sidechain / junction
     # terms come from this file.
     xml_path: Optional[str] = None
+
+    # Per-residue OpenMM ForceField XML fragments produced by the openff
+    # backend (one per resname). Each is a self-contained ``<ForceField>``
+    # document. Feed all of them plus ``xml_path`` (if set) into
+    # ``openmm.app.ForceField(*defaultFf(), *xml_paths, xml_path)`` to
+    # assemble the full force field for the system.
+    xml_paths: list = field(default_factory=list)
 
 
 @dataclass
@@ -781,6 +788,79 @@ class _ClusterDispatch:
     in_cluster_set: set = field(default_factory=set)
 
 
+_SUPPORTED_BACKENDS = ("antechamber", "openff")
+_DEFAULT_FORCEFIELD = {
+    "antechamber": "GAFF2",
+    "openff": "openff_unconstrained-2.3.0.offxml",
+}
+
+
+def _resolve_backend_map(backend):
+    """Normalise the ``backend`` argument to a callable ``resname -> name``.
+
+    ``backend`` may be:
+      - a single backend name (``"antechamber"`` or ``"openff"``) applied
+        to every resname,
+      - a dict mapping resname -> backend name, with optional ``"default"``
+        key providing the fallback.
+    """
+    if isinstance(backend, str):
+        if backend not in _SUPPORTED_BACKENDS:
+            raise ValueError(
+                f"backend={backend!r}: expected one of {_SUPPORTED_BACKENDS} "
+                f"or a dict mapping resname -> backend."
+            )
+        return lambda resname: backend
+    if isinstance(backend, dict):
+        default = backend.get("default", "antechamber")
+        if default not in _SUPPORTED_BACKENDS:
+            raise ValueError(
+                f"backend default={default!r}: expected one of "
+                f"{_SUPPORTED_BACKENDS}"
+            )
+        for k, v in backend.items():
+            if k == "default":
+                continue
+            if v not in _SUPPORTED_BACKENDS:
+                raise ValueError(
+                    f"backend[{k!r}]={v!r}: expected one of "
+                    f"{_SUPPORTED_BACKENDS}"
+                )
+        return lambda resname: backend.get(resname, default)
+    raise TypeError(
+        f"backend must be str or dict, got {type(backend).__name__}"
+    )
+
+
+def _resolve_forcefield_map(forcefield, backend_for):
+    """Normalise the ``forcefield`` argument to a callable
+    ``resname -> ff_name``.
+
+    Defaults per backend: GAFF2 for antechamber, Sage 2.3 (unconstrained)
+    for openff. ``forcefield`` may be a single name (applied everywhere)
+    or a dict mapping resname -> ff name.
+    """
+    if forcefield is None:
+        return lambda resname: _DEFAULT_FORCEFIELD[backend_for(resname)]
+    if isinstance(forcefield, str):
+        return lambda resname: forcefield
+    if isinstance(forcefield, dict):
+        default = forcefield.get(
+            "default",
+            None,
+        )
+        def _lookup(resname):
+            if resname in forcefield:
+                return forcefield[resname]
+            if default is not None:
+                return default
+            return _DEFAULT_FORCEFIELD[backend_for(resname)]
+        return _lookup
+    raise TypeError(
+        f"forcefield must be str, dict, or None, got {type(forcefield).__name__}"
+    )
+
+
 def _detect_clusters(mol, specs):
     """Walk ``specs`` and ``mol.bonds`` to group residues into clusters.
 
@@ -1004,6 +1084,468 @@ def _parameterize_free_residue_antechamber(
     )
     parameter_sets.append(copy.deepcopy(pset))
     return out_cif, out_frcmod
+
+
+def _apply_cluster_charge_policy(
+    off_mol,
+    cluster_model,
+    residue_atom_indices,
+    cap_atoms,
+    original_names,
+    pin_backbone_charges,
+    normalize,
+):
+    """Mutate ``off_mol.partial_charges`` in place to apply backbone
+    pinning (ff14SB-canonical backbone charges on chain-resident residues)
+    and per-residue / cluster normalisation. Run BEFORE
+    :func:`Interchange.from_smirnoff` so the charges flow through
+    ``charge_from_molecules`` into the resolved Interchange. Mirrors the
+    per-residue ``charge_map`` + cluster-residual distribution that
+    :func:`prepareClusterResidues` runs on the antechamber-typed mol2.
+    """
+    from openff.units import unit
+
+    n_atoms = off_mol.n_atoms
+    if off_mol.partial_charges is None:
+        raise ValueError(
+            "off_mol must have partial_charges assigned before calling "
+            "_apply_cluster_charge_policy. Compute Gasteiger or AM1-BCC "
+            "first and assign via off_mol.partial_charges = ..."
+        )
+    charges = np.array(
+        [
+            float(q.m_as(unit.elementary_charge))
+            for q in off_mol.partial_charges
+        ],
+        dtype=np.float64,
+    )
+
+    pinned_mask = np.zeros(n_atoms, dtype=bool)
+
+    # Pass 1: per-residue backbone pin.
+    for ri, atom_indices in enumerate(residue_atom_indices):
+        if not atom_indices:
+            continue
+        is_chain = (
+            ri < len(cluster_model.spec.is_chain_resident)
+            and cluster_model.spec.is_chain_resident[ri]
+        )
+        if not (pin_backbone_charges and is_chain):
+            continue
+
+        # Resolve the residue's atom-name set, terminus, and
+        # canonical-resname hint (for canonical anchor residues) so
+        # _backbone_charge_map picks the right ff14SB entry.
+        cluster_residue = cluster_model.spec.residues[ri]
+        present_names = {original_names[ai] for ai in atom_indices}
+        # canonical_resnames is only non-empty for canonical anchor residues
+        # (CYX/HID-renamed canonicals). For NCAAs it's "" and the charge map
+        # falls back to the amide-class table.
+        canonical_resname = ""
+        if (
+            ri < len(cluster_model.spec.canonical_resnames)
+            and ri < len(cluster_model.spec.is_canonical)
+            and cluster_model.spec.is_canonical[ri]
+        ):
+            canonical_resname = cluster_model.spec.canonical_resnames[ri]
+        # Match the antechamber backend (nonstandard.py:1695-1699): derive
+        # terminus from is_n_term / is_c_term, not from canonical_terminus.
+        # For a C-terminal NCAA, terminus="c" causes _backbone_charge_map
+        # to return {} (no pin) - the universal amide pin would mis-charge
+        # the carboxylate C / OXT.
+        if ri < len(cluster_model.spec.is_n_term) and cluster_model.spec.is_n_term[ri]:
+            terminus = "n"
+        elif ri < len(cluster_model.spec.is_c_term) and cluster_model.spec.is_c_term[ri]:
+            terminus = "c"
+        else:
+            terminus = ""
+        # Heuristic for proline-like NCAAs (no bonded H on N): look at
+        # whether the cluster Interchange has an N-H bond among the
+        # residue's atoms.
+        n_idx = next(
+            (
+                ai
+                for ai in atom_indices
+                if original_names[ai] == "N"
+            ),
+            None,
+        )
+        n_has_bonded_h = False
+        if n_idx is not None:
+            for bond in off_mol.bonds:
+                a, b = bond.atom1_index, bond.atom2_index
+                if a == n_idx or b == n_idx:
+                    other = b if a == n_idx else a
+                    elem = off_mol.atoms[other].atomic_number
+                    if elem == 1:  # hydrogen
+                        n_has_bonded_h = True
+                        break
+
+        net_charge = int(round(sum(
+            float(off_mol.atoms[ai].formal_charge.m_as(
+                unit.elementary_charge
+            ))
+            for ai in atom_indices
+        )))
+
+        charge_map = _backbone_charge_map(
+            canonical_resname=canonical_resname,
+            terminus=terminus,
+            present_names=present_names,
+            net_charge=net_charge,
+            n_has_bonded_h=n_has_bonded_h,
+        )
+        if not charge_map:
+            continue
+
+        for ai in atom_indices:
+            name = original_names[ai]
+            if name in charge_map:
+                charges[ai] = float(charge_map[name])
+                pinned_mask[ai] = True
+
+    # Pass 2: residual normalisation.
+    if normalize == "per_residue":
+        for ri, atom_indices in enumerate(residue_atom_indices):
+            if not atom_indices:
+                continue
+            net_q = int(round(sum(
+                float(off_mol.atoms[ai].formal_charge.m_as(
+                    unit.elementary_charge
+                ))
+                for ai in atom_indices
+            )))
+            non_pinned = [ai for ai in atom_indices if not pinned_mask[ai]]
+            if not non_pinned:
+                continue
+            current = sum(charges[ai] for ai in atom_indices)
+            residual = net_q - current
+            per_atom = residual / len(non_pinned)
+            for ai in non_pinned:
+                charges[ai] += per_atom
+    elif normalize == "cluster":
+        # Distribute the residue residual across RESIDUE non-pinned
+        # atoms only (caps untouched). Mirrors the antechamber pipeline
+        # at nonstandard.py:1762-1770, where per_residue_data carries
+        # only residue atoms - cluster_total / cluster_residual are
+        # computed and distributed over residue atoms.
+        cluster_atoms = [
+            ai for atom_indices in residue_atom_indices for ai in atom_indices
+        ]
+        if cluster_atoms:
+            net_q = int(round(sum(
+                float(off_mol.atoms[ai].formal_charge.m_as(
+                    unit.elementary_charge
+                ))
+                for ai in cluster_atoms
+            )))
+            non_pinned = [ai for ai in cluster_atoms if not pinned_mask[ai]]
+            if non_pinned:
+                current = sum(charges[ai] for ai in cluster_atoms)
+                residual = net_q - current
+                per_atom = residual / len(non_pinned)
+                for ai in non_pinned:
+                    charges[ai] += per_atom
+    # normalize is None: leave residual as-is.
+
+    # Interchange.from_smirnoff sanity-checks off_mol's TOTAL charge
+    # against the sum of formal charges over ALL atoms (residue + caps).
+    # After residue-only normalization, cap atoms still carry their raw
+    # Gasteiger values which sum to ~0 but not exactly (RDKit's Gasteiger
+    # is iterative and only converges to a small residual). Zero the cap
+    # sub-total by spreading the cap-Gasteiger residual equally across
+    # cap atoms - residue atoms (which we just normalised) stay untouched.
+    cap_list = sorted(cap_atoms)
+    if cap_list:
+        # Cap formal charge is 0 by construction (ACE/NME methyl).
+        cap_residual = sum(charges[ai] for ai in cap_list)
+        cap_shift = -cap_residual / len(cap_list)
+        for ai in cap_list:
+            charges[ai] += cap_shift
+
+    # Write back to off_mol.partial_charges so it flows through
+    # Interchange.from_smirnoff via charge_from_molecules=[off_mol].
+    off_mol.partial_charges = charges * unit.elementary_charge
+
+
+def _parameterize_cluster_openff(
+    cluster_model,
+    cluster_outdir,
+    *,
+    forcefield,
+    charge_method,
+    use_pyodide,
+    pin_backbone_charges,
+    normalize,
+    interchange_xml_paths,
+    cluster_index=0,
+):
+    """OpenFF backend for one cluster (one or more NCAA residues plus
+    ACE/NME-style caps): parameterise the cluster model compound via
+    SMIRNOFF, drop cap atoms, and emit one OpenMM ``<ForceField>`` XML
+    fragment covering every cluster residue as a separate ``<Residue>``
+    template.
+
+    The cluster Interchange covers the cap atoms during parameterisation
+    (they provide chemical context at the cluster boundary), but they are
+    NOT emitted into the final XML - the canonical residues on the other
+    side of the chain peptide bond come from ff14SB at load time. This
+    requires backbone-class renaming on the NCAA residues so ff14SB
+    matches the peptide-bond terms across the junction (Phase 2D - not
+    yet implemented).
+    """
+    from htmd.builder.openmm import (
+        _emit_openmm_xml_from_cluster_interchange,
+    )
+    from htmd.builder._ambertools import _assign_rdkit_gasteiger_charges
+    from openff.toolkit import ForceField
+    from openff.interchange import Interchange
+
+    if use_pyodide:
+        raise NotImplementedError(
+            "backend='openff' is not yet supported under Pyodide - SMIRNOFF "
+            "charge assignment needs RDKit's full chemistry stack which is "
+            "not available there. Use backend='antechamber' instead."
+        )
+
+    cluster_mol = Molecule(cluster_model.cif_path)
+
+    # Charges. Default to Gasteiger via RDKit if requested, otherwise let
+    # SMIRNOFF assign (typically AM1-BCC).
+    if charge_method == "gasteiger":
+        _assign_rdkit_gasteiger_charges(cluster_mol)
+    elif charge_method not in (None, "am1-bcc"):
+        raise ValueError(
+            f"backend='openff' unsupported charge_method {charge_method!r}. "
+            f"Use 'gasteiger', 'am1-bcc', or None."
+        )
+
+    off_mol = cluster_mol.toOpenFFMolecule(sanitize=True, assignStereo=True)
+
+    # Map atom index -> cluster residue index (or None for cap atoms).
+    atom_names_off = [a.name for a in off_mol.atoms]
+    atom_to_residue_idx = [
+        cluster_model.atom_to_residue.get(nm) for nm in atom_names_off
+    ]
+    cap_atoms = {
+        i for i, ri in enumerate(atom_to_residue_idx) if ri is None
+    }
+    original_names = [
+        cluster_model.atom_to_orig_name.get(nm, nm) for nm in atom_names_off
+    ]
+
+    # Build per-cluster-residue atom-index lists.
+    n_cluster_residues_pre = len(cluster_model.spec.residues)
+    residue_atom_indices_pre = [[] for _ in range(n_cluster_residues_pre)]
+    for i, ri in enumerate(atom_to_residue_idx):
+        if ri is None:
+            continue
+        residue_atom_indices_pre[ri].append(i)
+
+    # Mutate off_mol.partial_charges BEFORE building the Interchange, so
+    # backbone pinning / cluster normalisation flow through
+    # ``charge_from_molecules`` instead of trying to mutate the resolved
+    # Interchange's electrostatics (which exposes ``charges`` as a
+    # computed property, not a mutable mapping).
+    if (pin_backbone_charges or normalize is not None) and charge_method is not None:
+        _apply_cluster_charge_policy(
+            off_mol=off_mol,
+            cluster_model=cluster_model,
+            residue_atom_indices=residue_atom_indices_pre,
+            cap_atoms=cap_atoms,
+            original_names=original_names,
+            pin_backbone_charges=pin_backbone_charges,
+            normalize=normalize,
+        )
+
+    ff = ForceField(forcefield)
+    smirnoff_kwargs = {"force_field": ff, "topology": [off_mol]}
+    if charge_method is not None:
+        smirnoff_kwargs["charge_from_molecules"] = [off_mol]
+    ic = Interchange.from_smirnoff(**smirnoff_kwargs)
+
+    # The per-cluster-residue atom-index lists were already built above
+    # (residue_atom_indices_pre) for the charge-policy pass; reuse them.
+    residue_atom_indices = residue_atom_indices_pre
+
+    # Build residue_assignment: per-cluster-residue (resname, atom indices).
+    residue_assignment = []
+    external_bonds = {}
+    for ri, atom_indices in enumerate(residue_atom_indices):
+        if not atom_indices:
+            continue
+        cluster_residue = cluster_model.spec.residues[ri]
+        # Use the renamed resname if the cluster pipeline applied a
+        # canonical rename (e.g. CYS->CYX); otherwise keep the original.
+        resname = cluster_model.canonical_renames.get(ri, cluster_residue.resname)
+        residue_assignment.append((resname, atom_indices))
+
+        # External-bond markers: N/C for chain residues (one or both,
+        # depending on terminal flags). For free / scaffold residues no
+        # peptide-bond external bonds; non-peptide cluster crosslinks
+        # are handled in a TODO below.
+        is_chain = (
+            ri < len(cluster_model.spec.is_chain_resident)
+            and cluster_model.spec.is_chain_resident[ri]
+        )
+        if is_chain:
+            ext = []
+            if not cluster_model.spec.is_n_term[ri]:
+                ext.append("N")
+            if not cluster_model.spec.is_c_term[ri]:
+                ext.append("C")
+            external_bonds[resname] = ext
+        else:
+            external_bonds[resname] = []
+
+    # Backbone class overrides: for each chain-resident NCAA residue,
+    # rewrite the backbone atom classes (N/H/CA/HA/C/O and OXT for the
+    # C-terminus) to the ff14SB equivalents prefixed with ``protein-``.
+    # That lets the peptide bond at the canonical-NCAA junction resolve
+    # through ff14SB's tables at apply time - bonds/angles/torsions
+    # entirely within the backbone (e.g. N-CA-C-N) are owned by ff14SB
+    # and dropped from our XML; entries crossing into the sidechain (e.g.
+    # CA-CB) keep ff14SB classes on the backbone side and synthesised
+    # OFF classes on the sidechain side, so OpenMM resolves them from
+    # our cluster Interchange.
+    #
+    # Mirrors the antechamber pipeline's backbone_at mapping at
+    # ``nonstandard.py:1386``.
+    # Per-name (ff14SB TYPE, ff14SB CLASS) pairs. The type goes into the
+    # <Residue><Atom type=...> attribute; the class is what force entries
+    # use to look up parameters. ff14SB declares e.g. type "protein-CT"
+    # WITH class "CT" (no "protein-" prefix on the class), so emitting
+    # class1="protein-CT" in HarmonicBondForce would never match. Force
+    # entries must use the ff14SB class.
+    _BACKBONE_TO_FF14SB = {
+        "N":   ("protein-N",   "N"),
+        "H":   ("protein-H",   "H"),
+        "CA":  ("protein-CT",  "CT"),
+        "HA":  ("protein-H1",  "H1"),
+        "C":   ("protein-C",   "C"),
+        "O":   ("protein-O",   "O"),
+        "OXT": ("protein-O2",  "O2"),
+    }
+    type_overrides = {}
+    class_overrides = {}
+    for ri, atom_indices in enumerate(residue_atom_indices):
+        if not atom_indices:
+            continue
+        is_chain = (
+            ri < len(cluster_model.spec.is_chain_resident)
+            and cluster_model.spec.is_chain_resident[ri]
+        )
+        if not is_chain:
+            continue
+        for ai in atom_indices:
+            orig_name = original_names[ai]
+            pair = _BACKBONE_TO_FF14SB.get(orig_name)
+            if pair is not None:
+                type_overrides[ai] = pair[0]
+                class_overrides[ai] = pair[1]
+
+    # Non-peptide crosslinks within the cluster (scaffolded peptides,
+    # covalent ligands): each ClusterBond connects two atoms living in
+    # different cluster residues. The bond itself is INSIDE the cluster
+    # Interchange (parameterised in context), but for OpenMM to apply it
+    # at build time we need an ExternalBond marker on each side. The user
+    # then has to add the actual bond via topology.addBond - same
+    # workflow as amber.build's custombonds=... arg.
+    res_key_to_cluster_idx = {
+        (r.segid, r.chain, int(r.resid), r.insertion): ri
+        for ri, r in enumerate(cluster_model.spec.residues)
+    }
+    for cluster_bond in cluster_model.spec.bonds:
+        for end_atom in (cluster_bond.atom_a, cluster_bond.atom_b):
+            key = (
+                end_atom.segid,
+                end_atom.chain,
+                int(end_atom.resid),
+                end_atom.insertion,
+            )
+            ri = res_key_to_cluster_idx.get(key)
+            if ri is None:
+                # Bond endpoint is outside the cluster - shouldn't happen
+                # for ClusterSpec.bonds (those are by construction within
+                # the cluster), but we skip defensively.
+                continue
+            cluster_residue = cluster_model.spec.residues[ri]
+            resname = cluster_model.canonical_renames.get(
+                ri, cluster_residue.resname
+            )
+            external_bonds.setdefault(resname, []).append(end_atom.name)
+
+    xml_path = os.path.join(cluster_outdir, f"cluster_{cluster_index:03d}.xml")
+    _emit_openmm_xml_from_cluster_interchange(
+        ic=ic,
+        residue_assignment=residue_assignment,
+        cap_atoms=cap_atoms,
+        external_bonds=external_bonds,
+        xml_path=xml_path,
+        class_prefix=f"OFF_C{cluster_index:03d}",
+        atom_names=original_names,
+        class_overrides=class_overrides,
+        type_overrides=type_overrides,
+    )
+    interchange_xml_paths.append(xml_path)
+    return xml_path
+
+
+def _parameterize_free_residue_openff(
+    mol,
+    group,
+    ligand_dir,
+    *,
+    forcefield,
+    charge_method,
+    use_pyodide,
+    interchange_xml_paths,
+):
+    """OpenFF backend for one free residue: build a per-ligand
+    :class:`Interchange` via SMIRNOFF and emit it as a self-contained
+    OpenMM ``<ForceField>`` XML fragment.
+
+    Unlike the antechamber free-residue path, this does **not** produce
+    prepi/cif + frcmod files - the OpenFF backend only supports
+    ``htmd.builder.openmm.build``, not ``amber.build``. The emitted XML
+    fragment goes into ``ClusterOutputs.xml_paths`` and is consumed via
+    ``extra_xml=...`` at build time.
+    """
+    from htmd.builder.openmm import (
+        parameterizeLigandsOpenFF,
+        _emit_openmm_xml_from_interchange,
+    )
+
+    if use_pyodide:
+        raise NotImplementedError(
+            "backend='openff' is not yet supported under Pyodide - SMIRNOFF "
+            "charge assignment needs RDKit's full chemistry stack which is "
+            "not available there. Use backend='antechamber' instead."
+        )
+
+    # Slice the residue into its own Molecule (write_free_residue_cif also
+    # filters down to the residue's atoms and writes a CIF; we just want
+    # the in-memory slice).
+    sub_cif = os.path.join(ligand_dir, f"_slice_{group['resname']}.cif")
+    sub = _write_free_residue_cif(mol, group, sub_cif)
+
+    ic_map = parameterizeLigandsOpenFF(
+        sub,
+        ligand_ff=forcefield,
+        charge_method=charge_method,
+        resnames=[group["resname"]],
+    )
+    ic = ic_map[group["resname"]]
+
+    xml_path = os.path.join(ligand_dir, f"{group['resname']}.xml")
+    _emit_openmm_xml_from_interchange(
+        ic,
+        resname=group["resname"],
+        external_bond_atom_names=[],
+        xml_path=xml_path,
+    )
+    interchange_xml_paths.append(xml_path)
+    return xml_path
 
 
 def prepareClusterResidues(
@@ -1369,11 +1911,12 @@ def prepareClusterResidues(
         )
         out.frcmod_paths.append(per_res_frcmod)
 
-    # custombonds: one pair per cluster bond.
-    for bond in model.spec.bonds:
-        out.custombonds.append(
-            (_atom_sel_for_unique(bond.atom_a), _atom_sel_for_unique(bond.atom_b))
-        )
+    # Note: cluster custombonds (one pair per ClusterSpec.bonds entry)
+    # are emitted by the parameterizeFromSpecs main loop, not here.
+    # That keeps custombond emission per-cluster but independent of
+    # whether the cluster's parameterise step ran (the cluster might be
+    # deduped if its resname set duplicates an earlier cluster's, but
+    # the inter-residue bonds at the junctions still need wiring).
 
     return out
 
@@ -1674,6 +2217,8 @@ def parameterizeFromSpecs(
     specs,
     mol,
     outdir,
+    backend="antechamber",
+    forcefield=None,
     charge_method="am1-bcc",
     am1_path_length=15,
     pin_backbone_charges=True,
@@ -1810,6 +2355,9 @@ def parameterizeFromSpecs(
             "or normalize='cluster' / 'per_residue' (absorb the shift)."
         )
 
+    backend_for = _resolve_backend_map(backend)
+    forcefield_for = _resolve_forcefield_map(forcefield, backend_for)
+
     if use_pyodide is None:
         use_pyodide = _in_pyodide()
     if use_pyodide and str(charge_method).lower() == "am1-bcc":
@@ -1839,6 +2387,17 @@ def parameterizeFromSpecs(
     # of the same prepi.
     seen_singleton_keys = set()
 
+    # Multi-residue clusters whose resname set is entirely a subset of
+    # an already-emitted cluster's resnames are also redundant. The
+    # typical case is N-glycosylation: 1R1J's three NAG-Asn sites each
+    # produce a cluster with the same {XX*, NAG} resnames, and emitting
+    # them all would clash at app.ForceField load time with "Residue
+    # template <name> with the same override level already exists".
+    # tLeap-side dedup happens implicitly because the antechamber path
+    # writes per-resname (not per-cluster) prepi files; the openff
+    # path's per-cluster XMLs need the explicit dedup here.
+    seen_cluster_resname_sets = []
+
     # Run the cluster pipeline once per connected component.
     for ci, (members, cbonds) in enumerate(dispatch.cluster_membership):
         if len(members) == 1 and not cbonds:
@@ -1860,24 +2419,75 @@ def parameterizeFromSpecs(
         cluster_spec = _build_internal_cluster_spec(
             members, cbonds, mol, dispatch.groups, dispatch.spec_by_res_idx
         )
+
+        # Inter-residue cluster bonds (disulfides, NAG-Asn glycosidic,
+        # scaffold cross-links, ...) ALWAYS flow through to custombonds.
+        # tleap and openmm.build both need every junction's bond
+        # spelled out at build time - even when the surrounding cluster
+        # template is a duplicate of an earlier one (e.g. 1R1J's three
+        # NAG-Asn glycosylation sites share the same {XX*, NAG}
+        # resname set but each has its own ND2-C1 bond).
+        cluster_custombonds = [
+            (_atom_sel_for_unique(b.atom_a), _atom_sel_for_unique(b.atom_b))
+            for b in cluster_spec.bonds
+        ]
+        out.custombonds.extend(cluster_custombonds)
+
+        # Multi-residue dedup: skip the PARAMETERISE step if every
+        # resname in this cluster is already covered by a previously-
+        # emitted cluster. The custombonds above are emitted regardless.
+        cluster_resnames = frozenset(
+            dispatch.groups[m]["resname"] for m in members
+        )
+        if any(
+            cluster_resnames <= seen for seen in seen_cluster_resname_sets
+        ):
+            continue
+        seen_cluster_resname_sets.append(cluster_resnames)
+
         cluster_outdir = os.path.join(outdir, f"cluster_{ci:03d}")
         os.makedirs(cluster_outdir, exist_ok=True)
 
         cluster_model = buildClusterModel(mol, cluster_spec, cluster_outdir)
-        cluster_out = _parameterize_cluster_antechamber(
-            cluster_model,
-            cluster_outdir,
-            charge_method=charge_method,
-            am1_path_length=am1_path_length,
-            use_pyodide=use_pyodide,
-            pin_backbone_charges=pin_backbone_charges,
-            normalize=normalize,
-            residue_templates=residue_templates,
-            parameter_sets=parameter_sets,
-        )
-        out.topo_paths.extend(cluster_out.topo_paths)
-        out.frcmod_paths.extend(cluster_out.frcmod_paths)
-        out.custombonds.extend(cluster_out.custombonds)
+        # Cluster backend is taken from the FIRST member's resname; mixing
+        # backends within a single multi-residue cluster isn't supported
+        # (the cluster compound is one molecule, parameterised as a unit).
+        cluster_backend = backend_for(dispatch.groups[members[0]]["resname"])
+        if cluster_backend == "antechamber":
+            cluster_out = _parameterize_cluster_antechamber(
+                cluster_model,
+                cluster_outdir,
+                charge_method=charge_method,
+                am1_path_length=am1_path_length,
+                use_pyodide=use_pyodide,
+                pin_backbone_charges=pin_backbone_charges,
+                normalize=normalize,
+                residue_templates=residue_templates,
+                parameter_sets=parameter_sets,
+            )
+            out.topo_paths.extend(cluster_out.topo_paths)
+            out.frcmod_paths.extend(cluster_out.frcmod_paths)
+            # cluster_out.custombonds is empty since prepareClusterResidues
+            # no longer emits them - the main loop owns custombond emission.
+        elif cluster_backend == "openff":
+            _parameterize_cluster_openff(
+                cluster_model,
+                cluster_outdir,
+                forcefield=forcefield_for(
+                    dispatch.groups[members[0]]["resname"]
+                ),
+                charge_method=charge_method,
+                use_pyodide=use_pyodide,
+                pin_backbone_charges=pin_backbone_charges,
+                normalize=normalize,
+                interchange_xml_paths=out.xml_paths,
+                cluster_index=ci,
+            )
+        else:
+            raise ValueError(
+                f"backend={cluster_backend!r} not implemented for cluster "
+                f"containing {[dispatch.groups[m]['resname'] for m in members]!r}"
+            )
 
     # Non-chain residues that ended up outside any cluster: run antechamber
     # standalone and write a per-resname CIF + frcmod pair. ``LigandSpec``
@@ -1909,20 +2519,37 @@ def parameterizeFromSpecs(
         seen_ligand_resnames.add(g["resname"])
         ligand_dir = os.path.join(outdir, f"ligand_{g['resname']}")
         os.makedirs(ligand_dir, exist_ok=True)
-        out_cif, out_frcmod = _parameterize_free_residue_antechamber(
-            mol,
-            g,
-            ligand_dir,
-            outdir,
-            charge_method=charge_method,
-            am1_path_length=am1_path_length,
-            use_pyodide=use_pyodide,
-            normalize=normalize,
-            residue_templates=residue_templates,
-            parameter_sets=parameter_sets,
-        )
-        out.topo_paths.append(out_cif)
-        out.frcmod_paths.append(out_frcmod)
+        backend_name = backend_for(g["resname"])
+        if backend_name == "antechamber":
+            out_cif, out_frcmod = _parameterize_free_residue_antechamber(
+                mol,
+                g,
+                ligand_dir,
+                outdir,
+                charge_method=charge_method,
+                am1_path_length=am1_path_length,
+                use_pyodide=use_pyodide,
+                normalize=normalize,
+                residue_templates=residue_templates,
+                parameter_sets=parameter_sets,
+            )
+            out.topo_paths.append(out_cif)
+            out.frcmod_paths.append(out_frcmod)
+        elif backend_name == "openff":
+            _parameterize_free_residue_openff(
+                mol,
+                g,
+                ligand_dir,
+                forcefield=forcefield_for(g["resname"]),
+                charge_method=charge_method,
+                use_pyodide=use_pyodide,
+                interchange_xml_paths=out.xml_paths,
+            )
+        else:
+            raise ValueError(
+                f"backend={backend_name!r} not implemented for resname "
+                f"{g['resname']!r}"
+            )
 
     if residue_templates:
         xml_path = os.path.join(outdir, "parameters.xml")

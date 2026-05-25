@@ -577,7 +577,7 @@ def _test_full_pipeline_5vbl(tmp_path):
         "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
         "NLE": "CCCC[C@@H](C=O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
-        "OLC": "CCCCCCCC(O)OC[C@H](O)CO",
+        "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
     }
     # Disable amber.build's auto-capping for the inhibitor segment - its
     # C-terminal NCAA (200) is parameterized with its own prepi (which
@@ -618,7 +618,7 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
     from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
     from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.amber import build as amber_build
-    from htmd.builder.openff import build as openff_build
+    from htmd.builder.openmm import build as openff_build
     from collections import Counter
 
     mol = Molecule(VBL_PDB)
@@ -636,7 +636,7 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
         "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
         "NLE": "CCCC[C@@H](C=O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
-        "OLC": "CCCCCCCC(O)OC[C@H](O)CO",
+        "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
     }
     for resname, smi in smiles.items():
         if (mol.resname == resname).any():
@@ -700,7 +700,7 @@ def _test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
     from moleculekit.tools.autosegment import autoSegment
     from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.amber import build as amber_build
-    from htmd.builder.openff import build as openff_build
+    from htmd.builder.openmm import build as openff_build
 
     mol = Molecule("6A5J")
     mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
@@ -756,7 +756,7 @@ def _test_parameterize_from_specs_emits_openmm_xml(tmp_path):
         "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
         "NLE": "CCCC[C@@H](C=O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
-        "OLC": "CCCCCCCC(O)OC[C@H](O)CO",
+        "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
     }
     for resname, smi in smiles.items():
         if (mol.resname == resname).any():
