@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+from acellera_docs_theme import apply
+
 # -- Project information -----------------------------------------------------
 
 project = "HTMD"
@@ -33,7 +35,6 @@ source_suffix = {
     ".ipynb": "myst-nb",
 }
 
-templates_path = ["_templates"]
 exclude_patterns = ["build", "**/.ipynb_checkpoints"]
 
 # -- MyST / MyST-NB ----------------------------------------------------------
@@ -49,66 +50,13 @@ myst_heading_anchors = 3
 nb_execution_mode = "off"  # tutorials are pre-rendered; flip to "cache" when adopting MyST-NB
 nb_merge_streams = True
 
-# -- HTML output -------------------------------------------------------------
+# -- Acellera unified branding ----------------------------------------------
 
-html_theme = "pydata_sphinx_theme"
-html_static_path = ["_static"]
-html_css_files = ["custom.css"]
-html_show_sourcelink = True
-html_logo = "_static/img/acellera_new_web.png"
-html_favicon = "_static/img/acellera-logo-16x16.png"
-html_context = {"default_mode": "light"}
-
-html_theme_options = {
-    "logo": {
-        "image_light": "_static/img/acellera_new_web.png",
-        "image_dark": "_static/img/acellera_new_web.png",
-        "text": "HTMD",
-    },
-    "header_links_before_dropdown": 5,
-    "show_toc_level": 2,
-    "navigation_depth": 3,
-    "use_edit_page_button": False,
-    "navigation_with_keys": False,
-    "footer_start": ["copyright"],
-    "footer_end": [],
-    "icon_links": [
-        {
-            "name": "Acellera",
-            "url": "https://www.acellera.com",
-            "icon": "_static/img/acellera-logo-white.png",
-            "type": "local",
-        },
-        {
-            "name": "Twitter",
-            "url": "https://twitter.com/acellera",
-            "icon": "fab fa-twitter",
-            "type": "fontawesome",
-        },
-        {
-            "name": "GitHub",
-            "url": "https://github.com/Acellera/htmd",
-            "icon": "fab fa-github-square",
-            "type": "fontawesome",
-        },
-        {
-            "name": "LinkedIn",
-            "url": "https://www.linkedin.com/company/acellera/",
-            "icon": "fab fa-linkedin",
-            "type": "fontawesome",
-        },
-        {
-            "name": "Youtube",
-            "url": "https://www.youtube.com/user/acelleralive",
-            "icon": "fab fa-youtube",
-            "type": "fontawesome",
-        },
-    ],
-}
-
-html_sidebars = {
-    "**": ["sidebar-nav-bs.html"],
-}
+apply(
+    globals(),
+    project_name="HTMD",
+    github_repo="Acellera/htmd",
+)
 
 # -- LLM full-corpus artifact ------------------------------------------------
 
