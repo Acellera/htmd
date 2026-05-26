@@ -7,49 +7,33 @@ on:
   workflow_dispatch:
 
 jobs:
-  makedocs:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: "read"
       id-token: "write"
-    defaults:
-      run:
-        shell: bash -l {0}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install docs deps
+        run: uv sync --group docs
+
+      - name: Build HTML
+        run: cd doc && uv run make html
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_DOCS }}
           service_account: ${{ secrets.GCP_DOC_SERVICE_ACCOUNT }}
 
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          python-version: "3.10"
-          channels: acellera,conda-forge,defaults
-
-      - name: Install conda deps
+      - name: Sync HTML to GCP docs bucket
         run: |
-          conda install -y -q --file package/htmd/DEPENDENCIES nbconvert sphinx=6.1.3 python=3.10
-          pip install pydata-sphinx-theme==0.13.1 sphinx-argparse sphinx-notfound-page sphinx-sitemap
-
-      - name: Generate rst docs
-        run: |
-          cd doc; make rst
-
-      - name: Publish to GCP intermediate docs bucket
-        uses: "google-github-actions/upload-cloud-storage@v1"
-        with:
-          path: "doc/source"
-          destination: "software-acellera-intermediate/public_docs/htmd/${{ github.ref_name }}"
-
-      - name: Write update file to upload
-        run: echo "Updated" > update
-
-      - name: Upload "update" file to trigger new docs
-        uses: "google-github-actions/upload-cloud-storage@v1"
-        with:
-          path: "update"
-          destination: "software-acellera-intermediate/"
+          gcloud storage rsync doc/build/html gs://software-acellera-final/htmd \
+            --recursive \
+            --delete-unmatched-destination-objects

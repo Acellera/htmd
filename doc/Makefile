@@ -29,6 +29,9 @@ RST_FILES := $(addprefix $(TUTORIALSDIR)/,$(notdir $(IPYNB_FILES:.ipynb=.rst)))
 
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext static
 
+html: Makefile rst
+	@$(SPHINXBUILD) -M html "source" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  html       to make standalone HTML files"
