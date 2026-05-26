@@ -1297,6 +1297,7 @@ def _parameterize_cluster_openff(
     from htmd.builder.openmm import (
         _emit_openmm_xml_from_cluster_interchange,
         _assign_nagl_charges,
+        _assign_resp_charges,
     )
     from htmd.builder._ambertools import _assign_rdkit_gasteiger_charges
     from openff.toolkit import ForceField
@@ -1311,16 +1312,28 @@ def _parameterize_cluster_openff(
 
     cluster_mol = Molecule(cluster_model.cif_path)
 
-    # Charges. Default to Gasteiger via RDKit if requested, NAGL if
-    # explicitly chosen, otherwise let SMIRNOFF assign (typically AM1-BCC).
+    # Charges. Default to Gasteiger via RDKit if requested, NAGL or RESP
+    # if explicitly chosen, otherwise let SMIRNOFF assign (typically AM1-
+    # BCC). RESP dispatches to the private Acellera ``parameterize``
+    # package, which runs Psi4 and openff-recharge.
     if charge_method == "gasteiger":
         _assign_rdkit_gasteiger_charges(cluster_mol)
     elif charge_method == "nagl":
         _assign_nagl_charges(cluster_mol)
+    elif charge_method in ("resp", "resp-multiconf"):
+        if charge_method == "resp-multiconf":
+            logger.warning(
+                "resp-multiconf downgraded to single-conformer RESP for "
+                "cluster compounds: RDKit's ETKDG conformer generation is "
+                "not appropriate for clusters with ACE/NME caps and "
+                "peptide bonds. The existing cluster geometry is used."
+            )
+        _assign_resp_charges(cluster_mol, multi_conf=False)
     elif charge_method not in (None, "am1-bcc"):
         raise ValueError(
             f"backend='openff' unsupported charge_method {charge_method!r}. "
-            f"Use 'gasteiger', 'nagl', 'am1-bcc', or None."
+            f"Use 'gasteiger', 'nagl', 'resp', 'resp-multiconf', "
+            f"'am1-bcc', or None."
         )
 
     off_mol = cluster_mol.toOpenFFMolecule(sanitize=True, assignStereo=True)
@@ -2259,6 +2272,10 @@ def parameterizeFromSpecs(
         neural network as an AM1-BCC surrogate - much faster than
         antechamber AM1-BCC on medium-to-large molecules and honours
         the formal charge. Requires PyTorch.
+        ``"resp"`` / ``"resp-multiconf"`` (openff backend only) fit
+        RESP charges to a Psi4-computed QM ESP. Most accurate option
+        but requires the private Acellera ``parameterize`` package +
+        Psi4. ``resp-multiconf`` averages over up to 10 conformers.
         ``"abcg2"`` (antechamber backend only) is AM1-BCC v2.
     am1_path_length : int or None, optional
         Maximum path length for AM1-BCC charge equivalence determination,

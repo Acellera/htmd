@@ -301,6 +301,40 @@ def build(
 # ====================================================================
 
 
+def _assign_resp_charges(mol, multi_conf=False):
+    """Compute RESP charges (Restrained ElectroStatic Potential fit to a
+    Psi4-computed QM ESP) and write them onto ``mol.charge`` in place.
+
+    Dispatches to ``parameterize.charge.psi4resp.get_resp_psi4_charges``,
+    which runs HF/6-31G* (or def2-SV(P) when heavy elements are present)
+    via Psi4, builds the Merz-Singh-Kollman grid via openff-recharge, and
+    runs the iterative two-stage RESP fit. With ``multi_conf=True`` the
+    fit is performed jointly over up to 10 RDKit-generated conformers.
+
+    Requires the Acellera ``parameterize`` package (private; not on
+    public PyPI) and Psi4 + openff-recharge. Sensible only for the
+    openff backend - GAFF/GAFF2 expect antechamber-fit charges.
+    """
+    try:
+        from parameterize.charge.psi4resp import get_resp_psi4_charges
+    except ImportError as e:
+        raise ImportError(
+            "charge_method='resp'/'resp-multiconf' requires the Acellera "
+            "'parameterize' package (private, not on public PyPI) plus "
+            "Psi4 and openff-recharge. Contact the Acellera team for "
+            "access, or pick a different charge method."
+        ) from e
+
+    charges = get_resp_psi4_charges(mol, multi_conf=multi_conf)
+    arr = np.asarray(charges, dtype=np.float32)
+    if not np.all(np.isfinite(arr)):
+        raise RuntimeError(
+            "RESP fit produced non-finite charges; the Psi4 ESP "
+            "calculation or the iterative solver likely diverged."
+        )
+    mol.charge = arr
+
+
 def _assign_nagl_charges(mol, model_name="openff-gnn-am1bcc-1.0.0.pt"):
     """Compute AM1-BCC-equivalent partial charges with NAGL (a GNN
     surrogate for AM1-BCC) and write them onto ``mol.charge`` in place.
@@ -382,6 +416,10 @@ def parameterizeLigandsOpenFF(
         ``"nagl"`` - compute AM1-BCC-equivalent charges with the OpenFF
         NAGL graph neural network surrogate. Much faster than antechamber
         AM1-BCC on medium-to-large molecules. Needs PyTorch.
+        ``"resp"`` / ``"resp-multiconf"`` - RESP fit to a Psi4-computed
+        QM ESP. The most accurate option but requires the private
+        Acellera ``parameterize`` package plus Psi4. The multi-conf
+        variant averages the fit over up to 10 conformers.
         ``None`` - let SMIRNOFF assign its own charges (e.g. AM1-BCC for
         Sage). Requires sqm from AmberTools at runtime.
     resnames : list[str] or None, optional
@@ -414,12 +452,17 @@ def parameterizeLigandsOpenFF(
             _assign_rdkit_gasteiger_charges(sub)
         elif charge_method == "nagl":
             _assign_nagl_charges(sub)
+        elif charge_method == "resp":
+            _assign_resp_charges(sub, multi_conf=False)
+        elif charge_method == "resp-multiconf":
+            _assign_resp_charges(sub, multi_conf=True)
         elif charge_method is None:
             pass
         else:
             raise ValueError(
                 f"Unsupported charge_method {charge_method!r}. "
-                f"Supported: 'gasteiger', 'nagl', None."
+                f"Supported: 'gasteiger', 'nagl', 'resp', "
+                f"'resp-multiconf', None."
             )
 
         off_mol = sub.toOpenFFMolecule(sanitize=True, assignStereo=True)
