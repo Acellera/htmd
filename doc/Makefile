@@ -5,13 +5,13 @@
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 SPHINXAPIDOC  = sphinx-apidoc
-IPYTHON       = jupyter
 PAPER         =
 BUILDDIR      = build
 TUTORIALSDIR  = source/tutorials
 HTMDTAG       = $(shell python gethtmdtag.py tag)
 HTMDBRANCH    = $(shell python gethtmdtag.py branch)
 IPYNB_FILES   = $(shell ls ../tutorials/*.ipynb)
+IPYNB_OUT    := $(addprefix $(TUTORIALSDIR)/,$(notdir $(IPYNB_FILES)))
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
@@ -24,8 +24,6 @@ PAPEROPT_letter = -D latex_paper_size=letter
 ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
-
-RST_FILES := $(addprefix $(TUTORIALSDIR)/,$(notdir $(IPYNB_FILES:.ipynb=.rst)))
 
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext static
 
@@ -62,21 +60,25 @@ help:
 clean:
 	rm -f source/htmd.*
 	rm -rf $(TUTORIALSDIR)
-	rm source/version
+	rm -f source/version
+	rm -rf $(BUILDDIR)
 
 publish:
 	ssh software.acellera.com 'rm -rf /var/www/software.acellera.com/source/htmd/$(HTMDBRANCH)/*'
 	scp -r source/* www.acellera.com:/var/www/software.acellera.com/source/htmd/$(HTMDBRANCH)/
 	#ssh software.acellera.com 'chmod -R g+rwX software.acellera.com/'
 
-# Rule for building .rst from .ipynb
-$(TUTORIALSDIR)/%.rst: ../tutorials/%.ipynb
+# Copy .ipynb tutorials and their image dirs into source/tutorials/.
+# myst-nb consumes the .ipynb files directly (see source_suffix in conf.py)
+# so no nbconvert step is needed; cached outputs in the notebooks render
+# as-is because nb_execution_mode = "off".
+$(TUTORIALSDIR)/%.ipynb: ../tutorials/%.ipynb
 	mkdir -p $(TUTORIALSDIR)
-	$(IPYTHON) nbconvert $< --to rst --output-dir=$(TUTORIALSDIR)/
-	cp -R ../tutorials/wrapping_img/ $(TUTORIALSDIR)/
-	cp -R ../tutorials/img/ $(TUTORIALSDIR)/
+	cp $< $@
 
-tutorials: $(RST_FILES)
+tutorials: $(IPYNB_OUT)
+	@if [ -d ../tutorials/wrapping_img ]; then cp -R ../tutorials/wrapping_img $(TUTORIALSDIR)/; fi
+	@if [ -d ../tutorials/img ]; then cp -R ../tutorials/img $(TUTORIALSDIR)/; fi
 
 rst: tutorials
 	rm -f source/htmd.*
