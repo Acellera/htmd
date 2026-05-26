@@ -1383,7 +1383,8 @@ def _parameterize_cluster_openff(
         # External-bond markers: N/C for chain residues (one or both,
         # depending on terminal flags). For free / scaffold residues no
         # peptide-bond external bonds; non-peptide cluster crosslinks
-        # are handled in a TODO below.
+        # (disulfides, isopeptides) are emitted separately as custombonds
+        # by the main parameterizeFromSpecs loop.
         is_chain = (
             ri < len(cluster_model.spec.is_chain_resident)
             and cluster_model.spec.is_chain_resident[ri]
@@ -2379,27 +2380,41 @@ def parameterizeFromSpecs(
     residue_templates = []
     parameter_sets = []
 
-    # Singleton NCAA clusters (one chain-resident NCAA, no cluster bonds)
-    # that share resname + terminal flags are chemically identical model
-    # compounds, so antechamber output is identical too. tLeap loads only
-    # one unit per resname anyway. Dedup by (resname, is_n_term, is_c_term)
-    # to skip the redundant antechamber runs and avoid emitting N copies
-    # of the same prepi.
+    # Two-pass cluster handling. Pass 1 walks every cluster, extends
+    # ``out.custombonds`` with each junction bond, and decides which
+    # clusters still need parameterising. Pass 2 runs the actual
+    # parameterisation on the deduplicated work list. Splitting the two
+    # keeps custombond emission (every junction always counts) cleanly
+    # separated from template emission (subject to two dedup gates).
+    #
+    # Dedup gates filter the Pass 2 work list:
+    #
+    #   * Singleton chain-NCAA: a chain-resident NCAA cluster with no
+    #     cluster bonds and matching (resname, is_n_term, is_c_term) is
+    #     the same model compound as a previously-seen one. tLeap loads
+    #     one unit per resname anyway, and OpenFF would emit a duplicate
+    #     <Residue> entry.
+    #
+    #   * Multi-residue cluster: a cluster whose resname set is a subset
+    #     of any previously-emitted cluster's would clash at
+    #     ``app.ForceField`` load with "template <name> with the same
+    #     override level already exists". 1R1J's three NAG-Asn
+    #     glycosylation sites are the typical case (same {XX*, NAG}
+    #     resname set, distinct ND2-C1 junctions each emitted as its
+    #     own custombond pair).
+    cluster_tasks = []
     seen_singleton_keys = set()
-
-    # Multi-residue clusters whose resname set is entirely a subset of
-    # an already-emitted cluster's resnames are also redundant. The
-    # typical case is N-glycosylation: 1R1J's three NAG-Asn sites each
-    # produce a cluster with the same {XX*, NAG} resnames, and emitting
-    # them all would clash at app.ForceField load time with "Residue
-    # template <name> with the same override level already exists".
-    # tLeap-side dedup happens implicitly because the antechamber path
-    # writes per-resname (not per-cluster) prepi files; the openff
-    # path's per-cluster XMLs need the explicit dedup here.
     seen_cluster_resname_sets = []
 
-    # Run the cluster pipeline once per connected component.
     for ci, (members, cbonds) in enumerate(dispatch.cluster_membership):
+        cluster_spec = _build_internal_cluster_spec(
+            members, cbonds, mol, dispatch.groups, dispatch.spec_by_res_idx
+        )
+        out.custombonds.extend(
+            (_atom_sel_for_unique(b.atom_a), _atom_sel_for_unique(b.atom_b))
+            for b in cluster_spec.bonds
+        )
+
         if len(members) == 1 and not cbonds:
             spec = dispatch.spec_by_res_idx[members[0]]
             if (
@@ -2416,35 +2431,16 @@ def parameterizeFromSpecs(
                     continue
                 seen_singleton_keys.add(key)
 
-        cluster_spec = _build_internal_cluster_spec(
-            members, cbonds, mol, dispatch.groups, dispatch.spec_by_res_idx
-        )
-
-        # Inter-residue cluster bonds (disulfides, NAG-Asn glycosidic,
-        # scaffold cross-links, ...) ALWAYS flow through to custombonds.
-        # tleap and openmm.build both need every junction's bond
-        # spelled out at build time - even when the surrounding cluster
-        # template is a duplicate of an earlier one (e.g. 1R1J's three
-        # NAG-Asn glycosylation sites share the same {XX*, NAG}
-        # resname set but each has its own ND2-C1 bond).
-        cluster_custombonds = [
-            (_atom_sel_for_unique(b.atom_a), _atom_sel_for_unique(b.atom_b))
-            for b in cluster_spec.bonds
-        ]
-        out.custombonds.extend(cluster_custombonds)
-
-        # Multi-residue dedup: skip the PARAMETERISE step if every
-        # resname in this cluster is already covered by a previously-
-        # emitted cluster. The custombonds above are emitted regardless.
         cluster_resnames = frozenset(
             dispatch.groups[m]["resname"] for m in members
         )
-        if any(
-            cluster_resnames <= seen for seen in seen_cluster_resname_sets
-        ):
+        if any(cluster_resnames <= seen for seen in seen_cluster_resname_sets):
             continue
         seen_cluster_resname_sets.append(cluster_resnames)
 
+        cluster_tasks.append((ci, members, cluster_spec))
+
+    for ci, members, cluster_spec in cluster_tasks:
         cluster_outdir = os.path.join(outdir, f"cluster_{ci:03d}")
         os.makedirs(cluster_outdir, exist_ok=True)
 
@@ -2467,8 +2463,6 @@ def parameterizeFromSpecs(
             )
             out.topo_paths.extend(cluster_out.topo_paths)
             out.frcmod_paths.extend(cluster_out.frcmod_paths)
-            # cluster_out.custombonds is empty since prepareClusterResidues
-            # no longer emits them - the main loop owns custombond emission.
         elif cluster_backend == "openff":
             _parameterize_cluster_openff(
                 cluster_model,
