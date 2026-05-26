@@ -22,6 +22,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+_AUTHORITATIVE_BOND_EXTS = {
+    "psf",
+    "prmtop",
+    "prm",
+    "parm7",
+    "top",
+    "mol2",
+    "mae",
+    "sdf",
+}
+
+
+def _has_authoritative_bonds(molfile):
+    if isinstance(molfile, str):
+        molfile = [molfile]
+    for m in molfile:
+        ext = os.path.splitext(m)[1].lstrip(".").lower()
+        if ext in _AUTHORITATIVE_BOND_EXTS:
+            return True
+    return False
+
+
 class Frame(object):
     """Class used for referencing a specific frame of a :class:`Sim <htmd.simlist.Sim>` object object.
 
@@ -388,7 +410,9 @@ def _filtSim(i, sims, outFolder, filterSel):
         logger.warning(f"Error! Skipping simulation {name} due to error: {e}")
         return
 
-    sel = mol.atomselect(filterSel)
+    sel = mol.atomselect(
+        filterSel, guessBonds=not _has_authoritative_bonds(sims[i].molfile)
+    )
 
     for j in range(0, len(traj)):
         try:
@@ -478,11 +502,15 @@ def _filterTopology(sim, outfolder, filtsel):
     for m in ensurelist(sim.molfile):
         extensions.append(os.path.splitext(m)[1][1:])
 
+    sel_mask = mol.atomselect(
+        filtsel, guessBonds=not _has_authoritative_bonds(sim.molfile)
+    )
+
     for ext in list(set(extensions)):
         filttopo = path.join(outfolder, f"filtered.{ext}")
         if not path.isfile(filttopo):
             try:
-                mol.write(filttopo, filtsel)
+                mol.write(filttopo, sel_mask)
             except Exception as e:
                 logger.warning(
                     f"Filtering was not able to write {filttopo} due to error: {e}"
@@ -543,6 +571,18 @@ def _simName(foldername):
 
 
 class _TestSimlist(unittest.TestCase):
+    def test_has_authoritative_bonds(self):
+        assert _has_authoritative_bonds("structure.psf")
+        assert _has_authoritative_bonds("system.prmtop")
+        assert _has_authoritative_bonds("system.parm7")
+        assert _has_authoritative_bonds("ligand.mol2")
+        assert _has_authoritative_bonds(["structure.pdb", "topology.psf"])
+        assert _has_authoritative_bonds(["topology.prmtop", "coords.inpcrd"])
+        assert not _has_authoritative_bonds("structure.pdb")
+        assert not _has_authoritative_bonds("traj.xyz")
+        assert not _has_authoritative_bonds(["only.pdb"])
+        assert not _has_authoritative_bonds(["a.pdb", "b.coor"])
+
     def test_simlist_auto_structure(self):
         from htmd.home import home
         from htmd.projections.metric import _singleMolfile
