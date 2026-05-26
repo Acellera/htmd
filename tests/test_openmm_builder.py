@@ -32,6 +32,14 @@ try:
 except ImportError:
     _openff_installed = False
 
+try:
+    import openff.nagl  # noqa: F401
+    import openff.nagl_models  # noqa: F401
+
+    _nagl_installed = True
+except ImportError:
+    _nagl_installed = False
+
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -763,6 +771,92 @@ def _test_parameterize_ligands_openff_ben():
         "PeriodicTorsionForce": _BEN_EXPECTED_TORSIONS_IN_SYSTEM,
         "NonbondedForce": _BEN_EXPECTED_ATOMS,
     }
+
+
+# NAGL charges on protonated benzamidinium (BEN, +1). Reference values are
+# from openff-gnn-am1bcc-1.0.0; they are a GNN surrogate for AM1-BCC, so the
+# expected per-atom values differ from the Gasteiger reference above. The
+# molecule has two-fold symmetry across the amidinium C-aromatic axis, so
+# the two amidinium nitrogens and their four NH protons each form
+# equivalent pairs - the test asserts that explicitly.
+_BEN_NAGL_EXPECTED_CHARGES = [
+    -0.2451,  # C1 (ipso aromatic, bonded to amidinium C)
+    -0.0785,  # C2 (ortho)
+    -0.1173,  # C3 (meta)
+    -0.0447,  # C4 (para)
+    -0.1173,  # C5 (meta)
+    -0.0785,  # C6 (ortho)
+    +0.5327,  # C   (amidinium central C)
+    -0.4711,  # N1  (amidinium N, equivalent pair)
+    -0.4711,  # N2  (amidinium N, equivalent pair)
+    +0.1486,  # H1  (ortho ring H)
+    +0.1707,  # H2  (meta ring H)
+    +0.1621,  # H3  (para ring H)
+    +0.1707,  # H4  (meta ring H)
+    +0.1486,  # H5  (ortho ring H)
+    +0.3226,  # H6  (amidinium NH, equivalent quartet)
+    +0.3226,  # H7
+    +0.3226,  # H8
+    +0.3226,  # H9
+]
+
+
+@pytest.mark.skipif(
+    not (_openmm_installed and _openff_installed and _nagl_installed),
+    reason="OpenMM + OpenFF Interchange + NAGL required (install with 'uv sync --group nagl')",
+)
+def _test_parameterize_ligands_openff_ben_nagl():
+    """Build an Interchange for BEN via Sage 2.3 with NAGL charges (an
+    AM1-BCC GNN surrogate) and check the resulting per-atom charges against
+    pre-recorded reference values. Confirms the ``charge_method="nagl"``
+    plumbing through :func:`parameterizeLigandsOpenFF` flows charges via
+    ``charge_from_molecules`` so SMIRNOFF does not overwrite them, and that
+    the +1 amidinium net charge is preserved exactly."""
+    from moleculekit.molecule import Molecule
+    from htmd.builder.openmm import parameterizeLigandsOpenFF
+
+    mol = Molecule(os.path.join(_PARAM_TEST_DIR, "3PTB_BEN.cif"))
+    mol.filter("resname BEN", _logger=False)
+    mol.templateResidueFromSmiles("resname BEN", BEN_SMILES, addHs=True)
+
+    out = parameterizeLigandsOpenFF(
+        mol,
+        ligand_ff="openff_unconstrained-2.3.0.offxml",
+        charge_method="nagl",
+    )
+    assert set(out) == {"BEN"}
+    ic = out["BEN"]
+
+    assert ic.topology.n_atoms == _BEN_EXPECTED_ATOMS
+    assert ic.topology.n_bonds == _BEN_EXPECTED_BONDS
+
+    charges = []
+    for key in sorted(
+        ic["Electrostatics"].charges.keys(), key=lambda k: k.atom_indices[0]
+    ):
+        charges.append(float(ic["Electrostatics"].charges[key].m))
+    assert len(charges) == _BEN_EXPECTED_ATOMS
+
+    # Net charge: integer +1 (amidinium) preserved exactly.
+    assert abs(sum(charges) - 1.0) < 1e-4
+
+    # NAGL output is deterministic for a given model; tolerance covers
+    # only float32 / torch round-off, not model drift.
+    for i, (actual, expected) in enumerate(
+        zip(charges, _BEN_NAGL_EXPECTED_CHARGES)
+    ):
+        assert (
+            abs(actual - expected) < 1e-3
+        ), f"NAGL charge mismatch at atom {i}: actual={actual:.6f} expected={expected:.6f}"
+
+    # Resonance symmetry: N1 == N2, and the four amidinium N-H protons
+    # (H6/H7/H8/H9) are all equivalent. Bug-canary: if NAGL or our
+    # plumbing later asymmetrically biases one nitrogen we want to know.
+    assert charges[7] == pytest.approx(charges[8], abs=1e-6), "N1 vs N2 asymmetry"
+    nh_charges = charges[14:18]
+    assert all(
+        c == pytest.approx(nh_charges[0], abs=1e-6) for c in nh_charges
+    ), f"NH protons not equivalent: {nh_charges}"
 
 
 @pytest.mark.skipif(

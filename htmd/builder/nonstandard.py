@@ -1296,6 +1296,7 @@ def _parameterize_cluster_openff(
     """
     from htmd.builder.openmm import (
         _emit_openmm_xml_from_cluster_interchange,
+        _assign_nagl_charges,
     )
     from htmd.builder._ambertools import _assign_rdkit_gasteiger_charges
     from openff.toolkit import ForceField
@@ -1310,14 +1311,16 @@ def _parameterize_cluster_openff(
 
     cluster_mol = Molecule(cluster_model.cif_path)
 
-    # Charges. Default to Gasteiger via RDKit if requested, otherwise let
-    # SMIRNOFF assign (typically AM1-BCC).
+    # Charges. Default to Gasteiger via RDKit if requested, NAGL if
+    # explicitly chosen, otherwise let SMIRNOFF assign (typically AM1-BCC).
     if charge_method == "gasteiger":
         _assign_rdkit_gasteiger_charges(cluster_mol)
+    elif charge_method == "nagl":
+        _assign_nagl_charges(cluster_mol)
     elif charge_method not in (None, "am1-bcc"):
         raise ValueError(
             f"backend='openff' unsupported charge_method {charge_method!r}. "
-            f"Use 'gasteiger', 'am1-bcc', or None."
+            f"Use 'gasteiger', 'nagl', 'am1-bcc', or None."
         )
 
     off_mol = cluster_mol.toOpenFFMolecule(sanitize=True, assignStereo=True)
@@ -2252,6 +2255,11 @@ def parameterizeFromSpecs(
         ``"gasteiger"`` is faster, is computed via RDKit so it also
         honours the net charge, and is the automatic fallback under
         Pyodide where AM1-BCC's SQM backend is unavailable.
+        ``"nagl"`` (openff backend only) uses the OpenFF NAGL graph
+        neural network as an AM1-BCC surrogate - much faster than
+        antechamber AM1-BCC on medium-to-large molecules and honours
+        the formal charge. Requires PyTorch.
+        ``"abcg2"`` (antechamber backend only) is AM1-BCC v2.
     am1_path_length : int or None, optional
         Maximum path length for AM1-BCC charge equivalence determination,
         passed to antechamber's ``-pl`` flag. Caps antechamber's atom-

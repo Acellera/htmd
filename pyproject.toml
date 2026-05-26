@@ -91,5 +91,22 @@ openff = [
   "lxml>=5.0.0",
   "acellera-openff-amber-ff-ports>=2025.9.0",
 ]
-test = [{ include-group = "openff" }, "acemd", "flake8>=7.3.0", "pytest>=9.0.2"]
+# NAGL is opt-in: it pulls torch (~1GB+ wheel with CUDA libs) and
+# pytorch-lightning, which the openff backend does not otherwise need.
+# Users who want AM1-BCC-equivalent charges via the OpenFF NAGL GNN
+# surrogate (``charge_method="nagl"``) install with:
+#     uv sync --group nagl   (or pip install acellera-openff-nagl ...)
+nagl = [
+  "acellera-openff-nagl",
+  "acellera-openff-nagl-models",
+  "torch",
+  "pytorch-lightning",
+]
+test = [
+  { include-group = "openff" },
+  { include-group = "nagl" },
+  "acemd",
+  "flake8>=7.3.0",
+  "pytest>=9.0.2",
+]
 dev = [{ include-group = "test" }, "ffevaluation>=0.2.6", "ipython>=8.38.0"]

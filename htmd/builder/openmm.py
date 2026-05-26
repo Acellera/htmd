@@ -301,6 +301,44 @@ def build(
 # ====================================================================
 
 
+def _assign_nagl_charges(mol, model_name="openff-gnn-am1bcc-1.0.0.pt"):
+    """Compute AM1-BCC-equivalent partial charges with NAGL (a GNN
+    surrogate for AM1-BCC) and write them onto ``mol.charge`` in place.
+
+    NAGL is a SMIRNOFF-ecosystem tool that reproduces AM1-BCC charges
+    via a graph neural network, avoiding the SQM step. It is several
+    orders of magnitude faster than antechamber's AM1-BCC on medium-to-
+    large molecules and honours the formal charge. Only meaningful for
+    the openff backend - GAFF/GAFF2 expect antechamber-fit charges.
+
+    NAGL is an opt-in dependency (it pulls PyTorch + pytorch-lightning).
+    Install with ``uv sync --group nagl`` or ``pip install
+    acellera-openff-nagl acellera-openff-nagl-models torch
+    pytorch-lightning``.
+    """
+    try:
+        from openff.nagl import GNNModel
+        from openff.nagl_models import get_model
+    except ImportError as e:
+        raise ImportError(
+            "charge_method='nagl' requires the openff-nagl stack (NAGL + "
+            "PyTorch). Install with 'uv sync --group nagl' or 'pip "
+            "install acellera-openff-nagl acellera-openff-nagl-models "
+            "torch pytorch-lightning'."
+        ) from e
+
+    off_mol = mol.toOpenFFMolecule(sanitize=True, assignStereo=True)
+    model = GNNModel.load(get_model(model_name))
+    charges = model.compute_property(off_mol)
+    arr = np.asarray(getattr(charges, "magnitude", charges), dtype=np.float32)
+    if not np.all(np.isfinite(arr)):
+        raise RuntimeError(
+            "NAGL produced non-finite charges; the molecule may have an "
+            "atom in an environment the GNN was not trained on."
+        )
+    mol.charge = arr
+
+
 def parameterizeLigandsOpenFF(
     mol,
     ligand_ff="openff_unconstrained-2.3.0.offxml",
@@ -341,6 +379,9 @@ def parameterizeLigandsOpenFF(
         RDKit before SMIRNOFF application and pass them through
         ``charge_from_molecules`` so SMIRNOFF does not overwrite them.
         Honours the net formal charge.
+        ``"nagl"`` - compute AM1-BCC-equivalent charges with the OpenFF
+        NAGL graph neural network surrogate. Much faster than antechamber
+        AM1-BCC on medium-to-large molecules. Needs PyTorch.
         ``None`` - let SMIRNOFF assign its own charges (e.g. AM1-BCC for
         Sage). Requires sqm from AmberTools at runtime.
     resnames : list[str] or None, optional
@@ -371,12 +412,14 @@ def parameterizeLigandsOpenFF(
 
         if charge_method == "gasteiger":
             _assign_rdkit_gasteiger_charges(sub)
+        elif charge_method == "nagl":
+            _assign_nagl_charges(sub)
         elif charge_method is None:
             pass
         else:
             raise ValueError(
                 f"Unsupported charge_method {charge_method!r}. "
-                f"Supported: 'gasteiger', None."
+                f"Supported: 'gasteiger', 'nagl', None."
             )
 
         off_mol = sub.toOpenFFMolecule(sanitize=True, assignStereo=True)
