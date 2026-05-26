@@ -1,4 +1,4 @@
-# (c) 2015-2018 Acellera Ltd http://www.acellera.com
+# (c) 2015-2026 Acellera Ltd http://www.acellera.com
 # All Rights Reserved
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
@@ -6,14 +6,24 @@
 import subprocess
 import sys
 
-if sys.argv[1] == 'tag':
-    output = subprocess.check_output("git describe --tags", shell=True).decode('utf8')
-    tag = output.split('-')[0]
+
+def _safe_run(cmd):
+    try:
+        return subprocess.check_output(cmd, shell=True).decode("utf8").strip()
+    except subprocess.CalledProcessError:
+        return ""
+
+
+if sys.argv[1] == "tag":
+    output = _safe_run("git describe --tags")
+    tag = output.split("-")[0] if output else ""
     print(tag)
 
-if sys.argv[1] == 'branch':
-    output = subprocess.check_output("git rev-parse --abbrev-ref HEAD", shell=True).decode('utf8')
-    if output.startswith('master'):
-        print('latest')
-    elif output.startswith('rel-'):
-        print('stable')
+if sys.argv[1] == "branch":
+    output = _safe_run("git rev-parse --abbrev-ref HEAD")
+    if output.startswith("master"):
+        print("latest")
+    elif output.startswith("rel-"):
+        print("stable")
+    else:
+        print(output or "latest")
