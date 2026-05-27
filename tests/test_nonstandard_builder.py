@@ -44,8 +44,19 @@ from htmd.builder.nonstandard import (
     _residue_groups_with_index,
     _normalize_residue_charges,
     _backbone_charge_map,
+    _load_ff14sb_amino_lib_amber,
     _FF14SB_BACKBONE_CHARGES_BY_CLASS,
 )
+
+
+# Lazy-loaded once for the _backbone_charge_map unit tests below.
+# Loader needs tleap on PATH, so wrap in the same _tleap skip guard the
+# individual tests use.
+def _amber_lib_or_none():
+    try:
+        return _load_ff14sb_amino_lib_amber()
+    except (RuntimeError, FileNotFoundError):
+        return None
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(curr_dir, "test_nonstandard_builder")
@@ -1341,19 +1352,22 @@ def _test_normalize_residue_charges_pin_only_skips_normalization():
 def _test_backbone_charge_map_ncaa_charge_classes():
     # An NCAA is absent from the libraries, so the amide charges come
     # from the charge class the residue's net charge selects.
+    # The fallback path doesn't actually touch ff14sb_lib for NCAAs
+    # (it consults _FF14SB_BACKBONE_CHARGES_BY_CLASS), so an empty
+    # dict is fine for the lib argument here.
     present = {"N", "H", "CA", "HA", "C", "O", "CB", "CG"}
-    assert _backbone_charge_map("", "", present, 0) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
-    assert _backbone_charge_map("", "", present, 1) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[1]
-    assert _backbone_charge_map("", "", present, -1) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[-1]
+    assert _backbone_charge_map("", "", present, 0, ff14sb_lib={}) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
+    assert _backbone_charge_map("", "", present, 1, ff14sb_lib={}) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[1]
+    assert _backbone_charge_map("", "", present, -1, ff14sb_lib={}) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[-1]
     # A net charge with no standard backbone class pins nothing.
-    assert _backbone_charge_map("", "", present, 2) == {}
+    assert _backbone_charge_map("", "", present, 2, ff14sb_lib={}) == {}
 
 
 def _test_backbone_charge_map_terminal_ncaa_is_empty():
     # A terminal NCAA has no library entry and no universal terminal
     # charges, so nothing is pinned.
     present = {"N", "H", "CA", "HA", "C", "O", "OXT"}
-    assert _backbone_charge_map("", "c", present, -1) == {}
+    assert _backbone_charge_map("", "c", present, -1, ff14sb_lib={}) == {}
 
 
 @pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
@@ -1364,7 +1378,10 @@ def _test_backbone_charge_map_proline_like_ncaa_uses_pro():
     # convention. CD is left to refit because ring chemistry varies
     # (OIC vs. pipecolic vs. true PRO).
     present = {"N", "CA", "HA", "C", "O", "CB", "CG", "CD"}
-    cmap = _backbone_charge_map("", "", present, 0, n_has_bonded_h=False)
+    cmap = _backbone_charge_map(
+        "", "", present, 0, n_has_bonded_h=False,
+        ff14sb_lib=_amber_lib_or_none(),
+    )
     assert set(cmap) == {"N", "CA", "C", "O", "HA"}
     # ff14SB PRO library values (Maier 2015 / Cornell 1995).
     assert cmap["N"] == pytest.approx(-0.2548, abs=1e-4)
@@ -1381,7 +1398,10 @@ def _test_backbone_charge_map_proline_like_terminal_is_empty():
     # the terminal ionisation. Falls through to the safe empty map.
     present = {"N", "CA", "HA", "C", "O", "OXT", "CB", "CG", "CD"}
     assert (
-        _backbone_charge_map("", "c", present, -1, n_has_bonded_h=False) == {}
+        _backbone_charge_map(
+            "", "c", present, -1, n_has_bonded_h=False, ff14sb_lib={}
+        )
+        == {}
     )
 
 
@@ -1391,7 +1411,9 @@ def _test_backbone_charge_map_nterm_with_nh3_not_proline_like():
     # name-based "H absent" check would mis-classify it as proline-
     # like; the bond-based ``n_has_bonded_h`` flag does not.
     present = {"N", "CA", "HA", "C", "O", "H1", "H2", "H3", "CB", "CG", "CD"}
-    cmap = _backbone_charge_map("", "", present, 0, n_has_bonded_h=True)
+    cmap = _backbone_charge_map(
+        "", "", present, 0, n_has_bonded_h=True, ff14sb_lib={}
+    )
     # Without the n_has_bonded_h flag, this could have wrongly fallen
     # into the proline-like PRO map; with it, the residue is treated
     # as a normal amide NCAA and the universal charge-class fallback
@@ -1406,7 +1428,9 @@ def _test_backbone_charge_map_canonical_midchain():
     # CA / HA included - from the ff14SB CYS library entry; the sidechain
     # is left to antechamber.
     present = {"N", "H", "CA", "HA", "C", "O", "CB", "HB2", "HB3", "SG"}
-    cmap = _backbone_charge_map("CYS", "", present, 0)
+    cmap = _backbone_charge_map(
+        "CYS", "", present, 0, ff14sb_lib=_amber_lib_or_none()
+    )
     assert set(cmap) == {"N", "H", "CA", "HA", "C", "O"}
     for name, q in _NEUTRAL_BACKBONE.items():
         assert cmap[name] == pytest.approx(q, abs=1e-4)
@@ -1416,13 +1440,14 @@ def _test_backbone_charge_map_canonical_midchain():
 def _test_backbone_charge_map_canonical_terminal_variants():
     # The N-terminal variant pins the NH3+ hydrogens; the C-terminal
     # variant pins OXT. Sidechain atoms are never pinned.
+    lib = _amber_lib_or_none()
     n_present = {"N", "H1", "H2", "H3", "CA", "HA", "C", "O", "CB"}
-    n_map = _backbone_charge_map("ALA", "n", n_present, 1)
+    n_map = _backbone_charge_map("ALA", "n", n_present, 1, ff14sb_lib=lib)
     assert {"H1", "H2", "H3"} <= set(n_map)
     assert "CB" not in n_map
 
     c_present = {"N", "H", "CA", "HA", "C", "O", "OXT", "CB"}
-    c_map = _backbone_charge_map("ALA", "c", c_present, -1)
+    c_map = _backbone_charge_map("ALA", "c", c_present, -1, ff14sb_lib=lib)
     assert "OXT" in c_map
     assert "CB" not in c_map
 
@@ -1432,13 +1457,14 @@ def _test_backbone_charge_map_his_name_falls_through_to_charge_class():
     # "HIS" is not a library key (the libraries use HID / HIE / HIP), so
     # a His anchor falls through to the charge-class fallback: a neutral
     # His gets the neutral amide, a protonated (+1) His the cationic one.
+    lib = _amber_lib_or_none()
     present = {"N", "H", "CA", "HA", "C", "O", "CB", "CG", "ND1", "CE1", "NE2"}
     assert (
-        _backbone_charge_map("HIS", "", present, 0)
+        _backbone_charge_map("HIS", "", present, 0, ff14sb_lib=lib)
         == _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
     )
     assert (
-        _backbone_charge_map("HIS", "", present, 1)
+        _backbone_charge_map("HIS", "", present, 1, ff14sb_lib=lib)
         == _FF14SB_BACKBONE_CHARGES_BY_CLASS[1]
     )
 

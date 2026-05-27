@@ -15,6 +15,7 @@ Dependencies (imported lazily at call time):
 
 import contextlib
 import os
+import sys
 import numpy as np
 import logging
 
@@ -301,6 +302,25 @@ def build(
 # ====================================================================
 
 
+_MIN_INTERCHANGE_PYTHON = (3, 12)
+
+
+def _require_openff_python():
+    """Raise a clear error if the running Python is too old for
+    openff-interchange. From version 0.5 onward openff-interchange uses
+    PEP 695 ``type`` statement syntax (e.g. ``type Array = Any``) which
+    is a parse error on Python < 3.12. Trying to import it on 3.10 or
+    3.11 produces ``SyntaxError`` from inside the package - this guard
+    raises a friendlier message before the import is attempted."""
+    if sys.version_info < _MIN_INTERCHANGE_PYTHON:
+        raise RuntimeError(
+            f"openff-interchange requires Python "
+            f">= {_MIN_INTERCHANGE_PYTHON[0]}.{_MIN_INTERCHANGE_PYTHON[1]} "
+            "(uses PEP 695 type-statement syntax). You have Python "
+            f"{sys.version_info.major}.{sys.version_info.minor}."
+        )
+
+
 def _assign_resp_charges(mol, multi_conf=False):
     """Compute RESP charges (Restrained ElectroStatic Potential fit to a
     Psi4-computed QM ESP) and write them onto ``mol.charge`` in place.
@@ -431,6 +451,7 @@ def parameterizeLigandsOpenFF(
     dict[str, openff.interchange.Interchange]
         One Interchange per resname.
     """
+    _require_openff_python()
     from openff.toolkit import ForceField
     from openff.interchange import Interchange
     from htmd.builder._ambertools import _assign_rdkit_gasteiger_charges

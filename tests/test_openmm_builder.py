@@ -24,20 +24,30 @@ try:
 except Exception:
     _tleap_installed = False
 
+import sys
+
+# openff-interchange 0.5+ uses PEP 695 ``type`` statement syntax and
+# therefore needs Python >= 3.12. On 3.10 / 3.11 the package raises
+# SyntaxError at import time (not ImportError), so the version check
+# has to come first and the except clause has to cover SyntaxError too.
 try:
+    if sys.version_info < (3, 12):
+        raise ImportError("openff-interchange requires Python >= 3.12")
     import openff.toolkit  # noqa: F401
     import openff.interchange  # noqa: F401
 
     _openff_installed = True
-except ImportError:
+except (ImportError, SyntaxError):
     _openff_installed = False
 
 try:
+    if sys.version_info < (3, 12):
+        raise ImportError("openff-nagl requires Python >= 3.12 transitively")
     import openff.nagl  # noqa: F401
     import openff.nagl_models  # noqa: F401
 
     _nagl_installed = True
-except ImportError:
+except (ImportError, SyntaxError):
     _nagl_installed = False
 
 
@@ -988,8 +998,8 @@ NLE_SMILES = "CCCC[C@@H](C(=O)O)N"
 
 
 @pytest.mark.skipif(
-    not (_openmm_installed and _openff_installed),
-    reason="OpenMM + OpenFF Interchange required",
+    not (_openmm_installed and _openff_installed and _tleap_installed),
+    reason="OpenMM + OpenFF Interchange + AmberTools (tleap/antechamber) required",
 )
 def _test_parameterize_from_specs_openff_cluster_nle(tmp_path):
     """Cluster path via openff backend: parameterise an NLE singleton
@@ -1207,8 +1217,8 @@ def _test_parameterize_from_specs_openff_cluster_crosslinks(tmp_path):
 
 
 @pytest.mark.skipif(
-    not (_openmm_installed and _openff_installed),
-    reason="OpenMM + OpenFF Interchange required",
+    not (_openmm_installed and _openff_installed and _tleap_installed),
+    reason="OpenMM + OpenFF Interchange + AmberTools (tleap/antechamber) required",
 )
 def _test_parameterize_from_specs_openff_backbone_pin(tmp_path):
     """Phase 2E: pin_backbone_charges=True overrides NCAA backbone partial
@@ -1855,8 +1865,8 @@ def _test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
 
 
 @pytest.mark.skipif(
-    not (_openmm_installed and _openff_installed),
-    reason="OpenMM + OpenFF Interchange required",
+    not (_openmm_installed and _openff_installed and _tleap_installed),
+    reason="OpenMM + OpenFF Interchange + AmberTools (tleap/antechamber) required",
 )
 def _test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
     """Build 5VBL chain-A two ways via openmm.build:

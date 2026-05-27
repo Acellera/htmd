@@ -342,22 +342,79 @@ def _atom_sel_for_unique(uaid):
     return " and ".join(parts)
 
 
-# Cached ff14SB amino-acid lib (atom name -> (type, default charge) per resname).
-_FF14SB_AMINO_LIB = None
+# Cached ff14SB amino-acid libs. The antechamber backend reads from
+# AmberTools' amino*.lib via parmed (canonical source for that path);
+# the openff backend reads OpenMM's protein.ff14SB.xml (the canonical
+# source the OpenMM ForceField will use at apply time). Each cache is
+# populated independently the first time its loader is called.
+_FF14SB_AMINO_LIB_AMBER = None
+_FF14SB_AMINO_LIB_OPENMM = None
 
 
-def _load_ff14sb_amino_lib():
+def _load_ff14sb_amino_lib_openmm():
+    """Build the ff14SB ``{resname: {atom_name: (type, charge)}}`` dict by
+    parsing OpenMM's bundled ``amber14/protein.ff14SB.xml``. This is the
+    canonical source for the openff/openmm backend: it matches the data
+    the OpenMM ``ForceField`` will actually apply at build time, with no
+    AmberTools dependency.
+
+    OpenMM declares types as ``protein-CT``, ``protein-N``, etc.; the
+    bare AMBER class names (``CT``, ``N``) are used downstream for type
+    comparison, so the ``protein-`` prefix is stripped here.
+    """
+    global _FF14SB_AMINO_LIB_OPENMM
+    if _FF14SB_AMINO_LIB_OPENMM is not None:
+        return _FF14SB_AMINO_LIB_OPENMM
+
+    import openmm.app as app
+    import xml.etree.ElementTree as ET
+
+    xml_path = os.path.join(
+        os.path.dirname(app.__file__),
+        "data",
+        "amber14",
+        "protein.ff14SB.xml",
+    )
+    if not os.path.isfile(xml_path):
+        raise FileNotFoundError(
+            f"OpenMM ff14SB XML not found at {xml_path}. "
+            "OpenMM may be installed without the amber14 data package."
+        )
+
+    prefix = "protein-"
+    merged = {}
+    root = ET.parse(xml_path).getroot()
+    for residue in root.find("Residues").findall("Residue"):
+        resname = residue.attrib["name"]
+        atoms = {}
+        for atom in residue.findall("Atom"):
+            atomtype = atom.attrib["type"]
+            if atomtype.startswith(prefix):
+                atomtype = atomtype[len(prefix):]
+            atoms[atom.attrib["name"]] = (
+                atomtype,
+                float(atom.attrib["charge"]),
+            )
+        merged[resname] = atoms
+    _FF14SB_AMINO_LIB_OPENMM = merged
+    return _FF14SB_AMINO_LIB_OPENMM
+
+
+def _load_ff14sb_amino_lib_amber():
     """Lazy-load the ff14SB amino-acid libraries (mid-chain
     ``amino12.lib``, C-terminal ``aminoct12.lib``, N-terminal
     ``aminont12.lib``) so we can extract canonical atom types per
     residue. Terminal-variant entries (``CCYX``, ``NCYX``, ...) sit
     alongside the mid-chain ones in the returned dict.
 
+    This is the canonical source for the antechamber backend: it matches
+    what tleap will pull at build time. Needs AmberTools on PATH (or
+    ``tleap_pyodide`` under Pyodide) to locate the data dir.
+
     Returns a dict ``{resname: {atom_name: (type, charge)}}``."""
-    global _FF14SB_AMINO_LIB
-    if _FF14SB_AMINO_LIB is not None:
-        return _FF14SB_AMINO_LIB
-    from parmed.amber import AmberOFFLibrary
+    global _FF14SB_AMINO_LIB_AMBER
+    if _FF14SB_AMINO_LIB_AMBER is not None:
+        return _FF14SB_AMINO_LIB_AMBER
     import shutil
 
     tleap_path = shutil.which("tleap") or shutil.which("teLeap")
@@ -373,6 +430,9 @@ def _load_ff14sb_amino_lib():
                 "tleap_pyodide package installed (to locate the AmberTools "
                 "data dir)."
             )
+
+    from parmed.amber import AmberOFFLibrary
+
     libdir = os.path.join(amber_home, "dat", "leap", "lib")
     merged = {}
     main_lib_path = os.path.join(libdir, "amino12.lib")
@@ -387,8 +447,8 @@ def _load_ff14sb_amino_lib():
             continue
         for resname, residue in AmberOFFLibrary.parse(path).items():
             merged[resname] = {a.name: (a.type, a.charge) for a in residue.atoms}
-    _FF14SB_AMINO_LIB = merged
-    return _FF14SB_AMINO_LIB
+    _FF14SB_AMINO_LIB_AMBER = merged
+    return _FF14SB_AMINO_LIB_AMBER
 
 
 def _clean_frcmod_params(pset, mol, backbone_types, padding_mask):
@@ -553,8 +613,10 @@ def _emit_openmm_xml(residue_templates, parameter_sets, xml_path):
     # An atomtype string in our cluster output that belongs to this set is
     # an ff14SB type (backbone rename or canonical-anchor template) and
     # has to be rewritten to ``protein-<class>`` so OpenMM finds the
-    # corresponding ``<Type>`` declaration via the ff14SB XML.
-    ff14sb_lib = _load_ff14sb_amino_lib()
+    # corresponding ``<Type>`` declaration via the ff14SB XML. This is
+    # the antechamber path, so use the parmed-backed amber library
+    # (matches what tleap will apply at build time).
+    ff14sb_lib = _load_ff14sb_amino_lib_amber()
     ff14sb_classes = set()
     for resname_atoms in ff14sb_lib.values():
         ff14sb_classes.update(t for t, _charge in resname_atoms.values())
@@ -620,6 +682,8 @@ def _backbone_charge_map(
     present_names,
     net_charge,
     n_has_bonded_h=True,
+    *,
+    ff14sb_lib,
 ):
     """Return ``{atom_name: ff14SB charge}`` for the backbone atoms to pin
     on one chain-resident cluster residue.
@@ -658,7 +722,7 @@ def _backbone_charge_map(
     """
     if canonical_resname:
         prefix = {"n": "N", "c": "C"}.get(terminus, "")
-        entry = _load_ff14sb_amino_lib().get(f"{prefix}{canonical_resname}")
+        entry = ff14sb_lib.get(f"{prefix}{canonical_resname}")
         if entry is not None:
             return {
                 name: entry[name][1]
@@ -679,7 +743,7 @@ def _backbone_charge_map(
     # any extra ring atoms refit per the ff15ipq-m / Betz convention.
     # Only fires for net_charge == 0 (ff14SB has no charged-PRO).
     if "N" in present_names and not n_has_bonded_h and net_charge == 0:
-        pro_entry = _load_ff14sb_amino_lib().get("PRO")
+        pro_entry = ff14sb_lib.get("PRO")
         if pro_entry is not None:
             return {
                 name: pro_entry[name][1]
@@ -1105,6 +1169,11 @@ def _apply_cluster_charge_policy(
     """
     from openff.units import unit
 
+    # Openff path: the ff14SB charges we pin come from OpenMM's bundled
+    # protein.ff14SB.xml so they match exactly what app.ForceField will
+    # apply at build time (no AmberTools / parmed dependency here).
+    ff14sb_lib = _load_ff14sb_amino_lib_openmm()
+
     n_atoms = off_mol.n_atoms
     if off_mol.partial_charges is None:
         raise ValueError(
@@ -1194,6 +1263,7 @@ def _apply_cluster_charge_policy(
             present_names=present_names,
             net_charge=net_charge,
             n_has_bonded_h=n_has_bonded_h,
+            ff14sb_lib=ff14sb_lib,
         )
         if not charge_map:
             continue
@@ -1298,8 +1368,11 @@ def _parameterize_cluster_openff(
         _emit_openmm_xml_from_cluster_interchange,
         _assign_nagl_charges,
         _assign_resp_charges,
+        _require_openff_python,
     )
     from htmd.builder._ambertools import _assign_rdkit_gasteiger_charges
+
+    _require_openff_python()
     from openff.toolkit import ForceField
     from openff.interchange import Interchange
 
@@ -1669,6 +1742,11 @@ def prepareClusterResidues(
     # spanning the backbone-sidechain boundary still resolve.
     backbone_type_renames = {}
 
+    # Antechamber path: pin to the ff14SB charges from the AmberTools
+    # amino*.lib via parmed - tleap will apply these same values at
+    # build time so the pinned charges round-trip exactly.
+    ff14sb_lib = _load_ff14sb_amino_lib_amber() if pin_backbone_charges else None
+
     # Pass 1: build per-residue ``sub`` Molecules and apply the backbone
     # pin (if requested). Defer total-charge normalization to after the
     # loop so the ``normalize=='cluster'`` mode can run a single
@@ -1742,6 +1820,7 @@ def prepareClusterResidues(
                     {str(n) for n in sub.name},
                     net_charge,
                     n_has_bonded_h=n_has_bonded_h,
+                    ff14sb_lib=ff14sb_lib,
                 )
 
         # Apply the pin but defer the residual rebalance (net_charge=None).
