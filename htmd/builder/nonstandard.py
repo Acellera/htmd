@@ -37,6 +37,7 @@ import logging
 import math
 import os
 import tempfile
+import warnings
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -648,10 +649,20 @@ def _emit_openmm_xml(residue_templates, parameter_sets, xml_path):
                 template.connections.append(atom)
         omm.residues[rtd.resname] = template
 
-    omm.write(
-        xml_path,
-        provenance={"Source": ["htmd parameterizeFromSpecs"]},
-    )
+    # protein-* backbone types live in the ff14SB XML loaded next to this
+    # file, not in the local AmberParameterSet, so parmed can't resolve them.
+    from parmed.exceptions import ParameterWarning
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Some residue templates are using unavailable AtomTypes",
+            category=ParameterWarning,
+        )
+        omm.write(
+            xml_path,
+            provenance={"Source": ["htmd parameterizeFromSpecs"]},
+        )
 
 
 # ff14SB backbone amide charges (N, H, C, O), keyed by the residue's
